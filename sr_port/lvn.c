@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,7 @@ int lvn(oprtype *a,opctype index_op,triple *parent)
 	}
 
 	root = ref = newtriple(index_op);
-	ref->operand[0] = put_ilit(sb1 - sb2);
+	ref->operand[0] = put_ilit((mint)(sb1 - sb2));
 	while (sb2 < sb1)
 	{
 		s = newtriple(OC_PARAMETER);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@ boolean_t cli_str_to_hex(char *str, uint4 *dst)
 		return FALSE;
 	} else
 	{
-		*dst = result;
+		*dst = (uint4)result;
 		errno = save_errno;
 		return TRUE;
 	}
@@ -166,7 +166,7 @@ boolean_t cli_str_to_int(char *str, int4 *dst)
 		return FALSE;
 	} else
 	{
-		*dst = result;
+		*dst = (int4)result;
 		errno = save_errno;
 		return TRUE;
 	}
@@ -234,7 +234,7 @@ boolean_t cli_str_to_num(char *str, int4 *dst)
 		return FALSE;
 	} else
 	{
-		*dst = result;
+		*dst = (int4)result;
 		errno = save_errno;
 		return TRUE;
 	}
@@ -317,9 +317,9 @@ int cli_parse_two_numbers(char *qual_name, const char delimiter, uint4 *first_nu
 	if (*first_num_str != '\0') /* VMS issues EINVAL if strtoul is passed null string */
 	{
 		errno = 0;
-		num = STRTOUL(first_num_str, &num_endptr, 10);
+		num = (uint4)STRTOUL(first_num_str, &num_endptr, 10);
 		if ((0 == num && (0 != errno || (num_endptr == first_num_str && *first_num_str != '\0'))) ||
-		    (0 != errno && ULONG_MAX == num))
+		    (0 != errno && GTM64_ONLY(UINT_MAX == num) NON_GTM64_ONLY(ULONG_MAX == num)))
 		{
 			util_out_print("Error parsing or invalid parameter for !AZ", TRUE, qual_name);
 			return 0;
@@ -330,9 +330,9 @@ int cli_parse_two_numbers(char *qual_name, const char delimiter, uint4 *first_nu
 	if (second_num_str < two_num_str_top && *second_num_str != '\0')
 	{
 		errno = 0;
-		num = STRTOUL(second_num_str, &num_endptr, 10);
+		num = (uint4)STRTOUL(second_num_str, &num_endptr, 10);
 		if ((0 == num && (0 != errno || (num_endptr == second_num_str && *second_num_str != '\0'))) ||
-		    (0 != errno && ULONG_MAX == num))
+		    (0 != errno && GTM64_ONLY(UINT_MAX == num) NON_GTM64_ONLY(ULONG_MAX == num)))
 		{
 			util_out_print("Error parsing or invalid parameter for LOG_INTERVAL", TRUE);
 			return 0;

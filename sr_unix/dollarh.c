@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,6 @@ void dollarh(time_t intime, uint4 *days, time_t *seconds)
 	tdays = (uint4)((intime + (time_t)difftime(intime, mktime(ttime))) / ONEDAY) + DAYS;	/* adjust relative to UTC */
 	*days = tdays;				/* use temp local in case the caller has overlapped arguments */
 	assert(!run_time || ((*days == old_days) && (*seconds >= old_seconds)) || (*days > old_days) || (intime <= old_intime));
-	DEBUG_ONLY(old_seconds = *seconds; old_days = *days; old_intime = intime;)
+	DEBUG_ONLY(old_seconds = (uint4)*seconds; old_days = *days; old_intime = intime;)
 	return;
 }

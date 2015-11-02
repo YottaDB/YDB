@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,10 @@
 #include "private_code_copy.h"
 #include "iosp.h"
 
+#ifdef __ia64
+#include "ia64.h"
+#endif /*__ia64__*/
+
 GBLREF z_records		zbrk_recs;
 GBLREF mident_fixed		zlink_mname;
 GBLREF stack_frame		frame_pointer;
@@ -44,7 +48,8 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 	mstr		*obj;
 	rhdtyp		*routine;
 	zb_code		*addr, tmp_xf_code;
-	int4		*line_offset_addr, *next_line_offset_addr, addr_off;
+	int4		*line_offset_addr, *next_line_offset_addr;
+	ssize_t		addr_off;
 	zbrk_struct	*z_ptr;
 	cache_entry	*csp;
 	uint4		status;
@@ -112,6 +117,11 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			csp->zb_refcnt++;			/* This will keep it around */
 			op_unwind();				/* This removes entry from stack and decrements refcnt field */
 			addr = (zb_code *)LINE_NUMBER_ADDR(CURRENT_RHEAD_ADR(routine), line_offset_addr);
+			/* On HPPA (& other platforms) the addr returned is the address of the field in the instruction which is
+			   the offset of xfer table. But on IA64, as this field is set in the ADDS instruction as 14 bit immed
+			   value and this is written into 3 bitwise fields, we need to return the address of the whole instruction
+			   itself (in our case bundle as we are using a bundle for every instruction in the generated code.
+			*/
 			addr = find_line_call(addr);
 			if (NULL == (z_ptr = zr_find(&zbrk_recs, addr)))
 			{
@@ -137,21 +147,55 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 #endif
 				z_ptr = zr_get_free(&zbrk_recs, addr);
 				NON_USHBIN_ONLY(fix_pages((unsigned char *)addr, (unsigned char *)addr));
+#ifndef __ia64
 				z_ptr->m_opcode = *addr; /* save for later restore while cancelling breakpoint */
 				tmp_xf_code = (z_ptr->m_opcode & ZB_CODE_MASK) >> ZB_CODE_SHIFT;
-				if (xf_linefetch * sizeof(int4) == tmp_xf_code)
+#else
+				ia64_fmt_A4 inst;
+				/*Revist when instruction bundling implemented.*/
+				EXTRACT_INST(addr, inst, 3);
+				z_ptr->m_opcode = ASSEMBLE_14(inst);
+				tmp_xf_code = (z_ptr->m_opcode & ZB_CODE_MASK) >> ZB_CODE_SHIFT;
+#endif /* __ia64*/
+				if (xf_linefetch * sizeof(UINTPTR_T) == tmp_xf_code)
+#ifndef __ia64
 					*addr = (*addr & (~ZB_CODE_MASK)) | ((xf_zbfetch * sizeof(int4)) << ZB_CODE_SHIFT);
-				else if (xf_linestart * sizeof(int4) == tmp_xf_code)
+#else
+				{
+					zb_code imm14 = xf_zbfetch * sizeof(UINTPTR_T);
+					inst.format.imm7b=imm14;
+					inst.format.imm6d=imm14 >> 7;
+					inst.format.sb=imm14 >> 13;
+					/*Revist when instruction bundling implemented.*/
+					UPDATE_INST(addr, inst, 3);
+				}
+#endif
+				else if (xf_linestart * sizeof(UINTPTR_T) == tmp_xf_code)
+#ifndef __ia64
 					*addr = (*addr & (~ZB_CODE_MASK)) | ((xf_zbstart * sizeof(int4)) << ZB_CODE_SHIFT);
-				else if (((xf_zbstart * sizeof(int4)) != tmp_xf_code)
-					&& ((xf_zbfetch * sizeof(int4)) != tmp_xf_code))
+#else
+				{
+					zb_code imm14 = xf_zbstart * sizeof(UINTPTR_T);
+					inst.format.imm7b=imm14;
+					inst.format.imm6d=imm14 >> 7;
+					inst.format.sb=imm14 >> 13;
+					/*Revist when instruction bundling implemented.*/
+					UPDATE_INST(addr, inst, 3);
+				}
+#endif
+				else if (((xf_zbstart * sizeof(UINTPTR_T)) != tmp_xf_code)
+					&& ((xf_zbfetch * sizeof(UINTPTR_T)) != tmp_xf_code))
 					GTMASSERT;
 				z_ptr->rtn = &(CURRENT_RHEAD_ADR(routine))->routine_name;
 				assert(lab_name != NULL);
 				z_ptr->lab = lab_name;
 				z_ptr->offset = offset;
 				z_ptr->mpc = (zb_code *)((unsigned char *)addr - SIZEOF_LA);
+#ifndef __ia64
 				inst_flush(addr, sizeof(*addr));
+#else
+				inst_flush(addr, sizeof(ia64_bundle));
+#endif
 			}
 			if (z_ptr->action)
 			{	/* A zbreak command was already set for this line */

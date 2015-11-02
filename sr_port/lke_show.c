@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,8 @@ error_def(ERR_NOREGION);
 void	lke_show(void)
 {
 	bool			locks, all = TRUE, wait = TRUE, interactive = FALSE, match = FALSE, memory = TRUE, nocrit = TRUE;
-	int4			pid, ls_len;
+	int4			pid;
+	size_t			ls_len;
 	int			n;
 	char 			regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
 	mlk_ctldata_ptr_t	ctl;
@@ -101,7 +102,7 @@ void	lke_show(void)
 			{
 				/* Local region */
 				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
-				ls_len = cs_addrs->lock_addrs[1] - cs_addrs->lock_addrs[0];
+				ls_len = (size_t)(cs_addrs->lock_addrs[1] - cs_addrs->lock_addrs[0]);
 				ctl = (mlk_ctldata_ptr_t)malloc(ls_len);
 
 				/* Prevent any modification of the lock space while we make a local copy of it */

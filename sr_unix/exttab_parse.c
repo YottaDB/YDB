@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,7 @@ const static int parm_space_needed[] =
 };
 
 /* manage local get_memory'ed space (the space is never returned) */
-static void	*get_memory(int n)
+static void	*get_memory(size_t n)
 {
 	void		*x;
 	static void	*heap_base = 0;
@@ -175,7 +175,7 @@ static enum xc_types	scan_keyword (char **c)
 	d = scan_ident(b);
 	if (!d)
 		return xc_notfound;
-	len = d - b;
+	len = (int)(d - b);
 	for (i = 0 ;  i < sizeof(xctab) / sizeof(xctab[0]) ;  i++)
 	{
 		if ((0 == memcmp(xctab[i].nam, b, len)) && ('\0' ==  xctab[i].nam[len]))
@@ -284,14 +284,16 @@ static char	*read_table (char *b,int l,FILE *f)
  *   These mstr's will have a trailing null attached so that UNIX system routines can operate
  *   on them directly as const char *'s
  */
-static void	put_mstr (mstr *src,mstr *dst)
+static void	put_mstr (mstr *src, mstr *dst)
 {
 	char	*cp;
-	int	n;
+	ssize_t	n;
 
-	dst->len = n = src->len;
+	dst->len = src->len;
+	n = (ssize_t)src->len;
+
 	assert(n >= 0);
-	dst->addr = cp = (char *)get_memory(n + 1);
+	dst->addr = cp = (char *)get_memory((size_t)(n + 1));
 	if (0 < n)
 		memcpy(dst->addr, src->addr, dst->len);
 	dst->addr[n] = 0;
@@ -299,7 +301,7 @@ static void	put_mstr (mstr *src,mstr *dst)
 }
 
 /* utility to convert an array of bool's to a bit mask */
-static uint4	array_to_mask (bool ar[MAXIMUM_PARAMETERS],int n)
+static uint4	array_to_mask (bool ar[MAXIMUM_PARAMETERS], int n)
 {
 	uint4	mask = 0;
 	int	i;
@@ -410,7 +412,7 @@ struct extcall_package_list	*exttab_parse (mval *package)
 				ext_stx_error(ERR_ZCENTNAME, ext_table_file_name);
 		}
 		rtnnam.addr = tbp;
-		rtnnam.len = end - tbp;
+		rtnnam.len = INTCAST(end - tbp);
 		tbp = scan_space(end);
 		if (':' != *tbp++)
 			ext_stx_error(ERR_ZCCOLON, ext_table_file_name);
@@ -454,7 +456,7 @@ struct extcall_package_list	*exttab_parse (mval *package)
 		if (!end)
 			ext_stx_error(ERR_ZCRCALLNAME, ext_table_file_name);
 		callnam.addr = tbp;
-		callnam.len = end - tbp;
+		callnam.len = INTCAST(end - tbp);
 		tbp = scan_space(end);
 		tbp = scan_space(tbp);
 		for (parameter_count = 0;(MAXIMUM_PARAMETERS > parameter_count) && (')' != *tbp); parameter_count++)
@@ -521,7 +523,7 @@ struct extcall_package_list	*exttab_parse (mval *package)
 		entry_ptr->output_mask = array_to_mask(is_output, parameter_count);
 		entry_ptr->parms = get_memory(parameter_count * sizeof(entry_ptr->parms[0]));
 		entry_ptr->param_pre_alloc_size = get_memory(parameter_count * sizeof(int));
-		entry_ptr->parmblk_size = sizeof(void *) * parameter_count + sizeof(int);
+		entry_ptr->parmblk_size = SIZEOF(void *) * parameter_count + SIZEOF(int);
 		for (i = 0 ;  i < parameter_count ;  i++)
 		{
 			entry_ptr->parms[i] = parameter_types[i];
@@ -586,7 +588,7 @@ callin_entry_list*	citab_parse (void)
 		if (!(end = scan_ident(tbp)))
 			ext_stx_error(ERR_CIRCALLNAME, ext_table_file_name);
 		callnam.addr = tbp;
-		callnam.len = end - tbp;
+		callnam.len = INTCAST(end - tbp);
 		tbp = scan_space(end);
 		if (':' != *tbp++)
 			ext_stx_error(ERR_COLON, ext_table_file_name);
@@ -606,7 +608,7 @@ callin_entry_list*	citab_parse (void)
 		}
 		labref.addr = tbp;
 		if ((end = scan_labelref(tbp)))
-			labref.len = end - tbp;
+			labref.len = INTCAST(end - tbp);
 		else
 			ext_stx_error(ERR_CIENTNAME, ext_table_file_name);
 		tbp = scan_space(end);

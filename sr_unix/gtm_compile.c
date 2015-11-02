@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,10 +63,10 @@ int	gtm_compile (void)
 	prealloc_gt_timers();
 	run_time = FALSE;
 	compile_time = TRUE;
-	mstack_ptr = (unsigned char *)malloc(4096);
-	msp = stackbase = mstack_ptr + 4092;
+        mstack_ptr = (unsigned char *)malloc(USER_STACK_SIZE);
+        msp = stackbase = mstack_ptr + (USER_STACK_SIZE - sizeof(char *));
 	mv_chain = (mv_stent *) msp;
-	stackwarn = stacktop + 1024;
+        stackwarn = stacktop + (USER_STACK_SIZE / 4);
 
 	msp -= sizeof(stack_frame);
 	frame_pointer = (stack_frame *) msp;

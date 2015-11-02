@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +66,7 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return (ptr - base_addr) * (8/BML_BITS_PER_BLK);
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK));
 			}
 			else if (valid & 4)
 			{
@@ -74,7 +74,7 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 1;
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 1);
 			}
 			else if (valid & 16)
 			{
@@ -82,7 +82,7 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 2;
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 2);
 			}
 			else
 			{
@@ -90,7 +90,7 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return(ptr - base_addr) * (8/BML_BITS_PER_BLK) + 3;
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 3);
 			}
 		}
 		ptr++;
@@ -108,7 +108,7 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return (ptr - base_addr) * (8/BML_BITS_PER_BLK);
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK));
 			}
 			else if (*ptr & 4)
 			{
@@ -116,7 +116,7 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 1;
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 1);
 			}
 			else if (*ptr & 16)
 			{
@@ -124,14 +124,14 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 2;
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 2);
 			}
 			else
 			{	if (*ptr & 128)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 3;
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 3);
 			}
 		}
 	}
@@ -154,7 +154,7 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return (ptr - base_addr) * (8/BML_BITS_PER_BLK);
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK));
 			}
 			else if (valid & 4)
 			{
@@ -162,7 +162,7 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 1;
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 1);
 			}
 			else if (valid & 16)
 			{
@@ -170,7 +170,7 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 2;
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 2);
 			}
 			else
 			{
@@ -178,7 +178,7 @@ int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
 					*used = TRUE;
 				else
 					*used = FALSE;
-				return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 3;
+				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 3);
 			}
 		}
 	}

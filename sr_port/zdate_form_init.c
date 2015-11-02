@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@ GBLREF int4	zdate_form;
 
 void zdate_form_init(struct startup_vector *svec)
 {
-	uint4		status;
+	int4		status;
 	mstr		val, tn;
 	char		buf[MAX_TRANS_NAME_LEN];
 	error_def(ERR_TRNLOGFAIL);
@@ -37,7 +37,7 @@ void zdate_form_init(struct startup_vector *svec)
 	{
 		assert(tn.len < sizeof(buf));
 		buf[tn.len] = '\0';
-		zdate_form = STRTOL(buf, NULL, 10);
+		zdate_form = (int4)(STRTOL(buf, NULL, 10));
 	}
 	else if (SS_NOLOGNAM == status)
 		zdate_form = svec->zdate_form;

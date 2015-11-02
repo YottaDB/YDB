@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -170,11 +170,12 @@ gd_addr *gd_load(mstr *v)
 	header = (header_struct *)malloc(size);
 	file_read(file_ptr, size, (uchar_ptr_t)header, 1);			/* Read in body of file */
 	table = (gd_addr *)((char *)header + sizeof(header_struct));
-	table->local_locks = (struct gd_region_struct *)((unsigned)table->local_locks + (unsigned)table);
-	table->maps = (struct gd_binding_struct *)((unsigned)table->maps + (unsigned)table);
-	table->regions = (struct gd_region_struct *)((unsigned)table->regions + (unsigned)table);
-	table->segments = (struct gd_segment_struct *)((unsigned)table->segments + (unsigned)table);
-	table->end = (unsigned)table->end + (unsigned)table;
+        table->local_locks = (struct gd_region_struct *)((UINTPTR_T)table->local_locks + (UINTPTR_T)table);
+	table->maps = (struct gd_binding_struct *)((UINTPTR_T)table->maps + (UINTPTR_T)table);
+	table->regions = (struct gd_region_struct *)((UINTPTR_T)table->regions + (UINTPTR_T)table);
+	table->segments = (struct gd_segment_struct *)((UINTPTR_T)table->segments + (UINTPTR_T)table);
+	table->end = (table->end + (UINTPTR_T)table);
+
 	for (map = table->maps, map_top = map + table->n_maps;  map < map_top;  map++)
 	{
 		t_offset = map->reg.offset;
@@ -190,7 +191,7 @@ gd_addr *gd_load(mstr *v)
 	gd_addr_head = table;
 	fill_gd_addr_id(gd_addr_head, file_ptr);
 	close_gd_file(file_ptr);
-	table->tab_ptr = (hash_table_mname *) malloc(sizeof(hash_table_mname));
+	table->tab_ptr = (hash_table_mname *)malloc(sizeof(hash_table_mname));
 	init_hashtab_mname(table->tab_ptr, 0);
 	return table;
 }

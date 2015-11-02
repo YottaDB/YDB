@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 bool lke_get_answ(char *prompt);
 bool lke_showlock(struct CLB *lnk, mlk_shrblk_ptr_t tree, mstr *name, bool all, bool wait,
 	bool interactive, int4 pid, mstr one_lock);
-bool lke_showtree(struct CLB *lnk, mlk_shrblk_ptr_t tree, bool all, bool wait, long pid,
+bool lke_showtree(struct CLB *lnk, mlk_shrblk_ptr_t tree, bool all, bool wait, pid_t pid,
 	mstr one_lock, bool memory);
 void lke_exit(void);
 void lke_ctrlc_handler(void);

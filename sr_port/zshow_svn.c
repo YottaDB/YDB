@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -293,7 +293,7 @@ void zshow_svn(zshow_out *output)
 		var.str.addr = (char *)io_curr_device.in->dollar.zb;
 		while (c1 < c2 && *c1)
 			c1++;
-		var.str.len = (char *)c1 - var.str.addr;
+		var.str.len = INTCAST((char *)c1 - var.str.addr);
 		ZS_VAR_EQU(&x, zb_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZCHSET */
@@ -328,7 +328,7 @@ void zshow_svn(zshow_out *output)
 			sgtm_putmsg(&zdir_error[zdir.str.len + STR_LIT_LEN(arrow_text)], VARLSTCNT(6) ERR_ZDIROUTOFSYNC, 4,
 					zdir.str.len, zdir.str.addr, dollar_zdir.str.len, dollar_zdir.str.addr);
 			zdir.str.addr = zdir_error;
-			zdir.str.len = strlen(zdir_error) - 1; /* eliminate trailing '\n' */
+			zdir.str.len = STRLEN(zdir_error) - 1; /* eliminate trailing '\n' */
 		}
 		SKIP_DEVICE_IF_NOT_NEEDED(&zdir);
 		mval_write(output, &zdir, TRUE);

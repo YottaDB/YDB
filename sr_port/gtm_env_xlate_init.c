@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2001, 2006 Fidelity Information Services, Inc  *
+ *      Copyright 2001, 2007 Fidelity Information Services, Inc  *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -25,7 +25,7 @@ GBLREF mstr	env_gtm_env_xlate;
 
 void gtm_env_xlate_init(void)
 {
-	uint4		status;
+	int4		status;
 	mstr		val, tn;
 	char		buf[PATH_MAX];
 

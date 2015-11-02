@@ -48,7 +48,7 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 	tt_ptr = io_ptr->dev_sp;
 	assert(tt_ptr->write_active == FALSE);
 	tt_ptr->write_active = TRUE;
-	buff_left = IOTT_BUFF_LEN - (tt_ptr->tbuffp - tt_ptr->ttybuff);
+ 	buff_left = IOTT_BUFF_LEN - (int)((tt_ptr->tbuffp - tt_ptr->ttybuff));
 	assert(buff_left > IOTT_BUFF_MIN || prin_out_dev_failure);
 	if (buff_left < textlen)
         {
@@ -150,7 +150,7 @@ void iott_write(mstr *v)
 							break;
 						this_width += char_width;
 					}
-					len = ptr - (unsigned char *)str;
+					len = (int)(ptr - (unsigned char *)str);
 					if (0 == len)
 					{
 						if (char_width <= io_ptr->width)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,7 +84,7 @@ GBLREF	int4			backup_write_errno;
 LITREF	mval			literal_null;
 
 #define	COMMON_WRITE(A, B, C)	{					\
-					(*common_write)(A, B, C);	\
+					(*common_write)(A, B, (int)C);	\
 					if (0 != backup_write_errno)	\
 						return FALSE;		\
 				}
@@ -123,7 +123,8 @@ bool	mubinccpy (backup_reg_list *list)
 	sgmnt_data_ptr_t	header;
 	uint4			status, total_blks, bplmap, gds_ratio, save_blks;
 	int4			size1, bsize, bm_num, hint, lmsize, rsize, timeout, outsize,
-				blks_per_buff, counter, i, write_size, copysize, read_size, match;
+				blks_per_buff, counter, i, write_size, read_size, match;
+	size_t			copysize;
 	off_t			copied;
 	int			db_fd, exec_fd;
 	enum db_acc_method	access;
@@ -259,7 +260,7 @@ bool	mubinccpy (backup_reg_list *list)
 	outbuf->blk_size = header->blk_size;
 	outbuf->blks_to_upgrd = header->blks_to_upgrd;
 	util_out_print("MUPIP backup of database file !AD to !AD", TRUE, DB_LEN_STR(gv_cur_region), file->len, file->addr);
-	COMMON_WRITE(backup, (char *)outbuf, sizeof(inc_header));
+	COMMON_WRITE(backup, (char *)outbuf, SIZEOF(inc_header));
 	free(outbuf);
 
 	if (mu_ctrly_occurred  ||  mu_ctrlc_occurred)
@@ -274,7 +275,7 @@ bool	mubinccpy (backup_reg_list *list)
 	gds_ratio	= bsize / DISK_BLOCK_SIZE;
 	blks_per_buff	= BACKUP_READ_SIZE / bsize;	/* Worse case holds one block */
 	read_size	= blks_per_buff * bsize;
-	outsize		= sizeof(shmpool_blk_hdr) + bsize;
+	outsize		= SIZEOF(shmpool_blk_hdr) + bsize;
 	outptr		= (char_ptr_t)malloc(MAX(outsize, mubmaxblk));
 	sblkh_p		= (shmpool_blk_hdr_ptr_t)outptr;
 	data_ptr	= (char_ptr_t)(sblkh_p + 1);
@@ -482,7 +483,7 @@ bool	mubinccpy (backup_reg_list *list)
 		for (copied = 0; copied < cs_addrs->shmpool_buffer->dskaddr; copied += copysize)
 		{
 			if (cs_addrs->shmpool_buffer->dskaddr < copied + copysize)
-				copysize = cs_addrs->shmpool_buffer->dskaddr - copied;
+				copysize = (size_t)(cs_addrs->shmpool_buffer->dskaddr - copied);
 			DOREADRC(list->backup_fd, mubbuf, copysize, status);
 			if (0 != status)
 			{
@@ -507,7 +508,7 @@ bool	mubinccpy (backup_reg_list *list)
 		ptr1_top = ptr1 + ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
 		for ( ;  ptr1 < ptr1_top;  ptr1 += size1)
 		{
-			if ((size1 = ptr1_top - ptr1) > mubmaxblk)
+			if ((size1 = (int4)(ptr1_top - ptr1)) > mubmaxblk)
 				size1 = (mubmaxblk / DISK_BLOCK_SIZE) * DISK_BLOCK_SIZE;
 			size1 += sizeof(int4);
 			COMMON_WRITE(backup, (char *)&size1, sizeof(int4));
@@ -521,7 +522,7 @@ bool	mubinccpy (backup_reg_list *list)
 		ptr1_top = ptr1 + ROUND_UP(MASTER_MAP_SIZE(header), DISK_BLOCK_SIZE);
 		for ( ; ptr1 < ptr1_top ; ptr1 += size1)
 		{
-			if ((size1 = ptr1_top - ptr1) > mubmaxblk)
+			if ((size1 = (int4)(ptr1_top - ptr1)) > mubmaxblk)
 				size1 = (mubmaxblk / DISK_BLOCK_SIZE) * DISK_BLOCK_SIZE;
 			size1 += sizeof(int4);
 			COMMON_WRITE(backup, (char *)&size1, sizeof(int4));

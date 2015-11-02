@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,7 +75,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		jnl_info->before_images = TRUE;
 	} else if (CLI_NEGATED == cli_status1)
 	{
-		assert(CLI_PRESENT != jnl_options->cli_replic_on);
+		VMS_ONLY(assert(CLI_PRESENT != jnl_options->cli_replic_on);)
 		jnl_options->image_type_specified = TRUE;
 		jnl_info->before_images = FALSE;
 	} else

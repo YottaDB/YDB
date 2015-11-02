@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,14 +81,14 @@ void init_gtm(void)
 	svec.argcnt = sizeof(svec);
 	svec.rtn_start = svec.rtn_end = malloc(sizeof(rtn_tabent));
 	memset(svec.rtn_start, 0, sizeof(rtn_tabent));
-	svec.user_stack_size = 120 * 1024;
+	svec.user_stack_size = 240 * 1024;
 	svec.user_indrcache_size = 32;
 	svec.user_strpl_size = 20480;
 	svec.ctrlc_enable = 1;
 	svec.break_message_mask = 15;
 	svec.labels = 1;
 	svec.lvnullsubs = 1;
-	svec.base_addr = (unsigned char *)1;
+	svec.base_addr = (unsigned char *)1L;
 	svec.zdate_form = 0;
 	svec.sysid_ptr = &default_sysid;
 	gtm_startup(&svec);

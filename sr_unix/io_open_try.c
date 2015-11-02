@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,11 +95,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	in_port_t	sockport;
 	GTM_SOCKLEN_TYPE	socknamelen;
 	struct sockaddr_in	sockname;
-#ifndef sun
-	size_t		sockoptlen;
-#else
-	int		sockoptlen;
-#endif
+	GTM_SOCKLEN_TYPE	sockoptlen;
 	boolean_t	ichset_specified, ochset_specified;
 
 	mt_ptr = NULL;
@@ -254,7 +250,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 							28-JUL-1995 14:24:31 FERTIG REPLACE IO_OPEN_TRY.C(18)
 							"PER 3252: fix problems starting up mumps from an ""rsh"" or ""remsh"""
 						*/
-						sockoptlen = sizeof(sockoptval);
+						sockoptlen = SIZEOF(sockoptval);
 						sockstat = getsockopt(file_des, SOL_SOCKET, SO_TYPE, &sockoptval, &sockoptlen);
 						if (!sockstat && SOCK_STREAM == sockoptval)
 						{

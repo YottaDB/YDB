@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,9 +61,9 @@ int init_rand_table (void)
   int  i_seed, seed_len;
   int i, j, k;
 
-  time((time_t *)&i_seed);
+  i_seed = (int) time(NULL);
   SPRINTF(c_seed,"%d",i_seed);
-  seed_len = strlen(c_seed);
+  seed_len = STRLEN(c_seed);
 
   if (seed_len > MAX_SEED_LEN)
   	return(0);
@@ -91,4 +91,6 @@ int init_rand_table (void)
   rannum_table[MAX_RND_IDX - 2] = 55;
   rannum_table[MAX_RND_IDX - 1] = 24;
   rannum_table[MAX_RND_IDX] = 77;
+
+  return 1; /* No error. This is added to make compiler happy */
 }

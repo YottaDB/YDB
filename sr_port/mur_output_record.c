@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,7 +132,7 @@ uint4	mur_output_record()
 				jnl_fence_ctl.level = 1;
 				if (jnl_enabled)
 				{
-					jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1;
+					jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
 					cs_addrs->next_fenced = NULL;
 				}
 			} else if (IS_GUPD(rectype))
@@ -141,7 +141,7 @@ uint4	mur_output_record()
 				if (jnl_enabled)
 				{
 					jnl_fence_ctl.fence_list = cs_addrs;
-					cs_addrs->next_fenced = (sgmnt_addrs *)-1;
+					cs_addrs->next_fenced = (sgmnt_addrs *)-1L;
 				}
 			} else if (IS_TP(rectype))
 				tp_set_sgm();
@@ -167,11 +167,11 @@ uint4	mur_output_record()
 		if (IS_ZTP(rectype))
 		{	/* Even for FENCE_NONE we apply fences. Otherwise an FUPD/GUPD becomes UPD etc. */
 			assert(jnl_enabled ||
-				((sgmnt_addrs *)-1 == jnl_fence_ctl.fence_list && NULL == cs_addrs->next_fenced));
+				((sgmnt_addrs *)-1L == jnl_fence_ctl.fence_list && NULL == cs_addrs->next_fenced));
 			jnl_fence_ctl.level = 0;
 			if (jnl_enabled)
 			{
-				jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1;
+				jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
 				cs_addrs->next_fenced = NULL;
 			}
 		}
@@ -200,13 +200,13 @@ uint4	mur_output_record()
 		if (jnl_enabled)
 		{
 			jnl_fence_ctl.fence_list = cs_addrs;
-			cs_addrs->next_fenced = (sgmnt_addrs *)-1;
+			cs_addrs->next_fenced = (sgmnt_addrs *)-1L;
 		}
 		op_ztcommit(1);
 		assert(jnl_enabled ||
-			((sgmnt_addrs *)-1 == jnl_fence_ctl.fence_list && NULL == cs_addrs->next_fenced));
+			((sgmnt_addrs *)-1L == jnl_fence_ctl.fence_list && NULL == cs_addrs->next_fenced));
 		jnl_fence_ctl.level = 0;
-		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1;
+		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
 		cs_addrs->next_fenced = NULL;
 		break;
 	case JRT_INCTN:

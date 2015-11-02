@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,8 @@ cmi_status_t cmj_read_start(struct CLB *lnk)
 {
 	struct NTD *tsk = lnk->ntd;
 	cmi_status_t status = SS_NORMAL;
-	int rval, save_errno;
+	int save_errno;
+        ssize_t rval;
 	error_def(CMI_DCNINPROG);
 	error_def(CMI_LNKNOTIDLE);
 	error_def(CMI_OVERRUN);
@@ -84,7 +85,7 @@ cmi_status_t cmj_read_start(struct CLB *lnk)
 			cmj_postevent(lnk);
 			return ECONNRESET;
 		}
-		if (rval == (int)lnk->ios.u.len)
+		if (rval == lnk->ios.u.len)
 		{
 			lnk->ios.xfer_count = rval;
 			cmj_fini(lnk);
@@ -103,7 +104,7 @@ cmi_status_t cmj_read_start(struct CLB *lnk)
 		if (0 < rval)
 		{
 			assert(CMI_TCP_PREFIX_LEN > rval);
-			lnk->ios.len_len = rval;
+			lnk->ios.len_len = (int)rval;
 		}
 		status = cmj_clb_set_async(lnk);
 	}
@@ -112,7 +113,7 @@ cmi_status_t cmj_read_start(struct CLB *lnk)
 
 void cmj_read_interrupt(struct CLB *lnk, int signo)
 {
-	int rval;
+	ssize_t rval;
 	cmi_status_t status = SS_NORMAL;
 	error_def(CMI_OVERRUN);
 	char peekchar;
@@ -194,7 +195,7 @@ void cmj_read_interrupt(struct CLB *lnk, int signo)
 				return;
 			}
 		}
-		if (rval == (int)(lnk->ios.u.len - lnk->ios.xfer_count))
+		if (rval == (lnk->ios.u.len - lnk->ios.xfer_count))
 		{
 			lnk->ios.xfer_count += rval;
 			cmj_fini(lnk);

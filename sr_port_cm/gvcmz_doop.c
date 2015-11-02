@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,7 +89,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	if ((CMMS_Q_GET == query_code)
 			|| (CMMS_Q_INCREMENT == query_code)
 			|| (CMMS_Q_QUERY == query_code) && ((link_info *)lnk->usr)->query_is_queryget)
-		max_reply_len = lnk->mbl + sizeof(unsigned short) + MAX_DBSTRLEN; /* can't predict the length of data value */
+		max_reply_len = lnk->mbl + SIZEOF(unsigned short) + MAX_DBSTRLEN; /* can't predict the length of data value */
 	else
 		max_reply_len = lnk->mbl;
 	assert(max_reply_len <= (int4)CM_MAX_BUF_LEN);

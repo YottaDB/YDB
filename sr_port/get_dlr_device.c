@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,6 @@ void get_dlr_device(mval *v)
 	cend = cp + x.len;
 	for ( ; cp < cend && *cp ; cp++)
 		;
-	v->str.len = cp - v->str.addr;
+	v->str.len = INTCAST(cp - v->str.addr);
 	s2pool(&v->str);
 }

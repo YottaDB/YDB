@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	char		*trans_name;
 	bool		new = FALSE;
 	int		len;
-	uint4		status;
+	int4		status;
 	cmi_descriptor	node;
 	mstr		task1, task2;
 	unsigned char	buff[256], lbuff[MAX_HOST_NAME_LEN + GTCM_ENVVAR_PFXLEN];
@@ -99,14 +99,14 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	memcpy(lbuff, GTCM_ENVVAR_PFX, GTCM_ENVVAR_PFXLEN);
 	memcpy(lbuff + GTCM_ENVVAR_PFXLEN, node.addr, node.len);
 	task1.addr = (char *)lbuff;
-	task1.len = node.len + GTCM_ENVVAR_PFXLEN;
+	task1.len = node.len + (int)GTCM_ENVVAR_PFXLEN;
 	lbuff[task1.len] = '\0';
 	task2.addr = (char *)buff;
 	task2.len = 0;
 	if (NULL != (trans_name = GETENV((const char *)lbuff)))
 	{
 		status = SS_NORMAL;
-		task2.len = strlen(trans_name);
+		task2.len = STRLEN(trans_name);
 		memcpy(task2.addr, trans_name, task2.len);
 	} else
 		status = SS_NOLOGNAM;
@@ -134,7 +134,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	} else
 	{
 		assert(((link_info *)clb_ptr->usr)->lnk_active);
-		len = top - fn + 2 + S_HDRSIZE;
+		len = (int)(top - fn + 2 + S_HDRSIZE);
 		if (len <  CM_MINBUFSIZE)
 			len = CM_MINBUFSIZE;
 		if (stringpool.top - stringpool.free < len)

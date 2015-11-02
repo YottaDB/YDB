@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@
 		if (0 == *rPtr1++) 			\
 			break;				\
 	}						\
-	KEY_LEN = rPtr1 - (KEY_BASE);			\
+	KEY_LEN = (int)(rPtr1 - (KEY_BASE));		\
 }
 
 /**********************************************************************
@@ -67,7 +67,7 @@
 		if ((0 == *rPtr1++) && (0 == *rPtr1)) 	\
 			break;				\
 	}						\
-	KEY_LEN = rPtr1 + 1 - (KEY_BASE);		\
+	KEY_LEN = (int)(rPtr1 + 1 - (KEY_BASE));	\
 }
 
 /***********************************************************************
@@ -132,7 +132,7 @@
 				break;								\
 		}										\
 		*rPtr1++ = *rPtr2++;								\
-		KEY_LEN = rPtr2 - (REC_BASE) - sizeof(rec_hdr);					\
+		KEY_LEN = (int)(rPtr2 - (REC_BASE) - sizeof(rec_hdr));					\
 		if ((gv_cur_region->max_rec_size < (REC_SIZE)) 		||			\
 			(gv_cur_region->max_key_size < ((int)(KEY_LEN)+ (KEY_CMPC))) ||		\
 			(BSTAR_REC_SIZE > ((REC_SIZE) + ((0 == (LEVEL)) ? 1 : 0))) ||		\

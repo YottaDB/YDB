@@ -209,7 +209,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				}
 				patmaskptr = &obj->buff[0];
 				*patmaskptr++ = fixed_len;
-				*patmaskptr = outchar - patmaskptr; /* unit is sizeof(uint4) */
+				*patmaskptr = (uint4)(outchar - patmaskptr); /* unit is sizeof(uint4) */
 				*outchar++ = count;
 				*outchar++ = total_min;
 				*outchar++ = total_max;
@@ -220,7 +220,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						*outchar++ = max[seqcnt];
 				for (seqcnt = 0; seqcnt < count; seqcnt++)
 					*outchar++ = size[seqcnt];
-				obj->len = outchar - &obj->buff[0];
+				obj->len = (int4)(outchar - &obj->buff[0]);
 				instr->addr = (char *)inchar;
 				return 0;
 			}

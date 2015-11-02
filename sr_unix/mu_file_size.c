@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,5 +39,5 @@ unsigned int mu_file_size(file_control *fc)
 	if (-1 == fstat_res)
 		rts_error(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn), errno);
 	assert(0 == stat_buf.st_size % DISK_BLOCK_SIZE);
-	return stat_buf.st_size / DISK_BLOCK_SIZE;
+	return (unsigned int)(stat_buf.st_size / DISK_BLOCK_SIZE);
 }

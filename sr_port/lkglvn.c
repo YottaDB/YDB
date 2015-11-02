@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,7 +83,7 @@ int lkglvn(bool gblvn)
 	assert(window_ident.len <= MAX_MIDENT_LEN);
 	memcpy(lknam, window_ident.addr, window_ident.len);
 	lknam += window_ident.len;
-	*sb1++ = put_str(lkname_buf,lknam - lkname_buf);
+	*sb1++ = put_str(lkname_buf,(mstr_len_t)(lknam - lkname_buf));
 	advancewindow();
 	if (window_token == TK_LPAREN)
 	{	for (;;)
@@ -107,7 +107,7 @@ int lkglvn(bool gblvn)
 		}
 	}
 	ref = newtriple(ox);
-	ref->operand[0] = put_ilit(sb1 - sb2);
+	ref->operand[0] = put_ilit((mint)(sb1 - sb2));
 	for ( ; sb2 < sb1 ; sb2++)
 	{
 		t1 = newtriple(OC_PARAMETER);

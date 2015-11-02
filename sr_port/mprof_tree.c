@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,9 +29,9 @@ mprof_tree *new_node(trace_entry *arg)
 		tmp_rout_name = arg->rout_name;
 	if (NULL != tmp_rout_name && tmp_rout_name == arg->rout_name)
 	{
-		arg->rout_name = (mident *) pcalloc(sizeof(mident));
+		arg->rout_name = (mident *) pcalloc(SIZEOF(mident));
 		arg->rout_name->len = tmp_rout_name->len;
-		arg->rout_name->addr = (char *) pcalloc(tmp_rout_name->len);
+		arg->rout_name->addr = (char *) pcalloc((unsigned int)tmp_rout_name->len);
 		memcpy(arg->rout_name->addr, tmp_rout_name->addr, tmp_rout_name->len);
 
 	}
@@ -39,13 +39,13 @@ mprof_tree *new_node(trace_entry *arg)
 		tmp_label_name = arg->label_name;
 	if (NULL != tmp_label_name && tmp_label_name == arg->label_name)
 	{
-		arg->label_name = (mident *) pcalloc(sizeof(mident));
+		arg->label_name = (mident *) pcalloc(SIZEOF(mident));
 		arg->label_name->len = tmp_label_name->len;
-		arg->label_name->addr = (char *) pcalloc(tmp_label_name->len);
+		arg->label_name->addr = (char *) pcalloc((unsigned int)tmp_label_name->len);
 		memcpy(arg->label_name->addr, tmp_label_name->addr, tmp_label_name->len);
 	}
 
-        tree = (mprof_tree *)pcalloc(sizeof(mprof_tree));
+        tree = (mprof_tree *)pcalloc(SIZEOF(mprof_tree));
 	tree->e = *arg;
 	tree->e.count = tree->e.usr_time = tree->e.sys_time = 0;
 	tree->e.loop_level = tree->e.cur_loop_level = 0;

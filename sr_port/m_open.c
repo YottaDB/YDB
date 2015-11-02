@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@ int m_open(void)
 			make_commarg(&sopr, indir_open);
 			return TRUE;
 		} else	/* Only device given, default device parms */
-			plist = put_str((char *)empty_plist, sizeof(empty_plist));
+			plist = put_str((char *)empty_plist, SIZEOF(empty_plist));
 	} else
 	{
 		advancewindow();
@@ -51,7 +51,7 @@ int m_open(void)
 		{
 			case TK_COLON:
 				/* Default device parms */
-				plist = put_str((char *)empty_plist, sizeof(empty_plist));
+				plist = put_str((char *)empty_plist, SIZEOF(empty_plist));
 				break;
 			case TK_ATSIGN:
 				/* Indirect for device parms */

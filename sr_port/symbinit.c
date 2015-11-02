@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 #include "stack_frame.h"
 #include "mdq.h"
 
-#define MVST_STAB_SIZE (sizeof(*mv_chain) - sizeof(mv_chain->mv_st_cont) + sizeof(mv_chain->mv_st_cont.mvs_stab))
+#define MVST_STAB_SIZE (SIZEOF(*mv_chain) - SIZEOF(mv_chain->mv_st_cont) + SIZEOF(mv_chain->mv_st_cont.mvs_stab))
 
 GBLREF symval		*curr_symval;
 
@@ -34,7 +34,8 @@ int4 symbinit(void)
 	mv_stent	*mv_st_ent, *mvst_tmp, *mvst_prev;
 	stack_frame	*fp,*fp_prev,*fp_fix;
 	symval		*ptr;
-	int4		shift, size, ls_size, temp_size;
+	int4		shift, ls_size, temp_size;
+        int		size;
 	unsigned char	*old_sp, *top, *l_syms;
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
@@ -43,7 +44,7 @@ int4 symbinit(void)
 	{
 		temp_size = frame_pointer->rvector->temp_size;
 		size = frame_pointer->vartab_len;
-		ls_size = size * sizeof(mval *);
+		ls_size = size * SIZEOF(mval *);
 		if (frame_pointer->l_symtab != (mval **)((char *) frame_pointer - temp_size - ls_size))
 		{
 			msp_save = msp;
@@ -79,7 +80,7 @@ int4 symbinit(void)
 		old_sp = msp;
 		temp_size = fp_prev->rvector->temp_size;
 		size = fp_prev->vartab_len;
-		ls_size = size * sizeof(mval *);
+		ls_size = size * SIZEOF(mval *);
 		shift = MVST_STAB_SIZE;
 		if (fp_prev->l_symtab != (mval **)((char *) fp_prev - ls_size - temp_size))
 			shift += ls_size;
@@ -118,7 +119,8 @@ int4 symbinit(void)
 		}
 		if ((unsigned char *) mv_chain >= top)
 		{
-			mv_st_ent->mv_st_next = (char *) mv_chain - (char *) mv_st_ent;
+			mv_st_ent->mv_st_next = (uint4)((char *) mv_chain - (char *) mv_st_ent);
+
 			mv_chain = mv_st_ent;
 		}
 		else
@@ -132,8 +134,8 @@ int4 symbinit(void)
 				mvst_tmp = mvst_prev;
 				mvst_prev = (mv_stent *)((char *) mvst_tmp + mvst_tmp->mv_st_next);
 			}
-			mvst_tmp->mv_st_next = (char *) mv_st_ent - (char *) mvst_tmp;
-			mv_st_ent->mv_st_next = (char *) mvst_prev - (char *) mv_st_ent + shift;
+			mvst_tmp->mv_st_next = (uint4)((char *) mv_st_ent - (char *) mvst_tmp);
+			mv_st_ent->mv_st_next = (uint4)((char *) mvst_prev - (char *) mv_st_ent + shift);
 		}
 	}
 	mv_st_ent->mv_st_cont.mvs_stab = (symval *)NULL;	/* special case this so failed initialization can be detected */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,13 +34,13 @@ bool zlput_rname (rhdtyp *hdr)
 	rtn_tabent	*rbot, *mid, *rtop;
 	stack_frame	*fp;
 	char		*src, *new, *old_table;
-	int		src_len, comp;
+	int		comp;
 	ht_ent_mname    *tabent;
 	mname_entry	key;
 	uint4		*src_tbl, entries;
 	mstr		*curline;
 	mident		*rtn_name;
-	int		size;
+	size_t		size, src_len;
 
 	rtn_name = &hdr->routine_name;
 	rbot = rtn_names;
@@ -79,10 +79,10 @@ bool zlput_rname (rhdtyp *hdr)
 	{	/* Entry was not found. Add in a new one */
 		old_table = (char *)0;
 		src = (char *) mid;
-		src_len = (char *) rtn_names_end - (char *) mid + sizeof(rtn_tabent);
+		src_len = (char *)rtn_names_end - (char *)mid + sizeof(rtn_tabent);
 		if (rtn_names_end >= rtn_names_top)
 		{ /* Not enough room, recreate table in larger area */
-			size = (char *) rtn_names_end - (char *) rtn_names + (sizeof(rtn_tabent) * FREE_RTNTBL_SPACE);
+			size = (char *)rtn_names_end - (char *)rtn_names + (sizeof(rtn_tabent) * FREE_RTNTBL_SPACE);
 			new = malloc(size);
 			memcpy(new, rtn_names, (char *)mid - (char *)rtn_names);
 			mid = (rtn_tabent *)((char *)mid + (new - (char *)rtn_names));
@@ -100,7 +100,7 @@ bool zlput_rname (rhdtyp *hdr)
 		assert(NON_USHBIN_ONLY(!hdr->old_rhead_ptr) USHBIN_ONLY(!hdr->old_rhead_adr));
 	} else
 	{	/* Entry exists. Update it */
-		old_rhead = (rhdtyp *) mid->rt_adr;
+		old_rhead = (rhdtyp *)mid->rt_adr;
 		/* Verify routine is not currently active. If it is, we cannot replace it */
 		for (fp = frame_pointer; fp ; fp = fp->old_frame_pointer)
 			if (fp->rvector == old_rhead)

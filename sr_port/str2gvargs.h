@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,11 @@
 
 typedef struct
 {
-	int4	count;		/* caveat: this should be the same size as a pointer */
+#ifndef __osf__
+	ssize_t	count;
+#else
+	int4	count;
+#endif
 	mval	*args[MAX_GVSUBSCRIPTS + 1];
 } gvargs_t;
 

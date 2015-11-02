@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -205,7 +205,8 @@ void alloc_reg(void)
 
 	size = sa_temps[TVAL_REF] * sa_class_sizes[TVAL_REF];
 	sa_temps_offset[TVAL_REF] = size;
-	size += sa_temps[TINT_REF] * sa_class_sizes[TINT_REF];
+	/* Since we need to align the temp region to the largest types, align even int temps to sizeof(char*) */
+	size += ROUND_UP2(sa_temps[TINT_REF] * sa_class_sizes[TINT_REF], sizeof(char *));
 	sa_temps_offset[TINT_REF] = size;
 	size += sa_temps[TVAD_REF] * sa_class_sizes[TVAD_REF];
 	sa_temps_offset[TVAD_REF] = size;

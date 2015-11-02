@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,9 +64,9 @@ void op_fnzsubstr(mval* src, int first, int byte_width, mval* dest)
 				srcptr = tmpptr;
 			}
 		}
-		dest->str.len = srcptr - srcbase;
+		dest->str.len = INTCAST(srcptr - srcbase);
 	} else /* width exceeds the length, so return the rest of the entire string */
-		dest->str.len = srctop - srcbase;
+		dest->str.len = INTCAST(srctop - srcbase);
 	if (gtm_utf8_mode && !src_is_singlebyte && !badchar_inhibit)
 		MV_FORCE_LEN(dest); /* catch BADCHAR (if any) */
 }

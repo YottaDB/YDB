@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@ void iosocket_wtone(int ch)
 				GTMASSERT;
 		}
 		temp.addr = uni_c;
-		temp.len = endptr - uni_c;
+		temp.len = INTCAST(endptr - uni_c);
 		assert(0 < temp.len); /* we validated the code point already in op_wtone() */
 	}
 	UNICODE_ONLY(temp.char_len = 1);

@@ -54,7 +54,7 @@ GBLREF IN_PARMS *cli_lex_in_ptr;
  */
 void	clear_parm_vals(CLI_ENTRY *cmd_parms, boolean_t follow) 		/* pointer to option's parameter table */
 {
-	CLI_ENTRY	*root_param, *find_cmd_param();
+	CLI_ENTRY	*root_param;
 	int		need_copy;
 
 	need_copy = (gpcmd_qual != cmd_parms);
@@ -83,7 +83,7 @@ void	clear_parm_vals(CLI_ENTRY *cmd_parms, boolean_t follow) 		/* pointer to opt
 			if (cmd_parms->dfault_str)
 			{
 				cmd_parms->present = CLI_DEFAULT;
-				if (CLI_PRESENT != (int)cmd_parms->dfault_str)
+				if (CLI_PRESENT != (INTPTR_T)cmd_parms->dfault_str)
 					cmd_parms->pval_str = cmd_parms->dfault_str;
 			}
 			if ((FALSE != follow) && cmd_parms->qual_vals)
@@ -271,9 +271,9 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Too many parameters ");
 			return(-1);
 		}
-		if (parm_ary[parms_cnt] && ((char *)-1 != parm_ary[parms_cnt]))
+		if (parm_ary[parms_cnt] && (((char *)-1L) != parm_ary[parms_cnt]))
 			free(parm_ary[parms_cnt]);
-		parm_len = strlen(cli_token_buf) + 1;
+		parm_len = STRLEN(cli_token_buf) + 1;
 		parm_ary[parms_cnt] = malloc(parm_len);
 		memcpy(parm_ary[parms_cnt++], cli_token_buf, parm_len);
 		return(1);
@@ -559,7 +559,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 		ptr_next_val = local_str;
 		while (NULL != ptr_next_val)
 		{
-			len_str=strlen(ptr_next_val);
+			len_str= STRLEN(ptr_next_val);
 			strncpy(tmp_str, ptr_next_val, len_str);
 			tmp_str[len_str] = 0;
 			tmp_str_ptr = tmp_str;
@@ -641,7 +641,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 				}
 				if (val_flg)
 				{
-					ptr_equal_len = strlen(ptr_equal + 1);
+					ptr_equal_len = STRLEN(ptr_equal + 1);
 					pparm1->pval_str = malloc(ptr_equal_len + 1);
 					strncpy(pparm1->pval_str, ptr_next_val + (ptr_equal - tmp_str_ptr) + 1, ptr_equal_len);
 					pparm1->pval_str[ptr_equal_len] = 0;
@@ -959,7 +959,7 @@ bool cli_get_parm(char *entry, char val_buf[])
 			gets_res = cli_fgets(local_str, MAX_LINE, stdin, FALSE);
 			if (gets_res)
 			{
-				parm_len = strlen(gets_res);
+				parm_len = STRLEN(gets_res);
 				/* chop off newline */
 				if (local_str[parm_len - 1] == '\n')
 				{
@@ -980,14 +980,14 @@ bool cli_get_parm(char *entry, char val_buf[])
 				parm_ary[match_ind] = malloc(1);
 				*parm_ary[match_ind] = '\0';
 			}
-		} else if ((char *)-1 == parm_ary[match_ind])
+		} else if (((char *)-1L) == parm_ary[match_ind])
 			return(FALSE);
 		strcpy(val_buf, parm_ary[match_ind]);
 		if (!cli_look_next_token(&eof) || (0 == cli_gettoken(&eof)))
-			parm_ary[match_ind] = (char *)-1;
+			parm_ary[match_ind] = (char *)-1L;
 		else
 		{
-			parm_len = strlen(cli_token_buf) + 1;
+			parm_len = STRLEN(cli_token_buf) + 1;
 			if (MAX_LINE < parm_len)
 			{
 				PRINTF("Parameter string too long\n");

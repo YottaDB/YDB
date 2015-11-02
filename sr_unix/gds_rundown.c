@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -431,8 +431,8 @@ void gds_rundown(void)
 			{	/* mupip_jnl_recover will do this after mur_close_file */
 				csd->semid = INVALID_SEMID;
 				csd->shmid = INVALID_SHMID;
-				csd->sem_ctime.ctime = 0;
-				csd->shm_ctime.ctime = 0;
+				csd->gt_sem_ctime.ctime = 0;
+				csd->gt_shm_ctime.ctime = 0;
 			}
 			fileheader_sync(reg);
 			rel_crit(reg);
@@ -465,8 +465,8 @@ void gds_rundown(void)
 	{	/* mupip_jnl_recover will do this after mur_close_file */
 		db_ipcs.semid = INVALID_SEMID;
 		db_ipcs.shmid = INVALID_SHMID;
-		db_ipcs.sem_ctime = 0;
-		db_ipcs.shm_ctime = 0;
+		db_ipcs.gt_sem_ctime = 0;
+		db_ipcs.gt_shm_ctime = 0;
 		db_ipcs.fn_len = reg->dyn.addr->fname_len;
 		memcpy(db_ipcs.fn, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
 		db_ipcs.fn[reg->dyn.addr->fname_len] = 0;
@@ -484,8 +484,8 @@ void gds_rundown(void)
 	/* Unmap storage if mm mode but only the part that is not the fileheader (so shows up in dumps) */
 	if (is_mm)
 	{
-		munmap_len = (sm_long_t)(csa->db_addrs[1] - csa->db_addrs[0]) - ROUND_UP(SIZEOF_FILE_HDR(csa->hdr),
-											 MSYNC_ADDR_INCS);
+		munmap_len = (sm_long_t)((csa->db_addrs[1] - csa->db_addrs[0]) - ROUND_UP(SIZEOF_FILE_HDR(csa->hdr),
+											 MSYNC_ADDR_INCS));
 		if (munmap_len > 0)
 		{
 			munmap((caddr_t)(csa->db_addrs[0] + ROUND_UP(SIZEOF_FILE_HDR(csa->hdr), MSYNC_ADDR_INCS)),
@@ -582,7 +582,6 @@ CONDITION_HANDLER(gds_rundown_ch)
 	unix_db_info	*udi;
 	sgmnt_addrs	*csa;
 	boolean_t	cancelled_timer, cancelled_dbsync_timer;
-	void		rel_crit();
 
 	error_def(ERR_ASSERT);
 	error_def(ERR_CRITSEMFAIL);

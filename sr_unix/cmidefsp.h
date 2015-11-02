@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@ error_def(CMI_REASON_CONFIRM);
 #define CMI_IO_WOULDBLOCK(iostatus)	(EWOULDBLOCK == (iostatus) || EAGAIN == (iostatus))
 
 typedef que_head relque;
-typedef uint4 cmi_status_t;
+typedef int4 cmi_status_t;
 typedef uint4 cmi_reason_t;
 typedef int cmi_unit_t;
 

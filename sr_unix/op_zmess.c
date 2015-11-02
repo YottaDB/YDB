@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ void op_zmess(unsigned int cnt, ...)
 	va_list		var;
 	const err_ctl	*ectl;
 	const err_msg	*eptr;
-	int		fao[MAX_FAO_PARMS];
+	UINTPTR_T	fao[MAX_FAO_PARMS];
 	char		buff[FAO_BUFFER_SPACE];
 	unsigned int	errnum, j;
 	int		faocnt;

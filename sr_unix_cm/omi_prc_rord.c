@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,6 +69,6 @@ omi_prc_rord(omi_conn *cptr, char *xend, char *buff, char *bend)
 	bptr += v.str.len;
     }
 
-    return bptr - buff;
+    return (int)(bptr - buff);
 
 }

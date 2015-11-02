@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -269,7 +269,7 @@ int	iotcp_readfl(mval *v, int4 width, int4 timeout)
 		io_ptr->dollar.za = 9;
 		memcpy(tcpptr->dollar_device, "1,", len);
 		errptr = (char *)STRERROR(errno);
-		errlen = strlen(errptr);
+		errlen = STRLEN(errptr);
 		memcpy(&tcpptr->dollar_device[len], errptr, errlen);
 		if (io_ptr->dollar.zeof || -1 == status || 0 < io_ptr->error_handler.len)
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,7 +84,7 @@ void shmpool_buff_init(gd_region *reg)
 	memset(sbufh_p, 0, sizeof(shmpool_buff_hdr));
 	SET_LATCH_GLOBAL(&sbufh_p->shmpool_crit_latch, LOCK_AVAILABLE);
 	len = SHMPOOL_BUFFER_SIZE - sizeof(shmpool_buff_hdr);	/* Length to build buffers with */
-	elem_len = csa->hdr->blk_size + sizeof(shmpool_blk_hdr);
+	elem_len = csa->hdr->blk_size + SIZEOF(shmpool_blk_hdr);
 	assert((len & ~7) == len);				/* Verify 8 byte alignment */
 	assert((elem_len & ~7) == elem_len);
 	assert(len >= 2 * elem_len);				/* Need at least 1 rfmt and 1 bkup block */
@@ -184,7 +184,7 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 		if (sbufh_p->backup_errno)
 		{
 			shmpool_unlock_hdr(reg);
-			return (shmpool_blk_hdr_ptr_t)-1;
+			return (shmpool_blk_hdr_ptr_t)-1L;
 		}
 		if (MAX_BACKUP_FLUSH_TRY < attempts)
 		{	/* We have tried too long .. backup errors out */
@@ -192,7 +192,7 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 			sbufh_p->backup_errno = ERR_BCKUPBUFLUSH;
 			csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 			shmpool_unlock_hdr(reg);
-			return (shmpool_blk_hdr_ptr_t)-1;
+			return (shmpool_blk_hdr_ptr_t)-1L;
 		}
 #endif
 		{	/* We didn't hit the limit for this */

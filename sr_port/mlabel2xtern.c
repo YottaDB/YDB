@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001,2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@ void mlabel2xtern(mstr *dst, mident *rtn, mident *lab)
 	int	cnt;
 
 	/* length of the resultant symbol "<routine name>.<label name>" */
-	pt = dst->addr = mcalloc(rtn->len + lab->len + STR_LIT_LEN("."));
+	pt = dst->addr = mcalloc(rtn->len + lab->len +(unsigned int)(STR_LIT_LEN(".")));
 	memcpy(pt, rtn->addr, rtn->len);
 	pt += rtn->len;
 	*pt++ = '.';
@@ -49,6 +49,6 @@ void mlabel2xtern(mstr *dst, mident *rtn, mident *lab)
 				*pt++ = TOUPPER(lab->addr[cnt]);
 		}
 	}
-	dst->len = pt - dst->addr;
+	dst->len = INTCAST(pt - dst->addr);
 	return;
 }

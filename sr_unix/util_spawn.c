@@ -1,7 +1,7 @@
 #include "mdef.h"
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@ void util_spawn(void)
 	} else
 	{
 		assert(parm_ary[parms_cnt - 1]);
-		assert((char *)-1 != parm_ary[parms_cnt - 1]);
+		assert((char *)-1L != parm_ary[parms_cnt - 1]);
 		SYSTEM(parm_ary[parms_cnt - 1]);
 	}
 }

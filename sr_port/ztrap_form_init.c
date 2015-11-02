@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@ GBLREF	int	ztrap_form;
 
 void ztrap_form_init(void)
 {
-	uint4		status;
+	int4		status;
 	mstr		val, tn;
 	char		buf[1024], *buf_ptr = &buf[0];
 

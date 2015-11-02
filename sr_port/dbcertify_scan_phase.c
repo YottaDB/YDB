@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,7 +110,9 @@ void dbcertify_scan_phase(void)
 	int		max_max_rec_size;	/* Maximum value for max record size for given block size */
 	int		lm_offset;		/* Local bit map offset */
 	int		mm_offset;		/* Master map offset */
-	int		rc, len, save_errno, blk_index;
+	int		save_errno, blk_index;
+	ssize_t		rc;
+	size_t		len;
 	uchar_ptr_t	badfn;
 	char_ptr_t	errmsg;
 	unsigned char	dbfn[MAX_FN_LEN + 1];
@@ -215,7 +217,7 @@ void dbcertify_scan_phase(void)
 	psa->dbc_gv_cur_region->dyn.addr->acc_meth = dba_bg;
 	len = strlen((char_ptr_t)dbfn);
 	strcpy((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn);
-	psa->dbc_gv_cur_region->dyn.addr->fname_len = len;
+	psa->dbc_gv_cur_region->dyn.addr->fname_len = (unsigned short)len;
 
 	psa->dbc_gv_cur_region->dyn.addr->file_cntl = malloc(sizeof(*psa->dbc_gv_cur_region->dyn.addr->file_cntl));
 	memset(psa->dbc_gv_cur_region->dyn.addr->file_cntl, 0, sizeof(*psa->dbc_gv_cur_region->dyn.addr->file_cntl));
@@ -235,7 +237,7 @@ void dbcertify_scan_phase(void)
 	1) The reserved bytes value must be at least 8 (UNIX) or 9 (VMS).
 	2) The maximum record size must be < blk_size - 16 to allow for new V5 block header.
 	*/
-	max_max_rec_size = psa->dbc_cs_data->blk_size - sizeof(blk_hdr);
+	max_max_rec_size = psa->dbc_cs_data->blk_size - SIZEOF(blk_hdr);
 	if (VMS_ONLY(9) UNIX_ONLY(8) > psa->dbc_cs_data->reserved_bytes)
 	{
 		gtm_putmsg(VARLSTCNT(4) ERR_DBMINRESBYTES, 2, VMS_ONLY(9) UNIX_ONLY(8), psa->dbc_cs_data->reserved_bytes);
@@ -355,7 +357,7 @@ void dbcertify_scan_phase(void)
 	/* Now, update the fields in the output file's fileheader if we are writing it */
 	if (!psa->report_only)
 	{
-		rc = lseek(psa->outfd, (off_t)0, SEEK_SET);
+		rc = lseek(psa->outfd, (ssize_t)0, SEEK_SET);
 		if (-1 == rc)
 		{
 			save_errno = errno;
@@ -440,7 +442,8 @@ void dbcertify_scan_phase(void)
 */
 void dbc_write_p1out(phase_static_area *psa, void *obuf, int olen)
 {
-	int		rc, save_errno;
+	int		save_errno;
+	ssize_t		rc;
 	char_ptr_t	errmsg;
 
 	DBC_DEBUG(("DBC_DEBUG: Output %d bytes to dbcertscan output file\n", olen));
@@ -457,9 +460,11 @@ void dbc_write_p1out(phase_static_area *psa, void *obuf, int olen)
 /* Routine to process a database block */
 void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 {
-	int		rec_len, rec1_cmpc, rec1_gvn_len, rec2_cmpc, key_len, blk_levl, rec1_len, rec2_len, rec2_rlen;
+	int		rec_len, rec1_cmpc, rec2_cmpc, key_len, blk_levl, rec1_len, rec2_len, rec2_rlen;
 	int		free_bytes, blk_len;
-	int		rc, len, save_errno, mm_offset;
+	int		save_errno, mm_offset;
+	ssize_t		rc;
+	size_t		len, rec1_gvn_len;
 	boolean_t	have_dt_blk;
 	unsigned short	us_rec_len;
 	char_ptr_t	errmsg, key_pfx;
@@ -675,7 +680,7 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 			psa->rhdr.blk_type = blk_type;
 			psa->rhdr.blk_levl = blk_levl;
 			if (psa->bsu_keys && gdsblk_gvtleaf == blk_type)
-				psa->rhdr.akey_len = key_len = strlen((char_ptr_t)key_ptr);
+				psa->rhdr.akey_len = key_len = STRLEN((char_ptr_t)key_ptr);
 			else
 				psa->rhdr.akey_len = 0;
 			dbc_write_p1out(psa, &psa->rhdr, sizeof(p1rec));
@@ -710,7 +715,9 @@ void dbc_integ_error(phase_static_area *psa, block_id blk_num, char_ptr_t emsg)
 {
 	char_ptr_t	errmsg;
 	unsigned char	intgerrmsg[256];
-	int		len, rc, save_errno;
+	int		save_errno;
+	ssize_t		rc;
+	size_t		len;
 
 	if (!psa->final)
 		dbc_requeue_block(psa, blk_num);
@@ -764,7 +771,8 @@ void dbc_integ_error(phase_static_area *psa, block_id blk_num, char_ptr_t emsg)
 */
 uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 {
-	int		len, dtblk_index, hdr_len, rec_value_len, rec_len, rec_cmpc;
+	int		dtblk_index, hdr_len, rec_value_len, rec_len, rec_cmpc;
+	size_t		len;
 	uchar_ptr_t	blk_p, rec_value_p, subrec_p, key_end_p, rec_p;
 	block_info	*blk_set_p;
 	unsigned short	us_rec_len;
@@ -782,7 +790,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	}
 	assert(rec_p == trec_p);
 	dbc_find_key(psa, psa->first_rec_key, trec_p, 0);
-	psa->first_rec_key->gvn_len = strlen((char_ptr_t)psa->first_rec_key->base);	/* The GVN we need to lookup in the DT */
+	psa->first_rec_key->gvn_len = USTRLEN((char_ptr_t)psa->first_rec_key->base);	/* The GVN we need to lookup in the DT */
 	assert(0 < psa->first_rec_key->gvn_len);
 	psa->block_depth = -1;	/* Reset to beginning each pass */
 	dtblk_index = dbc_find_dtblk(psa, psa->first_rec_key, 0);
@@ -815,10 +823,10 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	/* Figure out collation for this global */
 	GET_USHORT(us_rec_len, &((rec_hdr *)blk_set_p->curr_rec)->rsiz);
 	rec_len = us_rec_len;
-	rec_value_len = rec_len - (rec_value_p - blk_set_p->curr_rec);
+	rec_value_len = (int)(rec_len - (rec_value_p - blk_set_p->curr_rec));
 	if (sizeof(block_id) < rec_value_len)
 	{	/* This global potentially has collation data in its record (taken from gvcst_root_search()) */
-		subrec_p = get_spec(rec_value_p + sizeof(block_id), rec_value_len - sizeof(block_id), COLL_SPEC);
+		subrec_p = get_spec(rec_value_p + sizeof(block_id), (int)(rec_value_len - sizeof(block_id)), COLL_SPEC);
 		if (subrec_p)
 		{
 			gv_target->nct = *(subrec_p + COLL_NCT_OFFSET);

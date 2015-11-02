@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ void	clean_mem(char *name)
 	char	buff[512];
 	int	q_id, s_id, m_id;
 
-	path1.len = strlen(name);
+	path1.len = STRLEN(name);
 	path1.addr = name;
 	if (trans_log_name(&path1, &path2, buff) != SS_NORMAL)
 		fprintf(stderr, "Error translating path: %s\n", name);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *tnd, struct sockaddr_in *inp)
 			{
 				if (0 == ip_len)
 				{
-					if (0 == (ip_len = cp - tnd_str))
+					if (0 == (ip_len = (int)(cp - tnd_str)))
 						return CMI_BADIPADDRPORT;
 				} else
 					return CMI_BADIPADDRPORT;

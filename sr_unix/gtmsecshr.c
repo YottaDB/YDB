@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -113,7 +113,7 @@ void clean_client_sockets(char *path)
 	char		last, suffix;
 	int		len;
 
-	len = strlen(path);
+	len = STRLEN(path);
 	last = path[len - 1];
 	for (suffix = 'a'; last > suffix; suffix++)
 	{
@@ -203,8 +203,8 @@ int main(void)
 		start_timer(timer_id, msec_timeout, gtmsecshr_timer_handler, 0, NULL);
 		while (!recv_complete)
 		{
-			num_chars_recd = RECVFROM(gtmsecshr_sockfd, (void *)recv_ptr, recv_len, 0,
-							(struct sockaddr *)&client_addr, (sssize_t *)&client_addr_len);
+			num_chars_recd = (int)(RECVFROM(gtmsecshr_sockfd, (void *)recv_ptr, recv_len, 0,
+							(struct sockaddr *)&client_addr, (sssize_t *)&client_addr_len));
 			if ((-1 == num_chars_recd) && (gtmsecshr_timer_popped || EINTR != errno))
 			{
 				rts_error(VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRRECVF, 0, errno);
@@ -238,8 +238,8 @@ int main(void)
 		start_timer(timer_id, msec_timeout, gtmsecshr_timer_handler, 0, NULL);
 		while (!send_complete)
 		{
-			num_chars_sent = SENDTO(gtmsecshr_sockfd, send_ptr, send_len, 0,
-							(struct sockaddr *)&client_addr, (sssize_t)client_addr_len);
+			num_chars_sent = (int)(SENDTO(gtmsecshr_sockfd, send_ptr, send_len, 0,
+							(struct sockaddr *)&client_addr, (sssize_t)client_addr_len));
 			if ((-1 == num_chars_sent) && (gtmsecshr_timer_popped || errno != EINTR))
 			{
 				 rts_error(VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRSENDF, 0, errno);
@@ -328,7 +328,7 @@ void gtmsecshr_init(void)
 	util_out_print("gtmsecshr started at !AD", TRUE, RTS_ERROR_STRING(time_ptr));
 	gtmsecshr_sig_init();
 	close(0);
-	for (file_des = sysconf(_SC_OPEN_MAX)-1; file_des >= 3; file_des--)
+	for (file_des = (int)sysconf(_SC_OPEN_MAX)-1; file_des >= 3; file_des--)
 		close(file_des);
 	CHDIR("/");
 	umask(0);
@@ -377,7 +377,7 @@ void gtmsecshr_init(void)
 	name_ptr = strrchr(gtmsecshr_sock_name.sun_path, '/');
 	while (*name_ptr == '/')	/* back off in case of double-slash */
 		name_ptr--;
-	gtmsecshr_socket_dir_len = name_ptr - gtmsecshr_sock_name.sun_path + 1;
+	gtmsecshr_socket_dir_len = (int)(name_ptr - gtmsecshr_sock_name.sun_path + 1);
 	/* Preallocate some timer blocks. */
 	prealloc_gt_timers();
 	return;
@@ -513,7 +513,7 @@ void gtmsecshr_switch_log_file(int sig)
 			MAX_TRANS_NAME_LEN - gtmsecshr_logpath_len - sizeof(GTMSECSHR_LOG_PREFIX),
 			TIME_FORMAT, tm_struct, dummy);
 	}
-	newname_len = strlen(newname);
+	newname_len = STRLEN(newname);
 	suffix = 1;
 	while ((0 == Stat(newname, &fs)) || (ENOENT != errno))	/* This file exists */
 	{
@@ -772,8 +772,8 @@ int service_request(gtmsecshr_mesg *buf)
 		}
 		header.semid = buf->mesg.db_ipcs.semid;
 		header.shmid = buf->mesg.db_ipcs.shmid;
-		header.sem_ctime.ctime = buf->mesg.db_ipcs.sem_ctime;
-		header.shm_ctime.ctime = buf->mesg.db_ipcs.shm_ctime;
+		header.gt_sem_ctime.ctime = buf->mesg.db_ipcs.gt_sem_ctime;
+		header.gt_shm_ctime.ctime = buf->mesg.db_ipcs.gt_shm_ctime;
 		if (!file_head_write(fn, &header, sizeof(header)))
 		{
 			buf->code = errno;

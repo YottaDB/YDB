@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,7 +93,9 @@ void	assert_jrec_member_offsets(void)
 	assert(sizeof(jnl_str_len_t) == sizeof(uint4));
 	/* since time in jnl record is a uint4, and since JNL_SHORT_TIME expects time_t, we better ensure they are same.
 	 * A change in the size of time_t would mean a redesign of the fields.  */
-	assert(sizeof(time_t) == sizeof(uint4));
+
+	assert(sizeof(time_t) == GTM64_ONLY(sizeof(int8)) NON_GTM64_ONLY(sizeof(int4)));
+
 	/* Make sure all jnl_seqno fields start at same offset. mur_output_record and others rely on this. */
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_upd, token_seq.jnl_seqno));
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_ztp_upd, jnl_seqno));
@@ -228,7 +230,7 @@ void gvcst_init (gd_region *greg)
 	}
 	if ((prev_reg = dbfilopn(greg)) != greg)
 	{
-		if (NULL == prev_reg || (gd_region *)-1 == prev_reg) /* (gd_region *)-1 == prev_reg => cm region open attempted */
+		if (NULL == prev_reg || (gd_region *)-1L == prev_reg) /* (gd_region *)-1 == prev_reg => cm region open attempted */
 			return;
 		greg->dyn.addr->file_cntl = prev_reg->dyn.addr->file_cntl;
 		memcpy(greg->dyn.addr->fname, prev_reg->dyn.addr->fname, prev_reg->dyn.addr->fname_len);
@@ -267,8 +269,8 @@ void gvcst_init (gd_region *greg)
 	UNIX_ONLY(
 		FILE_INFO(greg)->semid = INVALID_SEMID;
 		FILE_INFO(greg)->shmid = INVALID_SHMID;
-		FILE_INFO(greg)->sem_ctime = 0;
-		FILE_INFO(greg)->shm_ctime = 0;
+		FILE_INFO(greg)->gt_sem_ctime = 0;
+		FILE_INFO(greg)->gt_shm_ctime = 0;
 		FILE_INFO(greg)->ftok_semid = INVALID_SEMID;
 	)
 	VMS_ONLY(
@@ -394,7 +396,7 @@ void gvcst_init (gd_region *greg)
 	*/
 	time(&curr_time);
 	assert(MAXUINT4 > curr_time);
-	curr_time_uint4 = curr_time;
+	curr_time_uint4 = (uint4)curr_time;
 	next_warn_uint4 = csd->next_upgrd_warn.cas_time;
 	if (!csd->fully_upgraded && curr_time_uint4 > next_warn_uint4
 	    && COMPSWAP(&csd->next_upgrd_warn.time_latch, next_warn_uint4, 0, (curr_time_uint4 + UPGRD_WARN_INTERVAL), 0))

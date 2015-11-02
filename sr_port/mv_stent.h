@@ -92,7 +92,7 @@ typedef struct mv_stent_struct
 			int4 mvs_stck_size;
 		} mvs_stck;
 		int4 mvs_tval;
-		int4 mvs_tp_holder;
+	  	int4 mvs_tp_holder;
 	} mv_st_cont;
 } mv_stent;
 
@@ -116,7 +116,13 @@ void push_stck(void* val, int val_size, void** addr);
 #define MVST_ZINTR  11  /* Environmental save for $zinterrupt */
 #define MVST_ZINTDEV 12	/* In I/O when ZINTR, mstr input to now protected */
 
-#define MV_SIZE(X) (sizeof(*mv_chain) - sizeof(mv_chain->mv_st_cont) + sizeof(mv_chain->mv_st_cont.X))
+
+/* Variation of ROUND_UP2 macro that doesn't have the checking that generates a GTMASSERT. This is necessary because the
+   MV_SIZE macro is used in a static table initializer so cannot have executable (non-constant) code in it
+*/
+#define ROUND_UP2_NOCHECK(VALUE,MODULUS) (((VALUE) + ((MODULUS) - 1)) & ~((MODULUS) - 1))
+#define MV_SIZE(X) \
+        ROUND_UP2_NOCHECK(((sizeof(*mv_chain) - sizeof(mv_chain->mv_st_cont) + sizeof(mv_chain->mv_st_cont.X))), NATIVE_WSIZE)
 
 LITREF unsigned char mvs_size[];
 
@@ -124,14 +130,14 @@ LITREF unsigned char mvs_size[];
 	((msp <= stacktop) ? (msp += mvs_size[T]/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) : \
 	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) : \
 	(((mv_stent *) msp)->mv_st_type = T , \
-	((mv_stent *) msp)->mv_st_next = (unsigned char *) mv_chain - msp), \
+	((mv_stent *) msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)), \
 	mv_chain = (mv_stent *) msp)
 
 #define PUSH_MV_STCK(size) (((msp -= (mvs_size[MVST_STCK] + (size))) <= stackwarn) ? \
 	((msp <= stacktop) ? (msp += (mvs_size[MVST_STCK] + (size))/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) : \
 	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) : \
 	(((mv_stent *) msp)->mv_st_type = MVST_STCK , \
-	((mv_stent *) msp)->mv_st_next = (unsigned char *) mv_chain - msp), \
+	((mv_stent *) msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)), \
 	mv_chain = (mv_stent *) msp)
 
 #ifdef DEBUG

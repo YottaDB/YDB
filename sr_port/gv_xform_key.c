@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,7 @@ void	gv_xform_key(gv_key *keyp, bool xback)
 		} else
 		{
 			transform = xback;
-			temp.str.len = gvsub2str(c0, buff, FALSE) - buff;
+			temp.str.len = INTCAST(gvsub2str(c0, buff, FALSE) - buff);
 			transform = !xback;
 			mval2subsc(&temp, keyp);
 			c1 = &keyp->base[keyp->end];

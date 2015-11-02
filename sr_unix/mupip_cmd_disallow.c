@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2002, 2007 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -422,7 +422,7 @@ boolean_t cli_disallow_mupip_set(void)
 	disallow_return_value = (d_c_cli_present("REPLICATION.ON") && d_c_cli_present("REPLICATION.OFF"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("REPLICATION.ON") && (d_c_cli_present("JOURNAL.OFF") ||
-		d_c_cli_present("JOURNAL.DISABLE") || d_c_cli_negated("JOURNAL") || d_c_cli_negated("JOURNAL.BEFORE_IMAGES")));
+		d_c_cli_present("JOURNAL.DISABLE") || d_c_cli_negated("JOURNAL")));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  (d_c_cli_present("PREVJNLFILE") && !(d_c_cli_present("JNLFILE")));
 	CLI_DIS_CHECK_N_RESET;

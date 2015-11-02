@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ void sgtm_putmsg(char *out_str, ...)
 	int	arg_count, dummy, fao_actual, fao_count, i, msg_id;
 	char	msg_buffer[OUT_BUFF_SIZE];
 	mstr	msg_string;
-	int	util_outbufflen;
+	size_t	util_outbufflen;
 
 	VAR_START(var, out_str);
 	arg_count = va_arg(var, int);
@@ -57,7 +57,7 @@ void sgtm_putmsg(char *out_str, ...)
 
 	for (;;)
 	{
-		msg_id = va_arg(var, int);
+		msg_id = (int) va_arg(var, VA_ARG_TYPE);
 		--arg_count;
 
 		msg_string.addr = msg_buffer;
@@ -66,7 +66,7 @@ void sgtm_putmsg(char *out_str, ...)
 
 		if (arg_count > 0)
 		{
-			fao_actual = va_arg(var, int);
+			fao_actual = (int) va_arg(var, VA_ARG_TYPE);
 			--arg_count;
 
 			fao_count = fao_actual;

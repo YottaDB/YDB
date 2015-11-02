@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -119,7 +119,7 @@ void gtm_newintrinsic(mval *intrinsic)
 		/* Put new mvstent entry on (into) the mvstent chain */
 		if ((unsigned char *)mv_chain >= top)
 		{	/* Just put new entry on end of chain which preceeds our base frame */
-			mv_st_ent->mv_st_next = (char *)mv_chain - (char *)mv_st_ent;
+			mv_st_ent->mv_st_next = (unsigned int)((char *)mv_chain - (char *)mv_st_ent);
 			mv_chain = mv_st_ent;
 		} else
 		{	/* One of the indirect frames has mv_stents associated with it so we have to find
@@ -134,8 +134,8 @@ void gtm_newintrinsic(mval *intrinsic)
 				mvst_tmp = mvst_prev;
 				mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
 			}
-			mvst_tmp->mv_st_next = (char *)mv_st_ent - (char *)mvst_tmp;
-			mv_st_ent->mv_st_next = (char *)mvst_prev - (char *)mv_st_ent + mvs_size[MVST_MSAV];
+			mvst_tmp->mv_st_next = (unsigned int)((char *)mv_st_ent - (char *)mvst_tmp);
+			mv_st_ent->mv_st_next = (unsigned int)((char *)mvst_prev - (char *)mv_st_ent + mvs_size[MVST_MSAV]);
 		}
 		/* Save current values of intrinsic var in the inserted mv_stent */
 		mv_st_ent->mv_st_cont.mvs_msav.v = *intrinsic;

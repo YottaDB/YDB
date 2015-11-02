@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@
 #include "gtm_stdio.h"
 #endif
 
+#include "fix_xfer_entry.h"
 
 /* =============================================================================
  * EXTERNAL VARIABLES
@@ -37,7 +38,7 @@
  */
 
 /* The transfer table */
-GBLREF int 		(*xfer_table[])();
+GBLREF xfer_entry_t     xfer_table[];
 
 /* M Profiling active */
 GBLREF	boolean_t	is_tracing_on;
@@ -184,8 +185,11 @@ boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 p
 		/* -------------------------------------------------------
 		 * If table changed, it was not synchronized.
 		 * (Assumes these entries are all that would be changed)
+		 * Note asserts bypassed for Itanium due to nature of the
+		 * fixed up addresses making direct comparisions non-trivial.
 		 * --------------------------------------------------------
 		 */
+#ifndef __ia64
 		 assert((xfer_table[xf_linefetch] == op_linefetch) ||
 			(xfer_table[xf_linefetch] == op_zstepfetch) ||
 			(xfer_table[xf_linefetch] == op_zst_fet_over) ||
@@ -202,13 +206,14 @@ boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 p
 			(xfer_table[xf_zbstart] == op_zstzbstart));
 		 assert(xfer_table[xf_forchk1] == op_forchk1);
 		 assert((xfer_table[xf_forloop] == op_forloop) ||
-			(xfer_table[xf_forloop] == op_mprofforloop));
+                        (xfer_table[xf_forloop] == op_mprofforloop));
 		 assert(xfer_table[xf_ret] == opp_ret ||
 			xfer_table[xf_ret] == opp_zst_over_ret ||
 			xfer_table[xf_ret] == opp_zstepret);
 		 assert(xfer_table[xf_retarg] == op_retarg ||
 			xfer_table[xf_retarg] == opp_zst_over_retarg ||
 			xfer_table[xf_retarg] == opp_zstepretarg);
+#endif /* !ia64 */
 		/* -----------------------------------------------
 		 * Now call the specified set function to swap in
 		 * the desired handlers (and set flags or whatever).
@@ -331,20 +336,20 @@ boolean_t xfer_reset_handlers(int4 event_type)
 
 	if (is_tracing_on)
 	{
-		xfer_table[xf_linefetch] = op_mproflinefetch;
-		xfer_table[xf_linestart] = op_mproflinestart;
-		xfer_table[xf_forloop] = op_mprofforloop;
+		FIX_XFER_ENTRY(xf_linefetch, op_mproflinefetch);
+		FIX_XFER_ENTRY(xf_linestart, op_mproflinestart);
+		FIX_XFER_ENTRY(xf_forloop, op_mprofforloop);
 	} else
 	{
-		xfer_table[xf_linefetch] = op_linefetch;
-		xfer_table[xf_linestart] = op_linestart;
-		xfer_table[xf_forloop] = op_forloop;
+		FIX_XFER_ENTRY(xf_linefetch, op_linefetch);
+		FIX_XFER_ENTRY(xf_linestart, op_linestart);
+		FIX_XFER_ENTRY(xf_forloop, op_forloop);
 	}
-	xfer_table[xf_zbfetch] = op_zbfetch;
-	xfer_table[xf_zbstart] = op_zbstart;
-	xfer_table[xf_forchk1] = op_forchk1;
-	xfer_table[xf_ret] = opp_ret;
-	xfer_table[xf_retarg] = op_retarg;
+	FIX_XFER_ENTRY(xf_zbfetch, op_zbfetch);
+	FIX_XFER_ENTRY(xf_zbstart, op_zbstart);
+	FIX_XFER_ENTRY(xf_forchk1, op_forchk1);
+	FIX_XFER_ENTRY(xf_ret, opp_ret);
+	FIX_XFER_ENTRY(xf_retarg, op_retarg);
 
 #ifdef DEBUG_DEFERRED
 	(void) FPRINTF(stderr,"Reset xfer_table for event type %d.\n",event_type);

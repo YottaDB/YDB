@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,7 +82,7 @@ void	gvcst_kill(bool do_subtree)
 {
 	bool			clue, flush_cache;
 	boolean_t		left_extra, right_extra;
-	boolean_t		actual_update, next_fenced_was_null, jnl_enabled;
+	boolean_t		actual_update, next_fenced_was_null, write_logical_recs;
 	int4			prev_update_trans;
 	cw_set_element		*tp_cse;
 	enum cdb_sc		cdb_status;
@@ -100,7 +100,7 @@ void	gvcst_kill(bool do_subtree)
 	error_def(ERR_SCNDDBNOUPD);
 	error_def(ERR_REPLINSTMISMTCH);
 
-	if (REPL_ENABLED(cs_data) && is_replicator)
+	if (REPL_ALLOWED(cs_data) && is_replicator)
 	{
 		if (FALSE == pool_init)
 			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
@@ -272,7 +272,7 @@ void	gvcst_kill(bool do_subtree)
 			if (!actual_update)
 				sgm_info_ptr->update_trans = prev_update_trans;	/* restore status prior to redundant KILL */
 		}
-		if ((jnl_enabled = JNL_ENABLED(cs_addrs)) && actual_update)
+		if ((write_logical_recs = JNL_WRITE_LOGICAL_RECS(cs_addrs)) && actual_update)
 		{	/* Maintain journal records only if the kill actually resulted in an update. */
 			if (0 == dollar_tlevel)
 			{
@@ -312,10 +312,11 @@ void	gvcst_kill(bool do_subtree)
 				need_kip_incr = TRUE;
 			if ((trans_num)0 == t_end(&gv_target->hist, alt_hist))
 			{
-				if (jnl_fence_ctl.level && next_fenced_was_null && actual_update && jnl_enabled)
+				if (jnl_fence_ctl.level && next_fenced_was_null && actual_update && write_logical_recs)
 				{	/* If ZTransaction and first KILL and the kill resulted in an update
-					 * Note that "jnl_enabled" is used above instead of JNL_ENABLED(cs_addrs) since the
-					 * 	latter might have changed inside the call to t_end() above.
+					 * Note that "write_logical_recs" is used above instead of JNL_WRITE_LOGICAL_RECS(cs_addrs)
+					 * since the value of the latter macro might have changed inside the call to t_end()
+					 * (since jnl state changes could change the JNL_ENABLED check which is part of the macro).
 					 */
 					assert(NULL != cs_addrs->next_fenced);
 					assert(jnl_fence_ctl.fence_list == cs_addrs);

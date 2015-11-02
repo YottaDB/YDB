@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,7 @@ void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 	{
 		if (FILE_PRESENT == status2)
 		{
-			status = gtm_rename(filestr.addr, filestr.len, (char *)fn, fn_len, &ustatus);
+			status = gtm_rename(filestr.addr, (int)filestr.len, (char *)fn, fn_len, &ustatus);
 			if (SYSCALL_ERROR(status))
 			{
 				if (run_time)
@@ -86,7 +86,7 @@ void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 			} else
 			{
 				if (run_time)
-					send_msg(VARLSTCNT(6) ERR_FILERENAME, 4, filestr.len, filestr.addr, fn_len, fn);
+					send_msg(VARLSTCNT(6) ERR_FILERENAME, 4, (int)filestr.len, filestr.addr, fn_len, fn);
 				else
 					gtm_putmsg(VARLSTCNT(6) ERR_FILERENAME, 4, filestr.len, filestr.addr, fn_len, fn);
 			}
@@ -95,7 +95,7 @@ void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 	{
 		if (FILE_PRESENT == status2)
 		{
-			status = gtm_file_remove(filestr.addr, filestr.len, &ustatus);
+			status = gtm_file_remove(filestr.addr, (int)filestr.len, &ustatus);
 			if (SYSCALL_ERROR(status))
 			{
 				if (run_time)

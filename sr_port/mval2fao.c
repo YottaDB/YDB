@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@
 int mval2fao (
 char		*message,		/* text of message in fao format */
 va_list		pfao,			/* argument list of caller */
-int		*outparm,		/* array of resulting fao parameters */
+UINTPTR_T	*outparm,		/* array of resulting fao parameters */
 int		mcount, int fcount,	/* mvalcount and faocount */
 char		*bufbase, char *buftop)	/* buffer space for !AC and !AS */
 {
@@ -47,13 +47,15 @@ char		*bufbase, char *buftop)	/* buffer space for !AC and !AS */
 	parmcnt = 0;
 	buf = bufbase;
 	for ( ; mcount && parmcnt < fcount; )
-	{	MV_FORCE_DEFINED(fao);
+	{
+		MV_FORCE_DEFINED(fao);
 		while (*message != '!')
 			message++;
 		for (i=0;(*++message > 47) && (*message < 58);i++)		/* a length for the fao parameter */
 			;
 		switch (*message++)
-		{	case '/':
+		{
+			case '/':
 			case '_':
 			case '^':
 			case '!':	break;
@@ -74,14 +76,14 @@ char		*bufbase, char *buftop)	/* buffer space for !AC and !AS */
 								if (parmcnt + 2 > fcount)
 									return parmcnt;
 								outparm[parmcnt++] = (unsigned int)(fao)->str.len;
-								outparm[parmcnt++] = (unsigned int)(fao)->str.addr;
+								outparm[parmcnt++] = (UINTPTR_T)(fao)->str.addr;
 								break;
 /* ascii string descriptor */			case 'S':
 								if (buf + sizeof(desc_struct) >= buftop)
 									return -1;
 								((desc_struct *)buf)->len = (fao)->str.len;
 								((desc_struct *)buf)->addr = (fao)->str.addr;
-								outparm[parmcnt++] = (int) buf;
+								outparm[parmcnt++] = (UINTPTR_T)buf;
 								buf += sizeof(desc_struct);
 								break;
 						default:	return -1;
@@ -93,27 +95,29 @@ char		*bufbase, char *buftop)	/* buffer space for !AC and !AS */
 /* hex number */	case 'X':
 /* signed number */	case 'S':
 					num = MV_FORCE_INT(fao);
-					switch( *message++)
-					{	case 'B':	outparm[parmcnt++] = (char) num;
+					switch(*message++)
+					{
+						case 'B':	outparm[parmcnt++] = (UINTPTR_T)num;
 								break;
-						case 'W':	outparm[parmcnt++] = (short) num;
+						case 'W':	outparm[parmcnt++] = (UINTPTR_T)num;
 								break;
-						case 'L':	outparm[parmcnt++] = num;
+						case 'L':	outparm[parmcnt++] = (UINTPTR_T)num;
 								break;
 						default:	return -1;
 					}
-					fao = va_arg( pfao, mval *);
+					fao = va_arg(pfao, mval *);
 					mcount--;
 					break;
 /* zero filled num */	case 'Z':
 /* unsigned num */	case 'U':
 					num = MV_FORCE_INT(fao);
-					switch( *message++)
-					{	case 'B':	outparm[parmcnt++] = (unsigned char) num;
+					switch(*message++)
+					{
+						case 'B':	outparm[parmcnt++] = (UINTPTR_T)num;
 								break;
-						case 'W':	outparm[parmcnt++] = (unsigned short) num;
+						case 'W':	outparm[parmcnt++] = (UINTPTR_T)num;
 								break;
-						case 'L':	outparm[parmcnt++] = num;
+						case 'L':	outparm[parmcnt++] = (UINTPTR_T)num;
 								break;
 						default:	return -1;
 					}

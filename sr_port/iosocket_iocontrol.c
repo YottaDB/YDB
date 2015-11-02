@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ void	iosocket_iocontrol(mstr *d)
 	memset(&action[0], 0, sizeof(action));
 	if (2 != (n = SSCANF(d->addr, "%[^(](%hu)", &action[0], &depth)))
 		memcpy(&action[0], d->addr, d->len);
-	if (0 == (length = strlen(&action[0])))
+	if (0 == (length = STRLEN(&action[0])))
 		return;
 	lower_to_upper((uchar_ptr_t)&action[0], (uchar_ptr_t)&action[0], length);
 	if (0 == memcmp(&action[0], "LISTEN", length))
@@ -73,7 +73,7 @@ void	iosocket_dlr_device(mstr *d)
 	iod = io_curr_device.out;
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 
-	len = strlen(dsocketptr->dollar_device);
+ 	len = STRLEN(dsocketptr->dollar_device);
 	/* verify internal buffer has enough space for $DEVICE string value */
 	assert((int)d->len > len);
 	memcpy(d->addr, dsocketptr->dollar_device, len);
@@ -90,7 +90,7 @@ void	iosocket_dlr_key(mstr *d)
         iod = io_curr_device.out;
         dsocketptr = (d_socket_struct *)iod->dev_sp;
 
-        len = strlen(dsocketptr->dollar_key);
+        len = STRLEN(dsocketptr->dollar_key);
         /* verify internal buffer has enough space for $DEVICE string value */
         assert((int)d->len > len);
 	if (len > 0)

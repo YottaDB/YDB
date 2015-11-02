@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,9 +18,9 @@
 
 GBLREF int4 process_id;
 
-bool mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, uint4 auxown);
+bool mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, UINTPTR_T auxown);
 
-bool mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, uint4 auxown)
+bool mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, UINTPTR_T auxown)
 {
 	mlk_shrblk_ptr_t	d, dhead, d1;
 	bool			blocked;
@@ -54,12 +54,12 @@ bool mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, uint4 a
 	return blocked;
 }
 
-bool mlk_shrblk_find(mlk_pvtblk *p,
+bool mlk_shrblk_find(mlk_pvtblk       *p,
 		     mlk_shrblk_ptr_t *ret,
-		     uint4 auxown)
+		     UINTPTR_T        auxown)
 {
 	mlk_shrblk_ptr_t	pnt, d, d0, d1, dhead;
-	sm_int_ptr_t		chld_of_pnt, cop1;
+        ptroff_t		*chld_of_pnt, *cop1;
 	mlk_shrsub_ptr_t	dsub;
 	int			i, j, slen;
 	unsigned char		*cp;
@@ -67,8 +67,8 @@ bool mlk_shrblk_find(mlk_pvtblk *p,
 
 	blocked = FALSE;
 	*ret = 0;
-	for (pnt = 0 , chld_of_pnt = &p->ctlptr->blkroot , i = p->subscript_cnt , cp = p->value ;
-		i > 0 ; i-- , pnt = d , chld_of_pnt = (sm_int_ptr_t)&d->children, cp += slen)
+	for (pnt = 0 , chld_of_pnt = (ptroff_t *)&p->ctlptr->blkroot , i = p->subscript_cnt , cp = p->value ;
+		i > 0 ; i-- , pnt = d , chld_of_pnt = (ptroff_t *)&d->children, cp += slen)
 	{
 		slen = *cp++;
 

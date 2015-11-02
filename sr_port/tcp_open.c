@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +62,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 	char			temp_addr[SA_MAXLEN + 1], addr[SA_MAXLEN + 1];
 	char 			*from, *to, *errptr, *temp_ch;
 	int			match, sock, sendbufsize, size, ii, on = 1, temp_1 = -2;
-	int4                    errlen, rv, msec_timeout;
+	int4                    rv, msec_timeout;
 	struct	sockaddr_in	sin;
 	in_addr_t		temp_sin_addr;
 	char                    msg_buffer[1024];
@@ -125,7 +125,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		if (-1 == lsock)
 		{
 			errptr = (char *)STRERROR(errno);
-			errlen = strlen(errptr);
 			util_out_print(errptr, TRUE, errno);
 			return -1;
 		}
@@ -133,7 +132,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		if (-1 == tcp_routines.aa_setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)))
 		{
 			errptr = (char *)STRERROR(errno);
-			errlen = strlen(errptr);
 			(void)tcp_routines.aa_close(lsock);
 			util_out_print(errptr, TRUE, errno);
 			return -1;
@@ -141,7 +139,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		if (-1 == tcp_routines.aa_bind(lsock, (struct sockaddr *)&sin, sizeof(struct sockaddr)))
 		{
 			errptr = (char *)STRERROR(errno);
-			errlen = strlen(errptr);
 			(void)tcp_routines.aa_close(lsock);
 			util_out_print(errptr, TRUE, errno);
 			return -1;
@@ -150,7 +147,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		if (-1 == tcp_routines.aa_listen(lsock, MAX_CONN_PENDING))
 		{
 			errptr = (char *)STRERROR(errno);
-			errlen = strlen(errptr);
 			(void)tcp_routines.aa_close(lsock);
 			util_out_print(errptr, TRUE, errno);
 			return -1;
@@ -199,7 +195,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			} else  if (0 > rv)
 			{
 				errptr = (char *)STRERROR(errno);
-				errlen = strlen(errptr);
 				util_out_print(errptr, TRUE, errno);
 				(void)tcp_routines.aa_close(lsock);
 				return -1;
@@ -209,7 +204,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			if (-1 == sock)
 			{
 				errptr = (char *)STRERROR(errno);
-				errlen = strlen(errptr);
 				util_out_print(errptr, TRUE, errno);
 				(void)tcp_routines.aa_close(lsock);
 				return -1;
@@ -261,7 +255,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			if (-1 == sock)
 			{
 				errptr = (char *)STRERROR(errno);
-				errlen = strlen(errptr);
 				util_out_print(errptr, TRUE, errno);
 				return -1;
 			}
@@ -270,7 +263,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			{
 				(void)tcp_routines.aa_close(sock);
 				errptr = (char *)STRERROR(errno);
-				errlen = strlen(errptr);
 			        util_out_print(errptr, TRUE, errno);
 				return -1;
 			}
@@ -284,7 +276,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			{
 				(void)tcp_routines.aa_close(sock);
 				errptr = (char *)STRERROR(errno);
-				errlen = strlen(errptr);
 			        util_out_print(errptr, TRUE, errno);
 				return -1;
 			}

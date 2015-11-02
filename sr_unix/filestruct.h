@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,9 +24,9 @@ typedef struct unix_db_info_struct
 	int		fd;
 	gd_id		fileid;
 	int		semid;
-	time_t		sem_ctime;
+	time_t		gt_sem_ctime;
 	int		shmid;
-	time_t		shm_ctime;
+	time_t		gt_shm_ctime;
 	int		ftok_semid;
 	boolean_t	grabbed_ftok_sem;
         key_t           key;

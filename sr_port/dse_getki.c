@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 				if ((dlr_len = parse_dlr_char(src, top, slit)) > 0)
 				{
 					key_subsc.str.addr = slit;
-					key_subsc.str.len = strlen(slit);
+					key_subsc.str.len = STRLEN(slit);
 					src += dlr_len;
 				} else
 				{
@@ -118,7 +118,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 						util_out_print("Error:  invalid key.", TRUE);
 						return FALSE;
 					}
-				key_subsc.str.len = src - key_subsc.str.addr;
+				key_subsc.str.len = INTCAST(src - key_subsc.str.addr);
 				s2n(&key_subsc);
 				key_subsc.mvtype &= MV_NUM_MASK;
 			} else
@@ -138,7 +138,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 					*tmp++ = *src++;
 				}
 				key_subsc.str.addr = slit;
-				key_subsc.str.len = tmp - slit;
+				key_subsc.str.len = INTCAST(tmp - slit);
 			}
 
 			if ( 0 == key_subsc.str.len && NEVER == cs_addrs->hdr->null_subs)
@@ -170,7 +170,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 		util_out_print("Error:  invalid key.", TRUE);
 		return FALSE;
 	}
-	*len = temp_dst - bot + 1;
+	*len = (int)(temp_dst - bot + 1);
 	memcpy(dst, &gv_currkey->base[0], *len);
 	return TRUE;
 }
@@ -246,5 +246,5 @@ int parse_dlr_char(char *src, char *top, char *dlr_subsc)
 	if (tmp_buf == top)
 		return 0;
 	tmp_buf++;
-	return (tmp_buf - src);
+	return (int)(tmp_buf - src);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -149,6 +149,7 @@ void	mupip_recover(void)
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_MUPJNLINTERRUPT);
 	error_def(ERR_RLBKJNSEQ);
+	error_def(ERR_RLBKLOSTTNONLY);
 
 	ESTABLISH(mupip_recover_ch);
 	/* PHASE 1: Process user input, open journal files, create rctl for phase 2 */
@@ -157,6 +158,8 @@ void	mupip_recover(void)
 	mur_get_options();
 	if (!mur_open_files()) /* mur_open_files already issued error */
 		mupip_exit(ERR_MUNOACTION);
+	VMS_ONLY(assert(!mur_options.rollback_losttnonly);)
+	UNIX_ONLY(assert(!mur_options.rollback_losttnonly || mur_options.rollback);)
 	murgbl.prc_vec = prc_vec;
 	reg_total = murgbl.reg_total;
 	if (mur_options.show_head_only)
@@ -176,9 +179,11 @@ void	mupip_recover(void)
 			all_gen_properly_closed = FALSE;
 		if (jctl->jfh->recover_interrupted)
 		{
-			/* These journal files were created by recover */
+			/* These journal files were created by recover so they should be BEFORE_IMAGE */
 			if (!jctl->jfh->before_images)
 				GTMASSERT;
+			if (mur_options.rollback_losttnonly)
+				GTMASSERT;	/* dont know how one can end up with NOBEFORE_IMAGE jnl files in intrpt recovery */
 			rctl->jfh_recov_interrupted = TRUE;
 			intrrupted_recov_processing = murgbl.intrpt_recovery = TRUE;
 		} else if (rctl->recov_interrupted) /* it is not necessary to do interrupted recover processing */
@@ -218,6 +223,7 @@ void	mupip_recover(void)
 			!mur_options.lookback_time_specified && !mur_options.lookback_opers_specified)
 		  || (mur_options.rollback && !mur_options.resync_specified && 0 == mur_options.fetchresync_port)))
 	{ 	/* We do not need to do unnecessary processing */
+		assert(!mur_options.rollback_losttnonly);
 		if (mur_options.show)
 			mur_output_show();
 		murgbl.clean_exit = TRUE;		 /* "mur_close_files" (invoked from "mupip_exit_handler") relies on this */
@@ -237,6 +243,7 @@ void	mupip_recover(void)
 	}
 	if (mur_options.update && intrrupted_recov_processing)
 	{
+		assert(!mur_options.rollback_losttnonly);
 		JNL_PUT_MSG_PROGRESS("Interrupted recovery processing started");
 		/* Additional steps because recover was interrupted earlier */
 		if (SS_NORMAL != mur_apply_pblk(TRUE))
@@ -244,6 +251,8 @@ void	mupip_recover(void)
 		if (!mur_jctl_from_next_gen())
 			mupip_exit(ERR_MUNOACTION);
 	}
+	if (mur_options.rollback_losttnonly)
+		gtm_putmsg(VARLSTCNT(1) ERR_RLBKLOSTTNONLY);
 	/* The current resync_seqno of this replication instance needs to be calculated before the call to "gtmrecv_fetchresync" */
 	VMS_ONLY(jgbl.max_resync_seqno = 0;)
 	UNIX_ONLY(jgbl.max_dualsite_resync_seqno = 0;)
@@ -367,19 +376,23 @@ void	mupip_recover(void)
                  * 	    For mur_options.verify == true following will do complete
 		 *	    	PBLK processing (from lvrec_off to turn_around point)
 		 */
-		JNL_PUT_MSG_PROGRESS("Before image applying started");
                 if (mur_options.update)
-		{
+		{	/* If doing a LOSTTNONLY rollback we will not be applying any before images but we want to
+			 * invoke "mur_apply_pblk" as it does other things that we need.
+			 */
+			if (!mur_options.rollback_losttnonly)
+				JNL_PUT_MSG_PROGRESS("Before image applying started");
 			if (SS_NORMAL != mur_apply_pblk(FALSE))
 				mupip_exit(ERR_MUNOACTION);
 
 			/* PHASE 5 : Update journal file header with current state of recover, so that if this process
-			 *           is interrupted, we can recover from it. We already synched updates */
-			if (SS_NORMAL != mur_process_intrpt_recov())
+			 *	is interrupted, we can recover from it. We already synched updates. Dont do this
+			 *	in case of a LOSTTNONLY rollback as we want to avoid touching the database/jnl in this case.
+			 */
+			if (!mur_options.rollback_losttnonly && (SS_NORMAL != mur_process_intrpt_recov()))
 				mupip_exit(ERR_MUNOACTION);
 		}
 	}
-
 	/* PHASE 6 : Forward processing phase */
 	JNL_PUT_MSG_PROGRESS("Forward processing started");
 	if (mur_options.rollback)
@@ -402,7 +415,7 @@ void	mupip_recover(void)
 
 	/* PHASE 7 : Close all files, rundown and exit */
 	murgbl.clean_exit = TRUE;
-	if (mur_options.rollback)
+	if (mur_options.rollback && !mur_options.rollback_losttnonly)
 	{
 		assert(murgbl.consist_jnl_seqno <= losttn_seqno);
 		assert(murgbl.consist_jnl_seqno <= min_broken_seqno);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ int iomb_read(mval *v,int4 t)
 	if (mb_ptr->in_top == mb_ptr->in_pos)
 		status = iomb_dataread(t);
 
-	memcpy(v->str.addr,mb_ptr->in_pos,(v->str.len = mb_ptr->in_top - mb_ptr->in_pos));
+	memcpy(v->str.addr,mb_ptr->in_pos,(v->str.len = INTCAST(mb_ptr->in_top - mb_ptr->in_pos)));
 	mb_ptr->in_pos = mb_ptr->in_top = mb_ptr->inbuf;
 	io_ptr->dollar.x = 0;
 	io_ptr->dollar.y++;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@
 #define CST_BOK(r)		((uchar_ptr_t)(r) + sizeof(rec_hdr))
 #define CST_USAR(b, r)		((b)->bsiz - ((uchar_ptr_t(r) + (r)->rsiz - (uchar_ptr_t)(b)))
 #define CST_KSIZ		(gv_curr_key->end - gv_curr_key->base + 1)
-#define BSTAR_REC_SIZE		(sizeof(rec_hdr) + sizeof(block_id))
+#define BSTAR_REC_SIZE		INTCAST((sizeof(rec_hdr) + sizeof(block_id)))
 #define BSTAR_REC(r)		((rec_hdr_ptr_t)(r))->rsiz = BSTAR_REC_SIZE; ((rec_hdr_ptr_t)(r))->cmpc = 0;
 #define IS_LEAF(b)		(0 == ((blk_hdr_ptr_t)(b))->levl)
 #define IS_BML(b)		(BML_LEVL == ((blk_hdr_ptr_t)(b))->levl)

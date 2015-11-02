@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@
 }
 
 #define	BM_MINUS_BLKHDR_SIZE(bplm)	((bplm) / (BITS_PER_UCHAR / BML_BITS_PER_BLK))
-#define BM_SIZE(bplm)			(sizeof(blk_hdr) + BM_MINUS_BLKHDR_SIZE(bplm))
+#define BM_SIZE(bplm)			(USIZEOF(blk_hdr) + BM_MINUS_BLKHDR_SIZE(bplm))
 
 #define	VALIDATE_BM_BLK(blk, bp, csa, region, status)								\
 {														\

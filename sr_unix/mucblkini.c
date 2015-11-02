@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,7 @@ void mucblkini (void)
 	bp2 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
 	bmpsize = BM_SIZE(cs_addrs->hdr->bplmap);
 	if (cs_addrs->do_fullblockwrites)
-		bmpsize = ROUND_UP(bmpsize, cs_addrs->fullblockwrite_len);
+		bmpsize = (int4)ROUND_UP(bmpsize, cs_addrs->fullblockwrite_len);
 	bmp = (uchar_ptr_t)malloc(bmpsize);
 	LSEEKREAD(udi->fd, (off_t)(cs_addrs->hdr->start_vbn - 1) * DISK_BLOCK_SIZE, bmp, bmpsize, status);
 	if (0 != status)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ void lref_parse(unsigned char *label_ref, mstr* routine, mstr* label, int* offse
 
 	routine->addr = label->addr = (char *)label_ref;
 	*offset = 0;
-	label_len = strlen((const char *)label_ref);
+	label_len = STRLEN((const char *)label_ref);
 	for (i = 0, c = label_ref;  i < label_len;  i++)
 	{
 		ch = *c++;
@@ -37,13 +37,13 @@ void lref_parse(unsigned char *label_ref, mstr* routine, mstr* label, int* offse
 
 			if (ch == '+')
 			{
-				*offset = STRTOL((const char *)c, (char**)&c1, 10);
+				*offset = (int)STRTOL((const char *)c, (char**)&c1, 10);
 				if (c == c1 ||*c1 != '^')
 					rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
 				c = c1 + 1;
 			}
 			routine->addr = (char *)c;
-			routine->len = label_ref + label_len - c;
+			routine->len = INTCAST(label_ref + label_len - c);
 			break;
 		}
 	}

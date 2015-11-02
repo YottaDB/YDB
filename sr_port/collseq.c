@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +76,7 @@ collseq *ready_collseq(int act)
 		memcpy(filespec, CT_PREFIX, sizeof(CT_PREFIX));
 		fsp = i2asc(&filespec[sizeof(CT_PREFIX) - 1], act);
 		*fsp = 0;
-		fspec.len =  fsp - filespec;
+		fspec.len =  INTCAST(fsp - filespec);
 		fspec.addr = (char *)filespec;
 		if (!map_collseq(&fspec, &temp_csp))
 			return NULL;

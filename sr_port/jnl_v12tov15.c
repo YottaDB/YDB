@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,12 +69,12 @@ int jnl_v12tov15(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				if (IS_SET_KILL_ZKILL(rectype))
 				{
 					GET_USHORT(key_len, jb + V12_JREC_PREFIX_SIZE + v12_jnl_fixed_size[rectype]);
-					total_key = key_len + sizeof(unsigned short);
+					total_key = key_len + SIZEOF(unsigned short);
 					if (IS_SET(rectype))
 					{
 						GET_MSTR_LEN(long_data_len, jb + V12_JREC_PREFIX_SIZE +
 								   v12_jnl_fixed_size[rectype] + total_key);
-						total_data = long_data_len + sizeof(mstr_len_t);
+						total_data = long_data_len + SIZEOF(mstr_len_t);
 					}
 					conv_reclen = JREC_PREFIX_SIZE + FIXED_UPD_RECLEN +
 						total_key + total_data + JREC_SUFFIX_SIZE;
@@ -128,7 +128,7 @@ int jnl_v12tov15(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 					cb += sizeof(uint4);
 				} else
 					assert(FALSE);
-				nzeros = (cstart + clen_without_sfx - cb);
+				nzeros = (int)((cstart + clen_without_sfx - cb));
 				if (nzeros > 0)
 				{
 					memset(cb, 0, nzeros);
@@ -150,7 +150,7 @@ int jnl_v12tov15(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		break;
 	}
 	assert(0 == jlen || -1 == status);
-	*jnl_len = jb - jnl_buff;
-	*conv_len = cb - conv_buff;
+	*jnl_len = (uint4)(jb - jnl_buff);
+	*conv_len = (uint4)(cb - conv_buff);
 	return(status);
 }

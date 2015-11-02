@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,7 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 			utf8_badchar(0, srcptr, srctop, 0, NULL);
 		srcptr += bytelen;
 	}
-	pfxlen = srcptr - srcbase;
+	pfxlen = (int)(srcptr - srcbase);
 	if (skip > 0)
 	{ /* Case #2: schar is past the string length. echar test handled in generated code.
 	     Should be padded with as many spaces as characters remained to be skipped */
@@ -82,8 +82,8 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 	char_len = 0;
 	if (skip <= 0)
 	{ /* Case #4: echar is within the string length, suffix to be added */
-		sfxoff = srcptr - srcbase;
-		sfxlen = srctop - srcptr;
+		sfxoff = (int)(srcptr - srcbase);
+		sfxlen = (int)(srctop - srcptr);
 		if (!badchar_inhibit && sfxlen > 0)
 		{ /* validate the suffix, and we can compute char_len as well */
 			for (; (srcptr < srctop); ++char_len)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,8 @@
 #include "rtnhdr.h"
 #include "inst_flush.h"
 #include "private_code_copy.h"
+#include "stack_frame.h"
+#include <string.h>
 
 CONDITION_HANDLER(cre_priv_ch)
 {
@@ -39,7 +41,7 @@ uint4 cre_private_code_copy(rhdtyp *rtn)
 #ifdef USHBIN_SUPPORTED
 		assert(NULL != rtn->shlib_handle); /* don't need private copy if not shared */
 		assert(NULL == rtn->shared_ptext_adr); /* if already private, we shouldn't be calling this routine */
-		code_size = rtn->ptext_end_adr - rtn->ptext_adr;
+		code_size = (int)(rtn->ptext_end_adr - rtn->ptext_adr) ;
 		ESTABLISH_RET(cre_priv_ch, UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY));
 		new_ptext = malloc(code_size);
 		REVERT;

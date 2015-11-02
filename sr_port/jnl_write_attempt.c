@@ -57,15 +57,14 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	error_def(ERR_JNLMEMDSK);
 	error_def(ERR_JNLPROCSTUCK);
 	error_def(ERR_JNLWRTDEFER);
+	error_def(ERR_JNLWRTNOWWRTR);
 
-	/*
-	 * Some callers of jnl_sub_write_attempt (jnl_flush->jnl_write_attempt, jnl_write->jnl_write_attempt) are in
+	/* Some callers of jnl_sub_write_attempt (jnl_flush->jnl_write_attempt, jnl_write->jnl_write_attempt) are in
 	 * crit, and some other (jnl_wait->jnl_write_attempt) are not. Callers in crit do not need worry about journal
 	 * buffer fields (dskaddr, freeaddr) changing underneath them, but for those not in crit, jnl_sub_write_attempt
-	 * might incorrectly return an error status when journal file is swithched. Such callers should check for
+	 * might incorrectly return an error status when journal file is switched. Such callers should check for
 	 * journal file switched condition and terminate any loops they are in.
 	 */
-
 	jb = jpc->jnl_buff;
 	status = ERR_JNLWRTDEFER;
 	csa = &FILE_INFO(jpc->region)->s_addrs;
@@ -109,6 +108,15 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			loop_image_count = jb->image_count;
 			*lcnt = 1;	/* !!! this should be detected and limited by the caller !!! */
 			break;
+		}
+		UNIX_ONLY(assert(ERR_JNLWRTNOWWRTR != status);)	/* dont have asynchronous jnl writes in Unix */
+		if (csa->now_crit && (ERR_JNLWRTNOWWRTR != status) && (ERR_JNLWRTDEFER != status))
+		{	/* If not waiting for some other writer (or self in VMS) and holding crit better turn off journaling
+			 * and proceed with database update at least to avoid a database hang.
+			 */
+			jpc->jnl_buff->blocked = 0;
+			jnl_file_lost(jpc, status);
+			return status;
 		}
 		if (*lcnt <= JNL_MAX_FLUSH_TRIES)
 		{
@@ -167,11 +175,11 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 	boolean_t		was_crit, jnlfile_lost;
 
 	error_def(ERR_JNLCNTRL);
+	error_def(ERR_JNLFLUSH);
+	error_def(ERR_JNLFLUSHNOPROG);
 	error_def(ERR_JNLMEMDSK);
 	error_def(ERR_JNLPROCSTUCK);
 	error_def(ERR_JNLWRTDEFER);
-	error_def(ERR_JNLFLUSHNOPROG);
-	error_def(ERR_JNLFLUSH);
 	error_def(ERR_TEXT);
 
 	jb = jpc->jnl_buff;
@@ -182,8 +190,10 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 	     lcnt++, prev_lcnt = lcnt, cnt++)
 	{
 		status = jnl_sub_write_attempt(jpc, &lcnt, threshold);
-		if (!csa->now_crit && JNL_FILE_SWITCHED(jpc))
-		{
+		if (JNL_FILE_SWITCHED(jpc))
+		{	/* If we are holding crit, the journal file switch could happen in the form of journaling getting
+			 * turned OFF (due to disk space issues etc.)
+			 */
 			jpc->status = SS_NORMAL;
 			return SS_NORMAL;
 		}

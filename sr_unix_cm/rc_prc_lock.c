@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@
 #include "mlk_lock.h"
 #include "mlk_bckout.h"
 
-GBLREF int		rc_auxown;		/* From server, address to use in auxown field, same as OMI */
+GBLREF UINTPTR_T	rc_auxown;		/* From server, address to use in auxown field, same as OMI */
 GBLREF unsigned short	lks_this_cmd;
 GBLREF mlk_pvtblk	*mlk_pvt_root;
 GBLREF int		omi_pid;
@@ -85,7 +85,7 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 				prior = &(*prior)->next;
 		}
 		action = LOCKED;
-	}else if (req->hdr.r.fmd.value & RC_MODE_DECRLOCK)
+	} else if (req->hdr.r.fmd.value & RC_MODE_DECRLOCK)
 	{	sbk = &req->dlocks[0].sb_key;
 		fl = req->dlocks;
 
@@ -143,7 +143,7 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 		qhdr->a.erc.value = RC_SUCCESS;
 		REVERT;
 		return 0;
-	}else
+	} else
 		action = INCREMENTAL;
 	lock.mvtype = ext.mvtype = MV_STR;
 	lkname = (char*)req->dlocks[0].sb_key.key;
@@ -205,7 +205,7 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 				return 0;	/* Return lock not granted */
 			}
 			free(mp);
-		}else if (mp != mlk_pvt_root)
+		} else if (mp != mlk_pvt_root)
 		{	REVERT;
 			qhdr->a.erc.value = RC_GLOBERRUNSPEC;
 #ifdef DEBUG
@@ -230,8 +230,7 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 				x->level += x->translev;
 			else
 				x->level = 1;
-		}
-		else
+		} else
 		{
 			blocked = TRUE;
 			break;
@@ -241,10 +240,11 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 	{
 		for (x = mlk_pvt_root, i = 0;
 			i < locks_done ; x = x->next, i++)
-		{	mlk_bckout(x, action);
+		{
+			mlk_bckout(x, action);
 		}
 		qhdr->a.erc.value = RC_LOCKCONFLICT;
-	}else
+	} else
 		qhdr->a.erc.value = RC_SUCCESS;
 	REVERT;
 	return 0;

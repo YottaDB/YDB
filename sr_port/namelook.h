@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,6 @@
 
 #ifndef NAMELOOK_INCLUDED
 #define NAMELOOK_INCLUDED
-
 int namelook(const unsigned char offset_tab[], const nametabent *name_tab, char *str, int len);
 
 #endif /* NAMELOOK_INCLUDED */

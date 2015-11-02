@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,12 +23,14 @@
 
 GBLDEF int4		codegen_padlen;	/* pad code to section alignment */
 
-LITREF octabstruct	oc_tab[];	/* op-code table */
-GBLREF triple		t_orig;		/* head of triples */
-GBLREF char		cg_phase;	/* code generation phase */
-GBLREF int4		curr_addr;	/* current address */
-GBLREF src_line_struct	src_head;
-GBLREF short		source_column,source_line;
+LITREF	octabstruct	oc_tab[];	/* op-code table */
+GBLREF	triple		t_orig;		/* head of triples */
+GBLREF	char		cg_phase;	/* code generation phase */
+GBLREF	int4		curr_addr;	/* current address */
+GBLREF	src_line_struct	src_head;
+GBLREF	short		source_column,source_line;
+GBLREF	int4		pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
+GBLREF	triple		*curtchain;
 
 void	code_gen(void)
 {
@@ -41,6 +43,9 @@ void	code_gen(void)
 		curr_addr = t_orig.exorder.fl->rtaddr;
 		old_line = -1;
 	}
+	assert(0 == pending_errtriplecode);	/* we should never have a pending ins_errtriple at this point */
+	assert(curtchain == &t_orig);	/* curtchain should still be pointing to what it was originally */
+	DEBUG_ONLY(chktchain(&t_orig));	/* if this assert fails, then recompile with DEBUG_TRIPLES to catch the issue sooner */
 	dqloop(&t_orig, exorder, ct)
 	{
 		if (cg_phase == CGP_APPROX_ADDR)

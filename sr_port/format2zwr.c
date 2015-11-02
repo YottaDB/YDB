@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +60,7 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 				isill = (WEOF == ch) ? (ch = *cp, TRUE) : FALSE;
 				if (!isill)
 					isctl = !U_ISPRINT(ch);
-				chlen = strnext - cp;
+				chlen = (int)(strnext - cp);
 			}
 #endif
 			switch(fastate)

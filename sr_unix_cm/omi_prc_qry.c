@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,7 @@ omi_prc_qry(omi_conn *cptr, char *xend, char *buff, char *bend)
 
     if (v.str.len == 0) {
 	OMI_LI_WRIT(0, bptr);
-	return bptr - buff;
+	return (int)(bptr - buff);
     }
 
 /*  Put a global reference into the reply */
@@ -91,7 +91,7 @@ omi_prc_qry(omi_conn *cptr, char *xend, char *buff, char *bend)
     bgn2    = (uns_char *)bptr++;
     *bptr++ = '^';
     grp     = (char *)gv_altkey->base;
-    grl     = strlen(grp);
+    grl     = STRLEN(grp);
     OMI_SI_WRIT(grl + 1, bgn2);
     (void) strcpy(bptr, grp);
     bptr   += grl;
@@ -100,16 +100,16 @@ omi_prc_qry(omi_conn *cptr, char *xend, char *buff, char *bend)
     for (grp += grl + 1; *grp; grp += strlen(grp) + 1) {
 	bgn2   = (uns_char *)bptr++;
 	sbsp   = gvsub2str((uchar_ptr_t)grp, (uchar_ptr_t)bptr, FALSE);
-	grl    = sbsp - (uns_char *)bptr;
+	grl    = (int)(sbsp - (uns_char *)bptr);
 	OMI_SI_WRIT(grl, bgn2);
 	bptr  += grl;
 	sbsp  += grl + 1;
     }
 
 /*  Length of the global reference */
-    grl = (uns_char *)bptr - bgn1;
+    grl = (int)((uns_char *)bptr - bgn1);
     OMI_LI_WRIT(grl - OMI_LI_SIZ, bgn1);
 
-    return bptr - buff;
+    return (int)(bptr - buff);
 
 }

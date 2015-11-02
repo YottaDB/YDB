@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -138,55 +138,55 @@ int	getcaps(int fildes)
 		assert(-1 != AUTO_RIGHT_MARGIN);
 		if (0 == AUTO_RIGHT_MARGIN)
 			AUTO_RIGHT_MARGIN = gtm_auto_right_margin;
-		assert((char *)-1 != CLR_EOS);
+		assert((char *)-1L != CLR_EOS);
 		if (NULL == CLR_EOS)
 			CLR_EOS = gtm_clr_eos;
-		assert((char *)-1 != CLR_EOL);
+		assert((char *)-1L != CLR_EOL);
 		if (NULL == CLR_EOL)
 			CLR_EOL = gtm_clr_eol;
 		assert(-2 != COLUMNS);
 		if (-1 == COLUMNS)
 			COLUMNS = gtm_columns;
-		assert((char *)-1 != CURSOR_ADDRESS);
+		assert((char *)-1L != CURSOR_ADDRESS);
 		if (NULL == CURSOR_ADDRESS)
 			CURSOR_ADDRESS = gtm_cursor_address;
-		assert((char *)-1 != CURSOR_DOWN);
+		assert((char *)-1L != CURSOR_DOWN);
 		if (NULL == CURSOR_DOWN)
 			CURSOR_DOWN = gtm_cursor_down;
-		assert((char *)-1 != CURSOR_LEFT);
+		assert((char *)-1L != CURSOR_LEFT);
 		if (NULL == CURSOR_LEFT)
 			CURSOR_LEFT = gtm_cursor_left;
-		assert((char *)-1 != CURSOR_RIGHT);
+		assert((char *)-1L != CURSOR_RIGHT);
 		if (NULL == CURSOR_RIGHT)
 			CURSOR_RIGHT = gtm_cursor_right;
-		assert((char *)-1 != CURSOR_UP);
+		assert((char *)-1L != CURSOR_UP);
 		if (NULL == CURSOR_UP)
 			CURSOR_UP = gtm_cursor_up;
-		assert((char *)-1 != KEY_BACKSPACE);
+		assert((char *)-1L != KEY_BACKSPACE);
 		if (NULL == KEY_BACKSPACE)
 			KEY_BACKSPACE = gtm_key_backspace;
-		assert((char *)-1 != KEY_DC);
+		assert((char *)-1L != KEY_DC);
 		if (NULL == KEY_DC)
 			KEY_DC = gtm_key_dc;
-		assert((char *)-1 != KEY_DOWN);
+		assert((char *)-1L != KEY_DOWN);
 		if (NULL == KEY_DOWN)
 			KEY_DOWN = gtm_key_down;
-		assert((char *)-1 != KEY_LEFT);
+		assert((char *)-1L != KEY_LEFT);
 		if (NULL == KEY_LEFT)
 			KEY_LEFT = gtm_key_left;
-		assert((char *)-1 != KEY_RIGHT);
+		assert((char *)-1L != KEY_RIGHT);
 		if (NULL == KEY_RIGHT)
 			KEY_RIGHT = gtm_key_right;
-		assert((char *)-1 != KEY_UP);
+		assert((char *)-1L != KEY_UP);
 		if (NULL == KEY_UP)
 			KEY_UP = gtm_key_up;
-		assert((char *)-1 != KEY_INSERT);
+		assert((char *)-1L != KEY_INSERT);
 		if (NULL == KEY_INSERT)
 			KEY_INSERT = gtm_key_insert;
-		assert((char *)-1 != KEYPAD_LOCAL);
+		assert((char *)-1L != KEYPAD_LOCAL);
 		if (NULL == KEYPAD_LOCAL)
 			KEYPAD_LOCAL = gtm_keypad_local;
-		assert((char *)-1 != KEYPAD_XMIT);
+		assert((char *)-1L != KEYPAD_XMIT);
 		if (NULL == KEYPAD_XMIT)
 			KEYPAD_XMIT = gtm_keypad_xmit;
 		assert(-2 != GTM_LINES);

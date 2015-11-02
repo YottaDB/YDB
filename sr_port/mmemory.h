@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,7 @@
 typedef struct mcalloc_hdr_struct {
 	struct mcalloc_hdr_struct *link;	/* pointer to the next block */
 	int4		size;			/* size of the usable area in this block */
+	IA64_ONLY(int filler;)			/* The data(data[0]) on IA64 should begin on 8-byte boundary */
 	char		data[1];		/* beginning of the allocatable area (NOTE: should be last member) */
 } mcalloc_hdr;
 

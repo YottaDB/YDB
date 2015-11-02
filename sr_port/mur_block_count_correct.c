@@ -69,7 +69,7 @@ uint4 mur_block_count_correct(void)
 		case dba_bg:
 #endif
 		case dba_mm:
-			mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
+			mu_int_ovrhd = (int4)DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
 		break;
 	}
 	mu_int_ovrhd += 1;

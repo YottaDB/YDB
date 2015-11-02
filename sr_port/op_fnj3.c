@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -234,8 +234,8 @@ void op_fnj3(mval *src,int width,int fract,mval *dst)
 		}
 	}
 	dst->mvtype = MV_STR;
-	dst->str.addr = (char *) stringpool.free;
-	dst->str.len = (char *) cp - dst->str.addr;
+	dst->str.addr = (char *)stringpool.free;
+	dst->str.len = INTCAST((char *)cp - dst->str.addr);
 	stringpool.free = cp;
 	return;
 }

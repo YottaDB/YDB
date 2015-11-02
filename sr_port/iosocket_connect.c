@@ -73,6 +73,12 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
         dsocketptr->dollar_key[0] = '\0';
 
 #ifdef SOCK_INTR_CONNECT
+	/*
+	***** Note this code and the code further down is #ifdef'd out because this approach to handling jobinterrupts
+              during connect was not feasible because we are always dealing with a new sockintr device on the restart
+	      of an OPEN statement. There is no device to continue using so this approach needs to be changed.
+	      The code is left here in case it is useful when this is fixed.
+	*/
         /* Check for restart */
         if (dsocketptr->mupintr)
         {       /* We have a pending read restart of some sort - check we aren't recursing on this device */
@@ -122,7 +128,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 	        if (-1 == (socketptr->sd = tcp_routines.aa_socket(AF_INET, SOCK_STREAM, 0)))
         	{
                 	errptr = (char *)STRERROR(errno);
-                	errlen = strlen(errptr);
+			errlen = STRLEN(errptr);
                 	rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
                 	return FALSE;
         	}
@@ -130,7 +136,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 		if (-1 == tcp_routines.aa_setsockopt(socketptr->sd, SOL_SOCKET, SO_REUSEADDR, &temp_1, sizeof(temp_1)))
         	{
                 	errptr = (char *)STRERROR(errno);
-                	errlen = strlen(errptr);
+                	errlen = STRLEN(errptr);
                 	rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 				  RTS_ERROR_LITERAL("SO_REUSEADDR"), errno, errlen, errptr);
                 	return FALSE;
@@ -141,7 +147,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 						     IPPROTO_TCP, TCP_NODELAY, &temp_1, sizeof(temp_1)))
         	{
                 	errptr = (char *)STRERROR(errno);
-                	errlen = strlen(errptr);
+                	errlen = STRLEN(errptr);
                 	rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 				  RTS_ERROR_LITERAL("TCP_NODELAY"), errno, errlen, errptr);
                 	return FALSE;
@@ -153,7 +159,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 							     SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, sizeof(socketptr->bufsiz)))
 			{
 				errptr = (char *)STRERROR(errno);
-         			errlen = strlen(errptr);
+         			errlen = STRLEN(errptr);
                 		rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					  RTS_ERROR_LITERAL("SO_RCVBUF"), errno, errlen, errptr);
 				return FALSE;
@@ -165,7 +171,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 							     SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, &temp_1))
 			{
 				errptr = (char *)STRERROR(errno);
-         			errlen = strlen(errptr);
+         			errlen = STRLEN(errptr);
                 		rts_error(VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
 					  RTS_ERROR_LITERAL("SO_RCVBUF"), errno, errlen, errptr);
 				return FALSE;

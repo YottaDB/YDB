@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -160,6 +160,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	enum cdb_sc		status;
 	int			int_depth;
 	uint4			jnl_status;
+	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp, jbbp; /* jbp is non-NULL if journaling, jbbp is non-NULL only if before-image journaling */
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -196,6 +197,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	assert(!cw_set_depth || update_trans); /* whenever cw_set_depth is non-zero, ensure that update_trans is TRUE */
 	assert(cw_set_depth || !update_trans || gvdupsetnoop); /* whenever cw_set_depth is zero, ensure that update_trans
 								* is FALSE except when set noop optimization is enabled */
+	assert(0 == cr_array_index);
+	cr_array_index = 0;	/* be safe and reset it in PRO even if it is not zero */
 	if (csd->wc_blocked || (is_mm && (csa->total_blks != csa->ti->total_blks)))
 	{ /* If blocked, or we have MM and file has been extended, force repair */
 		status = cdb_sc_helpedout;	/* force retry with special status so philanthropy isn't punished */
@@ -218,7 +221,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			return csa->ti->curr_tn;
 		}
 	}
-	cr_array_index = 0;
 	ESTABLISH_RET(t_ch, 0);
 	if ((0 != cw_set_depth) && (gds_t_writemap == cw_set[0].mode))
 		cw_depth = 0;		/* freeing a block from gvcst_kill or reorg, or upgrading/downgrading a block by reorg */
@@ -269,15 +271,25 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 						 * the bitmap (due to concurrency issues at this point). Therefore we might be
 						 * actually reading uninitialized block headers and in turn a bad value of
 						 * "old_block->bsiz". Restart if we ever access a buffer whose size is greater
-						 * than the db block size.
+						 * than the db block size. The only exception is if the database has been fully
+						 * upgraded and we are reading a reused block that is in V4 format. In this
+						 * case there is no need to write a before-image so reset cs->old_block.
 						 */
 						bsiz = old_block->bsiz;
 						if (bsiz > csd->blk_size)
 						{
-							status = cdb_sc_lostbmlcr;
-							goto failed;
-						}
-						cs->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4*)old_block, bsiz);
+							if (!csd->fully_upgraded ||
+								(sizeof(v15_blk_hdr) > ((v15_blk_hdr_ptr_t)old_block)->bsiz))
+							{
+								status = cdb_sc_lostbmlcr;
+								goto failed;
+							} else
+							{	/* V4 format block even though db has been fully upgraded */
+								cs->old_block = NULL;
+							}
+						} else
+							cs->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED,
+								(uint4*)old_block, bsiz);
 					}
 				}
 				/* assert that the block that we got from bm_getfree is less than the total blocks.
@@ -670,26 +682,29 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					cs->ondsk_blkver = cr->ondsk_blkver;
 					if ((cs->cr != cr) || (cs->cycle != cr->cycle))
 					{	/* Global buffer containing "cs->blk" changed since we read it out of crit */
-						cs->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
-						cs->cr = cr;
-						cs->cycle = cr->cycle;
+						old_block = (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr);
 						if (NULL != jbbp)
 						{	/* PBLK checksum was computed outside-of-crit when block was read but
 							 * block has relocated in the cache since then. Recompute the checksum.
+							 * Even though we hold crit at this point we might see invalid bsiz fields
+							 * in case it is a reused block that is still in V4 format. Assert this.
+							 * In pro dont take chances so treat MIN(bsiz, csd->blk_size) as the
+							 * block size to unconditionally compute the checksum.
 							 */
-							old_block = (blk_hdr_ptr_t)cs->old_block;
-							/* We hold crit at this point so we are guaranteed valid bsiz field.
-							 * Hence we do not need to take MIN(bsiz, csd->blk_size) like we did
-							 * in the earlier call to jnl_get_checksum.
-							 */
-							assert(old_block->bsiz <= csd->blk_size);
+							bsiz = old_block->bsiz;
+							assert((bsiz <= csd->blk_size) || (csd->fully_upgraded
+								&& (((v15_blk_hdr_ptr_t)old_block)->bsiz <= csd->blk_size)));
 							if (old_block->tn < jbbp->epoch_tn)
+							{
 								cs->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED,
-													(uint4*)old_block,
-													old_block->bsiz);
-							else
+											(uint4*)old_block,
+											MIN(bsiz, csd->blk_size));
+							} else
 								cs->blk_checksum = 0;
 						}
+						cs->cr = cr;
+						cs->cycle = cr->cycle;
+						cs->old_block = (sm_uc_ptr_t)old_block;
 					}
 					assert(cs->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr));
 				}
@@ -706,7 +721,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		assert((inctn_invalid_op != inctn_opcode) || cw_depth
 				|| !is_replicator				/* exception case (b) */
 				|| (ERR_GVPUTFAIL == t_err) && gvdupsetnoop);	/* exception case (a) */
-		if (REPL_ENABLED(csa) && is_replicator && (inctn_invalid_op == inctn_opcode))
+		if (REPL_ALLOWED(csa) && is_replicator && (inctn_invalid_op == inctn_opcode))
 		{
 			replication = TRUE;
 			jpl = jnlpool_ctl;
@@ -717,7 +732,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			QWASSIGN(tjpl->jnl_seqno, jpl->jnl_seqno);
 			INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size);)
 			assert(jgbl.cumul_jnl_rec_len);
-			tmp_cumul_jnl_rec_len = jgbl.cumul_jnl_rec_len + sizeof(jnldata_hdr_struct);
+			tmp_cumul_jnl_rec_len = (uint4)(jgbl.cumul_jnl_rec_len + sizeof(jnldata_hdr_struct));
 			tjpl->write += sizeof(jnldata_hdr_struct);
 			if (tjpl->write >= tjpl->jnlpool_size)
 			{
@@ -757,7 +772,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			GTM_WHITE_BOX_TEST(WBTEST_T_END_JNLFILOPN, jnl_status, ERR_JNLFILOPN);
 			if (jnl_status == 0)
 			{
-				jbp = csa->jnl->jnl_buff;
+				jpc = csa->jnl;
+				jbp = jpc->jnl_buff;
 				/* tmp_cw_set_depth was used to do TOTAL_NONTPJNL_REC_SIZE calculation earlier in this function.
 				 * It is now though that the actual jnl record write occurs. Ensure that the current value of
 				 * cw_set_depth does not entail any change in journal record size than was calculated.
@@ -771,8 +787,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				if (DISK_BLOCKS_SUM(jbp->freeaddr, total_jnl_rec_size) > jbp->filesize)
 				{	/* Moved as part of change to prevent journal records splitting
 					 * across multiple generation journal files. */
-					jnl_flush(csa->jnl->region);
-					if (jnl_file_extend(csa->jnl, total_jnl_rec_size) == -1)
+					jnl_flush(jpc->region);
+					if (jnl_file_extend(jpc, total_jnl_rec_size) == -1)
 					{
 						assert((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa)));
 						status = cdb_sc_jnlclose;
@@ -781,9 +797,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 						goto failed;
 					}
 				}
-				if (0 == csa->jnl->pini_addr)
+				if (0 == jpc->pini_addr)
 					jnl_put_jrt_pini(csa);
-				if (jbp->before_images)
+				if (JNL_HAS_EPOCH(jbp))
 				{
 					if (jbp->next_epoch_time <= jgbl.gbl_jrec_time)
 					{	/* Flush the cache. Since we are in crit, defer syncing epoch */
@@ -796,16 +812,17 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 						}
 						VMS_ONLY(
 							if (csd->clustered  &&
-								!CCP_SEGMENT_STATE(csa->nl,
-									CCST_MASK_HAVE_DIRTY_BUFFERS))
+								!CCP_SEGMENT_STATE(csa->nl, CCST_MASK_HAVE_DIRTY_BUFFERS))
 							{
 								CCP_FID_MSG(gv_cur_region, CCTR_FLUSHLK);
 								ccp_userwait(gv_cur_region,
-									CCST_MASK_HAVE_DIRTY_BUFFERS, 0,
-										 csa->nl->ccp_cycle);
+									CCST_MASK_HAVE_DIRTY_BUFFERS, 0, csa->nl->ccp_cycle);
 							}
 						)
 					}
+				}
+				if (jbp->before_images)
+				{
 					/* do not write PBLKs if MUPIP REORG UPGRADE/DOWNGRADE with -NOSAFEJNL */
 					if (!mu_reorg_upgrd_dwngrd_in_prog || !mu_reorg_nosafejnl)
 					{
@@ -850,10 +867,12 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				if (write_after_image)
 				{	/* either DSE or MUPIP RECOVER playing an AIMG record */
 					assert(1 == cw_set_depth); /* only one block at a time */
+					assert(!replication);
 					cs = &cw_set[0];
 					jnl_write_aimg_rec(csa, cs);
 				} else if (write_inctn)
 				{
+					assert(!replication);
 					assert(!mu_reorg_upgrd_dwngrd_in_prog
 						|| (inctn_blkupgrd == inctn_opcode) || (inctn_blkdwngrd == inctn_opcode));
 					if (mu_reorg_upgrd_dwngrd_in_prog)
@@ -884,31 +903,42 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					jnl_write_logical(csa, non_tp_jfb_ptr);
 				} else
 					jnl_write_ztp_logical(csa, non_tp_jfb_ptr);
-				if (replication)
-				{
-					QWINCRBY(tjpl->jnl_seqno, seq_num_one);
-					QWASSIGN(csa->hdr->reg_seqno, tjpl->jnl_seqno);
-					if (is_updproc)
-					{
-						VMS_ONLY(
-							QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
-							QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
-						)
-						UNIX_ONLY(
-							assert(REPL_PROTO_VER_UNINITIALIZED !=
-								recvpool.gtmrecv_local->last_valid_remote_proto_ver);
-							if (REPL_PROTO_VER_DUALSITE ==
-								recvpool.gtmrecv_local->last_valid_remote_proto_ver)
-							{
-								QWINCRBY(jgbl.max_dualsite_resync_seqno, seq_num_one);
-								QWASSIGN(csa->hdr->dualsite_resync_seqno,
-									jgbl.max_dualsite_resync_seqno);
-							}
-						)
-					}
-				}
 			} else
 				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+		} else if (replication)
+		{	/* Case where JNL_ENABLED(csa) is FALSE but REPL_WAS_ENABLED(csa) is TRUE and therefore we need to
+			 * write logical jnl records in the journal pool (no need to write in journal buffer or journal file).
+			 */
+			assert(!JNL_ENABLED(csa) && REPL_WAS_ENABLED(csa));
+			if (0 == jnl_fence_ctl.level)
+			{
+				QWASSIGN(jnl_fence_ctl.token, tjpl->jnl_seqno);
+				jnl_write_logical(csa, non_tp_jfb_ptr);
+			} else
+                                jnl_write_ztp_logical(csa, non_tp_jfb_ptr);
+		}
+		if (replication)
+		{
+			QWINCRBY(tjpl->jnl_seqno, seq_num_one);
+			QWASSIGN(csa->hdr->reg_seqno, tjpl->jnl_seqno);
+			if (is_updproc)
+			{
+				VMS_ONLY(
+					QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
+					QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
+				)
+				UNIX_ONLY(
+					assert(REPL_PROTO_VER_UNINITIALIZED !=
+						recvpool.gtmrecv_local->last_valid_remote_proto_ver);
+					if (REPL_PROTO_VER_DUALSITE ==
+						recvpool.gtmrecv_local->last_valid_remote_proto_ver)
+					{
+						QWINCRBY(jgbl.max_dualsite_resync_seqno, seq_num_one);
+						QWASSIGN(csa->hdr->dualsite_resync_seqno,
+							jgbl.max_dualsite_resync_seqno);
+					}
+				)
+			}
 		}
 		csa->prev_free_blks = csa->ti->free_blocks;
 		csa->t_commit_crit = TRUE;
@@ -948,6 +978,15 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 						assert(retvalue); 	/* secshr_db_clnup() should have completed the commit */
 						status = cdb_sc_normal;	/* reset status to normal as transaction is complete */
 						assert(!csa->now_crit);	/* assert that we do not hold crit any more */
+						/* At this time "cr_array_index" could be non-zero and a few cache-records might
+						 * have their "in_cw_set" field set to TRUE. We should not reset "in_cw_set" as we
+						 * don't hold crit at this point and also because we might still need those buffers
+						 * pinned until their before-images are backed up in wcs_recover (in case an
+						 * online backup was running while secshr_db_clnup did its job). Reset the
+						 * local variable "cr_array_index" though so we do not accidentally reset the
+						 * "in_cw_set" fields ourselves before the wcs_recover.
+						 */
+						cr_array_index = 0;
 						goto skip_cr_array;	/* hence skip until past "cr_array_index" processing */
 					}
 				}
@@ -1009,7 +1048,7 @@ skip_cr_array:
 	if (update_trans)
 	{
 		wcs_timer_start(gv_cur_region, TRUE);
-		if (REPL_ENABLED(csa) && dse_running)
+		if (REPL_ALLOWED(csa) && dse_running)
 		{
 			temp_tn = dbtn + 1;
 			send_msg(VARLSTCNT(6) ERR_NOTREPLICATED, 4, &temp_tn, LEN_AND_LIT("DSE"), process_id);

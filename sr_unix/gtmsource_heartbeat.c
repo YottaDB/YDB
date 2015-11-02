@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,8 +91,10 @@ int gtmsource_init_heartbeat(void)
 
 	memset(repl_heartbeat_que_head, 0, num_q_entries * sizeof(repl_heartbeat_que_entry_t));
 	repl_heartbeat_free_head = repl_heartbeat_que_head + 1;
-	*(time_t *)&repl_heartbeat_que_head->heartbeat.ack_time[0] = 0;
-	*(time_t *)&repl_heartbeat_free_head->heartbeat.ack_time[0] = 0;
+	fprintf(stderr, "repl_heartbeat_que_head (0x%p) repl_heartbeat_free_head (0x%p). Address of ack_time (0x%p)\n",
+		repl_heartbeat_que_head, repl_heartbeat_free_head, &repl_heartbeat_free_head->heartbeat.ack_time[0]);
+	*(gtm_time4_t *)&repl_heartbeat_que_head->heartbeat.ack_time[0] = 0;
+	*(gtm_time4_t *)&repl_heartbeat_free_head->heartbeat.ack_time[0] = 0;
 	for (heartbeat_element = repl_heartbeat_free_head + 1, num_q_entries -= 2;
 	     num_q_entries > 0;
 	     num_q_entries--, heartbeat_element++)
@@ -150,8 +152,8 @@ boolean_t gtmsource_is_heartbeat_overdue(time_t *now, repl_heartbeat_msg_ptr_t o
 	memcpy(overdue_heartbeat, &heartbeat_element->heartbeat, sizeof(repl_heartbeat_msg_t));
 
 	REPL_DPRINT5("Overdue heartbeat - SEQNO : "INT8_FMT" time : %ld now : %ld difftime : %00.f\n",
-		     INT8_PRINT(*(seq_num *)&overdue_heartbeat->ack_seqno[0]), *(time_t *)&overdue_heartbeat->ack_time[0], *now,
-		     time_elapsed);
+		     INT8_PRINT(*(seq_num *)&overdue_heartbeat->ack_seqno[0]), *(gtm_time4_t *)&overdue_heartbeat->ack_time[0],
+		     *now, time_elapsed);
 
 	insqt((que_ent_ptr_t)heartbeat_element, (que_ent_ptr_t)repl_heartbeat_free_head);
 
@@ -178,7 +180,7 @@ int gtmsource_send_heartbeat(time_t *now)
 		return (SS_NORMAL);
 
 	QWASSIGN(*(seq_num *)&heartbeat_element->heartbeat.ack_seqno[0], jnlpool.jnlpool_ctl->jnl_seqno);
-	*(time_t *)&heartbeat_element->heartbeat.ack_time[0] = *now;
+	*(gtm_time4_t *)&heartbeat_element->heartbeat.ack_time[0] = *now;
 
 	heartbeat_element->heartbeat.type = REPL_HEARTBEAT;
 	heartbeat_element->heartbeat.len = MIN_REPL_MSGLEN;
@@ -198,7 +200,7 @@ int gtmsource_send_heartbeat(time_t *now)
 			earliest_sent_time = last_sent_time;
 
 		REPL_DPRINT4("HEARTBEAT sent with time %ld SEQNO "INT8_FMT" at %ld\n",
-			     *(time_t *)&heartbeat_element->heartbeat.ack_time[0],
+			     *(gtm_time4_t *)&heartbeat_element->heartbeat.ack_time[0],
 			     INT8_PRINT(*(seq_num *)&heartbeat_element->heartbeat.ack_seqno[0]), time(NULL));
 
 		return (SS_NORMAL);
@@ -220,6 +222,7 @@ int gtmsource_send_heartbeat(time_t *now)
 			RTS_ERROR_LITERAL("Error sending HEARTBEAT message. Error in select"), status);
 
 	GTMASSERT;
+	return -1; /* This will never get executed, added to make compiler happy */
 }
 
 int gtmsource_process_heartbeat(repl_heartbeat_msg_ptr_t heartbeat_msg)
@@ -232,17 +235,18 @@ int gtmsource_process_heartbeat(repl_heartbeat_msg_ptr_t heartbeat_msg)
 
 	QWASSIGN(ack_seqno, *(seq_num *)&heartbeat_msg->ack_seqno[0]);
 	REPL_DPRINT4("HEARTBEAT received with time %ld SEQNO "INT8_FMT" at %ld\n",
-		     *(time_t *)&heartbeat_msg->ack_time[0], INT8_PRINT(ack_seqno), time(NULL));
+		     *(gtm_time4_t *)&heartbeat_msg->ack_time[0], INT8_PRINT(ack_seqno), time(NULL));
 
 	for (heartbeat_element = (repl_heartbeat_que_entry_t *)remqh((que_ent_ptr_t)repl_heartbeat_que_head);
 	     NULL !=  heartbeat_element&&
-	     *(time_t *)&heartbeat_msg->ack_time[0] >= earliest_sent_time;
+	     *(gtm_time4_t *)&heartbeat_msg->ack_time[0] >= (gtm_time4_t)earliest_sent_time;
 	     heartbeat_element = (repl_heartbeat_que_entry_t *)remqh((que_ent_ptr_t)repl_heartbeat_que_head))
 	{
 		insqt((que_ent_ptr_t)heartbeat_element, (que_ent_ptr_t)repl_heartbeat_free_head);
 		earliest_sent_time =
-			*(time_t *)&((repl_heartbeat_que_entry_t *)
-			((unsigned char *)repl_heartbeat_que_head + repl_heartbeat_que_head->que.fl))->heartbeat.ack_time[0];
+			(time_t) *(gtm_time4_t *)&((repl_heartbeat_que_entry_t *)
+						   ((unsigned char *)repl_heartbeat_que_head +
+						    repl_heartbeat_que_head->que.fl))->heartbeat.ack_time[0];
 	}
 
 	if (NULL != heartbeat_element)

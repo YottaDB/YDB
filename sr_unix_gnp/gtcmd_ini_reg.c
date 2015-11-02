@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,8 @@
 
 #include <sys/types.h>
 #include <errno.h>
-#include <unistd.h>
+
+#include "gtm_unistd.h"
 
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
@@ -36,7 +37,7 @@
 #include "min_max.h"
 #include "mu_gv_cur_reg_init.h"
 
-GBLDEF cm_region_head	*reglist;
+GBLREF cm_region_head	*reglist;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
@@ -99,7 +100,7 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 		ptr->reg_hash = (hash_table_mname *)malloc(sizeof(hash_table_mname));
 		if (-1 != gethostname((char *)node, sizeof(node)))
 		{
-			retlen = strlen((char *)node);
+			retlen = USTRLEN((char *)node);
 			retlen = MIN(retlen, MAX_RN_LEN - 1);
 			memcpy(ptr->reg->rname, node, retlen);
 		} else

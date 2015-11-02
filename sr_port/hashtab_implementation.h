@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -272,9 +272,13 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 		If key is not present, it adds the entry and returns true.
 		As a side-effect tabent points to the matched entry or added entry
 */
-boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **tabentptr) {
-
-	unsigned int	hash, ht_index, save_ht_index, prime, rhfact;
+boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **tabentptr)
+{
+#ifdef INT8_HASH
+	gtm_uint64_t    hash, ht_index, save_ht_index, prime, rhfact;
+#else
+	uint4	 	hash, ht_index, save_ht_index, prime, rhfact;
+#endif /* INT8_HASH */
 	HT_ENT		*oldbase, *first_del_ent, *tabbase;
 	error_def(ERR_HTEXPFAIL);
 
@@ -296,7 +300,7 @@ boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **t
 	tabbase = &table->base[0];
 	prime = table->size;
 	FIND_HASH(key, hash);
-	ht_index = hash % prime;
+	ht_index = (int) (hash % prime);
 	*tabentptr = tabbase + ht_index;
 	RETURN_IF_ADDED(table, *tabentptr, key, value);
 	/* We are here because collision happened. Do collision resolution */
@@ -310,6 +314,7 @@ boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **t
 		SET_REHASH_INDEX(ht_index, rhfact, prime);
 	} while(ht_index != save_ht_index);
 	GTMASSERT;
+	return FALSE; /* to prevent warnings */
 }
 
 /*
@@ -318,7 +323,11 @@ boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **t
  */
 void *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
 {
-	unsigned int	hash, ht_index, save_ht_index, prime, rhfact;
+#ifdef INT8_HASH
+	gtm_uint64_t 	hash, ht_index, save_ht_index, prime, rhfact;
+#else
+	uint4 		hash, ht_index, save_ht_index, prime, rhfact;
+#endif /* INT8_HASH */
 	HT_ENT		*tabent, *tabbase;
 
 	tabbase = &table->base[0];
@@ -352,7 +361,11 @@ void *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
  */
 boolean_t DELETE_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
 {
-	unsigned int	hash, ht_index, save_ht_index, prime, rhfact;
+#ifdef INT8_HASH
+	gtm_uint64_t	hash, ht_index, save_ht_index, prime, rhfact;
+#else
+	uint4		hash, ht_index, save_ht_index, prime, rhfact;
+#endif /* INT8_HASH */
 	HT_ENT		*tabent, *tabbase;
 
 	tabbase = &table->base[0];

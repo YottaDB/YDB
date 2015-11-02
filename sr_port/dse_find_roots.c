@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,7 @@ void dse_find_roots(block_id index)
 				d_ptr->next = (global_dir_path *)malloc(sizeof(global_dir_path));
 			else
 			{	d_ptr->next = 0;
-				d_ptr->offset = rp - bp;
+				d_ptr->offset = (int4)(rp - bp);
 				break;
 			}
 			d_ptr = d_ptr->next;

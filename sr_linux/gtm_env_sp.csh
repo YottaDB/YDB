@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -21,6 +21,9 @@
 # re-initialize them for each subshell (i.e., don't undo any explicit changes that
 # have been made since the last version change).
 
+set platform_name = `uname | sed 's/-//g' | tr '[A-Z]' '[a-z]'`
+set mach_type = `uname -m`
+
 if ( $?gtm_version_change == "1" ) then
 
 	# Archiver definitions:
@@ -36,10 +39,18 @@ if ( $?gtm_version_change == "1" ) then
 	# setenv	gt_as_use_prebuilt	"yes"
 
 	# GNU as
-	setenv gt_as_assembler		"as"
+
+        if ( "ia64" == $mach_type && "linux" == $platform_name ) then
+	    setenv gt_as_assembler		"cc -c"
+        endif
+
+        if ( "ia64" != $mach_type && "linux" == $platform_name ) then
+            setenv gt_as_assembler          "as"
+            setenv gt_as_option_debug      "--gstabs"
+        endif
+
 	# to avoid naming files with .S
 	# smw 1999/12/04 setenv gt_as_options_common	"-c -x assembler-with-cpp"
-	setenv gt_as_option_debug	"--gstabs"
 	setenv gt_as_option_DDEBUG	""
 
 	# C definitions:
@@ -47,7 +58,7 @@ if ( $?gtm_version_change == "1" ) then
 	# generate position independent code
 	setenv 	gt_cc_shl_fpic		"-fPIC"
 
-#	setenv	gt_cc_options_common 	"-c -D_LARGEFILE64_SOURCE=1 -D_FILE_OFFSET_BITS=64"
+        #	setenv	gt_cc_options_common 	"-c -D_LARGEFILE64_SOURCE=1 -D_FILE_OFFSET_BITS=64"
 	# For gcc: _BSD_SOURCE for caddr_t, others
 	#	   _XOPEN_SOURCE=500 should probably define POSIX 199309 and/or
 	#		POSIX 199506 but doesnt so...
@@ -56,9 +67,19 @@ if ( $?gtm_version_change == "1" ) then
 #	setenv	gt_cc_options_common	"-c -ansi -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -D_POSIX_C_SOURCE=199506L
 #	setenv	gt_cc_options_common	"$gt_cc_options_common -D_FILE_OFFSET_BITS=64 -DFULLBLOCKWRITES -fsigned-char"
 #	_GNU_SOURCE includes _XOPEN_SOURCE=400, _BSD_SOURCE, and _POSIX_C_SOURCE-199506L among others
-	setenv	gt_cc_options_common	"-c -ansi -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -fsigned-char"
-	setenv gt_cc_options_common "$gt_cc_options_common $gt_cc_shl_fpic -Wimplicit -Wmissing-prototypes"
-        set lversion=`uname -r`
+#       Need _XOPEN_SOURCE=600 for posix_memalign() interface (replaces obsolete memalign)
+
+        setenv  gt_cc_options_common    "-c -ansi -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DXOPEN_SOURCE=600 -fsigned-char "
+
+        if ( "ia64" != $mach_type && "linux" == $platform_name ) then
+        	setenv gt_cc_options_common "$gt_cc_options_common $gt_cc_shl_fpic -Wimplicit -Wmissing-prototypes  "
+        endif
+
+        if ( "ia64" == $mach_type && "linux" == $platform_name ) then
+	        setenv gt_cc_options_common "$gt_cc_options_common $gt_cc_shl_fpic -Wimplicit -Wmissing-prototypes -D_LARGEFILE64_SOURCE "
+        endif
+
+	set lversion=`uname -r`
         set ltemp_ver=`echo $lversion | sed 's/./& /g'`
         if ($ltemp_ver[3] == "2"  && $ltemp_ver[1] == "2") then
             setenv gt_cc_options_common "$gt_cc_options_common -DNeedInAddrPort"
@@ -67,8 +88,9 @@ if ( $?gtm_version_change == "1" ) then
 # -fno-defer-pop to prevent problems with assembly/generated code with optimization
 # -fno-strict-aliasing since we don't comply with the rules
 # -ffloat-store for consistent results avoiding rounding differences
+        if ( "ia64" != $mach_type && "linux" == $platform_name ) then
 	setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store -march=i686"
-
+	endif
 	# -g	generate debugging information for dbx (no longer overrides -O)
 	setenv	gt_cc_option_debug	"-g"
 
@@ -82,7 +104,6 @@ if ( $?gtm_version_change == "1" ) then
 	# This means Call ins won't be available on Linux. Malli Sep 28, 2001
 	# setenv	gt_ld_options_common	"-Wl,-M -rdynamic"
 	setenv	gt_ld_options_common	"-Wl,-M"
-
 	setenv 	gt_ld_options_gtmshr	"-Wl,--version-script,gtmshr_symbols.export"
 
 	# need to re-define these in terms of new gt_ld_options_common:
@@ -92,7 +113,16 @@ if ( $?gtm_version_change == "1" ) then
 
 
 #	setenv	gt_ld_syslibs		"-lcurses -lm -lsocket -lnsl -ldl -lposix4"
-	setenv	gt_ld_syslibs		"-lncurses -lm -ldl"
+
+        if ( "ia64" == $mach_type && "linux" == $platform_name ) then
+# Added -lelf
+        	setenv	gt_ld_syslibs		" -lelf -lncurses -lm -ldl"
+        endif
+
+        if ( "ia64" != $mach_type && "linux" == $platform_name ) then
+        	setenv  gt_ld_syslibs           "-lncurses -lm -ldl"
+        endif
+
 	# -lrt for async I/O in mupip recover/rollback
 	setenv gt_ld_aio_syslib		"-lrt"
 
@@ -115,6 +145,13 @@ endif
 
 # Assembler definitions:
 # Note: we need to specify the assembler output file name or it will write it to the source directory.
-alias	gt_as_bta	'gt_as $gt_as_option_debug $gt_as_option_nooptimize -o `basename \!:1 .s`.o \!:1'
-alias	gt_as_dbg	'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize -o `basename \!:1 .s`.o \!:1'
+if ( "ia64" == $mach_type && "linux" == $platform_name ) then
+alias	gt_as_bta	'gt_as $gt_as_option_debug $gt_as_option_nooptimize'
+alias	gt_as_dbg	'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize'
 alias	gt_as_pro	'gt_as $gt_as_option_optimize -o `basename \!:1 .s`.o \!:1'
+endif
+if ( "ia64" != $mach_type && "linux" == $platform_name ) then
+alias   gt_as_bta       'gt_as $gt_as_option_debug $gt_as_option_nooptimize -o `basename \!:1 .s`.o \!:1'
+alias   gt_as_dbg       'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize -o `basename \!:1 .s`.o \!:1'
+alias   gt_as_pro       'gt_as $gt_as_option_optimize -o `basename \!:1 .s`.o \!:1'
+endif

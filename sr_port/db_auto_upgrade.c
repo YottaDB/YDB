@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +70,7 @@ void db_auto_upgrade(gd_region *reg)
 		{
 			case GDSMV51000:		/* Multi-site replication available */
 			case GDSMV52000:		/* Unicode */
+			case GDSMV53000:		/* M-Itanium release.*/
 				break;			/* Nothing to do for this version */
 			default:
 				csd->minor_dbver = GDSMVCURR;

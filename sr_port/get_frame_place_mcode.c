@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,8 +41,8 @@ void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
 	boolean_t	indirect_frame;
 	ihdtyp		*irtnhdr;
 	cache_entry	*indce;
-	int4		*vp;
-	unsigned char	*fpmpc;
+	INTPTR_T	*vp;
+  	unsigned char	*fpmpc;
 
 	assert(DOLLAR_STACK_PLACE == mode || DOLLAR_STACK_MCODE == mode);
 	assert(0 <= level);
@@ -70,7 +70,7 @@ void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
 		else
 			fpmpc = error_frame_save_mpc[level];
 		result->str.addr = (char *)&pos_str[0];
-		result->str.len = symb_line(fpmpc, &pos_str[0], 0, fp->rvector) - &pos_str[0];
+		result->str.len = INTCAST(symb_line(fpmpc, &pos_str[0], 0, fp->rvector) - &pos_str[0]);
 		indirect_frame = FALSE;
 	} else
 	{
@@ -126,7 +126,7 @@ void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
 			op_fntext(&label, offset, &routine, result);
 		} else
 		{	/* code picked up from cache_cleanup(). any changes here might need to be reflected there */
-			vp = (int4 *)fp->ctxt;
+			vp = (INTPTR_T *)fp->ctxt;
 			vp--;
 			assert((GTM_OMAGIC << 16) + OBJ_LABEL == *vp);	/* Validate backward linkage */
 			vp--;

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -82,18 +82,20 @@ if ( $?gtm_version_change == "1" ) then
 	# Generic C compiler information:
 
 	setenv	gt_cc_compiler		"cc"		# name of C compiler
+	setenv	gt_cpp_compiler		"cpp"		# name of C preprocessor
 
 	setenv	gt_cc_option_DBTABLD	"-DNOLIBGTMSHR"	# define NOLIBGTMSHR macro to statically link mumps for bta image
 
 	setenv	gt_cc_option_DDEBUG	"-DDEBUG"	# define DEBUG compilation-time macro
 
-	# specify header (include) file directory/ies (set by gtmsrc.csh during version command)
-	setenv	gtm_inc_list 		"/usr/local/include $gtm_inc_list"	# Add ICU library headers path
+	setenv	gt_cc_option_I		"-I/usr/local/include"	# specify ICU header (include) file directory
+								#   (set by gtmsrc.csh during version command)
 	setenv	gt_cc_option_debug	"-g"		# generate debugger information
 	setenv	gt_cc_option_nooptimize	""		# don't optimize generated code
 	setenv	gt_cc_option_optimize	"-O"		# optimize generated code
 
 	setenv	gt_cc_options_common	"-c"		# suppress link phase; force .o for each .c file even if only one
+	setenv	gt_cpp_options_common	""		# Options for C preprocessor
 
 
 	# Generic linker information:
@@ -178,6 +180,7 @@ alias	gt_as_pro		'gt_as $gt_as_option_optimize'
 
 # Generic C compiler invocations:
 
+alias	gt_cpp			'$gt_cpp_compiler $gt_cpp_options_common $gt_cc_option_I'
 alias	gt_cc			'$gt_cc_compiler $gt_cc_options_common $gt_cc_option_I'
 alias	gt_cc_bta		'gt_cc $gt_cc_option_DBTABLD $gt_cc_option_debug $gt_cc_option_nooptimize'
 alias	gt_cc_dbg		'gt_cc $gt_cc_option_DDEBUG $gt_cc_option_debug $gt_cc_option_nooptimize'

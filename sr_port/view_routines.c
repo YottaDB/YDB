@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ void view_routines(mval *dst, mident_fixed *name)
 	rtn_tabent	*bot, *top, *mid;
 	int4		comp;
 
-	temp.len = mid_len(name);
+	temp.len = INTCAST(mid_len(name));
 #ifdef UNIX
 	temp.addr = &name->c[0];
 #else

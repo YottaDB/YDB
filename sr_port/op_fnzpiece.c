@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,7 @@ void op_fnzpiece(mval *src, mval *del, int first, int last, mval *dst)
 	if (0 != match_res)
 		src_str -= del_len;
 	dst->str.addr = match_start;
-	dst->str.len = src_str - match_start;
+	dst->str.len = INTCAST(src_str - match_start);
 	dst->mvtype = MV_STR;
 	return;
 }

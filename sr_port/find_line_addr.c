@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ int4* find_line_addr (rhdtyp *routine, mstr *label, int4 offset, mident **lent_n
 		top = base + real_routine->labtab_len;
 		for (  ;  ;  )
 		{
-			n = (top - base) / 2;
+			n = (int)(top - base) / 2;
 			ptr = base + n;
 			MIDENT_CMP(&lname, &ptr->lab_name, stat);
 			if (0 == stat)

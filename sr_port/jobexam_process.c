@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -158,7 +158,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec)
 	dump_file_name_ptr = i2asc(dump_file_name_ptr, jobexam_counter);
 	def_file_name.mvtype = MV_STR;
 	def_file_name.str.addr = (char *)dump_file_name;
-	def_file_name.str.len = dump_file_name_ptr - dump_file_name;
+	def_file_name.str.len = INTCAST(dump_file_name_ptr - dump_file_name);
 	/* Call $ZPARSE processing to fill in any blanks, expand concealed logicals, etc. It is the callers
 	   responsibility to make sure garbage collection knows about the value in the returned filespec.
 	*/

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ int op_open(mval *device, mval *devparms, int timeout, mval *mspace)
 	io_log_name	*naml;				/* logical record for passed name */
 	io_log_name	*tl;				/* logical record for translated name */
 	io_log_name	*prev;				/* logical record for removal search */
-	uint4		stat;				/* status */
+	int4		stat;				/* status */
 	mstr		tn;				/* translated name */
 
 	error_def(LP_NOTACQ);				/* bad license */

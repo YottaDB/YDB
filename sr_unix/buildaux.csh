@@ -133,7 +133,7 @@ else
 	endif
 endif
 
-unalias ls
+unalias ls rm
 set buildaux_verbose = $?verbose
 set verbose
 set echo
@@ -394,9 +394,6 @@ if ( $buildaux_dbcertify == 1 ) then
 		echo "buildaux-E-linkdbcertify, Failed to link dbcertify (see ${dollar_sign}gtm_map/dbcertify.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
 	endif
-endif
-
-if ( $buildaux_dummy == 1 ) then
 endif
 
 unset buildaux_m

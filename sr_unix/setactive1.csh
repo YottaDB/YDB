@@ -302,6 +302,7 @@ echo "setenv gtm_pro	$gtm_vrt/pro"	>> $4
 if (-w $gtm_vrt/log ) then
 	echo "setenv gtm_log    $gtm_vrt/log"   >> $4
 else
+	echo "SETACTIVE1-E-LOGPERM : $gtm_vrt/log does not have group write permissions. Please fix that."
         echo "setenv gtm_log    $gtm_log_path/$gtm_verno"   >> $4
 endif
 echo "setenv gtm_misc	$gtm_vrt/misc"	>> $4

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,13 +66,14 @@ bool	mubfilcpy (backup_reg_list *list)
 	mstr			*file, tempfile;
 	unsigned char		command[MAX_FN_LEN * 2 + 5]; /* 5 == max(sizeof("cp"),sizeof("mv")) + 2 (space) + 1 (NULL) */
 	sgmnt_data_ptr_t	header_cpy;
-	int4			backup_fd = -1, size, vbn, status, counter, hdrsize, rsize, ntries;
+	int4			backup_fd = -1, size, vbn, counter, hdrsize, rsize, ntries;
+        ssize_t                 status;
 	int4			save_errno, adjust, blk_num, temp, rv, tempfilelen;
 	struct stat		stat_buf;
 	off_t			filesize, handled, offset;
 	char 			*inbuf, *zero_blk, *ptr, *errptr;
 	boolean_t		done;
-	char			tempfilename[MAX_FN_LEN + 1], tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN], *tempnam();
+	char			tempfilename[MAX_FN_LEN + 1], tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN];
 	int                     fstat_res;
 	uint4			ustatus;
 	shmpool_blk_hdr_ptr_t	sblkh_p;
@@ -86,7 +87,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	file = &(list->backup_file);
 	file->addr[file->len] = '\0';
 	header_cpy = list->backup_hdr;
-	hdrsize = ROUND_UP(SIZEOF_FILE_HDR(header_cpy), DISK_BLOCK_SIZE);
+	hdrsize = (int4)ROUND_UP(SIZEOF_FILE_HDR(header_cpy), DISK_BLOCK_SIZE);
 
 	/* the temporary file should be located in the destination directory */
 	ptr = file->addr + file->len - 1;
@@ -127,7 +128,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	{
 		gtm_tempnam(tempdir, prefix, tempfilename);
 		tempfile.addr = tempfilename;
-		tempfile.len = strlen(tempfilename);
+		tempfile.len = STRLEN(tempfilename);
 		if ((FILE_STAT_ERROR == (fstat_res = gtm_file_stat(&tempfile, NULL, NULL, FALSE, &ustatus))) ||
 		    (ntries > MAX_TEMP_OPEN_TRY))
 		{
@@ -141,7 +142,7 @@ bool	mubfilcpy (backup_reg_list *list)
 		}
 		ntries++;
 	}
-	tempfilelen = strlen(tempfilename);
+	tempfilelen = STRLEN(tempfilename);
 	memcpy(command, "cp ", 3);
 	memcpy(command + 3, gv_cur_region->dyn.addr->fname, gv_cur_region->dyn.addr->fname_len);
 	command[3 + gv_cur_region->dyn.addr->fname_len] = ' ';
@@ -276,7 +277,7 @@ bool	mubfilcpy (backup_reg_list *list)
 
 		if (0 < (filesize = stat_buf.st_size))
 		{
-			rsize = sizeof(shmpool_blk_hdr) + header_cpy->blk_size;
+			rsize = (int4)(sizeof(shmpool_blk_hdr) + header_cpy->blk_size);
 			sblkh_p = (shmpool_blk_hdr_ptr_t)malloc(rsize);
 			/* Do not use LSEEKREAD macro here because of dependence on setting filepointer for
 			   subsequent reads.
@@ -290,7 +291,7 @@ bool	mubfilcpy (backup_reg_list *list)
 			{
 				if (0 < status)
 				{
-					errptr = (char *)STRERROR(status);
+					errptr = (char *)STRERROR((int)status);
                 			util_out_print("read : ", TRUE, errptr);
 					util_out_print("Error reading the temporary file !AD.",
 						       TRUE, LEN_AND_STR(list->backup_tempfile));
@@ -324,7 +325,7 @@ bool	mubfilcpy (backup_reg_list *list)
 						size = (((blk_hdr_ptr_t)inbuf)->bsiz + 1) & ~1;
 
 					if (cs_addrs->do_fullblockwrites)
-						size = ROUND_UP(size, cs_addrs->fullblockwrite_len);
+						size = (int4)ROUND_UP(size, cs_addrs->fullblockwrite_len);
 					assert(cs_addrs->hdr->blk_size >= size);
                         		offset = (header_cpy->start_vbn - 1) * DISK_BLOCK_SIZE
 						+ ((off_t)header_cpy->blk_size * blk_num);

@@ -531,7 +531,7 @@ LCKSCANCELLED	<Error on remote node holding locks or zallocates.  All locks and 
 INVNETFILNM	<Invalid file name following node designation in global directory>/error/fao=0!/ansi=0
 NETDBOPNERR	<Error while attempting to open database across net>/error/fao=0!/ansi=0
 BADSRVRNETMSG	<Invalid message received from GT.CM server>/error/fao=0!/ansi=0
-BADGTMNETMSG	<Invalid message sent to GT.CM server, type: 0x!XL>/error/fao=1!/ansi=0
+BADGTMNETMSG	<Invalid message sent to GT.CM server, type: 0x!8XL>/error/fao=1!/ansi=0
 SERVERERR	<Severe error on server: !AD>/error/fao=2!/ansi=0
 NETFAIL		<Failure of Net operation>/error/fao=0!/ansi=0
 NETLCKFAIL	<Lock operation across Net failed>/error/fao=0!/ansi=0
@@ -892,7 +892,7 @@ GTMSECSHRFORKF	<gtmsecshr server unable to fork off a child process>/error/fao=0
 DBFSYNCERR	<Error synchronizing database file !AD to disk>/error/fao=2!/ansi=0
 SECONDAHEAD	<Secondary ahead of primary. !/ Secondary database possibly updated by process other than the update process.  First perform rollback.>/error/fao=0!/ansi=0
 SCNDDBNOUPD	<Database Updates not allowed on the secondary>/error/fao=0!/ansi=0
-MUINFOUINT4	<!AD : !UL [0x!XL]>/info/fao=4!/ansi=0
+MUINFOUINT4	<!AD : !UL [0x!8XL]>/info/fao=4!/ansi=0
 NLMISMATCHCALC	<Location of !AD expected at 0x!XL, but found at 0x!XL>/error/fao=4!/ansi=0
 GTMSECSHRLOGSWH	<Error switching gtmsecshr log file gtmsecshr log -- !AD original log -- !AD error phase -- !AD process id -- !UL>/error/fao=7!/ansi=0
 GTMSECSHRDEFLOG	<$gtm_log is either undefined or not defined to an absolute path, thus gtm_log is set to its default !AD>/info/fao=2!/ansi=0
@@ -981,7 +981,7 @@ OUTOFSPACE	<Database file !AD ran out of disk space.  Detected by process !UL.  
 JNLPVTINFO	<Pid 0x!XL!/     cycle 0x!XL fd_mismatch 0x!XL     channel 0x!XL sync_io 0x!XL!/ pini_addr 0x!XL  qio_active 0x!XL old_channel 0x!XL>/info/fao=8!/ansi=0
 NOSPACEEXT	<Not enough disk space for file !AD to extend.  !UL blocks needed.  !UL blocks available.>/error/fao=4!/ansi=0
 WCBLOCKED	<Field !AD is set by process !UL at transaction number 0x!16@XJ for database file !AD>/warning/fao=6!/ansi=0
-REPLJNLCLOSED	<Replication and journaling closed at region seqno !@ZJ [0x!16@XJ], system seqno !@ZJ [0x!16@XJ] for !AD>/warning/fao=6!/ansi=0
+REPLJNLCLOSED	<Replication in jeopardy as journaling got closed for database file !AD. Current region seqno is !@ZJ [0x!16@XJ] and system seqno is !@ZJ [0x!16@XJ]>/error/fao=6!/ansi=0
 RENAMEFAIL	<Rename of file !AD to !AD failed>/warning/fao=4!/ansi=0
 FILERENAME	<File !AD is renamed to !AD>/info/fao=4!/ansi=0
 JNLBUFINFO	<Pid 0x!XL!/     dsk 0x!XL     free 0x!XL  bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL!/ dskaddr 0x!XL freeaddr 0x!XL  qiocnt 0x!XL now_writer 0x!XL     fsync_pid 0x!XL!/filesize 0x!XL    cycle 0x!XL  errcnt 0x!XL    wrtsize 0x!XL fsync_dskaddr 0x!XL>/info/fao=16!/ansi=0
@@ -1201,7 +1201,7 @@ DBWCVERIFYEND	<Database file !AD, write cache verification finished by pid !UL [
 MUPIPSIG	<!AD (signal !UL) issued from process !UL [0x!XL] to process !UL [0x!XL]>/info/fao=7!/ansi=0
 HTEXPFAIL	<Hash table expansion failed for lack of memory>/error/fao=0!/ansi=0
 STPEXPFAIL	<Stringpool expansion failed. It could not expand to !UL bytes.>/error/fao=1!/ansi=0
-DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Expected 0x!XL, found 0x!XL>/warning/fao=2!/ansi=0
+DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Expected 0x!8XL, found 0x!8XL>/warning/fao=2!/ansi=0
 DBBTUFIXED	<The blocks-to-upgrade file-header field has been changed to the correct value>/info/fao=0!/ansi=0
 DBMAXREC2BIG	<Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL>/error/fao=3!/ansi=0
 DBCSCNNOTCMPLT	<Specified DBCERTIFY SCAN output file is not complete - Rerun scan>/error/fao=0!/ansi=0
@@ -1238,7 +1238,7 @@ VMSMEMORY2	<Central storage exhausted during allocation of dynamic file descript
 LOADBGSZ2	<Load error: BEGIN too large.  No records loaded.>/error/fao=0!/ansi=0
 LOADEDSZ2	<Load error: END too large.  No records loaded.>/error/fao=0!/ansi=0
 REPLINSTMISMTCH <Process has journal pool for !AD open but database !AD corresponds to !AD>/error/fao=6!/ansi=0
-REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XJ] from replication instance file !AD>/error/fao=4!/ansi=0
+REPLINSTREAD	<Error reading [0x!8XL] bytes at offset [0x!16@XJ] from replication instance file !AD>/error/fao=4!/ansi=0
 REPLINSTDBMATCH	<Replication instance file !AD has seqno [0x!16@XJ] while database has a different seqno [0x!16@XJ]>/error/fao=4!/ansi=0
 REPLINSTNMSAME	<Primary and Secondary instances have the same replication instance name !AD>/error/fao=2!/ansi=0
 REPLINSTNMUNDEF	<Replication instance name not defined>/error/fao=0!/ansi=0
@@ -1280,6 +1280,10 @@ SVNONEW		<Cannot NEW this special variable>/error/fao=0!/ansi=0
 ZINTDIRECT	<Attempt to enter direct mode from $ZINTERRUPT>/error/fao=0!/ansi=0
 ZINTRECURSEIO	<Attempt to do IO to the active device in $ZINTERRUPT>/error/fao=0!/ansi=0
 MRTMAXEXCEEDED	<Maximum value of !UL for SOCKET device parameter MOREREADTIME exceeded>/error/fao=1!/ansi=0
+JNLCLOSED	<Journaling closed for database file !AD at transaction number 0x!16@XJ>/error/fao=3!/ansi=0
+RLBKNOBIMG	<ROLLBACK cannot proceed as database !AD has NOBEFORE_IMAGE journaling>/error/fao=2!/ansi=0
+RLBKJNLNOBIMG	<Journal file !AD has NOBEFORE_IMAGE journaling>/info/fao=2!/ansi=0
+RLBKLOSTTNONLY	<ROLLBACK will only create a lost transaction file (database and journal files will not be modified)>/info/fao=0!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

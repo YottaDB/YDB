@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -123,7 +123,7 @@ void op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval 
 	 * pieces 2 - 4, then the pieces 2-4 will be replaced by one piece - expr.
 	 */
 
-	first_src_ind = match_ptr - (unsigned char *)src->str.addr;
+	first_src_ind = (int)(match_ptr - (unsigned char *)src->str.addr);
 	do {
 		match_ptr = matchb(del->str.len, (uchar_ptr_t)del->str.addr,
 				   src_len, src_str, &match_res);
@@ -133,10 +133,10 @@ void op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval 
 			goto l90;
 	} while (--second_src_ind > 0);
 
-	second_src_ind = match_ptr - (unsigned char *)src->str.addr - del->str.len;
+	second_src_ind = (int)(match_ptr - (unsigned char *)src->str.addr - del->str.len);
 	goto moveit;
   l80:
-	first_src_ind = match_ptr - (unsigned char *)src->str.addr;
+	first_src_ind = (int)(match_ptr - (unsigned char *)src->str.addr);
   l90:
 	second_src_ind = -1;
 
@@ -188,7 +188,7 @@ void op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval 
 
 	assert(str_addr - stringpool.free == str_len);
 	dst->mvtype = MV_STR;
-	dst->str.len = str_addr - stringpool.free;
+	dst->str.len = INTCAST(str_addr - stringpool.free);
 	dst->str.addr = (char *)stringpool.free;
 	stringpool.free = str_addr;
 	return;

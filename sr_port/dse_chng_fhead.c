@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -198,7 +198,7 @@ void dse_chng_fhead(void)
 				|| ((uint4)SGMNT_HDR_LEN < ((uint4)location + (uint4)size)))
 			util_out_print("Error: Cannot modify any location outside the file-header", TRUE);
 		else  if (0 != location % size)
-			util_out_print("Error: Location !UL [0x!XL] should be a multiple of Size !UL",
+			util_out_print("Error: Location !UL [0x!8XL] should be a multiple of Size !UL",
 							TRUE, location, location, size, size);
 		else
 		{
@@ -215,7 +215,7 @@ void dse_chng_fhead(void)
 			}
 			else if (sizeof(int4) == size)
 			{
-				SPRINTF(temp_str, "!UL [0x!XL]");
+				SPRINTF(temp_str, "!UL [0x!8XL]");
 				old_value = *(sm_uint_ptr_t)chng_ptr;
 			}
 			else if (sizeof(gtm_int64_t) == size)
@@ -226,16 +226,16 @@ void dse_chng_fhead(void)
 			if (value_present)
 			{
 				if (sizeof(char) == size)
-					*(sm_uc_ptr_t)chng_ptr = value;
+					*(sm_uc_ptr_t)chng_ptr = (unsigned char) value;
 				else if (sizeof(short) == size)
-					*(sm_ushort_ptr_t)chng_ptr = value;
+					*(sm_ushort_ptr_t)chng_ptr = (unsigned short) value;
 				else if (sizeof(int4) == size)
-					*(sm_uint_ptr_t)chng_ptr = value;
+					*(sm_uint_ptr_t)chng_ptr = (unsigned int) value;
 				else if (sizeof(gtm_int64_t) == size)
 					*(qw_num_ptr_t)chng_ptr = value;
 			} else
 				value = old_value;
-			SPRINTF(temp_str1, "Location !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
+			SPRINTF(temp_str1, "Location !UL [0x!8XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
 				temp_str, temp_str);
 			if (sizeof(int4) >= size)
 				util_out_print(temp_str1, TRUE, location, location, (uint4)old_value, (uint4)old_value,

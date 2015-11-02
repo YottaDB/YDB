@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,8 +68,6 @@ char		*get_new_free_element(buddy_list *list);	/* gets a freed-up element if ava
 
 #define	FREEUP_BUDDY_LIST(list)			\
 {						\
-	void	cleanup_list();			\
-						\
 	cleanup_list(list);			\
 	assert(list);				\
 	free(list);				\

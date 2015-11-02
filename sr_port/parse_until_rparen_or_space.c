@@ -19,24 +19,27 @@ GBLREF	char	window_token;
 
 /* This routine parses input until it finds a RIGHT PAREN or SPACE or EOL.
  * It places the parse cursor AT the RIGHT-PAREN or SPACE or EOL before returning.
+ * Returns FALSE in case of parse error.
+ * Returns TRUE otherwise.
  */
-void	parse_until_rparen_or_space()
+int	parse_until_rparen_or_space()
 {
-	int		lparencnt, rparencnt;
+	int		openparen;
 
-	lparencnt = 1;
-	rparencnt = 0;
-	for ( ; ; )
+	for ( openparen = 1; ; )
 	{
 		if (TK_RPAREN == window_token)
 		{
-			rparencnt++;
-			if (rparencnt >= lparencnt)
+			openparen--;
+			if (0 >= openparen)
 				break;
 		} else if (TK_LPAREN == window_token)
-			lparencnt++;
+			openparen++;
 		else if ((TK_EOL == window_token) || (TK_SPACE == window_token))
 			break;
+		else if (TK_ERROR == window_token)
+			return FALSE;
 		advancewindow();
 	}
+	return TRUE;
 }

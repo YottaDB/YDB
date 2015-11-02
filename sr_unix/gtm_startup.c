@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,6 +87,7 @@
 #include "gtm_utf8.h"
 #include "gtm_icu_api.h"	/* for u_strToUpper and u_strToLower */
 #include "gtm_conv.h"
+#include "fix_xfer_entry.h"
 
 #ifdef __sun
 #define PACKAGE_ENV_TYPE  "GTMXC_RPC"  /* env var to use rpc instead of xcall */
@@ -96,6 +97,7 @@
 #define MAX_INDIRECTION_NESTING 256
 
 GBLDEF void		(*restart)() = &mum_tstart;
+
 GBLREF mval 		**ind_result_array, **ind_result_sp, **ind_result_top;
 GBLREF mval 		**ind_source_array, **ind_source_sp, **ind_source_top;
 GBLREF rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
@@ -138,6 +140,8 @@ GBLREF boolean_t	utf8_patnumeric;
 GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
 GBLREF casemap_t	casemaps[];
+GBLREF inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
+GBLREF short		dollar_tlevel;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -155,20 +159,21 @@ void gtm_startup(struct startup_vector *svec)
 	mstr		log_name;
 
 	assert(svec->argcnt == sizeof(*svec));
+	IA64_ONLY(init_xfer_table();)
 	get_page_size();
-	rtn_fst_table = rtn_names = (rtn_tabent *) svec->rtn_start;
-	rtn_names_end = rtn_names_top = (rtn_tabent *) svec->rtn_end;
+	rtn_fst_table = rtn_names = (rtn_tabent *)svec->rtn_start;
+	rtn_names_end = rtn_names_top = (rtn_tabent *)svec->rtn_end;
 	if (svec->user_stack_size < 4096)
 		svec->user_stack_size = 4096;
 	if (svec->user_stack_size > 8388608)
 		svec->user_stack_size = 8388608;
 	mstack_ptr = (unsigned char *)malloc(svec->user_stack_size);
-	msp = stackbase = mstack_ptr + svec->user_stack_size - 4;
+        msp = stackbase = mstack_ptr + svec->user_stack_size - sizeof(char *);
 
 	/* mark the stack base so that if error occur during call-in gtm_init(), the unwind
 	   logic in gtmci_ch() will get rid of the stack completely */
 	fgncal_stack = stackbase;
-	mv_chain = (mv_stent *) msp;
+	mv_chain = (mv_stent *)msp;
 	stacktop = mstack_ptr + 2 * mvs_size[MVST_NTAB];
 	stackwarn = stacktop + 1024;
 	break_message_mask = svec->break_message_mask;
@@ -180,8 +185,8 @@ void gtm_startup(struct startup_vector *svec)
 	stp_init(svec->user_strpl_size);
 	if (svec->user_indrcache_size > MAX_INDIRECTION_NESTING || svec->user_indrcache_size < MIN_INDIRECTION_NESTING)
 		svec->user_indrcache_size = MIN_INDIRECTION_NESTING;
-	ind_result_array = (mval **) malloc(sizeof(int4) * svec->user_indrcache_size);
-	ind_source_array = (mval **) malloc(sizeof(int4) * svec->user_indrcache_size);
+	ind_result_array = (mval **)malloc(sizeof(int4) * svec->user_indrcache_size);
+	ind_source_array = (mval **)malloc(sizeof(int4) * svec->user_indrcache_size);
 	ind_result_sp = ind_result_array;
 	ind_result_top = ind_result_sp + svec->user_indrcache_size;
 	ind_source_sp = ind_source_array;
@@ -201,7 +206,7 @@ void gtm_startup(struct startup_vector *svec)
 	is_replicator = TRUE;	/* as GT.M goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	getjobname();
 	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
-			  &jnlpool.jnlpool_dummy_reg);
+			  &jnlpool.jnlpool_dummy_reg, &inctn_detail, &dollar_tlevel);
 	getzprocess();
 	getzmode();
 	geteditor();
@@ -213,9 +218,9 @@ void gtm_startup(struct startup_vector *svec)
             xfer_table[xf_fnfgncal] = (xfer_entry_t)op_fnfgncal_rpc;  /* using RPC */
 #endif
 	msp -= sizeof(stack_frame);
-	frame_pointer = (stack_frame *) msp;
+	frame_pointer = (stack_frame *)msp;
 	memset(frame_pointer,0, sizeof(stack_frame));
-	frame_pointer->temps_ptr = (unsigned char *) frame_pointer;
+	frame_pointer->temps_ptr = (unsigned char *)frame_pointer;
 	frame_pointer->ctxt = GTM_CONTEXT(gtm_ret_code);
 	frame_pointer->mpc = CODE_ADDRESS(gtm_ret_code);
 	frame_pointer->type = SFT_COUNT;
@@ -250,10 +255,10 @@ void gtm_startup(struct startup_vector *svec)
 		dollar_zmode.str.addr = &other_mode_buf[0];
 		dollar_zmode.str.len = sizeof(other_mode_buf) -1;
 	}
-	svec->frm_ptr = (unsigned char *) frame_pointer;
+	svec->frm_ptr = (unsigned char *)frame_pointer;
 	dollar_ztrap.mvtype = MV_STR;
 	dollar_ztrap.str.len = sizeof(init_break);
-	dollar_ztrap.str.addr = (char *) init_break;
+	dollar_ztrap.str.addr = (char *)init_break;
 	dollar_zstatus.mvtype = MV_STR;
 	dollar_zstatus.str.len = 0;
 	dollar_zstatus.str.addr = (char *)0;
@@ -295,24 +300,61 @@ void gtm_startup(struct startup_vector *svec)
 	return;
 }
 
+#if defined(__ia64)
+
+#ifdef XFER
+#	undef XFER
+#endif /* XFER */
+
+#define XFER(a,b) #b
+
+GBLDEF char *xfer_text[] = {
+#include "xfer.h"
+};
+
+#include "xfer_desc.i"
+
+/* On IA64, we want to use CODE_ADDRESS() macro, to dereference all the function pointers, before storing them in
+   global array. Now doing a dereference operation, as part of initialization, is not allowed by linux/gcc (HP'a aCC
+   was more tolerant towards this). So to make sure that the xfer_table is initialized correctly, before anyone
+   uses it, this function is called right at the beginning of gtm_startup
+*/
+
+int init_xfer_table()
+{
+	int i;
+
+	for (i = 0; i < (sizeof(xfer_text) / sizeof(char *)); i++)
+	{
+		if (ASM == function_type(xfer_text[i]))
+			xfer_table[i] = CODE_ADDRESS_ASM(xfer_table[i]);
+		else
+			xfer_table[i] = CODE_ADDRESS_C(xfer_table[i]);
+	}
+
+	return 0;
+}
+
+#endif /* __ia64 */
+
 void gtm_utf8_init(void)
 {
 	if (!gtm_utf8_mode)
-	{ /* Unicode is not enabled (i.e. $ZCHSET="M"). All standard functions must be byte oriented */
-		xfer_table[xf_fnascii] = (xfer_entry_t)&op_fnzascii;
-		xfer_table[xf_fnchar] = (xfer_entry_t)&op_fnzchar;
-		xfer_table[xf_fnextract] = (xfer_entry_t)&op_fnzextract;
-		xfer_table[xf_setextract] = (xfer_entry_t)&op_setzextract;
-		xfer_table[xf_fnfind] = (xfer_entry_t)&op_fnzfind;
-		xfer_table[xf_fnj2] = (xfer_entry_t)&op_fnzj2;
-		xfer_table[xf_fnlength] = (xfer_entry_t)&op_fnzlength;
-		xfer_table[xf_fnpopulation] = (xfer_entry_t)&op_fnzpopulation;
-		xfer_table[xf_fnpiece] = (xfer_entry_t)&op_fnzpiece;
-		xfer_table[xf_fnp1] = (xfer_entry_t)&op_fnzp1;
-		xfer_table[xf_setpiece] = (xfer_entry_t)&op_setzpiece;
-		xfer_table[xf_setp1] = (xfer_entry_t)&op_setzp1;
-		xfer_table[xf_fntranslate] = (xfer_entry_t)&op_fnztranslate;
-		xfer_table[xf_fnreverse] = (xfer_entry_t)&op_fnzreverse;
+	{	/* Unicode is not enabled (i.e. $ZCHSET="M"). All standard functions must be byte oriented */
+	  	FIX_XFER_ENTRY(xf_fnascii, op_fnzascii)
+		FIX_XFER_ENTRY(xf_fnchar, op_fnzchar)
+		FIX_XFER_ENTRY(xf_fnextract, op_fnzextract)
+		FIX_XFER_ENTRY(xf_setextract, op_setzextract)
+		FIX_XFER_ENTRY(xf_fnfind, op_fnzfind)
+		FIX_XFER_ENTRY(xf_fnj2, op_fnzj2)
+		FIX_XFER_ENTRY(xf_fnlength, op_fnzlength)
+		FIX_XFER_ENTRY(xf_fnpopulation, op_fnzpopulation)
+		FIX_XFER_ENTRY(xf_fnpiece, op_fnzpiece)
+		FIX_XFER_ENTRY(xf_fnp1, op_fnzp1)
+		FIX_XFER_ENTRY(xf_setpiece, op_setzpiece)
+		FIX_XFER_ENTRY(xf_setp1, op_setzp1)
+		FIX_XFER_ENTRY(xf_fntranslate, op_fnztranslate)
+		FIX_XFER_ENTRY(xf_fnreverse, op_fnzreverse)
 		return;
 	}
 	dollar_zchset.len = STR_LIT_LEN(UTF8_NAME);
@@ -323,3 +365,4 @@ void gtm_utf8_init(void)
 		dollar_zpatnumeric.addr = UTF8_NAME;
 	}
 }
+

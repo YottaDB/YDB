@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -172,6 +172,6 @@ nomatch:
 	return (psrc);
 
 found_match:
-	*res = 1 + (psrc - psrc_base);
+	*res = (int)(1 + (psrc - psrc_base));
 	return (psrc);
 }

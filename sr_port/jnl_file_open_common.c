@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -193,7 +193,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	assert(csd->autoswitchlimit);
 	JNL_WHOLE_TIME(prc_vec->jpv_time);
 	jb->epoch_interval = header.epoch_interval;
-	jb->next_epoch_time = MID_TIME(prc_vec->jpv_time) + jb->epoch_interval;
+	jb->next_epoch_time = (uint4)(MID_TIME(prc_vec->jpv_time) + jb->epoch_interval);
 	memcpy(&header.who_opened, prc_vec, sizeof(jnl_process_vector));
 	header.crash = TRUE;	/* in case this processes is crashed, this will remain TRUE */
 	VMS_ONLY(

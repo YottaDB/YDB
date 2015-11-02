@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,8 @@ bool	lke_showlock(
 	short		len1;
 	int 		len2;
 	bool		lock = FALSE, owned;
-	int4		f[7], gtcmbufidx, item, ret;
+	UINTPTR_T	f[7];
+        int4            gtcmbufidx, item, ret;
 	uint4		status;
 	char		*msg, save_ch, format[64], gtcmbuf[64];	/* gtcmbuf[] is to hold ": CLNTNODE = %s : CLNTPID = %s" */
 	static	mval	subsc = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
@@ -122,11 +123,12 @@ bool	lke_showlock(
 		name->addr[name->len++] = ')';
 		f[0] = name->len;
 	}
-	f[1] = (int4)name->addr;
+	f[1] = (UINTPTR_T)name->addr;
 	if (tree->owner || (tree->pending && wait))
 	{
 		pblk.process_id = tree->owner;
-		pblk.next = (wait && tree->pending) ? ((uchar_ptr_t)&tree->pending - (uchar_ptr_t)&pblk.next + tree->pending)
+		pblk.next = (wait && tree->pending) ?
+			(ptroff_t)((uchar_ptr_t)&tree->pending - (uchar_ptr_t)&pblk.next + tree->pending)
 						       : 0;
 		owned = (all || !wait) && tree->owner;
 		r = owned ? &pblk
@@ -164,11 +166,11 @@ bool	lke_showlock(
 					if (is_proc_alive((int4)r->process_id, 0))
 					{
 						f[3] = STR_LIT_LEN(existpr);
-						f[4] = (int4)existpr;
+						f[4] = (INTPTR_T)existpr;
 					} else
 					{
 						f[3] = STR_LIT_LEN(nonexpr);
-						f[4] = (int4)nonexpr;
+						f[4] = (UINTPTR_T)nonexpr;
 					}
 				)
 				if (tree->auxowner)
@@ -182,7 +184,7 @@ bool	lke_showlock(
 					gtcmbufidx += STR_LIT_LEN(CLNTPID_LIT);
 					SPRINTF(&gtcmbuf[gtcmbufidx], PIDPRINT_LIT, tree->auxpid);
 					f[5] = strlen(gtcmbuf);
-					f[6] = (int4)&gtcmbuf[0];
+					f[6] = (UINTPTR_T)&gtcmbuf[0];
 					assert(f[5] > gtcmbufidx);
 					assert(gtcmbufidx < sizeof(gtcmbuf));
 				} else

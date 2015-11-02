@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +86,7 @@ boolean_t	free_last_n_elements(buddy_list *list, int4 num)
 	{
 		ptrArrayCurr = list->ptrArrayCurr;
 		numLeft = num;
-		rowElemsLeft = (list->nextFreePtr - ptrArrayCurr[0]) / list->elemSize;
+		rowElemsLeft = (int4)(list->nextFreePtr - ptrArrayCurr[0]) / list->elemSize;
 		rowElemsMax = list->nElems - rowElemsLeft;
 		while (numLeft >= rowElemsLeft  &&  ptrArrayCurr != list->ptrArray)
 		{

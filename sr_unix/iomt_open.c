@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,7 +91,8 @@ short iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 {
 	bool		do_rewind, do_erase;
 	int		lab_type;
-	unsigned char	ch, *buff, len;
+	unsigned char	ch, *buff;
+        int		len;
 	int4		blocksize, recordsize, length;
 	uint4		status;
 	d_mt_struct	*mt, newmt;

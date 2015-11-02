@@ -125,7 +125,7 @@ void gvcst_root_search(void)
 					{
 						if (NULL != global_collation_mstr.addr)
 							free(global_collation_mstr.addr);
-						global_collation_mstr.len = rlen - (hdr_len + sizeof(block_id));
+						global_collation_mstr.len = rlen - (hdr_len + SIZEOF(block_id));
 						global_collation_mstr.addr = (char *)malloc(global_collation_mstr.len);
 					}
 					/* the memcpy needs to be done here instead of out of for loop for
@@ -176,7 +176,8 @@ void gvcst_root_search(void)
 	if (rlen > hdr_len + sizeof(block_id))
 	{
 		assert(NULL != global_collation_mstr.addr);
-		subrec_ptr = get_spec((uchar_ptr_t)global_collation_mstr.addr, rlen - (hdr_len + sizeof(block_id)), COLL_SPEC);
+		subrec_ptr = get_spec((uchar_ptr_t)global_collation_mstr.addr,
+				      (int)(rlen - (hdr_len + sizeof(block_id))), COLL_SPEC);
 		if (subrec_ptr)
 		{
 			gv_target->nct = *(subrec_ptr + COLL_NCT_OFFSET);

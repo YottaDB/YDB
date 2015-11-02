@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@
 
 GBLREF collseq		*local_collseq;
 
-int	sorts_after (mval *lhs, mval *rhs)
+long	sorts_after (mval *lhs, mval *rhs)
 {
 	if (local_collseq)
 	{

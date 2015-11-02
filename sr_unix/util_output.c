@@ -98,9 +98,10 @@ static	boolean_t	first_syslog = TRUE;
  *	output global value:
  *		outparm[] - array of numeric arguments from fao list (character
  *			    arguments already incorporated into buff
+ *
  */
 
-caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int faocnt)
+caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, int faocnt)
 {
 	desc_struct	*d;
 	signed char	schar;
@@ -110,7 +111,9 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 	unsigned char	uchar;
 	short		sshort, *s;
 	unsigned short	ushort;
-	int		i, length, field_width, repeat_count, int_val, ch, chlen, chwidth, cwidth;
+	int		i, length, field_width, repeat_count, int_val, ch, chwidth, cwidth;
+	UINTPTR_T	addr_val;
+        ssize_t		chlen ;
 	boolean_t	indirect;
 	qw_num_ptr_t	val_ptr;
 	unsigned char	numa[22];
@@ -161,7 +164,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 			for (c = message;  *c >= '0'  &&  *c <= '9';  ++c)
 				;
 
-			if ((length = c - message) > 0)
+			if ((length = (int)(c - message)) > 0)
 			{
 				field_width = repeat_count
 					= asc2i((uchar_ptr_t)message, length);
@@ -247,7 +250,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 
 					case 'Z': /* null teminated string */
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
-						length = c ? strlen(c) : 0;
+						length = c ? STRLEN(c) : 0;
 				}
 				/* Since gtmsecshr does not load ICU libraries (since dlopen() with LD_LIBRARY_PATH
 				 * does not work for root setuid executables), avoid calling gtm_wcswidth() and
@@ -281,7 +284,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 					} else
 					{
 						chlen = (caddr_t)UTF8_MBTOWC(c, ctop, ch) - c;
-						chwidth = (GTMSECSHR_IMAGE != image_type) ? UTF8_WCWIDTH(ch): chlen;
+						chwidth = (int)((GTMSECSHR_IMAGE != image_type) ? UTF8_WCWIDTH(ch): chlen);
 						/* Assume printability for GTMSECSHR */
 						isprintable = (-1 != chwidth) ||
 							((GTMSECSHR_IMAGE != image_type) ? U_ISSPACE(ch): TRUE);
@@ -337,7 +340,13 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 						}
 					else
 					{
-						GETFAOVALDEF(faocnt, fao, int4, int_val, 0);
+						IA64_ONLY(
+                                                if ('X' == type)
+                                                	{GETFAOVALDEF(faocnt, fao, UINTPTR_T, addr_val, 0);}
+                                                else
+                                                	{GETFAOVALDEF(faocnt, fao, int4, int_val, 0);}
+                                                )
+					  	NON_IA64_ONLY(GETFAOVALDEF(faocnt, fao, int4, int_val, 0);)
 						switch(type2)
 						{
 							case 'B':
@@ -347,7 +356,13 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 								int_val = int_val & 0xFFFF;
 								break;
 							case 'L':
-								int_val = int_val & 0xFFFFFFFF;
+								NON_IA64_ONLY(int_val = int_val & 0xFFFFFFFF;)
+								IA64_ONLY(
+		                                                if ('X' == type)
+									{addr_val = addr_val & 0xFFFFFFFFFFFFFFFF;}
+								else
+									{int_val = int_val & 0xFFFFFFFF;}
+								)
 								break;
 							default:
 								assert(FALSE);
@@ -375,12 +390,14 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 									length = sizeof(int4);
 							                break;
 							        case 'L':
-						               		length = sizeof(int4) + sizeof(int4);
+						               		NON_IA64_ONLY(length = sizeof(int4) + sizeof(int4);)
+									IA64_ONLY(length = sizeof(INTPTR_T) + sizeof(INTPTR_T);)
 						                       	break;
 								default:
 									assert(FALSE);
 							}
-							i2hex(int_val, numptr, length);
+							NON_IA64_ONLY(i2hex(int_val, numptr, length);)
+							IA64_ONLY(i2hex(addr_val, numptr, length);)
 							numptr += length;
 							break;
 						default:
@@ -413,7 +430,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 						if (val_ptr)
 						{
 							ret_ptr = i2ascl(numptr, *val_ptr);
-							length = ret_ptr - (uchar_ptr_t)numptr;
+							length =(int)(ret_ptr - (uchar_ptr_t)numptr);
 							if (0 != field_width)
 								numptr += MIN(length, field_width);
 							else
@@ -421,7 +438,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 						}
 					}
 				}
-				length = numptr - numa;		/* Length of asciified number */
+				length = (int)(numptr - numa);		/* Length of asciified number */
 				if (length < field_width)
 				{
 					memset(outptr, (('Z' == type) ? '0' : ' '), field_width - length);
@@ -429,7 +446,15 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 				}
 				if ((field_width > 0) && (field_width < length))
 				{
-					memset(outptr, '*', field_width);
+					IA64_ONLY(
+					/* If this is an integer to be printed using format specifier X, display the
+					   least 4 bytes */
+					if (type == 'X' && type2 == 'L' && (length == (2 * sizeof(INTPTR_T))))
+						memcpy(outptr, numa + sizeof(INTPTR_T), length/2);
+					else
+						memset(outptr, '*', field_width);
+					)
+					NON_IA64_ONLY(memset(outptr, '*', field_width);)
 					outptr += field_width;
 				} else
 				{

@@ -61,6 +61,7 @@ GBLREF boolean_t		gtm_utf8_mode;
 
 GBLDEF char 		**gtmenvp;
 
+
 int gtm_main (int argc, char **argv, char **envp)
 
 #ifdef __osf__

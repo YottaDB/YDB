@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,7 @@ int	iotcp_newlsock(io_log_name *dev, d_tcp_struct *tcpptr)
 	if (lsock == -1)
 	{
 		errptr = (char *)STRERROR(errno);
-		errlen = strlen(errptr);
+		errlen = STRLEN(errptr);
 		rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 		return 0;
 	}
@@ -96,7 +96,7 @@ int	iotcp_newlsock(io_log_name *dev, d_tcp_struct *tcpptr)
 	if (tcp_routines.aa_setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1)
 	{
 		errptr = (char *)STRERROR(errno);
-		errlen = strlen(errptr);
+		errlen = STRLEN(errptr);
 		(void)tcp_routines.aa_close(lsock);
 		rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 		return 0;
@@ -105,7 +105,7 @@ int	iotcp_newlsock(io_log_name *dev, d_tcp_struct *tcpptr)
 	if (tcp_routines.aa_bind(lsock, (struct sockaddr *)&tcpptr->sin, sizeof(struct sockaddr)) == -1)
 	{
 		errptr = (char *)STRERROR(errno);
-		errlen = strlen(errptr);
+		errlen = STRLEN(errptr);
 		(void)tcp_routines.aa_close(lsock);
 		rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 		return 0;
@@ -115,7 +115,7 @@ int	iotcp_newlsock(io_log_name *dev, d_tcp_struct *tcpptr)
 	if (tcp_routines.aa_listen(lsock, 5) == -1)
 	{
 		errptr = (char *)STRERROR(errno);
-		errlen = strlen(errptr);
+		errlen = STRLEN(errptr);
 		(void)tcp_routines.aa_close(lsock);
 		rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 		return 0;

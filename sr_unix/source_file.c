@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -201,7 +201,6 @@ int4	read_source_file (void)
 {
 	unsigned char	*cp;
 	mval		val;
-	void		read_source_ch();
 
 	errno = 0;
 	tmp_list_dev = io_curr_device;
@@ -218,7 +217,8 @@ int4	read_source_file (void)
 	if ( FALSE != io_curr_device.in->dollar.zeof )
 		return -1;
 	io_curr_device = tmp_list_dev;	/*	restore list file after reading	if it's opened	*/
-	return cp - source_buffer;	/*	var.str.len	*/
+
+	return (int4)(cp - source_buffer);	/*	var.str.len	*/
 
 }
 

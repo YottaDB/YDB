@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	cache_que_head_ptr_t	ahead;		/* serves dual purpose since cache_que_head = mmblk_que_head */
 	cache_state_rec_ptr_t	csr, csrfirst;	/* serves dual purpose for MM and BG */
 						/* since mmblk_state_rec is equal to the top of cache_state_rec */
-	int4                    err_status = 0, n, n1, n2, max_ent, max_writes, size, save_errno;
+	int4                    err_status = 0, n, n1, n2, max_ent, max_writes, save_errno;
+        size_t                  size ;
 	jnl_buffer_ptr_t        jb;
         jnl_private_control     *jpc;
 	node_local_ptr_t	cnl;
@@ -137,7 +138,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		{
 			if (SS_NORMAL != (err_status = jnl_qio_start(jpc)))
 			{
-				if (ERR_JNLWRTNOWWRTR != err_status && ERR_JNLWRTDEFER != err_status)
+				if (csa->now_crit && (ERR_JNLWRTNOWWRTR != err_status) && (ERR_JNLWRTDEFER != err_status))
 				{
 					jpc->jnl_buff->blocked = 0;
 					jnl_file_lost(jpc, err_status);
@@ -161,7 +162,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	for (n1 = n2 = 0, csrfirst = NULL;  n1 < max_ent  &&  n2 < max_writes  &&  !csd->wc_blocked ;  ++n1)
 	{
 		csr = (cache_state_rec_ptr_t)REMQHI((que_head_ptr_t)ahead);
-		if (INTERLOCK_FAIL == (int4)csr)
+		if (INTERLOCK_FAIL == (INTPTR_T)csr)
 		{
 			assert(FALSE);
 			SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);

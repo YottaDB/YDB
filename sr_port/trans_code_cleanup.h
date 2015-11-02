@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,10 +39,10 @@ void trans_code_cleanup(void);
 			GTMASSERT;						\
 		break;								\
 	case SFT_ZSTEP_ACT:							\
-		err = (int) ERR_ERRWEXC;					\
+		err = (int)ERR_ERRWEXC;					\
 		break;								\
 	case (SFT_ZINTR | SFT_COUNT):						\
-		err = (int) ERR_ERRWZINTR;					\
+		err = (int)ERR_ERRWZINTR;					\
 		break;								\
 	default:								\
 		GTMASSERT;							\

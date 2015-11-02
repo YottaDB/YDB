@@ -185,7 +185,7 @@ void dbcertify_certify_phase(void)
 	psa->dbc_gv_cur_region->dyn.addr = malloc(sizeof(gd_segment));
 	memset(psa->dbc_gv_cur_region->dyn.addr, 0, sizeof(gd_segment));
 	psa->dbc_gv_cur_region->dyn.addr->acc_meth = dba_bg;
-	len = strlen((char_ptr_t)psa->ofhdr.dbfn);
+	len = STRLEN((char_ptr_t)psa->ofhdr.dbfn);
 	strcpy((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn);
 	psa->dbc_gv_cur_region->dyn.addr->fname_len = len;
 
@@ -221,7 +221,7 @@ void dbcertify_certify_phase(void)
 
 	/* Allocate update array based on fileheader values */
 	psa->dbc_cs_data->max_update_array_size = psa->dbc_cs_data->max_non_bm_update_array_size =
-					ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(psa->dbc_cs_data), UPDATE_ARRAY_ALIGN_SIZE);
+		(uint4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(psa->dbc_cs_data), UPDATE_ARRAY_ALIGN_SIZE);
 	psa->dbc_cs_data->max_update_array_size += ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
 	update_array = malloc(psa->dbc_cs_data->max_update_array_size);
 	update_array_size = psa->dbc_cs_data->max_update_array_size;
@@ -476,7 +476,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 	/* Isolate the full key in the first record of the block */
 	dbc_init_key(psa, &psa->first_rec_key);
 	dbc_find_key(psa, psa->first_rec_key, blk_p + sizeof(v15_blk_hdr), psa->blk_set[0].blk_levl);
-	psa->first_rec_key->gvn_len = strlen((char_ptr_t)psa->first_rec_key->base);	/* The GVN we need to lookup in the DT */
+	psa->first_rec_key->gvn_len = USTRLEN((char_ptr_t)psa->first_rec_key->base);	/* The GVN we need to lookup in the DT */
 
 	/* Possibilities at this point:
 	   1) We are looking for a DT (directory tree) block.
@@ -694,17 +694,17 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			/* Compute the sizes of the LHS and RHS blocks assuming the current record moves into each of them */
 			if (blk_set_p->blk_levl)
 			{	/* Index block. The current record is changed into a *-key (a simple star key rec) */
-				new_lh_blk_len = (rec_p - blk_p) + BSTAR_REC_SIZE;
+				new_lh_blk_len = (int)((rec_p - blk_p) + BSTAR_REC_SIZE);
 			} else
 			{	/* Data block. Always simple split (no inserted record) */
-				new_lh_blk_len = next_rec_p - blk_p;
+				new_lh_blk_len = (int)(next_rec_p - blk_p);
 				assert(gdsblk_gvtleaf == blk_set_p->blk_type || gdsblk_dtleaf == blk_set_p->blk_type);
 			}
 			assert(0 < new_lh_blk_len);
 			/* assert that the LHS block without the current record is guaranteed not to be too-full */
 			assert((new_lh_blk_len - (next_rec_p - rec_p)) <= psa->max_blk_len);
 			/* Right hand side has key of curr_rec expanded since is first key of blcok */
-			new_rh_blk_len = sizeof(v15_blk_hdr) + blk_set_p->curr_match + blk_len - (rec_p - blk_p);
+			new_rh_blk_len = (int)(sizeof(v15_blk_hdr) + blk_set_p->curr_match + blk_len - (rec_p - blk_p) );
 			assert(0 < new_rh_blk_len);
 			if ((new_rh_blk_len <= psa->max_blk_len) || (new_lh_blk_len > psa->max_blk_len))
 				break;
@@ -730,7 +730,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		if (0 != blk_set_p->ins_rec.ins_key->end)
 		{
 			ins_key_len = blk_set_p->ins_rec.ins_key->end + 1;
-			ins_rec_len = ins_key_len + sizeof(block_id);	/* We only ever insert index records */
+			ins_rec_len = ins_key_len + SIZEOF(block_id);	/* We only ever insert index records */
 		} else
 			ins_key_len = ins_rec_len = 0;
 		blk_p = blk_set_p->old_buff;
@@ -754,10 +754,10 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		/* Make convenient copies of some commonly used record fields */
 		curr_rec_cmpc = ((rec_hdr *)blk_set_p->curr_rec)->cmpc;
 		curr_rec_shrink = blk_set_p->curr_match - curr_rec_cmpc;
-		curr_rec_offset = blk_set_p->curr_rec - blk_set_p->old_buff;
+		curr_rec_offset = (int)(blk_set_p->curr_rec - blk_set_p->old_buff);
 		GET_USHORT(us_rec_len, &((rec_hdr *)blk_set_p->curr_rec)->rsiz);
 		curr_rec_len = us_rec_len;
-		prev_rec_offset = blk_set_p->prev_rec - blk_set_p->old_buff;
+		prev_rec_offset = (int)(blk_set_p->prev_rec - blk_set_p->old_buff);
 		got_root = (gdsblk_dtroot == blk_set_p->blk_type) || (gdsblk_gvtroot == blk_set_p->blk_type);
 		/* Decide if this record insert (if an insert exists) will cause a block split or not. If this
 		   is the first block in the tree (the one we got from the phase 1 file), there will be no insert.
@@ -767,7 +767,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		   blocks that themselves are (still) too full.
 		*/
 		assert(gdsblk_read == blk_set_p->usage);
-		new_blk_len = (ins_rec_len ? (curr_blk_len + curr_rec_cmpc + sizeof(rec_hdr) + ins_rec_len
+		new_blk_len = (int)(ins_rec_len ? (curr_blk_len + curr_rec_cmpc + sizeof(rec_hdr) + ins_rec_len
 					      - blk_set_p->prev_match - blk_set_p->curr_match)
 			       : curr_blk_len);		/* No inserted rec, size does not change */
 		if (new_blk_len <= psa->max_blk_len)
@@ -796,7 +796,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			}
 			BLK_ADDR(ins_rec_hdr, sizeof(rec_hdr), rec_hdr);
 			/* Setup new record header */
-			new_rec_len = sizeof(rec_hdr) + ins_rec_len - blk_set_p->prev_match;
+			new_rec_len = (int)(sizeof(rec_hdr) + ins_rec_len - blk_set_p->prev_match);
 			ins_rec_hdr->rsiz = new_rec_len;
 			ins_rec_hdr->cmpc = blk_set_p->prev_match;
 			BLK_SEG(bs_ptr, (sm_uc_ptr_t)ins_rec_hdr, sizeof(rec_hdr));
@@ -818,7 +818,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			next_rec_hdr->rsiz = curr_rec_len - curr_rec_shrink;
 			next_rec_hdr->cmpc = blk_set_p->curr_match;
 			BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, sizeof(rec_hdr));
-			remain_offset = curr_rec_shrink + sizeof(rec_hdr);	/* Where rest of record plus any
+			remain_offset = curr_rec_shrink + SIZEOF(rec_hdr);	/* Where rest of record plus any
 										   further records begin */
 			remain_len = curr_blk_len - curr_rec_offset;
 			BLK_SEG(bs_ptr,
@@ -875,8 +875,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				   a simple star key rec or (b) No record is being added so the previous record is
 				   changed into a star key rec.
 				*/
-				new_lh_blk_len = curr_rec_offset + BSTAR_REC_SIZE
-					- (ins_rec_len ? 0 : (blk_set_p->curr_rec - blk_set_p->prev_rec));
+				new_lh_blk_len = (int)(curr_rec_offset + BSTAR_REC_SIZE
+					- (ins_rec_len ? 0 : (blk_set_p->curr_rec - blk_set_p->prev_rec)));
 			else
 			{
 				/* Data block. Always simple split (no inserted record) */
@@ -885,8 +885,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			}
 			assert(0 < new_lh_blk_len);
 			/* Right hand side has key of curr_rec expanded since is first key of blcok */
-			new_rh_blk_len = sizeof(v15_blk_hdr) + ((rec_hdr *)blk_set_p->curr_rec)->cmpc
-				+ (curr_blk_len - curr_rec_offset);
+			new_rh_blk_len = (int)(sizeof(v15_blk_hdr) + ((rec_hdr *)blk_set_p->curr_rec)->cmpc +
+					       (curr_blk_len - curr_rec_offset));
 			assert(0 < new_rh_blk_len);
 			/* Common initialization */
 			++psa->block_depth;			/* Need a new block to split into */
@@ -1031,10 +1031,11 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				*/
 				assert(!level_0);
 				/* Last record turns into star key record */
-				new_lh_blk_len = curr_rec_offset + BSTAR_REC_SIZE - (blk_set_p->curr_rec - blk_set_p->prev_rec);
+				new_lh_blk_len = (int)(curr_rec_offset + BSTAR_REC_SIZE -
+						       (blk_set_p->curr_rec - blk_set_p->prev_rec) );
 				assert(0 < new_lh_blk_len);
-				new_rh_blk_len = (sizeof(v15_blk_hdr) + sizeof(rec_hdr) + ins_rec_len
-						  + curr_blk_len - (curr_rec_offset) - curr_rec_shrink);
+				new_rh_blk_len = (int)(sizeof(v15_blk_hdr) + sizeof(rec_hdr) +
+						       ins_rec_len  + curr_blk_len - (curr_rec_offset) - curr_rec_shrink);
 				assert(0 < new_rh_blk_len);
 				if (new_lh_blk_len > psa->max_blk_len || new_rh_blk_len > psa->max_blk_len)
 				{	/* This is possible if we are inserting a record into a block (and thus we are
@@ -1162,7 +1163,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				next_rec_hdr->rsiz = curr_rec_len - curr_rec_shrink;
 				next_rec_hdr->cmpc = blk_set_p->curr_match;
 				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, sizeof(rec_hdr));
-				remain_offset = curr_rec_shrink + sizeof(rec_hdr);	/* Where rest of record plus any
+				remain_offset = curr_rec_shrink + SIZEOF(rec_hdr);	/* Where rest of record plus any
 											   further records begin */
 				remain_len = curr_blk_len - curr_rec_offset;
 				BLK_SEG(bs_ptr,
@@ -1350,7 +1351,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			}
 			DBC_DEBUG(("DBC_DEBUG: -- Block index %d being (re)built\n", blk_index));
 			assert(NULL != blk_sega_p);
-			new_blk_len = blk_sega_p->len;
+			new_blk_len = INTCAST(blk_sega_p->len);
 			new_blk_p = blk_set_p->new_buff;
 			((v15_blk_hdr_ptr_t)new_blk_p)->bsiz = blk_set_p->blk_len = new_blk_len;
 			((v15_blk_hdr_ptr_t)new_blk_p)->levl = blk_set_p->blk_levl;

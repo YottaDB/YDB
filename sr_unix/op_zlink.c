@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -130,11 +130,11 @@ void op_zlink (mval *v, mval *quals)
 
 			memmove(&srcnamebuf[0], file.addr, file.len);
 			memcpy(&srcnamebuf[file.len], DOTM, sizeof(DOTM));
-			srcnamelen = file.len + sizeof(DOTM) - 1;
+			srcnamelen = file.len + SIZEOF(DOTM) - 1;
 			assert (srcnamelen + sizeof(DOTM) <= MAX_FBUFF + 1);
 			memcpy(&objnamebuf[0],file.addr,file.len);
 			memcpy(&objnamebuf[file.len], DOTOBJ, sizeof(DOTOBJ));
-			objnamelen = file.len + sizeof(DOTOBJ) - 1;
+			objnamelen = file.len + SIZEOF(DOTOBJ) - 1;
 			assert (objnamelen + sizeof(DOTOBJ) <= MAX_FBUFF + 1);
 		}
 		if (!expdir)
@@ -168,13 +168,13 @@ void op_zlink (mval *v, mval *quals)
 		type = NOTYPE;
 		memcpy(&srcnamebuf[0],v->str.addr,v->str.len);
 		memcpy(&srcnamebuf[v->str.len], DOTM, sizeof(DOTM));
-		srcnamelen = v->str.len + sizeof(DOTM) - 1;
+		srcnamelen = v->str.len + SIZEOF(DOTM) - 1;
 		if (srcnamebuf[0] == '%')
 			srcnamebuf[0] = '_';
 
 		memcpy(&objnamebuf[0],&srcnamebuf[0],v->str.len);
 		memcpy(&objnamebuf[v->str.len], DOTOBJ, sizeof(DOTOBJ));
-		objnamelen = v->str.len + sizeof(DOTOBJ) - 1;
+		objnamelen = v->str.len + SIZEOF(DOTOBJ) - 1;
 
 		srcstr.addr = &srcnamebuf[0];
 		srcstr.len = srcnamelen;

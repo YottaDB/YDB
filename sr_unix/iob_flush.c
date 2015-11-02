@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,8 +39,8 @@
 void iob_flush(BFILE *bf)
 {
 	error_def(ERR_IOEOF);
-	int nwritten, nrewritten;
-	int nbytes;
+	ssize_t nwritten, nrewritten;
+	ssize_t nbytes;
 
 	if (!bf->write_mode)
 		return;

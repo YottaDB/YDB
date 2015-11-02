@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,17 +57,17 @@ GBLREF	sm_uc_ptr_t		jnldata_base;
 GBLREF	uint4			process_id;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
-GBLREF 	gtmsource_options_t	gtmsource_options;
+GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		pool_init;
-GBLREF	unsigned short		dollar_tlevel;
+GBLREF	short			dollar_tlevel;
 GBLREF	uint4			process_id;
 GBLREF	seq_num			seq_num_zero;
-GBLREF  enum gtmImageTypes      image_type;
+GBLREF	enum gtmImageTypes	image_type;
 GBLREF	node_local_ptr_t	locknl;
 GBLREF	uint4			log_interval;
 GBLREF	boolean_t		is_updproc;
 GBLREF	uint4			mutex_per_process_init_pid;
-GBLREF	bool             	run_time;
+GBLREF	bool			run_time;
 
 LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;
@@ -284,7 +284,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with jnlpool semctl IPC_STAT"), save_errno);
 		}
-		udi->sem_ctime = semarg.buf->sem_ctime;
+		udi->gt_sem_ctime = semarg.buf->sem_ctime;
 		/* Create the shared memory */
 #ifdef __MVS__
 		if (-1 == (udi->shmid = shmget(IPC_PRIVATE,
@@ -308,7 +308,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				 RTS_ERROR_LITERAL("Error with jnlpool shmctl IPC_STAT"), save_errno);
 		}
-		udi->shm_ctime = shmstat.shm_ctime;
+		udi->gt_shm_ctime = shmstat.shm_ctime;
 	} else
 	{	/* find create time of semaphore from the file header and check if the id is reused by others */
 		assert(repl_instance.crash);
@@ -342,9 +342,9 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 				ERR_TEXT, 2, RTS_ERROR_TEXT("jnlpool shm_ctime does not match"));
 		}
 		udi->semid = repl_instance.jnlpool_semid;
-		udi->sem_ctime = repl_instance.jnlpool_semid_ctime;
+		udi->gt_sem_ctime = repl_instance.jnlpool_semid_ctime;
 		udi->shmid = repl_instance.jnlpool_shmid;
-		udi->shm_ctime = repl_instance.jnlpool_shmid_ctime;
+		udi->gt_shm_ctime = repl_instance.jnlpool_shmid_ctime;
 		set_sem_set_src(udi->semid); /* repl_sem.c has some functions which needs some static variable to have the id */
 	}
 	status_l = (sm_long_t)(tmp_jnlpool_ctl = (jnlpool_ctl_ptr_t)do_shmat(udi->shmid, 0, 0));
@@ -406,8 +406,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	{	/* Need to initialize the different sections of journal pool. Start with the FILE HEADER section */
 		repl_instance.jnlpool_semid = udi->semid;
 		repl_instance.jnlpool_shmid = udi->shmid;
-		repl_instance.jnlpool_semid_ctime = udi->sem_ctime;
-		repl_instance.jnlpool_shmid_ctime = udi->shm_ctime;
+		repl_instance.jnlpool_semid_ctime = udi->gt_sem_ctime;
+		repl_instance.jnlpool_shmid_ctime = udi->gt_shm_ctime;
 		memcpy(jnlpool.repl_inst_filehdr, &repl_instance, REPL_INST_HDR_SIZE);	/* Initialize FILE HEADER */
 		jnlpool.repl_inst_filehdr->crash = TRUE;
 		/* Flush the file header to disk so future callers of "jnlpool_init" see the jnlpool_semid and jnlpool_shmid */
@@ -731,7 +731,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			{
 				assert(ERR_REPLINSTNOHIST == status);	/* the only error returned by repl_inst_triple_get() */
 				rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
-				repl_inst_flush_jnlpool();	/* to reset "crash" field in instance file header to FALSE */
+				repl_inst_flush_jnlpool(TRUE);	/* to reset "crash" field in instance file header to FALSE */
 				DETACH_AND_REMOVE_SHM_AND_SEM;	/* remove any sem/shm we had created */
 				ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 				rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
@@ -743,7 +743,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			if (instfilehdr_seqno < last_triple.start_seqno)
 			{	/* The jnl seqno in the instance file header is not greater than the last triple's start seqno */
 				rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
-				repl_inst_flush_jnlpool();	/* to reset "crash" field in instance file header to FALSE */
+				repl_inst_flush_jnlpool(TRUE);	/* to reset "crash" field in instance file header to FALSE */
 				DETACH_AND_REMOVE_SHM_AND_SEM;	/* remove any sem/shm we had created */
 				ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 				rts_error(VARLSTCNT(8) ERR_REPLINSTSEQORD, 6, LEN_AND_LIT("Instance file header"),

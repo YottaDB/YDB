@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@ void gtm_tempnam(char *dir, char *prefix, char *fullname)
 		memcpy(fullname, SCRATCH_DIR, len);
 	} else
 	{
-		len = strlen(dir);
+		len = STRLEN(dir);
 		memcpy(fullname, dir, len);
 	}
 	ptr = fullname + len;
@@ -46,7 +46,7 @@ void gtm_tempnam(char *dir, char *prefix, char *fullname)
 		memcpy(ptr, def_prefix, len);
 	} else
 	{
-		len = strlen(prefix);
+		len = STRLEN(prefix);
 		memcpy(ptr, prefix, len);
 	}
 	ptr += len;

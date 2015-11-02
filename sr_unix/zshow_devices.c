@@ -60,7 +60,6 @@ GBLREF boolean_t	gtm_utf8_mode;
 void zshow_devices(zshow_out *output)
 {
 	io_log_name	*l;		/* logical name pointer		*/
-	io_log_name	*prev = 0;	/* previous logical name	*/
 	mval		v;
 	mval		m;
 	d_rm_struct	*rm_ptr;
@@ -124,7 +123,7 @@ void zshow_devices(zshow_out *output)
 	static readonly char morereadtime_text[] = "MOREREADTIME=";
 
 	v.mvtype = MV_STR;
-	for (l = io_root_log_name;  l != 0;  prev = l, l = l->next)
+	for (l = io_root_log_name;  l != 0;  l = l->next)
 	{
 		if (l->iod->trans_name == l)
 		{
@@ -218,11 +217,11 @@ void zshow_devices(zshow_out *output)
 						ZS_ONE_OUT(&v,space_text);
 					}
 					ZS_PARM_EQU(&v,zshow_width);
-					MV_FORCE_MVAL(&m,(int) l->iod->width) ;
+					MV_FORCE_MVAL(&m,(int)l->iod->width) ;
 					mval_write(output, &m, FALSE);
 					ZS_ONE_OUT(&v,space_text);
 					ZS_PARM_EQU(&v,zshow_leng);
-					MV_FORCE_MVAL(&m,(int) l->iod->pair.out->length) ;
+					MV_FORCE_MVAL(&m,(int)l->iod->pair.out->length) ;
 					mval_write(output, &m, FALSE);
 					ZS_ONE_OUT(&v,space_text);
 					if (l->iod->write_filter)
@@ -322,7 +321,7 @@ void zshow_devices(zshow_out *output)
 					else if (l->iod->width != DEF_RM_WIDTH)
 					{
 						ZS_PARM_EQU(&v,zshow_rec);
-						MV_FORCE_MVAL(&m,(int) l->iod->width);
+						MV_FORCE_MVAL(&m,(int)l->iod->width);
 						mval_write(output, &m, FALSE);
 						ZS_ONE_OUT(&v,space_text);
 					}
@@ -524,7 +523,7 @@ void zshow_devices(zshow_out *output)
 						{
 							ZS_STR_OUT(&v, remote_text);
 							v.str.addr = socketptr->remote.saddr_ip;
-							v.str.len = strlen(socketptr->remote.saddr_ip);
+							v.str.len = STRLEN(socketptr->remote.saddr_ip);
 							zshow_output(output, &v.str);
 							ZS_ONE_OUT(&v, at_text);
 							tmpport = (int)socketptr->remote.port;
@@ -535,7 +534,7 @@ void zshow_devices(zshow_out *output)
 							{
 								ZS_STR_OUT(&v, local_text);
                                                         	v.str.addr = socketptr->local.saddr_ip;
-                                                        	v.str.len = strlen(socketptr->local.saddr_ip);
+                                                        	v.str.len = STRLEN(socketptr->local.saddr_ip);
                                                         	zshow_output(output, &v.str);
                                                         	ZS_ONE_OUT(&v, at_text);
 								tmpport = (int)socketptr->local.port;
@@ -557,7 +556,7 @@ void zshow_devices(zshow_out *output)
 						}
 						ZS_ONE_OUT(&v, space_text);
 		/* zbfsize */ 			ZS_STR_OUT(&v, zbfsize_text);
-						MV_FORCE_MVAL(&m, socketptr->buffer_size);
+						MV_FORCE_MVAL(&m, (int4)(socketptr->buffer_size));
 						mval_write(output, &m, FALSE);
 						ZS_ONE_OUT(&v, space_text);
 		/* izbfsize */ 			ZS_STR_OUT(&v, zibfsize_text);

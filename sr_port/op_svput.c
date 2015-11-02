@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -190,7 +190,7 @@ void op_svput(int varnum, mval *v)
 		else
 		{
 			UTF8_LEADING_BYTE(v->str.addr + sizeof(prombuf), v->str.addr, vptr);
-			gtmprompt.len = vptr - v->str.addr;
+			gtmprompt.len = INTCAST(vptr - v->str.addr);
 		}
 #endif
 		memcpy(gtmprompt.addr, v->str.addr, gtmprompt.len);

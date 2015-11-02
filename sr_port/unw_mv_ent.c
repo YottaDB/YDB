@@ -230,4 +230,6 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			GTMASSERT;
 			return 0;
 	}
+
+	return 0; /* This should never get executed, added to make compiler happy */
 }

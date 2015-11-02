@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -124,7 +124,7 @@ void dse_cache(void)
 					old_value = *(sm_ushort_ptr_t)chng_ptr;
 				} else if (sizeof(int4) == size)
 				{
-					SPRINTF(temp_str, "!UL [0x!XL]");
+					SPRINTF(temp_str, "!UL [0x!8XL]");
 					old_value = *(sm_uint_ptr_t)chng_ptr;
 				}
 				if (value_present)
@@ -139,14 +139,14 @@ void dse_cache(void)
 					value = old_value;
 				if (show_present)
 				{
-					SPRINTF(temp_str1, "Region !12AD : Location !UL [0x!XL] : Value = %s :"
+					SPRINTF(temp_str1, "Region !12AD : Location !UL [0x!8XL] : Value = %s :"
 								" Size = !UB [0x!XB]", temp_str);
 					util_out_print(temp_str1, TRUE, REG_LEN_STR(reg), offset, offset,
 								value, value, size, size);
 				} else
 				{
-					SPRINTF(temp_str1, "Region !12AD : Location !UL [0x!XL] : Old Value = %s : New Value = %s :"
-								" Size = !UB [0x!XB]", temp_str, temp_str);
+					SPRINTF(temp_str1, "Region !12AD : Location !UL [0x!8XL] : Old Value = %s : "
+						"New Value = %s : Size = !UB [0x!XB]", temp_str, temp_str);
 					util_out_print(temp_str1, TRUE, REG_LEN_STR(reg), offset, offset,
 								old_value, old_value, value, value, size, size);
 				}

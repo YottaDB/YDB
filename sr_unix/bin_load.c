@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ static readonly unsigned char gt_lit[] = "LOAD TOTAL";
  * that its size is 4 bytes and no valid data record can have length 4.
  */
 
-void		bin_call_db(int, int, int);
+void		bin_call_db(int, INTPTR_T, INTPTR_T);
 
 void bin_load(uint4 begin, uint4 end)
 {
@@ -74,8 +74,9 @@ void bin_load(uint4 begin, uint4 end)
 			cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1];
 	unsigned char	*end_buff;
 	unsigned short	len, rec_len, next_cmpc;
-	int		current, last, length, max_blk_siz, max_key, status, subsc_len;
-	uint4		iter, max_data_len, max_subsc_len, key_count, rec_count, global_key_count;
+	int		current, last, length, max_blk_siz, max_key, status;
+	uint4		iter, max_data_len, max_subsc_len, key_count;
+	ssize_t	        rec_count, global_key_count, subsc_len,extr_std_null_coll;
 	boolean_t	need_xlation, new_gvn, utf8_extract;
 	rec_hdr		*rp, *next_rp;
 	mval		v, tmp_mval;
@@ -83,7 +84,6 @@ void bin_load(uint4 begin, uint4 end)
 	collseq		*extr_collseq, *db_collseq, *save_gv_target_collseq;
 	coll_hdr	extr_collhdr, db_collhdr;
 	gv_key 		*tmp_gvkey;
-	uint4		extr_std_null_coll;
 	char		std_null_coll[BIN_HEADER_NUMSZ + 1];
 
 	error_def(ERR_GVIS);
@@ -217,10 +217,10 @@ void bin_load(uint4 begin, uint4 end)
 		cp1 = (unsigned char*)(rp + 1);
 		v.str.addr = (char*)cp1;
 		while (*cp1++) ;
-		v.str.len = (char*)cp1 - v.str.addr - 1;
+		v.str.len =INTCAST((char*)cp1 - v.str.addr - 1);
 		if (hdr_lvl <= '2' || new_gvn)
 		{
-			bin_call_db(BIN_BIND, (int)gd_header, (int)&v.str);
+			bin_call_db(BIN_BIND, (INTPTR_T)gd_header, (INTPTR_T)&v.str);
 			max_key = gv_cur_region->max_key_size;
 			db_collhdr.act = gv_target->act;
 			db_collhdr.ver = gv_target->ver;
@@ -357,7 +357,7 @@ void bin_load(uint4 begin, uint4 end)
 					transform = TRUE;
 					tmp_mval.mvtype = MV_STR;
                                 	tmp_mval.str.addr = (char *)dest_buff;
-                                	tmp_mval.str.len = end_buff - dest_buff;
+                                	tmp_mval.str.len = INTCAST(end_buff - dest_buff);
 					tmp_gvkey->prev = 0;
 					tmp_gvkey->end = 0;
 					if (extr_collseq)
@@ -391,10 +391,10 @@ void bin_load(uint4 begin, uint4 end)
 			if (max_subsc_len < (gv_currkey->end + 1))
 				max_subsc_len = gv_currkey->end + 1;
 			v.str.addr = (char*)cp1;
-			v.str.len = rec_len - (cp1 - (unsigned char *) rp);
+			v.str.len =INTCAST(rec_len - (cp1 - (unsigned char *)rp) );
 			if (max_data_len < v.str.len)
 				max_data_len = v.str.len;
-			bin_call_db(BIN_PUT, (int)&v, 0);
+			bin_call_db(BIN_PUT, (INTPTR_T)&v, 0);
 			if (mupip_error_occurred)
 			{
 				if (!mupip_DB_full)
@@ -420,7 +420,7 @@ void bin_load(uint4 begin, uint4 end)
 	}
 }
 
-void bin_call_db(int routine, int parm1, int parm2)
+void bin_call_db(int routine, INTPTR_T parm1, INTPTR_T parm2)
 {
 	error_def(ERR_CORRUPT);
 
@@ -430,7 +430,8 @@ void bin_call_db(int routine, int parm1, int parm2)
 
 	ESTABLISH(mupip_load_ch);
 	switch(routine)
-	{	case BIN_PUT:
+	{
+		case BIN_PUT:
 			op_gvput((mval *)parm1);
 			break;
 		case BIN_BIND:

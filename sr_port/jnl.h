@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,7 +8,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
+#include "mdef.h"
 #ifndef JNL_H_INCLUDED
 #define JNL_H_INCLUDED
 
@@ -75,6 +75,9 @@
 #define	WCSFLU_SYNC_EPOCH	4
 #define	WCSFLU_FSYNC_DB		8	/* Currently used only in Unix wcs_flu() */
 
+/* EPOCHs are written unconditionally in Unix (assuming jnl is ON) while they are written only for BEFORE_IMAGE in VMS */
+#define	JNL_HAS_EPOCH(jnlfile)	UNIX_ONLY(TRUE) VMS_ONLY(jnlfile->before_images)
+
 #ifdef DEBUG
 #define	DEFAULT_EPOCH_INTERVAL_IN_SECONDS	30 /* exercise epoch-syncing code relatively more often in DBG */
 #else
@@ -91,6 +94,28 @@
 #define REPL_WAS_ENABLED(X)	((X)->repl_state == repl_was_open) /* If TRUE, replication is now closed, but was open earlier */
 									/* In this state, replication records are not written */
 #define REPL_ALLOWED(X)		((X)->repl_state != repl_closed)	/* If TRUE, replication records are/were written */
+
+/* Logical records should be written if journaling is enabled in the region OR if replication state is WAS_ON (repl_was_open).
+ * In the former case, the journal records will be written to the journal pool, journal buffer and journal file.
+ * In the latter case, the journal records will be written to the journal pool but not to the journal buffer and journal file.
+ * All code that generates logical journal records should use the below macro instead of JNL_ENABLED macro.
+ * Note that replication does not care about non-logical records (PBLK/AIMG/INCTN etc.) and hence code that generates them does
+ * not need to (and should not) use this macro.
+ */
+#define	JNL_WRITE_LOGICAL_RECS(X)	(JNL_ENABLED(X) || REPL_WAS_ENABLED(X))
+
+/* The following macro should be used to invoke the function "jnl_write" for any logical record. This macro
+ * checks if journaling is enabled and if so invokes "jnl_write" else it invokes "jnl_write_poolonly" which
+ * writes only to the journal pool.
+ */
+#define	JNL_WRITE_APPROPRIATE(CSA, JPC, RECTYPE, JREC, BLKPTR, JFB)					\
+{													\
+	assert(JNL_ENABLED(CSA) || REPL_WAS_ENABLED(CSA));						\
+	if (JNL_ENABLED(CSA))										\
+		jnl_write(JPC, RECTYPE, JREC, BLKPTR, JFB); /* write to jnlbuffer, jnlfile, jnlpool */	\
+	else												\
+		jnl_write_poolonly(JPC, RECTYPE, JREC, JFB);	/* write to jnlpool only */		\
+}
 
 #define MUEXTRACT_TYPE(A) 	(((A)[0]-'0')*10 + ((A)[1]-'0')) /* A is a character pointer */
 
@@ -621,27 +646,27 @@ typedef union
 
 
 /* Macro to access fixed size record's size */
-#define	TCOM_RECLEN		sizeof(struct_jrec_tcom)
-#define	ZTCOM_RECLEN		sizeof(struct_jrec_ztcom)
-#define	INCTN_RECLEN		sizeof(struct_jrec_inctn)
-#define	PINI_RECLEN		sizeof(struct_jrec_pini)
-#define	PFIN_RECLEN		sizeof(struct_jrec_pfin)
-#define	NULL_RECLEN		sizeof(struct_jrec_null)
-#define	EPOCH_RECLEN		sizeof(struct_jrec_epoch)
-#define	EOF_RECLEN 		sizeof(struct_jrec_eof)
+#define	TCOM_RECLEN		SIZEOF(struct_jrec_tcom)
+#define	ZTCOM_RECLEN		SIZEOF(struct_jrec_ztcom)
+#define	INCTN_RECLEN		SIZEOF(struct_jrec_inctn)
+#define	PINI_RECLEN		SIZEOF(struct_jrec_pini)
+#define	PFIN_RECLEN		SIZEOF(struct_jrec_pfin)
+#define	NULL_RECLEN		SIZEOF(struct_jrec_null)
+#define	EPOCH_RECLEN		SIZEOF(struct_jrec_epoch)
+#define	EOF_RECLEN 		SIZEOF(struct_jrec_eof)
 /* Macro to access variable size record's fixed part's size */
-#define FIXED_UPD_RECLEN	offsetof(struct_jrec_upd, mumps_node)
-#define FIXED_ZTP_UPD_RECLEN	offsetof(struct_jrec_ztp_upd, mumps_node)
-#define MIN_ALIGN_RECLEN	(offsetof(struct_jrec_align, align_str.text[0]) + JREC_SUFFIX_SIZE)
-#define FIXED_ALIGN_RECLEN	offsetof(struct_jrec_align, align_str.text[0])
-#define FIXED_BLK_RECLEN 	offsetof(struct_jrec_blk, blk_contents[0])
-#define FIXED_PBLK_RECLEN 	offsetof(struct_jrec_blk, blk_contents[0])
-#define FIXED_AIMG_RECLEN 	offsetof(struct_jrec_blk, blk_contents[0])
-#define MIN_PBLK_RECLEN		(offsetof(struct_jrec_blk, blk_contents[0]) + JREC_SUFFIX_SIZE)
-#define MIN_AIMG_RECLEN		(offsetof(struct_jrec_blk, blk_contents[0]) + JREC_SUFFIX_SIZE)
+#define FIXED_UPD_RECLEN	OFFSETOF(struct_jrec_upd, mumps_node)
+#define FIXED_ZTP_UPD_RECLEN	OFFSETOF(struct_jrec_ztp_upd, mumps_node)
+#define MIN_ALIGN_RECLEN	(OFFSETOF(struct_jrec_align, align_str.text[0]) + JREC_SUFFIX_SIZE)
+#define FIXED_ALIGN_RECLEN	OFFSETOF(struct_jrec_align, align_str.text[0])
+#define FIXED_BLK_RECLEN 	OFFSETOF(struct_jrec_blk, blk_contents[0])
+#define FIXED_PBLK_RECLEN 	OFFSETOF(struct_jrec_blk, blk_contents[0])
+#define FIXED_AIMG_RECLEN 	OFFSETOF(struct_jrec_blk, blk_contents[0])
+#define MIN_PBLK_RECLEN		(OFFSETOF(struct_jrec_blk, blk_contents[0]) + JREC_SUFFIX_SIZE)
+#define MIN_AIMG_RECLEN		(OFFSETOF(struct_jrec_blk, blk_contents[0]) + JREC_SUFFIX_SIZE)
 
-#define JREC_PREFIX_SIZE	(sizeof(jrec_prefix))
-#define JREC_SUFFIX_SIZE	(sizeof(jrec_suffix))
+#define JREC_PREFIX_SIZE	SIZEOF(jrec_prefix)
+#define JREC_SUFFIX_SIZE	SIZEOF(jrec_suffix)
 #define MIN_JNLREC_SIZE		(JREC_PREFIX_SIZE + JREC_SUFFIX_SIZE)
 #define JREC_PREFIX_UPTO_LEN_SIZE	(offsetof(jrec_prefix, pini_addr))
 
@@ -772,7 +797,7 @@ DEBUG_ONLY(
 	}										\
 }
 
-#define	JNL_HDR_LEN		sizeof(jnl_file_header)
+#define	JNL_HDR_LEN		SIZEOF(jnl_file_header)
 #define	JNL_FILE_FIRST_RECORD	JNL_HDR_LEN
 
 /* Minimum possible journal file size */
@@ -864,8 +889,8 @@ DEBUG_ONLY(
 	 * journal file creation, we consider the max possible logical record size. */						\
 	assert(FIXED_UPD_RECLEN <= FIXED_ZTP_UPD_RECLEN);									\
 	/* fixed size part of ztp update record + MAX possible (key + data) len + keylen + datalen */				\
-	(JINFO)->max_logi_reclen = ROUND_UP2(FIXED_ZTP_UPD_RECLEN + ((CSD)->blk_size - sizeof(blk_hdr) - sizeof(rec_hdr)) +	\
-			                      sizeof(jnl_str_len_t) + sizeof(mstr_len_t) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY);\
+	(JINFO)->max_logi_reclen = ROUND_UP2(FIXED_ZTP_UPD_RECLEN + ((CSD)->blk_size - USIZEOF(blk_hdr) - USIZEOF(rec_hdr)) +	\
+			                     USIZEOF(jnl_str_len_t) + USIZEOF(mstr_len_t) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY);\
 	assert((JINFO)->max_phys_reclen >= (JINFO)->max_logi_reclen);								\
 }
 
@@ -887,6 +912,7 @@ void	jnl_write_inctn_rec(sgmnt_addrs	*csa);
 void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb);
 void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb);
 void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record);
+void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, jnl_format_buffer *jfb);
 
 #ifdef VMS
 void	finish_active_jnl_qio(void);

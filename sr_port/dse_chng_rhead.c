@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,7 +114,7 @@ void dse_chng_rhead(void)
 			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-		if (x < 0 || x > 0x7f)
+		if (x > 0x7f)
 		{
 			util_out_print("Error: invalid cmpc.",TRUE);
 			t_abort(gv_cur_region, cs_addrs);

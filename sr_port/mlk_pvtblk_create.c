@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 		MV_FORCE_STR(mp_temp);
 		assert((mp_temp)->mvtype & MV_STR);
 		assert((mp_temp)->str.len < 256);
-		len += (mp_temp)->str.len;
+		len += (int)(mp_temp)->str.len;
 		rlen += ROUND_UP(((mp_temp)->str.len + 1), 4);
 	}
 	va_end(mp);
@@ -127,7 +127,7 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 	{
 		mp_temp = va_arg(mp, mval *);
 		MV_FORCE_STR(mp_temp);
-		len = (mp_temp)->str.len;
+		len = (int)(mp_temp)->str.len;
 		*cp++ = len;
 		memcpy(cp, (mp_temp)->str.addr, len);
 		cp += len;

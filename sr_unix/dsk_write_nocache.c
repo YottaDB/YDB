@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,7 +83,7 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	}
 	DEBUG_ONLY(else GTMASSERT);
 	if (csa->do_fullblockwrites)
-		size = ROUND_UP(size, csa->fullblockwrite_len); /* round size up to next full logical filesys block. */
+		size =(int)ROUND_UP(size, csa->fullblockwrite_len); /* round size up to next full logical filesys block. */
 	assert(size <= csd->blk_size);
 	assert(FALSE == reg->read_only);
 	assert(!csa->acc_meth.bg.cache_state->cache_array || buff != (sm_uc_ptr_t)csd);

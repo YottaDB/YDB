@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,7 +107,7 @@ boolean_t gvcst_queryget(mval *val)
 				}
 				key_size = gv_altkey->end + 1;
 				GET_RSIZ(rsiz, rp);
-				data_len = rsiz + rp->cmpc - sizeof(rec_hdr) - key_size;
+				data_len = rsiz + rp->cmpc - SIZEOF(rec_hdr) - key_size;
 				if (data_len < 0  || (sm_uc_ptr_t)rp + rsiz > (sm_uc_ptr_t)bp + ((blk_hdr_ptr_t)bp)->bsiz)
 				{
 					assert(CDB_STAGNATE > t_tries);

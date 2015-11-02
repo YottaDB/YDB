@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ void i2smval(mval *v, uint4 i)
 		v->m[0] = (v->m[1] % 10) * MANT_LO;
 		v->m[1] /= 10;
 	}
-	v->str.len = c - v->str.addr;
+	v->str.len = INTCAST(c - v->str.addr);
 	v->e = v->str.len + MV_XBIAS;
 	assert(v->m[1] < MANT_HI);
 }
@@ -208,7 +208,7 @@ void     double2mval(mval *dst, double src)
         char    buf[67];    /* [possible] sign, decimal-point, [up to] 64 digits, and terminator */
 	SPRINTF(buf, "%lf", src);
 	dst->mvtype = MV_STR;
-	dst->str.len = strlen(buf);
+	dst->str.len = STRLEN(buf);
 	dst->str.addr = buf;
 	s2n(dst);
 	dst->mvtype &= ~MV_STR;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,12 +11,12 @@
 #ifndef HASHTAB_COMMON_H
 #define HASHTAB_COMMON_H
 
-#define HT_VALUE_DUMMY ((void *) 1)
+#define HT_VALUE_DUMMY ((void *) 1L)
 	/* It is required not to have 0 or -1 for this macro.
 	 * This is passed when hashtable callers want to use hash table just for the keys.
 	 * Say, database code wants to create a list of blocks being read for a transactions.
 	 * There is no corresponding value associated. For that case HT_VALUE_DUMMY will be passed as "value". */
-#define HT_DELETED_ENTRY ((void *) - 1)
+#define HT_DELETED_ENTRY ((void *) -1L)
 		/* Note: We may need to change the above during 64-bit port */
 #define HTENT_MARK_DELETED(tabent) (HT_DELETED_ENTRY == (tabent)->value)
 #define HT_LOAD_FACTOR 	50
@@ -63,10 +63,10 @@ We can remove them when we are certain that ELF_HASH is the best choice for us.
 
 /*
 #define CHAR_BITS 8
-#define BITS_IN_int     ( sizeof(int) * CHAR_BITS )
-#define THREE_QUARTERS  ((int) ((BITS_IN_int * 3) / 4))
-#define ONE_EIGHTH      ((int) (BITS_IN_int / 8))
-#define HIGH_BITS       ( ~((unsigned int)(~0) >> ONE_EIGHTH ))
+#define BITS_IN_int     (SIZEOF(int) * CHAR_BITS)
+#define THREE_QUARTERS  (BITS_IN_int * 3 / 4)
+#define ONE_EIGHTH      (BITS_IN_int / 8)
+#define HIGH_BITS       (~((unsigned int)(~0) >> ONE_EIGHTH ))
 #define PJW_HASH(sptr, len, hash, init_hashval)				\
 {									\
 	uint4 	tempint;						\

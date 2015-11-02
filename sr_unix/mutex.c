@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -664,6 +664,8 @@ static	enum cdb_sc mutex_wakeup(mutex_struct_ptr_t addr)
 		else
 			rel_quant();
 	} while (quant_retry_counter_remq);
+
+	return (cdb_sc_dbccerr); /* This will never get executed, added to make compiler happy */
 }
 
 
@@ -883,11 +885,13 @@ void mutex_salvage(gd_region *reg)
 			mutex_salvaged = TRUE;
 			MUTEX_DPRINT2("%d : mutex salvaged, culprit was our own process\n", process_id);
 		} else if (!is_proc_alive(holder_pid, UNIX_ONLY(0) VMS_ONLY(holder_imgcnt)))
-		{
-			COMPSWAP(&csa->critical->semaphore, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
-			csa->nl->in_crit = 0;
-			mutex_salvaged = TRUE;
+		{	/* Release the COMPSWAP lock AFTER setting csa->nl->in_crit to 0 as an assert in
+			 * grab_crit (checking that csa->nl->in_crit is 0) relies on this order.
+			 */
 			send_msg(VARLSTCNT(5) ERR_MUTEXFRCDTERM, 3, holder_pid, REG_LEN_STR(reg));
+			csa->nl->in_crit = 0;
+			COMPSWAP(&csa->critical->semaphore, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
+			mutex_salvaged = TRUE;
 			MUTEX_DPRINT3("%d : mutex salvaged, culprit was %d\n", process_id, holder_pid);
 		} else if (FALSE == disable_sigcont)
 		{

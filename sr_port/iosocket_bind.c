@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ boolean_t	iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 	boolean_t	no_time_left = FALSE;
 	d_socket_struct *dsocketptr;
 	ABS_TIME        cur_time, end_time;
-	GTM_SOCKLEN_TYPE          addrlen;
+	GTM_SOCKLEN_TYPE	addrlen;
 	error_def(ERR_SOCKINIT);
 	error_def(ERR_GETSOCKOPTERR);
 	error_def(ERR_SETSOCKOPTERR);
@@ -63,7 +63,7 @@ boolean_t	iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 		{
 		        real_errno = errno;
 			errptr = (char *)STRERROR(real_errno);
-         		errlen = strlen(errptr);
+         		errlen = STRLEN(errptr);
                 	rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, real_errno, errlen, errptr);
 			return FALSE;
 		}
@@ -73,7 +73,7 @@ boolean_t	iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 		{
 		        real_errno = errno;
 			errptr = (char *)STRERROR(real_errno);
-         		errlen = strlen(errptr);
+         		errlen = STRLEN(errptr);
                 	rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					RTS_ERROR_LITERAL("SO_REUSEADDR"), real_errno, errlen, errptr);
 			return FALSE;
@@ -85,7 +85,7 @@ boolean_t	iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 		{
 		        real_errno = errno;
 			errptr = (char *)STRERROR(real_errno);
-         		errlen = strlen(errptr);
+         		errlen = STRLEN(errptr);
                 	rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					RTS_ERROR_LITERAL("TCP_NODELAY"), real_errno, errlen, errptr);
 			return FALSE;
@@ -98,7 +98,7 @@ boolean_t	iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 			{
 			        real_errno = errno;
 				errptr = (char *)STRERROR(real_errno);
-         			errlen = strlen(errptr);
+         			errlen = STRLEN(errptr);
                 		rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					RTS_ERROR_LITERAL("SO_RCVBUF"), real_errno, errlen, errptr);
 				return FALSE;
@@ -112,7 +112,7 @@ boolean_t	iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 			{
 			        real_errno = errno;
 				errptr = (char *)STRERROR(real_errno);
-         			errlen = strlen(errptr);
+         			errlen = STRLEN(errptr);
                 		rts_error(VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
 					RTS_ERROR_LITERAL("SO_RCVBUF"), real_errno, errlen, errptr);
 				return FALSE;
@@ -139,7 +139,7 @@ boolean_t	iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
                                 break;
                         default:
                                 errptr = (char *)STRERROR(real_errno);
-                                errlen = strlen(errptr);
+                                errlen = STRLEN(errptr);
                 		rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, real_errno, errlen, errptr);
                                 break;
                         }
@@ -150,12 +150,12 @@ boolean_t	iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
                         hiber_start(100);
                 }
 	} while (temp_1 < 0);
-	addrlen = sizeof(socketptr->local.sin);
+	addrlen = SIZEOF(socketptr->local.sin);
 	if (-1 == tcp_routines.aa_getsockname(socketptr->sd, (struct sockaddr *)&socketptr->local.sin, &addrlen))
 	{
 		real_errno = errno;
 		errptr = (char *)STRERROR(real_errno);
-		errlen = strlen(errptr);
+		errlen = STRLEN(errptr);
 		rts_error(VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, real_errno, errlen, errptr);
 	        return FALSE;
 	}

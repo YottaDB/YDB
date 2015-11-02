@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,7 +75,8 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, boolean_t skip_pi
 { /* On entry, *send_len is the number of bytes to be sent
    * On exit, *send_len contains the number of bytes sent
    */
-	int		bytes_sent, send_size, status, eintr_cnt, eagain_cnt, ewouldblock_cnt, emsgsize_cnt;
+	int		send_size, status, eintr_cnt, eagain_cnt, ewouldblock_cnt, emsgsize_cnt;
+  	ssize_t		bytes_sent;
 	long		wait_val;
 	fd_set		output_fds;
         struct timeval	timeout;
@@ -163,8 +164,8 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, boolean_t skip_pi
 		}
 		if (0 < bytes_sent)
 		{
-			*send_len = bytes_sent;
-			REPL_DPRINT2("repl_send: returning with send_len %d\n", bytes_sent);
+			*send_len = (int)bytes_sent;
+			REPL_DPRINT2("repl_send: returning with send_len %ld\n", bytes_sent);
 			return (SS_NORMAL);
 		}
 		repl_errno = EREPL_SEND;
@@ -179,7 +180,8 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, boolean_t skip_da
 { /* On entry *recv_len is the maximum length to be received.
    * On exit, *recv_len will contain the number of bytes received.
    */
-	int		bytes_recvd, status, max_recv_len, eintr_cnt, eagain_cnt;
+	int		status, max_recv_len, eintr_cnt, eagain_cnt;
+	ssize_t		bytes_recvd;
 	long		wait_val;
 	fd_set		input_fds;
         struct timeval	timeout;
@@ -237,8 +239,8 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, boolean_t skip_da
 			;
 		if (0 < bytes_recvd)
 		{
-			*recv_len = bytes_recvd;
-			REPL_DPRINT2("repl_recv: returning with recv_len %d\n", bytes_recvd);
+			*recv_len = (int)bytes_recvd;
+			REPL_DPRINT2("repl_recv: returning with recv_len %ld\n", bytes_recvd);
 			return (SS_NORMAL);
 		}
 		if (0 == bytes_recvd)
@@ -275,7 +277,7 @@ int repl_close(int *sock_fd)
 static int get_sock_buff_size(int sockfd, int *buffsize, int which_buf)
 {
 	int	status;
-#ifndef sun
+#if !defined(sun) && !defined(__ia64)
 	size_t	optlen;
 #else
 	int	optlen;
@@ -322,13 +324,14 @@ void repl_log_conn_info(int sock_fd, FILE *log_fp)
 {
 	struct sockaddr_in	local, remote;
 	GTM_SOCKLEN_TYPE	len;
-	int			errlen, save_errno;
+	int			save_errno;
+        size_t			errlen;
 	char			*errptr, local_ip[16], remote_ip[16];
 	in_port_t		local_port, remote_port;
 	error_def(ERR_GETSOCKNAMERR);
 	error_def(ERR_TEXT);
 
-	len = sizeof(local);
+	len = SIZEOF(local);
 	if (0 == getsockname(sock_fd, (struct sockaddr *)&local, &len))
 	{
 		local_port = ntohs(local.sin_port);
@@ -344,7 +347,7 @@ void repl_log_conn_info(int sock_fd, FILE *log_fp)
 		local_port = -1;
 		strcpy(local_ip, "*UNKNOWN*");
 	}
-	len = sizeof(remote);
+	len = SIZEOF(remote);
 	if (0 == getpeername(sock_fd, (struct sockaddr *)&remote, &len))
 	{
 		remote_port = ntohs(remote.sin_port);

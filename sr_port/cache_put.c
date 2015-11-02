@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "cachectl.h"
 #include "cacheflush.h"
 #include "rtnhdr.h"
+#include "gtm_malloc.h"
 
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	int			indir_cache_mem_size;
@@ -32,7 +33,7 @@ void cache_put(icode_str *src, mstr *object)
 	indir_cache_mem_size += (ICACHE_SIZE + object->len);
 	if (indir_cache_mem_size > MAX_CACHE_MEMSIZE || cache_table.size > MAX_CACHE_ENTRIES)
 		cache_table_rebuild();
-	csp = (cache_entry *)malloc(ICACHE_SIZE + object->len);
+	csp = (cache_entry *)GTM_TEXT_MALLOC(ICACHE_SIZE + object->len);
 	csp->obj.addr = (char *)csp + ICACHE_SIZE;
 	csp->refcnt = csp->zb_refcnt = 0;
 	csp->src = *src;
@@ -58,10 +59,11 @@ void cache_put(icode_str *src, mstr *object)
 		   safely and correctly.
 		*/
 		fix_base = (mval *)((unsigned char *)csp->obj.addr + ((ihdtyp *)(csp->obj.addr))->fixup_vals_off);
+
 		for (fix = fix_base, i = 0 ;  i < fixup_cnt ;  i++, fix++)
 		{
 			if (MV_IS_STRING(fix))		/* if string, place in string pool */
-				fix->str.addr = (int4)fix->str.addr + object->addr;
+				fix->str.addr = (INTPTR_T)fix->str.addr + object->addr;
 		}
 	}
 	fixup_cnt = ((ihdtyp *)(csp->obj.addr))->vartab_len;
@@ -70,7 +72,7 @@ void cache_put(icode_str *src, mstr *object)
 		/* Do address fix up of local variable name which is in stringpool */
 		var_base = (var_tabent *)((unsigned char *)csp->obj.addr + ((ihdtyp *)(csp->obj.addr))->vartab_off);
 		for (varent = var_base, i = 0; i < fixup_cnt; i++, varent++)
-			varent->var_name.addr = (int4)varent->var_name.addr + object->addr;
+			varent->var_name.addr = (INTPTR_T) varent->var_name.addr + object->addr;
 	}
 	*object = csp->obj;				/* Update location of object code for comp_indr */
 	cacheflush(csp->obj.addr, csp->obj.len, BCACHE);

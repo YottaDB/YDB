@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,8 +45,10 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 	 * returns a FALSE for systemic problems that require a wcs_recover or something more drastic.
 	 */
 
-	uint4			cnt, lcnt, offset, max_tn;
-	int4			bp_lo, bp_top, bp, cr_base, cr_top, bt_top_off, bt_base_off, i;
+	uint4			cnt, lcnt ;
+        ssize_t			offset ;
+        trans_num 		max_tn ;
+	INTPTR_T		bp_lo, bp_top, bp, cr_base, cr_top, bt_top_off, bt_base_off;
 	sm_uc_ptr_t		bptmp;
 	bool			ret;
 	sgmnt_addrs		*csa;
@@ -60,8 +62,9 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 	char			secshr_string_delta[256];
 	sm_uc_ptr_t		jnl_buff_expected;
 	boolean_t		blkque_array[WC_MAX_BUFFS]; /* TRUE indicates we saw the cr or bt of that array index */
-	int4			n_bts;	/* a copy of csd->n_bts since it is used frequently in this routine */
+	int4			i, n_bts;	/* a copy of csd->n_bts since it is used frequently in this routine */
 	trans_num		dummy_tn;
+	int                     max_size;
 
 	error_def(ERR_DBFHEADERR);
 	error_def(ERR_DBADDRANGE);
@@ -440,28 +443,29 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 	bt_top_off = GDS_ANY_ABS2REL(csa, (sm_uc_ptr_t)csd + offset);
 
 	/* print info. that secshr_db_clnup stored */
-	if (0 != csd->secshr_ops_index)
+	if (0 != csa->nl->secshr_ops_index)
 	{
+		max_size = sizeof(csa->nl->secshr_ops_array)/sizeof(csa->nl->secshr_ops_array[0]);
 		assert(expect_damage);
-		if (sizeof(csd->secshr_ops_array) < csd->secshr_ops_index)
+		if (max_size < csa->nl->secshr_ops_index)
 		{
 			SPRINTF(secshr_string, "secshr_max_index exceeded. max_index = %d [0x%08x] : ops_index = %d [0x%08x]",
-					sizeof(csd->secshr_ops_array), sizeof(csd->secshr_ops_array),
-					csd->secshr_ops_index, csd->secshr_ops_index);
+					max_size, max_size,
+					csa->nl->secshr_ops_index, csa->nl->secshr_ops_index);
 			send_msg(VARLSTCNT(6) ERR_DBCLNUPINFO, 4, DB_LEN_STR(reg), RTS_ERROR_TEXT(secshr_string));
-			csd->secshr_ops_index = sizeof(csd->secshr_ops_array);
+			csa->nl->secshr_ops_index = max_size;
 		}
-		for (i = 0; (i + 1) < csd->secshr_ops_index; i += csd->secshr_ops_array[i])
+		for (i = 0; (i + 1) < csa->nl->secshr_ops_index; i += csa->nl->secshr_ops_array[i])
 		{
-			SPRINTF(secshr_string, "Line %3d ", csd->secshr_ops_array[i + 1]);
-			for (lcnt = i + 2; lcnt < MIN(csd->secshr_ops_index, i + csd->secshr_ops_array[i]); lcnt++)
+			SPRINTF(secshr_string, "Line %3d ", csa->nl->secshr_ops_array[i + 1]);
+			for (lcnt = i + 2; lcnt < MIN(csa->nl->secshr_ops_index, i + csa->nl->secshr_ops_array[i]); lcnt++)
 			{
-				SPRINTF(secshr_string_delta, " : [0x%08x]", csd->secshr_ops_array[lcnt]);
+				SPRINTF(secshr_string_delta, " : [0x%08x]", csa->nl->secshr_ops_array[lcnt]);
 				strcat(secshr_string, secshr_string_delta);
 			}
 			send_msg(VARLSTCNT(6) ERR_DBCLNUPINFO, 4, DB_LEN_STR(reg), RTS_ERROR_TEXT(secshr_string));
 		}
-		csd->secshr_ops_index = 0;
+		csa->nl->secshr_ops_index = 0;
 	}
 	/* loop through the cache_recs */
 	memset(blkque_array, 0, n_bts * sizeof(boolean_t));	/* initially, we did not find any cr in the cr blkques */
@@ -826,7 +830,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		assert(expect_damage);
 		ret = FALSE;
 		send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), que_head, 0, RTS_ERROR_TEXT("cacheq_active"), que_head,
-			((sm_long_t)que_head / (int4)sizeof(que_ent)) * (int4)sizeof(que_ent));
+			((sm_long_t)que_head / sizeof(que_ent)) * sizeof(que_ent));
 	}
 	/* loop through the active queue */
 	for (cstt_prev = (cache_state_rec_ptr_t)que_head, cstt = (cache_state_rec_ptr_t)((sm_uc_ptr_t)que_head + que_head->fl),
@@ -872,7 +876,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			assert(expect_damage);
 			ret = FALSE;
 			dummy_tn = cstt->flushed_dirty_tn + 1;
-			send_msg(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), (int)cstt + sizeof(que_head), cstt->blk,
+			send_msg(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), cstt + sizeof(que_head), cstt->blk,
 				&cstt->dirty, RTS_ERROR_TEXT("active dirty (tn)"), &dummy_tn, &csd->trans_hist.curr_tn);
 		}
 		/* if caller_is_wcs_recover, we would have waited for all writers to stop manipulating the active/wip queues
@@ -911,7 +915,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		assert(expect_damage);
 		ret = FALSE;
 		send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), que_head, 0, RTS_ERROR_TEXT("cacheq_wip"), que_head,
-			((sm_long_t)que_head / (int4)sizeof(que_ent)) * (int4)sizeof(que_ent));
+			((sm_long_t)que_head / sizeof(que_ent)) * sizeof(que_ent));
 	}
 #ifdef VMS
 	for (cstt_prev = que_head, cstt = (cache_state_rec_ptr_t)((sm_uc_ptr_t)que_head + que_head->fl), cnt = n_bts;

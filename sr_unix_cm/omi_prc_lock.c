@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,8 @@ omi_prc_lock(omi_conn *cptr, char *xend, char *buff, char *bend)
     {	if (!(*prior)->granted || !(*prior)->nodptr || (*prior)->nodptr->owner != omi_pid)
 		mlk_pvtblk_delete(prior);
 	else
-	{	(*prior)->trans = 0;
+	{
+		(*prior)->trans = 0;
 		prior = &(*prior)->next;
 	}
     }
@@ -80,11 +81,11 @@ omi_prc_lock(omi_conn *cptr, char *xend, char *buff, char *bend)
     if (rv == 0) {
 	OMI_SI_WRIT(0, bptr);
 	REVERT;
-	return bptr - buff;
+	return (int)(bptr - buff);
     }
 
     mlk_pvt_root->trans = 0;
-    if (!(rv = mlk_lock(mlk_pvt_root, (uint4)cptr, FALSE)))
+    if (!(rv = mlk_lock(mlk_pvt_root, (UINTPTR_T)cptr, FALSE)))
     {	    /* Lock succeeded; inform the client */
 	mlk_pvt_root->granted = TRUE;
 	mlk_pvt_root->level++;
@@ -92,7 +93,8 @@ omi_prc_lock(omi_conn *cptr, char *xend, char *buff, char *bend)
     rv = !rv;
 
     if (!mlk_pvt_root->nodptr || mlk_pvt_root->nodptr->owner != omi_pid)
-    {	next = mlk_pvt_root->next;
+    {
+	next = mlk_pvt_root->next;
 	free(mlk_pvt_root);
 	mlk_pvt_root = next;
 	rv = 0;
@@ -100,5 +102,5 @@ omi_prc_lock(omi_conn *cptr, char *xend, char *buff, char *bend)
 
     OMI_SI_WRIT(rv, bptr);
     REVERT;
-    return bptr - buff;
+    return (int)(bptr - buff);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +104,9 @@ void mupip_upgrade(void)
 	error_def(ERR_TEXT);
 
 	/* Structure checks .. */
+#ifndef __ia64
 	assert((24 * 1024) == sizeof(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
+#endif
 
 	UNIX_ONLY(sem_inf = (sem_info *)malloc(sizeof(sem_info) * 2);
 		  memset(sem_inf, 0, sizeof(sem_info) * 2);
@@ -223,7 +225,7 @@ void mupip_upgrade(void)
 		gtm_putmsg(VARLSTCNT(6) ERR_MUUPGRDNRDY, 4, db_fn_len, db_fn, gtm_release_name_len, gtm_release_name);
 		mupip_exit(ERR_MUNOUPGRD);
 	}
-	max_max_rec_size = v15_csd.blk_size - sizeof(blk_hdr);
+	max_max_rec_size = v15_csd.blk_size - SIZEOF(blk_hdr);
 	if (VMS_ONLY(9) UNIX_ONLY(8) > v15_csd.reserved_bytes)
 	{
 		gtm_putmsg(VARLSTCNT(6) ERR_DBMINRESBYTES, 4, VMS_ONLY(9) UNIX_ONLY(8), v15_csd.reserved_bytes);

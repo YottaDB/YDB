@@ -81,6 +81,9 @@ GBLREF int4		curr_addr;
 GBLREF char		cg_phase;	/* code generation phase */
 GBLDEF uint4	txtrel_cnt;	/* count of text relocation records */
 
+/* its referenced in ind_code.c */
+GBLDEF int              calculated_code_size, generated_code_size;
+
 void trip_gen(triple *ct)
 {
 	oprtype		**sopr, *opr;	/* triple operand */
@@ -610,9 +613,17 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	}
 	assert (code_idx < BUFFERED_CODE_SIZE);
 	if (cg_phase == CGP_MACHINE)
+	{
+         	generated_code_size += code_idx;
 		emit_immed ((char *)&code_buf[0], sizeof(unsigned char) * code_idx);
-	else if (cg_phase != CGP_ASSEMBLY)
+	} else if (cg_phase != CGP_ASSEMBLY)
+	{
+	        if (cg_phase == CGP_APPROX_ADDR)
+		{
+		      calculated_code_size += code_idx;
+		}
 		curr_addr += sizeof(unsigned char) * code_idx;
+	}
 	code_reference += sizeof(unsigned char) * code_idx;
 	jmp_offset -= sizeof(unsigned char) * code_idx;
 	return inst;

@@ -40,6 +40,12 @@ GBLREF	int4			gtm_max_sockets;
 LITREF 	unsigned char		io_params_size[];
 LITREF	mstr			chset_names[];
 
+#define FREE_SOCKPTR(sockptr)							\
+{										\
+	if (NULL != sockptr->buffer) free(sockptr->buffer);			\
+	free(sockptr);								\
+}
+
 #define ESTABLISHED		"ESTABLISHED"
 
 short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 timepar)
@@ -102,7 +108,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			ioptr->state = dev_never_opened;
 		}
 	}
-	d_socket_struct_len = sizeof(d_socket_struct) + (sizeof(socket_struct) * (gtm_max_sockets - 1));
+	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (gtm_max_sockets - 1));
 	if (ioptr->state == dev_never_opened)
 	{
 		dsocketptr = ioptr->dev_sp = (void *)malloc(d_socket_struct_len);
@@ -343,7 +349,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		{
 			if (iosocket_handle(sock_handle, &handle_len, FALSE, newdsocket) >= 0)
 			{
-                  		free(socketptr);
+                  		FREE_SOCKPTR(socketptr);
 				rts_error(VARLSTCNT(4) ERR_SOCKETEXIST, 2, handle_len, sock_handle);
                   		return FALSE;
                 	}
@@ -355,11 +361,17 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
                 if (0 <= delimiter_len)
                         iosocket_delimiter(delimiter_buffer, delimiter_len, socketptr, (0 == delimiter_len));
 		if (ioptr->wrap && 0 != socketptr->n_delimiter && ioptr->width < socketptr->delimiter[0].len)
+		{
+			iosocket_delimiter((unsigned char *)NULL, 0, socketptr, TRUE);
+			FREE_SOCKPTR(socketptr);
 			rts_error(VARLSTCNT(4) ERR_DELIMWIDTH, 2, ioptr->width, socketptr->delimiter[0].len);
+			assert(FALSE);
+		}
 		/* connects newdsocket and socketptr (the new socket) */
 		if (gtm_max_sockets <= newdsocket->n_socket)
 		{
-			free(socketptr);
+			iosocket_delimiter((unsigned char *)NULL, 0, socketptr, TRUE);
+			FREE_SOCKPTR(socketptr);
 			rts_error(VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
 			return FALSE;
 		}
@@ -374,7 +386,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		if (socketptr->sd > 0)
 			(void)tcp_routines.aa_close(socketptr->sd);
 		iosocket_delimiter((unsigned char *)NULL, 0, socketptr, TRUE);
-		free(socketptr);
+		FREE_SOCKPTR(socketptr);
 		return FALSE;
 	} else if (is_principal)
 	{	/* fill in what bind or connect would */

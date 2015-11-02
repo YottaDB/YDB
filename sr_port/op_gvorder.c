@@ -75,13 +75,16 @@ void op_gvorder (mval *v)
 
 		v->mvtype = MV_STR;
 		if (found)
-		{ 	gv_altkey->prev = gv_currkey->prev;
+		{
+			gv_altkey->prev = gv_currkey->prev;
 
 	 		if (stringpool.top - stringpool.free < MAX_KEY_SZ)
- 			{ 	if (*(&gv_altkey->base[0] + gv_altkey->prev) != 0xFF)
+ 			{
+				if (*(&gv_altkey->base[0] + gv_altkey->prev) != 0xFF)
 		 			n = MAX_FORM_NUM_SUBLEN;
 				else
-				{	n = gv_altkey->end - gv_altkey->prev;
+				{
+					n = gv_altkey->end - gv_altkey->prev;
 					assert (n > 0);
 				}
 		 		if (stringpool.top - stringpool.free < n)
@@ -89,7 +92,7 @@ void op_gvorder (mval *v)
 			}
 	 		v->str.addr = (char *)stringpool.free;
 	 		stringpool.free = gvsub2str (&gv_altkey->base[0] + gv_altkey->prev, stringpool.free, FALSE);
-	 		v->str.len = (char *)stringpool.free - v->str.addr;
+	 		v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
 			assert (v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
 			assert (v->str.addr + v->str.len <= (char *)stringpool.top &&
 				v->str.addr + v->str.len >= (char *)stringpool.base);
@@ -106,7 +109,8 @@ void op_gvorder (mval *v)
 		} else
 			*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
 	} else	/* the following section is for $O(^gname) */
-	{	assert (2 < gv_currkey->end);
+	{
+		assert (2 < gv_currkey->end);
 		assert (gv_currkey->end < (MAX_MIDENT_LEN + 3));	/* until names are not in midents */
 		save_targ = gv_target;
 		if (INVALID_GV_TARGET != reset_gv_target)
@@ -120,11 +124,13 @@ void op_gvorder (mval *v)
 		while (map < gd_map_top &&
 			(memcmp(gv_currkey->base, map->name,
 				gv_currkey->end == (MAX_MIDENT_LEN + 2) ? MAX_MIDENT_LEN : gv_currkey->end - 1) >= 0))
-		{	map++;
+		{
+			map++;
 		}
 
 		for (; map < gd_map_top; ++map)
-		{	gv_cur_region = map->reg.addr;
+		{
+			gv_cur_region = map->reg.addr;
 			if (!gv_cur_region->open)
 				gv_init_reg(gv_cur_region);
 			change_reg();
@@ -145,7 +151,8 @@ void op_gvorder (mval *v)
 				assert (1 < gv_altkey->end);
 				assert (gv_altkey->end < (MAX_MIDENT_LEN + 2));	/* until names are not in midents */
 				if (memcmp(gv_altkey->base, map->name, gv_altkey->end - 1) > 0)
-				{	found = FALSE;
+				{
+					found = FALSE;
 					break;
 				}
 				name.addr = (char *)&gv_altkey->base[0];
@@ -154,7 +161,8 @@ void op_gvorder (mval *v)
 					break;
 				gv_bind_name(gd_header, &name);
 				if (gv_cur_region != map->reg.addr)
-				{	found = FALSE;
+				{
+					found = FALSE;
 					break;
 				}
 				if ((gv_target->root != 0) && (gvcst_data() != 0))
@@ -182,7 +190,8 @@ void op_gvorder (mval *v)
 		RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 		v->mvtype = MV_STR;
 		if (found)
-		{	if (stringpool.free + name.len + 1 > stringpool.top)
+		{
+			if (stringpool.free + name.len + 1 > stringpool.top)
 				stp_gcol (name.len + 1);
 #ifdef mips
 			/* the following line works around a tandem compiler bug. */

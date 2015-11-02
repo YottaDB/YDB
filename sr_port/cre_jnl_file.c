@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -169,6 +169,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	int			fstat_res;
 #endif
 	uint4			temp_offset, temp_checksum;
+
 	error_def(ERR_FILERENAME);
 	error_def(ERR_RENAMEFAIL);
 	error_def(ERR_JNLCRESTATUS);
@@ -287,7 +288,8 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	memcpy((unsigned char*)&pini_record->process_vector[CURR_JPV], (unsigned char*)prc_vec, sizeof(jnl_process_vector));
 	/* Already process_vector[ORIG_JPV] is memset 0 */
 	pini_record->prefix.pini_addr = JNL_HDR_LEN;
-	if (info->before_images)
+	/* EPOCHs are written unconditionally in Unix while they are written only for BEFORE_IMAGE in VMS */
+	if (JNL_HAS_EPOCH(info))
 	{
 		epoch_record = (struct_jrec_epoch *)&jrecbuf[PINI_RECLEN];
 		epoch_record->prefix.jrec_type = JRT_EPOCH;

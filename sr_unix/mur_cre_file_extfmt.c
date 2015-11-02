@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,14 +85,14 @@ int4 mur_cre_file_extfmt(int recstat)
 	ptr = (char *)&mur_jctl->jnl_fn[mur_jctl->jnl_fn_len];
 	while (DOT != *ptr)	/* we know journal file name alway has a DOT */
 		ptr--;
-	base_len = ptr - (char *)&mur_jctl->jnl_fn[0];
+	base_len = (int)(ptr - (char *)&mur_jctl->jnl_fn[0]);
 	file_info = murgbl.file_info[recstat] = (void *)malloc(sizeof(fi_type));
 	if (0 == mur_options.extr_fn_len[recstat])
 	{
 		mur_options.extr_fn[recstat] = malloc(MAX_FN_LEN);
 		mur_options.extr_fn_len[recstat] = base_len;
 		memcpy(mur_options.extr_fn[recstat], mur_jctl->jnl_fn, base_len);
-		fn_exten_size = strlen(fn_exten[recstat]);
+		fn_exten_size = STRLEN(fn_exten[recstat]);
 		memcpy(mur_options.extr_fn[recstat] + base_len, fn_exten[recstat], fn_exten_size);
 		mur_options.extr_fn_len[recstat] += fn_exten_size;
 	}
@@ -131,7 +131,7 @@ int4 mur_cre_file_extfmt(int recstat)
 				ptr = " RECOVER";
 		} else
 			ptr = " EXTRACT";
-		tmplen = strlen(ptr);
+		tmplen = STRLEN(ptr);
 		memcpy(&murgbl.extr_buff[extrlen], ptr, tmplen);
 		extrlen += tmplen;
 		if (mur_options.rollback)
@@ -140,12 +140,12 @@ int4 mur_cre_file_extfmt(int recstat)
 				ptr = " PRIMARY ";
 			else
 				ptr = " SECONDARY ";
-			tmplen = strlen(ptr);
+			tmplen = STRLEN(ptr);
 			memcpy(&murgbl.extr_buff[extrlen], ptr, tmplen);
 			extrlen += tmplen;
 			assert(NULL != jnlpool.repl_inst_filehdr);
 			ptr = (char *)&jnlpool.repl_inst_filehdr->this_instname[0];
-			tmplen = strlen(ptr);
+			tmplen = STRLEN(ptr);
 			memcpy(&murgbl.extr_buff[extrlen], ptr, tmplen);
 			extrlen += tmplen;
 		}

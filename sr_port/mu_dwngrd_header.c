@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,19 +71,19 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 	v15_csd->file_corrupt = csd->file_corrupt;
 	v15_csd->createinprogress = csd->createinprogress;
 	time(&v15_csd->creation.date_time);	/* No need to propagate previous value */
-	v15_csd->last_inc_backup = csd->last_inc_backup;
-	v15_csd->last_com_backup = csd->last_com_backup;
-	v15_csd->last_rec_backup = csd->last_rec_backup;
+	v15_csd->last_inc_backup = (v15_trans_num) csd->last_inc_backup;
+	v15_csd->last_com_backup = (v15_trans_num) csd->last_com_backup;
+	v15_csd->last_rec_backup = (v15_trans_num) csd->last_rec_backup;
 	v15_csd->reorg_restart_block = csd->reorg_restart_block;
 	memcpy(v15_csd->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
 	v15_csd->owner_node = csd->owner_node;
 	v15_csd->image_count = csd->image_count;
 	v15_csd->kill_in_prog = csd->kill_in_prog;
-	v15_csd->trans_hist.curr_tn = csd->trans_hist.curr_tn;
-	v15_csd->trans_hist.early_tn = csd->trans_hist.early_tn;
-	v15_csd->trans_hist.last_mm_sync = csd->trans_hist.last_mm_sync;
-	v15_csd->trans_hist.header_open_tn = csd->trans_hist.header_open_tn;
-	v15_csd->trans_hist.mm_tn = csd->trans_hist.mm_tn;
+	v15_csd->trans_hist.curr_tn = (v15_trans_num) csd->trans_hist.curr_tn;
+	v15_csd->trans_hist.early_tn = (v15_trans_num) csd->trans_hist.early_tn;
+	v15_csd->trans_hist.last_mm_sync = (v15_trans_num) csd->trans_hist.last_mm_sync;
+	v15_csd->trans_hist.header_open_tn = (v15_trans_num) csd->trans_hist.header_open_tn;
+	v15_csd->trans_hist.mm_tn = (v15_trans_num) csd->trans_hist.mm_tn;
 	v15_csd->trans_hist.lock_sequence = csd->trans_hist.lock_sequence;
 	v15_csd->trans_hist.total_blks = csd->trans_hist.total_blks;
 	v15_csd->trans_hist.free_blocks = csd->trans_hist.free_blocks;
@@ -96,8 +96,8 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 #ifdef UNIX
 	v15_csd->semid = INVALID_SEMID;
 	v15_csd->shmid = INVALID_SHMID;
-	v15_csd->sem_ctime.ctime = 0;
-	v15_csd->shm_ctime.ctime = 0;
+	v15_csd->gt_sem_ctime.ctime = 0;
+	v15_csd->gt_shm_ctime.ctime = 0;
 #endif
 	/* Note none of the counter fields are being carried over. An upgrade or downgrade will
 	   implicitly set them to zero by not initializing them.
@@ -124,7 +124,7 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 		v15_csd->resync_tn = csd->resync_tn;
 	)
 	UNIX_ONLY(
-		v15_csd->resync_seqno = csd->dualsite_resync_seqno;
+		v15_csd->resync_seqno = (v15_trans_num) csd->dualsite_resync_seqno;
 		if (0 == csd->zqgblmod_seqno)
 		{	/* Special value 0 of zqgblmod_seqno in multisite version corresponds to resync seqno of 1 in dualsite */
 			v15_csd->old_resync_seqno = 1;

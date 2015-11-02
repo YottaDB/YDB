@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,8 +32,9 @@ void cli_err_strcat(char *str)
 {
 	int lencli, lenstr;
 
-	lencli = strlen(cli_err_str);
-	lenstr = strlen(str);
+
+	lencli = STRLEN(cli_err_str);
+	lenstr = STRLEN(str);
 
 	/* No error string should be longer than MAX_CLI_ERR_STR */
 	assert(MAX_CLI_ERR_STR > lencli + lenstr + 2);
@@ -142,7 +143,7 @@ boolean_t cli_check_any2(int argcnt, ...)
 	oper = 0;
 	while(argcnt)
 	{
-		if (va_arg(var, int) && 1 < ++state)
+		if (va_arg(var, VA_ARG_TYPE_BOOL) && 1 < ++state)
 			return TRUE;
 		argcnt--;
 	}

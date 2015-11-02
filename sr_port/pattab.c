@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -411,6 +411,8 @@ int load_pattern_table(int name_len,char *file_name)
 		return 1;
 	} else
 		pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
+
+	return -1; /* This will never get executed, added to make compiler happy */
 }
 
 static int open_patfile(int name_len, char *file_name)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,13 +33,14 @@ GBLDEF	bool		neterr_pending;
 
 error_def(ERR_LCKSCANCELLED);
 
-void	gvcmz_neterr(int *err)
+void	gvcmz_neterr(INTPTR_T *err)
 {
 	struct CLB	*p, *pn, *p1;
 	unsigned char	*temp, buff[512];
 	gd_addr		*gdptr;
 	gd_region	*region, *r_top;
-	uint4		count, lck_info, err_buff[10];
+	uint4		count, lck_info;
+	INTPTR_T	err_buff[10];
 	boolean_t	locks = FALSE;
 
 	neterr_pending = FALSE;
@@ -106,8 +107,8 @@ void	gvcmz_neterr(int *err)
 	{
 		if (NULL != err)
 		{
-			count = *(int4 *)err + 1;
-			memcpy(err_buff, err, count * sizeof(int4));
+			count = (uint4)(*err + 1);
+			memcpy(err_buff, err, count * sizeof(INTPTR_T));
 			err_buff[count] = 0;
 			err_buff[count + 1] = ERR_LCKSCANCELLED;
 			err_buff[count + 2] = 0;

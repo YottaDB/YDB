@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,8 +46,7 @@ int4	v12_jnl_record_length(jnl_record *rec, int4 top)  /* top is maximum length 
 	{
 		return -1;
 	}
-
-	n = JREC_PREFIX_SIZE + v12_jnl_fixed_size[rectype];
+	n =(int4)(JREC_PREFIX_SIZE + v12_jnl_fixed_size[rectype]);
 
 	switch (rectype)
 	{

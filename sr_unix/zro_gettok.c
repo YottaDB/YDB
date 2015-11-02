@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ int zro_gettok (char **lp, char *top, mstr *tok)
 		while (*lp < top && **lp != ZRO_DEL && **lp != ZRO_LBR && **lp != ZRO_RBR)
 			(*lp)++;
 		toktyp = ZRO_IDN;
-		tok->len = *lp - tok->addr;
+		tok->len = INTCAST(*lp - tok->addr);
 		break;
 	}
 	return toktyp;

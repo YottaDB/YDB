@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +61,7 @@
 #include "tp_timeout.h"
 #include "deferred_events.h"
 #include "op.h"
+#include "fix_xfer_entry.h"
 
 /* ------------------------------------------------------------------
  * Macro for timer ID
@@ -72,8 +73,7 @@
  * EXTERNAL VARIABLES
  * =============================================================================
  */
-
-GBLREF int 		(* volatile xfer_table[])();	/* The transfer table */
+GBLREF xfer_entry_t     xfer_table[];
 GBLREF volatile int4	outofband;
 
 void tptimeout_set(int4 dummy_param);
@@ -142,12 +142,12 @@ void tptimeout_set(int4 dummy_param)
 
 	if (tptimeout != outofband)
 	{
-		xfer_table[xf_linefetch] = op_fetchintrrpt;
-		xfer_table[xf_linestart] = op_startintrrpt;
-		xfer_table[xf_zbfetch] = op_fetchintrrpt;
-		xfer_table[xf_zbstart] = op_startintrrpt;
-		xfer_table[xf_forchk1] = op_startintrrpt;
-		xfer_table[xf_forloop] = op_forintrrpt;
+		FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
+		FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
+		FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);
+		FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);
+		FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
+		FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
 		outofband = tptimeout;
 		VMS_ONLY(
 			status = sys$setef(efn_outofband);

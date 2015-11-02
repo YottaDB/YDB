@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +21,9 @@ void mlk_prcblk_delete(mlk_ctldata_ptr_t ctl,
 		       uint4 pid)
 {
 	mlk_prcblk_ptr_t	pr;
-	sm_int_ptr_t		prpt;
+	ptroff_t		*prpt;
 
-	for (prpt = &d->pending; *prpt; )
+	for (prpt = (ptroff_t *)&d->pending; *prpt; )
 	{
 		pr = (mlk_prcblk_ptr_t)R2A(*prpt);
 		if ((pr->process_id == pid) && (--pr->ref_cnt <= 0))
@@ -41,7 +41,7 @@ void mlk_prcblk_delete(mlk_ctldata_ptr_t ctl,
 				if (0 != pid)
 					break;
 		} else
-				prpt = &pr->next;
+				prpt = (ptroff_t *) &pr->next;
 	}
 	return;
 }

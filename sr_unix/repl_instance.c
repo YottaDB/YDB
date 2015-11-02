@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,10 +109,10 @@ boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsiz
  * Return Value:
  *	None
  */
-void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, int4 buflen)
+void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 {
 	int		status, fd;
-	int4		actual_readlen;
+	size_t		actual_readlen;
 	unix_db_info	*udi;
 	gd_region	*reg;
 
@@ -190,7 +190,7 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, int4 buflen)
  * Return Value:
  *	None.
  */
-void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, int4 buflen)
+void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 {
 	int		status, fd, oflag;
 	unix_db_info	*udi;
@@ -618,7 +618,8 @@ void	repl_inst_triple_add(repl_triple *triple)
 void	repl_inst_triple_truncate(seq_num rollback_seqno)
 {
 	unix_db_info	*udi;
-	int4		status, index, nullsize;
+	int4		status, index;
+        size_t		nullsize;
 	off_t		offset;
 	repl_triple	temptriple, *triple = &temptriple;
 	char		histdetail[256];
@@ -740,7 +741,7 @@ void	repl_inst_flush_gtmsrc_lcl()
  * Return Value:
  *	None
  */
-void	repl_inst_flush_jnlpool()
+void	repl_inst_flush_jnlpool(boolean_t reset_recvpool_fields)
 {
 	unix_db_info		*udi;
 	int4			index;
@@ -764,8 +765,11 @@ void	repl_inst_flush_jnlpool()
 	jnlpool.repl_inst_filehdr->crash = FALSE;
 	jnlpool.repl_inst_filehdr->jnlpool_semid = INVALID_SEMID;
 	jnlpool.repl_inst_filehdr->jnlpool_shmid = INVALID_SHMID;
-	jnlpool.repl_inst_filehdr->recvpool_semid = INVALID_SEMID;	/* Just in case it is not already reset */
-	jnlpool.repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;	/* Just in case it is not already reset */
+	if (reset_recvpool_fields)
+	{
+		jnlpool.repl_inst_filehdr->recvpool_semid = INVALID_SEMID;	/* Just in case it is not already reset */
+		jnlpool.repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;	/* Just in case it is not already reset */
+	}
 	/* If the source server that created the journal pool died before it was completely initialized in "gtmsource_seqno_init"
 	 * do not copy seqnos from the journal pool into the instance file header. Instead keep the instance file header unchanged.
 	 */

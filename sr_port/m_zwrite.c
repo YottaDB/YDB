@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ GBLREF char 		director_token;
 GBLREF short int 	source_column;
 GBLREF short int 	last_source_column;
 GBLREF uint4 		pat_everything[];
-GBLREF uint4 		sizeof_pat_everything;
+GBLREF mstr_len_t	sizeof_pat_everything;
 
 /******	CAUTION !!! ******
  *	All occurrences of put_lit should be replaced by put_ilit.  In order to maintain object

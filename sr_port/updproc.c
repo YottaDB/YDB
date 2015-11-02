@@ -86,7 +86,7 @@
 #include "jnl_get_checksum.h"
 #include "updproc_get_gblname.h"
 
-GBLREF	unsigned short		dollar_tlevel;
+GBLREF	short			dollar_tlevel;
 GBLREF	gv_key			*gv_currkey;
 GBLREF  gd_region               *gv_cur_region;
 GBLREF  sgmnt_addrs             *cs_addrs;
@@ -292,6 +292,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	sgmnt_data_ptr_t	csd;
 	char	           	gv_mname[MAX_KEY_SZ];
 	static	seq_num		seqnum_diff = 0;
+	jnl_private_control	*jpc;
 
 	UNIX_ONLY(
 		repl_triple		triple;
@@ -542,9 +543,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 								ts_mv.mvtype = MV_STR;
 								ts_mv.str.len = 0;
 								ts_mv.str.addr = NULL;
-								assert((!dollar_tlevel && !tupd_num)
-									|| dollar_tlevel && (tupd_num || t_tries ||
-										cdb_sc_helpedout == t_fail_hist[t_tries]));
+								assert((!dollar_tlevel && !tupd_num) || dollar_tlevel
+										&& (tupd_num || dollar_trestart));
 								if (!dollar_tlevel)
 									op_tstart(TRUE, TRUE, &ts_mv, 0); /* not equal to -1
 														==> RESTARTABLE */
@@ -594,23 +594,30 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				SHM_WRITE_MEMORY_BARRIER;
 				csa->ti->early_tn = csa->ti->curr_tn + 1;
 				JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() */
-				jnl_status = jnl_ensure_open();
-				if (0 == jnl_status)
+				if (JNL_WRITE_LOGICAL_RECS(csa))
 				{
-					if (0 == csa->jnl->pini_addr)
-						jnl_put_jrt_pini(csa);
+					jpc = csa->jnl;
+					if (JNL_ENABLED(csa))
+					{
+						jnl_status = jnl_ensure_open();
+						if (0 == jnl_status)
+						{
+							if (0 == jpc->pini_addr)
+								jnl_put_jrt_pini(csa);
+						} else
+							rts_error(VARLSTCNT(6) jnl_status, 4,
+								JNL_LEN_STR(csa->hdr), DB_LEN_STR(gv_cur_region));
+					}
+					null_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
 					null_record.prefix.jrec_type = JRT_NULL;
 					null_record.prefix.forwptr = null_record.suffix.backptr = NULL_RECLEN;
 					null_record.prefix.time = jgbl.gbl_jrec_time;
 					null_record.prefix.tn = csa->ti->curr_tn;
-					null_record.prefix.pini_addr = csa->jnl->pini_addr;
 					null_record.prefix.checksum = INIT_CHECKSUM_SEED;
 					null_record.jnl_seqno = jnl_seqno;
 					null_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-					jnl_write(csa->jnl, JRT_NULL, (jnl_record *)&null_record, NULL, NULL);
-				} else
-					rts_error(VARLSTCNT(6) jnl_status, 4,
-						JNL_LEN_STR(csa->hdr), DB_LEN_STR(gv_cur_region));
+					JNL_WRITE_APPROPRIATE(csa, jpc, JRT_NULL, (jnl_record *)&null_record, NULL, NULL);
+				}
 				temp_jnlpool_ctl->jnl_seqno++;
 				csa->hdr->reg_seqno = temp_jnlpool_ctl->jnl_seqno;
 				VMS_ONLY(

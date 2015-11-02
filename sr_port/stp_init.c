@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@ void stp_init(unsigned int size)
 	if (lasttop != 0)
 	{
 		na_page[0] = na_page[1]
-			   = stringpool.top + sizeof(int4);
+			   = stringpool.top + sizeof(char *);
 		reset_access(na_page, stringpool.prvprt);
 	}
 
@@ -38,15 +38,14 @@ void stp_init(unsigned int size)
 	   "runaway" loops, for example) will cause ACCVIO errors.
 	*/
 	stringpool.base = stringpool.free
-			= (unsigned char *) malloc (size + sizeof(int4) + 2*OS_PAGE_SIZE);
+                = (unsigned char *)malloc(size + sizeof(char *) + 2 * OS_PAGE_SIZE);
 
-	na_page[0] = na_page[1]
-		   = (unsigned char *)
-		(((unsigned) stringpool.base + size + sizeof(int4) + 2*OS_PAGE_SIZE & ~(OS_PAGE_SIZE - 1)) - OS_PAGE_SIZE);
-
+        na_page[0] = na_page[1]
+                   = (unsigned char *)
+                ((((UINTPTR_T)stringpool.base + size + sizeof(char *) + 2 * OS_PAGE_SIZE) & ~(OS_PAGE_SIZE - 1)) - OS_PAGE_SIZE);
 	stringpool.lasttop = lasttop;
 	lasttop = stringpool.top
-		= na_page[0] - sizeof(int4);
+		= na_page[0] - sizeof(char *);
 
 	set_noaccess (na_page, &stringpool.prvprt);
 

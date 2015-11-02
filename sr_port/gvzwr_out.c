@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ void gvzwr_out(void)
 	MV_FORCE_STR(&val);
 	outdesc.mvtype = MV_STR;
 	outdesc.str.addr = &buff[0];
-	outdesc.str.len = end - outdesc.str.addr;
+	outdesc.str.len = INTCAST(end - outdesc.str.addr);
 	zshow_output(zwr_output,&outdesc.str);
 	buff[0] = '=';
 	one.addr = &buff[0];

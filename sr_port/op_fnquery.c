@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -337,7 +337,7 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 					(unsigned char *)parent->ptrs.val_ent.children->num->ptr.lv + sizeof(sbs_blk));
 				if (stringpool.top - stringpool.free < MAX_NUM_SIZE)
 				{
-					v1->str.len = (char *)stringpool.free - v1->str.addr;
+					v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 					stp_gcol(MAX_NUM_SIZE);
 					assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 				}
@@ -350,7 +350,7 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 			case SBS_BLK_TYPE_FLT:
 				if (stringpool.top - stringpool.free < MAX_NUM_SIZE)
 				{
-					v1->str.len = (char *)stringpool.free - v1->str.addr;
+					v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 					stp_gcol(MAX_NUM_SIZE);
 					assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 				}
@@ -360,7 +360,7 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 					last_fnquery_return_sub[last_fnquery_return_subcnt++] = *v2;
 				break;
 			case SBS_BLK_TYPE_STR:
-				v1->str.len = (char *)stringpool.free - v1->str.addr;
+				v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 				v2->mvtype = MV_STR;
 				if (local_collseq)
 				{
@@ -381,7 +381,7 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 					   digits to be treated as a number. It must be output as a quoted string. */
 					if (stringpool.top - stringpool.free < v2->str.len + 2)
 					{
-						v1->str.len = (char *)stringpool.free - v1->str.addr;
+						v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 						stp_gcol(v2->str.len + 2);
 						assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 					}
@@ -413,14 +413,14 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 		}
 		if (stringpool.top == stringpool.free)
 		{
-			v1->str.len = (char *)stringpool.free - v1->str.addr;
+			v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 			stp_gcol(1);
 			assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 		}
 		*stringpool.free++ = (h2 < h1 ? ',' : ')');
 	}
 	dst->mvtype = MV_STR;
-	dst->str.len = (char *)stringpool.free - v1->str.addr;
+	dst->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 	dst->str.addr = v1->str.addr;
 	POP_MV_STENT();	/* v2 */
 	POP_MV_STENT();	/* v1 */

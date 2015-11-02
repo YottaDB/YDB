@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,19 +13,19 @@
 #define JNL_TYPEDEF_H_INCLUDED
 
 #define NA 			0
-#define SETREC			0x00000001
-#define KILLREC			0x00000002
-#define ZKILLREC		0x00000004
+#define SETREC			0x00000001L
+#define KILLREC			0x00000002L
+#define ZKILLREC		0x00000004L
 #define SET_KILL_ZKILL_MASK	(SETREC | KILLREC | ZKILLREC)
 
-#define TUPDREC			0x00000010
-#define UUPDREC			0x00000020
-#define TCOMREC			0x00000040
+#define TUPDREC			0x00000010L
+#define UUPDREC			0x00000020L
+#define TCOMREC			0x00000040L
 #define TPREC_MASK		(TUPDREC | UUPDREC | TCOMREC)
 
-#define FUPDREC			0x00000100
-#define GUPDREC			0x00000200
-#define ZTCOMREC		0x00000400
+#define FUPDREC			0x00000100L
+#define GUPDREC			0x00000200L
+#define ZTCOMREC		0x00000400L
 #define ZTPREC_MASK		(FUPDREC | GUPDREC | ZTCOMREC)
 
 #define FENCE_MASK		(TPREC_MASK | ZTPREC_MASK)

@@ -177,7 +177,8 @@ GBLDEF	unsigned char	*msp,
 			*restart_ctxt,
 			*stackbase,
 			*stacktop,
-			*stackwarn;
+			*stackwarn,
+			*restart_pc;
 GBLDEF	int4		backup_close_errno,
 			backup_write_errno,
 			mubmaxblk,
@@ -186,7 +187,6 @@ GBLDEF	int4		backup_close_errno,
 			restore_read_errno;
 GBLDEF	volatile int4	outofband, crit_count = 0;
 GBLDEF	int		mumps_status = SS_NORMAL,
-			restart_pc,
 			stp_array_size = 0;
 GBLDEF	gvzwrite_struct	gvzwrite_block;
 GBLDEF	io_log_name	*io_root_log_name;
@@ -521,7 +521,7 @@ GBLDEF	hash_table_int4		cw_stagnate;
 GBLDEF	boolean_t		cw_stagnate_reinitialized = FALSE;
 
 GBLDEF	uint4		pat_everything[] = { 0, 2, PATM_E, 1, 0, PAT_MAX_REPEAT, 0, PAT_MAX_REPEAT, 1 }; /* pattern = ".e" */
-GBLDEF	uint4		sizeof_pat_everything = sizeof(pat_everything);
+GBLDEF	mstr_len_t	sizeof_pat_everything = SIZEOF(pat_everything);
 
 GBLDEF	uint4		*pattern_typemask;
 GBLDEF	pattern		*pattern_list;
@@ -902,3 +902,5 @@ GBLDEF	d_socket_struct		*newdsocket;		/* Commonly used temp socket area */
 
 GBLDEF	boolean_t		dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 GBLDEF	int			socketus_interruptus;	/* How many times socket reads have been interrutped */
+
+GBLDEF	int4			pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */

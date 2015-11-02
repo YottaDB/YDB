@@ -43,6 +43,7 @@ GBLREF	bool	devctlexp;
 GBLREF	triple	*curtchain;
 
 LITREF	toktabtype	tokentable[];
+LITREF	mval		literal_null;
 
 /* note that svn_index array provides indexes into this array for each letter of the
    alphabet so changes here should be reflected there.
@@ -516,14 +517,11 @@ int expritem(oprtype *a)
 					if (!(bool)((*fun_parse[index])(a, fun_data[index].opcode)))
 						return FALSE;
 				} else
-				{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
-					 * (invoked by stx_error). Get the reference to it.
-					 */
-					ref = curtchain->exorder.bl;	/* corresponds to put_ilit(FALSE) in ins_errtriple */
-					*a = put_tref(ref);
-					assert(OC_RTERROR == ref->exorder.bl->exorder.bl->opcode);
+				{
+					*a = put_lit((mval *)&literal_null);
 					/* Parse the remaining arguments until the corresponding RIGHT-PAREN/SPACE/EOL is reached */
-					parse_until_rparen_or_space();
+					if (!parse_until_rparen_or_space())
+						return FALSE;
 				}
 				if (window_token != TK_RPAREN)
 				{
@@ -561,13 +559,7 @@ int expritem(oprtype *a)
 						*a = put_tref(ref);
 					}
 				} else
-				{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
-					 * (invoked by stx_error). Get the reference to it.
-					 */
-					ref = curtchain->exorder.bl;	/* corresponds to put_ilit(FALSE) in ins_errtriple */
-					*a = put_tref(ref);
-					assert(OC_RTERROR == ref->exorder.bl->exorder.bl->opcode);
-				}
+					*a = put_lit((mval *)&literal_null);
 			}
 		}
 		return TRUE;

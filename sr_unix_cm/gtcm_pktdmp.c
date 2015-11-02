@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -147,7 +147,7 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 	chr = (char *)buf;
 	    while (ptr < end) {
 		fputc('\t', fp);
-		if ((len = end - ptr) > 16)
+		if ((len = (int)(end - ptr)) > 16)
 		    len = 16;
 		memcpy(chr, ptr, len);
 		ptr += len;

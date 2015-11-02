@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,8 +106,8 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	{
 		csd->semid = INVALID_SEMID;
 		csd->shmid = INVALID_SHMID;
-		csd->sem_ctime.ctime = 0;
-		csd->shm_ctime.ctime = 0;
+		csd->gt_sem_ctime.ctime = 0;
+		csd->gt_shm_ctime.ctime = 0;
 		LSEEKWRITE(udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
 		if (0 != status)
 		{
@@ -121,8 +121,8 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	{
 		db_ipcs.semid = INVALID_SEMID;
 		db_ipcs.shmid = INVALID_SHMID;
-		db_ipcs.sem_ctime = 0;
-		db_ipcs.shm_ctime = 0;
+		db_ipcs.gt_sem_ctime = 0;
+		db_ipcs.gt_shm_ctime = 0;
 		if (!get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, (unsigned int *)&db_ipcs.fn_len,
 					MAX_TRANS_NAME_LEN, &ustatus))
 		{
@@ -152,8 +152,8 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		return FALSE;
 	udi->semid = INVALID_SEMID;
 	udi->shmid = INVALID_SHMID;
-	udi->sem_ctime = 0;
-	udi->shm_ctime = 0;
+	udi->gt_sem_ctime = 0;
+	udi->gt_shm_ctime = 0;
 	assert((reg != standalone_reg) || (NULL == standalone_reg));	/* ftok_sem_release() should have NULLified it */
 	standalone_reg = NULL;		/* just in case */
 	return TRUE;

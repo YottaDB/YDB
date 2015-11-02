@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,14 +57,16 @@ omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
     ESTABLISH_RET(omi_dbms_ch,0);
     rv = omi_gvextnam(cptr, len.value, cptr->xptr);
 /*  If true, there was an error finding the global reference in the DBMS */
-    if (rv < 0) {
+    if (rv < 0)
+    {
 	REVERT;
 	return rv;
     }
     cptr->xptr += len.value;
 
 /*  Bounds checking */
-    if (cptr->xptr > xend) {
+    if (cptr->xptr > xend)
+    {
 	REVERT;
 	return -OMI_ER_PR_INVMSGFMT;
     }
@@ -78,17 +80,22 @@ omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
     op_gvorder(&vo);
 /*  $ORDER (buffer write) */
     OMI_SI_WRIT(vo.str.len, bptr);
-    if (vo.str.len) {
+    if (vo.str.len)
+    {
 	memcpy(bptr, vo.str.addr, vo.str.len);
 	bptr += vo.str.len;
     }
 
 /*  Bunching */
-    if (cptr->exts & OMI_XTF_NEWOP) {
-	if (vo.str.len) {
-	    if (!gv_currkey->prev) {
+    if (cptr->exts & OMI_XTF_NEWOP)
+    {
+	if (vo.str.len)
+	{
+	    if (!gv_currkey->prev)
+	    {
 		if (*vo.str.addr != '^')
-		{	REVERT;
+		{
+		    REVERT;
 		    return -OMI_ER_PR_INVGLOBREF;
 		}
 		vo.str.addr++;	vo.str.len--;
@@ -96,9 +103,11 @@ omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
 		vo.str.addr--;	vo.str.len++;
 		gv_curr_subsc_null = FALSE;
 	    }
-	    else {
+	    else
+	    {
 		if (gv_currkey->top != gv_altkey->top)
-		{	REVERT
+		{
+		    REVERT
 		    return -OMI_ER_DB_UNRECOVER;
 		}
 		memcpy(gv_currkey, gv_altkey,
@@ -109,9 +118,10 @@ omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
 /*	    $DATA */
 	    op_gvdata(&vd);
 	    if (!(vd.mvtype & MV_INT))
-		{	REVERT;
-			return -OMI_ER_DB_UNRECOVER;
-		}
+	    {
+		    REVERT;
+		    return -OMI_ER_DB_UNRECOVER;
+	    }
 /*	    $GET */
 	    undef_inhibit = TRUE;
 	    rv = op_gvget(&vg);
@@ -139,6 +149,6 @@ omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
 
     REVERT;
 
-    return bptr - buff;
+    return (int)(bptr - buff);
 
 }

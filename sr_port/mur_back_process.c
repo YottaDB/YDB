@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -300,7 +300,7 @@ uint4 mur_back_processing(boolean_t apply_pblk, seq_num *pre_resolve_seqno, jnl_
 				fc = rctl->gd->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
 				fc->op_buff = (sm_uc_ptr_t)rctl->csd;
-				fc->op_len = ROUND_UP(SIZEOF_FILE_HDR(rctl->csd), DISK_BLOCK_SIZE);
+				fc->op_len = (int)ROUND_UP(SIZEOF_FILE_HDR(rctl->csd), DISK_BLOCK_SIZE);
 				fc->op_pos = 1;
 				dbfilop(fc);
 			}
@@ -308,7 +308,8 @@ uint4 mur_back_processing(boolean_t apply_pblk, seq_num *pre_resolve_seqno, jnl_
 	} /* end else !mur_options.forward */
 	DEBUG_ONLY(iterationcnt++;)
 	*pre_resolve_seqno = 0;
-	murgbl.db_updated = mur_options.update && !mur_options.verify;
+	if (!mur_options.rollback_losttnonly)
+		murgbl.db_updated = mur_options.update && !mur_options.verify;
 	/* At this point we have computed murgbl.tp_resolve_time. It is the time upto which (at least)
 	 * we need to do token resolution. This is for all kinds of recovery and rollback.
 	 * Following for loop will do backward processing and resolve token up to this murgbl.tp_resolve_time.

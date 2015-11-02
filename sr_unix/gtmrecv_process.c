@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,7 @@
 #include "muprec.h"
 #include "gtmmsg.h"
 #include "is_proc_alive.h"
+#include "jnl_typedef.h"
 
 #define RECVBUFF_REPLMSGLEN_FACTOR 		8
 
@@ -100,6 +101,9 @@ GBLDEF	time_t			repl_recv_prev_log_time;
 GBLDEF	time_t			repl_recv_this_log_time;
 GBLDEF	volatile time_t		gtmrecv_now = 0;
 
+GBLDEF	boolean_t	src_node_same_endianness = TRUE;
+GBLDEF	boolean_t 	src_node_endianness_known = FALSE;
+
 GBLREF  gtmrecv_options_t	gtmrecv_options;
 GBLREF	int			gtmrecv_listen_sock_fd;
 GBLREF	recvpool_addrs		recvpool;
@@ -128,6 +132,9 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	mur_gbls_t		murgbl;
 
+LITREF	int		jrt_update[JRT_RECTYPES];
+LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
+
 static	unsigned char	*buffp, *buff_start, *msgbuff, *filterbuff;
 static	int		buff_unprocessed;
 static	int		buffered_data_len;
@@ -143,6 +150,112 @@ static	double		time_elapsed;
 static	int		recvpool_size;
 static	int		heartbeat_period;
 static	char		assumed_remote_proto_ver;
+
+/* convert endianness of transaction */
+static int repl_tr_endian_convert(uchar_ptr_t jnl_buff, uint4 jnl_len)
+{
+	unsigned char		*jb, *jstart, *ptr;
+	enum	jnl_record_type	rectype;
+	int			status, reclen;
+	uint4			jlen;
+	jrec_prefix 		*prefix;
+	jnl_record	*rec;
+	jnl_string	*keystr;
+	mstr_len_t	*val_ptr;
+	mval	val_mv;
+	repl_triple_jnl_ptr_t	triplecontent;
+
+	jb = jnl_buff;
+	status = SS_NORMAL;
+	jlen = jnl_len;
+	assert(0 == ((uint4)jb % sizeof(uint4)));
+   	while (JREC_PREFIX_SIZE <= jlen)
+	{
+		assert(0 == ((uint4)jb % sizeof(uint4)));
+		rec = (jnl_record *) jb;
+		rectype = rec->prefix.jrec_type; 
+		reclen = rec->prefix.forwptr = GTM_BYTESWAP_24(rec->prefix.forwptr);
+
+		if (JRT_TRIPLE != rectype)
+		{		
+			rec->prefix.pini_addr = GTM_BYTESWAP_32(rec->prefix.pini_addr);
+			rec->prefix.time = GTM_BYTESWAP_32(rec->prefix.time);
+			rec->prefix.checksum = GTM_BYTESWAP_32(rec->prefix.checksum);
+			rec->prefix.tn = GTM_BYTESWAP_64(rec->prefix.tn);
+			((jrec_suffix *)((unsigned char *)rec + reclen - JREC_SUFFIX_SIZE))->backptr =
+				GTM_BYTESWAP_24(((jrec_suffix *)((unsigned char *)rec + reclen - JREC_SUFFIX_SIZE))->backptr);
+			assert(IS_REPLICATED(rectype));
+			if (IS_REPLICATED(rectype))
+				rec->jrec_null.jnl_seqno = GTM_BYTESWAP_64(rec->jrec_null.jnl_seqno);
+		}
+		
+		jstart = jb;
+   		if (0 != reclen)
+		{
+   			if (reclen <= jlen)
+			{
+				if (JRT_TRIPLE == rectype)
+				{
+					triplecontent = (repl_triple_jnl_ptr_t) rec;
+					triplecontent->cycle = GTM_BYTESWAP_32(triplecontent->cycle);
+					triplecontent->start_seqno = GTM_BYTESWAP_64(triplecontent->start_seqno);
+				}
+				
+				if (IS_SET_KILL_ZKILL(rectype))
+				{
+					if (IS_ZTP(rectype))
+					{
+						keystr = (jnl_string *)&rec->jrec_fset.mumps_node;
+						rec->jrec_fset.token = GTM_BYTESWAP_64(rec->jrec_fset.token);
+					}
+					else
+					{
+						keystr = (jnl_string *)&rec->jrec_set.mumps_node;
+						keystr->length = GTM_BYTESWAP_32(keystr->length);
+					} 
+					if (IS_SET(rectype))
+					{
+						val_ptr = (mstr_len_t *)&keystr->text[keystr->length];
+						*val_ptr = GTM_BYTESWAP_32(*val_ptr);
+					}
+				}
+					
+					if (JRT_TCOM == rectype)
+					{
+						*(trans_num *)&rec->jrec_tcom.jnl_tid = GTM_BYTESWAP_64(*(trans_num *)&rec->jrec_tcom.jnl_tid);						
+					}
+					
+					if (JRT_ZTCOM == rectype)
+					{
+					rec->jrec_ztcom.token = GTM_BYTESWAP_64(rec->jrec_ztcom.token);
+					rec->jrec_ztcom.participants = GTM_BYTESWAP_32(rec->jrec_ztcom.participants);
+					}
+				
+				
+				jb = jb + reclen;
+				assert(jb == jstart + reclen);
+				jlen -= reclen;
+				continue;
+			}
+/*      Incomplete record */
+			assert(FALSE);
+			status = -1;
+			break;
+		}
+/*      Bad record */
+		assert(FALSE);
+		status = -1;
+		break;
+	}
+	if ((-1 != status) && (0 != jlen))
+	{
+/*      Incomplete record */
+		assert(FALSE);
+		status = -1;
+	}
+	assert(0 == jlen || -1 == status);
+	return(status);
+}
 
 static void do_flow_control(uint4 write_pos)
 {
@@ -173,10 +286,19 @@ static void do_flow_control(uint4 write_pos)
 	if (space_used >= recvpool_high_watermark && !xoff_sent)
 	{
 		/* Send XOFF message */
-		xoff_msg.type = REPL_XOFF;
-		memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, sizeof(seq_num));
-		xoff_msg.len = MIN_REPL_MSGLEN;
-		REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, xoff_msg.len, FALSE, &gtmrecv_poll_immediate)
+		if ( src_node_same_endianness )
+		{
+			xoff_msg.type = REPL_XOFF;
+			memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, sizeof(seq_num));
+			xoff_msg.len = MIN_REPL_MSGLEN;
+		}
+		else
+		{
+			xoff_msg.type = GTM_BYTESWAP_32(REPL_XOFF);
+			*((seq_num*)&xoff_msg.msg[0]) = GTM_BYTESWAP_64(upd_proc_local->read_jnl_seqno);
+			xoff_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);		
+		}
+		REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_poll_immediate)
 		{
 			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
 			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
@@ -215,10 +337,19 @@ static void do_flow_control(uint4 write_pos)
 		gtmrecv_poll_interval.tv_usec = GTMRECV_WAIT_FOR_UPD_PROGRESS_US;
 	} else if (space_used < recvpool_low_watermark && xoff_sent)
 	{
-		xon_msg.type = REPL_XON;
-		memcpy((uchar_ptr_t)&xon_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, sizeof(seq_num));
-		xon_msg.len = MIN_REPL_MSGLEN;
-		REPL_SEND_LOOP(gtmrecv_sock_fd, &xon_msg, xon_msg.len, FALSE, &gtmrecv_poll_immediate)
+		if ( src_node_same_endianness )
+		{
+			xon_msg.type = REPL_XON;
+			memcpy((uchar_ptr_t)&xon_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, sizeof(seq_num));
+			xon_msg.len = MIN_REPL_MSGLEN;
+		}
+		else
+		{
+			xon_msg.type = GTM_BYTESWAP_32(REPL_XON);
+			*((seq_num*)&xon_msg.msg[0]) = GTM_BYTESWAP_64(upd_proc_local->read_jnl_seqno);
+			xon_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
+		}
+		REPL_SEND_LOOP(gtmrecv_sock_fd, &xon_msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_poll_immediate)
 		{
 			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
 			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
@@ -394,6 +525,8 @@ static int gtmrecv_est_conn(void)
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection established, using TCP send buffer size %d receive buffer size %d\n",
 			repl_max_send_buffsize, repl_max_recv_buffsize);
 	repl_log_conn_info(gtmrecv_sock_fd, gtmrecv_log_fp);
+	/* re-determine endianness of other side */
+	src_node_endianness_known = FALSE;
 	return (SS_NORMAL);
 }
 
@@ -547,6 +680,12 @@ static void process_tr_buff(int msg_type)
 			break;
 		write_len = ((recvpool_ctl->write != write_wrap) ?  (write_loc - recvpool_ctl->write) : write_loc);
 		write_off = ((recvpool_ctl->write != write_wrap) ? recvpool_ctl->write : 0);
+		
+		if (!src_node_same_endianness)
+			if (SS_NORMAL != (status = repl_tr_endian_convert(recvpool.recvdata_base + write_off,write_len)))
+				repl_log(gtmrecv_log_fp, FALSE, TRUE, 
+					"REPL ERROR - Journal records did not endian convert properly\n");
+		
 		if (filter_pass || (NO_FILTER == gtmrecv_filter) || is_new_triple)
 		{
 			if (recvpool_ctl->jnl_seqno - lastlog_seqno >= log_interval)
@@ -626,6 +765,13 @@ static void process_tr_buff(int msg_type)
 				assert(recvpool_ctl->last_valid_triple.start_seqno < recvpool_ctl->jnl_seqno);
 			} else
 			{
+				if ( !src_node_same_endianness )
+				{ 
+					triplecontent.cycle = GTM_BYTESWAP_32(triplecontent.cycle);
+					triplecontent.forwptr = GTM_BYTESWAP_24(triplecontent.forwptr); 
+					triplecontent.start_seqno = GTM_BYTESWAP_64(triplecontent.start_seqno);
+				}
+
 				assert(sizeof(triplecontent) == triplelen);
 				assert(JRT_TRIPLE == triplecontent.jrec_type);
 				assert(triplecontent.forwptr == sizeof(triplecontent));
@@ -675,8 +821,8 @@ static void process_tr_buff(int msg_type)
 				save_filter_buff = repl_filter_buff;
 				gtmrecv_alloc_filter_buff(repl_filter_bufsiz + (repl_filter_bufsiz >> 1));
 				in_buff += in_size;
-				in_size = pre_filter_write_len - (in_buff - recvpool.recvdata_base - write_off);
-				out_bufsiz = repl_filter_bufsiz - (out_buff - save_filter_buff) - out_size;
+				in_size = (uint4)(pre_filter_write_len - (in_buff - recvpool.recvdata_base - write_off));
+				out_bufsiz = (uint4)(repl_filter_bufsiz - (out_buff - save_filter_buff) - out_size);
 				out_buff = repl_filter_buff + (out_buff - save_filter_buff) + out_size;
 				tot_out_size += out_size;
 			}
@@ -760,11 +906,24 @@ void	gtmrecv_repl_send(repl_msg_ptr_t msgp, char *msgtypestr, seq_num optional_s
 			optional_seqno, optional_seqno);
 	} else
 		repl_log(log_fp, TRUE, TRUE, "Sending %s message\n", msgtypestr);
-	REPL_SEND_LOOP(gtmrecv_sock_fd, msgp, msgp->len, FALSE, &gtmrecv_poll_immediate)
+	if ( src_node_same_endianness )
 	{
-		gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-		if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-			return;
+		REPL_SEND_LOOP(gtmrecv_sock_fd, msgp, msgp->len, FALSE, &gtmrecv_poll_immediate)
+		{
+			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
+			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
+				return;
+		}
+	}
+
+	if ( !src_node_same_endianness )
+	{
+		REPL_SEND_LOOP(gtmrecv_sock_fd, msgp, GTM_BYTESWAP_32(msgp->len), FALSE, &gtmrecv_poll_immediate)
+		{
+			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
+			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
+				return;
+		}
 	}
 	if (SS_NORMAL != status)
 	{
@@ -795,20 +954,40 @@ void gtmrecv_send_triple_info(repl_triple *triple, int4 triple_num)
 
 	/*************** Send REPL_TRIPLE_INFO1 message ***************/
 	memset(&tripinfo1_msg, 0, sizeof(tripinfo1_msg));
-	tripinfo1_msg.type = REPL_TRIPLE_INFO1;
-	tripinfo1_msg.len = MIN_REPL_MSGLEN;
-	tripinfo1_msg.start_seqno = triple->start_seqno;
+	if ( src_node_same_endianness )
+	{
+		tripinfo1_msg.type = REPL_TRIPLE_INFO1;
+		tripinfo1_msg.len = MIN_REPL_MSGLEN;
+		tripinfo1_msg.start_seqno = triple->start_seqno;
+	}
+	else
+	{
+		tripinfo1_msg.type = GTM_BYTESWAP_32(REPL_TRIPLE_INFO1);
+		tripinfo1_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
+		tripinfo1_msg.start_seqno = GTM_BYTESWAP_64(triple->start_seqno);
+	}
 	memcpy(tripinfo1_msg.instname, triple->root_primary_instname, MAX_INSTNAME_LEN - 1);
 	gtmrecv_repl_send((repl_msg_ptr_t)&tripinfo1_msg, "REPL_TRIPLE_INFO1", tripinfo1_msg.start_seqno);
 	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 		return;
 	/*************** Send REPL_TRIPLE_INFO2 message ***************/
 	memset(&tripinfo2_msg, 0, sizeof(tripinfo2_msg));
-	tripinfo2_msg.type = REPL_TRIPLE_INFO2;
-	tripinfo2_msg.len = MIN_REPL_MSGLEN;
-	tripinfo2_msg.start_seqno = triple->start_seqno;
-	tripinfo2_msg.cycle = triple->root_primary_cycle;
-	tripinfo2_msg.triple_num = triple_num;
+	if ( src_node_same_endianness )
+	{
+		tripinfo2_msg.type = REPL_TRIPLE_INFO2;
+		tripinfo2_msg.len = MIN_REPL_MSGLEN;
+		tripinfo2_msg.start_seqno = triple->start_seqno;
+		tripinfo2_msg.cycle = triple->root_primary_cycle;
+		tripinfo2_msg.triple_num = triple_num;
+	}
+	else
+	{
+		tripinfo2_msg.type = GTM_BYTESWAP_32(REPL_TRIPLE_INFO2);
+		tripinfo2_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
+		tripinfo2_msg.start_seqno = GTM_BYTESWAP_64(triple->start_seqno);
+		tripinfo2_msg.cycle = GTM_BYTESWAP_32(triple->root_primary_cycle);
+		tripinfo2_msg.triple_num = GTM_BYTESWAP_32(triple_num);
+	}	
 	/* Since this is not a root primary instance, updates should be disabled. Assert that */
 	assert((NULL == jnlpool_ctl) || jnlpool_ctl->upd_disabled);
 	assert((NULL == jnlpool_ctl) || (jnlpool_ctl->jnl_seqno >= jnlpool_ctl->start_jnl_seqno));
@@ -851,9 +1030,6 @@ static boolean_t	is_active_source_server_running(void)
 static void do_main_loop(boolean_t crash_restart)
 {
 	/* The work-horse of the Receiver Server */
-
-	void		do_flow_control();
-
 	recvpool_ctl_ptr_t		recvpool_ctl;
 	upd_proc_local_ptr_t		upd_proc_local;
 	gtmrecv_local_ptr_t		gtmrecv_local;
@@ -1071,6 +1247,25 @@ static void do_main_loop(boolean_t crash_restart)
 			if (0 == data_len)
 			{
 				assert(0 == ((unsigned long)buffp & (sizeof(((repl_msg_ptr_t)buffp)->type) - 1)));
+
+				if (!src_node_endianness_known)
+				{
+					if ( ((repl_msg_ptr_t)buffp)->type > 256 && GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->type) < 256 )
+					{
+						src_node_endianness_known = FALSE;
+						src_node_same_endianness = FALSE;
+					}
+					else
+					{
+						src_node_endianness_known = FALSE;
+						src_node_same_endianness = TRUE;
+					}
+				}
+				if ( !src_node_same_endianness )
+				{
+					((repl_msg_ptr_t)buffp)->type = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->type);
+					((repl_msg_ptr_t)buffp)->len = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->len);				
+				}
 				msg_type = ((repl_msg_ptr_t)buffp)->type;
 				msg_len = data_len = ((repl_msg_ptr_t)buffp)->len - REPL_MSG_HDRLEN;
 				assert(0 == (msg_len & ((sizeof((repl_msg_ptr_t)buffp)->type) - 1)));
@@ -1111,13 +1306,29 @@ static void do_main_loop(boolean_t crash_restart)
 					if (0 == data_len)
 					{	/* Heartbeat msg contents start from buffp - msg_len */
 						memcpy(heartbeat.ack_seqno, buffp - msg_len, msg_len);
+						if ( !src_node_same_endianness )
+						{													
+							 *(gtm_time4_t *)&heartbeat.ack_time[0] = GTM_BYTESWAP_32(*(gtm_time4_t *)&heartbeat.ack_time[0]);
+							 *(seq_num *)&heartbeat.ack_seqno[0] = GTM_BYTESWAP_64(*(seq_num *)&heartbeat.ack_seqno[0]);
+						}
 						REPL_DPRINT4("HEARTBEAT received with time %ld SEQNO %llu at %ld\n",
-							     *(time_t *)&heartbeat.ack_time[0],
+							     *(gtm_time4_t *)&heartbeat.ack_time[0],
 							     (*(seq_num *)&heartbeat.ack_seqno[0]), time(NULL));
-						heartbeat.type = REPL_HEARTBEAT;
-						heartbeat.len = MIN_REPL_MSGLEN;
-						QWASSIGN(*(seq_num *)&heartbeat.ack_seqno[0], upd_proc_local->read_jnl_seqno);
-						REPL_SEND_LOOP(gtmrecv_sock_fd, &heartbeat, heartbeat.len,
+						if ( src_node_same_endianness )
+						{													
+							heartbeat.type = REPL_HEARTBEAT;
+							heartbeat.len = MIN_REPL_MSGLEN;
+							QWASSIGN(*(seq_num *)&heartbeat.ack_seqno[0], upd_proc_local->read_jnl_seqno);
+						}
+						else
+						{
+							heartbeat.type = GTM_BYTESWAP_32(REPL_HEARTBEAT);
+							heartbeat.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
+							QWASSIGN(*(seq_num *)&heartbeat.ack_seqno[0], upd_proc_local->read_jnl_seqno);
+							*(seq_num *)&heartbeat.ack_seqno[0] = GTM_BYTESWAP_64(*(seq_num *)&heartbeat.ack_seqno[0]);
+							*(gtm_time4_t *)&heartbeat.ack_time[0] = GTM_BYTESWAP_32(*(gtm_time4_t *)&heartbeat.ack_time[0]);
+						}
+						REPL_SEND_LOOP(gtmrecv_sock_fd, &heartbeat, MIN_REPL_MSGLEN,
 								FALSE, &gtmrecv_poll_immediate)
 						{
 							gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
@@ -1126,8 +1337,13 @@ static void do_main_loop(boolean_t crash_restart)
 						}
 						/* Error handling for the above send_loop is not required as it'll be caught
 						 * in the next recv_loop of the receiver server */
+						if ( !src_node_same_endianness )
+						{													
+							 *(gtm_time4_t *)&heartbeat.ack_time[0] = GTM_BYTESWAP_32(*(gtm_time4_t *)&heartbeat.ack_time[0]);
+							 *(seq_num *)&heartbeat.ack_seqno[0] = GTM_BYTESWAP_64(*(seq_num *)&heartbeat.ack_seqno[0]);
+						}
 						REPL_DPRINT4("HEARTBEAT sent with time %ld SEQNO %llu at %ld\n",
-							     *(time_t *)&heartbeat.ack_time[0],
+							     *(gtm_time4_t *)&heartbeat.ack_time[0],
 							     (*(seq_num *)&heartbeat.ack_seqno[0]), time(NULL));
 					}
 					break;
@@ -1149,8 +1365,16 @@ static void do_main_loop(boolean_t crash_restart)
 						assert(REPL_PROTO_VER_MULTISITE <= recvpool.gtmrecv_local->remote_proto_ver);
 						/*************** Send REPL_INSTANCE_INFO message ***************/
 						memset(&instinfo_msg, 0, sizeof(instinfo_msg));
-						instinfo_msg.type = REPL_INSTANCE_INFO;
-						instinfo_msg.len = MIN_REPL_MSGLEN;
+						if ( src_node_same_endianness )
+						{
+							instinfo_msg.type = REPL_INSTANCE_INFO;
+							instinfo_msg.len = MIN_REPL_MSGLEN;	
+						}
+						else
+						{
+							instinfo_msg.type = GTM_BYTESWAP_32(REPL_INSTANCE_INFO);
+							instinfo_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);						
+						}
 						memcpy(instinfo_msg.instname, jnlpool.repl_inst_filehdr->this_instname,
 							MAX_INSTNAME_LEN - 1);
 						instinfo_msg.was_rootprimary = (unsigned char)repl_inst_was_rootprimary();
@@ -1164,7 +1388,7 @@ static void do_main_loop(boolean_t crash_restart)
 								&& !need_instinfo_msg->is_rootprimary)
 						{
 							gtm_putmsg(VARLSTCNT(4) ERR_PRIMARYNOTROOT, 2,
-								LEN_AND_STR((char *)need_instinfo_msg->instname));
+								LEN_AND_STR((char *) need_instinfo_msg->instname));
 							gtmrecv_autoshutdown();	/* should not return */
 							assert(FALSE);
 						}
@@ -1185,7 +1409,14 @@ static void do_main_loop(boolean_t crash_restart)
 						assert(msg_len == MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
 						need_tripleinfo_msg = (repl_needtriple_msg_ptr_t)(buffp - msg_len
 													- REPL_MSG_HDRLEN);
-						input_triple_seqno = need_tripleinfo_msg->seqno;
+						if ( src_node_same_endianness )
+						{													
+							input_triple_seqno = need_tripleinfo_msg->seqno;
+						}
+						else
+						{
+							input_triple_seqno = GTM_BYTESWAP_64(need_tripleinfo_msg->seqno);
+						}
 						repl_log(gtmrecv_log_fp, TRUE, FALSE, "Received REPL_NEED_TRIPLE_INFO message"
 							" for seqno %llu [0x%llx]\n", input_triple_seqno, input_triple_seqno);
 						first_unprocessed_seqno = upd_proc_local->read_jnl_seqno;
@@ -1359,6 +1590,10 @@ static void do_main_loop(boolean_t crash_restart)
 						start_msg = (repl_start_reply_msg_ptr_t)(buffp - msg_len - REPL_MSG_HDRLEN);
 						assert((unsigned long)start_msg % sizeof(seq_num) == 0); /* alignment check */
 						QWASSIGN(recvd_jnl_seqno, *(seq_num *)start_msg->start_seqno);
+						if (  !src_node_same_endianness )
+						{
+							recvd_jnl_seqno = GTM_BYTESWAP_64(recvd_jnl_seqno);
+						}
 						recvpool.gtmrecv_local->last_valid_remote_proto_ver =
 							recvpool.gtmrecv_local->remote_proto_ver;
 						if (REPL_WILL_RESTART_WITH_INFO == msg_type)
@@ -1373,6 +1608,10 @@ static void do_main_loop(boolean_t crash_restart)
 							 * so we are okay fetching start_msg->start_flags unconditionally.
 							 */
 							GET_ULONG(recvd_start_flags, start_msg->start_flags);
+							if ( !src_node_same_endianness )
+							{
+								recvd_start_flags = GTM_BYTESWAP_32(recvd_start_flags);
+							}
 							assert(remote_jnl_ver > V15_JNL_VER || 0 == recvd_start_flags);
 							if (remote_jnl_ver <= V15_JNL_VER) /* safety in pro */
 								recvd_start_flags = 0;
@@ -1500,7 +1739,6 @@ void gtmrecv_process(boolean_t crash_restart)
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
-	void 			gtmrecv_heartbeat_timer();
 
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;

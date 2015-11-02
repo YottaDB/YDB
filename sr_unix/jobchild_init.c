@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -113,7 +113,7 @@ void jobchild_init(void)
 
 		/* Set process priority */
 		if (jparms.baspri)
-			nice((int) jparms.baspri);
+			nice((int)jparms.baspri);
 		/* Set up $ZMODE to "OTHER" */
 		dollar_zmode.mvtype = MV_STR;
 		dollar_zmode.str.addr = &other_mode_buf[0];
@@ -153,7 +153,7 @@ void jobchild_init(void)
 	}
 	if (job_arglist.callargs)
 	{
-		callg((int(*)(int cnt, ...))push_parm, &job_arglist);
+		callg((INTPTR_T (*)(intszofptr_t cnt, ...))push_parm, (gparam_list *)&job_arglist);
 		frame_pointer->type |= SFT_EXTFUN;
 	}
 	REVERT;

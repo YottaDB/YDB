@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@ void gvcst_tp_init(gd_region *greg)
 		si->tlvl_info_list = (buddy_list *)malloc(sizeof(buddy_list));
 		initialize_list(si->tlvl_info_list, sizeof(tlevel_info), TLVL_INFO_LIST_INIT_ALLOC);
 		si->new_buff_list = (buddy_list *)malloc(sizeof(buddy_list));
-		initialize_list(si->new_buff_list, sizeof(que_ent) + csa->hdr->blk_size, NEW_BUFF_LIST_INIT_ALLOC);
+		initialize_list(si->new_buff_list, SIZEOF(que_ent) + csa->hdr->blk_size, NEW_BUFF_LIST_INIT_ALLOC);
 		si->recompute_list = (buddy_list *)malloc(sizeof(buddy_list));
 		initialize_list(si->recompute_list, sizeof(key_cum_value), RECOMPUTE_LIST_INIT_ALLOC);
 		/* The size of the si->cr_array can go up to TP_MAX_MM_TRANSIZE, but usually is quite less.

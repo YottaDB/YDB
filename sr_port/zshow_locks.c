@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ void zshow_locks(zshow_out *output)
 			v.str.addr = &lvl[0];
 			v.str.len = sizeof(lvl) - 1;
 			zshow_output(output,&v.str);
-			MV_FORCE_MVAL(&v,temp->level) ;
+			MV_FORCE_MVAL(&v,(int)temp->level) ;
 			mval_write(output,&v,TRUE);
 		}
 		else if (temp->level)
@@ -65,7 +65,7 @@ void zshow_locks(zshow_out *output)
 			v.str.addr = &lvl[0];
 			v.str.len = sizeof(lvl) - 1;
 			zshow_output(output,&v.str);
-			MV_FORCE_MVAL(&v,temp->level) ;
+			MV_FORCE_MVAL(&v,(int)temp->level) ;
 			mval_write(output,&v,TRUE);
 		}else if (temp->zalloc)
 		{

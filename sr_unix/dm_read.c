@@ -215,7 +215,7 @@ void	dm_read (mval *v)
 	 */
 
 	length = tt_ptr->in_buf_sz + ESC_LEN;
-	exp_length = utf8_active ? ((sizeof(wint_t) * length) + (GTM_MB_LEN_MAX * length) + sizeof(gtm_int64_t)) : length;
+	exp_length = utf8_active ? (uint4)((sizeof(wint_t) * length) + (GTM_MB_LEN_MAX * length) + sizeof(gtm_int64_t)) : length;
 	zint_restart = FALSE;
 	if (tt_ptr->mupintr)
 	{	/* restore state to before job interrupt */
@@ -244,9 +244,10 @@ void	dm_read (mval *v)
 			if (utf8_active)
 			{	/* need to properly align U32 buffer */
 				assert(exp_length == tt_state->exp_length);
-				buffer_32_start = (wint_t *)ROUND_UP2((int4)(buffer_start + (GTM_MB_LEN_MAX * length)),
+				buffer_32_start = (wint_t *)ROUND_UP2((INTPTR_T)(buffer_start + (GTM_MB_LEN_MAX * length)),
 							sizeof(gtm_int64_t));
-				if (buffer_moved && (((int)buffer_32_start & 0x7) != ((int)tt_state->buffer_32_start & 0x7)))
+				if (buffer_moved &&
+				    (((INTPTR_T)buffer_32_start & 0x7) != ((INTPTR_T)tt_state->buffer_32_start & 0x7)))
 					memmove(buffer_32_start, buffer_start + ((unsigned char *)tt_state->buffer_32_start
 						- tt_state->buffer_start), (sizeof(wint_t) * length));
 				current_32_ptr = buffer_32_start;
@@ -276,7 +277,7 @@ void	dm_read (mval *v)
 		buffer_start = current_ptr = stringpool.free;
 		if (utf8_active)
 		{
-			buffer_32_start = (wint_t *)ROUND_UP2((int4)(stringpool.free + (GTM_MB_LEN_MAX * length)),
+			buffer_32_start = (wint_t *)ROUND_UP2((INTPTR_T)(stringpool.free + (GTM_MB_LEN_MAX * length)),
 					sizeof(gtm_int64_t));
 			current_32_ptr = buffer_32_start;
 		}
@@ -303,7 +304,7 @@ void	dm_read (mval *v)
 
 	/* to turn keypad on if possible */
 #ifndef __MVS__
-	if (!zint_restart && NULL != KEYPAD_XMIT && (keypad_len = strlen(KEYPAD_XMIT)))	/* embedded assignment */
+	if (!zint_restart && NULL != KEYPAD_XMIT && (keypad_len = STRLEN(KEYPAD_XMIT)))	/* embedded assignment */
 		DOWRITE(tt_ptr->fildes, KEYPAD_XMIT, keypad_len);
 #endif
 
@@ -393,7 +394,7 @@ void	dm_read (mval *v)
 		 * selstat > 0; try reading something
 		 * -----------------------------------
 		 */
-		else if (0 > (status = read(tt_ptr->fildes, &inbyte, 1)))
+		else if (0 > (status = (int)read(tt_ptr->fildes, &inbyte, 1)))
 		{
 			/* -------------------------
 			 * Error return from read().
@@ -467,7 +468,7 @@ void	dm_read (mval *v)
 					if (WEOF == inchar)
 					{	/* invalid char */
 						io_ptr->dollar.za = 9;
-						utf8_badchar(more_ptr - more_buf, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
+						utf8_badchar((int)(more_ptr - more_buf), more_buf, more_ptr, 0, NULL);
 						break;
 					}
 				} else if (0 < (utf8_more = UTF8_MBFOLLOW(&inbyte)))	/* assignment */
@@ -598,11 +599,10 @@ void	dm_read (mval *v)
 				} else
 				{
 #endif
-					match_length = strcspn((const char *)buffer_start, delimiter_string);
+					match_length = (uint4)strcspn((const char *)buffer_start, delimiter_string);
 
 					/* only "rec" and "recall" should be accepted */
-
-					if (   ((match_length == strlen(REC)) || (match_length == strlen(RECALL)))
+					if (((match_length == strlen(REC)) || (match_length == strlen(RECALL)))
 				    		&& strncmp((const char *)buffer_start, RECALL, match_length) == 0)
 					{
 						strtok((char *)buffer_start, delimiter_string);
@@ -659,7 +659,7 @@ void	dm_read (mval *v)
 
 					if (!decimal)
 					{
-						int	 m, len = strlen(argv[1]);
+						int	 m, len = STRLEN(argv[1]);
 
 						for (m = 1;  m <= recall_num;  m++)
 						{
@@ -695,7 +695,7 @@ void	dm_read (mval *v)
 #ifdef UNICODE_SUPPORTED
 						if (utf8_active)
 						{	/* note out* variables are used for input here */
-							int	len = comline_base[recall_index].len;
+							unsigned int	len = comline_base[recall_index].len;
 
 							instr = dx_instr = 0;
 							outtop = (unsigned char *)comline_base[recall_index].addr + len;
@@ -954,7 +954,7 @@ void	dm_read (mval *v)
 #ifdef UNICODE_SUPPORTED
 					if (utf8_active)
 					{
-						int	len = comline_base[cl].len;
+						unsigned int	len = comline_base[cl].len;
 
 						instr = dx_instr = 0;
 						outtop = (unsigned char *)comline_base[cl].addr + len;
@@ -1012,7 +1012,7 @@ void	dm_read (mval *v)
 
 	/* turn keypad off */
 #ifndef __MVS__
-	if (NULL != KEYPAD_LOCAL && (keypad_len = strlen(KEYPAD_LOCAL)))	/* embedded assignment */
+	if (NULL != KEYPAD_LOCAL && (keypad_len = STRLEN(KEYPAD_LOCAL)))	/* embedded assignment */
 		DOWRITE(tt_ptr->fildes, KEYPAD_LOCAL, keypad_len);
 #endif
 
@@ -1030,7 +1030,7 @@ void	dm_read (mval *v)
 		current_32_ptr = buffer_32_start;
 		for (i = 0; i < outlen && outptr < outtop; i++, current_32_ptr++)
 			outptr = UTF8_WCTOMB(*current_32_ptr, outptr);
-		v->str.len = outptr - buffer_start;
+		v->str.len = INTCAST(outptr - buffer_start);
 	} else
 #endif
 		v->str.len = outlen;

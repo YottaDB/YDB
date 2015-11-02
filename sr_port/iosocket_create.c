@@ -116,7 +116,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 			socketptr->remote.port = port;
 			SPRINTF(socketptr->remote.saddr_ip, "%s", addr);
 		}
-		lower_to_upper((uchar_ptr_t)tcp, (uchar_ptr_t)tcp, sizeof("TCP") - 1);
+		lower_to_upper((uchar_ptr_t)tcp, (uchar_ptr_t)tcp, SIZEOF("TCP") - 1);
 		if (0 == MEMCMP_LIT(tcp, "TCP"))
 			socketptr->protocol = socket_tcpip;
 		else
@@ -135,7 +135,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
-			tmplen = strlen(errptr);
+			tmplen = STRLEN(errptr);
 			rts_error(VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 			free(socketptr);
 			return NULL;
@@ -146,7 +146,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
-			tmplen = strlen(errptr);
+			tmplen = STRLEN(errptr);
 			rts_error(VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr); /* need new error */
 			free(socketptr);
 			return NULL;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,7 +110,7 @@ int jnl_v17tov17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		status = -1;
 	}
 	assert(0 == jlen || -1 == status);
-	*jnl_len = jb - jnl_buff;
-	*conv_len = cb - conv_buff;
+	*jnl_len = (uint4)(jb - jnl_buff);
+	*conv_len = (uint4)(cb - conv_buff);
 	return(status);
 }

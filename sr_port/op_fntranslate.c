@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 	for (char_len = 0; inptr < intop && outptr < outtop; ++char_len, inptr = nextptr, outptr += outlen)
 	{
 		nextptr = UTF8_MBTOWC(inptr, intop, code);
-		inlen = nextptr - inptr;
+		inlen = (int)(nextptr - inptr);
 		assert(inlen > 0);
 		assert((1 == inlen) || (WEOF != code));
 		assert((1 == inlen) || hashtab_created);
@@ -111,7 +111,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 		{
 			if (0 == xlate[*inptr]) /* store 1-based byte offset */
 			{
-		    		xlate[*inptr] = outptr - outbase + 1;
+		    		xlate[*inptr] = (int)(outptr - outbase + 1);
 				char_already_seen = FALSE;
 			} else
 				char_already_seen = TRUE;
@@ -121,7 +121,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 			char_already_seen = FALSE;
 		} else
 			char_already_seen = TRUE;
-		outlen = UTF8_MBNEXT(outptr, outtop) - outptr; /* byte length of replacement character */
+		outlen =(int)(UTF8_MBNEXT(outptr, outtop) - outptr); /* byte length of replacement character */
 		if (!char_already_seen && (n = outlen - inlen) > max_len_incr)
 			max_len_incr = n; /* extra stringpool space needed if this translation occurs */
 	}
@@ -129,7 +129,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 	for (; inptr < intop; inptr = nextptr, ++char_len)
 	{
 		nextptr = UTF8_MBTOWC(inptr, intop, code);
-		inlen = nextptr - inptr;
+		inlen = (int)(nextptr - inptr);
 		assert(inlen > 0);
 		assert((1 == inlen) || (WEOF != code));
 		assert((1 == inlen) || hashtab_created);
@@ -162,7 +162,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 	for (inptr = (unsigned char *)src->str.addr, intop = inptr + src->str.len ; inptr < intop ; inptr = nextptr)
 	{
 		nextptr = UTF8_MBTOWC(inptr, intop, code);
-		inlen = nextptr - inptr;
+		inlen = (int)(nextptr - inptr);
 		assert(inlen > 0);
 		if (1 == inlen)
 			choff = xlate[*inptr];
@@ -178,7 +178,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 		{ /* translation exists, replace the source character */
 			assert(choff > 0);
 			chptr = &outbase[choff - 1];	/* retreive the character using 1-based index */
-			chlen = UTF8_MBNEXT(chptr, outtop) - chptr;
+			chlen = (int)(UTF8_MBNEXT(chptr, outtop) - chptr);
 			assert(chlen > 0);
 		}
 		if (MAXPOSINT4 != choff)
@@ -237,7 +237,7 @@ void op_fnztranslate(mval *src,mval *in_str,mval *out_str,mval *dst)
 			*outpt++ = ch;
 	}
 	dst->str.addr = (char *)dstp;
-	dst->str.len = outpt - dstp;
+	dst->str.len = INTCAST(outpt - dstp);
 	dst->mvtype = MV_STR;
 	stringpool.free = outpt;
 }

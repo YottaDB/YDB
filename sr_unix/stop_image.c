@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,6 @@ void stop_image(void)
 /* This entry point will core if necessary */
 void stop_image_conditional_core(void)
 {
-	void stop_image_no_core();
 	/* If coming here because of an IO error presumably while handling a real error,
 	   then don't core. */
 	if (EIO == error_condition)

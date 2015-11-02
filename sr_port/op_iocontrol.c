@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,7 @@ void op_iocontrol(UNIX_ONLY_COMMA(int4 n) mval *vparg, ...)
 		}
 		if (MV_IS_CANONICAL(vp))
 		{
-			m = vp->str.len;
+			m = (int)vp->str.len;
 			if (cp + m > stringpool.top)
 				break;
 			memcpy(cp, vp->str.addr, m);
@@ -73,7 +73,7 @@ void op_iocontrol(UNIX_ONLY_COMMA(int4 n) mval *vparg, ...)
 		{
 			if (count > 0)
 				*cp++ = '"';
-			for (m = 0, cq = (unsigned char *)vp->str.addr, length = vp->str.len
+			for (m = 0, cq = (unsigned char *)vp->str.addr, length = (int)vp->str.len
 				; m < length && cp < stringpool.top ; m++)
 			{
 				if (*cq == '"')
@@ -92,7 +92,7 @@ void op_iocontrol(UNIX_ONLY_COMMA(int4 n) mval *vparg, ...)
 	if (cp - stringpool.free > MAX_DEVCTL_LENGTH)
 		rts_error(VARLSTCNT(1) ERR_CTLMNEMAXLEN);
 	assert(cp < stringpool.top);
-	val.len = cp - stringpool.free;
+	val.len = INTCAST(cp - stringpool.free);
 	val.addr = (char *)stringpool.free;
 	(*io_curr_device.out->disp_ptr->iocontrol)(&val);
 	return;

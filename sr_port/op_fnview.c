@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -116,7 +116,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			n = 0;
 			break;
 		case VTK_STKSIZ:
-			n = stackbase - stacktop;
+			n = (int)(stackbase - stacktop);
 			break;
 		case VTK_ICSIZE:
 			n = 0;	/* must change run-time structure */
@@ -128,7 +128,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			n = cache_fails;
 			break;
 		case VTK_SPSIZE:
-			n = stringpool.top - stringpool.base;
+			n = (int)(stringpool.top - stringpool.base);
 			break;
 		case VTK_GDSCERT:
 			if (certify_all_blocks)
@@ -352,7 +352,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				}
 				assert(stringpool.free < stringpool.top);
 				/* subtract one to remove extra trailing delimiter */
-				dst->str.len = (char *)stringpool.free - dst->str.addr - 1;
+				dst->str.len = INTCAST((char *)stringpool.free - dst->str.addr - 1);
 			} else
 				dst->str.len = 0;
 			break;

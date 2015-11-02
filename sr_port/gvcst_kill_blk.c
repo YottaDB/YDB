@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -203,7 +203,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			cse->first_off = 0;
 		return cdb_sc_normal;
 	}
-	next_rec_shrink = old_blk_hdr->bsiz + ((bytptr)del_ptr - (bytptr)right_ptr);
+	next_rec_shrink = (int)(old_blk_hdr->bsiz + ((bytptr)del_ptr - (bytptr)right_ptr));
 	if (sizeof(blk_hdr) >= next_rec_shrink)
 	{
 		assert(CDB_STAGNATE > t_tries);
@@ -328,7 +328,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			if (horiz_growth)
 			{
 				old_cse->undo_next_off[0] = curr_chain.next_off;
-				old_cse->undo_offset[0] = curr - buffer;
+				old_cse->undo_offset[0] = (block_offset)(curr - buffer);
 				assert(old_cse->undo_offset[0]);
 			}
 			curr_chain.next_off = 0;
@@ -340,13 +340,13 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				if (horiz_growth)
 				{
 					old_cse->undo_next_off[1] = prev_chain.next_off;
-					old_cse->undo_offset[1] = prev - buffer;
+					old_cse->undo_offset[1] = (block_offset)(prev - buffer);
 					assert(old_cse->undo_offset[1]);
 				}
-				prev_chain.next_off = (bytptr)left_ptr - prev + sizeof(rec_hdr);
+				prev_chain.next_off = (unsigned int)((bytptr)left_ptr - prev + (unsigned int)(sizeof(rec_hdr)));
 				GET_LONGP(prev, &prev_chain);
 			} else	/* it's the first (and only) one */
-				cse->first_off = (bytptr)left_ptr - buffer + sizeof(rec_hdr);
+				cse->first_off = (block_offset)((bytptr)left_ptr - buffer + sizeof(rec_hdr));
 		} else if (curr >= (bytptr)del_ptr)
 		{	/* may be more records on the right that aren't deleted */
 			while (curr < (bytptr)right_ptr)
@@ -371,7 +371,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 					if (horiz_growth)
 					{
 						old_cse->undo_next_off[0] = prev_chain.next_off;
-						old_cse->undo_offset[0] = prev - buffer;
+						old_cse->undo_offset[0] = (block_offset)(prev - buffer);
 						assert(old_cse->undo_offset[0]);
 					}
 					prev_chain.next_off = 0;
@@ -389,15 +389,15 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 					if (horiz_growth)
 					{
 						old_cse->undo_next_off[0] = prev_chain.next_off;
-						old_cse->undo_offset[0] = prev - buffer;
+						old_cse->undo_offset[0] = (block_offset)(prev - buffer);
 						assert(old_cse->undo_offset[0]);
 					}
-					prev_chain.next_off = curr - prev - ((bytptr)right_ptr - (bytptr)del_ptr)
-						+ (next_rec_shrink > 0 ? next_rec_shrink : 0);
+					prev_chain.next_off = (unsigned int)(curr - prev - ((bytptr)right_ptr - (bytptr)del_ptr)
+						+ (next_rec_shrink > 0 ? next_rec_shrink : 0));
 					GET_LONGP(prev, &prev_chain);
 				} else	/* curr remains first: adjust the head */
-					cse->first_off = curr - buffer - ((bytptr)right_ptr - (bytptr)del_ptr)
-						+ (next_rec_shrink > 0 ? next_rec_shrink : 0);
+					cse->first_off = (block_offset)(curr - buffer - ((bytptr)right_ptr - (bytptr)del_ptr)
+						+ (next_rec_shrink > 0 ? next_rec_shrink : 0));
 			}
 		}
 	}

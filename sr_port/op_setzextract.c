@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,7 +114,7 @@ void op_setzextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 
 	assert(straddr - stringpool.free == strlen);
 	dst->mvtype = MV_STR;
-	dst->str.len = straddr - stringpool.free;
+	dst->str.len = INTCAST(straddr - stringpool.free);
 	dst->str.addr = (char *)stringpool.free;
 	stringpool.free = straddr;
 }

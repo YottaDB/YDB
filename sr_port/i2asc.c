@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,14 +32,16 @@ uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n)
 			n = m;
 		}
 	}
-	len = ar + sizeof(ar) - q;
+	len = (unsigned int)(ar + sizeof(ar) - q);
 	memcpy(p, q, len);
 	return p + len;
 }
+
 uchar_ptr_t i2ascl(uchar_ptr_t p, qw_num n)
 {
 	unsigned char	ar[22], *q;
-	uint4		len, r;
+	uint4		len;
+	long		 r;
 
 	q = ar + sizeof(ar);
 	if (QWEQ(n, seq_num_zero))
@@ -52,9 +54,9 @@ uchar_ptr_t i2ascl(uchar_ptr_t p, qw_num n)
 			*--q = r + '0';
 		}
 	}
-	len = ar + sizeof(ar) - q;
+	len = (uint4)(ar + sizeof(ar) - q);
 	memcpy(p, q, len);
-	return p + len;
+	return (unsigned char *)(p + len) ;
 }
 #ifdef INT8_SUPPORTED
 uchar_ptr_t i2asclx(uchar_ptr_t p, qw_num n)
@@ -78,7 +80,7 @@ uchar_ptr_t i2asclx(uchar_ptr_t p, qw_num n)
 			n = n >> 4;
 		}
 	}
-	len = ar + sizeof(ar) - q;
+	len = (uint4)(ar + sizeof(ar) - q);
 	memcpy(p, q, len);
 	return p + len;
 }

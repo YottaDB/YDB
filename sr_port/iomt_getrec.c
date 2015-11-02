@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,21 +32,21 @@ void iomt_getrec (io_desc *dv)
 	cp = mt_ptr->buffptr;
 	if (!mt_ptr->stream)
 		fill_char = '^';
-	ln = mt_ptr->bufftop - cp;
+	ln = (int)(mt_ptr->bufftop - cp);
 	if (ln < 0)
 		rts_error (VARLSTCNT (1) ERR_MTRECTOOBIG);
 	else if (ln == 0)
 	{
 		iomt_readblk (dv);
 		cp = mt_ptr->buffer;
-		ln = mt_ptr->bufftop - cp;
+		ln = (int)(mt_ptr->bufftop - cp);
 	} else if (*cp == fill_char)
 	{
 		if (!mt_ptr->fixed || !skpc (fill_char, ln, (char *)cp))
 		{
 			iomt_readblk (dv);
 			cp = mt_ptr->buffer;
-			ln = mt_ptr->bufftop - cp;
+			ln = (int)(mt_ptr->bufftop - cp);
 		}
 	}
 	if (mt_ptr->fixed)

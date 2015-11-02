@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
+#include "jnl.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "repl_dbg.h"
@@ -39,18 +40,30 @@
 #include "repl_sp.h"
 #include "repl_log.h"
 #include "is_proc_alive.h"
+#include "gtmmsg.h"
+#include "sgtm_putmsg.h"
+#include "util.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
+GBLREF	gd_addr			*gd_header;
 
 int gtmsource_checkhealth(void)
 {
 	uint4			gtmsource_pid;
 	int			status, semval;
-	boolean_t		srv_alive;
+	boolean_t		srv_alive, all_files_open;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
 	int4			index, num_servers;
+	seq_num			reg_seqno, jnlseqno;
+	gd_region		*reg, *region_top;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	char			errtxt[OUT_BUFF_SIZE];
+
+	error_def(ERR_NOTALLDBOPN);
+	error_def(ERR_REPLJNLCLOSED);
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	if (NULL != jnlpool.gtmsource_local)	/* Check health of a specific source server */
@@ -108,6 +121,34 @@ int gtmsource_checkhealth(void)
 				semval, num_servers);
 			repl_log(stderr, FALSE, TRUE, "Error : Check if any pid reported above is NOT a source server process\n");
 			status |= SRV_ERR;
+		}
+	}
+	/* Check that there are no regions with replication state = WAS_ON (i.e. repl_was_open). If so report that.
+	 * But to determine that, we need to attach to all the database regions.
+	 */
+	gvinit();
+	/* We use the same code dse uses to open all regions but we must make sure they are all open before proceeding. */
+	all_files_open = region_init(FALSE);
+	if (!all_files_open)
+	{
+		gtm_putmsg(VARLSTCNT(1) ERR_NOTALLDBOPN);
+		status |= SRV_ERR;
+	} else
+	{
+		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
+		{
+			csa = &FILE_INFO(reg)->s_addrs;
+			csd = csa->hdr;
+			if (REPL_WAS_ENABLED(csd))
+			{
+				assert(!JNL_ENABLED(csd) || REPL_ENABLED(csd));	/* || is for turning replication on concurrently */
+				reg_seqno = csd->reg_seqno;
+				jnlseqno = (NULL != jnlpool.jnlpool_ctl) ? jnlpool.jnlpool_ctl->jnl_seqno : MAX_SEQNO;
+				sgtm_putmsg(errtxt, VARLSTCNT(8) ERR_REPLJNLCLOSED, 6, DB_LEN_STR(reg),
+					&reg_seqno, &reg_seqno, &jnlseqno, &jnlseqno);
+				repl_log(stderr, FALSE, TRUE, errtxt);
+				status |= SRV_ERR;
+			}
 		}
 	}
 	return (status + NORMAL_SHUTDOWN);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -251,9 +251,10 @@ void	mu_reorg_upgrd_dwngrd(void)
 			|| (!upgrade && ((total_blks - free_blks) == actual_blks2upgrd)))
 		{
 			util_out_print("Region !AD : Blocks to Upgrade counter indicates no action needed for MUPIP REORG !AD",
-				TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
-			util_out_print("Region !AD : Total Blocks = [0x!XL] : Free Blocks = [0x!XL] : Blocks to upgrade = [0x!XL]",
-				TRUE, REG_LEN_STR(reg), total_blks, free_blks, actual_blks2upgrd);
+				       TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
+			util_out_print("Region !AD : Total Blocks = [0x!8XL] : Free Blocks = [0x!8XL] : "
+				       "Blocks to upgrade = [0x!8XL]",
+				       TRUE, REG_LEN_STR(reg), total_blks, free_blks, actual_blks2upgrd);
 			util_out_print("Region !AD : MUPIP REORG !AD finished!/", TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
 			rel_crit(reg);
 			continue;
@@ -293,7 +294,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		start_bmp = ROUND_DOWN(start_blk, BLKS_PER_LMAP);
 		last_bmp  = ROUND_DOWN(stop_blk - 1, BLKS_PER_LMAP);
 		curblk = start_blk;	/* curblk is the block to be upgraded/downgraded */
-		util_out_print("Region !AD : Started processing from block number [0x!XL]", TRUE, REG_LEN_STR(reg), curblk);
+		util_out_print("Region !AD : Started processing from block number [0x!8XL]", TRUE, REG_LEN_STR(reg), curblk);
 		if (NULL != bptr)
 		{	/* malloc/free "bptr" for each region as GDS block-size can be different */
 			free(bptr);
@@ -359,7 +360,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			{	/* certify the block while holding crit as cert_blk uses fields from file-header (shared memory) */
 				assert(FALSE);	/* in pro, skip ugprading/downgarding all blks in this unreliable local bitmap */
 				rel_crit(reg);
-				util_out_print("Region !AD : Bitmap Block [0x!XL] has integrity errors. Skipping this bitmap.",
+				util_out_print("Region !AD : Bitmap Block [0x!8XL] has integrity errors. Skipping this bitmap.",
 					TRUE, REG_LEN_STR(reg), curbmp);
 				status1 = ERR_MUNOFINISH;
 				continue;
@@ -408,7 +409,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 						} else
 						{
 							gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status1);
-							util_out_print("Region !AD : Error occurred while reading block [0x!XL]",
+							util_out_print("Region !AD : Error occurred while reading block [0x!8XL]",
 								TRUE, REG_LEN_STR(reg), curblk);
 							status1 = ERR_MUNOFINISH;
 							goto stop_reorg_on_this_reg;	/* goto needed because of nested FOR Loop */
@@ -604,21 +605,21 @@ void	mu_reorg_upgrd_dwngrd(void)
 		}
 		curr_tn = csd->trans_hist.curr_tn;
 		rel_crit(reg);
-		util_out_print("Region !AD : Stopped processing at block number [0x!XL]", TRUE, REG_LEN_STR(reg), curblk);
+		util_out_print("Region !AD : Stopped processing at block number [0x!8XL]", TRUE, REG_LEN_STR(reg), curblk);
 		/* Print statistics */
-		util_out_print("Region !AD : Statistics : Blocks Read From Disk (Bitmap)     : 0x!XL",
+		util_out_print("Region !AD : Statistics : Blocks Read From Disk (Bitmap)     : 0x!8XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_read_from_disk_bmp);
-		util_out_print("Region !AD : Statistics : Blocks Skipped (Free/Recycled)     : 0x!XL",
+		util_out_print("Region !AD : Statistics : Blocks Skipped (Free/Recycled)     : 0x!8XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_skipped_free_recycled);
-		util_out_print("Region !AD : Statistics : Blocks Read From Disk (Non-Bitmap) : 0x!XL",
+		util_out_print("Region !AD : Statistics : Blocks Read From Disk (Non-Bitmap) : 0x!8XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_read_from_disk_nonbmp);
-		util_out_print("Region !AD : Statistics : Blocks Skipped (new fmt in disk)   : 0x!XL",
+		util_out_print("Region !AD : Statistics : Blocks Skipped (new fmt in disk)   : 0x!8XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_skipped_newfmtindisk);
-		util_out_print("Region !AD : Statistics : Blocks Skipped (new fmt in cache)  : 0x!XL",
+		util_out_print("Region !AD : Statistics : Blocks Skipped (new fmt in cache)  : 0x!8XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_skipped_newfmtincache);
-		util_out_print("Region !AD : Statistics : Blocks Converted (Bitmap)          : 0x!XL",
+		util_out_print("Region !AD : Statistics : Blocks Converted (Bitmap)          : 0x!8XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_converted_bmp);
-		util_out_print("Region !AD : Statistics : Blocks Converted (Non-Bitmap)      : 0x!XL",
+		util_out_print("Region !AD : Statistics : Blocks Converted (Non-Bitmap)      : 0x!8XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_converted_nonbmp);
 		if (reorg_entiredb && (SS_NORMAL == status1) && (0 != blocks_left))
 		{	/* file-header counter does not match what reorg on the entire database expected to see */
@@ -627,8 +628,9 @@ void	mu_reorg_upgrd_dwngrd(void)
 				TRUE, REG_LEN_STR(reg));
 			status1 = ERR_MUNOFINISH;
 		} else
-			util_out_print("Region !AD : Total Blocks = [0x!XL] : Free Blocks = [0x!XL] : Blocks to upgrade = [0x!XL]",
-				TRUE, REG_LEN_STR(reg), total_blks, free_blks, actual_blks2upgrd);
+			util_out_print("Region !AD : Total Blocks = [0x!8XL] : Free Blocks = [0x!8XL] : "
+				       "Blocks to upgrade = [0x!8XL]",
+				       TRUE, REG_LEN_STR(reg), total_blks, free_blks, actual_blks2upgrd);
 		/* Issue success or failure message for this region */
 		if (SS_NORMAL == status1)
 		{	/* issue success only if REORG did not encounter any error in its processing */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 			*status = errno;
 			return FALSE;
 		}
-		cwd_len = strlen(cwdbuf);
+		cwd_len = STRLEN(cwdbuf);
 		cptr = orig_fn;
 		if (('.' == *cptr)  &&  ('.' == *(cptr + 1)))
 		{
@@ -55,7 +55,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 			for (c1 = &cwdbuf[cwd_len - 1];  i > 0;  --i)
 				while ('/' != *c1)
 					--c1;
-			if ((length = (c1 - cwdbuf) + orig_len - (cptr - orig_fn)) + 1 > max_len)
+			if ((length = (int)((c1 - cwdbuf) + orig_len - (cptr - orig_fn))) + 1 > max_len)
 			{
 				*status = ERR_FILENAMETOOLONG;
 				return FALSE;
@@ -66,7 +66,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 		{
 			if ('.' == *cptr && '/' == (*(cptr + 1)))
 				cptr += 2;
-			if ((length = cwd_len + 1 + orig_len - (cptr - orig_fn)) + 1 > max_len)
+			if ((length = (int)(cwd_len + 1 + orig_len - (cptr - orig_fn))) + 1 > max_len)
 			{
 				*status = ERR_FILENAMETOOLONG;
 				return FALSE;

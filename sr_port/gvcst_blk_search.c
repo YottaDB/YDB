@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -220,14 +220,14 @@ enum cdb_sc 	gvcst_search_blk (gv_key *pKey, srch_blk_status *pStat)
 		} while ( --nTargLen);
 
 		if (nFlg > 0)
-			nMatchCnt = pCurrTarg - pTargKeyBase;
+			nMatchCnt =(int)(pCurrTarg - pTargKeyBase);
 		else
 		{	/* Key is after target*/
 			if (nRecLen == BSTAR_REC_SIZE  &&  (((blk_hdr_ptr_t)pBlkBase)->levl != 0))
 				/* Star key has size of sizeof(rec_hdr) + sizeof(block_id), make match = 0 */
 				nTargLen = 0;
 			else
-				nTargLen = pCurrTarg - pTargKeyBase;
+				nTargLen = (int)(pCurrTarg - pTargKeyBase);
 			break;
 		}
 	}
@@ -301,7 +301,7 @@ enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOl
 			} while (--nTmp);
 			if (nFlg > 0)
 			{
-				nMatchCnt = pCurrTarg - pTargKeyBase;
+				nMatchCnt = (int)(pCurrTarg - pTargKeyBase);
 				nTargLen -= nMatchCnt;
 			}
 			if (nFlg < 0)
@@ -313,7 +313,7 @@ enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOl
 		if (nFlg == 0)
 		{
 			nTmp = nMatchCnt;
-			nMatchCnt = pCurrTarg - pTargKeyBase;
+			nMatchCnt = (int)(pCurrTarg - pTargKeyBase);
 			nTargLen -= nMatchCnt;
 			nTmp -= nMatchCnt;
 
@@ -386,14 +386,14 @@ alt_loop_entry:		/* Compression count == match count;  Compare current target wi
 				pCurrTarg++;
 			} while (--nTargLen);
 			if (nFlg > 0)
-				nMatchCnt = pCurrTarg - pTargKeyBase;
+				nMatchCnt = (int)(pCurrTarg - pTargKeyBase);
 			else
 match_term:		{	/* Key is after target*/
 				if (nRecLen == BSTAR_REC_SIZE  &&  (((blk_hdr_ptr_t)pBlkBase)->levl != 0))
 					/* Star key has size of sizeof(rec_hdr) + sizeof(block_id), make match = 0 */
 					nTargLen = 0;
 				else
-					nTargLen = pCurrTarg - pTargKeyBase;
+					nTargLen = (int)(pCurrTarg - pTargKeyBase);
 				break;
 			}
 		}

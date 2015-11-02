@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 				return NULL;
 			}
 			in_len = u_strlen(ufgets_Ubuffer);
-			in_len = trim_U16_line_term(ufgets_Ubuffer, in_len);
+			in_len = trim_U16_line_term(ufgets_Ubuffer, (int4)in_len);
 			for (non_space_off = u16_off = mbc_len = 0; u16_off < in_len && mbc_len < (buffersize - 1); )
 			{
 				U16_NEXT(ufgets_Ubuffer, u16_off, in_len, uc32_cp);	/* updates u16_off */
@@ -96,7 +96,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 			}
 			errorcode = U_ZERO_ERROR;
 			u_strToUTF8(buffer, buffersize, &mbc_dest_len, &ufgets_Ubuffer[non_space_off],
-					in_len - non_space_off + 1, &errorcode);	/* include null */
+			(int4)in_len - non_space_off + 1, &errorcode);	/* include null */
 			if (U_FAILURE(errorcode))
 				if (U_BUFFER_OVERFLOW_ERROR == errorcode)
 				{       /* truncate so null terminated */

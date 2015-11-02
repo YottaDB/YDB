@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@ GBLREF	sigset_t	blockalrm;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	sgmnt_data_ptr_t cs_data;
 GBLREF	unsigned char	cw_set_depth;
-GBLREF	unsigned short	dollar_tlevel;
+GBLREF	short		dollar_tlevel;
 GBLREF	gd_addr		*gd_header;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	inctn_opcode_t	inctn_opcode;
@@ -113,7 +113,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	assert(blocks <= (MAXTOTALBLKS(cs_data) - cs_data->trans_hist.total_blks));
 
 	if (!blocks)
-		return (NO_FREE_SPACE); /* should this be changed to show extension not enabled ? */
+		return (uint4)(NO_FREE_SPACE); /* should this be changed to show extension not enabled ? */
 	bplmap = cs_data->bplmap;
 	/* new total of non-bitmap blocks will be number of current, non-bitmap blocks, plus new blocks desired
 	   There are (bplmap - 1) non-bitmap blocks per bitmap, so add (bplmap - 2) to number of non-bitmap blocks
@@ -141,7 +141,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 					(uint4)(avail_blocks - ((new_blocks <= avail_blocks) ? new_blocks : 0)));
 #ifndef __MVS__
 			if (blocks > (uint4)avail_blocks)
-				return (NO_FREE_SPACE);
+				return (uint4)(NO_FREE_SPACE);
 #endif
 		}
 	}
@@ -166,7 +166,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			 *	in crit from t_begin() to t_end(). t_retry() has logic that will wait for unfreeze.
 			 * In either case, we need to restart. Returning EXTEND_UNFREEZECRIT will cause one in t_end/tp_tend.
 			 */
-			return EXTEND_UNFREEZECRIT;
+			return (uint4)(EXTEND_UNFREEZECRIT);
 		}
 		while (cs_data->freeze)
 			hiber_start(1000);
@@ -185,7 +185,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		if (FALSE == was_crit)
 		{
 			rel_crit(gv_cur_region);
-			return (EXTEND_SUSPECT);
+			return (uint4)(EXTEND_SUSPECT);
 		}
 		/* If free_blocks counter is not ok, then correct it. Do the check again. If still fails, then GTMASSERT. */
 		if (is_free_blks_ctr_ok() ||
@@ -199,7 +199,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		{
 			GDSFILEXT_CLNUP;
 			send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
-			return(NO_FREE_SPACE);	/* should have better return status */
+			return (uint4)(NO_FREE_SPACE);	/* should have better return status */
 		}
 	}
 	if (dba_mm == cs_addrs->hdr->acc_meth)
@@ -239,7 +239,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			}
 			GDSFILEXT_CLNUP;
 			send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
-			return (NO_FREE_SPACE);
+			return (uint4)(NO_FREE_SPACE);
 		}
 		cs_addrs->hdr = cs_data;
 	}
@@ -247,7 +247,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	{
 		GDSFILEXT_CLNUP;
 		send_msg(VARLSTCNT(1) ERR_TOTALBLKMAX);
-		return (NO_FREE_SPACE);
+		return (uint4)(NO_FREE_SPACE);
 	}
 	CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 	assert(0 < (int)new_blocks);
@@ -292,9 +292,9 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	{
 		GDSFILEXT_CLNUP;
 		if (ENOSPC == save_errno)
-			return (NO_FREE_SPACE);
+			return (uint4)(NO_FREE_SPACE);
 		send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
-		return (NO_FREE_SPACE);
+		return (uint4)(NO_FREE_SPACE);
 	}
 	DEBUG_ONLY(prev_extend_blks_to_upgrd = cs_data->blks_to_upgrd;)
 	/* inctn_detail.blks_to_upgrd_delta holds the increase in "csd->blks_to_upgrd" due to the file extension */
@@ -326,7 +326,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			{
 				GDSFILEXT_CLNUP;
 				send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
-				return (NO_FREE_SPACE);
+				return (uint4)(NO_FREE_SPACE);
 			}
 		}
 		assert(0 == new_bit_maps);
@@ -344,7 +344,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		{
 			GDSFILEXT_CLNUP;
 			send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), errno);
-			return (NO_FREE_SPACE);
+			return (uint4)(NO_FREE_SPACE);
 		}
 		put_mmseg((caddr_t)(cs_addrs->db_addrs[0]), (size_t)new_eof);
 #else
@@ -353,7 +353,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		{
 			GDSFILEXT_CLNUP;
 			send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), errno);
-			return (NO_FREE_SPACE);
+			return (uint4)(NO_FREE_SPACE);
 		}
 #endif
 		free(cs_data);			/* note current assumption that cs_data has not changed since memcpy above */

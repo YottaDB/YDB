@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,9 @@
 #include "xfer_enum.h"
 #include "indir_enum.h"
 #include "op.h"
+#include "fix_xfer_entry.h"
 
-GBLREF int		(* volatile xfer_table[])();
+GBLREF xfer_entry_t     xfer_table[];
 GBLREF stack_frame	*frame_pointer;
 GBLDEF unsigned char	*zstep_level;
 GBLREF mval		zstep_action;
@@ -25,6 +26,7 @@ GBLREF mval		dollar_zstep;
 GBLREF bool		neterr_pending;
 GBLREF int4		outofband;
 GBLREF int		iott_write_error;
+IA64_ONLY(int function_type(char*);)
 
 void op_zstep(uint4 code, mval *action)
 {
@@ -43,10 +45,10 @@ void op_zstep(uint4 code, mval *action)
 		case ZSTEP_INTO:
 			if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
 			{
-				xfer_table[xf_linefetch] = op_zstepfetch;
-				xfer_table[xf_linestart] = op_zstepstart;
-				xfer_table[xf_zbfetch] = op_zstzbfetch;
-				xfer_table[xf_zbstart] = op_zstzbstart;
+				FIX_XFER_ENTRY(xf_linefetch, op_zstepfetch);
+				FIX_XFER_ENTRY(xf_linestart, op_zstepstart);
+				FIX_XFER_ENTRY(xf_zbfetch, op_zstzbfetch);
+				FIX_XFER_ENTRY(xf_zbstart, op_zstzbstart);
 			}
 			break;
 		case ZSTEP_OVER:
@@ -63,19 +65,19 @@ void op_zstep(uint4 code, mval *action)
 			{
 				if (code == ZSTEP_OVER)
 				{
-					xfer_table[xf_linefetch] = op_zst_fet_over;
-					xfer_table[xf_linestart] = op_zst_st_over;
-					xfer_table[xf_zbfetch] = op_zstzb_fet_over;
-					xfer_table[xf_zbstart] = op_zstzb_st_over;
+					FIX_XFER_ENTRY(xf_linefetch, op_zst_fet_over);
+					FIX_XFER_ENTRY(xf_linestart, op_zst_st_over);
+					FIX_XFER_ENTRY(xf_zbfetch, op_zstzb_fet_over);
+					FIX_XFER_ENTRY(xf_zbstart, op_zstzb_st_over);
 				}
 				else
 				{
-					xfer_table[xf_ret] = opp_zstepret;
-					xfer_table[xf_retarg] = opp_zstepretarg;
-					xfer_table[xf_linefetch] = op_linefetch;
-					xfer_table[xf_linestart] = op_linestart;
-					xfer_table[xf_zbfetch] = op_zbfetch;
-					xfer_table[xf_zbstart] = op_zbstart;
+					FIX_XFER_ENTRY(xf_ret, opp_zstepret);
+					FIX_XFER_ENTRY(xf_retarg, opp_zstepretarg);
+					FIX_XFER_ENTRY(xf_linefetch, op_linefetch);
+					FIX_XFER_ENTRY(xf_linestart, op_linestart);
+					FIX_XFER_ENTRY(xf_zbfetch, op_zbfetch);
+					FIX_XFER_ENTRY(xf_zbstart, op_zbstart);
 				}
 			}
 			break;

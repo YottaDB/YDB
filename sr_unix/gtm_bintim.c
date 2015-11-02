@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@ int gtm_bintim(char *toscan, jnl_proc_time *timep)
     time_t	now, mktime_ret;
     struct tm	time_tm, *now_tm;
     int		num, sec, min, hour, day, year;
-    int		len = strlen(toscan), matched = 0;
+    int		len = STRLEN(toscan), matched = 0;
     char	month[256];
 
     num = SSCANF(toscan, "%d %d", &day, &hour);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -180,7 +180,7 @@ static	int4			first_time = TRUE;
 				if (nextsrc - src >= 2 && '^' == *src)
 				{
 					namestr.addr = (char *)src + 1;		/* skip initial '^' */
-					namestr.len = nextsrc - src - 2;	/* do not count initial '^' and trailing '\0' */
+					namestr.len = INTCAST(nextsrc - src - 2); /* do not count initial '^' and trailing '\0' */
 					if (namestr.len > MAX_MIDENT_LEN)
 						namestr.len = MAX_MIDENT_LEN;
 					if (valid_mname(&namestr))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@ void murgetlst(void)
 		ptr->next = (inc_list_struct*)malloc(sizeof(inc_list_struct));
 		ptr = ptr->next;
 		ptr->next = 0;
-		ptr->input_file.len = c2 - c1;
+		ptr->input_file.len = INTCAST(c2 - c1);
 		ptr->input_file.addr = (char *)malloc(c2 - c1 + 1);
 		memcpy(ptr->input_file.addr, c1, c2 - c1);
 		*(char*)(ptr->input_file.addr + (c2 - c1)) = '\0';

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,9 +37,16 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #endif
 	unsigned char	*temps_ptr;	/* pointer to base of temps */
 	char		*vartab_ptr;	/* variable table may be in rvector or on stack */
+  	GTM64_ONLY(struct stack_frame_struct *old_frame_pointer;) /* Moved old_frame_pointer near all
+								     pointers for alignment and smaller stackframe
+								     size
+								   */
+
 	short		vartab_len;	/* variable table length */
 	short           temp_mvals;     /* temp mval count if this frame for an indirect rtn (ihdtyp) */
-	struct stack_frame_struct *old_frame_pointer;
+        NON_GTM64_ONLY(struct stack_frame_struct *old_frame_pointer;) /* old_frame_pointer remains at the same
+									 place for 32-bit platforms
+								       */
 	/* note the alignment of these next two fields is critical to correct operation of
 	   opp_ret on the VMS platforms. Any changes here need to be reflected there.
 	*/

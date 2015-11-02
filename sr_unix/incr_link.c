@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include <errno.h>
+#include <string.h>
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 
@@ -29,8 +30,9 @@
 #include "min_max.h"
 #include "gtmdbglvl.h"
 #include "cmd_qlf.h"	/* needed for CQ_UTF8 */
+#include "gtm_malloc.h"
 
-#define RELOCATE(field, type, base) field = (type)((unsigned char *)(field) + (unsigned int)(base))
+#define RELOCATE(field, type, base) field = (type)((unsigned char *)(field) + (UINTPTR_T)(base))
 #define RELREAD 50			/* number of relocation entries to buffer */
 
 /* This macro will check if the file is an old non-shared-binary variant of GT.M code and if
@@ -89,7 +91,8 @@ void		zl_error_hskpng(int4 file);
 bool	incr_link (int file_desc, zro_ent *zro_entry)
 {
 	rhdtyp		*old_rhead;
-	int		status, sect_ro_rel_size, sect_rw_rel_size, sect_rw_nonrel_size;
+	int		sect_ro_rel_size, sect_rw_rel_size;
+        ssize_t         status, sect_rw_nonrel_size;
 	lab_tabent	*lbt_ent, *lbt_bot, *lbt_top, *olbt_ent, *olbt_bot, *olbt_top;
 	lnr_tabent	*olnt_ent, olnt_top;
 	mident_fixed	module_name;
@@ -156,7 +159,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	}
 	if (0 != memcmp(hdr->jsb, (char *)jsb_action, sizeof(jsb_action)) ||
 	    0 != memcmp(&hdr->jsb[sizeof(jsb_action)], JSB_MARKER,
-			     MIN(STR_LIT_LEN(JSB_MARKER), sizeof(sizeof(hdr->jsb) - sizeof(jsb_action)))))
+                       	MIN(STR_LIT_LEN(JSB_MARKER), sizeof(hdr->jsb) - sizeof(jsb_action))))
 	{
 		if (!shlib)	/* Shared library cannot recompile so this is always an error */
 		{
@@ -179,11 +182,11 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 					;
 				zl_error(0, zro_entry, ERR_DLLVERSION, len, &(pre_v5_routine_name->c[0]),
 				 	zro_entry->str.len, zro_entry->str.addr);
-			}
-			else { /* Note: routine_name field has not been relocated yet, so compute its absolute
-				  address in the shared library and use it */
+			} else
+			{	/* Note: routine_name field has not been relocated yet, so compute its absolute
+				   address in the shared library and use it */
 				zl_error(0, zro_entry, ERR_DLLVERSION, hdr->routine_name.len, (char *)shdr +
-					(unsigned int)hdr->literal_text_adr + (unsigned int)hdr->routine_name.addr,
+					(UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
 				 	zro_entry->str.len, zro_entry->str.addr);
 			}
 		}
@@ -197,14 +200,14 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		     in the shared library and use it */
 			if ((hdr->compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
 			{
-				zl_error(0, zro_entry, ERR_DLLCHSETUTF8, hdr->routine_name.len, (char *)shdr +
-					(unsigned int)hdr->literal_text_adr + (unsigned int)hdr->routine_name.addr,
-					 zro_entry->str.len, zro_entry->str.addr);
+				zl_error(0, zro_entry, ERR_DLLCHSETUTF8, (int)hdr->routine_name.len, (char *)shdr +
+					(UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
+					 (int)zro_entry->str.len, zro_entry->str.addr);
 			} else
 			{
-				zl_error(0, zro_entry, ERR_DLLCHSETM, hdr->routine_name.len, (char *)shdr +
-					(unsigned int)hdr->literal_text_adr + (unsigned int)hdr->routine_name.addr,
-					 zro_entry->str.len, zro_entry->str.addr);
+				zl_error(0, zro_entry, ERR_DLLCHSETM, (int)hdr->routine_name.len, (char *)shdr +
+					 (UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
+					 (int)zro_entry->str.len, zro_entry->str.addr);
 			}
 		}
 		zl_error_hskpng(file_desc);
@@ -225,8 +228,8 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		rel_base = shdr;
 	else
 	{
-		sect_ro_rel_size = (unsigned int)hdr->literal_adr - (unsigned int)hdr->ptext_adr;
-		sect_ro_rel = malloc(sect_ro_rel_size);
+		sect_ro_rel_size = (unsigned int)((INTPTR_T) hdr->literal_adr - (INTPTR_T) hdr->ptext_adr);
+		sect_ro_rel = GTM_TEXT_MALLOC(sect_ro_rel_size);
 		/* It should be aligned well at this point but make a debug level check to verify */
 		assert((int)sect_ro_rel == ((int)sect_ro_rel & ~(LINKAGE_PSECT_BOUNDARY - 1)));
 		DOREADRC(file_desc, sect_ro_rel, sect_ro_rel_size, status);
@@ -263,7 +266,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	RELOCATE(hdr->literal_text_adr, unsigned char *, rel_base);
 
 	/* Read-write releasable section */
-	sect_rw_rel_size = (int)hdr->labtab_adr - (int)hdr->literal_adr;
+	sect_rw_rel_size = (int)((INTPTR_T)hdr->labtab_adr - (INTPTR_T)hdr->literal_adr);
 	sect_rw_rel = malloc(sect_rw_rel_size);
 	if (shlib)
 		memcpy(sect_rw_rel, shdr + (int)hdr->literal_adr, sect_rw_rel_size);
@@ -281,7 +284,10 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	   not resident in the object. The values in this section will be setup later by addr_fix()
 	   and/or auto-zlink.
 	*/
-	hdr->linkage_adr = (lnk_tabent *)malloc(hdr->linkage_len * sizeof(lnk_tabent));
+	/* Allocate 1 extra, to align linkage_adr */
+	hdr->linkage_adr = (lnk_tabent *)malloc((hdr->linkage_len * sizeof(lnk_tabent)) + sizeof(lnk_tabent));
+	assert(PADLEN(hdr->linkage_adr, sizeof(lnk_tabent) == 0));
+	assert(((UINTPTR_T)hdr->linkage_adr % sizeof(lnk_tabent)) == 0);
 	memset((char *)hdr->linkage_adr, 0, (hdr->linkage_len * sizeof(lnk_tabent)));
 	/* Relocations for read-write releasable section. Perform relocation on literal mval table and
 	 * variable table entries since they both point to the offsets from the beginning of the
@@ -299,8 +305,8 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 
 	/* Fixup header's source path and routine names as they both point to the offsets from the
 	 * beginning of the literal text pool */
-	hdr->src_full_name.addr += (int)hdr->literal_text_adr;
-	hdr->routine_name.addr += (int)hdr->literal_text_adr;
+        hdr->src_full_name.addr += (INTPTR_T)hdr->literal_text_adr;
+        hdr->routine_name.addr += (INTPTR_T)hdr->literal_text_adr;
 
 	if (GDL_PrintEntryPoints & gtmDebugLevel)
 	{	/* Prepare name and address for announcement.. */
@@ -350,7 +356,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 
 		/* Copy routine name to local variable because zl_error free's it.  */
 		memcpy(&module_name.c[0], hdr->routine_name.addr, hdr->routine_name.len);
-		zl_error(file_desc, zro_entry, ERR_LOADRUNNING, hdr->routine_name.len, &module_name.c[0], 0, 0);
+		zl_error(file_desc, zro_entry, ERR_LOADRUNNING, (int)hdr->routine_name.len, &module_name.c[0], 0, 0);
 	}
 	/* Fix up of routine headers for old versions of routine so they point to the newest version */
 	old_rhead = hdr->old_rhead_adr;
@@ -408,7 +414,8 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 	res_list		*res_root, *new_res, *res_temp, *res_temp1;
 	unsigned char		*symbols, *sym_temp, *sym_temp1, *symtop, *res_addr;
 	struct relocation_info	rel[RELREAD], *rel_ptr;
-	int			numrel, rel_read, string_size, sym_size, status, i;
+	int	       	numrel, rel_read, string_size, sym_size, i;
+        ssize_t                 status;
 	mident_fixed		rtnid, labid;
 	mstr			rtn_str;
 	rhdtyp			*rtn;
@@ -418,7 +425,7 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 	urx_addr		*urx_tmpaddr;
 
 	res_root = NULL;
-	numrel = (hdr->sym_table_off - hdr->rel_table_off) / sizeof(struct relocation_info);
+	numrel = (int)((hdr->sym_table_off - hdr->rel_table_off) / sizeof(struct relocation_info));
 	if ((numrel * sizeof(struct relocation_info)) != (hdr->sym_table_off - hdr->rel_table_off))
 		return FALSE;	/* Size was not even multiple of relocation entries */
 
@@ -545,7 +552,7 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 				return FALSE;
 			}
 		}
-		sym_size = sym_temp1 - sym_temp;
+		sym_size = (int)(sym_temp1 - sym_temp);
 		assert(sym_size <= MAX_MIDENT_LEN);
 		memcpy(&rtnid.c[0], sym_temp, sym_size);
 		rtnid.c[sym_size] = 0;
@@ -572,7 +579,7 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 					return FALSE;
 				}
 			}
-			sym_size = sym_temp1 - sym_temp;
+			sym_size = (int)(sym_temp1 - sym_temp);
 			assert(sym_size <= MAX_MIDENT_LEN);
 			memcpy(&labid.c[0], sym_temp, sym_size);
 			labid.c[sym_size] = 0;
@@ -616,7 +623,7 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 			}
 		}
 		/* This symbol is unknown. Put on the (local) unresolved extern chain -- either for labels or routines */
-		urx_rp = urx_putrtn(rtn_str.addr, rtn_str.len, urx_lcl);  /* Find/create unresolved node for routine */
+		urx_rp = urx_putrtn(rtn_str.addr, (int)rtn_str.len, urx_lcl);  /* Find/create unresolved node for routine */
 		res_temp = res_root->next;
 		while(res_root)
 		{	/* add unresolved addr entry to existing or new routine and/or label node. */
@@ -626,7 +633,7 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 			{
 				urx_tmpaddr = (urx_addr *)malloc(sizeof(urx_addr));
 				urx_tmpaddr->next = urx_rp->addr;
-				urx_tmpaddr->addr = (int4 *)((char *)hdr->linkage_adr + res_root->addr);
+				urx_tmpaddr->addr = (INTPTR_T *)((char *)hdr->linkage_adr + res_root->addr);
 				urx_rp->addr = urx_tmpaddr;
 			}
 			res_temp1 = res_root->list;

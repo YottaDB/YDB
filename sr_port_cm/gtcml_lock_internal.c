@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@ char gtcml_lock_internal(cm_region_list *reg, unsigned char action)
 	{
 		if (ZALLOCATED == action && x->old && !x->zalloc)
 			x->old = FALSE;
-		if (!(wakeup = mlk_lock(x, (uint4)curr_entry, CMMS_L_LKACQUIRE == curr_entry->state ? FALSE : TRUE)))
+		if (!(wakeup = mlk_lock(x, (UINTPTR_T)curr_entry, CMMS_L_LKACQUIRE == curr_entry->state ? FALSE : TRUE)))
 		{
 			switch (action)
 			{

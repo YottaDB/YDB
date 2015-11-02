@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,7 +112,7 @@ void dse_m_rest (
 			util_len += i2hex_nofill(blk, &util_buff[util_len], 8);
 			memcpy(&util_buff[util_len], " record offset ",15);
 			util_len += 15;
-			util_len += i2hex_nofill(rp - bp, &util_buff[util_len], 4);
+			util_len += i2hex_nofill((int)(rp - bp), &util_buff[util_len], 4);
 			util_buff[util_len] = 0;
 			util_out_print((char*)util_buff,TRUE);
 			continue;

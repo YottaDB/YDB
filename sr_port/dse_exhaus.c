@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,7 +99,7 @@ void dse_exhaus(int4 pp, int4 op)
 	    }
 	    GET_LONG(patch_path[pp],ptr);
 	}
-	patch_offset[op] = rp - bp;
+	patch_offset[op] = (int4)(rp - bp);
 	if (patch_path[pp] == patch_find_blk)
 	{
 	    if (!patch_exh_found)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef __TRANS_LOG_NAME_H__
 #define __TRANS_LOG_NAME_H__
 
-uint4 trans_log_name(mstr *log, mstr *trans, char *buffer);
+int4 trans_log_name(mstr *log, mstr *trans, char *buffer);
 
 #endif

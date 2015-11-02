@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,7 +97,7 @@ typedef struct
 
 #define BLK_INIT(BNUM, ARRAY) 									\
 {												\
-	update_array_ptr = (char*)ROUND_UP2((int)update_array_ptr, UPDATE_ELEMENT_ALIGN_SIZE);	\
+	update_array_ptr = (char*)ROUND_UP2((INTPTR_T)update_array_ptr, UPDATE_ELEMENT_ALIGN_SIZE);	\
 	(ARRAY) = (blk_segment*)update_array_ptr; 						\
 	update_array_ptr += BLK_SEG_ARRAY_SIZE*sizeof(blk_segment); 				\
 	assert((update_array + update_array_size) - update_array_ptr >= 0); 			\
@@ -111,8 +111,8 @@ typedef struct
 
 #define BLK_SEG(BNUM, ADDR, LEN) 					\
 {									\
-	(BNUM)->addr = (ADDR); 						\
-	(BNUM)->len  = (LEN); 						\
+	(BNUM)->addr = (ADDR);				\
+	(BNUM)->len  = (LEN);				\
 	blk_seg_cnt += (LEN); 						\
 	assert((char *)BNUM - update_array_ptr < 0); 			\
 	(BNUM)++;							\
@@ -143,16 +143,16 @@ typedef struct
  */
 
 #ifdef DEBUG
-#define BLK_ADDR(X,Y,Z) 								\
-(											\
-	update_array_ptr = (char*)(((int)update_array_ptr + 7) & ~7), 			\
-	assert((update_array + update_array_size - Y) - update_array_ptr >= 0), 	\
-	(X) = (Z*)update_array_ptr, update_array_ptr += Y				\
+#define BLK_ADDR(X,Y,Z)                                                                 \
+(                                                                                       \
+        update_array_ptr = (char*)(((INTPTR_T)update_array_ptr + 7) & ~7),                   \
+        assert((update_array + update_array_size - Y) - update_array_ptr >= 0),         \
+        (X) = (Z*)update_array_ptr, update_array_ptr += Y                               \
 )
 #else
-#define BLK_ADDR(X,Y,Z)									\
-(											\
-	update_array_ptr = (char*)(((int)update_array_ptr + 7) & ~7), 			\
-	(X) = (Z*)update_array_ptr, update_array_ptr += Y				\
+#define BLK_ADDR(X,Y,Z)                                                                 \
+(                                                                                       \
+        update_array_ptr = (char*)(((INTPTR_T)update_array_ptr + 7) & ~7),                   \
+        (X) = (Z*)update_array_ptr, update_array_ptr += Y                               \
 )
 #endif

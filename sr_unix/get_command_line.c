@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,6 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 {
 	int		first_item, len, word_cnt;
 	unsigned char	*cp;
-	void		stp_gcol();
 
 	result->mvtype = MV_STR;
 	len = -1;							/* to compensate for no space at the end */
@@ -68,7 +67,7 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 	result->str.len = len;
 	for (word_cnt = first_item; ; *cp++ = ' ')
 	{
-		len = strlen(cmd_arg[word_cnt]);
+		len = STRLEN(cmd_arg[word_cnt]);
 		memcpy(cp, cmd_arg[word_cnt], len);
 		if (++word_cnt == cmd_cnt)
 			break;

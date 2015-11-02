@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,14 @@
 #include "gtm_string.h"
 #include "objlabel.h"
 #include "stringpool.h"
+#include "min_max.h"
 
+IA64_DEBUG_ONLY(GBLREF int4 	generated_count;)
+IA64_DEBUG_ONLY(GBLREF int4	calculated_count;)
+IA64_DEBUG_ONLY(GBLREF struct inst_count 	generated_details[MAX_CODE_COUNT];)
+IA64_DEBUG_ONLY(GBLREF struct inst_count	calculated_details[MAX_CODE_COUNT];)
+IA64_ONLY(GBLREF int4      	generated_code_size;)
+IA64_ONLY(GBLREF int4		calculated_code_size;)
 GBLREF int4		curr_addr, code_size;
 GBLREF char		cg_phase;	/* code generation phase */
 GBLREF char		cg_phase_last;	/* previous code generation phase */
@@ -91,8 +98,10 @@ void	cg_lab (mlabel *mlbl, char *do_emit);
 
 void	obj_code (uint4 src_lines, uint4 checksum)
 {
+	int		i;
 	uint4		lits_pad_size, object_pad_size, lnr_pad_size;
 	int4		offset;
+	int4		old_code_size;
 	rhdtyp		rhead;
 	mline		*mlx, *mly;
 	var_tabent	*vptr;
@@ -123,11 +132,23 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	curr_addr = PTEXT_OFFSET;
 	cg_phase = CGP_APPROX_ADDR;
 	cg_phase_last = CGP_NOSTATE;
+
+	IA64_ONLY(calculated_code_size = 0;)
+	IA64_DEBUG_ONLY(calculated_count = 0;)
+
 	code_gen();
 	code_size = curr_addr;
 	cg_phase = CGP_ADDR_OPT;
 	comp_lits(&rhead);
+	old_code_size = code_size;
 	shrink_trips();
+
+	IA64_ONLY
+	(
+		if (old_code_size != code_size)
+			calculated_code_size -= ((old_code_size - code_size)/16);
+	)
+
 	if ((cmd_qlf.qlf & CQ_MACHINE_CODE))
 	{
 		cg_phase = CGP_ASSEMBLY;
@@ -137,12 +158,13 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 		return;
 
 	/* Executable code offset setup */
+	IA64_ONLY(assert(!(PTEXT_OFFSET % SECTION_ALIGN_BOUNDARY));)
 	rhead.ptext_adr = (unsigned char *)PTEXT_OFFSET;
 	rhead.ptext_end_adr = (unsigned char *)code_size;
 	/* Line number table offset setup */
 	rhead.lnrtab_adr = (lnr_tabent *)rhead.ptext_end_adr;
 	rhead.lnrtab_len = src_lines;
-	code_size += src_lines * sizeof(int4);
+	code_size += src_lines * sizeof(lnr_tabent);
 	lnr_pad_size = PADLEN(code_size, SECTION_ALIGN_BOUNDARY);
 	code_size += lnr_pad_size;
 	/* Literal text section offset setup */
@@ -152,7 +174,7 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	assert(0 == PADLEN(code_size, NATIVE_WSIZE));
 	/* Literal mval section offset setup */
 	rhead.literal_adr = (mval *)code_size;
-	rhead.literal_len = lits_mval_size / sizeof(mval);
+	rhead.literal_len = lits_mval_size / SIZEOF(mval);
 	code_size += lits_mval_size;
 	/* Padding so variable table starts on proper boundary */
 	lits_pad_size = PADLEN(code_size, SECTION_ALIGN_BOUNDARY);
@@ -163,7 +185,7 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	code_size += mvmax * sizeof(var_tabent);
 	/* Linkage section setup. No table in object but need its length. */
 	rhead.linkage_adr = NULL;
-	rhead.linkage_len = linkage_size / sizeof(lnk_tabent);
+	rhead.linkage_len = linkage_size / SIZEOF(lnk_tabent);
 	/* Label table offset setup */
 	rhead.labtab_adr = (lab_tabent *)code_size;
 	rhead.labtab_len = mlmax;
@@ -194,15 +216,43 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	/* Start the creation of the output object */
 	create_object_file(&rhead);
 	cg_phase = CGP_MACHINE;
+
+	IA64_ONLY(generated_code_size = 0;)
+	IA64_DEBUG_ONLY(generated_count = 0;)
+
 	code_gen();
+
+	IA64_DEBUG_ONLY(
+	if (calculated_code_size != generated_code_size)
+	{
+		if (getenv("DUMP_CODE_SIZE_DIFFERENCE"))
+		{
+			PRINTF("Here is the instruction count for each triple type :\n");
+			for (i = 0; i < MAX(calculated_count, generated_count); i++)
+			{
+				if (calculated_details[i].size != generated_details[i].size ||
+				    calculated_details[i].sav_in != generated_details[i].sav_in)
+					PRINTF("[X]");
+				else
+					PRINTF("[ ]");
+			}
+			PRINTF("calculated (size = %d save_in = 0x%x)  gen (size = %d save_in = 0x%x)\n",
+			       calculated_details[i].size, calculated_details[i].sav_in, generated_details[i].size,
+			       generated_details[i].sav_in);
+		} else
+			PRINTF("Set the env variable - DUMP_CODE_SIZE_DIFFERENCE - to see more details about the difference\n");
+	}
+	)
+
+	IA64_ONLY(assert(calculated_code_size == generated_code_size));
 	/* External entry definitions (line number table */
-	offset = mline_root.externalentry->rtaddr - PTEXT_OFFSET;
+	offset = (int4)(mline_root.externalentry->rtaddr - PTEXT_OFFSET);
 	emit_immed((char *)&offset, sizeof(offset));	/* line 0 */
 	for (mlx = mline_root.child ; mlx ; mlx = mly)
 	{
 		if (mlx->table)
 		{
-			offset = mlx->externalentry->rtaddr - PTEXT_OFFSET;
+			offset = (int4)(mlx->externalentry->rtaddr - PTEXT_OFFSET);
 			emit_immed((char *)&offset, sizeof(offset));
 		}
 		if ((mly = mlx->child) == 0)
@@ -231,10 +281,10 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	if (lits_pad_size)
 		emit_immed(PADCHARS, lits_pad_size);
 	/* Variable table: */
-	vptr = (var_tabent *)mcalloc(mvmax * sizeof(var_tabent));
+	vptr = (var_tabent *)mcalloc(mvmax * USIZEOF(var_tabent));
 	if (mvartab)
 		walktree(mvartab, cg_var, (char *)&vptr);
-	emit_immed((char *)vptr, mvmax * sizeof(var_tabent));
+	emit_immed((char *)vptr, mvmax * USIZEOF(var_tabent));
 	/* The label table */
 	if (mlabtab)
 		walktree((mvar *)mlabtab, cg_lab, (char *)TRUE);

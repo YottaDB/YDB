@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -300,12 +300,12 @@ typedef struct v15_sgmnt_data_struct
 	{
 		time_t	ctime;		/* For current GTM code sem_ctime field corresponds to creation time */
 		int4	filler[2];	/* Filler to make sure above is okay even if takes 2 words on some platform */
-	} sem_ctime;
+	} gt_sem_ctime;
 	union
 	{
 		time_t	ctime;		/* For current GTM code sem_ctime field corresponds to creation time */
 		int4	filler[2];	/* Filler to make sure above is okay even if takes 2 words on some platform */
-	} shm_ctime;
+	} gt_shm_ctime;
 	boolean_t	recov_interrupted;	/* whether a MUPIP JOURNAL -RECOVER/ROLLBACK command on this db got interrupted */
 	int4		intrpt_recov_jnl_state;		/* journaling state at start of interrupted recover/rollback */
 	int4		intrpt_recov_repl_state;	/* replication state at start of interrupted recover/rollback */

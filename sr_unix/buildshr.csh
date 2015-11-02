@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -80,15 +80,18 @@ endif
 if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
 	# Building libgtmshr.so shared library
 	set aix_loadmap_option = ''
+	set aix_binitfini_option = ''
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = "-bcalls:$gtm_map/libgtmshr.loadmap -bmap:$gtm_map/libgtmshr.loadmap -bxref:$gtm_map/libgtmshr.loadmap"
 		# Delete old gtmshr since AIX linker fails to overwrite an already loaded shared library.
 		rm -f $3/libgtmshr$gt_ld_shl_suffix
+		# Define gtmci_cleanup as a termination routine for libgtmshr on AIX.
+		set aix_binitfini_option = "-binitfini::gtmci_cleanup"
 	endif
 
 	$shell $gtm_tools/genexport.csh $gtm_tools/gtmshr_symbols.exp gtmshr_symbols.export
 
-	gt_ld $gt_ld_options $gt_ld_shl_options $gt_ld_ci_options $aix_loadmap_option \
+	gt_ld $gt_ld_options $gt_ld_shl_options $aix_binitfini_option $gt_ld_ci_options $aix_loadmap_option \
 		${gt_ld_option_output}$3/libgtmshr$gt_ld_shl_suffix \
 		${gt_ld_linklib_options} $gt_ld_syslibs >& $gtm_map/libgtmshr.map
 	if ( $status != 0 ) then

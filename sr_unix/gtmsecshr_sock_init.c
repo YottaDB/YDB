@@ -164,7 +164,7 @@ int4 gtmsecshr_sock_init(int caller)
 	}
 
 	id_str[i2hex_nofill((unsigned int)gtmsecshr_key, (uchar_ptr_t )id_str, MAX_ID_LEN)] = 0;
-	id_str_len = strlen((char *)id_str);
+	id_str_len = STRLEN((char *)id_str);
 	memcpy(gtmsecshr_sockpath + gtmsecshr_sockpath_len, (char *)id_str, id_str_len);
 	gtmsecshr_sockpath_len += id_str_len;
 	gtmsecshr_sock_name.sun_family = AF_UNIX;
@@ -219,7 +219,7 @@ int4 gtmsecshr_sock_init(int caller)
 					if (!suffix)
 					{
 						suffix = 'a';
-						gtmsecshr_cli_sockpath_end = strlen(gtmsecshr_cli_sock_name.sun_path);
+						gtmsecshr_cli_sockpath_end = STRLEN(gtmsecshr_cli_sock_name.sun_path);
 						gtmsecshr_cli_sock_name.sun_path[gtmsecshr_cli_sockpath_end + 1] = '\0';
 #ifdef EXACT_SIZE_SOCKNAME
 						gtmsecshr_cli_sockpath_len++; /* Account for socket name growth (suffix) */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -133,7 +133,7 @@ boolean_t dse_b_dmp(void)
 				memcpy(&util_buff[util_len], " ", 1);
 				util_len++;
 				ondsk_blkver = (!is_mm ? cr->ondsk_blkver : GDSV5);
-				len = strlen(gtm_dbversion_table[ondsk_blkver]);
+				len = STRLEN(gtm_dbversion_table[ondsk_blkver]);
 				memcpy(&util_buff[util_len], gtm_dbversion_table[ondsk_blkver], len);
 				util_len += len;
 				memcpy(&util_buff[util_len], "!/", 2);
@@ -194,7 +194,7 @@ boolean_t dse_b_dmp(void)
 					memcpy(&util_buff[util_len], " ", 1);
 					util_len++;
 					ondsk_blkver = (!is_mm ? cr->ondsk_blkver : GDSV5);
-					len = strlen(gtm_dbversion_table[ondsk_blkver]);
+					len = STRLEN(gtm_dbversion_table[ondsk_blkver]);
 					memcpy(&util_buff[util_len], gtm_dbversion_table[ondsk_blkver], len);
 					util_len += len;
 					util_buff[util_len] = 0;

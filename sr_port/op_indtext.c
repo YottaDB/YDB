@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 	*stringpool.free++ = '^';
 	memcpy(stringpool.free, rtn->str.addr, rtn->str.len);
 	stringpool.free += rtn->str.len;
-	mv_chain->mv_st_cont.mvs_mval.str.len = stringpool.free - (unsigned char*)mv_chain->mv_st_cont.mvs_mval.str.addr;
+	mv_chain->mv_st_cont.mvs_mval.str.len = INTCAST(stringpool.free - (unsigned char*)mv_chain->mv_st_cont.mvs_mval.str.addr);
 
 	indir_src.str = mv_chain->mv_st_cont.mvs_mval.str;
 	indir_src.code = indir_text;

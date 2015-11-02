@@ -21,6 +21,7 @@
 #include "do_xform.h"
 #include "undx.h"
 #include "mvalconv.h"
+#include "val_iscan.h" 
 
 #define IS_INTEGER 0
 
@@ -39,7 +40,7 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	int4			temp;
 	lv_sbs_tbl     		*tbl;
 	lv_val			*lv;
-       	sbs_search_status      	status;
+  	sbs_search_status      	status;
 	mval			*key;
 	int			arg1;
 
@@ -58,12 +59,12 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	{
 		cur_subscr++;
 		key = va_arg(var, mval *);
-	       	if ((tbl = lv->ptrs.val_ent.children) == 0)
-			lv = 0;
+       	if ((tbl = lv->ptrs.val_ent.children) == 0)
+		lv = 0;
 		else
 		{
 			assert(tbl->ident == MV_SBS);
-			if (!MV_IS_CANONICAL(key))
+			if ( !(key->mvtype & MV_NM ? !(key->mvtype & MV_NUM_APPROX)  : (bool)val_iscan(key)) )
 			{
 				if (local_collseq)
 				{

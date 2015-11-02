@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,11 +18,11 @@
 #include "mvalconv.h"
 
 GBLREF int4 process_id;
+double          drand48();
+void            srand48();
 
 void op_fnrandom (int4 interval, mval *ret)
 {
-	double		drand48();
-	void		srand48();
 	static int4	seed = 0;
 	error_def	(ERR_RANDARGNEG);
 
@@ -32,7 +32,7 @@ void op_fnrandom (int4 interval, mval *ret)
 	}
 	if (seed == 0)
 	{
-		seed = time(0) * process_id;
+		seed = (int4)(time(0) * process_id);
 		srand48(seed);
 	}
 	MV_FORCE_MVAL(ret, ((uint4)(interval * drand48())));

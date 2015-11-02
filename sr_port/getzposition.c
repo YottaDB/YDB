@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,6 @@ void getzposition (mval *v)
 	v->mvtype = MV_STR;
 	v->str.addr = (char *) stringpool.free;
 	stringpool.free = get_symb_line (stringpool.free, 0, 0);
-	v->str.len = (char *) stringpool.free - v->str.addr;
+	v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
 	return;
 }

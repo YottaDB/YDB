@@ -89,7 +89,7 @@ char *s2n (mval *u)
 		}
 		c++ ;
 	}							/* R2 */
-	k = d - c ;
+	k = (int4)(d - c) ;
 	if ( c < eos )
 	{	d = c + 9 ;
 		w = ( d < eos ? d : eos ) ;

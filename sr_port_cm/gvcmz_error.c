@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,9 @@ GBLREF gv_key *gv_currkey;
 
 void gvcmz_error(char code, uint4 status)
 {
-	int	err[6], *ptr;
-	bool	gv_error;
+	INTPTR_T	err[6], *ptr;
+	bool		gv_error;
+
 	error_def(ERR_GVDATAFAIL);
 	error_def(ERR_GVGETFAIL);
 	error_def(ERR_GVKILLFAIL);
@@ -110,7 +111,7 @@ void gvcmz_error(char code, uint4 status)
 	{
 		*ptr++ = 2;
 		*ptr++ = 9;
-		*ptr++ = (int)"Net error";
+		*ptr++ = (INTPTR_T)"Net error";
 	}
 	*ptr++  = status;
 	err[0] = ptr - err - 1;

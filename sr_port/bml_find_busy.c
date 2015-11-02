@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,24 +32,29 @@ int4 bml_find_busy(int4 hint, uchar_ptr_t base_addr, int4 total_blks)
 		hint_pos = 0;
 	hint_pos = hint_pos / 8;
 
-	for (ptr = base_addr + hint_pos, top = base_addr + (total_bits +7) / 8 - 1; ptr < top; ptr++)
-	{	if ((*ptr & 0x3) == 0)
-		{	ret_val = (ptr - base_addr) * (8/BML_BITS_PER_BLK);
+	for (ptr = base_addr + hint_pos, top = base_addr + (total_bits + 7) / 8 - 1; ptr < top; ptr++)
+	{
+	  	if ((*ptr & 0x3) == 0)
+		{
+			ret_val = (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK));
 			if (ret_val >= hint)
 				return ret_val;
 		}
 		if ((*ptr & 0xc) == 0)
-		{	ret_val = (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 1;
+		{
+			ret_val = (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 1);
 			if (ret_val >= hint)
 				return ret_val;
 		}
 		if ((*ptr & 0x30) == 0)
-		{	ret_val = (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 2;
+		{
+			ret_val = (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 2);
 			if (ret_val >= hint)
 				return ret_val;
 		}
 		if ((*ptr & 0xc0) == 0)
-		{	ret_val = (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 3;
+		{
+			ret_val = (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 3);
 			if (ret_val >= hint)
 				return ret_val;
 		}
@@ -66,35 +71,47 @@ int4 bml_find_busy(int4 hint, uchar_ptr_t base_addr, int4 total_blks)
 		valid = *ptr;
 
 	if ((valid & 0x3) == 0)
-	{	ret_val = (ptr - base_addr) * (8/BML_BITS_PER_BLK);
+	{
+		ret_val = (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK));
 		if (ret_val >= hint)
 			return ret_val;
 	}
 	if ((valid & 0xc) == 0)
-	{	ret_val = (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 1;
+	{
+		ret_val = (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 1);
 		if (ret_val >= hint)
 			return ret_val;
 	}
 	if ((valid & 0x30) == 0)
-	{	ret_val = (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 2;
+	{
+		ret_val = (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 2);
 		if (ret_val >= hint)
 			return ret_val;
 	}
 	if ((valid & 0xc0) == 0)
-	{	ret_val = (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 3;
+	{
+		ret_val = (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 3);
 		if (ret_val >= hint && ret_val <= total_blks)
 			return ret_val;
 	}
 
 	for (ptr = base_addr, top = base_addr + hint_pos; ptr < top; ptr++)
-	{	if ((*ptr & 0x3) == 0)
-		{	return (ptr - base_addr) * (8/BML_BITS_PER_BLK);
-		}else if ((*ptr & 0xc) == 0)
-		{	return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 1;
-		}else if ((*ptr & 0x30) == 0)
-		{	return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 2;
-		}else if ((*ptr & 0xc0) == 0)
-		{	return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 3;
+	{
+		if ((*ptr & 0x3) == 0)
+		{
+			return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK));
+		}
+		else if ((*ptr & 0xc) == 0)
+		{
+			return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 1);
+		}
+		else if ((*ptr & 0x30) == 0)
+		{
+			return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 2);
+		}
+		else if ((*ptr & 0xc0) == 0)
+		{
+			return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 3);
 		}
 	}
 
@@ -109,13 +126,13 @@ int4 bml_find_busy(int4 hint, uchar_ptr_t base_addr, int4 total_blks)
 		valid = *ptr;
 
 	if ((valid & 0x3) == 0)
-		return (ptr - base_addr) * (8/BML_BITS_PER_BLK);
+		return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK));
 	if ((valid & 0xc) == 0)
-		return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 1;
+		return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 1);
 	if ((valid & 0x30) == 0)
-		return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 2;
+		return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 2);
 	if ((valid & 0xc0) == 0)
-		return (ptr - base_addr) * (8/BML_BITS_PER_BLK) + 3;
+		return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 3);
 
 	return -1;
 }

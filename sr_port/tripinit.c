@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ void tripinit(void)
 	{
 		mcavailbase = (mcalloc_hdr *)malloc(MC_DSBLKSIZE);
 		mcavailbase->link = NULL;
-		mcavailbase->size = MC_DSBLKSIZE - MCALLOC_HDR_SZ;
+		mcavailbase->size = (int4)(MC_DSBLKSIZE - MCALLOC_HDR_SZ);
 	}
 	mcavailptr = mcavailbase;
 	mcavail = mcavailptr->size;

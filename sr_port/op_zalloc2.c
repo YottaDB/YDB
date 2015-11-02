@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +62,7 @@ GBLREF	mlk_pvtblk	*mlk_pvt_root;
  *	the $T variable by the caller if timeout is specified.
  * -----------------------------------------------
  */
-int	op_zalloc2(int4 timeout, uint4 auxown)	/* timeout in seconds */
+int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 {
 	bool		blocked, timer_on;
 	signed char	gotit;

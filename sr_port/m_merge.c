@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,7 +82,6 @@ int m_merge(void)
 			ref = newtriple(OC_COMMARG);
 			ref->operand[0] = mopr;
                 	ref->operand[1] = put_ilit((mint) indir_merge);
-			ins_triple(ref);
 			return TRUE;
 		}
 		type = MARG1_LCL | MARG1_GBL;

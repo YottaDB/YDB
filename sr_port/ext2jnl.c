@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec)
 	{
 		*ext_next++ = '\0';
 		rec = (jnl_record *)ext2jnl(ext_buff, rec);
-		assert(0 == (int)rec % JNL_REC_START_BNDRY);
+		assert(0 == (INTPTR_T)rec % JNL_REC_START_BNDRY);
 		if (ext_stop == ext_buff)
 			break;
 		ext_buff = ext_next;
@@ -163,14 +163,14 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	assert(NULL != ptr);
 	ptr = strtok(NULL, "\\");		/* get the tn field */
 	assert(NULL != ptr);
-	rec->prefix.tn = asc2i((uchar_ptr_t)ptr, strlen(ptr));
+	rec->prefix.tn = asc2i((uchar_ptr_t)ptr, STRLEN(ptr));
 	ptr = strtok(NULL, "\\");		/* get the pid field */
 	assert(NULL != ptr);
 	ptr = strtok(NULL, "\\");		/* get the client pid field */
 	assert(NULL != ptr);
 	ptr = strtok(NULL, "\\");		/* get the token or jnl_seqno */
 	assert(NULL != ptr);
-	rec->jrec_null.jnl_seqno = asc2l((uchar_ptr_t)ptr, strlen(ptr));
+	rec->jrec_null.jnl_seqno = asc2l((uchar_ptr_t)ptr,STRLEN(ptr));
 
 	if (MUEXT_NULL == exttype)
 	{
@@ -194,7 +194,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	assert(IS_SET_KILL_ZKILL(rectype));
 	assert(NULL != ptr);
 
-	len = strlen(ptr);
+	len = STRLEN(ptr);
 	keylength = zwrkeylength(ptr, len); /* determine length of key */
 
 	REPL_DPRINT2("ext2jnl source:KEY=DATA:%s\n", ptr);
@@ -202,7 +202,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	str2gvkey_nogvfunc(ptr, keylength, gv_currkey);
 	rec->jrec_kill.mumps_node.length = gv_currkey->end;
 	memcpy(rec->jrec_kill.mumps_node.text, gv_currkey->base, gv_currkey->end);
-	temp_reclen = FIXED_UPD_RECLEN + rec->jrec_kill.mumps_node.length + sizeof(jnl_str_len_t);
+	temp_reclen = FIXED_UPD_RECLEN + rec->jrec_kill.mumps_node.length + SIZEOF(jnl_str_len_t);
 	if (IS_KILL_ZKILL(rectype))
 	{
 		temp_reclen += JREC_SUFFIX_SIZE;

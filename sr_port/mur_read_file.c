@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,23 +47,24 @@
 #include "gtmmsg.h"
 #include "mur_validate_checksum.h"
 
-error_def(ERR_JNLBADLABEL);
-error_def(ERR_BOVTNGTEOVTN);
-error_def(ERR_BOVTMGTEOVTM);
 error_def(ERR_BEGSEQGTENDSEQ);
+error_def(ERR_BOVTMGTEOVTM);
+error_def(ERR_BOVTNGTEOVTN);
+error_def(ERR_GTMASSERT);
+error_def(ERR_JNLBADLABEL);
 error_def(ERR_JNLBADRECFMT);
-error_def(ERR_JNLREADBOF);
-error_def(ERR_JNLREADEOF);
 error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLINVALID);
-error_def(ERR_NOPREVLINK);
-error_def(ERR_JNLREAD);
-error_def(ERR_GTMASSERT);
-error_def(ERR_PREMATEOF);
 error_def(ERR_JNLNOBIJBACK);
-error_def(ERR_REPLNOTON);
-error_def(ERR_TEXT);
+error_def(ERR_JNLREAD);
+error_def(ERR_JNLREADBOF);
+error_def(ERR_JNLREADEOF);
 error_def(ERR_JNLUNXPCTERR);
+error_def(ERR_NOPREVLINK);
+error_def(ERR_PREMATEOF);
+error_def(ERR_REPLNOTON);
+error_def(ERR_RLBKJNLNOBIMG);
+error_def(ERR_TEXT);
 
 GBLREF	mur_rab_t	mur_rab;
 GBLREF	mur_read_desc_t	mur_desc;
@@ -323,7 +324,7 @@ uint4 mur_prev(off_jnl_t dskaddr)
 			if (0 == mur_desc.index)
 			{ /* copy partial record to just past the end of seq_buff[1], i.e., aux_seq_buff[1] to make the record
 			   * available in contiguous memory */
-				partial_reclen = (unsigned char *)mur_rab.jnlrec - mur_desc.seq_buff[0].base;
+				partial_reclen = (uint4)((unsigned char *)mur_rab.jnlrec - mur_desc.seq_buff[0].base);
 				if (0 < partial_reclen)
 					memcpy(mur_desc.seq_buff[1].top, mur_desc.seq_buff[0].base, partial_reclen);
 				suffix = (jrec_suffix *)(mur_desc.seq_buff[1].top + partial_reclen - JREC_SUFFIX_SIZE);
@@ -510,7 +511,7 @@ uint4 mur_next(off_jnl_t dskaddr)
 			if (1 == mur_desc.index)
 			{ /* copy partial record to just prior to the beginning of seq_buf[0], i.e., aux_buff1
 			   * to make the record available in contiguous memory */
-				partial_reclen = buf_top - (unsigned char *)prefix;
+				partial_reclen = (uint4)(buf_top - (unsigned char *)prefix);
 				if (0 < partial_reclen)
 					memcpy(mur_desc.seq_buff[0].base - partial_reclen, (char *)prefix, partial_reclen);
 				prefix = (jrec_prefix *)(mur_desc.seq_buff[0].base - partial_reclen);
@@ -885,8 +886,9 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		DO_FILE_READ(jctl->channel, 0, jfh, JNL_HDR_LEN, jctl->status, jctl->status2);
 		if (SS_NORMAL == jctl->status)
 		{
-			cre_jnl_rec_size = jfh->before_images ? PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN :
-								PINI_RECLEN + PFIN_RECLEN + EOF_RECLEN;
+			cre_jnl_rec_size = JNL_HAS_EPOCH(jfh)
+					? PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN
+					: PINI_RECLEN + PFIN_RECLEN + EOF_RECLEN;
 			if (cre_jnl_rec_size + JNL_HDR_LEN <= jctl->os_filesize)
 			{
 				DO_FILE_READ(jctl->channel, JNL_HDR_LEN, jrecbuf, cre_jnl_rec_size, jctl->status, jctl->status2);
@@ -915,8 +917,15 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 	}
 	if (!mur_options.forward && !jfh->before_images)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_JNLNOBIJBACK, 2, jctl->jnl_fn_len, jctl->jnl_fn);
-		return FALSE;
+		VMS_ONLY(assert(!mur_options.rollback_losttnonly);)
+		if (mur_options.rollback_losttnonly)
+		{	/* Already prepared for a LOSTTNONLY rollback. Allow NOBEFORE_IMAGE journal file but issue a warning. */
+			gtm_putmsg(VARLSTCNT(4) ERR_RLBKJNLNOBIMG, 2, jctl->jnl_fn_len, jctl->jnl_fn);
+		} else
+		{
+			gtm_putmsg(VARLSTCNT(4) ERR_JNLNOBIJBACK, 2, jctl->jnl_fn_len, jctl->jnl_fn);
+			return FALSE;
+		}
 	}
 	if (!REPL_ALLOWED(jfh) && mur_options.rollback)
 	{
@@ -931,7 +940,7 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		return FALSE;
 	}
 	/* We have at least one good record */
-	if (jfh->before_images)
+	if (JNL_HAS_EPOCH(jfh))
 	{
 		jrec = (jnl_record *)((char *)jrec + PINI_RECLEN);
 		if (!IS_VALID_JNLREC(jrec, jfh) || JRT_EPOCH != jrec->prefix.jrec_type)

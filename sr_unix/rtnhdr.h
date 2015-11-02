@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,6 +88,7 @@ typedef struct	rhead_struct
 	int4			temp_size;		/* (#) temp_size value of current module version */
 	struct rhead_struct	*current_rhead_adr;	/* (#) address of routine header of current module version */
 	struct rhead_struct	*old_rhead_adr;		/* (#) chain of replaced routine headers */
+        IA64_ONLY(char  filler[8];) /* Need to make this structure 16 byte aligned */
 } rhdtyp;
 
 /* Routine table entry */

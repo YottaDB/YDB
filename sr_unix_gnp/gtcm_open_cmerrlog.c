@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,11 +38,11 @@ void gtcm_open_cmerrlog(void)
 	char		new_lfn_path[MAX_TRANS_NAME_LEN + 1];
 	int		new_len;
 	uint4 		ustatus;
-	uint4 		rval;
+	int4 		rval;
 	FILE 		*new_file;
 	error_def(ERR_TEXT);
 
-	if (0 != (len = strlen(gtcm_gnp_server_log)))
+	if (0 != (len = STRLEN(gtcm_gnp_server_log)))
 	{
 		lfn1.addr = gtcm_gnp_server_log;
 		lfn1.len = len;

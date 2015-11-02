@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,10 @@ typedef struct repl_inst_hdr_struct
 						 * this instance is brought up as a propagating primary and the receiver server
 						 * connects to the new primary source server successfully.
 						 */
-	unsigned char   filler_512[404];
+	NON_IA64_ONLY(unsigned char   filler_512[404];)
+	IA64_ONLY(unsigned char   filler_512[380];) 	/*On IA64 the size of time_t is 8 which will account for 20 extra bytes.
+						  	 *And 4 additional byes as the member 'jnlpool_semid_ctime' starts starts on
+							 *8 byte-boundary, so totally we need to reduce filler by 24(20 + 4) */
 } repl_inst_hdr;
 
 /* Any changes to the following structure might have to be reflected in "gtmsource_local_struct" structure in gtmsource.h as well.
@@ -100,8 +103,8 @@ typedef struct gtmsrc_lcl_struct
 boolean_t	repl_inst_get_name(char *, unsigned int *, unsigned int);
 void		repl_inst_create(void);
 void		repl_inst_edit(void);
-void		repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, int4 buflen);
-void		repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, int4 buflen);
+void		repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen);
+void		repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen);
 void		repl_inst_sync(char *fn);
 void		repl_inst_jnlpool_reset(void);
 void		repl_inst_recvpool_reset(void);
@@ -114,7 +117,7 @@ void		repl_inst_triple_add(repl_triple *triple);
 void		repl_inst_triple_truncate(seq_num rollback_seqno);
 void		repl_inst_flush_filehdr(void);
 void		repl_inst_flush_gtmsrc_lcl(void);
-void		repl_inst_flush_jnlpool(void);
+void		repl_inst_flush_jnlpool(boolean_t reset_recvpool_fields);
 boolean_t	repl_inst_was_rootprimary(void);
 void		repl_inst_reset_zqgblmod_seqno_and_tn(void);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +86,7 @@ void op_gvquery (mval *v)
 		{
 			if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_altkey, TRUE)) == 0)
 				end = &buff[MAX_ZWR_KEY_SZ - 1];
-			size = end - &buff[0] - 1; /* exclude ^ */
+			size = (int)(end - &buff[0] - 1); /* exclude ^ */
 			glob_begin = &buff[1]; /* skip ^ */
 		} else
 		{
@@ -95,7 +95,7 @@ void op_gvquery (mval *v)
 		}
 		/* Need to return a double-quote for every single-quote; assume worst case. */
 		/* Account for ^ in both cases - extnam and no extnam */
-		maxlen = size + ((0 == extnam_str.len) ? 1 : ((extnam_str.len * 2) + STR_LIT_LEN(extnamdelim)));
+		maxlen = size + ((0 == extnam_str.len) ? 1 : ((extnam_str.len * 2) + (int)(STR_LIT_LEN(extnamdelim))));
 		if ((stringpool.top - stringpool.free) < maxlen)
 			stp_gcol(maxlen);
 		extnamdst = stringpool.free;
@@ -116,7 +116,7 @@ void op_gvquery (mval *v)
 			extnam_str.len = 0;
 		}
 		memcpy(extnamdst, glob_begin, size);
-		v->str.len = extnamdst - stringpool.free + size;
+		v->str.len = INTCAST(extnamdst - stringpool.free + size);
 		v->str.addr = (char *)stringpool.free;
 		stringpool.free += v->str.len;
 		assert (v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);

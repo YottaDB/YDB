@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,7 +112,7 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 				ptr = base = node;	/* Update pointers past node name */
 
 				/* See if the desired (query) node is the local node */
-				node_name_len = node - trans.addr;	/* Scanned node including ':' */
+				node_name_len = (int)(node - trans.addr);	/* Scanned node including ':' */
 				query_node_len = node_name_len - 1;	/* Pure name length, no ':' on end */
 				assert(MAX_HOST_NAME_LEN >= query_node_len);
 				assert(0 < query_node_len);
@@ -239,7 +239,7 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 					ptr++;
 			}
 			memmove(del, ptr, top - ptr);
-			diff = ptr - del;
+			diff = (int)(ptr - del);
 			ptr -= diff;
 			top -= diff;
 			state = SLASH;
@@ -296,7 +296,7 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 		name = ptr;
 		if (def.fnb & F_HAS_NAME)
 		{	/* Use default filename if we didn't find one */
-			diff = name - node;
+			diff = (int)(name - node);
 			if (def.b_name + diff > pblk->buff_size)
 				return ERR_PARBUFSM;
 			memcpy(name, def.l_name, def.b_name);
@@ -309,7 +309,7 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 		ext = ptr;
 		if (def.fnb & F_HAS_EXT)
 		{	/* Use default file extension if we didn't find one */
-			diff = ext - node;
+			diff = (int)((ext - node));
 			if (def.b_ext + diff > pblk->buff_size)
 				return ERR_PARBUFSM;
 			memcpy(ext, def.l_ext, def.b_ext);
@@ -321,7 +321,7 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 
 	if (!hasdir  &&  (def.fnb & F_HAS_DIR))
 	{
-		diff = name - base;
+		diff = (int)(name - base);
 		diff = def.b_dir - diff;
 		if (def.b_dir + pblk->b_name + pblk->b_ext > pblk->buff_size)
 			return ERR_PARBUFSM;

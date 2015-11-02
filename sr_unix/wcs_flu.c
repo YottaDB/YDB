@@ -281,7 +281,7 @@ bool wcs_flu(bool options)
 		assert(memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1) == 0);
 		fileheader_sync(gv_cur_region);
 	}
-	if (jnl_enabled && write_epoch && jb->before_images)
+	if (jnl_enabled && write_epoch)
 	{	/* If need to write an epoch,
 		 *	(1) get hold of the jnl io_in_prog lock.
 		 *	(2) set need_db_fsync to TRUE in the journal buffer.
@@ -325,7 +325,7 @@ bool wcs_flu(bool options)
 	if (!was_crit)
 		rel_crit(gv_cur_region);
 	/* sync the epoch record in the journal if needed. */
-	if (jnl_enabled && jb->before_images && write_epoch && sync_epoch && csa->ti->curr_tn == csa->ti->early_tn)
+	if (jnl_enabled && write_epoch && sync_epoch && (csa->ti->curr_tn == csa->ti->early_tn))
 	{	/* Note that if we are in the midst of committing and came here through a bizarre
 		 * stack trace (like wcs_get_space etc.) we want to defer syncing to when we go out of crit.
 		 * Note that we are guaranteed to come back to wcs_wtstart since we are currently in commit-phase

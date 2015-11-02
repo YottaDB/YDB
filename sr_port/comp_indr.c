@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #include "mprof.h"
 #include "cacheflush.h"
 #include "compiler.h"
+#include "obj_file.h"
 
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*stackbase, *stacktop, *stackwarn, *msp;
@@ -32,7 +33,8 @@ void	comp_indr (mstr *obj)
 {
 	stack_frame	*sf;
 	unsigned char	*fix, *fix_base, *tmps, *syms, *save_msp;
-	int		tempsz, vartabsz, fixup_cnt, *vp;
+	int		tempsz, vartabsz, fixup_cnt;
+	INTPTR_T	*vp;
 	ihdtyp		*rtnhdr;
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
@@ -44,7 +46,7 @@ void	comp_indr (mstr *obj)
 	/* Check that our cache_entry pointer is in proper alignment with us */
 	assert(rtnhdr->indce->obj.addr == (char *)rtnhdr);
 
-	tempsz = rtnhdr->temp_size;
+	tempsz = ROUND_UP2(rtnhdr->temp_size, SIZEOF(char *));
 	tmps = msp -= tempsz;
 	vartabsz = rtnhdr->vartab_len;
 	vartabsz *= sizeof(mval *);
@@ -75,11 +77,12 @@ void	comp_indr (mstr *obj)
 	sf->vartab_ptr = (char *)rtnhdr + rtnhdr->vartab_off;
 	sf->temp_mvals = rtnhdr->temp_mvals;
 	/* Code starts just past the literals that were fixed up and past the validation and hdr offset fields */
-	sf->mpc = (unsigned char *)rtnhdr + rtnhdr->fixup_vals_off + (rtnhdr->fixup_vals_num * sizeof(mval)) +
-		(2 * sizeof(int4));
+	sf->mpc = (unsigned char *)rtnhdr + rtnhdr->fixup_vals_off + (rtnhdr->fixup_vals_num * sizeof(mval));
+        IA64_ONLY(sf->mpc  = (unsigned char *)ROUND_UP2((UINTPTR_T)sf->mpc, SECTION_ALIGN_BOUNDARY));
+	sf->mpc = sf->mpc + (2 * sizeof(INTPTR_T)); /*Account for hdroffset and MAGIC_VALUE*/
 	sf->flags = SFF_INDCE;		/* We will be needing cleanup for this frame */
 	DEBUG_ONLY(
-		vp = (int *)sf->mpc;
+		vp = (INTPTR_T *)sf->mpc;
 		vp--;
 		assert((GTM_OMAGIC << 16) + OBJ_LABEL == *vp);
 		vp--;
@@ -89,7 +92,6 @@ void	comp_indr (mstr *obj)
 
 	if (is_tracing_on)
 		new_prof_frame(FALSE);
-
 	sf->ctxt = sf->mpc;
 	assert(msp < stackbase);
 	frame_pointer = sf;

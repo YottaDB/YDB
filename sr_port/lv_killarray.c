@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,15 +30,19 @@ void lv_killarray(lv_sbs_tbl *a)
 	assert(a->sym->ident == MV_SYM);
        	fl = &(a->sym->lv_flist);
 	if (a->num)
-	{	if (a->int_flag)
-		{  	assert(a->num);
+	{
+		if (a->int_flag)
+		{
+			assert(a->num);
 			blk = a->num;
  	 	   	for (i = 0; i < SBS_NUM_INT_ELE; i++)
-       	       	       	{      	if (lv = blk->ptr.lv[i])
+       	       	       	{
+				if (lv = blk->ptr.lv[i])
 		   	 	{
 		   			lv->v.mvtype = 0;
 		   			if (lv->ptrs.val_ent.children)
-		   			{	lv_killarray(lv->ptrs.val_ent.children);
+		   			{
+						lv_killarray(lv->ptrs.val_ent.children);
 		   			}
 		   			lv->ptrs.free_ent.next_free = *fl;
 		   			*fl = lv;
@@ -48,13 +52,17 @@ void lv_killarray(lv_sbs_tbl *a)
 		   	a->int_flag = 0;
 		}
 		else
-       	       	{      	for (blk = a->num; blk; )
-		 	{	for (f = &blk->ptr.sbs_flt[0], top = (char *)&blk->ptr.sbs_flt[blk->cnt];
+       	       	{
+			for (blk = a->num; blk; )
+		 	{
+				for (f = &blk->ptr.sbs_flt[0], top = (char *)&blk->ptr.sbs_flt[blk->cnt];
 					f < (sbs_flt_struct *)top; f++)
-		 	 	{	lv = f->lv;
+		 	 	{
+					lv = f->lv;
 		 			lv->v.mvtype = 0;
 		 			if (lv->ptrs.val_ent.children)
-		 			{	lv_killarray(lv->ptrs.val_ent.children);
+		 			{
+						lv_killarray(lv->ptrs.val_ent.children);
 		 			}
 		 			lv->ptrs.free_ent.next_free = *fl;
 		 			*fl = lv;
@@ -67,13 +75,17 @@ void lv_killarray(lv_sbs_tbl *a)
 		a->num = 0;
 	}
 	if (a->str)
-	{      	for (blk = a->str; blk; )
-	 	{	for (s = &blk->ptr.sbs_str[0], top = (char *)&blk->ptr.sbs_str[blk->cnt];
+	{
+		for (blk = a->str; blk; )
+	 	{
+				for (s = &blk->ptr.sbs_str[0], top = (char *)&blk->ptr.sbs_str[blk->cnt];
 				s < (sbs_str_struct *)top; s++)
-	 	 	{	lv = s->lv;
+	 	 	{
+				lv = s->lv;
 	 			lv->v.mvtype = 0;
 	 			if (lv->ptrs.val_ent.children)
-	 			{	lv_killarray(lv->ptrs.val_ent.children);
+	 			{
+					lv_killarray(lv->ptrs.val_ent.children);
 	 			}
 	 			lv->ptrs.free_ent.next_free = *fl;
 	 			*fl = lv;

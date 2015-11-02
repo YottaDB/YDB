@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,7 @@
 #include "mlk_shr_init.h"
 #include "eintr_wrappers.h"
 #include "is_file_identical.h"
+#include "repl_instance.h"
 
 #include "heartbeat_timer.h"
 #include "util.h"
@@ -172,7 +173,7 @@ gd_region *dbfilopn (gd_region *reg)
 	{	/* Remote node specification given */
 		assert(pblk.b_node && pblk.l_node[pblk.b_node - 1] == ':');
 		gvcmy_open(reg, &pblk);
-		return (gd_region *)-1;
+		return (gd_region *)-1L;
 	}
 	fnptr = (char *)seg->fname + pblk.b_node;
 	udi = FILE_INFO(reg);
@@ -182,8 +183,8 @@ gd_region *dbfilopn (gd_region *reg)
 	udi->ftok_semid = INVALID_SEMID;
 	udi->semid = INVALID_SEMID;
 	udi->shmid = INVALID_SHMID;
-	udi->sem_ctime = 0;
-	udi->shm_ctime = 0;
+	udi->gt_sem_ctime = 0;
+	udi->gt_shm_ctime = 0;
 	reg->read_only = FALSE;		/* maintain csa->read_write simultaneously */
 	udi->s_addrs.read_write = TRUE;	/* maintain reg->read_only simultaneously */
 	if (udi->fd == -1)
@@ -221,11 +222,11 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd)
 	switch(reg->dyn.addr->acc_meth)
 	{
 	case dba_mm:
-		reg->sec_size = ROUND_UP(NODE_LOCAL_SPACE + LOCK_SPACE_SIZE(csd) + MMBLK_CONTROL_SIZE(csd) \
+		reg->sec_size = (uint4)ROUND_UP(NODE_LOCAL_SPACE + LOCK_SPACE_SIZE(csd) + MMBLK_CONTROL_SIZE(csd) \
 					 + JNL_SHARE_SIZE(csd) + SHMPOOL_BUFFER_SIZE, OS_PAGE_SIZE);
 		break;
 	case dba_bg:
-		reg->sec_size = ROUND_UP(NODE_LOCAL_SPACE + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE) + LOCK_SPACE_SIZE(csd) \
+		reg->sec_size = (uint4)ROUND_UP(NODE_LOCAL_SPACE + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE) + LOCK_SPACE_SIZE(csd) \
 					 + CACHE_CONTROL_SIZE(csd) + JNL_SHARE_SIZE(csd) + SHMPOOL_BUFFER_SIZE, OS_PAGE_SIZE);
 		break;
 	default:
@@ -237,7 +238,7 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd)
 void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 {
 	boolean_t       	is_bg, read_only;
-	char            	machine_name[MAX_MCNAMELEN];
+	char            	machine_name[MAX_MCNAMELEN], instfilename[MAX_FN_LEN + 1];
 	file_control    	*fc;
 	int			gethostname_res, stat_res, mm_prot;
 	int4            	status, semval, dblksize, fbwsize;
@@ -253,6 +254,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	uint4           	sopcnt;
 	unix_db_info    	*udi;
 	char			now_running[MAX_REL_NAME];
+	unsigned int		full_len;
 
 	error_def(ERR_CLSTCONFLICT);
 	error_def(ERR_CRITSEMFAIL);
@@ -262,6 +264,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	error_def(ERR_REQRUNDOWN);
 	error_def(ERR_SYSCALL);
 	error_def(ERR_VERMISMATCH);
+	error_def(ERR_REPLINSTUNDEF);
 
 	assert(tsd->acc_meth == dba_bg  ||  tsd->acc_meth == dba_mm);
 	is_bg = (dba_bg == tsd->acc_meth);
@@ -296,14 +299,14 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	dbfilop(fc);		/* Read file header */
 	udi->shmid = tsd->shmid;
 	udi->semid = tsd->semid;
-	udi->sem_ctime = tsd->sem_ctime.ctime;
-	udi->shm_ctime = tsd->shm_ctime.ctime;
+	udi->gt_sem_ctime = tsd->gt_sem_ctime.ctime;
+	udi->gt_shm_ctime = tsd->gt_shm_ctime.ctime;
 	dbsecspc(reg, tsd); 	/* Find db segment size */
 	if (!mupip_jnl_recover)
 	{
 		if (INVALID_SEMID == udi->semid)
 		{
-			if (0 != udi->sem_ctime || INVALID_SHMID != udi->shmid || 0 != udi->shm_ctime)
+			if (0 != udi->gt_sem_ctime || INVALID_SHMID != udi->shmid || 0 != udi->gt_shm_ctime)
 			/* We must have somthing wrong in protocol or, code, if this happens */
 				GTMASSERT;
 			/*
@@ -336,7 +339,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, IPC_STAT, semarg))
 				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 					ERR_TEXT, 2, LEN_AND_LIT("Error with database control semctl IPC_STAT"), errno);
-			tsd->sem_ctime.ctime = udi->sem_ctime = semarg.buf->sem_ctime;
+			tsd->gt_sem_ctime.ctime = udi->gt_sem_ctime = semarg.buf->sem_ctime;
 		} else
 		{
 			if (INVALID_SHMID == udi->shmid)
@@ -349,13 +352,13 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			if (-1 == semctl(udi->semid, 0, IPC_STAT, semarg))
 				/* file header has valid semid but semaphore does not exists */
 				rts_error(VARLSTCNT(6) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name));
-			else if (semarg.buf->sem_ctime != tsd->sem_ctime.ctime)
+			else if (semarg.buf->sem_ctime != tsd->gt_sem_ctime.ctime)
 				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
 						ERR_TEXT, 2, LEN_AND_LIT("sem_ctime does not match"));
 			if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
 				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 					ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl"), errno);
-			else if (shmstat.shm_ctime != tsd->shm_ctime.ctime)
+			else if (shmstat.shm_ctime != tsd->gt_shm_ctime.ctime)
 				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
 					ERR_TEXT, 2, LEN_AND_LIT("shm_ctime does not match"));
 		}
@@ -379,10 +382,10 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		}
 	} else /* for mupip_jnl_recover we were already in mu_rndwn_file and got "semid" semaphore  */
 	{
-		if (INVALID_SEMID == udi->semid || 0 == udi->sem_ctime)
+		if (INVALID_SEMID == udi->semid || 0 == udi->gt_sem_ctime)
 			/* make sure mu_rndwn_file() has reset created semaphore for standalone access */
 			GTMASSERT;
-		if (INVALID_SHMID != udi->shmid || 0 != udi->shm_ctime)
+		if (INVALID_SHMID != udi->shmid || 0 != udi->gt_shm_ctime)
 			/* make sure mu_rndwn_file() has reset shared memory */
 			GTMASSERT;
 		udi->shmid = INVALID_SHMID;	/* reset shmid so dbinit_ch does not get confused in case we go there */
@@ -407,7 +410,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
 			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl"), errno);
-		tsd->shm_ctime.ctime = udi->shm_ctime = shmstat.shm_ctime;
+		tsd->gt_shm_ctime.ctime = udi->gt_shm_ctime = shmstat.shm_ctime;
 	}
 #ifdef DEBUG_DB64
 	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, next_smseg, SHM_RND));
@@ -525,6 +528,13 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		memcpy(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
 		memcpy(csa->nl->label, GDS_LABEL, GDS_LABEL_SZ - 1);				/* GDS label */
 		memcpy(csa->nl->fname, reg->dyn.addr->fname, reg->dyn.addr->fname_len);		/* database filename */
+		if (REPL_ALLOWED(csd))
+		{
+			if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1))
+				rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+			assert(full_len);
+			memcpy(csa->nl->replinstfilename, instfilename, full_len);
+		}
 		csa->nl->creation_date_time.ctime = csd->creation.ctime;
 		csa->nl->highest_lbm_blk_changed = -1;
 		csa->nl->wcs_timers = -1;
@@ -543,7 +553,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		{
 			csd->trans_hist.early_tn = csd->trans_hist.curr_tn;
 			csd->max_update_array_size = csd->max_non_bm_update_array_size
-				= ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE);
+				= (int4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE);
 			csd->max_update_array_size += ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
 			/* add current db_csh counters into the cumulative counters and reset the current counters */
 #define TAB_DB_CSH_ACCT_REC(COUNTER, DUMMY1, DUMMY2)					\
@@ -689,8 +699,8 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 */
 		db_ipcs.semid = tsd->semid;	/* use tsd instead of csd in order for MM to work too */
 		db_ipcs.shmid = tsd->shmid;
-		db_ipcs.sem_ctime = tsd->sem_ctime.ctime;
-		db_ipcs.shm_ctime = tsd->shm_ctime.ctime;
+		db_ipcs.gt_sem_ctime = tsd->gt_sem_ctime.ctime;
+		db_ipcs.gt_shm_ctime = tsd->gt_shm_ctime.ctime;
 		db_ipcs.fn_len = reg->dyn.addr->fname_len;
 		memcpy(db_ipcs.fn, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
 		db_ipcs.fn[reg->dyn.addr->fname_len] = 0;
@@ -718,7 +728,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		if (-1 != status)
 		{
 			dblksize = csd->blk_size;
-			fbwsize = dbvfs.f_bsize;
+			fbwsize = (int4)dbvfs.f_bsize;
 			if (0 != fbwsize && (0 == dblksize % fbwsize) && (0 == ((csd->start_vbn - 1) * DISK_BLOCK_SIZE) % fbwsize))
 				csa->do_fullblockwrites = TRUE;		/* This region is fullblockwrite enabled */
 			/* Report this length in DSE even if not enabled */

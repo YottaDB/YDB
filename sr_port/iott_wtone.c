@@ -41,7 +41,7 @@ void iott_wtone(int v)
 	else if (CHSET_UTF8 == io_curr_device.out->ochset)
 	{
 		up = UTF8_WCTOMB(v, utf_buf);
-		temp.len = up - utf_buf;
+		temp.len = INTCAST(up - utf_buf);
 		temp.addr = (char *)&utf_buf[0];
 	} else
 		rts_error(VARLSTCNT(4) ERR_BADCHSET, 2, chset_names[io_curr_device.out->ochset].len,

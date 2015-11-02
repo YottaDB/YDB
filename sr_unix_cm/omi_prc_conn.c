@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,7 @@ static char rcsid[] = "$Header:$";
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include <crypt.h> /* for crypt() */
+#include <unistd.h> /* for crypt() */
 
 #include "gtcm.h"
 #include "omi.h"
@@ -169,7 +170,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 	    struct spwd *spass, *getspnam();
 	    struct stat buf;
 #endif
-	    struct passwd *pass, *getpwnam();
+	    struct passwd *pass;
 	    char *pw, *syspw;
 
 	    /* lowercase agent name */
@@ -294,6 +295,6 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 /*  Change the state of the connection */
     cptr->state = OMI_ST_CONN;
 
-    return bptr - buff;
+    return (int)(bptr - buff);
 
 }

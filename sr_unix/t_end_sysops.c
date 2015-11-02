@@ -10,7 +10,6 @@
  ****************************************************************/
 
 #include "mdef.h"
-
 #include "gtm_stdlib.h"		/* for GETENV */
 #include "gtm_ipc.h"
 #include "gtm_fcntl.h"
@@ -731,7 +730,7 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 			}
 		}	/* end of for loop to control buffer */
 		cr->bt_index = GDS_ABS2REL(bt);
-		bt->cache_index = GDS_ABS2REL(cr);
+		bt->cache_index = (int4)GDS_ABS2REL(cr);
 	} else
 	{
 		cr = (cache_rec_ptr_t)GDS_REL2ABS(cr);
@@ -896,7 +895,6 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 	    && (((blk_hdr_ptr_t)(blk_ptr))->tn >= csa->shmpool_buffer->inc_backup_tn))
 	{
 		assert(cr->blk == cs->blk);
-		assert(read_before_image);
 		assert(cs->old_block == blk_ptr);
 		assert(cr->in_cw_set);	/* to write valid before-image, ensure buffer is protected against preemption */
 		backup_block(cs->blk, cr, NULL);
@@ -1071,7 +1069,7 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 /* Used to prevent staleness of buffers. Start timer to call wcs_stale to do periodic flushing */
 void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 {
-	int4			reg_parm;
+	INTPTR_T		reg_parm;
 	jnl_private_control	*jpc;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -1089,7 +1087,7 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 		if ((dba_bg == reg->dyn.addr->acc_meth) ||		/* bg mode or */
 		    (dba_mm == reg->dyn.addr->acc_meth && (0 < csd->defer_time)))	/* defer'd mm mode */
 		{
-			reg_parm = (int4)reg;
+			reg_parm = (UINTPTR_T)reg;
 			csa->timer = TRUE;
 			INCR_CNT(&csa->nl->wcs_timers, &csa->nl->wc_var_lock);
 			start_timer((TID)reg,
@@ -1152,6 +1150,8 @@ uint4	jnl_ensure_open(void)
 	if (NOJNL == jpc->channel)
 	{
 		jpc->pini_addr = 0;
+		if (GTCM_GNP_SERVER_IMAGE == image_type)
+			gtcm_jnl_switched(jpc->region); /* Reset pini_addr of all clients that had any older journal file open */
 		jnl_status = jnl_file_open(gv_cur_region, 0 == cs_addrs->nl->jnl_file.u.inode, 0);
 	} else if (JNL_FILE_SWITCHED(jpc))
 	{
@@ -1161,10 +1161,11 @@ uint4	jnl_ensure_open(void)
 		jpc->channel = NOJNL;
 		jpc->pini_addr = 0;
 		if (GTCM_GNP_SERVER_IMAGE == image_type)
-			gtcm_jnl_switched();
+			gtcm_jnl_switched(jpc->region); /* Reset pini_addr of all clients that had any older journal file open */
 		jnl_status = jnl_file_open(gv_cur_region, 0 == cs_addrs->nl->jnl_file.u.inode, 0);
 	}
-	assert((0 != jnl_status) || !JNL_FILE_SWITCHED(jpc));
+	assert((0 != jnl_status) || !JNL_FILE_SWITCHED(jpc)
+		|| (is_src_server && !JNL_ENABLED(cs_addrs) && REPL_WAS_ENABLED(cs_addrs)));
 	return jnl_status;
 }
 

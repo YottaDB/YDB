@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -193,9 +193,9 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 							*/
 		++cpcidx;				/* Next piece */
 		if (pcoff < pcoffmax)
-			*pcoff++ = first - start;	/* offset to this piece */
+			*pcoff++ =(unsigned int)(first - start);	/* offset to this piece */
 		if (pcoff == pcoffmax)
-			*pcoff++ = last - start;	/* store start of first piece beyond what is in cache */
+			*pcoff++ = (unsigned int)(last - start);	/* store start of first piece beyond what is in cache */
 	}
 
 	ldst.str.addr = (char *)first;
@@ -204,7 +204,7 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 	if (spcidx != cpcidx)
 	{
 		if (pcoff < pcoffmax)
-			*pcoff = last - start;		/* If not at end of cache, save start of "next" piece */
+			*pcoff = (unsigned int)(last - start);		/* If not at end of cache, save start of "next" piece */
 
 		last -= dlmlen;				/* Undo bump past last delim (existing or not)
 							   of piece for accurate string len */
@@ -215,7 +215,7 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 
 		/* If we the above loop ended prematurely because we ran out of text, we return null string */
 		if (trgpcidx < cpcidx)
-			ldst.str.len = last - first;	/* Length of piece we located */
+			ldst.str.len = INTCAST(last - first);	/* Length of piece we located */
 		else
 			ldst.str.len = 0;
 

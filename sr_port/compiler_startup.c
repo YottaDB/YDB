@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,8 @@ bool compiler_startup(void)
 	bool		compile_w_err;
 	unsigned char	err_buf[45];
 	unsigned char 	*cp, *cp2;
-	int		errknt, n;
+	int		errknt;
+	int4            n;
 	uint4		checksum, srcint, line_count;
 	mlabel		*null_lab;
 	src_line_struct	*sl;

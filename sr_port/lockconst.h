@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,8 +30,7 @@
 */
 
 #ifdef __hppa
-#  define alignedaddr(x) (volatile int *)((int)(x) + 15 & ~0xf)  /* 32-bit */
-/*  #define alignedaddr(x) (volatile int *)((long)(x) + 15 & ~0xf)  64-bit */
+#  define alignedaddr(x) (volatile int *)((UINTPTR_T)(x) + 15 & ~0xf)  /* 32-bit */
 
     /* Given a pointer into memory, round up to the nearest 16-byte boundary
        by adding 15, then masking off the last four bits.
@@ -40,7 +39,7 @@
        The VOLATILE keyword is essential in this macro: it ensures that the
        compiler does not perform certain optimizations which would compromise
        the integrity the spinlock logic.
-    */
+     */
 
 #  define release_spinlock(lockarea)  {if (1) {                       \
         _flush_globals();                                           \

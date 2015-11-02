@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +76,7 @@ enum cdb_sc	gvcst_rtsib(srch_hist *full_hist, int level)
 	}
 	/* old now points to the first block which did not have a star key pointer*/
 	new = new_base + (old - old_base + 1);
-	full_hist->depth = level + old - old_base;
+	full_hist->depth = (int)(level + old - old_base);
 	(new--)->blk_num = 0;
 	new->tn = old->tn;
 	new->ptr = NULL;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,8 @@ enum opt_enum
 };
 
 static struct
-{ char *name;
+{
+  char *name;
   enum opt_enum option;
   int args;
 } optlist[] =

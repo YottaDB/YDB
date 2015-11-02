@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 
 GBLDEF bool	neterr_pending;
 
-void gvcmz_neterr(int *err)
+void gvcmz_neterr(INTPTR_T *err)
 {
 	assert(FALSE);
 }

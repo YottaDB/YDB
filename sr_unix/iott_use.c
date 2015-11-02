@@ -355,7 +355,7 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				case iop_x:
 					GET_LONG(d_out->dollar.x, pp->str.addr + p_offset);
-					if (0 > d_out->dollar.x)
+					if (0 > (int4)d_out->dollar.x)
 						d_out->dollar.x = 0;
 					if (d_out->dollar.x > d_out->width && d_out->wrap)
 					{
@@ -368,7 +368,7 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				case iop_y:
 					GET_LONG(d_out->dollar.y, pp->str.addr + p_offset);
-					if (0 > d_out->dollar.y)
+					if (0 > (int4)d_out->dollar.y)
 						d_out->dollar.y = 0;
 					if (d_out->length)
 						d_out->dollar.y %= d_out->length;

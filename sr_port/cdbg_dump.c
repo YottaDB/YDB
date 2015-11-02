@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,7 +110,8 @@ void cdbg_dump_shrunk_triple(triple *dtrip, int old_size, int new_size)
 void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 {
 	triple	*rtrip;
-	int	offset, len;
+	int	offset;
+        int	len;
 	char	*buff;
 	char 	mid[sizeof(mident_fixed)];
 

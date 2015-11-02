@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,9 @@
 */
 
 #include "caller_id.h"
+#include "gtm_malloc.h"
 #include "gtm_malloc_src.h"
 
-
+#ifdef __linux__
+GBLDEF boolean_t        force_text_alloc;
+#endif /* __linux__ */

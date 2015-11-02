@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ uint4 jnl_get_checksum_entire(uint4 checksum, uint4 *buff, int bufflen)
 	uint4		*blk_top, blen;
 
 	assert(checksum);
-	for (blen = bufflen / sizeof(*buff), blk_top = buff + blen ; buff < blk_top; buff++)
+	for (blen = bufflen / USIZEOF(*buff), blk_top = buff + blen ; buff < blk_top; buff++)
 		checksum = ADJUST_CHECKSUM(checksum, *buff);
 	assert(checksum);
 	/* It is theoretically possible that the computed checksum turns out to be 0. In order to differentiate this

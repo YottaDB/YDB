@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,20 @@
 
 #include <sys/types.h>
 
-typedef          long	int4;		/* 4-byte signed integer */
-typedef unsigned long	uint4;		/* 4-byte unsigned integer */
+#if defined(__ia64)
+#define GTM64
+#endif /* __ia64 */
+
+#ifdef GTM64
+typedef          int    int4;           /* 4-byte signed integer */
+typedef unsigned int    uint4;          /* 4-byte unsigned integer */
+typedef          long   int8;           /* 8-byte signed integer */
+typedef unsigned long   uint8;          /* 8-byte unsigned integer */
+#define INT8_NATIVE
+#else
+typedef          long   int4;
+typedef unsigned long   uint4;
+#endif /* GTM64 */
 
 #ifdef __s390__
 typedef		 short int2;		/* 2-byte signed integer */
@@ -74,15 +86,24 @@ error_def(ERR_ASSERT);
 #endif
 #endif /* __sparc */
 
-#ifdef __hpux
+#if defined(__ia64)
+#define CACHELINE_SIZE        128
+#elif defined(__hppa)
 #define CACHELINE_SIZE        64
+#endif /* __ia64 */
+
+#ifdef __hpux
 #define MSYNC_ADDR_INCS        OS_PAGE_SIZE
 #define MUTEX_MSEM_WAKE
 #define POSIX_MSEM
 #define USHBIN_SUPPORTED
 #define OFF_T_LONG
 /* Make sure linkage Psect is aligned on appropriate boundary. */
+#ifdef __ia64
+#define LINKAGE_PSECT_BOUNDARY	8
+#else
 #define LINKAGE_PSECT_BOUNDARY	4
+#endif //__ia64
 typedef uint4 mach_inst;	/* machine instruction */
 #endif /* __hpux */
 
@@ -118,6 +139,21 @@ typedef unsigned short	in_port_t;
 
 #endif /* __s390__ */
 
+#ifdef __ia64
+#  ifdef __linux__
+#    define MSYNC_ADDR_INCS        OS_PAGE_SIZE
+#    undef BIGENDIAN
+#    define USHBIN_SUPPORTED
+     /* Make sure linkage Psect is aligned on appropriate boundary. */
+#    define LINKAGE_PSECT_BOUNDARY  8
+typedef uint4 mach_inst;        /* machine instruction */
+#  elif defined(__hpux)
+void call_runtime();
+void opp_dmode();
+void dyncall();
+#  endif
+#endif /* __ia64 */
+
 #ifdef __i386
 /* Through Pentium Pro/II/III, should use CPUID to get real value perhaps */
 #define CACHELINE_SIZE        32
@@ -132,7 +168,11 @@ typedef unsigned short	in_port_t;
  * string "GTM_CODE". On USHBIN_ONLY platforms, reserve space of 16 bytes that holds
  * instructions for simple 'return -1' plus as many characters of "GTM_CODE" as can be fit
  * in the rest of the available bytes */
+#if __ia64
+#define RHEAD_JSB_SIZE 24 /* We need 16 bytes for putting the 'return -1' instruction + the GTM_CODE string */
+#else
 #define RHEAD_JSB_SIZE	NON_USHBIN_ONLY(8) USHBIN_ONLY(16)
+#endif /* __ia64 */
 
 typedef struct
 {
@@ -178,7 +218,23 @@ typedef struct
 #define free gtm_free
 #endif
 
+#ifndef __ia64
 #define CODE_ADDRESS(func)	(unsigned char *)func
+#else
+/* On IA64, there is a need to differentiate between generated code and regular
+ * functions. When regular function addresses are obtained, this macro is
+ * always used, and this will set the bottom two bits of the given address
+ * (which is actually the function descriptor/PLABEL). Later in call_runtime/dyncall,
+ * the bottom two bits will be checked and removed if required and a
+ * dereference will happen to extract the actual target address.
+ * This is done to mimic the behaviour of PLABEL/$$DYNCALL of HPPA on IA64.
+ */
+#define CODE_ADDRESS_C(func)	((unsigned char*) ((unsigned long)func | (unsigned long)0x3))
+#define CODE_ADDRESS_ASM(func)	((unsigned char *) *(unsigned long *)func)
+#define CODE_ADDRESS(func)	CODE_ADDRESS_ASM(func)
+
+#endif /* __ia64 */
+
 #ifndef GTM_CONTEXT
 #define	GTM_CONTEXT(func)	0	/* not used on this target */
 #endif

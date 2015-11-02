@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ enum cdb_sc	gvincr_compute_post_incr(srch_blk_status *bh)
 	GET_USHORT(rec_size, &rp->rsiz);
 	target_key_size = bh->curr_rec.match;
 	assert(target_key_size == gv_currkey->end + 1);
-	data_len = rec_size + rp->cmpc - sizeof(rec_hdr) - target_key_size;
+	data_len = rec_size + rp->cmpc - SIZEOF(rec_hdr) - target_key_size;
 	if ((0 > data_len) || (((sm_uc_ptr_t)rp + rec_size) > ((sm_uc_ptr_t)buffaddr + cur_blk_size)))
 	{
 		assert(CDB_STAGNATE > t_tries);

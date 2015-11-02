@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,8 @@
 
 void mlk_shrsub_garbage_collect(mlk_ctldata_ptr_t ctl)
 {
-	int4 			delta, n, bckp;
+        ptroff_t                bckp;
+	int4 			delta, n;
 	mlk_shrsub_ptr_t	p;
 	mlk_shrblk_ptr_t	b;
 	sm_uc_ptr_t		f;
@@ -28,7 +29,7 @@ void mlk_shrsub_garbage_collect(mlk_ctldata_ptr_t ctl)
 	for (p = (mlk_shrsub_ptr_t)R2A(ctl->subbase), f = (sm_uc_ptr_t)R2A(ctl->subfree);
 		p < (mlk_shrsub_ptr_t) f ; p = (mlk_shrsub_ptr_t)((sm_uc_ptr_t) p + n))
 	{
-		n = MLK_SHRSUB_SIZE(p);
+		n = (int4)MLK_SHRSUB_SIZE(p);
 		bckp = p->backpointer;
 		if (0 == bckp)
 			delta += n;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ static	int4		gvname_unknown_len = STR_LIT_LEN(GVNAME_UNKNOWN);
 
 GBLDEF	int4		tprestart_syslog_limit;			/* limit TPRESTARTs */
 GBLDEF	int4		tprestart_syslog_delta; 		/* limit TPRESTARTs */
-GBLDEF	int4		tp_fail_histtn[CDB_MAX_TRIES], tp_fail_bttn[CDB_MAX_TRIES];
+GBLDEF	trans_num	tp_fail_histtn[CDB_MAX_TRIES], tp_fail_bttn[CDB_MAX_TRIES];
 GBLDEF	int4		tp_fail_n, tp_fail_level;
 GBLDEF	int4		n_pvtmods, n_blkmods;
 GBLDEF	gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];
@@ -380,7 +380,7 @@ void	tp_restart(int newlevel)
 		unw_mv_ent(mvc);
 		mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
 	}
-	assert((int)mvc < (int)frame_pointer);
+	assert((INTPTR_T)mvc < (INTPTR_T)frame_pointer);
 	mv_chain = mvc;
 	msp = (unsigned char *)mvc;
 	REVERT;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,7 +94,7 @@ int main(int argc, char_ptr_t argv[])
     ctxt = ctxt;
     ESTABLISH_RET(omi_dbms_ch, -1);	/* any return value to signify error return */
     gtcm_init(argc, argv);
-    gtcm_ltime = gtcm_stime = time(0);
+    gtcm_ltime = gtcm_stime = (int4)time(0);
 #ifdef GTCM_RC
     rc_create_cpt();
 #endif

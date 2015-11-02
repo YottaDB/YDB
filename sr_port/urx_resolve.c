@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@ void urx_resolve(rhdtyp *rtn, lab_tabent *lbl_tab, lab_tabent *lbl_top)
 #ifdef VMS
 		*ap->addr = (int4)rtn->linkage_ptr;
 #else
-		*ap->addr = (int4)rtn;
+		*ap->addr = (UINTPTR_T)rtn;
 #endif
 		rp1->addr = ap->next;
 		free(ap);
@@ -45,8 +45,8 @@ void urx_resolve(rhdtyp *rtn, lab_tabent *lbl_tab, lab_tabent *lbl_top)
 			{
 				assert(*ap->addr == 0);
 				*ap->addr =
-					USHBIN_ONLY((int4)&lbl_tab->lnr_adr)
-					NON_USHBIN_ONLY((int4)LABENT_LNR_ENTRY(rtn, lbl_tab));
+					USHBIN_ONLY((INTPTR_T)&lbl_tab->lnr_adr)
+					NON_USHBIN_ONLY((INTPTR_T)LABENT_LNR_ENTRY(rtn, lbl_tab));
 				lp1->addr = ap->next;
 				free(ap);
 			}

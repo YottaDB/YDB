@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -124,7 +124,9 @@ uint4	mur_get_pini(off_jnl_t pini_addr, pini_list_struct **pplst)
 	plst->state = IGNORE_PROC;
 	memcpy(&plst->jpv,     &mur_rab.pinirec->process_vector[CURR_JPV], sizeof(jnl_process_vector));
 	memcpy(&plst->origjpv, &mur_rab.pinirec->process_vector[ORIG_JPV], sizeof(jnl_process_vector));
+#ifndef GTM64
 	assert(sizeof(void *) == sizeof(pini_addr));
+#endif /* GTM64 */
 	add_hashtab_int4(&mur_jctl->pini_list, (uint4 *)&pini_addr, (void *)plst, &tabent);
 	*pplst = plst;
 	return SS_NORMAL;

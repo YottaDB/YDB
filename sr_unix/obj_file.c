@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -171,7 +171,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 	sym1 = 0;
 	while (sym)
 	{
-		if ((cmp = memvcmp(name->addr, name->len, &sym->name[0], sym->name_len - 1)) <= 0)
+		if ((cmp = memvcmp(name->addr, (int)name->len, &sym->name[0], sym->name_len - 1)) <= 0)
 			break;
 		sym1 = sym;
 		sym = sym->next;
@@ -180,7 +180,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 	if (cmp || !sym)
 	{
 		/* Didn't find it in existing symbols; create new symbol.  */
-		newsym = (struct sym_table *)mcalloc(sizeof(struct sym_table) + name->len);
+		newsym = (struct sym_table *)mcalloc(USIZEOF(struct sym_table) + name->len);
 		newsym->name_len = name->len + 1;
 		memcpy(&newsym->name[0], name->addr, name->len);
 		newsym->name[name->len] = 0;
@@ -260,7 +260,7 @@ void	output_symbol(void)
 	uint4			string_length;
 	struct sym_table	*sym;
 
-	string_length = sizeof(int4) + sym_table_size;
+	string_length = USIZEOF(int4) + sym_table_size;
 	assert(string_length == output_symbol_size());
 	emit_immed((char *)&string_length, sizeof(string_length));
 	sym = symbols;
@@ -319,9 +319,9 @@ void	emit_literals(void)
 	mliteral	*p;
 
 	/* emit the literal text pool which includes the source file path and routine name */
-	offset = stringpool.free - stringpool.base;
+	offset = (uint4)(stringpool.free - stringpool.base);
 	emit_immed((char *)stringpool.base, offset);
-	padsize = PADLEN(offset, NATIVE_WSIZE); /* comp_lits aligns the start of source path on NATIVE_WSIZE boundary.*/
+	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE)); /* comp_lits aligns the start of source path on NATIVE_WSIZE boundary.*/
 	if (padsize)
 	{
 		emit_immed(PADCHARS, padsize);
@@ -329,7 +329,7 @@ void	emit_literals(void)
 	}
 	emit_immed(source_file_name, source_name_len);
 	offset += source_name_len;
-	padsize = PADLEN(offset, NATIVE_WSIZE); /* comp_lits aligns the start of routine_name on NATIVE_WSIZE boundary.*/
+	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE)); /* comp_lits aligns the start of routine_name on NATIVE_WSIZE boundary.*/
 	if (padsize)
 	{
 		emit_immed(PADCHARS, padsize);
@@ -337,7 +337,7 @@ void	emit_literals(void)
 	}
 	emit_immed(routine_name.addr, routine_name.len);
 	offset += routine_name.len;
-	padsize = PADLEN(offset, NATIVE_WSIZE); /* comp_lits aligns the start of literal area on NATIVE_WSIZE boundary.*/
+	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE)); /* comp_lits aligns the start of literal area on NATIVE_WSIZE boundary.*/
 	if (padsize)
 	{
 		emit_immed(PADCHARS, padsize);
@@ -404,10 +404,10 @@ int4	find_linkage(mstr* name)
  *
  *	Description:	Return offset to literal from literal Psect base register.
  */
-int4	literal_offset(int4 offset)
+int	literal_offset(UINTPTR_T offset)
 {
 	/* If we have no offset assigned yet, assume a really big offset. */
 	if (-1 == offset)
 		offset = MAXPOSINT4;
-	return (run_time ? (offset - (int4)runtime_base) : (offset));
+	return (int)((run_time ? (offset - (UINTPTR_T)runtime_base) : offset));
 }

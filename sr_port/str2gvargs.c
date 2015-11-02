@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,8 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	char		*p1, *p2, *c_top, *c_ref, ch, *subsc_ptr, *dstptr, *strnext;
 	int		count;
 	mval		*spt;
-	int 		chcode, chlen, chtmp;
+	int 		chcode, chtmp;
+	mstr_len_t	chlen;
 	boolean_t	naked, concat, dot_seen, dollarzch, isdolar;
 	error_def(ERR_NOTGBL);
 	error_def(ERR_GVINVALID);
@@ -75,7 +76,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	ch = *cp;
 	if ('(' == ch)
 	{
-		spt->str.len = cp - spt->str.addr - 1;
+		spt->str.len = INTCAST(cp - spt->str.addr - 1);
 		naked = TRUE;
 	} else
 	{
@@ -88,7 +89,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 			if (!ISALPHA(ch) && !ISDIGIT(ch))
 				rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
 		}
-		spt->str.len = cp - spt->str.addr;
+		spt->str.len = INTCAST(cp - spt->str.addr);
 		op_gvargs->args[count] = spt;
 		count++;
 		spt++;
@@ -122,7 +123,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 				}
 				if (!concat)
 				{
-					spt->str.len = p1 - spt->str.addr;
+					spt->str.len = INTCAST(p1 - spt->str.addr);
 					subsc_ptr = p1;
 				} else
 				{
@@ -179,7 +180,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 #ifdef UNICODE_SUPPORTED
 					else {
 						strnext = (char *)UTF8_WCTOMB(chcode, dstptr);
-						chlen = strnext - dstptr;
+						chlen = INTCAST(strnext - dstptr);
 						if (0 == chlen)
 							rts_error(VARLSTCNT(5) ERR_DLRCILLEGAL, 3, len, c_ref, chcode);
 					}
@@ -243,7 +244,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 				}
 				if (!concat)
 				{
-					spt->str.len = p1 - spt->str.addr;
+					spt->str.len = INTCAST(p1 - spt->str.addr);
 					subsc_ptr = p1;
 				} else
 				{

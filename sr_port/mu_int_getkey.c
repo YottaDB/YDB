@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,7 +118,7 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 							return FALSE;
 						}
 					}
-					tmpmval.str.len = src - (unsigned char*)tmpmval.str.addr;
+					tmpmval.str.len = INTCAST(src - (unsigned char*)tmpmval.str.addr);
 					if (!tmpmval.str.len)
 					{
 						util_out_print("Error in SUBSCRIPT qualifier : Empty subscript specified at "
@@ -147,7 +147,7 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 						*tmp++ = *src++;
 					}
 					tmpmval.str.addr = (char*)slit;
-					tmpmval.str.len = tmp - slit;
+					tmpmval.str.len = INTCAST(tmp - slit);
 				}
 				mval2subsc(&tmpmval, muint_tmpkey);
 				if ((src >= top) || (',' != *src))

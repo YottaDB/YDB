@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -177,7 +177,7 @@ static int rc_init_ipc(void)
 		PERROR("Error with rc shmget");
 		return errno;
 	}
-	if ((int)(rc_cpt = (rc_cp_table*)do_shmat(rc_shmid, 0, 0)) == -1)
+	if ((INTPTR_T)(rc_cpt = (rc_cp_table*)do_shmat(rc_shmid, 0, 0)) == -1L)
 	{
 		PERROR("Error with rc shmat");
 		return errno;
@@ -296,7 +296,7 @@ int rc_cpt_inval(void)
 			PERROR("Error with rc shmget");
 			return errno;
 		}
-		if ((int)(rc_cpt = (rc_cp_table*)do_shmat(rc_shmid, 0, 0)) == -1)
+		if ((INTPTR_T)(rc_cpt = (rc_cp_table*)do_shmat(rc_shmid, 0, 0)) == -1L)
 		{
 			PERROR("Error with rc shmat");
 			return errno;
@@ -484,7 +484,7 @@ int rc_create_cpt(void)
 		PERROR("Error with rc shmget");
 		return errno;
 	}
-	if ((int)(rc_cpt = (rc_cp_table*)do_shmat(rc_shmid, 0, 0)) == -1)
+	if ((INTPTR_T)(rc_cpt = (rc_cp_table*)do_shmat(rc_shmid, 0, 0)) == -1L)
 	{
 		PERROR("Error with rc shmat");
 		return errno;
@@ -585,7 +585,7 @@ void rc_send_cpt(rc_xblk_hdr *head, rc_rsp_page *last_aq)	/* Zero if no read op 
 		if (ptr < (char *)rc_cpt->ring_buff)
 		{
 			ptr = (char *)rc_cpt->ring_buff;
-			copy_size = (char *)&rc_cpt->ring_buff[rc_cpt->index] - (char *)rc_cpt->ring_buff;
+			copy_size = (int4)((char *)&rc_cpt->ring_buff[rc_cpt->index] - (char *)rc_cpt->ring_buff);
 		} else
 			copy_size = cpt_size;
 		memcpy((char *)head + head->cpt_tab.value, ptr, copy_size);

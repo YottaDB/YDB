@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -317,7 +317,7 @@ void op_merge(void)
 					ptr2 = gvsub2str(ptr, buff, FALSE);
 					subsc->mvtype = MV_STR;
 					subsc->str.addr = (char *)buff;
-					subsc->str.len = ptr2 - buff;
+					subsc->str.len = INTCAST(ptr2 - buff);
 					s2pool(&subsc->str);
 					dst_lv = op_putindx(VARLSTCNT(2) dst_lv, subsc);
 					while (*ptr++);	/* skip to start of next subscript */

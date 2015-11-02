@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -360,7 +360,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #pragma pointer_size (restore)
 #endif
 
-		string_len = strlen("%s=%d") + strlen(CHILD_FLAG_ENV) + MAX_NUM_LEN - 4;
+		string_len = STRLEN("%s=%d") + STRLEN(CHILD_FLAG_ENV) + MAX_NUM_LEN - 4;
 		if (string_len > MAX_CMD_LINE)
 			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		c1 = (char *)malloc(string_len + 1);
@@ -382,7 +382,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			strncpy(pbuff, jparms->gbldir.addr, jparms->gbldir.len);
 			*(pbuff + jparms->gbldir.len) = '\0';
-			string_len = strlen("%s=%s") + strlen(GBLDIR_ENV) + strlen(pbuff) - 4;
+			string_len = STRLEN("%s=%s") + STRLEN(GBLDIR_ENV) + STRLEN(pbuff) - 4;
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
@@ -401,7 +401,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			strncpy(pbuff, jparms->startup.addr, jparms->startup.len);
 			*(pbuff + jparms->startup.len) = '\0';
-			string_len = strlen("%s=%s") + strlen(STARTUP_ENV) + strlen(pbuff) - 4;
+			string_len = STRLEN("%s=%s") + STRLEN(STARTUP_ENV) + STRLEN(pbuff) - 4;
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
@@ -420,7 +420,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			strncpy(pbuff, jparms->input.addr, jparms->input.len);
 			*(pbuff + jparms->input.len) = '\0';
-			string_len = strlen("%s=%s") + strlen(IN_FILE_ENV) + strlen(pbuff) - 4;
+			string_len = STRLEN("%s=%s") + STRLEN(IN_FILE_ENV) + STRLEN(pbuff) - 4;
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
@@ -442,7 +442,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			*(pbuff + jparms->output.len) = '\0';
 			if (jobpid)
 				SPRINTF(&pbuff[jparms->output.len], ".%d", getpid());
-			string_len = strlen("%s=%s") + strlen(OUT_FILE_ENV) + strlen(pbuff) - 4;
+			string_len = STRLEN("%s=%s") + STRLEN(OUT_FILE_ENV) + STRLEN(pbuff) - 4;
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
@@ -464,7 +464,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			*(pbuff + jparms->error.len) = '\0';
 			if (jobpid)
 				SPRINTF(&pbuff[jparms->error.len], ".%d", getpid());
-			string_len = strlen("%s=%s") + strlen(ERR_FILE_ENV) + strlen(pbuff) - 4;
+			string_len = STRLEN("%s=%s") + STRLEN(ERR_FILE_ENV) + STRLEN(pbuff) - 4;
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
@@ -484,7 +484,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			strncpy(pbuff, jparms->routine.addr, jparms->routine.len);
 			*(pbuff + jparms->routine.len) = '\0';
-			string_len = strlen("%s=%s") + strlen(ROUTINE_ENV) + strlen(pbuff) - 4;
+			string_len = STRLEN("%s=%s") + STRLEN(ROUTINE_ENV) + STRLEN(pbuff) - 4;
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
@@ -502,7 +502,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		strncpy(pbuff, jparms->label.addr, jparms->label.len);
 		*(pbuff + jparms->label.len) = '\0';
-		string_len = strlen("%s=%s") + strlen(LABEL_ENV) + strlen(pbuff) - 4;
+		string_len = STRLEN("%s=%s") + STRLEN(LABEL_ENV) + STRLEN(pbuff) - 4;
 		if (string_len > TEMP_BUFF_SIZE)
 			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		c1 = (char *)malloc(string_len + 1);
@@ -515,7 +515,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #endif
 
 		/* pass the offset */
-		string_len = strlen("%s=%ld") + strlen(OFFSET_ENV) + MAX_NUM_LEN - 5;
+		string_len = STRLEN("%s=%ld") + STRLEN(OFFSET_ENV) + MAX_NUM_LEN - 5;
 		if (string_len > TEMP_BUFF_SIZE)
 			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		c1 = (char *)malloc(string_len + 1);
@@ -530,7 +530,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		/* pass Priority to child */
 		if (jparms->baspri != 0)
 		{
-			string_len = strlen("%s=%ld") + strlen(PRIORITY_ENV) + MAX_NUM_LEN - 5;
+			string_len = STRLEN("%s=%ld") + STRLEN(PRIORITY_ENV) + MAX_NUM_LEN - 5;
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
@@ -548,7 +548,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		{
 			if (jp->parm->str.len > MAX_CMD_LINE - 2)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			string_len = strlen(parm_string) + jp->parm->str.len + 1;
+			string_len = STRLEN(parm_string) + jp->parm->str.len + 1;
 			if (string_len > MAX_CMD_LINE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len);
@@ -575,7 +575,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			} else
 				parm_string[6] = parm_string[6] + 1;
 		}
-		string_len = strlen("%s=%ld") + strlen(GTMJCNT_ENV) + MAX_NUM_LEN - 5;
+		string_len = STRLEN("%s=%ld") + STRLEN(GTMJCNT_ENV) + MAX_NUM_LEN - 5;
 		if (string_len > TEMP_BUFF_SIZE)
 			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		c1 = (char *)malloc(string_len + 1);
@@ -611,7 +611,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			env_end = strchr(*old_env_cur, '=');
 			if ((NULL != env_end) && !STRNCMP_LIT(*old_env_cur, "gtm"))
 			{
-				env_len = env_end - *old_env_cur + 1;	/* include the '=' too */
+				env_len = (int)(env_end - *old_env_cur + 1);	/* include the '=' too */
 				assert(env_len <= strlen(*old_env_cur));
 				for (new_env_cur = env_ary; new_env_cur < new_env_top; new_env_cur++)
 				{
@@ -703,4 +703,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			return (EINVAL);		/* return some error condition */
 		}
 	}
+
+	return (EINVAL); /* This should never get executed, added to make compiler happy */
 }

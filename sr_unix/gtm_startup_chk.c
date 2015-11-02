@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,7 @@ int gtm_chk_dist(char *image)
 	memset(&pblk, 0, sizeof(pblk));
 	if (NULL != (ptr1 = (char *)GETENV(GTM_DIST)))
 	{
-		plen = strlen(ptr1);
+		plen = STRLEN(ptr1);
 		if (MAX_FBUFF - 2 > plen + GTMSECSHR_NAMELEN)
 			memcpy(pbuff, ptr1, plen);
 		else
@@ -83,7 +83,7 @@ int gtm_chk_dist(char *image)
 	pblk.buff_size = MAX_FBUFF;
 	pblk.fop = F_SYNTAXO;
 	gtm_name.addr = image;
-	gtm_name.len = strlen(image);
+	gtm_name.len = STRLEN(image);
 	/*	strings returned in pblk are not null terminated 	*/
 	status = parse_file(&gtm_name, &pblk);
 	if (!(status & 1))
@@ -95,7 +95,7 @@ int gtm_chk_dist(char *image)
 			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("getcwd"), CALLFROM, errno);
 
-		prefix_len = strlen(prefix);
+		prefix_len = STRLEN(prefix);
 		if(MAX_FBUFF < prefix_len + pblk.b_esl + 1)
 			rts_error(VARLSTCNT(3) ERR_MAXGTMPATH, 1, MAX_FBUFF - pblk.b_name);
 		if (DIR_SEPARATOR != prefix[prefix_len - 1])

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,26 +24,33 @@ lv_val *lv_nxt_str_inx(sbs_blk *root, mstr *key, sbs_search_status *status)
 	assert (root);
        	prev = root;
        	for (blk = root; ; prev = blk, blk = nxt)
-       	{      	if (!(nxt = blk->nxt))
-		{	break;
+       	{
+		if (!(nxt = blk->nxt))
+		{
+			break;
 		}
        	       	x = mstrcmp(key, &nxt->ptr.sbs_str[0].str);
        	       	if (x < 0)
-		{	break;
+		{
+			break;
 		}
 	}
 
 	status->blk = blk;
 	status->prev = prev;
        	for (p = (sbs_str_struct*)&blk->ptr.sbs_str[0], top =  (sbs_str_struct*)&blk->ptr.sbs_str[blk->cnt]; p < top; p++)
-       	{      	x = mstrcmp(key, &p->str);
+       	{
+		x = mstrcmp(key, &p->str);
 	 	if (x == 0)
-       	       	{	if (++p < top)
-	 	 	{	status->ptr = (char*)p;
+       	       	{
+			if (++p < top)
+	 	 	{
+				status->ptr = (char*)p;
 	 			return(p->lv);
 	 		}
 	 		else if (blk->nxt)
-	 		{	status->prev = blk;
+	 		{
+				status->prev = blk;
 	 			status->blk  = blk->nxt;
 	 			assert(status->blk->cnt);
 	 			p = (sbs_str_struct*)&status->blk->ptr.sbs_str[0];
@@ -52,12 +59,14 @@ lv_val *lv_nxt_str_inx(sbs_blk *root, mstr *key, sbs_search_status *status)
 			}
 	 	}
 	 	if (x < 0)
-	 	{	status->ptr = (char*)p;
+	 	{
+			status->ptr = (char*)p;
 			return(p->lv);
 	 	}
 	}
 	if (blk->nxt)
-	{	status->prev = blk;
+	{
+		status->prev = blk;
 		status->blk  = blk->nxt;
 		assert(status->blk->cnt);
 		p = (sbs_str_struct*)&status->blk->ptr.sbs_str[0];
@@ -65,7 +74,8 @@ lv_val *lv_nxt_str_inx(sbs_blk *root, mstr *key, sbs_search_status *status)
 		return(p->lv);
 	}
 	else
-	{ 	status->ptr = (char*)p;
+	{
+		status->ptr = (char*)p;
 	 	return(0);
 	}
 }

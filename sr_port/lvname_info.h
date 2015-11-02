@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,9 @@
  * Following structure has the format of variable arguments passed to op_putindx
  */
 #ifndef MERGE_LOCAL_DEFINED
-typedef struct lvname_info_struct {
-	int4			total_lv_subs; /* Total subscripts + 1 for name itself */
+typedef struct lvname_info_struct
+{
+	intszofptr_t		total_lv_subs; /* Total subscripts + 1 for name itself */
 	struct lv_val_struct	*start_lvp;
 	mval 			*lv_subs[MAX_LVSUBSCRIPTS];
 	struct lv_val_struct	*end_lvp;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,7 @@ boolean_t probe(uint4 len, void *addr, boolean_t write)
 #if defined(__alpha)
 	temp = ROUND_DOWN2((uint4)addr, OS_PAGE_SIZE);
 	status = mvalid((caddr_t)temp, (size_t)(len + ((uint4)addr - temp)), write ? PROT_WRITE : PROT_READ);
+	assert(0 == status);
 	return (status == 0 ? TRUE : FALSE);
 #else
 	return TRUE;

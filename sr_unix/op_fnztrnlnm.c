@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,7 +83,7 @@ void op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 			stringpool.free += retlen;
 		}else if (item_code == LENGTH)
 		{
-			MV_FORCE_MVAL(ret, strlen(status));
+			MV_FORCE_MVAL(ret, STRLEN(status));
 			n2s(ret);
 		}else
 		{	assert(item_code == TERMINAL);

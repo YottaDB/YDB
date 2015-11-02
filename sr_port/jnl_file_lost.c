@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,9 @@ void jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	unsigned int	status;
 	sgmnt_addrs	*csa;
 	seq_num		reg_seqno, jnlseqno;
+
 	error_def(ERR_REPLJNLCLOSED);
+	error_def(ERR_JNLCLOSED);
 
 	switch(jpc->region->dyn.addr->acc_meth)
 	{
@@ -56,20 +58,24 @@ void jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 		GTMASSERT;
 	}
 #ifdef VMS
-	assert(0 != memcmp(csa->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)));
+	/* The following assert has been removed as it could be FALSE if the caller is "jnl_file_extend"
+	 *	assert(0 != memcmp(csa->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)));
+	 */
 #endif
-	/* assert((TRUE == csa->now_crit) || ((TRUE == csa->hdr->clustered) && (CCST_CLOSED == csa->nl->ccp_state)));
-	 * disabled for now because of the demon */
+	assert(csa->now_crit);
 	if (0 != jnl_stat)
 		jnl_send_oper(jpc, jnl_stat);
 	csa->hdr->jnl_state = jnl_closed;
+	jpc->jnl_buff->cycle++; /* increment shared cycle so all future callers of jnl_ensure_open recognize journal switch */
+	assert(jpc->cycle < jpc->jnl_buff->cycle);
 	if (REPL_ENABLED(csa->hdr))
 	{
 		csa->hdr->repl_state = repl_was_open;
 		reg_seqno = csa->hdr->reg_seqno;
 		jnlseqno = (NULL != jnlpool.jnlpool_ctl) ? jnlpool.jnlpool_ctl->jnl_seqno : MAX_SEQNO;
-		send_msg(VARLSTCNT(8) ERR_REPLJNLCLOSED, 6, &reg_seqno, &reg_seqno, &jnlseqno, &jnlseqno, DB_LEN_STR(jpc->region));
-	}
+		send_msg(VARLSTCNT(8) ERR_REPLJNLCLOSED, 6, DB_LEN_STR(jpc->region), &reg_seqno, &reg_seqno, &jnlseqno, &jnlseqno);
+	} else
+		send_msg(VARLSTCNT(5) ERR_JNLCLOSED, 3, DB_LEN_STR(jpc->region), &csa->ti->curr_tn);
 #ifdef VMS
 	assert(0 != csa->jnl->jnllsb->lockid);
 	status = gtm_enqw(EFN$C_ENF, LCK$K_EXMODE, csa->jnl->jnllsb, LCK$M_CONVERT | LCK$M_NODLCKBLK,

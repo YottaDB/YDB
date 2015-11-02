@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,11 +33,14 @@ GBLREF uint4		rundown_process_id;
 GBLREF uint4		rundown_image_count;
 GBLREF int4		rundown_os_page_size;
 GBLREF gd_region	**jnlpool_reg_addrs;
+GBLREF inctn_detail_t	*inctn_detail_addrs;
+GBLREF short		*dollar_tlevel_addrs;
 
 #define DEF_PGSZ	512
 
 void init_secshr_addrs(gd_addr_fn_ptr getnxtgdr, cw_set_element *cwsetaddrs, sgm_info **firstsiaddrs,
-	unsigned char *cwsetdepthaddrs, uint4 epid, uint4 icnt, int4 gtmospagesize, gd_region **jpool_reg_address)
+	unsigned char *cwsetdepthaddrs, uint4 epid, uint4 icnt, int4 gtmospagesize, gd_region **jpool_reg_address,
+	inctn_detail_t *inctn_detail_address, short *dollar_tlevel_address)
 {
 	get_next_gdr_addrs = getnxtgdr;
 	cw_set_addrs = cwsetaddrs;
@@ -49,4 +52,6 @@ void init_secshr_addrs(gd_addr_fn_ptr getnxtgdr, cw_set_element *cwsetaddrs, sgm
 	rundown_os_page_size = ((0 != gtmospagesize) && ((gtmospagesize / DEF_PGSZ) * DEF_PGSZ) == gtmospagesize) ? gtmospagesize
 														  : DEF_PGSZ;
 	jnlpool_reg_addrs = jpool_reg_address;
+	inctn_detail_addrs = inctn_detail_address;
+	dollar_tlevel_addrs = dollar_tlevel_address;
 }

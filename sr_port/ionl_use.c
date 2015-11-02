@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -113,7 +113,7 @@ void ionl_use(io_desc *iod, mval *pp)
 
 			GET_LONG(col, pp->str.addr + p_offset);
 			d_out->dollar.x = col;
-			if ((d_out->dollar.x) < 0)
+			if ((int4)(d_out->dollar.x) < 0)
 				d_out->dollar.x = 0;
 			if (d_out->dollar.x > d_out->width && d_out->wrap)
 				d_out->dollar.x %= d_out->width;
@@ -125,7 +125,7 @@ void ionl_use(io_desc *iod, mval *pp)
 
 			GET_LONG(row, (pp->str.addr + p_offset));
 			d_out->dollar.y = row;
-			if ((d_out->dollar.y) < 0)
+			if ((int4)(d_out->dollar.y) < 0)
 				d_out->dollar.y = 0;
 			if (d_out->length)
 				d_out->dollar.y %= d_out->length;

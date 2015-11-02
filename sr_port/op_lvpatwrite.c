@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,11 +28,11 @@
 #include "mvalconv.h"
 #include "gtm_maxstr.h"
 
-void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) int4 arg1, ...)
+void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 {
 	va_list		var;
 	boolean_t	flag, local_buff;
-	int4		arg2;
+	UINTPTR_T	arg2;
 	VMS_ONLY(int4	count;)
 	mval		*mv;
 	zshow_out	output, *out;
@@ -56,7 +56,7 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) int4 arg1, ...)
 	} else
 		out = (zshow_out *) arg1;
 	count--;
-	arg1 = va_arg(var, int4);
+	arg1 = va_arg(var, UINTPTR_T);
 	lvzwr_init(TRUE, (mval *)arg1);
 	count--;
 	for (; count > 0; )
@@ -76,20 +76,20 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) int4 arg1, ...)
 			lvzwr_arg(flag, (mval *)0, (mval *)0);
 			break;
 		case ZWRITE_BOTH:
-			arg1 = va_arg(var, int4);
-			arg2 = va_arg(var, int4);
+			arg1 = va_arg(var, UINTPTR_T);
+			arg2 = va_arg(var, UINTPTR_T);
 			count -= 2;
 			lvzwr_arg(flag, (mval *)arg1, (mval *)arg2);
 			break;
 		case ZWRITE_UPPER:
-			arg1 = va_arg(var, int4);
+			arg1 = va_arg(var, UINTPTR_T);
 			count--;
 			lvzwr_arg(flag, (mval *)0, (mval *)arg1);
 			break;
 		case ZWRITE_VAL:
 		case ZWRITE_LOWER:
 		case ZWRITE_PATTERN:
-			arg1 = va_arg(var, int4);
+			arg1 = va_arg(var, UINTPTR_T);
 			count--;
 			lvzwr_arg(flag, (mval *)arg1, (mval *)0);
 			break;

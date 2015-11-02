@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +104,7 @@ void mval_write(zshow_out *output, mval *v, bool flush)
 				isill = (WEOF == ch) ? (ch = (unsigned char)v->str.addr[src_cnt], TRUE) : FALSE;
 				if (!isill)
 					isctl = !U_ISPRINT(ch);
-				chlen = strnext - &v->str.addr[src_cnt];
+				chlen = (int)(strnext - &v->str.addr[src_cnt]);
 			}
 			)
 			switch(fastate)

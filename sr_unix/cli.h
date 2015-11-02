@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@
 				 * (since there is not CLI_DEFAULT on VMS,
 				 * cli_present() should not return CLI_DEFAULT).
 				 */
-#define DEFA_PRESENT	(char *) CLI_PRESENT	/* default present */
+#define DEFA_PRESENT	(char *) 1L /* Should be same as CLI_PRESENT - default present */
 
 #define CLI_GET_STR_ALL	cli_get_str
 

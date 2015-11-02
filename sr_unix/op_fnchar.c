@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,7 +96,7 @@ void op_fnzchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
 			*base++ = ch;
 	}
 	va_end(var);
-	dst->str.len = (char *)base - dst->str.addr;
+	dst->str.len = INTCAST((char *)base - dst->str.addr);
 	stringpool.free += dst->str.len;
 }
 
@@ -131,7 +131,7 @@ void op_fnzechar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
 			*base++ = ch;
 	}
 	va_end(var);
-	dst->str.len = (char *)base - dst->str.addr;
+	dst->str.len = INTCAST((char *)base - dst->str.addr);
 	stringpool.free += dst->str.len;
 
 	*base = '\0';

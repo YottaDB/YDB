@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +11,10 @@
 
 #include "mdef.h"
 
-void i2hex(unsigned int val, uchar_ptr_t dest, int len)
+void i2hex(UINTPTR_T val, uchar_ptr_t dest, int len)
 {
 	register uchar_ptr_t cp;
-	register unsigned int n;
+	register UINTPTR_T n;
 	char x;
 	n = val;
 	cp = &dest[len];

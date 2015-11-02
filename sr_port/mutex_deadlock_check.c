@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,12 +112,12 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr)
 			{
 				++crit_deadlock_check_cycle;
 				if (FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs.critical == criticalPtr)
-				{	/* grab_lock going for crit on the jnlpool region. gv_cur_region points to the
-					 * current region of interest, which better have replication enabled, and be now crit
+				{	/* grab_lock going for crit on the jnlpool region. gv_cur_region points to the current
+					 * region of interest, which better have REPL_ENABLED or REPL_WAS_ENABLED, and be now crit
 					 */
 					assert(cs_addrs == &FILE_INFO(gv_cur_region)->s_addrs);
 					csa = &FILE_INFO(gv_cur_region)->s_addrs;
-					if (FALSE == csa->now_crit || !REPL_ENABLED(csa->hdr))
+					if (FALSE == csa->now_crit || !REPL_ALLOWED(csa->hdr))
 						GTMASSERT;	/* should have crit on gv_cur_region before asking for jnlpool */
 					csa->crit_check_cycle = crit_deadlock_check_cycle; /* allow for crit in gv_cur_region */
 				}

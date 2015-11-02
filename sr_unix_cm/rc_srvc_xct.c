@@ -40,7 +40,7 @@ struct rc_clnt_err
 };
 
 GBLDEF int      rc_size_return = 0;
-GBLDEF int      rc_auxown = 0;
+GBLDEF UINTPTR_T rc_auxown = 0;
 GBLDEF int      rc_errno = 0;
 GBLDEF int      rc_nxact = 0;
 GBLDEF int      rc_nerrs = 0;
@@ -82,7 +82,7 @@ rc_srvc_xact(cptr, xend)
 	int             rv, rqlen;
 	char	       *tptr;
 	int 		dumped = 0;
-	int		pkt_len = xend - (char *) cptr;
+	int		pkt_len = (int)(xend - (char *) cptr);
 
 	/* Reserve space for the RC header in the response buffer */
 	fxhdr = (rc_xblk_hdr *) cptr->xptr;
@@ -112,7 +112,7 @@ rc_srvc_xact(cptr, xend)
 
 
 	/* Stash this for any lock operations */
-	rc_auxown = (int) cptr;
+	rc_auxown = (UINTPTR_T)cptr;
 	/* This is the list of errors */
 	elst = (rc_clnt_err *) 0;
 	/* This is the offset of the first error Aq */
@@ -149,7 +149,7 @@ rc_srvc_xact(cptr, xend)
 	/*	Do we do this yet? */
 		else if (	/* (qhdr->r.typ.value < 0) || */ /* this is commented out as it always evaluates to FALSE */
 			(qhdr->r.typ.value > RC_OP_MAX )
-			 || (!rc_dispatch_table[qhdr->r.typ.value]))
+			|| (!rc_dispatch_table[qhdr->r.typ.value]))
 		{
 #ifdef DEBUG
 			if (qhdr->r.typ.value == RC_EXCH_INFO)
@@ -175,9 +175,9 @@ rc_srvc_xact(cptr, xend)
 			if (qhdr->r.typ.value == RC_GET_PAGE
 			    || qhdr->r.typ.value == RC_GET_RECORD)
 			{
-				rc_size_return = (char *) fxhdr
+				rc_size_return = (int4)((char *) fxhdr
 					+ fxhdr->end.value - RC_MIN_CPT_SIZ - (char *) qhdr
-					- sizeof(rc_rsp_page) + 1;
+					- sizeof(rc_rsp_page) + 1);
 			}
 			rc_overflow = cptr->of;
 			rc_errno = RC_SUCCESS;
@@ -186,7 +186,8 @@ rc_srvc_xact(cptr, xend)
 				char msg[256];
 				sprintf(msg,"invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
 					fxhdr->free.value, fxhdr->end.value);
-				gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
+				/*GTM64: Assuming length of packet wont excced MAX_INT */
+				gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
 				if (history)
 				    dump_omi_rq();
 				return -OMI_ER_PR_INVMSGFMT;
@@ -198,8 +199,8 @@ rc_srvc_xact(cptr, xend)
 				char *p;
 				sprintf(msg,"corrupted packet, free (%x) > end.value (%x).  Dumped RC header + packet",
 					fxhdr->free.value,fxhdr->end.value);
-				gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
-				p = (char *) -1;
+				gtcm_cpktdmp((char *)fxhdr, (int)(((char *)xend) - ((char *)fxhdr)),msg);
+				p = (char *)-1L;
 				*p = 1;   /*guarenteed core dump */
 			}
 			if (qhdr->a.len.value > fxhdr->end.value)
@@ -209,7 +210,7 @@ rc_srvc_xact(cptr, xend)
 				sprintf(msg,"corrupted packet, qhdr.a.len.value=%x > fxhdr end (%x).  Dumped RC header + packet",
 					qhdr->a.len.value,fxhdr->end.value);
 				gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value, msg);
-				p = (char *) -1;
+				p = (char *)-1L;
 				*p = 1;   /*guarenteed core dump */
 			}
 			rc_nxact++;
@@ -319,7 +320,8 @@ rc_srvc_xact(cptr, xend)
 	    char msg[256];
 	    sprintf(msg,"invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->free.value, fxhdr->end.value);
-	    gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
+	    /*GTM64: Assuming length of packet wont excced MAX_INT */
+	    gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
 	    if (history)
 		dump_omi_rq();
 	    return -OMI_ER_PR_INVMSGFMT;
@@ -329,7 +331,8 @@ rc_srvc_xact(cptr, xend)
 	    char msg[256];
 	    sprintf(msg,"invalid packet :  cpt_tab (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->cpt_tab.value, fxhdr->end.value);
-	    gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
+	    /*GTM64: Assuming length of packet wont excced MAX_INT */
+	    gtcm_cpktdmp((char *)fxhdr, (int)(((char *)xend) - ((char *)fxhdr)),msg);
 	    if (history)
 		dump_omi_rq();
 	    return -OMI_ER_PR_INVMSGFMT;
@@ -341,7 +344,8 @@ rc_srvc_xact(cptr, xend)
 	    sprintf(msg,"invalid packet :  cpt_tab + cpt_siz (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->cpt_tab.value + fxhdr->cpt_siz.value,
 		    fxhdr->end.value);
-	    gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
+	    /*GTM64: Assuming length of packet wont excced MAX_INT */
+	    gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
 	    if (history)
 		dump_omi_rq();
 	    return -OMI_ER_PR_INVMSGFMT;
@@ -352,7 +356,8 @@ rc_srvc_xact(cptr, xend)
 	    char msg[256];
 	    sprintf(msg,"invalid Aq packet :  free (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->free.value, fxhdr->end.value);
-	    gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
+  	    /*GTM64: Assuming length of packet wont excced MAX_INT */
+	    gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
 	    if (history)
 		dump_omi_rq();
 	    assert(fxhdr->free.value <= fxhdr->end.value);

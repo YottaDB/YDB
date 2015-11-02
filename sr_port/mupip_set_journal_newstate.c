@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,16 +71,26 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 		} else
 			rptr->jnl_new_state = jnl_open;	/* turn journaling on for REPLICATION=ON */
 	}
-	rptr->before_images = (jnl_options->image_type_specified ?  jnl_info->before_images : current_image);
+	VMS_ONLY(rptr->before_images = (jnl_options->image_type_specified ?  jnl_info->before_images : current_image);)
+	UNIX_ONLY(
+		rptr->before_images = (jnl_options->image_type_specified
+			? jnl_info->before_images
+			: (((CLI_PRESENT == jnl_options->cli_replic_on) && (repl_open != repl_curr_state))
+				? TRUE
+				: current_image));
+	)
 	if (CLI_PRESENT == jnl_options->cli_replic_on) /* replic="ON" */
 	{
 		assert((CLI_ABSENT == jnl_options->cli_journal)
 			|| (!((CLI_NEGATED == jnl_options->cli_enable) || (CLI_NEGATED == jnl_options->cli_on))
 			|| (jnl_open == rptr->jnl_new_state)));
-		assert((CLI_ABSENT == jnl_options->cli_journal) || (!jnl_options->image_type_specified || rptr->before_images));
 		rptr->repl_new_state = repl_open;
 		rptr->jnl_new_state = jnl_open;
-		rptr->before_images = TRUE;
+		VMS_ONLY(
+			assert((CLI_ABSENT == jnl_options->cli_journal)
+				|| (!jnl_options->image_type_specified || rptr->before_images));
+			rptr->before_images = TRUE;
+		)
 	} else if (CLI_NEGATED == jnl_options->cli_replic_on) /* replic="OFF" */
 		rptr->repl_new_state = repl_closed;
 	else
@@ -89,11 +99,13 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 		{
 			if (CLI_ABSENT != jnl_options->cli_journal)
 			{
-				if (jnl_options->image_type_specified && !rptr->before_images)
-				{
-					gtm_putmsg(VARLSTCNT(4) ERR_REPLNOBEFORE, 2, DB_LEN_STR(gv_cur_region));
-					return EXIT_WRN;
-				}
+				VMS_ONLY(
+					if (jnl_options->image_type_specified && !rptr->before_images)
+					{
+						gtm_putmsg(VARLSTCNT(4) ERR_REPLNOBEFORE, 2, DB_LEN_STR(gv_cur_region));
+						return EXIT_WRN;
+					}
+				)
 				if (jnl_open != rptr->jnl_new_state)
 				{
 					gtm_putmsg(VARLSTCNT(8) ERR_REPLJNLCNFLCT, 6,

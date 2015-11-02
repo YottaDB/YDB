@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ typedef struct {
 		zs_gv_struct	gv;
     } out_var;
     bool		flush;		/* flush the buffer					*/
-}zshow_out;
+} zshow_out;
 
 #include "mlkdef.h"
 

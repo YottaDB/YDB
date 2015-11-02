@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2004, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -117,7 +117,7 @@ int jnl_v16tov15(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		status = -1;
 	}
 	assert(0 == jlen || -1 == status);
-	*jnl_len = jb - jnl_buff;
-	*conv_len = cb - conv_buff;
+	*jnl_len = (uint4)(jb - jnl_buff);
+	*conv_len = (uint4)(cb - conv_buff);
 	return(status);
 }

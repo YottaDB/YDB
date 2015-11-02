@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,11 +27,11 @@ void mlk_prcblk_add(gd_region *reg,
 		    uint4 pid)
 {
 	mlk_prcblk_ptr_t	pr;
-	sm_int_ptr_t		prpt;
+        ptroff_t		*prpt;
 	int			lcnt;
 
-	for (prpt = &d->pending, lcnt = FILE_INFO(reg)->s_addrs.hdr->lock_space_size / PRC_FACTOR;
-			*prpt && lcnt; prpt = &pr->next, lcnt--)
+	for (prpt = (ptroff_t *)&d->pending, lcnt = FILE_INFO(reg)->s_addrs.hdr->lock_space_size / PRC_FACTOR;
+			*prpt && lcnt; prpt = (ptroff_t *) &pr->next, lcnt--)
 	{
 		pr = (mlk_prcblk_ptr_t)R2A(*prpt);
 		if (pr->process_id == pid)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -238,7 +238,8 @@ void op_add (mval *u, mval *v, mval *s)
 		{
                         s->sgn = 0;
                 } else
-                {       s->sgn = 1;
+                {
+			s->sgn = 1;
                         m1 = -m1;
                 }
                 s->mvtype = MV_NM;

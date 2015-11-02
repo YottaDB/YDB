@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ bool	lke_showtree(struct CLB 	*lnk,
 		     mlk_shrblk_ptr_t	tree,
 		     bool 		all,
 		     bool 		wait,
-		     long 		pid,
+		     pid_t 		pid,
 		     mstr 		one_lock,
 		     bool 		memory)
 {

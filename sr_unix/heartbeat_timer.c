@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,6 @@
 #include "heartbeat_timer.h"
 #include "gt_timer.h"
 #include "gtmimagename.h"
-#include "gtcm_jnl_switched.h"
 #include "dpgbldir.h"
 
 GBLREF	volatile uint4		heartbeat_counter;
@@ -72,8 +71,6 @@ void heartbeat_timer(void)
 					F_CLOSE(jpc->channel, rc);
 					jpc->channel = NOJNL;
 					jpc->pini_addr = 0;
-					if (GTCM_GNP_SERVER_IMAGE == image_type)
-						gtcm_jnl_switched();
 				}
 			}
 		}

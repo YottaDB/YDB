@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@
 #define EXT_DET_PREFIX()									\
 {												\
 	SPRINTF(murgbl.extr_buff, "0x%08x [0x%04x] :: ", mur_jctl->rec_offset, mur_rab.jreclen);\
-	extract_len = strlen(murgbl.extr_buff);							\
+	extract_len = STRLEN(murgbl.extr_buff);							\
 	memcpy(murgbl.extr_buff + extract_len, jrt_label[rec->prefix.jrec_type], LAB_LEN);	\
 	extract_len += LAB_LEN;									\
 	memcpy(murgbl.extr_buff + extract_len, LAB_TERM, LAB_TERM_SZ);				\
@@ -270,7 +270,7 @@ typedef struct
 	int			wrn_count;
 	int			broken_cnt;		/* Number of broken entries */
 	int			max_extr_record_length;	/* maximum size of zwr-format extracted journal record */
-	jnl_tm_t		tp_resolve_time;	/* Time of the point upto which a region will be processed for
+	size_t			tp_resolve_time;	/* Time of the point upto which a region will be processed for
 							   TP token resolution for backward or forward recover.
 							   Note : This is what prevents user to change system time. */
 	seq_num			resync_seqno;		/* is 0, if consistent rollback and no interrupted recovery */
@@ -334,7 +334,6 @@ typedef struct jnl_ctl_list_struct
 									FALSE otherwise */
         boolean_t                       tail_analysis;		/* true for mur_fread_eof */
         boolean_t                       after_end_of_data;	/* true for record offset more than end_of_data */
-	boolean_t 			before_image; 		/* True if the database has before image journaling enabled */
         boolean_t                       read_only;		/* TRUE if read_only for extract/show/verify */
 	int				jnlrec_cnt[JRT_RECTYPES];/* Count of each type of record found in this journal  */
 	int4				status;			/* Last status of the last operation done on this journal */
@@ -421,6 +420,7 @@ typedef struct
 	boolean_t		forward,
 				update,
 				rollback,
+				rollback_losttnonly,
 				verify,
 				before_time_specified,
 				since_time_specified,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +60,7 @@ void	iotcp_write(mstr *v)
 			iod->dollar.za = 9;
 			memcpy(tcpptr->dollar_device, LITONE_COMMA, sizeof(LITONE_COMMA));
 			errptr = (char *)STRERROR(errno);
-			errlen = strlen(errptr);
+			errlen = STRLEN(errptr);
 			memcpy(&tcpptr->dollar_device[sizeof(LITONE_COMMA) - 1], errptr, errlen);
 			rts_error(VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);
 		}

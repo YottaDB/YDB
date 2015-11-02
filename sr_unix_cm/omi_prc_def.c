@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,14 +48,16 @@ omi_prc_def(omi_conn *cptr, char *xend, char *buff, char *bend)
     ESTABLISH_RET(omi_dbms_ch,0);
     rv = omi_gvextnam(cptr, len.value, cptr->xptr);
 /*  If true, there was an error finding the global reference in the DBMS */
-    if (rv < 0) {
+    if (rv < 0)
+    {
 	REVERT;
 	return rv;
     }
     cptr->xptr += len.value;
 
 /*  Bounds checking */
-    if (cptr->xptr > xend) {
+    if (cptr->xptr > xend)
+    {
 	REVERT;
 	return -OMI_ER_PR_INVMSGFMT;
     }
@@ -67,19 +69,22 @@ omi_prc_def(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  $DATA */
     op_gvdata(&vd);
-    if (!(vd.mvtype & MV_INT)) {
+    if (!(vd.mvtype & MV_INT))
+    {
 	REVERT;
 	return -OMI_ER_DB_UNRECOVER;
     }
 
-    if (cptr->exts & OMI_XTF_NEWOP) {
+    if (cptr->exts & OMI_XTF_NEWOP)
+    {
 /*	$GET */
 	undef_inhibit = TRUE;
 	rv = op_gvget(&vg);
 /*	$ORDER */
 	op_gvorder(&vo);
 	OMI_SI_WRIT(vo.str.len, bptr);
-	if (vo.str.len) {
+	if (vo.str.len)
+	{
 	    memcpy(bptr, vo.str.addr, vo.str.len);
 	    bptr += vo.str.len;
 	}
@@ -88,12 +93,14 @@ omi_prc_def(omi_conn *cptr, char *xend, char *buff, char *bend)
 /*  $DATA (buffer write) */
     OMI_SI_WRIT(vd.m[1] / MV_BIAS, bptr);
 
-    if (cptr->exts & OMI_XTF_NEWOP) {
+    if (cptr->exts & OMI_XTF_NEWOP)
+    {
 /*	$GET (buffer write) */
 	OMI_SI_WRIT((rv ? 1 : 0), bptr);
 	if (!rv || !vg.str.len)
 	    OMI_LI_WRIT(0, bptr);
-	else {
+	else
+	{
 	    OMI_LI_WRIT(vg.str.len, bptr);
 	    memcpy(bptr, vg.str.addr, vg.str.len);
 	    bptr += vg.str.len;
@@ -102,6 +109,6 @@ omi_prc_def(omi_conn *cptr, char *xend, char *buff, char *bend)
 
     REVERT;
 
-    return bptr - buff;
+    return (int)(bptr - buff);
 
 }

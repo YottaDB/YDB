@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +62,7 @@ void	mupip_set_journal_fname(jnl_create_info *jnl_info)
 				if (DOT == *ctop)
 				{
 					first_time = FALSE;
-					ext_name_len = ptr2 - ctop - 1;
+					ext_name_len = (int)(ptr2 - ctop - 1);
 					assert(0 <= ext_name_len);
 					memcpy(ext_name, ctop + 1, ext_name_len);
 					ptr2 = ctop;

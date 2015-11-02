@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,12 +30,13 @@ GBLREF bool	prin_out_dev_failure;
 void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 {
 	d_tt_struct	*tt_ptr;
-	int4		write_len, status;
+	int4		status;
+	ssize_t		write_len;
 	error_def(ERR_NOPRINCIO);
 
 	tt_ptr = io_ptr->dev_sp;
 	assert(tt_ptr->write_active);
-	write_len = tt_ptr->tbuffp - tt_ptr->ttybuff;
+	write_len = (ssize_t)(tt_ptr->tbuffp - tt_ptr->ttybuff);
 
 	if (0 < write_len)
 	{

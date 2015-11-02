@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,7 +121,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 				}
 			} else
 			{
-				iorm_write_utf_ascii(iod, RMEOL, strlen(RMEOL));
+				iorm_write_utf_ascii(iod, RMEOL,STRLEN(RMEOL));
 			}
 			rm_ptr->out_bytes = 0;
 		} else

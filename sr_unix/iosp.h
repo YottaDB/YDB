@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 #include "gtm_ctype.h"
 
 #define SS_NORMAL  0
-#define SS_NOLOGNAM  ((uint4)-1)
+#define SS_NOLOGNAM  -1
 #define SS_ENDOFTAPE 2
 #define SS_ENDOFFILE 4
 

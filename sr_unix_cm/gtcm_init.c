@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,13 @@
 #include "getzdir.h"		/* for getzdir() prototype */
 #include "gt_timer.h"		/* for prealloc_gt_timers() prototype */
 #include "cli.h"
+#include "filestruct.h"
+#include "jnl.h"		/* for inctn_detail */
+#include "gdskill.h"
+#include "buddy_list.h"
+#include "hashtab_int4.h"
+#include "tp.h"
+#include "init_secshr_addrs.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -73,6 +80,8 @@ GBLREF uint4			process_id;
 GBLREF jnlpool_addrs		jnlpool;
 GBLREF bool			certify_all_blocks;
 GBLREF boolean_t		is_replicator;
+GBLREF inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
+GBLREF short			dollar_tlevel;
 
 void	gtcm_fail(int sig);
 
@@ -84,10 +93,9 @@ void	gtcm_fail(int sig);
  */
 void gtcm_init(int argc, char_ptr_t argv[])
 {
-	char			*ptr, *getenv();
+	char			*ptr;
 	struct sigaction 	ignore, act;
 	void			get_page_size();
-	void			init_secshr_addrs();
 	gd_addr 		*get_next_gdr();
 	int		  	pid;
 	char			msg[256];
@@ -183,7 +191,8 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	rts_stringpool = stringpool;
 	curr_pattern = pattern_list = &mumps_pattern;
 	pattern_typemask = mumps_pattern.typemask;
-	init_secshr_addrs(get_next_gdr, cw_set, NULL, &cw_set_depth, process_id, 0, OS_PAGE_SIZE, &jnlpool.jnlpool_dummy_reg);
+	init_secshr_addrs(get_next_gdr, cw_set, NULL, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
+		&jnlpool.jnlpool_dummy_reg, &inctn_detail, &dollar_tlevel);
 	initialize_pattern_table();
 
 	 /* Preallocate some timer blocks. */

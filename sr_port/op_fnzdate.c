@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 			{
 				temp_mval.mvtype = MV_STR;
 				temp_mval.str.addr = (char *)outptr;
-				temp_mval.str.len = outtop - outptr;
+				temp_mval.str.len = INTCAST(outtop - outptr);
 				s2n(&temp_mval);
 				time = MV_FORCE_INT(&temp_mval);
 				if (time < 0) time = 0;
@@ -102,7 +102,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 		day -= month * 365;
 		for (i = montab ; day >= *i ; day -= *i++)
 			;
-		month = (i - montab) + 1;
+		month = (int)((i - montab)) + 1;
 		day++;
 		assert(month > 0 && month <= 12);
 	}
@@ -126,7 +126,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 		fmtptr = (unsigned char *)fmt->str.addr;
 		fmttop = fmtptr + fmt->str.len;
 	}
-	outlen = fmttop - fmtptr;
+	outlen = (int)(fmttop - fmtptr);
 	if (outlen >= ZDATE_MAX_LEN)
 		rts_error(VARLSTCNT(1) ERR_ZDATEFMT);
 	outptr = stringpool.free;
@@ -268,7 +268,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 		rts_error(VARLSTCNT(1) ERR_ZDATEFMT);
 	dst->mvtype = MV_STR;
 	dst->str.addr = (char *)stringpool.free;
-	dst->str.len = (char *)outptr - dst->str.addr;
+	dst->str.len = INTCAST((char *)outptr - dst->str.addr);
 	stringpool.free = outptr;
 	return;
 }

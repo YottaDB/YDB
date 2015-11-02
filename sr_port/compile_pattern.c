@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ int compile_pattern(oprtype *opr, bool is_indirect)
 	} else
 	{
 		instr.addr = (char *)&source_buffer[source_column - 1];
-		instr.len = strlen(instr.addr);
+		instr.len = STRLEN(instr.addr);
 		status = patstr(&instr, &retstr, NULL);
 		last_source_column = (short int)(instr.addr - (char *)source_buffer);
 		assert(last_source_column);
@@ -75,7 +75,7 @@ int compile_pattern(oprtype *opr, bool is_indirect)
 			return FALSE;
 		}
 		retmval.mvtype = MV_STR;
-		retmval.str.len = retstr.len * sizeof(uint4);
+		retmval.str.len = retstr.len * SIZEOF(uint4);
 		retmval.str.addr = (char *)stringpool.free;
 		if (stringpool.top - stringpool.free < retmval.str.len)
 			stp_gcol(retmval.str.len);

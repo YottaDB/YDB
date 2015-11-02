@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ void mlk_shrclean(gd_region *region,
 	bool			delete_status;
 	sgmnt_addrs		*csa;
 
-	max_loop_tries = ((sm_uc_ptr_t)R2A(ctl->subtop) - (sm_uc_ptr_t)ctl) / sizeof(mlk_shrblk);
+	max_loop_tries = (int4)(((sm_uc_ptr_t)R2A(ctl->subtop) - (sm_uc_ptr_t)ctl) / sizeof(mlk_shrblk));
 		/* although more than the actual, it is better than underestimating */
 
 	for (d = d0 = (mlk_shrblk_ptr_t)R2A(d->rsib), d1 = NULL; d != d1 && max_loop_tries > lcnt; lcnt++)

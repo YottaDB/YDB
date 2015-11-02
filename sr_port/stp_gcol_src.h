@@ -117,8 +117,8 @@ static mstr		**topstr, **array, **arraytop;
 #endif /* end if STP_MOVE ... else ... */
 
 #define MV_STPG_PUT(X) \
-	(*topstr++ = (X), topstr >= arraytop ? \
-        (stp_put_int = topstr - array, stp_expand_array(), array = stp_array, \
+	(*topstr++ = (X), topstr >= arraytop ?  \
+         (stp_put_int = (int)(topstr - array), stp_expand_array(), array = stp_array,\
         topstr = array + stp_put_int, arraytop = array + stp_array_size) : 0)
 
 #define PROCESS_CACHE_ENTRY(cp)								\
@@ -177,7 +177,7 @@ static mstr		**topstr, **array, **arraytop;
 	while (cstr < topstr) \
 	{ \
 		if (mstr_native_align) \
-			stringpool.free = (unsigned char *)ROUND_UP2((uint4)stringpool.free, NATIVE_WSIZE); \
+			stringpool.free = (unsigned char *)ROUND_UP2((INTPTR_T)stringpool.free, NATIVE_WSIZE); \
 		/* Determine extent of next contiguous block and copy it into new stringpool.base. */ \
 		begaddr = endaddr = (unsigned char *)((*cstr)->addr); \
 		delta = (*cstr)->addr - (char *)stringpool.free; \
@@ -201,8 +201,9 @@ static void expand_stp(unsigned int new_size)
 void mv_parse_tree_collect(mvar *node);
 void mv_parse_tree_collect(mvar *node)
 {
-	mstr	*string;
-	int	stp_put_int;
+	mstr		*string;
+	int		stp_put_int;
+
 	string = (mstr *)STR_STPG_GET(&node->mvname);
 	if (string)
 		MV_STPG_PUT(string);
@@ -225,8 +226,8 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 	int			space_asked = 0, move_count = 0;
 #endif
 	unsigned char		*strpool_base, *straddr, *tmpaddr, *begaddr, *endaddr;
-	int			delta, index, blklen, space_before_compact, space_after_compact, space_needed;
-	int			stp_put_int, fixup_cnt, tmplen, totspace, padlen;
+	int			index, space_needed, stp_put_int, fixup_cnt, tmplen, totspace;
+	long			space_before_compact, space_after_compact, blklen, delta, space_reclaim, padlen;
 	io_log_name		*l;		/* logical name pointer		*/
 	lv_blk			*lv_blk_ptr;
 	lv_sbs_tbl		*tbl;
@@ -255,7 +256,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 	static int		indr_stp_maxnoexp_passes = STP_INITMAXNOEXP_PASSES;
 	static int		rts_stp_maxnoexp_passes = STP_INITMAXNOEXP_PASSES;
 	int			*maxnoexp_passes;
-	int			stp_incr, space_reclaim;
+	int			stp_incr;
 	boolean_t		maxnoexp_growth;
 	ht_ent_objcode 		*tabent_objcode, *topent;
 	ht_ent_mname		*tabent_mname, *topent_mname;
@@ -267,8 +268,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	assert(stringpool.top - stringpool.free < space_asked || space_asked == 0);
-	assert(((unsigned)stringpool.top & 0x00000003) == 0);
-
+        assert(CHK_BOUNDARY_ALIGNMENT(stringpool.top) == 0);
 #ifdef STP_MOVE
 	assert(from < to); /* why did we call with zero length range, or a bad range? */
 	assert((from <  (char *)stringpool.base && to <  (char *)stringpool.base) || /* range to be moved should not intersect */
@@ -643,7 +643,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 		if (stp_incr < space_needed)
 			stp_incr = ROUND_UP(space_needed, OS_PAGE_SIZE);
 		assert(stp_incr + stringpool.top - stringpool.base >= space_needed + blklen);
-		expand_stp(stp_incr + stringpool.top - stringpool.base);
+		expand_stp((unsigned int)(stp_incr + stringpool.top - stringpool.base));
 		if (strpool_base != stringpool.base) /* expanded successfully */
 		{
 			cstr = array;
@@ -690,7 +690,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 			{
 				/* Determine extent of next contiguous block to move and move it. */
 				if (mstr_native_align)
-					stringpool.free = (unsigned char *)ROUND_UP2((uint4)stringpool.free, NATIVE_WSIZE);
+					stringpool.free = (unsigned char *)ROUND_UP2((INTPTR_T)stringpool.free, NATIVE_WSIZE);
 				begaddr = endaddr = (unsigned char *)((*cstr)->addr);
 				delta = (*cstr)->addr - (char *)stringpool.free;
 				PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta);

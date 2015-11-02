@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,19 @@
 #include "gbldirnam.h"
 #include "hashtab_mname.h"
 
+#ifdef GTM64
+#define SAVE_ADDR_REGION                   \
+{ \
+	int4 *tmp = (int *)&(addr->regions); \
+	*int4_ptr++ = *tmp; \
+	int4_ptr++;       \
+}
+#else /* GTM64 */
+#define SAVE_ADDR_REGION                   \
+	*int4_ptr++ = (int4)addr->regions;
+#endif /* GTM64 */
+
+
 typedef struct gdr_name_struct
 {
 	mstr		name;
@@ -46,7 +59,7 @@ gd_addr *create_dummy_gbldir(void)
 	gd_region	*region;
 	gd_region	*region_top;
 	gd_segment	*segment;
-	int4		*long_ptr;
+	int4		*int4_ptr;
 	uint4		t_offset, size;
 
 	size = sizeof(header_struct) + sizeof(gd_addr) + 3 * sizeof(gd_binding) + 1 * sizeof(gd_region) + 1 * sizeof(gd_segment);
@@ -57,47 +70,47 @@ gd_addr *create_dummy_gbldir(void)
 	memcpy(header->label, GDE_LABEL_LITERAL, sizeof(GDE_LABEL_LITERAL));
 	addr = (gd_addr *)((char *)header + sizeof(header_struct));
 	addr->max_rec_size = 256;
-	addr->maps = (gd_binding*)((unsigned )addr + sizeof(gd_addr));
+	addr->maps = (gd_binding*)((UINTPTR_T)addr + sizeof(gd_addr));
 	addr->n_maps = 3;
-	addr->regions = (gd_region*)((int4)(addr->maps) + 3 * sizeof(gd_binding));
+	addr->regions = (gd_region*)((INTPTR_T)(addr->maps) + 3 * sizeof(gd_binding));
 	addr->n_regions = 1;
-	addr->segments = (gd_segment*)((int4)(addr->regions) + sizeof(gd_region));
+	addr->segments = (gd_segment*)((INTPTR_T)(addr->regions) + sizeof(gd_region));
 	addr->n_segments = 1;
 	addr->link = 0;
 	addr->tab_ptr = 0;
 	addr->id = 0;
 	addr->local_locks = 0;
-	addr->end = (int4)(addr->segments + 1 * sizeof(gd_segment));
-	long_ptr = (int4*)((int4)(addr->maps));
-	*long_ptr++ = 0x232FFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = (int4)addr->regions;
-	*long_ptr++ = 0x24FFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = (int4)addr->regions;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = (int4)addr->regions;
-	region = (gd_region*)((int4)(addr->regions));
-	segment = (gd_segment*)((int4)(addr->segments));
+	addr->end = (UINTPTR_T)(addr->segments + 1 * sizeof(gd_segment));
+	int4_ptr = (int4*)(addr->maps);
+	*int4_ptr++ = 0x232FFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+        SAVE_ADDR_REGION
+	*int4_ptr++ = 0x24FFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+        SAVE_ADDR_REGION
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+        SAVE_ADDR_REGION
+	region = (gd_region*)(addr->regions);
+	segment = (gd_segment*)(addr->segments);
 	region->rname_len = 7;
 	memcpy(region->rname,"DEFAULT",7);
 

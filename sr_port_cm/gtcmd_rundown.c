@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 			wcs_timer_start(gv_cur_region, TRUE);
 		que_next = (cm_region_list *)((unsigned char *)ptr + ptr->regque.fl);
 		que_last = (cm_region_list *)((unsigned char *)ptr + ptr->regque.bl);
-		link = (unsigned char *)que_next - (unsigned char *)que_last;
+		link = (int4)((unsigned char *)que_next - (unsigned char *)que_last);
 		que_last->regque.fl = link;
 		que_next->regque.bl = -link;
 		last = ptr;

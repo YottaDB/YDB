@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ GBLREF	stack_frame		*frame_pointer;
  * returns FALSE otherwise */
 static	boolean_t	fill_dollar_stack_info(mval *mvalptr, mstr *mstrptr)
 {
-	int	space_left;
+	ssize_t		space_left;
 
 	if (mvalptr->str.len)
 	{
@@ -105,11 +105,11 @@ static	boolean_t	fill_dollar_stack_level(int array_level, int frame_level, int c
 
 boolean_t	ecode_add(mstr *str)		/* add "str" to $ECODE and return whether SUCCESS or FAILURE as TRUE/FALSE */
 {
-	int		space_left, ecode_index, stack_index;
+	int		ecode_index, stack_index;
 	boolean_t	shrink;
  	int		cur_zlevel, level;
 	char		eclostmid_buf[MAX_DIGITS_IN_INT + STR_LIT_LEN(",Z,")], *dest;
-	int		eclostmid_len;
+	ssize_t		space_left, eclostmid_len;
 
 	error_def(ERR_ECLOSTMID);
 
@@ -166,7 +166,7 @@ boolean_t	ecode_add(mstr *str)		/* add "str" to $ECODE and return whether SUCCES
 	}
 	if (shrink)
 	{
-		INCR_ECODE_INDEX(dollar_ecode.index, &eclostmid_buf[0], eclostmid_len);
+		INCR_ECODE_INDEX(dollar_ecode.index, &eclostmid_buf[0], (mstr_len_t)eclostmid_len);
 	}
 	INCR_ECODE_INDEX(dollar_ecode.index, str->addr, str->len);
 	if ((1 == dollar_ecode.index)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ int mlk_tree_wake_children(mlk_ctldata_ptr_t ctl,
 
 	gotone = FALSE;
 
-	max_loop_tries = ((sm_uc_ptr_t)R2A(ctl->subtop) - (sm_uc_ptr_t)ctl) / sizeof(mlk_shrblk);
+	max_loop_tries = (int4)(((sm_uc_ptr_t)R2A(ctl->subtop) - (sm_uc_ptr_t)ctl) / sizeof(mlk_shrblk));
 		/* although more than the actual, it is better than underestimating */
 
 	for (bhead = b = d , bnext = NULL; bnext != bhead && max_loop_tries > lcnt; lcnt++)

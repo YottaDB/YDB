@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,7 +106,7 @@ int mu_op_open(mval *v, mval *p, int t, mval *mspace)
 
 static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspace)
 {
-	uint4		status;
+	int4		status;
 	int4		size;
 	mstr		tn;		/* translated name */
 	mstr		chset_mstr;

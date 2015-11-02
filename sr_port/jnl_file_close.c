@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,8 +73,11 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
-	assert(csa->now_crit || (csd->clustered && (CCST_CLOSED == csa->nl->ccp_state)));
-	ASSERT_JNLFILEID_NOT_NULL(csa)
+	assert(!clean || csa->now_crit || (csd->clustered && (CCST_CLOSED == csa->nl->ccp_state)));
+	DEBUG_ONLY(
+		if (clean)
+			ASSERT_JNLFILEID_NOT_NULL(csa);
+	)
 	jpc = csa->jnl;
 #if defined(UNIX)
 	if (csa->dbsync_timer)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,8 +53,8 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  *	V17	V17	GT.M V5.0-000
  */
 
-#define IF_INVALID	((intlfltr_t)0)
-#define IF_NONE		((intlfltr_t)(-1))
+#define IF_INVALID	((intlfltr_t)0L)
+#define IF_NONE		((intlfltr_t)(-1L))
 #define IF_12TO15	(intlfltr_t)jnl_v12tov15
 #define IF_15TO12	(intlfltr_t)jnl_v15tov12
 #define IF_16TO12	(intlfltr_t)jnl_v16tov12

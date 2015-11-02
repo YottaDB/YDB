@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -137,7 +137,7 @@ int mu_bin_read(void)
 	io_desc		*iod;
 	d_rm_struct     *d_rm;
 
-	s1 = buff1_end - buff1_ptr;
+	s1 = (int)(buff1_end - buff1_ptr);
 	memmove(buff1, buff1_ptr, s1);
 	buff1_end = buff1 + s1;
 	buff1_ptr = buff1;
@@ -176,7 +176,7 @@ short	mu_load_get(char **in_ptr)
 		if ( !(io_curr_device.in->dollar.x) )
 		{
 			*in_ptr = buff1_ptr;
-			ret_len = buff1_end - buff1_ptr;
+			ret_len = (int)(buff1_end - buff1_ptr);
 			REVERT;
 			return ret_len;
 		}

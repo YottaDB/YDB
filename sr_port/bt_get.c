@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@ bt_rec_ptr_t bt_get(int4 block)		/* block = block # to get */
 	assert(bt->blk == BT_QUEHEAD);
 	for (lcnt = csa->hdr->n_bts; lcnt > 0; lcnt--)
 	{
-		bt = (bt_rec_ptr_t) ((sm_uc_ptr_t) bt + bt->blkque.fl);
+		bt = (bt_rec_ptr_t)((sm_uc_ptr_t) bt + bt->blkque.fl);
 		if (bt->blk == block)
 			return bt;
 		if (bt->blk == BT_QUEHEAD)

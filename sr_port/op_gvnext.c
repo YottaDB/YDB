@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -115,7 +115,7 @@ void op_gvnext(mval *v)
 		v->str.addr = (char *) stringpool.free;
 		c = (char *)(&gv_altkey->base[0] + gv_altkey->prev);
 		stringpool.free = gvsub2str ((uchar_ptr_t)c,stringpool.free, FALSE);
-		v->str.len = stringpool.free - (unsigned char *) v->str.addr;
+		v->str.len = INTCAST(stringpool.free - (unsigned char *) v->str.addr);
 		assert (v->str.addr < (char *) stringpool.top && v->str.addr >= (char *) stringpool.base);
 		assert (v->str.addr + v->str.len <= (char *) stringpool.top &&
 			v->str.addr + v->str.len >= (char *) stringpool.base);

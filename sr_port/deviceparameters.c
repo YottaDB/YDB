@@ -554,7 +554,7 @@ int deviceparameters(oprtype *c, char who_calls)
 				*/
 				if (parptr - parstr + x.oprval.tref->operand[0].oprval.mlit->v.str.len + 5 > sizeof(parstr))
 				{
-					cat_list[cat_cnt++] = put_str(parstr, parptr - parstr);
+					cat_list[cat_cnt++] = put_str(parstr, INTCAST(parptr - parstr));
 					parptr = parstr;
 				}
 				assert(x.oprval.tref->operand[0].oprclass == MLIT_REF);
@@ -570,7 +570,7 @@ int deviceparameters(oprtype *c, char who_calls)
 			{
 				if (parptr > parstr)
 				{
-					cat_list[cat_cnt++] = put_str(parstr, parptr - parstr);
+					cat_list[cat_cnt++] = put_str(parstr, INTCAST(parptr - parstr));
 					parptr = parstr;
 				}
 				ref = newtriple(OC_CVTPARM);
@@ -596,12 +596,13 @@ int deviceparameters(oprtype *c, char who_calls)
 	}
 	if (parse_warn)
 	{	/* Parse the remaining arguments until the corresponding RIGHT-PAREN or SPACE or EOL is reached */
-		parse_until_rparen_or_space();
+		if (!parse_until_rparen_or_space())
+			return FALSE;
 		if (window_token == TK_RPAREN)
 			advancewindow();
 	}
 	*parptr++ = iop_eol;
-	cat_list[cat_cnt++] = put_str(parstr,parptr - parstr);
+	cat_list[cat_cnt++] = put_str(parstr,INTCAST(parptr - parstr));
 	if (cat_cnt <= 1)
 		*c = cat_list[0];
 	else

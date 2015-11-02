@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@
 #include "gtm_exit_handler.h"
 #include "gtm_savetraps.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
+#include "code_address_type.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -66,7 +67,7 @@ static callin_entry_list* get_entry(const char* call_name)
 	callin_entry_list	*entry;
 	int 			len;
 	entry = ci_table;
-	for (len = strlen(call_name); NULL != entry; entry = entry->next_entry)
+	for (len = STRLEN(call_name); NULL != entry; entry = entry->next_entry)
 	{
 		while (NULL != entry && entry->call_name.len != len)
 			entry = entry->next_entry;
@@ -123,7 +124,7 @@ int gtm_ci (const char *c_rtn_name, ...)
 	 * On NON_USHBIN platforms -- 2nd argument to EXTCALL is this pointer
 	 * On USHBIN -- 2nd argument to EXTCALL is the pointer to this pointer (&lnr_entry) */
 	lnr_entry = &label_offset;
-	*lnr_entry = CODE_OFFSET(base_addr, transfer_addr);
+	*lnr_entry = (uint4)CODE_OFFSET(base_addr, transfer_addr);
 	param_blk.labaddr = USHBIN_ONLY(&)lnr_entry;
 	param_blk.argcnt = entry->argcnt;
 
@@ -199,7 +200,7 @@ int gtm_ci (const char *c_rtn_name, ...)
 				case xc_char_star:
 					arg_mval.mvtype = MV_STR;
 					arg_mval.str.addr = va_arg(var, gtm_char_t*);
-					arg_mval.str.len = strlen(arg_mval.str.addr);
+					arg_mval.str.len = STRLEN(arg_mval.str.addr);
 					if (MAX_STRLEN < arg_mval.str.len)
 					{
 						va_end(var);
@@ -229,7 +230,7 @@ int gtm_ci (const char *c_rtn_name, ...)
 	}
 	va_end(var);
 	param_blk.mask = out_mask;
-	param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0) ? &op_extcall : &op_extexfun;
+param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0) ? CODE_ADDRESS_TYPE(op_extcall) : CODE_ADDRESS_TYPE(op_extexfun);
 	/* the params block needs to be stored & restored across multiple
 	   gtm environments. So instead of storing explicitely, setting the
 	   global param_list to point to local param_blk will do the job */
@@ -357,7 +358,7 @@ int gtm_init()
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,
 		 * the unwind logic in gtmci_ch() will get rid of the whole stack. */
-		msp = (unsigned char*)-1;
+		msp = (unsigned char*)-1L;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (!gtm_startup_active)
@@ -437,3 +438,27 @@ void gtm_zstatus(char* msg, int len)
 	memcpy(msg, dollar_zstatus.str.addr, msg_len);
 	msg[msg_len] = 0;
 }
+
+#ifdef _AIX
+/* If libgtmshr was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
+   the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
+   'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
+   our exit handler has already been called. Linux and Solaris don't need this, looking at the
+   other platforms we support to see if resolutions can be found. This routine will be called
+   by the OS when libgtmshr is unloaded. Specified with the -binitfini loader option on AIX
+   to be run when the shared library is unloaded. 06/2007 SE
+*/
+void gtmci_cleanup(void)
+{	/* This code is only for callin cleanup */
+	if (MUMPS_CALLIN != invocation_mode)
+		return;
+	/* If we have already run the exit handler, no need to do so again */
+	if (gtm_startup_active)
+	{
+		gtm_exit_handler();
+		gtm_startup_active = FALSE;
+	}
+	/* Unregister exit handler .. AIX only for now */
+	unatexit(gtm_exit_handler);
+}
+#endif

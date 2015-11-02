@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,5 +24,5 @@
 #undef memcmp
 int gtm_memcmp (const void *a, const void *b, size_t len)
 {
-	return (len == 0 ? len : memcmp(a, b, len));
+	return (int)(len == 0 ? len : memcmp(a, b, len));
 }

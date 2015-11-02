@@ -57,7 +57,7 @@ typedef struct	mliteralstruct
 		struct	mliteralstruct	*fl,
 					*bl;
 	}			que;
-	int			rt_addr;
+        INTPTR_T       		rt_addr;
 	mval			v;
 } mliteral;
 
@@ -171,20 +171,9 @@ typedef struct
 } toktabtype;
 
 #ifdef DEBUG
-#  define COMPDBG(x) if (gtmDebugLevel & GDL_DebugCompiler) {x}
+#  define COMPDBG(x)	if (gtmDebugLevel & GDL_DebugCompiler) {x}
 #else
 #  define COMPDBG(x)
-#endif
-#ifdef DEBUG_TRIPLES
-#  define chktchain(x) 										\
-{												\
-	triple *tp;										\
-	for (tp = (x)->exorder.fl; tp != (x); tp = tp->exorder.fl)				\
-		if (tp->exorder.bl->exorder.fl != tp || tp->exorder.fl->exorder.bl != tp)	\
-			GTMASSERT;								\
-}
-#else
-#  define chktchain(x)
 #endif
 
 /* Some errors should not cause stx_error to issue an rts_error. These are the errors related to
@@ -235,13 +224,13 @@ error_def(ERR_DEVPARVALREQ);
 #define	NO_FORMALLIST	(-1)
 #define	MAX_ACTUALS	32
 
-void	parse_until_rparen_or_space(void);
+int	parse_until_rparen_or_space(void);
 
 triple *maketriple(opctype op);
 triple *newtriple(opctype op);
 void  ins_triple(triple *x);
 triple *setcurtchain(triple *x);
-int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, int src_len);
+int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len_t src_len);
 void comp_init(mstr *src);
 void comp_indr(mstr *obj);
 bool compiler_startup(void);
@@ -256,10 +245,12 @@ oprtype put_mfun(mident *l);
 oprtype put_mlab(mident *l);
 oprtype put_mnxl(void);
 oprtype put_mvar(mident *x);
-oprtype put_str(char *pt, int n);
+oprtype put_str(char *pt, mstr_len_t n);
 oprtype put_tjmp(triple *x);
 oprtype put_tnxt(triple *x);
 oprtype put_tref(triple *x);
+
+void	chktchain(triple *head);
 
 int bool_expr(bool op, oprtype *addr);
 int eval_expr(oprtype *a);

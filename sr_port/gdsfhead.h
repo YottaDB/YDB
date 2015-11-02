@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,12 +106,13 @@ typedef struct cache_rec_struct
 	/* this point should be quad-word aligned */
 
 	trans_num	dirty;		/* block has been modified since last written to disk; used by bt_put, db_csh_getn
-  					 * mu_rndwn_file wcs_recover, secshr_db_clnup, wr_wrtfin_all and extensively by the ccp */
+					 * mu_rndwn_file wcs_recover, secshr_db_clnup, wr_wrtfin_all and extensively by the ccp */
 	trans_num	flushed_dirty_tn;	/* value of dirty at the time of flushing */
 	trans_num	tn;
 	sm_off_t	bt_index;	/* offset to bt_rec */
 	sm_off_t	buffaddr;	/* offset to buffer holding actual data*/
-        sm_off_t	twin;		/* offset to cache_rec of another copy of the same block from bg_update & wcs_wt_all(VMS)*/
+	sm_off_t	twin;		/* (VMS) offset to cache_rec of another copy of the same block from bg_update & wcs_wt_all
+					 * (Unix & VMS) offset to cache_rec holding before-image for wcs_recover to backup */
 #ifdef VMS
 	sm_off_t	shmpool_blk_off; /* Offset to shmpool block containing the reformat buffer for this CR */
 	int4		filler;		/* Alignment */
@@ -179,12 +180,13 @@ typedef struct
 	/* this point should be quad-word aligned */
 
 	trans_num	dirty;		/* block has been modified since last written to disk; used by bt_put, db_csh_getn
-  					 * mu_rndwn_file wcs_recover, secshr_db_clnup, wr_wrtfin_all and extensively by the ccp */
+ 					 * mu_rndwn_file wcs_recover, secshr_db_clnup, wr_wrtfin_all and extensively by the ccp */
 	trans_num	flushed_dirty_tn;	/* value of dirty at the time of flushing */
 	trans_num	tn;
 	sm_off_t	bt_index;	/* offset to bt_rec */
 	sm_off_t	buffaddr;	/* offset to buffer holding actual data*/
-	sm_off_t	twin;		/* offset to cache_rec of another copy of the same block from bg_update & wcs_wt_all(VMS)*/
+	sm_off_t	twin;		/* (VMS) offset to cache_rec of another copy of the same block from bg_update & wcs_wt_all
+					 * (Unix & VMS) offset to cache_rec holding before-image for wcs_recover to backup */
 #ifdef VMS
 	sm_off_t	shmpool_blk_off; /* Offset to shmpool block containing the reformat buffer for this CR */
 	int4		filler;		/* Alignment */
@@ -280,7 +282,7 @@ void verify_queue(que_head_ptr_t qhdr);
 #define	DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd)							\
 {														\
 	cache_rec_ptr_t		cache_start;									\
-	int4			bufindx;									\
+	long			bufindx;									\
 	sm_uc_ptr_t		bufstart;									\
 	GBLREF	boolean_t	dse_running, write_after_image;							\
 														\
@@ -511,9 +513,9 @@ void verify_queue(que_head_ptr_t qhdr);
 /* Interlocked queue instruction constants ... */
 
 #define	QI_STARVATION		3
-#define EMPTY_QUEUE		0
+#define EMPTY_QUEUE		0L
 #define QUEUE_WAS_EMPTY		1
-#define INTERLOCK_FAIL		-1
+#define INTERLOCK_FAIL		-1L
 #define QUEUE_INSERT_SUCCESS	1
 
 typedef trans_num	bg_trc_rec_tn;
@@ -570,7 +572,7 @@ typedef struct compswap_time_field_struct
 	   size of global_latch_t's largest size (on HPUX).
 	*/
 	global_latch_t	time_latch;
-#ifndef __hpux
+#ifndef __hppa
 	int4		hp_latch_space[4];	/* padding only on non-hpux systems */
 #endif
 } compswap_time_field;
@@ -728,8 +730,8 @@ typedef struct sgmnt_data_struct
 	/************* FIELDS USED ONLY BY UNIX ********************************/
 	int4		semid;			/* Since int may not be of fixed size, int4 is used */
 	int4		shmid;			/* Since int may not be of fixed size, int4 is used */
-	gtm_time8	sem_ctime;		/* time of creation of semaphore */
-	gtm_time8	shm_ctime;		/* time of creation of shared memory */
+	gtm_time8	gt_sem_ctime;		/* time of creation of semaphore */
+	gtm_time8	gt_shm_ctime;		/* time of creation of shared memory */
 	char		filler_unixonly[40];	/* to ensure this section has 64-byte multiple size */
 	/************* ACCOUNTING INFORMATION ********************************/
 	int4		n_retries[CDB_MAX_TRIES];
@@ -980,8 +982,8 @@ typedef struct
 typedef struct	file_control_struct
 {
 	sm_uc_ptr_t	op_buff;
+	UNIX_ONLY(gtm_int64_t) VMS_ONLY(int4)	op_pos;
 	int		op_len;
-	int		op_pos;
 	void		*file_info;   /* Pointer for OS specific struct */
 	char		file_type;
 	char		op;
@@ -1008,8 +1010,8 @@ typedef struct	gd_addr_struct
 	struct gd_segment_struct	*segments;
 	struct gd_addr_struct		*link;
 	struct hash_table_mname_struct  *tab_ptr;
-	gd_id				*id;	/* Need to be converted to be of type gd_id_ptr_t when 64-bit port is done */
-	int4				end;
+	gd_id				*id;
+        UINTPTR_T			end;
 } gd_addr;
 typedef gd_addr *(*gd_addr_fn_ptr)();
 
@@ -1242,11 +1244,11 @@ typedef struct	gv_namehead_struct
 	srch_hist	*alt_hist;			/* alternate history. initialized once per gv_target */
 	struct collseq_struct	*collseq;		/* pointer to a linked list of user supplied routine addresses
 			 				   for internationalization */
-	uint4		filler_uint4;			/* To make clue start at 8-byte boundary */
+	NON_GTM64_ONLY(uint4		filler_uint4;)	/* To make clue start at 8-byte boundary */
 	gv_key		clue;				/* Clue key, must be last in namehead struct because of hung buffer */
 } gv_namehead;
 
-#define INVALID_GV_TARGET (gv_namehead *)-1
+#define INVALID_GV_TARGET (gv_namehead *)-1L
 
 /* Following three macros define the mechanism to restore gv_target under normal and error conditions.
  * RESET_GV_TARGET should be used to restore gv_target from the global, reset_gv_target, only when we
@@ -1308,7 +1310,7 @@ typedef struct	gv_namehead_struct
 			temp = &mv_chain->mv_st_cont.mvs_mval;									\
 			temp->mvtype = MV_STR;											\
 			temp->str.addr = (char *)buff;										\
-			temp->str.len = end - buff;										\
+			temp->str.len = (mstr_len_t)(end - buff);								\
 			mval2subsc(temp, gv_currkey);										\
 			POP_MV_STENT(); /* temp */										\
 		} else														\
@@ -1472,20 +1474,31 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 # pragma pointer_size(restore)
 #endif
 
-#define INCR_KIP(CSD, CSA, KIP_FLAG)				\
-{								\
-	assert(!KIP_FLAG);					\
-	INCR_CNT(&CSD->kill_in_prog, &CSA->nl->wc_var_lock);	\
-	KIP_FLAG = TRUE;					\
-}
 #define DECR_KIP(CSD, CSA, KIP_FLAG)				\
 {								\
 	assert(KIP_FLAG);					\
 	KIP_FLAG = FALSE;					\
 	DECR_CNT(&CSD->kill_in_prog, &CSA->nl->wc_var_lock);	\
 }
+/* Note that the INCR_KIP and CAREFUL_INCR_KIP macros should be maintained in parallel */
+#define INCR_KIP(CSD, CSA, KIP_FLAG)				\
+{								\
+	assert(!KIP_FLAG);					\
+	INCR_CNT(&CSD->kill_in_prog, &CSA->nl->wc_var_lock);	\
+	KIP_FLAG = TRUE;					\
+}
+/* The CAREFUL_INCR_KIP macro is the same as the INCR_KIP macro except that it uses CAREFUL_INCR_CNT instead of INCR_CNT.
+ * This does alignment checks and is needed by secshr_db_clnup as it runs in kernel mode in VMS.
+ * The INCR_KIP and CAREFUL_INCR_KIP macros should be maintained in parallel.
+ */
+#define CAREFUL_INCR_KIP(CSD, CSA, KIP_FLAG)				\
+{									\
+	assert(!KIP_FLAG);						\
+	CAREFUL_INCR_CNT(&CSD->kill_in_prog, &CSA->nl->wc_var_lock);	\
+	KIP_FLAG = TRUE;						\
+}
 #define INVALID_SEMID -1
-#define INVALID_SHMID -1
+#define INVALID_SHMID -1L
 
 #if defined(UNIX)
 #define DB_FSYNC(reg, udi, csa, db_fsync_in_prog, save_errno)					\
@@ -1532,11 +1545,11 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 /* A more efficient macro than CR_BUFFER_CHECK when we have cr_lo and cr_hi already available */
 #define CR_BUFFER_CHECK1(reg, csa, csd, cr, cr_lo, cr_hi)					\
 {												\
-	int4  	bp, bp_lo, bp_top, cr_top;							\
+	INTPTR_T bp, bp_lo, bp_top, cr_top;							\
 	error_def(ERR_DBCRERR);									\
 												\
 	cr_top = GDS_ANY_ABS2REL(csa, cr_hi);							\
-	bp_lo = ROUND_UP(cr_top, OS_PAGE_SIZE);						\
+	bp_lo = ROUND_UP(cr_top, OS_PAGE_SIZE);							\
 	bp = bp_lo + ((cr) - (cr_lo)) * csd->blk_size;						\
 	if (bp != cr->buffaddr)									\
 	{											\

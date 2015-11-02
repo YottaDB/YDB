@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@ triple *maketriple(opctype op)
 {
 GBLREF short int source_line,source_column;
 triple *x;
-x = (triple *) mcalloc((unsigned int) sizeof(triple));
+x = (triple *)mcalloc(USIZEOF(triple));
 x->opcode = op;
 x->src.line = source_line;
 x->src.column = source_column;

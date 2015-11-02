@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,7 +82,7 @@ void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 	va_end(var);
 	dst->mvtype = MV_STR;
 	dst->str.addr = (char *) base;
-	dst->str.len = cp - base;
+	dst->str.len = INTCAST(cp - base);
 	stringpool.free = cp;
 	return;
 }

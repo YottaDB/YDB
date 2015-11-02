@@ -69,7 +69,7 @@ GBLREF	char		*KEYPAD_LOCAL, *KEYPAD_XMIT;
 #	define SEND_KEYPAD_LOCAL
 #else
 #	define	SEND_KEYPAD_LOCAL					\
-		if (edit_mode && NULL != KEYPAD_LOCAL && (keypad_len = strlen(KEYPAD_LOCAL)))	/* embedded assignment */	\
+		if (edit_mode && NULL != KEYPAD_LOCAL && (keypad_len = STRLEN(KEYPAD_LOCAL)))	/* embedded assignment */	\
 			DOWRITE(tt_ptr->fildes, KEYPAD_LOCAL, keypad_len);
 #endif
 
@@ -100,7 +100,7 @@ void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
 			curptr32 = dataptr32;
 			for (i = 0; i < datalen && outptr < outtop; i++, curptr32++)
 				outptr = UTF8_WCTOMB(*curptr32, outptr);
-			vmvalptr->str.len = outptr - buffer_start;
+			vmvalptr->str.len = INTCAST(outptr - buffer_start);
 		} else
 			vmvalptr->str.len = datalen;
 		vmvalptr->str.addr = (char *)buffer_start;
@@ -181,7 +181,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	ioptr_width = io_ptr->width;
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	/* if utf8_active, need room for multi byte characters plus wint_t buffer */
-	exp_length = utf8_active ? ((sizeof(wint_t) * length) + (GTM_MB_LEN_MAX * length) + sizeof(gtm_int64_t)) : length;
+	exp_length = utf8_active ? (int)(((sizeof(wint_t) * length) + (GTM_MB_LEN_MAX * length) + sizeof(gtm_int64_t))) : length;
 	zint_restart = FALSE;
 	if (tt_ptr->mupintr)
 	{	/* restore state to before job interrupt */
@@ -210,9 +210,10 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			if (utf8_active)
 			{	/* need to properly align U32 buffer */
 				assert(exp_length == tt_state->exp_length);
-				buffer_32_start = (wint_t *)ROUND_UP2((int4)(buffer_start + (GTM_MB_LEN_MAX * length)),
+				buffer_32_start = (wint_t *)ROUND_UP2((INTPTR_T)(buffer_start + (GTM_MB_LEN_MAX * length)),
 							sizeof(gtm_int64_t));
-				if (buffer_moved && (((int)buffer_32_start & 0x7) != ((int)tt_state->buffer_32_start & 0x7)))
+				if (buffer_moved &&
+				    (((INTPTR_T)buffer_32_start & 0x7) != ((INTPTR_T)tt_state->buffer_32_start & 0x7)))
 					memmove(buffer_32_start, buffer_start + ((unsigned char *)tt_state->buffer_32_start
 						- tt_state->buffer_start), (sizeof(wint_t) * length));
 				current_32_ptr = buffer_32_start;
@@ -241,7 +242,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		buffer_start = current_ptr = stringpool.free;
 		if (utf8_active)
 		{
-			buffer_32_start = (wint_t *)ROUND_UP2((int4)(stringpool.free + (GTM_MB_LEN_MAX * length)),
+			buffer_32_start = (wint_t *)ROUND_UP2((INTPTR_T)(stringpool.free + (GTM_MB_LEN_MAX * length)),
 					sizeof(gtm_int64_t));
 			current_32_ptr = buffer_32_start;
 		}
@@ -297,7 +298,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		{
 			/* to turn keypad on if possible */
 #ifndef __MVS__
-			if (NULL != KEYPAD_XMIT && (keypad_len = strlen(KEYPAD_XMIT)))	/* embedded assignment */
+			if (NULL != KEYPAD_XMIT && (keypad_len = STRLEN(KEYPAD_XMIT)))	/* embedded assignment */
 			{
 				DOWRITERC(tt_ptr->fildes, KEYPAD_XMIT, keypad_len, status);
 				if (0 != status)
@@ -405,7 +406,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				break;
 			}
 			continue;	/* select() timeout; keep going */
-		} else if (0 < (rdlen = read(tt_ptr->fildes, &inbyte, 1)))	/* This read is protected */
+		} else if (0 < (rdlen = (int)(read(tt_ptr->fildes, &inbyte, 1))))	/* This read is protected */
 		{
 			assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
 			/* --------------------------------------------------
@@ -452,8 +453,8 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 					{	/* invalid char */
 						io_ptr->dollar.za = 9;
 						iott_readfl_badchar(v, buffer_32_start, outlen,
-								    (more_ptr - more_buf), more_buf, more_ptr, buffer_start);
-						utf8_badchar(more_ptr - more_buf, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
+								    (int)(more_ptr - more_buf), more_buf, more_ptr, buffer_start);
+						utf8_badchar((int)(more_ptr - more_buf), more_buf, more_ptr, 0, NULL); /* BADCHAR */
 						break;
 					}
 				} else if (0 < (utf8_more = UTF8_MBFOLLOW(&inbyte)))	/* assignment */
@@ -948,7 +949,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		}
 		if (FINI ==  io_ptr->esc_state)
 		{
-			int zb_len = zb_ptr - io_ptr->dollar.zb;
+			int zb_len = (int)(zb_ptr - io_ptr->dollar.zb);
 
 			escape_edit = FALSE;
 			down = strncmp((const char *)io_ptr->dollar.zb, KEY_DOWN, zb_len);
@@ -1018,7 +1019,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 						goto term_error;
 					}
 				}
-				instr = tt_ptr->recall_buff.len;
+				instr = (int)tt_ptr->recall_buff.len;
 				if (length < instr)
 					instr = length;	/* restrict to length of read */
 				if (0 != instr)
@@ -1128,7 +1129,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		current_32_ptr = buffer_32_start;
 		for (i = 0; i < outlen && outptr < outtop; i++, current_32_ptr++)
 			outptr = UTF8_WCTOMB(*current_32_ptr, outptr);
-		v->str.len = outptr - buffer_start;
+		v->str.len = INTCAST(outptr - buffer_start);
 	} else
 #endif
 		v->str.len = outlen;
@@ -1139,7 +1140,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		{
 			if (tt_ptr->recall_buff.addr)
 				free(tt_ptr->recall_buff.addr);
-			tt_ptr->recall_size = BUFF_CHAR_SIZE * outlen;
+			tt_ptr->recall_size = (int)(BUFF_CHAR_SIZE * outlen);
 			tt_ptr->recall_buff.addr = malloc(tt_ptr->recall_size);
 		}
 		tt_ptr->recall_width = dx_outlen;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,7 +96,7 @@ void iomt_wteol (int4 cnt, io_desc *dv)
 			    + MT_RECHDRSIZ > mt_ptr->bufftop)
 			{
 				cp = (unsigned char *) (mt_ptr->rec.addr + mt_ptr->rec.len);
-				x = mt_ptr->bufftop - cp;
+				x = (int)(mt_ptr->bufftop - cp);
 				assert (x >= 0);
 				if (x > 0)
 					memset (cp, '^', x);

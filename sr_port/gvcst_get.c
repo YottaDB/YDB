@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@ bool	gvcst_get(mval *v)
 			{
 				rp = (rec_hdr_ptr_t)(gv_target->hist.h[0].buffaddr + gv_target->hist.h[0].curr_rec.offset);
 				GET_USHORT(rsiz, &rp->rsiz);
-				data_len = rsiz + rp->cmpc - sizeof(rec_hdr) - key_size;
+				data_len = rsiz + rp->cmpc - SIZEOF(rec_hdr) - key_size;
 				if (data_len < 0  || (sm_uc_ptr_t)rp + rsiz >
 					gv_target->hist.h[0].buffaddr + ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz)
 				{

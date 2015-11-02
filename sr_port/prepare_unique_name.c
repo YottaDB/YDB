@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,13 +49,13 @@ uint4 	prepare_unique_name(char *org_fn, int org_fn_len, char *prefix, char *suf
 	*ustatus = SS_NORMAL;
 	if (0 != prefix[0])
 	{
-		prefix_len = strlen(prefix);
+		prefix_len = STRLEN(prefix);
 		assert('\0' == org_fn[org_fn_len]);
 		filename_begin = strrchr(org_fn, DIR_FILE_SEPARATOR);
 		length = 0;
 		if (NULL != filename_begin)
 		{
-			length = filename_begin - org_fn + 1;
+			length = (int4)(filename_begin - org_fn + 1);
 			assert(length < org_fn_len);
 			memcpy(rename_fn, org_fn, length);
 			org_fn_len -= length;
@@ -67,7 +67,7 @@ uint4 	prepare_unique_name(char *org_fn, int org_fn_len, char *prefix, char *suf
 	}
 	if (0 != suffix[0])
 	{
-		suffix_len = strlen(suffix);
+		suffix_len = STRLEN(suffix);
 		memcpy(rename_fn, org_fn, org_fn_len);
 		memcpy(rename_fn + org_fn_len, suffix, suffix_len);
 		*rename_fn_len = org_fn_len + suffix_len;

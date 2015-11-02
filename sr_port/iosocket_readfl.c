@@ -623,7 +623,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 #ifdef UNICODE_SUPPORTED
 						if (CHSET_UTF8 == ichset)
 						{
-							iosocket_readfl_badchar(v, ((unsigned char *)c_ptr - stringpool.free),
+							iosocket_readfl_badchar(v, (int)((unsigned char *)c_ptr - stringpool.free),
 										0, c_ptr, c_top);
 							UTF8_BADCHAR(0, c_ptr, c_top, 0, NULL);
 						} else /* UTF16LE or UTF16BE */
@@ -631,9 +631,10 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							inv_beg = c_ptr;
 							if ((c_ptr += 2) >= c_top)
 								c_ptr = c_top;
-							iosocket_readfl_badchar(v, ((unsigned char *)inv_beg - stringpool.free),
-										(c_ptr - inv_beg), inv_beg, c_top);
-							UTF8_BADCHAR(c_ptr - inv_beg, inv_beg, c_top,
+							iosocket_readfl_badchar(v,
+										(int)((unsigned char *)inv_beg - stringpool.free),
+										(int)(c_ptr - inv_beg), inv_beg, c_top);
+							UTF8_BADCHAR((int)(c_ptr - inv_beg), inv_beg, c_top,
 								     chset_names[ichset].len, chset_names[ichset].addr);
 						}
 #endif
@@ -766,7 +767,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	}
 	if (chars_read > 0)
 	{	/* there's something to return */
-		v->str.len = c_ptr - stringpool.free;
+		v->str.len = INTCAST(c_ptr - stringpool.free);
 		v->str.addr = (char *)stringpool.free;
 		UNICODE_ONLY(v->str.char_len = chars_read);
 		assert(v->str.len == bytes_read);
@@ -807,7 +808,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		len = sizeof(ONE_COMMA) - 1;
 		memcpy(dsocketptr->dollar_device, ONE_COMMA, len);
 		errptr = (char *)STRERROR(real_errno);
-		errlen = strlen(errptr) + 1;
+		errlen = STRLEN(errptr) + 1;
 		memcpy(&dsocketptr->dollar_device[len], errptr, errlen);
 		if (iod->dollar.zeof || -1 == status || 0 < iod->error_handler.len)
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@ void ionl_wteol(int4 val, io_desc *io_ptr)
 
 	assert(val);
 	io_ptr->esc_state = START;
-	eol.len = strlen(NATIVE_TTEOL);
+	eol.len = STRLEN(NATIVE_TTEOL);
 	eol.addr = (char *)NATIVE_TTEOL;
 	for (eol_cnt = val; eol_cnt--; )
 	{

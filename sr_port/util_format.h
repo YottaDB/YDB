@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
 #define __UTIL_FORMAT_H__
 
 #ifdef UNIX
-caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int faocnt);
+caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, int faocnt);
 #elif defined(VMS)
 caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size);
 #else

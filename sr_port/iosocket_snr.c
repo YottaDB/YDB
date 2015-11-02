@@ -111,7 +111,7 @@ ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, i
 	/* =================================== select and recv ================================================= */
 	assert(0 == socketptr->buffered_length);
 	socketptr->buffered_length = 0;
-	bytesread = iosocket_snr_io(socketptr, recvbuff, recvsize, flags, time_for_read);
+	bytesread = (int)iosocket_snr_io(socketptr, recvbuff, recvsize, flags, time_for_read);
 	SOCKET_DEBUG2(PRINTF("socsnr: bytes read from recv: %d  timeout: %d\n", bytesread, out_of_time); DEBUGSOCKFLUSH);
 	if (0 < bytesread)
 	{	/* -------- got something this time ----------- */
@@ -180,7 +180,8 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int flags, ABS_TIME *time_for_read,
 				   boolean_t wait_for_input)
 {
-	int	mblen, readlen, bytesread, real_errno;
+	int	mblen, bytesread, real_errno;
+	ssize_t  readlen;
 	char	*readptr;
 
 	assert(CHSET_M != iod->ichset);
@@ -281,7 +282,7 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			readptr = socketptr->buffer + socketptr->buffered_offset + socketptr->buffered_length;
 			readlen = socketptr->buffer_size - socketptr->buffered_offset - socketptr->buffered_length;
 			assert(0 < readlen);
-			bytesread = iosocket_snr_io(socketptr, readptr, readlen, flags, time_for_read);
+			bytesread = (int)iosocket_snr_io(socketptr, readptr, readlen, flags, time_for_read);
 			SOCKET_DEBUG2(PRINTF("socsnrupb: Read %d chars\n", bytesread); DEBUGSOCKFLUSH);
 			if (0 > bytesread)
 			{       /* Some error occurred. Check for restartable condition. */

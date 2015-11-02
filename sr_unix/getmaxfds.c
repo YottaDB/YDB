@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,5 +24,5 @@ int getmaxfds(void)
 
 	if (getrlimit(RLIMIT_NOFILE, &rlp) < 0)
 		return -1;
-	return rlp.rlim_cur;
+	return (int)rlp.rlim_cur;
 }

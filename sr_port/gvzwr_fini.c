@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,7 +92,7 @@ void gvzwr_fini(zshow_out *out, int pat)
 			else
 			{
 				gvzwrite_block.fixed = (gvzwrite_block.fixed ? TRUE : FALSE);
-				gvzwr_var((int4) MV_FORCE_INT(&data), 0);
+				gvzwr_var((int4)MV_FORCE_INT(&data), 0);
 			}
 		}
 	} else
@@ -113,7 +113,7 @@ void gvzwr_fini(zshow_out *out, int pat)
 				op_gvdata(&data);
 				if ((MV_FORCE_INT(&data)))
 				{
-					gvzwr_var((int4) MV_FORCE_INT(&data), 0);
+					gvzwr_var((int4)MV_FORCE_INT(&data), 0);
 				}
 			}
 			op_gvorder(&local);

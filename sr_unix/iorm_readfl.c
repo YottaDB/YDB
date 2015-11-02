@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -210,7 +210,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		assert(NULL != rm_ptr->inbuf);
 		if (rm_ptr->fixed)
                 {
-			buff_len = rm_ptr->inbuf_top - rm_ptr->inbuf_off;
+			buff_len = (int)(rm_ptr->inbuf_top - rm_ptr->inbuf_off);
 			if (0 == buff_len)
 			{	/* need to refill the buffer */
 				buff_len = iorm_get(io_ptr);
@@ -238,7 +238,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							} else
 							{
 								SETZACANCELTIMER;
-								iorm_readfl_badchar(v, ((unsigned char *)temp - stringpool.free),
+								iorm_readfl_badchar(v,
+										    (int)((unsigned char *)temp - stringpool.free),
 										    mblen, char_ptr, rm_ptr->inbuf_top);
 								rm_ptr->inbuf_off = char_ptr + mblen;	/* mark as read */
 								UTF8_BADCHAR(mblen, char_ptr, rm_ptr->inbuf_top,
@@ -253,7 +254,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							} else
 							{
 								SETZACANCELTIMER;
-								iorm_readfl_badchar(v, ((unsigned char *)temp - stringpool.free),
+								iorm_readfl_badchar(v,
+										    (int)((unsigned char *)temp - stringpool.free),
 										    mblen, char_ptr, rm_ptr->inbuf_top);
 								rm_ptr->inbuf_off = char_ptr + mblen;	/* mark as read */
 								UTF8_BADCHAR(mblen, char_ptr, rm_ptr->inbuf_top,
@@ -268,7 +270,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							} else
 							{
 								SETZACANCELTIMER;
-								iorm_readfl_badchar(v, ((unsigned char *)temp - stringpool.free),
+								iorm_readfl_badchar(v,
+										    (int)((unsigned char *)temp - stringpool.free),
 										    mblen, char_ptr, rm_ptr->inbuf_top);
 								rm_ptr->inbuf_off = char_ptr + mblen;	/* mark as read */
 								UTF8_BADCHAR(mblen, char_ptr, rm_ptr->inbuf_top,
@@ -279,7 +282,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							GTMASSERT;
 					}
 				}
-				v->str.len = char_ptr - rm_ptr->inbuf_off;
+				v->str.len = INTCAST(char_ptr - rm_ptr->inbuf_off);
 				UNICODE_ONLY(v->str.char_len = char_count;)
 				if (0 < v->str.len)
 				{
@@ -306,7 +309,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			{	 /* use bytes from buffer for character left over from last read */
 				assert(rm_ptr->done_1st_read);
 				bytes2read = 0;			/* use bytes from buffer left over from last read */
-				bytes_read = char_bytes_read = rm_ptr->inbuf_pos - rm_ptr->inbuf_off;
+				bytes_read = char_bytes_read = (int)(rm_ptr->inbuf_pos - rm_ptr->inbuf_off);
 				add_bytes = bytes_read - 1;	/* to satisfy asserts */
 			}
 			char_start = rm_ptr->inbuf_off;
@@ -342,7 +345,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							break;			/* nothing read for this char so treat as EOF */
 						assert(1 < (bytes2read + bytes_read));	/* incomplete character */
 						SETZACANCELTIMER;
-						iorm_readfl_badchar(v, ((unsigned char *)temp - stringpool.free),
+						iorm_readfl_badchar(v, (int)((unsigned char *)temp - stringpool.free),
 								    bytes_read, char_start, rm_ptr->inbuf_pos);
 						rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
 						UTF8_BADCHAR(bytes_read, char_start, rm_ptr->inbuf_pos,
@@ -364,7 +367,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							} else if (-1 == add_bytes)
 							{
 								SETZACANCELTIMER;
-								iorm_readfl_badchar(v, ((unsigned char *)temp - stringpool.free),
+								iorm_readfl_badchar(v,
+										    (int)((unsigned char *)temp - stringpool.free),
 										    char_bytes_read,
 										    char_start, (char_start + char_bytes_read));
 								rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
@@ -410,7 +414,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							if (WEOF == utf_code)
 							{	/* invalid mb char */
 								SETZACANCELTIMER;
-								iorm_readfl_badchar(v, ((unsigned char *)temp - stringpool.free),
+								iorm_readfl_badchar(v,
+										    (int)((unsigned char *)temp - stringpool.free),
 										    char_bytes_read,
 										    char_start, rm_ptr->inbuf_pos);
 								rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
@@ -453,7 +458,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							} else if (-1 == add_bytes)
 							{	/*  not valid */
 								SETZACANCELTIMER;
-                                                                iorm_readfl_badchar(v, ((unsigned char *)temp - stringpool.free),
+                                                                iorm_readfl_badchar(v,
+										    (int)((unsigned char *)temp - stringpool.free),
 										    char_bytes_read,
                                                                                     char_start, rm_ptr->inbuf_pos);
 								rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
@@ -469,7 +475,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 						if (WEOF == utf_code)
 						{	/* invalid mb char */
 							SETZACANCELTIMER;
-							iorm_readfl_badchar(v, ((unsigned char *)temp - stringpool.free),
+							iorm_readfl_badchar(v, (int)((unsigned char *)temp - stringpool.free),
 									    char_bytes_read, char_start, rm_ptr->inbuf_pos);
 							rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
 							UTF8_BADCHAR(char_bytes_read, char_start, rm_ptr->inbuf_pos,

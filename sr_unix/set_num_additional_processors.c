@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,6 @@ void set_num_additional_processors(void)
 	}
 #endif
 #endif
-	num_additional_processors = numcpus - 1;
+	num_additional_processors = (int4)(numcpus - 1);
 }
 

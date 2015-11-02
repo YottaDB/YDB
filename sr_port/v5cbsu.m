@@ -1,6 +1,6 @@
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;								;
-	;	Copyright 2005, 2006 Fidelity Information Services, Inc	;
+	;	Copyright 2005, 2007 Fidelity Information Services, Inc	;
 	;								;
 	;	This source code contains the intellectual property	;
 	;	of its copyright holder(s), and is made available	;
@@ -189,6 +189,8 @@ init
 	Set endian("AXP")=FALSE
 	Set endian("x86")=FALSE
 	Set endian("HP-PA")=TRUE
+	Set endian("IA64/B")=TRUE
+	Set endian("IA64/L")=FALSE
 	Set endian("SPARC")=TRUE
 	Set endian("RS6000")=TRUE
 	Set endian("S390")=TRUE

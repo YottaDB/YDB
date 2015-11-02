@@ -171,7 +171,7 @@ static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
 		cp = (char *)src;
 		assert(((int)cp < (int)stringpool.base) || ((int)cp > (int)stringpool.top));
 		dst->mvtype = MV_STR;
-		str_len = strlen(cp);
+		str_len = STRLEN(cp);
 		if (str_len > MAX_STRLEN)
 			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 		dst->str.len = str_len;
@@ -219,12 +219,12 @@ static int	extarg_getsize(void *src, enum xc_types typ, mval *dst)
 	case xc_char_starstar:
 		cpp = (char **)src;
 		if (*cpp)
-			return strlen(*cpp);
+			return STRLEN(*cpp);
 		else
 			return 0;
 	case xc_char_star:
 		cp = (char *)src;
-		return strlen(cp);
+		return STRLEN(cp);
 	case xc_string_star:
 		sp = (struct extcall_string *)src;
 		if ((0 < sp->len) && ((int)sp->addr < (int)stringpool.free) && ((int)sp->addr >= (int)stringpool.base))
@@ -241,6 +241,8 @@ static int	extarg_getsize(void *src, enum xc_types typ, mval *dst)
 		rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
 		break;
 	}
+
+	return 0; /* This should never get executed, added to make compiler happy */
 }
 
 void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
@@ -250,7 +252,8 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	int4 		callintogtm_vectorindex;
 	mval		*arg, *v;
 	int4		n, *free_space_pointer;
-	uint4		m1, status;
+	uint4		m1;
+	INTPTR_T	status;
 	char		*cp, *free_string_pointer;
 	int		pre_alloc_size;
 	int		save_mumps_status;
@@ -258,11 +261,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	char		*xtrnl_table_name;
 	struct extcall_package_list	*package_ptr;
 	struct extcall_entry_list	*entry_ptr;
-	struct param_list_struct
-	{
-		int4	n;
-		void	*arg[MAXIMUM_PARAMETERS];
-	} *param_list;
+	gparam_list	*param_list;
 	error_def	(ERR_TEXT);
 	error_def	(ERR_ZCVECTORINDX);
 	error_def	(ERR_ZCCTENV);
@@ -349,8 +348,9 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 			}
 	}
 	va_end(var);
-	param_list = (struct param_list_struct *)malloc(n);
-	free_space_pointer = (int4 *)((char *)param_list + sizeof(int) + sizeof(void *)*argcnt);
+        /* Double the size, to take care of any alignments in the middle  */
+	param_list = (gparam_list *)malloc(n * 2);
+	free_space_pointer = (int4 *)((char *)param_list + sizeof(ssize_t) + sizeof(void *)*argcnt);
 	free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* load-up the parameter list */
 	VAR_START(var, argcnt);
@@ -378,10 +378,10 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 					memcpy(free_string_pointer, v->str.addr, v->str.len);
 				free_string_pointer += v->str.len;
 				*free_string_pointer++ = 0;
-			}
-			else if (-1 != pre_alloc_size)
+			} else if (-1 != pre_alloc_size)
 				free_string_pointer += pre_alloc_size;
 			else /* Output and no pre-allocation specified */
+			{
 				if (0 == package->str.len)
 					/* default package - do not display package name */
 					rts_error(VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i+1, RTS_ERROR_LITERAL("<DEFAULT>"),
@@ -389,20 +389,21 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				else
 					rts_error(VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i+1, package->str.len, package->str.addr,
 						extref->str.len, extref->str.addr);
+			}
 			break;
 		case xc_char_starstar:
+			free_space_pointer = (int4 *)ROUND_UP2(((INTPTR_T)free_space_pointer), sizeof(char *));
 			param_list->arg[i] = free_space_pointer;
 			if (m1 & 1)
 			{
-				*free_space_pointer = (int4)free_string_pointer;
+				*(char **)free_space_pointer = free_string_pointer;
 				if (v->str.len)
 					memcpy(free_string_pointer, v->str.addr, v->str.len);
 				free_string_pointer += v->str.len;
 				*free_string_pointer++ = 0;
-			}
-			else
-				*free_space_pointer = (int4)free_string_pointer++;
-			free_space_pointer++;
+			} else
+				*(char **)free_space_pointer = free_string_pointer++;
+			free_space_pointer = (int4 *)((char *)free_space_pointer + sizeof(char *));
 			break;
 		case xc_long_star:
 			param_list->arg[i] = free_space_pointer;
@@ -416,17 +417,19 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 			break;
 		case xc_string_star:
 			param_list->arg[i] = free_space_pointer;
-			*(int *)free_space_pointer++ = v->str.len;
-			*free_space_pointer++ = (int4)free_string_pointer;
+			*(int *)free_space_pointer++ = (int)v->str.len;
+			free_space_pointer = (int4 *)ROUND_UP2(((INTPTR_T)free_space_pointer), sizeof(char *));
+			*(char **)free_space_pointer = free_string_pointer;
+			free_space_pointer = (int4 *)((char *)free_space_pointer + sizeof(char *));
 			if (m1 & 1)
 			{
 				if (v->str.len)
 					memcpy(free_string_pointer, v->str.addr, v->str.len);
 				free_string_pointer += v->str.len;
-			}
-			else if (-1 != pre_alloc_size)
+			} else if (-1 != pre_alloc_size)
 				free_string_pointer += pre_alloc_size;
 			else /* Output and no pre-allocation specified */
+			{
 				if (0 == package->str.len)
 					/* default package - do not display package name */
 					rts_error(VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i+1, RTS_ERROR_LITERAL("<DEFAULT>"),
@@ -434,6 +437,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				else
 					rts_error(VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i+1, package->str.len, package->str.addr,
 						extref->str.len, extref->str.addr);
+			}
 			break;
 		case xc_float_star:
 			param_list->arg[i] = free_space_pointer;
@@ -441,14 +445,14 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 			free_space_pointer = (int4 *)((char *)free_space_pointer + sizeof(float));
 			break;
 		case xc_double_star:
-			free_space_pointer = (int4 *)(ROUND_UP2((int)free_space_pointer, sizeof(double)));
+			free_space_pointer = (int4 *)(ROUND_UP2(((INTPTR_T)free_space_pointer), sizeof(double)));
 			param_list->arg[i] = free_space_pointer;
 			*((double *)free_space_pointer) = (m1 & 1) ? (double)mval2double(v) : (double)0.0;
 			free_space_pointer = (int4 *)((char *)free_space_pointer + sizeof(double));
 			break;
 		case xc_pointertofunc:
-			if ( ((callintogtm_vectorindex = (int4 )mval2i(v)) >= xc_unknown_function)
-				|| (callintogtm_vectorindex < 0) )
+			if (((callintogtm_vectorindex = (int4)mval2i(v)) >= xc_unknown_function)
+				|| (callintogtm_vectorindex < 0))
 			{
 				rts_error(VARLSTCNT(7) ERR_ZCVECTORINDX, 1, callintogtm_vectorindex, ERR_TEXT, 2,
 					RTS_ERROR_TEXT("Passing Null vector"));
@@ -459,9 +463,10 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 			break;
 		case xc_pointertofunc_star:
 			/* cannot pass in a function adress to be modified by the user program */
+			free_space_pointer = (int4 *)ROUND_UP2(((INTPTR_T)free_space_pointer), sizeof(INTPTR_T));
 			param_list->arg[i] = free_space_pointer;
-			*((int4 *)*free_space_pointer) = 0;
-			free_space_pointer++;
+			*((INTPTR_T *)free_space_pointer) = 0;
+			free_space_pointer = (int4 *)((char *)free_space_pointer + sizeof(char *));
 			break;
 		default:
 			va_end(var);

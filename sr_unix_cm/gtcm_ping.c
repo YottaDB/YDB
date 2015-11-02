@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,9 +28,6 @@
 #include <sys/types.h>
 #include "gtm_netdb.h"
 #include "gtm_socket.h"
-#ifdef SCO
-#include <sys/stream.h>
-#endif
 #ifndef __MVS__
 #include <netinet/tcp.h>
 #endif
@@ -83,7 +80,7 @@ int icmp_ping(int conn)
 {
 	fd_set			fdmask;
 	struct sockaddr_in	paddr;
-	int			paddr_len = sizeof(struct sockaddr_in);
+	size_t			paddr_len = sizeof(struct sockaddr_in);
 	struct icmp		*icp;
 	struct ip		*ip;
 	struct timeval		timeout;
@@ -105,7 +102,11 @@ int icmp_ping(int conn)
 	icp->icmp_cksum = 0;
 	icp->icmp_seq = conn;
 	icp->icmp_id = ident;				/* ID */
-	time((time_t *)&pingsend[ICMP_MINLEN]);		/* time stamp */
+	{
+	  time_t time_val;
+	  time(&time_val);
+	  *((int *)(&pingsend[ICMP_MINLEN])) = (int) time_val;  	/* time stamp */
+	}
 	/* compute ICMP checksum here */
 	icp->icmp_cksum = in_cksum((u_short *)icp, ICMP_MINLEN + sizeof(int));
 	while (cc = sendto(pingsock, (char *)pingsend, ICMP_MINLEN + sizeof(int), 0, (struct sockaddr *)&paddr, paddr_len) < 0)
@@ -135,6 +136,7 @@ int icmp_ping(int conn)
 		OMI_DBG((omi_debug, "ping: send to %s\n",host));
 	}
 #endif
+	return 1; /* No Error. Added to make compiler happy */
 }
 
 /* get_ping_rsp
@@ -147,7 +149,7 @@ int get_ping_rsp(void)
 {
 	struct sockaddr_in from;
 	register int cc;
-	int fromlen;
+	size_t fromlen;
 	struct icmp *icp;
 	struct ip *ip;
 
@@ -157,7 +159,7 @@ int get_ping_rsp(void)
 		exit(1);
 	}
 	fromlen = sizeof(from);
-	while ((cc = recvfrom(pingsock, (char *)pingrcv, IP_MAXPACKET, 0, (struct sockaddr *)&from, (size_t *)&fromlen)) < 0)
+	while ((cc = (int)(recvfrom(pingsock, (char *)pingrcv, IP_MAXPACKET, 0, (struct sockaddr *)&from, (size_t *)&fromlen))) < 0)
 	{
 		if (errno == EINTR)
 			continue;

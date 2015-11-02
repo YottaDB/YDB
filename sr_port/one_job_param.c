@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,8 @@ GBLREF mident	window_ident;
 int one_job_param (char **parptr)
 {
 	boolean_t	neg;
-	int		x, len, num;
+	int		x, num;
+        int		len;
 	error_def	(ERR_JOBPARUNK);
 	error_def	(ERR_JOBPARNOVAL);
 	error_def	(ERR_JOBPARVALREQ);

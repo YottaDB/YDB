@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,7 +69,7 @@ void	mur_extract_set(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 
 	if (mur_options.detail)
 		SPRINTF(murgbl.extr_buff, "0x%08x [0x%04x] :: ", mur_jctl->rec_offset, mur_rab.jreclen);
-	extract_len = (mur_options.detail ? strlen(murgbl.extr_buff) : 0);
+	extract_len = (mur_options.detail ? STRLEN(murgbl.extr_buff) : 0);
 	rectype = rec->prefix.jrec_type;
 	if (IS_FUPD_TUPD(rectype))
 	{
@@ -88,7 +88,7 @@ void	mur_extract_set(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 				strcpy(murgbl.extr_buff + extract_len, "TSTART \\");
 			else /* if (IS_FUPD(rectype)) */
 				strcpy(murgbl.extr_buff + extract_len, "ZTSTART\\");
-			extract_len = strlen(murgbl.extr_buff);
+			extract_len = STRLEN(murgbl.extr_buff);
 		}
 		EXTTIME(rec->prefix.time);
 		EXTQW(rec->prefix.tn);
@@ -124,7 +124,7 @@ void	mur_extract_set(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 			memcpy(murgbl.extr_buff, "                       ", 23);
 			extract_len = 23;
 		} else
-			extract_len = strlen(murgbl.extr_buff);
+			extract_len = STRLEN(murgbl.extr_buff);
 		strcpy(murgbl.extr_buff + extract_len, "       \\");
 		memcpy(murgbl.extr_buff + extract_len, jrt_label[rectype], LAB_LEN);
 		extract_len += LAB_LEN;

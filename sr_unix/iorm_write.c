@@ -55,7 +55,7 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 			if (WEOF == utf_code)
 			{
 				iod->dollar.za = 9;
-				UTF8_BADCHAR((nextmb - out), out, top, 0, NULL);
+				UTF8_BADCHAR((int)(nextmb - out), out, top, 0, NULL);
 			}
 			if (CHSET_UTF16BE == iod->ochset)
 				nextoutptr = UTF16BE_WCTOMB(utf_code, outptr);
@@ -64,10 +64,10 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 			if (nextoutptr == outptr)
 			{	/* invalid codepoint */
 				iod->dollar.za = 9;
-				UTF8_BADCHAR((nextmb - out), out, top, chset_names[iod->ochset].len,
+				UTF8_BADCHAR((int)(nextmb - out), out, top, chset_names[iod->ochset].len,
 						chset_names[iod->ochset].addr);
 			}
-			mblen = nextoutptr - outptr;
+			mblen = (int)(nextoutptr - outptr);
 			outlen += mblen;
 		}
 	} else
@@ -164,13 +164,13 @@ void iorm_write_utf(mstr *v)
 				if (nextoutptr == outptr)
 				{	/* invalid codepoint */
 					iod->dollar.za = 9;
-					UTF8_BADCHAR((nextmb - inptr), inptr, top, chset_names[iod->ochset].len,
+					UTF8_BADCHAR((int)((nextmb - inptr)), inptr, top, chset_names[iod->ochset].len,
 							chset_names[iod->ochset].addr);
 				}
-				mblen  = nextoutptr - outptr;
+				mblen  = (int)(nextoutptr - outptr);
 				outptr = nextoutptr;
 			} else
-				mblen = nextmb - inptr;
+				mblen = (int)(nextmb - inptr);
 			GTM_IO_WCWIDTH(utf_code, mbwidth);
 			assert(mblen);
 		}
@@ -199,7 +199,7 @@ void iorm_write_utf(mstr *v)
 				if (!iod->wrap)	/* non-stream device wants NOWRAP, so break right away without writing any more */
 					break;
 				if (!rm_ptr->fixed && iod->wrap)
-					iorm_write_utf_ascii(iod, RMEOL, strlen(RMEOL));
+					iorm_write_utf_ascii(iod, RMEOL, STRLEN(RMEOL));
 				else if (rm_ptr->fixed && rm_ptr->out_bytes < rm_ptr->recordsize)
 				{	/* padding bytes needed */
 					temppad = rm_ptr->padchar;

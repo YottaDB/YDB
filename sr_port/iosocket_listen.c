@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +76,7 @@ boolean_t iosocket_listen(io_desc *iod, unsigned short len)
         if (-1 == tcp_routines.aa_listen(socketptr->sd, len))
         {
                 errptr = (char *)STRERROR(errno);
-                errlen = strlen(errptr);
+                errlen = STRLEN(errptr);
                 rts_error(VARLSTCNT(6) ERR_SOCKLISTEN, 0, ERR_TEXT, 2, errlen, errptr);
                 return FALSE;
         }

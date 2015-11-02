@@ -105,7 +105,7 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 		top += mvs_size[mv_st_ent->mv_st_type];
 		mv_st_prev = (mv_stent *)((char *) mv_st_ent + mv_st_ent->mv_st_next);
 	}
-	shift = (char *) frame_pointer - top - size;
+	shift = (int4)((char *) frame_pointer - top - size);
 	if (shift)
 	{
    		if ((unsigned char *)mv_chain + shift <= stackwarn)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 	if (rp_targ > b_top)
 	{
 		memcpy(util_buff, "Error: offset greater than blk size of ", 39);
-		util_buff[ i2hex_nofill(b_top - bp, (uchar_ptr_t)&util_buff[39], 8) + 39 ] = 0;
+		util_buff[ i2hex_nofill((int4)(b_top - bp), (uchar_ptr_t)&util_buff[39], 8) + 39 ] = 0;
 		util_out_print(&util_buff[0],TRUE);
 		return 0;
 	}

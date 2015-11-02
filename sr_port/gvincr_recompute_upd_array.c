@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,7 +96,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	cur_blk_size = ((blk_hdr_ptr_t)buffaddr)->bsiz;
 	rp = (rec_hdr_ptr_t)(buffaddr + bh->curr_rec.offset);
 	GET_USHORT(rec_size, &rp->rsiz);
-	data_len = rec_size + rp->cmpc - sizeof(rec_hdr) - target_key_size;
+	data_len = rec_size + rp->cmpc - SIZEOF(rec_hdr) - target_key_size;
 	if (cdb_sc_normal != (status = gvincr_compute_post_incr(bh)))
 	{
 		assert(CDB_STAGNATE > t_tries);
@@ -141,7 +141,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	memcpy(va, value.addr, value.len);
 	BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
 	rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + rec_size);
-	tail_len = cur_blk_size - ((sm_uc_ptr_t)rp - buffaddr);
+	tail_len = (int4)(cur_blk_size - ((sm_uc_ptr_t)rp - buffaddr));
 	assert(tail_len >= 0); /* else gvincr_recompute_post_incr would have returned cdb_sc_rmisalign and we will not be here */
 	if (tail_len > 0)
 	{
@@ -161,7 +161,11 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	assert((cse->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr)) || (bh->cycle != cr->cycle) || (bh->cr != cr));
 	cse->ondsk_blkver = cr->ondsk_blkver;
 	cse->done = FALSE;
-	if (JNL_ENABLED(csa))
+	/* Reformat the logical SET jnl-record if we need to write logical records. But recompute checksums for PBLK record
+	 * ONLY IF journaling is enabled. Do not need to do this in the case REPL_WAS_ENABLED(csa) is TRUE as replication
+	 * only cares about logical records. Hence the separation of the code below into two "if" blocks.
+	 */
+	if (JNL_WRITE_LOGICAL_RECS(csa))
 	{	/* Re-format the logical SET jnl-record */
 		jfb = non_tp_jfb_ptr;
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
@@ -173,6 +177,9 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 		jgbl.cumul_jnl_rec_len = jfb->record_size;
 		assert(0 == jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY);
 		DEBUG_ONLY(jgbl.cumul_index++;)
+	}
+	if (JNL_ENABLED(csa))
+	{	/* Recompute checksums in case necessary */
 		if (csa->jnl_before_image && (NULL != cse->old_block))
 		{
 			old_block = (blk_hdr_ptr_t)cse->old_block;

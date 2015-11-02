@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,11 +70,6 @@ void gtmsource_seqno_init(void)
 				max_dualsite_resync_seqno = csd->dualsite_resync_seqno;
 			if (zqgblmod_seqno < csd->zqgblmod_seqno)
 				zqgblmod_seqno = csd->zqgblmod_seqno;
-			/* Copy replication instance name into the database shared memory.
-			 * Used later to avoid updates from a different replication instance name to this database.
-			 */
-			assert(sizeof(csa->nl->replinstfilename) == sizeof(jnlpool.jnlpool_ctl->jnlpool_id.instfilename));
-			memcpy(csa->nl->replinstfilename, gld_fn, sizeof(csa->nl->replinstfilename));
 		}
 	}
 	if (0 == db_seqno)

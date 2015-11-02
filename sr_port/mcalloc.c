@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@ char *mcalloc(unsigned int n)
 	/* Choice of char_ptr_t made because it is a 64 bit pointer on Tru64 which
 	   is the alignment we need there, or any other 64 bit platforms we support
 	   in the future. */
-	n = ROUND_UP2(n, sizeof(char_ptr_t));
+ 	n = ROUND_UP2(n, USIZEOF(char_ptr_t));
 
 	if (n > mcavail)
 	{ /* No sufficient space in the current block. Follow the link and check if the next block has sufficient
@@ -49,10 +49,10 @@ char *mcalloc(unsigned int n)
 			}
 			else
 				nxt = NULL;
-			new_size = MAX(MC_DSBLKSIZE, (n + MCALLOC_HDR_SZ));
+			new_size = (int)MAX(MC_DSBLKSIZE, (n + MCALLOC_HDR_SZ));
 			hdr = (mcalloc_hdr *)malloc(new_size);
 			hdr->link = nxt;
-			hdr->size = new_size - MCALLOC_HDR_SZ;
+			hdr->size = (int4)(new_size - MCALLOC_HDR_SZ);
 			mcavailptr->link = hdr;
 		}
 		assert(n <= hdr->size);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,7 @@ void op_fnextract(int last, int first, mval *src, mval *dest)
 		if (srcbase + len >= srctop)
 		{ /* A more efficient implementation of usages like $E(str,99999) where there is no need
 		     to scan the rest of the string unless BADCHAR errors need to be caught */
-			dest->str.len = srctop - srcbase;
+			dest->str.len = INTCAST(srctop - srcbase);
 			if (!badchar_inhibit)
 				MV_FORCE_LEN(dest);
 		}
@@ -86,7 +86,7 @@ void op_fnextract(int last, int first, mval *src, mval *dest)
 				srcptr += bytelen;
 			}
 			assert(srcptr <= srctop);
-			dest->str.len = srcptr - srcbase;
+			dest->str.len = INTCAST(srcptr - srcbase);
 			dest->str.char_len = len - skip;
 			dest->mvtype |= MV_UTF_LEN;
 		}

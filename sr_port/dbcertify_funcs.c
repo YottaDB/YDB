@@ -156,7 +156,7 @@ void dbc_run_command_file(phase_static_area *psa, char_ptr_t cmdname, char_ptr_t
 	cp = cmdbuf1 + sizeof(RUN_CMD) - 1;
 	memcpy(cp, psa->tmpcmdfile, psa->tmpcmdfile_len);
 	cp += psa->tmpcmdfile_len;
-	cmd_len = cp - cmdbuf1;
+	cmd_len = (int)(cp - cmdbuf1);
 	*cp = '\0';
 
 	rc = dbc_syscmd((char_ptr_t)cmdbuf1);
@@ -311,7 +311,7 @@ void dbc_gen_temp_file_names(phase_static_area *psa)
 	cp = psa->tmpcmdfile;
 	if (0 != *psa->tmpfiledir)
 	{	/* A temporary file directory was specified .. use it */
-		len = strlen((char_ptr_t)psa->tmpfiledir);
+		len = STRLEN((char_ptr_t)psa->tmpfiledir);
 		memcpy(cp, psa->tmpfiledir, len);
 		cp += len;
 #ifdef VMS
@@ -321,18 +321,18 @@ void dbc_gen_temp_file_names(phase_static_area *psa)
 		if ('/' != *(cp - 1))
 			*cp++ = '/';
 #endif
-		dir_len = cp - psa->tmpcmdfile;
+		dir_len = (int)(cp - psa->tmpcmdfile);
 	} else
 		dir_len = 0;
 	MEMCPY_LIT(cp, TMPFILEPFX);
 	cp = psa->tmpcmdfile + sizeof(TMPFILEPFX) - 1;
 	*cp++ = '_';
-	len = strlen((char_ptr_t)regname_p);
+	len = STRLEN((char_ptr_t)regname_p);
 	memcpy(cp, regname_p, len);
 	cp += len;
 	MEMCPY_LIT(cp, TMPCMDFILSFX);
 	cp += sizeof(TMPCMDFILSFX) - 1;
-	psa->tmpcmdfile_len = cp - psa->tmpcmdfile;
+	psa->tmpcmdfile_len = (int)(cp - psa->tmpcmdfile);
 	*cp = '\0';	/* Null terminate */
 
 	/* Now same thing for temporary results file */
@@ -345,12 +345,12 @@ void dbc_gen_temp_file_names(phase_static_area *psa)
 	MEMCPY_LIT(cp, TMPFILEPFX);
 	cp = psa->tmprsltfile + sizeof(TMPFILEPFX) - 1;
 	*cp++ = '_';
-	len = strlen((char_ptr_t)regname_p);
+	len = STRLEN((char_ptr_t)regname_p);
 	memcpy(cp, regname_p, len);
 	cp += len;
 	MEMCPY_LIT(cp, TMPRSLTFILSFX);
 	cp += sizeof(TMPRSLTFILSFX) - 1;
-	psa->tmprsltfile_len = cp - psa->tmprsltfile;
+	psa->tmprsltfile_len = (int)(cp - psa->tmprsltfile);
 	*cp = '\0';	/* Null terminate */
 
 
@@ -438,7 +438,7 @@ void dbc_find_database_filename(phase_static_area *psa, uchar_ptr_t regname, uch
 		rptr = dbc_read_result_file(psa, ERR_NOREGION, regname);	/* Should have filename */
 		if (0 != MEMCMP_LIT(rptr, FILETAB))
 			GTMASSERT;
-		len = strlen(((char_ptr_t)rptr + sizeof(FILETAB) - 1)) - 1;
+		len = STRLEN(((char_ptr_t)rptr + sizeof(FILETAB) - 1)) - 1;
 		assert(MAX_FN_LEN >= len);
 		assert(len);
 		memcpy(dbfn, (rptr + sizeof(FILETAB) - 1), len);
@@ -446,13 +446,13 @@ void dbc_find_database_filename(phase_static_area *psa, uchar_ptr_t regname, uch
 		rptr = dbc_read_result_file(psa, ERR_NOREGION, regname);
 		if (0 != MEMCMP_LIT(rptr, REGIONTAB))
 			GTMASSERT;
-		len = strlen((char_ptr_t)rptr + sizeof(REGIONTAB) - 1) - 1;
+		len = STRLEN((char_ptr_t)rptr + sizeof(REGIONTAB) - 1) - 1;
 		assert(len);
 		*(rptr + sizeof(REGIONTAB) - 1 + len) = 0;	/* Get rid of trailing \n */
 		if (0 == strcmp(((char_ptr_t)rptr + sizeof(REGIONTAB) - 1), (char_ptr_t)regname))
 			break;				/* Found match */
 		rptr = dbc_read_result_file(psa, ERR_NOREGION, regname);	/* Ingored blank line */
-		len = strlen((char_ptr_t)rptr);
+		len = STRLEN((char_ptr_t)rptr);
 		if ('\n' == rptr[len - 1]) --len;	/* Note last record of output file does not have '\n' so test
 							   before adjusting 'len' */
 		if ('\r' == rptr[len - 1]) --len;	/* Same for carriage return (mostly for VMS) */
@@ -648,7 +648,7 @@ void dbc_find_key(phase_static_area *psa, dbc_gv_key *key, uchar_ptr_t rec_p, in
 		{	/* Just found the end of the key */
 			*key_targ_p++ = 0;		/* Create key ending null */
 			*key_targ_p = 0;		/* Install 2nd 0x00 as part of key but not part of length */
-			key->end = key_targ_p - key->base;
+			key->end = (uint4)(key_targ_p - key->base);
 			break;
 		}
 		/* Else, copy subscript separator char and keep scanning */
@@ -836,7 +836,7 @@ void dbc_init_key(phase_static_area *psa, dbc_gv_key **key)
 	if (NULL == *key)
 	{	/* Need a key allocated for this block */
 		*key = malloc(sizeof(dbc_gv_key) + psa->dbc_cs_data->max_key_size);
-		(*key)->top = sizeof(dbc_gv_key) + psa->dbc_cs_data->max_key_size;
+		(*key)->top = (uint4)(sizeof(dbc_gv_key) + psa->dbc_cs_data->max_key_size);
 	}
 	(*key)->end  = (*key)->gvn_len = 0;
 	return;

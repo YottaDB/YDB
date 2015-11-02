@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ void advancewindow(void)
 	error_def(ERR_NUMOFLOW);
 	unsigned char	*cp1, *cp2, *cp3, x;
 	char		*tmp;
-	int		y;
+	int		y, charlen;
 
 	last_source_column = source_column;
 	source_column = (unsigned char *) lexical_ptr - source_buffer + 1;
@@ -101,7 +101,7 @@ void advancewindow(void)
 			director_token = TK_STRLIT;
 			director_mval.mvtype = MV_STR;
 			director_mval.str.addr = (char *) cp3;
-			director_mval.str.len = cp2 - cp3;
+			director_mval.str.len = INTCAST(cp2 - cp3);
 			stringpool.free = cp2;
 			s2n(&director_mval);
 #ifdef UNICODE_SUPPORTED
@@ -109,8 +109,14 @@ void advancewindow(void)
 			{	/* UTF8 mode and not compiling an indirect gets an optimization to set the
 				   (true) length of the string into the mval
 				*/
-				director_mval.str.char_len = utf8_len_stx(&director_mval.str);
-				director_mval.mvtype |= MV_UTF_LEN;
+				charlen = utf8_len_stx(&director_mval.str);
+				if (0 > charlen)	/* got a BADCHAR error */
+					director_token = TK_ERROR;
+				else
+				{
+					assert(charlen == director_mval.str.char_len);
+					director_mval.mvtype |= MV_UTF_LEN;
+				}
 			}
 #endif
 			return;
@@ -127,7 +133,7 @@ void advancewindow(void)
 				if (y != TK_UPPER && y != TK_DIGIT && y != TK_LOWER)
 					break;
 			}
-			director_ident.len = cp2 - (unsigned char*)director_ident.addr;
+			director_ident.len = INTCAST(cp2 - (unsigned char*)director_ident.addr);
 			director_token = TK_IDENT;
 			return;
 		case TK_PERIOD:
@@ -144,14 +150,14 @@ void advancewindow(void)
 				director_token = TK_ERROR;
 				return;
 			}
-			if ( s2n_intlit )
+			if (s2n_intlit)
 			{
 				director_token = TK_NUMLIT ;
 				n2s(&director_mval);
 			} else
 			{
 				director_token = TK_INTLIT ;
-				director_mval.str.len = lexical_ptr - director_mval.str.addr ;
+				director_mval.str.len = INTCAST(lexical_ptr - director_mval.str.addr );
 				if (stringpool.free + director_mval.str.len > stringpool.top)
 					stp_gcol(director_mval.str.len) ;
 				memcpy(stringpool.free,director_mval.str.addr,director_mval.str.len) ;

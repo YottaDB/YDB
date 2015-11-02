@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,12 +56,12 @@ viewtab_entry *viewkeys(mstr *v)
 			else if (n == 0)
 			{
 				if (vt_ptr < vt_top - 1 && memcmp(cmpbuf, (vt_ptr + 1)->keyword, len) == 0)
-					vt_ptr = (viewtab_entry *)-1;
+					vt_ptr = (viewtab_entry *)-1L;
 				break;
 			}
 		}
 	}
-	if (vt_ptr == (viewtab_entry *)-1)
+	if (vt_ptr == (viewtab_entry *)-1L)
 		rts_error(VARLSTCNT(4) ERR_VIEWAMBIG, 2, v->len, v->addr);
 	else if (!vt_ptr || vt_ptr >= vt_top)
 		rts_error(VARLSTCNT(4) ERR_VIEWNOTFOUND, 2, v->len, v->addr);

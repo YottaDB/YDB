@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -216,7 +216,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 					assert(0 < mblen);
 					if (mblen == dlmlen && 0 == memcmp(start_sfx, ldelim.unibytes_val, dlmlen))
 					{
-						delim_last_scan == TRUE;
+						delim_last_scan = TRUE;
 						break;
 					}
 					/* Increment ptrs by size of found char */
@@ -256,10 +256,10 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 		   end_pfx	-> end of the prefix piece including delimiter
 		   start_sfx	-> start of suffix piece (with delimiter) or = end_pfx/src->str.addr if none
 		*/
-		pfx_str_len = end_pfx - (unsigned char *)src->str.addr;
+		pfx_str_len = (int)(end_pfx - (unsigned char *)src->str.addr);
 		if (0 > pfx_str_len)
 			pfx_str_len = 0;
-		sfx_start_offset = start_sfx - (unsigned char *)src->str.addr;
+		sfx_start_offset = (int)(start_sfx - (unsigned char *)src->str.addr);
 		sfx_str_len = src->str.len - sfx_start_offset;
 		if (0 > sfx_str_len)
 			sfx_str_len = 0;
@@ -304,7 +304,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 
 	assert(str_addr - stringpool.free == str_len);
 	dst->mvtype = MV_STR;
-	dst->str.len = str_addr - stringpool.free;
+	dst->str.len = INTCAST(str_addr - stringpool.free);
 	dst->str.addr = (char *)stringpool.free;
 	stringpool.free = str_addr;
 

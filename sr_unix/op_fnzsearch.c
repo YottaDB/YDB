@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -199,13 +199,13 @@ void dir_srch (parse_blk *pfil)
 		}
 		assert(c <= top);
 		sub.str.addr = pfil->l_dir;
-		sub.str.len = lastd - sub.str.addr;
+		sub.str.len = INTCAST(lastd - sub.str.addr);
 		tmp = op_putindx(VARLSTCNT(2) dir1, &sub);
 		tmp->v.mvtype = MV_STR; tmp->v.str.len = 0;
 		for(;;)
 		{
 			tn.addr = lastd;	/* wildcard segment */
-			tn.len = c - lastd - 1;
+			tn.len = INTCAST(c - lastd - 1);
 			lastd = c;
 			genpat(&tn, &pat_mval);
 			seen_wd = FALSE;
@@ -238,7 +238,7 @@ void dir_srch (parse_blk *pfil)
 				while(READDIR(dp, dent))
 				{
 					compare.str.addr = &dent->d_name[0];
-					compare.str.len = strlen(&dent->d_name[0]);
+					compare.str.len = STRLEN(&dent->d_name[0]);
 					UNICODE_ONLY(
 						if (gtm_utf8_mode)
 							compare.mvtype &= ~MV_UTF_LEN;	/* to force "char_len" to be recomputed
@@ -320,7 +320,7 @@ void dir_srch (parse_blk *pfil)
 			while(READDIR(dp, dent))
 			{
 				compare.str.addr = &dent->d_name[0];
-				compare.str.len = strlen(&dent->d_name[0]);
+				compare.str.len = STRLEN(&dent->d_name[0]);
 				UNICODE_ONLY(
 					if (gtm_utf8_mode)
 						compare.mvtype &= ~MV_UTF_LEN;/* force "char_len" to be recomputed in do_pattern */

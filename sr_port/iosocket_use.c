@@ -80,7 +80,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	int		fil_type, nodelay, p_offset = 0;
 	uint4		bfsize = DEFAULT_SOCKET_BUFFER_SIZE, ibfsize;
 	char		*tab;
-	int		save_errno, d_socket_struct_len;
+	int		save_errno;
+	size_t		d_socket_struct_len;
 	mstr		lcl_zff;
 
 	error_def(ERR_ABNCOMPTINC);

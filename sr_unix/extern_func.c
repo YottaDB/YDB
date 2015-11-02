@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,8 @@ int extern_func(oprtype *a)
 	if (have_ident = (window_token == TK_IDENT))
 	{
 		if (director_token == TK_PERIOD)	/* if ident is a package reference, then take it off */
-		{	package.len = lexical_ptr - extref - 1;
+		{
+			package.len = INTCAST(lexical_ptr - extref - 1);
 			package.addr = extref;
 			extref = lexical_ptr;
 			advancewindow();		/* get to . */
@@ -57,18 +58,21 @@ int extern_func(oprtype *a)
 		}
 	}
 	if (window_token == TK_CIRCUMFLEX)
-	{	advancewindow();
+	{
+		advancewindow();
 		if (window_token == TK_IDENT)
-		{	have_ident = TRUE;
+		{
+			have_ident = TRUE;
 			advancewindow();
 		}
 	}
 	if (!have_ident)
-	{	stx_error(ERR_RTNNAME);
+	{
+		stx_error(ERR_RTNNAME);
 		return FALSE;
 	}
-	extentry.len = (char *)&source_buffer[last_source_column - 1] - extref;
-	extentry.len = (extentry.len > MAX_EXTREF ? MAX_EXTREF : extentry.len);
+	extentry.len = INTCAST((char *)&source_buffer[last_source_column - 1] - extref);
+	extentry.len = INTCAST(extentry.len > MAX_EXTREF ? MAX_EXTREF : extentry.len);
 	extentry.addr = extref;
 
 	calltrip = maketriple( (a ? OC_FNFGNCAL : OC_FGNCAL));
@@ -101,7 +105,8 @@ int extern_func(oprtype *a)
 		cnt++;
 	}
 	else
-	{	if (!(actcnt = actuallist (nxtopr)))
+	{
+		if (!(actcnt = actuallist (nxtopr)))
 			return FALSE;
 		cnt += actcnt;
 	}

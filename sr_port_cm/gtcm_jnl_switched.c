@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,20 +22,31 @@
 #include "cmmdef.h"
 #include "relqueopi.h"
 #include "gtcm_jnl_switched.h"
+#include "gtcm_find_reghead.h"
 
 GBLDEF cm_region_head	*curr_cm_reg_head; /* current cm_region_head structure serviced by the GT.CM server. */
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 
-void gtcm_jnl_switched()
+void gtcm_jnl_switched(gd_region *reg)
 {
 	cm_region_list *ptr;
+	cm_region_head	*reghead;
 	que_ent		qe;
 
-	assert(curr_cm_reg_head->reg == gv_cur_region);
-	ptr = (cm_region_list *)RELQUE2PTR(curr_cm_reg_head->head.fl);
-	while ((cm_region_head *)ptr != curr_cm_reg_head)
+	if ((NULL != curr_cm_reg_head) && (curr_cm_reg_head->reg == reg))
+	{
+		assert(reg == gv_cur_region);
+		reghead = curr_cm_reg_head;
+	} else
+	{	/* curr_cm_reg_head does NOT correspond to the input region. Determine it. */
+		reghead = gtcm_find_reghead(reg);
+		if (NULL == reghead)
+			return;
+	}
+	ptr = (cm_region_list *)RELQUE2PTR(reghead->head.fl);
+	while ((cm_region_head *)ptr != reghead)
 	{
 		ptr->pini_addr = 0;
 		ptr = (cm_region_list *)RELQUE2PTR(ptr->regque.fl);

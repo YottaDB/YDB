@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ void zshow_stack(zshow_out *output)
 {
 	bool		line_reset;
 	unsigned char	*addr;
-	unsigned short	nocount_frames[64], *nfp, *nfp_top;
+	unsigned short	nocount_frames[64], *nfp;
 	stack_frame	*fp;
 	mstr 		v;
 	unsigned char	buff[MAX_ENTRYREF_LEN + MAX_FRAME_MESS_LEN];
@@ -44,7 +44,6 @@ void zshow_stack(zshow_out *output)
 	v.addr = (char *)&buff[0];
 	flush_pio();
 	nfp = &nocount_frames[0];
-	nfp_top = &nocount_frames[64];
 	line_reset = FALSE;
 	for (fp = frame_pointer; fp->old_frame_pointer; fp = fp->old_frame_pointer)
 	{
@@ -68,7 +67,7 @@ void zshow_stack(zshow_out *output)
 			}
 			else
 				addr = fp->mpc;
-			v.len = symb_line(addr, &buff[0], 0, fp->rvector) - &buff[0];
+			v.len = INTCAST(symb_line(addr, &buff[0], 0, fp->rvector) - &buff[0]);
 			if (v.len == 0)
 			{
 				memcpy(&buff[0], UNK_LOC_MESS, sizeof(UNK_LOC_MESS) - 1);

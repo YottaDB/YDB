@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@
 #define QWPERCENTCALC(lpt, rpt, qwint_size, int_blks, blk_size) 	\
 {									\
 	qw_num	tmp;							\
-	uint4	rem;							\
+	size_t	rem; 						\
 									\
 	if (int_blks)							\
 	{								\
@@ -276,7 +276,7 @@ void mupip_integ(void)
 		mu_index_blks = mu_index_recs = 0;
 		mu_int_err_ranges = (CLI_NEGATED != cli_present("KEYRANGES"));
 		mu_int_root_level = (unsigned char)-1;
-		mu_map_errs = 0, prev_errknt = largest_tn = 0;
+		mu_map_errs = 0, prev_errknt = 0, largest_tn = 0;
 		mu_int_blks_to_upgrd = 0;
 		for (idx = 0;  idx <= MAX_BT_DEPTH;  idx++)
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ oprtype make_gvsubsc(mval *v)
 	if (stringpool.top - stringpool.free < MAX_SRCLINE + sizeof(gv_key))
 	{	stp_gcol(MAX_SRCLINE + sizeof(gv_key));
 	}
-	if ((int) stringpool.free & 1)
+	if ((int)stringpool.free & 1)
 		stringpool.free++;	/* word align key for structure refs */
 	gp = (gv_key *) stringpool.free;
 	gp->top = MAX_SRCLINE;

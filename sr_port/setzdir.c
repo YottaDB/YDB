@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ void setzdir(mval *newdir, mval *full_path_of_newdir)
 	{
 		if (NULL != GETCWD(directory_buffer, sizeof(directory_buffer), getcwd_res))
 		{
-			length = strlen(directory_buffer);
+			length = USTRLEN(directory_buffer);
 			UNIX_ONLY(directory_buffer[length++] = '/';)
 		} else
 		{

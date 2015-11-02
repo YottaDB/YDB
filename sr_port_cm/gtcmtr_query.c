@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -113,7 +113,7 @@ bool gtcmtr_query(void)
 		assert((uint4)tot_val_len == (curr_entry->query_is_queryget ? val.str.len + sizeof(unsigned short) : 0));
 	} else
 		key_len = tot_val_len = 0;
-	msg_len = sizeof(unsigned char) + sizeof(unsigned short) + sizeof(unsigned char) + key_len + tot_val_len;
+	msg_len = SIZEOF(unsigned char) + SIZEOF(unsigned short) + SIZEOF(unsigned char) + key_len + tot_val_len;
 	if (msg_len > curr_entry->clb_ptr->mbl)
 		cmi_realloc_mbf(curr_entry->clb_ptr, msg_len);
 	ptr = curr_entry->clb_ptr->mbf;

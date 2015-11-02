@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,7 +97,7 @@ void omi_dump_pkt(omi_conn *cptr)
 	chr  = (char *)buf;
 	while (ptr < end) {
 	    OMI_DBG((omi_debug, "\t"));
-	    if ((len = end - ptr) > 20)
+	    if ((len = (int)(end - ptr)) > 20)
 		len = 20;
 	    memcpy(chr, ptr, len);
 	    ptr += len;

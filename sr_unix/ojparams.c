@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -115,7 +115,7 @@ void ojparams (char *p, job_params_type *job_params)
 			break;
 
 		case jp_priority:
-			job_params->baspri = (int4) (*((int4 *)p));
+			job_params->baspri = (int4)(*((int4 *)p));
 			break;
 
 		case jp_startup:
@@ -150,7 +150,7 @@ void ojparams (char *p, job_params_type *job_params)
 			break;
 
 		case jpdt_str:
-			p += (unsigned) *p + 1;
+			p += (unsigned)*p + 1;
 			break;
 		default:
 			GTMASSERT;
@@ -164,7 +164,7 @@ void ojparams (char *p, job_params_type *job_params)
  */
 	if (job_params->input.len == 0)
 	{
-		job_params->input.len = strlen(definput);
+		job_params->input.len = STRLEN(definput);
 		job_params->input.addr = definput;
 	}
 	else
@@ -248,7 +248,7 @@ void ojparams (char *p, job_params_type *job_params)
  */
 	if (job_params->logfile.len == 0)
 	{
-		job_params->logfile.len = strlen(deflogfile);
+		job_params->logfile.len = STRLEN(deflogfile);
 		job_params->logfile.addr = deflogfile;
 	}
 	else

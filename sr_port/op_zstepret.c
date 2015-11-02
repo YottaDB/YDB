@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +13,9 @@
 #include "zstep.h"
 #include "xfer_enum.h"
 #include "op.h"
+#include "fix_xfer_entry.h"
 
-GBLREF int 	(* volatile xfer_table[])();
+GBLREF xfer_entry_t	xfer_table[];
 GBLREF bool	neterr_pending;
 GBLREF int4	outofband;
 GBLREF int	iott_write_error;
@@ -23,11 +24,11 @@ void op_zstepret(void)
 {
 	if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
 	{
-		xfer_table[xf_linefetch] = op_zst_fet_over;
-		xfer_table[xf_linestart] = op_zst_st_over;
-		xfer_table[xf_zbfetch] = op_zstzb_fet_over;
-		xfer_table[xf_zbstart] = op_zstzb_st_over;
-		xfer_table[xf_ret] = opp_ret;
-		xfer_table[xf_retarg] = op_retarg;
+                    FIX_XFER_ENTRY(xf_linefetch, op_zst_fet_over);
+                    FIX_XFER_ENTRY(xf_linestart, op_zst_st_over);
+                    FIX_XFER_ENTRY(xf_zbfetch, op_zstzb_fet_over);
+                    FIX_XFER_ENTRY(xf_zbstart, op_zstzb_st_over);
+                    FIX_XFER_ENTRY(xf_ret, opp_ret);
+                    FIX_XFER_ENTRY(xf_retarg, op_retarg);
 	}
 }

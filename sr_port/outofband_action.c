@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@ GBLREF volatile int4		outofband;
 GBLREF volatile int4 		ctrap_action_is;
 GBLREF io_pair		io_std_device;
 GBLREF stack_frame	*frame_pointer;
-GBLREF int		restart_pc;
+GBLREF unsigned char	*restart_pc;
 GBLREF unsigned char	*restart_ctxt;
 GBLREF void             (*tp_timeout_action_ptr)(void);
 
@@ -38,7 +38,7 @@ void outofband_action(bool lnfetch_or_start)
 			iott_flush(io_std_device.in);
 		if (lnfetch_or_start)
 		{
-			restart_pc = (int) frame_pointer->mpc;
+			restart_pc =  frame_pointer->mpc;
 			restart_ctxt = frame_pointer->ctxt;
 		}
 

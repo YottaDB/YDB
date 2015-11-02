@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ int namelook(const unsigned char offset_tab[], const nametabent *name_tab, char 
 		if ((strlength == i->len) || ((strlength > i->len) && (i->name[i->len] == '*')))
 		{
 			if (!memcmp(&temp[0], i->name, (int4)(i->len)))
-				return i - name_tab;
+				return (int)(i - name_tab);
 		}
 	}
 	return -1;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -137,8 +137,7 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 	int			req_code, wait_count = 0;
 	int			mesg_len;
 	int			recv_len, send_len;
-	int			recd = 0, sent;
-	int			num_chars_recvd, num_chars_sent;
+	ssize_t			recd = 0, sent, num_chars_recvd, num_chars_sent;
 	int 			save_errno, ret_code = 0, init_ret_code = 0;
 	int			loop_count = 0;
 	boolean_t		retry = FALSE, recv_complete, send_complete;
@@ -148,8 +147,6 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 	char			*recv_ptr, *send_ptr;
 	struct sockaddr_un	server_proc;
 	struct sembuf		sop[4];
-	struct timeval		input_timeval;
-	struct timeval		save_input_timeval;
 	fd_set			wait_on_fd;
 	gtmsecshr_mesg		mesg;
 	TID			timer_id;
@@ -192,7 +189,7 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 	while (MAX_RETRIES > loop_count)
 	{	/* first, try the sendto */
 		req_code = mesg.code = code;
-		mesg.len = GTM_MESG_HDR_SIZE;
+		mesg.len = (int4)(GTM_MESG_HDR_SIZE);
   		if (REMOVE_FILE == code)
 		{
 			memcpy(mesg.mesg.path, path, path_len);

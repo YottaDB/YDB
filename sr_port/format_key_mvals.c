@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,9 +39,9 @@ unsigned char	*format_key_mvals(unsigned char *buff, int size, lvname_info *lvnp
 	int		cnt;
 	mval		*keys;
 	int		n, subcnt;
-	unsigned char	*endbuff, *format_lvname();
+	unsigned char	*endbuff;
 
-	cnt = lvnp->total_lv_subs - 1;
+	cnt = (int)lvnp->total_lv_subs - 1;
 	endbuff = format_lvname(lvnp->start_lvp, buff, size);
 	size -= (endbuff - buff);
 	buff = endbuff;

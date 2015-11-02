@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@ boolean_t file_head_write(char *fn, sgmnt_data_ptr_t header, int4 len)
 	error_def(ERR_DBFILOPERR);
 	error_def(ERR_DBNOTGDS);
 
-	header_size = SIZEOF_FILE_HDR(header);
+	header_size = (int)SIZEOF_FILE_HDR(header);
 	assert(SGMNT_HDR_LEN == len || header_size == len);
 	OPENFILE(fn, O_RDWR, fd);
 	if (-1 == fd)

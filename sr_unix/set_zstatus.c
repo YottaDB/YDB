@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,8 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 	mval		val;		/* pointer to dollar_zstatus */
 	unsigned char	zstatus_buff[2*OUT_BUFF_SIZE];
 	unsigned char	*zstatus_bptr, *zstatus_iter;
-	int		util_len, save_arg;
+	int		save_arg;
+	size_t		util_len ;
 	mval		*status_loc;
 	boolean_t 	trans_frame;
 
@@ -56,7 +57,7 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 			save_arg = arg;
 			SET_ERR_CODE(frame_pointer, arg);
 		}
-		src->len = get_symb_line((unsigned char*)src->addr, &b_line, ctxtp) - (unsigned char*)src->addr;
+		src->len = INTCAST(get_symb_line((unsigned char*)src->addr, &b_line, ctxtp) - (unsigned char*)src->addr);
 	}
 	MV_FORCE_MVAL(&val, arg);
 	n2s(&val);
@@ -98,7 +99,7 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 			*zstatus_iter = ',';
 	}
 	status_loc = (NULL == zyerr_frame) ? &dollar_zstatus : &dollar_zerror;
-	status_loc->str.len = zstatus_bptr - zstatus_buff;
+	status_loc->str.len = INTCAST(zstatus_bptr - zstatus_buff);
 	status_loc->str.addr = (char *)zstatus_buff;
 	s2pool(&status_loc->str);
 	status_loc->mvtype = MV_STR;

@@ -76,7 +76,7 @@
 	iod->dollar.za = 9; \
 	memcpy(dsocketptr->dollar_device, ONE_COMMA, sizeof(ONE_COMMA)); \
 	errptr = (char *)STRERROR(syserror); \
-	errlen = strlen(errptr); \
+	errlen = STRLEN(errptr); \
 	memcpy(&dsocketptr->dollar_device[sizeof(ONE_COMMA) - 1], errptr, errlen); \
 	if (socketptr->ioerror) \
 		rts_error(VARLSTCNT(6) gtmerror, 0, ERR_TEXT, 2, errlen, errptr); \

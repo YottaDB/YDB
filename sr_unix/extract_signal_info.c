@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,13 @@
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
 
+#if defined(__ia64) && defined(__hpux)
+#include <sys/uc_access.h>
+#include <sys/types.h>
+#include <machine/sys/reg_struct.h>
+#endif /* __ia64 */
 #include <signal.h>
+
 
 #include "gtmsiginfo.h"
 
@@ -63,7 +69,7 @@ void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsigin
 
 	memset(gtmsi, 0, sizeof(*gtmsi));
 	gtmsi->signal = sig;
-#if defined(__osf__) || defined (__hpux) || defined(__sparc) || defined(__MVS__)
+#if defined(__osf__) || defined (__hpux) || defined(__sparc) || defined(__MVS__) || (defined(__linux__) && defined(__ia64))
 	if (NULL != info)
 	{
 		switch(info->si_code)
@@ -90,6 +96,7 @@ void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsigin
 				gtmsi->infotype |= GTMSIGINFO_BADR;
 				if (NULL != context)
 				{
+#ifndef __ia64
 					if (0 == (context->uc_mcontext.ss_flags & SS_NARROWISINVALID))
 					{
 						/* Interrupt location is in narrow area */
@@ -100,6 +107,9 @@ void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsigin
 						gtmsi->int_iadr =
 							(caddr_t)(context->uc_mcontext.ss_wide.ss_32.ss_pcoq_head_hi & ~3);
 					}
+#else /* __ia64 */
+					__uc_get_ip(context, (uint64_t *) &gtmsi->int_iadr);
+#endif /* __ia64 */
 					gtmsi->infotype |= GTMSIGINFO_ILOC;
 				}
 				break;
@@ -206,22 +216,28 @@ void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsigin
 	   we will pull what information we can out of the context blocks. */
 	if (NULL != context)
 	{
-#ifdef Linux390
+#  ifdef Linux390
 		if (NULL != context->sregs)
 		{
                 	gtmsi->int_iadr = (caddr_t)context->sregs->regs.psw.addr;
                 	gtmsi->infotype |= GTMSIGINFO_ILOC;
 		}
 
-#else
-# ifndef REG_EIP
-#   define REG_EIP EIP
-# endif
+#  elif defined(__ia64)
+		gtmsi->subcode = info->si_code;
+		gtmsi->bad_vadr = info->si_addr;
+		gtmsi->infotype |= GTMSIGINFO_BADR;
+		gtmsi->int_addr = (caddr_t)(context->_mc.sc_ip);
+		gtmsi->infotype |= GTMSIGINFO_ILOC;
+#  elif defined(__i386)
+#    ifndef REG_EIP
+#      define REG_EIP EIP
+#    endif
 		gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_EIP];
 		gtmsi->infotype = GTMSIGINFO_ILOC;
 		if (NULL != (gtmsi->bad_vadr = (caddr_t)context->uc_mcontext.cr2))
 			gtmsi->infotype |= GTMSIGINFO_BADR;
-#endif
+#  endif
 	}
 #else
 #  error "Unsupported Platform"

@@ -19,7 +19,7 @@
 ############################################
 
 #	gtm_curpro is the current production version
-setenv	gtm_curpro	"V44004"
+setenv	gtm_curpro	"V51000"	# V52000,A,B cannot be gtm_curpro due to $gtm_inc_list issue in gtm_env.csh/gtmsrc.csh
 
 #	gtm_verno is the current production version
 setenv	gtm_verno	$gtm_curpro

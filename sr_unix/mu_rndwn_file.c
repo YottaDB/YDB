@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,8 @@
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 
+#include <sys/types.h>
+#include <sys/ipc.h>
 #include <sys/mman.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
@@ -184,13 +186,13 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	}
 	udi->shmid = tsd->shmid;
 	udi->semid = tsd->semid;
-	udi->sem_ctime = tsd->sem_ctime.ctime;
-	udi->shm_ctime = tsd->shm_ctime.ctime;
+	udi->gt_sem_ctime = tsd->gt_sem_ctime.ctime;
+	udi->gt_shm_ctime = tsd->gt_shm_ctime.ctime;
 	if (standalone)
 	{
 		semarg.buf = &semstat;
 		if (INVALID_SEMID == udi->semid || -1 == semctl(udi->semid, 0, IPC_STAT, semarg) ||
-			tsd->sem_ctime.ctime != semarg.buf->sem_ctime)
+			tsd->gt_sem_ctime.ctime != semarg.buf->sem_ctime)
 		{
 			/*
 			 * if no database access control semaphore id is found, or,
@@ -242,7 +244,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 				ftok_sem_release(reg, TRUE, TRUE);
 				return FALSE;
 			}
-			udi->sem_ctime = tsd->sem_ctime.ctime = semarg.buf->sem_ctime;
+			udi->gt_sem_ctime = tsd->gt_sem_ctime.ctime = semarg.buf->sem_ctime;
 		}
 		/* Now lock the database using access control semaphore and increment counter */
 		sop[0].sem_num = 0; sop[0].sem_op = 0;
@@ -278,7 +280,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	 * We try this for both values of "standalone"
 	 */
 	if (INVALID_SHMID == udi->shmid || -1 == shmctl(udi->shmid, IPC_STAT, &shm_buf) ||
-		tsd->shm_ctime.ctime != shm_buf.shm_ctime) /* if no shared memory exists */
+		tsd->gt_shm_ctime.ctime != shm_buf.shm_ctime) /* if no shared memory exists */
 	{
 		if (rc_cpt_removed)
 		{       /* reset RC values if we've rundown the RC CPT */
@@ -294,7 +296,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			 * It might result in orphaned shared memory segment.
 			 */
 			tsd->shmid = udi->shmid = INVALID_SHMID;
-			tsd->shm_ctime.ctime = udi->shm_ctime = 0;
+			tsd->gt_shm_ctime.ctime = udi->gt_shm_ctime = 0;
 			if (standalone)
 			{
 				/* Reset ipc fields in file header */
@@ -317,9 +319,9 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 				} else
 				{
 					db_ipcs.semid = tsd->semid;
-					db_ipcs.sem_ctime = tsd->sem_ctime.ctime;
+					db_ipcs.gt_sem_ctime = tsd->gt_sem_ctime.ctime;
 					db_ipcs.shmid = tsd->shmid;
-					db_ipcs.shm_ctime = tsd->shm_ctime.ctime;
+					db_ipcs.gt_shm_ctime = tsd->gt_shm_ctime.ctime;
 					if (!get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, &db_ipcs.fn_len,
 											MAX_TRANS_NAME_LEN, &status_msg))
 					{
@@ -362,8 +364,8 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 				tsd->owner_node = 0;
 				tsd->shmid = INVALID_SHMID;
 				tsd->semid = INVALID_SEMID;
-				tsd->sem_ctime.ctime = 0;
-				tsd->shm_ctime.ctime = 0;
+				tsd->gt_sem_ctime.ctime = 0;
+				tsd->gt_shm_ctime.ctime = 0;
 			}
 		}
 		assert(!standalone);
@@ -535,7 +537,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	if (sem_created)
 	{
 		csd->semid = tsd->semid;
-		csd->sem_ctime.ctime = tsd->sem_ctime.ctime;
+		csd->gt_sem_ctime.ctime = tsd->gt_sem_ctime.ctime;
 	}
 	assert(JNL_ALLOWED(csd) == JNL_ALLOWED(tsd));
 	free(tsd);
@@ -615,11 +617,11 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	csd->owner_node = 0;
 	csd->freeze = 0;
 	csd->shmid = INVALID_SHMID;
-	csd->shm_ctime.ctime = 0;
+	csd->gt_shm_ctime.ctime = 0;
 	if (!standalone)
 	{
 		csd->semid = INVALID_SEMID;
-		csd->sem_ctime.ctime = 0;
+		csd->gt_sem_ctime.ctime = 0;
 	}
 	if (dba_bg == acc_meth)
 	{
@@ -667,7 +669,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		}
 	}
 	udi->shmid = INVALID_SHMID;
-	udi->shm_ctime = 0;
+	udi->gt_shm_ctime = 0;
 	REVERT;
 	RESET_GV_CUR_REGION;
 	restore_rndwn_gbl = TRUE;

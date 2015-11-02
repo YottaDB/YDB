@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -126,7 +126,7 @@ typedef struct
 	bool		wrap;
 	bool		fixed;
 	bool		stream;
-}d_mt_struct;
+} d_mt_struct;
 
 int iomt_info(d_mt_struct *mt);
 uint4 iomt_rdlblk(d_mt_struct *mt_ptr, uint4 mask, iosb *stat_blk, void *buff, int size);

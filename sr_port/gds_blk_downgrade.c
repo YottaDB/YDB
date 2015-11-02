@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,7 @@ void gds_blk_downgrade(v15_blk_hdr_ptr_t gds_blk_trg, blk_hdr_ptr_t gds_blk_src)
 	tn = gds_blk_src->tn;
 	assert((MAX_TN_V4 >= tn) || dse_running);
 	levl = gds_blk_src->levl;
-	movesize = bsiz - sizeof(blk_hdr);
+	movesize = bsiz - USIZEOF(blk_hdr);
 	if ((sm_uc_ptr_t)gds_blk_trg != (sm_uc_ptr_t)gds_blk_src)
 	{	/* Normal case, downgrade is to a new buffer. Our simple check is quicker
 		   than just always doing memmove() would be. But assert they are at least
@@ -77,7 +77,7 @@ void gds_blk_downgrade(v15_blk_hdr_ptr_t gds_blk_trg, blk_hdr_ptr_t gds_blk_src)
 
 	gds_blk_trg->bsiz = bsiz - SPACE_NEEDED;
 	gds_blk_trg->levl = levl;
-	v15tn = tn;
+	v15tn = (v15_trans_num) tn;
 	UNIX_ONLY(gds_blk_trg->tn = v15tn);
 	VMS_ONLY(PUT_ULONG(&gds_blk_trg->tn, v15tn));
 }

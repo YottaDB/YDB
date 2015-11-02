@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ enum cdb_sc	gvcst_lftsib(srch_hist *full_hist)
 	}
 	/* old now points to the first block which had a non-zero prev_rec.offset */
 	new = new_base + (old - old_base + 1);
-	full_hist->depth = old - old_base;
+	full_hist->depth = (uint4)(old - old_base);
 	(new--)->blk_num = 0;
 	new->blk_num = old->blk_num;
 	new->tn = old->tn;

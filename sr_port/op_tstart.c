@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,6 +132,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	unsigned char		tp_bat[TP_BATCH_LEN];
 	mname_entry		tpvent;
 	ht_ent_mname		*tabent, *curent, *topent;
+	sgmnt_addrs		*csa;
 
 	/* If we haven't done any TP until now, turn the flag on to tell gvcst_init to
 	   initialize it in any regions it opens from now on and initialize it in any
@@ -166,7 +167,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	MV_FORCE_STR(tid);
 	if (0 == dollar_tlevel)
 	{
-		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1;
+		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
 		jgbl.cumul_jnl_rec_len = 0;
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 		t_tries = (FALSE == is_standalone) ? 0 : CDB_STAGNATE;
@@ -200,7 +201,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 						ptrstart = (unsigned char *)tid->str.addr;
 						ptrend = ptrstart + TID_STR_SIZE;
 						UTF8_LEADING_BYTE(ptrend, ptrstart, ptrinvalidbegin)
-						tid->str.len = ptrinvalidbegin - ptrstart;
+						tid->str.len = INTCAST(ptrinvalidbegin - ptrstart);
 					}
 				}
 			}
@@ -209,7 +210,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 			memcpy(tcom_record.jnl_tid, (char *)tid->str.addr, tid->str.len);
 			if ((TP_BATCH_SHRT == tid->str.len) || (TP_BATCH_LEN == tid->str.len))
 			{
-				lower_to_upper(tp_bat, (uchar_ptr_t)tid->str.addr, tid->str.len);
+				lower_to_upper(tp_bat, (uchar_ptr_t)tid->str.addr, (int)tid->str.len);
 				if (0 == memcmp(TP_BATCH_ID, tp_bat, tid->str.len))
 					jgbl.wait_for_jnl_hard = FALSE;
 			}
@@ -265,7 +266,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		}
 		if ((unsigned char *)mv_chain >= top)
 		{
-			mv_st_ent->mv_st_next = (char *)mv_chain - (char *)mv_st_ent;
+			mv_st_ent->mv_st_next = (unsigned int)((char *)mv_chain - (char *)mv_st_ent);
 			mv_chain = mv_st_ent;
 		} else
 		{
@@ -278,8 +279,9 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 				mvst_tmp = mvst_prev;
 				mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
 			}
-			mvst_tmp->mv_st_next = (char *)mv_st_ent - (char *)mvst_tmp;
-			mv_st_ent->mv_st_next = (char *)mvst_prev - (char *)mv_st_ent + mvs_size[MVST_TPHOLD];
+			mvst_tmp->mv_st_next = (unsigned int)((char *)mv_st_ent - (char *)mvst_tmp);
+			mv_st_ent->mv_st_next = (unsigned int)((char *)mvst_prev - (char *)mv_st_ent + mvs_size[MVST_TPHOLD]);
+
 		}
 	} else
 	{
@@ -291,8 +293,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	if (NULL == tpstackbase)
 	{
 		tstack_ptr = (unsigned char *)malloc(32768);
-		tp_sp = tpstackbase
-		      = tstack_ptr + 32764;
+		tp_sp = tpstackbase = tstack_ptr + 32768;
 		tpstacktop = tstack_ptr;
 		tpstackwarn = tpstacktop + 1024;
 		tp_pointer = NULL;
@@ -415,7 +416,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	}
 	++dollar_tlevel;
 	/* Store the global (across all segments) dollar_tlevel specific information. Curently, it holds only jnl related info. */
-	if ((sgmnt_addrs *)-1 != jnl_fence_ctl.fence_list)
+	if ((sgmnt_addrs *)-1L != jnl_fence_ctl.fence_list)
 	{
 		for (prev_gtli = NULL, gtli = global_tlvl_info_head; gtli; gtli = gtli->next_global_tlvl_info)
 			prev_gtli = gtli;
@@ -445,7 +446,12 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		else
 			new_tli->tlvl_kill_used = 0;
 		new_tli->tlvl_tp_hist_info = si->last_tp_hist;
-		if (JNL_ENABLED(&FILE_INFO(si->gv_cur_region)->s_addrs))
+		/* Prepare for journaling logical records if journaling is enabled on this region OR if replication was
+		 * allowed on this region (this is a case where replication was ON originally but later transitioned
+		 * into WAS_ON state and journaling got turned OFF.
+		 */
+		csa = &FILE_INFO(si->gv_cur_region)->s_addrs;
+		if (JNL_WRITE_LOGICAL_RECS(csa))
 		{
 			for (prev_jfb = NULL, jfb = si->jnl_head; jfb; jfb = jfb->next)
 				prev_jfb = jfb;

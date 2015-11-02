@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,7 +85,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	cp2 = req->key.key + req->key.len.value;
 	for (cp1 = req->key.key; *cp1 && cp1 < cp2; cp1++)
 		;
-	v.str.len = cp1 - req->key.key;
+	v.str.len = INTCAST(cp1 - req->key.key);
 	v.str.addr = req->key.key;
 	if (v.str.len > MAX_MIDENT_LEN)	/* GT.M does not support global variables > MAX_MIDENT_LEN chars */
 	{

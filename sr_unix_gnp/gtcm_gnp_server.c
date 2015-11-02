@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,6 @@
 #include "util.h"
 #include "getzdir.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
-#include "gtm_icu_api.h"
 #include "suspsigs_handler.h"
 
 #ifdef UNICODE_SUPPORTED
@@ -112,6 +111,7 @@ GBLDEF gd_region		*action_que_dummy_reg;
 GBLDEF char			gtcm_gnp_server_log[MAX_FN_LEN + 1];
 /* the length is the orignal length */
 GBLDEF int			gtcm_gnp_log_path_len;
+
 GBLREF FILE			*gtcm_errfs;
 GBLREF bool			certify_all_blocks;
 GBLREF bool			licensed;
@@ -133,6 +133,8 @@ GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
 GBLREF boolean_t		is_replicator;
 GBLREF boolean_t		gtm_utf8_mode;
+GBLREF inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
+GBLREF short			dollar_tlevel;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -296,7 +298,11 @@ static void gtcm_gnp_server_actions(void)
 			}
 			if (curr_entry)		/* curr_entry can be NULL if went through gtcmtr_terminate */
 			{
-				time((time_t *)&curr_entry->lastact[0]);
+#ifdef GTM64
+			  	time((time_t *)&curr_entry->lastact);
+#else
+			  	time((time_t *)&curr_entry->lastact[0]);
+#endif /* GTM64 */
 				/* curr_entry is used by gtcm_urgread_ast to determine if it needs to defer the interrupt message */
 				prev_curr_entry = curr_entry;
 				if (CM_WRITE == reply)
@@ -479,7 +485,8 @@ int main(int argc, char **argv, char **envp)
 		exit(status);
 	}
 	atexit(gtcm_exi_handler);
-	init_secshr_addrs(get_next_gdr, cw_set, NULL, &cw_set_depth, process_id, 0, OS_PAGE_SIZE, &jnlpool.jnlpool_dummy_reg);
+	init_secshr_addrs(get_next_gdr, cw_set, NULL, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
+		&jnlpool.jnlpool_dummy_reg, &inctn_detail, &dollar_tlevel);
 	initialize_pattern_table();
 
 	/* Pre-allocate some timer blocks. */

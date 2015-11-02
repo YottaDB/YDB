@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,7 @@ void mupip_cvtgbl(void)
 			mupip_exit(ERR_LOADBGSZ);
 		else if (MAXUINT4 < begin_i8)
 			mupip_exit(ERR_LOADBGSZ2);
-		begin = begin_i8;
+		begin = (uint4) begin_i8;
 	} else
 	{
 		begin = 1;
@@ -83,7 +83,7 @@ void mupip_cvtgbl(void)
 			mupip_exit(ERR_LOADEDSZ2);
 		if (end_i8 < begin_i8)
 			mupip_exit(ERR_LOADEDBG);
-		end = end_i8;
+		end = (uint4) end_i8;
 	} else
 		end = MAXUINT4;
 	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)

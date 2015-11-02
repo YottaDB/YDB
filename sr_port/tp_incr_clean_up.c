@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,7 +75,7 @@ void tp_incr_clean_up(short newlevel)
 	ht_ent_int4		*tabent;
 
 	assert(newlevel > 0);
-	if ((sgmnt_addrs *)-1 != jnl_fence_ctl.fence_list)	/* currently global_tlvl_info struct holds only jnl related info */
+	if ((sgmnt_addrs *)-1L != jnl_fence_ctl.fence_list)	/* currently global_tlvl_info struct holds only jnl related info */
 		rollbk_gbl_tlvl_info(newlevel);
 	tmp_gv_cur_region = gv_cur_region;	/* save region and associated pointers to restore them later */
 	for (si = first_sgm_info;  si != NULL;  si = si->next_sgm_info)
@@ -241,7 +241,7 @@ void rollbk_gbl_tlvl_info(short newlevel)
 	if (gtli && newlevel + 1 == gtli->t_level)
 		jnl_fence_ctl.fence_list = gtli->global_tlvl_fence_info;
 	else
-		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1;
+		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
 
 	FREE_GBL_TLVL_INFO(gtli);
 	if (prev_gtli)
@@ -306,7 +306,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 			FREE_KILL_SET(si, temp_kill_set);
 			si->kill_set_head = si->kill_set_tail = NULL;
 		}
-		if (JNL_ENABLED(cs_addrs))
+		if (JNL_WRITE_LOGICAL_RECS(cs_addrs))
 		{
 			if (tli->tlvl_jfb_info)
 			{
@@ -361,7 +361,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 		temp_kill_set = si->kill_set_head;
 		FREE_KILL_SET(si, temp_kill_set);
 		si->kill_set_head = si->kill_set_tail = NULL;
-		if (JNL_ENABLED(cs_addrs))
+		if (JNL_WRITE_LOGICAL_RECS(cs_addrs))
 		{
 			temp_jfb = si->jnl_head;
 			FREE_JFB_INFO(si, temp_jfb);

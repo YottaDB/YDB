@@ -38,13 +38,14 @@ GBLREF va_list			last_va_list_ptr;	/* set by util_format */
 
 void stx_error(int in_error, ...)
 {
-	va_list	args;
-	int	cnt, arg1, arg2, arg3, arg4;
-	bool	list, warn;
-	char	msgbuf[MAX_SRCLINE];
-	char	buf[MAX_SRCLINE + LISTTAB + sizeof(ARROW)];
-	char	*c;
-	mstr	msg;
+	va_list		args;
+	VA_ARG_TYPE	cnt, arg1, arg2, arg3, arg4;
+	bool		list, warn;
+	char		msgbuf[MAX_SRCLINE];
+	char		buf[MAX_SRCLINE + LISTTAB + sizeof(ARROW)];
+	char		*c;
+	mstr		msg;
+	boolean_t	is_stx_warn;	/* current error is actually of type warning and we are in CGP_PARSE phase */
 
 	error_def(ERR_SRCLIN);
 	error_def(ERR_SRCLOC);
@@ -65,9 +66,16 @@ void stx_error(int in_error, ...)
 
 	flush_pio();
 	va_start(args, in_error);
-	shift_gvrefs = FALSE;
+	/* In case of a IS_STX_WARN type of parsing error, we resume parsing so it is important NOT to reset
+	 * the following global variables
+	 * 	a) shift_gvrefs
+	 *	b) source_error_found
+	 */
+	is_stx_warn = ((CGP_PARSE == cg_phase) && IS_STX_WARN(in_error));
+	if (!is_stx_warn)
+		shift_gvrefs = FALSE;
 	if (run_time)
-	{	/* If the current error is of type STX_WARN then do not issue an error at compile time. Insert 
+	{	/* If the current error is of type STX_WARN then do not issue an error at compile time. Insert
 		 * triple to issue the error at runtime. If and when this codepath is reached at runtime (M command
 		 * could have a postconditional that bypasses this code) issue the rts_error.
 		 * See IS_STX_WARN macro definition for details.
@@ -79,12 +87,12 @@ void stx_error(int in_error, ...)
 		}
 		if (ERR_BADCHAR == in_error)
 		{
-			cnt = va_arg(args, int);
+			cnt = va_arg(args, VA_ARG_TYPE);
 			assert(cnt == 4);
-			arg1 = va_arg(args, int);
-			arg2 = va_arg(args, int);
-			arg3 = va_arg(args, int);
-			arg4 = va_arg(args, int);
+			arg1 = va_arg(args, VA_ARG_TYPE);
+			arg2 = va_arg(args, VA_ARG_TYPE);
+			arg3 = va_arg(args, VA_ARG_TYPE);
+			arg4 = va_arg(args, VA_ARG_TYPE);
 			va_end(args);
 			rts_error(VARLSTCNT(6) in_error, cnt, arg1, arg2, arg3, arg4);
 		} else if ((ERR_LABELMISSING == in_error)
@@ -94,17 +102,17 @@ void stx_error(int in_error, ...)
 				|| (ERR_BADCHSET == in_error)
 				|| (ERR_BADCASECODE == in_error))
 		{
-			cnt = va_arg(args, int);
+			cnt = va_arg(args, VA_ARG_TYPE);
 			assert(cnt == 2);
-			arg1 = va_arg(args, int);
-			arg2 = va_arg(args, int);
+			arg1 = va_arg(args, VA_ARG_TYPE);
+			arg2 = va_arg(args, VA_ARG_TYPE);
 			va_end(args);
 			rts_error(VARLSTCNT(4) in_error, cnt, arg1, arg2);
 		} else if ((ERR_CEUSRERROR == in_error) || (ERR_INVDLRCVAL == in_error))
 		{
-			cnt = va_arg(args, int);
+			cnt = va_arg(args, VA_ARG_TYPE);
 			assert(cnt == 1);
-			arg1 = va_arg(args, int);
+			arg1 = va_arg(args, VA_ARG_TYPE);
 			va_end(args);
 			rts_error(VARLSTCNT(3) in_error, cnt, arg1);
 		} else
@@ -120,11 +128,12 @@ void stx_error(int in_error, ...)
 		va_end(args);
 		return;
 	}
-	if (in_error != ERR_CETOOMANY &&	/* compiler escape errors shouldn't hide others */
-	    in_error != ERR_CEUSRERROR &&
-	    in_error != ERR_CEBIGSKIP &&
-	    in_error != ERR_CETOOLONG &&
-	    in_error != ERR_CENOINDIR)
+	if (!is_stx_warn
+		&& (ERR_CETOOMANY != in_error)	/* compiler escape errors shouldn't hide others */
+		&& (ERR_CEUSRERROR!= in_error)
+		&& (ERR_CEBIGSKIP != in_error)
+		&& (ERR_CETOOLONG != in_error)
+		&& (ERR_CENOINDIR != in_error))
 	{
 		source_error_found = (int4 ) in_error;
 	}
@@ -141,12 +150,12 @@ void stx_error(int in_error, ...)
 	{
 		memset(buf, ' ', LISTTAB);
 		show_source_line(&buf[LISTTAB], warn);
-		cnt = va_arg(args, int);
+		cnt = va_arg(args, VA_ARG_TYPE);
 		assert(cnt == 4);
-		arg1 = va_arg(args, int);
-		arg2 = va_arg(args, int);
-		arg3 = va_arg(args, int);
-		arg4 = va_arg(args, int);
+		arg1 = va_arg(args, VA_ARG_TYPE);
+		arg2 = va_arg(args, VA_ARG_TYPE);
+		arg3 = va_arg(args, VA_ARG_TYPE);
+		arg4 = va_arg(args, VA_ARG_TYPE);
 		if (warn)
 		{
 			dec_err(VARLSTCNT(6) in_error, 4, arg1, arg2, arg3, arg4);
@@ -162,10 +171,10 @@ void stx_error(int in_error, ...)
 			|| (ERR_BADCHSET == in_error)
 			|| (ERR_BADCASECODE == in_error))
 	{
-		cnt = va_arg(args, int);
+		cnt = va_arg(args, VA_ARG_TYPE);
 		assert(cnt == 2);
-		arg1 = va_arg(args, int);
-		arg2 = va_arg(args, int);
+		arg1 = va_arg(args, VA_ARG_TYPE);
+		arg2 = va_arg(args, VA_ARG_TYPE);
 		if (warn)
 		{
 			dec_err(VARLSTCNT(4) in_error, 2, arg1, arg2);
@@ -181,9 +190,9 @@ void stx_error(int in_error, ...)
 				dec_err(VARLSTCNT(1) in_error);
 			else
 			{
-				cnt = va_arg(args, int);
+				cnt = va_arg(args, VA_ARG_TYPE);
 				assert(cnt == 1);
-				arg1 = va_arg(args, int);
+				arg1 = va_arg(args, VA_ARG_TYPE);
 				dec_err(VARLSTCNT(3) in_error, 1, arg1);
 			}
 		}

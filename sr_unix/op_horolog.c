@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ void op_horolog(mval *s)
 	stringpool.free  = i2asc(stringpool.free, days);
 	*stringpool.free++ = ',';
 	stringpool.free = i2asc(stringpool.free, (uint4)seconds);
-	s->str.len = (char *) stringpool.free - s->str.addr;
+	s->str.len = INTCAST((char *)stringpool.free - s->str.addr);
 	s->mvtype = MV_STR;
 	return;
 }

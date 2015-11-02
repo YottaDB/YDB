@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ short iomb_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			{
 			case iop_blocksize:
 				GET_LONG(d_mb->maxmsg, (pp->str.addr + p_offset));
-				if (d_mb->maxmsg < 0)
+				if ((int4)d_mb->maxmsg < 0)
 					rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 				break;
 			case iop_readonly:

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,9 +65,11 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 	error_def(ERR_MUINFOUINT4);
 	error_def(ERR_MUINFOUINT8);
 	error_def(ERR_MUINFOSTR);
-	error_def(ERR_DBFSYNCERR);								\
+	error_def(ERR_DBFSYNCERR);
 
-	murgbl.db_updated = TRUE;
+	assert(!mur_options.rollback_losttnonly || !apply_intrpt_pblk);
+	if (!mur_options.rollback_losttnonly)
+		murgbl.db_updated = TRUE;
 	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
 	{
 		if (!apply_intrpt_pblk)
@@ -97,6 +99,7 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 				 * Now we are in the phase to apply original GT.M generated PBLKs.
 				 * We skip application of PBLKs till the last recover's turn-around point.
 				 */
+				assert(!mur_options.rollback_losttnonly);
 				mur_jctl = rctl->jctl = rctl->jctl_apply_pblk;
 				assert(mur_jctl->apply_pblk_stop_offset);
 				mur_jctl->rec_offset = mur_jctl->apply_pblk_stop_offset;
@@ -301,6 +304,8 @@ uint4 mur_output_pblk(void)
 	struct_jrec_blk	pblkrec;
 	uchar_ptr_t	pblkcontents;
 
+	if (mur_options.rollback_losttnonly)	/* In case of a LOSTTNONLY rollback, it is still possible to reach here */
+		return SS_NORMAL;/* if one region has NOBEFORE_IMAGE while another has BEFORE_IMAGE. Any case do NOT apply PBLKs */
 	rctl = &mur_ctl[mur_regno];
 	pblkrec = mur_rab.jnlrec->jrec_pblk;
 	/* note that all fields in the "jrec_pblk" typedef structure are now referencible from the local variable "pblkrec".

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,7 @@
 #include "incr_link.h"
 #include "min_max.h"	/* MIDENT_CMP needs MIN */
 #include "cmd_qlf.h"	/* needed for CQ_UTF8 */
+#include "gtm_malloc.h"
 
 /* INCR_LINK - read and process a mumps object module.  Link said module to
  	currently executing image */
@@ -90,7 +91,7 @@ bool incr_link(int file_desc)
 
 	assert (file_hdr.a_bss == 0);
 	code_size = file_hdr.a_text + file_hdr.a_data;
-	code = malloc(code_size);
+	code = GTM_TEXT_MALLOC(code_size);
 	DOREADRL(file_desc, code, code_size, read_size);
 	if (read_size != code_size)
 	{
@@ -385,7 +386,7 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 			else
 			{	urx_tmpaddr = (urx_addr *) malloc(sizeof(urx_addr));
 				urx_tmpaddr->next = urx_rp->addr;
-				urx_tmpaddr->addr = (int4 *)(((char *)code) + res_root->addr);
+				urx_tmpaddr->addr = (INTPTR_T *)(((char *)code) + res_root->addr);
 				urx_rp->addr = urx_tmpaddr;
 			}
 			res_temp1 = res_root->list;

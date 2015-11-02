@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -139,7 +139,7 @@ void	mur_close_files(void)
 			tp_change_reg();
 			if (mur_options.update && JNL_ENABLED(rctl))
 				cs_addrs->jnl->pini_addr = 0; /* Stop simulation of GTM process journal record writing */
-			if (NULL != rctl->jctl && murgbl.clean_exit && mur_options.rollback)
+			if (NULL != rctl->jctl && murgbl.clean_exit && mur_options.rollback && !mur_options.rollback_losttnonly)
 			{	/* to write proper jnl_seqno in epoch record */
 				assert(murgbl.stop_rlbk_seqno >= murgbl.resync_seqno);
 				assert(murgbl.stop_rlbk_seqno >= murgbl.consist_jnl_seqno);
@@ -178,7 +178,7 @@ void	mur_close_files(void)
 							DB_LEN_STR(gv_cur_region),
 							LEN_AND_STR(jnl_state_lit[csd->jnl_state]));
 					UNIX_ONLY(
-						if (NULL != rctl->jctl && mur_options.rollback)
+						if (NULL != rctl->jctl && mur_options.rollback && !mur_options.rollback_losttnonly)
 						{
 							assert(murgbl.consist_jnl_seqno);
 							csd->reg_seqno = murgbl.consist_jnl_seqno;
@@ -201,7 +201,10 @@ void	mur_close_files(void)
 						}
 					)
 					VMS_ONLY(
-						if (NULL != rctl->jctl && mur_options.rollback && murgbl.consist_jnl_seqno)
+						if ((NULL != rctl->jctl)
+							&& mur_options.rollback
+							&& !mur_options.rollback_losttnonly
+							&& murgbl.consist_jnl_seqno)
 						{
 							if (set_resync_to_region)
 							{
@@ -230,7 +233,8 @@ void	mur_close_files(void)
 				if (!file_head_write((char *)rctl->gd->dyn.addr->fname, csd, sizeof(csd_temp)))
 					wrn_count++;
 			} /* else do not restore state */
-			if (rctl->standalone && !mur_options.forward && murgbl.clean_exit && (NULL != rctl->jctl_turn_around))
+			if (rctl->standalone && !mur_options.forward && !mur_options.rollback_losttnonly
+				&& murgbl.clean_exit && (NULL != rctl->jctl_turn_around))
 			{	/* some backward processing and possibly forward processing was done. do some cleanup */
 				assert(NULL == rctl->jctl_turn_around || NULL != rctl->jctl_head);
 				jctl = rctl->jctl_turn_around;
@@ -356,7 +360,7 @@ void	mur_close_files(void)
 	assert(!mur_options.rollback || murgbl.repl_standalone || !murgbl.clean_exit);
 	if (mur_options.rollback && murgbl.repl_standalone)
 	{
-		if (murgbl.clean_exit && murgbl.consist_jnl_seqno)
+		if (murgbl.clean_exit && !mur_options.rollback_losttnonly && murgbl.consist_jnl_seqno)
 		{	/* The database has been successfully rolled back by the MUPIP JOURNAL ROLLBACK command.
 			 * Virtually truncate the triple history in the replication instance file if necessary.
 			 * Before that we need to get the ftok lock on the instance file as the truncate function requires that.

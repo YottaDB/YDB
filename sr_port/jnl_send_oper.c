@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ void jnl_send_oper(jnl_private_control *jpc, uint4 status)
 	csd = csa->hdr;
 	jb = jpc->jnl_buff;
 	UNIX_ONLY(assert((ENOSPC != jpc->status) || jb->enospc_errcnt);)
-	UNIX_ONLY(assert((ENOSPC == jpc->status) || !jb->enospc_errcnt);)
+	UNIX_ONLY(assert((SS_NORMAL == jpc->status) || (ENOSPC == jpc->status) || !jb->enospc_errcnt);)
 	VMS_ONLY(assert(!jb->enospc_errcnt));	/* currently not updated in VMS, so should be 0 */
 	ok_to_log = (jb->enospc_errcnt ?  (1 == (jb->enospc_errcnt % ENOSPC_LOGGING_PERIOD)) : TRUE);
 

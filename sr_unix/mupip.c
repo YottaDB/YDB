@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,26 +67,28 @@
 #endif
 
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
-GBLDEF	bool			in_backup;
+GBLREF	bool			in_backup;
 GBLREF	bool			licensed;
 GBLREF	bool			transform;
 GBLREF	int			(*func)();
 GBLREF	mval			curr_gbl_root;
 GBLREF	global_latch_t		defer_latch;
 GBLREF	enum gtmImageTypes	image_type;
-GBLREF	sgm_info         	*first_sgm_info;
-GBLREF	cw_set_element   	cw_set[];
-GBLREF	unsigned char    	cw_set_depth;
+GBLREF	sgm_info		*first_sgm_info;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	unsigned char		cw_set_depth;
 GBLREF	uint4			process_id;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF sgm_info         	*first_sgm_info;
-GBLREF cw_set_element   	cw_set[];
-GBLREF unsigned char    	cw_set_depth;
-GBLREF uint4			process_id;
-GBLREF jnlpool_addrs		jnlpool;
-GBLREF spdesc   		rts_stringpool, stringpool;
-GBLREF char			cli_err_str[];
-GBLREF boolean_t		gtm_utf8_mode;
+GBLREF	sgm_info		*first_sgm_info;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	uint4			process_id;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	spdesc			rts_stringpool, stringpool;
+GBLREF	char			cli_err_str[];
+GBLREF	boolean_t		gtm_utf8_mode;
+GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
+GBLREF	short			dollar_tlevel;
 
 void display_prompt(void);
 
@@ -110,7 +112,7 @@ int main (int argc, char **argv)
 	get_page_size();
 	getjobnum();
 	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
-			  &jnlpool.jnlpool_dummy_reg);
+			  &jnlpool.jnlpool_dummy_reg, &inctn_detail, &dollar_tlevel);
 	getzdir();
 	initialize_pattern_table();
 	prealloc_gt_timers();

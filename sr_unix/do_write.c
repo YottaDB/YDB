@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@ int4	do_write (int4 fdesc, off_t fptr, sm_uc_ptr_t fbuff, size_t fbuff_len)
 {
 	sigset_t	savemask;
 	int4		save_errno, retry_count;
-	int4		status;
+        ssize_t 	status;
 
 	/* Block SIGALRM signal - no timers can pop and give us trouble */
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +11,14 @@
 
 #include "mdef.h"
 
+#undef malloc
+#undef free
+
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
+#include "gtm_stdlib.h"
 #include <unistd.h>
 #include <errno.h>
 
@@ -28,6 +32,19 @@
 #include "filestruct.h"
 #include "gbldirnam.h"
 
+#ifdef GTM64
+#define SAVE_ADDR_REGION                   \
+{ \
+	int4 *tmp = (int4 *) &(addr->regions); \
+	*long_ptr++ = *tmp; \
+	long_ptr++;       \
+}
+#else /* GTM64 */
+#define SAVE_ADDR_REGION                   \
+	*long_ptr++ = (int4)addr->regions;
+#endif /* GTM64 */
+
+
 int main(int argc, char **argv)
 {
 	int		fd;
@@ -37,7 +54,7 @@ int main(int argc, char **argv)
 	gd_region	*region;
 	gd_segment	*segment;
 	int4		*long_ptr;
-	uint4	size;
+	uint4		size;
 	int		i, alloc, extend, block, global, key, lock, record;
 
 	argv++;
@@ -62,43 +79,43 @@ int main(int argc, char **argv)
 		}
 		switch (argv[0][1])
 		{
-			case 'a':	if (-1 == (alloc = asc2i((uchar_ptr_t)&argv[0][2],strlen(argv[0]) - 2)))
+			case 'a':	if (-1 == (alloc = asc2i((uchar_ptr_t)&argv[0][2],STRLEN(argv[0]) - 2)))
 					{
 						PRINTF("Invalid value for -a: %s\n", &argv[0][2]);
 						return 0;
 					}
 					break;
-			case 'b':	if (-1 == (block = asc2i((uchar_ptr_t)&argv[0][2],strlen(argv[0]) - 2)))
+			case 'b':	if (-1 == (block = asc2i((uchar_ptr_t)&argv[0][2],STRLEN(argv[0]) - 2)))
 					{
 						PRINTF("Invalid value for -b: %s\n", &argv[0][2]);
 						return 0;
 					}
 					break;
-			case 'e':	if (-1 == (extend = asc2i((uchar_ptr_t)&argv[0][2],strlen(argv[0]) - 2)))
+			case 'e':	if (-1 == (extend = asc2i((uchar_ptr_t)&argv[0][2],STRLEN(argv[0]) - 2)))
 					{
 						PRINTF("Invalid value for -e: %s\n", &argv[0][2]);
 						return 0;
 					}
 					break;
-			case 'g':	if (-1 == (global = asc2i((uchar_ptr_t)&argv[0][2], strlen(argv[0]) - 2)))
+			case 'g':	if (-1 == (global = asc2i((uchar_ptr_t)&argv[0][2], STRLEN(argv[0]) - 2)))
 					{
 						PRINTF("Invalid value for -g: %s\n", &argv[0][2]);
 						return 0;
 					}
 					break;
-			case 'k':	if (-1 == (key = asc2i((uchar_ptr_t)&argv[0][2],strlen(argv[0]) - 2)))
+			case 'k':	if (-1 == (key = asc2i((uchar_ptr_t)&argv[0][2], STRLEN(argv[0]) - 2)))
 					{
 						PRINTF("Invalid value for -k: %s\n", &argv[0][2]);
 						return 0;
 					}
 					break;
-			case 'l':	if (-1 == (lock = asc2i((uchar_ptr_t)&argv[0][2],strlen(argv[0]) - 2)))
+			case 'l':	if (-1 == (lock = asc2i((uchar_ptr_t)&argv[0][2], STRLEN(argv[0]) - 2)))
 					{
 						PRINTF("Invalid value for -l: %s\n", &argv[0][2]);
 						return 0;
 					}
 					break;
-			case 'r':	if (-1 == (record = asc2i((uchar_ptr_t)&argv[0][2],strlen(argv[0]) - 2)))
+			case 'r':	if (-1 == (record = asc2i((uchar_ptr_t)&argv[0][2], STRLEN(argv[0]) - 2)))
 					{
 						PRINTF("Invalid value for -r: %s\n", &argv[0][2]);
 						return 0;
@@ -159,35 +176,65 @@ int main(int argc, char **argv)
 	memset(header, 0, ROUND_UP(size, DISK_BLOCK_SIZE));
 	header->filesize = size;
 	size = ROUND_UP(size, DISK_BLOCK_SIZE);
-	memcpy(header->label, GDE_LABEL_LITERAL, sizeof(GDE_LABEL_LITERAL));
+	MEMCPY_LIT(header->label, GDE_LABEL_LITERAL);
 	addr = (gd_addr *)((char *)header + sizeof(header_struct));
 	addr->max_rec_size = 256;
 	addr->maps = (gd_binding*)(sizeof(gd_addr));
 	addr->n_maps = 3;
-	addr->regions = (gd_region*)((int4)(addr->maps) + 3 * sizeof(gd_binding));
+	addr->regions = (gd_region *)((INTPTR_T)(addr->maps) + 3 * sizeof(gd_binding));
 	addr->n_regions = 1;
-	addr->segments = (gd_segment*)((int4)(addr->regions) + sizeof(gd_region));
+	addr->segments = (gd_segment *)((INTPTR_T)(addr->regions) + sizeof(gd_region));
 	addr->n_segments = 1;
 	addr->link = 0;
 	addr->tab_ptr = 0;
 	addr->id = 0;
 	addr->local_locks = 0;
-	addr->end = (int4)(addr->segments + 1 * sizeof(gd_segment));
-	long_ptr = (int4*)((char*)addr + (int4)(addr->maps));
+	addr->end = (INTPTR_T)((char *)addr->segments + 1 * sizeof(gd_segment));
+	long_ptr = (int4*)((char *)addr + (INTPTR_T)(addr->maps));
+
+#ifdef BIGENDIAN
 	*long_ptr++ = 0x232FFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = (int4)addr->regions;
+#else
+        *long_ptr++ = 0xFFFF2F23;
+#endif
+	*long_ptr++ = 0xFFFFFFF;
+	*long_ptr++ = 0xFFFFFFF;
+	*long_ptr++ = 0xFFFFFFF;
+	*long_ptr++ = 0xFFFFFFF;
+	*long_ptr++ = 0xFFFFFFF;
+	*long_ptr++ = 0xFFFFFFF;
+	*long_ptr++ = 0xFFFFFFF;
+	SAVE_ADDR_REGION
+
+#ifdef BIGENDIAN
 	*long_ptr++ = 0x24FFFFFF;
+#else
+        *long_ptr++ = 0xFFFFFF24;
+#endif
 	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = (int4)addr->regions;
 	*long_ptr++ = 0xFFFFFFFF;
 	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = (int4)addr->regions;
-	region = (gd_region*)((char*)addr + (int4)(addr->regions));
-	segment = (gd_segment*)((char*)addr + (int4)(addr->segments));
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	SAVE_ADDR_REGION
+
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	SAVE_ADDR_REGION
+
+	region = (gd_region*)((char *)addr + (INTPTR_T)(addr->regions));
+	segment = (gd_segment*)((char *)addr + (INTPTR_T)(addr->segments));
 	region->rname_len = 7;
 	memcpy(region->rname,"DEFAULT",7);
-	region->dyn.offset = (int4)addr->segments;
+	region->dyn.offset = (INTPTR_T)addr->segments;
 	region->max_rec_size = record;
 	region->max_key_size = key;
 	region->open = region->lock_write = region->null_subs = region->jnl_state = 0;
@@ -203,7 +250,7 @@ int main(int argc, char **argv)
 	segment->ext_blk_count = extend;
 	segment->cm_blk = 0;
 	segment->lock_space = lock;
-	memcpy(segment->defext,".dat",4);
+	memcpy(segment->defext,".DAT",4);
 	segment->global_buffers = global;
 	segment->buckets = 0;
 	segment->windows = 0;

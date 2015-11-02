@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,31 +31,30 @@ static char rcsid[] = "$Header:$";
 int
 omi_prc_unla(omi_conn *cptr, char *xend, char *buff, char *bend)
 {
-    GBLREF int		  omi_pid;
-    GBLREF mlk_pvtblk	 *mlk_pvt_root;
+	GBLREF int		  omi_pid;
+	GBLREF mlk_pvtblk	 *mlk_pvt_root;
 
-    mlk_pvtblk		**prior;
+	mlk_pvtblk		**prior;
 
 
-/*  Condition handler for DBMS operations */
-    ESTABLISH_RET(omi_dbms_ch,0);
+	/*  Condition handler for DBMS operations */
+	ESTABLISH_RET(omi_dbms_ch,0);
 
-/*  Loop through all the locks, unlocking ones that belong to this agent */
-    for (prior = &mlk_pvt_root; *prior; )
-    {
-	if (!(*prior)->granted || !(*prior)->nodptr || (*prior)->nodptr->owner != omi_pid)
-	    mlk_pvtblk_delete(prior);
-	else if ((*prior)->nodptr->auxowner == (int)cptr)
+	/*  Loop through all the locks, unlocking ones that belong to this agent */
+	for (prior = &mlk_pvt_root; *prior; )
 	{
-	    mlk_unlock(*prior);
-	    mlk_pvtblk_delete(prior);
+		if (!(*prior)->granted || !(*prior)->nodptr || (*prior)->nodptr->owner != omi_pid)
+			mlk_pvtblk_delete(prior);
+		else if ((*prior)->nodptr->auxowner == (UINTPTR_T)cptr)
+		{
+			mlk_unlock(*prior);
+			mlk_pvtblk_delete(prior);
+		} else
+			prior = &(*prior)->next;
 	}
-	else
-	    prior = &(*prior)->next;
-    }
 
-    REVERT;
+	REVERT;
 
-/*  The response contains only a header */
-    return 0;
+	/*  The response contains only a header */
+	return 0;
 }

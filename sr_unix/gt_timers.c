@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +55,10 @@
 #include <time.h>
 #include <string.h>
 #include <stddef.h>
+
+#if defined(__ia64) && defined(__linux__)
+#include "gtm_unistd.h"
+#endif /* __ia64 && __linux__  */
 
 #include "gt_timer.h"
 #include "wake_alarm.h"
@@ -198,7 +202,7 @@ void	prealloc_gt_timers(void)
 	   hope to need (dbg versions will assert fail if this number is exceeded).
 	   Allocate them with 16 bytes of possible data each. */
 
-	timeblk_hdrlen = (int4)offsetof(GT_TIMER, hd_data[0]);
+	timeblk_hdrlen = OFFSETOF(GT_TIMER, hd_data[0]);
 	timeblk = timeblks = (GT_TIMER *)malloc((timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * INIT_GT_TIMERS);
 	for (gt_timer_cnt = INIT_GT_TIMERS; 0 < gt_timer_cnt; --gt_timer_cnt)
 	{
@@ -240,8 +244,8 @@ void	sys_get_curr_time (ABS_TIME *atp)
 
 	/* getclock or clock_gettime perhaps to avoid tz just to ignore */
 	gettimeofday(&tv, &tz);
-	atp->at_sec = tv.tv_sec;
-	atp->at_usec = tv.tv_usec;
+	atp->at_sec = (int4)tv.tv_sec;
+	atp->at_usec = (int4)tv.tv_usec;
 #else
 	atp->at_sec = time((int4 *) 0);
 	atp->at_usec = 0;
@@ -467,7 +471,7 @@ static void	sys_settimer (TID tid, ABS_TIME *time_to_expir, void (*handler)())
 	setitimer(ITIMER_REAL, &sys_timer, &old_sys_timer);
 #else
 	if (time_to_expir->at_sec == 0)
-		alarm((unsigned) 1);
+		alarm((unsigned)1);
 	else
 		alarm(time_to_expir->at_sec);
 #endif

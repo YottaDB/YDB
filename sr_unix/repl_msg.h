@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,9 @@ enum
 	REPL_TRIPLE_INFO2,		/* 19 */
 	REPL_NEW_TRIPLE,		/* 20 */
 	REPL_INST_NOHIST,		/* 21 */
-	REPL_LOSTTNCOMPLETE		/* 22 */
+	REPL_LOSTTNCOMPLETE,		/* 22 */
+	REPL_MSGTYPE_LAST=256		/* 256 */
+	/* any new message need to be added before REPL_MSGTYPE_LAST */
 };
 
 #define	REPL_PROTO_VER_UNINITIALIZED	(char)0xFF	/* -1, the least of the versions to denote an uninitialized version field */
@@ -63,7 +65,7 @@ enum
 				    * the definition of repl_msg_t as well
 				    * as to accommodate a seq_num */
 
-#define REPL_MSG_HDRLEN	(sizeof(int4) + sizeof(int4)) /* For type and
+#define REPL_MSG_HDRLEN	(uint4)(sizeof(int4) + sizeof(int4)) /* For type and
 						     * len fields */
 
 typedef struct	/* Used also to send a message of type REPL_INST_NOHIST */
@@ -192,7 +194,7 @@ typedef struct
 	int4		type;
 	int4		len;
 	unsigned char	ack_seqno[sizeof(seq_num)];
-	unsigned char	ack_time[sizeof(time_t)];
+	unsigned char	ack_time[sizeof(gtm_time4_t)];
 	unsigned char	filler_32[12];
 } repl_heartbeat_msg_t; /* The first two fields should be as in repl_msg_t */
 

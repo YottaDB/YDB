@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,7 @@ void io_init(bool term_ctrl)
 	};
 
 
-	uint4		status;
+	int4		status;
         mval    	val;
 	mstr		tn;
  	MSTR_CONST	(gtm_netout, "GTM_NETOUT");

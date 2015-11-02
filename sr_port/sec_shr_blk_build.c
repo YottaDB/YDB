@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,9 +32,9 @@
 {											\
 	if (csa->read_write || is_bg)							\
 	{										\
-		if (csd->secshr_ops_index < sizeof(csd->secshr_ops_array))		\
-			csd->secshr_ops_array[csd->secshr_ops_index] = (uint4)(value);	\
-		csd->secshr_ops_index++;						\
+		if (csa->nl->secshr_ops_index < sizeof(csa->nl->secshr_ops_array))		\
+			csa->nl->secshr_ops_array[csa->nl->secshr_ops_index] = (INTPTR_T)(value);	\
+		csa->nl->secshr_ops_index++;						\
 	}										\
 }
 
@@ -51,6 +51,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 		SECSHR_ACCOUNTING(__LINE__);
 		SECSHR_ACCOUNTING(cse->upd_addr);
 		SECSHR_ACCOUNTING(sizeof(blk_segment));
+		assert(FALSE);
 		return FALSE;
 	}
 	if (!(GTM_PROBE(sizeof(blk_hdr), base_addr, WRITE)))
@@ -59,12 +60,13 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 		SECSHR_ACCOUNTING(__LINE__);
 		SECSHR_ACCOUNTING(base_addr);
 		SECSHR_ACCOUNTING(sizeof(blk_hdr));
+		assert(FALSE);
 		return FALSE;
 	}
 	/* block transaction number needs to be modified first. see comment in gvcst_blk_build as to why */
 	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
-	((blk_hdr_ptr_t)base_addr)->bsiz = array->len;
+	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);
 	((blk_hdr_ptr_t)base_addr)->levl = cse->level;
 
 	if (cse->forward_process)
@@ -78,6 +80,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 				SECSHR_ACCOUNTING(__LINE__);
 				SECSHR_ACCOUNTING(seg);
 				SECSHR_ACCOUNTING(sizeof(blk_segment));
+				assert(FALSE);
 				return FALSE;
 			}
 			if (!seg->len)
@@ -89,6 +92,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 				SECSHR_ACCOUNTING(seg);
 				SECSHR_ACCOUNTING(seg->addr);
 				SECSHR_ACCOUNTING(seg->len);
+				assert(FALSE);
 				return FALSE;
 			}
 			if (!(GTM_PROBE(seg->len, ptr, WRITE)))
@@ -99,6 +103,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 				SECSHR_ACCOUNTING(ptr);
 				SECSHR_ACCOUNTING(seg->addr);
 				SECSHR_ACCOUNTING(seg->len);
+				assert(FALSE);
 				return FALSE;
 			}
 			memmove(ptr, seg->addr, seg->len);
@@ -115,6 +120,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 				SECSHR_ACCOUNTING(__LINE__);
 				SECSHR_ACCOUNTING(seg);
 				SECSHR_ACCOUNTING(sizeof(blk_segment));
+				assert(FALSE);
 				return FALSE;
 			}
 			if (!seg->len)
@@ -126,6 +132,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 				SECSHR_ACCOUNTING(seg);
 				SECSHR_ACCOUNTING(seg->addr);
 				SECSHR_ACCOUNTING(seg->len);
+				assert(FALSE);
 				return FALSE;
 			}
 			ptr -= seg->len;
@@ -137,6 +144,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 				SECSHR_ACCOUNTING(ptr);
 				SECSHR_ACCOUNTING(seg->addr);
 				SECSHR_ACCOUNTING(seg->len);
+				assert(FALSE);
 				return FALSE;
 			}
 			memmove(ptr, seg->addr, seg->len);

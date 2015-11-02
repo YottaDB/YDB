@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,8 +35,10 @@
 #define MAX_ENTRY_LEN   1024
 
 
-typedef struct shm_parms_struct{
-        int             shmid, sgmnt_siz;
+typedef struct shm_parms_struct
+{
+	ssize_t		sgmnt_siz;
+        int             shmid;
         key_t           key;
 } shm_parms;
 
@@ -116,9 +118,9 @@ typedef struct shm_parms_struct{
 		return NULL;						\
 	}								\
 	if (cli_is_dcm(parm))						\
-		parm_buff->ENTRY = STRTOUL(parm, NULL, 10);		\
+		parm_buff->ENTRY = (int)(STRTOUL(parm, NULL, 10));	\
 	else if (cli_is_hex(parm + 2))					\
-		parm_buff->ENTRY = STRTOUL(parm, NULL, 16);		\
+		parm_buff->ENTRY = (int)(STRTOUL(parm, NULL, 16));	\
 	else								\
 	{								\
 		assert(FALSE);						\

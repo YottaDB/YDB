@@ -100,13 +100,15 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	jrec_suffix		suffix;
 	boolean_t		nowrap;
 	struct_jrec_blk		*jrec_blk;
-	uint4			checksum;
+	uint4			checksum, jnlpool_size;
 	DEBUG_ONLY(uint4	lcl_dskaddr;)
 
 	error_def(ERR_JNLWRTNOWWRTR);
 	error_def(ERR_JNLWRTDEFER);
 
 	csa = &FILE_INFO(jpc->region)->s_addrs;
+	/* Ensure that no replicated journal record is written by this routine if REPL-WAS_ENABLED(csa) is TRUE */
+	assert((JNL_ENABLED(csa) && !REPL_WAS_ENABLED(csa)) || !jrt_is_replicated[rectype]);
 	assert(csa->now_crit  ||  (csa->hdr->clustered  &&  csa->nl->ccp_state == CCST_CLOSED));
 	assert(rectype > JRT_BAD  &&  rectype < JRT_RECTYPES && JRT_ALIGN != rectype);
 	jb = jpc->jnl_buff;
@@ -327,7 +329,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		assert((&FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs)->now_crit);	/* ensure we have the jnl pool lock */
 		DEBUG_ONLY(jgbl.cu_jnl_index++;)
 		srclen = jpc->jnl_buff->size - jb->free;
-		dstlen = temp_jnlpool_ctl->jnlpool_size - temp_jnlpool_ctl->write;
+		jnlpool_size = temp_jnlpool_ctl->jnlpool_size;
+		dstlen = jnlpool_size - temp_jnlpool_ctl->write;
 		if (rlen <= srclen)
 		{
 			if (rlen <= dstlen)	/* dstlen & srclen >= rlen  (most frequent case) */
@@ -360,8 +363,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			}
 		}
 		temp_jnlpool_ctl->write += rlen;
-		if (temp_jnlpool_ctl->write >= temp_jnlpool_ctl->jnlpool_size)
-			temp_jnlpool_ctl->write -= temp_jnlpool_ctl->jnlpool_size;
+		if (temp_jnlpool_ctl->write >= jnlpool_size)
+			temp_jnlpool_ctl->write -= jnlpool_size;
 	}
 	/* Note that freeaddr should be updated ahead of free since jnl_output_sp.c does computation of wrtsize
 	 * based on free and asserts follow later there which use freeaddr.

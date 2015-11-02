@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,8 +112,8 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 #ifdef UNIX
 	csd->semid = INVALID_SEMID;
 	csd->shmid = INVALID_SHMID;
-	csd->sem_ctime.ctime = 0;
-	csd->shm_ctime.ctime = 0;
+	csd->gt_sem_ctime.ctime = 0;
+	csd->gt_shm_ctime.ctime = 0;
 #endif
 	/* Note none of the counter fields are being carried over. An upgrade or downgrade will
 	   implicitly set them to zero by not initializing them.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -115,12 +115,12 @@ GBLREF	boolean_t		skip_block_chain_tail_check;
 	if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, temp_key, TRUE)))			\
 		end = &buff[MAX_ZWR_KEY_SZ - 1];						\
 	rts_error(VARLSTCNT(11) ERR_RSVDBYTE2HIGH, 5, new_blk_size_single,			\
-		REG_LEN_STR(gv_cur_region), blk_size, reserved_bytes,				\
+		REG_LEN_STR(gv_cur_region), blk_size, blk_reserved_bytes,			\
 		ERR_GVIS, 2, end - buff, buff);							\
 }
 
 static	block_id	lcl_root;
-static	int4		blk_size, blk_fill_size;
+static	int4		blk_size, blk_fill_size, blk_reserved_bytes;
 static	int4 const	zeroes = 0;
 static	boolean_t	jnl_format_done;
 
@@ -137,7 +137,7 @@ void	gvcst_put(mval *val)
 
 	is_dollar_incr = in_gvcst_incr;
 	in_gvcst_incr = FALSE;
-	if (REPL_ENABLED(cs_data) && is_replicator)
+	if (REPL_ALLOWED(cs_data) && is_replicator)
 	{
 		if (FALSE == pool_init)
 			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
@@ -172,7 +172,8 @@ void	gvcst_put(mval *val)
 		}
 	}
 	blk_size = cs_data->blk_size;
-	blk_fill_size = (blk_size * gv_fillfactor) / 100 - cs_data->reserved_bytes;
+	blk_reserved_bytes = cs_data->reserved_bytes;
+	blk_fill_size = (blk_size * gv_fillfactor) / 100 - blk_reserved_bytes;
 	jnl_format_done = FALSE;	/* do jnl_format() only once per logical transaction irrespective of number of retries */
 	do
 	{
@@ -180,7 +181,8 @@ void	gvcst_put(mval *val)
 		lcl_root = gv_target->root;
 		while(!gvcst_put_blk(val, &extra_block_split_req))
 			;
-	} while (extra_block_split_req);
+	}
+	while (extra_block_split_req);
 }
 
 static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
@@ -203,7 +205,6 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 				last_possible_left_offset, new_rec_size, next_rec_shrink, next_rec_shrink1,
 				offset_sum, rec_cmpc, target_key_size, tp_lev, undo_index;
 	uint4			segment_update_array_size;
-	int4			reserved_bytes;
 	char			*va;
 	sm_uc_ptr_t		cp1, cp2, curr;
 	unsigned short		extra_record_orig_size, rec_size, temp_short;
@@ -313,8 +314,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 			gv_target->root = tp_root;
 		}
 	}
-	reserved_bytes = cs_data->reserved_bytes;
-	blk_reserved_size = blk_size - reserved_bytes;
+	blk_reserved_size = blk_size - blk_reserved_bytes;
 	if (0 == tp_root)
 	{	/* there is no entry in the GVT (and no root), so create a new empty tree and put the name in the GVT */
 		/* Create the data block */
@@ -336,7 +336,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 		} else
 			value = val->str;
 		/* Potential size of a GVT leaf block containing just the new/updated record */
-		new_blk_size_single = sizeof(blk_hdr) + sizeof(rec_hdr) + temp_key->end + 1 + value.len;
+		new_blk_size_single = SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + temp_key->end + 1 + value.len;
 		if (new_blk_size_single > blk_reserved_size)
 		{	/* The record that is newly inserted/updated does not fit by itself in a separate block
 			 * if the current reserved-bytes for this database is taken into account. Cannot go on.
@@ -423,6 +423,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 			 * the post-increment value is not known until here. so do the check here.
 			 */
 			ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value);
+
 		} else
 			value = val->str;
 	}
@@ -437,7 +438,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 		cur_blk_size = ((blk_hdr_ptr_t)bh->buffaddr)->bsiz;
 		target_key_size = temp_key->end + 1;
 		/* Potential size of a block containing just the new/updated record */
-		new_blk_size_single = sizeof(blk_hdr) + sizeof(rec_hdr) + target_key_size + value.len;
+		new_blk_size_single = SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + target_key_size + value.len;
 		if (new_blk_size_single > blk_reserved_size)
 		{	/* The record that is newly inserted/updated does not fit by itself in a separate block
 			 * if the current reserved-bytes for this database is taken into account. If this is not a
@@ -489,7 +490,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 		prev_rec_match = bh->prev_rec.match;
 		if (new_rec)
 		{
-			new_rec_size = sizeof(rec_hdr) + target_key_size - prev_rec_match + value.len;
+			new_rec_size = SIZEOF(rec_hdr) + target_key_size - prev_rec_match + value.len;
 			if (cur_blk_size <= (signed int)curr_rec_offset) /* typecast necessary to enforce "signed int" comparison */
 				next_rec_shrink = 0;
 			else
@@ -503,7 +504,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 				status = cdb_sc_mkblk;
 				goto retry;
 			}
-			new_rec_size = sizeof(rec_hdr) + (target_key_size - rec_cmpc) + value.len;
+			new_rec_size = SIZEOF(rec_hdr) + (target_key_size - rec_cmpc) + value.len;
 			delta = new_rec_size - rec_size;
 			if (!delta && gvdupsetnoop && value.len
 				&& !memcmp(value.addr, (sm_uc_ptr_t)rp + new_rec_size - value.len, value.len))
@@ -548,7 +549,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 			if (no_pointers)	/* level zero (normal) data block: no deferred pointer chains */
 				ins_chain_offset = 0;
 			else			/* index or directory level block */
-				ins_chain_offset = (sm_uc_ptr_t)rp - bh->buffaddr + new_rec_size - sizeof(block_id);
+				ins_chain_offset =(int)((sm_uc_ptr_t)rp - bh->buffaddr + new_rec_size - sizeof(block_id));
 			BLK_INIT(bs_ptr, bs1);
 			if (0 == rc_set_fragment)
 			{
@@ -568,7 +569,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 				}
 				if (!new_rec)
 					rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + rec_size);
-				n = cur_blk_size - ((sm_uc_ptr_t)rp - bh->buffaddr);
+				n = (int)(cur_blk_size - ((sm_uc_ptr_t)rp - bh->buffaddr));
 				if (n > 0)
 				{
 					if (new_rec)
@@ -594,8 +595,8 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 				memcpy(va, value.addr, value.len);
 				BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
 				/* Third piece is data after fragment + rest of block after record */
-				n = cur_blk_size - ((sm_uc_ptr_t)curr_rec_hdr - bh->buffaddr) - sizeof(rec_hdr)
-					- (gv_currkey->end + 1 - curr_rec_hdr->cmpc) - rc_set_fragment - value.len;
+				n =(int)(cur_blk_size - ((sm_uc_ptr_t)curr_rec_hdr - bh->buffaddr) - sizeof(rec_hdr)
+					- (gv_currkey->end + 1 - curr_rec_hdr->cmpc) - rc_set_fragment - value.len);
 				if (0 < n)
 					BLK_SEG(bs_ptr,
 						(sm_uc_ptr_t)curr_rec_hdr + gv_currkey->end + 1 - curr_rec_hdr->cmpc
@@ -653,7 +654,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 					if (horiz_growth)
 					{
 						old_cse->undo_next_off[0] = curr_chain.next_off;
-						old_cse->undo_offset[0] = curr - bh->buffaddr;
+						old_cse->undo_offset[0] = (block_offset)(curr - bh->buffaddr);
 						assert(old_cse->undo_offset[0]);
 					}
 					if (0 == curr_chain.next_off)
@@ -666,7 +667,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 					{	/* update the chain record before the new one */
 						/* 			   ---|---------------v--------------------v
 						 * [blk_hdr]...[existing rec ( )]...[new rec ( )]...[existing rec ( )] */
-						curr_chain.next_off = ins_chain_offset - (curr - bh->buffaddr);
+						curr_chain.next_off = (unsigned int)(ins_chain_offset - (curr - bh->buffaddr));
 						GET_LONGP(curr, &curr_chain);
 						cse->next_off = offset_sum - (ins_chain_offset - new_rec_size) - next_rec_shrink1;
 					}
@@ -682,7 +683,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 			gv_target->clue.end = 0;	/* invalidate clue */
 			/* Potential size of the left and right blocks, including the new record */
 			new_blk_size_l = curr_rec_offset + new_rec_size;
-			new_blk_size_r = sizeof(blk_hdr) + sizeof(rec_hdr) + target_key_size + value.len + cur_blk_size
+			new_blk_size_r = SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + target_key_size + value.len + cur_blk_size
 						- curr_rec_offset - (new_rec ? next_rec_shrink : rec_size);
 			assert(new_blk_size_single <= blk_reserved_size);
 			assert(blk_reserved_size >= blk_fill_size);
@@ -732,10 +733,10 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 				 * point would free up. The following assert checks that at least for reserved bytes
 				 * less than or equal to 16, the space constraint is unconditionally met.
 				 */
-				assert((bs1[0].len <= blk_reserved_size) || reserved_bytes > 16);
+				assert((bs1[0].len <= blk_reserved_size) || blk_reserved_bytes > 16);
 				/* prepare the existing block */
 				BLK_INIT(bs_ptr, bs1);
-				ins_chain_offset = no_pointers ? 0 : sizeof(blk_hdr) + sizeof(rec_hdr) + target_key_size;
+				ins_chain_offset = no_pointers ? 0 : (int)(sizeof(blk_hdr) + sizeof(rec_hdr) + target_key_size);
 				left_hand_offset = left_hand_index
 						 = 0;
 				if (!new_rec)
@@ -790,7 +791,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 					left_hand_offset = 0;
 				else
 				{
-					left_hand_offset = curr_rec_offset + sizeof(rec_hdr);
+					left_hand_offset = curr_rec_offset + SIZEOF(rec_hdr);
 					if (level_0)
 						left_hand_offset += target_key_size - prev_rec_match;
 					/* else it is a *-key (implies the child pointer follows immediately) so no need to
@@ -883,7 +884,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 				 * point would free up. The following assert checks that at least for reserved bytes
 				 * less than or equal to 16, the space constraint is unconditionally met.
 				 */
-				assert((bs1[0].len <= blk_reserved_size) || reserved_bytes > 16);
+				assert((bs1[0].len <= blk_reserved_size) || blk_reserved_bytes > 16);
 				/* assert that both !new_rec and copy_extra_record can never be TRUE at the same time */
 				assert(new_rec || !copy_extra_record);
 				if (!new_rec || copy_extra_record)
@@ -932,7 +933,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 				 * point would free up. The following assert checks that at least for reserved bytes
 				 * less than or equal to 16, the space constraint is unconditionally met.
 				 */
-				assert((bs1[0].len <= blk_reserved_size) || reserved_bytes > 16);
+				assert((bs1[0].len <= blk_reserved_size) || blk_reserved_bytes > 16);
 			}
 			next_blk_index = t_create(bh->blk_num, (uchar_ptr_t)new_blk_bs, left_hand_offset, left_hand_index,
 				bh->level);
@@ -967,7 +968,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 					curr = bh->buffaddr + offset_sum;
 					GET_LONGP(&curr_chain, curr);
 					assert(curr_chain.flag == 1);
-					last_possible_left_offset = curr_rec_offset + extra_record_orig_size - sizeof(off_chain);
+					last_possible_left_offset = curr_rec_offset + extra_record_orig_size - SIZEOF(off_chain);
 					/* some of the following logic used to be in tp_split_chain which was nixed */
 					if (offset_sum <= last_possible_left_offset)
 					{	/* the split falls within or after the chain; otherwise entire chain stays right */
@@ -1027,7 +1028,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 									assert(!cse->undo_next_off[0] && !cse->undo_offset[0]);
 									assert(!cse->undo_next_off[1] && !cse->undo_offset[1]);
 									cse->undo_next_off[0] = curr_chain.next_off;
-									cse->undo_offset[0] = curr - bh->buffaddr;
+									cse->undo_offset[0] = (block_offset)(curr - bh->buffaddr);
 								}
 								GET_LONGP(curr, &prev_chain);
 								offset_sum += curr_chain.next_off;
@@ -1040,7 +1041,8 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 									/* first_off --------------------v
 									 * [blk_hdr]...[curr rec (*-key)( )] */
 									assert(prev_rec_offset >= sizeof(blk_hdr));
-									cse_new->first_off = prev_rec_offset + sizeof(rec_hdr);
+									cse_new->first_off = (block_offset)(prev_rec_offset +
+													    sizeof(rec_hdr));
 								} else
 								{	/* update the next_off of the previous chain record */
 									/*		      ---|--------------------v
@@ -1049,8 +1051,9 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 									prev_chain = curr_chain;
 									assert((offset_sum - prev_chain.next_off) /* check old */
 										== (curr - bh->buffaddr)); /* method equivalent */
-									prev_chain.next_off = (prev_rec_offset
-										+ sizeof(rec_hdr) - (curr - bh->buffaddr));
+									prev_chain.next_off = (unsigned int)(
+										(prev_rec_offset + (unsigned int)(sizeof(rec_hdr))
+										 - (curr - bh->buffaddr)));
 									assert((curr - bh->buffaddr + prev_chain.next_off)
 										<= ((new_blk_size_l < blk_reserved_size
 										? new_blk_size_l : blk_reserved_size)
@@ -1063,7 +1066,8 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 										assert(!cse->undo_next_off[1]
 											&& !cse->undo_offset[1]);
 										cse->undo_next_off[0] = curr_chain.next_off;
-										cse->undo_offset[0] = curr - bh->buffaddr;
+										cse->undo_offset[0] = (block_offset)(curr -
+														     bh->buffaddr);
 										undo_index = 1;
 									}
 									GET_LONGP(curr, &prev_chain);
@@ -1078,7 +1082,8 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 									assert(!cse->undo_next_off[undo_index] &&
 										!cse->undo_offset[undo_index]);
 									cse->undo_next_off[undo_index] = curr_chain.next_off;
-									cse->undo_offset[undo_index] = curr - bh->buffaddr;
+									cse->undo_offset[undo_index] = (block_offset)(curr -
+														      bh->buffaddr);
 								}
 								curr_chain.next_off = 0;
 								GET_LONGP(curr, &curr_chain);
@@ -1107,8 +1112,8 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 									/* the new rec may or may not be a *-key */
 									assert((offset_sum - curr_chain.next_off) /* check old */
 										== (curr - bh->buffaddr)); /* method equivalent */
-									curr_chain.next_off = left_hand_offset -
-												(curr - bh->buffaddr);
+									curr_chain.next_off = (block_offset)(left_hand_offset -
+												(curr - bh->buffaddr));
 								}
 							} else
 								curr_chain.next_off = 0;
@@ -1121,7 +1126,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 								assert(!cse->undo_next_off[0] && !cse->undo_offset[0]);
 								assert(!cse->undo_next_off[1] && !cse->undo_offset[1]);
 								cse->undo_next_off[0] = old_curr_chain_next_off;
-								cse->undo_offset[0] = curr - bh->buffaddr;
+								cse->undo_offset[0] = (block_offset)(curr - bh->buffaddr);
 							}
 							GET_LONGP(curr, &curr_chain);
 						}	/* end of *-key or not alternatives */
@@ -1154,8 +1159,8 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 						/* first_off------------------v
 						 * [blk_hdr]...[existing rec ( )] */
 						assert(offset_sum >= (int)cse->first_off);
-						cse->first_off = offset_sum - last_possible_left_offset + rec_cmpc
-								+ sizeof(blk_hdr) - sizeof(off_chain);
+						cse->first_off =  (block_offset)(offset_sum - last_possible_left_offset + rec_cmpc
+								+ sizeof(blk_hdr) - sizeof(off_chain));
 						assert(cse->first_off >= (sizeof(blk_hdr) + sizeof(rec_hdr)));
 					}
 					assert((ins_chain_offset + (int)cse->next_off) <=
@@ -1301,8 +1306,9 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 					goto retry;
 				}
 				assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
-				ins_off1 = sizeof(blk_hdr) + sizeof(rec_hdr) + target_key_size;
-				ins_off2 = sizeof(blk_hdr) + 2 * sizeof(rec_hdr) + sizeof(block_id) + target_key_size;
+				ins_off1 = (block_offset)(sizeof(blk_hdr) + sizeof(rec_hdr) + target_key_size);
+				ins_off2 = (block_offset)(sizeof(blk_hdr) + (2 * sizeof(rec_hdr)) + sizeof(block_id) +
+							  target_key_size);
 				assert(ins_off1 < ins_off2);
 				cse = t_write(bh, (unsigned char *)bs1, ins_off1, next_blk_index, bh->level + 1, TRUE, FALSE);
 				if (make_it_null)
@@ -1391,7 +1397,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 	assert(!dollar_tlevel || !jnl_format_done
 		|| (JNL_SET == ((jnl_format_buffer *)((uchar_ptr_t)sgm_info_ptr->jnl_tail
 								- offsetof(jnl_format_buffer, next)))->ja.operation));
-	if (JNL_ENABLED(cs_addrs) && (!jnl_format_done || is_dollar_incr))
+	if (JNL_WRITE_LOGICAL_RECS(cs_addrs) && (!jnl_format_done || is_dollar_incr))
 	{
 		if (0 == dollar_tlevel)
 		{
@@ -1419,7 +1425,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 		DEBUG_ONLY(jgbl.cumul_index++;)
 		jnl_format_done = TRUE;
 	}
-validate:
+/* validate: Commenting out thie label as its never referenced. Done to make HP compiler happy and not throw warning. */
 	horiz_growth = FALSE;
 	assert(cs_addrs->dir_tree == gv_target || tp_root);
 	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);

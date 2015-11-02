@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +19,10 @@
 
 
 typedef int		xc_status_t;
+typedef	int		xc_int_t;
+typedef unsigned int 	xc_uint_t;
 
-#ifdef __osf__
+#if defined(__osf__) || defined(__ia64)
 typedef	int		xc_long_t;
 typedef unsigned int 	xc_ulong_t;
 #else

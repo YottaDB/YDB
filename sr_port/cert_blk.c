@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -160,7 +160,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			{
 				/* if (full bitmap || full chunk || regular scan of a "short" bitmap) */
 				if ((offset == bplmap) || ((blk_top - (sm_uc_ptr_t)chunk_p) > sizeof(chunk))
-				    || (bml_find_free((sm_uc_ptr_t)chunk_p - mp, mp, offset, &dummy_bool) != NO_FREE_SPACE))
+				    || (bml_find_free((int4)((sm_uc_ptr_t)chunk_p - mp), mp, offset, &dummy_bool) != NO_FREE_SPACE))
 				{
 					full = FALSE;
 				}
@@ -243,7 +243,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	for (rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)bp + sizeof(blk_hdr)) ;  rp < (rec_hdr_ptr_t)blk_top ;  rp = r_top)
 	{
 		GET_RSIZ(rec_size, rp);
-		rec_offset = (sm_ulong_t)rp - (sm_ulong_t)bp;
+		rec_offset = (int)((sm_ulong_t)rp - (sm_ulong_t)bp);
 		/*add util_buff here*/
 
 		util_len=0;
@@ -344,7 +344,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 				}
 			}
 			num_subscripts--;	/* the global variable name was counted above as a subscript. adjust that */
-			key_size = blk_id_ptr - key_base;
+			key_size = (int4)(blk_id_ptr - key_base);
 			if (!first_key && (rec_cmpc < min_cmpc))
 			{	/* name-level change between consecutive records in the block, this should be a directory block */
 				if (is_gvt)

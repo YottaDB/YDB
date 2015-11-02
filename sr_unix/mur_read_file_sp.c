@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ uint4 mur_fread_start(mur_buff_desc_t *buff)
  **************************************************************************************/
 uint4 mur_fread_wait(mur_buff_desc_t *buff)
 {
-	int	nbytes;
+	ssize_t	nbytes;
 
 	error_def(ERR_PREMATEOF);
 
@@ -145,7 +145,7 @@ boolean_t mur_fopen_sp(jnl_ctl_list *jctl)
 		FSTAT_FILE(jctl->channel, &stat_buf, status);
 		if (-1 != status)
 		{
-			jctl->os_filesize = stat_buf.st_size;
+			jctl->os_filesize = (off_jnl_t) stat_buf.st_size;
 			return TRUE;
 		}
 		jctl->status = errno;

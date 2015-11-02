@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,7 +80,7 @@ void op_break(void)
 		}
 	}
 
-	if (do_msg && ((line_length = get_symb_line((uchar_ptr_t)line, 0, 0) - (uchar_ptr_t)line) != 0))
+	if (do_msg && ((line_length = (int) (get_symb_line((uchar_ptr_t)line, 0, 0) - (uchar_ptr_t)line)) != 0))
 	{	dec_nofac = TRUE;
 		dec_err(VARLSTCNT(4) ERR_RTSLOC, 2, line_length, line);
 		dec_nofac = FALSE;

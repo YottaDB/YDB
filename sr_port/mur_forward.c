@@ -106,7 +106,14 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	gv_keysize = ROUND_UP2(MAX_KEY_SZ + MAX_NUM_SUBSC_LEN, 4);
 	mu_gv_stack_init(&mstack_ptr);
 	gv_target = targ_alloc(gv_keysize, NULL);
-	murgbl.db_updated = mur_options.update;
+	assert(!mur_options.rollback_losttnonly || !murgbl.db_updated);
+	if (!mur_options.rollback_losttnonly)
+		murgbl.db_updated = mur_options.update;
+	/* At this point, murgbl.db_updated is the same as mur_options.update except in the case of LOSTTNONLY rollback in which
+	 * case it is FALSE while mur_options.update is TRUE. Both these variables are used in the below code depending on
+	 * whichever is appropriate. Note that we do NOT want to update the database (i.e. play forward any jnl records forward)
+	 * in case of a LOSTTNONLY rollback.
+	 */
 	murgbl.consist_jnl_seqno = 0;
 	assert(!mur_options.rollback || (losttn_seqno <= min_broken_seqno));
 	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
@@ -117,7 +124,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			assert(NULL == rctl->jctl_turn_around);
 			mur_jctl = rctl->jctl = rctl->jctl_head;
 			mur_jctl->rec_offset = JNL_HDR_LEN;
-			jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1; /* initialized to reflect journaling is not enabled */
+			jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L; /* initialized to reflect journaling is not enabled */
 		} else
 		{
 			mur_jctl = rctl->jctl = (NULL == rctl->jctl_turn_around) ? rctl->jctl_head : rctl->jctl_turn_around;
@@ -160,7 +167,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 				break;
 			if (mur_options.selection && !mur_select_rec())
 				continue;
-			assert((0 == mur_options.after_time) || mur_options.forward && !mur_options.update);
+			assert((0 == mur_options.after_time) || mur_options.forward && !murgbl.db_updated);
 			if (rec_time < mur_options.after_time)
 				continue;
 			if (REC_HAS_TOKEN_SEQ(rectype))
@@ -256,7 +263,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			}
 			if (!mur_options.update && !mur_options.extr[GOOD_TN])
 				continue;
-			if (mur_options.update && IS_TUPD(rectype) && GOOD_TN == recstat)
+			if (murgbl.db_updated && IS_TUPD(rectype) && GOOD_TN == recstat)
 			{	/* Even for FENCE_NONE we apply fences. Otherwise an TUPD becomes UPD etc. */
 				if (dollar_tlevel)
 				{
@@ -289,7 +296,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 				if (NULL != rctl->csa)
 				{/* find out collation of key in the jnl-record from the database corresponding to the jnl file */
 					gvent.var_name.addr = (char *)gv_currkey->base;
-					gvent.var_name.len = strlen((char *)gv_currkey->base);
+					gvent.var_name.len = STRLEN((char *)gv_currkey->base);
 					COMPUTE_HASH_MNAME(&gvent);
 					if ((NULL !=  (tabent = lookup_hashtab_mname(&rctl->gvntab, &gvent))) &&
 								(NULL != (gv_target = (gv_namehead *)tabent->value)))
@@ -385,11 +392,11 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 						murgbl.wrn_count++;
 						gtm_putmsg(VARLSTCNT(6) ERR_DUPTN, 4, &curr_tn, mur_jctl->rec_offset,
 							mur_jctl->jnl_fn_len, mur_jctl->jnl_fn);
-						if (mur_options.update && dollar_tlevel)
+						if (murgbl.db_updated && dollar_tlevel)
 							op_trollback(0);
 					}
 				}
-				if (mur_options.update)
+				if (murgbl.db_updated)
 				{
 					assert(!mur_options.rollback || (rec_token_seq < losttn_seqno));
 					if (SS_NORMAL != (status = mur_output_record())) /* updates murgbl.consist_jnl_seqno */
@@ -414,7 +421,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 		if (SS_NORMAL != status && ERR_JNLREADEOF != status)
 			return status;
 		jgbl.mur_plst = NULL;	/* No more simulation of GT.M activity for this region. */
-		if (mur_options.update && SS_NORMAL != mur_block_count_correct())
+		if (murgbl.db_updated && SS_NORMAL != mur_block_count_correct())
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_BLKCNTEDITFAIL, 2, DB_LEN_STR(gv_cur_region));
 			murgbl.wrn_count++;

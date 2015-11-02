@@ -53,7 +53,7 @@ LITREF	unsigned char	lower_to_upper_table[];
 
 int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 {
-	boolean_t	ret = FALSE, timed, utf8_active, zint_restart;
+	boolean_t	ret = FALSE, timed, utf8_active, zint_restart, first_time;
 	unsigned char	inbyte;
 	wint_t		inchar;
 #ifdef __MVS__
@@ -73,7 +73,6 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	fd_set		input_fd;
 	struct timeval	input_timeval;
-	struct timeval	save_input_timeval;
 	ABS_TIME	cur_time, end_time;
 	mv_stent	*mv_zintdev;
 
@@ -179,6 +178,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 		}
 	}
 	input_timeval.tv_usec = 0;
+	first_time = TRUE;
 	do
 	{
 		if (outofband)
@@ -209,13 +209,38 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			outofband_action(FALSE);
 			break;
 		}
+		if (!first_time)
+		{
+			if (timed)
+			{
+				if (0 != msec_timeout)
+				{
+					sys_get_curr_time(&cur_time);
+					cur_time = sub_abs_time(&end_time, &cur_time);
+					if (0 > cur_time.at_sec)
+					{
+						ret = FALSE;
+						break;
+					}
+					input_timeval.tv_sec = cur_time.at_sec;
+					input_timeval.tv_usec = cur_time.at_usec;
+				}
+			} else
+			{	/* This is an untimed read. We had set the select timeout to be 100 seconds by default. But since
+				 * "select" changes the timeout (in Linux) to account for the elapsed wait time, we need to reset
+				 * the timeout to be 100 seconds (else multiple iterations of this for loop could cause it to be
+				 * reset to 0 causing a CPU spin loop).
+				 */
+				input_timeval.tv_sec  = 100;
+			}
+		} else
+			first_time = FALSE;
 		FD_ZERO(&input_fd);
 		FD_SET(tt_ptr->fildes, &input_fd);
 		assert(FD_ISSET(tt_ptr->fildes, &input_fd) != 0);
 		/* the checks for EINTR below are valid and should not be converted to EINTR
 		 * wrapper macros, since the select/read is not retried on EINTR.
 		 */
-		save_input_timeval = input_timeval;	/* take a copy and pass it because select() below might change it */
 		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL, &input_timeval);
 		if (0 > selstat)
 		{
@@ -235,8 +260,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 				break;
 			}
 			continue;	/* select() timeout; try again */
-		}
-		else if ((rdlen = read(tt_ptr->fildes, &inbyte, 1)) == 1)	/* This read is protected */
+		} else if ((rdlen = (int)(read(tt_ptr->fildes, &inbyte, 1))) == 1)	/* This read is protected */
 		{
 			assert(FD_ISSET(tt_ptr->fildes, &input_fd) != 0);
 
@@ -267,8 +291,8 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 						io_ptr->dollar.za = 9;
 						/* No data to return */
 						iott_readfl_badchar(NULL, NULL, 0,
-								    (more_ptr- more_buf), more_buf, more_ptr, NULL);
-						utf8_badchar(more_ptr - more_buf, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
+								    (int)((more_ptr - more_buf)), more_buf, more_ptr, NULL);
+						utf8_badchar((int)(more_ptr - more_buf), more_buf, more_ptr, 0, NULL); /* BADCHAR */
 						break;
 					}
 				} else
@@ -453,18 +477,6 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 					rts_error(VARLSTCNT(1) ERR_IOEOF);
 			}
 			break;
-		}
-		if (timed && (0 != msec_timeout))
-		{
-			sys_get_curr_time(&cur_time);
-			cur_time = sub_abs_time(&end_time, &cur_time);
-			if (0 > cur_time.at_sec)
-			{
-				ret = FALSE;
-				break;
-			}
-			input_timeval.tv_sec = cur_time.at_sec;
-			input_timeval.tv_usec = cur_time.at_usec;
 		}
 	} while (!out_of_time);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,8 @@ GBLREF hash_table_mname rt_name_tbl;
 
 int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 {
-	int		fd, n, status, *lt_ptr, size;
+	int		fd, n,*lt_ptr, size;
+        ssize_t         status;
 	uint4		checksum, srcint;
 	bool		badfmt, found, added;
 	mstr		src;
@@ -77,13 +78,13 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 		free(c);
 		if (fd == -1)
 		{
-			n = rtn_vector->routine_name.len;
+			n = (int)rtn_vector->routine_name.len;
 			memcpy(srcnamebuf, rtn_vector->routine_name.addr, n);
 			if (srcnamebuf[0] == '%')	/* percents are translated to _ on filenames */
 				srcnamebuf[0] = '_';
 			MEMCPY_LIT(&srcnamebuf[n], DOTM);
 			src.addr = srcnamebuf;
-			src.len = n + STR_LIT_LEN(DOTM);
+			src.len = INTCAST(n + STR_LIT_LEN(DOTM));
 			zro_search (0, 0, &src, &srcdir, TRUE);
 			if (srcdir)
 			{
@@ -106,7 +107,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 
 		if (!found)
 			srcstat |= SRCNOTFND;
-		n = found ? rtn_vector->lnrtab_len : 0;
+		n = found ? (int)rtn_vector->lnrtab_len : 0;
 		assert((found && n >= 1) || (n == 0));
 		/* first two words are the status code and the number of entries */
 		src_tbl = (uint4 *)malloc(n * sizeof(mstr) + sizeof(uint4) * 2);
@@ -133,7 +134,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 			}
 			if (c == c1)
 				rts_error(VARLSTCNT(1) ERR_TXTSRCFMT);
-			size = c - buff;
+			size = (int)(c - buff);
 			if (size)
 			{
 				for (c2 = buff + size, c1 = buff;
@@ -187,7 +188,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 		srcstat |= LABELNOTFOUND;
 	else if (!(srcstat & (SRCNOTFND | SRCNOTAVAIL)))
 	{
-		n = (int) (lt_ptr - (int *)LNRTAB_ADR(rtn_vector));
+		n = (int)(lt_ptr - (int *)LNRTAB_ADR(rtn_vector));
 		n += offset;
 		if (n == 0)
 			srcstat |= ZEROLINE;

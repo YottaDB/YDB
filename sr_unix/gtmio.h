@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -278,7 +278,7 @@ for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
    we need to run the 64bit versions of these calls because the POSIX version linkage to the
    64 bit variation is broken. SE 07/2005.
 */
-#ifdef __hpux
+#if (defined(__hpux) && !defined(__ia64))
 # if !defined(pread) && !defined(pread64)
 #  define pread pread64
 #  define pwrite pwrite64
@@ -575,7 +575,7 @@ for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
 		  break; \
         } \
 	if (-1 != gtmioStatus) \
-		RLEN = FBUFF_LEN - gtmioBuffLen; 	/* Return length actually read */ \
+		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually read */ \
 	else 	    					/* Had legitimate error - return it */ \
 		RLEN = -1; \
 }
@@ -585,7 +585,7 @@ for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
 	ssize_t		gtmioStatus; \
 	size_t		gtmioBuffLen; \
 	sm_uc_ptr_t	gtmioBuff; \
-	gtmioBuffLen = FBUFF_LEN; \
+	gtmioBuffLen =  (size_t)FBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
 	for (;;) \
         { \
@@ -600,7 +600,7 @@ for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
 		  break; \
         } \
 	if (-1 != gtmioStatus) \
-		RLEN = FBUFF_LEN - gtmioBuffLen; 	/* Return length actually read */ \
+		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); 	/* Return length actually read */ \
 	else 	    					/* Had legitimate error - return it */ \
 		RLEN = -1; \
 }
@@ -675,7 +675,7 @@ for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
 		        break; \
         } \
 	if (-1 != gtmioStatus) \
-		RLEN = FBUFF_LEN - gtmioBuffLen; 	/* Return length actually written */ \
+		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); 	/* Return length actually written */ \
 	else 	    					/* Had legitimate error - return it */ \
 		RLEN = -1; \
 }

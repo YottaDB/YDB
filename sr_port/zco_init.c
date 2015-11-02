@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@ GBLREF	mstr	dollar_zcompile;
 
 void zco_init (void)
 {
-	uint4	status;
+	int4	status;
 	mstr		val, tn;
 	char		buf1[MAX_TRANS_NAME_LEN]; /* buffer to hold translated name */
 

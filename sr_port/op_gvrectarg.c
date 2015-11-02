@@ -65,7 +65,7 @@ void op_gvrectarg (mval *v)
 	if (!MV_IS_STRING(v))
 		GTMASSERT;
 
-	n = len = v->str.len - sizeof(short) - sizeof(gd_targ_addr) - sizeof(gv_curr_subsc_null) - sizeof(gv_prev_subsc_null);
+	n = len = v->str.len - SIZEOF(short) - SIZEOF(gd_targ_addr) - SIZEOF(gv_curr_subsc_null) - SIZEOF(gv_prev_subsc_null);
 	if (len <= 0)
 	{
 		if (gv_currkey)
@@ -87,9 +87,9 @@ void op_gvrectarg (mval *v)
 			GTMASSERT;
 	}
 
-	temp.len = (char *)c - temp.addr - 1;
+	temp.len = INTCAST((char *)c - temp.addr - 1);
 	if ((NULL != gd_header) && (gd_header->maps == gd_map)
-		&& (0 == gv_currkey->base[temp.len]) && (0 == memcmp(gv_currkey->base, temp.addr, temp.len)))
+	    && (0 == gv_currkey->base[temp.len]) && (0 == memcmp(gv_currkey->base, temp.addr, temp.len)))
 	{
 		gv_currkey->end = temp.len + 1;
 		gv_currkey->prev = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +62,7 @@ boolean_t	skip;		if TRUE, skip over shared libraries. If FALSE, probe shared lib
 				if (!skip)
 				{
 					assert(op->shrlib);
-					rtnname.len = objstr->len - STR_LIT_LEN(DOTOBJ);
+					rtnname.len = objstr->len - (int)STR_LIT_LEN(DOTOBJ);
 					memcpy(objfn, objstr->addr, rtnname.len);
 					objfn[rtnname.len] = 0;
 					rtnname.addr = objfn;

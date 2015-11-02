@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +55,6 @@ lv_val* op_m_srchindx(UNIX_ONLY_COMMA(int4 count) lv_val *lvarg, ...)
 	for (cur_subscr = 0;  cur_subscr < lvn_info->total_lv_subs - 1;  cur_subscr++)
 		lvn_info->lv_subs[cur_subscr] = va_arg(var, mval *); /* subcsripts are args[2:argcnt] */
 	va_end(var);
-	lvn_info->end_lvp = (lv_val *)callg((int(*)(int argcnt_arg, ...))op_srchindx, lvn_info);
+	lvn_info->end_lvp = (lv_val *)callg((INTPTR_T (*)(intszofptr_t argcnt_arg, ...))op_srchindx, (gparam_list *)lvn_info);
 	return lvn_info->end_lvp;
 }

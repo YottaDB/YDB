@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	blk_segment	*seg, *stop_ptr, *array;
 	off_chain	chain;
 	sm_uc_ptr_t	ptr, ptrtop;
-	int		n;
+	sm_ulong_t	n;
 	int4		offset;
 
 	assert(dollar_tlevel || cs_addrs->now_crit);
@@ -93,7 +93,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	}
 	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
-	((blk_hdr_ptr_t)base_addr)->bsiz = array->len;
+	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);
 	((blk_hdr_ptr_t)base_addr)->levl = cse->level;
 
 	if (cse->forward_process)
@@ -105,7 +105,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 			ptr += ((blk_segment *)(array + 1))->len;
 		for (  ;seg <= stop_ptr;)
 		{
-			assert(0 <= (int)seg->len);
+			assert(0L <= ((INTPTR_T)seg->len));
 			memmove(ptr, seg->addr, seg->len);
 			ptr += seg->len;
 			seg++;
@@ -117,7 +117,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		ptr = base_addr + array->len;
 		while (seg != stop_ptr)
 		{
-			assert(0 <= (int)seg->len);
+			assert(0L <= ((INTPTR_T)seg->len));
 			ptr -= (n = seg->len);
 			memmove(ptr, seg->addr, n);
 			seg--;

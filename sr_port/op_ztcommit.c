@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@ void    op_ztcommit(int4 n)
 		QWASSIGN(ztcom_record.token, jnl_fence_ctl.token); /* token was computed in the first call to
 								      jnl_write_ztp_logical after op_ztstart */
 		ztcom_record.participants = 0;
-		for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = csa->next_fenced)
+		for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *)-1L;  csa = csa->next_fenced)
 			ztcom_record.participants++;
 	} else
 	{
@@ -82,13 +82,14 @@ void    op_ztcommit(int4 n)
 		ztcom_record.participants = jgbl.mur_jrec_participants;
 	}
 	replication = yes_jnl_no_repl = FALSE;
-	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = csa->next_fenced)
+	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *)-1L;  csa = csa->next_fenced)
 	{
-		if (REPL_ENABLED(csa))
+		if (REPL_ALLOWED(csa))
 		{
-			assert(JNL_ENABLED(csa));
+			assert(JNL_ENABLED(csa) || REPL_WAS_ENABLED(csa));
 			replication = TRUE;
-		} else if (JNL_ENABLED(csa)) {
+		} else if (JNL_ENABLED(csa))
+		{
 			yes_jnl_no_repl = TRUE;
 			save_gv_cur_region = csa->region;
 		}
@@ -102,7 +103,7 @@ void    op_ztcommit(int4 n)
 
 	/* Note that only those regions that are actively journaling will appear in the following list: */
 	save_gv_cur_region = gv_cur_region; /* we change gv_cur_region in the loop, so save for later restore */
-	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = csa->next_fenced)
+	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *)-1L;  csa = csa->next_fenced)
 	{
 		gv_cur_region = csa->jnl->region;
 		tp_change_reg();
@@ -114,7 +115,7 @@ void    op_ztcommit(int4 n)
 			jnl_put_jrt_pini(csa);
 		if (!jgbl.forw_phase_recovery)
 		{
-			if (REPL_ENABLED(csa))
+			if (REPL_ALLOWED(csa))
 				QWASSIGN(ztcom_record.jnl_seqno, temp_jnlpool_ctl->jnl_seqno);
 			else
 				QWASSIGN(ztcom_record.jnl_seqno, seq_num_zero);
@@ -122,7 +123,7 @@ void    op_ztcommit(int4 n)
 		ztcom_record.prefix.pini_addr = csa->jnl->pini_addr;
 		ztcom_record.prefix.tn = csa->ti->curr_tn;
 		ztcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
-		jnl_write(csa->jnl, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL, NULL);
+		JNL_WRITE_APPROPRIATE(csa, csa->jnl, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL, NULL);
 		rel_crit(gv_cur_region);
 		if (!jgbl.forw_phase_recovery)
 			wcs_timer_start(gv_cur_region, TRUE);
@@ -131,7 +132,7 @@ void    op_ztcommit(int4 n)
 	tp_change_reg(); /* bring cs_* in sync with gv_cur_region */
 	if (replication)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
-	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = next_csa)
+	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *)-1L;  csa = next_csa)
 	{       /* do the waits in a separate loop to prevent spreading out the transaction */
 		if (!jgbl.forw_phase_recovery)
 			jnl_wait(csa->jnl->region);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,8 @@ void jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header)
 	JNL_WHOLE_FROM_SHORT_TIME(prc_vec->jpv_time, jgbl.gbl_jrec_time);
 	memcpy(&header->who_created, (unsigned char*)prc_vec, sizeof(jnl_process_vector));
 	memcpy(&header->who_opened,  (unsigned char*)prc_vec, sizeof(jnl_process_vector));
-	if (info->before_images)
+	/* EPOCHs are written unconditionally in Unix while they are written only for BEFORE_IMAGE in VMS */
+	if (JNL_HAS_EPOCH(info))
 		header->end_of_data = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN;
 	else
 		header->end_of_data = JNL_HDR_LEN + PINI_RECLEN + PFIN_RECLEN;

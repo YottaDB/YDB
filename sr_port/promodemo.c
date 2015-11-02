@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,11 +24,13 @@ void promote (mval *v)
 		v->sgn = 0 ;
 	}
 	else if ( v->m[1] < 0 )
-	{ 	v->sgn = 1 ;
+	{
+		v->sgn = 1 ;
 		v->m[1] = -v->m[1] ;
 	}
 	else
-	{	*v = literal_zero ;
+	{
+		*v = literal_zero ;
 		return ;
 	}
 	v->m[0] = exp = 0 ;
@@ -48,7 +50,8 @@ void demote (mval *v,int exp,int sign)
 		v->m[1] /= ten_pwr[EXP_INT_OVERF - 1 - exp] ;
 	}
 	else
-	{	v->m[1] /= -ten_pwr[EXP_INT_OVERF - 1 - exp] ;
+	{
+		v->m[1] /= -ten_pwr[EXP_INT_OVERF - 1 - exp] ;
 	}
 	v->mvtype = MV_NM | MV_INT ;
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@ GBLREF unsigned char *source_buffer;
 GBLREF bool		transform;
 
 
-int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, int src_len)
+int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len_t src_len)
 {
 
 	triple *ref;

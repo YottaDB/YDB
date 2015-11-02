@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 	gd_region		*cur_region;
 	sgmnt_addrs		*cs_adr;
 	mlk_ctldata		*lke_ctl;
-	int4			ls_len;
+	ssize_t			ls_len;
 	mstr 			dnode;
 	show_reply		srep;
 	uint4			status;

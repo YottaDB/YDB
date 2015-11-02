@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,9 +26,9 @@ void base_frame(rhdtyp *base_address)
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
 
-	if ((int4)msp & 1)	/* synchronize mumps stack on even boundary */
+	if ((INTPTR_T)msp & 1)	/* synchronize mumps stack on even boundary */
 		msp--;
-	if ((int4)msp & 2)
+	if ((INTPTR_T)msp & 2)
 		msp -= 2;
 
 	msp_save = msp;

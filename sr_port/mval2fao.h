@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 #ifndef __MVAL2FAO_H__
 #define __MVAL2FAO_H__
 
-int mval2fao(char *message, va_list pfao, int *outparm, int mcount, int fcount, char *bufbase,
+int mval2fao(char *message, va_list pfao, UINTPTR_T *outparm, int mcount, int fcount, char *bufbase,
 	char *buftop);
 
 #endif

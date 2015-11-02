@@ -71,7 +71,7 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 	if (MAX_KEY < kwd->str.len)
 		rts_error(VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
 
-	lower_to_upper((uchar_ptr_t)upcase, (uchar_ptr_t)kwd->str.addr, kwd->str.len);
+	lower_to_upper((uchar_ptr_t)upcase, (uchar_ptr_t)kwd->str.addr, (int)kwd->str.len);
 
 	keywd_indx = kw_cputim ;
 	/* future enhancement:
@@ -118,6 +118,6 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 			return;
 	}
 	if (kw_isprocalive != keywd_indx)
-		info = (info * 100) / sysconf(_SC_CLK_TCK);	/* Convert to standard 100 ticks per second */
+		info = (int4)((info * 100) / sysconf(_SC_CLK_TCK));	/* Convert to standard 100 ticks per second */
 	i2mval(ret, info);
 }

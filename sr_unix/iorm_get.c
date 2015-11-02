@@ -105,10 +105,10 @@ int	iorm_get_bom(io_desc *io_ptr)
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	chset = io_ptr->ichset;
 	assert(UTF16BE_BOM_LEN == UTF16LE_BOM_LEN);
-	bom_bytes2read = (CHSET_UTF8 == chset) ? UTF8_BOM_LEN : UTF16BE_BOM_LEN;
+	bom_bytes2read = (int4)((CHSET_UTF8 == chset) ? UTF8_BOM_LEN : UTF16BE_BOM_LEN);
 	for (; rm_ptr->bom_buf_cnt < bom_bytes2read; )
 	{
-		DOREADRLTO(rm_ptr->fildes, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt], (bom_bytes2read - rm_ptr->bom_buf_cnt),
+		DOREADRLTO(rm_ptr->fildes, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt], bom_bytes2read - rm_ptr->bom_buf_cnt,
 				out_of_time, status);
 		if (0 > status)
 		{
@@ -181,7 +181,7 @@ int	iorm_get(io_desc *io_ptr)
 		status = 0;
 	}
 	if (0 <= status && 0 < bytes2read)
-		DOREADRLTO(rm_ptr->fildes, rm_ptr->inbuf_pos, bytes2read, out_of_time, status);
+		DOREADRLTO(rm_ptr->fildes, rm_ptr->inbuf_pos, (int)bytes2read, out_of_time, status);
 	if (0 > status)
 	{
 		bytes_read = 0;

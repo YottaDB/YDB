@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,8 @@ unsigned char mu_cre_file(void)
 {
 	char		*cc = NULL, path[MAX_FBUFF + 1], errbuff[512];
 	unsigned char	buff[DISK_BLOCK_SIZE];
-	int		fd = -1, i, lower, upper, status, norm_vbn;
+	int		fd = -1, i, lower, upper, norm_vbn;
+        ssize_t         status;
 	uint4		raw_dev_size;		/* size of a raw device, in bytes */
 	int4		blocks_for_create, blocks_for_extension, save_errno;
 	GTM_BAVAIL_TYPE	avail_blocks;
@@ -180,9 +181,9 @@ unsigned char mu_cre_file(void)
 		seg = gv_cur_region->dyn.addr;
 
 		/* blocks_for_create is in the unit of DISK_BLOCK_SIZE */
-		blocks_for_create = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1 +
+		blocks_for_create = (int4)(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1 +
 					(seg->blk_size / DISK_BLOCK_SIZE *
-					 ((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1)) + seg->allocation));
+					 ((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1)) + seg->allocation)));
 		if ((uint4)avail_blocks < blocks_for_create)
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), blocks_for_create, (uint4)avail_blocks);
@@ -224,7 +225,7 @@ unsigned char mu_cre_file(void)
 		 * make into a multiple of BLKS_PER_LMAP to have a complete bitmap
 		 * for each set of blocks.
 		 */
-		cs_data->trans_hist.total_blks = raw_dev_size - ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE);
+		cs_data->trans_hist.total_blks = raw_dev_size - (uint4)ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE);
 		cs_data->trans_hist.total_blks /= (uint4)(((gd_segment *)gv_cur_region->dyn.addr)->blk_size);
 		if (0 == (cs_data->trans_hist.total_blks - DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, BLKS_PER_LMAP - 1)
 			  % (BLKS_PER_LMAP - 1)))

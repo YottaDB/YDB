@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,5 +48,6 @@ int exttime (uint4 time, char *buffer, int extract_len)
 	*ptr++ = ',';
 	ptr = i2asc(ptr, (uint4)seconds);
 	*ptr++ = '\\';
-	return (char *)ptr - buffer;
+/* The use of this fn is only once, that too only as offset.. */
+	return (int)((char *)ptr - buffer);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,8 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 	unsigned char	cc;
 	short int	size;
 	int4		util_len, head, ch;
-	int		buf_len, field_width, chlen, fastate, chwidth = 0;
+	int		buf_len, field_width,fastate, chwidth = 0;
+        ssize_t   	chlen;
 	block_id	blk_id;
 
 	if (rp >= b_top)
@@ -75,7 +76,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 		util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len], 8);
 		MEMCPY_LIT(&util_buff[util_len], "  Off ");
 		util_len += sizeof("  Off ") - 1;
-		util_len += i2hex_nofill(rp - bp, (uchar_ptr_t)&util_buff[util_len], 4);
+		util_len += i2hex_nofill((int)(rp - bp), (uchar_ptr_t)&util_buff[util_len], 4);
 		MEMCPY_LIT(&util_buff[util_len], "  Size ");
 		util_len += sizeof("  Size ") - 1;
 		util_len += i2hex_nofill(size, (uchar_ptr_t)&util_buff[util_len], 4);
@@ -112,7 +113,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 	patch_comp_key[patch_comp_count] = patch_comp_key[patch_comp_count + 1] = 0;
 	if (patch_is_fdmp)
 	{
-		if (dse_fdmp(key_top, r_top - key_top))
+		if (dse_fdmp(key_top, (int)(r_top - key_top)))
 			patch_fdmp_recs++;
 	} else
 	{
@@ -168,7 +169,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 					return NULL;
 				}
 				util_len = 8;
-				i2hex_blkfill(cptr0 - bp, (uchar_ptr_t)util_buff, 8);
+				i2hex_blkfill((int)(cptr0 - bp), (uchar_ptr_t)util_buff, 8);
 				MEMCPY_LIT(&util_buff[util_len], " : |");
 				util_len += sizeof(" : |") - 1;
 				util_buff[util_len] = 0;

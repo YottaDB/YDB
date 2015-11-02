@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,5 +111,5 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 	csa->wbuf_dqd--;
 
 	BG_TRACE_PRO_ANY(csa, db_csh_get_too_many_loops);
-	return (cache_rec_ptr_t)(TRUE == csa->now_crit ? (cache_rec_ptr_t)CR_NOTVALID : NULL);
+	return (TRUE == csa->now_crit ? (cache_rec_ptr_t)CR_NOTVALID : (cache_rec_ptr_t) NULL);
 }

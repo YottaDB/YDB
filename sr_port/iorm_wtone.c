@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ void iorm_wtone(int ch)
 				GTMASSERT;
 		}
 		temp.addr = (char *)uni_buf;
-		temp.len = endptr - uni_buf;
+		temp.len = INTCAST(endptr - uni_buf);
 		assert(0 < temp.len); /* we validated the code point already in op_wtone() */
 	}
 #endif

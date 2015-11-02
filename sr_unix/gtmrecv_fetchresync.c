@@ -70,6 +70,8 @@ GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		repl_connection_reset;
 GBLREF 	mur_gbls_t		murgbl;
+GBLREF	boolean_t	src_node_same_endianness;
+GBLREF	boolean_t 	src_node_endianness_known;
 
 CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 {
@@ -194,7 +196,17 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 			resync_msg.resync_seqno = jgbl.max_dualsite_resync_seqno;
 		assert(resync_msg.resync_seqno);
 		resync_msg.proto_ver = REPL_PROTO_VER_THIS;
+/* wdm debug begin */
+		if (REPL_PROTO_VER_DUALSITE == resync_msg.proto_ver)
+			repl_log(stdout, TRUE, TRUE, "resync_msg.proto_ver is dualsite \n" );
+		else if (REPL_PROTO_VER_MULTISITE == resync_msg.proto_ver)	
+			repl_log(stdout, TRUE, TRUE, "resync_msg.proto_ver is multisite \n" );
+			else
+			repl_log(stdout, TRUE, TRUE, "resync_msg.proto_ver is neither dual site nor multisite \n" );					
+/* wdm debug end */
 		resync_msg.node_endianness = NODE_ENDIANNESS;
+		src_node_same_endianness = TRUE; /* don't convert */ 
+		src_node_endianness_known = FALSE; /* lets reconsider afresh */
 		gtmrecv_repl_send((repl_msg_ptr_t)&resync_msg, "REPL_FETCH_RESYNC", resync_msg.resync_seqno);
 		if (repl_connection_reset)
 		{	/* Connection got reset during the above send */
@@ -225,6 +237,26 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 			if (wait_count <= 0)
 				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Waited too long to get message from primary. Check if primary is alive."));
+/* wdm */ 
+				if (!src_node_endianness_known)
+				{
+					if ( msg.type > 256 && GTM_BYTESWAP_32(msg.type) < 256 )
+					{
+						src_node_endianness_known = FALSE;
+						src_node_same_endianness = FALSE;
+					}
+					else
+					{
+						src_node_endianness_known = FALSE;
+						src_node_same_endianness = TRUE;
+					}
+				}
+				if ( !src_node_same_endianness )
+				{
+					msg.type = GTM_BYTESWAP_32(msg.type);
+					msg.len = GTM_BYTESWAP_32(msg.len);				
+				}
+/* wdm */
 			switch(msg.type)
 			{
 				case REPL_NEED_INSTANCE_INFO:
@@ -236,8 +268,16 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 					assert(REPL_PROTO_VER_UNINITIALIZED != murgbl.remote_proto_ver);
 					assert(REPL_PROTO_VER_MULTISITE <= murgbl.remote_proto_ver);
 					memset(&instinfo_msg, 0, sizeof(instinfo_msg));
-					instinfo_msg.type = REPL_INSTANCE_INFO;
-					instinfo_msg.len = MIN_REPL_MSGLEN;
+					if ( src_node_same_endianness )
+					{
+						instinfo_msg.type = REPL_INSTANCE_INFO;
+						instinfo_msg.len = MIN_REPL_MSGLEN;	
+					}
+					else
+					{
+						instinfo_msg.type = GTM_BYTESWAP_32(REPL_INSTANCE_INFO);
+						instinfo_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);						
+					}
 					assert(NULL != jnlpool.repl_inst_filehdr);
 					memcpy(instinfo_msg.instname, jnlpool.repl_inst_filehdr->this_instname,
 						MAX_INSTNAME_LEN - 1);
@@ -251,13 +291,26 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 
 				case REPL_NEED_TRIPLE_INFO:
 					need_tripleinfo_msg = (repl_needtriple_msg_ptr_t)&msg;
-					repl_log(stdout, TRUE, TRUE, "Received REPL_NEED_TRIPLE_INFO message for seqno "
-						"%llu [0x%llx]\n", need_tripleinfo_msg->seqno, need_tripleinfo_msg->seqno);
+					if ( src_node_same_endianness )
+					{													
+						repl_log(stdout, TRUE, TRUE, "Received REPL_NEED_TRIPLE_INFO message for seqno "
+							"%llu [0x%llx]\n", need_tripleinfo_msg->seqno, need_tripleinfo_msg->seqno);
+					}
+					else
+					{
+						repl_log(stdout, TRUE, TRUE, "Received REPL_NEED_TRIPLE_INFO message for seqno "
+							"%llu [0x%llx]\n", GTM_BYTESWAP_64(need_tripleinfo_msg->seqno), 
+							GTM_BYTESWAP_64(need_tripleinfo_msg->seqno));
+					}
 					assert(REPL_PROTO_VER_UNINITIALIZED != murgbl.remote_proto_ver);
 					assert(NULL != jnlpool.jnlpool_dummy_reg);
 					repl_inst_ftok_sem_lock();
-					status = repl_inst_wrapper_triple_find_seqno(need_tripleinfo_msg->seqno,
-											&triple, &triple_num);
+					if ( src_node_same_endianness )
+						status = repl_inst_wrapper_triple_find_seqno(need_tripleinfo_msg->seqno,
+							&triple, &triple_num);
+					else
+						status = repl_inst_wrapper_triple_find_seqno(GTM_BYTESWAP_64(need_tripleinfo_msg->seqno),
+							&triple, &triple_num);										
 					repl_inst_ftok_sem_release();
 					if (0 != status)
 					{	/* Close the connection. The function call above would have issued the error. */
@@ -299,7 +352,14 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 			rts_error(VARLSTCNT(1) ERR_REPLCOMM);
 			return ERR_REPLCOMM;
 		}
-		QWASSIGN(*resync_seqno, *(seq_num *)&msg.msg[0]);
+		if ( src_node_same_endianness )
+		{
+			QWASSIGN(*resync_seqno, *(seq_num *)&msg.msg[0]);
+		}
+		else
+		{
+			QWASSIGN(*resync_seqno, GTM_BYTESWAP_64(*(seq_num *)&msg.msg[0]));	
+		}
 		/* Wait till connection is broken or REPL_CONN_CLOSE is received */
 		REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_fetchresync_poll)
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,10 +29,8 @@ void gtcml_unlock(void)
 
 	for (prior = &mlk_cm_root ; *prior ; )
 	{
-		if (!(*prior)->granted	|| ((*prior)->nodptr->auxowner != (uint4) curr_entry))
-		{
+		if (!(*prior)->granted	|| ((*prior)->nodptr->auxowner != (UINTPTR_T)curr_entry))
 			mlk_pvtblk_delete(prior);
-		}
 		else if ((*prior)->zalloc)
 		{
 			(*prior)->level = 0;

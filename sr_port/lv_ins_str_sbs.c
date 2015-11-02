@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,8 @@ lv_val *lv_ins_str_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
        	       	dst = &blk->ptr.sbs_str[blk->cnt];
        	       	src = dst - 1;
 	       	for ( ; src >= (sbs_str_struct *)stat->ptr; src--, dst--)
-       	       	{      	*dst = *src;
+       	       	{
+			*dst = *src;
 	       	}
 	 	slot = (sbs_str_struct *)stat->ptr;
 	       	blk->cnt++;
@@ -51,10 +52,12 @@ lv_val *lv_ins_str_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
  	       	prev = stat->prev;
        	       	dst = &prev->ptr.sbs_str[prev->cnt];
        	       	if (stat->ptr == (char *)&blk->ptr.sbs_str[0])
-	 	{      	slot = dst;
+	 	{
+			slot = dst;
 	 	}
 	 	else
-	 	{      	src = &blk->ptr.sbs_str[0];
+	 	{
+			src = &blk->ptr.sbs_str[0];
        	       	       	*dst = *src;
        	       	       	dst = src;
        	       	       	src += 1;
@@ -69,18 +72,22 @@ lv_val *lv_ins_str_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
        	       	dst = &nxt->ptr.sbs_str[nxt->cnt];
        	       	src = dst - 1;
        	       	for ( ; src >= &nxt->ptr.sbs_str[0]; src--, dst--)
-	       	{	*dst = *src;
+	       	{
+			*dst = *src;
 	       	}
 
 	 	if (stat->ptr == (char *)&blk->ptr.sbs_str[blk->cnt])
-	       	{	slot = dst;
+	       	{
+			slot = dst;
 	 	}
 	     	else
-	     	{      	*dst = blk->ptr.sbs_str[blk->cnt - 1];
+	     	{
+			*dst = blk->ptr.sbs_str[blk->cnt - 1];
 	       	       	dst = &blk->ptr.sbs_str[blk->cnt - 1];
        	     	       	src = dst - 1;
 	       	 	for ( ; src >= (sbs_str_struct *)stat->ptr; src--, dst--)
-	       	       	{      	*dst = *src;
+	       	       	{
+				*dst = *src;
 	 	       	}
 	 	 	slot = (sbs_str_struct *)stat->ptr;
 	 	}
@@ -93,29 +100,34 @@ lv_val *lv_ins_str_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
 		assert (new->sbs_que.fl && new->sbs_que.bl);
 		new->nxt = blk;
 		if (stat->prev == stat->blk)
-		{	tbl->str = new;
+		{
+			tbl->str = new;
 		}
 		else
-       	       	{      	stat->prev->nxt = new;
+       	       	{
+			stat->prev->nxt = new;
 		}
 
        	       	dst = &new->ptr.sbs_str[0];
        	       	if (stat->ptr == (char *)&blk->ptr.sbs_str[0])
-	     	{	slot = dst;
+	     	{
+			slot = dst;
 			new->cnt = 1;
 	     	}
 	     	else
 	     	{
        	       	       	src = &blk->ptr.sbs_str[0];
        	       	       	for ( ; src < (sbs_str_struct *)stat->ptr; src++, dst++)
-	       	       	{      	*dst = *src;
+	       	       	{
+				*dst = *src;
 	     	       	}
 			new->cnt = dst - &new->ptr.sbs_str[0];
 	     		slot = &blk->ptr.sbs_str[0];
 	     		dst = slot + 1;
 	     		top = (char *)&blk->ptr.sbs_str[blk->cnt];
        	       	       	for ( ; src < (sbs_str_struct *)top; src++, dst++)
-	       	       	{      	*dst = *src;
+	       	       	{
+				*dst = *src;
 	     	       	}
 			blk->cnt = blk->cnt - new->cnt + 1;
 	 	}

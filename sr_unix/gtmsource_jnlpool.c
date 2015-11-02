@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,11 +58,11 @@ int gtmsource_jnlpool(void)
 		print_offset = (CLI_PRESENT == cli_present("DETAIL"));
 		section_offset = 0;
 		repl_inst_dump_jnlpoolctl(jnlpool.jnlpool_ctl);
-		section_offset = (sm_uc_ptr_t)jnlpool.repl_inst_filehdr - (sm_uc_ptr_t)jnlpool.jnlpool_ctl;
+		section_offset = (uint4)((sm_uc_ptr_t)jnlpool.repl_inst_filehdr - (sm_uc_ptr_t)jnlpool.jnlpool_ctl);
 		repl_inst_dump_filehdr(jnlpool.repl_inst_filehdr);
-		section_offset = (sm_uc_ptr_t)jnlpool.gtmsrc_lcl_array - (sm_uc_ptr_t)jnlpool.jnlpool_ctl;
+		section_offset = (uint4)((sm_uc_ptr_t)jnlpool.gtmsrc_lcl_array - (sm_uc_ptr_t)jnlpool.jnlpool_ctl);
 		repl_inst_dump_gtmsrclcl(jnlpool.gtmsrc_lcl_array);
-		section_offset = (sm_uc_ptr_t)jnlpool.gtmsource_local_array - (sm_uc_ptr_t)jnlpool.jnlpool_ctl;
+		section_offset = (uint4)((sm_uc_ptr_t)jnlpool.gtmsource_local_array - (sm_uc_ptr_t)jnlpool.jnlpool_ctl);
 		repl_inst_dump_gtmsourcelocal(jnlpool.gtmsource_local_array);
 	}
 	if (CLI_PRESENT == cli_present("CHANGE"))

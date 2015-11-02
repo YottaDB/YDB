@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -26,6 +26,7 @@
 #
 
 #	Get the version number/designation:
+
 echo " "
 echo -n "Enter Version		"
 echo -n "[$gtm_verno]:	"

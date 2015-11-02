@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,7 +99,11 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 			DELIMIT_CURR;
 			MEMCPY_LIT(curr, ZERO_TIME_DELIM);
 			curr += STR_LIT_LEN(ZERO_TIME_DELIM);
+#ifdef __ia64
+			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_kill.prefix.tn);
+#else
 			curr = (char *)i2asc((uchar_ptr_t)curr, rec->jrec_kill.prefix.tn);
+#endif /* __ia64 */
 			DELIMIT_CURR;
 			MEMCPY_LIT(curr, PIDS_DELIM);
 			curr += STR_LIT_LEN(PIDS_DELIM);
@@ -121,7 +125,11 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 			DELIMIT_CURR;
 			MEMCPY_LIT(curr, ZERO_TIME_DELIM);
 			curr += STR_LIT_LEN(ZERO_TIME_DELIM);
+#ifdef __ia64
+			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_tcom.prefix.tn);
+#else
 			curr = (char *)i2asc((uchar_ptr_t)curr, rec->jrec_tcom.prefix.tn);
+#endif /* __ia64 */
 			DELIMIT_CURR;
 			MEMCPY_LIT(curr, PIDS_DELIM);
 			curr += STR_LIT_LEN(PIDS_DELIM);
@@ -149,7 +157,11 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	DELIMIT_CURR;
 	MEMCPY_LIT(curr, ZERO_TIME_DELIM);
 	curr += STR_LIT_LEN(ZERO_TIME_DELIM);
+#ifdef __ia64
+	curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_kill.prefix.tn);
+#else
 	curr = (char *)i2asc((uchar_ptr_t)curr, rec->jrec_kill.prefix.tn);
+#endif /* __ia64 */
 	DELIMIT_CURR;
 	MEMCPY_LIT(curr, PIDS_DELIM);
 	curr += STR_LIT_LEN(PIDS_DELIM);
@@ -163,7 +175,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	assert(IS_SET_KILL_ZKILL(rectype));
 	DELIMIT_CURR;
 	keystr = (jnl_string *)&rec->jrec_kill.mumps_node;
-	ptr = (char *)ROUND_UP((uint4)key_buff, 8);
+	ptr = (char *)ROUND_UP((unsigned long)key_buff, 8);
 	key = (gv_key *)ptr;
 	key->top = MAX_KEY_SZ;
 	key->end = keystr->length;

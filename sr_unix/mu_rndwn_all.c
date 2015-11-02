@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,7 +111,7 @@ int mu_rndwn_all(void)
 				validate_replpool_shm_entry(entry, (replpool_id_ptr_t)&replpool_id, &tmp_exit_status, &shmid))
 		{
 			assert(JNLPOOL_SEGMENT == replpool_id.pool_type || RECVPOOL_SEGMENT == replpool_id.pool_type);
-			ret_status = mu_rndwn_repl_instance(&replpool_id, TRUE);
+			ret_status = mu_rndwn_repl_instance(&replpool_id, TRUE, FALSE);
 			ret_ptr = i2asc((uchar_ptr_t)shmid_buff, shmid);
 			*ret_ptr = '\0';
 			gtm_putmsg(VARLSTCNT(6) (JNLPOOL_SEGMENT == replpool_id.pool_type) ?
@@ -174,7 +174,7 @@ boolean_t validate_db_shm_entry(char *entry, char *fname, int *exit_stat)
 		nl_addr = (node_local_ptr_t)start_addr;
 		memcpy(fname, nl_addr->fname, MAX_FN_LEN + 1);
 		fname[MAX_FN_LEN] = '\0';			/* make sure the fname is null terminated */
-		fname_len = strlen(fname);
+		fname_len = STRLEN(fname);
 		if (-1 == Stat(fname, &st_buff))		/* check if there is any such file */
 		{
 			shmdt((void *)start_addr);
@@ -386,9 +386,9 @@ int parse_sem_id(char *entry)
 		indx2++;
 	entry[indx2] = '\0';
 	if (cli_is_dcm(parm))
-		return STRTOUL(parm, NULL, 10);
+		return (int)STRTOUL(parm, NULL, 10);
 	else if (cli_is_hex(parm + 2))
-		return STRTOUL(parm, NULL, 16);
+		return (int)STRTOUL(parm, NULL, 16);
 	else
 	{
 		assert(FALSE);

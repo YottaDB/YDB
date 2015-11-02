@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,7 @@ rc_prc_kill(rc_q_hdr *qhdr)
     v.mvtype = MV_STR;
     for (cp1 = req->key.key; *cp1; cp1++)
 	;
-    v.str.len = cp1 - req->key.key;
+    v.str.len = INTCAST(cp1 - req->key.key);
     v.str.addr = req->key.key;
 	if (v.str.len > 8)	/* GT.M does not support global variables > 8 chars */
 	{	qhdr->a.erc.value = RC_KEYTOOLONG;

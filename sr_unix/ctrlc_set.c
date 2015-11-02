@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 #include "xfer_enum.h"
 #include "outofband.h"
 #include "deferred_events.h"
+#include "fix_xfer_entry.h"
 
 
 /* ------------------------------------------------------------------
@@ -22,7 +23,7 @@
  * Note: dummy parameter is for calling compatibility.
  * ------------------------------------------------------------------
  */
-GBLREF int 				(* volatile xfer_table[])();
+GBLREF xfer_entry_t			xfer_table[];
 GBLREF volatile bool 			run_time, ctrlc_on;
 GBLREF volatile int4			ctrap_action_is,outofband;
 
@@ -35,12 +36,12 @@ void ctrlc_set(int4 dummy_param)
 		{
 			ctrap_action_is = 0;
 			outofband = ctrlc;
-			xfer_table[xf_linefetch] = op_fetchintrrpt;
-			xfer_table[xf_linestart] = op_startintrrpt;
-			xfer_table[xf_zbfetch] = op_fetchintrrpt;
-			xfer_table[xf_zbstart] = op_startintrrpt;
-			xfer_table[xf_forchk1] = op_startintrrpt;
-			xfer_table[xf_forloop] = op_forintrrpt;
+               		FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
+	                FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
+	                FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);
+        	        FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);
+	                FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
+	                FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
 		}
 	}
 }

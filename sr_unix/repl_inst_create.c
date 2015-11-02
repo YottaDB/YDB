@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,7 +82,7 @@ void repl_inst_create(void)
 	if (!repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN+1))
 		rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
 	buff_8byte_aligned = &buff_unaligned[0];
-	buff_8byte_aligned = (char *)ROUND_UP2((int4)buff_8byte_aligned, 8);
+	buff_8byte_aligned = (char *)ROUND_UP2((INTPTR_T)buff_8byte_aligned, 8);
 	repl_instance = (repl_inst_hdr_ptr_t)&buff_8byte_aligned[0];
 	gtmsrc_lcl_array = (gtmsrc_lcl_ptr_t)&buff_8byte_aligned[REPL_INST_HDR_SIZE];
 	memset(machine_name, 0, sizeof(machine_name));

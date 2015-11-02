@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,8 @@ GBLREF io_pair	io_curr_device;
 
 void iomb_write(mstr *v)
 {
-	uint4	status, efn_mask;
+	uint4	efn_mask;
+	ssize_t	status;
 	d_mb_struct *mb_ptr;
 	char	*ch;
 	int	len, out_len;

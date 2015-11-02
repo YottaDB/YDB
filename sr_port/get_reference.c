@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ void get_reference(mval *var)
 	int	maxlen;
 
 	/* you need to return a double-quote for every single-quote. assume worst case. */
-	maxlen = MAX_ZWR_KEY_SZ + (!extnam_str.len ? 0 : ((extnam_str.len * 2) + sizeof(extnamdelim)));
+	maxlen = MAX_ZWR_KEY_SZ + (!extnam_str.len ? 0 : ((extnam_str.len * 2) + SIZEOF(extnamdelim)));
 	if (stringpool.free + maxlen > stringpool.top)
 		stp_gcol(maxlen);
 	var->mvtype = MV_STR;
@@ -61,7 +61,7 @@ void get_reference(mval *var)
 			 * was part of he original name of the global variable
 			 */
 			*start = extnamdelim[4];
-		var->str.len = end - var->str.addr;
+		var->str.len = INTCAST(end - var->str.addr);
 		stringpool.free += var->str.len;
 	}
 }

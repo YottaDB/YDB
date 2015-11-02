@@ -9,11 +9,12 @@
  *								*
  ****************************************************************/
 
+
 #ifndef MDEF_included
 #define MDEF_included
 
 /* mstr needs to be defined before including "mdefsp.h".  */
-typedef unsigned int mstr_len_t;
+typedef int mstr_len_t;
 #ifndef __vms
 typedef struct
 {
@@ -45,7 +46,6 @@ typedef struct
 
 #include <sys/types.h>
 
-
 #define sssize_t      size_t
 #define SHMDT(X)	shmdt((void *)(X))
 
@@ -56,15 +56,83 @@ typedef struct
 #include "mdefsa.h"
 #include "mdefsp.h"
 
-#if !defined(__alpha) && !defined(__sparc) && !defined(__hpux) && !defined(mips)
-#define UNALIGNED_ACCESS_SUPPORTED
+/* For all platforms except Tru64/VMS (alpha platforms), the [U]INTPTR_T types will be equivalenced to [u]intptr_t.
+   But since this type is used for alignment and other checking, and since Tru64/VMS (implemented as a
+   32 bit platform) unconditionally sets this type to its 8 char variant, on Tru64/VMS we will explicitly make
+   [U]INTPTR_T a 4 byte creature.
+*/
+#ifndef __alpha
+typedef intptr_t INTPTR_T;
+typedef uintptr_t UINTPTR_T;
+#else
+typedef int INTPTR_T;
+typedef unsigned int UINTPTR_T;
 #endif
+/* The int_fill_t type is defined to be basically the same size as an address on the platforms it runs on. So it
+   is the same size as intptr_t without the connotation of being a pointer. This is used in places where size_t
+   or ssize_t would normally be used except they can't be used because they are the wrong size on Alpha systems.
+   Classic usage is in places where need constant integer and pointer sized elements.
+*/
+typedef INTPTR_T intszofptr_t;
+typedef UINTPTR_T uintszofptr_t;
+
+#ifdef GTM64
+#	define USER_STACK_SIZE  8192
+#	define GTM64_ONLY(X)	X
+#	define NON_GTM64_ONLY(X)
+#	define VA_ARG_TYPE long
+#	define VA_ARG_TYPE_BOOL int
+#else
+#       define USER_STACK_SIZE  4096
+#	define GTM64_ONLY(X)
+#	define NON_GTM64_ONLY(X)	X
+#	define VA_ARG_TYPE int
+#	define VA_ARG_TYPE_BOOL int
+#endif /* GTM64 */
+
+#ifdef __linux__
+#	define LINUX_ONLY(X) X
+#else
+#	define LINUX_ONLY(X)
+#endif
+
+#if !defined(__alpha) && !defined(__sparc) && !defined(__hpux) && !defined(mips) && !defined(__ia64)
+#	define UNALIGNED_ACCESS_SUPPORTED
+#endif
+
+#if defined(__ia64)
+#	define IA64_ONLY(X)	X
+#	define NON_IA64_ONLY(X)
+#	define OFFSETOF(X,Y) ((int)(offsetof(X,Y)))
+#	define USIZEOF(X) ((unsigned int)(sizeof(X)))
+#	define STRLEN(X) ((int)(strlen(X)))
+#	define USTRLEN(X) ((unsigned int)(strlen(X)))
+#	define SIZEOF(X) ((int)(sizeof(X)))
+#	define INTCAST(X) ((int)(X))
+#	define UINTCAST(X) ((uint4)(X))
+#  ifdef DEBUG
+#	define	IA64_DEBUG_ONLY(X)	X
+#  else
+#	define	IA64_DEBUG_ONLY(X)
+#  endif /* DEBUG */
+#else
+#	define	IA64_ONLY(X)
+#	define	NON_IA64_ONLY(X)	X
+#	define	OFFSETOF(X,Y) offsetof(X,Y)
+#	define 	USIZEOF(X) ((uint4)sizeof(X))
+#	define 	STRLEN(X) strlen(X)
+#	define 	USTRLEN(X) strlen(X)
+#	define 	SIZEOF(X) sizeof(X)
+#	define  INTCAST(X) X
+#	define  UINTCAST(X) X
+#	define	IA64_DEBUG_ONLY(X)
+#endif/* __ia64 */
 
 #define BITS_PER_UCHAR  8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
 
 #define MAXPOSINT4		((int4)0x7fffffff)
 #define	MAX_DIGITS_IN_INT	10	/* maximum number of decimal digits in an integer */
-#define	MAX_DIGITS_IN_EXP	2	/* maximum number of decimal digits in an exponent */
+#define MAX_DIGITS_IN_EXP       2       /* maximum number of decimal digits in an exponent */
 #define MAX_HOST_NAME_LEN	256
 
 #ifndef _AIX
@@ -113,9 +181,13 @@ typedef struct
 /* The M stack frame on all platforms that follow pv-based linkage model (alpha model)
  * contains a pointer to the base of routine's literal section. All such platforms
  * must define HAS_LITERAL_SECT so that the routines that create a new stack frame
- * initialize literal_ptr field apppropriately. */
-#if defined(__alpha) || defined(_AIX) || defined(__hpux) || defined(__MVS__) || defined(__s390__)
-#define HAS_LITERAL_SECT
+ * initialize literal_ptr field apppropriately.
+ *
+ * Note removed "defined(__MVS__) || defined(__s390__) ||" from this ifdef to shorten the line. These can
+ * be reinserted in the even these platforms are reactivated.
+ */
+#if defined(__alpha) || defined(_AIX) || defined(__hpux) || (defined(__linux__) && defined(__ia64))
+#	define HAS_LITERAL_SECT
 #endif
 
 typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of type long */
@@ -139,13 +211,13 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 
 #define NR_REG		16
 #ifndef TRUE
-#define TRUE		 1
+#	define TRUE		 1
 #endif
 #ifndef FALSE
-#define FALSE		 0
+#	define FALSE		 0
 #endif
 #ifndef NULL
-#define NULL		((void *) 0)
+#	define NULL		((void *) 0)
 #endif
 #define NUL		 0x00
 #define SP		 0x20
@@ -188,11 +260,11 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
  */
 GBLREF	boolean_t		gtm_utf8_mode;
 #ifdef UNICODE_SUPPORTED
-#define ZWR_EXP_RATIO(X)	((!gtm_utf8_mode) ? (((X) * 6 + 7)) : ((X) * 9 + 11))
-#define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 9 + 11)
+#	define ZWR_EXP_RATIO(X)	((!gtm_utf8_mode) ? (((X) * 6 + 7)) : ((X) * 9 + 11))
+#	define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 9 + 11)
 #else
-#define ZWR_EXP_RATIO(X)	((X) * 6 + 7)
-#define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 6 + 7)
+#	define ZWR_EXP_RATIO(X)	((X) * 6 + 7)
+#	define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 6 + 7)
 #endif
 
 
@@ -224,7 +296,7 @@ char *s2n(mval *u);
 #define MV_IS_CANONICAL(X)	(((X)->mvtype & MV_NM) ? (((X)->mvtype & MV_NUM_APPROX) == 0) : (bool)nm_iscan(X))
 #define MV_INIT(X)		((X)->mvtype = 0, (X)->fnpc_indx = 0xff)
 #define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = 0xff,		\
-				      (X)->str.len = LEN, (X)->str.addr = (char *)ADDR)
+				      (X)->str.len = INTCAST(LEN), (X)->str.addr = (char *)ADDR)
 
 #define	ASCII_MAX		(unsigned char)0x7F
 #define	IS_ASCII(X)		((uint4)(X) <= ASCII_MAX)	/* X can be greater than 255 hence the typecast to uint4 */
@@ -272,7 +344,7 @@ char *s2n(mval *u);
 #define ROUND_DOWN2(VALUE, MODULUS)		(CHECKPOT(MODULUS) (VALUE) & ~((MODULUS) - 1))
 
 /* Length needed to pad out to a given power of 2 boundary */
-#define PADLEN(value, bndry) (ROUND_UP2((sm_long_t)(value), bndry) - (sm_long_t)(value))
+#define PADLEN(value, bndry) (int)(ROUND_UP2((sm_long_t)(value), bndry) - (sm_long_t)(value))
 
 /* LOG2_OF_INTEGER returns the ceiling of log (base 2) of number */
 #define LOG2_OF_INTEGER(number, log2_of_number)			\
@@ -313,7 +385,7 @@ int4 timeout2msec(int4 timeout);
 #define	STR_LIT_LEN(LITERAL)		(sizeof(LITERAL) - 1)
 #define	LITERAL_AND_LENGTH(LITERAL)	(LITERAL), (sizeof(LITERAL) - 1)
 #define	LENGTH_AND_LITERAL(LITERAL)	(sizeof(LITERAL) - 1), (LITERAL)
-#define	STRING_AND_LENGTH(STRING)	(STRING), (strlen((char *)(STRING)))
+#define	STRING_AND_LENGTH(STRING)	(STRING), (STRLEN((char *)(STRING)))
 #define	LENGTH_AND_STRING(STRING)	(strlen((char *)(STRING))), (STRING)
 
 #define	LEN_AND_LIT(LITERAL)		LENGTH_AND_LITERAL(LITERAL)
@@ -449,7 +521,7 @@ typedef struct
 							   for VMS) */
 		} parts;
 	} u;
-#ifdef __hpux
+#if defined __hppa
 	volatile int4	hp_latch_space[4];		/* Used for HP load_and_clear locking instructions per
 							   HP whitepaper on spinlocks */
 #endif
@@ -464,6 +536,8 @@ typedef	union gtm_time8_struct
 	time_t	ctime;		/* For current GTM code sem_ctime field corresponds to creation time */
 	int4	filler[2];	/* Filler to ensure size is 2 words on all platforms */
 } gtm_time8;
+
+typedef uint4 gtm_time4_t;
 
 typedef struct
 {
@@ -673,12 +747,10 @@ typedef que_head *	que_head_ptr_t;
 /* Define some basic types for shared memory (sm) access depending on whether the platform we are    */
 /* using is capable of supporting 32 or 64 bit pointers or not.					     */
 
-#ifdef DB64
+#if defined(DB64) || defined(GTM64)
 #  if defined(__osf__) && defined(__alpha)
 #    pragma pointer_size(save)
 #    pragma pointer_size(long)
-#  else
-#    error UNSUPPORTED PLATFORM
 #  endif
   typedef char *char_ptr_t;		/* Define 64 bit pointer to char */
   typedef unsigned char *uchar_ptr_t;	/* Define 64 bit pointer to unsigned char */
@@ -690,10 +762,8 @@ typedef que_head *	que_head_ptr_t;
   typedef volatile uint4 *vuint_ptr_t;	/* Define 64 bit pointer to volatile uint */
   typedef void *void_ptr_t;		/* Define 64 bit pointer to void */
   typedef qw_num *qw_num_ptr_t;		/* Define 64 bit pointer to qw_num */
-#ifndef __vax
   typedef latch_t *latch_ptr_t;		/* Define 64 bit pointer to latch_t */
   typedef ulatch_t *ulatch_ptr_t;	/* Define 64 bit pointer to ulatch_t */
-#endif
 
   /* Shared memory connotation */
   typedef char_ptr_t sm_c_ptr_t;	/* Define 64 bit pointer to char */
@@ -724,10 +794,8 @@ typedef que_head *	que_head_ptr_t;
   typedef volatile uint4 *vuint_ptr_t;	/* Define 32 bit pointer to volatile uint */
   typedef void *void_ptr_t;		/* Define 32 bit pointer to void */
   typedef qw_num *qw_num_ptr_t;		/* Define 32 bit pointer to qw_num */
-#ifndef __vax
   typedef latch_t *latch_ptr_t;		/* Define 32 bit pointer to latch_t */
   typedef ulatch_t *ulatch_ptr_t;	/* Define 32 bit pointer to ulatch_t */
-#endif
 
   /* Shared memory connotation */
   typedef char_ptr_t sm_c_ptr_t;	/* Define 32 bit pointer to char */
@@ -738,8 +806,8 @@ typedef que_head *	que_head_ptr_t;
   typedef vint_ptr_t sm_vint_ptr_t;	/* Define 32 bit pointer to volatile int */
   typedef uint_ptr_t sm_uint_ptr_t;	/* Define 32 bit pointer to uint */
   typedef vuint_ptr_t sm_vuint_ptr_t;	/* Define 32 bit pointer to volatile uint */
-  typedef int4 sm_long_t;		/* Define 32 bit integer type */
-  typedef uint4 sm_ulong_t;		/* Define 32 bit unsigned integer type */
+  typedef INTPTR_T sm_long_t;		/* Define 32 bit integer type */
+  typedef UINTPTR_T sm_ulong_t;		/* Define 32 bit unsigned integer type */
   typedef global_latch_t *sm_global_latch_ptr_t; /* Define 32 bit pointer to hp_latch */
   /* The macro FILL8DCL is used (on a 32 bit system) to provide a filler area of 32 bits and
      the actual 32 bit declared area. Whether the high order word or the low order word of
@@ -751,6 +819,9 @@ typedef que_head *	que_head_ptr_t;
 #    define FILL8DCL(type,name,fillnum) type name,fill##fillnum
 #  endif
 #endif
+
+/* Need to define a type for storing pointer differences */
+typedef INTPTR_T  ptroff_t;
 
 /* Need to define a consistently sized off_t type. Some platforms it is 4 bytes, others it is
    4 or 8 bytes depending on flags. The following OFF_T macro is setup to allow the size of the
@@ -854,7 +925,7 @@ typedef enum
 #define NOLICENSE	/* cheap way to obsolete it */
 
 /* integer conversion functions */
-void i2hex(unsigned int val, uchar_ptr_t dest, int len);
+void i2hex(UINTPTR_T val, uchar_ptr_t dest, int len);
 void i2hexl(qw_num val, uchar_ptr_t dest, int len);
 void i2hex_blkfill(int num, uchar_ptr_t addr, int len);
 void i2hexl_blkfill(qw_num num, uchar_ptr_t addr, int len);
@@ -903,21 +974,21 @@ unsigned int asc_hex2i(char *p, int len);
 		num = -1;											\
 }
 
-void	double2s(double *dp, mval *v);	/* double conversion */
-
-int	skpc(char c, int length, char *string);
-void	*gtm_malloc(size_t size);
-void	gtm_free(void *addr);
-int	gtm_memcmp (const void *, const void *, size_t);
-int	is_equ(mval *u, mval *v);
-char	is_ident(mstr *v);
-int	nm_iscan(mval *v);
-void	mcfree(void);
-int4	getprime(int4 n);
-void	push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...);
-void	suspend(void);
-mval	*push_mval(mval *arg1);
-void	mval_lex(mval *v, mstr *output);
+void double2s(double *dp, mval *v); /* double conversion */
+int skpc(char c, int length, char *string);
+void *gtm_malloc(size_t size);
+void gtm_free(void *addr);
+int gtm_memcmp (const void *, const void *, size_t);
+DEBUG_ONLY(void printMallocInfo(void);)
+int is_equ(mval *u, mval *v);
+char is_ident(mstr *v);
+int nm_iscan(mval *v);
+void mcfree(void);
+int4 getprime(int4 n);
+void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...);
+void suspend(void);
+mval *push_mval(mval *arg1);
+void mval_lex(mval *v, mstr *output);
 
 #define ZTRAP_CODE	0x00000001
 #define ZTRAP_ENTRYREF	0x00000002
@@ -927,6 +998,12 @@ void	mval_lex(mval *v, mstr *output);
 #define GTM_BYTESWAP_16(S)		\
 	(  (((S) & 0xff00) >> 8)	\
 	 | (((S) & 0x00ff) << 8)	\
+	)
+
+#define GTM_BYTESWAP_24(L)		\
+	(  (((L) & 0xff0000) >> 16)	\
+	 | ((L) & 0x00ff00)		\
+	 | (((L) & 0x0000ff) << 16)	\
 	)
 
 #define GTM_BYTESWAP_32(L)		\
@@ -990,7 +1067,7 @@ qw_num	gtm_byteswap_64(qw_num num64);
 
 typedef uint4 		jnl_tm_t;
 typedef uint4 		off_jnl_t;
-typedef int4 		sm_off_t;
+typedef INTPTR_T	sm_off_t;
 typedef gtm_uint64_t	gtm_off_t;
 
 #define MAXUINT8	((gtm_uint64_t)-1)
@@ -1059,5 +1136,7 @@ typedef enum
 } gtm_chset_t;
 
 #define	IS_UTF16_CHSET(chset)	((CHSET_UTF16 == (chset)) || (CHSET_UTF16LE == (chset)) || (CHSET_UTF16BE == (chset)))
+
+#define CHK_BOUNDARY_ALIGNMENT(pointer) (((UINTPTR_T)pointer) & (sizeof(UINTPTR_T) - 1))
 
 #endif /* MDEF_included */

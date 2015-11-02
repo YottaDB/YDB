@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,8 +24,6 @@
 #include "stack_frame.h"
 #include "mu_gv_stack_init.h"
 
-#define USER_STACK_SIZE		16384			/* (16 * 1024) */
-
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF  gd_region               *gv_cur_region;
@@ -45,7 +43,7 @@ void mu_gv_stack_init(unsigned char **mstack_ptr)
 	/* There may be M transactions in the journal files.  If so, op_tstart() and op_tcommit()
 	   will be called during recovery;  they require a couple of dummy stack frames to be set up */
 	*mstack_ptr = (unsigned char *)malloc(USER_STACK_SIZE);
-	msp = stackbase = *mstack_ptr + USER_STACK_SIZE - 4;
+	msp = stackbase = *mstack_ptr + USER_STACK_SIZE - sizeof(char *);
 	mv_chain = (mv_stent *)msp;
 	stacktop = *mstack_ptr + 2 * mvs_size[MVST_NTAB];
 	stackwarn = stacktop + 1024;

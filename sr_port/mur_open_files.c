@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,6 +121,7 @@ boolean_t mur_open_files()
 	error_def (ERR_JNLSTATEOFF);
 	error_def (ERR_REPLSTATEOFF);
 	error_def (ERR_REPLINSTUNDEF);
+	error_def (ERR_RLBKNOBIMG);
 	error_def (ERR_MUPJNLINTERRUPT);
 	error_def (ERR_ROLLBKINTERRUPT);
 	error_def (ERR_DBRDONLY);
@@ -177,7 +178,7 @@ boolean_t mur_open_files()
 			gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTUNDEF);
 			return FALSE;
 		}
-		if (!mu_rndwn_repl_instance(&replpool_id, FALSE))
+		if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE))
 			return FALSE;	/* mu_rndwn_repl_instance will have printed appropriate message in case of error */
 		assert(NULL == jnlpool.repl_inst_filehdr);
 		murgbl.repl_standalone = mu_replpool_grab_sem(FALSE);
@@ -349,6 +350,19 @@ boolean_t mur_open_files()
 							}
 							continue;
 						}
+						UNIX_ONLY(
+						else if (!rctl->before_image)
+						{	/* Replicated database with NOBEFORE_IMAGE journaling.
+							 * ROLLBACK is allowed only if -FETCHRESYNC or -RESYNC is specified.
+							 */
+							if (!mur_options.fetchresync_port && !mur_options.resync_specified)
+							{
+								gtm_putmsg(VARLSTCNT(4) ERR_RLBKNOBIMG, 2, DB_LEN_STR(rctl->gd));
+								return FALSE;
+							}
+							mur_options.rollback_losttnonly = TRUE;
+						}
+						)
 					}
 					if (csd->freeze)
 					{	/* region_freeze should release freeze here */
@@ -375,7 +389,7 @@ boolean_t mur_open_files()
 					fc = rctl->gd->dyn.addr->file_cntl;
 					fc->op = FC_WRITE;
 					fc->op_buff = (sm_uc_ptr_t)csd;
-					fc->op_len = ROUND_UP(SIZEOF_FILE_HDR(csd), DISK_BLOCK_SIZE);
+					fc->op_len = (int)ROUND_UP(SIZEOF_FILE_HDR(csd), DISK_BLOCK_SIZE);
 					fc->op_pos = 1;
 					dbfilop(fc);
 				}
@@ -417,7 +431,7 @@ boolean_t mur_open_files()
                         	if (!mur_fopen(jctl))
                                 	return FALSE;
 				/* note mur_fread_eof must be done after setting mur_ctl, mur_regno and mur_jctl */
-				mur_regno = (rctl - &mur_ctl[0]);
+				mur_regno = (int)(rctl - &mur_ctl[0]);
 				if (SS_NORMAL != (jctl->status = mur_fread_eof(jctl)))
 				{
 					gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
@@ -450,7 +464,7 @@ boolean_t mur_open_files()
 			cptr_last = cptr;
 			while (0 != *cptr && ',' != *cptr && '"' != *cptr &&  ' ' != *cptr)
 				++cptr;
-			if (!get_full_path(cptr_last, cptr - cptr_last,
+			if (!get_full_path(cptr_last, (unsigned int)(cptr - cptr_last),
 						(char *)jctl->jnl_fn, &jctl->jnl_fn_len, MAX_FN_LEN, &jctl->status2))
 			{
 				gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, cptr_last, cptr - cptr_last, jctl->status2);

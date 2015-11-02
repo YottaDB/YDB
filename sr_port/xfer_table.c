@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@ int
 
 #ifndef UNICODE_SUPPORTED
 /* Call "z" counterparts for non-unicode flavor of these functions on unsupported platforms */
+
 #define op_fnascii op_fnzascii
 #define op_fnchar op_fnzchar
 #define op_fnzechar op_fnzchar
@@ -35,12 +36,17 @@ int
 #define op_setpiece op_setzpiece
 #define op_setp1 op_setzp1
 #define op_fntranslate op_fnztranslate
+
 #endif
 
 /* Initialize the table with the runtime routine functions */
+
 #define XFER(a,b) b
+
 GBLDEF xfer_entry_t xfer_table[] =
 {
 #include "xfer.h"
 };
 #undef XFER
+
+

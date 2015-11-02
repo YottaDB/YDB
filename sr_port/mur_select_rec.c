@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +76,8 @@ boolean_t	mur_select_rec()
 		assert(key->end <= key->top);
 		memcpy(key->base, &keystr->text[0], keystr->length);
 		key->base[key->end] = '\0';
-		key_len = format_targ_key((uchar_ptr_t)asc_key_buff, MAX_ZWR_KEY_SZ, key, FALSE) - (unsigned char *)asc_key_buff;
+		key_len = INTCAST((format_targ_key((uchar_ptr_t)asc_key_buff, MAX_ZWR_KEY_SZ, key, FALSE) -
+				   (unsigned char *)asc_key_buff));
 	}
 	/* Check this record against the various selection lists */
 	if (NULL != mur_options.user)

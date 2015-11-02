@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ void zl_cmd_qlf (mstr *quals, command_qualifier *qualif)
 	memcpy(cbuf, COMMAND, sizeof(COMMAND) - 1);
 	memcpy(cbuf + sizeof(COMMAND) -1, quals->addr, quals->len);
 	cbuf[sizeof(COMMAND) - 1 + quals->len] = 0;
-	cli_str_setup(sizeof(COMMAND) + quals->len, cbuf);
+	cli_str_setup((SIZEOF(COMMAND) + quals->len), cbuf);
 	parse_ret = parse_cmd();
 	if (parse_ret)
 		rts_error(VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));

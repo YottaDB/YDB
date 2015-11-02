@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,9 @@
  */
 GBLDEF siginfo_t	exi_siginfo;
 
-#if defined(__osf__) || defined(_AIX) || defined(Linux390)
+#if defined(__ia64) && defined(__hpux)
+GBLDEF ucontext_t *exi_context;
+#elif defined(__osf__) || defined(_AIX) || defined(Linux390)
 GBLDEF struct sigcontext exi_context;
 #else
 GBLDEF ucontext_t	exi_context;
@@ -86,6 +88,10 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		exi_siginfo = *info;
 	else
 		memset(&exi_siginfo, 0, sizeof(*info));
+
+#if defined(__ia64) && defined(__hpux)
+	exi_context = context;
+#else
 	if (NULL != context)
 	{
 #if defined(__osf__) || defined(_AIX) || defined(Linux390)
@@ -95,6 +101,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 #endif
 	} else
 		memset(&exi_context, 0, sizeof(exi_context));
+#endif /* ia64 & hp */
 	/* Check if we are fielding nested immediate shutdown signals */
 	if (EXIT_IMMED <= exit_state)
 	{
@@ -148,7 +155,11 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			break;
 		case SIGQUIT:	/* Handle SIGQUIT specially which we ALWAYS want to defer if possible as it is always sent */
 			dont_want_core = TRUE;
+#if defined(__ia64) && defined(__hpux)
+			extract_signal_info(sig, &exi_siginfo, exi_context, &signal_info);
+#else
 			extract_signal_info(sig, &exi_siginfo, &exi_context, &signal_info);
+#endif /* __ia64 */
 			switch(signal_info.infotype)
 			{
 				case GTMSIGINFO_NONE:
@@ -222,7 +233,11 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			break;
 #endif
 		default:
+#if defined(__ia64) && defined(__hpux)
+			extract_signal_info(sig, &exi_siginfo, exi_context, &signal_info);
+#else
 			extract_signal_info(sig, &exi_siginfo, &exi_context, &signal_info);
+#endif /* __ia64 */
 			switch(signal_info.infotype)
 			{
 				case GTMSIGINFO_NONE:

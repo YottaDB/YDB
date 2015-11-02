@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,18 +20,19 @@ GBLREF spdesc		stringpool;
 GBLREF unsigned short	source_name_len;
 GBLREF mident		routine_name;
 
-GBLDEF uint4 		lits_text_size, lits_mval_size;
+GBLDEF uint4		lits_text_size, lits_mval_size;
 
 void comp_lits(rhdtyp *rhead)
 {
-	uint4		offset, cnt;
+  	size_t		offset;
+	uint4		cnt;
 	uint4 		align_pad;
 	mliteral	*p;
 
 	/* Literal text pool is formed in stringpool except for the file name/path of the
 	 * source module and routine name which will be emitted by emit_literals immediately
 	 * following the literal text pool and is considered part of that text pool.*/
-	offset = stringpool.free - stringpool.base;
+	offset = (stringpool.free - stringpool.base);
 	offset += PADLEN(offset, NATIVE_WSIZE);
 	rhead->src_full_name.len = source_name_len;
 	rhead->src_full_name.addr = (char *)offset;
@@ -41,7 +42,7 @@ void comp_lits(rhdtyp *rhead)
 	rhead->routine_name.addr = (char *)offset;
 	offset += routine_name.len;
 	offset += PADLEN(offset, NATIVE_WSIZE);
-	lits_text_size = offset;
+	lits_text_size = UINTCAST(offset);
 	offset = 0;
 	dqloop(&literal_chain, que, p)
 		if (p->rt_addr < 0)
@@ -49,5 +50,5 @@ void comp_lits(rhdtyp *rhead)
 			p->rt_addr = offset;
 			offset += sizeof(mval);
 		}
-	lits_mval_size = offset;
+	lits_mval_size = UINTCAST(offset);
 }

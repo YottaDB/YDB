@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,8 @@ GBLREF va_list	last_va_list_ptr;
 void util_cm_print(clb_struct *lnk, int code, char *message, int flush, ...)
 {
 	va_list		var;
-	int4		status, msglen, i;
+	int4		status, i;
+        size_t          msglen ;
 
 	VAR_START(var, flush);
 
@@ -48,7 +49,7 @@ void util_cm_print(clb_struct *lnk, int code, char *message, int flush, ...)
 	{
 		util_out_print(NULL, RESET);	/* Clear any pending messages */
 		util_out_print_vaparm(message, NOFLUSH, var, MAXPOSINT4);
-		msglen = (char *)util_outptr - (char *)util_outbuff;
+		msglen = (size_t)((char *)util_outptr - (char *)util_outbuff);
 		memcpy(outptr, util_outbuff, msglen);
 		outptr += msglen;
 	}

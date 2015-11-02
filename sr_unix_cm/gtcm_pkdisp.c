@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,8 +94,8 @@ int main(int argc, char_ptr_t argv[])
 	{
 		if (rdmr)
 		{
-			cc = &buff[sizeof(buff)] - &bptr[blen];
-			if ((cc = read(fd, &bptr[blen], cc)) < 0)
+			cc = (int)(&buff[sizeof(buff)] - &bptr[blen]);
+			if ((cc = (int)(read(fd, &bptr[blen], cc))) < 0)
 			{
 				printf("%s: read(): %s", argv[0], sys_errlist[errno]);
 				exit(-1);
@@ -165,7 +165,7 @@ int main(int argc, char_ptr_t argv[])
 			while (xptr < end)
 			{
 				fputc('\t', stdout);
-				if ((len = end - xptr) > 20)
+				if ((len = (int)(end - xptr)) > 20)
 					len = 20;
 				memcpy(chr, xptr, len);
 				xptr += len;

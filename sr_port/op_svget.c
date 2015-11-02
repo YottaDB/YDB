@@ -1,5 +1,5 @@
 /****************************************************************
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -162,7 +162,7 @@ void op_svget(int varnum, mval *v)
 			*v = dollar_system;
 			break;
 		case SV_STORAGE:
-			i2mval(v, getstorage());
+			i2usmval(v, getstorage());
 			break;
 		case SV_TLEVEL:
 			count = (int)dollar_tlevel;
@@ -192,7 +192,7 @@ void op_svget(int varnum, mval *v)
 			v->str.addr = (char *)stringpool.free;
 			while (c1 < c2 && *c1)
 				*stringpool.free++ = *c1++;
-			v->str.len = (char *)stringpool.free - v->str.addr;
+			v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
 			break;
 		case SV_ZC:	/****THESE ARE DUMMY VALUES ONLY!!!!!!!!!!!!!!!!!****/
 			MV_FORCE_MVAL(v, 0);

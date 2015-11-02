@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1007,8 +1007,9 @@ int gtmsource_process(void)
 							save_filter_buff = repl_filter_buff;
 							gtmsource_alloc_filter_buff(repl_filter_bufsiz + (repl_filter_bufsiz >> 1));
 							in_buff += in_size;
-							in_size = pre_intlfilter_datalen - (in_buff - gtmsource_msgp->msg);
-							out_bufsiz = repl_filter_bufsiz - (out_buff - save_filter_buff) - out_size;
+							in_size = (uint4)(pre_intlfilter_datalen - (in_buff - gtmsource_msgp->msg));
+							out_bufsiz = (uint4)(repl_filter_bufsiz -
+									     (out_buff - save_filter_buff) - out_size);
 							out_buff = repl_filter_buff + (out_buff - save_filter_buff) + out_size;
 							tot_out_size += out_size;
 						}

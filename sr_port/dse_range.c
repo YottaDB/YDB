@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -242,7 +242,7 @@ void dse_range(void)
 	}
 	if (!cnt++)
 	    util_out_print("!/Blocks in the specified key range:",TRUE);
-	util_out_print("Block:  !XL Level: !2UL",TRUE,blk,level);
+	util_out_print("Block:  !8XL Level: !2UL",TRUE,blk,level);
 /*	memcpy(util_buff,"	",1);
 	util_len = 1;
 	util_len += i2hex_nofill(blk,&util_buff[util_len],8);

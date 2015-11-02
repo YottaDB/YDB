@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,7 +132,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 		}
 		/* Reserve enough space for naked reference. Include space for ^() and a maximum of sub_count ',' separators for
 		 * subscripts specified as arguments to $NAME() in addition to those in the naked reference */
-		space_needed = (STR_LIT_LEN("^()") + ZWR_EXP_RATIO(MAX_KEY_SZ) + sub_count);
+		space_needed = (int)((STR_LIT_LEN("^()") + ZWR_EXP_RATIO(MAX_KEY_SZ) + sub_count));
 		TEST_FAKE_STRINGPOOL_FULL;
 		if (space_needed > stringpool.top - stringpool.free)
 			stp_gcol(space_needed);
@@ -163,7 +163,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 			/* Naked reference copied, now copy remaining subscripts. From this point on, maintain dst to protect
 			 * against potential string shuffling by mval_lex->stp_gcol
 			 */
-			dst->str.len = sptr - stringpool.free;
+			dst->str.len = INTCAST(sptr - stringpool.free);
 			dst->str.addr = (char *)stringpool.free;
 			assert(dst->str.len < space_needed);
 			stringpool.free = sptr;
@@ -180,14 +180,14 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 			dst->str.len++;
 		} else
 		{ /* naked reference, zero depth => result is just the global name */
-			dst->str.len = sptr - stringpool.free;
+			dst->str.len = INTCAST(sptr - stringpool.free);
 			dst->str.addr = (char *)stringpool.free;
 			assert(dst->str.len < space_needed);
 			stringpool.free = sptr;
 		}
 	} else
 	{
-		space_needed = STR_LIT_LEN("^[,]()") + MAX_MIDENT_LEN + sub_count - 1; 	/* ^[,]GLVN(max of sub_count-1 *
+		space_needed = (int)(STR_LIT_LEN("^[,]()") + MAX_MIDENT_LEN + sub_count - 1); 	/* ^[,]GLVN(max of sub_count-1 *
 											 * subscript separator commas) */
 		TEST_FAKE_STRINGPOOL_FULL;
 		if (space_needed > stringpool.top - stringpool.free) /* We don't account for subscripts here as they are        */

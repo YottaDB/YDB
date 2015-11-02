@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,6 +76,7 @@
 #include "send_msg.h"
 #include "jobexam_process.h"
 #include "jobinterrupt_process_cleanup.h"
+#include "fix_xfer_entry.h"
 
 #ifdef UNIX
 #include "ftok_sems.h"
@@ -85,8 +86,8 @@ GBLREF	spdesc		stringpool, rts_stringpool, indr_stringpool;
 GBLREF	volatile int4	outofband;
 GBLREF	volatile bool	std_dev_outbnd;
 GBLREF	volatile bool	compile_time;
-GBLREF	int		restart_pc;
-GBLREF	int		t_tries;
+GBLREF	unsigned char   *restart_pc;
+GBLREF	unsigned int	t_tries;
 GBLREF	unsigned char	*restart_ctxt;
 GBLREF	unsigned char	*stackwarn, *tpstackwarn;
 GBLREF	unsigned char	*stacktop, *tpstacktop;
@@ -101,7 +102,7 @@ GBLREF	short		dollar_tlevel;
 GBLREF	mval		dollar_ztrap;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	volatile bool	neterr_pending;
-GBLREF	int		(* volatile xfer_table[])();
+GBLREF	xfer_entry_t	xfer_table[];
 GBLREF	unsigned short	proc_act_type;
 GBLREF	mval		**ind_result_array, **ind_result_sp;
 GBLREF	mval		**ind_source_array, **ind_source_sp;
@@ -232,10 +233,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 * ---------------------------------------------------------------------
 		 */
 		neterr_pending = TRUE;
-		xfer_table[xf_linefetch] = op_fetchintrrpt;
-		xfer_table[xf_linestart] = op_startintrrpt;
-		xfer_table[xf_forchk1] = op_startintrrpt;
-		xfer_table[xf_forloop] = op_forintrrpt;
+                FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
+                FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
+                FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
+                FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
 		CONTINUE;
 	}
 	MDB_START;
@@ -388,7 +389,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		}
 		UNIX_ONLY(
 			/* Release FTOK lock on the replication instance file if holding it (possible if error in jnlpool_init) */
-			assert((NULL == jnlpool.jnlpool_dummy_reg) || jnlpool.jnlpool_dummy_reg->open);
+			assert((NULL == jnlpool.jnlpool_dummy_reg) || jnlpool.jnlpool_dummy_reg->open || !pool_init);
 			if ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
 			{
 				udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
@@ -426,8 +427,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	if ((int)ERR_CTRLY == SIGNAL)
 	{
 		outofband_clear();
-		assert(NULL != (unsigned char *)restart_pc);
-		frame_pointer->mpc = (unsigned char *)restart_pc;
+		assert(NULL != restart_pc);
+		frame_pointer->mpc = restart_pc;
 		frame_pointer->ctxt = restart_ctxt;
 		MUM_TSTART;
 	} else  if ((int)ERR_CTRLC == SIGNAL)
@@ -435,7 +436,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		outofband_clear();
 		if (!trans_action && !dm_action)
 		{
-			frame_pointer->mpc = (unsigned char *)restart_pc;
+			frame_pointer->mpc = restart_pc;
 			frame_pointer->ctxt = restart_ctxt;
 			assert(NULL != frame_pointer->mpc);
 			if (!(frame_pointer->type & SFT_DM))
@@ -479,8 +480,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 				stringpool = indr_stringpool;	/* change back */
 			}
 			assert(NULL != dollar_ecode.error_last_b_line);
-			assert(NULL != (unsigned char *)restart_pc);
-			frame_pointer->mpc = (unsigned char *)restart_pc;
+			assert(NULL != restart_pc);
+			frame_pointer->mpc = restart_pc;
 			frame_pointer->ctxt = restart_ctxt;
 			err_act = NULL;
 			dollar_ecode.error_last_ecode = SIGNAL;
@@ -570,8 +571,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 		MUM_TSTART;
 	} else  if ((int)ERR_JOBINTRRQST == SIGNAL)
 	{
-		assert(NULL != (unsigned char *)restart_pc);
-		frame_pointer->mpc = (unsigned char *)restart_pc;
+		assert(NULL != restart_pc);
+		frame_pointer->mpc = restart_pc;
 		frame_pointer->ctxt = restart_ctxt;
 		assert(!dollar_zininterrupt);
 		dollar_zininterrupt = TRUE;	/* Note done before outofband is cleared to prevent nesting */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,6 @@ void	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, m
 	uint4 		status;
 	char 		field_buf[DIR_LEN], type_buf[SYN_LEN], result[MAX_FBUFF + 1];
 	parse_blk	pblk;
-	int4		parse_file();
 
 	error_def(ERR_ZPARSETYPE);
 	error_def(ERR_ZPARSFLDBAD);

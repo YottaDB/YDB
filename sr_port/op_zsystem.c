@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -105,7 +105,7 @@ void op_zsystem(mval *v)
 	if (v->str.len)
 	{
 		strcat(cmd, " -c '");
-		len = strlen(cmd);
+		len = STRLEN(cmd);
 		memcpy(cmd + len, v->str.addr, v->str.len);
 		*(cmd + len + v->str.len) = 39; /* ' = 39 */
 		*(cmd + len + v->str.len + 1) = 0;

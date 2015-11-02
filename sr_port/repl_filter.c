@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -236,12 +236,14 @@ int repl_filter_init(char *filter_cmd)
 		repl_errno = EREPL_FILTERSTART_FORK;
 		return(FILTERSTART_ERR);
 	}
+
+	return -1; /* This should never get executed, added to make compiler happy */
 }
 
 static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len)
 {
 	/* Send the transaction tr_num in buffer tr of len tr_len to the filter */
-	int	extr_len, send_len, sent_len;
+	ssize_t	extr_len, send_len, sent_len;
 	char	first_rectype, *send_ptr, *extr_end;
 
 	if (QWNE(tr_num, seq_num_zero))
@@ -269,7 +271,8 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len)
 	{
 		REPL_DPRINT1("Sending FILTER_EOT\n");
 	}
-	)
+	);
+
 	for (send_ptr = extract_buff, send_len = extr_len; send_len > 0; send_ptr += sent_len, send_len -= sent_len)
 	{
 		/* the check for EINTR below is valid and should not be converted to an EINTR wrapper macro, because EAGAIN
@@ -303,7 +306,8 @@ static void wait_for_filter_input(void)
 static int repl_filter_recv_line(char *line, int *line_len, int max_line_len)
 { /* buffer input read from repl_filter_srv_fd[READ_END], return one line at a time; line separator is '\n' */
 
-	int	l_len, r_len, buff_remaining, save_errno;
+	int	save_errno;
+        ssize_t l_len, r_len, buff_remaining ;
 
 	for (; ;)
 	{
@@ -311,8 +315,10 @@ static int repl_filter_recv_line(char *line, int *line_len, int max_line_len)
 			;
 		if (srv_line_end < srv_read_end) /* newline found */
 		{
-			*line_len = l_len = srv_line_end - srv_line_start + 1; /* include '\n' in length */
-			if (l_len <= max_line_len)
+			l_len = (ssize_t)(srv_line_end - srv_line_start + 1); /* include '\n' in length */
+			*line_len = (int4)l_len ;
+
+			if ((int)l_len <= max_line_len)
 			{
 				memcpy(line, srv_line_start, l_len);
 				srv_line_start = ++srv_line_end; /* move past '\n' for next line */
@@ -415,7 +421,7 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len)
 		extr_ptr[extr_len] = '\0'; /* terminate with null for ext2jnlcvt */
 		if (NULL == (tr_end = ext2jnlcvt(extr_ptr, extr_len, (jnl_record *)tr)))
 			return (repl_errno = EREPL_FILTERBADCONV);
-		*tr_len = tr_end - (char *)&tr[0];
+		*tr_len = (int4)(tr_end - (char *)&tr[0]);
 		/* TCOM record for non TP converted to TP must have the same seqno as the original non TP record */
 		assert(!is_nontp || 1 == rec_cnt || QWEQ(save_jnl_seqno, ((struct_jrec_tcom *)tr_end)->token_seq.jnl_seqno));
 	} else /* 0 == rec_cnt */
@@ -430,7 +436,7 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len)
 
 int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize)
 {
-	int repl_filter_send(), repl_filter_recv(), status;
+	int status;
 
 	if (SS_NORMAL != (status = repl_filter_send(tr_num, tr, *tr_len)))
 		return (status);

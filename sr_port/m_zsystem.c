@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,4 +42,6 @@ int m_zsystem(void)
 		make_commarg(&x,indir_zsystem);
 		return TRUE;
 	}
+
+	return FALSE; /* This will never get executed, added to make compiler happy */
 }

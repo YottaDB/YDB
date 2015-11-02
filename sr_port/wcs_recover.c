@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,15 +38,18 @@
 #include "gdsbgtr.h"
 #include "gdsbml.h"
 #include "filestruct.h"
+#include "gdscc.h"
 #include "interlock.h"
 #include "jnl.h"
 #include "testpt.h"
 #include "sleep_cnt.h"
+#include "mupipbckup.h"
 
 #ifdef UNIX
 #  include "eintr_wrappers.h"
    GBLREF	sigset_t	blockalrm;
 #endif
+
 #include "send_msg.h"
 #include "bit_set.h"
 #include "bit_clear.h"
@@ -62,6 +65,7 @@
 #include "gtm_malloc.h"		/* for verifyAllocatedStorage() prototype */
 #include "cert_blk.h"
 #include "shmpool.h"
+#include "bm_getfree.h"
 
 GBLREF	bool             	certify_all_blocks;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -97,17 +101,23 @@ void wcs_recover(gd_region *reg)
 	que_ent_ptr_t		back_link; /* should be crit & not need interlocked ops. */
 	sgmnt_data_ptr_t	csd;
 	sgmnt_addrs		*csa;
-	bool			blk_used, change_bmm;
+	bool			blk_used;
 	int4			bml_full, dummy_errno, blk_size;
 	uint4			jnl_status, epid;
-	int			bt_buckets;
+	int4			bt_buckets, bufindx;	/* should be the same type as "csd->bt_buckets" */
 	inctn_opcode_t          save_inctn_opcode;
 	unsigned int		bplmap, lcnt, total_blks, wait_in_rip;
 	sm_uc_ptr_t		buffptr;
+	blk_hdr_ptr_t		blk_ptr;
+	INTPTR_T		bp_lo, bp_top, old_block;
+	boolean_t		backup_block_saved, change_bmm;
 
 	error_def(ERR_BUFRDTIMEOUT);
+	error_def(ERR_DBADDRALIGN);
+	error_def(ERR_DBADDRANGE);
 	error_def(ERR_DBCCERR);
 	error_def(ERR_DBCNTRLERR);
+	error_def(ERR_DBCRERR);
 	error_def(ERR_DBDANGER);
 	error_def(ERR_ERRCALL);
 	error_def(ERR_INVALIDRIP);
@@ -164,6 +174,85 @@ void wcs_recover(gd_region *reg)
 	cr_top = cr_top + csd->n_bts;
 	blk_size = csd->blk_size;
 	buffptr = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_top, OS_PAGE_SIZE);
+	backup_block_saved = FALSE;
+	if (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb)
+	{	/* Online backup is in progress. Check if secshr_db_clnup has created any cache-records with pointers to
+		 * before-images that need to be backed up. If so take care of that first before doing any cache recovery.
+		 */
+		bp_lo = (INTPTR_T)buffptr;
+		bp_top = bp_lo + (csd->n_bts * csd->blk_size);
+		for (cr = cr_lo; cr < cr_top;  cr++)
+		{
+			if (cr->stopped && (0 != cr->twin))
+			{	/* Check if cr->twin points to a valid buffer. Only in that case, do the backup */
+				old_block = (INTPTR_T)GDS_ANY_REL2ABS(csa, cr->twin);
+				if (!IS_PTR_IN_RANGE(old_block, bp_lo, bp_top))
+				{
+					send_msg(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
+						cr, cr->blk, old_block, RTS_ERROR_TEXT("bkup_before_image_range"), bp_lo, bp_top);
+					assert(FALSE);
+					continue;
+				} else if (!IS_PTR_ALIGNED(old_block, bp_lo, csd->blk_size))
+				{
+					send_msg(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), cr, cr->blk,
+						RTS_ERROR_TEXT("bkup_before_image_align"), old_block, bp_lo, csd->blk_size);
+					assert(FALSE);
+					continue;
+				}
+				bufindx = (old_block - bp_lo) / csd->blk_size;
+				assert(0 <= bufindx);
+				assert(bufindx < csd->n_bts);
+				cr_alt = &cr_lo[bufindx];
+				assert((sm_uc_ptr_t)old_block == (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr));
+				/* Do other checks to validate before-image buffer */
+				if (cr_alt == cr)
+				{
+					send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+						RTS_ERROR_TEXT("bkup_before_image_cr_same"), cr_alt, FALSE, CALLFROM);
+					assert(FALSE);
+					continue;
+				} else if (cr->blk != cr_alt->blk)
+				{
+					send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+						RTS_ERROR_TEXT("bkup_before_image_blk"), cr_alt->blk, cr->blk, CALLFROM);
+					assert(FALSE);
+					continue;
+				} else if (!cr_alt->in_cw_set)
+				{
+					send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr_alt, cr_alt->blk,
+						RTS_ERROR_TEXT("bkup_before_image_in_cw_set"), cr_alt->in_cw_set, TRUE, CALLFROM);
+					assert(FALSE);
+					continue;
+				} else if (cr_alt->stopped)
+				{
+					send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr_alt, cr_alt->blk,
+						RTS_ERROR_TEXT("bkup_before_image_stopped"), cr_alt->stopped, FALSE, CALLFROM);
+					assert(FALSE);
+					continue;
+				}
+				VMS_ONLY(assert(!cr_alt->twin || cr_alt->bt_index);)
+				/* The following check is the same as the one in bg_update */
+				blk_ptr = (blk_hdr_ptr_t)old_block;
+				if ((cr_alt->blk >= csa->nl->nbb)
+					&& (0 == csa->shmpool_buffer->failed)
+					&& (blk_ptr->tn < csa->shmpool_buffer->backup_tn)
+					&& (blk_ptr->tn >= csa->shmpool_buffer->inc_backup_tn))
+				{
+					cr_alt->buffaddr = cr->twin;	/* reset it to what it should be just to be safe */
+					backup_block(cr_alt->blk, cr_alt, NULL);
+					backup_block_saved = TRUE;
+				}
+			}
+		}
+	}
+	/* After recovering the cache, we normally increment the db curr_tn. But this should not be done if called from
+	 * forward journal recovery, since we want the final database transaction number to match the journal file's
+	 * eov_tn (to avoid JNLDBTNNOMATCH errors). Therefore in this case, make sure all "tn" fields in the bt and cache are set
+	 * to one less than the final db tn. This is done by decrementing the database current transaction number at the
+	 * start of the recovery and incrementing it at the end.
+	 */
+	if (!mu_rndwn_file_dbjnl_flush && mupip_jnl_recover && !JNL_ENABLED(csd))
+		csd->trans_hist.curr_tn--;
 	for (cr = cr_lo, wait_in_rip = 0; cr < cr_top;  cr++, buffptr += blk_size)
 	{
 		cr->buffaddr = GDS_ANY_ABS2REL(csa, buffptr);	/* reset it to what it should be just to be safe */
@@ -374,7 +463,7 @@ void wcs_recover(gd_region *reg)
 					}
 				}	/* if (LATCH_CLEAR < WRITE_LATCH_VAL(cr_alt)) */
 			}	/* if (CR_NOTVALID == cr_alt) */
-			bt->cache_index = GDS_ANY_ABS2REL(csa, cr);
+			bt->cache_index = (int4)GDS_ANY_ABS2REL(csa, cr);
 			cr->bt_index = GDS_ANY_ABS2REL(csa, bt);
 			cr->dirty = csd->trans_hist.curr_tn;
 			cr->flushed_dirty_tn = 0;	/* need to be less than cr->dirty. we choose 0. */
@@ -428,7 +517,7 @@ void wcs_recover(gd_region *reg)
 				if (CR_NOTVALID == bt->cache_index)
 				{	/* no previous entry for this block; more recent cache record will twin when processed */
 					cr->bt_index = GDS_ANY_ABS2REL(csa, bt);
-					bt->cache_index = GDS_ANY_ABS2REL(csa, cr);
+					bt->cache_index = (int4)GDS_ANY_ABS2REL(csa, cr);
 					insqh((que_ent_ptr_t)&cr->blkque, (que_ent_ptr_t)hq);
 				} else
 				{	/* form the twin with the previous (and more recent) cache record */
@@ -468,7 +557,7 @@ void wcs_recover(gd_region *reg)
 			bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID == bt->cache_index)
 			{	/* no previous entry for this block */
-				bt->cache_index = GDS_ANY_ABS2REL(csa, cr);
+				bt->cache_index = (int4)GDS_ANY_ABS2REL(csa, cr);
 				cr->bt_index = GDS_ANY_ABS2REL(csa, bt);
 				cr->refer = TRUE;
 				hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
@@ -488,7 +577,7 @@ void wcs_recover(gd_region *reg)
 					WRITE_LATCH_VAL(cr_alt) = LATCH_CONFLICT;
 					cr_alt->twin = GDS_ANY_ABS2REL(csa, cr);
 					cr->twin = GDS_ANY_ABS2REL(csa, cr_alt);
-					bt->cache_index = GDS_ANY_ABS2REL(csa, cr);
+					bt->cache_index = (int4)GDS_ANY_ABS2REL(csa, cr);
 					cr->bt_index = GDS_ANY_ABS2REL(csa, bt);
 					cr->refer = TRUE;
 					hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
@@ -529,7 +618,7 @@ void wcs_recover(gd_region *reg)
 			bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID == bt->cache_index)
 			{	/* no previous entry for this block */
-				bt->cache_index = GDS_ANY_ABS2REL(csa, cr);
+				bt->cache_index = (int4)GDS_ANY_ABS2REL(csa, cr);
 				cr->bt_index = GDS_ANY_ABS2REL(csa, bt);
 				cr->refer = TRUE;
 				insqh((que_ent_ptr_t)&cr->blkque, (que_ent_ptr_t)hq);
@@ -589,18 +678,21 @@ void wcs_recover(gd_region *reg)
 			} else
 				jnl_file_lost(csa->jnl, jnl_status);
 		}
-		/* do not increment early_tn/curr_tn for forward recovery */
-		if (!mupip_jnl_recover || JNL_ENABLED(csd))
-		{
-			csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
-			INCREMENT_CURR_TN(csd);
-		}
+		csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
+		INCREMENT_CURR_TN(csd);
 	}
 	csa->wbuf_dqd = 0;	/* reset this so the wcs_wtstart below will work */
 	csd->wc_blocked = FALSE;
 	in_wcs_recover = FALSE;
 	if (!reg->read_only)
+	{
 		DCLAST_WCS_WTSTART(reg, 0, dummy_errno);
+		VMS_ONLY(
+			wcs_wtfini(gv_cur_region);	/* try to free as many buffers from the wip queue if write is done */
+		)
+	}
+	if (backup_block_saved)
+		backup_buffer_flush(reg);
 	TP_CHANGE_REG(save_reg);
 	return;
 }
@@ -609,7 +701,8 @@ void wcs_recover(gd_region *reg)
 
 void	wcs_mm_recover(gd_region *reg)
 {
-	int			status, mm_prot;
+	int			mm_prot;
+	INTPTR_T		status;
         struct stat     	stat_buf;
 	sm_uc_ptr_t		old_base[2];
 	sigset_t        	savemask;
@@ -636,22 +729,22 @@ void	wcs_mm_recover(gd_region *reg)
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
 	old_base[0] = cs_addrs->db_addrs[0];
 	old_base[1] = cs_addrs->db_addrs[1];
-	status = munmap((caddr_t)old_base[0], (size_t)(old_base[1] - old_base[0]));
+	status = (INTPTR_T)munmap((caddr_t)old_base[0], (size_t)(old_base[1] - old_base[0]));
 	if (-1 != status)
 	{
 		udi = FILE_INFO(gv_cur_region);
 		FSTAT_FILE(udi->fd, &stat_buf, status);
 #ifdef DEBUG_DB64
 		rel_mmseg((caddr_t)old_base[0]);
-		status = ((sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)get_mmseg((size_t)stat_buf.st_size),
+		status = (sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)get_mmseg((size_t)stat_buf.st_size),
 										(size_t)stat_buf.st_size,
 										mm_prot,
-										GTM_MM_FLAGS, udi->fd, (off_t)0)));
+										GTM_MM_FLAGS, udi->fd, (off_t)0));
 #else
-		status = ((sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)NULL,
+		status = (sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)NULL,
 										(size_t)stat_buf.st_size,
 										mm_prot,
-										GTM_MM_FLAGS, udi->fd, (off_t)0)));
+										GTM_MM_FLAGS, udi->fd, (off_t)0));
 #endif
 	}
 	if (-1 == status)

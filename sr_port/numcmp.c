@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@
  *	so it is not appropriate to return the difference of the two mval values.
  */
 
-int4 numcmp (mval *u, mval *v)
+long numcmp (mval *u, mval *v)
 {
 	mval	w;
 	MV_FORCE_NUM(u);

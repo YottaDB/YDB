@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ int m_use(void)
 			return TRUE;
 		} else
 		{	/* default device parms */
-			plist = put_str((char *)empty_plist, sizeof(empty_plist));
+			plist = put_str((char *)empty_plist, SIZEOF(empty_plist));
 		}
 	} else
 	{	/* Have device parms. Determine type */

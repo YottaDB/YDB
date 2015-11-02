@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +23,9 @@
 
 #if defined(__osf__) && defined(__alpha)
 #define GTM_SOCKLEN_TYPE size_t
-#elif defined(VMS) 
+#elif defined(VMS)
 #define GTM_SOCKLEN_TYPE size_t
-#elif __sparc
+#elif (defined(__sparc) || defined (__ia64))
 #define GTM_SOCKLEN_TYPE int
 #else
 #define GTM_SOCKLEN_TYPE socklen_t

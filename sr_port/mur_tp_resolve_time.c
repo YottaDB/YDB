@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,7 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 			murgbl.tp_resolve_time = rctl->csd->intrpt_recov_tp_resolve_time;
 	}
 	if (mur_options.since_time < murgbl.tp_resolve_time)
-		murgbl.tp_resolve_time = mur_options.since_time;
+		murgbl.tp_resolve_time = (jnl_tm_t)mur_options.since_time;
 	if (FENCE_NONE == mur_options.fences && !mur_options.since_time_specified && !murgbl.intrpt_recovery)
 		murgbl.tp_resolve_time = max_lvrec_time;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,8 +78,8 @@
 typedef struct ipcs_mesg_struct {
 	int		semid;
 	int		shmid;
-	time_t		sem_ctime;
-	time_t		shm_ctime;
+	time_t		gt_sem_ctime;
+	time_t		gt_shm_ctime;
 	unsigned int	fn_len;
 	char		fn[MAX_TRANS_NAME_LEN];
 } ipcs_mesg;

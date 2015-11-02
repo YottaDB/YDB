@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,6 +93,8 @@ GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
+GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
+GBLREF	short			dollar_tlevel;
 
 int gtmsource()
 {
@@ -228,7 +230,7 @@ int gtmsource()
 	process_id = getpid();
 	/* Reinvoke secshr related initialization with the child's pid */
 	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
-		  &jnlpool.jnlpool_dummy_reg);
+		  &jnlpool.jnlpool_dummy_reg, &inctn_detail, &dollar_tlevel);
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool. */
 	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
 	if (!mutex_per_process_init_pid)

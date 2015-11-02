@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -234,7 +234,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 			assert(!fixed || (alt_tot_min == tempuint));
 			alt_tot_max = (tempuint < totchar) ? tempuint : totchar;
 			alt_pat.str.addr = (char *)patptr;
-			alt_pat.str.len = alt_size * sizeof(uint4);
+			alt_pat.str.len = alt_size * SIZEOF(uint4);
 			/* Note that the below zero min length avoiding code is actually an optimization.
 			 * This is because if we start from length 0, we will end up matching the input string and in case
 			 * 	the alternation pattern's max count is huge (e.g. PAT_MAX) we will end up recursing
@@ -266,7 +266,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 					assert(strtmp < strtop);
 					strtmp = UTF8_MBNEXT(strtmp, strtop);
 				}
-				bytelen = strtmp - strptr;
+				bytelen = (int)(strtmp - strptr);
 			}
 			)
 			UNICODE_ONLY(

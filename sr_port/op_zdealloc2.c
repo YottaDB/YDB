@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ GBLREF tp_frame		*tp_pointer;
  * -----------------------------------------------
  */
 
-void op_zdealloc2(int4 timeout, uint4 auxown)
+void op_zdealloc2(int4 timeout, UINTPTR_T auxown)
 {
 	unsigned short	count;
 	mlk_pvtblk	**prior;

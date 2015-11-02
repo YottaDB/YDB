@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@
 #include "ast.h"	/* for ENABLE/DISABLE */
 #endif
 
-#define CR_NOTVALID (-1)
+#define CR_NOTVALID (-1L)
 
 #define WC_MAX_BUFFS 64*1024
 #define WC_DEF_BUFFS 128
@@ -292,6 +292,9 @@ typedef struct node_local_struct
 	char		replinstfilename[MAX_FN_LEN + 1];/* 256 : Name of the replication instance file corresponding to this db.
 							  *       In VMS, this is the name of the corresponding global directory.
 							  */
+   	int4		secshr_ops_index;
+   	INTPTR_T	secshr_ops_array[255];	/* taking up 1K(on 32-bit platform) and 2K(on 64-bit platforms) */
+
 } node_local;
 
 #ifdef DEBUG

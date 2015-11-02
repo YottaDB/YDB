@@ -102,20 +102,23 @@ setenv gtm_pct		$gtmsrc_pct_list[1]
 setenv gtm_src		$gtmsrc_src_list[1]
 setenv gtm_tools	$gtmsrc_tools_list[1]
 
+unsetenv gt_as_option_I
+unsetenv gt_cc_option_I
 
 setenv	gtm_version_change	`date`
-
 source $gtm_tools/gtm_env.csh
-
 unsetenv gtm_version_change
 
-
-setenv	gt_as_option_I	""
+if (! $?gt_as_option_I) then
+	setenv	gt_as_option_I	""
+endif
 foreach i ($gtm_inc_list)
 	setenv	gt_as_option_I	"$gt_as_option_I -I$i"
 end
 
-setenv	gt_cc_option_I	""
+if (! $?gt_cc_option_I) then
+	setenv	gt_cc_option_I	""
+endif
 foreach i ($gtm_inc_list)
 	setenv	gt_cc_option_I	"$gt_cc_option_I -I$i"
 end

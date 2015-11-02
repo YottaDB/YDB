@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ uint4 jnl_get_checksum(uint4 checksum, uint4 *buff, int bufflen)
 	uint4 	*top, *blk_base, *blk_top, blen;
 
 	assert(checksum);
-	for (blen = bufflen / sizeof(*buff), top = buff + blen, blk_top = buff + CHKSUM_SEGLEN4 / 2; buff < top ;)
+	for (blen = bufflen / USIZEOF(*buff), top = buff + blen, blk_top = buff + CHKSUM_SEGLEN4 / 2; buff < top ;)
 	{
 		if (blk_top > top)
 			blk_top = top;

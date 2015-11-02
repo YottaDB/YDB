@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,7 +112,7 @@ int gtcm_dmpstat(int sig)
     OMI_DBG((omi_debug, "Number of bytes sent: %ld\n", omi_bsent));
     FPRINTF(fp, "\n");
 
-    gtcm_ltime = t;
+    gtcm_ltime = (int4)t;
     omi_nxact2 = 0;
 
     fflush(fp);

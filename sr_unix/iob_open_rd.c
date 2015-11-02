@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,6 @@ BFILE *iob_open_rd(path, blksiz, blkfactor)
     int blksiz;
     int blkfactor;
 {
-    void *malloc();
     int fd;
     BFILE *file;
 

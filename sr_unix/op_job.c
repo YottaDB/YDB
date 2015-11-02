@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -258,4 +258,6 @@ int	op_job(int4 argcnt, ...)
 		dollar_zjob = zjob_pid;
 		return TRUE;
 	}
+
+	return FALSE; /* This will never get executed, added to make compiler happy */
 }

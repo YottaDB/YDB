@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,8 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 	cmi_status_t status = SS_NORMAL;
 	struct msghdr msg;
 	struct iovec vec[NUM_IOVECS];
-	int rval, save_errno;
+	int save_errno;
+        ssize_t rval;
 	error_def(CMI_DCNINPROG);
 	error_def(CMI_LNKNOTIDLE);
 	error_def(CMI_OVERRUN);
@@ -78,7 +79,7 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 		lnk->ios.len_len = CMI_TCP_PREFIX_LEN;
 		rval -= CMI_TCP_PREFIX_LEN; /* subtract out length overhead */
 		lnk->ios.xfer_count = rval;
-		if (rval == (int)lnk->cbl)
+		if (rval == lnk->cbl)
 		{
 			cmj_fini(lnk);		/* done */
 			return status;
@@ -92,10 +93,10 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 		if (rval > 0)
 		{
 			assert(CMI_TCP_PREFIX_LEN > rval);
-			lnk->ios.len_len = rval;
+			lnk->ios.len_len = (int)rval;
 		}
 	}
-	CMI_DPRINT(("cmj_write_start: sendmsg partial send %d bytes\n", rval));
+	CMI_DPRINT(("cmj_write_start: sendmsg partial send %ld bytes\n", rval));
 	status = cmj_clb_set_async(lnk); /* more to write */
 	return status;
 }
@@ -103,7 +104,7 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 cmi_status_t cmj_write_urg_start(struct CLB *lnk)
 {
 	cmi_status_t status = SS_NORMAL;
-	int rval;
+	ssize_t rval;
 	error_def(CMI_DCNINPROG);
 	error_def(CMI_LNKNOTIDLE);
 	error_def(CMI_OVERRUN);
@@ -127,7 +128,8 @@ cmi_status_t cmj_write_urg_start(struct CLB *lnk)
 
 void cmj_write_interrupt(struct CLB *lnk, int signo)
 {
-	int rval, save_errno;
+	int save_errno;
+        ssize_t rval;
 	cmi_status_t status = SS_NORMAL;
 
 	if (lnk->mun == -1)
@@ -206,7 +208,7 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 			status = cmj_clb_set_async(lnk);
 			if (CMI_ERROR(status))
 				cmj_err(lnk, CMI_REASON_STATUS, status);
-			CMI_DPRINT(("cmj_write_interrupt: send partial (1) send %d bytes\n", rval));
+			CMI_DPRINT(("cmj_write_interrupt: send partial (1) send %ld bytes\n", rval));
 		}
 	}
 	else
@@ -220,6 +222,6 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 		status = cmj_clb_set_async(lnk);
 		if (CMI_ERROR(status))
 			cmj_err(lnk, CMI_REASON_STATUS, status);
-		CMI_DPRINT(("cmj_write_interrupt: send partial (2) send %d bytes\n", rval));
+		CMI_DPRINT(("cmj_write_interrupt: send partial (2) send %ld bytes\n", rval));
 	}
 }

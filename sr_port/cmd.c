@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -191,7 +191,7 @@ int cmd(void)
 
 	assert(cmd_index[26] == (sizeof(cmd_names)/sizeof(nametabent)));
 
-
+	CHKTCHAIN(curtchain);
 	pos_in_chain = *curtchain;
 	if (window_token != TK_IDENT)
 	{

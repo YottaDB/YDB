@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,11 +28,11 @@ static readonly char alnum[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-uint4 trans_log_name(mstr *log, mstr *trans, char *buffer)
+int4 trans_log_name(mstr *log, mstr *trans, char *buffer)
 {
 	char	*s_start, *s_ptr, *tran_buff, *b_ptr;
 	int	i;
-	uint4	ret;
+	int4	ret;
 	char	temp[128], buff[MAX_NUMBER_FILENAMES];
 
 	b_ptr = buffer;
@@ -69,6 +69,6 @@ uint4 trans_log_name(mstr *log, mstr *trans, char *buffer)
 	}
 	memcpy(b_ptr, s_start, s_ptr - s_start);
 	trans->addr = buffer;
-	trans->len = b_ptr - buffer + s_ptr - s_start;
+	trans->len = INTCAST(b_ptr - buffer + s_ptr - s_start);
 	return ret;
 }

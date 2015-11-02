@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,8 @@ static char *encode_os(void);
 
 LITDEF	gtcm_proto_cpu_info_t	gtcm_proto_cpu_info[] =
 {
+	LIT_AND_LEN("IA64/B"),			"IA64/B",
+	LIT_AND_LEN("IA64/L"),			"IA64/L",
 	LIT_AND_LEN("RS6000"),			"PPC",
 	LIT_AND_LEN("AXP"),			"AXP",
 	LIT_AND_LEN("HP-PA"),			"PAR",
@@ -120,6 +122,7 @@ static char *encode_cpu()
 		}
 	}
 	GTMASSERT;
+	return NULL; /* Added to make compiler happy and not throw warning */
 }
 
 static char *encode_os()
@@ -146,4 +149,5 @@ static char *encode_os()
 		}
 	}
 	GTMASSERT;
+	return NULL; /* Added to make compiler happy and not throw warning */
 }

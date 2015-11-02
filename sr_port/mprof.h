@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,17 @@
 
 #ifndef MPROF_H_INCLUDED
 #define MPROF_H_INCLUDED
-
+#include "xfer_enum.h"
+#include "fix_xfer_entry.h"
 #define OFFSET_LEN 			8
 #define TOTAL_SIZE_OF_PROFILING_STACKS 	8388608
 #define	GUARD_RING_FOR_PROFILING_STACK	1024
-#define PROFCALLOC_DSBLKSIZE 		8180
+#ifdef __ia64
+#define PROFCALLOC_DSBLKSIZE 		8192
+#else
+#define PROFCALLOC_DSBLKSIZE            8180
+#endif
+
 #define MAX_MPROF_TREE_HEIGHT		32
 
 /*entry points recognized by pcurrpos*/
@@ -25,40 +31,43 @@
 #define MPROF_LINESTART	0x8
 
 #define POPULATE_PROFILING_TABLE() { \
-	xfer_table[xf_linefetch] = op_mproflinefetch; \
-	xfer_table[xf_linestart] = op_mproflinestart; \
-	xfer_table[xf_extexfun]	 = op_mprofextexfun; \
-	xfer_table[xf_extcall]   = op_mprofextcall; \
-	xfer_table[xf_exfun]     = op_mprofexfun; \
-	xfer_table[xf_callb]     = op_mprofcallb; \
-	xfer_table[xf_calll]     = op_mprofcalll; \
-	xfer_table[xf_callw]     = op_mprofcallw; \
-	xfer_table[xf_callspl]   = op_mprofcallspl; \
-	xfer_table[xf_callspw]   = op_mprofcallspw; \
-	xfer_table[xf_callspb]   = op_mprofcallspb; \
-	xfer_table[xf_forlcldob] = op_mprofforlcldob; \
-	xfer_table[xf_forlcldow] = op_mprofforlcldow; \
-	xfer_table[xf_forlcldol] = op_mprofforlcldol; \
-	xfer_table[xf_forloop]   = op_mprofforloop; \
+	/* xfer_table[xf_linefetch] = op_mproflinefetch; */	\
+    /*	xfer_table[xf_linefetch] = NON_IA64_ONLY((op_mproflinefetch) IA64_ONLY(CODE_ADDRESS_ASM(op_mproflinestart));*/ \
+	FIX_XFER_ENTRY(xf_linefetch, op_mproflinefetch); \
+   /*	xfer_table[xf_linestart] = NON_IA64_ONLY(op_mproflinestart) IA64_ONLY(CODE_ADDRESS_ASM(op_mproflinestart)); */  \
+	FIX_XFER_ENTRY(xf_linestart, op_mproflinestart) \
+	FIX_XFER_ENTRY(xf_extexfun, op_mprofextexfun); \
+	FIX_XFER_ENTRY(xf_extcall, op_mprofextcall); \
+	FIX_XFER_ENTRY(xf_exfun, op_mprofexfun); \
+	FIX_XFER_ENTRY(xf_callb, op_mprofcallb); \
+	FIX_XFER_ENTRY(xf_calll, op_mprofcalll); \
+	FIX_XFER_ENTRY(xf_callw, op_mprofcallw); \
+	FIX_XFER_ENTRY(xf_callspl, op_mprofcallspl); \
+	FIX_XFER_ENTRY(xf_callspw, op_mprofcallspw); \
+	FIX_XFER_ENTRY(xf_callspb, op_mprofcallspb); \
+	FIX_XFER_ENTRY(xf_forlcldob, op_mprofforlcldob); \
+	FIX_XFER_ENTRY(xf_forlcldow, op_mprofforlcldow); \
+	FIX_XFER_ENTRY(xf_forlcldol, op_mprofforlcldol); \
+	FIX_XFER_ENTRY(xf_forloop, op_mprofforloop); \
 }
 
 #define CLEAR_PROFILING_TABLE() { \
-	xfer_table[xf_linefetch] = op_linefetch; \
-	xfer_table[xf_linestart] = op_linestart; \
-	xfer_table[xf_extexfun]  = op_extexfun; \
-	xfer_table[xf_extcall]   = op_extcall; \
-	xfer_table[xf_exfun]     = op_exfun; \
-	xfer_table[xf_callb]     = op_callb; \
-	xfer_table[xf_callw]     = op_callw; \
-	xfer_table[xf_calll]     = op_calll; \
-	xfer_table[xf_exfun]     = op_exfun; \
-	xfer_table[xf_callspb]   = op_callspb; \
-	xfer_table[xf_callspw]   = op_callspw; \
-	xfer_table[xf_callspl]   = op_callspl; \
-	xfer_table[xf_forlcldob] = op_forlcldob; \
-	xfer_table[xf_forlcldow] = op_forlcldow; \
-	xfer_table[xf_forlcldol] = op_forlcldol; \
-	xfer_table[xf_forloop]   = op_forloop; \
+	FIX_XFER_ENTRY(xf_linefetch, op_linefetch); \
+	FIX_XFER_ENTRY(xf_linestart, op_linestart); \
+	FIX_XFER_ENTRY(xf_extexfun, op_extexfun); \
+	FIX_XFER_ENTRY(xf_extcall, op_extcall); \
+	FIX_XFER_ENTRY(xf_exfun, op_exfun); \
+	FIX_XFER_ENTRY(xf_callb, op_callb); \
+	FIX_XFER_ENTRY(xf_callw, op_callw); \
+	FIX_XFER_ENTRY(xf_calll, op_calll); \
+/*	xfer_table[xf_exfun]     = op_exfun; */ \
+	FIX_XFER_ENTRY(xf_callspb, op_callspb); \
+	FIX_XFER_ENTRY(xf_callspw, op_callspw); \
+	FIX_XFER_ENTRY(xf_callspl, op_callspl); \
+	FIX_XFER_ENTRY(xf_forlcldob, op_forlcldob); \
+	FIX_XFER_ENTRY(xf_forlcldow, op_forlcldow); \
+	FIX_XFER_ENTRY(xf_forlcldol, op_forlcldol); \
+	FIX_XFER_ENTRY(xf_forloop, op_forloop); \
 }
 
 typedef struct {

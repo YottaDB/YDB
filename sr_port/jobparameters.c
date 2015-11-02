@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,6 +69,6 @@ int jobparameters (oprtype *c)
 		}
 	}
 	*parptr++ = jp_eol;
-	*c = put_str (parastr,parptr - parastr);
+	*c = put_str (parastr,(mstr_len_t)(parptr - parastr));
 	return TRUE;
 }

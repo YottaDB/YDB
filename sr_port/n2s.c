@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,7 @@ unsigned char *n2s(mval *mv_ptr)
 			m0 /= 10;
 			*--cp1 = tmp - (m0 * 10) + '0';
 		}
-		n0 = &lcl_buf[sizeof(lcl_buf)] - cp1;
+		n0 = (int4)(&lcl_buf[sizeof(lcl_buf)] - cp1);
 		memcpy(cp, cp1, n0);
 		cp += n0;
 	} else
@@ -119,7 +119,7 @@ unsigned char *n2s(mval *mv_ptr)
 	NON_UNICODE_ONLY(mv_ptr->str.len = cp - start);
 #ifdef UNICODE_SUPPORTED
 	/* Numerics are not unicode so cheaply set "unicode" length same as ascii length */
-	mv_ptr->str.len = mv_ptr->str.char_len = cp - start;
+	mv_ptr->str.len = mv_ptr->str.char_len = INTCAST(cp - start);
 	mv_ptr->mvtype |= MV_UTF_LEN;
 #endif
 	stringpool.free = cp;

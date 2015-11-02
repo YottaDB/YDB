@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,7 +83,7 @@ int gtm_file_stat(mstr *file, mstr *def, mstr *ret, boolean_t check_prv, uint4 *
 	}
 	if (NULL != ret)
 		/* We asume ret->addr has MAX_FN_LEN bytes allocated */
-		if (!get_full_path((char *)tmpfile->addr, tmpfile->len, ret->addr, &ret->len, MAX_FN_LEN, status))
+		if (!get_full_path((char *)tmpfile->addr,  tmpfile->len, ret->addr, (unsigned int *) &ret->len, MAX_FN_LEN, status))
 			 return FILE_STAT_ERROR;
 	if (file_not_found)
 		return FILE_NOT_FOUND;

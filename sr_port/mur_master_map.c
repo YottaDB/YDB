@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ void	mur_master_map()
 	assert(cs_data == cs_addrs->hdr);
 	db_ctl = mur_ctl[mur_regno].db_ctl;
 	bplmap = cs_data->bplmap;
-	bml_size = ROUND_UP(BML_BITS_PER_BLK * bplmap + sizeof(blk_hdr), 8);
+	bml_size = ROUND_UP(BML_BITS_PER_BLK * bplmap + USIZEOF(blk_hdr), 8);
 	bml_buffer = (uchar_ptr_t)malloc(bml_size);
 	for (blk_index = 0;  blk_index < cs_data->trans_hist.total_blks;  blk_index += bplmap)
 	{	/* Read local bit map into buffer */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,5 +23,5 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum);
 void cdbg_dump_mval(int indent, mval *mv);
 void cdbg_dump_mstr(int indent, mstr *ms);
 char *cdbg_indent(int indent);
-char *cdbg_makstr(char *str, char **buf, int len);
+char *cdbg_makstr(char *str, char **buf, mstr_len_t len);
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +104,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 			in_ptr = (unsigned char*)mstr_buf1.addr; /* mstr_buf1.addr is used just in case it is
 								    reallocated by the XFORM routine */
 		}
-		if ((unsigned char *)((int)out_key->end + tmp_len + 3) > (unsigned char *)(out_key->top - MAX_NUM_SUBSC_LEN))
+		if ((out_key->end + tmp_len + 3) > (out_key->top - MAX_NUM_SUBSC_LEN))
 		{
 			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, out_key, TRUE)))
 				end = &buff[MAX_ZWR_KEY_SZ - 1];
@@ -119,8 +119,8 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 				if (ch <= 1)
 				{
 					*out_ptr++ = STR_SUB_ESCAPE;
-					if (out_ptr - (int)out_key->base + tmp_len + 3
-						> (unsigned char *)(out_key->top - MAX_NUM_SUBSC_LEN))
+					if (((int) (out_ptr - out_key->base + tmp_len + 3))
+						> (out_key->top - MAX_NUM_SUBSC_LEN))
 					{
 						if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, out_key, TRUE)))
 							end = &buff[MAX_ZWR_KEY_SZ - 1];

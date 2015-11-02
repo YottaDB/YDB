@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,9 @@ GBLREF	boolean_t	gtm_utf8_mode;
 
 error_def(ERR_BADCHAR);
 
-/* This is the same as "utf8_len" except that it invokes UTF8_BADCHAR_STX macro which does a stx_error instead of rts_error */
+/* This is the same as "utf8_len" except that it invokes UTF8_BADCHAR_STX macro which does a stx_error instead of rts_error.
+ * If UTF8_BADCHAR_STX is invoked, this function returns a -1 signalling a parse error.
+ */
 int utf8_len_stx(mstr* str)
 {
 	int	charlen, bytelen;
@@ -39,7 +41,10 @@ int utf8_len_stx(mstr* str)
 		for (; ptr < ptrtop; charlen++, ptr += bytelen)
 		{
 			if (!UTF8_VALID(ptr, ptrtop, bytelen))
+			{
 				UTF8_BADCHAR_STX(0, ptr, ptrtop, 0, NULL);
+				return -1;
+			}
 		}
 	} else
 	{

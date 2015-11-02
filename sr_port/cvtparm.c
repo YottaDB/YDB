@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,7 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 		if (src->str.len > 255)	/*one byte string lengths within a parameter string*/
 			return (int4) ERR_DEVPARTOOBIG;
 		strlen = src->str.len;
-		siz = strlen + sizeof(unsigned char);
+		siz = strlen + SIZEOF(unsigned char);
 		cp = (unsigned char *) src->str.addr;
 		break;
 	case IOP_SRC_MSK:

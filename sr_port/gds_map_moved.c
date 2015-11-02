@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ void gds_map_moved(hash_table_mname *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_
 
 	assert(cs_addrs->now_crit);
 	assert((NULL != cs_addrs->dir_tree) && (NULL != &cs_addrs->dir_tree->hist));
-	adj = new_base - old_base;
+	adj = (sm_long_t)(new_base - old_base);
 	assert(0 != adj);
 	dir_hist = hist = &cs_addrs->dir_tree->hist;
 	for (hist_index = 0;  HIST_TERMINATOR != hist->h[hist_index].blk_num;  hist_index++)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -568,7 +568,7 @@ void mupip_backup(void)
 				if (ptr > rptr->backup_file.addr)
 				{
 					memcpy(tempdir_trans_buffer, rptr->backup_file.addr,
-						(tempdir_trans.len = ptr - rptr->backup_file.addr + 1));
+						(tempdir_trans.len = INTCAST(ptr - rptr->backup_file.addr + 1)));
 					tempdir_trans_buffer[tempdir_trans.len] = '\0';
 				} else
 #if defined(UNIX)
@@ -623,7 +623,7 @@ void mupip_backup(void)
 			}
 			/* Now that the temporary file has been opened successfully, close the fd returned by mkstemp */
 			F_CLOSE(tmpfd, fclose_res);
-			tempdir_full.len = strlen(tempdir_full.addr); /* update the length */
+			tempdir_full.len = STRLEN(tempdir_full.addr); /* update the length */
 			if (debug_mupip)
 				util_out_print("!/MUPIP INFO:   Temp file name: !AD", TRUE,tempdir_full.len, tempdir_full.addr);
 			memcpy(&rptr->backup_tempfile[0], tempdir_full.addr, tempdir_full.len);
@@ -1183,8 +1183,8 @@ repl_inst_bkup_done:
 			rptr->backup_hdr->repl_state = repl_closed;
 			rptr->backup_hdr->semid = INVALID_SEMID;
 			rptr->backup_hdr->shmid = INVALID_SHMID;
-			rptr->backup_hdr->sem_ctime.ctime = 0;
-			rptr->backup_hdr->shm_ctime.ctime = 0;
+			rptr->backup_hdr->gt_sem_ctime.ctime = 0;
+			rptr->backup_hdr->gt_shm_ctime.ctime = 0;
 			if (jnl_options[jnl_off] || bkdbjnl_off_specified)
 				rptr->backup_hdr->jnl_state = jnl_closed;
 			if (jnl_options[jnl_disable] || bkdbjnl_disable_specified)

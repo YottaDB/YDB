@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ void show_source_line(char* buf, boolean_t warn)
 #ifdef UNICODE_SUPPORTED
 		else
 		{
-			chlen = UTF8_MBTOWC(c, c_top, ch) - (uchar_ptr_t)c;
+			chlen = (int)(UTF8_MBTOWC(c, c_top, ch) - (uchar_ptr_t)c);
 			if (WEOF != ch && 0 < (chwidth = UTF8_WCWIDTH(ch)))
 			{
 				memset(b, ' ', chwidth);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ void gtcm_bind_name(cm_region_head *rh, boolean_t xform)
 
 	GTCM_CHANGE_REG(rh);	/* sets the global variables gv_cur_region/cs_addrs/cs_data appropriately */
 	gvent.var_name.addr = (char *)gv_currkey->base;
-	gvent.var_name.len = strlen((char *)gv_currkey->base);
+	gvent.var_name.len = STRLEN((char *)gv_currkey->base);
 	COMPUTE_HASH_MNAME(&gvent);
 	if (NULL == (tabent = lookup_hashtab_mname(rh->reg_hash, &gvent)) || NULL == (gv_target = (gv_namehead *)tabent->value))
 	{

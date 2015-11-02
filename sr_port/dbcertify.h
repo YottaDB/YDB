@@ -265,10 +265,9 @@ typedef struct
  *	at the next octaword-aligned location in the update array and sets
  *		BNUM = &ARRAY[1]
  */
-
 #define BLK_INIT(BNUM, ARRAY) 									\
 {												\
-	update_array_ptr = (char_ptr_t)ROUND_UP2((int)update_array_ptr, UPDATE_ELEMENT_ALIGN_SIZE);	\
+	update_array_ptr = (char_ptr_t)ROUND_UP2((INTPTR_T)update_array_ptr, UPDATE_ELEMENT_ALIGN_SIZE);	\
 	(ARRAY) = (blk_segment *)update_array_ptr; 						\
 	update_array_ptr += BLK_SEG_ARRAY_SIZE * sizeof(blk_segment); 				\
 	assert(((update_array + update_array_size) - update_array_ptr) >= 0); 			\
@@ -286,7 +285,6 @@ typedef struct
  *		and it returns the value of blk_seg_cnt,
  *	otherwise, it returns zero and the caller should invoke t_retry
  */
-
 #define BLK_FINI(BNUM,ARRAY) 								\
 (											\
 	(BNUM--)->addr = (uchar_ptr_t)0,						\

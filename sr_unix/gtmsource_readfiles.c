@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,7 +120,7 @@ static	int repl_read_file(repl_buff_t *rb)
 {
 	repl_buff_desc 		*b;
 	repl_file_control_t	*fc;
-	int			nb;
+	ssize_t			nb;
 	sgmnt_addrs		*csa;
 	uint4			dskaddr;
 	uint4			read_less, status;
@@ -206,8 +206,8 @@ static	int repl_read_file(repl_buff_t *rb)
 #endif
 	if (nb >= 0)
 	{
-		b->buffremaining -= nb;
-		b->readaddr += nb;
+		b->buffremaining -= (uint4)nb;
+		b->readaddr += (uint4)nb;
 		if (fc->eof_addr < b->readaddr)
 			fc->eof_addr = b->readaddr;
 		return (SS_NORMAL);
@@ -261,7 +261,7 @@ static	int repl_next(repl_buff_t *rb)
 			  	  ERR_TEXT, 2, LEN_AND_STR(err_string), status);
 		}
 	}
-	maxreclen = ((b->base + REPL_BLKSIZE(rb)) - b->recbuff) - b->buffremaining;
+	maxreclen = (uint4)(((b->base + REPL_BLKSIZE(rb)) - b->recbuff) - b->buffremaining);
 	assert(maxreclen > 0);
 	if (maxreclen > JREC_PREFIX_UPTO_LEN_SIZE &&
 		(reclen = ((jrec_prefix *)b->recbuff)->forwptr) <= maxreclen &&
@@ -721,7 +721,7 @@ static void increase_buffer(unsigned char **buff, int *buflen, int buffer_needed
 			  LEN_AND_LIT("Error extending buffer space while reading files. Malloc error"), alloc_status);
 	}
 	*buff = (unsigned char *)gtmsource_msgp + (*buff - old_msgp);
-	*buflen = gtmsource_msgbufsiz - (*buff - (unsigned char *)gtmsource_msgp);
+	*buflen =(int)(gtmsource_msgbufsiz - (*buff - (unsigned char *)gtmsource_msgp));
 	return;
 }
 
@@ -1230,7 +1230,7 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 		}
 		read_len = read_regions(&buff, &buff_avail, pass > 1, &brkn_trans, read_jnl_seqno);
 		if (brkn_trans)
-			rts_error(VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_REPLBRKNTRANS), 1, &read_jnl_seqno);
+			rts_error(VARLSTCNT(3) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno);
 		total_read += read_len;
 		assert(total_read % JNL_WRT_END_MODULUS == 0);
 	}
@@ -1483,7 +1483,6 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 		for ( ; ctl->next != NULL && ctl->next->reg == region; prev_ctl = ctl, ctl = ctl->next)
 			;
 	}
-	assert(!*brkn_trans);
 	return (cumul_read);
 }
 
@@ -1603,7 +1602,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	} while (TRUE);
 	if (file2pool)
 	{
-		gtmsource_local->read = read_addr % jnlpool_size;
+		gtmsource_local->read = (uint4)(read_addr % jnlpool_size) ;
 		gtmsource_local->read_state = read_state = READ_POOL;
 	} else
 		read_state = gtmsource_local->read_state;

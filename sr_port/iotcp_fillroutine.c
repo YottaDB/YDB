@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,7 @@ int	gtm_recv(int socket, void *buffer, size_t length, int flags)
 
 	do
 	{
-		res = recv(socket, buffer, length, flags);
+		res = (int)(recv(socket, buffer, (int)(length), flags));
 	} while (-1 == res && EINTR == errno);
 
 	return(res);
@@ -99,7 +99,7 @@ int	gtm_send(int socket, void *buffer, size_t length, int flags)
 
 	do
 	{
-		res = send(socket, buffer, length, flags);
+		res = (int)(send(socket, buffer, (int)(length), flags));
 	} while (-1 == res && EINTR == errno);
 
 	return(res);

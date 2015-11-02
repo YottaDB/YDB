@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ int lke_getki(char* src, int srclen, char* outbuff)
 				return -1;	/* invalid (unescaped) quote within a quoted key */
 		}
 		src = one_lockbuf;
-		srclen = outptr - one_lockbuf;
+		srclen = (int)(outptr - one_lockbuf);
 	}
 	inptr = memchr(src, '(', srclen);
 	if (NULL == inptr)
@@ -73,7 +73,7 @@ int lke_getki(char* src, int srclen, char* outbuff)
 				if (')' != *nextptr)
 					return -1;
 			}
-			subsc.str.len = nextptr - inptr;
+			subsc.str.len = INTCAST(nextptr - inptr);
 			subsc.str.addr = inptr;
 			if (val_iscan(&subsc))
 			{
@@ -107,5 +107,5 @@ int lke_getki(char* src, int srclen, char* outbuff)
 			return -1;
 		*outptr++ = *nextptr++;
 	}
-	return outptr - outbuff;
+	return (int)(outptr - outbuff);
 }

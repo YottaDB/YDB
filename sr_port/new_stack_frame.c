@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	msp -= x1 = rtn_base->temp_size;
 	sf->temps_ptr = msp;
 	sf->type = SFT_COUNT;
-	msp -= x2 = rtn_base->vartab_len * sizeof(mval *);
+	msp -= x2 = rtn_base->vartab_len * USIZEOF(mval *);
 	sf->l_symtab = (mval **) msp;
    	if (msp <= stackwarn)
    	{

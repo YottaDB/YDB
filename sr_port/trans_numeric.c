@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2004, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ uint4 trans_numeric(mstr *log, boolean_t *is_defined,  boolean_t ignore_errors)
 		assert(tn.len < sizeof(buf));
 		endptr = tn.addr + tn.len;
 		*endptr = '\0';
-		value = STRTOUL(buf, &endptr, 0);	/* Base 0 allows base 10, 0x or octal input */
+		value = (uint4)STRTOUL(buf, &endptr, 0);	/* Base 0 allows base 10, 0x or octal input */
 		/* At this point, if '\0' == *endptr, the entire string was successfully consumed as
 		   a numeric string. If not, endptr has been updated to point to the errant chars. We
 		   currently have no clients who care about this so there is no expansion on this but

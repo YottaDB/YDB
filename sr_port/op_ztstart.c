@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ void	op_ztstart(void)
 	if (jnl_fence_ctl.level == 0)
 	{
 		jnl_fence_ctl.token = 0;
-		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1;
+		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
 	}
 	++jnl_fence_ctl.level;
 }

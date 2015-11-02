@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,10 +72,10 @@ void genpat(mstr *input, mval *patbuf)
 		*pat_str++ = '"';
 	*pat_str++ = ' ';
 	instr.addr = source_buffer;
-	instr.len = pat_str - source_buffer;
+	instr.len = INTCAST(pat_str - source_buffer);
 	if (status = patstr(&instr, &pat_ptstr, NULL))
 		rts_error(VARLSTCNT(1) status);
 	assert(pat_ptstr.len <= MAX_PATOBJ_LENGTH);
-	patbuf->str.len = pat_ptstr.len * sizeof(uint4);
+	patbuf->str.len = pat_ptstr.len * SIZEOF(uint4);
 	memcpy(patbuf->str.addr, &pat_ptstr.buff[0], patbuf->str.len);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,8 @@ unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine)
 		label_table++;
 	}
 	line_table = LABENT_LNR_ENTRY(routine, max_label);
-	in_addr_offset = in_addr - CODE_BASE_ADDR(routine);
+/* Used as offset !! */
+	in_addr_offset = (int4)(in_addr - CODE_BASE_ADDR(routine));
 	last_line = LNRTAB_ADR(routine);
 	last_line += routine->lnrtab_len;
 	for( ; ++line_table < last_line ;)

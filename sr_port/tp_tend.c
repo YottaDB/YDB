@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -141,6 +141,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 	jnlpool_ctl_ptr_t	jpl, tjpl;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress */
 	blk_hdr_ptr_t		old_block;
+	unsigned int		bsiz;
 
 	error_def(ERR_DLCKAVOIDANCE);
 	error_def(ERR_JNLTRANS2BIG);
@@ -701,9 +702,9 @@ boolean_t	tp_tend(boolean_t crit_only)
 		csa = cs_addrs;
 		csd = cs_data;
 		ctn = csd->trans_hist.curr_tn;
-		if (REPL_ENABLED(csa))
+		if (REPL_ALLOWED(csa))
 		{
-			assert(JNL_ENABLED(csa));
+			assert(JNL_ENABLED(csa) || REPL_WAS_ENABLED(csa));
 			replication = TRUE;
 			repl_tp_region_count++;
 		} else if (JNL_ENABLED(csa))
@@ -759,21 +760,29 @@ boolean_t	tp_tend(boolean_t crit_only)
 					cse->ondsk_blkver = cr->ondsk_blkver;
 					if ((cse->cr != cr) || (cse->cycle != cr->cycle))
 					{	/* Global buffer containing "cse->blk" changed since we read it out of crit */
-						cse->cr = cr;
-						cse->cycle = cr->cycle;
-						cse->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+						old_block = (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr);
+						assert(sizeof(bsiz) == sizeof(old_block->bsiz));
 						if (NULL != jbp)
 						{	/* PBLK checksum was computed outside-of-crit when block was read but
 							 * block has relocated in the cache since then. Recompute the checksum.
+							 * Even though we hold crit at this point we might see invalid bsiz fields
+							 * in case it is a reused block that is still in V4 format. Assert this.
+							 * In pro dont take chances so treat MIN(bsiz, csd->blk_size) as the
+							 * block size to unconditionally compute the checksum.
 							 */
-							old_block = (blk_hdr_ptr_t)cse->old_block;
-							assert(old_block->bsiz <= csd->blk_size);
+							bsiz = old_block->bsiz;
+							assert((bsiz <= csd->blk_size) || (csd->fully_upgraded
+								&& (((v15_blk_hdr_ptr_t)old_block)->bsiz <= csd->blk_size)));
 							if (old_block->tn < jbp->epoch_tn)
 								cse->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED,
-											(uint4 *)old_block, old_block->bsiz);
+											(uint4 *)old_block,
+											MIN(bsiz, old_block->bsiz));
 							else
 								cse->blk_checksum = 0;
 						}
+						cse->cr = cr;
+						cse->cycle = cr->cycle;
+						cse->old_block = (sm_uc_ptr_t)old_block;
 					}
 				}
 			}
@@ -815,7 +824,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 					goto failed;
 				}
 			}
-			if (jbp->before_images && (jbp->next_epoch_time <= jgbl.gbl_jrec_time))
+			if (JNL_HAS_EPOCH(jbp) && (jbp->next_epoch_time <= jgbl.gbl_jrec_time))
 			{	/* Flush the cache. Since we are in crit, defer syncing the epoch */
 				if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH))
 				{
@@ -891,6 +900,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 		ctn = csa->ti->curr_tn;
 		assert(ctn == csa->ti->early_tn);
 		csa->ti->early_tn = ctn + 1;
+		/* Write non-logical records (PBLK) if applicable */
 		if (JNL_ENABLED(csa))
 		{
 			jpc = csa->jnl;
@@ -933,6 +943,10 @@ boolean_t	tp_tend(boolean_t crit_only)
 						cse->jnl_freeaddr = 0;
 				}
 			}
+		}
+		/* Write logical journal records if applicable. */
+		if (JNL_WRITE_LOGICAL_RECS(csa))
+		{
 			if (!jgbl.forw_phase_recovery)
 			{
 				if (0 == participants)
@@ -978,14 +992,14 @@ boolean_t	tp_tend(boolean_t crit_only)
 		}
 	}
 	/* Note that only those regions that are actively journaling will appear in the following list: */
-	for (csa = jnl_fence_ctl.fence_list;  (sgmnt_addrs *) -1 != csa;  csa = csa->next_fenced)
+	for (csa = jnl_fence_ctl.fence_list;  (sgmnt_addrs *)-1L != csa;  csa = csa->next_fenced)
 	{
 		jpc = csa->jnl;
 		assert(((sgm_info *)(csa->sgm_info_ptr))->update_trans);
 		tcom_record.prefix.pini_addr = jpc->pini_addr;
 		tcom_record.prefix.tn = csa->ti->curr_tn;
 		tcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
-		if (REPL_ENABLED(csa))
+		if (REPL_ALLOWED(csa))
 		{
 			csa->hdr->reg_seqno = tjpl->jnl_seqno;
 			if (is_updproc)
@@ -1002,7 +1016,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 		}
 		TP_CHANGE_REG_IF_NEEDED(jpc->region);
 		/* Note tcom_record.jnl_tid was set in op_tstart() or updproc() */
-		jnl_write(jpc, JRT_TCOM, (jnl_record *)&tcom_record, NULL, NULL);
+		JNL_WRITE_APPROPRIATE(csa, jpc, JRT_TCOM, (jnl_record *)&tcom_record, NULL, NULL);
 	}
 	/* the following section is the actual commitment of the changes in the database */
 	for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
@@ -1047,6 +1061,15 @@ boolean_t	tp_tend(boolean_t crit_only)
 						assert(retvalue); /* secshr_db_clnup() should have completed the commit for us */
 						status = cdb_sc_normal;	/* reset status to normal as transaction is complete */
 						goto skip_failed;	/* do not do "failed:" processing as we do not hold crit */
+						/* At this time "si->cr_array_index" could be non-zero for one or more regions
+						 * and a few cache-records might have their "in_cw_set" field set to TRUE. We
+						 * should not reset "in_cw_set" as we don't hold crit at this point and also because
+						 * we might still need those buffers pinned until their before-images are backed up
+						 * in wcs_recover (in case an online backup was running while secshr_db_clnup
+						 * did its job). The local variable "si->cr_array_index" could be reset at this
+						 * point but since it is already unconditionally done in tp_clean_up (invoked
+						 * before the end of this transaction) we dont do anything here.
+						 */
 					}
 				} else if (!cse->done)
 				{	/* This is a block that is needed in the 2nd-phase of KILL. Build a private copy
@@ -1173,7 +1196,8 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 	char			*va;
 	enum cdb_sc		status;
 	gv_key			*pKey;
-	int4			blk_size, blk_fill_size, cur_blk_size, blk_seg_cnt, delta, n, new_rec_size, next_rec_shrink;
+	int4			blk_size, blk_fill_size, cur_blk_size, blk_seg_cnt, delta ;
+        int4                    n, new_rec_size, next_rec_shrink;
 	int4			rec_cmpc, target_key_size;
 	uint4			segment_update_array_size;
 	key_cum_value		*kv, *kvhead;
@@ -1253,8 +1277,8 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 			}
 		}
 		if (new_rec)
-		{
-			new_rec_size = sizeof(rec_hdr) + target_key_size - bh->prev_rec.match + value.len;
+		 {
+			new_rec_size = SIZEOF(rec_hdr) + target_key_size - bh->prev_rec.match + value.len;
 			if (cur_blk_size <= (int)bh->curr_rec.offset)
 				next_rec_shrink = 0;
 			else
@@ -1267,7 +1291,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 				assert(CDB_STAGNATE > t_tries);
 				return cdb_sc_mkblk;
 			}
-			new_rec_size = sizeof(rec_hdr) + (target_key_size - rec_cmpc) + value.len;
+			new_rec_size = SIZEOF(rec_hdr) + (target_key_size - rec_cmpc) + value.len;
 			delta = new_rec_size - rec_size;
 			next_rec_shrink = 0;
 		}
@@ -1296,7 +1320,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 			}
 			if (!new_rec)
 				rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + rec_size);
-			n = cur_blk_size - ((sm_uc_ptr_t)rp - buffaddr);
+			n = (int)(cur_blk_size - ((sm_uc_ptr_t)rp - buffaddr));
 			if (n > 0)
 			{
 				if (new_rec)
@@ -1305,7 +1329,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 					next_rec_hdr->rsiz = rec_size - next_rec_shrink;
 					next_rec_hdr->cmpc = bh->curr_rec.match;
 					BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, sizeof(rec_hdr));
-					next_rec_shrink += sizeof(rec_hdr);
+					next_rec_shrink += SIZEOF(rec_hdr);
 				}
 				BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + next_rec_shrink, n - next_rec_shrink);
 			}
@@ -1390,11 +1414,16 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 				cse->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 				old_block = (blk_hdr_ptr_t)cse->old_block;
 				if (NULL != jbp)
-				{
-					assert(old_block->bsiz <= csa->hdr->blk_size);
+				{	/* Even though we hold crit at this point we might see invalid bsiz fields
+					 * in case it is a reused block that is still in V4 format. Assert this.
+					 * In pro dont take chances so treat MIN(bsiz, csa->hdr->blk_size) as the
+					 * block size to unconditionally compute the checksum.
+					 */
+					assert((old_block->bsiz <= csa->hdr->blk_size) || csa->hdr->fully_upgraded
+							&& (((v15_blk_hdr_ptr_t)old_block)->bsiz <= csa->hdr->blk_size));
 					if (old_block->tn < jbp->epoch_tn)
 						cse->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED,
-											(uint4 *)old_block, old_block->bsiz);
+								(uint4 *)old_block, MIN(old_block->bsiz, csa->hdr->blk_size));
 					else
 						cse->blk_checksum = 0;
 				}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -735,7 +735,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(recov_interrupted);
 	SWAP_SD4(intrpt_recov_jnl_state);
 	SWAP_SD4(intrpt_recov_repl_state);
-#define TAB_BG_TRC_REC(A,B)	new->B##_cntr = new->B##_tn = 0;
+#define TAB_BG_TRC_REC(A,B)	new->B##_cntr = (bg_trc_rec_cntr) 0; new->B##_tn = (bg_trc_rec_tn) 0;
 #include "tab_bg_trc_rec.h"
 #undef TAB_BG_TRC_REC
 #define TAB_DB_CSH_ACCT_REC(A,B,C)	new->A.cumul_count = new->A.curr_count = 0;
@@ -953,7 +953,7 @@ void endian_cvt_blk_hdr(blk_hdr_ptr_t blkhdr, boolean_t new_is_native, boolean_t
 	}
 	assert(sizeof(char) == sizeof(blkhdr->levl));	/* no need to swap */
 	if (make_empty)
-		blkhdr->bsiz = new_is_native ? sizeof(blk_hdr) : GTM_BYTESWAP_32(sizeof(blk_hdr));
+		blkhdr->bsiz = new_is_native ? USIZEOF(blk_hdr) : GTM_BYTESWAP_32(USIZEOF(blk_hdr));
 	else
 		blkhdr->bsiz = GTM_BYTESWAP_32(blkhdr->bsiz);
 	blkhdr->tn = GTM_BYTESWAP_64(blkhdr->tn);
@@ -1029,7 +1029,7 @@ void endian_find_key(endian_info *info, end_gv_key *targ_gv_key, char *rec_p, in
 		{	/* end of key since two nulls */
 			*targ_key++ = 0;	/* end the target key */
 			*targ_key = 0;		/* with two as well */
-			targ_gv_key->end = targ_key - targ_gv_key->key;
+			targ_gv_key->end = (unsigned int)(targ_key - targ_gv_key->key);
 			break;
 		}
 		/* Else, copy subscript separator char and keep scanning */
@@ -1185,7 +1185,7 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 		have_dt_blk = TRUE;
 	else
 	{
-		rec1_gvn_len = strlen((char *)rec1_ptr + sizeof(rec_hdr));
+		rec1_gvn_len = STRLEN((char *)rec1_ptr + sizeof(rec_hdr));
 		if (-1 != rec2_cmpc && rec2_cmpc <= rec1_gvn_len)
 			have_dt_blk = TRUE;
 	}
@@ -1217,7 +1217,7 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 			if (ptr2blk <= info->tot_blks)
 			{	/* might be a pointer so need to check the hard way */
 				gv_key.key = rec1_ptr + sizeof(rec_hdr);
-				gv_key.top = gv_key.end = gv_key.gvn_len = key_top - gv_key.key - 1;
+				gv_key.top = gv_key.end = gv_key.gvn_len = (unsigned int)(key_top - gv_key.key - 1);
 				dtblk = endian_find_dtblk(info, &gv_key);
 				if (dtblk != blknum)
 					have_gvtleaf = TRUE;	/* blknum is not DT level 0 */

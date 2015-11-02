@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,8 @@
 #include "emit_code.h"
 #include "gtmci.h"
 #include "inst_flush.h"
+#include "obj_file.h"
+#include "gtm_malloc.h"
 
 #ifdef USHBIN_SUPPORTED
 /* From here down is only defined in a shared binary environment */
@@ -62,35 +64,79 @@ static dyn_modes our_modes[2] =
 	}
 };
 
+#if defined(__ia64)
+
+#if defined(__linux__)
+
+void dmode_table_init() __attribute__((constructor));
+
+#else /* __hpux */
+
+#pragma INIT "dmode_table_init"
+
+#endif /* __linux__ */
+
+/* On IA64, we want to use CODE_ADDRESS() macro, to dereference all the function pointers, before storing them in
+   global array. Now doing a dereference operation, as part of initialization, is not allowed by linux/gcc (HP'a aCC
+   was more tolerant towards this). So to make sure that the xfer_table is initialized correctly, before anyone
+   uses it, one needs to create a 'constructor/initializer' function, which is gauranted to be called as soon as
+   this module is loaded, and initialize the xfer_table correctly within that function.  gcc provides the below
+   mechanism to do this
+*/
+
+
+void dmode_table_init()
+{
+	/* Note that we assume the order of the function pointers. If the above our_modes table initialization
+	 * changes, this also needs to be revisited
+	 */
+
+	our_modes[0].func_ptr1 = CODE_ADDRESS_C(our_modes[0].func_ptr1);
+	our_modes[0].func_ptr2 = CODE_ADDRESS_ASM(our_modes[0].func_ptr2);
+	our_modes[0].func_ptr3 = CODE_ADDRESS_ASM(our_modes[0].func_ptr3);
+
+	our_modes[1].func_ptr1 = CODE_ADDRESS_ASM(our_modes[1].func_ptr1);
+	our_modes[1].func_ptr2 = CODE_ADDRESS_C(our_modes[1].func_ptr2);
+	our_modes[1].func_ptr3 = CODE_ADDRESS_ASM(our_modes[1].func_ptr3);
+}
+
+#endif /* __ia64 */
 
 rhdtyp *make_mode (int mode_index)
 {
 	rhdtyp		*base_address;
 	lab_tabent	*lbl;
 	lnr_tabent	*lnr;
-	unsigned int	*code;
+	IA64_ONLY(uint8		*code;)
+	NON_IA64_ONLY(unsigned int	*code;)
 	dyn_modes	*dmode;
+	int algnd_rtnhdr_size = (int)ROUND_UP2(sizeof(rhdtyp), SECTION_ALIGN_BOUNDARY);
+	int algnd_code_size   = (int)ROUND_UP2(CODE_SIZE, NATIVE_WSIZE);
+	int algnd_lbltab_size = (int)ROUND_UP2(sizeof(lab_tabent), NATIVE_WSIZE);
+	int algnd_lnrtab_size = (int)ROUND_UP2(CODE_LINES * sizeof(lnr_tabent), NATIVE_WSIZE);
 
 	assert(DM_MODE == mode_index || CI_MODE == mode_index);
-	base_address = (rhdtyp *)malloc(sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(lnr_tabent));
-	memset(base_address, 0, 	sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(lnr_tabent));
+        base_address = (rhdtyp *)GTM_TEXT_MALLOC(algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
+	memset(base_address, 0, algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
 	dmode = &our_modes[mode_index];
 	base_address->routine_name.len = dmode->rtn_name_len;
 	base_address->routine_name.addr = dmode->rtn_name;
 
-	base_address->ptext_adr = (unsigned char *)base_address + sizeof(rhdtyp);
-	base_address->ptext_end_adr = (unsigned char *)base_address->ptext_adr + CODE_SIZE;
+	base_address->ptext_adr = (unsigned char *)base_address + algnd_rtnhdr_size;
+	base_address->ptext_end_adr = (unsigned char *)base_address->ptext_adr + algnd_code_size;
 
 	base_address->lnrtab_adr = (lnr_tabent *)base_address->ptext_end_adr;
 
-	base_address->labtab_adr = (lab_tabent *)((unsigned char *)base_address + sizeof(rhdtyp) +
-						  CODE_SIZE + CODE_LINES * sizeof(lnr_tabent));
+	base_address->labtab_adr = (lab_tabent *)((unsigned char *)base_address + algnd_rtnhdr_size +
+						  algnd_code_size + algnd_lnrtab_size);
 
 	base_address->lnrtab_len = CODE_LINES;
 	base_address->labtab_len = 1;
 
-	code = (unsigned int *)base_address->ptext_adr;	/* start of executable code */
+	IA64_ONLY(code = (uint8 *)base_address->ptext_adr;)	/* start of executable code */
+	NON_IA64_ONLY(code = (unsigned int *)base_address->ptext_adr;)	/* start of executable code */
 	GEN_CALL(dmode->func_ptr1);			/* line 0,1 */
+
 #ifdef _AIX
 	if (CI_MODE == mode_index)
 	{
@@ -105,19 +151,26 @@ rhdtyp *make_mode (int mode_index)
 	}
 #endif
 	GEN_CALL(dmode->func_ptr2);
-#ifdef __hpux
+
+#if defined (__ia64)
+	if (DM_MODE == mode_index)
+	{
+		GEN_UNCOD_JUMP(-(2 * 5)); /* branch to dm_setup which is at the top of the direct mode frame. */
+	}
+#elif defined(__hpux)
 	if (DM_MODE == mode_index)
 	{
 		*code++ = HPPA_INS_BEQ | (MAKE_COND_BRANCH_TARGET(-8) << HPPA_SHIFT_OFFSET); /* BEQ r0,r0, -8 */
 		*code++ = HPPA_INS_NOP;
 	}
-#endif
-	GEN_CALL(dmode->func_ptr3);				/* line 2 */
+#endif /* __ia64 */
+	GEN_CALL(dmode->func_ptr3);						/* line 2 */
 
 	lnr = LNRTAB_ADR(base_address);
-	*lnr++ = 0;						/* line 0 */
-	*lnr++ = 0;						/* line 1 */
-	*lnr++ = 2 * CALL_SIZE + EXTRA_INST * sizeof(int);	/* line 2 */
+	*lnr++ = 0;								/* line 0 */
+	*lnr++ = 0;								/* line 1 */
+	IA64_ONLY(*lnr++ = 2 * CALL_SIZE + EXTRA_INST_SIZE;)			/* line 2 */
+	NON_IA64_ONLY(*lnr++ = 2 * CALL_SIZE + EXTRA_INST * sizeof(int);)	/* line 2 */
 
 	lbl = base_address->labtab_adr;
 	lbl->lnr_adr = base_address->lnrtab_adr;
@@ -125,7 +178,7 @@ rhdtyp *make_mode (int mode_index)
 	base_address->current_rhead_adr = base_address;
 	zlput_rname(base_address);
 
-	inst_flush(base_address, sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(lnr_tabent));
+	inst_flush(base_address, algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
 
 	return base_address;
 }

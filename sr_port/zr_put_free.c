@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,11 @@
 #include "zbreak.h"
 #include "inst_flush.h"
 #include "private_code_copy.h"
+
+#ifdef __ia64
+#include "ia64.h"
+#endif /*__ia64__*/
+
 
 GBLREF hash_table_objcode	cache_table;
 
@@ -47,8 +52,23 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 			z_ptr->action = NULL;
 		}
 	}
+#ifndef __ia64
 	*z_ptr->mpc = z_ptr->m_opcode;
 	inst_flush(z_ptr->mpc, sizeof(*z_ptr->mpc));
+#else
+	{
+	  	ia64_fmt_A4 inst;
+		EXTRACT_INST(z_ptr->mpc, inst, 3);
+		zb_code imm14 = z_ptr->m_opcode;
+		inst.format.imm7b=imm14;
+		inst.format.imm6d=imm14 >> 7;
+		inst.format.sb=imm14 >> 13;
+		/*Revist when instruction bundling implemented.*/
+		UPDATE_INST(z_ptr->mpc, inst, 3);
+		inst_flush(z_ptr->mpc, sizeof(ia64_bundle));
+	}
+#endif
+
 #ifdef USHBIN_SUPPORTED
 	if (((z_ptr == zrecs->beg) || !MIDENT_EQ((z_ptr - 1)->rtn, z_ptr->rtn)) &&
 	    (((z_ptr + 1) == zrecs->free) || !MIDENT_EQ((z_ptr + 1)->rtn, z_ptr->rtn)))

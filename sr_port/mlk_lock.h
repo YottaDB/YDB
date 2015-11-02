@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef MLK_LOCK_INCLUDED
 #define MLK_LOCK_INCLUDED
 
-uint4 mlk_lock(mlk_pvtblk *p, uint4 auxown, bool new);
+uint4 mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, bool new);
 
 #endif /* MLK_LOCK_INCLUDED */

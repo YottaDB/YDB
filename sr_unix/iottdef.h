@@ -21,7 +21,7 @@
 
 #include "iottdefsp.h"
 
-#define NUM_BITS_IN_INT4	(sizeof(int4) * 8)
+#define NUM_BITS_IN_INT4	(SIZEOF(int4) * 8)
 
 #define TTDEF_BUF_SZ 		1024
 #define TTDEF_PG_WIDTH 		255

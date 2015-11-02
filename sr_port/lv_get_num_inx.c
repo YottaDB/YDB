@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,12 +20,13 @@ lv_val *lv_get_num_inx(sbs_blk *root, mval *key, sbs_search_status *status)
        	sbs_blk	       	*blk, *nxt, *prev;
        	sbs_flt_struct 	*p, *top;
 	mval		tmp ;
-	int4		x ;
+        long		x ;
 
 	assert(root);
        	prev = root;
        	for (blk = root; ; prev = blk, blk = nxt)
-       	{      	if (!(nxt = blk->nxt))
+       	{
+		if (!(nxt = blk->nxt))
 		{	break;
 	 	}
 		MV_ASGN_FLT2MVAL(tmp,nxt->ptr.sbs_flt[0].flt) ;

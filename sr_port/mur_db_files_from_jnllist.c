@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +76,7 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 			cptr_last = cptr;
 			while (0 != *cptr && ',' != *cptr && '"' != *cptr &&  ' ' != *cptr)
 				++cptr;
-			if (!get_full_path(cptr_last, cptr - cptr_last,
+			if (!get_full_path(cptr_last, (unsigned int)(cptr - cptr_last),
 						(char *)jctl->jnl_fn, &jctl->jnl_fn_len, MAX_FN_LEN, &ustatus))
 			{
 				gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, cptr_last, cptr - cptr_last, ustatus);

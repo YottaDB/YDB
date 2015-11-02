@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,8 @@ void lv_cnv_int_tbl(lv_sbs_tbl *tbl)
        	f = (sbs_flt_struct*)&tbl->num->ptr.sbs_flt[0];
 
        	for (i = 0, p = &old->ptr.lv[0], p_top = &old->ptr.lv[SBS_NUM_INT_ELE]; p < p_top; p++, i++)
-       	{      	if (*p)
+       	{
+		if (*p)
        	       	{      	if (blk->cnt >= SBS_NUM_FLT_ELE)
 		       	{
 				blk->nxt = lv_get_sbs_blk (tbl->sym);

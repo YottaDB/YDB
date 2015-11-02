@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,7 +132,7 @@ void list_cmd(void)
 
 
 LITDEF char gtm_copy_right[] = "\
-  Copyright 1985, 2004 Sanchez Computer Associates, Inc.";
+  Copyright 1985, 2007 Fidelity Information Services, Inc";
 
 LITREF char gtm_release_name[];
 LITREF int4 gtm_release_name_len;
@@ -172,7 +172,7 @@ void list_head(bool newpage)
 	op_write(&head);
 
 	head.str.addr = (char *)page_no_buf;
-	head.str.len = i2asc(page_no_buf, lst_param.page) - page_no_buf;
+	head.str.len = INTCAST(i2asc(page_no_buf, lst_param.page) - page_no_buf);
 	op_write(&head);
 	op_wteol(1);
 

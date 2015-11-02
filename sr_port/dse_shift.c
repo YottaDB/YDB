@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -149,7 +149,7 @@ void dse_shift(void)
 	} else
 	{
 		if (shift > offset)
-			shift = offset - sizeof(blk_hdr);
+			shift = offset - SIZEOF(blk_hdr);
 		if (offset - shift > sizeof(blk_hdr))
 			BLK_SEG(bs_ptr, bp + sizeof(blk_hdr), offset - shift - sizeof(blk_hdr));
 		if (size - offset)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,9 +30,11 @@ int m_zshow(void)
 	error_def(ERR_VAREXPECTED);
 
 	if (window_token == TK_SPACE || window_token == TK_EOL || window_token == TK_COLON)
-	{	code = ZSHOW_NOPARM;
+	{
+		code = ZSHOW_NOPARM;
 	}else
-	{	code = ZSHOW_DEVICE;
+	{
+		code = ZSHOW_DEVICE;
 		switch (strexpr(&func))
 		{
 		case EXPR_FAIL:
@@ -48,7 +50,8 @@ int m_zshow(void)
 		}
 	}
 	if (window_token == TK_COLON)
-	{	advancewindow();
+	{
+		advancewindow();
 		switch(window_token)
 		{
 		case TK_CIRCUMFLEX:
@@ -58,25 +61,30 @@ int m_zshow(void)
 			outtype = newtriple(OC_PARAMETER);
 			r->operand[1] = put_tref(outtype);
 			if (code == ZSHOW_NOPARM)
-			{	r->operand[0] = put_str(&def_str[0],sizeof(def_str) - 1);
+			{
+				r->operand[0] = put_str(&def_str[0], (SIZEOF(def_str) - 1));
 			}else
-			{	r->operand[0] = func;
+			{
+				r->operand[0] = func;
 			}
 			outtype->operand[0] = put_ilit(ZSHOW_GLOBAL);
 			ins_triple(r);
 			return TRUE;
 		case TK_IDENT:
 			if (!lvn(&output, OC_PUTINDX, 0))
-			{	stx_error(ERR_VAREXPECTED);
+			{
+				stx_error(ERR_VAREXPECTED);
 				return FALSE;
 			}
 			r = maketriple(OC_ZSHOWLOC);
 			outtype = newtriple(OC_PARAMETER);
 			r->operand[1] = put_tref(outtype);
 			if (code == ZSHOW_NOPARM)
-			{	r->operand[0] = put_str(&def_str[0],sizeof(def_str) - 1);
+			{
+				r->operand[0] = put_str(&def_str[0], (SIZEOF(def_str) - 1));
 			}else
-			{	r->operand[0] = func;
+			{
+				r->operand[0] = func;
 			}
 			lvar = newtriple(OC_PARAMETER);
 			outtype->operand[1] = put_tref(lvar);
@@ -86,14 +94,17 @@ int m_zshow(void)
 			return TRUE;
 		case TK_ATSIGN:
 			if (!indirection(&output))
-			{	stx_error(ERR_VAREXPECTED);
+			{
+				stx_error(ERR_VAREXPECTED);
 				return FALSE;
 			}
 			r = newtriple(OC_INDRZSHOW);
 			if (code == ZSHOW_NOPARM)
-			{	r->operand[0] = put_str(&def_str[0],sizeof(def_str) - 1);
+			{
+				r->operand[0] = put_str(&def_str[0], (SIZEOF(def_str) - 1));
 			}else
-			{	r->operand[0] = func;
+			{
+				r->operand[0] = func;
 			}
 			r->operand[1] = output;
 			return TRUE;
@@ -106,9 +117,11 @@ int m_zshow(void)
 	outtype = newtriple(OC_PARAMETER);
 	r->operand[1] = put_tref(outtype);
 	if (code == ZSHOW_NOPARM)
-	{	r->operand[0] = put_str(&def_str[0],sizeof(def_str) - 1);
+	{
+		r->operand[0] = put_str(&def_str[0], (SIZEOF(def_str) - 1));
 	}else
-	{	r->operand[0] = func;
+	{
+		r->operand[0] = func;
 	}
 	outtype->operand[0] = put_ilit(ZSHOW_DEVICE);
 	ins_triple(r);

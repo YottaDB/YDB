@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@ void urx_putlab (char *lab, int lablen, urx_rtnref *rtn, char *addr)
 
 	tmpap = (urx_addr *)malloc(sizeof(urx_addr));
 	tmpap->next = lp1->addr;
-	tmpap->addr = (int4 *)addr;
+	tmpap->addr = (INTPTR_T *)addr;
 	lp1->addr = tmpap;
 	return;
 }

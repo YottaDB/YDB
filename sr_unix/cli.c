@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -245,7 +245,7 @@ boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 {
 	char		buf[MAX_LINE];
 	char		local_str[MAX_LINE];
-	unsigned int	maxdstlen, maxbuflen, copylen;
+	size_t		maxdstlen, maxbuflen, copylen;
 
 	maxbuflen = sizeof(buf);
 	maxdstlen = *max_len;
@@ -266,7 +266,7 @@ boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 	copylen = MIN(copylen, maxdstlen);
 	memset(dst, 0, maxdstlen);
 	memcpy(dst, buf, copylen);
-	*max_len = copylen;
+	*max_len = (unsigned short) copylen;
 	return TRUE;
 }
 
@@ -300,7 +300,7 @@ boolean_t cli_get_time(char *entry, uint4 *dst)
 				{
 					if (MAXFACTOR < factor)
 						return FALSE;
-					*dst = *dst + (STRTOUL(cp + 1, NULL, 10) * factor);
+					*dst = *dst + (uint4)(STRTOUL(cp + 1, NULL, 10) * factor);
 					/* #define MAXFACTOR shows the series for factor */
 					factor = ((10 == factor) ? 100 : 60) * factor;
 				}

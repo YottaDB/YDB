@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,9 +19,13 @@
 #include "op.h"
 #include "auto_zlink.h"
 
+GBLREF unsigned char    *obpt;          /* output buffer index */
 GBLREF stack_frame	*frame_pointer;
 
-rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent *line)
+IA64_ONLY(GBLREF uint8 		imm14;)
+IA64_ONLY(GBLREF char 		asm_mode;)
+
+rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent **line)
 {
 	lnk_tabent	*A_rtnhdr;
 	lnk_tabent	*A_labaddr;
@@ -49,12 +53,29 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent *line)
  *	registers are loaded via "load" instructions.  However, this routine should never be invoked from direct
  *	mode because the applicable routine should have been ZLINK'ed by prior calls to op_labaddr and op_rhdaddr.
  */
-	if (!VALID_CALLING_SEQUENCE(pc))
-		GTMASSERT;
+
+	NON_IA64_ONLY(if (!VALID_CALLING_SEQUENCE(pc)))
+		NON_IA64_ONLY(GTMASSERT;)
 
 	/* Calling sequence O.K.; get address(address(routine header)) and address(address(label offset)).  */
-	A_rtnhdr  = (lnk_tabent *)(RTNHDR_PV_OFF(pc) + frame_pointer->ctxt);
-	A_labaddr = (lnk_tabent *)(LABADDR_PV_OFF(pc) + frame_pointer->ctxt);
+#ifdef __ia64 /* __ia64 */
+	{
+		uint8 imm;
+		int8 *buf2, i;
+		ia64_bundle  bundle;
+		uint8 dummy, dummy2, dummy1;
+		int isMovl = 0;
+
+		RTNHDR_PV_OFF(pc,imm);
+		A_rtnhdr  = (lnk_tabent *)(imm + frame_pointer->ctxt);
+		dummy1 = dummy; /* For silly compiler warning */
+		LABADDR_PV_OFF(pc, imm);
+		A_labaddr = (lnk_tabent *)(imm + frame_pointer->ctxt);
+	}
+#endif /* __ia64 */
+
+        NON_IA64_ONLY(A_rtnhdr  = (lnk_tabent *)(RTNHDR_PV_OFF(pc) + frame_pointer->ctxt);)
+        NON_IA64_ONLY(A_labaddr = (lnk_tabent *)(LABADDR_PV_OFF(pc) + frame_pointer->ctxt);)
 
 	if (azl_geturxrtn((char *)A_rtnhdr, &rname, &rtnurx))
 	{
@@ -76,7 +97,7 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent *line)
 		op_zlink(&rtn, 0);
 		if (0 != (rhead = find_rtn_hdr(&rname)))
 		{
-			*line = (long)(A_labaddr->ext_ref);
+			*line = (lnr_tabent *)(A_labaddr->ext_ref);
 			if (0 == *line)
 				rts_error(VARLSTCNT(1) ERR_LABELUNKNOWN);
 			return rhead;

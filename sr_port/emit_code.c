@@ -66,8 +66,9 @@ GBLREF int		sa_temps_offset[];
 GBLREF int		sa_temps[];
 LITREF int		sa_class_sizes[];
 
-GBLDEF uint4		code_buf[NUM_BUFFERRED_INSTRUCTIONS];
+GBLDEF UINTPTR_T	code_buf[NUM_BUFFERRED_INSTRUCTIONS];
 GBLDEF int		code_idx;
+GBLDEF int		calculated_code_size, generated_code_size;
 GBLDEF int		jmp_offset;	/* Offset to jump target */
 GBLDEF int		code_reference;	/* Offset from pgm start to current loc */
 
@@ -463,7 +464,11 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							assert(ct->opcode == OC_ILIT);
 							cnt = ct->operand[0].oprval.ilit;
 							reg = get_arg_reg();
+#ifdef __ia64
+							LOAD_IMM14(reg, cnt);
+#else /* !__ia64 */
 							GEN_LOAD_IMMED(reg, cnt);
+#endif /* __ia64 */
 							cnt++;
 							inst++;
 						} else
@@ -727,11 +732,20 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	}
 	assert(code_idx < NUM_BUFFERRED_INSTRUCTIONS);
 	if (cg_phase == CGP_MACHINE)
-		emit_immed ((char *)&code_buf[0], sizeof(uint4) * code_idx);
+	{
+	   generated_code_size += code_idx;
+	   emit_immed ((char *)&code_buf[0], sizeof(UINTPTR_T) * code_idx);
+	}
 	else if (cg_phase != CGP_ASSEMBLY)
-		curr_addr += sizeof(uint4) * code_idx;
-	code_reference += sizeof(uint4) * code_idx;
-	jmp_offset -= sizeof(uint4) * code_idx;
+	{
+	   if (cg_phase == CGP_APPROX_ADDR)
+	   {
+               calculated_code_size += code_idx;
+	   }
+	   curr_addr += sizeof(UINTPTR_T) * code_idx;
+	}
+	code_reference += sizeof(UINTPTR_T) * code_idx;
+	jmp_offset -= sizeof(UINTPTR_T) * code_idx;
 	last_vax_inst = sav_in;
 	return inst;
 }
@@ -952,7 +966,11 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							} else
 								/* Gross expansion ok first time through */
 								emit_base_offset(1, LONG_JUMP_OFFSET); /* Non-0 base reg for AIX */
+#if defined(__ia64)
+							code_idx += 2;
+#else
 							code_idx++;
+#endif /* __ia64 */
 							inst_emitted = TRUE;
 							break;
 						case OC_CDLIT:
@@ -1071,7 +1089,11 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							else
 								reg = GTM_REG_LITERAL_BASE;
 							emit_base_offset(reg, offset);
+#if defined(__ia64)
+							GEN_LOAD_ADDR_FROM_BUF(trg_reg);
+#else
 							code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(trg_reg);
+#endif /* __ia64 */
 							inst_emitted = TRUE;
 							break;
 						case OC_CDLIT:
@@ -1224,7 +1246,11 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							else
 								reg = GTM_REG_LITERAL_BASE;
 							emit_base_offset(reg, offset);
+#if defined(__ia64)
+							GEN_LOAD_ADDR_FROM_BUF(trg_reg);
+#else
 							code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(trg_reg);
+#endif /* __ia64 */
 							inst_emitted = TRUE;
 							break;
 						case OC_CDLIT:

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,6 +63,6 @@ void iomt_rdstream (uint4 len, void *str, io_desc *dv)
 			endrec = TRUE;
 	}
 	mt_ptr->rec.addr = (char *) cp;
-	mt_ptr->rec.len = cx - cp;
+	mt_ptr->rec.len = INTCAST(cx - cp);
 	mt_ptr->last_op = mt_read;
 }

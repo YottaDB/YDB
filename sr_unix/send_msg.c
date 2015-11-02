@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@ GBLREF va_list	last_va_list_ptr;
 void send_msg(int arg_count, ...)
 {
         va_list var;
-        int     dummy, fao_actual, fao_count, i, msg_id;
+        int   dummy, fao_actual, fao_count, i, msg_id;
         char    msg_buffer[1024];
         mstr    msg_string;
 
@@ -52,7 +52,7 @@ void send_msg(int arg_count, ...)
 
         for (;;)
         {
-                msg_id = va_arg(var, int);
+                msg_id = (int) va_arg(var, VA_ARG_TYPE);
                 --arg_count;
 
                 msg_string.addr = msg_buffer;
@@ -61,7 +61,7 @@ void send_msg(int arg_count, ...)
 
                 if (arg_count > 0)
                 {
-                        fao_actual = va_arg(var, int);
+                        fao_actual = (int) va_arg(var, VA_ARG_TYPE);
                         --arg_count;
 
                         fao_count = fao_actual;

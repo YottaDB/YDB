@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,8 +73,8 @@ block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw
 	sm_uc_ptr_t	bmp;
 	block_id	bml, hint, hint_cycled, hint_limit;
 	block_id_ptr_t	b_ptr;
-	int		cw_set_top, depth;
-	unsigned int	lcnt, local_maps, map_size, n_decrements = 0, total_blks;
+	int		cw_set_top, depth, lcnt;
+	unsigned int	local_maps, map_size, n_decrements = 0, total_blks;
 	trans_num	ctn;
 	int4		free_bit, offset;
 	uint4		space_needed;
@@ -249,7 +249,7 @@ block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw
 boolean_t	is_free_blks_ctr_ok(void)
 {
 	bool		blk_used;
-	block_id	bml, free_bit, free_bml;
+	block_id	bml, free_bit, free_bml, maxbitsthismap;
 	cache_rec_ptr_t	cr;
 	int		cycle;
 	sm_uc_ptr_t	bmp;
@@ -265,6 +265,7 @@ boolean_t	is_free_blks_ctr_ok(void)
 		bml = bmm_find_free((uint4)free_bml, (sm_uc_ptr_t)MM_ADDR(cs_data), local_maps);
 		if (bml < free_bml)
 			break;
+		free_bml = bml;
 		bml *= BLKS_PER_LMAP;
 		if (!(bmp = t_qread(bml, (sm_int_ptr_t)&cycle, &cr))
 				|| (BM_SIZE(BLKS_PER_LMAP) != ((blk_hdr_ptr_t)bmp)->bsiz)
@@ -273,7 +274,9 @@ boolean_t	is_free_blks_ctr_ok(void)
 			assert(FALSE);	/* In pro, we will simply skip counting this local bitmap. */
 			continue;
 		}
-		for (free_bit = 0; free_bit < BLKS_PER_LMAP; free_bit++)
+		assert(free_bml <= (local_maps - 1));
+		maxbitsthismap = (free_bml != (local_maps - 1)) ? BLKS_PER_LMAP : total_blks - bml;
+		for (free_bit = 0; free_bit < maxbitsthismap; free_bit++)
 		{
 			free_bit = bm_find_blk(free_bit, (sm_uc_ptr_t)bmp + sizeof(blk_hdr), BLKS_PER_LMAP, &blk_used);
 			assert(NO_FREE_SPACE <= free_bit);

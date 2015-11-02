@@ -1,5 +1,5 @@
 /****************************************************************
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ void ecode_get(int level, mval *val)
 	{
 		assert(dollar_ecode.end > dollar_ecode.begin);
 		val->str.addr = dollar_ecode.begin;
-		val->str.len = dollar_ecode.end - dollar_ecode.begin + 1;	/* to account for terminating ',' */
+		val->str.len = INTCAST(dollar_ecode.end - dollar_ecode.begin + 1);	/* to account for terminating ',' */
 		s2pool(&val->str);
 	} else
 	{

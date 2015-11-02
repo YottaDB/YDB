@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -143,9 +143,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			 * timer in this case.
 			 */
 			if (!jpc || (NOJNL == jpc->channel) || !JNL_FILE_SWITCHED(jpc))
-			{	/* Note that the following wcs_flu() asks for an epoch to be synced. But if not before-imaging,
-				 * it will just flush the file-header which is exactly what we want in that case.
-				 */
+			{
 				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 				BG_TRACE_PRO_ANY(csa, n_dbsync_writes);
 			}
@@ -155,7 +153,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	}
 	if (dbsync_defer_timer)
 	{
-		assert(sizeof(int4) == sizeof(csa));
+		assert(sizeof(INTPTR_T) == sizeof(csa));
 		start_timer((TID)csa, TIM_DEFER_DBSYNC, &wcs_clean_dbsync, sizeof(csa), (char *)&csa);
 	} else
 		csa->dbsync_timer = FALSE;

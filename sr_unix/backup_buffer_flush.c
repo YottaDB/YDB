@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ error_def(ERR_BKUPTMPFILWRITE);
 boolean_t backup_buffer_flush(gd_region *reg)
 {
 	int			write_size, fd;
-	uint4			status;
+	int4			status;
 	sgmnt_addrs		*csa;
 	shmpool_buff_hdr_ptr_t	sbufh_p;
 	shmpool_blk_hdr_ptr_t	sblkh_p, next_sblkh_p;
@@ -89,7 +89,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 			shmpool_unlock_hdr(reg);
 			return FALSE;
 		}
-		write_size = (sizeof(*sblkh_p) + sbufh_p->blk_size);
+		write_size = SIZEOF(*sblkh_p) + sbufh_p->blk_size;
 		DEBUG_ONLY(flush_cnt = 0);
 		for (sblkh_p = SBLKP_REL2ABS(&sbufh_p->que_backup, fl);
 		     sblkh_p != (shmpool_blk_hdr_ptr_t)&sbufh_p->que_backup;

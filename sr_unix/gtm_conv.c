@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2006 Fidelity Information Services, Inc       *
+ *      Copyright 2006, 2007 Fidelity Information Services, Inc       *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -72,7 +72,7 @@ int verify_chset(const mstr *parm)
 	{
 		if (parm->len == vptr->len &&
 		    0 == memcmp(mode, vptr->addr, vptr->len))
-			return (vptr - chset_names); /* return the index */
+			return (int)(vptr - chset_names); /* return the index */
 	}
 	return -1;
 }
@@ -181,7 +181,7 @@ int gtm_conv(UConverter* from, UConverter* to, mstr *src, char* dstbuff, int* bu
 		dstlen = *bufflen;
 	}
 	srcptr = src->addr;
-	srclen = src->len;
+	srclen = (int)src->len;
 	dstptr = dstbase;
 	status = U_ZERO_ERROR; /* initialization to "success" is required by ICU */
 	ucnv_convertEx(to, from, &dstptr, dstptr + dstlen, (const char**)&srcptr, srcptr + srclen,
@@ -203,7 +203,7 @@ int gtm_conv(UConverter* from, UConverter* to, mstr *src, char* dstbuff, int* bu
 		status1 = U_ZERO_ERROR;
 		ichset = ucnv_getName(from, &status1);
 		assert(U_SUCCESS(status1));
-		UTF8_BADCHAR(1, (srcptr - 1), NULL, strlen(ichset), ichset);
+		UTF8_BADCHAR(1,(unsigned char *) (srcptr - 1), NULL,STRLEN(ichset), ichset);
 	}
-	return dstptr - dstbase;
+	return (int) (dstptr - dstbase);
 }

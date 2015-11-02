@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -246,6 +246,7 @@ int gtmsource_ctl_init(void)
 
 	gd_region		*region_top, *reg;
 	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
 	repl_ctl_element	*tmp_ctl, *prev_ctl;
 	int			jnl_file_len, status;
 	unsigned char		jnl_file_name[JNL_NAME_SIZE];
@@ -260,11 +261,19 @@ int gtmsource_ctl_init(void)
 	{
 		assert(reg->open);
 		csa = &FILE_INFO(reg)->s_addrs;
-		if (REPL_ALLOWED(csa->hdr))
-		{ /* Although replication may be WAS_ON, it is possible that source server has not yet
-		     sent records that were generated when replication was ON. We have to open and read
-		     this journal file to cover such a case */
-			status = repl_ctl_create(&tmp_ctl, reg, 0, NULL, TRUE);
+		csd = csa->hdr;
+		if (REPL_ALLOWED(csd))
+		{	/* Although replication may be WAS_ON, it is possible that source server has not yet sent records
+			 * that were generated when replication was ON. We have to open and read this journal file to
+			 * cover such a case. But in the WAS_ON case, do not ask for a jnl_ensure_open to be done since
+			 * it will return an error (it will try to open the latest generation journal file and that will
+			 * fail because of "jpc->cycle" vs "jpc->jnl_buff->cycle" mismatch). The idea is that we try and
+			 * send as many seqnos as possible in that case.
+			 */
+			if (REPL_WAS_ENABLED(csd))
+				status = repl_ctl_create(&tmp_ctl, reg, csd->jnl_file_len, (char *)csd->jnl_file_name, FALSE);
+			else
+				status = repl_ctl_create(&tmp_ctl, reg, 0, NULL, TRUE);
 			assert(SS_NORMAL == status);
 			prev_ctl->next = tmp_ctl;
 			tmp_ctl->prev = prev_ctl;

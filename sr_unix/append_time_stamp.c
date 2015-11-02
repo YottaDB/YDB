@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@ uint4 append_time_stamp(char *fn, int fn_len, int *app_len, uint4 *ustatus)
 	struct stat	stat_buf;
 	struct tm	*tm_struct;
 	int		status;
+	size_t          tt;
 
 	*ustatus = SS_NORMAL;
 	STAT_FILE(fn, &stat_buf, status);
@@ -35,7 +36,8 @@ uint4 append_time_stamp(char *fn, int fn_len, int *app_len, uint4 *ustatus)
 		return errno;
 	assert(0 <  MAX_FN_LEN - fn_len - 1);
 	tm_struct = localtime(&(stat_buf.st_ctime));
-	STRFTIME(&fn[fn_len], MAX_FN_LEN - fn_len - 1, TIME_EXT_FMT, tm_struct, *app_len);
+	STRFTIME(&fn[fn_len], MAX_FN_LEN - fn_len - 1, TIME_EXT_FMT, tm_struct, tt);
+	*app_len = (int)tt;
 	return SS_NORMAL;
 }
 

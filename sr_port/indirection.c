@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,7 @@ int indirection(oprtype *a)
 			}
 		}
 		/* store argument count...n args plus the name plus the dst*/
-		ref->operand[0] = put_ilit((mint) (sb1 - sb2) + 2);
+		ref->operand[0] = put_ilit((mint)(sb1 - sb2) + 2);
 		ins_triple(ref);
 		next = newtriple(OC_PARAMETER);
 		next->operand[0] = *a;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,8 +35,8 @@ lv_val *lv_getslot(symval *sym)
 				p->next = sym->first_block.next;
 				sym->first_block.next = p;
 			}
-			if (n < p->lv_top - p->lv_base)
-				n = p->lv_top - p->lv_base;
+			if (n < (int)(p->lv_top - p->lv_base))
+				n = (int)(p->lv_top - p->lv_base);
 			if (p->lv_free < p->lv_top)
 			{
 				x = p->lv_free++;

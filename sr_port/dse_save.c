@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -153,7 +153,7 @@ void dse_save(void)
 	{
 		ptr = &buff[buff_len];
 		*ptr = 0;
-		j = ptr - &buff[0] + 1;
+		j = (unsigned int)(ptr - &buff[0] + 1);
 		patch_save_set[patch_save_count].comment = (char *)malloc(j);
 		memcpy(patch_save_set[patch_save_count].comment, &buff[0], j);
 	} else

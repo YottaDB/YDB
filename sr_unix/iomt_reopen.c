@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ uint4 iomt_reopen (io_desc *dv, unsigned short mode, int rewind)
 		rpos = mt_ptr->recpos;
 	}
 	status = close (mt_ptr->access_id);
-	if (status < 0)
+	if ((int4)status < 0)
 	{
 		PERROR("iomt_reopen");
 		rts_error (VARLSTCNT (5) ERR_MTIOERR, 2, dv->name->len, dv->name->dollar_io, errno);

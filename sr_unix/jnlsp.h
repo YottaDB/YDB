@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,17 @@ typedef unix_file_info		fi_type;
 #define EXTINTVMS(I)
 #define EXTTXTVMS(T,L)
 
+#ifndef GTM64
 #define	JNL_SHORT_TIME(S)		(time((time_t *)&S))
+#else
+#define JNL_SHORT_TIME(S)		\
+{					\
+	time_t temp_t; 			\
+	time(&temp_t); 			\
+	S = (int4) temp_t;		\
+}
+#endif
+
 #define JNL_WHOLE_FROM_SHORT_TIME(W, S)	W = (S)
 #define	JNL_WHOLE_TIME(W)		\
 {					\

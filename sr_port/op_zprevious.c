@@ -93,7 +93,7 @@ void op_zprevious(mval *v)
 			}
 			v->str.addr = (char *)stringpool.free;
 			stringpool.free = gvsub2str(&gv_altkey->base[gv_altkey->prev], stringpool.free, FALSE);
-			v->str.len = (char *)stringpool.free - v->str.addr;
+			v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
 			assert(v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
 			assert(v->str.addr + v->str.len <= (char *)stringpool.top &&
 				v->str.addr + v->str.len >= (char *)stringpool.base);

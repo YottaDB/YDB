@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 #include "iosp.h"
 #include "gtmio.h"
 #include "gds_blk_downgrade.h"
+#include "gdsbml.h"
 
 GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	int		reformat_buffer_len;
@@ -42,6 +43,9 @@ int	dsk_write(gd_region *reg, block_id blk, cache_rec_ptr_t cr)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		buff;
+	DEBUG_ONLY(
+		blk_hdr_ptr_t	blk_hdr;
+	)
 
 	udi = (unix_db_info *)(reg->dyn.addr->file_cntl->file_info);
 	csa = &udi->s_addrs;
@@ -50,6 +54,13 @@ int	dsk_write(gd_region *reg, block_id blk, cache_rec_ptr_t cr)
 	assert(cr);
 	assert(cr->buffaddr);
 	buff = GDS_ANY_REL2ABS(csa, cr->buffaddr);
+	DEBUG_ONLY(
+		blk_hdr = (blk_hdr_ptr_t)buff;
+		assert((unsigned)GDSVLAST > (unsigned)blk_hdr->bver);
+		assert((LCL_MAP_LEVL == blk_hdr->levl) || ((unsigned)MAX_BT_DEPTH > (unsigned)blk_hdr->levl));
+		assert((unsigned)csd->blk_size >= (unsigned)blk_hdr->bsiz);
+		assert((unsigned)csd->trans_hist.curr_tn >= (unsigned)blk_hdr->tn);
+	)
 	assert(((blk_hdr_ptr_t)buff)->bver);	/* GDSV4 (0) version uses this field as a block length so should always be > 0 */
 	assert(0 == fast_lock_count); /* ensure the static reformat buffer is not being used currently */
 	++fast_lock_count; 	/* Prevents interrupt from using reformat buffer while we have it */
@@ -83,7 +94,7 @@ int	dsk_write(gd_region *reg, block_id blk, cache_rec_ptr_t cr)
 	DEBUG_ONLY(else GTMASSERT);
 	if (csa->do_fullblockwrites)
 		/* round size up to next full logical filesys block. */
-		size = ROUND_UP(size, csa->fullblockwrite_len);
+		size = (int)ROUND_UP(size, csa->fullblockwrite_len);
 	assert(size <= csd->blk_size);
 	assert(FALSE == reg->read_only);
 	assert(dba_bg == reg->dyn.addr->acc_meth);

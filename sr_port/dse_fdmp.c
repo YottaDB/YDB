@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,7 @@ boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 	assert(MAX_ZWR_KEY_SZ >= work_char_ptr - work_buff);
 	if (GLO_FMT == dse_dmp_format)
 	{
-		if (!dse_fdmp_output(work_buff, (work_char_ptr - work_buff)))
+		if (!dse_fdmp_output(work_buff, (int4)(work_char_ptr - work_buff)))
 			return FALSE;
 		if (!dse_fdmp_output(data, len))
 			return FALSE;
@@ -87,7 +87,7 @@ boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 		assert(ZWR_FMT == dse_dmp_format);
 		*work_char_ptr++ = '=';
 		format2zwr(data, len, work_char_ptr, &dest_len);
-		if (!dse_fdmp_output(work_buff, work_char_ptr + dest_len - work_buff))
+		if (!dse_fdmp_output(work_buff, (int4)(work_char_ptr + dest_len - work_buff)))
 			return FALSE;
 	}
 	return TRUE;

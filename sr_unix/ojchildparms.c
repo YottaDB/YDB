@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,64 +40,64 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 	error_def(ERR_STRINGOFLOW);
 
 	if (jparms->directory.addr = GETENV(CWD_ENV))
-		jparms->directory.len = strlen(jparms->directory.addr);
+		jparms->directory.len = STRLEN(jparms->directory.addr);
 	else
 		jparms->directory.len = 0;
 
 	if (jparms->gbldir.addr = GETENV(GBLDIR_ENV))
-		jparms->gbldir.len = strlen(jparms->gbldir.addr);
+		jparms->gbldir.len = STRLEN(jparms->gbldir.addr);
 	else
 		jparms->gbldir.len = 0;
 
 	if (jparms->startup.addr = GETENV(STARTUP_ENV))
-		jparms->startup.len = strlen(jparms->startup.addr);
+		jparms->startup.len = STRLEN(jparms->startup.addr);
 	else
 		jparms->startup.len = 0;
 
 	if (jparms->input.addr = GETENV(IN_FILE_ENV))
-		jparms->input.len = strlen(jparms->input.addr);
+		jparms->input.len = STRLEN(jparms->input.addr);
 	else
 		jparms->input.len = 0;
 
 	if (jparms->output.addr = GETENV(OUT_FILE_ENV))
-		jparms->output.len = strlen(jparms->output.addr);
+		jparms->output.len = STRLEN(jparms->output.addr);
 	else
 		jparms->output.len = 0;
 
 	if (jparms->error.addr = GETENV(ERR_FILE_ENV))
-		jparms->error.len = strlen(jparms->error.addr);
+		jparms->error.len = STRLEN(jparms->error.addr);
 	else
 		jparms->error.len = 0;
 
 	if (jparms->routine.addr = GETENV(ROUTINE_ENV))
-		jparms->routine.len = strlen(jparms->routine.addr);
+		jparms->routine.len = STRLEN(jparms->routine.addr);
 	else
 		jparms->routine.len = 0;
 
 	if (jparms->label.addr = GETENV(LABEL_ENV))
-		jparms->label.len = strlen(jparms->label.addr);
+		jparms->label.len = STRLEN(jparms->label.addr);
 	else
 		jparms->label.len = 0;
 
 	if (jparms->logfile.addr = GETENV(LOG_FILE_ENV))
-		jparms->logfile.len = strlen(jparms->logfile.addr);
+		jparms->logfile.len = STRLEN(jparms->logfile.addr);
 	else
 		jparms->logfile.len = 0;
 
 	if (sp = GETENV(OFFSET_ENV))
-		jparms->offset = ATOL(sp);
+		jparms->offset = (int)(ATOL(sp));
 	else
 		jparms->offset = 0;
 
 	if (sp = GETENV(PRIORITY_ENV))
-		jparms->baspri = ATOL(sp);
+		jparms->baspri = (int)(ATOL(sp));
 	else
 		jparms->baspri = 0;
 
 	if (!(sp = GETENV(GTMJCNT_ENV)))
 		GTMASSERT;
 
-	if (argcnt = ATOL(sp))
+	if (argcnt = (int)(ATOL(sp)))
 	{
 		g_args->callargs = argcnt + 4;
 		g_args->truth = 1;
@@ -111,7 +111,7 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 			{
 				if (stringpool.free + strlen(sp) > stringpool.top)
 					rts_error(VARLSTCNT(1) (ERR_STRINGOFLOW));
-				arglst[i].str.len = strlen(sp);
+				arglst[i].str.len = STRLEN(sp);
 				arglst[i].str.addr = (char *)stringpool.free;
 				memcpy(stringpool.free, sp, arglst[i].str.len);
 				stringpool.free += arglst[i].str.len;

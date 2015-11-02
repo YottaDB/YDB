@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,20 +44,23 @@ GBLREF	seq_num			seq_num_zero;
 /* This called for TP and non-TP, but not for ZTP */
 void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 {
-	struct_jrec_upd	*jrec;
+	struct_jrec_upd		*jrec;
+	jnl_private_control	*jpc;
 
-	assert(0 != csa->jnl->pini_addr);
+	/* If REPL_WAS_ENABLED(csa) is TRUE, then we would not have gone through the code that initializes
+	 * jgbl.gbl_jrec_time or jpc->pini_addr. But in this case, we are not writing the journal record
+	 * to the journal buffer or journal file but write it only to the journal pool from where it gets
+	 * sent across to the update process that does not care about these fields so it is ok to leave them as is.
+	 */
+	jpc = csa->jnl;
+	assert((0 != jpc->pini_addr) || REPL_WAS_ENABLED(csa));
+	assert(jgbl.gbl_jrec_time || REPL_WAS_ENABLED(csa));
 	assert(csa->now_crit);
 	assert(IS_SET_KILL_ZKILL(jfb->rectype));
 	assert(!IS_ZTP(jfb->rectype));
 	jrec = (struct_jrec_upd *)jfb->buff;
-	jrec->prefix.pini_addr = (0 == csa->jnl->pini_addr) ? JNL_HDR_LEN : csa->jnl->pini_addr;
+	jrec->prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
 	jrec->prefix.tn = csa->ti->curr_tn;
-	assert(jgbl.gbl_jrec_time);
-	if (!jgbl.gbl_jrec_time)
-	{	/* no idea how this is possible, but just to be safe */
-		JNL_SHORT_TIME(jgbl.gbl_jrec_time);
-	}
 	jrec->prefix.time = jgbl.gbl_jrec_time;
 	jrec->prefix.checksum = jfb->checksum;
 	if (jgbl.forw_phase_recovery)
@@ -67,5 +70,5 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 	{	/* t_end and tp_tend already has set token or jnl_seqno into jnl_fence_ctl.token */
 		QWASSIGN(jrec->token_seq.token, jnl_fence_ctl.token);
 	}
-	jnl_write(csa->jnl, jfb->rectype, (jnl_record *)jrec, NULL, jfb);
+	JNL_WRITE_APPROPRIATE(csa, jpc, jfb->rectype, (jnl_record *)jrec, NULL, jfb);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,20 +30,27 @@ void lv_zap_sbs(lv_sbs_tbl *tbl, lv_val *lv)
 	if (tbl->str)
 	{
 		for (prev = blk = tbl->str; blk; prev = blk, blk = blk->nxt)
-		{	for (s = &blk->ptr.sbs_str[0], top = (char *)&blk->ptr.sbs_str[blk->cnt];
+		{
+			for (s = &blk->ptr.sbs_str[0], top = (char *)&blk->ptr.sbs_str[blk->cnt];
 				s < (sbs_str_struct *)top; s++)
-			{	if (s->lv == lv)
-		 		{	hit = 1;
+			{
+				if (s->lv == lv)
+		 		{
+					hit = 1;
 					for (s1 = s + 1; s1 < (sbs_str_struct *)top; s1++, s++)
-		 			{	*s = *s1;
+		 			{
+						*s = *s1;
 		 			}
 					blk->cnt--;
 					if (blk->cnt == 0)
-					{	if (prev == blk)
-						{	tbl->str = blk->nxt;
+					{
+						if (prev == blk)
+						{
+							tbl->str = blk->nxt;
 						}
 						else
-						{	assert(prev->nxt == blk);
+						{
+							assert(prev->nxt == blk);
 							prev->nxt = blk->nxt;
 		     				}
 						lv_free_sbs_blk(blk);
@@ -52,18 +59,22 @@ void lv_zap_sbs(lv_sbs_tbl *tbl, lv_val *lv)
 		 		}
 			}
 			if (hit)
-			{	break;
+			{
+				break;
 			}
 	    	}
 	}
 	if (!hit && tbl->num)
 	{
 		if (tbl->int_flag)
-		{	blk = tbl->num;
+		{
+			blk = tbl->num;
 			for (lvp = &blk->ptr.lv[0], top = (char *)&blk->ptr.lv[SBS_NUM_INT_ELE];
 				lvp < (lv_val **)top; lvp++)
-			{	if (*lvp == lv)
-				{	*lvp = 0;
+			{
+				if (*lvp == lv)
+				{
+					*lvp = 0;
 					hit = 1;
 					blk->cnt--;
 					if (blk->cnt == 0)
@@ -79,20 +90,27 @@ void lv_zap_sbs(lv_sbs_tbl *tbl, lv_val *lv)
 		else
 		{
 			for (prev = blk = tbl->num; blk; prev = blk, blk = blk->nxt)
-			{	for (f = &blk->ptr.sbs_flt[0], top = (char *)&blk->ptr.sbs_flt[blk->cnt];
+			{
+				for (f = &blk->ptr.sbs_flt[0], top = (char *)&blk->ptr.sbs_flt[blk->cnt];
 					f < (sbs_flt_struct *)top; f++)
-				{	if (f->lv == lv)
-			 		{    	hit = 1;
+				{
+					if (f->lv == lv)
+			 		{
+						hit = 1;
 					       	for (f1 = f + 1; f1 < (sbs_flt_struct *)top; f1++, f++)
-			 			{	*f = *f1;
+			 			{
+							*f = *f1;
 			 			}
 						blk->cnt--;
 						if (blk->cnt == 0)
-						{	if (prev == blk)
-						       	{      	tbl->num = blk->nxt;
+						{
+							if (prev == blk)
+						       	{
+								tbl->num = blk->nxt;
 						 	}
 						 	else
-						 	{	assert(prev->nxt == blk);
+						 	{
+								assert(prev->nxt == blk);
 						 	 	prev->nxt = blk->nxt;
 			     			 	}
 						 	lv_free_sbs_blk(blk);
@@ -101,7 +119,8 @@ void lv_zap_sbs(lv_sbs_tbl *tbl, lv_val *lv)
 			 		}
 				}
 				if (hit)
-				{	break;
+				{
+					break;
 				}
 	       	       	}
 		}
@@ -116,7 +135,8 @@ void lv_zap_sbs(lv_sbs_tbl *tbl, lv_val *lv)
 		{
 	       		ptbl = tbl->lv->ptrs.val_ent.parent.sbs;
 			if (ptbl->ident == MV_SBS)
-			{	assert(tbl->sym->ident == MV_SYM);
+			{
+				assert(tbl->sym->ident == MV_SYM);
 				lv1 = tbl->lv;
 				lv1->ptrs.free_ent.next_free = tbl->sym->lv_flist;
 			 	tbl->sym->lv_flist = tbl->lv;

@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -141,20 +141,30 @@ cp $preserve_time $cms_dir/*/gtmsrc.csh .
 
 ############### Define platform-specific libraries ##################################
 
-set gtm_s_aix   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_rs6000 sr_aix "
-set gtm_s_osf1  = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_alpha  sr_dux "
-set gtm_s_hpux  = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hppa   sr_hpux "
-set gtm_s_linux = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_i386   sr_linux "
-set gtm_s_sunos = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_sparc  sr_sun "
-set gtm_s_os390 = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_s390   sr_os390 "
-set gtm_s_l390  = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_l390   sr_linux "
+set gtm_s_aix     = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_rs6000 sr_aix  "
+set gtm_s_osf1    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_alpha  sr_dux  "
+set gtm_s_hpux    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hppa   sr_hpux "
+set gtm_s_linux   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_i386   sr_linux"
+set gtm_s_sunos   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_sparc  sr_sun  "
+set gtm_s_os390   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_s390   sr_os390"
+set gtm_s_l390    = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_l390   sr_linux"
+set gtm_s_hpia    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hpux   sr_ia64 "
+set gtm_s_linuxia = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_linux  sr_ia64 "
 
 set platform_library = "$platform_name"
 if ( "s390" == $MACHTYPE && "linux" == $platform_library ) then
-	set platform_library = "l390"
+        set platform_library = "l390"
 endif
 if ( "z/OS" == $MACHTYPE ) then
-	set platform_library = "os390"
+        set platform_library = "os390"
+endif
+
+set mach_type = `uname -m`
+if ( "ia64" == $mach_type && "hpux" == $platform_library ) then
+        set platform_library = "hpia"
+endif
+if ( "ia64" == $mach_type && "linux" == $platform_library ) then
+        set platform_library = "linuxia"
 endif
 
 ########### Copy sources from platform-specific directories into appropriate version-subdirectories ############

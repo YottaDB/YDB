@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,7 +81,7 @@ void op_newvar(uint4 arg1)
 		else
 			ptab->lst_addr = NULL;
 		frame_pointer->l_symtab[arg1] = (mval *)new;
-		assert(0 <= arg1);
+		assert(arg1 >= 0);
 	} else
 	{	/* Current (youngest) frame IS an indirect frame.
 		   The situation is more complex because this is not a true stackframe.
@@ -152,7 +152,7 @@ void op_newvar(uint4 arg1)
 		/* Put new mvstent entry on (into) the mvstent chain */
 		if ((unsigned char *)mv_chain >= top)
 		{	/* Just put new entry on end of chain which preceeds our base frame */
-			mv_st_ent->mv_st_next = (char *)mv_chain - (char *)mv_st_ent;
+			mv_st_ent->mv_st_next = (unsigned int)((char *)mv_chain - (char *)mv_st_ent);
 			mv_chain = mv_st_ent;
 		} else
 		{	/* One of the indirect frames has mv_stents associated with it so we have to find
@@ -167,8 +167,8 @@ void op_newvar(uint4 arg1)
 				mvst_tmp = mvst_prev;
 				mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
 			}
-			mvst_tmp->mv_st_next = (char *)mv_st_ent - (char *)mvst_tmp;
-			mv_st_ent->mv_st_next = (char *)mvst_prev - (char *)mv_st_ent + mvs_size[MVST_NVAL];
+			mvst_tmp->mv_st_next = (unsigned int)((char *)mv_st_ent - (char *)mvst_tmp);
+			mv_st_ent->mv_st_next = (unsigned int)((char *)mvst_prev - (char *)mv_st_ent + mvs_size[MVST_NVAL]);
 		}
 		new = mv_st_ent->mv_st_cont.mvs_nval.mvs_val = lv_getslot(curr_symval);
 		ptab = &mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab;

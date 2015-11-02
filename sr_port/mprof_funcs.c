@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,13 +34,12 @@
 #include "svnames.h"
 #include "mprof.h"
 #include "outofband.h"
-#include "xfer_enum.h"
+/* #include "xfer_enum.h" */
 #include "op.h"
 #include "callg.h"
 #include "gtmmsg.h"
 #include "str2gvargs.h"
 
-GBLREF	int			(*xfer_table[])();
 GBLREF 	boolean_t		is_tracing_on;
 GBLREF 	stack_frame		*frame_pointer;
 GBLREF 	unsigned char 		*profstack_base, *profstack_top, *prof_msp, *profstack_warn;
@@ -349,8 +348,11 @@ void pcurrpos(int inside_for_loop)
 char *pcalloc(unsigned int n)
 {
 	char **x;
-
-	n = ((n + 3) & ~3); /* make sure that it is quad-word aligned */
+#ifdef __ia64
+	n = ((n + 7) & ~7); /* same logic applied for alignment */
+#else
+	n = ((n + 3) & ~3); /* make sure that it is quad-word aliged */
+#endif
 	if (n > mprof_ptr->pcavail)
 	{
 		if (*mprof_ptr->pcavailptr)
@@ -482,13 +484,13 @@ void unw_prof_frame(void)
 			e.rout_name = tmp_trc_tbl_entry.rout_name;
 		} else
 		{
-			e.label_name = (mident *) pcalloc(sizeof(mident));
+			e.label_name = (mident *) pcalloc(SIZEOF(mident));
 			e.label_name->len = prof_fp->label_name->len;
-			e.label_name->addr = pcalloc(e.label_name->len);
+			e.label_name->addr = pcalloc((unsigned int)e.label_name->len);
 			memcpy(e.label_name->addr, prof_fp->label_name->addr, prof_fp->label_name->len);
-			e.rout_name = (mident *) pcalloc(sizeof(mident));
+			e.rout_name = (mident *) pcalloc(SIZEOF(mident));
 			e.rout_name->len =  prof_fp->rout_name->len;
-			e.rout_name->addr = pcalloc(e.rout_name->len);
+			e.rout_name->addr = pcalloc((unsigned int)e.rout_name->len);
 			memcpy(e.rout_name->addr, prof_fp->rout_name->addr, prof_fp->rout_name->len);
 		}
 		e.line_num = -1;
@@ -554,7 +556,8 @@ void crt_gbl(mprof_tree *p, int info_level)
 	/* Write the data into the global
 	 */
 	char		*c_top, *c_ref, ch;
-	int		count, arg_index, subsc_len, start_point, tmp_str_len;
+	int		count, arg_index, subsc_len, tmp_str_len;
+	INTPTR_T	start_point;
 	mval		data;
 	char		dataval[96];	/* big enough for data value */
 	unsigned char	subsval[12];	/* see i2asc + 1 for null char */
@@ -564,24 +567,24 @@ void crt_gbl(mprof_tree *p, int info_level)
 
 	if (0 == p->e.count)
 		return;
-	count = mprof_ptr->gvargs.count;
+	count = (int)mprof_ptr->gvargs.count;
 	spt = &mprof_ptr->subsc[count];
 	/* Global name --> ^PREFIX(<OPTIONAL ARGUMENTS>, "rout-name", "label-name", "line-num", "forloop") */
 	spt->mvtype = MV_STR;
 	spt->str.len = p->e.rout_name->len;
-	spt->str.addr = (char *)pcalloc(spt->str.len);
+	spt->str.addr = (char *)pcalloc((unsigned int)spt->str.len);
 	memcpy(spt->str.addr, p->e.rout_name->addr, spt->str.len);
 	mprof_ptr->gvargs.args[count++] = spt++;
 	spt->mvtype = MV_STR;
 	if (0 != p->e.label_name->len)
 	{
 		spt->str.len = p->e.label_name->len;
-		spt->str.addr = (char *)pcalloc(spt->str.len);
+		spt->str.addr = (char *)pcalloc((unsigned int)spt->str.len);
 		memcpy(spt->str.addr, p->e.label_name->addr, spt->str.len);
 	} else
 	{	/* place holder before first label */
 		spt->str.len = sizeof(MPROF_NULL_LABEL) - 1;
-		spt->str.addr = (char *)pcalloc(spt->str.len);
+		spt->str.addr = (char *)pcalloc((unsigned int)spt->str.len);
 		memcpy(spt->str.addr, MPROF_NULL_LABEL, spt->str.len);
 	}
 	mprof_ptr->gvargs.args[count++] = spt++;
@@ -589,8 +592,8 @@ void crt_gbl(mprof_tree *p, int info_level)
 	if (-1 != p->e.line_num)
 	{
 		tmpnum = i2asc(asc_line_num, (unsigned int) p->e.line_num);
-		spt->str.len = tmpnum - asc_line_num;
-		spt->str.addr = (char *)pcalloc(spt->str.len);
+		spt->str.len = INTCAST(tmpnum - asc_line_num);
+		spt->str.addr = (char *)pcalloc((unsigned int)spt->str.len);
 		memcpy(spt->str.addr, asc_line_num, spt->str.len);
 		mprof_ptr->gvargs.args[count] = spt;
 		count++;
@@ -598,7 +601,7 @@ void crt_gbl(mprof_tree *p, int info_level)
 	} else if (0 == p->e.line_num)
 	{
 		spt->str.len = sizeof("*unk*") - 1;
-		spt->str.addr = (char *)pcalloc(spt->str.len);
+		spt->str.addr = (char *)pcalloc((unsigned int)spt->str.len);
 		memcpy(spt->str.addr, "*unk*", spt->str.len);
 		mprof_ptr->gvargs.args[count] = spt;
 		count++;
@@ -607,22 +610,22 @@ void crt_gbl(mprof_tree *p, int info_level)
 	{
 		spt->mvtype = MV_STR;
 		spt->str.len = sizeof(MPROF_FOR_LOOP) - 1;
-		spt->str.addr = (char *)pcalloc(sizeof(MPROF_FOR_LOOP) - 1);
+		spt->str.addr = (char *)pcalloc(USIZEOF(MPROF_FOR_LOOP) - 1);
 		memcpy(spt->str.addr, MPROF_FOR_LOOP, spt->str.len);
 		mprof_ptr->gvargs.args[count++] = spt++;
 		/*write for level into the subscript as well*/
 		spt->mvtype = MV_STR;
 		tmpnum = i2asc(subsval, p->e.loop_level);
-		spt->str.len = tmpnum - subsval;
-		spt->str.addr = (char *)pcalloc(spt->str.len);
+		spt->str.len = INTCAST(tmpnum - subsval);
+		spt->str.addr = (char *)pcalloc((unsigned int)spt->str.len);
 		memcpy(spt->str.addr, subsval, spt->str.len);
 		mprof_ptr->gvargs.args[count++] = spt++;
 	}
 	mprof_ptr->gvargs.count = count;
-	callg((int(*)(int count_arg, ...))op_gvname, &mprof_ptr->gvargs);
+	callg((INTPTR_T(*)(intszofptr_t count_arg, ...))op_gvname, (gparam_list *)&mprof_ptr->gvargs);
 	mprof_ptr->gvargs.count = mprof_ptr->curr_num_subscripts;
 	/* Data --> "count:cpu-time in user mode:cpu-time in sys mode:cpu-time total" */
-	start_point = (int)&dataval[0];
+	start_point = (INTPTR_T)&dataval[0];
 	tmpnum = (unsigned char *)&dataval[0];
 	end = i2asc(tmpnum, p->e.count);
 	tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
@@ -644,16 +647,16 @@ void crt_gbl(mprof_tree *p, int info_level)
 #endif
 	}
 	data.mvtype = MV_STR;
-	data.str.len = (((int )tmpnum - start_point) > 0) ? ((int )tmpnum - start_point) : (start_point - (int )tmpnum);
+	data.str.len = (((INTPTR_T)tmpnum - start_point) > 0) ? ((int )((INTPTR_T)tmpnum - start_point)) : ((int)(start_point - (INTPTR_T)tmpnum));
 	if ((mprof_ptr->overflowed_levels) && (-1 == p->e.line_num))
 	{
 		tmp_str_len = data.str.len;
 		data.str.len += sizeof(OVERFLOW_STRING) - 1;
-		data.str.addr = (char *)pcalloc(data.str.len);
+		data.str.addr = (char *)pcalloc((unsigned int)data.str.len);
 		MEMCPY_LIT(dataval + tmp_str_len, OVERFLOW_STRING);
 
 	} else
-		data.str.addr = (char *)pcalloc(data.str.len);
+		data.str.addr = (char *)pcalloc((unsigned int)data.str.len);
 	memcpy(data.str.addr, dataval, data.str.len);
 	op_gvput(&data);
 	return;
@@ -724,7 +727,7 @@ static void get_entryref_information(boolean_t line, trace_entry *tmp_trc_tbl_en
 		return;
 	line_table = LABENT_LNR_ENTRY(routine, max_label);
 	offset = 0;
-	in_addr_offset = CODE_OFFSET(routine, addr);
+	in_addr_offset = (int4)CODE_OFFSET(routine, addr);
 	last_line = LNRTAB_ADR(routine);
 	last_line += routine->lnrtab_len;
 	for( ; ++line_table < last_line ; offset++)
@@ -786,7 +789,7 @@ static void parse_gvn(mval *gvn)
 		if (!ISALNUM(ch))
 			RTS_ERROR_VIEWNOTFOUND("Invalid global name");
 	}
-	spt->str.len = (long)mpsp - (long)spt->str.addr;
+	spt->str.len = INTCAST(mpsp - spt->str.addr);
 	mprof_ptr->gvargs.args[count++] = spt++;
 	spt->str.addr = (char *)mpsp;
 	/* Process subscripts if any */
@@ -865,7 +868,7 @@ static void parse_gvn(mval *gvn)
 				c_ref++;
 				continue;
 			}
-			spt->str.len = (long)mpsp - (long)spt->str.addr;
+			spt->str.len = INTCAST(mpsp - spt->str.addr);
 			if (MAX_GVSUBSCRIPTS <= count)
 				rts_error(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 			mprof_ptr->gvargs.args[count++] = spt++;
@@ -883,7 +886,8 @@ static void parse_gvn(mval *gvn)
 			RTS_ERROR_VIEWNOTFOUND("There are trailing characters after the global name");
 	}
 	assert((char *)mpsp <= mprof_mstr.addr + mprof_mstr.len);	/* Ensure we haven't overrun the malloced buffer */
-	mprof_ptr->curr_num_subscripts = mprof_ptr->gvargs.count = count;
+	mprof_ptr->gvargs.count = count;
+	mprof_ptr->curr_num_subscripts = (int)mprof_ptr->gvargs.count;
 }
 
 void stack_leak_check(void)

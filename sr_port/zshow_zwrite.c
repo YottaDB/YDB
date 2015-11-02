@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 #include "mvalconv.h"
 
 GBLREF uint4 pat_everything[];
-GBLREF uint4 sizeof_pat_everything;
+GBLREF mstr_len_t sizeof_pat_everything;
 
 void zshow_zwrite(zshow_out *output)
 {
@@ -32,9 +32,9 @@ void zshow_zwrite(zshow_out *output)
 	zshow_output(output,0);
 	pat.mvtype = MV_STR;
 	pat.str.addr = (char *)&pat_everything[0];
-	pat.str.len = sizeof_pat_everything - 1;
+	pat.str.len = INTCAST(sizeof_pat_everything - 1);
 	MV_FORCE_MVAL(&mv,ZWRITE_ASTERISK) ;
 	n2s(&mv);
-	op_lvpatwrite(VARLSTCNT(3) (int4)output, &pat, &mv);
+	op_lvpatwrite(VARLSTCNT(3) (UINTPTR_T)output, &pat, &mv);
 	return;
 }

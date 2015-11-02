@@ -88,8 +88,8 @@ int	omi_srvc_xact (omi_conn *cptr)
 	int		 cc, save_errno;
 
 /*	If true, an error occurred */
-	cc = &cptr->buff[cptr->bsiz] - &cptr->bptr[cptr->blen];
-	while (!servtime_expired && (cc = read(cptr->fd, &cptr->bptr[cptr->blen], cc)) < 0  &&  errno == EINTR)
+	cc =(int)(&cptr->buff[cptr->bsiz] - &cptr->bptr[cptr->blen]);
+	while (!servtime_expired && (cc = (int)(read(cptr->fd, &cptr->bptr[cptr->blen], cc))) < 0  &&  errno == EINTR)
 			;
 	save_errno = errno;
 	if (servtime_expired)
@@ -131,16 +131,16 @@ int	omi_srvc_xact (omi_conn *cptr)
 #ifdef FILE_TCP
 	int		 cc;
 
-	cc = &cptr->buff[cptr->bsiz] - &cptr->bptr[cptr->blen];
+	cc = (int)(&cptr->buff[cptr->bsiz] - &cptr->bptr[cptr->blen]);
 /*	If true, an error occurred */
-	if ((cc = read(cptr->fd, &cptr->bptr[cptr->blen], 4)) <= 0)
+	if ((cc = (int)read(cptr->fd, &cptr->bptr[cptr->blen], 4)) <= 0)
 	{
 		return -1;
 	}
 	cptr->blen += 4;
 	cptr->xptr  = cptr->bptr;
 	OMI_VI_READ(&mlen, cptr->xptr);
-	if ((cc = read(cptr->fd, &cptr->bptr[cptr->blen], mlen.value)) <= 0)
+	if ((cc = (int)read(cptr->fd, &cptr->bptr[cptr->blen], mlen.value)) <= 0)
 	{
 		return -1;
 	}
@@ -319,7 +319,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 
 		/* start counting server up time with the first transaction */
 		if (!omi_nxact)
-			gtcm_stime = time(0);
+		  gtcm_stime = (int4)time(0);
 
 /*		If true, this is an RC request; service it in the RC code */
 		if (cptr->exts & OMI_XTF_RC && rh.op_class.value == 2)
@@ -397,7 +397,7 @@ int	omi_srvc_xact (omi_conn *cptr)
  *	size of the response */
 	if (!xblk)
 	{
-		blen = bptr - buff;
+		blen = (int)(bptr - buff);
 		bptr = buff;
 		if (bunches)
 		{
@@ -417,7 +417,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 /*	Write out the response (in pieces if necessary) */
 	while (blen > 0)
 	{
-		while(!servtime_expired && (cc = write(cptr->fd, bptr, blen)) < 0)
+		while(!servtime_expired && (cc = (int)(write(cptr->fd, bptr, blen))) < 0)
 			;
 		save_errno = errno;
 		if (cc < 0)

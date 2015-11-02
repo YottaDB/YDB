@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,9 @@ void buff_flush(void);
  * 	ret
  #	nop	# (hppa)
  */
-#ifdef __hpux
+#if defined(__ia64)
+#  define JSB_ACTION_N_INS	4
+#elif defined(__hpux)
 #  define JSB_ACTION_N_INS	3
 #else
 #  define JSB_ACTION_N_INS	2

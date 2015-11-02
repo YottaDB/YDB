@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -124,7 +124,7 @@ boolean_t mu_replpool_grab_sem(boolean_t immediate)
 		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			 RTS_ERROR_LITERAL("Error with jnlpool semctl"), save_errno);
 	}
-	udi->sem_ctime = semarg.buf->sem_ctime;
+	udi->gt_sem_ctime = semarg.buf->sem_ctime;
 	status = grab_sem_all_source();
 	if (0 != status)
 	{
@@ -133,7 +133,7 @@ boolean_t mu_replpool_grab_sem(boolean_t immediate)
 		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	}
 	repl_instance.jnlpool_semid = udi->semid;
-	repl_instance.jnlpool_semid_ctime = udi->sem_ctime;
+	repl_instance.jnlpool_semid_ctime = udi->gt_sem_ctime;
 	/*
 	 * --------------------------
 	 * Now semaphores of recvpool
@@ -168,7 +168,7 @@ boolean_t mu_replpool_grab_sem(boolean_t immediate)
 		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			 RTS_ERROR_LITERAL("Error with recvpool semctl"), save_errno);
 	}
-	udi->sem_ctime = semarg.buf->sem_ctime;
+	udi->gt_sem_ctime = semarg.buf->sem_ctime;
 	status = grab_sem_all_receive();
 	if (0 != status)
 	{
@@ -178,7 +178,7 @@ boolean_t mu_replpool_grab_sem(boolean_t immediate)
 		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	}
 	repl_instance.recvpool_semid = udi->semid;
-	repl_instance.recvpool_semid_ctime = udi->sem_ctime;
+	repl_instance.recvpool_semid_ctime = udi->gt_sem_ctime;
 	/* Initialize jnlpool.repl_inst_filehdr as it is used later by gtmrecv_fetchresync() */
 	assert(NULL == jnlpool.repl_inst_filehdr);
 	jnlpool.repl_inst_filehdr = (repl_inst_hdr_ptr_t)malloc(sizeof(repl_inst_hdr));

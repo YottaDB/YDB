@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -242,7 +242,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 			si->tlvl_info_head = NULL;
 			next_si = si->next_sgm_info;
 			si->next_sgm_info = NULL;
-			jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1;
+			jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
 		}	/* for (all segments in the transaction) */
 		jgbl.cumul_jnl_rec_len = 0;
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)

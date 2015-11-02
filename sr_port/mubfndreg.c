@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,13 +31,16 @@ bool found;
 
 found = FALSE;
 for (i = 0, reg = gd_header->regions; i < gd_header->n_regions ;i++, reg++)
-{	if (len == reg->rname_len && (memcmp(&reg->rname[0],&(regbuf[0]),len) == 0))
-	{  	found = TRUE;
+{
+	if (len == reg->rname_len && (memcmp(&reg->rname[0],&(regbuf[0]),len) == 0))
+	{
+		found = TRUE;
 		break;
 	}
 }
 if (!found)
-{ 	util_out_print("REGION !AD not found.", TRUE, len, regbuf);
+{
+	util_out_print("REGION !AD not found.", TRUE, len, regbuf);
  	return FALSE;
 }
 if (reg->dyn.addr->acc_meth == dba_usr)

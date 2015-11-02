@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ void dse_f_key(void)
 	for (key_top = &targ_key[0]; key_top <= &targ_key[256]; )
 		if (!*key_top++)
 			break;
-	size_root = key_top - &targ_key[0] + 1;
+	size_root = (int)(key_top - &targ_key[0] + 1);
 	memcpy(&targ_key_root[0],&targ_key[0],size_root);
 	targ_key_root[size_root - 1] = targ_key_root[size_root] = 0;
 	patch_find_root_search = TRUE;

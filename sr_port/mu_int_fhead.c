@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -187,7 +187,7 @@ boolean_t mu_int_fhead(void)
 		case dba_bg:
 		/*** WARNING: Drop thru ***/
 		case dba_mm:
-			mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
+			mu_int_ovrhd = (int4)DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
 #else
 #error unsupported platform
 #endif
@@ -216,7 +216,7 @@ boolean_t mu_int_fhead(void)
 	}
 	/* make working space for all local bitmaps */
 	maps = (mu_data->trans_hist.total_blks + mu_data->bplmap - 1) / mu_data->bplmap;
-	size = BM_SIZE(mu_data->bplmap) - sizeof(blk_hdr);
+	size = (unsigned int)(BM_SIZE(mu_data->bplmap) - sizeof(blk_hdr));
 	size *= maps;
 	mu_int_locals = (unsigned char *)malloc(size);
 	memset(mu_int_locals, FOUR_BLKS_FREE, size);

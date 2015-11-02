@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ void stpg_sort (mstr **base, mstr **top)
 		{
 			ix = l;
 			jx = r;
-			kx = l + ((int) (r - l) / 2);
+			kx = l + ((int)(r - l) / 2);
 			kx = ((*ix)->addr > (*jx)->addr) ?
 				(((*jx)->addr > (*kx)->addr) ?
 					jx :

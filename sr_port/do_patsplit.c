@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -182,7 +182,7 @@ int do_patsplit(mval *str, mval *pat)
 	{	/* left section has at least one pattern atom. create its compilation string */
 		patptr = left_ptstr.buff;
 		*patptr++ = fixed[0];
-		*patptr++ = fixed_patptr - patptr_start + 1;
+		*patptr++ = (uint4)(fixed_patptr - patptr_start + 1);
 		memcpy(patptr, patptr_start, (char *)fixed_patptr - (char *)patptr_start);
 		patptr += fixed_patptr - patptr_start;
 		*patptr++ = cnt[0];
@@ -198,14 +198,14 @@ int do_patsplit(mval *str, mval *pat)
 		for (index = 0; index < cnt[0]; index++)
 			*patptr++ = size[index];
 		left_pat.mvtype = MV_STR;
-		left_pat.str.len = (char *)patptr - (char *)&left_ptstr.buff[0];
+		left_pat.str.len = INTCAST((char *)patptr - (char *)&left_ptstr.buff[0]);
 		left_pat.str.addr = (char *)&left_ptstr.buff[0];
 	}
 
 	/* create fixed length pattern atom's compilation string */
 	patptr = fixed_ptstr.buff;
 	*patptr++ = TRUE;	/* fixed length pattern */
-	*patptr++ = right_patptr - fixed_patptr + 1;
+	*patptr++ = (uint4)(right_patptr - fixed_patptr + 1);
 	memcpy(patptr, fixed_patptr, (char *)right_patptr - (char *)fixed_patptr);
 	patptr += right_patptr - fixed_patptr;
 	*patptr++ = 1;						/* count */
@@ -215,7 +215,7 @@ int do_patsplit(mval *str, mval *pat)
 	*patptr++ = min[fixed_index];				/* min[0] */
 	*patptr++ = size[fixed_index];				/* size[0] */
 	fixed_pat.mvtype = MV_STR;
-	fixed_pat.str.len = (char *)patptr - (char *)&fixed_ptstr.buff[0];
+	fixed_pat.str.len = INTCAST((char *)patptr - (char *)&fixed_ptstr.buff[0]);
 	fixed_pat.str.addr = (char *)&fixed_ptstr.buff[0];
 
 	cnt[1] = count - fixed_index - 1;
@@ -223,7 +223,7 @@ int do_patsplit(mval *str, mval *pat)
 	{	/* right section has at least one pattern atom. create its compilation string */
 		patptr = right_ptstr.buff;
 		*patptr++ = fixed[1];
-		*patptr++ = patptr_end - right_patptr + 1;
+		*patptr++ = (uint4)(patptr_end - right_patptr + 1);
 		memcpy(patptr, right_patptr, (char *)patptr_end - (char *)right_patptr);
 		patptr += patptr_end - right_patptr;
 		*patptr++ = cnt[1];
@@ -239,7 +239,7 @@ int do_patsplit(mval *str, mval *pat)
 		for (index = fixed_index + 1; index < count; index++)
 			*patptr++ = size[index];
 		right_pat.mvtype = MV_STR;
-		right_pat.str.len = (char *)patptr - (char *)&right_ptstr.buff[0];
+		right_pat.str.len = INTCAST((char *)patptr - (char *)&right_ptstr.buff[0]);
 		right_pat.str.addr = (char *)&right_ptstr.buff[0];
 	}
 	strbytelen = str->str.len;
@@ -323,7 +323,7 @@ int do_patsplit(mval *str, mval *pat)
 	for (match = FALSE; !match && (fixedptr <= maxfixedptr); fixedptr = fixednext, rightptr = rightnext, leftcharlen++)
 	{
 		fixed_str.str.addr = (char *)fixedptr;
-		fixed_str.str.len = rightptr - fixedptr;
+		fixed_str.str.len = INTCAST(rightptr - fixedptr);
 		if (!gtm_utf8_mode)
 		{
 			fixednext = fixedptr + 1;
@@ -344,7 +344,7 @@ int do_patsplit(mval *str, mval *pat)
 		assert(cnt[0] || cnt[1]); /* fixed_pat takes only one pattern atom and non-zero rest are in cnt[0] and cnt[1] */
 		if (cnt[0])
 		{
-			left_str.str.len = fixedptr - (unsigned char *)left_str.str.addr;
+			left_str.str.len = INTCAST(fixedptr - (unsigned char *)left_str.str.addr);
 			UNICODE_ONLY(left_str.str.char_len = leftcharlen;)
 			match = fixed[0] ? do_patfixed(&left_str, &left_pat) : do_pattern(&left_str, &left_pat);
 			if (!match)
@@ -354,7 +354,7 @@ int do_patsplit(mval *str, mval *pat)
 		{
 			right_str.str.addr = (char *)rightptr;
 			UNICODE_ONLY(right_str.str.char_len = strcharlen - leftcharlen - fixedcharlen;)
-			right_str.str.len = strtop - rightptr;
+			right_str.str.len = INTCAST(strtop - rightptr);
 			match = (fixed[1] ? do_patfixed(&right_str, &right_pat) : do_pattern(&right_str, &right_pat));
 		}
 	}

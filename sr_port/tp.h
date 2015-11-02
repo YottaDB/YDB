@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -193,7 +193,7 @@ GBLREF	gd_region	*tp_fail_hist_reg[];
 GBLREF	gv_namehead	*tp_fail_hist[];
 GBLREF	int4		tp_fail_n;
 GBLREF	int4		tp_fail_level;
-GBLREF	int4		tp_fail_histtn[], tp_fail_bttn[];
+GBLREF	trans_num	tp_fail_histtn[], tp_fail_bttn[];
 
 #define TP_TRACE_HIST(X, Y) 										\
 {													\

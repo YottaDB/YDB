@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -209,7 +209,7 @@ void mupip_restore(void)
 	msg_string.len = sizeof(msg_buffer);
 
 	inhead = (inc_header *)malloc(sizeof(inc_header) + 8);
-	inhead = (inc_header *)((((int4)inhead) + 7) & -8);
+	inhead = (inc_header *)((((INTPTR_T)inhead) + 7) & -8);
 	rest_blks = 0;
 
 	for (ptr = in_files.next;  ptr;  ptr = ptr->next)
@@ -398,7 +398,7 @@ void mupip_restore(void)
 				{	/* -- similar logic exist in bml_newmap.c, which need to pick up any new updates here -- */
 					newmap = (char *)malloc(old_blk_size);
 					((blk_hdr *)newmap)->bver = GDSVCURR;
-					((blk_hdr *)newmap)->bsiz = BM_SIZE(bplmap);
+					((blk_hdr *)newmap)->bsiz = (unsigned int)(BM_SIZE(bplmap));
 					((blk_hdr *)newmap)->levl = LCL_MAP_LEVL;
 					((blk_hdr *)newmap)->tn = curr_tn;
 					newmap_bptr = newmap + sizeof(blk_hdr);
@@ -425,7 +425,7 @@ void mupip_restore(void)
 				old_tot_blks = inhead->db_total_blks;
 			}
 		}
-		rsize = sizeof(shmpool_blk_hdr) + inhead->blk_size;
+		rsize = SIZEOF(shmpool_blk_hdr) + inhead->blk_size;
 		for ( ; ;)
 		{        /* All reords are of fixed size so process until we get to a zeroed record marking the end */
 			COMMON_READ(in, inbuf, rsize);	/* Note rsize == sblkh_p */
@@ -495,7 +495,7 @@ void mupip_restore(void)
 		assert((sizeof(sgmnt_data) + sizeof(int4)) == rsize);
 		COMMON_READ(in, inbuf, rsize);
 		((sgmnt_data_ptr_t)inbuf)->start_vbn = old_start_vbn;
-		((sgmnt_data_ptr_t)inbuf)->free_space = ((old_start_vbn - 1) * DISK_BLOCK_SIZE) - SIZEOF_FILE_HDR(inbuf);
+		((sgmnt_data_ptr_t)inbuf)->free_space = (uint4)(((old_start_vbn - 1) * DISK_BLOCK_SIZE) - SIZEOF_FILE_HDR(inbuf));
 		LSEEKWRITE(db_fd, 0, inbuf, rsize - sizeof(int4), save_errno);
 		if (0 != save_errno)
 		{
@@ -586,7 +586,7 @@ static void exec_read(BFILE *bf, char *buf, int nbytes)
 #ifdef DEBUG_ONLINE
 	PRINTF("file descriptor is %d and bytes needed is %d\n", bf->fd, needed);
 #endif
-	while(0 != (got = read(bf->fd, curr, needed)))
+	while(0 != (got = (int)(read(bf->fd, curr, needed))))
 	{
 		if (got == needed)
 			break;

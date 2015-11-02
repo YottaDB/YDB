@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@ void ecode_set(int errnum)
 	ecode_ptr = (char *)i2asc((unsigned char *)ecode_ptr, errnum);
 	*ecode_ptr++ = ',';
 	ecode_mstr.addr = &ecode_buff[0];
-	ecode_mstr.len = ecode_ptr - ecode_mstr.addr;
+	ecode_mstr.len = INTCAST(ecode_ptr - ecode_mstr.addr);
 	assert(ecode_mstr.len <= ECODE_MAX_LEN);
 	if (ecode_mstr.len > ECODE_MAX_LEN_WITH_BUFFER)
 		GTMASSERT;

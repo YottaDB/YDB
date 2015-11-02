@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ int4	getstorage(void)
 {
         struct rlimit	rl;
         int 		save_errno;
-	unsigned int	cur_sbrk;
+	UINTPTR_T       cur_sbrk;
         rlim_t		size;
 
         if (0 != getrlimit(RLIMIT_DATA,&rl))
@@ -37,7 +37,7 @@ int4	getstorage(void)
                           CALLFROM,
                           save_errno);
         }
-	cur_sbrk = (unsigned int)sbrk(0); /* Two step conversion to eliminate warnings */
+	cur_sbrk = (UINTPTR_T)sbrk(0); /* Two step conversion to eliminate warnings */
 	size = rl.rlim_cur - cur_sbrk;
 #ifdef INT8_SUPPORTED
         if(MAXPOSINT4 < size)
@@ -50,7 +50,7 @@ int4	getstorage(void)
 
 int4	getstorage(void)
 {
-	return (int4)(ulimit(3,0) - (ulimit_t)sbrk(0));
+	 return (int4)(ulimit(3,0) - (ulimit_t)sbrk(0));
 }
 
 #endif

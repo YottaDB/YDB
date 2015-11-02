@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@ void	iotcp_dlr_device(mstr *d)
 	iod = io_curr_device.out;
 	tcpptr = (d_tcp_struct *)iod->dev_sp;
 
-	len = strlen(tcpptr->dollar_device);
+	len = STRLEN(tcpptr->dollar_device);
 	/* verify internal buffer has enough space for $DEVICE string value */
 	assert((int)d->len > len);
 	memcpy(d->addr, tcpptr->dollar_device, len);
@@ -53,7 +53,7 @@ void	iotcp_dlr_key(mstr *d)
 	iod = io_curr_device.out;
 	tcpptr = (d_tcp_struct *)iod->dev_sp;
 
-	len = strlen(tcpptr->saddr);
+    	len = STRLEN(tcpptr->saddr);
 	/* verify internal buffer has enough space for $KEY string value */
 	assert((int)d->len > len);
 	memcpy(d->addr, tcpptr->saddr, len);

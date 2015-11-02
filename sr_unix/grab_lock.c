@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,7 @@
 #include "deferred_signal_handler.h"
 #include "have_crit.h"
 #include "caller_id.h"
+#include "is_proc_alive.h"
 
 GBLREF	volatile int4		crit_count;
 GBLREF	VSIG_ATOMIC_T		forced_exit;
@@ -72,7 +73,12 @@ void	grab_lock(gd_region *reg)
 			}
 			return;
 		}
-		assert(csa->nl->in_crit == 0);
+		/* There is only one case we know of when csa->nl->in_crit can be non-zero and that is when a process holding
+		 * crit gets kill -9ed and another process ends up invoking "secshr_db_clnup" which in turn clears the
+		 * crit semaphore (making it available for waiters) but does not also clear csa->nl->in_crit since it does not
+		 * hold crit at that point. But in that case, the pid reported in csa->nl->in_crit should be dead. Check that.
+		 */
+		assert((0 == csa->nl->in_crit) || (FALSE == is_proc_alive(csa->nl->in_crit, 0)));
 		csa->nl->in_crit = process_id;
 		CRIT_TRACE(crit_ops_gw);		/* see gdsbt.h for comment on placement */
 		crit_count = 0;

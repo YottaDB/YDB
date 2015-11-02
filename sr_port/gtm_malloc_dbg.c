@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,9 @@
 
 #  define gtm_malloc gtm_malloc_dbg
 #  define gtm_free gtm_free_dbg
+#ifdef __linux__
+#  define gtm_text_malloc gtm_text_malloc_dbg
+#endif /* __ia64 */
 #  define findStorElem findStorElem_dbg
 #  define processDeferredFrees processDeferredFrees_dbg
 #  define DEBUG
@@ -46,22 +49,29 @@
 #  define GTM_MALLOC_DEBUG
 #  include "caller_id.h"
 #  include "gtm_malloc_src.h"
+
 #else
 
 /* We have a DEBUG build -- Nobody should call gtm_malloc_dbg directly */
 #  include "mdef.h"
+#  include "gtm_malloc.h"
 /* Include some defs for these rtns to keep the compiler quiet for this routine.
    Nobody should be calling these directly so we don't want them where they can
    get included anywhere else.
 */
 void gtm_malloc_dbg(size_t size);
 void gtm_free_dbg(void *addr);
-
 void gtm_malloc_dbg(size_t size)  /* No return or return value since we are terminal */
 {
 	GTMASSERT;
 }
 
+#ifdef __linux__
+void *gtm_text_malloc_dbg(size_t a)
+{
+	GTMASSERT;
+}
+#endif /* __linux__ */
 void gtm_free_dbg(void *addr)
 {
 	GTMASSERT;

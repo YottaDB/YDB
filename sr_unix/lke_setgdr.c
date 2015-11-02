@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +62,7 @@ void lke_setgdr(void)
 		cli_get_value("gld", buf) ;
 		def = FALSE;
 		reset.mvtype = MV_STR;
-		reset.str.len = strlen(buf);
+		reset.str.len = STRLEN(buf);
 		reset.str.addr = buf;
 	}
 	else

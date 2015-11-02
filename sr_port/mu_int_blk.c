@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -287,7 +287,7 @@ boolean_t mu_int_blk(
 		mu_int_recs[level]++;
 		GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)rec_base)->rsiz));
 		rec_size = temp_ushort;
-		mu_int_offset[mu_int_plen - 1] = rec_base - blk_base;
+		mu_int_offset[mu_int_plen - 1] = (uint4)(rec_base - blk_base);
 		if (rec_size <= sizeof(rec_hdr))
 		{
 			mu_int_err(ERR_DBRSIZMN, TRUE, TRUE, buff, comp_length, top_key, top_len, (unsigned int)blk_levl);
@@ -376,13 +376,13 @@ boolean_t mu_int_blk(
 				if (KEY_DELIMITER == *ptr++)
 				{
 					if (first_key)
-						name_len = ptr - key_base;
+						name_len = (int)(ptr - key_base);
 					first_key = FALSE;
 					if (KEY_DELIMITER == *ptr++)
 						break;
 				}
 			}
-			key_size = ptr - key_base;
+			key_size = (int)(ptr - key_base);
 			if (level && (rec_size - sizeof(block_id) - sizeof(rec_hdr) != key_size))
 			{
 				mu_int_err(ERR_DBKEYMN, TRUE, TRUE, buff, comp_length, top_key, top_len,
@@ -620,7 +620,7 @@ boolean_t mu_int_blk(
 					mu_int_offset[mu_int_plen]=0;
 					mu_int_path[mu_int_plen++]=child;
 					mu_int_err(ERR_DBBDBALLOC, TRUE, TRUE, old_buff, comp_length, buff, buff_length,
-							(unsigned int) ((blk_hdr_ptr_t)ptr)->levl);
+							(unsigned int)((blk_hdr_ptr_t)ptr)->levl);
 					mu_int_plen--;
 					free(blk_base);
 					return FALSE;
@@ -652,7 +652,7 @@ boolean_t mu_int_blk(
 				{
 					if (muint_end_key)	/* range */
 					{
-						len = c1 - temp_buff + 1;
+						len = (int)(c1 - temp_buff + 1);
 						if ((0 < memcmp(muint_start_key->base, temp_buff, len < muint_start_keyend ?
 									len : muint_start_keyend))
 							|| (0 >  memcmp(muint_end_key->base, temp_buff, len < muint_end_keyend ?
@@ -675,7 +675,7 @@ boolean_t mu_int_blk(
 				assert(sizeof(trees_tail->key) == sizeof(muint_temp_buff));
 				memcpy(trees_tail->key, muint_temp_buff, sizeof(muint_temp_buff));
 
-				hdr_len = sizeof(rec_hdr) + strlen(trees_tail->key) + 2 - rec_cmpc; /* We cannot use
+				hdr_len = SIZEOF(rec_hdr) + STRLEN(trees_tail->key) + 2 - rec_cmpc; /* We cannot use
 									mid_len() which expects mident_fixed structure */
 				/* +2 in the above hdr_len calculation is to take into account
 				   two \0's after the end of the key
@@ -683,7 +683,7 @@ boolean_t mu_int_blk(
 				if (rec_size > hdr_len + sizeof(block_id))
 				{
 					subrec_ptr = get_spec((sm_uc_ptr_t)rec_base + hdr_len + sizeof(block_id),
-									rec_size - (hdr_len + sizeof(block_id)), COLL_SPEC);
+									(int)(rec_size - (hdr_len + sizeof(block_id))), COLL_SPEC);
 					if (subrec_ptr)
 					{
 						trees_tail->nct = *(subrec_ptr + COLL_NCT_OFFSET);

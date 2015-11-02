@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,13 +21,13 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 				   unsigned char *val,		/* the subscript */
 				   int len,			/* subscript's length */
 				   mlk_shrblk_ptr_t par,	/* pointer to the parent (zero if top level) */
-				   sm_int_ptr_t ptr,		/* parent's pointer to us (zero if we are not the eldest child */
+				   ptroff_t *ptr,		/* parent's pointer to us (zero if we are not the eldest child */
 				   int nshrs)			/* number of shrblks remaining to be created for this operation */
 {
 	mlk_ctldata_ptr_t	ctl;
 	mlk_shrblk_ptr_t	ret, shr1;
 	mlk_shrsub_ptr_t	subptr;
-	int4 			n;
+	ptroff_t		n;
 
 	ctl = p->ctlptr;
 
@@ -38,7 +38,7 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	   running that close to the edge, they should be increasing their lock space or using fewer locks anyway.
 	   (see 7/97).
         */
-	n = nshrs * (3 + sizeof(mlk_shrsub) - 1) + (p->total_length - (val - p->value));
+	n = (ptroff_t)(nshrs * (3 + sizeof(mlk_shrsub) - 1) + (p->total_length - (val - p->value)));
 	if (ctl->subtop - ctl->subfree < n || ctl->blkcnt < nshrs)
 		return 0;
 
@@ -56,13 +56,13 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 		A2R(ret->parent, par);
 	if (ptr)
 		A2R(*ptr, ret);
-	n = ROUND_UP(sizeof(mlk_shrsub) - 1 + len, 4);
+	n = (ptroff_t)ROUND_UP(sizeof(mlk_shrsub) - 1 + len, sizeof(ptroff_t));
 	if (ctl->subtop - ctl->subfree < n)
 		GTMASSERT;
 	subptr = (mlk_shrsub_ptr_t)R2A(ctl->subfree);
 	ctl->subfree += n;
 	A2R(ret->value, subptr);
-	n = (sm_uc_ptr_t)ret - (sm_uc_ptr_t)&subptr->backpointer;
+	n = (ptroff_t)((sm_uc_ptr_t)ret - (sm_uc_ptr_t)&subptr->backpointer);
 	assert (n < 0);
 	subptr->backpointer = n;
 	subptr->length = len;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,19 +16,20 @@
 #include "indir_enum.h"
 #include "op.h"
 #include "io.h"
+#include "fix_xfer_entry.h"
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF mval 		zstep_action;
-GBLREF int 		(* volatile xfer_table[])();
+GBLREF xfer_entry_t	xfer_table[];
 
 void op_zst_break(void)
 {
-	xfer_table[xf_linefetch] = op_linefetch;
-	xfer_table[xf_linestart] = op_linestart;
-	xfer_table[xf_zbfetch] = op_zbfetch;
-	xfer_table[xf_zbstart] = op_zbstart;
-	xfer_table[xf_ret] = opp_ret;
-	xfer_table[xf_retarg] = op_retarg;
+	FIX_XFER_ENTRY(xf_linefetch, op_linefetch);
+	FIX_XFER_ENTRY(xf_linestart, op_linestart);
+	FIX_XFER_ENTRY(xf_zbfetch, op_zbfetch);
+	FIX_XFER_ENTRY(xf_zbstart, op_zbstart);
+	FIX_XFER_ENTRY(xf_ret, opp_ret);
+	FIX_XFER_ENTRY(xf_retarg, op_retarg);
 
 	flush_pio();
 	op_commarg(&zstep_action,indir_linetail);

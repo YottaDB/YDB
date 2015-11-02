@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@
  */
 boolean_t logical_truth_value(mstr *log, boolean_t negate, boolean_t *is_defined)
 {
-	uint4		status;
+	int4		status;
 	mstr		tn;
 	char		buf[1024];
 	boolean_t	zero, is_num;

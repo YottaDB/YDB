@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,12 +23,15 @@ void mupip_ctrl(int sig)
 {
 	assert (sig == SIGINT);
 
-	curr_time = time(0);
+	curr_time = (int4)time(0);
 	if (prev_time)
-	{	if ((curr_time - prev_time) > 1)
-		{	mu_ctrlc_occurred = TRUE;
+	{
+		if ((curr_time - prev_time) > 1)
+		{
+			mu_ctrlc_occurred = TRUE;
 		}else
-		{	mu_ctrly_occurred = TRUE;
+		{
+			mu_ctrly_occurred = TRUE;
 		}
 	}else
 		mu_ctrlc_occurred = TRUE;

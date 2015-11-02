@@ -197,7 +197,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	} else  if (rv < 0)
 	{
 		errptr = (char *)STRERROR(errno);
-		errlen = strlen(errptr);
+		errlen = STRLEN(errptr);
 		rts_error(VARLSTCNT(6) ERR_SOCKWAIT, 0, ERR_TEXT, 2, errlen, errptr);
 		return FALSE;
 	}
@@ -221,7 +221,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		if (rv == -1)
 		{
 			errptr = (char *)STRERROR(errno);
-			errlen = strlen(errptr);
+			errlen = STRLEN(errptr);
 			rts_error(VARLSTCNT(6) ERR_SOCKACPT, 0, ERR_TEXT, 2, errlen, errptr);
 			return FALSE;
 		}

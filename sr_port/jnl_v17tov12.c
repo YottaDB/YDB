@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,13 +73,13 @@ int jnl_v17tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 					ptr = jb + FIXED_UPD_RECLEN;
 					GET_JNL_STR_LEN(key_len, ptr);
 					assert(key_len <= MAX_KEY_SZ);
-					src_total_key = key_len + sizeof(jnl_str_len_t);
-					des_total_key = key_len + sizeof(unsigned short);
+					src_total_key = key_len + SIZEOF(jnl_str_len_t);
+					des_total_key = key_len + SIZEOF(unsigned short);
 					if (IS_SET(rectype))
 					{
 						ptr = jb + FIXED_UPD_RECLEN + src_total_key;
 						GET_MSTR_LEN(long_data_len, ptr);
-						total_data = long_data_len + sizeof(mstr_len_t);
+						total_data = long_data_len + SIZEOF(mstr_len_t);
 					}
 				}
 				clen_without_sfx = ROUND_UP(V12_JREC_PREFIX_SIZE + v12_jnl_fixed_size[rectype] + des_total_key +
@@ -153,7 +153,7 @@ int jnl_v17tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 					cb += sizeof(uint4) + sizeof(uint4);	/* participants + ts_short_time */
 				} else
 					assert(FALSE);
-				nzeros = (cstart + clen_without_sfx - cb);
+				nzeros = (int)((cstart + clen_without_sfx - cb));
 				if (nzeros > 0)
 				{
 					assert(V12_JNL_REC_START_BNDRY > nzeros);
@@ -186,7 +186,7 @@ int jnl_v17tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		status = -1;
 	}
 	assert(0 == jlen || -1 == status);
-	*jnl_len = jb - jnl_buff;
-	*conv_len = cb - conv_buff;
+	*jnl_len = (uint4)(jb - jnl_buff);
+	*conv_len = (uint4)(cb - conv_buff);
 	return(status);
 }

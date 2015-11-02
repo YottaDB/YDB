@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,8 +66,8 @@ GBLREF enum gtmImageTypes	image_type;
  * ------------------------------------------------------
  */
 uint4 mlk_lock(mlk_pvtblk *p,
-	       uint4 auxown,
-	       bool new)
+	       UINTPTR_T  auxown,
+	       bool       new)
 {
 	mlk_ctldata_ptr_t	ctl;
 	mlk_shrblk_ptr_t	d;
@@ -98,7 +98,7 @@ uint4 mlk_lock(mlk_pvtblk *p,
 		   that already contains the consideration for the length byte. This is so we get
 		   room to put a bunch of nicely aligned blocks so the compiler can give us its
 		   best shot at efficient code. */
-		siz = p->subscript_cnt * (3 + sizeof(mlk_shrsub) - 1) + p->total_length;
+		siz = p->subscript_cnt * (3 + SIZEOF(mlk_shrsub) - 1) + p->total_length;
 		if (ctl->subtop - ctl->subfree < siz || ctl->blkcnt < p->subscript_cnt)
 			mlk_garbage_collect(ctl, siz, p);
 		blocked = mlk_shrblk_find(p, &d, auxown);

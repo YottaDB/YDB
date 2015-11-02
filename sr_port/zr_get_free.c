@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@ zbrk_struct *zr_get_free(z_records *zrecs, zb_code *addr)
 	if (1 == zrecs->end - zrecs->free)	/* expand if necessary */
 	{
 		temp = *zrecs;
-		zr_init(zrecs, 2 * (zrecs->end - zrecs->beg));
+		zr_init(zrecs, 2 * (int)(zrecs->end - zrecs->beg));
 		assert(2 * (temp.end - temp.beg) == (zrecs->end - zrecs->beg));
 		memcpy((char *)zrecs->beg, (char *)temp.beg, (temp.free - temp.beg) * sizeof(zbrk_struct));
 		assert(zrecs->free == zrecs->beg);

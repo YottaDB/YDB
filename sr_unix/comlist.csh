@@ -75,6 +75,8 @@ set comlist_status = 0
 
 set dollar_sign = \$
 
+unalias ls rm
+
 set comlist_start_directory = `pwd`
 
 switch ( $gtm_verno )

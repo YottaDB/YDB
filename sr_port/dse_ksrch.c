@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,8 @@ int dse_ksrch(block_id srch,
 {
 	sm_uc_ptr_t	bp, b_top, rp, r_top, key_top, blk_id;
 	unsigned char	cc;
-	int	    	size, rsize;
+	int	    	rsize;
+	ssize_t		size;
 	int4		cmp;
 	short		dummy_short;
 	int4		dummy_int;
@@ -61,7 +62,7 @@ int dse_ksrch(block_id srch,
 	*off = 0;
 	for (rp = bp + sizeof(blk_hdr); rp < b_top; rp = r_top)
 	{
-		*off = rp - bp;
+		*off = (int4)(rp - bp);
 		GET_SHORT(dummy_short, &((rec_hdr_ptr_t)rp)->rsiz);
 		rsize = dummy_short;
 		if (rsize < sizeof(rec_hdr))
@@ -87,13 +88,13 @@ int dse_ksrch(block_id srch,
 			cc = patch_comp_count;
 		else
 			cc = ((rec_hdr_ptr_t) rp)->cmpc;
-		size = key_top - rp - sizeof(rec_hdr);
+		size = (ssize_t)(key_top - rp - sizeof(rec_hdr));
 		if (size > sizeof(patch_comp_key) - 2 - cc)
 			size = sizeof(patch_comp_key) - 2 - cc;
 		if (size < 0)
 			size = 0;
 		memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
-		patch_comp_count = cc + size;
+		patch_comp_count = (int)(cc + size);
 		GET_LONGP(pp, key_top);
 		cmp = memvcmp(targ_key, targ_len, &patch_comp_key[0], patch_comp_count);
 		if (0 > cmp)

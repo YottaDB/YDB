@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,9 @@
 /*	File modified by Hallgarth on 28-APR-1986 08:39:49.98    */
 
 /* Declare all xf_* enumerators */
+#ifndef XFER_ENUM_H
+#define XFER_ENUM_H
+
 #define XFER(a,b) a
 enum
 {
@@ -38,3 +41,4 @@ typedef int (* volatile xfer_entry_t)();
 #define op_fntranslate op_fnztranslate
 #define op_fnreverse op_fnzreverse
 #endif /* UNICODE_SUPPORTED */
+#endif /* XFER_ENUM_H */

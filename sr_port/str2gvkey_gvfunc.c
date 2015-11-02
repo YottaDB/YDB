@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,6 @@ void str2gvkey_gvfunc(char *cp, int len)
 	gvargs_t	op_gvargs;
 
 	naked = str2gvargs(cp, len, &op_gvargs);
-	callg((int(*)(int cnt, ...))(naked ? op_gvnaked : op_gvname), &op_gvargs);
+	callg((INTPTR_T (*)(intszofptr_t cnt, ...))(naked ? op_gvnaked : op_gvname), (gparam_list *)&op_gvargs);
 	return;
 }

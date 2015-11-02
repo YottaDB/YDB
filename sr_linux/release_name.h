@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +9,14 @@
  *								*
  ****************************************************************/
 
-#define GTM_RELEASE_NAME 	"GT.M V5.2-000B Linux x86"
+#ifdef __CYGWIN__
+#define GTM_RELEASE_NAME 	"GT.M V5.2-001 CYGWIN x86"
+#elif defined(__ia64)
+#define GTM_RELEASE_NAME 	"GT.M V5.2-001 Linux IA64"
+#elif defined(__s390__)
+#define GTM_RELEASE_NAME 	"GT.M V5.2-001 Linux S390"
+#else
+#define GTM_RELEASE_NAME 	"GT.M V5.2-001 Linux x86"
+#endif
 #define GTM_PRODUCT 		"GT.M"
 #define GTM_VERSION		"V5.2"

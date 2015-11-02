@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 typedef	struct urx_addr_type
 	{
-		int4			*addr;
+		INTPTR_T			*addr;
 		struct urx_addr_type	*next;
 	}	urx_addr;
 

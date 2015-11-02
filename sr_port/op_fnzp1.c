@@ -160,9 +160,9 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 							   or if hit last char, +2 past end of piece */
 		++cpcidx;				/* Next piece */
 		if (pcoff < pcoffmax)
-			*pcoff++ = first - start;	/* offset to this piece */
+			*pcoff++ = (unsigned int)(first - start);	/* offset to this piece */
 		if (pcoff == pcoffmax)
-			*pcoff++ = last - start;	/* store start of first piece beyond what is in cache */
+			*pcoff++ = (unsigned int)(last - start);	/* store start of first piece beyond what is in cache */
 	}
 
 	ldst.str.addr = (char *)first;
@@ -171,7 +171,7 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 	if (spcidx != cpcidx)
 	{
 		if (pcoff < pcoffmax)
-			*pcoff = last - start;		/* If not at end of cache, save start of "next" piece */
+			*pcoff = (unsigned int)(last - start);		/* If not at end of cache, save start of "next" piece */
 
 		--last;					/* Undo bump past last delim or +2 past end char
 							   of piece for accurate string len */
@@ -182,7 +182,7 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 
 		/* If the above loop ended prematurely because we ran out of text, we return null string */
 		if (trgpcidx < cpcidx)
-			ldst.str.len = last - first;	/* Length of piece we located */
+			ldst.str.len = INTCAST(last - first);	/* Length of piece we located */
 		else
 			ldst.str.len = 0;
 

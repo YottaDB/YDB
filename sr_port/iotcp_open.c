@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -272,7 +272,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 			if (0 > status)
 			{
 				errptr = (char *)STRERROR(errno);
-				errlen = strlen(errptr);
+				errlen = STRLEN(errptr);
 				iotcp_rmlsock((io_desc *)dev->iod);
 				rts_error(VARLSTCNT(6) ERR_SOCKWAIT, 0, ERR_TEXT, 2, errlen, errptr);
 				return FALSE;
@@ -282,7 +282,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 			if (-1 == status)
 			{
 				errptr = (char *)STRERROR(errno);
-				errlen = strlen(errptr);
+				errlen = STRLEN(errptr);
 				iotcp_rmlsock((io_desc *)dev->iod);
 				rts_error(VARLSTCNT(6) ERR_SOCKACPT, 0, ERR_TEXT, 2, errlen, errptr);
 				return FALSE;
@@ -308,7 +308,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 				if (-1 == newtcp.socket)
 				{
 					errptr = (char *)STRERROR(errno);
-					errlen = strlen(errptr);
+					errlen = STRLEN(errptr);
 					rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 					return FALSE;
 				}
@@ -317,7 +317,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 				{
 					(void)tcp_routines.aa_close(newtcp.socket);
 					errptr = (char *)STRERROR(errno);
-					errlen = strlen(errptr);
+					errlen = STRLEN(errptr);
 					rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 					return FALSE;
 				}
@@ -326,7 +326,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 				{
 					(void)tcp_routines.aa_close(newtcp.socket);
 					errptr = (char *)STRERROR(errno);
-					errlen = strlen(errptr);
+					errlen = STRLEN(errptr);
 					rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 					return FALSE;
 				}
@@ -339,7 +339,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 				{
 					(void)tcp_routines.aa_close(newtcp.socket);
 					errptr = (char *)STRERROR(errno);
-					errlen = strlen(errptr);
+					errlen = STRLEN(errptr);
 					rts_error(VARLSTCNT(6) ERR_OPENCONN, 0, ERR_TEXT, 2, errlen, errptr);
 					return FALSE;
 				}

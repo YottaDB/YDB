@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -108,7 +108,7 @@ int m_job(void)
 		if (TK_COLON == window_token)
 		{
 			is_timeout = TRUE;
-			plist = put_str((char *)empty_plist,sizeof(empty_plist));
+			plist = put_str((char *)empty_plist,SIZEOF(empty_plist));
 		} else
 		{
 			if (!jobparameters(&plist))
@@ -125,7 +125,7 @@ int m_job(void)
 	} else
 	{
 		is_timeout = FALSE;
-		plist = put_str((char *)empty_plist,sizeof(empty_plist));
+		plist = put_str((char *)empty_plist,SIZEOF(empty_plist));
 		timeout = put_ilit(NO_M_TIMEOUT);
 	}
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -356,9 +356,9 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 					there will be no prev_rec in right block.
 				   Else (if curr_rec is not first key)
 					there will be some records before new_ins_key, at least prev_rec */
-				delta = BSTAR_REC_SIZE + new_ins_keylen
+				delta = (int)(BSTAR_REC_SIZE + new_ins_keylen
 					- old_ances_currkeylen + new_ances_currkeylen
-					+ ((0 == new_ins_keycmpc) ? 0 : (((rec_hdr_ptr_t)new_blk2_frec_base)->cmpc));
+					+ ((0 == new_ins_keycmpc) ? 0 : (((rec_hdr_ptr_t)new_blk2_frec_base)->cmpc)));
 				if (sizeof(blk_hdr) + old_right_piece_len + delta <= blk_size - cs_data->reserved_bytes)
 				{
 					insert_in_left = FALSE;
@@ -378,7 +378,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			{
 				/* in this case prev_rec (if exists), new key and curr_rec should go into left block
 					and curr_rec will be the last record (*-key) of left new block */
-				delta = BSTAR_REC_SIZE + new_ins_keylen ;
+				delta = BSTAR_REC_SIZE + new_ins_keylen;
 				if (new_leftblk_top_off + delta <= blk_size - cs_data->reserved_bytes)
 					insert_in_left = TRUE;
 				else
@@ -450,7 +450,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				BLK_SEG(bs_ptr2, ances_currkey + new_ances_currkeycmpc, new_ances_currkeylen);
 				ins_off = blk_seg_cnt;
 				BLK_SEG(bs_ptr2, (unsigned char *)&zeroes, sizeof(block_id));
-				save_blk_piece_len = new_blk1_top - old_blk1_last_rec_size - old_blk_after_currec;
+				save_blk_piece_len = (int)(new_blk1_top - old_blk1_last_rec_size - old_blk_after_currec);
 				if (0 < save_blk_piece_len )
 				{
  					if (old_blk_after_currec + save_blk_piece_len >= new_blk2_top)
@@ -496,7 +496,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			{
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr2, sizeof(rec_hdr));
 				BLK_SEG(bs_ptr2, newblk2_first_key, newblk2_first_keysz);
-				save_blk_piece_len = new_blk2_top - new_blk2_rem;
+				save_blk_piece_len = (int)(new_blk2_top - new_blk2_rem);
 				if (0 > save_blk_piece_len)
 				{
 					assert(t_tries < CDB_STAGNATE);
@@ -518,7 +518,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		{	/* new_ins_key to be inserted in right block */
 			/* LEFT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
-			save_blk_piece_len = new_leftblk_top_off - sizeof(blk_hdr) - old_blk1_last_rec_size;
+			save_blk_piece_len = (int)(new_leftblk_top_off - sizeof(blk_hdr) - old_blk1_last_rec_size);
 			if (old_blk1_base + sizeof(blk_hdr) + save_blk_piece_len >= new_blk2_top)
 			{
 				assert(t_tries < CDB_STAGNATE);
@@ -546,8 +546,8 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			{	/* anything before curr_rec */
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr2, sizeof(rec_hdr));
 				BLK_SEG(bs_ptr2, newblk2_first_key, newblk2_first_keysz);
-				save_blk_piece_len = gv_target->hist.h[level].curr_rec.offset -
-					new_leftblk_top_off  - (new_blk2_rem - new_blk2_frec_base);
+				save_blk_piece_len = (int)(gv_target->hist.h[level].curr_rec.offset -
+					new_leftblk_top_off  - (new_blk2_rem - new_blk2_frec_base));
 				if (new_blk2_rem + save_blk_piece_len >=  new_blk2_top )
 				{
 					assert(t_tries < CDB_STAGNATE);
@@ -570,7 +570,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			BLK_SEG(bs_ptr2, ances_currkey + new_ances_currkeycmpc, new_ances_currkeylen);
 			ins_off = blk_seg_cnt;
 			BLK_SEG(bs_ptr2, (unsigned char *)&zeroes, sizeof(block_id));
-			save_blk_piece_len = new_blk2_top - old_blk_after_currec;
+			save_blk_piece_len = (int)(new_blk2_top - old_blk_after_currec);
 			if (0 < save_blk_piece_len)
 			{
 				BLK_ADDR(save_blk_piece, save_blk_piece_len, unsigned char);

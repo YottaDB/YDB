@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,7 +73,7 @@ int	iott_write_raw(int fildes, void *str832, unsigned int len)
 				outptr = UTF8_WCTOMB(temp32, outptr);
 			}
 			/* either end of input or end of conversion buffer */
-			if (0 < (outlen = (outptr - string)))
+			if (0 < (outlen = (int)((outptr - string))))
 			{	/* something to write */
 				DOWRITERL_A(fildes, string, outlen, this_write);
 				if (0 > this_write)
@@ -146,7 +146,7 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 					line_width += this_width;
 					outptr = nextptr;
 				}
-				outlen = outptr - strstart;
+				outlen = (int)(outptr - strstart);
 				len -= outlen;
 			} else
 			{
@@ -164,7 +164,7 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 					temp32 = *str32;	/* preserve argument */
 					outptr = UTF8_WCTOMB(temp32, outptr);
 				}
-				outlen = outptr - string;
+				outlen =(int)(outptr - string);
 				strstart = string;
 			}
 			assert(!writenewline || len);
@@ -359,7 +359,7 @@ int	write_loop(int fildes, unsigned char *str, int num_times)
 	unsigned char	*temp = NULL;
 
 	*string = '\0';
-	size_required = num_times * strlen((char *)str);
+	size_required = num_times * STRLEN((char *)str);
 
 	if (size_required > sizeof(string))
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@ lv_blk *lv_newblock(lv_blk *block_addr, lv_blk *next_block, int size)
 	register int n;
 
 	ptr = block_addr;
-	n = size * sizeof(lv_val);
+	n = size * SIZEOF(lv_val);
 	ptr->lv_base = ptr->lv_free = (lv_val *)malloc(n);
 	memset(ptr->lv_base, 0, n);
 	ptr->lv_top = ptr->lv_base + size;

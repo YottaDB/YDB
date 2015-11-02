@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,13 +71,13 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 		{
 			if (',' == *ptr1)
 			{
-				len = ptr1 - ptr;
+				len = (int)(ptr1 - ptr);
 				ptr1++;
 				break;
 			}
 			else if (!*ptr1)
 			{
-				len = ptr1 - ptr;
+				len = (int)(ptr1 - ptr);
 				break;
 			}
 		}
@@ -142,7 +142,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 		}
 		else
 		{
-			gmap_beg.len = c - gmap_beg.addr;
+			gmap_beg.len = INTCAST(c - gmap_beg.addr);
 			c++;
 			gmap_end.addr = c;
 			gmap_end.len = len - 1;

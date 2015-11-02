@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,10 +9,11 @@
  *								*
  ****************************************************************/
 
-/*** STUB FILE ***/
+/* STUB FILE only for non-ia64 versions */
 #include "mdef.h"
 #include "inst_flush.h"
 
 void inst_flush(void *start, int4 len)
 {
+        IA64_ONLY(cacheflush(start, len, 0 ));
 }

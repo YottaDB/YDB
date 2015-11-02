@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,8 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned ch
 	unsigned char	temp[OFFSET_LEN];
 	lab_tabent	*max_label, *label_table, *last_label;
 	lnr_tabent	*line_table, *last_line;
-	int4		len, ct, offset, in_addr_offset;
+	int4		len, ct, offset;
+        int4	        in_addr_offset;
 
 	if (!ADDR_IN_CODE(in_addr, routine))
 		return out;
@@ -60,7 +61,7 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned ch
 		out += len;
 	}
 	offset = 0;
-	in_addr_offset = in_addr - CODE_BASE_ADDR(routine);
+	in_addr_offset = (int4)(in_addr - CODE_BASE_ADDR(routine));
 	last_line = LNRTAB_ADR(routine);
 	last_line += routine->lnrtab_len;
 	for( ; ++line_table < last_line ; offset++)

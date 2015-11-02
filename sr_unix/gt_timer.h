@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
  */
 #include <signal.h>
 
-typedef int4 TID;		/* Timer ID type */
+typedef INTPTR_T TID;		/* Timer ID type */
 
 /*
  * -----------------------------------------------------
@@ -36,8 +36,8 @@ typedef int4 TID;		/* Timer ID type */
  * -----------------------------------------------------
  */
 typedef struct tag_abs_time {
-	int4	at_sec;		/* seconds */
-	int4	at_usec;	/* and microseconds */
+	long	at_sec;		/* seconds */
+	long	at_usec;	/* and microseconds */
 } ABS_TIME;
 
 /*
@@ -49,13 +49,16 @@ typedef struct tag_abs_time {
  * -----------------------------------------------------
  */
 typedef struct tag_ts {
-	TID		tid;		/* Timer id */
 	ABS_TIME	expir_time;	/* Absolute Time when timer expires */
 	void		(*handler)();	/* Pointer to handler routine */
 	struct tag_ts	*next;		/* Pointer to next */
+        TID             tid;            /* Timer id */
         int4            safe;           /* just sets flags, no real work */
 	int4		hd_len_max;	/* Max length this blk can hold */
 	int4		hd_len;		/* Handler data length */
+  	GTM64_ONLY(int4 padding;)       /* Padding for 8 byte alignment of hd_data. Remove if hd_data
+					 * is made to starts on a 8 byte boundary (for GTM64)
+					 */
 	char		hd_data[1];	/* Handler data */
 } GT_TIMER;
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -151,8 +151,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		}
 	}
 	udi->semid = repl_instance.recvpool_semid;
-	udi->sem_ctime = repl_instance.recvpool_semid_ctime;
-	udi->shm_ctime = repl_instance.recvpool_shmid_ctime;
+	udi->gt_sem_ctime = repl_instance.recvpool_semid_ctime;
+	udi->gt_shm_ctime = repl_instance.recvpool_shmid_ctime;
 	recvpool_shmid = udi->shmid = repl_instance.recvpool_shmid;
 	if (new_ipc)
 	{
@@ -192,7 +192,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				 RTS_ERROR_LITERAL("Error with recvpool semctl"), save_errno);
 		}
-		udi->sem_ctime = semarg.buf->sem_ctime;
+		udi->gt_sem_ctime = semarg.buf->sem_ctime;
 	} else
 		set_sem_set_recvr(udi->semid);
 	/* First go for the access control lock */
@@ -234,7 +234,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				 RTS_ERROR_LITERAL("Error with recvpool shmctl"), save_errno);
 		}
-		udi->shm_ctime = shmstat.shm_ctime;
+		udi->gt_shm_ctime = shmstat.shm_ctime;
 		shm_created = TRUE;
 	}
 	status_l = (sm_long_t)(recvpool.recvpool_ctl = (recvpool_ctl_ptr_t)do_shmat(recvpool_shmid, 0, 0));
@@ -252,7 +252,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	if (shm_created)
 		recvpool.recvpool_ctl->initialized = FALSE;
 	recvpool.upd_proc_local = (upd_proc_local_ptr_t)((sm_uc_ptr_t)recvpool.recvpool_ctl   + RECVPOOL_CTL_SIZE);
-	recvpool.gtmrecv_local  = (gtmrecv_local_ptr_t) ((sm_uc_ptr_t)recvpool.upd_proc_local + UPD_PROC_LOCAL_SIZE);
+	recvpool.gtmrecv_local  = (gtmrecv_local_ptr_t)((sm_uc_ptr_t)recvpool.upd_proc_local + UPD_PROC_LOCAL_SIZE);
 	recvpool.upd_helper_ctl = (upd_helper_ctl_ptr_t)((sm_uc_ptr_t)recvpool.gtmrecv_local  + GTMRECV_LOCAL_SIZE);
 	recvpool.recvdata_base  = (sm_uc_ptr_t)recvpool.recvpool_ctl + RECVDATA_BASE_OFF;
 	if (GTMRECV == pool_user && gtmrecv_startup)
@@ -322,8 +322,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		grab_lock(jnlpool.jnlpool_dummy_reg);
 		jnlpool.repl_inst_filehdr->recvpool_shmid = udi->shmid;
 		jnlpool.repl_inst_filehdr->recvpool_semid = udi->semid;
-		jnlpool.repl_inst_filehdr->recvpool_shmid_ctime = udi->shm_ctime;
-		jnlpool.repl_inst_filehdr->recvpool_semid_ctime = udi->sem_ctime;
+		jnlpool.repl_inst_filehdr->recvpool_shmid_ctime = udi->gt_shm_ctime;
+		jnlpool.repl_inst_filehdr->recvpool_semid_ctime = udi->gt_sem_ctime;
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 		/* Flush the file header to disk so future callers of "jnlpool_init" see the jnlpool_semid and jnlpool_shmid */
 		repl_inst_flush_filehdr();

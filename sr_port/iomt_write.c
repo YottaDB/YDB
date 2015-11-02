@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ iomt_write (mstr *v)
 		{
 			outcp = mt_ptr->buffptr;
 			n = (outcp + inlen > mt_ptr->bufftop) ?
-				mt_ptr->bufftop - outcp : inlen;
+				(int)(mt_ptr->bufftop - outcp) : inlen;
 			if (n <= 0)
 			{
 				iomt_vlflush (io_ptr);

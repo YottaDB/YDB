@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +12,9 @@
 #include "mdef.h"
 #include "xfer_enum.h"
 #include "op.h"
+#include "fix_xfer_entry.h"
 
-GBLREF int 		(* volatile xfer_table[])();
+GBLREF xfer_entry_t	xfer_table[];
 GBLREF bool 		neterr_pending;
 GBLREF int4 		outofband;
 GBLREF int 		iott_write_error;
@@ -22,11 +23,11 @@ void op_zst_over(void)
 {
 	if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
 	{
-		xfer_table[xf_linefetch] = op_linefetch;
-		xfer_table[xf_linestart] = op_linestart;
-		xfer_table[xf_zbfetch] = op_zbfetch;
-		xfer_table[xf_zbstart] = op_zbstart;
-		xfer_table[xf_ret] = opp_zst_over_ret;
-		xfer_table[xf_retarg] = opp_zst_over_retarg;
+                    FIX_XFER_ENTRY(xf_linefetch, op_linefetch);
+                    FIX_XFER_ENTRY(xf_linestart, op_linestart);
+                    FIX_XFER_ENTRY(xf_zbfetch, op_zbfetch);
+                    FIX_XFER_ENTRY(xf_zbstart, op_zbstart);
+                    FIX_XFER_ENTRY(xf_ret,opp_zst_over_ret);
+                    FIX_XFER_ENTRY(xf_retarg, opp_zst_over_retarg);
 	}
 }

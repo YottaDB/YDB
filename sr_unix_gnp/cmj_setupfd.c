@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +62,7 @@ cmi_status_t cmj_setupfd(int fd)
 		return (cmi_status_t)errno;
 #endif
 #ifndef GTCM_KEEP_DEFAULT_BUFLEN /* if you want to test with system allocated default buflen, define this and rebuild */
-	optlen = sizeof(buflen);
+	optlen = SIZEOF(buflen);
 	if (-1 == (rval = getsockopt(fd, SOL_SOCKET, SO_SNDBUF, (void *)&snd_buflen, &optlen)) ||
 	    -1 == (rval = getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (void *)&rcv_buflen, &optlen)))
 		return (cmi_status_t)errno;

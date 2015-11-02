@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +62,7 @@ typedef struct
 {
 	unsigned char		*base;		/* Pointer to the buffer base of this mur_buff_desc */
 	unsigned char		*top;		/* Pointer to the buffer top of this mur_buff_desc */
-	int4			blen;		/* Length of the buffer till end of valid data  */
+	off_jnl_t		blen;		/* Length of the buffer till end of valid data  */
 	off_jnl_t		dskaddr;   	/* disk offset from which this buffer was read */
 	boolean_t		read_in_progress;/* Asynchronous read requested and in progress */
 #if defined(UNIX)

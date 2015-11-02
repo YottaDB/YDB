@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef MU_RNDWN_REPL_INSTANCE_INCLUDED
 #define MU_RNDWN_REPL_INSTANCE_INCLUDED
 
-boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t immediate);
+boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t immediate, boolean_t rndwn_both_pools);
 
 #endif /* MU_RNDWN_REPL_INSTANCE_INCLUDED */

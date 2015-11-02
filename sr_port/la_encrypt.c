@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,9 +31,6 @@ char	 	*q , 				/* input sequence 		*/
 int 		len,				/* sequence length 		*/
 uint4 		bcs[])				/* result, binary form 		*/
 {
-	void		la_encrypt_table();
-	uint4		la_encrypt_value();
-
 	static uint4	poly0[10] = {0xEDB88320, 0xA001A001, 0x00008408, 0x00000000, 0xA001A001, 1, 1, 1, 1, 1};
 	static uint4	init0[10] = {0xFFFFFFFF, 0x00000000, 0x0000FFFF, 0xFFFFFFFF, 0x00000000, 0, 0, 0, 0, 0};
 	static uint4	poly1[10] = {0xA001A001, 0x00008408, 0xEDB88320, 0xEDB88320, 0x0000A001, 1, 1, 1, 1, 1};

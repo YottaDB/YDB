@@ -49,7 +49,7 @@
 GBLREF io_pair		io_curr_device;
 GBLREF io_pair		io_std_device;
 GBLREF stack_frame	*frame_pointer;
-GBLREF int		restart_pc;
+GBLREF unsigned char	*restart_pc;
 GBLREF unsigned char	*restart_ctxt;
 GBLREF mstr		gtmprompt;
 GBLREF short		dollar_tlevel;
@@ -113,8 +113,9 @@ void	op_dmode(void)
 	old_errno = errno;
 #endif
 
-	*((int4 **)&restart_pc) = (int4 *)CODE_ADDRESS(call_dm);
-	*((int4 **)&restart_ctxt) = (int4 *)GTM_CONTEXT(call_dm);
+	*((INTPTR_T **)&restart_pc) = (INTPTR_T *)CODE_ADDRESS(call_dm);
+	*((INTPTR_T **)&restart_ctxt) = (INTPTR_T *)GTM_CONTEXT(call_dm);
+
 #ifdef UNIX
 	loop_cnt = 0;
 	old_errno = 0;

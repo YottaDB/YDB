@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ mlabel *get_mladdr(mident *lab_name)
 	lab_str.len = lname->len;
 	lab_str.addr = lname->addr;
 	s2pool_align(&lab_str);
-	*p = (mlabel *) mcalloc((unsigned int) sizeof(mlabel));
+	*p = (mlabel *) mcalloc(SIZEOF(mlabel));
 	(*p)->mvname.len = lab_str.len;
 	(*p)->mvname.addr = lab_str.addr;
 	assert(!(*p)->lson && !(*p)->rson);

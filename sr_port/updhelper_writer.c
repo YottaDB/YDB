@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,8 +93,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 
 int updhelper_writer(void)
 {
-	upd_helper_ctl_ptr_t	upd_helper_ctl;
-	uint4			last_pre_read_offset, pre_read_offset;
+	uint4			pre_read_offset;
 	int			lcnt;
 	int4			dummy_errno;
 	gd_region		*reg, *r_top;
@@ -106,8 +105,6 @@ int updhelper_writer(void)
 	call_on_signal = updhelper_writer_sigstop;
 	updhelper_init(UPD_HELPER_WRITER);
 	repl_log(updhelper_log_fp, TRUE, TRUE, "Helper writer started. PID %d [0x%X]\n", process_id, process_id);
-	last_pre_read_offset = 0;
-	upd_helper_ctl = recvpool.upd_helper_ctl;
 	for (lcnt = 0; (NO_SHUTDOWN == helper_entry->helper_shutdown); )
 	{
 		flushed = FALSE;

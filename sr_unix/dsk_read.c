@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,7 @@
 #include "error.h"
 #include "gtmio.h"
 #include "gds_blk_upgrade.h"
+#include "gdsbml.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -45,6 +46,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 	enum db_ver		tmp_ondskblkver;
 	sm_uc_ptr_t		save_buff = NULL;
 	DEBUG_ONLY(
+		blk_hdr_ptr_t	blk_hdr;
 		static int	in_dsk_read;
 	)
 	/* It is possible that the block that we read in from disk is a V4 format block.  The database block scanning routines
@@ -118,6 +120,16 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 		if ((NULL != save_buff) && (NULL != buff))	/* Buffer not moved by upgrade, we must move */
 			memcpy(save_buff, buff, size);
 	}
-	DEBUG_ONLY(in_dsk_read--;)
+	DEBUG_ONLY(
+		in_dsk_read--;
+		if (cs_addrs->now_crit)
+		{	/* Do basic checks on the GDS block that was just read */
+			blk_hdr = (NULL != save_buff) ? (blk_hdr_ptr_t)save_buff : (blk_hdr_ptr_t)buff;
+			assert((unsigned)GDSVLAST > (unsigned)blk_hdr->bver);
+			assert((LCL_MAP_LEVL == blk_hdr->levl) || ((unsigned)MAX_BT_DEPTH > (unsigned)blk_hdr->levl));
+			assert((unsigned)size >= (unsigned)blk_hdr->bsiz);
+			assert((unsigned)cs_data->trans_hist.curr_tn >= (unsigned)blk_hdr->tn);
+		}
+	)
 	return save_errno;
 }

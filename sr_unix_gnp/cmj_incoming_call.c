@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@ void cmj_incoming_call(struct NTD *tsk)
 	int rval, rc;
 	struct CLB *lnk;
 	struct sockaddr_in in;
-	GTM_SOCKLEN_TYPE sz = sizeof(in);
+	GTM_SOCKLEN_TYPE sz = SIZEOF(in);
 	cmi_status_t status;
 
 	while ((-1 == (rval = accept(tsk->listen_fd, (struct sockaddr *)&in, &sz))) && EINTR == errno)

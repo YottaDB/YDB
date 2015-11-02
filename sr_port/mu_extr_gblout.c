@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -167,7 +167,7 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 				st->reclen = rec_size;
 			if (st->keylen < gv_currkey->end + 1)
 				st->keylen = gv_currkey->end + 1;
-			data_len = rec_size - (cp1 - (sm_uc_ptr_t)rp);
+			data_len = (int)(rec_size - (cp1 - (sm_uc_ptr_t)rp));
 			if (0 > data_len)
 				INTEG_ERROR_RETURN
 			if (st->datalen < data_len)
@@ -175,7 +175,7 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 			if (MU_FMT_BINARY != format)
 			{
 				cp2 = (unsigned char *)format_targ_key(key_buffer, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
-				fmtd_key_len = cp2 - key_buffer;
+				fmtd_key_len = (int)(cp2 - key_buffer);
 				if (MU_FMT_ZWR == format)
 				{
 					memcpy(zwr_buffer, key_buffer, fmtd_key_len);

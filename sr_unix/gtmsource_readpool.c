@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +104,7 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 			}
 			if (sizeof(jnldata_hdr_struct) < jnldata_len && jnldata_len <= jnlpool_size)
 			{
-				read_size = jnldata_len - sizeof(jnldata_hdr_struct);
+				read_size = jnldata_len - USIZEOF(jnldata_hdr_struct);
 				if (0 < read_size && read_size <= maxbufflen)
 				{
 					if (0 < (wrap_size = (int4)(read - (jnlpool_size - jnldata_len))))
@@ -182,7 +182,7 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 										buf_top - tr_p);
 								}
 							)
-							jnldata_len = (tr_p - buff) + sizeof(jnldata_hdr_struct);
+							jnldata_len = (uint4)((tr_p - buff) + sizeof(jnldata_hdr_struct));
 							wrap_size = (int4)(read - (jnlpool_size - jnldata_len));
 						}
 						REPL_DPRINT4("Pool read seqno : "INT8_FMT" Num Tr read : %d Total Tr len : %d\n",
@@ -228,7 +228,7 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 						gtmsource_local->read = read;
 						gtmsource_local->read_addr = read_addr;
 						gtmsource_local->read_jnl_seqno = read_jnl_seqno;
-						*data_len = first_tr_len - sizeof(jnldata_hdr_struct);
+						*data_len = first_tr_len - SIZEOF(jnldata_hdr_struct);
 						return (jnldata_len);
 					} /* else overflow happened, or about to happen */
 				} else if (0 < read_size && jnlpool_hasnt_overflowed(jctl, jnlpool_size, read_addr))

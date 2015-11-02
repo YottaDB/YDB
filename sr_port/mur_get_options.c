@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -300,7 +300,7 @@ void	mur_get_options(void)
 			else
 				rl_ptr->next = rl_ptr1;
 			rl_ptr = rl_ptr1;
-			file_name_specified_len = cptr - entry_ptr;
+			file_name_specified_len = (unsigned int)(cptr - entry_ptr);
 			memcpy(file_name_specified, entry, file_name_specified_len);
 			*(file_name_specified + file_name_specified_len)= '\0';
 			if (!get_full_path(file_name_specified, file_name_specified_len, file_name_expanded,

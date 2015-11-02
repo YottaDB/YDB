@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -123,7 +123,7 @@ void gtcm_loop(omi_conn_ll *cll)
 	    break;
 	}
 
-	now = time(0);
+	now = (int)time(0);
 
 /*	if we are doing pinging...check the ping socket */
 	if (psock >= 0 && FD_ISSET(psock, &r_fds))
@@ -172,8 +172,7 @@ void gtcm_loop(omi_conn_ll *cll)
 		    if (cptr->ping_cnt >= MAX_PING_CNT)
 		    {
 			    OMI_DBG((omi_debug, "%s: no response from connection %d, dropping...\n",
-				     SRVR_NAME,cptr->stats.id,
-				     cptr->stats.id));
+				     SRVR_NAME,cptr->stats.id));
 			    if (prev)
 				    prev->next = cptr->next;
 			    else

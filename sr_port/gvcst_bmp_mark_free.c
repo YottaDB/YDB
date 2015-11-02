@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -105,7 +105,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				++nextblk)
 				;
 			update_array_ptr = update_array;
-			len = (char *)nextblk - (char *)blk;
+			len = (unsigned int)((char *)nextblk - (char *)blk);
 			memcpy(update_array_ptr, blk, len);
 			update_array_ptr += len;
 			alt_hist.h[0].blk_num = 0;			/* need for calls to T_END for bitmaps */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -179,7 +179,7 @@ void	op_tcommit(void)
 							{
 								assert(is_mm);
 								wcs_mm_recover(si->gv_cur_region);
-								delta = (sm_uc_ptr_t)csa->hdr - (sm_uc_ptr_t)csd;
+								delta = (sm_long_t)((sm_uc_ptr_t)csa->hdr - (sm_uc_ptr_t)csd);
 								csd = csa->hdr;
 								/* update cse's update array and old_block */
 								for (update_cse = si->first_cw_set;  NULL != update_cse;
@@ -244,17 +244,31 @@ void	op_tcommit(void)
 									 * reading uninitialized block headers and in turn a bad
 									 * value of "old_block->bsiz". Restart if we ever access a
 									 * buffer whose size is greater than the db block size.
+									 * The only exception is if the database has been fully
+									 * upgraded and we are reading a reused block that is in
+									 * V4 format. In this case there is no need to write a
+									 * before-image so reset cs->old_block.
 									 */
 									bsiz = old_block->bsiz;
 									if (bsiz > csd->blk_size)
 									{
-										status = cdb_sc_lostbmlcr;
-										t_fail_hist[t_tries] = status;
-										SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-										TP_RETRY_ACCOUNTING(csa, csd, status);
-										break;
-									}
-									cse->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED,
+										if (!csd->fully_upgraded ||
+											(sizeof(v15_blk_hdr) >
+											((v15_blk_hdr_ptr_t)old_block)->bsiz))
+										{
+											status = cdb_sc_lostbmlcr;
+											t_fail_hist[t_tries] = status;
+											SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa,
+												status);
+											TP_RETRY_ACCOUNTING(csa, csd, status);
+											break;
+										} else
+										{	/* V4 format reused block */
+											cse->old_block = NULL;
+										}
+									} else
+										cse->blk_checksum = jnl_get_checksum(
+													INIT_CHECKSUM_SEED,
 													(uint4 *)old_block, bsiz);
 								}
 							} else
@@ -313,9 +327,9 @@ void	op_tcommit(void)
 			{	/* For mupip journal recover all transactions applied during forward phase are treated as
 			   	 * BATCH transaction for performance gain, since the recover command can be reissued like
 			   	 * a batch restart. Similarly update process considers all transactions as BATCH */
-				if ((sgmnt_addrs *)-1 != (csa = jnl_fence_ctl.fence_list))
+				if ((sgmnt_addrs *)-1L != (csa = jnl_fence_ctl.fence_list))
 				{
-					for (; (sgmnt_addrs *)-1 != csa;  csa = csa->next_fenced)
+					for (; (sgmnt_addrs *)-1L != csa;  csa = csa->next_fenced)
 					{	/* only those regions that are actively journaling will appear in the list: */
 						TP_CHANGE_REG_IF_NEEDED(csa->jnl->region);
 						jnl_wait(csa->jnl->region);
