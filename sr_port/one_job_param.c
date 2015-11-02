@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ const static readonly nametabent job_param_names[] =
 #define JPSDEF(a,b,c) c
 const static readonly jp_type job_param_data[] =
 {
-#include "jobparamstrs.h"
+#include "jobparamstrs.h"	/* BYPASSOK */
 };
 
 const static readonly unsigned char job_param_index[27] =
@@ -50,33 +50,31 @@ LITDEF jp_datatype	job_param_datatypes[] =
 #include "jobparams.h"
 };
 
-GBLREF char	window_token, director_token;
-GBLREF mval	window_mval;
-GBLREF mident	window_ident;
+error_def(ERR_JOBPARNOVAL);
+error_def(ERR_JOBPARNUM);
+error_def(ERR_JOBPARSTR);
+error_def(ERR_JOBPARUNK);
+error_def(ERR_JOBPARVALREQ);
 
 int one_job_param (char **parptr)
 {
 	boolean_t	neg;
 	int		x, num;
-        int		len;
+	int		len;
+	DCL_THREADGBL_ACCESS;
 
-	error_def	(ERR_JOBPARUNK);
-	error_def	(ERR_JOBPARNOVAL);
-	error_def	(ERR_JOBPARVALREQ);
-	error_def	(ERR_JOBPARNUM);
-	error_def	(ERR_JOBPARSTR);
-
-	if ((window_token != TK_IDENT) ||
-	    ((x = namelook (job_param_index, job_param_names, window_ident.addr, window_ident.len)) < 0))
-	{
+	SETUP_THREADGBL_ACCESS;
+	if ((TK_IDENT != TREF(window_token))
+	     || (0 > (x = (namelook(job_param_index, job_param_names, (TREF(window_ident)).addr, (TREF(window_ident)).len)))))
+	{	/* NOTE assigment above */
 		stx_error (ERR_JOBPARUNK);
 		return FALSE;
 	}
-	advancewindow ();
+	advancewindow();
 	*(*parptr)++ = job_param_data[x];
 	if (job_param_datatypes[job_param_data[x]] != jpdt_nul)
 	{
-		if (window_token != TK_EQUAL)
+		if (TK_EQUAL != TREF(window_token))
 		{
 			stx_error (ERR_JOBPARVALREQ);
 			return FALSE;
@@ -84,38 +82,38 @@ int one_job_param (char **parptr)
 		advancewindow ();
 		switch (job_param_datatypes[job_param_data[x]])
 		{
-			case jpdt_num:
-				neg = FALSE;
-				if (window_token == TK_MINUS && director_token == TK_INTLIT)
-				{
-					advancewindow();
-					neg = TRUE;
-				}
-				if (window_token != TK_INTLIT)
-				{
-					stx_error (ERR_JOBPARNUM);
-					return FALSE;
-				}
-				num = MV_FORCE_INTD(&window_mval);
-				*((int4 *) (*parptr)) = (neg ? -num : num);
-				*parptr += SIZEOF(int4);
-				break;
-			case jpdt_str:
-				if (window_token != TK_STRLIT)
-				{
-					stx_error (ERR_JOBPARSTR);
-					return FALSE;
-				}
-				len = window_mval.str.len;
-				*(*parptr)++ = len;
-				memcpy (*parptr, window_mval.str.addr, len);
-				*parptr += len;
-				break;
-			default:
-				GTMASSERT;
+		case jpdt_num:
+			neg = FALSE;
+			if ((TK_MINUS == TREF(window_token)) && (TK_INTLIT == TREF(director_token)))
+			{
+				advancewindow();
+				neg = TRUE;
+			}
+			if (TK_INTLIT != TREF(window_token))
+			{
+				stx_error (ERR_JOBPARNUM);
+				return FALSE;
+			}
+			num = MV_FORCE_INTD(&(TREF(window_mval)));
+			*((int4 *)(*parptr)) = (neg ? -num : num);
+			*parptr += SIZEOF(int4);
+			break;
+		case jpdt_str:
+			if (TK_STRLIT != TREF(window_token))
+			{
+				stx_error (ERR_JOBPARSTR);
+				return FALSE;
+			}
+			len = (TREF(window_mval)).str.len;
+			*(*parptr)++ = len;
+			memcpy(*parptr, (TREF(window_mval)).str.addr, len);
+			*parptr += len;
+			break;
+		default:
+			GTMASSERT;
 		}
 		advancewindow ();
-	} else if (window_token == TK_EQUAL)
+	} else if (TK_EQUAL == TREF(window_token))
 	{
 		stx_error (ERR_JOBPARNOVAL);
 		return FALSE;

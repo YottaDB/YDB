@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "gtm_logicals.h"
+#include "secshr_client.h"
 
 GBLREF struct sockaddr_un       gtmsecshr_sock_name;
 GBLREF key_t                    gtmsecshr_key;
@@ -92,6 +93,18 @@ const static char readonly secshrstart_error_code[][MAX_GTMSECSHR_FAIL_MESG_LEN]
 	"See syslog for cause of failure",
 };
 
+error_def(ERR_GTMSECSHR);
+error_def(ERR_GTMSECSHRPERM);
+error_def(ERR_GTMSECSHRSOCKET);
+error_def(ERR_GTMSECSHRSRVF);
+error_def(ERR_GTMSECSHRSRVFID);
+error_def(ERR_GTMSECSHRSRVFIL);
+error_def(ERR_GTMSECSHRSTART);
+error_def(ERR_GTMSECSHRTMPPATH);
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+
 #define MAX_RETRIES			7
 #define CLIENT_ACK_TIMER		5
 
@@ -131,16 +144,12 @@ const static char readonly secshrstart_error_code[][MAX_GTMSECSHR_FAIL_MESG_LEN]
 	start_timer(timer_id, msec_timeout, client_timer_handler, 0, NULL);			\
 }
 
-void client_timer_handler(void);
-int create_server (void);
-
-
 void client_timer_handler(void)
 {
 	client_timer_popped = 1;
 }
 
-int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int path_len)
+int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path_len)
 {
 	int                     client_sockfd, create_server_status, fcntl_res;
 	int			req_code, wait_count = 0;
@@ -161,18 +170,6 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 	TID			timer_id;
 	int4			msec_timeout;
 	char			*gtm_tmp_ptr;
-
-	error_def(ERR_GTMSECSHR);
-	error_def(ERR_GTMSECSHRPERM);
-	error_def(ERR_GTMSECSHRSOCKET);
-	error_def(ERR_GTMSECSHRSRVF);
-	error_def(ERR_GTMSECSHRSRVFID);
-	error_def(ERR_GTMSECSHRSRVFIL);
-	error_def(ERR_GTMSECSHRSTART);
-	error_def(ERR_GTMSECSHRTMPPATH);
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_TEXT);
 
 	timer_id = (TID)send_mesg2gtmsecshr;
 
@@ -253,10 +250,10 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 					wcs_backoff(loop_count + 1);
 				} else
 				{
-#ifdef SECSHR_DEBUG
+#					ifdef SECSHR_DEBUG
 					util_out_print("secshr_client starting server due to sendto failure errno = !UL",
 						TRUE, save_errno);
-#endif
+#					endif
 					send_msg(VARLSTCNT(10) ERR_GTMSECSHRSRVF, 3, RTS_ERROR_TEXT("Client"), process_id,
 							ERR_TEXT, 2, RTS_ERROR_TEXT("sendto to gtmsecshr failed"), save_errno);
 					/* if gtm_tmp is not defined, show default path */
@@ -329,9 +326,9 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 			retry = TRUE;
 			if (client_timer_popped)
 			{
-#ifdef SECSHR_DEBUG
+#				ifdef SECSHR_DEBUG
 				util_out_print("secshr_client starting server due to recvfrom timeout", TRUE);
-#endif
+#				endif
 				START_SERVER;
 			}
 			loop_count++;
@@ -382,22 +379,18 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 	return ret_code;
 }
 
-int create_server (void)
+int create_server(void)
 {
 	int		child_pid, done_pid, status = 0;
-#ifdef _BSD
+#	ifdef _BSD
 	union	wait	chld_status;
 #	define CSTAT	chld_status
-#else
+#	else
 #	define CSTAT	status
-#endif
+#	endif
 	int		save_errno;
 
-	error_def(ERR_GTMSECSHRSTART);
-	error_def(ERR_GTMSECSHRSRVF);
-	error_def(ERR_TEXT);
-
-        if (0 == (child_pid = fork()))
+        if (0 == (child_pid = fork()))	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
 	{
 		process_id = getpid();
 

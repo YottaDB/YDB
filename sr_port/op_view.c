@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,8 @@
 #include <stdarg.h>
 #include "gtm_string.h"
 
+#include "gtmio.h"
+#include "have_crit.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -73,6 +75,7 @@ GBLREF	symval			*curr_symval;
 GBLREF	uint4			gtmDebugLevel;
 GBLREF	boolean_t		lvmon_enabled;
 GBLREF	spdesc			stringpool;
+GBLREF	boolean_t		is_updproc;
 
 error_def(ERR_ACTRANGE);
 error_def(ERR_COLLATIONUNDEF);
@@ -271,34 +274,45 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			break;
 #		ifndef VMS
 		case VTK_JNLERROR:
-			TREF(error_on_jnl_file_lost) = MV_FORCE_INT(parmblk.value);
-			if (MAX_JNL_FILE_LOST_OPT < TREF(error_on_jnl_file_lost))
-				TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_TURN_OFF;
-			if (NULL == gd_header)		/* open gbldir */
-				gvinit();
-			save_reg = gv_cur_region;
-			/* change all regions */
-			reg = gd_header->regions;
-			r_top = reg + gd_header->n_regions - 1;
-			for (;  reg <= r_top;  reg++)
+			/* In case of update process, dont let this variable be user-controlled. We always want to error out
+			 * if we are about to invoke "jnl_file_lost". This way we will force the operator to fix whatever
+			 * caused the jnl_file_lost invocation (e.g. permissions, disk space issues etc.) and restart
+			 * the receiver server so replication can resume from wherever we last left. On the other hand,
+			 * automatically turning off journaling (and hence replication) (like is a choice for GT.M)
+			 * would make resumption of replication much more effort for the user.
+			 */
+			assert(!is_updproc || (JNL_FILE_LOST_ERRORS == TREF(error_on_jnl_file_lost)));
+			if (!is_updproc)
 			{
-				if (!reg->open)
-					gv_init_reg(reg);
-				if (!reg->read_only)
+				TREF(error_on_jnl_file_lost) = MV_FORCE_INT(parmblk.value);
+				if (MAX_JNL_FILE_LOST_OPT < TREF(error_on_jnl_file_lost))
+					TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_TURN_OFF;
+				if (NULL == gd_header)		/* open gbldir */
+					gvinit();
+				save_reg = gv_cur_region;
+				/* change all regions */
+				reg = gd_header->regions;
+				r_top = reg + gd_header->n_regions - 1;
+				for (;  reg <= r_top;  reg++)
 				{
-					gv_cur_region = reg;
-					change_reg();
-					csa = cs_addrs;
-					csd = csa->hdr;
-					if (JNL_ENABLED(csd))
+					if (!reg->open)
+						gv_init_reg(reg);
+					if (!reg->read_only)
 					{
-						was_crit = csa->now_crit;
-						if (!was_crit)
-							grab_crit(reg);
+						gv_cur_region = reg;
+						change_reg();
+						csa = cs_addrs;
+						csd = csa->hdr;
 						if (JNL_ENABLED(csd))
-							csa->jnl->error_reported = FALSE;
-						if (!was_crit)
-							rel_crit(reg);
+						{
+							was_crit = csa->now_crit;
+							if (!was_crit)
+								grab_crit(reg);
+							if (JNL_ENABLED(csd))
+								csa->jnl->error_reported = FALSE;
+							if (!was_crit)
+								rel_crit(reg);
+						}
 					}
 				}
 			}
@@ -359,7 +373,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 		case VTK_JNLWAIT:
 			/* go through all regions that could have possibly been open across all global directories */
 			for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
-				for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions;  reg < r_top;  reg++)
+				for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions; reg < r_top; reg++)
 					jnl_wait(reg);
 			break;
 		case VTK_JOBPID:
@@ -383,7 +397,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 					SET_GVNH_NOISOLATION_STATUS(gvnh, FALSE);
 				parmblk.ni_list.type = NOISOLATION_PLUS;
 			}
-			assert(NOISOLATION_PLUS == parmblk.ni_list.type || NOISOLATION_MINUS == parmblk.ni_list.type);
+			assert((NOISOLATION_PLUS == parmblk.ni_list.type) || (NOISOLATION_MINUS == parmblk.ni_list.type));
 			if (NOISOLATION_PLUS == parmblk.ni_list.type)
 			{
 				for (gvnh_entry = parmblk.ni_list.gvnh_list; gvnh_entry; gvnh_entry = gvnh_entry->next)
@@ -494,18 +508,17 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			/* lct = -1 indicates user wants to change only ncol, not lct */
 			if (-1 != lct)
 			{
-				if (lct < MIN_COLLTYPE || lct > MAX_COLLTYPE)
+				if ((lct < MIN_COLLTYPE) || (lct > MAX_COLLTYPE))
 				{
 					va_end(var);
 					rts_error(VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
 				}
 			}
 			/* at this point, verify that there is no local data with subscripts */
-			for (cstab = curr_symval;  cstab;  cstab = cstab->last_tab)
+			for (cstab = curr_symval; cstab; cstab = cstab->last_tab)
 			{
 				assert(cstab->h_symtab.top == cstab->h_symtab.base + cstab->h_symtab.size);
-				for (tabent = cstab->h_symtab.base, topent = cstab->h_symtab.top;
-				     tabent < topent; tabent++)
+				for (tabent = cstab->h_symtab.base, topent = cstab->h_symtab.top; tabent < topent; tabent++)
 				{
 					if (HTENT_VALID_MNAME(tabent, lv_val, lv))
 					{
@@ -591,7 +604,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				}
 				arg = va_arg(var, mval *);
 				MV_FORCE_STR(arg);
-				turn_tracing_on(arg);
+				turn_tracing_on(arg, FALSE, TRUE);
 			} else
 			{
 				if (2 == numarg)

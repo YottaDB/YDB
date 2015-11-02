@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Serivces, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Serivces, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,9 @@
 #define MEGA_BOUND    (1024 * 1024)
 #endif
 
-#define FTOK	ftok
+#define FTOK	gtm_ftok
+#define FTOK_OLD	ftok
+
+key_t gtm_ftok(const char *path, int id);
 
 #endif

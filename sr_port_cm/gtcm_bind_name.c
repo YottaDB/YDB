@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,8 +61,7 @@ void gtcm_bind_name(cm_region_head *rh, boolean_t xform)
 		}
 	} else
 		gv_target = gvnh_reg->gvt;
-	if ((!gv_target->root) || (DIR_ROOT == gv_target->root))
-		gvcst_root_search();
+	GVCST_ROOT_SEARCH;
 	if ((gv_target->collseq || gv_target->nct) && xform)
 		gv_xform_key(gv_currkey, FALSE);
 	return;

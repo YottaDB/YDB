@@ -20,46 +20,47 @@
 #include "cache.h"
 #include "hashtab_objcode.h"
 #include "op.h"
+#include "fullbool.h"
 
-GBLREF char 			window_token, director_token;
-GBLREF mident 			window_ident;
-GBLREF mval 			**ind_source_sp, **ind_source_top;
-GBLREF mval 			**ind_result_sp, **ind_result_top;
+error_def(ERR_INDMAXNEST);
+error_def(ERR_VAREXPECTED);
 
 void	op_indo2(mval *dst, mval *target, mval *value)
 {
-	error_def(ERR_INDMAXNEST);
-	error_def(ERR_VAREXPECTED);
-	bool		rval;
-	mstr		object, *obj;
+	icode_str	indir_src;
+	int		rval;
+	mstr		*obj, object;
 	oprtype		v, sav_opr;
 	triple		*s, *src, *oldchain, tmpchain, *r;
-	icode_str	indir_src;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if ((TREF(ind_source_sp) >= TREF(ind_source_top)) || (TREF(ind_result_sp) >= TREF(ind_result_top)))
+		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp & ind_source_sp */
 	MV_FORCE_DEFINED(value);
 	MV_FORCE_STR(target);
 	indir_src.str = target->str;
 	indir_src.code = indir_fnorder2;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
+		obj = &object;
 		comp_init(&target->str);
 		src = newtriple(OC_IGETSRC);
 		s = maketriple(OC_NOOP);	/* we'll fill it in as we go along */
-		switch (window_token)
+		switch (TREF(window_token))
 		{
 		case TK_IDENT:
-			if (director_token != TK_LPAREN)
-			{	s->opcode = OC_FNLVNAMEO2;
-				s->operand[0] = put_str(window_ident.addr,window_ident.len);
+			if (TREF(director_token) != TK_LPAREN)
+			{
+				s->opcode = OC_FNLVNAMEO2;
+				s->operand[0] = put_str((TREF(window_ident)).addr,(TREF(window_ident)).len);
 				s->operand[1] = put_tref(src);
 				ins_triple(s);
 				advancewindow();
-				rval = TRUE;
+				rval = EXPR_GOOD;
 				break;
 			}
-			if (rval = lvn(&s->operand[0], OC_SRCHINDX, s))
+			if (EXPR_FAIL != (rval = lvn(&s->operand[0], OC_SRCHINDX, s)))	/* NOTE assignment */
 			{
 				s->opcode = OC_FNO2;
 				sav_opr = s->operand[1];
@@ -71,7 +72,7 @@ void	op_indo2(mval *dst, mval *target, mval *value)
 			}
 			break;
 		case TK_CIRCUMFLEX:
-			if (rval = gvn())
+			if (EXPR_FAIL != (rval = gvn()))				/* NOTE assignment */
 			{
 				s->opcode = OC_GVO2;
 				s->operand[0] = put_tref(src);
@@ -79,11 +80,12 @@ void	op_indo2(mval *dst, mval *target, mval *value)
 			}
 			break;
 		case TK_ATSIGN:
-			if (TREF(shift_side_effects))
+			TREF(saw_side_effect) = TREF(shift_side_effects);
+			if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
 			{
 				dqinit(&tmpchain, exorder);
 				oldchain = setcurtchain(&tmpchain);
-				if (rval = indirection(&s->operand[0]))
+				if (EXPR_FAIL != (rval = indirection(&s->operand[0])))	/* NOTE assignment */
 				{
 					s->opcode = OC_INDO2;
 					s->operand[1] = put_tref(src);
@@ -98,7 +100,7 @@ void	op_indo2(mval *dst, mval *target, mval *value)
 					setcurtchain(oldchain);
 			} else
 			{
-				if (rval = indirection(&s->operand[0]))
+				if (EXPR_FAIL != (rval = indirection(&s->operand[0])))	/* NOTE assignment */
 				{
 					s->opcode = OC_INDO2;
 					s->operand[1] = put_tref(src);
@@ -108,27 +110,18 @@ void	op_indo2(mval *dst, mval *target, mval *value)
 			break;
 		default:
 			stx_error(ERR_VAREXPECTED);
+			rval = FALSE;
 			break;
 		}
 		v = put_tref(s);
-		if (comp_fini(rval, &object, OC_IRETMVAL, &v, target->str.len))
-		{
-			indir_src.str.addr = target->str.addr;
-			cache_put(&indir_src, &object);
-			if (ind_source_sp + 1 >= ind_source_top || ind_result_sp + 1 >= ind_result_top)
-				rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-
-			*ind_result_sp++ = dst;
-			*ind_source_sp++ = value;
-			comp_indr(&object);
-		}
-	} else
-	{
-		if (ind_source_sp + 1 >= ind_source_top || ind_result_sp + 1 >= ind_result_top)
-			rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-
-		*ind_result_sp++ = dst;
-		*ind_source_sp++ = value;
-		comp_indr(obj);
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &v, target->str.len))
+			return;
+		indir_src.str.addr = target->str.addr;
+		cache_put(&indir_src, obj);
+		/* Fall into code activation below */
 	}
+	*(TREF(ind_result_sp))++ = dst;
+	*(TREF(ind_source_sp))++ = value;
+	comp_indr(obj);
+	return;
 }

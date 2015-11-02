@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,34 +19,31 @@
 #include "cmd.h"
 #include "deviceparameters.h"
 
-GBLREF char window_token;
-
 int m_use(void)
 {
-	oprtype		sopr, plist, devpopr;
-	int4		rval;
-	triple		*ref;
-	triple		*indref;
 	boolean_t	inddevparms;
 	static readonly unsigned char empty_plist[1] = { iop_eol };
+	int		rval;
+	oprtype		sopr, plist, devpopr;
+	triple		*indref, *ref;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	inddevparms = FALSE;
-	if (!(rval = strexpr(&sopr)))
+	if (EXPR_FAIL == (rval = expr(&sopr, MUMPS_STR)))	/* NOTE assignment */
 		return FALSE;
-	if (window_token != TK_COLON)
+	if (TK_COLON != TREF(window_token))
 	{	/* Single parameter */
-		if (rval == EXPR_INDR)
+		if (EXPR_INDR == rval)
 		{	/* Indirect entire parameter list */
 			make_commarg(&sopr, indir_use);
 			return TRUE;
-		} else
-		{	/* default device parms */
+		} else	/* default device parms */
 			plist = put_str((char *)empty_plist, SIZEOF(empty_plist));
-		}
 	} else
 	{	/* Have device parms. Determine type */
 		advancewindow();
-		if (TK_ATSIGN == window_token)
+		if (TK_ATSIGN == TREF(window_token))
 		{	/* Have indirect device parms */
 			if (!indirection(&devpopr))
 				return FALSE;

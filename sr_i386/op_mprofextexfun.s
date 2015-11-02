@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -46,11 +46,6 @@
 .extern	push_parm
 .extern	rts_error
 
-Grp5_Prefix	=	0x0ff		# escape for CALL_Ev opcode
-CALL_Ev		=	0x010		# CALL_Ev part of ModR/M byte
-reg_opcode_mask	=	0x038
-ISFORMAL	=	0x0244		# xf_isformal*4
-
 actual1		=	24
 act_cnt		=	20
 mask_arg	=	16
@@ -78,26 +73,27 @@ ENTRY op_mprofextexfun
 	movl	label_arg(%ebp),%eax
 	cmpl	$0,%eax
 	je	l3
-l1:	movl	(%eax),%ebx
+
+l1:	pushl	%eax			# save labaddr
+	movl	(%eax),%eax		# get offset to line number entry
+	cmpl	$0,%eax
+	je	l5
+	addl	mrt_curr_ptr(%edx),%eax
+	addl	%edx,%eax		# get the pointer to line number entry
+	movl	(%eax),%ebx		# get line number
 	addl	mrt_curr_ptr(%edx),%ebx
 	addl	%edx,%ebx
-	cmpb	$Grp5_Prefix,0(%ebx)
-	jne	l6
-	movb	1(%ebx),%cl
-	andb	$reg_opcode_mask,%cl
-	cmpb	$CALL_Ev,%cl
-	jne	l6
-	cmpl	$ISFORMAL,2(%ebx)
-	jne	l6
+	popl	%eax			# restore labaddr
+
+	cmpl	$0,4(%eax)		# labaddr += 4, to point to has_parms; then *has_parms
+	je	l6			# if has_parms == 0, then issue an error
+
 	pushl	%ebx
 	pushl	$0
 	pushl	%edx
 	call	new_stack_frame_sp
 	addl	$12,%esp
-	movl	frame_pointer,%edx
-	movl	msf_old_frame_off(%edx),%eax
-	movl	%eax,frame_pointer
-	movl	%edx,sav_msf(%ebp)
+
 	leal	ret_val(%ebp),%esi
 	movl	%esp,%edi
 	movl	act_cnt(%ebp),%eax
@@ -111,9 +107,7 @@ l1:	movl	(%eax),%ebx
 	addl	$4,%eax			# include: $T(just pushed) plus other 3
 	pushl	%eax			# push total count
 	call	push_parm		# push_parm ($T, ret_value, mask, argc [,arg1, arg2, ...]);
-	movl	sav_msf(%ebp),%eax
-	movl	%eax,frame_pointer
-	orw	$SFT_EXTFUN,msf_typ_off(%eax)
+
 retlab:	leal	sav_ebx(%ebp),%esp
 	movl	act_cnt(%ebp),%eax
 	addl	$5,%eax

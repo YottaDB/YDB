@@ -34,17 +34,18 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	jnl_gbls_t		jgbl;
 
+error_def(ERR_ASSERT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_MEMORY);
+error_def(ERR_VMSMEMORY);
+
 CONDITION_HANDLER(t_ch)
 {
 	boolean_t	retvalue;
-
-	error_def(ERR_GTMCHECK);
-	error_def(ERR_GTMASSERT);
-	error_def(ERR_ASSERT);
-        error_def(ERR_MEMORY);
-        error_def(ERR_VMSMEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_OUTOFSPACE);
 
 	START_CH;
 	UNIX_ONLY(

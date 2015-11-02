@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -162,7 +162,6 @@ typedef struct
 #define OCT_CGSKIP	128
 #define OCT_COERCE	256
 
-
 typedef struct
 {
 	char			name[20];
@@ -190,13 +189,17 @@ typedef struct
 #	 error UNSUPPORTED PLATFORM
 #endif
 
-#define EXPR_FAIL	0	/* expression had syntax error */
-#define EXPR_GOOD	1	/* expression ok, no indirection at root */
+#define MUMPS_INT	0	/* integer - they only type the compiler handles differently */
+#define MUMPS_EXPR	1	/* expression */
+#define MUMPS_STR	2	/* string */
+#define MUMPS_NUM	3	/* numeric - potentially non-integer */
+
+#define EXPR_FAIL	0	/* expression had syntax error - frequently represented by FALSE*/
+#define EXPR_GOOD	1	/* expression ok, no indirection at root - frequently represented by TRUE */
 #define EXPR_INDR	2	/* expression ok, indirection at root */
 #define EXPR_SHFT	4	/* expression ok, involved shifted GV references */
 
 #define CHARMAXARGS	256
-#define	MAX_ACTUALS	32
 #define MAX_FORARGS	127
 #define MAX_SRCLINE	8192	/* maximum length of a program source or indirection line */
 #define	NO_FORMALLIST	(-1)
@@ -357,14 +360,14 @@ error_def(ERR_SVNOSET);
 #define TRUE_WITH_INDX 2
 
 int		actuallist(oprtype *opr);
-int		bool_expr(bool op, oprtype *addr);
-void		bx_boolop(triple *t, bool jmp_type_one, bool jmp_to_next, bool sense, oprtype *addr);
+int		bool_expr(boolean_t op, oprtype *addr);
+void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);
 void		bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr);
-void		bx_tail(triple *t, bool sense, oprtype *addr);
+void		bx_tail(triple *t, boolean_t sense, oprtype *addr);
 void		chktchain(triple *head);
 void		code_gen(void);
 void		coerce(oprtype *a, unsigned short new_type);
-int		comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len_t src_len);
+int		comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len_t src_len);
 void		comp_init(mstr *src);
 void		comp_indr(mstr *obj);
 boolean_t	compiler_startup(void);
@@ -373,7 +376,7 @@ int		eval_expr(oprtype *a);
 int		expratom(oprtype *a);
 int		exfunc(oprtype *a, boolean_t alias_target);
 int		expritem(oprtype *a);
-int		expr(oprtype *a);
+int		expr(oprtype *a, int m_type);
 void		ex_tail(oprtype *opr);
 int		extern_func(oprtype *a);
 int		f_ascii(oprtype *a, opctype op);
@@ -437,21 +440,19 @@ int		gvn(void);
 void		ind_code(mstr *obj);
 int		indirection(oprtype *a);
 void		ins_triple(triple *x);
-int		intexpr(oprtype *a);
 void		int_label(void);
 int		jobparameters (oprtype *c);
 boolean_t	line(uint4 *lnc);
 int		linetail(void);
-int		lkglvn(bool gblvn);
-int		lref(oprtype *label, oprtype *offset, bool no_lab_ok, mint commarg_code, bool commarg_ok, bool *got_some);
+int		lkglvn(boolean_t gblvn);
+int	lref(oprtype *label, oprtype *offset, boolean_t no_lab_ok, mint commarg_code, boolean_t commarg_ok, boolean_t *got_some);
 int		lvn(oprtype *a,opctype index_op,triple *parent);
 void		make_commarg(oprtype *x, mint ind);
 oprtype		make_gvsubsc(mval *v);
 triple		*maketriple(opctype op);
-int		name_glvn(bool gblvn, oprtype *a);
+int		name_glvn(boolean_t gblvn, oprtype *a);
 triple		*newtriple(opctype op);
 int		nref(void);
-int		numexpr(oprtype *a);
 void		obj_code(uint4 src_lines, uint4 checksum);
 int		one_job_param(char **parptr);
 int		parse_until_rparen_or_space(void);
@@ -481,7 +482,6 @@ void		shrink_jmps(void);
 #		endif
 void		start_fetches(opctype op);
 void		start_for_fetches(void);
-int		strexpr(oprtype *a);
 void		tnxtarg(oprtype *a);
 void		tripinit(void);
 void		walktree(mvar *n,void (*f)(),char *arg);

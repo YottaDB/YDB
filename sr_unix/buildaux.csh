@@ -95,6 +95,7 @@ if (4 <= $#) then
 			set new_auxillarylist = "$new_auxillarylist lke gtcm_gnp_server"
 		else if ( "$auxillary" == "gnpclient") then
 			$shell $gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2
+			if (0 != $status) @ buildaux_status = $status
 		else if ( "$auxillary" == "gnpserver") then
 			set new_auxillarylist = "$new_auxillarylist gtcm_gnp_server"
 		else if ( "$auxillary" == "cmisockettcp") then
@@ -107,11 +108,13 @@ if (4 <= $#) then
 			set new_auxillarylist = "$new_auxillarylist gtcm_pkdisp gtcm_shmclean"
 		else if ("$auxillary" == "mumps") then
 			$shell $gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2
+			if (0 != $status) @ buildaux_status = $status
 			if ($#argv == 4) then
 				exit $buildaux_status
 			endif
 		else if ( "$auxillary" == "gtmrpc" || "$auxillary" == "gtm_svc") then
 			$shell $gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2
+			if (0 != $status) @ buildaux_status = $status
 		else
 			set new_auxillarylist = "$new_auxillarylist $auxillary"
 		endif
@@ -182,9 +185,9 @@ if ( $buildaux_gde == 1 ) then
 		# Not doing so could cause later INVCHSET error if parent environment switches back to M mode.
 		setenv LC_CTYPE C
 		setenv gtm_chset M
-		mumps *.m
-		if ($status != 0) then
-			set buildaux_status = `expr $buildaux_status + 1`
+		./mumps *.m
+		if (0 != $status) @ buildaux_status = $status
+		if ($buildaux_status != 0) then
 			echo "buildaux-E-compile_M, Failed to compile .m programs in M mode" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
@@ -207,8 +210,8 @@ if ( $buildaux_gde == 1 ) then
 				ln -s ../$mfile $mfile
 			end
 			../mumps *.m
-			if ($status != 0) then
-				set buildaux_status = `expr $buildaux_status + 1`
+			if (0 != $status) @ buildaux_status = $status
+			if ($buildaux_status != 0) then
 				echo "buildaux-E-compile_UTF8, Failed to compile .m programs in UTF-8 mode" \
 					>> $gtm_log/error.`basename $gtm_exe`.log
 			endif
@@ -251,7 +254,9 @@ endif
 if ( $buildaux_geteuid == 1 ) then
 	set aix_loadmap_option = ''
 	if ( $HOSTOS == "AIX") then
-		set aix_loadmap_option = "-bcalls:$gtm_map/geteuid.loadmap -bmap:$gtm_map/geteuid.loadmap -bxref:$gtm_map/geteuid.loadmap"
+		set aix_loadmap_option = "-bcalls:$gtm_map/geteuid.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bmap:$gtm_map/geteuid.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bxref:$gtm_map/geteuid.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/geteuid	-L$gtm_obj $gtm_obj/geteuid.o \
 			$gt_ld_sysrtns $gt_ld_extra_libs -lmumps $gt_ld_syslibs >& $gtm_map/geteuid.map
@@ -272,7 +277,9 @@ if ( $buildaux_gtmsecshr == 1 ) then
 	$gtm_com/IGS $3/gtmsecshr "RMDIR"	# remove root-owned gtmsecshr, gtmsecshrdir, gtmsecshrdir/gtmsecshr files/dirs
 	foreach file (gtmsecshr gtmsecshr_wrapper)
 		if ( $HOSTOS == "AIX") then
-		    set aix_loadmap_option = "-bcalls:$gtm_map/$file.loadmap -bmap:$gtm_map/$file.loadmap -bxref:$gtm_map/$file.loadmap"
+		    set aix_loadmap_option = "-bcalls:$gtm_map/$file.loadmap"
+		    set aix_loadmap_option = "$aix_loadmap_option -bmap:$gtm_map/$file.loadmap"
+		    set aix_loadmap_option = "$aix_loadmap_option -bxref:$gtm_map/$file.loadmap"
 		endif
 		gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/${file} -L$gtm_obj $gtm_obj/${file}.o \
 				$gt_ld_sysrtns $gt_ld_extra_libs -lmumps $gt_ld_syslibs >& $gtm_map/${file}.map
@@ -297,6 +304,7 @@ if ( $buildaux_gtmsecshr == 1 ) then
 		cd utf8; ln -s ../gtmsecshrdir gtmsecshrdir; cd -
 	endif
 	$gtm_com/IGS $3/gtmsecshr "CHOWN" # make gtmsecshr, gtmsecshrdir, gtmsecshrdir/gtmsecshr files/dirs root owned
+	if (0 != $status) @ buildaux_status = $status
 endif
 
 if ( $buildaux_lke == 1 ) then
@@ -344,7 +352,9 @@ endif
 if ( $buildaux_gtcm_server == 1 ) then
 	set aix_loadmap_option = ''
 	if ( $HOSTOS == "AIX") then
-		set aix_loadmap_option = "-bcalls:$gtm_map/gtcm_server.loadmap -bmap:$gtm_map/gtcm_server.loadmap -bxref:$gtm_map/gtcm_server.loadmap"
+		set aix_loadmap_option = "-bcalls:$gtm_map/gtcm_server.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bmap:$gtm_map/gtcm_server.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bxref:$gtm_map/gtcm_server.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_server -L$gtm_obj \
 		$gtm_obj/gtcm_main.o $gtm_obj/omi_srvc_xct.o $gt_ld_sysrtns $gt_ld_options_all_exe \
@@ -365,7 +375,9 @@ endif
 if ( $buildaux_gtcm_gnp_server == 1 ) then
 	set aix_loadmap_option = ''
 	if ( $HOSTOS == "AIX") then
-		set aix_loadmap_option = "-bcalls:$gtm_map/gtcm_gnp_server.loadmap -bmap:$gtm_map/gtcm_gnp_server.loadmap -bxref:$gtm_map/gtcm_gnp_server.loadmap"
+		set aix_loadmap_option = "-bcalls:$gtm_map/gtcm_gnp_server.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bmap:$gtm_map/gtcm_gnp_server.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bxref:$gtm_map/gtcm_gnp_server.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_gnp_server -L$gtm_obj \
 		$gtm_obj/gtcm_gnp_server.o $gt_ld_sysrtns $gt_ld_options_all_exe \
@@ -388,7 +400,9 @@ endif
 if ( $buildaux_gtcm_play == 1 ) then
 	set aix_loadmap_option = ''
 	if ( $HOSTOS == "AIX") then
-		set aix_loadmap_option = "-bcalls:$gtm_map/gtcm_play.loadmap -bmap:$gtm_map/gtcm_play.loadmap -bxref:$gtm_map/gtcm_play.loadmap"
+		set aix_loadmap_option = "-bcalls:$gtm_map/gtcm_play.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bmap:$gtm_map/gtcm_play.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bxref:$gtm_map/gtcm_play.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_play -L$gtm_obj \
 		$gtm_obj/gtcm_play.o $gtm_obj/omi_sx_play.o $gt_ld_sysrtns $gt_ld_options_all_exe \
@@ -409,7 +423,9 @@ endif
 if ( $buildaux_gtcm_pkdisp == 1 ) then
 	set aix_loadmap_option = ''
 	if ( $HOSTOS == "AIX") then
-		set aix_loadmap_option = "-bcalls:$gtm_map/gtcm_pkdisp.loadmap -bmap:$gtm_map/gtcm_pkdisp.loadmap -bxref:$gtm_map/gtcm_pkdisp.loadmap"
+		set aix_loadmap_option = "-bcalls:$gtm_map/gtcm_pkdisp.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bmap:$gtm_map/gtcm_pkdisp.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bxref:$gtm_map/gtcm_pkdisp.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_pkdisp -L$gtm_obj $gtm_obj/gtcm_pkdisp.o \
 		$gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_extra_libs $gt_ld_syslibs \
@@ -428,7 +444,9 @@ endif
 if ( $buildaux_gtcm_shmclean == 1 ) then
 	set aix_loadmap_option = ''
 	if ( $HOSTOS == "AIX") then
-		set aix_loadmap_option = "-bcalls:$gtm_map/gtcm_shmclean.loadmap -bmap:$gtm_map/gtcm_shmclean.loadmap -bxref:$gtm_map/gtcm_shmclean.loadmap"
+		set aix_loadmap_option = "-bcalls:$gtm_map/gtcm_shmclean.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bmap:$gtm_map/gtcm_shmclean.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bxref:$gtm_map/gtcm_shmclean.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_shmclean -L$gtm_obj $gtm_obj/gtcm_shmclean.o	\
 		$gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_extra_libs $gt_ld_syslibs	\
@@ -447,7 +465,9 @@ endif
 if ( $buildaux_semstat2 == 1 ) then
 	set aix_loadmap_option = ''
 	if ( $HOSTOS == "AIX") then
-		set aix_loadmap_option = "-bcalls:$gtm_map/semstat2.loadmap -bmap:$gtm_map/semstat2.loadmap -bxref:$gtm_map/semstat2.loadmap"
+		set aix_loadmap_option = "-bcalls:$gtm_map/semstat2.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bmap:$gtm_map/semstat2.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bxref:$gtm_map/semstat2.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/semstat2 -L$gtm_obj $gtm_obj/semstat2.o \
 		$gt_ld_sysrtns $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/semstat2.map
@@ -468,7 +488,7 @@ if ( $buildaux_ftok == 1 ) then
 		set aix_loadmap_option = "-bcalls:$gtm_map/ftok.loadmap -bmap:$gtm_map/ftok.loadmap -bxref:$gtm_map/ftok.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/ftok -L$gtm_obj $gtm_obj/ftok.o \
-			$gt_ld_sysrtns $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/ftok.map
+			$gt_ld_sysrtns -lmumps $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/ftok.map
 	if ( $status != 0  ||  ! -x $3/ftok ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkftok, Failed to link ftok (see ${dollar_sign}gtm_map/ftok.map)" \
@@ -483,7 +503,9 @@ endif
 if ( $buildaux_dbcertify == 1 ) then
 	set aix_loadmap_option = ''
 	if ( $HOSTOS == "AIX") then
-		set aix_loadmap_option = "-bcalls:$gtm_map/dbcertify.loadmap -bmap:$gtm_map/dbcertify.loadmap -bxref:$gtm_map/dbcertify.loadmap"
+		set aix_loadmap_option = "-bcalls:$gtm_map/dbcertify.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bmap:$gtm_map/dbcertify.loadmap"
+		set aix_loadmap_option = "$aix_loadmap_option -bxref:$gtm_map/dbcertify.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/dbcertify -L$gtm_obj \
 		$gtm_obj/{dbcertify,dbcertify_cmd}.o $gt_ld_sysrtns -ldbcertify -lmupip -lmumps -lstub $gt_ld_aio_syslib \

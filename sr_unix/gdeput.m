@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2009 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2011 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -110,7 +110,12 @@ cregion:
 	s rec=rec_$c(regs(s,"NULL_SUBSCRIPTS"))
 	s rec=rec_$c(regs(s,"JOURNAL"))
 	s rec=rec_$$num2bin(4,regs(s,"ALLOCATION"))
-	s rec=rec_$$num2bin(2,regs(s,"EXTENSION"))
+	s rec=rec_$$num2bin(4,regs(s,"EXTENSION"))
+	s rec=rec_$$num2bin(4,regs(s,"AUTOSWITCHLIMIT"))
+	s rec=rec_$$num2bin(4,regs(s,"ALIGNSIZE"))
+	s rec=rec_$$num2bin(4,regs(s,"EPOCH_INTERVAL"))
+	s rec=rec_$$num2bin(4,regs(s,"SYNC_IO"))
+	s rec=rec_$$num2bin(4,regs(s,"YIELD_LIMIT"))
 	s rec=rec_$$num2bin(2,regs(s,"BUFFER_SIZE"))
 	s rec=rec_$c(regs(s,"BEFORE_IMAGE"))
 	s rec=rec_$tr($j("",4)," ",ZERO)							;filler
@@ -118,8 +123,7 @@ cregion:
 	s rec=rec_$$num2bin(1,regs(s,"STDNULLCOLL"))
 	s rec=rec_$$num2bin(1,$zl(regs(s,"FILE_NAME")))
 	s rec=rec_regs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$zl(regs(s,"FILE_NAME")))," ",ZERO)
-	i (gtm64=TRUE) s rec=rec_$tr($j("",12)," ",ZERO)					; reserved + padding
-	e  s rec=rec_$tr($j("",8)," ",ZERO)							; reserved
+	s rec=rec_$tr($j("",SIZEOF("gd_region_padding"))," ",ZERO)				; reserved + padding
 	q
 csegment:
 	d writerec

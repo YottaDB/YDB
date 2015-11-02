@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -160,7 +160,6 @@ XFER(xf_zprevious, op_zprevious),
 XFER(xf_fnzprevious, op_fnzprevious),
 XFER(xf_gvquery, op_gvquery),
 XFER(xf_fnquery, op_fnquery),
-XFER(xf_isformal, op_isformal),
 XFER(xf_bindparm, op_bindparm),
 XFER(xf_retarg, op_retarg),
 XFER(xf_exfun, op_exfun),

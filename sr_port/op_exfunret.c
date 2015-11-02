@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,10 @@
 #include "gdsfhead.h"
 #include "alias.h"
 
-GBLREF	mval	*alias_retarg;
+GBLREF	mval		*alias_retarg;
+GBLREF	boolean_t	dollar_zquit_anyway;
+
+LITREF	mval 		literal_null;
 
 error_def(ERR_QUITARGREQD);
 error_def(ERR_QUITALSINV);
@@ -45,16 +48,22 @@ void op_exfunret(mval *retval)
 	savtyp = retval->mvtype;
 	retval->mvtype &= ~MV_RETARG;
 	if (0 == (MV_RETARG & savtyp))
-		rts_error(VARLSTCNT(1) ERR_QUITARGREQD);
+		/* if dollar_zquit_anyway is TRUE, then do not give an error when no value is returned from an
+		 * extrinsic; just make the return value NULL instead
+		 */
+		if (dollar_zquit_anyway)
+			*retval = literal_null;
+		else
+			rts_error(VARLSTCNT(1) ERR_QUITARGREQD);
 	if (0 != (MV_ALIASCONT & savtyp))
 	{	/* We have an alias container return which has already had its reference counts increased. Remove
 		 * the extra reference counts before we raise the actual error since the assignment and thus the
 		 * alias reference are NOT being created.
 		 */
 		srclvc = (lv_val *)retval->str.addr;
-		assert(LV_IS_BASE_VAR(srclvc));	/* Verify base var */
+		assert(LV_IS_BASE_VAR(srclvc));		/* Verify base var */
 		assert(srclvc->stats.trefcnt >= srclvc->stats.crefcnt);
-		assert(1 <= srclvc->stats.crefcnt);				/* Verify is existing container ref */
+		assert(1 <= srclvc->stats.crefcnt);	/* Verify is existing container ref */
 		DECR_CREFCNT(srclvc);
 		DECR_TREFCNT(srclvc);
 		alias_retarg = NULL;

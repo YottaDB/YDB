@@ -16,18 +16,18 @@
 #include "mdq.h"
 
 GBLREF	int4		pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
-GBLREF	triple		*curtchain, t_orig;
+GBLREF	triple		t_orig;
 
 void ins_errtriple(int4 in_error)
 {
-	triple 		*x, *triptr;
 	boolean_t	add_rterror_triple;
+	triple 		*triptr, *x;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (!IS_STX_WARN(in_error) GTMTRIG_ONLY( || TREF(trigger_compile)))
 	{	/* Not a warning and not a trigger, we have a real error (warnings become errors in triggers) */
-		if (curtchain != &t_orig)
+		if (TREF(curtchain) != &t_orig)
 		{	/* If working with more than 1 chain defer until back to 1 because dqdelchain cannot delete across
 			 * multiple chains. Set global variable "pending_errtriplecode" and let "setcurtchain" call here again.
 			 */
@@ -49,9 +49,9 @@ void ins_errtriple(int4 in_error)
 			x = x->exorder.fl;
 			assert(OC_ILIT == x->opcode);	/* corresponds to put_ilit(FALSE) in previous ins_errtriple */
 		}
-		dqdelchain(x, curtchain, exorder);
-		assert(!add_rterror_triple || ((TREF(pos_in_chain)).exorder.bl->exorder.fl == curtchain));
-		assert(!add_rterror_triple || (curtchain->exorder.bl == (TREF(pos_in_chain)).exorder.bl));
+		dqdelchain(x, TREF(curtchain), exorder);
+		assert(!add_rterror_triple || ((TREF(pos_in_chain)).exorder.bl->exorder.fl == TREF(curtchain)));
+		assert(!add_rterror_triple || ((TREF(curtchain))->exorder.bl == (TREF(pos_in_chain)).exorder.bl));
 	} else
 		/* For IS_STX_WARN errors (if not compiling a trigger), parsing continues, so dont strip the chain */
 		add_rterror_triple = TRUE;

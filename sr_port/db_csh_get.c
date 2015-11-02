@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,9 +37,9 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 	cache_rec_ptr_t			cr, cr_hash_base;
 	int				blk_hash, lcnt, ocnt, hmax;
 	bool				is_mm;
-#ifdef DEBUG
+#	ifdef DEBUG
 	cache_rec_ptr_t			cr_low, cr_high;
-#endif
+#	endif
 
 	csa = cs_addrs;
 	csd = csa->hdr;
@@ -60,11 +60,10 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 		cr_hash_base = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + blk_hash);
 	}
 	ocnt = 0;
-	csa->wbuf_dqd++;			/* Tell rundown we have an orphaned block in case of interrupt */
 	do
 	{
 		cr = cr_hash_base;
-		assert(cr->blk == BT_QUEHEAD);
+		assert((0 == cr->blk) || (BT_QUEHEAD == cr->blk));
 		lcnt = hmax;
 		do
 		{
@@ -77,10 +76,7 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 				 * queue changed on us.
 				 */
 				if (cr == cr_hash_base)
-				{
-					csa->wbuf_dqd--;
 					return (cache_rec_ptr_t)NULL;
-				}
 				break;			/* Retry - something changed */
 			}
 			if ((CR_BLKEMPTY != cr->blk) && ((cr->blk % hmax) != blk_hash))
@@ -99,7 +95,6 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 					 */
 					cr->refer = TRUE;
 				}
-				csa->wbuf_dqd--;
 				return cr;
 			}
 			lcnt--;
@@ -108,8 +103,6 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 		/* We rarely expect to come here, hence it is considered better to recompute the maximum value of ocnt (for the
 		 * termination check) instead of storing it in a local variable at the beginning of the do loop */
 	} while (ocnt < (csa->now_crit ? 1 : ENOUGH_TRIES_TO_FALL_BACK));
-	csa->wbuf_dqd--;
-
 	BG_TRACE_PRO_ANY(csa, db_csh_get_too_many_loops);
 	return (TRUE == csa->now_crit ? (cache_rec_ptr_t)CR_NOTVALID : (cache_rec_ptr_t) NULL);
 }

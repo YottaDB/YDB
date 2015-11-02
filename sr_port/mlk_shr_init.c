@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,17 +36,20 @@ void mlk_shr_init(sm_uc_ptr_t base,
 	 *  mlk_ctldata	--> SIZEOF(mlk_ctldata)
 	 *  mlk_shrblk	--> size * 5/8 (consisting of nr_blocks number of mlk_shrblk structures)
 	 *  mlk_prcblk	--> size * 1/8 (consisting of nr_procs  number of mlk_prcblk structures)
-	 *  mlk_shrsubs	--> size * 3/8 - SIZEOF(mlk_ctldata) (consisting of variable number of variable length subscript strings)
+	 *  mlk_shrsubs	--> size * 2/8 - SIZEOF(mlk_ctldata) (consisting of variable number of variable length subscript strings)
+	 * Total block counts are recorded in ctl->max_* becuase those values are used for free lock space calculation.
+	 * (see:lke_show.c and mlk_unlock.c)
 	 */
+
 	nr_blocks = ((size >> 1) + (size >> 3)) / SIZEOF(mlk_shrblk);	/* size/2 + size/8 = size*5/8 */
 	nr_procs = (size >> 3) / SIZEOF(mlk_prcblk);
-
 	memset(base, 0, size);
 	ctl = (mlk_ctldata_ptr_t)base;
 	sb = (mlk_shrblk_ptr_t)(ctl + 1);
 	ctl->wakeups = 1;
 	A2R(ctl->blkfree, sb);
 	ctl->blkcnt = nr_blocks;
+	ctl->max_blkcnt = nr_blocks;
 	for (i = 1; i < nr_blocks ; i++, sb++)
 	{
 		A2R(sb->rsib, sb + 1);
@@ -54,6 +57,7 @@ void mlk_shr_init(sm_uc_ptr_t base,
 	pb = (mlk_prcblk_ptr_t)(sb + 1);
 	A2R(ctl->prcfree, pb);
 	ctl->prccnt = nr_procs;
+	ctl->max_prccnt = nr_procs;
 	for (i = 1; i < nr_procs ; i++, pb++)
 	{
 		A2R(pb->next, pb + 1);
@@ -64,9 +68,7 @@ void mlk_shr_init(sm_uc_ptr_t base,
 	cp = (sm_uc_ptr_t)base + size;
 	A2R(ctl->subtop ,cp);
 	assert(ctl->subtop > ctl->subbase);
-
 	if (read_write)
 		csa->hdr->trans_hist.lock_sequence = 0;
-
 	return;
 }

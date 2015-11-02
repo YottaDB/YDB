@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,8 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		dse_running;
 
+error_def(ERR_DYNUPGRDFAIL);
+
 int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolean_t blk_free)
 {
 	unix_db_info		*udi;
@@ -75,7 +77,6 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		int 		crypt_status;
 		boolean_t	is_encrypted;
 	)
-	error_def(ERR_DYNUPGRDFAIL);
 
 	/* Note: Even in snapshots, only INTEG requires dsk_read to read FREE blocks. The assert below should be modified
 	 * if we later introduce a scheme where we can figure out as to who started the snapshots and assert accordingly
@@ -131,9 +132,9 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		  enc_save_buff,
 		  size,
 		  save_errno);
-	assert(0 == save_errno);
+	assert((0 == save_errno) GTM_TRUNCATE_ONLY(|| (-1 == save_errno)));
 #	ifdef GTM_CRYPT
-	if (is_encrypted)
+	if (is_encrypted && (0 == save_errno))
 	{
 		bsiz = (int)((blk_hdr_ptr_t)enc_save_buff)->bsiz;
 		req_dec_blk_size = MIN(cs_data->blk_size, bsiz) - SIZEOF(blk_hdr);
@@ -207,7 +208,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	}
 	DEBUG_ONLY(
 		in_dsk_read--;
-		if (!blk_free && cs_addrs->now_crit && !dse_running)
+		if (!blk_free && cs_addrs->now_crit && !dse_running && (0 == save_errno))
 		{	/* Do basic checks on GDS block that was just read. Do it only if holding crit as we could read
 			 * uninitialized blocks otherwise. Also DSE might read bad blocks even inside crit so skip checks.
 			 */

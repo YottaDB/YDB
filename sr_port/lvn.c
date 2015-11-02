@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,48 +16,48 @@
 #include "subscript.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
-GBLREF mident window_ident;
+error_def(ERR_MAXNRSUBSCRIPTS);
+error_def(ERR_RPARENMISSING);
+error_def(ERR_VAREXPECTED);
 
-int lvn(oprtype *a,opctype index_op,triple *parent)
+int lvn(oprtype *a, opctype index_op, triple *parent)
 {
-	oprtype subscripts[MAX_LVSUBSCRIPTS],*sb1,*sb2,*sb;
-	triple *ref,*s, *root;
 	char x;
-	error_def(ERR_MAXNRSUBSCRIPTS);
-	error_def(ERR_RPARENMISSING);
-	error_def(ERR_VAREXPECTED);
+	oprtype *sb, *sb1, *sb2, subscripts[MAX_LVSUBSCRIPTS];
+	triple *ref, *root, *s;
+	DCL_THREADGBL_ACCESS;
 
-	if (window_token != TK_IDENT)
+	SETUP_THREADGBL_ACCESS;
+	if (TREF(window_token) != TK_IDENT)
 	{
 		stx_error(ERR_VAREXPECTED);
 		return FALSE;
 	}
-	*a = put_mvar(&window_ident);
+	*a = put_mvar(&(TREF(window_ident)));
 	advancewindow();
-	if (window_token != TK_LPAREN)
+	if (TK_LPAREN != TREF(window_token))
 		return TRUE;
-	assert(a->oprclass == TRIP_REF);
+	assert(TRIP_REF == a->oprclass);
 	ref = a->oprval.tref;
-	assert(ref->opcode == OC_VAR);
+	assert(OC_VAR == ref->opcode);
 	sb1 = sb2 = subscripts;
 	*sb1++ = *a;
 	for (;;)
 	{
-		if (sb1 >= ARRAYTOP(subscripts))
+		if (ARRAYTOP(subscripts) <= sb1)
 		{
 			stx_error(ERR_MAXNRSUBSCRIPTS);
 			return FALSE;
 		}
 		advancewindow();
-		if (!expr(sb1++))
+		if (EXPR_FAIL == expr(sb1++, MUMPS_EXPR))
 			return FALSE;
-		if ((x = window_token) == TK_RPAREN)
+		if (TK_RPAREN == (x = TREF(window_token)))	/* NOTE assignment */
 		{
 			advancewindow();
 			break;
 		}
-		if (x != TK_COMMA)
+		if (TK_COMMA != x)
 		{
 			stx_error(ERR_RPARENMISSING);
 			return FALSE;
@@ -72,7 +72,6 @@ int lvn(oprtype *a,opctype index_op,triple *parent)
 			return TRUE;
 		}
 	}
-
 	root = ref = newtriple(index_op);
 	ref->operand[0] = put_ilit((mint)(sb1 - sb2));
 	while (sb2 < sb1)

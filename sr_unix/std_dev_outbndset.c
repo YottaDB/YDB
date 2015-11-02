@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,35 +34,22 @@ void std_dev_outbndset(int4 ob_char)
 	unsigned short  n;
 	d_tt_struct      *tt_ptr;
 
-	tt_ptr = (d_tt_struct *) io_std_device.in->dev_sp;
-	if (ob_char > MAXOUTOFBAND)
-	{
+	if (MAXOUTOFBAND < ob_char)
 		GTMASSERT;
-	}
-	else
+	else if (tt == io_std_device.in->type)
 	{
+		tt_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 		std_dev_outbnd = TRUE;
 		mask = SHFT_MSK << ob_char;
 		if (mask & tt_ptr->enbld_outofbands.mask)
-		{
-			(void) xfer_set_handlers(outofband_event, &ctrap_set, ob_char);
-		}
+			(void)xfer_set_handlers(outofband_event, &ctrap_set, ob_char);
 		else if (mask & CTRLC_MSK)
-		{
-	        	(void) xfer_set_handlers(outofband_event, &ctrlc_set, 0);
-		}
+	        	(void)xfer_set_handlers(outofband_event, &ctrlc_set, 0);
 		else if (mask & CTRLY_MSK)
-		{
-	        	(void) xfer_set_handlers(outofband_event, &ctrly_set, 0);
-		}
-		else if ((ob_char ==  CTRL_U) &&
-			 (spc_inp_prc & SHFT_MSK << CTRL_U))
-		{
+	        	(void)xfer_set_handlers(outofband_event, &ctrly_set, 0);
+		else if ((CTRL_U == ob_char) && (spc_inp_prc & (SHFT_MSK << CTRL_U)))
 			ctrlu_occurred = TRUE;
-		}
 		else
-		{
 			GTMASSERT;
-		}
 	}
 }

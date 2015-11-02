@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,40 +14,41 @@
 
 void trans_code_cleanup(void);
 
-error_def(ERR_ERRWZTRAP);
 error_def(ERR_ERRWETRAP);
-error_def(ERR_ERRWZBRK);
-error_def(ERR_ERRWIOEXC);
 error_def(ERR_ERRWEXC);
+error_def(ERR_ERRWIOEXC);
+error_def(ERR_ERRWZBRK);
 error_def(ERR_ERRWZINTR);
+error_def(ERR_ERRWZTRAP);
 
-#define SET_ERR_CODE(fp, err)							\
-{										\
-	switch (fp->type)							\
-	{									\
-	case SFT_ZBRK_ACT:							\
-		err = (int)ERR_ERRWZBRK;					\
-		break;								\
-	case SFT_DEV_ACT:							\
-		err = (int)ERR_ERRWIOEXC;					\
-		break;								\
-	case SFT_ZTRAP:								\
-		if (err_act == &dollar_etrap.str)				\
-			err = (int)ERR_ERRWETRAP;				\
-		else if (err_act == &dollar_ztrap.str)				\
-			err = (int)ERR_ERRWZTRAP;				\
-		else								\
-			GTMASSERT;						\
-		break;								\
-	case SFT_ZSTEP_ACT:							\
-		err = (int)ERR_ERRWEXC;					\
-		break;								\
-	case (SFT_ZINTR | SFT_COUNT):						\
-		err = (int)ERR_ERRWZINTR;					\
-		break;								\
-	default:								\
-		GTMASSERT;							\
-	}									\
+/* Note assertpro() checks have extra text in them to identify which assertpro tripped */
+#define SET_ERR_CODE(fp, errmsg)					\
+{									\
+	switch (fp->type)						\
+	{								\
+		case SFT_ZBRK_ACT:					\
+			errmsg = ERR_ERRWZBRK;				\
+			break;						\
+		case SFT_DEV_ACT:					\
+			errmsg = ERR_ERRWIOEXC;				\
+			break;						\
+		case SFT_ZTRAP:						\
+			if (err_act == &dollar_etrap.str)		\
+				errmsg = ERR_ERRWETRAP;			\
+			else if (err_act == &dollar_ztrap.str)		\
+				errmsg = ERR_ERRWZTRAP;			\
+			else						\
+				assertpro(FALSE && err_act);		\
+			break;						\
+		case SFT_ZSTEP_ACT:					\
+			errmsg = ERR_ERRWEXC;				\
+			break;						\
+		case (SFT_ZINTR | SFT_COUNT):				\
+			errmsg = ERR_ERRWZINTR;				\
+			break;						\
+		default:						\
+			assertpro(FALSE && fp->type);			\
+	}								\
 }
 
 #endif

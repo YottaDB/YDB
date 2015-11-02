@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,16 +21,8 @@
 #include "gtmmsg.h"
 
 #if defined(UNIX)
-#define GET_CONFIRM(X,Y) {PRINTF("CONFIRMATION: ");FGETS((X), (Y), stdin, fgets_res);Y = strlen(X);}
-
 #include "gtm_ipc.h"
-
 GBLREF uint4	user_id;
-#elif defined(VMS)
-#define GET_CONFIRM(X,Y) {if(!cli_get_str("CONFIRMATION",(X),&(Y))) {rts_error(VARLSTCNT(1) ERR_DSEWCINITCON); \
-	return;}}
-#else
-#error UNSUPPORTED PLATFORM
 #endif
 
 #include "gdsblk.h"
@@ -65,6 +57,11 @@ GBLREF	uint4		process_id;
 GBLREF	gd_addr		*original_header;
 GBLREF	boolean_t	dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 
+error_def(ERR_DBRDONLY);
+error_def(ERR_DSEWCINITCON);
+error_def(ERR_FREEZE);
+error_def(ERR_FREEZECTRL);
+
 void dse_all(void)
 {
 	gd_region	*ptr;
@@ -74,8 +71,6 @@ void dse_all(void)
 	gd_region	*old_region;
 	block_id	old_block;
 	int4		stat;
-	char		confirm[256];
-	unsigned short	len;
 	boolean_t	ref = FALSE;
 	boolean_t	crit = FALSE;
 	boolean_t	wc = FALSE;
@@ -89,14 +84,7 @@ void dse_all(void)
 	boolean_t	was_crit;
 	gd_addr         *temp_gdaddr;
 	gd_binding      *map;
-#ifdef UNIX
-	char		*fgets_res;
-#endif
-
-	error_def(ERR_DSEWCINITCON);
-	error_def(ERR_FREEZE);
-        error_def(ERR_DBRDONLY);
-	error_def(ERR_FREEZECTRL);
+	UNIX_ONLY(char	*fgets_res;)
 
 	old_addrs = cs_addrs;
 	old_region = gv_cur_region;
@@ -106,13 +94,7 @@ void dse_all(void)
 	if (cli_present("RENEW") == CLI_PRESENT)
 	{
 		crit = ref = wc = nofreeze = TRUE;
-		len = SIZEOF(confirm);
-		GET_CONFIRM(confirm,len);
-		if (confirm[0] != 'Y' && confirm[0] != 'y')
-		{
-			rts_error(VARLSTCNT(1) ERR_DSEWCINITCON);
-			return;
-		}
+		GET_CONFIRM_AND_HANDLE_NEG_RESPONSE;
 	} else
 	{
 		if (cli_present("CRITINIT") == CLI_PRESENT)
@@ -121,14 +103,8 @@ void dse_all(void)
 			ref = TRUE;
 		if (cli_present("WCINIT") == CLI_PRESENT)
 		{
+			GET_CONFIRM_AND_HANDLE_NEG_RESPONSE;
 			wc = TRUE;
-			len = SIZEOF(confirm);
-			GET_CONFIRM(confirm,len);
-			if (confirm[0] != 'Y' && confirm[0] != 'y')
-			{
-				rts_error(VARLSTCNT(1) ERR_DSEWCINITCON);
-				return;
-			}
 		}
 		if (cli_present("BUFFER_FLUSH") == CLI_PRESENT)
 			flush = TRUE;
@@ -224,19 +200,14 @@ void dse_all(void)
 			{
 				if (!was_crit)
 					grab_crit(gv_cur_region);	/* no point seizing crit if WE already have it held */
-				cs_addrs->hold_onto_crit = TRUE;	/* need to do this AFTER grab_crit */
+				cs_addrs->hold_onto_crit = TRUE; /* need to do this AFTER grab_crit */
+				cs_addrs->dse_crit_seize_done = TRUE;
 			}
 			if (wc)
 			{
 				if (!was_crit && !seize)
 					grab_crit(gv_cur_region);
-				bt_init(cs_addrs);
-				if (cs_addrs->hdr->acc_meth == dba_bg)
-				{
-					bt_refresh(cs_addrs);
-					db_csh_ini(cs_addrs);
-					db_csh_ref(cs_addrs);
-				}
+				DSE_WCREINIT(cs_addrs);
 				if (!was_crit && (!seize || release))
 					rel_crit(gv_cur_region);
 			}
@@ -244,12 +215,18 @@ void dse_all(void)
 				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 			if (release)
 			{	/* user wants crit to be released unconditionally so "was_crit" not checked like everywhere else */
-				cs_addrs->hold_onto_crit = FALSE;	/* need to do this BEFORE rel_crit */
 				if (cs_addrs->now_crit)
+				{
+					cs_addrs->dse_crit_seize_done = FALSE;
+					cs_addrs->hold_onto_crit = FALSE; /* need to do this BEFORE rel_crit */
 					rel_crit(gv_cur_region);
+				}
 				else
+				{
+					assert(!cs_addrs->hold_onto_crit && !cs_addrs->dse_crit_seize_done);
 					util_out_print("Current process does not own the Region: !AD.",
 						TRUE, REG_LEN_STR(gv_cur_region));
+				}
 			}
 			if (nofreeze)
 			{

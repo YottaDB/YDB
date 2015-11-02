@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,22 +16,21 @@
 #include "toktyp.h"
 #include "cmd.h"
 
-GBLREF 	char 	window_token;
-GBLREF 	mval 	window_mval;
-
 int m_trollback(void)
 {
+	oprtype	x;
 	triple	*ref;
-	oprtype x;
+	DCL_THREADGBL_ACCESS;
 
-	if (TK_SPACE == window_token || TK_EOL == window_token)
+	SETUP_THREADGBL_ACCESS;
+	if ((TK_SPACE == TREF(window_token)) || (TK_EOL == TREF(window_token)))
 	{
 		ref = newtriple(OC_TROLLBACK);
 		ref->operand[0] = put_ilit(0);
 		return TRUE;
 	} else
 	{
-		switch (intexpr(&x))
+		switch (expr(&x, MUMPS_INT))
 		{
 		case EXPR_FAIL:
 			return FALSE;
@@ -44,6 +43,5 @@ int m_trollback(void)
 			return TRUE;
 		}
 	}
-
 	return FALSE; /* This should never get executed, added to make compiler happy */
 }

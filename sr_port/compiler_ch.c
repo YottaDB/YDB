@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,16 +27,18 @@ GBLREF command_qualifier	cmd_qlf;
 GBLREF char			cg_phase;
 GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
 
+error_def(ERR_ASSERT);
+error_def(ERR_FORCEDHALT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_MEMORY);
+error_def(ERR_VMSMEMORY);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_OUTOFSPACE);
+
 CONDITION_HANDLER(compiler_ch)
 {
-	error_def(ERR_ASSERT);
-	error_def(ERR_FORCEDHALT);
-	error_def(ERR_GTMASSERT);
-	error_def(ERR_GTMCHECK);
-	error_def(ERR_MEMORY);
-	error_def(ERR_VMSMEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_OUTOFSPACE);
 
 	START_CH;
 	if (DUMPABLE)

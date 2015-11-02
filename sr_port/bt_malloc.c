@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,6 @@ void bt_malloc(sgmnt_addrs *csa)
 	csa->nl->bt_base_off = (n += SIZEOF(bt_rec));			/* th_queue anchor referenced above */
 	assert((n += (csd->n_bts * SIZEOF(bt_rec))) == (SIZEOF_FILE_HDR(csd)) + (BT_SIZE(csd)));	/* DON'T use n after this */
 	bt_init(csa);
-	bt_refresh(csa);
+	bt_refresh(csa, TRUE);
 	return;
 }

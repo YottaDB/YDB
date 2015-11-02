@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,6 @@
 #include "dbfilop.h"
 #include "mupip_exit.h"
 #include "mupint.h"
-#include "mu_file_size.h"
 #include "mu_gv_cur_reg_init.h"
 #include "gtmmsg.h"
 #include "wbox_test_init.h"
@@ -44,6 +43,11 @@ GBLREF unsigned char		*mu_int_master;
 GTMCRYPT_ONLY(
 GBLREF gtmcrypt_key_t		mu_int_encrypt_key_handle;
 )
+
+error_def(ERR_DBFSTHEAD);
+error_def(ERR_MUNODBNAME);
+error_def(ERR_MUSTANDALONE);
+
 boolean_t mu_int_init(void)
 {
 	unsigned int	native_size, size, status;
@@ -53,9 +57,6 @@ boolean_t mu_int_init(void)
 	GTMCRYPT_ONLY(
 		int	crypt_status;
 	)
-	error_def(ERR_MUNODBNAME);
-	error_def(ERR_MUSTANDALONE);
-	error_def(ERR_DBFSTHEAD);
 
 	mu_gv_cur_reg_init();
 	/* get filename */
@@ -76,7 +77,7 @@ boolean_t mu_int_init(void)
 		gtm_putmsg(VARLSTCNT(1) status);
 		return FALSE;
 	}
-	native_size = mu_file_size(fc);
+	native_size = gds_file_size(fc);
 	if (native_size < DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_MIN, DISK_BLOCK_SIZE) + MIN_DB_BLOCKS)
 	{
 		mu_int_err(ERR_DBFSTHEAD, 0, 0, 0, 0, 0, 0, 0);

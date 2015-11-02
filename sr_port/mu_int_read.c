@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,13 @@ GBLREF gtmcrypt_key_t	mu_int_encrypt_key_handle;
 GBLREF	boolean_t	ointeg_this_reg;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	uint4		mu_int_errknt;
+GBLREF	bool		region;
+
+error_def(ERR_DBRDERR);
+error_def(ERR_DBROLLEDBACK);
+error_def(ERR_DYNUPGRDFAIL);
+error_def(ERR_INTEGERRS);
+error_def(ERR_REGSSFAIL);
 
 uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 {
@@ -60,12 +67,14 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 		shm_snapshot_t	*ss_shm_ptr;
 	)
 
-	error_def(ERR_DBRDERR);
-	error_def(ERR_DYNUPGRDFAIL);
-	error_def(ERR_REGSSFAIL);
-	error_def(ERR_INTEGERRS);
-
 	csa = cs_addrs;
+#	ifdef UNIX
+	if (region && csa->nl->onln_rlbk_pid)
+	{
+		gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+		mupip_exit(ERR_INTEGERRS);
+	}
+#	endif
 	tmp_ptr = malloc(mu_int_data.blk_size);
 #	ifdef GTM_SNAPSHOT
 	if (ointeg_this_reg)
@@ -92,7 +101,7 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 		fc->op = FC_READ;
 		fc->op_buff = tmp_ptr;
 		fc->op_len = mu_int_data.blk_size;
-		fc->op_pos = mu_int_ovrhd + (mu_int_data.blk_size / DISK_BLOCK_SIZE * blk);
+		fc->op_pos = mu_int_ovrhd + ((gtm_int64_t)mu_int_data.blk_size / DISK_BLOCK_SIZE * blk);
 		dbfilop(fc); /* No return if error */
 #		ifdef GTM_SNAPSHOT
 		if (ointeg_this_reg)

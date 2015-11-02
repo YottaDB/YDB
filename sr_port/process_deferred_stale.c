@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,9 +35,15 @@
 #include "tp_change_reg.h"
 #include "dpgbldir.h"
 #include "process_deferred_stale.h"
+#ifdef UNIX
+# include "jnl.h"
+#endif
 
 GBLREF	boolean_t	unhandled_stale_timer_pop;
 GBLREF	gd_region	*gv_cur_region;
+#ifdef UNIX
+GBLREF	jnl_gbls_t	jgbl;
+#endif
 
 void process_deferred_stale(void)
 {
@@ -57,7 +63,27 @@ void process_deferred_stale(void)
 			if (r_cur->open)
 			{
 				csa = &FILE_INFO(r_cur)->s_addrs;
-				assert(!T_IN_CRIT_OR_COMMIT_OR_WRITE(csa));
+				/* We don't expect to be in crit or commit when process_deferred_stale is invoked. The only
+				 * exceptions are :
+				 * (a) ONLINE ROLLBACK - holds the crit for the entire duration. In this case, do the flush anyways.
+				 *     While this might slowdown the online rollback run, with our current knowledge, we dont have
+				 *     any benchmarks to decide whether it is a good thing to let the buffer flush at the end (in
+				 *     gds_rundown) take care of all the updates done by rollback or do it periodically.
+				 * (b) A concurrent process in t_end detected an ONLINE ROLLBACK in the final or penultimate retry
+				 *     and invoked gvcst_redo_root_search to redo the root search of the concerned gv_target. This
+				 *     root search ended up calling t_end and noticed an unhandled timer pop and thereby coming
+				 *     here. Since root search is invoked in the 2nd or 3rd retry, the process sets hold_onto_crit.
+				 *     So, assert that is indeed the case. Also, have a much stricter assert to ensure that
+				 *     gv_target->root = DIR_ROOT (indicating we are in gvcst_root_search). Also, since we want to
+				 *     avoid flushing buffers if already holding crit, continue to the next region.
+				 */
+				assert(!T_IN_CRIT_OR_COMMIT_OR_WRITE(csa) || csa->hold_onto_crit);
+				assert(!T_IN_CRIT_OR_COMMIT_OR_WRITE(csa)
+					UNIX_ONLY(|| jgbl.onlnrlbk || (NULL == gv_target) || (DIR_ROOT == gv_target->root)));
+#				ifdef UNIX
+				if (!jgbl.onlnrlbk && csa->now_crit)
+					continue;
+#				endif
 				if (csa->stale_defer)
 				{
 					gv_cur_region = r_cur;

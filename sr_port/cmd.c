@@ -37,9 +37,14 @@
 #	 error UNSUPPORTED PLATFORM
 #endif
 
-GBLREF char	window_token;
-GBLREF mident	window_ident;
-GBLREF triple	*curtchain, *curr_fetch_trip;
+GBLREF triple	*curr_fetch_trip;
+
+error_def(ERR_CMD);
+error_def(ERR_CNOTONSYS);
+error_def(ERR_EXPR);
+error_def(ERR_INVCMD);
+error_def(ERR_PCONDEXPECTED);
+error_def(ERR_SPOREOL);
 
 int cmd(void)
 {	/* All the commands are listed here. Two pairs of entries in general.
@@ -86,6 +91,7 @@ LITDEF nametabent cmd_names[] =
 		,{2, "ZH"}
 		,{5, "ZHALT"}
 		,{5, "ZHELP"}
+		,{7, "ZINVCMD"}
 		,{2, "ZK"}, {5, "ZKILL"}
 		,{2, "ZL"}, {5, "ZLINK"}
 		,{2, "ZM"}, {8, "ZMESSAGE"}
@@ -124,7 +130,7 @@ LITDEF unsigned char cmd_index[27] =
 	{
 		0, 0, 2, 4, 6, 8, 10, 12, 15, 17, 19, 21, 23
 		,25, 27, 29, 29, 31, 33, 35, 43, 45, 47, 49
-		,51, 51, GTMTRIG_ONLY(95) NON_GTMTRIG_ONLY(93)
+		,51, 51, GTMTRIG_ONLY(96) NON_GTMTRIG_ONLY(94)
 	};
 LITDEF struct
 	{
@@ -174,6 +180,7 @@ LITDEF struct
 		,{m_zhelp, 1, 1, ALL_SYS}
 		,{m_zhalt, 1, 1, ALL_SYS}
 		,{m_zhelp, 1, 1, ALL_SYS}
+		,{m_zinvcmd, 1, 1, ALL_SYS}
 		,{m_zwithdraw, 0, 1, ALL_SYS}, {m_zwithdraw, 0, 1, ALL_SYS}
 		,{m_zlink, 1, 1, ALL_SYS}, {m_zlink, 1, 1, ALL_SYS}
 		,{m_zmessage, 0, 1, ALL_SYS}, {m_zmessage, 0, 1, ALL_SYS}
@@ -193,37 +200,32 @@ LITDEF struct
 
 	triple		*temp_expr_start, *ref0, *ref1, *fetch0, *triptr;
 	char		*c;
-	int		x;
+	int		rval, x;
 	oprtype		*cr;
-	boolean_t	rval, shifting;
-	error_def(ERR_CMD);
-	error_def(ERR_INVCMD);
-	error_def(ERR_PCONDEXPECTED);
-	error_def(ERR_SPOREOL);
-	error_def(ERR_EXPR);
-	error_def(ERR_CNOTONSYS);
+	boolean_t	shifting;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(cmd_index[26] == (SIZEOF(cmd_names)/SIZEOF(nametabent)));
-	CHKTCHAIN(curtchain);
-	TREF(pos_in_chain) = *curtchain;
-	if (window_token != TK_IDENT)
+	assert((SIZEOF(cmd_names) / SIZEOF(nametabent)) == cmd_index[26]);
+	CHKTCHAIN(TREF(curtchain));
+	TREF(pos_in_chain) = *TREF(curtchain);
+	if (TREF(window_token) != TK_IDENT)
 	{
 		stx_error(ERR_CMD);
 		return FALSE;
 	}
-	assert(0 != window_ident.len);
-	c = window_ident.addr;
-	if (*c == '%')
+	assert(0 != (TREF(window_ident)).len);
+	c = (TREF(window_ident)).addr;
+	if ('%' == *c)
 	{
 		stx_error(ERR_CMD);
 		return FALSE;
 	}
-	if ((x = namelook(cmd_index, cmd_names, c, window_ident.len)) < 0)
+	if (0 > (x = namelook(cmd_index, cmd_names, c, (TREF(window_ident)).len)))
 	{
 		stx_error(ERR_INVCMD);
-		return FALSE;
+		if (0 > (x = namelook(cmd_index, cmd_names, "ZINVCMD", 7)))
+			return FALSE;
 	}
 	if (!VALID_CMD(x) )
 	{
@@ -231,13 +233,13 @@ LITDEF struct
 		return FALSE;
 	}
 	advancewindow();
-	if (window_token != TK_COLON || !cmd_data[x].pcnd_ok)
+	if ((TK_COLON != TREF(window_token)) || !cmd_data[x].pcnd_ok)
 		cr = NULL;
 	else
 	{
 		advancewindow();
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
-		if (!bool_expr((bool) FALSE,cr))
+		if (!bool_expr(FALSE, cr))
 		{
 			stx_error(ERR_PCONDEXPECTED);
 			return FALSE;
@@ -249,9 +251,9 @@ LITDEF struct
 			triptr->operand[0] = put_tref(temp_expr_start);
 		}
 	}
-	if (window_token == TK_SPACE)
+	if (TK_SPACE == TREF(window_token))
 		advancewindow();
-	else if (window_token != TK_EOL || !cmd_data[x].eol_ok)
+	else if ((TK_EOL != TREF(window_token)) || !cmd_data[x].eol_ok)
 	{
 		stx_error(ERR_SPOREOL);
 		return FALSE;
@@ -259,24 +261,23 @@ LITDEF struct
 	fetch0 = curr_fetch_trip;
 	for (;;)
 	{
-		rval = (*cmd_data[x].fcn)();
-		if (!rval || window_token != TK_COMMA)
+		if ((EXPR_FAIL == (rval = (*cmd_data[x].fcn)())) || (TK_COMMA != TREF(window_token)))	/* NOTE assignment */
 			break;
 		else
 		{	advancewindow();
-			if (window_token == TK_SPACE || window_token == TK_EOL)
+			if ((TK_SPACE == TREF(window_token)) || (TK_EOL == TREF(window_token)))
 			{
 				stx_error(ERR_EXPR);
 				return FALSE;
 			}
 		}
 	}
-	if (rval && cr)
+	if ((EXPR_FAIL != rval) && cr)
 	{
 		if (fetch0 != curr_fetch_trip)
 		{
-			assert (curr_fetch_trip->opcode == OC_FETCH);
-			*cr = put_tjmp(curtchain->exorder.bl);
+			assert(OC_FETCH == curr_fetch_trip->opcode);
+			*cr = put_tjmp((TREF(curtchain))->exorder.bl);
 		} else
 		{
 			if (shifting)
@@ -290,5 +291,7 @@ LITDEF struct
 				tnxtarg(cr);
 		}
 	}
+	if (!cr && (m_zinvcmd == cmd_data[x].fcn))
+		return FALSE;
 	return rval;
 }

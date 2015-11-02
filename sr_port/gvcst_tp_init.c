@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,7 +71,7 @@ void gvcst_tp_init(gd_region *greg)
 			si->cr_array_size = 0;
 			si->cr_array = NULL;
 		}
-		si->fresh_start = TRUE;
+		si->tp_set_sgm_done = FALSE;
 	} else
 		si = csa->sgm_info_ptr;
 	si->gv_cur_region = greg;

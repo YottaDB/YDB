@@ -37,14 +37,14 @@
 GBLREF int              merge_args;
 GBLREF merge_glvn_ptr	mglvnp;
 
-void merge_desc_check(void)
+error_def(ERR_MERGEDESC);
+
+boolean_t merge_desc_check(void)
 {
-        unsigned char		buff1[MAX_ZWR_KEY_SZ], buff2[MAX_ZWR_KEY_SZ], *end1, *end2;
+	unsigned char		buff1[MAX_ZWR_KEY_SZ], buff2[MAX_ZWR_KEY_SZ], *end1, *end2;
 	enum db_acc_method	acc_meth1, acc_meth2;
 	gd_region		*reg1, *reg2;
 	gv_namehead		*gvt1, *gvt2;
-
-	error_def(ERR_MERGEDESC);
 
 	if (MARG1_IS_GBL(merge_args) && MARG2_IS_GBL(merge_args))
 	{
@@ -71,11 +71,13 @@ void merge_desc_check(void)
 			&& ((ddp_info *)(&FILE_INFO(reg1)->file_id))->volset == ((ddp_info *)(&FILE_INFO(reg2)->file_id))->volset)))
 		{
 			UNIX_ONLY(assert(dba_usr != acc_meth1 && dba_usr != acc_meth2);)
-			return;
+			return 1;
 		}
 		if (0 == memcmp(mglvnp->gblp[IND1]->s_gv_currkey->base, mglvnp->gblp[IND2]->s_gv_currkey->base,
 			        MIN(mglvnp->gblp[IND1]->s_gv_currkey->end, mglvnp->gblp[IND2]->s_gv_currkey->end)))
 		{
+			if (mglvnp->gblp[IND1]->s_gv_currkey->end == mglvnp->gblp[IND2]->s_gv_currkey->end)
+				return 0; /* NOOP - merge self */
 			if (0 == (end1 = format_targ_key(buff1, MAX_ZWR_KEY_SZ, mglvnp->gblp[IND1]->s_gv_currkey, TRUE)))
 				end1 = &buff1[MAX_ZWR_KEY_SZ - 1];
 			if (0 == (end2 = format_targ_key(buff2, MAX_ZWR_KEY_SZ, mglvnp->gblp[IND2]->s_gv_currkey, TRUE)))
@@ -87,6 +89,8 @@ void merge_desc_check(void)
 		}
 	} else if (MARG1_IS_LCL(merge_args) && MARG2_IS_LCL(merge_args))
 	{
+		if (mglvnp->lclp[IND1] == mglvnp->lclp[IND2])
+			return 0; /* NOOP - merge self */
 		if (lcl_arg1_is_desc_of_arg2(mglvnp->lclp[IND1], mglvnp->lclp[IND2]))
 		{
 			end1 = format_key_lv_val(mglvnp->lclp[IND1], buff1, SIZEOF(buff1));
@@ -99,4 +103,5 @@ void merge_desc_check(void)
 			rts_error(VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
 		}
 	}
+	return 1;
 }

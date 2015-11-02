@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,25 +15,26 @@
 #include "toktyp.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
+error_def(ERR_COMMA);
 
 int f_zsigproc(oprtype *a, opctype op)
 {
 	triple *r;
-	error_def(ERR_COMMA);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
 	/* First argument is integer process id */
-	if (!intexpr(&(r->operand[0])))
+	if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_INT))
 		return FALSE;	/* Improper process id argument */
-	if (window_token != TK_COMMA)
+	if (TK_COMMA != TREF(window_token))
 	{	/* 2nd argument (for now) required */
 		stx_error(ERR_COMMA);
 		return FALSE;
 	}
 	advancewindow();
 	/* 2nd argument is the signal number to send */
-	if (!intexpr(&(r->operand[1])))
+	if (EXPR_FAIL == expr(&(r->operand[1]), MUMPS_INT))
 		return FALSE;	/* Improper signal number argument */
 	ins_triple(r);
 	*a = put_tref(r);

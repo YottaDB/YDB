@@ -19,12 +19,10 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-
 int m_goto(void)
 {
-	triple tmpchain, *oldchain, *obp, *ref0, *ref1, *triptr;
-	oprtype *cr;
+	oprtype	*cr;
+	triple	*obp, *oldchain, *ref0, *ref1, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -36,11 +34,11 @@ int m_goto(void)
 		return FALSE;
 	}
 	setcurtchain(oldchain);
-	if (window_token == TK_COLON)
+	if (TK_COLON == TREF(window_token))
 	{
 		advancewindow();
-		cr = (oprtype *) mcalloc(SIZEOF(oprtype));
-		if (!bool_expr((bool) FALSE, cr))
+		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
+		if (!bool_expr(FALSE, cr))
 			return FALSE;
 		if (TREF(expr_start) != TREF(expr_start_orig))
 		{

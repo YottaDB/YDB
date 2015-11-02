@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,98 +17,97 @@
 #include "stringpool.h"
 #include "rwformat.h"
 
-GBLREF char 	window_token;
-GBLREF mident 	window_ident;
+error_def(ERR_COMMAORRPAREXP);
+error_def(ERR_CTLMNEXPECTED);
+error_def(ERR_RWFORMAT);
 
 int rwformat(void)
 {
-	triple	*ref, *argcnt, *parm;
-	oprtype	x;
 	int	n;
 	mval	key;
+	oprtype	x;
+	triple	*argcnt, *parm, *ref;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_RWFORMAT);
-	error_def(ERR_COMMAORRPAREXP);
-	error_def(ERR_CTLMNEXPECTED);
-
+	SETUP_THREADGBL_ACCESS;
 	ref = 0;
 	for (;;)
 	{
-		switch (window_token)
+		switch (TREF(window_token))
 		{
-			case TK_EXCLAIMATION:
-				n = 0;
-				do
-				{
-					n++;
-					advancewindow();
-				} while (window_token == TK_EXCLAIMATION);
-				ref = maketriple(OC_WTEOL);
-				ref->operand[0] = put_ilit(n);
-				ins_triple(ref);
-				break;
-			case TK_HASH:
+		case TK_EXCLAIMATION:
+			n = 0;
+			do
+			{
+				n++;
 				advancewindow();
-				ref = newtriple(OC_WTFF);
-				break;
-			case TK_QUESTION:
-				advancewindow();
-				if (!intexpr(&x))
-					return FALSE;
-				ref = newtriple(OC_WTTAB);
-				ref->operand[0] = x;
-				return TRUE;
-			case TK_SLASH:
-				advancewindow();
-				if (window_token != TK_IDENT)
-				{
-					stx_error(ERR_CTLMNEXPECTED);
-					return FALSE;
-				}
-				assert(0 < window_ident.len);
-				key.mvtype = MV_STR;
-				key.str.len = window_ident.len;
-				key.str.addr = window_ident.addr;
-				s2n(&key);
-				s2pool(&(key.str));
-				argcnt = parm = newtriple(OC_PARAMETER);
-				parm->operand[0] = put_lit(&key);
-				advancewindow();
-				n = 1;
-				if (window_token == TK_LPAREN)
-				{
-					advancewindow();
-					for ( ;; )
-					{
-						if (!expr(&x))
-							return FALSE;
-						n++;
-						ref = newtriple(OC_PARAMETER);
-						ref->operand[0] = x;
-						parm->operand[1] = put_tref(ref);
-						parm = ref;
-						if (window_token == TK_RPAREN)
-						{
-							advancewindow();
-							break;
-						}
-						if (window_token != TK_COMMA)
-						{
-							stx_error(ERR_COMMAORRPAREXP);
-							return FALSE;
-						}
-						advancewindow();
-					}
-				}
-				ref = newtriple(OC_IOCONTROL);
-				ref->operand[0] = put_ilit(n);
-				ref->operand[1] = put_tref(argcnt);
-				return TRUE;
-			default:
-				if (ref)
-					return TRUE;
-				stx_error(ERR_RWFORMAT);
+			} while (TK_EXCLAIMATION == TREF(window_token));
+			ref = maketriple(OC_WTEOL);
+			ref->operand[0] = put_ilit(n);
+			ins_triple(ref);
+			break;
+		case TK_HASH:
+			advancewindow();
+			ref = newtriple(OC_WTFF);
+			break;
+		case TK_QUESTION:
+			advancewindow();
+			if (EXPR_FAIL == expr(&x, MUMPS_INT))
 				return FALSE;
+			ref = newtriple(OC_WTTAB);
+			ref->operand[0] = x;
+			return TRUE;
+		case TK_SLASH:
+			advancewindow();
+			if (TK_IDENT != TREF(window_token))
+			{
+				stx_error(ERR_CTLMNEXPECTED);
+				return FALSE;
+			}
+			assert(0 < (TREF(window_ident)).len);
+			key.mvtype = MV_STR;
+			key.str.len = (TREF(window_ident)).len;
+			key.str.addr = (TREF(window_ident)).addr;
+			s2n(&key);
+			s2pool(&(key.str));
+			argcnt = parm = newtriple(OC_PARAMETER);
+			parm->operand[0] = put_lit(&key);
+			advancewindow();
+			n = 1;
+			if (TK_LPAREN == TREF(window_token))
+			{
+				advancewindow();
+				for (;;)
+				{
+					if (EXPR_FAIL == expr(&x, MUMPS_EXPR))
+						return FALSE;
+					n++;
+					ref = newtriple(OC_PARAMETER);
+					ref->operand[0] = x;
+					parm->operand[1] = put_tref(ref);
+					parm = ref;
+					if (TK_RPAREN == TREF(window_token))
+					{
+						advancewindow();
+						break;
+					}
+					if (TK_COMMA != TREF(window_token))
+					{
+						stx_error(ERR_COMMAORRPAREXP);
+						return FALSE;
+					}
+					advancewindow();
+				}
+			}
+			ref = newtriple(OC_IOCONTROL);
+			ref->operand[0] = put_ilit(n);
+			ref->operand[1] = put_tref(argcnt);
+			return TRUE;
+		default:
+			if (ref)
+				return TRUE;
+			stx_error(ERR_RWFORMAT);
+			return FALSE;
 		}
 	}
 }

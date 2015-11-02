@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +48,14 @@ GBLREF 	gd_region		*gv_cur_region;
 GBLREF 	sgmnt_data_ptr_t	cs_data;
 GBLREF 	sgmnt_addrs		*cs_addrs;
 
+error_def(ERR_COLLATIONUNDEF);
+error_def(ERR_COLLTYPVERSION);
+error_def(ERR_DBFILERR);
+error_def(ERR_FILEPARSE);
+error_def(ERR_GVIS);
+error_def(ERR_MUNOACTION);
+error_def(ERR_TEXT);
+
 void mucregini(int4 blk_init_size)
 {
 	int4			status;
@@ -57,14 +65,6 @@ void mucregini(int4 blk_init_size)
 	uint4			ustatus;
 	mstr 			jnlfile, jnldef, tmpjnlfile;
 	time_t			ctime;
-
-	error_def(ERR_COLLATIONUNDEF);
-	error_def(ERR_COLLTYPVERSION);
-	error_def(ERR_GVIS);
-	error_def(ERR_DBFILERR);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_TEXT);
-	error_def(ERR_FILEPARSE);
 
 	MEMCPY_LIT(cs_data->label, GDS_LABEL);
 	cs_data->desired_db_format = GDSVCURR;
@@ -111,12 +111,26 @@ void mucregini(int4 blk_init_size)
 	cs_data->jnl_state = gv_cur_region->jnl_state;
 	cs_data->epoch_interval = JNL_ALLOWED(cs_data) ? DEFAULT_EPOCH_INTERVAL : 0;
 	cs_data->alignsize = JNL_ALLOWED(cs_data) ? (DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE) : 0;
-	cs_data->autoswitchlimit = JNL_ALLOWED(cs_data) ? ALIGNED_ROUND_DOWN(JNL_ALLOC_MAX, cs_data->jnl_alq, cs_data->jnl_deq) : 0;
 #ifdef UNIX
+	if (JNL_ALLOWED(cs_data))
+	{
+		if (cs_data->jnl_alq + cs_data->jnl_deq > gv_cur_region->jnl_autoswitchlimit)
+		{
+			cs_data->autoswitchlimit = gv_cur_region->jnl_autoswitchlimit;
+			cs_data->jnl_alq = cs_data->autoswitchlimit;
+		} else
+			cs_data->autoswitchlimit = ALIGNED_ROUND_DOWN(gv_cur_region->jnl_autoswitchlimit,
+							cs_data->jnl_alq, cs_data->jnl_deq);
+	}
+	else
+		cs_data->autoswitchlimit = 0;
 	assert(!(MAX_IO_BLOCK_SIZE % DISK_BLOCK_SIZE));
 	cs_data->jnl_buffer_size = ROUND_UP(gv_cur_region->jnl_buffer_size,
 		MIN(MAX_IO_BLOCK_SIZE, cs_data->blk_size) / DISK_BLOCK_SIZE);
+	if(cs_data->jnl_alq + cs_data->jnl_deq > cs_data->autoswitchlimit)
+		cs_data->jnl_alq = cs_data->autoswitchlimit;
 #else
+	cs_data->autoswitchlimit = JNL_ALLOWED(cs_data) ? ALIGNED_ROUND_DOWN(JNL_ALLOC_MAX, cs_data->jnl_alq, cs_data->jnl_deq) : 0;
 	cs_data->jnl_buffer_size = gv_cur_region->jnl_buffer_size;
 #endif
 	if (JNL_ALLOWED(cs_data) && !cs_data->jnl_buffer_size)
@@ -155,7 +169,6 @@ void mucregini(int4 blk_init_size)
 		 */
 		cs_data->zqgblmod_seqno = 0;
 		cs_data->zqgblmod_tn = 0;
-		cs_data->dualsite_resync_seqno = 1;
 		assert(!cs_data->multi_site_open);
 		cs_data->multi_site_open = TRUE;
 	)

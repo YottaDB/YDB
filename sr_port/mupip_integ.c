@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@
 #include "mupip_exit.h"
 #ifdef UNIX
 #include "ipcrmid.h"
-#include "ftok_sems.h"
+#include "db_ipcs_reset.h"
 #endif
 #include "mu_getlst.h"
 #include "mu_outofband_setup.h"
@@ -241,7 +241,23 @@ void mupip_integ(void)
 		muint_fast = TRUE;
 	else
 		muint_fast = FALSE;
-	if (CLI_PRESENT == cli_present("REGION"))
+
+	/* DBG qualifier prints extra debug messages while waiting for KIP in region freeze */
+	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
+	GTM_SNAPSHOT_ONLY(online_specified = (CLI_PRESENT == cli_present("ONLINE"));)
+#	ifdef GTM_SNAPSHOT
+	if (online_specified)
+	{ 	/* if MUPIP INTEG -ONLINE -ANALYZE=<filename> is given then display details about the snapshot file
+		 * and do early return
+		 */
+		if (cli_get_str("ANALYZE", ss_filename, &ss_file_len))
+		{
+			ss_anal_shdw_file(ss_filename, ss_file_len);
+			return;
+		}
+	}
+#	endif
+	if ((CLI_PRESENT == cli_present("REGION")) GTM_SNAPSHOT_ONLY(|| online_specified))
 	{
 		gvinit(); /* side effect: initializes gv_altkey (used by code below) & gv_currkey (not used by below code) */
 		region = TRUE;
@@ -256,6 +272,9 @@ void mupip_integ(void)
 		rptr = grlist;
 	} else
 		GVKEY_INIT(gv_altkey, DBKEYSIZE(MAX_KEY_SZ));	/* used by code below */
+	GTM_SNAPSHOT_ONLY(online_integ = ((TRUE != cli_negated("ONLINE")) && region)); /* Default option for INTEG is -ONLINE */
+	GTM_SNAPSHOT_ONLY(preserve_snapshot = (CLI_PRESENT == cli_present("PRESERVE"))); /* Should snapshot file be preserved ? */
+	GTM_SNAPSHOT_ONLY(assert(!online_integ || (region && !tn_reset_specified)));
 	if (CLI_PRESENT == cli_present("SUBSCRIPT"))
 	{
 		keylen = SIZEOF(key_buff);
@@ -277,28 +296,6 @@ void mupip_integ(void)
 	muint_all_index_blocks = !(block || muint_key);
 	mu_int_master = malloc(MASTER_MAP_SIZE_MAX);
 	tn_reset_specified = (CLI_PRESENT == cli_present("TN_RESET"));
-	/* Note if -ONLINE is explicitly specified */
-	GTM_SNAPSHOT_ONLY(online_specified = (CLI_PRESENT == cli_present("ONLINE"));)
-	/* DEFAULT option for INTEG will be -ONLINE */
-	GTM_SNAPSHOT_ONLY(online_integ = ((TRUE != cli_negated("ONLINE")) && region);)
-	/* Should the snapshot shadow file be preserved ?*/
-	GTM_SNAPSHOT_ONLY(preserve_snapshot = (CLI_PRESENT == cli_present("PRESERVE"));)
-	/* DBG qualifier prints extra debug messages while waiting for KIP in region freeze */
-	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
-#	ifdef GTM_SNAPSHOT
-	if (online_specified)
-	{
-		/* if MUPIP INTEG -ONLINE -ANALYZE=<filename> is given then display details about the snapshot file
-		 * and do early return
-		 */
-		if (cli_get_str("ANALYZE", ss_filename, &ss_file_len))
-		{
-			ss_anal_shdw_file(ss_filename, ss_file_len);
-			return;
-		}
-		assert(region && !tn_reset_specified);
-	}
-#	endif
 	mu_outofband_setup();
 	UNIX_ONLY(ESTABLISH(mu_int_ch);)
 	if (region)

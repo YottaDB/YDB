@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,6 @@
  ****************************************************************/
 
 #include "mdef.h"
-
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -31,6 +30,7 @@
 #include "mlk_unlock.h"
 #include "mlk_wake_pending.h"
 #include "gvusr.h"
+#include "min_max.h"
 
 GBLREF	int4 		process_id;
 GBLREF	short		crash_count;
@@ -46,16 +46,16 @@ void mlk_unlock(mlk_pvtblk *p)
 	mlk_ctldata_ptr_t	ctl;
 	bool			stop_waking, was_crit;
 	sgmnt_addrs		*csa;
+	float			ls_free;	/* Free space in bottleneck subspace */
 
 	if (p->region->dyn.addr->acc_meth != dba_usr)
 	{
-		csa = &FILE_INFO(p->region)->s_addrs;
-
-		d = p->nodptr;
 		ctl = p->ctlptr;
+		assert((ctl->max_blkcnt > 0) && (ctl->max_prccnt > 0) && ((ctl->subtop - ctl->subbase) > 0));
+		csa = &FILE_INFO(p->region)->s_addrs;
+		d = p->nodptr;
 		if (csa->critical)
 			crash_count = csa->critical->crashcnt;
-
 		if (dollar_tlevel && !((t_tries < CDB_STAGNATE) || csa->now_crit)) /* Final retry and region not locked down */
 		{	/* make sure this region is in the list in case we end up retrying */
 			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
@@ -86,10 +86,13 @@ void mlk_unlock(mlk_pvtblk *p)
 					mlk_shrblk_delete_if_empty(ctl, d);
 			}
 		}
+		/* Find the ratio of least free subspace. Here we intentionally ignore shr_sub_len to keep unlock lightweight. */
+		ls_free = MIN(((float)ctl->blkcnt) / ctl->max_blkcnt, ((float)ctl->prccnt) / ctl->max_prccnt);
+		if (ls_free >= LOCK_SPACE_FULL_SYSLOG_THRESHOLD)
+			csa->nl->lockspacefull_logged = FALSE; /* Allow syslog writes if enough free space is established. */
 		if (FALSE == was_crit)
 			rel_crit(p->region);
 	} else	/* acc_meth == dba_usr */
 		gvusr_unlock(p->total_length, &p->value[0], p->region);
-
 	return;
 }

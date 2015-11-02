@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,8 @@ static char rcsid[] = "$Header:$";
 #include "omi.h"
 #include "gtm_pwd.h"
 #include "gtm_ctype.h"
+#include "gtmio.h"
+#include "have_crit.h"
 #ifdef GTCM_RC
 #include "rc.h"
 #endif /* defined(GTCM_RC) */
@@ -184,7 +186,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 	    /* lowercase agent name */
 	    for(s = ag_name; *s; s++)
-		    if (ISUPPER(*s))
+		    if (ISUPPER_ASCII(*s))
 			    *s = TOLOWER(*s);
 
 #ifdef SHADOWPW

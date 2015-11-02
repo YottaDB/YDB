@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ void op_gvrectarg(mval *v)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* You might be somewhat apprehensive at the seemingly cavalier use of GTMASSERT in this routine.
+	/* You might be somewhat apprehensive at the seemingly cavalier use of assertpro() in this routine.
 	 * First, let me explain myself.  The mvals passed to RECTARG are supposed to come only from SAVTARG,
 	 * and are to represent the state of gv_currkey when SAVTARG was done.  Consequently, there are
 	 * certain preconditions that one can expect.  Namely,
@@ -63,8 +63,7 @@ void op_gvrectarg(mval *v)
 	 *	3) All gv_keys end with 00.  When reading this mval, if you run out of characters
 	 *		before you see a 0, something is amiss.
 	 */
-	if (!MV_IS_STRING(v))
-		GTMASSERT;
+	assertpro(MV_IS_STRING(v));
 	len = v->str.len;
 	if (0 == len)
 	{
@@ -77,8 +76,7 @@ void op_gvrectarg(mval *v)
 		}
 		return;
 	}
-	if (NULL == gv_currkey)
-		GTMASSERT;
+	assertpro(NULL != gv_currkey);
 	assert(GVSAVTARG_FIXED_SIZE <= len);
 	c = (unsigned char *)v->str.addr;
 	/* op_gvsavtarg had ensured 8-byte alignment of v->str.addr but it is possible a "stp_gcol" was invoked in between
@@ -102,19 +100,16 @@ void op_gvrectarg(mval *v)
 	{	/* Restore sgm_info_ptr if needed.
 		 * a) If first_sgm_info is NULL (possible if op_gvrectarg is called as part of tp restart handling),
 		 *	then no region is included in this TP so set sgm_info_ptr to NULL.
-		 * b) If the region has not yet been opened in this TP transaction (si->fresh_start is TRUE), then
+		 * b) If the region has not yet been opened in this TP transaction (si->tp_set_sgm_done is FALSE), then
 		 *	again set sgm_info_ptr to NULL.
 		 * c) If the region corresponding to the restored $reference has already been opened as part
 		 * 	of this TP transaction, then set sgm_info_ptr to point to the corresponding tp structure.
 		 */
-		assert(cs_addrs == gv_target->gd_csa);
-		si = cs_addrs->sgm_info_ptr;
-		if ((NULL != first_sgm_info) && !si->fresh_start)
-		{	/* Case (c) */
-			sgm_info_ptr = si;
-			DBG_CHECK_IN_FIRST_SGM_INFO_LIST(si);
-		} else
-		{	/* Case (a) OR (b).
+		assert((NULL == gv_target) || (cs_addrs == gv_target->gd_csa));
+		if ((NULL == first_sgm_info) || (NULL == cs_addrs) || (NULL == (si = cs_addrs->sgm_info_ptr))
+			|| !si->tp_set_sgm_done)
+		{	/* Note: Assignment in above test
+			 * Case (a) OR (b).
 			 * In case of (b), note that first_sgm_info could be non-NULL while sgm_info_ptr is NULL.
 			 * We can fix the latter to be a non-NULL value by invoking "tp_set_sgm". But we dont want
 			 * to do that here because it can cause restarts (due to the "insert_region" call) and this
@@ -125,6 +120,10 @@ void op_gvrectarg(mval *v)
 			 * are invoked as they assume sgm_info_ptr is non-NULL if dollar_tlevel is non-zero.
 			 */
 			sgm_info_ptr = NULL;
+		} else
+		{	/* Case (c) */
+			sgm_info_ptr = si;
+			DBG_CHECK_IN_FIRST_SGM_INFO_LIST(si);
 		}
 		assert((NULL != first_sgm_info) || (NULL == sgm_info_ptr));
 	}

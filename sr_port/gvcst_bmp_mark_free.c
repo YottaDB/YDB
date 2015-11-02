@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@
 #include "add_inter.h"
 #include "gvcst_bmp_mark_free.h"
 #include "t_busy2free.h"
+#include "t_abort.h"
 
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	cw_set_element		cw_set[];
@@ -55,23 +56,35 @@ GBLREF	boolean_t		mu_reorg_process;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	uint4			dollar_tlevel;
+#ifdef UNIX
+GBLREF	unsigned int		t_tries;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+#endif
+GBLREF	gd_region		*gv_cur_region;
+
+error_def(ERR_GVKILLFAIL);
+error_def(ERR_IGNBMPMRKFREE);
 
 trans_num gvcst_bmp_mark_free(kill_set *ks)
 {
-	block_id	bit_map, next_bm, *updptr;
-	blk_ident	*blk, *blk_top, *nextblk;
-	trans_num	ctn, start_db_fmt_tn;
-	unsigned int	len;
-	int4		blk_prev_version;
-	srch_hist	alt_hist;
-	trans_num	ret_tn = 0;
-	boolean_t	visit_blks;
-	srch_blk_status	bmphist;
-	cache_rec_ptr_t	cr;
-	enum db_ver	ondsk_blkver;
+	block_id		bit_map, next_bm, *updptr;
+	blk_ident		*blk, *blk_top, *nextblk;
+	trans_num		ctn, start_db_fmt_tn;
+	unsigned int		len;
+#	if defined(UNIX) && defined(DEBUG)
+	unsigned int		lcl_t_tries;
+#	endif
+	int4			blk_prev_version;
+	srch_hist		alt_hist;
+	trans_num		ret_tn = 0;
+	boolean_t		visit_blks;
+	srch_blk_status		bmphist;
+	cache_rec_ptr_t		cr;
+	enum db_ver		ondsk_blkver;
+	enum cdb_sc		status;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_GVKILLFAIL);
-
+	SETUP_THREADGBL_ACCESS;
 	assert(inctn_bmp_mark_free_gtm == inctn_opcode || inctn_bmp_mark_free_mu_reorg == inctn_opcode);
 	/* Note down the desired_db_format_tn before you start relying on cs_data->fully_upgraded.
 	 * If the db is fully_upgraded, take the optimal path that does not need to read each block being freed.
@@ -92,6 +105,15 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	{	/* Database has been completely upgraded. Free all blocks in one bitmap as part of one transaction. */
 		assert(cs_data->db_got_to_v5_once); /* assert all V4 fmt blocks (including RECYCLED) have space for V5 upgrade */
 		inctn_detail.blknum_struct.blknum = 0; /* to indicate no adjustment to "blks_to_upgrd" necessary */
+		/* If any of the mini transaction below restarts because of an online rollback, we don't want the application
+		 * refresh to happen (like $ZONLNRLBK++ or rts_error(DBROLLEDBACK). This is because, although we are currently in
+		 * non-tp (dollar_tleve = 0), we could actually be in a TP transaction and have actually faked dollar_tlevel. In
+		 * such a case, we should NOT * be issuing a DBROLLEDBACK error as TP transactions are supposed to just restart in
+		 * case of an online rollback. So, set the global variable that gtm_onln_rlbk_clnup can check and skip doing the
+		 * application refresh, but will reset the clues. The next update will see the cycle mismatch and will accordingly
+		 * take the right action.
+		 */
+		UNIX_ONLY(TREF(only_reset_clues_if_onln_rlbk) = TRUE);
 		for ( ; blk < blk_top;  blk = nextblk)
 		{
 			if (0 != blk->flag)
@@ -142,13 +164,35 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					continue;
 				}
 				t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -(int4)(nextblk - blk));
+				UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
 				if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL, TN_NOT_SPECIFIED)))
+				{
+#					ifdef UNIX
+					assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
+					status = t_fail_hist[t_tries - 1];
+					if ((cdb_sc_onln_rlbk1 == status) || (cdb_sc_onln_rlbk2 == status))
+					{	/* t_end restarted due to online rollback. Discard bitmap free-up and return control
+						 * to the application. But, before that reset only_reset_clues_if_onln_rlbk to FALSE
+						 */
+						TREF(only_reset_clues_if_onln_rlbk) = FALSE;
+						send_msg(VARLSTCNT(6) ERR_IGNBMPMRKFREE, 4, REG_LEN_STR(gv_cur_region),
+								DB_LEN_STR(gv_cur_region));
+						t_abort(gv_cur_region, cs_addrs);
+						return ret_tn; /* actually 0 */
+					}
+#					endif
 					continue;
+				}
 				break;
 			}
 			if (0 == ret_tn) /* db format change occurred. Fall through to below for loop to visit each block */
+			{
+				/* Abort any active transaction to get rid of lingering Non-TP artifacts */
+				t_abort(gv_cur_region, cs_addrs);
 				break;
+			}
 		}
+		TREF(only_reset_clues_if_onln_rlbk) = FALSE;
 	}	/* for all blocks in the kill_set */
 	for ( ; blk < blk_top; blk++)
 	{	/* Database has NOT been completely upgraded. Have to read every block that is going to be freed
@@ -234,8 +278,20 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				continue;
 			}
 			t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -1);
+			UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
 			if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL, TN_NOT_SPECIFIED)))
+			{
+#				ifdef UNIX
+				assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
+				assert(0 < t_tries);
+				DEBUG_ONLY(status = t_fail_hist[t_tries - 1]); /* get the recent restart code */
+				/* We don't expect online rollback related retries because we are here with the database NOT fully
+				 * upgraded. This means, online rollback cannot even start (it issues ORLBKNOV4BLK). Assert that.
+				 */
+				assert((cdb_sc_onln_rlbk1 != status) && (cdb_sc_onln_rlbk2 != status));
+#				endif
 				continue;
+			}
 			break;
 		}
 	}	/* for all blocks in the kill_set */

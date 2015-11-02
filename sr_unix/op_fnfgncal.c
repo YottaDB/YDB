@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@
 #include "callg.h"
 #include "callintogtmxfer.h"
 #include "min_max.h"
+#include "have_crit.h"
 
 /******************************************************************************
  *
@@ -100,17 +101,28 @@ GBLREF unsigned char    *msp;
 GBLREF spdesc 		stringpool;
 GBLREF int    		(*callintogtm_vectortable[])();
 GBLREF int		mumps_status;
-error_def(ERR_ZCRTENOTF);
-error_def(ERR_ZCUSRRTN);
-error_def(ERR_ZCARGMSMTCH);
+GBLREF volatile int4	gtmMallocDepth;
+
+error_def(ERR_MAXSTRLEN);
+error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
+error_def(ERR_XCVOIDRET);
+error_def(ERR_ZCARGMSMTCH);
+error_def(ERR_ZCCTENV);
 error_def(ERR_ZCMAXPARAM);
 error_def(ERR_ZCNOPREALLOUTPAR);
+error_def(ERR_ZCRTENOTF);
+error_def(ERR_ZCSTATUSRET);
+error_def(ERR_ZCUSRRTN);
+error_def(ERR_ZCVECTORINDX);
 
-static	int			call_table_initialized = 0;
+STATICDEF int			call_table_initialized = 0;
+
+STATICFNDCL void extarg2mval(void *src, enum xc_types typ, mval *dst);
+STATICFNDCL int extarg_getsize(void *src, enum xc_types typ, mval *dst);
 
 /* routine to convert external return values to mval's */
-static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
+STATICFNDEF void extarg2mval(void *src, enum xc_types typ, mval *dst)
 {
 	xc_long_t		str_len;
 	xc_int_t		s_int_num;
@@ -119,8 +131,6 @@ static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
 	xc_ulong_t		uns_long_num;
 	char			*cp;
 	struct extcall_string	*sp;
-	error_def(ERR_ZCSTATUSRET);
-	error_def(ERR_MAXSTRLEN);
 
 	switch(typ)
 	{
@@ -154,19 +164,19 @@ static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
 			break;
 		case xc_long:
 			s_long_num = (xc_long_t)src;
-			MV_FORCE_MVAL(dst, s_long_num);
+			MV_FORCE_LMVAL(dst, s_long_num);
 			break;
 		case xc_ulong:
 			uns_long_num = (xc_ulong_t)src;
-			MV_FORCE_UMVAL(dst, uns_long_num);
+			MV_FORCE_ULMVAL(dst, uns_long_num);
 			break;
 		case xc_long_star:
 			s_long_num = *((xc_long_t *)src);
-			MV_FORCE_MVAL(dst, s_long_num);
+			MV_FORCE_LMVAL(dst, s_long_num);
 			break;
 		case xc_ulong_star:
 			uns_long_num = *((xc_ulong_t *)src);
-			MV_FORCE_UMVAL(dst, uns_long_num);
+			MV_FORCE_ULMVAL(dst, uns_long_num);
 			break;
 		case xc_string_star:
 			sp = (struct extcall_string *)src;
@@ -211,7 +221,7 @@ static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
 }
 
 /* subroutine to calculate stringpool requirements for an external argument */
-static int	extarg_getsize(void *src, enum xc_types typ, mval *dst)
+STATICFNDEF int extarg_getsize(void *src, enum xc_types typ, mval *dst)
 {
 	int4			n;
 	char			*cp, **cpp;
@@ -267,12 +277,7 @@ static int	extarg_getsize(void *src, enum xc_types typ, mval *dst)
 	return 0; /* This should never get executed, added to make compiler happy */
 }
 
-error_def	(ERR_TEXT);
-error_def	(ERR_XCVOIDRET);
-error_def	(ERR_ZCCTENV);
-error_def	(ERR_ZCVECTORINDX);
-
-void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
+void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
 {
 	va_list		var;
 	int		i, rslt;
@@ -296,8 +301,9 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	assert(n_mvals == argcnt + 5);
 	assert(MV_IS_STRING(package));	/* package and routine are literal strings */
 	assert(MV_IS_STRING(extref));
-	if (MAXIMUM_PARAMETERS < argcnt)
+	if (MAX_ACTUALS < argcnt)
 		rts_error(VARLSTCNT(1) ERR_ZCMAXPARAM);
+	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state); /* interrupts should be enabled for external calls */
 	/* find package */
 	for (package_ptr = TREF(extcall_package_root); package_ptr; package_ptr = package_ptr->next_package)
 	{

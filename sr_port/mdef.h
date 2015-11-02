@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,6 +72,9 @@ typedef struct
 #define MSTR_EQ(x, y)		(((x)->len == (y)->len) && !memcmp((x)->addr, (y)->addr, (x)->len))
 
 #include <sys/types.h>
+
+typedef int 		int4;		/* 4-byte signed integer */
+typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 
 #define sssize_t	size_t
 #define SHMDT(X)	shmdt((void *)(X))
@@ -456,10 +459,19 @@ mval *underr (mval *start, ...);
 #define MV_FORCE_BOOL(X)	(MV_FORCE_NUM(X), (X)->m[1] ? TRUE : FALSE)
 #define MV_FORCE_INT(M)		(MV_FORCE_DEFINED(M), MV_FORCE_INTD(M))
 #define MV_FORCE_INTD(M)	(DBG_ASSERT(MV_DEFINED(M)) (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i(M))
-#define MV_FORCE_UMVAL(M,I)     (((I) >= 1000000) ? i2usmval((M),(int)(I)) : \
+#define MV_FORCE_UMVAL(M,I)	(((I) >= 1000000) ? i2usmval((M),(int)(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
 #define MV_FORCE_MVAL(M,I)	(((I) >= 1000000 || (I) <= -1000000) ? i2mval((M),(int)(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
+#ifdef GTM64
+#define MV_FORCE_ULMVAL(M,L)	(((L) >= 1000000) ? ul2mval((M),(unsigned long)(L)) : \
+				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS ))
+#define MV_FORCE_LMVAL(M,L)	(((L) >= 1000000 || (L) <= -1000000) ? l2mval((M),(long)(L)) : \
+				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS ))
+#else
+#define MV_FORCE_ULMVAL		MV_FORCE_UMVAL
+#define MV_FORCE_LMVAL		MV_FORCE_MVAL
+#endif
 #define MV_FORCE_DEFINED(X)	((!MV_DEFINED(X)) ? (X) = underr(X) : (X))
 /* Note MV_FORCE_CANONICAL currently only used in op_add() when vars are known to be defined so no MV_FORCE_DEFINED()
    macro has been added. If uses are added, this needs to be revisited. 01/2008 se
@@ -561,7 +573,7 @@ mval *underr (mval *start, ...);
 #  define PRO_ONLY(statement)			statement
 #endif
 
-/* These are the analogs of the preceeding, but are more efficient when the MODULUS is a Power Of Two.
+/* These are the analogs of the preceding, but are more efficient when the MODULUS is a Power Of Two.
  * One thing to watch for is that VALUE could be 8-byte and MODULUS could be 4-bytes. In that case, we
  * want to return an 8-byte value. So need to typecast MODULUS to 8-bytes before we do "& ~(MODULUS -1)"
  * or else that will be a 4-byte value and cause a bitwise & with an 8-byte value resulting in a truncated
@@ -585,9 +597,10 @@ mval *underr (mval *start, ...);
 }
 
 #define CALLFROM	LEN_AND_LIT(__FILE__), __LINE__
-void gtm_assert ( int file_name_len, char file_name[], int line_no);
+void gtm_assert(int file_name_len, char file_name[], int line_no);
+int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[], int line_no);
 #define GTMASSERT	(gtm_assert(CALLFROM))
-
+#define assertpro(x) ((x) ? 1 : gtm_assert2((SIZEOF(#x) - 1), (#x), CALLFROM))
 #ifdef UNIX
 int rts_error(int argcnt, ...);
 void dec_err(uint4 argcnt, ...);
@@ -626,13 +639,8 @@ int4 timeout2msec(int4 timeout);
 #define	SET_PROCESS_EXITING_TRUE				\
 {								\
 	GBLREF	int		process_exiting;		\
-	GBLREF	boolean_t	hold_onto_locks;		\
 								\
 	process_exiting = TRUE;					\
-	/* as we are about to exit, no point requiring crit	\
-	 * to be held in case we held it until now (e.g. online	\
-	 * mupip journal recover/rollback */			\
-	hold_onto_locks = FALSE;				\
 }
 
 /* Macro to copy a source string to a malloced area that is set to the destination pointer.
@@ -1484,43 +1492,238 @@ typedef gtm_uint64_t	gtm_off_t;
 							 == ((non_native_uint8 *)&(TO8))->value[msb_index])
 #endif
 
+#define	MAX_SUPPL_STRMS		16	/* max # of non-supplementary streams that can connect to a supplementary root primary */
+
 #ifdef UNIX	/* Replication instance file related structures */
 
 /* The below macros and typedef are required in "repl_instance.h", "gtmsource.h", "gtmrecv.h" and "repl_msg.h".
  * They are hence included in this common header file
  */
 #define	MAX_INSTNAME_LEN	16	/* Max Length of the replication instance name including terminating null character '\0' */
-#define	NUM_GTMSRC_LCL		16	/* number of gtmsrc_lcl structures in the replication instance file */
+#define	NUM_GTMSRC_LCL		16	/* max number of source servers that can run on a root primary instance.
+					 * also the number of gtmsrc_lcl structures in the replication instance file */
+#define	NUM_GTMRCV_LCL		16	/* max number of receiver servers that can run at the same time on a supplementary
+					 * root primary instance. On a non-supplementary instance, only 1 receiver server can run */
+#define	INVALID_SUPPL_STRM	-1	/* stream #s 0 to 15 are the valid ones */
 #define	REPL_INST_HDR_SIZE	(SIZEOF(repl_inst_hdr))
 #define	GTMSRC_LCL_SIZE		(SIZEOF(gtmsrc_lcl) * NUM_GTMSRC_LCL)			/* size of the gtmsrc_lcl array */
 #define	GTMSOURCE_LOCAL_SIZE	(SIZEOF(gtmsource_local_struct) * NUM_GTMSRC_LCL)	/* size of the gtmsource_local array */
-#define	REPL_INST_TRIPLE_OFFSET	(REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE)
+#define	REPL_INST_HISTINFO_START	(REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE)
+
+/* Although we have dedicated 60-bits for the stream specific seqno, it is still a very high value and should not be reached
+ * in practice. Therefore, we arbitrarily pick 48-bits as the maximum value for this seqno and assert that the remaining 12 bits
+ * are zero in at least our test environments. This way we catch any uninitialized/garbage value usages of this seqno in the code.
+ */
+#define	IS_VALID_STRM_SEQNO(SEQNO)	(0 == (SEQNO & 0x0FFF000000000000LLU))
+
+/* Given a strm_seqno, determine the corresponding stream# by getting the most significant 4 bits of the 64-bit seqno */
+#define	GET_STRM_INDEX(SEQNO)		(DBG_ASSERT(IS_VALID_STRM_SEQNO(SEQNO))		\
+					 (((SEQNO) >> 60) & 0xF))
+
+/* Given a 64-bit strm_seqno, determine the corresponding 60-bit stream specific seqno. */
+#define	GET_STRM_SEQ60(SEQNO)		(DBG_ASSERT(IS_VALID_STRM_SEQNO(SEQNO))		\
+					 ((SEQNO) & (0x0FFFFFFFFFFFFFFFLLU)))
+
+/* Given a 60-bit strm_seqno and 4-bit stream#, this macro returns a unified 64-bit sequence number */
+#define	SET_STRM_INDEX(SEQNO, STRM_NO)	(DBG_ASSERT(0 == GET_STRM_INDEX(SEQNO))		\
+					 DBG_ASSERT((STRM_NO) <= 0xF)			\
+					 ((SEQNO) | (((seq_num)STRM_NO) << 60)))
 
 #define	MAX_NODENAME_LEN	16	/* used by repl_instance.h. A similar macro JPV_LEN_NODE is defined in jnl.h */
 
-typedef struct repl_triple_struct
-{	/* Each repl_triple is uniquely defined by the following 3 fields */
-	unsigned char	root_primary_instname[MAX_INSTNAME_LEN];/* the root primary instance that generated the seqnos */
-	seq_num		start_seqno;				/* the first seqno generated in this triple by the root primary */
+#define	UNKNOWN_INSTNAME	"<UNKNOWN>"	/* used in places where instance name is not known (e.g. if pre-V51000 version) */
+
+/* The following defines the structure holding the instance information in a replication instance file.
+ * Any changes to this structure might need changes to the ENDIAN_CONVERT_REPL_INST_UUID macro.
+ */
+typedef struct repl_inst_uuid_struct
+{
+	unsigned char	created_nodename[MAX_NODENAME_LEN];	/* Nodename on which instance file was created */
+	unsigned char	this_instname[MAX_INSTNAME_LEN];	/* Instance name that this file corresponds to */
+	uint4		created_time;				/* Time when this instance file was created */
+	uint4		creator_pid;				/* Process id that created the instance file */
+} repl_inst_uuid;
+
+/* Macro to endian convert an entire "repl_inst_uuid" structure contents given a pointer to the structure */
+#define	ENDIAN_CONVERT_REPL_INST_UUID(PTR)					\
+{										\
+	/* No need to convert "created_nodename" as it is a character array */	\
+	/* No need to convert "this_instname" as it is a character array */	\
+	/* Endian convert 4-byte "created_time" */				\
+	(PTR)->created_time = GTM_BYTESWAP_32((PTR)->created_time);		\
+	/* Endian convert 4-byte "creator_pid" */				\
+	(PTR)->creator_pid = GTM_BYTESWAP_32((PTR)->creator_pid);		\
+}
+
+/* A NULL UUID is denoted by a 0 value for created_time. In that case, other fields are uninitialized and hence unusable.
+ * A non-NULL UUID has a non-zero value for created_time. In that case, other fields are guaranteed to have been initialized.
+ */
+#define	IS_REPL_INST_UUID_NULL(UUID)		(0 == (UUID).created_time)
+#define	IS_REPL_INST_UUID_NON_NULL(UUID)	(!IS_REPL_INST_UUID_NULL(UUID))
+#define	NULL_INITIALIZE_REPL_INST_UUID(UUID)	(UUID).created_time = 0
+
+/* Lot of code (e.g. repl_inst_dump) relies on "created_nodename" (which can be a string upto MAX_NODENAME_LEN bytes long)
+ * being NOT null-terminated at the (MAX_NODENAME_LEN - 1)th byte ONLY if the node name length is LESS THAN the max length.
+ * This lets them avoid a scan of the string (to find the real length) in the null-terminated case and safely pass it to
+ * any function (e.g. printf etc.) that expects a null-terminated string. Verify that using the below assert.
+ */
+#ifdef DEBUG
+#define	DBG_CHECK_CREATED_NODENAME(PTR)					\
+{									\
+	int	index, last_byte_non_null;				\
+	char	*lclPtr = (char *)PTR;					\
+									\
+	last_byte_non_null = lclPtr[MAX_NODENAME_LEN -1];		\
+	if (last_byte_non_null)						\
+	{								\
+		for (index = 0; index < MAX_NODENAME_LEN; index++)	\
+		{							\
+			if (!lclPtr[index])				\
+				assert(FALSE);				\
+		}							\
+	}								\
+}
+#else
+#define	DBG_CHECK_CREATED_NODENAME(PTR)
+#endif
+
+/* The following macros define what value the "histinfo_type" member of the repl_histinfo structure gets filled in with */
+#define	HISTINFO_TYPE_NORMAL	1	/* A history record generated whenever a root primary starts up */
+#define	HISTINFO_TYPE_UPDRESYNC	2	/* A history record generated when a receiver server starts up with -UPDATERESYNC on
+					 * a supplementary root primary instance.
+					 */
+#define	HISTINFO_TYPE_NORESYNC	3	/* A history record generated when a receiver server starts up with -NORESYNC.
+					 * Used by a propagating primary supplementary instance to know that "prev_histinfo_num"
+					 * has to be recomputed on the receiver side.
+					 */
+
+/* The following defines the structure of a history record in the instance file.
+ * Any changes to this structure might need changes to the ENDIAN_CONVERT_REPL_HISTINFO macro.
+ */
+typedef struct repl_histinfo_struct
+{	/* Each history record is uniquely defined by the following 5 fields (consider start_seqno and strm_seqno as one field) */
+	unsigned char	root_primary_instname[MAX_INSTNAME_LEN];/* the root primary instance that generated this history record */
+	seq_num		start_seqno;				/* the first seqno generated in this history record by the
+								 *	root primary. In case of a supplementary instance, this
+								 * 	seqno is the unified seqno across all streams.
+								 */
+	seq_num		strm_seqno;				/* the stream specific jnl seqno. this will help identify which
+								 * of the potentially 16 streams (0 for local instance, 1 to 15 for
+								 * non-local streams) this history record corresponds to.
+								 */
 	uint4		root_primary_cycle;			/* a copy of the "root_primary_cycle" field in the instance file
 								 * header of the root primary when it generated the seqno
 								 * "start_seqno". This is needed to distinguish two invocations
 								 * of the same instance
 								 */
-	/* Time fields have surrounding fillers so all fields in this structure (and hence the replication instance file
-	 * which this is a part of) start at the same offset irrespective of whether time_t is 4-bytes or 8-bytes.
-	 */
-	int4		filler8bytealign_1;
-	time_t		created_time;				/* Time when triple was written to this file */
-	NON_GTM64_ONLY(int4	filler8bytealign_2;)
-	unsigned char	rcvd_from_instname[MAX_INSTNAME_LEN];	/* NULL if this triple was written by a source server (i.e. this
-								 * instance was a root primary then). Non-NULL if this was written
-								 * by the update process (on receipt of a REPL_NEW_TRIPLE record).
-								 * In this case this field holds the instance name of the immediate
-								 * primary that sent this REPL_NEW_TRIPLE record.
+	uint4		creator_pid;				/* pid on rootprimary instance that wrote this history record */
+	uint4		created_time;				/* time on rootprimary when this history record was generated */
+	int4		histinfo_num;				/* = 'n' if this is the n'th history record in the instance file */
+	int4		prev_histinfo_num;			/* = 'n' if the previous history record corresponding to this
+								 * stream is the n'th history record in the instance file.
 								 */
-	unsigned char	filler_64[8];				/* for future expansion */
-} repl_triple;
+	char		strm_index;				/* = 0 by default.
+								 * = anywhere from 1 to 15 if this history record corresponds to a
+								 *	non-supplementary stream of updates.
+								 */
+	char		history_type;				/* can take any one of the HISTINFO_TYPE_* macro values */
+	char		filler_8[2];				/* Filler for 8-byte alignment */
+	repl_inst_uuid	lms_group;				/* Non-null only if this instance file is supplementary AND if
+								 * the history record has "strm_index" greater than 0.
+								 * Null otherwise.  In the non-null case, this field stores
+								 * the lms group uuid for this particular non-supplementary
+								 * stream. The "created_time" field will be non-zero in this case
+								 * else zero (this field will be used to determine whether the
+								 * "lms_group" member is valid or not given a history record).
+								 */
+	int4		last_histinfo_num[MAX_SUPPL_STRMS];	/* a copy of the last_histinfo_num[] array from the instance file
+								 * header BEFORE this history record was added to the instance file.
+								 */
+} repl_histinfo;
+
+/* Macro to endian convert an entire "repl_inst_uuid" structure contents given a pointer to the structure */
+#define	ENDIAN_CONVERT_REPL_HISTINFO(PTR)						\
+{											\
+	/* No need to convert "root_primary_instname" as it is a character array */	\
+	/* Endian convert 8-byte "start_seqno" */					\
+	(PTR)->start_seqno = GTM_BYTESWAP_64((PTR)->start_seqno);			\
+	/* Endian convert 8-byte "strm_seqno" */					\
+	(PTR)->strm_seqno = GTM_BYTESWAP_64((PTR)->strm_seqno);				\
+	/* Endian convert 4-byte "root_primary_cycle" */				\
+	(PTR)->root_primary_cycle = GTM_BYTESWAP_32((PTR)->root_primary_cycle);		\
+	/* Endian convert 4-byte "creator_pid" */					\
+	(PTR)->creator_pid = GTM_BYTESWAP_32((PTR)->creator_pid);			\
+	/* Endian convert 4-byte "created_time" */					\
+	(PTR)->created_time = GTM_BYTESWAP_32((PTR)->created_time);			\
+	/* Endian convert 4-byte "histinfo_num" */					\
+	(PTR)->histinfo_num = GTM_BYTESWAP_32((PTR)->histinfo_num);			\
+	/* Endian convert 4-byte "prev_histinfo_num" */					\
+	(PTR)->prev_histinfo_num = GTM_BYTESWAP_32((PTR)->prev_histinfo_num);		\
+	/* No need to convert "strm_index" as it is a 1-byte character */		\
+	/* No need to convert "history_type" as it is a 1-byte character */		\
+	/* Endian convert "lms_group" of type "repl_inst_uuid" */			\
+	ENDIAN_CONVERT_REPL_INST_UUID(&((PTR)->lms_group));				\
+	/* No need to endian convert "last_histinfo_num" as this is not relevant	\
+	 * across a replication connection and is regenerated on the receiver anyways.	\
+	 */										\
+}
+
+#define	INVALID_HISTINFO_NUM	-1	/* 0 is a valid history record number (first element of array) so set it to -1 */
+#define	UNKNOWN_HISTINFO_NUM	-2	/* Special value to indicate there is a history record but is not yet part of the
+					 * replication instance file and hence does not have a history number yet (this is
+					 * assigned by the function "repl_inst_histinfo_add" only when it adds this history
+					 * record to the instance file on the receiving instance). This is possible for
+					 * example if the history record is in the receive pool waiting for it to be played
+					 * by the update process. Currently used by a propagating primary supplementary instance.
+					 */
+
+/* The following two macros convert a history record from that of a non-supplementary instance to a supplementary instance
+ * and vice versa. The "start_seqno" and "strm_seqno" fields are the ones which are manipulated in these conversions.
+ */
+#define	CONVERT_NONSUPPL2SUPPL_HISTINFO(HISTINFO, JNLPOOL_CTL)						\
+{													\
+	/* Until now "start_seqno" actually corresponded to the non-supplementary stream's seqno.	\
+	 * Now that we are writing this history record into a supplementary instance file, switch it	\
+	 * to be the supplementary seqno (jnlpool_ctl->jnl_seqno). Until now "strm_seqno" was 0.	\
+	 * Now switch that to be what "start_seqno" was before.						\
+	 */												\
+	assert(0 < (HISTINFO)->strm_index);								\
+	assert(MAX_SUPPL_STRMS > (HISTINFO)->strm_index);						\
+	assert(0 == (HISTINFO)->strm_seqno);								\
+	(HISTINFO)->strm_seqno = (HISTINFO)->start_seqno;						\
+	(HISTINFO)->start_seqno = (JNLPOOL_CTL)->jnl_seqno;						\
+}
+
+#define	CONVERT_SUPPL2NONSUPPL_HISTINFO(HISTINFO)							\
+{													\
+	/* This macro is invoked just before sending a non-supplementary stream history record 		\
+	 * in a supplementary instance back to a non-supplementary instance. The latter does not	\
+	 * understand strm_seqnos hence the need to convert.						\
+	 */												\
+	assert(0 < (HISTINFO).strm_index);								\
+	assert(MAX_SUPPL_STRMS > (HISTINFO).strm_index);						\
+	assert((HISTINFO).strm_seqno);									\
+	(HISTINFO).start_seqno = (HISTINFO).strm_seqno;							\
+	(HISTINFO).strm_seqno = 0;									\
+}
+
+/* A structure to hold ALL aspects of ONE side (could be local or remote) of a replication connection */
+typedef struct repl_conn_info_struct
+{
+	int4		proto_ver;		/* The replication communication protocol version of this side of the pipe.
+						 * Needs to be "signed" in order to be able to do signed comparisons of this with
+						 * the macros REPL_PROTO_VER_DUALSITE (0) and REPL_PROTO_VER_UNINITIALIZED (-1)
+						 */
+	uint4		jnl_ver;		/* Format of the journal records */
+	boolean_t	is_std_null_coll;	/* TRUE if M-standard null collation; FALSE if GT.M null collation */
+	boolean_t	trigger_supported;	/* TRUE if supports triggers; FALSE otherwise */
+	boolean_t	cross_endian;		/* TRUE if both sides of the replication connection have different endianness */
+	boolean_t	endianness_known;	/* TRUE if endianness of other side is known/determined; FALSE until then */
+	boolean_t	null_subs_xform;	/* 0 if the null subscript collation is same between the servers
+						 * Non-zero (GTMNULL_TO_STDNULL_COLL or STDNULL_TO_GTMNULL_COLL) if different
+						 */
+	boolean_t	is_supplementary;	/* Whether one side of the connection is a supplementary instance */
+} repl_conn_info_t;
 
 #endif	/* Replication instance file related structures */
 
@@ -1574,6 +1777,16 @@ typedef enum
 #	define	GTM_SNAPSHOT_ONLY(X)
 #endif
 
+/* Currently MUPIP REORG -TRUNCATE is only supported on Unix */
+#ifdef UNIX
+#	define	GTM_TRUNCATE
+#	define	NON_GTM_TRUNCATE_ONLY(X)
+#	define	GTM_TRUNCATE_ONLY(X)		X
+#else
+#	define	NON_GTM_TRUNCATE_ONLY(X)	X
+#	define	GTM_TRUNCATE_ONLY(X)
+#endif
+
 /* Currently triggers are supported only on Unix */
 #if defined(UNIX) && !defined(__hppa)	/* triggers not supported on HPUX-HPPA */
 #	define	GTM_TRIGGER
@@ -1596,7 +1809,7 @@ typedef struct gtm_num_range_struct
 
 /* Debug FPRINTF with pre and post requisite flushing of appropriate streams */
 #ifndef DBGFPF
-# define DBGFPF(x)	{flush_pio(); FPRINTF x; fflush(stderr); fflush(stdout);}
+# define DBGFPF(x)	{flush_pio(); FPRINTF x; FFLUSH(stderr); FFLUSH(stdout);}
 #endif
 
 /* Settings for lv_null_subs */
@@ -1612,5 +1825,9 @@ enum
 #define MAX_LVSUBSCRIPTS 32
 #define MAX_INDSUBSCRIPTS 32
 #define MAX_FOR_STACK 32
+
+#define	MAX_ACTUALS	32	/* Maximum number of arguments allowed in an actuallist. This value also determines
+				 * how many parameters are allowed to be passed between M and C.
+				 */
 
 #endif /* MDEF_included */

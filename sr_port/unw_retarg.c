@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,8 @@
 #include "gdsfhead.h"
 #include "alias.h"
 #include "min_max.h"
+#include "compiler.h"
+#include "parm_pool.h"
 #include "get_ret_targ.h"
 
 GBLREF	void		(*unw_prof_frame_ptr)(void);
@@ -39,6 +41,8 @@ GBLREF	tp_frame	*tp_pointer;
 GBLREF	boolean_t	is_tracing_on;
 GBLREF	symval		*curr_symval;
 GBLREF	mval		*alias_retarg;
+GBLREF	boolean_t	dollar_truth;
+GBLREF	boolean_t	dollar_zquit_anyway;
 
 LITREF	mval 		literal_null;
 
@@ -47,7 +51,7 @@ error_def(ERR_NOTEXTRINSIC);
 error_def(ERR_STACKUNDERFLO);
 error_def(ERR_TPQUIT);
 
-/* this has to be maintained in parallel with op_unwind(), the unwind without a return argument (intrinsic quit) routine */
+/* This has to be maintained in parallel with op_unwind(), the unwind without a return argument (intrinsic quit) routine. */
 int unw_retarg(mval *src, boolean_t alias_return)
 {
 	mval		ret_value, *trg;
@@ -56,7 +60,9 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	lv_val		*srclv, *srclvc, *base_lv;
 	symval		*symlv, *symlvc;
 	int4		srcsymvlvl;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	assert(NULL == alias_retarg);
 	alias_retarg = NULL;
@@ -119,27 +125,32 @@ int unw_retarg(mval *src, boolean_t alias_return)
 			got_ret_target = TRUE;
 		} /* else fall into below which will raise the NOTEXTRINSIC error */
 	}
-	/* Note: we are unwinding uncounted (indirect) frames here to allow
-	   the QUIT command to have indirect arguments and thus be executed by
-	   commarg in an indirect frame. By unrolling the indirect frames here
-	   we get back to the point where we can find where to put the quit value.
-	*/
+	/* Note: we are unwinding uncounted (indirect) frames here to allow the QUIT command to have indirect arguments
+	 * and thus be executed by commarg in an indirect frame. By unrolling the indirect frames here we get back to
+	 * the point where we can find where to put the quit value.
+	 */
 	unwind_nocounts();
+	assert(frame_pointer && (frame_pointer->type & SFT_COUNT));
 	while (mv_chain < (mv_stent *)frame_pointer)
 	{
 		msp = (unsigned char *)mv_chain;
-		/* If this is an alias_return arg, still do the unwind but bypass the arg set logic which was
-		 * already taken care of above.
-		 */
-		if ((trg = unw_mv_ent(mv_chain)) && !alias_return) /* CAUTION : Assignment */
-		{
-			assert(!got_ret_target);
-			got_ret_target = TRUE;
-			*trg = ret_value;
-		}
+		unw_mv_ent(mv_chain);
 		POP_MV_STENT();
 	}
-	if (!got_ret_target)
+	if (0 <= frame_pointer->dollar_test)
+		dollar_truth = (boolean_t)frame_pointer->dollar_test;
+	/* Now that we have unwound the uncounted frames, we should be left with a counted frame that
+	 * contains some ret_value, NULL or not. If the value is non-NULL, let us restore the $TEST
+	 * value from that frame as well as update *trg for non-alias returns.
+	 */
+	if ((trg = frame_pointer->ret_value) && !alias_return)	/* CAUTION: Assignment */
+	{	/* If this is an alias_return arg, bypass the arg set logic which was done above. */
+		assert(!got_ret_target);
+		got_ret_target = TRUE;
+		*trg = ret_value;
+	}
+	/* do not throw an error if return value is expected from a non-extrinsic, but dollar_zquit_anyway is true */
+	if (!dollar_zquit_anyway && !got_ret_target)
 		rts_error(VARLSTCNT(1) ERR_NOTEXTRINSIC);	/* This routine was not invoked as an extrinsic function */
 	/* Note that error_ret() should be invoked only after the rts_error() of TPQUIT and NOTEXTRINSIC.
 	 * This is so the TPQUIT/NOTEXTRINSIC error gets noted down in $ECODE (which wont happen if error_ret() is called before).
@@ -148,15 +159,18 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	if (is_tracing_on)
 		(*unw_prof_frame_ptr)();
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
+	PARM_ACT_UNSTACK_IF_NEEDED;
 	frame_pointer = frame_pointer->old_frame_pointer;
 	DBGEHND((stderr, "unw_retarg: Stack frame 0x"lvaddr" unwound - frame 0x"lvaddr" now current - New msp: 0x"lvaddr"\n",
 		 prevfp, frame_pointer, msp));
-	if (NULL != zyerr_frame && frame_pointer > zyerr_frame)
+	if ((NULL != zyerr_frame) && (frame_pointer > zyerr_frame))
 		zyerr_frame = NULL;
 	if (!frame_pointer)
 		rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
 	assert(frame_pointer >= (stack_frame *)msp);
-	trg->mvtype |= MV_RETARG;
+	/* ensuring that trg is not NULL */
+	if (!dollar_zquit_anyway || trg)
+		trg->mvtype |= MV_RETARG;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	return 0;
 }

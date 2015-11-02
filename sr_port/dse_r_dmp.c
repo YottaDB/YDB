@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,9 @@ GBLREF int		patch_fdmp_recs;
 GBLREF int		patch_rec_counter;
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_CTRLC);
+
 boolean_t dse_r_dmp(void)
 {
 	block_id	blk;
@@ -44,11 +47,8 @@ boolean_t dse_r_dmp(void)
 	int4		dummy_int;
 	cache_rec_ptr_t	dummy_cr;
 	short 		record, size;
-	boolean_t	was_crit;
+	boolean_t	was_crit, was_hold_onto_crit;
 	int4		nocrit_present;
-
-	error_def(ERR_DSEBLKRDFAIL);
-	error_def(ERR_CTRLC);
 
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
@@ -72,7 +72,7 @@ boolean_t dse_r_dmp(void)
 		count = 1;
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (!(bp = t_qread(patch_curr_blk, &dummy_int, &dummy_cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
@@ -83,7 +83,7 @@ boolean_t dse_r_dmp(void)
 		b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
 	if (((blk_hdr_ptr_t) bp)->levl && patch_is_fdmp)
 	{
-		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 		util_out_print("Error:  cannot perform GLO/ZWR dump on index block.", TRUE);
 		return FALSE;
 	}
@@ -91,12 +91,12 @@ boolean_t dse_r_dmp(void)
 	{
 		if (!(rp = skan_rnum (bp, FALSE)))
 		{
-			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 			return FALSE;
 		}
 	} else if (!(rp = skan_offset (bp, FALSE)))
 	{
-		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 		return FALSE;
 	}
 	util_out_print(0, TRUE);
@@ -106,7 +106,7 @@ boolean_t dse_r_dmp(void)
 			break;
 		patch_rec_counter += 1;
 	}
-	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (util_interrupt)
 		rts_error(VARLSTCNT(1) ERR_CTRLC);
 	else if (cli_present("HEADER") == CLI_NEGATED)

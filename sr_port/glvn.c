@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,19 +14,18 @@
 #include "opcode.h"
 #include "toktyp.h"
 #include "mdq.h"
+#include "fullbool.h"
 
-GBLREF char window_token;
+error_def(ERR_VAREXPECTED);
 
 int glvn(oprtype *a)
 {
-
-	triple *ref, *oldchain, tmpchain, *triptr;
+	triple *oldchain, *ref, tmpchain, *triptr;
 	oprtype x1;
-	error_def(ERR_VAREXPECTED);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	switch(window_token)
+	switch (TREF(window_token))
 	{
 	case TK_IDENT:
 		if (!lvn(a,OC_GETINDX,0))
@@ -38,7 +37,8 @@ int glvn(oprtype *a)
 		*a = put_tref(newtriple(OC_GVGET));
 		return TRUE;
 	case TK_ATSIGN:
-		if (TREF(shift_side_effects))
+		TREF(saw_side_effect) = TREF(shift_side_effects);
+		if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);

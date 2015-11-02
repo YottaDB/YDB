@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,15 +19,8 @@
 
 #include <sys/time.h>
 #include <errno.h>
-#ifdef UNIX
 #include <sys/sem.h>
 #include "repl_instance.h"
-#elif defined(VMS)
-#include <descrip.h> /* Required for gtmrecv.h */
-#else
-#error Unsupported platform
-#endif
-
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -44,13 +37,14 @@
 #include "is_proc_alive.h"
 #include "repl_log.h"
 #include "gt_timer.h"
-#ifdef UNIX
 #include "ftok_sems.h"
-#endif
 #include "gtmmsg.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
 
 #define GTMRECV_WAIT_FOR_SHUTDOWN	(1000 - 1) /* ms, almost 1s */
 
+GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	uint4			process_id;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int			recvpool_shmid;
@@ -60,16 +54,17 @@ GBLREF	int			gtmrecv_srv_count;
 GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 
+error_def(ERR_RECVPOOLSETUP);
+error_def(ERR_TEXT);
+
 int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 {
 	uint4           savepid;
-	boolean_t       shut_upd_too = FALSE;
+	boolean_t       shut_upd_too = FALSE, was_crit;
 	int             status;
 	unix_db_info	*udi;
 
-	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_TEXT);
-
+	udi = (unix_db_info *)FILE_INFO(recvpool.recvpool_dummy_reg);
 	repl_log(stdout, TRUE, TRUE, "Initiating shut down\n");
 	call_on_signal = NULL;		/* So we don't reenter on error */
 	/* assert that auto shutdown should be invoked only if the current process is a receiver server */
@@ -86,7 +81,6 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 		}
 	} else
 	{	/* ftok semaphore and recvpool access semaphore should already be held from the previous call to "recvpool_init" */
-		DEBUG_ONLY(udi = (unix_db_info *)FILE_INFO(recvpool.recvpool_dummy_reg);)
 		assert(udi->grabbed_ftok_sem);
 		assert(holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
 		/* We do not want to hold the options semaphore to avoid deadlocks with receiver server startup (C9F12-002766) */
@@ -141,7 +135,18 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 		}
 		rel_sem_immediate( RECV, RECV_POOL_ACCESS_SEM);
 	} else if (NORMAL_SHUTDOWN == exit_status)
+	{
+		assert(!udi->s_addrs.hold_onto_crit);
+		was_crit = udi->s_addrs.now_crit;
+		/* repl_inst_recvpool_reset inturn invokes repl_inst_flush_filehdr which expects the caller to grab journal pool
+		 * lock if journal pool is available.
+		*/
+		if ((NULL != jnlpool.jnlpool_ctl) && !was_crit)
+			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
 		repl_inst_recvpool_reset();
+		if ((NULL != jnlpool.jnlpool_ctl) && !was_crit)
+			rel_lock(jnlpool.jnlpool_dummy_reg);
+	}
 	if (!ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, FALSE))
 		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	return (exit_status);

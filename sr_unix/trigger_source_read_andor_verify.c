@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,11 @@ GBLREF	int			tprestart_state;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	trans_num		local_tn;
-DEBUG_ONLY(boolean_t		donot_INVOKE_MUMTSTART;)
+GBLREF	unsigned int		t_tries;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+#ifdef DEBUG
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#endif
 
 LITREF	mval			literal_batch;
 LITREF	mval			literal_hasht;
@@ -71,6 +75,7 @@ STATICFNDCL int trigger_source_raov(mstr *trigname, trigger_action trigger_op);
 STATICFNDCL int trigger_source_raov_tpwrap_helper(mstr *trigname, trigger_action trigger_op);
 STATICFNDCL void trigger_source_raov_trigload(mstr *trigname, gv_trigger_t **ret_trigdsc);
 
+error_def(ERR_DBROLLEDBACK);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRIGCOMPFAIL);
 error_def(ERR_TRIGNAMBAD);
@@ -151,8 +156,11 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op)
 	sgmnt_addrs		*csa;	/* Used in SWITCH_TO_DEFAULT_REGION macro */
 	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
 	uint4			cycle;
+	DEBUG_ONLY(unsigned int	lcl_t_tries;)
+	enum cdb_sc		failure;
+	DCL_THREADGBL_ACCESS;
 
-
+	SETUP_THREADGBL_ACCESS;
 	assert(NULL != trigname);
 	assert((NULL != trigname->addr) && (0 != trigname->len));
 	/* Before we try to save anything, see if there is something to save and initialize stuff if not */
@@ -175,15 +183,33 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op)
 		op_tstart(IMPLICIT_TSTART, TRUE, &literal_batch, 0);
 		for (;;)
 		{	/* Now that we are TP wrapped, fetch the trigger source lines from the ^#t global */
+			DEBUG_ONLY(lcl_t_tries = t_tries);
 			src_fetch_status = trigger_source_raov_tpwrap_helper(trigname, trigger_op);
 			if (0 == src_fetch_status)
+			{
+				assert(0 == dollar_tlevel); /* op_tcommit should have made sure of this */
 				break;
-			assert(ERR_TPRETRY == src_fetch_status);
+			}
 			/* A restart has been signalled inside trigger fetch code for this possibly implicit TP wrapped
 			 * transaction. Redo source fetch logic.
 			 */
-			assert(0 < t_tries);
+			assert(ERR_TPRETRY == src_fetch_status);
 			assert(CDB_STAGNATE >= t_tries);
+			assert(0 < t_tries);
+			assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
+			failure = t_fail_hist[t_tries - 1];
+			assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
+				|| !gv_target || !gv_target->root);
+			assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
+				|| !IS_MCODE_RUNNING || TREF(dollar_zonlnrlbk));
+			if (cdb_sc_onln_rlbk2 == failure)
+				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than proceeding with the next
+			 * retry. Even though online rollback restart resets root block to zero for all gv_targets, ^#t root is
+			 * always established in gvtr_db_read_hasht (called below). We don't care about the root block being reset
+			 * for other gv_target because when they are referenced later in the process, op_gvname will be done and
+			 * that will anyways establish the root block numbers once again.
+			 */
 		}
 	} else
 		/* no return if TP restart */

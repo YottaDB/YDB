@@ -36,29 +36,31 @@
 #include "t_retry.h"
 #include "t_end.h"
 
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
+GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF sgmnt_data_ptr_t	cs_data;
+GBLREF spdesc		stringpool;
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
-GBLREF spdesc		stringpool;
+
+error_def(ERR_GVQUERYGETFAIL);
 
 boolean_t gvcst_queryget(mval *val)
 {
+	blk_hdr_ptr_t	bp;
 	boolean_t	found, two_histories;
 	enum cdb_sc	status;
 	int		rsiz, key_size, data_len;
-	unsigned short	temp_ushort;
-	blk_hdr_ptr_t	bp;
 	rec_hdr_ptr_t	rp;
 	srch_blk_status	*bh;
 	srch_hist	*rt_history;
+	unsigned short	temp_ushort;
 	DEBUG_ONLY(unsigned char *save_strp = NULL);
 
 	T_BEGIN_READ_NONTP_OR_TP(ERR_GVQUERYGETFAIL);
-	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
+	assert((CDB_STAGNATE > t_tries) || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	for (;;)
 	{
 		two_histories = FALSE;
@@ -143,6 +145,7 @@ boolean_t gvcst_queryget(mval *val)
 				val->str.addr = (char *)stringpool.free;
 				val->str.len = data_len;
 				stringpool.free += data_len;
+				INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, 1);
 			}
 			return found;
 		}

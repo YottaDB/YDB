@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2009 Fidelity Information Services, Inc	!
+!	Copyright 2001, 2011 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -14,7 +14,7 @@
 
 BLKSIZ512	<Block size !AD rounds to !AD>/info/fao=4
 EXECOM		<Executing command file !AD>/info/fao=2
-FNF		<File not found: !AD>/info/fao=2
+FILENOTFND	<File !AD not found>/error/fao=2
 GDCREATE	<Creating Global Directory file !/	!AD>/info/fao=2
 GDECHECK	<Internal GDE consistency check>/info/fao=0
 GDUNKNFMT	<!AD !/	is not formatted as a Global Directory>/info/fao=2
@@ -67,5 +67,6 @@ GDNOTSET	<Global Directory not changed because the current GD cannot be written>
 INVGBLDIR	<Invalid Global Directory spec: !AD.!/Continuing with !AD>/info/fao=4
 WRITEERROR	<Cannot exit because of write failure.  Reason for failure: !AD>/info/fao=2
 NONASCII	<!AD is illegal for a !AD as it contains non-ASCII characters>/error/fao=4
-ENCNOMM		<!AD No encryption support for MM access method>/error/fao=2
+CRYPTNOMM	<!AD is an encrypted database. Cannot support MM access method.>/error/fao=2
+JNLALLOCGROW	<Increased Journal ALLOCATION from [!AD blocks] to [!AD blocks] to match AUTOSWITCHLIMIT for !AD !AD>/info/fao=8
 	.end

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,8 @@
 #include "gtm_unistd.h"
 
 #include "gtm_string.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 #include "omi.h"
 

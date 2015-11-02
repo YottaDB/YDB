@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,8 @@
 #define VAL_NOT_REQ	1	/* Value not Required, but allowed */
 #define VAL_REQ		2	/* Value Required */
 
+#define PARM_NOT_REQ	0	/* Parameter optional */
+#define PARM_REQ	1	/* Parameter required */
 
 #define NON_NEG		0	/* Non Negatable */
 #define NEG		1	/* Negatable */
@@ -70,6 +72,7 @@
 typedef struct cmd_parm_struct {
 	char		name[MAX_OPT_LEN];
 	char		prompt[MAX_OPT_LEN];
+	boolean_t	parm_required;	/* Is this parameter required or optional? */
 } CLI_PARM;
 
 typedef struct cmd_parm_tag {

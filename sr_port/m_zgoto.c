@@ -19,30 +19,28 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-
 error_def(ERR_COLON);
 
 int m_zgoto(void)
 {
-	triple		tmpchain, *oldchain, *obp, *ref0, *ref1, *triptr;
+	int		rval;
 	oprtype		*cr, quits;
-	int4		rval;
+	triple		*obp, *oldchain, *ref0, *ref1, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	dqinit(&tmpchain, exorder);
 	oldchain = setcurtchain(&tmpchain);
-	if ((TK_EOL == window_token) || (TK_SPACE == window_token))
+	if ((TK_EOL == TREF(window_token)) || (TK_SPACE == TREF(window_token)))
 	{	/* Default zgoto level is 1 */
 		quits = put_ilit(1);
 		rval = EXPR_GOOD;
-	} else if (!(rval = intexpr(&quits)))		/* note assignment */
+	} else if (EXPR_FAIL == (rval = expr(&quits, MUMPS_INT)))		/* NOTE assignment */
 	{
 		setcurtchain(oldchain);
 		return FALSE;
 	}
-	if ((EXPR_INDR != rval) && ((TK_EOL == window_token) || (TK_SPACE == window_token)))
+	if ((EXPR_INDR != rval) && ((TK_EOL == TREF(window_token)) || (TK_SPACE == TREF(window_token))))
 	{	/* Only level parm supplied (no entry ref) - job for op_zg1 */
 		setcurtchain(oldchain);
 		obp = oldchain->exorder.bl;
@@ -51,7 +49,7 @@ int m_zgoto(void)
 		ref0->operand[0] = quits;
 		return TRUE;
 	}
-	if (TK_COLON != window_token)
+	if (TK_COLON != TREF(window_token))
 	{	/* First arg parsed, not ending in ":". Better have been indirect */
 		setcurtchain(oldchain);
 		if (EXPR_INDR != rval)
@@ -65,7 +63,7 @@ int m_zgoto(void)
 	 	return TRUE;
 	}
 	advancewindow();
-	if (TK_COLON != window_token)
+	if (TK_COLON != TREF(window_token))
 	{
 		if (!entryref(OC_NOOP, OC_PARAMETER, (mint)indir_goto, FALSE, FALSE, TRUE))
 		{
@@ -84,11 +82,11 @@ int m_zgoto(void)
 		ins_triple(ref0);
 		setcurtchain(oldchain);
 	}
-	if (TK_COLON == window_token)
+	if (TK_COLON == TREF(window_token))
 	{	/* post conditional expression */
 		advancewindow();
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
-		if (!bool_expr((bool)FALSE, cr))
+		if (!bool_expr(FALSE, cr))
 			return FALSE;
 		if (TREF(expr_start) != TREF(expr_start_orig))
 		{

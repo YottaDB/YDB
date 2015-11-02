@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,6 +65,17 @@ void	t_begin_crit(uint4 err)	/* err - error code for current gvcst_routine */
 	update_trans = UPDTRNS_DB_UPDATED_MASK;
 	was_crit = cs_addrs->now_crit;
 	assert(!was_crit || cs_addrs->hold_onto_crit);
+#	ifdef GTM_TRUNCATE
+	/* Sync private and shared copies of total_blks. We do this here in order to avoid the following scenario, in which
+	 * t_end attempts a restart due to a truncate that happened before t_begin_crit:
+	 * 1. db_init happens (csa->total_blks = 200, csa->ti->total_blks = 200)
+	 * 2. truncate happens (csa->total_blks = 200, csa->ti->total_blks = 100)
+	 * 3. enter t_begin_crit (csa->total_blks = 200, csa->ti->total_blks = 100)
+	 * 4. go to t_end, try to restart since 200 > 100... assert goes off since t_tries = CDB_STAGNATE.
+	 */
+	if (dba_mm != cs_addrs->hdr->acc_meth)
+		cs_addrs->total_blks = cs_addrs->ti->total_blks;
+#	endif
 	if (!was_crit)
 	{	/* We are going to grab_crit. If csd->wc_blocked is set to TRUE, we will end up calling wcs_recover as part of
 		 * grab_crit. Set variable to indicate it is ok to do so even though t_tries is CDB_STAGNATE since we are not

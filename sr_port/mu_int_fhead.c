@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,6 @@
 #include "gdsblk.h"
 #include "gdsbml.h"
 #include "mupint.h"
-#include "mu_file_size.h"
 #include "gtmmsg.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
@@ -39,6 +38,32 @@ GBLREF sgmnt_data		mu_int_data;
 GBLREF uint4			mu_int_errknt;
 GBLREF boolean_t		tn_reset_specified;
 
+error_def(ERR_DBNOTDB);
+error_def(ERR_DBINCRVER);
+error_def(ERR_DBSVBNMIN);
+error_def(ERR_DBFLCORRP);
+error_def(ERR_DBCREINCOMP);
+error_def(ERR_DBBSIZZRO);
+error_def(ERR_DBSZGT64K);
+error_def(ERR_DBNOTMLTP);
+error_def(ERR_DBBPLMLT512);
+error_def(ERR_DBBPLMGT2K);
+error_def(ERR_DBBPLNOT512);
+error_def(ERR_DBTTLBLK0);
+error_def(ERR_DBTNNEQ);
+error_def(ERR_DBMAXKEYEXC);
+error_def(ERR_DBMXRSEXCMIN);
+error_def(ERR_DBMAXRSEXBL);
+error_def(ERR_DBUNDACCMT);
+error_def(ERR_DBHEADINV);
+error_def(ERR_DBFGTBC);
+error_def(ERR_DBFSTBC);
+error_def(ERR_DBTOTBLK);
+error_def(ERR_DBMISALIGN);
+error_def(ERR_KILLABANDONED);
+error_def(ERR_MUKILLIP);
+error_def(ERR_MUTNWARN);
+
 #ifdef GTM_SNAPSHOT
 # define GET_NATIVE_SIZE(native_size)									\
 {													\
@@ -50,11 +75,11 @@ GBLREF boolean_t		tn_reset_specified;
 		native_size = util_ss_ptr->native_size;							\
 		assert(0 != native_size); /* Ensure native_size is updated properly in ss_initiate */	\
 	} else												\
-		native_size = mu_file_size(gv_cur_region->dyn.addr->file_cntl);				\
+		native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);				\
 }
 #else
 # define GET_NATIVE_SIZE(native_size)	\
-	native_size = mu_file_size(gv_cur_region->dyn.addr->file_cntl);
+	native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);
 #endif
 boolean_t mu_int_fhead(void)
 {
@@ -63,31 +88,6 @@ boolean_t mu_int_fhead(void)
 	trans_num	temp_tn, max_tn_warn;
 	sgmnt_data_ptr_t mu_data;
 	GTMCRYPT_ONLY(int	crypt_status;)
-	error_def(ERR_KILLABANDONED);
-	error_def(ERR_MUKILLIP);
-	error_def(ERR_MUTNWARN);
-	error_def(ERR_DBNOTDB);
-	error_def(ERR_DBINCRVER);
-	error_def(ERR_DBSVBNMIN);
-	error_def(ERR_DBFLCORRP);
-	error_def(ERR_DBCREINCOMP);
-	error_def(ERR_DBBSIZZRO);
-	error_def(ERR_DBSZGT64K);
-	error_def(ERR_DBNOTMLTP);
-	error_def(ERR_DBBPLMLT512);
-	error_def(ERR_DBBPLMGT2K);
-	error_def(ERR_DBBPLNOT512);
-	error_def(ERR_DBTTLBLK0);
-	error_def(ERR_DBTNNEQ);
-	error_def(ERR_DBMAXKEYEXC);
-	error_def(ERR_DBMXRSEXCMIN);
-	error_def(ERR_DBMAXRSEXBL);
-	error_def(ERR_DBUNDACCMT);
-	error_def(ERR_DBHEADINV);
-	error_def(ERR_DBFGTBC);
-	error_def(ERR_DBFSTBC);
-	error_def(ERR_DBTOTBLK);
-	error_def(ERR_DBMISALIGN);
 
 	mu_data = &mu_int_data;
 	if (MEMCMP_LIT(mu_data->label, GDS_LABEL))

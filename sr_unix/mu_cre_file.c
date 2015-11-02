@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@
 #include "mu_cre_file.h"
 #include "gtmmsg.h"
 #include "util.h"
+#include "gtmdbglvl.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
@@ -68,17 +69,22 @@
 	PERROR(errbuff);				\
 }
 
-#define SPRINTF_AND_PERROR_MVS(MESSAGE)				\
-{								\
-	save_errno = errno;					\
+#define SPRINTF_AND_PERROR_MVS(MESSAGE)					\
+{									\
+	save_errno = errno;						\
 	SPRINTF(errbuff, MESSAGE, path, realfiletag, TAG_BINARY);	\
-	errno = save_errno;					\
-	PERROR(errbuff);					\
+	errno = save_errno;						\
+	PERROR(errbuff);						\
 }
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	uint4			gtmDebugLevel;
+
+error_def(ERR_NOSPACECRE);
+error_def(ERR_LOWSPACECRE);
+error_def(ERR_MUNOSTRMBKUP);
 
 unsigned char mu_cre_file(void)
 {
@@ -99,12 +105,8 @@ unsigned char mu_cre_file(void)
 	char		datfile_hash[GTMCRYPT_HASH_LEN];
 	int		init_status;
 	int		crypt_status;
-)
+	)
 	ZOS_ONLY(int	realfiletag;)
-
-	error_def(ERR_NOSPACECRE);
-	error_def(ERR_LOWSPACECRE);
-	error_def(ERR_MUNOSTRMBKUP);
 
 	assert((-(SIZEOF(uint4) * 2) & SIZEOF_FILE_HDR_DFLT) == SIZEOF_FILE_HDR_DFLT);
 	cs_addrs = &udi_struct.s_addrs;
@@ -171,10 +173,10 @@ unsigned char mu_cre_file(void)
 			SPRINTF_AND_PERROR("Error reading header for file %s\n");
 			return EXIT_ERR;
 		}
-#ifdef __MVS__
+#		ifdef __MVS__
 		if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
 			SPRINTF_AND_PERROR_MVS("Error setting tag policy for file %s (%d) to %d\n");
-#endif
+#		endif
 		if (!memcmp(buff, GDS_LABEL, STR_LIT_LEN(GDS_LABEL)))
 		{
 			char rsp[80];
@@ -190,7 +192,6 @@ unsigned char mu_cre_file(void)
 			i *= 2;
 			lseek(fd, (off_t)i * BUFSIZ, SEEK_SET);
 		}
-
 		lower = i / 2;
 		upper = i;
 		while ((lower + upper) / 2 != lower)
@@ -211,10 +212,10 @@ unsigned char mu_cre_file(void)
 			SPRINTF_AND_PERROR("Error opening file %s\n");
 			return EXIT_ERR;
 		}
-#ifdef __MVS__
+#		ifdef __MVS__
 		if (-1 == gtm_zos_set_tag(fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
 			SPRINTF_AND_PERROR_MVS("Error setting tag policy for file %s (%d) to %d\n");
-#endif
+#		endif
 		if (0 != (save_errno = disk_block_available(fd, &avail_blocks, FALSE)))
 		{
 			errno = save_errno;
@@ -228,12 +229,19 @@ unsigned char mu_cre_file(void)
 		blocks_for_create = (int4)(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1 +
 					(seg->blk_size / DISK_BLOCK_SIZE *
 					 ((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1)) + seg->allocation)));
-		if ((uint4)avail_blocks < blocks_for_create)
-		{
-			gtm_putmsg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), blocks_for_create, (uint4)avail_blocks);
-			send_msg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), blocks_for_create, (uint4)avail_blocks);
-			CLEANUP(EXIT_ERR);
-			return EXIT_ERR;
+		if (!(gtmDebugLevel & GDL_IgnoreAvailSpace))
+		{	/* Bypass this space check if debug flag above is on. Allows us to create a large sparce DB
+			 * in space it could never fit it if wasn't sparse. Needed for some tests.
+			 */
+			if ((uint4)avail_blocks < blocks_for_create)
+			{
+				gtm_putmsg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), blocks_for_create,
+					   (uint4)avail_blocks);
+				send_msg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), blocks_for_create,
+					 (uint4)avail_blocks);
+				CLEANUP(EXIT_ERR);
+				return EXIT_ERR;
+			}
 		}
 		blocks_for_extension = (seg->blk_size / DISK_BLOCK_SIZE *
 					((DIVIDE_ROUND_UP(EXTEND_WARNING_FACTOR * seg->ext_blk_count, BLKS_PER_LMAP - 1))
@@ -256,8 +264,8 @@ unsigned char mu_cre_file(void)
 	cs_data->semid = INVALID_SEMID;
 	cs_data->shmid = INVALID_SHMID;
 	/* We want our datablocks to start on what would be a block boundary within the file which will aid I/O
-	   so pad the fileheader if necessary to make this happen.
-	*/
+	 * so pad the fileheader if necessary to make this happen.
+	 */
 	norm_vbn = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1;
 	assert(START_VBN_CURRENT >= norm_vbn);
 	cs_data->start_vbn = START_VBN_CURRENT;

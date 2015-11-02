@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,7 @@ void	t_busy2free(srch_blk_status *blkhist)
 	cse->old_block = blkhist->buffaddr;
 	old_block = (blk_hdr_ptr_t)cse->old_block;
 	cse->was_free = FALSE; /* t_busy2free operates on BUSY blocks and hence cse->was_free is set to FALSE unconditionally */
+	cse->blk_checksum = 0;
 	csa = cs_addrs;
 	assert(NULL != old_block);
 	jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;

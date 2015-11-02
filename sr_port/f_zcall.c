@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,42 +15,43 @@
 #include "toktyp.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
+error_def(ERR_FCHARMAXARGS);
 
-int f_zcall( oprtype *a, opctype op)
+int f_zcall(oprtype *a, opctype op)
 {
-	triple *root, *last, *curr,*ref;
-	oprtype argv[CHARMAXARGS], *argp;
-	int argc;
-	error_def(ERR_FCHARMAXARGS);
+	int	argc;
+	oprtype	*argp, argv[CHARMAXARGS];
+	triple	*curr,*ref, *last, *root;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	argp = &argv[0];
 	argc = 0;
-	if (!expr(argp))
+	if (EXPR_FAIL == expr(argp, MUMPS_EXPR))
 		return FALSE;
-	assert(argp->oprclass == TRIP_REF);
+	assert(TRIP_REF == argp->oprclass);
 	argc++;
 	argp++;
 	for (;;)
 	{
-		if (window_token != TK_COMMA)
+		if (TK_COMMA != TREF(window_token))
 			break;
 		advancewindow();
-		if (window_token == TK_COMMA || window_token == TK_RPAREN)
+		if (TK_COMMA == TREF(window_token) || TK_RPAREN == TREF(window_token))
 		{
 			ref = newtriple(OC_NULLEXP);
 			*argp = put_tref(ref);
-		}
-		else
+		} else
 		{
-			if (!expr(argp))
+			if (EXPR_FAIL == expr(argp, MUMPS_EXPR))
 				return FALSE;
-			assert(argp->oprclass == TRIP_REF);
+			assert(TRIP_REF == argp->oprclass);
 		}
 		argc++;
 		argp++;
 		if (argc >= CHARMAXARGS)
-		{	stx_error(ERR_FCHARMAXARGS);
+		{
+			stx_error(ERR_FCHARMAXARGS);
 			return FALSE;
 		}
 	}

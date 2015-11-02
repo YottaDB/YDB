@@ -12,8 +12,8 @@
 #include "mdef.h"
 
 #ifdef VMS
-#include "efn.h"
-#include <ssdef.h>
+# include "efn.h"
+# include <ssdef.h>
 #endif
 
 #include "xfer_enum.h"
@@ -25,11 +25,9 @@
 #include "add_inter.h"
 #include "op.h"
 #include "iott_wrterr.h"
-
-#ifdef DEBUG_DEFERRED
-#include "gtm_stdio.h"
+#ifdef DEBUG_DEFERRED_EVENT
+# include "gtm_stdio.h"
 #endif
-
 #include "fix_xfer_entry.h"
 
 /* =============================================================================
@@ -39,13 +37,10 @@
 
 /* The transfer table */
 GBLREF xfer_entry_t     xfer_table[];
-
 /* M Profiling active */
 GBLREF	boolean_t	is_tracing_on;
-
 /* Marks sensitive database operations */
 GBLREF volatile int4	fast_lock_count;
-
 #if defined(VMS)
 GBLREF volatile short   num_deferred;
 #else
@@ -74,7 +69,6 @@ GBLREF volatile int4	ctrap_action_is, outofband;
  * should be in an AST and AST's can't be nested (we assert to that effect
  * in xfer_set_handlers). The macro INCR_CNT_SP accomplishes this task for us.
  */
-
 #if defined(UNIX)
 volatile int4 			xfer_table_events[DEFERRED_EVENTS];
 #define	INCR_CNT_SP(X,Y)	INCR_CNT(X,Y)
@@ -129,9 +123,9 @@ boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 p
 	 * ------------------------------------------------------------------
 	 * Use interlocked operations to prevent races between set and reset,
 	 * and to avoid missing overlapping sets.
-	 * On HP:
+	 * On HPUX-HPPA:
 	 *    OK only if there's no a risk a conflicting operation is
-	 *    in progress  (can deadlock).
+	 *    in progress  (can deadlock in micro-lock).
 	 * On all platforms:
 	 *    Don't want I/O from a sensitive area.
 	 * Avoid both by testing fast_lock_count, and doing interlocks and
@@ -139,51 +133,30 @@ boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 p
 	 * risk is missing an event when there's already one happening.
 	 * ------------------------------------------------------------------
 	 */
-
 	VMS_ONLY(assert(lib$ast_in_prog()));
 	if (fast_lock_count == 0)
 	{
-#ifdef DEBUG_DEFERRED
-		(void) FPRINTF(stderr,
-			       "\nBefore interlocked operations:  "
-			       "xfer_table_events[%d]=%d, "
-			       "first_event=%s, "
-			       "num_deferred=%d\n",
-			       event_type,
-			       xfer_table_events[event_type],
-			       (is_first_event?"TRUE":"FALSE"),
-			       num_deferred);
-#endif
+		DBGDFRDEVNT((stderr, "xfer_set_handlers: Before interlocked operations:  "
+			     "xfer_table_events[%d]=%d, first_event=%s, num_deferred=%d\n",
+			     event_type, xfer_table_events[event_type], (is_first_event ? "TRUE" : "FALSE"),
+			     num_deferred));
 		if (1 == INCR_CNT_SP(&xfer_table_events[event_type], &defer_latch))
-		{
 			/* Concurrent events can collide here, too */
 			is_first_event =  (1 == INCR_CNT_SP(&num_deferred, &defer_latch));
-		}
-
-#ifdef DEBUG_DEFERRED
-		(void) FPRINTF(stderr,
-			       "\nAfter interlocked operations:   "
-			       "xfer_table_events[%d]=%d, "
-			       "first_event=%s, "
-			       "num_deferred=%d\n",
-			       event_type,xfer_table_events[event_type],
-			       (is_first_event?"TRUE":"FALSE"),
-			       num_deferred);
-#endif
+		DBGDFRDEVNT((stderr, "xfer_set_handlers: After interlocked operations:   "
+			     "xfer_table_events[%d]=%d, first_event=%s, num_deferred=%d\n",
+			     event_type,xfer_table_events[event_type], (is_first_event ? "TRUE" : "FALSE"),
+			     num_deferred));
 	} else if (1 == ++xfer_table_events[event_type])
 		is_first_event = (1 == ++num_deferred);
 	if (is_first_event)
 	{
 		first_event = event_type;
-
-#ifdef DEBUG_DEFERRED
+#		ifdef DEBUG_DEFERRED_EVENT
 		if (0 != fast_lock_count)
-		{
-			(void) FPRINTF(stderr,
-				       "Setting xfer_table for event type %d.\n",
-				       event_type);
-		}
-#endif
+			DBGDFRDEVNT((stderr, "xfer_set_handlers: Setting xfer_table for event type %d\n",
+				     event_type));
+#		endif
 		/* -------------------------------------------------------
 		 * If table changed, it was not synchronized.
 		 * (Assumes these entries are all that would be changed)
@@ -191,48 +164,49 @@ boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 p
 		 * fixed up addresses making direct comparisions non-trivial.
 		 * --------------------------------------------------------
 		 */
-#ifndef __ia64
-		 assert((xfer_table[xf_linefetch] == op_linefetch) ||
-			(xfer_table[xf_linefetch] == op_zstepfetch) ||
-			(xfer_table[xf_linefetch] == op_zst_fet_over) ||
-			(xfer_table[xf_linefetch] == op_mproflinefetch));
-		 assert((xfer_table[xf_linestart] == op_linestart) ||
-			(xfer_table[xf_linestart] == op_zstepstart) ||
-			(xfer_table[xf_linestart] == op_zst_st_over) ||
-			(xfer_table[xf_linestart] == op_mproflinestart));
-		 assert((xfer_table[xf_zbfetch] == op_zbfetch) ||
-		 	(xfer_table[xf_zbfetch] == op_zstzb_fet_over) ||
-			(xfer_table[xf_zbfetch] == op_zstzbfetch));
-		 assert((xfer_table[xf_zbstart] == op_zbstart) ||
-			(xfer_table[xf_zbstart] == op_zstzb_st_over) ||
-			(xfer_table[xf_zbstart] == op_zstzbstart));
-		 assert((xfer_table[xf_forchk1] == op_forchk1) ||
-			(xfer_table[xf_forchk1] == op_mprofforchk1));
-		 assert((xfer_table[xf_forloop] == op_forloop));
-		 assert(xfer_table[xf_ret] == opp_ret ||
-			xfer_table[xf_ret] == opp_zst_over_ret ||
-			xfer_table[xf_ret] == opp_zstepret);
-		 assert(xfer_table[xf_retarg] == op_retarg ||
-			xfer_table[xf_retarg] == opp_zst_over_retarg ||
-			xfer_table[xf_retarg] == opp_zstepretarg);
-#endif /* !ia64 */
+#		ifndef __ia64
+		assert((xfer_table[xf_linefetch] == op_linefetch) ||
+		       (xfer_table[xf_linefetch] == op_zstepfetch) ||
+		       (xfer_table[xf_linefetch] == op_zst_fet_over) ||
+		       (xfer_table[xf_linefetch] == op_mproflinefetch));
+		assert((xfer_table[xf_linestart] == op_linestart) ||
+		       (xfer_table[xf_linestart] == op_zstepstart) ||
+		       (xfer_table[xf_linestart] == op_zst_st_over) ||
+		       (xfer_table[xf_linestart] == op_mproflinestart));
+		assert((xfer_table[xf_zbfetch] == op_zbfetch) ||
+		       (xfer_table[xf_zbfetch] == op_zstzb_fet_over) ||
+		       (xfer_table[xf_zbfetch] == op_zstzbfetch));
+		assert((xfer_table[xf_zbstart] == op_zbstart) ||
+		       (xfer_table[xf_zbstart] == op_zstzb_st_over) ||
+		       (xfer_table[xf_zbstart] == op_zstzbstart));
+		assert((xfer_table[xf_forchk1] == op_forchk1) ||
+		       (xfer_table[xf_forchk1] == op_mprofforchk1));
+		assert((xfer_table[xf_forloop] == op_forloop));
+		assert(xfer_table[xf_ret] == opp_ret ||
+		       xfer_table[xf_ret] == opp_zst_over_ret ||
+		       xfer_table[xf_ret] == opp_zstepret);
+		assert(xfer_table[xf_retarg] == op_retarg ||
+		       xfer_table[xf_retarg] == opp_zst_over_retarg ||
+		       xfer_table[xf_retarg] == opp_zstepretarg);
+#		endif /* !IA64 */
 		/* -----------------------------------------------
 		 * Now call the specified set function to swap in
 		 * the desired handlers (and set flags or whatever).
 		 * -----------------------------------------------
 		 */
+		DBGDFRDEVNT((stderr, "xfer_set_handlers: Driving event setup handler\n"));
 		set_fn(param_val);
 	}
-#ifdef DEBUG_DEFERRED
+#	ifdef DEBUG_DEFERRED_EVENT
 	else if (0 != fast_lock_count)
 	{
-		(void) FPRINTF(stderr,
-			       "\n---Multiple deferred events---\n"
-			       "Event type %d occurred while type %d was pending\n",
-			       event_type,
-			       first_event);
+		DBGDFRDEVNT((stderr, "xfer_set_handlers: ---Multiple deferred events---\n"
+			     "Event type %d occurred while type %d was pending\n", event_type, first_event));
+	} else
+	{
+		DBGDFRDEVNT((stderr, "xfer_set_handlers: Event bypassed -- was not first event\n"));
 	}
-#endif
+#	endif
  	assert(no_event != first_event);
 	return is_first_event;
 }
@@ -253,28 +227,20 @@ boolean_t xfer_reset_if_setter(int4 event_type)
 {
 	if (event_type == first_event)
 	{
+		DBGDFRDEVNT((stderr, "xfer_reset_if_setter: event_type is first_event\n"));
 		/* Still have to synchronize the same way... */
-		if (TRUE == xfer_reset_handlers(event_type))
-		{ 	/* *********************************
-			 * Check for and activate any
-			 * other pending events before
-			 * returning success:
-			 * *********************************
-			 */
+		if (xfer_reset_handlers(event_type))
+		{ 	/* Check for and activate any other pending events before returning success */
 		  	/* (Not implemented) */
 			return TRUE;
 		} else
-		{ 	/* ---------------------------------
-			 * Would require interleaved resets
-			 * to get here, e.g. due to
-			 * rts_error from interrupt level.
-			 * ---------------------------------
-			 */
+		{ 	/* Would require interleaved resets to get here, e.g. due to rts_error from interrupt level */
 			assert(FALSE);
 			return FALSE;
 		}
-	} else
-		return FALSE;
+	}
+	DBGDFRDEVNT((stderr, "xfer_reset_if_setter: event_type is NOT first_event\n"));
+	return FALSE;
 }
 
 /* ------------------------------------------------------------------
@@ -322,8 +288,7 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	int4		e_type;
 	boolean_t	reset_type_is_set_type;
 	int4		status;
-	int 		e, ei, e_tot=0;
-
+	int 		e, ei, e_tot = 0;
 
 	/* ------------------------------------------------------------------
 	 * Note: If reset routine can preempt path from handler to
@@ -334,7 +299,6 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	 */
 	assert(0 < num_deferred);
 	assert(0 < xfer_table_events[event_type]);
-
 	if (is_tracing_on)
 	{
 		FIX_XFER_ENTRY(xf_linefetch, op_mproflinefetch);
@@ -351,45 +315,27 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	FIX_XFER_ENTRY(xf_zbstart, op_zbstart);
 	FIX_XFER_ENTRY(xf_ret, opp_ret);
 	FIX_XFER_ENTRY(xf_retarg, op_retarg);
-
-#ifdef DEBUG_DEFERRED
-	(void) FPRINTF(stderr,"Reset xfer_table for event type %d.\n",event_type);
-#endif
-
+	DBGDFRDEVNT((stderr, "xfer_reset_handlers: Reset xfer_table for event type %d.\n", event_type));
 	reset_type_is_set_type =  (event_type == first_event);
-
-#ifdef DEBUG
+#	ifdef DEBUG
 	if (!reset_type_is_set_type)
-	{
- 		rts_error(VARLSTCNT(4) ERR_DEFEREVENT,
- 				 2,
- 				 event_type,
- 				 first_event);
-	}
-#endif
+ 		rts_error(VARLSTCNT(4) ERR_DEFEREVENT, 2, event_type, first_event);
+#	endif
 
-#ifdef DEBUG_DEFERRED
-/*--------------------------------------------=---------------------------------
- * Note: concurrent modification of array elements means events that occur
- * during this section will cause inconsistent totals.
- *-----------------------------------------------------------------------------
- */
-	for (ei=no_event; ei<DEFERRED_EVENTS; ei++)
-	{
+#	ifdef DEBUG_DEFERRED_EVENT
+	/* Note: concurrent modification of array elements means events that occur during this section will
+	 * cause inconsistent totals.
+	 */
+	for (ei = no_event; ei < DEFERRED_EVENTS; ei++)
 		e_tot += xfer_table_events[ei];
-	}
-	if (e_tot >1)
+	if (1 < e_tot)
 	{
-		(void) FPRINTF(stderr,"Event Log:\n");
+		DBGDFRDEVNT((stderr, "xfer_reset_handlers: Event Log:\n"));
 		for (ei=no_event; ei<DEFERRED_EVENTS; ei++)
-		{
-			(void) FPRINTF(stderr,
-				       "  Event type %d: count was %d.\n",
-				       ei,
-				       xfer_table_events[ei]);
-		}
+			DBGDFRDEVNT((stderr, "xfer_reset_handlers:   Event type %d: count was %d.\n",
+				     ei, xfer_table_events[ei]));
 	}
-#endif
+#	endif
 
 	/* -------------------------------------------------------------------------
 	 * Kluge(?): set all locations to nonzero value to
@@ -419,12 +365,11 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	num_deferred = 0;
 	ctrap_action_is = 0;
 	outofband = 0;
-	VMS_ONLY(
-		status = sys$clref(efn_outofband);
-		assert(SS$_WASSET == status);
-		if ((SS$_WASSET != status) && (SS$_WASCLR != status))
-			GTMASSERT;
-	)
+#	ifdef VMS
+	status = sys$clref(efn_outofband);
+	assert(SS$_WASSET == status);
+	assertpro((SS$_WASSET == status) || (SS$_WASCLR == status));
+#	endif
 	/* ******************************************************************
 	 * There is a race here:
 	 * If a new event interrupts after previous line and before
@@ -446,9 +391,7 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	 */
 	/* Clear to allow new events to be reset only after we're all done. */
 	for (e_type = 1; DEFERRED_EVENTS > e_type; e_type++)
-	{
 		xfer_table_events[e_type] = FALSE;
-	}
 	return reset_type_is_set_type;
 }
 
@@ -464,9 +407,8 @@ void async_action(bool lnfetch_or_start)
 
 	switch(first_event)
 	{
-	case (outofband_event):
-		if (0 == outofband)
-		{	/* This function can be invoked only by a op_*intrrpt* transfer table function. Those transfer table
+		case (outofband_event):
+			/* This function can be invoked only by a op_*intrrpt* transfer table function. Those transfer table
 			 * functions should be active only for a short duration between the occurrence of an outofband event
 			 * and the handling of it at a logical boundary (next M-line). We dont expect to be running with
 			 * those transfer table functions for more than one M-line. If "outofband" is set to 0, the call to
@@ -475,34 +417,32 @@ void async_action(bool lnfetch_or_start)
 			 * might lead to application integrity issues. It is therefore considered safer to GTMASSERT as we
 			 * will at least have the core for analysis.
 			 */
-			GTMASSERT;
-		}
-		outofband_action(lnfetch_or_start);
-		break;
-	case (tt_write_error_event):
-		UNIX_ONLY(
+			assertpro(0 != outofband);
+			outofband_action(lnfetch_or_start);
+			break;
+		case (tt_write_error_event):
+#			ifdef UNIX
 			xfer_reset_if_setter(tt_write_error_event);
 			iott_wrterr();
-		)
-		/* VMS tt error processing is done in op_*intrrpt */
-		break;
-	case (network_error_event):
-		/* -------------------------------------------------------
-		 * Network error not implemented here yet. Need to move
-		 * from mdb_condition_handler after review.
-		 * -------------------------------------------------------
-		 */
-	case (zstp_or_zbrk_event):
-		/* -------------------------------------------------------
-		 * ZStep/Zbreak events not implemented here yet. Need to
-		 * move here after review.
-		 * -------------------------------------------------------
-		 */
-	default:
-		GTMASSERT;	/* see above GTMASSERT for comment as to why this is needed */
+#			endif
+			/* VMS tt error processing is done in op_*intrrpt */
+			break;
+		case (network_error_event):
+			/* -------------------------------------------------------
+			 * Network error not implemented here yet. Need to move
+			 * from mdb_condition_handler after review.
+			 * -------------------------------------------------------
+			 */
+		case (zstp_or_zbrk_event):
+			/* -------------------------------------------------------
+			 * ZStep/Zbreak events not implemented here yet. Need to
+			 * move here after review.
+			 * -------------------------------------------------------
+			 */
+		default:
+			assertpro(FALSE);	/* see above assertpro() for comment as to why this is needed */
 	}
 }
-
 
 /* ------------------------------------------------------------------
  * Indicate whether an xfer_table change is pending.

@@ -16,9 +16,6 @@
 #include "advancewindow.h"
 #include "compile_pattern.h"
 
-GBLREF triple *curtchain;
-GBLREF char director_token, window_token;
-
 error_def(ERR_EXPR);
 error_def(ERR_RHMISSING);
 
@@ -32,38 +29,38 @@ int eval_expr(oprtype *a)
 	oprtype x1, x2;
 	opctype i;
 	unsigned short type;
-	bool ind_pat;
+	boolean_t ind_pat;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (!expratom(&x1))
 	{	/* If didn't already add an error of our own, do so now with catch all expression error */
-		if (OC_RTERROR != curtchain->exorder.bl->exorder.bl->exorder.bl->opcode)
+		if (OC_RTERROR != (TREF(curtchain))->exorder.bl->exorder.bl->exorder.bl->opcode)
 			stx_error(ERR_EXPR);
 		return EXPR_FAIL;
 	}
-	while (i = tokentable[window_token].bo_type)
+	while (i = tokentable[TREF(window_token)].bo_type)	/* NOTE assignment NOT condition */
 	{
-		type = tokentable[window_token].opr_type;
+		type = tokentable[TREF(window_token)].opr_type;
 		if (oc_tab[i].octype & OCT_BOOL)
 		{
 			if (!TREF(shift_side_effects))
 			{
-				for (ref = curtchain->exorder.bl; oc_tab[ref->opcode].octype & OCT_BOOL; ref = ref->exorder.bl)
-					;
+				assert(FALSE == TREF(saw_side_effect));
+				for (ref = (TREF(curtchain))->exorder.bl; oc_tab[ref->opcode].octype & OCT_BOOL;
+					ref = ref->exorder.bl)
+						;
 				TREF(expr_start) = TREF(expr_start_orig) = ref;
 			}
 			switch (i)
 			{
-				case OC_NAND:
-				case OC_AND:
-				case OC_NOR:
-				case OC_OR:
-					TREF(shift_side_effects) = -TRUE;	/* "special" TRUE triggers warning in expritem */
-					break;
-				default:
-					if (!TREF(shift_side_effects))
-						TREF(shift_side_effects) = TRUE;
+			case OC_NAND:
+			case OC_AND:
+			case OC_NOR:
+			case OC_OR:
+				TREF(shift_side_effects) = TRUE;
+			default:
+				break;
 			}
 		}
 		coerce(&x1, type);
@@ -76,7 +73,7 @@ int eval_expr(oprtype *a)
 				ref1->operand[1] = put_tref(parm);
 				ref1 = parm;
 				ref1->operand[0] = x1;
-				if (TK_UNDERSCORE != window_token)
+				if (TK_UNDERSCORE != TREF(window_token))
 				{
 					assert(op_count > 1);
 					ref->operand[0] = put_ilit(op_count);
@@ -93,10 +90,10 @@ int eval_expr(oprtype *a)
 			}
 		} else
 		{
-			if ((TK_QUESTION == window_token) || (TK_NQUESTION == window_token))
+			if ((TK_QUESTION == TREF(window_token)) || (TK_NQUESTION == TREF(window_token)))
 			{
 				ind_pat = FALSE;
-				if (TK_ATSIGN == director_token)
+				if (TK_ATSIGN == TREF(director_token))
 				{
 					ind_pat = TRUE;
 					advancewindow();
@@ -120,5 +117,5 @@ int eval_expr(oprtype *a)
 		x1 = put_tref(ref);
 	}
 	*a = x1;
-	return (OC_INDGLVN == curtchain->exorder.bl->opcode) ? EXPR_INDR : EXPR_GOOD;
+	return (OC_INDGLVN == (TREF(curtchain))->exorder.bl->opcode) ? EXPR_INDR : EXPR_GOOD;
 }

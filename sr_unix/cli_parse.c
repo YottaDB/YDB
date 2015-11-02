@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -797,7 +797,10 @@ int parse_cmd(void)
 	 * -------------------------------------
 	 */
 	if (-1 == res)
+	{
 		func = 0;
+		eof = 0;
+	}
 	else
 		return (0);
 	/* -------------------------
@@ -975,11 +978,14 @@ bool cli_get_parm(char *entry, char val_buf[])
 		ind++;
 	}
 	if (-1 != match_ind)
-	{	/* If no value, prompt for it */
+	{
 		if (NULL == TAREF1(parm_ary, match_ind))
 		{
+			if (!((gpcmd_parm_vals + match_ind)->parm_required)) /* Value not required */
+				return FALSE;
+			/* If no value and required, prompt for it */
 			PRINTF("%s", (gpcmd_parm_vals + match_ind)->prompt);
-		/* smw FGETS(local_str, MAX_LINE, stdin, gets_res);	*/
+			fflush(stdout);
 			gets_res = cli_fgets(local_str, MAX_LINE, stdin, FALSE);
 			if (gets_res)
 			{
@@ -1020,6 +1026,7 @@ bool cli_get_parm(char *entry, char val_buf[])
 			if (MAX_LINE < parm_len)
 			{
 				PRINTF("Parameter string too long\n");
+				fflush(stdout);
 				return (FALSE);
 			}
 			TAREF1(parm_str_len, match_ind) = parm_len;

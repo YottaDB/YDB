@@ -122,11 +122,14 @@ GBLREF	mval			dollar_ztwormhole;
 #endif
 
 LITREF	mval			literal_null;
+LITREF	char			alphanumeric_table[];
+LITREF	int			alphanumeric_table_len;
 
 STATICDEF int4			gtm_trigger_comp_prev_run_time;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
 error_def(ERR_LABELUNKNOWN);
 error_def(ERR_MAXTRIGNEST);
@@ -323,16 +326,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	/* Verify the routine name set by MUPIP TRIGGER and read by gvtr_db_read_hasht() is not in use */
 	if (NULL != find_rtn_hdr(&trigdsc->rtn_desc.rt_name))
 	{	/* Ooops .. need name to be more unique.. */
-		/* Though variable definitions are conventionally done at the function entry, the reason alphanumeric_table
-		 * definition is done here is to minimize the time taken to initialize the below table in the most common case
-		 * (i.e. no trigger name collisions).
-		 */
-		char 		alphanumeric_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-							'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
-							'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
-							't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7',
-							'8', '9', '\0'};
-		alphnum_len = STR_LIT_LEN(alphanumeric_table);
+		alphnum_len = alphanumeric_table_len;	/* Local copy so can override it for whitebox test */
 		namesub1 = trigdsc->rtn_desc.rt_name.addr + trigdsc->rtn_desc.rt_name.len++;
 		/* If WBTEST_HELPOUT_TRIGNAMEUNIQ is defined, set alphnum_len to 1. This way, we make the maximum
 		 * possible combinations for the uniqe trigger names to be 3 which is significantly lesser than
@@ -481,8 +475,8 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		op_zlink(&zlfile, (mval *)&literal_null);	/* need cast due to "extern const" attributes */
 		/* No return here if link fails for some reason */
 		trigdsc->rtn_desc.rt_adr = find_rtn_hdr(&trigdsc->rtn_desc.rt_name);
-		if (NULL == trigdsc->rtn_desc.rt_adr)
-			GTMASSERT;	/* Can't find routine we just put there? Catastrophic if happens */
+		/* Verify can find routine we just put there. Catastrophic if not */
+		assertpro(NULL != trigdsc->rtn_desc.rt_adr);
 		/* Replace the randomly generated source name with the constant "GTM Trigger" */
 		trigdsc->rtn_desc.rt_adr->src_full_name.addr = GTM_TRIGGER_SOURCE_NAME;
 		trigdsc->rtn_desc.rt_adr->src_full_name.len = STRLEN(GTM_TRIGGER_SOURCE_NAME);
@@ -798,9 +792,10 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
  */
 void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 {
-	if (0 == (frame_pointer->type & SFT_TRIGR))
-		GTMASSERT;		/* Would normally be an assert but potential frame stack damage so severe
-					   and resulting debug difficulty that we GTMASSERT instead. */
+	/* Would normally be an assert but potential frame stack damage so severe and resulting debug difficulty that we
+	 * assertpro() instead.
+	 */
+	assertpro(frame_pointer->type & SFT_TRIGR);
 	/* Unwind the trigger base frame */
 	op_unwind();
 	/* restore frame_pointer stored at msp (see base_frame.c) */
@@ -889,8 +884,7 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 				MIDENT_CMP(&mid->rt_name, rtnname, comp);
 				if (0 == comp)
 					break;
-				if (0 < comp)
-					GTMASSERT;	/* Routine should be found */
+				assertpro(0 >= comp);	/* Routine should be found */
 			}
 			break;
 		} else
@@ -911,7 +905,7 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	}
 #	ifdef DEBUG
 	assert(rtnhdr == mid->rt_adr);
-	/* Verify trigger routine we want to remove is not currently active. If it is, we need to GTMASSERT.
+	/* Verify trigger routine we want to remove is not currently active. If it is, we need to assert fail.
 	 * Triggers are not like regular routines since they should only ever be referenced from the stack during a
 	 * transaction. Likewise, we should only ever load the triggers as the first action in that transaction.
 	 */

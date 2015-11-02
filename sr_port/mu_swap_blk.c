@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -128,7 +128,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	work_blk_ptr = gv_target->hist.h[level].buffaddr;
 	work_blk_size = ((blk_hdr_ptr_t)work_blk_ptr)->bsiz;
 	work_blk_id = gv_target->hist.h[level].blk_num;
-	if (SIZEOF(blk_hdr) >= work_blk_size || blk_size < work_blk_size)
+	if (blk_size < work_blk_size)
 	{
 		assert(t_tries < CDB_STAGNATE);
 		return cdb_sc_blkmod;

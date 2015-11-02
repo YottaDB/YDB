@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2009, 2011 Fidelity Information Services, Inc #
+#	Copyright 2009, 2012 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -59,12 +59,21 @@ else
 	ext=".so"
 fi
 
+# Flags to build shared libraries of M routines
+if [ "dux" = $arch ] ; then ldflags="-shared -taso -lc" ; ldcmd="ld" # Tru64 UNIX
+elif [ "hp" = $arch ] ; then ldflags="-b" ; ldcmd="ld" # HP-UX - all platforms
+elif [ "ibm" = $arch ] ; then ldflags="-brtl -G -bexpfull -bnoentry -b64" ; ldcmd="ld" # AIX
+elif [ "linux" = $arch ] ; then ldflags="-shared" ; ldcmd="ld" # Linux - all platforms
+elif [ "solaris" = $arch ] ; then ldflags="-G -64" ; ldcmd="ld" # Solaris SPARC
+elif [ "zos" = $arch ] ; then ldflags="-q64 -W c,DLL,XPLINK,EXPORTFULL -W l,DLL,XPLINK" ; ldcmd="xlc" # z/OS
+else echo "Shared libary ldflags not set for this platform"; exit 1
+fi
 
 # Binaries
 binaries="mupip mumps libgtmshr$ext lke dse  geteuid ftok semstat2"
 
 # Normal scripts - executed by anyone
-nscripts="gtmbase upperc upperc_cp lowerc lowerc_cp"
+nscripts="gtmbase lowerc_cp"
 
 # z/OS needs to copy the exports file
 if [ $arch = "zos" ]; then
@@ -109,7 +118,7 @@ if [ "`./geteuid`" != "root" ] ; then
 fi
 
 $echo "                     GT.M Configuration Script"
-$echo "Copyright 2009, 2011 Fidelity National Information Services, Inc. Use of this"
+$echo "Copyright 2009, 2012 Fidelity Information Services, Inc. Use of this"
 $echo "software is restricted by the provisions of your license agreement."
 $echo ""
 
@@ -193,7 +202,7 @@ else
 
 	read resp
 	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-		mkdir -p $gtmdist
+		mkdir -p $gtmdist/plugin/r $gtmdist/plugin/o
 		chmod 0755 $gtmdist
 		chown $owner $gtmdist
 		chgrp $binuser $gtmdist
@@ -234,7 +243,7 @@ if [ -d "utf8" ]; then
 	else
 		library_path="/usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /lib32 /lib"
 	fi
-	$echo "Should unicode support be installed? (y or n) \c"
+	$echo "Should UTF-8 support be installed? (y or n) \c"
 	read resp
 	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 		would_like_utf8=1
@@ -247,7 +256,7 @@ if [ -d "utf8" ]; then
 			majmin=`$echo $icu_ver | cut -f 1 -d "."`
 			if [ "$majmin" -lt "36" ] ; then
 				$echo "WARNING: ICU version $gtm_icu_version is less than 3.6. \c"
-				$echo "Unicode support will not be installed"
+				$echo "UTF-8 support will not be installed"
 				would_like_utf8=0
 				doutf8=0
 			fi
@@ -331,15 +340,15 @@ if [ -d "utf8" ]; then
 		done
 		if [ "$found_icu" -eq 0 ] ; then
 			if [ "$majmin" != "" ] ; then
-				$echo "WARNING: ICU version $gtm_icu_version not found. Not installing Unicode support."
+				$echo "WARNING: ICU version $gtm_icu_version not found. Not installing UTF-8 support."
 			else
-				$echo "WARNING: Default ICU version not found. Not installing Unicode support."
+				$echo "WARNING: Default ICU version not found. Not installing UTF-8 support."
 			fi
 		fi
 		# Look for locale
-		utflocale=`locale -a | grep -i en_us | grep -i utf | sed 's/.lp64$//' | grep '8$' | head -n1`
+		utflocale=`locale -a | grep -i .utf | sed 's/.lp64$//' | grep '8$' | head -n1`
 		if [ "$utflocale" = "" ] ; then
-			$echo "WARNING: UTF8 locale not found. Not installing Unicode support."
+			$echo "WARNING: UTF8 locale not found. Not installing UTF-8 support."
 		fi
 		# If both libicu and locale are on system then install UTF-8 support
 		if [ "$found_icu" -ne 0  -a "$utflocale" != "" ] ; then
@@ -384,7 +393,7 @@ if [ $arch = "zos" ]; then
 fi
 if [ "$doutf8" -ne 0 ]; then
 	if [ ! -d $gtmdist/utf8 ]; then
-		mkdir $gtmdist/utf8
+		mkdir -p $gtmdist/utf8 $gtmdist/plugin/o/utf8
 	fi
 fi
 
@@ -398,6 +407,15 @@ fi
 
 # Install COPYING if it is applicable
 file=COPYING
+if [ -f $file ]; then
+	cp $file $gtmdist
+	if [ "$doutf8" -ne 0 ]; then
+		ln -s ../$file $gtmdist/utf8/$file
+	fi
+fi
+
+# Install README.txt if it is applicable
+file=README.txt
 if [ -f $file ]; then
 	cp $file $gtmdist
 	if [ "$doutf8" -ne 0 ]; then
@@ -650,7 +668,10 @@ $echo ""
 # Ensure we are NOT in UTF-8 mode
 gtm_chset="M"
 export gtm_chset
-(cd $gtmdist; ./mumps -noignore *.m; $echo $?>compstat)
+(cd $gtmdist; ./mumps -noignore *.m; $echo $?>compstat ; \
+ if [ "$is64bit_gtm" -eq 1 -o "linux" != $arch ] ; then $ldcmd $ldflags -o libgtmutil$ext *.o ; fi )
+
+# Now work on UTF-8 mode
 if [ "$doutf8" -ne 0 ]; then
 	# Ensure we ARE in UTF-8 mode
 	utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
@@ -681,7 +702,8 @@ if [ "$doutf8" -ne 0 ]; then
 		LD_LIBRARY_PATH=$save_icu_libpath
 		export LD_LIBRARY_PATH
 	fi
-	(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -noignore *.m; $echo $?>>$gtmdist/compstat)
+	(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -noignore *.m; $echo $?>>$gtmdist/compstat; \
+	if [ $is64bit_gtm -eq 1 -o "linux" != $arch ] ; then $ldcmd $ldflags -o libgtmutil$ext *.o ; fi )
 	gtm_chset="M"
 	export gtm_chset
 fi
@@ -718,7 +740,11 @@ fi
 gtm_dist=$gtmdist
 export gtm_dist
 
-gtmroutines=$gtmdist
+if [ -f $gtm_dist/libgtmutil$ext ] ; then
+    gtmroutines=$gtm_dist/libgtmutil$ext
+else
+    gtmroutines=$gtmdist
+fi
 export gtmroutines
 
 # Create the global directories for the help databases.
@@ -745,7 +771,7 @@ GDE.in2
 
 other_object_files="CHK2LEV.o CHKOP.o GENDASH.o GENOUT.o GETNEAR.o GTMHELP.o GTMHLPLD.o LOAD.o LOADOP.o"
 other_object_files="$other_object_files LOADVX.o MSG.o TTTGEN.o TTTSCAN.o UNLOAD.o GTMDefinedTypesInit.o"
-csh_script_files="lowerc.csh lowerc_cp.csh upperc.csh upperc_cp.csh"
+csh_script_files=""
 if [ $arch = "zos" ]; then
 	other_object_files="$other_object_files GENEXPORT.o"
 fi
@@ -760,12 +786,26 @@ chmod 0444 $gtmdist/*.dat
 chmod 0444 $gtmdist/*.gld
 
 # $other_object_files, $csh_script_files should be removed unconditionally
-\rm -rf $other_object_files $csh_script_files
+savedir=`pwd`
+# temporarily change to $gtmdist
+cd $gtmdist
+\rm -rf $other_object_files $csh_script_files lowerc_cp
 
 if [ -d utf8 ]; then
 	cd utf8
-	\rm -rf $other_object_files $csh_script_files
-	cd ..
+	\rm -rf $other_object_files $csh_script_files lowerc_cp
+fi
+# change back to original directory
+cd $savedir
+
+# Optionally remove .o files if they are in a shared library
+if [ -f $gtm_dist/libgtmutil$ext ] ; then
+    $echo ""
+    $echo "Object files of M routines placed in shared library $gtm_dist/libgtmutil$ext"
+    $echo "Keep original .o object files (y or n)? \c"
+    read resp
+    if [ "n" = $resp -o "N" = $resp ] ; then rm -f $gtm_dist/*.o $gtm_dist/utf8/*.o ; fi
+    $echo ""
 fi
 
 # change group ownership of all files if group restricted
@@ -859,8 +899,8 @@ read resp
 
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
-		*.gtc gtm* gde* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
-		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* COPYING
+		*.gtc gtm* gde* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid $other_object_files $csh_script_files lowerc_cp\
+		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* COPYING README.txt
 	\rm -rf GETPASS.o plugin PINENTRY.o
 	if [ -d utf8 ]; then
 		\rm -rf utf8

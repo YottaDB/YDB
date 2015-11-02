@@ -55,6 +55,9 @@
 #include "hashtab_mname.h"
 #include "process_gvt_pending_list.h"
 #include "gtmmsg.h"
+#ifdef UNIX
+#include "heartbeat_timer.h"
+#endif
 
 #ifdef	GTM_FD_TRACE
 #include "gtm_dbjnl_dupfd_check.h"
@@ -76,7 +79,6 @@ GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	buddy_list		*global_tlvl_info_list;
-GBLREF	int4			tprestart_syslog_limit;
 GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLREF	tp_region		*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
 GBLREF	unsigned int		t_tries;
@@ -87,13 +89,20 @@ GBLREF	sm_uc_ptr_t		reformat_buffer;
 GBLREF	int			reformat_buffer_len;
 GBLREF	volatile int		reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLREF	volatile int4		fast_lock_count;
-GBLREF	boolean_t		new_dbinit_ipc;
 GBLREF	gvt_container		*gvt_pending_list;
 GBLREF	boolean_t		dse_running;
 GBLREF	jnl_gbls_t		jgbl;
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
+
+error_def(ERR_BADDBVER);
+error_def(ERR_DBCREINCOMP);
+error_def(ERR_DBFLCORRP);
+error_def(ERR_DBNOTGDS);
+error_def(ERR_DBVERPERFWARN1);
+error_def(ERR_DBVERPERFWARN2);
+error_def(ERR_MMNODYNUPGRD);
 
 void	assert_jrec_member_offsets(void)
 {
@@ -136,6 +145,12 @@ void	assert_jrec_member_offsets(void)
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_tcom, token_seq.jnl_seqno));
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_ztworm, token_seq.jnl_seqno));
 
+	/* Make sure all strm_seqno fields start at same offset. Lot of modules rely on this */
+	assert(offsetof(struct_jrec_null, strm_seqno) == offsetof(struct_jrec_upd, strm_seqno));
+	assert(offsetof(struct_jrec_null, strm_seqno) == offsetof(struct_jrec_tcom, strm_seqno));
+	assert(offsetof(struct_jrec_null, strm_seqno) == offsetof(struct_jrec_ztworm, strm_seqno));
+	/* EOF and EPOCH are not included in the above asserts because they have not ONE but 16 strm_seqno values each */
+
 	assert(offsetof(struct_jrec_ztcom, token) == offsetof(struct_jrec_upd, token_seq));
 	/* Make sure all jnl_seqno and token fields start at 8-byte boundary */
 	assert(offsetof(struct_jrec_upd, token_seq.jnl_seqno) ==
@@ -173,19 +188,21 @@ void	assert_jrec_member_offsets(void)
 void gvcst_init(gd_region *greg)
 {
 	sgmnt_addrs		*csa, *prevcsa, *regcsa;
-	sgmnt_data_ptr_t	csd, temp_cs_data;
+	sgmnt_data_ptr_t	csd;
+#	ifdef VMS
 	char			cs_data_buff[ROUND_UP(SGMNT_HDR_LEN, DISK_BLOCK_SIZE)];
+	sgmnt_data_ptr_t	temp_cs_data;
+#	endif
 	uint4			segment_update_array_size;
 	file_control		*fc;
 	gd_region		*prev_reg, *reg_top;
-#ifdef DEBUG
+#	ifdef DEBUG
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
 	blk_ident		tmp_blk;
-#endif
+#	endif
 	mstr			log_nam, trans_log_nam;
 	char			trans_buff[MAX_FN_LEN + 1];
-	static int4		first_time = TRUE;
 	unique_file_id		*greg_fid, *reg_fid;
 	gd_addr			*addr_ptr;
 	tp_region		*tr;
@@ -201,14 +218,7 @@ void gvcst_init(gd_region *greg)
 	boolean_t		added, first_wasopen;
 	intrpt_state_t		save_intrpt_ok_state;
 
-	error_def(ERR_BADDBVER);
-	error_def(ERR_DBCREINCOMP);
-	error_def(ERR_DBFLCORRP);
-	error_def(ERR_DBNOTGDS);
-	error_def(ERR_DBVERPERFWARN1);
-	error_def(ERR_DBVERPERFWARN2);
-	error_def(ERR_MMNODYNUPGRD);
-
+	UNSUPPORTED_PLATFORM_CHECK;
 	assert(!jgbl.forw_phase_recovery);
 	CWS_INIT;	/* initialize the cw_stagnate hash-table */
 	/* check the header design assumptions */
@@ -231,26 +241,6 @@ void gvcst_init(gd_region *greg)
 	 * Therefore assert that TH_BLOCK points to the 512-byte block where the "trans_hist" member lies in the fileheader.
 	 */
 	assert(DIVIDE_ROUND_UP(offsetof(sgmnt_data, trans_hist), DISK_BLOCK_SIZE) == TH_BLOCK);
-	if (TRUE == first_time)
-	{
-		log_nam.addr = GTM_TPRESTART_LOG_LIMIT;
-		log_nam.len = STR_LIT_LEN(GTM_TPRESTART_LOG_LIMIT);
-		if (SS_NORMAL == TRANS_LOG_NAME(&log_nam, &trans_log_nam, trans_buff, SIZEOF(trans_buff), do_sendmsg_on_log2long))
-		{
-			tprestart_syslog_limit = ATOI(trans_log_nam.addr);
-			if (0 > tprestart_syslog_limit)
-				tprestart_syslog_limit = 0;
-		}
-		log_nam.addr = GTM_TPRESTART_LOG_DELTA;
-		log_nam.len = STR_LIT_LEN(GTM_TPRESTART_LOG_DELTA);
-		if (SS_NORMAL == TRANS_LOG_NAME(&log_nam, &trans_log_nam, trans_buff, SIZEOF(trans_buff), do_sendmsg_on_log2long))
-		{
-			tprestart_syslog_delta = ATOI(trans_log_nam.addr);
-			if (0 > tprestart_syslog_delta)
-				tprestart_syslog_delta = MAXPOSINT4;
-		}
-		first_time = FALSE;
-	}
 	if ((prev_reg = dbfilopn(greg)) != greg)
 	{
 		if (NULL == prev_reg || (gd_region *)-1L == prev_reg) /* (gd_region *)-1 == prev_reg => cm region open attempted */
@@ -352,9 +342,9 @@ void gvcst_init(gd_region *greg)
 	csa = (sgmnt_addrs *)&FILE_INFO(greg)->s_addrs;
 
 #ifdef	NOLICENSE
-	licensed= TRUE ;
+	licensed = TRUE;
 #else
-	CRYPT_CHKSYSTEM ;
+	CRYPT_CHKSYSTEM;
 #endif
 	db_init_region = greg;	/* initialized for dbinit_ch */
 	csa->hdr = NULL;
@@ -362,23 +352,11 @@ void gvcst_init(gd_region *greg)
         csa->jnl = NULL;
 	csa->persistent_freeze = FALSE;	/* want secshr_db_clnup() to clear an incomplete freeze/unfreeze codepath */
 	csa->regcnt = 1;	/* At this point, only one region points to this csa */
-	UNIX_ONLY(
-		FILE_INFO(greg)->semid = INVALID_SEMID;
-		FILE_INFO(greg)->shmid = INVALID_SHMID;
-		FILE_INFO(greg)->gt_sem_ctime = 0;
-		FILE_INFO(greg)->gt_shm_ctime = 0;
-		FILE_INFO(greg)->ftok_semid = INVALID_SEMID;
-	)
-	VMS_ONLY(
-		csa->db_addrs[0] = csa->db_addrs[1] = NULL;
-		csa->lock_addrs[0] = csa->lock_addrs[1] = NULL;
-	)
-	UNSUPPORTED_PLATFORM_CHECK;
-	new_dbinit_ipc = FALSE; /* dbinit_ch relies on this flag. Reset it before establishing condition handler
-				 * just in case this was set to TRUE by a previous "gvcst_init". */
-        ESTABLISH(dbinit_ch);
-
+#	ifdef VMS
+	csa->db_addrs[0] = csa->db_addrs[1] = NULL;
+	csa->lock_addrs[0] = csa->lock_addrs[1] = NULL;
 	greg_acc_meth = greg->dyn.addr->acc_meth;
+	assert(dba_cm != greg_acc_meth);
 	temp_cs_data = (sgmnt_data_ptr_t)cs_data_buff;
 	fc = greg->dyn.addr->file_cntl;
 	fc->file_type = greg_acc_meth;
@@ -387,38 +365,14 @@ void gvcst_init(gd_region *greg)
 	fc->op_len = SIZEOF(*temp_cs_data);
 	fc->op_pos = 1;
 	dbfilop(fc);
-
-	if (MEMCMP_LIT(temp_cs_data->label, GDS_LABEL))
-	{
-		if (memcmp(temp_cs_data->label, GDS_LABEL, GDS_LABEL_SZ - 3))
-			rts_error(VARLSTCNT(4) ERR_DBNOTGDS, 2, DB_LEN_STR(greg));
-		else
-			rts_error(VARLSTCNT(4) ERR_BADDBVER, 2, DB_LEN_STR(greg));
-	}
-	/* Set the following values to sane values for recovery/rollback */
-	if (mupip_jnl_recover)
-	{
-		temp_cs_data->createinprogress = FALSE;
-		temp_cs_data->freeze = 0;
-		temp_cs_data->image_count = 0;
-		temp_cs_data->owner_node = 0;
-	}
-	if (temp_cs_data->createinprogress)
-		rts_error(VARLSTCNT(4) ERR_DBCREINCOMP, 2, DB_LEN_STR(greg));
-	/* Do not error out while journal recovery is running or dse is running */
-	if (temp_cs_data->file_corrupt && !mupip_jnl_recover && !dse_running)
-		rts_error(VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(greg));
-	/* Warn the user CORRUPT_FILE flag set*/
-	if (temp_cs_data->file_corrupt && dse_running)
-		gtm_putmsg(VARLSTCNT(4) MAKE_MSG_WARNING(ERR_DBFLCORRP), 2, DB_LEN_STR(greg));
-	if ((dba_mm == temp_cs_data->acc_meth) && temp_cs_data->blks_to_upgrd)
-		rts_error(VARLSTCNT(4) ERR_MMNODYNUPGRD, 2, DB_LEN_STR(greg));
-	assert(greg_acc_meth != dba_cm);
+	DO_BADDBVER_CHK(greg, temp_cs_data);
+	DO_DB_HDR_CHECK(greg, temp_cs_data); /* Basic sanity check on the file header fields */
 	if (greg_acc_meth != temp_cs_data->acc_meth)
 	{
 		greg_acc_meth = temp_cs_data->acc_meth;
 		greg->dyn.addr->acc_meth = greg_acc_meth;
 	}
+#	endif
 	/* Here's the shared memory layout:
 	 *
 	 * low address
@@ -464,24 +418,34 @@ void gvcst_init(gd_region *greg)
 	 * high address
 	 */
  	/* Ensure first 3 members (upto now_running) of node_local are at the same offset for any version.
+	 *
+	 * Structure ----> node_local <----    size 59392 [0xe800]
+	 *
+	 *	offset = 0000 [0x0000]      size = 0012 [0x000c]    ----> node_local.label
+	 *	offset = 0012 [0x000c]      size = 0256 [0x0100]    ----> node_local.fname
+	 *	offset = 0268 [0x010c]      size = 0036 [0x0024]    ----> node_local.now_running
+	 *
 	 * This is so that the VERMISMATCH error can be successfully detected in db_init/mu_rndwn_file
 	 *	and so that the db-file-name can be successfully obtained from orphaned shm by mu_rndwn_all.
 	 */
- 	assert(offsetof(node_local, label[0]) == 0);
-	/* Unfortunately, GDS_LABEL_SZ can't be defined with STR_LIT_LEN because of header nesting issues.
-	 * So, let's make sure it's correct.
-	 */
-	assert(GDS_LABEL_SZ == SIZEOF(GDS_LABEL));
-	assert(offsetof(node_local, fname[0]) == GDS_LABEL_SZ);
-	assert(offsetof(node_local, now_running[0]) == GDS_LABEL_SZ + MAX_FN_LEN + 1);
-	assert(SIZEOF(csa->nl->now_running) == MAX_REL_NAME);
+ 	assert(0 == OFFSETOF(node_local, label[0]));
+ 	assert(12 == SIZEOF(((node_local *)NULL)->label));
+ 	assert(12 == GDS_LABEL_SZ);
+	assert(12 == OFFSETOF(node_local, fname[0]));
+ 	assert(256 == SIZEOF(((node_local *)NULL)->fname));
+ 	assert(256 == (MAX_FN_LEN + 1));
+	assert(268 == OFFSETOF(node_local, now_running[0]));
+ 	assert(36 == SIZEOF(((node_local *)NULL)->now_running));
+	assert(36 == MAX_REL_NAME);
+	UNIX_ONLY(START_HEARTBEAT_IF_NEEDED;)
 	/* Protect the db_init and the code below until we set greg->open to TRUE. This is needed as otherwise,
 	 * if a MUPIP STOP is issued to this process at a time-window when db_init is completed but greg->open
 	 * is NOT set to TRUE, will cause gds_rundown NOT to clean up the shared memory created by db_init and
 	 * thus would be left over in the system.
 	 */
 	DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT);
-	db_init(greg, temp_cs_data);
+	VMS_ONLY(db_init(greg, temp_cs_data);)
+	UNIX_ONLY(db_init(greg);)
 	crash_count = csa->critical->crashcnt;
 	csa->regnum = ++region_open_count;
 	csd = csa->hdr;
@@ -492,7 +456,8 @@ void gvcst_init(gd_region *greg)
 	csa->db_trigger_cycle = csd->db_trigger_cycle;
 #	endif
 	/* set csd and fill in selected fields */
-	assert(greg_acc_meth == greg->dyn.addr->acc_meth);
+	assert(greg->dyn.addr->acc_meth == csd->acc_meth); /* db_init should have made sure this assert holds good */
+	greg_acc_meth = csd->acc_meth;
 	switch (greg_acc_meth)
 	{
 	case dba_mm:
@@ -580,7 +545,7 @@ void gvcst_init(gd_region *greg)
 		{
 			non_tp_jfb_ptr = (jnl_format_buffer *)malloc(SIZEOF(jnl_format_buffer));
 			non_tp_jfb_buff_ptr =  (unsigned char *)malloc(MAX_JNL_REC_SIZE);
-			non_tp_jfb_ptr->buff = (char *) non_tp_jfb_buff_ptr;
+			non_tp_jfb_ptr->buff = (char *)non_tp_jfb_buff_ptr;
 			/* If the journal records need to be encrypted in the journal file and if replication is in use,
 			 * we will need access to both the encrypted (for the journal file) and unencrypted (for the
 			 * journal pool) journal record contents. Since this code is executed only once (for the first
@@ -594,18 +559,18 @@ void gvcst_init(gd_region *greg)
 		}
 		/* csa->min_total_tpjnl_rec_size represents the minimum journal buffer space needed for a TP transaction.
 		 * It is a conservative estimate assuming that one ALIGN record and one PINI record will be written for
-		 *	one set of fixed size jnl records written.
+		 * one set of fixed size jnl records written.
 		 * si->total_jnl_rec_size is initialized/reinitialized  to this value here and in tp_clean_up().
 		 * The purpose of this field is to avoid recomputation of the variable in tp_clean_up().
 		 * In addition to this, space requirements for whatever journal records get formatted as part of
-		 *	jnl_format() need to be taken into account.
-		 *	This is done in jnl_format() where si->total_jnl_rec_size is appropriately incremented.
+		 * jnl_format() need to be taken into account.
+		 * This is done in jnl_format() where si->total_jnl_rec_size is appropriately incremented.
 		 */
 		csa->min_total_tpjnl_rec_size = PINI_RECLEN + TCOM_RECLEN + MIN_ALIGN_RECLEN;
 		/* Similarly csa->min_total_nontpjnl_rec_size represents the minimum journal buffer space needed
-		 *	for a non-TP transaction.
+		 * for a non-TP transaction.
 		 * It is a conservative estimate assuming that one ALIGN record and one PINI record will be written for
-		 *	one set of fixed size jnl records written.
+		 * one set of fixed size jnl records written.
 		 */
 		csa->min_total_nontpjnl_rec_size = PINI_RECLEN + MIN_ALIGN_RECLEN;
 	}
@@ -622,14 +587,14 @@ void gvcst_init(gd_region *greg)
 	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT);
 	if (dba_bg == greg_acc_meth)
 	{	/* Check if (a) this region has non-upgraded blocks and if so, (b) the reformat buffer exists and
-		   (c) if it is big enough to deal with this region. If the region does not have any non-upgraded
-		   block (blks_to_upgrd is 0) we will not allocate the buffer at this time. Note that this opens up
-		   a small window for errors. If this buffer is not allocated and someone turns on compatibility
-		   mode and before the process can discover this and allocate the buffer, it runs out of memory,
-		   errors out and finds it is responsible for running down the database, it could fail on a recursive
-		   memory error when it tries to allocate the block. This is (to me) an acceptable risk as it is
-		   very low and compares favorably to the cost of every process allocating a database block sized
-		   chunk of private storage that will be seldom if ever used (SE 3/2005).
+		 * (c) if it is big enough to deal with this region. If the region does not have any non-upgraded
+		 * block (blks_to_upgrd is 0) we will not allocate the buffer at this time. Note that this opens up
+		 * a small window for errors. If this buffer is not allocated and someone turns on compatibility
+		 * mode and before the process can discover this and allocate the buffer, it runs out of memory,
+		 * errors out and finds it is responsible for running down the database, it could fail on a recursive
+		 * memory error when it tries to allocate the block. This is (to me) an acceptable risk as it is
+		 * very low and compares favorably to the cost of every process allocating a database block sized
+		 * chunk of private storage that will be seldom if ever used (SE 3/2005).
 		 */
 		if (0 != csd->blks_to_upgrd && csd->blk_size > reformat_buffer_len)
 		{	/* Buffer not big enough (or does not exist) .. get a new one releasing old if it exists */
@@ -690,6 +655,5 @@ void gvcst_init(gd_region *greg)
 			tr->file.fid_index = (&FILE_INFO(tr->reg)->s_addrs)->fid_index;
 		DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 	}
-	REVERT;
 	return;
 }

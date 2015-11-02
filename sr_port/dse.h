@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,8 @@
 
 #ifndef __DSE_H__
 #define __DSE_H__
+
+error_def(ERR_DSEWCREINIT);
 
 #define PATCH_SAVE_SIZE		128
 #define DSE_DMP_TIME_FMT	"DD-MON-YEAR 24:60:SS"
@@ -58,26 +60,76 @@ enum dse_fmt
 };
 
 /* Grab crit for dse* functions taking into account -nocrit if specified */
-#define	DSE_GRAB_CRIT_AS_APPROPRIATE(WAS_CRIT, NOCRIT_PRESENT, CS_ADDRS, GV_CUR_REGION)	\
-{											\
-	if (!WAS_CRIT)									\
-	{										\
-		if (NOCRIT_PRESENT)							\
-			CS_ADDRS->now_crit = TRUE;					\
-		else									\
-			grab_crit(GV_CUR_REGION);					\
-	}										\
+#define	DSE_GRAB_CRIT_AS_APPROPRIATE(WAS_CRIT, WAS_HOLD_ONTO_CRIT, NOCRIT_PRESENT, CS_ADDRS, GV_CUR_REGION)	\
+{														\
+	if (!WAS_CRIT)												\
+	{													\
+		if (NOCRIT_PRESENT)										\
+			CS_ADDRS->now_crit = TRUE;								\
+		else												\
+			grab_crit(GV_CUR_REGION);								\
+		WAS_HOLD_ONTO_CRIT = CS_ADDRS->hold_onto_crit;							\
+		CS_ADDRS->hold_onto_crit = TRUE;								\
+	}													\
 }
 
 /* Rel crit for dse* functions taking into account -nocrit if specified */
-#define	DSE_REL_CRIT_AS_APPROPRIATE(WAS_CRIT, NOCRIT_PRESENT, CS_ADDRS, GV_CUR_REGION)	\
+#define	DSE_REL_CRIT_AS_APPROPRIATE(WAS_CRIT, WAS_HOLD_ONTO_CRIT, NOCRIT_PRESENT, CS_ADDRS, GV_CUR_REGION)	\
+{														\
+	if (!WAS_CRIT)												\
+	{													\
+		assert(CS_ADDRS->hold_onto_crit);								\
+		assert((TRUE == WAS_HOLD_ONTO_CRIT) || (FALSE == WAS_HOLD_ONTO_CRIT));				\
+		CS_ADDRS->hold_onto_crit = WAS_HOLD_ONTO_CRIT;							\
+		if (NOCRIT_PRESENT)										\
+			CS_ADDRS->now_crit = FALSE;								\
+		else												\
+			rel_crit(GV_CUR_REGION);								\
+	}													\
+}
+
+#ifdef UNIX
+# define GET_CONFIRM(X, Y)								\
 {											\
-	if (!WAS_CRIT)									\
+	PRINTF("CONFIRMATION: ");							\
+	FGETS((X), (Y), stdin, fgets_res);						\
+	Y = strlen(X);									\
+}
+#else
+# define GET_CONFIRM(X, Y)								\
+{											\
+	if(!cli_get_str("CONFIRMATION",(X),&(Y)))					\
 	{										\
-		if (NOCRIT_PRESENT)							\
-			CS_ADDRS->now_crit = FALSE;					\
-		else									\
-			rel_crit(GV_CUR_REGION);					\
+		rts_error(VARLSTCNT(1) ERR_DSEWCINITCON);				\
+		return;									\
+	}										\
+}
+#endif
+
+#define GET_CONFIRM_AND_HANDLE_NEG_RESPONSE						\
+{											\
+	int		len;								\
+	char		confirm[256];							\
+											\
+	len = SIZEOF(confirm);								\
+	GET_CONFIRM(confirm, len);							\
+	if (confirm[0] != 'Y' && confirm[0] != 'y')					\
+	{										\
+		rts_error(VARLSTCNT(1) ERR_DSEWCINITCON);				\
+		return;									\
+	}										\
+}
+
+#define DSE_WCREINIT(CS_ADDRS)								\
+{											\
+	assert(CS_ADDRS->now_crit);							\
+	bt_init(CS_ADDRS);								\
+	if (CS_ADDRS->hdr->acc_meth == dba_bg)						\
+	{										\
+		bt_refresh(CS_ADDRS, TRUE);						\
+		db_csh_ini(CS_ADDRS);							\
+		db_csh_ref(CS_ADDRS, TRUE);						\
+		send_msg(VARLSTCNT(4) ERR_DSEWCREINIT, 2, DB_LEN_STR(gv_cur_region));	\
 	}										\
 }
 

@@ -53,14 +53,15 @@ UNIX_ONLY(GBLREF sigset_t blockalrm;)
 DEBUG_ONLY(GBLREF boolean_t ok_to_UNWIND_in_exit_handling;)
 
 error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
-error_def(ERR_MEMORY);
-error_def(ERR_VMSMEMORY);
-error_def(ERR_OUTOFSPACE);
-error_def(ERR_STACKOFLOW);
-error_def(ERR_STACKCRIT);
-error_def(ERR_JOBEXAMFAIL);
 error_def(ERR_JOBEXAMDONE);
+error_def(ERR_JOBEXAMFAIL);
+error_def(ERR_MEMORY);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_VMSMEMORY);
 
 void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 {
@@ -70,16 +71,16 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	boolean_t		saved_mv_stent;
 	char			saved_util_outbuff[OUT_BUFF_SIZE];
 	int			saved_util_outbuff_len;
-#ifdef UNIX
+#	ifdef UNIX
 	struct sigaction	new_action, prev_action;
 	sigset_t		savemask;
-#endif
+#	endif
 	/* If the input file name is the result of an expression, it is likely being held in the
-	   same temporary as the output file spec. We can tell if this is true by comparing the
-	   address of the input and output mvals. If they are the same, make a copy of the input
-	   filespec in a garbage collection safe mval prior to initializing the output mval
-	   (which in this case would clear the input mval as well if it had not just been saved).
-	*/
+	 *  same temporary as the output file spec. We can tell if this is true by comparing the
+	 *  address of the input and output mvals. If they are the same, make a copy of the input
+	 *  filespec in a garbage collection safe mval prior to initializing the output mval
+	 *  (which in this case would clear the input mval as well if it had not just been saved).
+	 */
 	if (dump_file_name == dump_file_spec)
 	{	/* Make saved copy of input mval */
 		PUSH_MV_STENT(MVST_MVAL);
@@ -93,25 +94,25 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 		saved_mv_stent = FALSE;
 	}
 
-#ifdef UNIX
+#	ifdef UNIX
 	/* Block out timer calls that might trigger processing that could fail. We especially want to prevent
-	   nesting of signal handlers since the longjump() function used by the UNWIND macro is undefined on
-	   Tru64 when signal handlers are nested.
-	*/
+	 * nesting of signal handlers since the longjump() function used by the UNWIND macro is undefined on
+	 * Tru64 when signal handlers are nested.
+	 */
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
 
 	/* Setup new signal handler to just drive condition handler which will do the right thing */
 	memset(&new_action, 0, SIZEOF(new_action));
 	sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = SA_SIGINFO;
-#ifdef __sparc
+#	ifdef __sparc
 	new_action.sa_handler = jobexam_signal_handler;
-#else
+#	else
 	new_action.sa_sigaction = jobexam_signal_handler;
-#endif
+#	endif
 	sigaction(SIGBUS, &new_action, &prev_action);
 	sigaction(SIGSEGV, &new_action, 0);
-#endif
+#	endif
 	*dump_file_spec = empty_str_mval;
 	dev_in_use = io_curr_device;		/* Save current IO device */
 	/* Save text in util_outbuff which can be detrimentally overwritten by ZSHOW */
@@ -140,22 +141,20 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	 */
 	if (saved_mv_stent)
 	{
-		if (mv_chain > new_mv_stent)
-			/* This violates our assumptions that the mv_stent we pushed onto the stack should
-			   still be there */
-			GTMASSERT;
+		assertpro(mv_chain <= new_mv_stent);	/* This violates our assumptions that the mv_stent we pushed onto the
+							 * stack should still be there */
 		while (mv_chain <= new_mv_stent)
 		{
 			POP_MV_STENT();
 		}
 	}
-#ifdef UNIX
+#	ifdef UNIX
 	/* Restore the signal handlers how they were */
 	sigaction(SIGBUS, &prev_action, 0);
 	sigaction(SIGSEGV, &prev_action, 0);
 	/* Let the timers pop again.. */
 	sigprocmask(SIG_SETMASK, &savemask, NULL);
-#endif
+#	endif
 }
 
 /* This routine is broken out as another ep so we can do cleanup processing in jobexam_process if
@@ -180,8 +179,8 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec)
 	def_file_name.str.addr = (char *)dump_file_name;
 	def_file_name.str.len = INTCAST(dump_file_name_ptr - dump_file_name);
 	/* Call $ZPARSE processing to fill in any blanks, expand concealed logicals, etc. It is the callers
-	   responsibility to make sure garbage collection knows about the value in the returned filespec.
-	*/
+	 * responsibility to make sure garbage collection knows about the value in the returned filespec.
+	 */
 	op_fnzparse(dump_filename_arg, &empty_str_mval, &def_file_name, &empty_str_mval, &no_conceal_op, dump_file_spec);
 	/* Parms of file to be created (newversion) */
 	parms.mvtype = MV_STR;
@@ -209,19 +208,19 @@ CONDITION_HANDLER(jobexam_dump_ch)
 	START_CH;
 
 	/* Operation:
-	   1) Flush out message we came here because of to operator console
-	   2) Put out our message stating that we screwed up
-	   3) Unwind the errant frames so we can return to the user without screwing
-	      up the task that got interrupted to do this examine.
-	*/
-#if defined(DEBUG) && defined(UNIX)
+	 * 1) Flush out message we came here because of to operator console
+	 * 2) Put out our message stating that we screwed up
+	 * 3) Unwind the errant frames so we can return to the user without screwing
+	 *    up the task that got interrupted to do this examine.
+	 */
+#	if defined(DEBUG) && defined(UNIX)
 	if (DUMPABLE)
 	{	/* For debug UNIX issues, let's make a core if we would have made one in open code */
 		save_created_core = created_core;
 		gtm_fork_n_core();
 		created_core = save_created_core;
 	}
-#endif
+#	endif
 	UNIX_ONLY(util_out_print(0, OPER));
 	VMS_ONLY(sig->chf$l_sig_args -= 2);
 	VMS_ONLY(callg(send_msg, &sig->chf$l_sig_args));

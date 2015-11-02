@@ -20,10 +20,6 @@
 #include "cmd.h"
 #include "namelook.h"
 
-GBLREF char 		window_token;
-GBLREF mval 		window_mval;
-GBLREF mident 		window_ident;
-GBLREF char 		director_token;
 GBLREF short int 	source_column;
 
 error_def(ERR_INVZSTEP);
@@ -49,25 +45,25 @@ static readonly char zstep_type[]={ ZSTEP_INTO, ZSTEP_INTO,
 
 int m_zstep(void)
 {
-	triple *head;
 	char	type;
 	int	x;
 	oprtype action;
 	opctype	op;
+	triple *head;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert((SIZEOF(zstep_names) / SIZEOF(nametabent)) == zstep_index[26]);
 	op = OC_ZSTEP;
-	switch(window_token)
+	switch (TREF(window_token))
 	{
 	case TK_SPACE:
 	case TK_EOL:
 		type = ZSTEP_OVER;
 		break;
 	case TK_IDENT:
-		if (0 > (x = namelook(zstep_index, zstep_names, window_ident.addr, window_ident.len)))	/* assignment */
-		{
+		if (0 > (x = namelook(zstep_index, zstep_names, (TREF(window_ident)).addr, (TREF(window_ident)).len)))
+		{	/* NOTE assignment above*/
 			stx_error(ERR_INVZSTEP);
 			return FALSE;
 		}
@@ -79,15 +75,15 @@ int m_zstep(void)
 		return FALSE;
 		break;
 	}
-	if (TK_COLON == window_token)
+	if (TK_COLON == TREF(window_token))
 	{	advancewindow();
-		if (!expr(&action))
+		if (EXPR_FAIL == expr(&action, MUMPS_EXPR))
 			return FALSE;
 		op = OC_ZSTEPACT;
 	}
 	head = maketriple(op);
 	head->operand[0] = put_ilit(type);
-	if (op == OC_ZSTEPACT)
+	if (OC_ZSTEPACT == op)
 		head->operand[1] = action;
 	ins_triple(head);
 	return TRUE;

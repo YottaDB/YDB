@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,38 +29,33 @@ GBLREF int4		curr_addr, code_size;
 GBLREF char		cg_phase;	/* code generation phase */
 GBLREF triple		t_orig;		/* head of triples */
 GBLREF uint4		gtmDebugLevel;
-GBLREF int4		codegen_padlen;	/* Pad to code segment to put on section boundary */
 LITREF octabstruct	oc_tab[];	/* op-code table */
 
 /* Certain triples need to have their expansions shrunk down to be optimal. Current
-   triples that are eligible for shrinking are:
-
-   <triples of type OCT_JUMP>
-   OC_LDADDR
-   OC_FORLOOP
-   literal argument references (either one) for given triple
-
-   Many of the jump triples start out life as long jumps because of the assumped jump offset
-   in the first pass before the offsets are known. This is where we shrink them.
-
-   For the literal referencess, if the offset into the literal table exceeds that which can be
-   addressed by the immediate operand of a load address instruction, a long form is generated.
-   But this long form is initially assumed. This is where we will shrink it if we can which
-   should be the normal case.
-
-*/
+ * triples that are eligible for shrinking are:
+ *  <triples of type OCT_JUMP>
+ *  OC_LDADDR
+ *  OC_FORLOOP
+ *  literal argument references (either one) for given triple
+ * Many of the jump triples start out life as long jumps because of the assumped jump offset
+ * in the first pass before the offsets are known. This is where we shrink them.
+ *
+ * For the literal referencess, if the offset into the literal table exceeds that which can be
+ * addressed by the immediate operand of a load address instruction, a long form is generated.
+ * But this long form is initially assumed. This is where we will shrink it if we can which
+ * should be the normal case.
+ */
 
 void shrink_trips(void)
 {
 	int		new_size, old_size, shrink;
 	boolean_t	first_pass;
 	triple		*ct;	/* current triple */
+	DCL_THREADGBL_ACCESS;
 
-
-#ifdef DEBUG
-	/* If debug and compiler debugging is enabled, run through the triples again to show where we are just
-	   befire we modify them.
-	*/
+	SETUP_THREADGBL_ACCESS;
+#	ifdef DEBUG
+	/* If debug and compiler debugging enabled, run through triples again to show where we are just before we modify them. */
 	if (gtmDebugLevel & GDL_DebugCompiler)
 	{
 		PRINTF(" \n\n\n\n************************************ Begin pre-shrink_trips dump *****************************\n");
@@ -71,16 +66,15 @@ void shrink_trips(void)
 		}
 		PRINTF(" \n\n\n\n************************************ Begin shrink_trips scan *****************************\n");
 	}
-#endif
-
+#	endif
 	first_pass = TRUE;
-	assert(cg_phase == CGP_ADDR_OPT);	/* Follows address optimization phase */
+	assert(CGP_ADDR_OPT == cg_phase);	/* Follows address optimization phase */
 	do
 	{
 		shrink = 0;
 		dqloop(&t_orig, exorder, ct)
 		{
-			if (oc_tab[ct->opcode].octype & OCT_JUMP || ct->opcode == OC_LDADDR || ct->opcode == OC_FORLOOP)
+			if ((oc_tab[ct->opcode].octype & OCT_JUMP) || (OC_LDADDR == ct->opcode) || (OC_FORLOOP == ct->opcode))
 			{
 				old_size = ct->exorder.fl->rtaddr - ct->rtaddr;
 				curr_addr = 0;
@@ -109,35 +103,30 @@ void shrink_trips(void)
 				COMPDBG(if (0 != (old_size - new_size)) cdbg_dump_shrunk_triple(ct, old_size, new_size););
 				shrink += old_size - new_size;
 			} else
-			{
 				ct->rtaddr -= shrink;
-			}
 			if (0 == shrink && OC_TRIPSIZE == ct->opcode)
 			{	/* This triple is a reference to another triple whose codegen size we want to compute for an
-				   argument to another triple. We will only do this on what appears to (thus far) be
-				   the last pass through the triples).
-				*/
+				 * argument to another triple. We will only do this on what appears to (thus far) be
+				 * the last pass through the triples).
+				 */
 				curr_addr = 0;
 				trip_gen(ct->operand[0].oprval.tsize->ct);
 				ct->operand[0].oprval.tsize->size = curr_addr;
 			}
-		}/* dqloop */
+		}	/* dqloop */
 		code_size -= shrink;
 		first_pass = FALSE;
 	} while (0 != shrink);		/* Do until no more shrinking occurs */
 
 	/* Now that the code has been strunk, we may have to adjust the pad length of the code segment. Compute
-	   this by now subtracting out the size of the pad length from the code size and recomputing the pad length
-	   and readjusting the code size. (see similar computation in code_gen().
-	*/
-	code_size -= codegen_padlen;
-	codegen_padlen = PADLEN(code_size, SECTION_ALIGN_BOUNDARY);	/* Length to pad to align next section */
-	code_size += codegen_padlen;
-
-#ifdef DEBUG
-	/* If debug and compiler debugging is enabled, run through the triples again to show what we
-	   have done to them..
-	*/
+	 * this by now subtracting out the size of the pad length from the code size and recomputing the pad length
+	 * and readjusting the code size. (see similar computation in code_gen().
+	 */
+	code_size -= TREF(codegen_padlen);
+	TREF(codegen_padlen) = PADLEN(code_size, SECTION_ALIGN_BOUNDARY);	/* Length to pad to align next section */
+	code_size += TREF(codegen_padlen);
+#	ifdef DEBUG
+	/* If debug and compiler debuggingenabled, run through the triples again to show what we did to them */
 	if (gtmDebugLevel & GDL_DebugCompiler)
 	{
 		dqloop(&t_orig, exorder, ct)
@@ -146,9 +135,8 @@ void shrink_trips(void)
 			cdbg_dump_triple(ct, 0);
 		}
 	}
-#endif
+#	endif
 }
-
 
 /* Check if this operand or any it may be chained to are literals in the literal section (not immediate operands) */
 boolean_t litref_triple_oprcheck(oprtype *operand)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,10 +9,9 @@
  *								*
  ****************************************************************/
 
+#include <stddef.h>
 #include "mdef.h"
-
 #include "gtm_string.h"
-
 #include "mlkdef.h"
 #include "copy.h"
 #include "mlk_shrsub_garbage_collect.h"
@@ -39,7 +38,7 @@ void mlk_shrsub_garbage_collect(mlk_ctldata_ptr_t ctl)
 			b->value -= delta;
 			bckp += delta;
 			p->backpointer = bckp;
-			memcpy((sm_uc_ptr_t) p - delta, p, n);
+			memmove((sm_uc_ptr_t) p - delta, p, n);
 		}
 	}
 	ctl->subfree -= delta;

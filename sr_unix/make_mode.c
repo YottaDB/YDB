@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,12 +46,11 @@ void dmode_table_init(void);
 #endif /* __ia64 */
 
 /* This routine is called to create (currently two different) dynamic routines that
-   can be executed. One is a direct mode frame, the other is a callin base frame. They
-   are basically identical except in the entry points that they call. To this end, this
-   common routine is called for both with the entry points to be put into the generated
-   code being passed in as parameters.
-*/
-
+ * can be executed. One is a direct mode frame, the other is a callin base frame. They
+ * are basically identical except in the entry points that they call. To this end, this
+ * common routine is called for both with the entry points to be put into the generated
+ * code being passed in as parameters.
+ */
 typedef struct dyn_modes_struct
 {
 	char 		*rtn_name;
@@ -82,13 +81,12 @@ static dyn_modes our_modes[2] =
 #if defined(__ia64)
 
 /* On IA64, we want to use CODE_ADDRESS() macro, to dereference all the function pointers, before storing them in
-   global array. Now doing a dereference operation, as part of initialization, is not allowed by linux/gcc (HP'a aCC
-   was more tolerant towards this). So to make sure that the xfer_table is initialized correctly, before anyone
-   uses it, one needs to create a 'constructor/initializer' function, which is gauranted to be called as soon as
-   this module is loaded, and initialize the xfer_table correctly within that function.  gcc provides the below
-   mechanism to do this
-*/
-
+ * global array. Now doing a dereference operation, as part of initialization, is not allowed by linux/gcc (HP'a aCC
+ * was more tolerant towards this). So to make sure that the xfer_table is initialized correctly, before anyone
+ * uses it, one needs to create a 'constructor/initializer' function, which is gauranted to be called as soon as
+ * this module is loaded, and initialize the xfer_table correctly within that function.  gcc provides the below
+ * mechanism to do this
+ */
 static char dyn_modes_type[2][3] = {
 					{'C','A','A'},
 					{'A','C','A'}
@@ -121,24 +119,19 @@ rhdtyp *make_mode (int mode_index)
 	int algnd_lbltab_size = (int)ROUND_UP2(SIZEOF(lab_tabent), NATIVE_WSIZE);
 	int algnd_lnrtab_size = (int)ROUND_UP2(CODE_LINES * SIZEOF(lnr_tabent), NATIVE_WSIZE);
 
-	assert(DM_MODE == mode_index || CI_MODE == mode_index);
+	assert((DM_MODE == mode_index) || (CI_MODE == mode_index));
         base_address = (rhdtyp *)GTM_TEXT_ALLOC(algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
 	memset(base_address, 0, algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
 	dmode = &our_modes[mode_index];
 	base_address->routine_name.len = dmode->rtn_name_len;
 	base_address->routine_name.addr = dmode->rtn_name;
-
 	base_address->ptext_adr = (unsigned char *)base_address + algnd_rtnhdr_size;
 	base_address->ptext_end_adr = (unsigned char *)base_address->ptext_adr + algnd_code_size;
-
 	base_address->lnrtab_adr = (lnr_tabent *)base_address->ptext_end_adr;
-
 	base_address->labtab_adr = (lab_tabent *)((unsigned char *)base_address + algnd_rtnhdr_size +
 						  algnd_code_size + algnd_lnrtab_size);
-
 	base_address->lnrtab_len = CODE_LINES;
 	base_address->labtab_len = 1;
-
 	code = (CODEBUF_TYPE *)base_address->ptext_adr;	/* start of executable code */
 #ifdef __ia64
 	if (dyn_modes_type[mode_index][0] == 'C')
@@ -160,7 +153,8 @@ rhdtyp *make_mode (int mode_index)
 		 * On other platforms, ci_start usually invokes op_ext* which will return directly
 		 * to the generated code. Since RS6000 doesn't support call instruction without altering
 		 * return address register (LR), the workaround is to call op_ext* not from ci_restart
-		 * but from this dummy code */
+		 * but from this dummy code
+		 */
 		*code++ = RS6000_INS_MTLR | GTM_REG_ACCUM << RS6000_SHIFT_RS;
 		*code++ = RS6000_INS_BRL;
 	}
@@ -202,21 +196,16 @@ rhdtyp *make_mode (int mode_index)
 #else
         GEN_CALL(dmode->func_ptr3); 			/* line 2 */
 #endif /* __ia64 */
-
 	lnr = LNRTAB_ADR(base_address);
 	*lnr++ = 0;								/* line 0 */
 	*lnr++ = 0;								/* line 1 */
 	IA64_ONLY(*lnr++ = 2 * CALL_SIZE + EXTRA_INST_SIZE;)			/* line 2 */
 	NON_IA64_ONLY(*lnr++ = 2 * CALL_SIZE + EXTRA_INST * SIZEOF(int);)	/* line 2 */
-
 	lbl = base_address->labtab_adr;
 	lbl->lnr_adr = base_address->lnrtab_adr;
-
 	base_address->current_rhead_adr = base_address;
 	zlput_rname(base_address);
-
 	inst_flush(base_address, algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
-
 	return base_address;
 }
 

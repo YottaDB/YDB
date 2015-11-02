@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,18 +36,19 @@
 
 GBLREF	mur_opt_struct	mur_options;
 
+error_def(ERR_DBJNLNOTMATCH);
+error_def(ERR_JNLBADRECFMT);
+error_def(ERR_JNLCYCLE);
+error_def(ERR_JNLTNOUTOFSEQ);
+error_def(ERR_MUJNLPREVGEN);
+
+
 boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 {
 	reg_ctl_list	*rctl;
 	jnl_ctl_list	*new_jctl, *cur_jctl, *jctl;
 	redirect_list	*rl_ptr;
 	boolean_t	proceed;
-
-	error_def(ERR_DBJNLNOTMATCH);
-	error_def(ERR_JNLBADRECFMT);
-	error_def(ERR_MUJNLPREVGEN);
-	error_def(ERR_JNLTNOUTOFSEQ);
-	error_def(ERR_JNLCYCLE);
 
 	jctl = *jjctl;
 	rctl = jctl->reg_ctl;
@@ -70,6 +71,13 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 		free(new_jctl);
 		return FALSE;
 	}
+	/* It is NOT possible for a previous generation journal file to have jfh->crash to be TRUE. Assert that.
+	 * This also indicates that jctl->properly_closed will always be TRUE for a previous generation journal
+	 * file. The only exception is if the current generation journal file is created by recovery. In this
+	 * case the previous generation journal file (not created by recover) can have the crash field set to TRUE.
+	 */
+	assert((new_jctl->properly_closed && !new_jctl->jfh->crash) || (jctl->jfh->recover_interrupted &&
+			!new_jctl->jfh->recover_interrupted));
 	assert(!mur_options.forward || (!(jctl->jfh->recover_interrupted && !new_jctl->jfh->recover_interrupted)));
 	/* Skip the continuty of journal files check if both of these are true:
 	 * 1) if current generation was created by recover and

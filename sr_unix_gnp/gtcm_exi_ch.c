@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,8 @@
 
 #include "gtm_unistd.h"
 
+#include "have_crit.h"
+#include "gtmio.h"
 #include "gtm_time.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -37,12 +39,13 @@ GBLREF FILE		*gtcm_errfs;
 GBLREF unsigned char	*util_outptr;
 GBLREF int4		exi_condition;
 
+error_def(ERR_TEXT);
+
 CONDITION_HANDLER(gtcm_exi_ch)
 {
 	int		rc;
 	now_t		now;	/* for GET_CUR_TIME macro */
 	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
-	error_def(ERR_TEXT);
 
 	if (gtcm_firsterr)
 		gtcm_open_cmerrlog();
@@ -57,7 +60,7 @@ CONDITION_HANDLER(gtcm_exi_ch)
 		GET_CUR_TIME;
 		time_str[CTIME_BEFORE_NL] = 0;
 		FPRINTF(gtcm_errfs, "%s: %s", time_str, util_outbuff);
-		fflush(gtcm_errfs);
+		FFLUSH(gtcm_errfs);
 	}
 	send_msg(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("GT.CM TERMINATION RUNDOWN ERROR"));
 

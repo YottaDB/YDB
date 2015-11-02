@@ -41,7 +41,8 @@
 #include "gtm_zos_io.h"
 #endif
 
-static	int	ftok_ids[FTOK_ID_CNT] = {1, 43};
+static	int	ftok_ids[FTOK_ID_CNT] = {1, 43, 43};
+static	int	ftok_ver[FTOK_ID_CNT] = {0, 0, 1};
 
 error_def(ERR_MUSTANDALONE);
 error_def(ERR_DBOPNERR);
@@ -80,8 +81,11 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 	memset(sem_inf, 0, (SIZEOF(sem_inf) * FTOK_ID_CNT));	/* Zero all fields so we know what to clean up */
 
 	for (i = 0; FTOK_ID_CNT > i; ++i)
-	{	/* Once through for both ftok key'd semaphores */
-		sem_inf[i].ftok_key = FTOK(db_fn, ftok_ids[i]);
+	{	/* Once through for both ftok key'd semaphores, and both FTOKs for the new semaphore */
+		if (ftok_ver[i] == 0)
+			sem_inf[i].ftok_key = FTOK_OLD(db_fn, ftok_ids[i]);
+		else
+			sem_inf[i].ftok_key = FTOK(db_fn, ftok_ids[i]);
 		if (-1 == sem_inf[i].ftok_key)
 		{
 			save_errno = errno;
@@ -169,7 +173,7 @@ void mu_all_version_release_standalone(sem_info *sem_inf)
 	/* Note that we ignore most errors in this routine as we may get called with the alleged semaphores in
 	   just about any state.
 	*/
-	for (i = 0; 2 > i; ++i)
+	for (i = 0; FTOK_ID_CNT > i; ++i)
 	{	/* release/delete any held semaphores in this set */
 		if (sem_inf[i].sem_id && -1 != sem_inf[i].sem_id)
 		{

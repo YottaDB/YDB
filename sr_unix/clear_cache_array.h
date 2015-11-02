@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +9,9 @@
  *								*
  ****************************************************************/
 
-#ifndef MU_FILE_SIZE_INCLUDED
-#define MU_FILE_SIZE_INCLUDED
+#ifndef CLEAR_CACHE_ARRAY_DEFINED
+#define CLEAR_CACHE_ARRAY_DEFINED
 
-unsigned int mu_file_size(file_control *fc);
+void clear_cache_array(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg, uint4 new_total, uint4 old_total);
 
-#endif /* MU_FILE_SIZE_INCLUDED */
+#endif

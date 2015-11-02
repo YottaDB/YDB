@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,39 +20,40 @@
 #include "hashtab_objcode.h"
 #include "op.h"
 
-GBLREF	char			window_token;
-GBLREF	mval			**ind_source_sp, **ind_source_top;
-GBLREF	mval			**ind_result_sp, **ind_result_top;
+error_def(ERR_INDMAXNEST);
+error_def(ERR_VAREXPECTED);
 
 void	op_indfnname(mval *dst, mval *target, mval *depth)
 {
-	bool		rval;
-	mstr		object, *obj;
-	oprtype		v;
-	bool		gbl;
-	triple		*s, *src;
+	boolean_t	gbl;
 	icode_str	indir_src;
+	int		rval;
+	mstr		*obj, object;
+	oprtype		v;
+	triple		*s, *src;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_INDMAXNEST);
-	error_def(ERR_VAREXPECTED);
-
+	SETUP_THREADGBL_ACCESS;
+	if ((TREF(ind_source_sp) >= TREF(ind_source_top)) || (TREF(ind_result_sp) >= TREF(ind_result_top)))
+		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp & ind_source_sp */
 	MV_FORCE_STR(target);
 	indir_src.str = target->str;
 	indir_src.code = indir_fnname;
-	if (NULL == (obj = cache_get(&indir_src)))
+	if (NULL == (obj = cache_get(&indir_src)))	/* NOTE assignment */
 	{
+		obj = &object;
 		gbl = FALSE;
 		comp_init(&target->str);
 		src = newtriple(OC_IGETSRC);
 		s = maketriple(OC_FNNAME);
-		switch (window_token)
+		switch (TREF(window_token))
 		{
 		case TK_CIRCUMFLEX:
 			gbl = TRUE;
 			advancewindow();
 			/* caution fall through */
 		case TK_IDENT:
-			if (rval = name_glvn(gbl, &s->operand[1]))
+			if (EXPR_FAIL != (rval = name_glvn(gbl, &s->operand[1])))	/* NOTE assignment */
 			{
 				ins_triple(s);
 				s->operand[0] = put_tref(src);
@@ -60,7 +61,7 @@ void	op_indfnname(mval *dst, mval *target, mval *depth)
 			break;
 		case TK_ATSIGN:
 			s->opcode = OC_INDFNNAME;
-			if (rval = indirection(&(s->operand[0])))
+			if (EXPR_FAIL != (rval = indirection(&(s->operand[0]))))	/* NOTE assignment */
 			{
 				s->operand[1] = put_tref(src);
 				ins_triple(s);
@@ -68,25 +69,18 @@ void	op_indfnname(mval *dst, mval *target, mval *depth)
 			break;
 		default:
 			stx_error(ERR_VAREXPECTED);
+			rval = EXPR_FAIL;
 			break;
 		}
 		v = put_tref(s);
-		if (comp_fini(rval, &object, OC_IRETMVAL, &v, target->str.len))
-		{
-			indir_src.str.addr = target->str.addr;
-			cache_put(&indir_src, &object);
-			if (ind_source_sp + 1 >= ind_source_top || ind_result_sp + 1 >= ind_result_top)
-				rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-			*ind_result_sp++ = dst;
-			*ind_source_sp++ = depth;
-			comp_indr(&object);
-		}
-	} else
-	{
-		if (ind_source_sp + 1 >= ind_source_top || ind_result_sp + 1 >= ind_result_top)
-			rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-		*ind_result_sp++ = dst;
-		*ind_source_sp++ = depth;
-		comp_indr(obj);
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &v, target->str.len))
+			return;
+		indir_src.str.addr = target->str.addr;
+		cache_put(&indir_src, obj);
+		/* Fall into code activation below */
 	}
+	*(TREF(ind_result_sp))++ = dst;
+	*(TREF(ind_source_sp))++ = depth;
+	comp_indr(obj);
+	return;
 }

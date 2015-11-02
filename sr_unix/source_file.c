@@ -45,17 +45,6 @@ GBLREF short		object_name_len;
 GBLREF int		object_file_des;
 GBLREF command_qualifier cmd_qlf;
 
-error_def(ERR_ASSERT);
-error_def(ERR_ERRORSUMMARY);
-error_def(ERR_FILENOTFND);
-error_def(ERR_FILEPARSE);
-error_def(ERR_GTMASSERT);
-error_def(ERR_GTMCHECK);
-error_def(ERR_MEMORY);
-error_def(ERR_OBJFILERR);
-error_def(ERR_SRCFILERR);
-error_def(ERR_STACKOFLOW);
-
 static bool	tt_so_do_once;
 static io_pair	compile_src_dev;
 static io_pair	dev_in_use;	/*	before opening source file	*/
@@ -67,6 +56,18 @@ static readonly unsigned char open_params_list[] =
 	(unsigned char)iop_m,
 	(unsigned char)iop_eol
 };
+
+error_def(ERR_ASSERT);
+error_def(ERR_ERRORSUMMARY);
+error_def(ERR_FILENOTFND);
+error_def(ERR_FILEPARSE);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_MEMORY);
+error_def(ERR_OBJFILERR);
+error_def(ERR_SRCFILERR);
+error_def(ERR_STACKOFLOW);
 
 void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 {

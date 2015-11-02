@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,12 @@
 
 #ifndef MLK_UNLOCK_INCLUDED
 #define MLK_UNLOCK_INCLUDED
+
+#define LOCK_SPACE_FULL_SYSLOG_THRESHOLD	0.25	/* Minimum free space percentage to write LOCKSPACEFULL to syslog again.
+							 * MIN(free_prcblk_ratio, free_shr_blk_ratio) must be greater than this
+							 * value to print syslog again (see also: gdsbt.h,
+							 * lockspacefull_logged definition
+							 */
 
 void mlk_unlock(mlk_pvtblk *p);
 

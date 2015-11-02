@@ -22,22 +22,23 @@
 #include "valid_mname.h"
 
 GBLREF	symval			*curr_symval;
-GBLREF	char			window_token;
-GBLREF	mval			**ind_source_sp, **ind_source_top;
+
+error_def(ERR_INDMAXNEST);
+error_def(ERR_VAREXPECTED);
 
 void	op_indset(mval *target, mval *value)
 {
-	error_def(ERR_INDMAXNEST);
-	error_def(ERR_VAREXPECTED);
-	bool		rval;
-	mstr		object, *obj;
+	char 		new;
+	ht_ent_mname 	*tabent;
+	icode_str	indir_src;
+	int		rval;
+	mstr		*obj, object;
 	oprtype		v;
 	triple		*s, *src;
-	char 		new;
-	icode_str	indir_src;
 	var_tabent	targ_key;
-	ht_ent_mname 	*tabent;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_DEFINED(value);
 	MV_FORCE_STR(target);
 	indir_src.str = target->str;
@@ -54,13 +55,16 @@ void	op_indset(mval *target, mval *value)
 			((lv_val *)tabent->value)->v = *value;
 			return;
 		}
+		if (TREF(ind_source_sp) >= TREF(ind_source_top))
+			rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_source_sp */
+		obj = &object;
 		comp_init(&target->str);
 		src = maketriple(OC_IGETSRC);
 		ins_triple(src);
-		switch (window_token)
+		switch (TREF(window_token))
 		{
 		case TK_IDENT:
-			if (rval = lvn(&v, OC_PUTINDX, 0))
+			if (EXPR_FAIL != (rval = lvn(&v, OC_PUTINDX, 0)))	/* NOTE assignment */
 			{
 				s = maketriple(OC_STO);
 				s->operand[0] = v;
@@ -69,7 +73,7 @@ void	op_indset(mval *target, mval *value)
 			}
 			break;
 		case TK_CIRCUMFLEX:
-			if (rval = gvn())
+			if (EXPR_FAIL != (rval = gvn()))			/* NOTE assignment */
 			{
 				s = maketriple(OC_GVPUT);
 				s->operand[0] = put_tref(src);
@@ -77,7 +81,7 @@ void	op_indset(mval *target, mval *value)
 			}
 			break;
 		case TK_ATSIGN:
-			if (rval = indirection(&v))
+			if (EXPR_FAIL != (rval = indirection(&v)))		/* NOTE assignment */
 			{
 				s = maketriple(OC_INDSET);
 				s->operand[0] = v;
@@ -87,23 +91,16 @@ void	op_indset(mval *target, mval *value)
 			break;
 		default:
 			stx_error(ERR_VAREXPECTED);
+			rval = EXPR_FAIL;
 			break;
 		}
-		if (comp_fini(rval, &object, OC_RET, 0, target->str.len))
-		{
-			indir_src.str.addr = target->str.addr;
-			cache_put(&indir_src, &object);
-			*ind_source_sp++ = value;
-			if (ind_source_sp >= ind_source_top)
-				rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-			comp_indr(&object);
-		}
-	}
-	else
-	{
-		*ind_source_sp++ = value;
-		if (ind_source_sp >= ind_source_top)
-			rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-		comp_indr(obj);
-	}
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, 0, target->str.len))
+			return;
+		indir_src.str.addr = target->str.addr;
+		cache_put(&indir_src, obj);
+		/* Fall into code activation below */
+	} else if (TREF(ind_source_sp) >= TREF(ind_source_top))
+		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_source_sp */
+	*(TREF(ind_source_sp))++ = value;
+	comp_indr(obj);
 }

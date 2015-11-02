@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,8 @@
 #define	ECODE_MAX_LEN			((2 * MAX_DIGITS_IN_INT) + STR_LIT_LEN(",M,Z,"))
 #define	ECODE_MAX_LEN_WITH_BUFFER	((ECODE_MAX_LEN) + (BUFFER_FOR_OVERFLOW))
 
+error_def(ERR_SETECODE);
+
 void ecode_set(int errnum)
 {
 	mval		tmpmval;
@@ -36,20 +38,18 @@ void ecode_set(int errnum)
 	int		ansi_error;
 	int		severity;
 
-	error_def(ERR_SETECODE);
-
 	/* If this routine was called with error code SETECODE,
 	 * an end-user just put a correct value into $ECODE,
 	 * and it shouldn't be replaced by this routine.
 	 */
 	if (ERR_SETECODE == errnum)
 		return;
-	/* When the value of $ECODE is non-empty, error trapping
-	* will be invoked. When the severity level does not warrant
-	* error trapping, no value should be copied into $ECODE
-	*/
+	/* When the value of $ECODE is non-empty, error trapping is invoked. When the severity level does not warrant
+	 * error trapping, no value should be copied into $ECODE. Note: the message is verified it IS a GTM message before
+	 * checking the severity code so system error numbers aren't misinterpreted.
+	 */
 	severity = errnum & SEV_MSK;
-	if ((INFO == severity) || (SUCCESS == severity))
+	if ((NULL != err_check(errnum)) && ((INFO == severity) || (SUCCESS == severity)))
 		return;
 	/* Get ECODE string from error-number. If the error has an ANSI standard code, return ,Mnnn, (nnn is ANSI code).
 	 * Always return ,Zxxx, (xxx is GT.M code). Note that the value of $ECODE must start and end with a comma
@@ -59,9 +59,8 @@ void ecode_set(int errnum)
 	if (ectl = err_check(errnum))
 	{
 		ansi_error = ((errnum & FACMASK(ectl->facnum)) && (MSGMASK(errnum, ectl->facnum) <= ectl->msg_cnt))
-					? error_ansi[MSGMASK(errnum, ectl->facnum) - 1]
-					: 0;
-		if (ansi_error > 0)
+			? error_ansi[MSGMASK(errnum, ectl->facnum) - 1]	: 0;
+		if (0 < ansi_error)
 		{
 			*ecode_ptr++ = 'M';
 			ecode_ptr = (char *)i2asc((unsigned char *)ecode_ptr, ansi_error);
@@ -74,7 +73,6 @@ void ecode_set(int errnum)
 	ecode_mstr.addr = &ecode_buff[0];
 	ecode_mstr.len = INTCAST(ecode_ptr - ecode_mstr.addr);
 	assert(ecode_mstr.len <= ECODE_MAX_LEN);
-	if (ecode_mstr.len > ECODE_MAX_LEN_WITH_BUFFER)
-		GTMASSERT;
+	assertpro(ECODE_MAX_LEN_WITH_BUFFER >= ecode_mstr.len);
 	ecode_add(&ecode_mstr);
 }

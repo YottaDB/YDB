@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,51 +18,48 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-
 int m_zlink(void)
 {
 	int	rval;
-	triple	*ref;
 	oprtype	file, quals;
+	triple	*ref;
+	DCL_THREADGBL_ACCESS;
 
-	if (window_token == TK_EOL || window_token == TK_SPACE || window_token == TK_COLON)
+	SETUP_THREADGBL_ACCESS;
+	if ((TK_EOL == TREF(window_token)) || (TK_SPACE == TREF(window_token)) || (TK_COLON == TREF(window_token)))
 	{
 		ref = newtriple(OC_SVGET);
 		ref->operand[0] = put_ilit(SV_ZSOURCE);
 		file = put_tref(ref);
-		if (window_token == TK_COLON)
+		if (TK_COLON == TREF(window_token))
 		{
 			advancewindow();
-			if (!strexpr(&quals))
+			if (EXPR_FAIL == expr(&quals, MUMPS_STR))
 				return FALSE;
-		}
-		else
+		} else
 		{
 			ref = newtriple(OC_SVGET);
 			ref->operand[0] = put_ilit(SV_ZCOMPILE);
 			quals = put_tref(ref);
 		}
-	}
-	else
+	} else
 	{
-		if (!(rval = strexpr(&file)))
+		if (EXPR_FAIL == (rval = expr(&file, MUMPS_STR)))	/* NOTE assignment */
 			return FALSE;
-		if (window_token != TK_COLON)
+		if (TK_COLON != TREF(window_token))
 		{
-			if (rval == EXPR_INDR)
+			if (EXPR_INDR == rval)
 			{
-				make_commarg(&file,indir_zlink);
+				make_commarg(&file, indir_zlink);
 				return TRUE;
 			}
 			ref = newtriple(OC_SVGET);
 			ref->operand[0] = put_ilit(SV_ZCOMPILE);
 			quals = put_tref(ref);
-		}
-		else
+		} else
 		{
 			advancewindow();
-			if (!strexpr(&quals))
+			if (EXPR_FAIL == expr(&quals, MUMPS_STR))
 				return FALSE;
 		}
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,26 +18,25 @@ enum
 	REPL_START_JNL_SEQNO = 0,	/* 0 */
 	REPL_TR_JNL_RECS,		/* 1 */
 	REPL_ROLLBACK_FIRST,		/* 2 */
-	REPL_WILL_RESTART_OBSOLETE,	/* 3 */ /* Obsoleted effective V4.4-002 since we no longer support dual site config with
-						 * V4.1 versions. But, DO NOT remove this message type to keep other message types
-						 * same as in V4.2 and V4.3 versions */
+	REPL_OBSOLETE_WILL_RESTART,	/* 3 */ /* Obsoleted effective V4.4-002 since we no longer support dual site config with
+						 * V4.1 versions. But slot# preserved to not perturb other message #s */
 	REPL_XOFF,			/* 4 */
 	REPL_XON,			/* 5 */
 	REPL_BADTRANS,			/* 6 */
 	REPL_HEARTBEAT,			/* 7 */
 	REPL_FETCH_RESYNC,		/* 8 */
 	REPL_RESYNC_SEQNO,		/* 9 */
-	REPL_START_SEQNO_STOPSRCFILTER_OBSOLETE, /* 10 */ /* needed for backward compatibility */
+	REPL_OBSOLETE_STOPSRCFILTER,	/* 10 */ /* message no longer used but slot# 10 preserved to not perturb other message #s */
 	REPL_XOFF_ACK_ME,		/* 11 */
 	REPL_XOFF_ACK,			/* 12 */
 	REPL_WILL_RESTART_WITH_INFO,	/* 13 */
 	REPL_MULTISITE_MSG_START,	/* 14 */ /* All messages after this are newly introduced for multi-site support only */
-	REPL_NEED_INSTANCE_INFO,	/* 15 */
-	REPL_INSTANCE_INFO,		/* 16 */
-	REPL_NEED_TRIPLE_INFO,		/* 17 */
-	REPL_TRIPLE_INFO1,		/* 18 */
-	REPL_TRIPLE_INFO2,		/* 19 */
-	REPL_NEW_TRIPLE,		/* 20 */
+	REPL_OLD_NEED_INSTANCE_INFO,	/* 15 */
+	REPL_OLD_INSTANCE_INFO,		/* 16 */
+	REPL_NEED_HISTINFO,		/* 17 */
+	REPL_OLD_TRIPLEINFO1,		/* 18 */
+	REPL_OLD_TRIPLEINFO2,		/* 19 */
+	REPL_OLD_TRIPLE,		/* 20 */
 	REPL_INST_NOHIST,		/* 21 */
 	REPL_LOSTTNCOMPLETE,		/* 22 */
 	REPL_CMP_TEST,			/* 23 */
@@ -45,6 +44,12 @@ enum
 	REPL_CMP2UNCMP,			/* 25 */  /* used to signal a transition to uncompressed messages in case of errors */
 	REPL_TR_CMP_JNL_RECS,		/* 26 */  /* used to send compressed messages whose pre-compressed length is <  2**24 */
 	REPL_TR_CMP_JNL_RECS2,		/* 27 */  /* used to send compressed messages whose pre-compressed length is >= 2**24 */
+	REPL_NEED_INSTINFO,		/* 28 */
+	REPL_INSTINFO,			/* 29 */
+	REPL_HISTINFO,			/* 30 */  /* used to exchange history information as part of a replication handshake */
+	REPL_HISTREC,			/* 31 */  /* sent in the middle of a journal record stream to signal start of new history */
+	REPL_NEED_STRMINFO,		/* 32 */  /* sent by a supplementary source server to a supplementary receiver server */
+	REPL_STRMINFO,			/* 33 */  /* sent in response to a REPL_NEED_STRMINFO message */
 	REPL_MSGTYPE_LAST=256		/* 256 */
 	/* any new message need to be added before REPL_MSGTYPE_LAST */
 };
@@ -55,11 +60,16 @@ enum
 #define	REPL_PROTO_VER_MULTISITE_CMP	(char)0x2	/* Versions V5.3-003 and above that suport multisite replication with
 							 * the ability to compress the logical records in the replication pipe.
 							 */
-#define	REPL_PROTO_VER_THIS		REPL_PROTO_VER_MULTISITE_CMP
+#define	REPL_PROTO_VER_SUPPLEMENTARY	(char)0x3	/* Versions V5.5-000 and above that suport supplementary instances */
+#define	REPL_PROTO_VER_THIS		REPL_PROTO_VER_SUPPLEMENTARY
 							/* The current/latest version of the communication protocol between the
 							 * primary (source server) and secondary (receiver server or rollback)
 							 */
 
+/* A few of these flag bits (e.g. START_FLAG_SRCSRV_IS_VMS) are no longer used but they should not be removed just in case prior
+ * versions that used those bitslots communicate with a newer version that assigns a different meaning to those slots. Any new
+ * slot additions need to happen at the end of the list. No replacements of unused slots.
+ */
 #define	START_FLAG_NONE				0x00000000
 #define	START_FLAG_STOPSRCFILTER		0x00000001
 #define	START_FLAG_UPDATERESYNC			0x00000002
@@ -67,7 +77,8 @@ enum
 #define	START_FLAG_COLL_M			0x00000008
 #define	START_FLAG_VERSION_INFO			0x00000010
 #define	START_FLAG_TRIGGER_SUPPORT		0x00000020
-#define	START_FLAG_SRCSRV_IS_VMS		0x00000040
+#define	START_FLAG_SRCSRV_IS_VMS		0x00000040	/* Obsolete but preserve slot */
+#define	START_FLAG_NORESYNC			0x00000080
 
 #define	MIN_REPL_MSGLEN		32 /* To keep compiler happy with
 				    * the definition of repl_msg_t as well
@@ -131,7 +142,7 @@ typedef struct	/* Used also to send a message of type REPL_TR_CMP_JNL_RECS2 */
 #define	MAX_REPL_MSGLEN	(1 * 1024 * 1024) /* should ideally match the TCP send (recv) bufsiz of source (receiver) server */
 #define MAX_TR_BUFFSIZE	(MAX_REPL_MSGLEN - REPL_MSG_HDRLEN2) /* allow for biggest replication message header */
 
-typedef struct
+typedef struct	/* used to send a message of type REPL_START_JNL_SEQNO */
 {
 	int4		type;
 	int4		len;
@@ -141,10 +152,11 @@ typedef struct
 	char		proto_ver;	/* Needs to be "signed char" in order to be able to do signed comparisons of this with
 					 * the macros REPL_PROTO_VER_DUALSITE (0) and REPL_PROTO_VER_UNINITIALIZED (-1) */
 	char		node_endianness;	/* 'L' if this machine is little endian, 'B' if it is big endian */
-	char		filler_32[9];
+	char		is_supplementary;	/* TRUE for a supplementary instance; FALSE otherwise */
+	char		filler_32[8];
 } repl_start_msg_t; /* The first two fields should be as in repl_msg_t */
 
-typedef struct
+typedef struct	/* used to send a message of type REPL_WILL_RESTART_WITH_INFO or REPL_ROLLBACK_FIRST or REPL_RESYNC_SEQNO */
 {
 	int4		type;
 	int4		len;
@@ -154,7 +166,8 @@ typedef struct
 	char		proto_ver;	/* Needs to be "signed char" in order to be able to do signed comparisons of this with
 					 * the macros REPL_PROTO_VER_DUALSITE (0) and REPL_PROTO_VER_UNINITIALIZED (-1) */
 	char		node_endianness;	/* 'L' if this machine is little endian, 'B' if it is big endian */
-	char		filler_32[9];
+	char		is_supplementary;	/* TRUE for a supplementary instance; FALSE otherwise */
+	char		filler_32[8];
 } repl_start_reply_msg_t; /* The first two fields should be as in repl_msg_t */
 
 typedef struct	/* used to send a message of type REPL_FETCH_RESYNC */
@@ -165,10 +178,11 @@ typedef struct	/* used to send a message of type REPL_FETCH_RESYNC */
 	char		proto_ver;	/* Needs to be "signed char" in order to be able to do signed comparisons of this with
 					 * the macros REPL_PROTO_VER_DUALSITE (0) and REPL_PROTO_VER_UNINITIALIZED (-1) */
 	char		node_endianness;	/* 'L' if this machine is little endian, 'B' if it is big endian */
-	char		filler_32[14];
+	char		is_supplementary;	/* TRUE for a supplementary instance; FALSE otherwise */
+	char		filler_32[13];
 } repl_resync_msg_t; /* The first two fields should be as in repl_msg_t */
 
-typedef struct	/* used to send a message of type REPL_NEED_INSTANCE_INFO */
+typedef struct	/* used to send a message of type REPL_OLD_NEED_INSTANCE_INFO */
 {
 	int4		type;
 	int4		len;
@@ -178,21 +192,46 @@ typedef struct	/* used to send a message of type REPL_NEED_INSTANCE_INFO */
 	char		node_endianness;	/* 'L' if this machine is little endian, 'B' if it is big endian */
 	char		is_rootprimary;	/* Whether the source server that is sending this message is a root primary or not. */
 	char		filler_32[5];
-} repl_needinst_msg_t; /* The first two fields should be as in repl_msg_t */
+} repl_old_needinst_msg_t; /* The first two fields should be as in repl_msg_t */
 
-typedef struct	/* used to send a message of type REPL_NEED_TRIPLE_INFO */
+typedef struct	/* used to send a message of type REPL_NEED_INSTINFO */
 {
 	int4		type;
 	int4		len;
-	seq_num		seqno;	/* The triple requested is that of "seqno-1" */
-	char		filler_32[16];
-} repl_needtriple_msg_t; /* The first two fields should be as in repl_msg_t */
+	unsigned char	instname[MAX_INSTNAME_LEN];
+	repl_inst_uuid	lms_group_info;
+	char		proto_ver;	/* Needs to be "signed char" in order to be able to do signed comparisons of this with
+					 * the macros REPL_PROTO_VER_DUALSITE (0) and REPL_PROTO_VER_UNINITIALIZED (-1) */
+	char		is_rootprimary;	/* Whether the source server that is sending this message is a root primary or not. */
+	char		is_supplementary;	/* TRUE for a supplementary instance; FALSE otherwise */
+	char		filler_32[5];
+} repl_needinst_msg_t; /* The first two fields should be as in repl_msg_t */
 
-typedef struct	/* used to send a message of type REPL_INSTANCE_INFO */
+typedef struct	/* used to send a message of type REPL_OLD_INSTANCE_INFO */
 {
 	int4		type;
 	int4		len;
 	unsigned char	instname[MAX_INSTNAME_LEN];	/* The name of this replication instance */
+	unsigned char	was_rootprimary;
+	char		filler_32[7];
+} repl_old_instinfo_msg_t; /* The first two fields should be as in repl_msg_t */
+
+typedef struct	/* used to send a message of type REPL_INSTINFO */
+{
+	int4		type;
+	int4		len;
+	unsigned char	instname[MAX_INSTNAME_LEN];	/* The name of this replication instance */
+	seq_num		strm_jnl_seqno;		/* Whenever a supplementary receiver handshakes with a non-supplementary source,
+						 * the current jnl seqno (which is across all streams) is sent in the initial
+						 * REPL_START_JNL_SEQNO message. Only after the source server sends the
+						 * REPL_NEED_INSTINFO message does the receiver know which non-supplementary stream
+						 * the source corresponds to and can therefore determine the stream specific
+						 * jnl seqno. Once this is known, instead of re-sending the REPL_START_JNL_SEQNO
+						 * message, the receiver sends this new seqno in the "strm_jnl_seqno" field as
+						 * part of the REPL_INSTINFO message. In cases where the receiver is not
+						 * supplementary or if the soruce is supplementary, this field is set to 0.
+						 */
+	repl_inst_uuid	lms_group_info;
 	unsigned char	was_rootprimary;
 	char		filler_32[7];
 } repl_instinfo_msg_t; /* The first two fields should be as in repl_msg_t */
@@ -209,31 +248,51 @@ typedef struct	/* used to send messages of type REPL_CMP_TEST or REPL_CMP_SOLVE 
 					/* buffer to hold overflow in case compression expands data */
 } repl_cmpinfo_msg_t; /* The first two fields should be as in repl_msg_t */
 
-typedef struct	/* used to send a message of type REPL_TRIPLE_INFO1 */
+typedef struct	/* used to send a message of type REPL_NEED_HISTINFO */
 {
 	int4		type;
 	int4		len;
-	seq_num		start_seqno;	/* the starting seqno of the triple range */
-	unsigned char	instname[MAX_INSTNAME_LEN];
-} repl_tripinfo1_msg_t; /* The first two fields should be as in repl_msg_t */
-
-typedef struct	/* used to send a message of type REPL_TRIPLE_INFO2 */
-{
-	int4		type;
-	int4		len;
-	seq_num		start_seqno;	/* the starting seqno of the triple range */
-	uint4		cycle;
-	uint4		triple_num;
+	seq_num		seqno;		/* The histinfo requested is that of "seqno-1" */
+	int4		strm_num;	/* used only in case of supplementary instances */
+	int4		histinfo_num;	/* if not INVALID_HISTINFO_NUM, then we want the histinfo_num'th history record
+					 * on the remote side. in this case ignore seqno & strm_num.
+					 */
 	char		filler_32[8];
-} repl_tripinfo2_msg_t; /* The first two fields should be as in repl_msg_t */
+} repl_needhistinfo_msg_t; /* The first two fields should be as in repl_msg_t */
 
-/* A REPL_NEW_TRIPLE message is sent in such a form that the receiver server can copy it (after removing the 8-byte header
+typedef struct	/* used to send a message of type REPL_OLD_TRIPLEINFO1 */
+{
+	int4		type;
+	int4		len;
+	seq_num		start_seqno;	/* the starting seqno of the histinfo range */
+	unsigned char	instname[MAX_INSTNAME_LEN];
+} repl_histinfo1_msg_t; /* The first two fields should be as in repl_msg_t */
+
+typedef struct	/* used to send a message of type REPL_OLD_TRIPLEINFO2 */
+{
+	int4		type;
+	int4		len;
+	seq_num		start_seqno;	/* the starting seqno of the histinfo range */
+	uint4		cycle;
+	int4		histinfo_num;
+	char		filler_32[8];
+} repl_histinfo2_msg_t; /* The first two fields should be as in repl_msg_t */
+
+typedef struct	/* used to send a message of type REPL_HISTINFO */
+{
+	int4		type;
+	int4		len;
+	repl_histinfo	history;
+} repl_histinfo_msg_t; /* The first two fields should be as in repl_msg_t */
+
+/* A REPL_OLD_TRIPLE message is sent in such a form that the receiver server can copy it (after removing the 8-byte header
  * containing the "type" and "len") as such into the receive pool. The update process treats this content as yet another
  * journal record type. Therefore we need to introduce a new journal record type (JRT_TRIPLE) for this purpose and define a
- * structure (repl_triple_jnl_t) that has this type information and the triple related information. This will then be a
- * member of the REPL_NEW_TRIPLE message.
+ * structure (repl_old_triple_jnl_t) that has this type information and the triple related information. This will then be a
+ * member of the REPL_OLD_TRIPLE message.
+ * Note: GT.M versions that support supplementary instances send a REPL_HISTREC message instead of REPL_OLD_TRIPLE.
  */
-typedef struct	/* sub-structure used to send a message of type REPL_NEW_TRIPLE */
+typedef struct	/* sub-structure used to send a message of type REPL_OLD_TRIPLE */
 {
 	uint4		jrec_type : 8;	/* This definition is copied from that of "jrec_prefix" */
 	uint4		forwptr : 24;	/* This definition is copied from that of "jrec_prefix" */
@@ -241,14 +300,44 @@ typedef struct	/* sub-structure used to send a message of type REPL_NEW_TRIPLE *
 	seq_num		start_seqno;	/* The starting seqno of the triple range */
 	unsigned char	instname[MAX_INSTNAME_LEN];	/* The instance name that generated this triple */
 	unsigned char	rcvd_from_instname[MAX_INSTNAME_LEN];	/* instance name this triple was received from (on the secondary) */
-} repl_triple_jnl_t;
+} repl_old_triple_jnl_t;
 
-typedef struct	/* used to send a message of type REPL_NEW_TRIPLE */
+typedef struct	/* used to send a message of type REPL_OLD_TRIPLE */
 {
 	int4			type;
 	int4			len;
-	repl_triple_jnl_t	triplecontent;
-} repl_triple_msg_t; /* The first two fields should be as in repl_msg_t */
+	repl_old_triple_jnl_t	triplecontent;
+} repl_old_triple_msg_t; /* The first two fields should be as in repl_msg_t */
+
+typedef struct	/* sub-structure used to send a message of type REPL_HISTREC */
+{
+	uint4		jrec_type : 8;	/* This definition is copied from that of "jrec_prefix" */
+	uint4		forwptr : 24;	/* This definition is copied from that of "jrec_prefix" */
+	uint4		filler_8byte_align;
+	repl_histinfo	histcontent;	/* the structure containing the history information */
+} repl_histrec_jnl_t;
+
+typedef struct	/* used to send a message of type REPL_HISTREC */
+{
+	int4			type;
+	int4			len;
+	repl_histrec_jnl_t	histjrec;	/* the journal record containing the history information */
+} repl_histrec_msg_t; /* The first two fields should be as in repl_msg_t */
+
+typedef struct	/* used to send a message of type REPL_NEED_STRMINFO */
+{
+	int4		type;
+	int4		len;
+	seq_num		seqno;	/* The strminfo requested is that of "seqno-1" */
+	char		filler_32[16];
+} repl_needstrminfo_msg_t; /* The first two fields should be as in repl_msg_t */
+
+typedef struct	/* used to send a message of type REPL_STRMINFO */
+{
+	int4		type;
+	int4		len;
+	int4		last_histinfo_num[MAX_SUPPL_STRMS];
+} repl_strminfo_msg_t; /* The first two fields should be as in repl_msg_t */
 
 typedef struct
 {
@@ -287,13 +376,18 @@ typedef repl_cmpmsg_t		*repl_cmpmsg_ptr_t;
 typedef repl_start_msg_t	*repl_start_msg_ptr_t;
 typedef repl_start_reply_msg_t	*repl_start_reply_msg_ptr_t;
 typedef repl_resync_msg_t	*repl_resync_msg_ptr_t;
+typedef repl_old_needinst_msg_t	*repl_old_needinst_msg_ptr_t;
 typedef repl_needinst_msg_t	*repl_needinst_msg_ptr_t;
-typedef repl_needtriple_msg_t	*repl_needtriple_msg_ptr_t;
+typedef repl_old_instinfo_msg_t	*repl_old_instinfo_msg_ptr_t;
 typedef repl_instinfo_msg_t	*repl_instinfo_msg_ptr_t;
-typedef repl_tripinfo1_msg_t	*repl_tripinfo1_msg_ptr_t;
-typedef repl_tripinfo2_msg_t	*repl_tripinfo2_msg_ptr_t;
-typedef repl_triple_jnl_t	*repl_triple_jnl_ptr_t;
-typedef repl_triple_msg_t	*repl_triple_msg_ptr_t;
+typedef repl_needhistinfo_msg_t	*repl_needhistinfo_msg_ptr_t;
+typedef repl_histinfo1_msg_t	*repl_histinfo1_msg_ptr_t;
+typedef repl_histinfo2_msg_t	*repl_histinfo2_msg_ptr_t;
+typedef repl_old_triple_jnl_t	*repl_old_triple_jnl_ptr_t;
+typedef repl_histrec_jnl_t	*repl_histrec_jnl_ptr_t;
+typedef repl_histinfo_msg_t	*repl_histinfo_msg_ptr_t;
+typedef repl_needstrminfo_msg_t	*repl_needstrminfo_msg_ptr_t;
+typedef repl_strminfo_msg_t	*repl_strminfo_msg_ptr_t;
 typedef repl_heartbeat_msg_t	*repl_heartbeat_msg_ptr_t;
 typedef repl_cmpinfo_msg_t	*repl_cmpinfo_msg_ptr_t;
 
@@ -301,10 +395,11 @@ typedef repl_cmpinfo_msg_t	*repl_cmpinfo_msg_ptr_t;
 # pragma pointer_size(restore)
 #endif
 
-void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_seqno);
-void	gtmsource_send_new_triple(boolean_t rcvr_same_endianness);
+void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_seqno, int4 optional_strm_num);
+void	gtmsource_send_new_histrec(void);
 
 void	gtmrecv_repl_send(repl_msg_ptr_t msgp, int4 type, int4 len, char *msgtypestr, seq_num optional_seqno);
-void	gtmrecv_send_triple_info(repl_triple *triple, int4 triple_num);
+void	gtmrecv_send_histinfo(repl_histinfo *histinfo);
+void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, boolean_t is_rcvr_srvr);
 
 #endif

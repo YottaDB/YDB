@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *      Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -13,18 +13,18 @@
 #include "compiler.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
-
 /* $ZWIDTH(): Single parameter - string expression */
 int f_zwidth(oprtype *a, opctype op)
 {
-        triple *r;
+	triple *r;
+	DCL_THREADGBL_ACCESS;
 
-        r = maketriple(op);
-        if (!strexpr(&(r->operand[0])))
-                return FALSE;
-        ins_triple(r);
-        *a = put_tref(r);
-        return TRUE;
+	SETUP_THREADGBL_ACCESS;
+	r = maketriple(op);
+	if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_STR))
+		return FALSE;
+	ins_triple(r);
+	*a = put_tref(r);
+	return TRUE;
 }
 

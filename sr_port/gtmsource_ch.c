@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,25 +46,26 @@
 GBLREF	gd_addr		*gd_header;
 GBLREF	jnlpool_addrs	jnlpool;
 
+error_def(ERR_ASSERT);
+error_def(ERR_CTRLC);
+error_def(ERR_FORCEDHALT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_MEMORY);
+error_def(ERR_VMSMEMORY);
+
 CONDITION_HANDLER(gtmsource_ch)
 {
 	gd_addr		*addr_ptr;
 	gd_region	*reg_local, *reg_top;
 	sgmnt_addrs	*csa;
 
-#ifdef UNIX
+#	ifdef UNIX
 	unix_db_info	*udi;
-#endif
-
-	error_def(ERR_ASSERT);
-	error_def(ERR_CTRLC);
-	error_def(ERR_FORCEDHALT);
-	error_def(ERR_GTMCHECK);
-	error_def(ERR_GTMASSERT);
-        error_def(ERR_MEMORY);
-        error_def(ERR_VMSMEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_OUTOFSPACE);
+#	endif
 
 	START_CH;
 	if (!(IS_GTM_ERROR(SIGNAL)) || DUMPABLE || SEVERITY == ERROR)

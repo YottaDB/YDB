@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,13 +40,13 @@
 LITREF  char                    gtm_release_name[];
 LITREF  int4                    gtm_release_name_len;
 
+error_def(ERR_MUINFOUINT8);
+
 /* Update header from v4.x to v5.0-000 */
 void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 {
 	time_t	ctime;
 	seq_num	v15_reg_seqno;
-
-	error_def(ERR_MUINFOUINT8);
 
 	memset(csd, 0, SIZEOF(sgmnt_data));
 	MEMCPY_LIT(csd->label, GDS_LABEL);
@@ -85,7 +85,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->last_rec_backup = v15_csd->last_rec_backup;
 	csd->reorg_restart_block = v15_csd->reorg_restart_block;		/* New from V4.2 */
 	memcpy(csd->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
-	csd->owner_node = v15_csd->owner_node;
+	VMS_ONLY(csd->owner_node = v15_csd->owner_node;)
 	csd->image_count = v15_csd->image_count;
 	csd->kill_in_prog = 0;
 	csd->abandoned_kills = v15_csd->kill_in_prog;	/* assert to 0 ??? */
@@ -180,24 +180,17 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 		if (0 == csd->reg_seqno)
 		{	/* This can happen for pre-replication versions */
 			csd->reg_seqno = 1;
-			csd->dualsite_resync_seqno = 1;
 			csd->zqgblmod_seqno = 0;	/* see comment in mucregini.c for why initial value is 0 */
 			csd->zqgblmod_tn = 0;		/* see comment in mucregini.c for why initial value is 0 */
 			csd->repl_state = repl_closed;
 		} else
 		{
-			csd->dualsite_resync_seqno = v15_csd->resync_seqno;
 			csd->pre_multisite_resync_seqno = v15_csd->resync_seqno;
 			/* resync_seqno should never be greater the region's reg_seqno. Ensure that this is indeed the case. In PRO,
 			 * fix the fields to be at most the value of the region's reg_seqno if they are found to be greater than
 			 * reg_seqno
 			 */
 			assert(v15_csd->resync_seqno <= v15_reg_seqno);
-			if (v15_csd->resync_seqno > v15_reg_seqno)
-				csd->dualsite_resync_seqno = csd->pre_multisite_resync_seqno = v15_reg_seqno;
-			assert(csd->dualsite_resync_seqno);
-			if (!csd->dualsite_resync_seqno)
-				csd->dualsite_resync_seqno = 1;
 		}
 		assert(!csd->multi_site_open);
 		csd->multi_site_open = TRUE;
@@ -223,10 +216,6 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 		csd->yield_lmt = v15_csd->yield_lmt;
 		memcpy(csd->jnl_file_name, v15_csd->jnl_file_name, JNL_NAME_SIZE);
 		PRINT_JNL_FIELDS(csd);
-		UNIX_ONLY(
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("Resync sequence number"),
-						&csd->dualsite_resync_seqno, &csd->dualsite_resync_seqno);
-		)
 		VMS_ONLY(
 			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("Resync sequence number"),
 						&csd->resync_seqno, &csd->resync_seqno);

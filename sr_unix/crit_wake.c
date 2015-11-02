@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,14 +14,15 @@
 #include <signal.h>
 #include "io.h"
 #include "gtmsecshr.h"
+#include "secshr_client.h"
 #include "crit_wake.h"
 #include "send_msg.h"
 #include "have_crit.h"
 
+error_def(ERR_NOSUCHPROC);
+
 int crit_wake (sm_uint_ptr_t pid)
 {
-	error_def(ERR_NOSUCHPROC);
-
 	if (0 == kill(*pid, SIGALRM))
 		return 0;
 	else if (ESRCH == errno)

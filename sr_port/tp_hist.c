@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,11 @@
 #include "cws_insert.h"
 #include "memcoherency.h"
 #include "wbox_test_init.h"
+#ifdef UNIX
+#include "repl_msg.h"		/* needed for gtmsource.h */
+#include "gtmsource.h"		/* needed for SYNC_ONLN_RLBK_CYCLES */
+#include "tp_grab_crit.h"
+#endif
 
 #define MMBLK_OFFSET(BLK)     													\
 	(cs_addrs->db_addrs[0] + (cs_addrs->hdr->start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)(cs_addrs->hdr->blk_size * (BLK)))
@@ -70,7 +75,6 @@ GBLREF	trans_num	local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	int4		n_pvtmods, n_blkmods;
 GBLREF	unsigned int	t_tries;
 GBLREF	uint4		t_err;
-GBLREF	int4		tprestart_syslog_delta;
 GBLREF	boolean_t	is_updproc;
 GBLREF	boolean_t	mupip_jnl_recover;
 GBLREF	boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
@@ -91,11 +95,12 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	block_id	blk;
 	srch_blk_status	*local_hash_entry;
 	enum cdb_sc	status = cdb_sc_normal;
-	boolean_t	is_mm, store_history;
+	boolean_t	is_mm, store_history, was_crit;
 	sgm_info	*si;
 	ht_ent_int4	*tabent, *lookup_tabent;
 	cw_set_element	*cse;
 	cache_rec_ptr_t	cr;
+	sgmnt_addrs	*csa;
 #	ifdef DEBUG
 	boolean_t	wc_blocked;
 	boolean_t	ready2signal_gvundef_lcl;
@@ -114,6 +119,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
 	assert((NULL != sgm_info_ptr) && (cs_addrs->sgm_info_ptr == sgm_info_ptr));
 	si = sgm_info_ptr;
+	csa = si->tp_csa;
 	gvt = gv_target;
 	store_history = (!gvt->noisolation || ERR_GVKILLFAIL == t_err || ERR_GVPUTFAIL == t_err);
 	assert(hist1 != &gvt->hist);
@@ -140,7 +146,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	SHM_READ_MEMORY_BARRIER;
 	for (hist = &gvt->hist; hist != NULL && cdb_sc_normal == status; hist = (hist == &gvt->hist) ? hist1 : NULL)
 	{	/* this loop execute once or twice: 1st for gv_target and then for hist1, if any */
-		if (tprestart_syslog_delta)
+		if (TREF(tprestart_syslog_delta))
 			n_blkmods = n_pvtmods = 0;
 		for (t1 = hist->h; HIST_TERMINATOR != (blk = t1->blk_num); t1++)
 		{
@@ -204,7 +210,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						assert((CDB_STAGNATE > t_tries)
 							|| (gtm_white_box_test_case_enabled
 							    && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number)));
-						if (tprestart_syslog_delta)
+						if (TREF(tprestart_syslog_delta))
 						{
 							n_blkmods++;
 							if (t2->cse || t1->cse)
@@ -262,6 +268,31 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 #						endif
 					}
 				}
+#				ifdef UNIX
+				if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
+				{
+					status = cdb_sc_onln_rlbk1;
+					if (csa->db_onln_rlbkd_cycle != csa->nl->db_onln_rlbkd_cycle)
+						status = cdb_sc_onln_rlbk2; /* database taken back to a different logical state */
+					/* We want to sync the online rollback cycles ONLY under crit. So, grab_crit and sync the
+					 * cycles. While tp_grab_crit would have been a better choice, the reason we don't use
+					 * tp_grab_crit here is because if we don't sync cycles because we don't hold crit but
+					 * do invoke t_retry which increments $zonlnrlbk and on the subsequent retry we remain
+					 * unlucky in getting crit, we will end up incrementing $zonlnrlbk more than once for a
+					 * single online rollback event. In the worst case we will have $zonlnrlbk=3 which from
+					 * the user perspective is incorrect. So, sync the cycles the first time we detect the
+					 * online rollback
+					 */
+					assert(!csa->hold_onto_crit);
+					was_crit = csa->now_crit;
+					if (!was_crit)
+						grab_crit(gv_cur_region);
+					SYNC_ONLN_RLBK_CYCLES;
+					if (!was_crit)
+						rel_crit(gv_cur_region);
+					break;
+				}
+#				endif
 				/* Although t1->first_tp_srch_status (i.e. t2) is used for doing blkmod check,
 				 * we need to use BOTH t1 and t1->first_tp_srch_status to do the cdb_sc_lostcr check.
 				 *
@@ -284,7 +315,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				 */
 				if ((t1 != t2) && t1->cr)
 				{
-					assert((sm_long_t)GDS_REL2ABS(t1->cr->buffaddr) == (sm_long_t)t1->buffaddr);
+					assert(((sm_long_t)GDS_REL2ABS(t1->cr->buffaddr) == (sm_long_t)t1->buffaddr)
+						UNIX_ONLY(|| (0 != csa->nl->onln_rlbk_pid)));
 					if (t1->cycle != t1->cr->cycle)
 					{
 						assert(CDB_STAGNATE > t_tries);
@@ -295,7 +327,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				}
 				if (cr)
 				{
-					assert((sm_long_t)GDS_REL2ABS(cr->buffaddr) == (sm_long_t)t2->buffaddr);
+					assert(((sm_long_t)GDS_REL2ABS(cr->buffaddr) == (sm_long_t)t2->buffaddr)
+						UNIX_ONLY( || (0 != csa->nl->onln_rlbk_pid)));
 					if (t2->cycle != cr->cycle)
 					{
 						assert(CDB_STAGNATE > t_tries);
@@ -425,7 +458,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 			for (t1 = hist->h; HIST_TERMINATOR != (blk = t1->blk_num); t1++)
 			{
 				t2 = t1->first_tp_srch_status ? t1->first_tp_srch_status : t1;
-				assert(t2->tn <= t1->tn);
+				assert((t2->tn <= t1->tn) UNIX_ONLY(|| (0 != csa->nl->onln_rlbk_pid)));
 				/* Take this time to also check that gv_targets match between t1 and t2.
 				 * If they dont, the restart should be detected in tp_tend.
 				 * Set the flag donot_commit to catch the case this does not restart.

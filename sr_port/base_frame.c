@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,14 +19,14 @@
 GBLREF unsigned char 	*stacktop, *stackwarn, *msp;
 GBLREF stack_frame	*frame_pointer;
 
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
+
 void base_frame(rhdtyp *base_address)
 {
 	void		gtm_ret_code();	/* This is an external which points to code without an entry mask */
 	unsigned char	*msp_save;
 	stack_frame	*fp;
-
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
 
 	if ((INTPTR_T)msp & 1)	/* synchronize mumps stack on even boundary */
 		msp--;
@@ -59,4 +59,6 @@ void base_frame(rhdtyp *base_address)
 	fp->vartab_len = 0;
 	fp->vartab_ptr = (char *)fp;
 	fp->type = SFT_COUNT;
+	fp->ret_value = NULL;
+	fp->dollar_test = -1;
 }

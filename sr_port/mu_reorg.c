@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,6 +87,27 @@ GBLREF	boolean_t		need_kip_incr;
 GBLREF	uint4			update_trans;
 GBLREF	boolean_t		mu_reorg_in_swap_blk;
 
+error_def(ERR_DBRDONLY);
+error_def(ERR_GBLNOEXIST);
+error_def(ERR_MAXBTLEVEL);
+error_def(ERR_MUREORGFAIL);
+
+
+#ifdef UNIX
+# define ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(LCL_T_TRIES)								\
+{																\
+	boolean_t		tn_aborted;											\
+																\
+	ABORT_TRANS_IF_GBL_EXIST_NOMORE(LCL_T_TRIES, tn_aborted);								\
+	if (tn_aborted)														\
+	{															\
+		gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);						\
+		reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused, file_extended, lvls_reduced, blks_coalesced,\
+				blks_split, blks_swapped);									\
+		return TRUE; /* It is not an error if the global (that once existed) doesn't exist anymore (due to ROLLBACK) */	\
+	}															\
+}
+#endif
 void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *kill_set_list, trans_num tn);
 void reorg_finish(block_id dest_blk_id, int blks_processed, int blks_killed,
 	int blks_reused, int file_extended, int lvls_reduced,
@@ -184,15 +205,14 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 	srch_hist		*rtsib_hist;
 	jnl_buffer_ptr_t	jbp;
 	trans_num		ret_tn;
-
-	error_def(ERR_MUREORGFAIL);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_GBLNOEXIST);
-	error_def(ERR_MAXBTLEVEL);
+#	ifdef UNIX
+	DEBUG_ONLY(unsigned int	lcl_t_tries;)
+#	endif
 
 	t_err = ERR_MUREORGFAIL;
 	kill_set_tail = &kill_set_list;
 	/* Initialization for current global */
+	inctn_opcode = inctn_invalid_op; /* temporary reset; satisfy an assert in t_end() */
 	op_gvname(VARLSTCNT(1) gn);
 	/* Cannot proceed for read-only data files */
 	if (gv_cur_region->read_only)
@@ -200,6 +220,8 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 		gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		return FALSE;
 	}
+	if (0 == gv_target->root)
+		return TRUE; /* It is not an error that global was killed */
 	dest_blk_id = cs_addrs->reorg_last_dest;
 	inctn_opcode = inctn_mu_reorg;
 
@@ -278,26 +300,6 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					assert(CDB_STAGNATE > t_tries);
 					t_retry(status);
 					continue;
-				} else if (gv_currkey->end + 1 != gv_target->hist.h[0].curr_rec.match)
-                                {
-					if (SIZEOF(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
-						&& 1 == gv_target->hist.depth)
-					{
-						if (cs_addrs->now_crit)
-						{
-							t_abort(gv_cur_region, cs_addrs); /* do crit and other cleanup */
-							gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
-							reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
-								file_extended, lvls_reduced,
-								blks_coalesced, blks_split, blks_swapped);
-							return TRUE; /* It is not an error that global was killed */
-						} else
-						{
-							assert(CDB_STAGNATE > t_tries);
-							t_retry(status);
-							continue;
-						}
-					}
                                 }
 				if (gv_target->hist.depth <= level)
 				{
@@ -330,9 +332,12 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						return FALSE;
 					} else if (cdb_sc_normal == status)
 					{
+						UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
 						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED)))
 						{
 							need_kip_incr = FALSE;
+							assert(NULL == kip_csa);
+							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
 							continue;
 						}
 						if (detailed_log)
@@ -389,11 +394,13 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 							if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
 								WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
 						}
+						UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
 						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), rtsib_hist,
 							TN_NOT_SPECIFIED)))
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
+							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
 							if (level)
 							{	/* reinitialize level member in rtsib_hist srch_blk_status' */
 								for (count = 0; count < MAX_BT_DEPTH; count++)
@@ -457,12 +464,14 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						inctn_opcode = inctn_invalid_op; /* temporary reset; satisfy an assert in t_end() */
 						assert(UPDTRNS_DB_UPDATED_MASK == update_trans);
 						update_trans = 0; /* tell t_end, this is no longer an update transaction */
+						UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
 						if ((trans_num)0 == (ret_tn = t_end(rtsib_hist, NULL, TN_NOT_SPECIFIED)))
 						{
 							need_kip_incr = FALSE;
+							assert(NULL == kip_csa);
+							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
 							inctn_opcode = inctn_mu_reorg;	/* reset inctn_opcode to its default */
 							update_trans = UPDTRNS_DB_UPDATED_MASK;/* reset update_trans to old value */
-							assert(NULL == kip_csa);
 							continue;
 						}
 						/* There is no need to reset update_trans in case of a successful "t_end" call.
@@ -505,26 +514,6 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					assert(CDB_STAGNATE > t_tries);
 					t_retry(status);
 					continue;
-				} else if (gv_currkey->end + 1 != gv_target->hist.h[0].curr_rec.match)
-                                {
-					if (SIZEOF(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
-						&& 1 == gv_target->hist.depth)
-					{
-						if (cs_addrs->now_crit)
-						{
-							t_abort(gv_cur_region, cs_addrs); /* do crit and other cleanup */
-							gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
-							reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
-								file_extended, lvls_reduced,
-								blks_coalesced, blks_split, blks_swapped);
-							return TRUE; /* It is not an error that global was killed */
-						} else
-						{
-							assert(CDB_STAGNATE > t_tries);
-							t_retry(status);
-							continue;
-						}
-					}
                                 }
 				if (gv_target->hist.depth <= level)
 					break;
@@ -544,6 +533,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					}
 				} else if (cdb_sc_normal == status)
 				{
+					UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
 					if (0 < kill_set_list.used)
 					{
 						need_kip_incr = TRUE;
@@ -555,6 +545,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
+							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
 							DECR_BLK_NUM(dest_blk_id);
 							continue;
 						}
@@ -578,6 +569,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					{
 						need_kip_incr = FALSE;
 						assert(NULL == kip_csa);
+						UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
 						DECR_BLK_NUM(dest_blk_id);
 						continue;
 					}
@@ -636,25 +628,6 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				assert(CDB_STAGNATE > t_tries);
 				t_retry(status);
 				continue;
-			} else if (gv_currkey->end + 1 != gv_target->hist.h[0].curr_rec.match)
-			{
-				if (SIZEOF(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
-					&& 1 == gv_target->hist.depth)
-				{
-					if (cs_addrs->now_crit)
-					{
-						t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
-						gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
-						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
-							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
-						return TRUE; /* It is not an error that global was killed */
-					} else
-					{
-						assert(CDB_STAGNATE > t_tries);
-						t_retry(status);
-						continue;
-					}
-				}
 			}
 			if (gv_target->hist.depth <= level)
 				break;
@@ -671,10 +644,12 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				need_kip_incr = TRUE;
 				if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
 					WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
+				UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
 				if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED)))
 				{
 					need_kip_incr = FALSE;
 					assert(NULL == kip_csa);
+					UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
 					continue;
 				}
 				if (detailed_log)

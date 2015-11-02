@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,23 +10,28 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_stdio.h"
+
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
 #include "op.h"
 #include "unwind_nocounts.h"
+#include "error.h"
 #include "error_trap.h"
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF stack_frame	*error_frame;
 GBLREF tp_frame		*tp_pointer;
 
+error_def(ERR_TPQUIT);
+
 bool unwind_nocounts(void)
 {	short		unwind;
 	bool		dmode;
 	stack_frame	*fp;
 	boolean_t	sf_error_ret = FALSE;
-	error_def(ERR_TPQUIT);
 
 	dmode = FALSE;
 	unwind = 0;

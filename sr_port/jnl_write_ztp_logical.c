@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,8 @@ void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 		}
 	}
 	assert(0 != jnl_fence_ctl.token);
-	QWASSIGN(jrec->token_seq.token, jnl_fence_ctl.token);
+	jrec->token_seq.token = jnl_fence_ctl.token;
+	jrec->strm_seqno = 0;	/* strm_seqno is only for replication & ZTCOM does not work with replic */
 	GTMCRYPT_ONLY(assert(!REPL_ALLOWED(csa));)
 	JNL_WRITE_APPROPRIATE(csa, jpc, jfb->rectype, (jnl_record *)jrec, NULL, jfb);
 }

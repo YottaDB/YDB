@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,7 @@
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
+#include "gtm_strings.h"
 
 #ifdef UNIX
 # include "gtmio.h"
@@ -62,13 +63,13 @@
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	mur_opt_struct	mur_options;
 
+error_def(ERR_FILENOTCREATE);
+
 void mur_close_file_extfmt()
 {
 	int		recstat;
 	fi_type		*file_info;
 	static readonly	char 	*ext_file_type[] = {STR_JNLEXTR, STR_BRKNEXTR, STR_LOSTEXTR};
-
-	error_def(ERR_FILENOTCREATE);
 
 	assert(0 == GOOD_TN);
 	assert(1 == BROKEN_TN);
@@ -81,9 +82,17 @@ void mur_close_file_extfmt()
 			MUR_CLOSE_FILE(murgbl.file_info[recstat]);
 			free(murgbl.file_info[recstat]);
 			murgbl.file_info[recstat] = NULL;
-		} else if (0 != mur_options.extr_fn_len[recstat])
+		}
+#ifdef UNIX
+		else if (mur_options.extr_fn[recstat] /* If STDOUT no file closing message. */
+			   && (0 != STRNCASECMP(mur_options.extr_fn[recstat], JNL_STDO_EXTR, SIZEOF(JNL_STDO_EXTR))))
 			gtm_putmsg(VARLSTCNT(6) ERR_FILENOTCREATE, 4, LEN_AND_STR(ext_file_type[recstat]),
-						mur_options.extr_fn_len[recstat], mur_options.extr_fn[recstat]);
+				   mur_options.extr_fn_len[recstat], mur_options.extr_fn[recstat]);
+#else
+		else if (mur_options.extr_fn[recstat])
+			gtm_putmsg(VARLSTCNT(6) ERR_FILENOTCREATE, 4, LEN_AND_STR(ext_file_type[recstat]),
+				   mur_options.extr_fn_len[recstat], mur_options.extr_fn[recstat]);
+#endif
 		if (0 != mur_options.extr_fn_len[recstat])
 		{
 			free(mur_options.extr_fn[recstat]);

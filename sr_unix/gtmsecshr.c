@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,6 @@
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_imagetype_init.h"
 #include "gtm_threadgbl_init.h"
-#include "fork_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -104,6 +103,7 @@ error_def(ERR_BADTAG);
 error_def(ERR_DBFILOPERR);
 error_def(ERR_DBNOTGDS);
 error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
 error_def(ERR_GTMSECSHR);
 error_def(ERR_GTMSECSHRCHDIRF);
@@ -132,18 +132,18 @@ error_def(ERR_STACKOFLOW);
 error_def(ERR_TEXT);
 
 /* Note that this condition handler is not really properly setup as a condition handler
-   in that it has none of the required condition handler macros in it. It's job is just
-   to perform shutdown logic when it is called. No further handlers are called hence
-   the streamlined nature.
-*/
+ * in that it has none of the required condition handler macros in it. It's job is just
+ * to perform shutdown logic when it is called. No further handlers are called hence
+ * the streamlined nature.
+ */
 CONDITION_HANDLER(gtmsecshr_cond_hndlr)
 {
 	gtmsecshr_exit(arg, DUMPABLE ? TRUE : FALSE);
 }
 
-/*	If there was a leftover socket, the client will append a lower case letter
-	which we take as a flag to delete all sockets for the current client pid
-*/
+/* If there was a leftover socket, the client will append a lower case letter
+ * which we take as a flag to delete all sockets for the current client pid
+ */
 void clean_client_sockets(char *path)
 {
 	char		last, suffix;
@@ -285,7 +285,7 @@ int main(void)
 		}
 		cancel_timer(timer_id);
 
-		/* Note :- The condition serv_fail should happen only when gtmsecshr does
+		/* Note: The condition serv_fail should happen only when gtmsecshr does
 		 * not have permission to service a request and should happen only when
 		 * the gtmsecshr is not installed set-uid to root.
 		 */
@@ -332,7 +332,7 @@ void gtmsecshr_init(void)
 				ERR_GTMSECSHRSSIDF, 0, save_errno);
 	}
 	gtmsecshr_open_log_file();
-	DO_FORK(pid);
+	pid = fork();	/* timers have not been initialized, no need to do FORK_CLEAN; BYPASSOK */
 	if (0 > pid)
 	{
 		save_errno = errno;
@@ -348,7 +348,8 @@ void gtmsecshr_init(void)
 	util_out_print("gtmsecshr started at !AD", TRUE, RTS_ERROR_STRING(time_ptr));
 	gtmsecshr_sig_init();
 	CLOSEFILE(0, rc);
-	for (file_des = (int)sysconf(_SC_OPEN_MAX)-1; file_des >= 3; file_des--)
+	file_des = sysconf(_SC_OPEN_MAX);
+	for (file_des = file_des - 1; file_des >= 3; file_des--)
 	{	/* Close the file only if we have it open. This is to avoid a CLOSEFAIL error in case of
 		 * trying to close an invalid file descriptor.
 		 */
@@ -512,7 +513,7 @@ int gtmsecshr_open_log_file (void)
 #	if defined(__MVS__)
 	if (-1 == Stat(gtmsecshr_logpath, &buf))
 		create_logfile = 1;
-#endif
+#	endif
 	if (0 > (gtmsecshr_log_file = OPEN3(gtmsecshr_logpath, O_RDWR|O_CREAT|O_APPEND, GTMSECSHR_PERMS)))
 	{
 		send_msg(VARLSTCNT(14) ERR_GTMSECSHRLOGF, 3, RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
@@ -531,7 +532,7 @@ int gtmsecshr_open_log_file (void)
 		if (-1 == gtm_zos_tag_to_policy(gtmsecshr_log_file, TAG_UNTAGGED, &realfiletag))
 			gtm_tag_error(gtmsecshr_logpath, realfiletag, TAG_UNTAGGED);
 	}
-#endif
+#	endif
 	assert(0 <= gtmsecshr_log_file);
 	if (-1 == dup2(gtmsecshr_log_file, 1))
 	{
@@ -599,7 +600,7 @@ void gtmsecshr_switch_log_file(int sig)
 		    && gtm_tag_error(gtmsecshr_logpath, realfiletag, TAG_EBCDIC))
 		|| ((!gtm_zos_autocvt_enabled()) && ((-1 == gtm_zos_tag_to_policy(gtmsecshr_log_file, TAG_UNTAGGED, &realfiletag))
  						 && gtm_tag_error(gtmsecshr_logpath, realfiletag, TAG_UNTAGGED)))
-#endif
+#	endif
 		|| (-1 == dup2(temp_fd, 1))
 		|| (-1 == dup2(temp_fd, 2)))
 	{
@@ -632,9 +633,10 @@ void gtmsecshr_signal_handler(int sig, siginfo_t *info, void *context)
 	/* Do standard signal handling */
 	(void)generic_signal_handler(sig, info, context);
 	/* Note that we are not letting process_signal run gtm_fork_n_core. In testing,
-	   bad things occurred when the root process ran into trouble trying to fork
-	   so our object is to avoid the problem entirely and core here if we need to
-	   and if the OS will do it (Linux seems not to core if root process). */
+	 * bad things occurred when the root process ran into trouble trying to fork
+	 * so our object is to avoid the problem entirely and core here if we need to
+	 * and if the OS will do it (Linux seems not to core if root process).
+	 */
 	gtmsecshr_exit(sig, need_core);
 }
 

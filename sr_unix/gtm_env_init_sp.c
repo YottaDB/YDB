@@ -15,6 +15,7 @@
 #include <env.h>
 #endif
 #include <errno.h>
+#include <sys/sem.h>
 #include "gtm_string.h"
 #include "gtm_strings.h"
 #include "gtm_ctype.h"
@@ -44,13 +45,14 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "replgbl.h"
+#include "gtm_semutils.h"
 
 #define	DEFAULT_NON_BLOCKED_WRITE_RETRIES	10	/* default number of retries */
 #ifdef __MVS__
-#  define PUTENV_BPXK_MDUMP_PREFIX "_BPXK_MDUMP="
+#  define PUTENV_BPXK_MDUMP_PREFIX 		"_BPXK_MDUMP="
 #endif
 
-#define DEFAULT_MUPIP_TRIGGER_ETRAP "IF $ZJOBEXAM()"
+#define DEFAULT_MUPIP_TRIGGER_ETRAP 		"IF $ZJOBEXAM()"
 
 GBLREF	int4			gtm_shmflags;			/* Shared memory flags for shmat() */
 GBLREF	uint4			gtm_principal_editing_defaults;	/* ext_cap flags if tt */
@@ -88,7 +90,7 @@ static readonly unsigned char editing_index[27] =
 void	gtm_env_init_sp(void)
 {	/* Unix only environment initializations */
 	mstr		val, trans;
-	int4		status, index, len;
+	int4		status, index, len, hrtbt_cntr_delta;
 	size_t		cwdlen;
 	boolean_t	ret, is_defined;
 	char		buf[MAX_TRANS_NAME_LEN], *token, cwd[GTM_PATH_MAX];
@@ -249,4 +251,14 @@ void	gtm_env_init_sp(void)
 		(TREF(replgbl)).jnl_release_timeout = 0;
 	else if (MAXPOSINT4 / MILLISECS_IN_SEC < (TREF(replgbl)).jnl_release_timeout) /* max value supported for timers */
 		(TREF(replgbl)).jnl_release_timeout = MAXPOSINT4 / MILLISECS_IN_SEC;
+	/* Initialize variable that controls the maximum time that a process should spend while waiting for semaphores in db_init */
+	val.addr = GTM_DB_STARTUP_MAX_WAIT;
+	val.len = SIZEOF(GTM_DB_STARTUP_MAX_WAIT) - 1;
+	hrtbt_cntr_delta = trans_numeric(&val, &is_defined, FALSE);
+	if (!is_defined)
+		TREF(dbinit_max_hrtbt_delta) = DEFAULT_DBINIT_MAX_HRTBT_DELTA;
+	else if ((INDEFINITE_WAIT_ON_EAGAIN != hrtbt_cntr_delta) && (NO_SEMWAIT_ON_EAGAIN != hrtbt_cntr_delta))
+		TREF(dbinit_max_hrtbt_delta) = (ROUND_UP2(hrtbt_cntr_delta, 8)) / 8;
+	else
+		TREF(dbinit_max_hrtbt_delta) = hrtbt_cntr_delta;
 }

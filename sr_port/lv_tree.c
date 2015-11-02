@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,8 @@
 #include "numcmp.h"
 #include "arit.h"
 #include "promodemo.h"	/* for "promote" & "demote" prototype */
+#include "gtmio.h"
+#include "have_crit.h"
 
 #define	LV_TREE_INIT_ALLOC	 	 4
 #define	LV_TREENODE_INIT_ALLOC		16

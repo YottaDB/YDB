@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,8 @@
 	 * as not needing checksum recomputation. To ensure the checksum is recomputed inside crit,	\
 	 * we note down a tn of 0 in case the block is locked for update (cr->in_tend is non-zero).	\
 	 */												\
-	assert((gds_t_acquired == cse->mode) || (gds_t_create == cse->mode));				\
+	assert((gds_t_acquired == cse->mode) || (gds_t_create == cse->mode)				\
+		|| (gds_t_recycled2free == cse->mode));							\
 	assert(cse->old_block == (sm_uc_ptr_t)(old_blk));						\
 	assert((bsize) <= csd->blk_size);								\
 	/* Since this macro is invoked only in case of before-image journaling and since MM does not	\

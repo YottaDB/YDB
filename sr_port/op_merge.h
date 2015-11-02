@@ -27,7 +27,7 @@ typedef merge_glvn_struct *merge_glvn_ptr;
 /* Function Prototypes */
 void 	op_merge(void);
 void 	op_merge_arg(int m_opr_type, lv_val *lvp);
-void 	merge_desc_check(void);
+boolean_t 	merge_desc_check(void); /* returns 1 if ok to merge, 0 if merge self, error if descendants */
 
 #define OP_MERGE_DEFINED
 #endif

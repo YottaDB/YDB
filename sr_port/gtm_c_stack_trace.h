@@ -93,13 +93,13 @@ error_def(ERR_TEXT);
 		SPRINTF(currpos, "%u %u %u", WAITINGPID, BLOCKINGPID, COUNT);					\
 		assert (STRLEN(command) < arr_len);								\
 		rs = SYSTEM((char *)command);									\
-		send_msg(VARLSTCNT(6) ERR_STUCKACT, 4, STRLEN("SUCCESS"), rs ? "FAILURE" : "SUCCESS",  		\
-			STRLEN(command), (char *)command);							\
 		if (0 != rs)											\
 		{												\
 			save_errno = errno;									\
+			send_msg(VARLSTCNT(6) ERR_STUCKACT, 4, LEN_AND_LIT("FAILURE"), LEN_AND_STR(command));	\
 			send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("system"), CALLFROM, save_errno);	\
-		}												\
+		} else												\
+			send_msg(VARLSTCNT(6) ERR_STUCKACT, 4, LEN_AND_LIT("SUCCESS"), LEN_AND_STR(command));	\
 		free((void *)command);										\
 	}													\
 }

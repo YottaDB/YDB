@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,6 +74,10 @@
 #include "memcoherency.h"
 #include "gtm_c_stack_trace.h"
 
+#ifdef GTM_TRUNCATE
+#include "recover_truncate.h"
+#endif
+
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF 	sgmnt_data_ptr_t 	cs_data;
@@ -85,14 +89,15 @@ GBLREF  inctn_opcode_t          inctn_opcode;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	enum gtmImageTypes	image_type;
-GBLREF	boolean_t		mu_rndwn_file_dbjnl_flush;
 GBLREF	uint4			gtmDebugLevel;
 GBLREF	unsigned int		cr_array_index;
 GBLREF	uint4			dollar_tlevel;
-GBLREF volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
+GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
+GBLREF	boolean_t		is_src_server;
 #ifdef DEBUG
 GBLREF	unsigned int		t_tries;
 GBLREF	int			process_exiting;
+GBLREF	boolean_t		in_mu_rndwn_file;
 #endif
 
 error_def(ERR_BUFRDTIMEOUT);
@@ -135,18 +140,29 @@ void wcs_recover(gd_region *reg)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	/* If this is the source server, do not invoke cache recovery as that implies touching the database file header
+	 * (incrementing the curr_tn etc.) and touching the journal file (writing INCTN records) both of which are better
+	 * avoided by the source server; It is best to keep it as read-only to the db/jnl as possible.  It is ok to do
+	 * so because the source server anyways does not rely on the integrity of the database cache and so does not need
+	 * to fix it right away. Any other process that does rely on the cache integrity will fix it when it gets crit next.
+	 */
+	if (is_src_server)
+		return;
 	save_reg = gv_cur_region;	/* protect against [at least] M LOCK code which doesn't maintain cs_addrs and cs_data */
 	TP_CHANGE_REG(reg);		/* which are needed by called routines such as wcs_wtstart and wcs_mm_recover */
 	if (dba_mm == reg->dyn.addr->acc_meth)	 /* MM uses wcs_recover to remap the database in case of a file extension */
 	{
 		wcs_mm_recover(reg);
 		TP_CHANGE_REG(save_reg);
+		TREF(wcs_recover_done) = TRUE;
 		return;
 	}
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
 	si = csa->sgm_info_ptr;
+	/* If a mupip truncate operation was abruptly interrupted we have to correct any inconsistencies */
+	GTM_TRUNCATE_ONLY(recover_truncate(csa, csd, gv_cur_region);)
 	/* We are going to UNPIN (reset in_cw_set to 0) ALL cache-records so assert that we are not in the middle of a
 	 * non-TP or TP transaction that has already PINNED a few buffers as otherwise we will create an out-of-design state.
 	 * The only exception is if we are in the 2nd phase of KILL in a TP transaction. In this case si->cr_aray_index
@@ -168,11 +184,11 @@ void wcs_recover(gd_region *reg)
 	/* if the wait loop above hits the limit, or cnl->intent_wtstart goes negative, it is ok to proceed since
 	 * wcs_verify (invoked below) reports and clears cnl->intent_wtstart and cnl->in_wtstart.
 	 */
+	assert(!TREF(donot_write_inctn_in_wcs_recover) || in_mu_rndwn_file UNIX_ONLY(|| jgbl.onlnrlbk));
+	assert(!in_mu_rndwn_file || (0 == cnl->wcs_phase2_commit_pidcnt));
 	assert(!csa->wcs_pidcnt_incremented); /* we should never have come here with a phase2 commit pending for ourself */
-	/* Wait for any pending phase2 commits to finish.
-	 * In case of mupip rundown, we know no one else is accessing shared memory so no point waiting.
-	 */
-	if (!mu_rndwn_file_dbjnl_flush && cnl->wcs_phase2_commit_pidcnt)
+	/* Wait for any pending phase2 commits to finish */
+	if (cnl->wcs_phase2_commit_pidcnt)
 	{
 		wcs_phase2_commit_wait(csa, NULL); /* not checking return value since even if it fails we want to do recovery */
 		/* At this point we expect cnl->wcs_phase2_commit_pidcnt to be 0. But it is possible in case of crash tests that
@@ -194,11 +210,11 @@ void wcs_recover(gd_region *reg)
 	 * is equivalent to being in the midst of a database commit and therefore defer exit handling in case of a MUPIP STOP.
 	 * wc_blocked is anyways set to TRUE at this point so the next process to grab crit will anyways attempt another recovery.
 	 */
-	if (!mu_rndwn_file_dbjnl_flush)
+	if (!TREF(donot_write_inctn_in_wcs_recover))
 		csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
 	assert(!in_wcs_recover);	/* should not be called if we are already in "wcs_recover" for another region */
 	in_wcs_recover = TRUE;	/* used by bt_put() called below */
-	bt_refresh(csa);	/* this resets all bt->cache_index links to CR_NOTVALID */
+	bt_refresh(csa, TRUE);	/* this resets all bt->cache_index links to CR_NOTVALID */
 	/* the following queue head initializations depend on the wc_blocked mechanism for protection from wcs_wtstart */
 	wip_head = &csa->acc_meth.bg.cache_state->cacheq_wip;
 	memset(wip_head, 0, SIZEOF(cache_que_head));
@@ -308,7 +324,7 @@ void wcs_recover(gd_region *reg)
 	 * to one less than the final db tn. This is done by decrementing the database current transaction number at the
 	 * start of the recovery and incrementing it at the end. To keep early_tn and curr_tn in sync, decrement early_tn as well.
 	 */
-	if (!mu_rndwn_file_dbjnl_flush && mupip_jnl_recover && !JNL_ENABLED(csd))
+	if (!TREF(donot_write_inctn_in_wcs_recover) && mupip_jnl_recover && !JNL_ENABLED(csd))
 	{
 		csd->trans_hist.curr_tn--;
 		csd->trans_hist.early_tn--;
@@ -746,7 +762,7 @@ void wcs_recover(gd_region *reg)
 	 * if called from mu_rndwn_file(), we have standalone access to shared memory so no need to increment db curr_tn
 	 * or write inctn (since no concurrent GT.M process is present in order to restart because of this curr_tn change)
 	 */
-	if (!mu_rndwn_file_dbjnl_flush)
+	if (!TREF(donot_write_inctn_in_wcs_recover))
 	{
 		jpc = csa->jnl;
 		if (JNL_ENABLED(csd) && (NULL != jpc) && (NULL != jpc->jnl_buff))
@@ -791,6 +807,7 @@ void wcs_recover(gd_region *reg)
 	if (backup_block_saved)
 		backup_buffer_flush(reg);
 	TP_CHANGE_REG(save_reg);
+	TREF(wcs_recover_done) = TRUE;
 	return;
 }
 
@@ -859,7 +876,7 @@ void	wcs_mm_recover(gd_region *reg)
 }
 #endif
 #elif defined(VMS)
-
+/* wcs_mm_recover is not yet implemented on VMS */
 void	wcs_mm_recover(gd_region *reg)
 {
 	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];
@@ -867,9 +884,8 @@ void	wcs_mm_recover(gd_region *reg)
 	assert(&FILE_INFO(reg)->s_addrs == cs_addrs);
 	assert(cs_addrs->now_crit);
 	assert(cs_addrs->hdr == cs_data);
-	assert(!cs_addrs->hold_onto_crit);
-	/* but it isn't yet implemented on VMS */
-	rel_crit(gv_cur_region);
+	if (!cs_addrs->hold_onto_crit)
+		rel_crit(gv_cur_region);
 	if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 		end = &buff[MAX_ZWR_KEY_SZ - 1];
 	rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);

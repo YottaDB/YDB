@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,8 @@
 #include "trans_log_name.h"
 #include "hashtab_mname.h"
 #include "hashtab.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 /* TEMPORARY CONSTANT - minimum value of the database RC_RESERVED field */
 #define RC_RESERVED	128

@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -20,6 +20,7 @@ endif
 
 echo ""
 
+set runall_status = 0
 set listonly = 0
 set compileonly = 0
 set linkonly = 0
@@ -175,6 +176,7 @@ if ($?RUNALL_BYPASS_VERSION_CHECK == 0) then
 		echo "RUNALL-E-WRONGVERSION : Cannot Runall a Non-Developemental Version  ---->   $gtm_verno"
 		echo "-----------------------------------------------------------------------------------"
 		echo ""
+		@ runall_status = 1	# to signal that the runall failed to do its job
 		goto cleanup
 	endif
 endif
@@ -246,9 +248,10 @@ touch ${TMP_DIR}_src_files
 # Note shortened variable to RUNALL_BYPASS_GEN_THREADGBL due to failure on Tru64 (too long var name).
 if ($?RUNALL_BYPASS_GEN_THREADGBL == 0) then
 	tcsh $gtm_tools/gen_gtm_threadgbl_deftypes.csh
-	if (0 != $status) then
-	    echo "Failed to build gtm_threadgbl_deftypes.h - aborting build"
-	    exit 1
+	if (0 != $status) @ runall_status = $status
+	if (0 != $runall_status) then
+		echo "Failed to build gtm_threadgbl_deftypes.h - aborting build"
+		exit $runall_status
 	endif
 endif
 
@@ -296,6 +299,7 @@ else
 		echo ""
 		echo "Unable to find the last modified executable in $gtm_exe. ....... Exiting"
 		echo ""
+		@ runall_status = 1	# to signal that the runall failed to do its job
 		goto cleanup
 	endif
 endif
@@ -386,8 +390,9 @@ if (!(-z ${TMP_DIR}_src_files)) then
 	mv ${TMP_DIR}_src_files_sorted ${TMP_DIR}_src_files
 else if (-z ${TMP_DIR}_pct_files) then
 	echo ""
-	echo " -- Error: Nothing to Compile ............ Exiting"
+	echo " -- Nothing to Compile ............ Exiting"
 	echo ""
+	@ runall_status = 0	# runall's job is done even though there is nothing to compile
 	goto cleanup
 endif
 
@@ -411,6 +416,7 @@ if ($listonly) then
 	echo ""
 	cat ${TMP_DIR}_pct_files
 	echo ""
+	@ runall_status = 0
 	goto cleanup
 endif
 
@@ -457,21 +463,26 @@ if (! -z ${TMP_DIR}_src_files) then
 			if ($ext == "s") then
 				echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
 				if ( "ia64" == $mach_type && "linux" == $platform_name ) then
-				    # assembler differences in HPUX on Linux. Send preprocessed assembly file on Linux.
-				    set lfile = `basename ${file}`
-				    set lfile = $lfile:r
-				    gt_cpp -E ${gtm_src}/${file}.s > ${gtm_src}/${lfile}_cpp.s
-				    runall_as ${gtm_src}/${lfile}_cpp.s  -o ${lfile}.o
-				    \rm ${gtm_src}/${lfile}_cpp.s
+					# assembler differences in HPUX on Linux. Send preprocessed assembly file on Linux.
+					set lfile = `basename ${file}`
+					set lfile = $lfile:r
+					gt_cpp -E ${gtm_src}/${file}.s > ${gtm_src}/${lfile}_cpp.s
+					if (0 != $status) @ runall_status = $status
+					runall_as ${gtm_src}/${lfile}_cpp.s  -o ${lfile}.o
+					if (0 != $status) @ runall_status = $status
+					\rm -f ${gtm_src}/${lfile}_cpp.s
 				else if ( "os390" == $platform_name ) then
 					runall_as $gtm_src/${file}.s
+					if (0 != $status) @ runall_status = $status
 					if ( -e $gtm_obj/${file}.dbg )  chmod ugo+r $gtm_obj/${file}.dbg
 				else
-				    runall_as $gtm_src/${file}.s
+				 	runall_as $gtm_src/${file}.s
+					if (0 != $status) @ runall_status = $status
 				endif
 			else if ($ext == "c") then
 				echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
 				runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/$file.c
+				if (0 != $status) @ runall_status = $status
 				if ($file == "omi_srvc_xct") then
 					chmod a+w $gtm_src/omi_sx_play.c
 					\cp $gtm_src/omi_srvc_xct.c $gtm_src/omi_sx_play.c
@@ -480,6 +491,7 @@ if (! -z ${TMP_DIR}_src_files) then
 					# remove pre-existing object
 					rm -f $gtm_obj/omi_sx_play.o
 					runall_cc -DFILE_TCP $RUNALL_EXTRA_CC_FLAGS $gtm_src/omi_sx_play.c
+					if (0 != $status) @ runall_status = $status
 				endif
 			else if ($ext == "msg") then
 				echo "$gtm_src/$file.$ext   ---->  $gtm_obj/${file}_ctl.c  ---->  $gtm_obj/${file}_ctl.o"
@@ -489,6 +501,7 @@ if (! -z ${TMP_DIR}_src_files) then
 				setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
 				setenv gtmroutines "$gtm_obj($gtm_pct)"
 				$gtm_root/$gtm_curpro/pro/mumps -run msg $gtm_src/$file.msg Unix
+				if (0 != $status) @ runall_status = $status
 				setenv gtm_dist "$real_gtm_dist"
 				unset real_gtm_dist
 				mv ${file}_ctl.c $gtm_src/${file}_ctl.c
@@ -496,10 +509,8 @@ if (! -z ${TMP_DIR}_src_files) then
 					mv -f ${file}_ansi.h $gtm_inc
 				endif
 				runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/${file}_ctl.c
+				if (0 != $status) @ runall_status = $status
 				set objfile = ${file}_ctl.o
-			endif
-			if ($status == 1) then
-				goto cleanup
 			endif
 		endif
 		set library=`grep "^$file " ${TMP_DIR}_exclude`
@@ -524,7 +535,7 @@ if (! -z ${TMP_DIR}_src_files) then
 		endif
 	end   # foreach
 
-	if ($compileonly) then
+	if ($compileonly || (0 != $runall_status)) then
 		goto cleanup
 	endif
 
@@ -553,13 +564,12 @@ if (! -z ${TMP_DIR}_src_files) then
 		gt_ar $gt_ar_option_delete $dstlib `cat $lib_` >& /dev/null
 		echo "-->  into $dstlib <--"
 		gt_ar $gt_ar_option_update $dstlib `cat $lib_`
+		if (0 != $status) @ runall_status = $status
 		if (("ia64" == $mach_type) && ("hpux" == $platform_name)) then
 			ranlib $dstlib
+			if (0 != $status) @ runall_status = $status
 		endif
-		if ($status) then
-			if ($?RUNALL_DEBUG != 0) env
-			goto cleanup
-		endif
+		if (0 != $status) @ runall_status = $status
 		if (("" != "$retainlist") && ("libgtmrpc.a" == $library)) then
 			rm -f `cat $lib_ | egrep -v -f $gtm_tools/retain_list.txt`
 		else
@@ -567,6 +577,10 @@ if (! -z ${TMP_DIR}_src_files) then
 		endif
 		echo ""
 	end
+	if (0 != $runall_status) then
+		goto cleanup
+	endif
+
 	echo ""
 
 	echo "----------------------------------------------------------"
@@ -586,6 +600,7 @@ endif # if (! -z ${TMP_DIR}_src_files) then
 # if either libmumps.a or a platform specific support library changes rebuild everything
 if ("$mumps_changed" != "" || "$gtmplatformlib_changed" != "") then
 	$shell $gtm_tools/build${RUNALL_IMAGE}.csh $RUNALL_VERSION
+	if (0 != $status) @ runall_status = $status
 else
 	# If the plugin files are modified, include them in the final list of build routines.
 	if ("TRUE" == "$exclude_compile_list_modified") then
@@ -600,6 +615,7 @@ else
 	endif
 	set build_routine = `cat ${TMP_DIR}_build_routine.final`
 	$shell $gtm_tools/buildaux.csh $RUNALL_VERSION $RUNALL_IMAGE $gtm_root/$RUNALL_VERSION/$RUNALL_IMAGE $build_routine
+	if (0 != $status) @ runall_status = $status
 endif
 
 echo ""
@@ -617,6 +633,7 @@ endif
 # Generate Special Debug Files (z/OS specific at the moment)
 if ( -e $gtm_tools/gtm_dbgld.csh ) then
 	$gtm_tools/gtm_dbgld.csh $RUNALL_IMAGE
+	if (0 != $status) @ runall_status = $status
 endif
 
 cleanup:
@@ -635,3 +652,4 @@ echo -n "   --  "
 date
 echo ""
 
+exit $runall_status

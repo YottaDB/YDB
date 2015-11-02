@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,9 @@
 #include "op.h"
 #include "mvalconv.h"
 #include "is_proc_alive.h"
+#include "eintr_wrappers.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 #define MAX_KEY 16
 #define MAX_STR 16
@@ -30,6 +33,8 @@ GBLREF spdesc 	stringpool ;
 typedef char	keyword[MAX_KEY] ;
 
 #define	MAX_KEY_LEN	20	/* maximum length across all keywords in the key[] array below */
+
+error_def	(ERR_BADJPIPARAM);
 
 static keyword	key[]= {
 	"CPUTIM",
@@ -53,9 +58,8 @@ enum 	kwind {
 
 void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 {
-	error_def	(ERR_BADJPIPARAM);
 	struct tms	proc_times;
-	int4		info ;
+	int4		info, sc_clk_tck;
 	int		keywd_indx;
 	char		upcase[MAX_KEY_LEN];
 
@@ -117,6 +121,9 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 			return;
 	}
 	if (kw_isprocalive != keywd_indx)
-		info = (int4)((info * 100) / sysconf(_SC_CLK_TCK));	/* Convert to standard 100 ticks per second */
+	{
+		SYSCONF(_SC_CLK_TCK, sc_clk_tck);
+		info = (int4)((info * 100) / sc_clk_tck);	/* Convert to standard 100 ticks per second */
+	}
 	i2mval(ret, info);
 }

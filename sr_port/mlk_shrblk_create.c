@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +9,7 @@
  *								*
  ****************************************************************/
 
+#include <stddef.h>
 #include "mdef.h"
 
 #include "gtm_string.h"
@@ -30,18 +31,7 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	ptroff_t		n;
 
 	ctl = p->ctlptr;
-
-	/* I *believe* the purpose of this test is to tell if some other process has stolen the space available
-	   and made it impossible for us to fit all of our subscripts into shrsubs. I have added the "3" to the
-	   size of the shrsub since this is the maximum rounding that would be added for word alignment. It is
-	   not exact and could potentially refuse a lock that would fail were the value exact but if a user is
-	   running that close to the edge, they should be increasing their lock space or using fewer locks anyway.
-	   (see 7/97).
-        */
-	n = (ptroff_t)(nshrs * (3 + SIZEOF(mlk_shrsub) - 1) + (p->total_length - (val - p->value)));
-	if (ctl->subtop - ctl->subfree < n || ctl->blkcnt < nshrs)
-		return 0;
-
+	assert((ctl->subtop - ctl->subfree) >= (MLK_PVTBLK_SHRSUB_SIZE(p, nshrs) - (val - p->value)) && ctl->blkcnt >= nshrs);
 	ret = (mlk_shrblk_ptr_t)R2A(ctl->blkfree);
 	ctl->blkcnt--;
 	if (ret->rsib == 0)
@@ -56,7 +46,7 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 		A2R(ret->parent, par);
 	if (ptr)
 		A2R(*ptr, ret);
-	n = (ptroff_t)ROUND_UP(SIZEOF(mlk_shrsub) - 1 + len, SIZEOF(ptroff_t));
+	n = (ptroff_t)ROUND_UP(OFFSETOF(mlk_shrsub, data[0]) + len, SIZEOF(ptroff_t));
 	if (ctl->subtop - ctl->subfree < n)
 		GTMASSERT;
 	subptr = (mlk_shrsub_ptr_t)R2A(ctl->subfree);

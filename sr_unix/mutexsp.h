@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -113,11 +113,11 @@ void mutex_per_process_init(void);
 #endif
 
 #ifdef MUTEX_DEBUG
-#define MUTEX_DPRINT1(p)		{FPRINTF(stderr, p); fflush(stderr);}
-#define MUTEX_DPRINT2(p, q)		{FPRINTF(stderr, p, q); fflush(stderr);}
-#define MUTEX_DPRINT3(p, q, r)		{FPRINTF(stderr, p, q, r); fflush(stderr);}
-#define MUTEX_DPRINT4(p, q, r, s)	{FPRINTF(stderr, p, q, r, s); fflush(stderr);}
-#define MUTEX_DPRINT5(p, q, r, s,t) 	{FPRINTF(stderr, p, q, r, s, t); fflush(stderr);}
+#define MUTEX_DPRINT1(p)		{FPRINTF(stderr, p); FFLUSH(stderr);}
+#define MUTEX_DPRINT2(p, q)		{FPRINTF(stderr, p, q); FFLUSH(stderr);}
+#define MUTEX_DPRINT3(p, q, r)		{FPRINTF(stderr, p, q, r); FFLUSH(stderr);}
+#define MUTEX_DPRINT4(p, q, r, s)	{FPRINTF(stderr, p, q, r, s); FFLUSH(stderr);}
+#define MUTEX_DPRINT5(p, q, r, s,t) 	{FPRINTF(stderr, p, q, r, s, t); FFLUSH(stderr);}
 #else
 #define MUTEX_DPRINT1(p)
 #define MUTEX_DPRINT2(p, q)
@@ -203,16 +203,16 @@ if (!mutex_trc_dump_done) \
 					if ((y) && !mutex_test_signalled)    \
 					{ 				     \
 						FPRINTF(stderr, x);          \
-						fflush(stderr); 	     \
+						FFLUSH(stderr); 	     \
 						mutex_test_signalled = TRUE; \
 						exi_rundown(SIGQUIT);	change this before use     \
 					} 				     \
 					else ;
-#define MUTEX_TEST_PRINT1(p)		{FPRINTF(stderr, p); fflush(stderr);}
-#define MUTEX_TEST_PRINT2(p, q)		{FPRINTF(stderr, p, q); fflush(stderr);}
-#define MUTEX_TEST_PRINT3(p, q, r)	{FPRINTF(stderr, p, q, r); fflush(stderr);}
-#define MUTEX_TEST_PRINT4(p, q, r, s)	{FPRINTF(stderr, p, q, r, s); fflush(stderr);}
-#define MUTEX_TEST_PRINT5(p, q, r, s,t) {FPRINTF(stderr, p, q, r, s, t); fflush(stderr);}
+#define MUTEX_TEST_PRINT1(p)		{FPRINTF(stderr, p); FFLUSH(stderr);}
+#define MUTEX_TEST_PRINT2(p, q)		{FPRINTF(stderr, p, q); FFLUSH(stderr);}
+#define MUTEX_TEST_PRINT3(p, q, r)	{FPRINTF(stderr, p, q, r); FFLUSH(stderr);}
+#define MUTEX_TEST_PRINT4(p, q, r, s)	{FPRINTF(stderr, p, q, r, s); FFLUSH(stderr);}
+#define MUTEX_TEST_PRINT5(p, q, r, s,t) {FPRINTF(stderr, p, q, r, s, t); FFLUSH(stderr);}
 
 #else
 

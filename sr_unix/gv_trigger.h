@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,10 @@
 #define GV_TRIGGER_H_INCLUDED
 
 #include "gv_trigger_common.h"	/* ^#t related macros (common to both Unix and VMS) */
+
+error_def(ERR_GVIS);
+error_def(ERR_GVZTRIGFAIL);
+error_def(ERR_TRIGREPLSTATE);
 
 #define	HASHT_OPT_ISOLATION	"I"
 #define	HASHT_OPT_NOISOLATION	"NOI"
@@ -43,7 +47,6 @@ typedef enum
 					 * Both the index and the property name are guaranteed to be less than 20
 					 * and hence MAX_TRIG_UTIL_LEN set to 40 should be enough
 					 */
-
 /* Miscellaneous structures needed to build the global variable trigger superstructures : gv_trigger_t and gvt_trigger_t */
 typedef struct gvtr_subs_star_struct
 {
@@ -158,7 +161,6 @@ typedef struct gvtr_invoke_parms_struct
 {
 	gvt_trigger_t	*gvt_trigger;	/* Input parameter */
 	gvtr_cmd_type_t	gvtr_cmd;	/* Input parameter */
-	boolean_t	duplicate_set;	/* Input parameter */
 	int		num_triggers_invoked;	/* Output parameter : # of triggers invoked by an update */
 } gvtr_invoke_parms_t;
 
@@ -186,8 +188,6 @@ typedef struct gvtr_invoke_parms_struct
 	LITREF	mval			literal_batch;										\
 	uint4				cycle;											\
 	boolean_t			set_upd_trans_t_err, cycle_mismatch, db_trigger_cycle_mismatch, ztrig_cycle_mismatch;	\
-																\
-	error_def(ERR_GVZTRIGFAIL);												\
 																\
 	assert(TPRESTART_STATE_NORMAL == tprestart_state);									\
 	assert(!skip_dbtriggers);												\
@@ -240,7 +240,7 @@ typedef struct gvtr_invoke_parms_struct
 			assert((tp_pointer->fp == frame_pointer) && (MVST_TPHOLD == mv_chain->mv_st_type)			\
 				&& (msp == (unsigned char *)mv_chain));								\
 			IS_TPWRAP = TRUE;											\
-			assert(CSA->sgm_info_ptr->fresh_start && !CSA->sgm_info_ptr->update_trans);				\
+			assert(!CSA->sgm_info_ptr->tp_set_sgm_done && !CSA->sgm_info_ptr->update_trans);			\
 			tp_set_sgm();												\
 			/* tp_set_sgm above will update CSA->db_trigger_cycle (from CSD->db_trigger_cycle). Set local variable 	\
 			 * cycle to match CSA->db_trigger_cycle so as to pass the updated value to gvtr_init. 			\
@@ -353,7 +353,7 @@ typedef struct gvtr_invoke_parms_struct
 	SAVE_MV_CHAIN = mv_chain;										\
 	PUSH_MV_STENT(MVST_MVAL);	/* protect $ztoldval from stp_gcol */					\
 	ZTOLD_MVAL = &mv_chain->mv_st_cont.mvs_mval;								\
-	ZTOLD_MVAL->mvtype = 0;	/* make sure mval is setup enough to protect stp_gcol (if invoked below) from	\
+	ZTOLD_MVAL->mvtype = 0;	/* make sure mval is setup enough to protect stp_gcol, if invoked below, from	\
 				 * incorrectly reading its contents until it is fully initialized later. */	\
 }
 
@@ -428,17 +428,15 @@ typedef struct gvtr_invoke_parms_struct
 	key += HASHT_GBLNAME_FULL_LEN;											\
 	*key++ = '\0';		/* double '\0' for terminating key */							\
 	gv_currkey->end = HASHT_GBLNAME_FULL_LEN;									\
-	if (0 == gv_target->root)											\
-	{	/* Determine root block of ^#t global in this database file. Need to use gvcst_root_search.		\
-		 * It expects gv_currkey, gv_target, gv_cur_region, cs_addrs & cs_data to be set up appropriately.	\
-		 * gv_currkey & gv_target are already set up. The remaining should be set up which is asserted below.	\
-		 */													\
-		assert(&FILE_INFO(gv_cur_region)->s_addrs == csa);							\
-		assert(cs_addrs == csa);										\
-		assert(cs_data == csa->hdr);										\
-		/* Do the actual search for ^#t global in the directory tree */						\
-		gvcst_root_search();											\
-	}														\
+	/* Determine root block of ^#t global in this database file. Need to use gvcst_root_search for this.		\
+	 * It expects gv_currkey, gv_target, gv_cur_region, cs_addrs & cs_data to be set up appropriately.		\
+	 * gv_currkey & gv_target are already set up. The remaining should be set up which is asserted below.		\
+	 */														\
+	assert(&FILE_INFO(gv_cur_region)->s_addrs == csa);								\
+	assert(cs_addrs == csa);											\
+	assert(cs_data == csa->hdr);											\
+	/* Do the actual search for ^#t global in the directory tree */							\
+	GVCST_ROOT_SEARCH;												\
 }
 
 #define	SWITCH_TO_DEFAULT_REGION			\
@@ -461,32 +459,41 @@ typedef struct gvtr_invoke_parms_struct
 		tp_set_sgm();				\
 }
 
+GBLREF	uint4		dollar_tlevel;
+GBLREF	int4		gtm_trigger_depth;
+GBLREF	int4		tstart_trigger_depth;
+
+/* This macro returns if the current update is an EXPLICIT update or not. Any update done as part of a
+ * trigger invocation is not considered an explicit update. Note that it is possible to do a TROLLBACK
+ * while inside trigger code. In this case, any updates done after the trollback while still inside the
+ * trigger code are considered explicit updates. Hence the seemingly complicated check below.
+ * There is a version without the asserts for use ONLY WITH the IS_OK_TO_INVOKE_GVCST_KILL macro where nested
+ * asserts dont work well with the C preprocessor.
+ */
+#define	IS_EXPLICIT_UPDATE	(DBG_ASSERT(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth))	\
+					IS_EXPLICIT_UPDATE_NOASSERT)
+
+#define	IS_EXPLICIT_UPDATE_NOASSERT	(!dollar_tlevel || (tstart_trigger_depth == gtm_trigger_depth))
+
 /* Check if update is inside trigger (implicit update) and to a replicated database. If so check that
  * corresponding triggering update (explicit update) also occurred in a replicated database. If not this
  * is an out-of-design situation as the replicating secondary will see no journal records for this TP
  * transaction (since the triggering update did not get replicated) and so cannot keep the secondary
  * in sync with the primary. In this case, issue an error.
  */
-#define	TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(REG, CSA)									\
-{																\
-	GBLREF	boolean_t	explicit_update_repl_state;									\
-	GBLREF	gv_key		*gv_currkey;											\
-	GBLREF	uint4		dollar_tlevel;											\
-	GBLREF	int4		gtm_trigger_depth;										\
-	GBLREF	int4		tstart_trigger_depth;										\
-																\
-	error_def(ERR_TRIGREPLSTATE);												\
-	error_def(ERR_GVIS);													\
-																\
-	assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));							\
-	if (dollar_tlevel && (gtm_trigger_depth > tstart_trigger_depth)	&& !explicit_update_repl_state && REPL_ALLOWED(CSA))	\
-	{															\
-		unsigned char	buff[MAX_ZWR_KEY_SZ], *end;									\
-																\
-		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))					\
-			end = &buff[MAX_ZWR_KEY_SZ - 1];									\
-		rts_error(VARLSTCNT(8) ERR_TRIGREPLSTATE, 2, DB_LEN_STR(REG), ERR_GVIS, 2, end - buff, buff);			\
-	}															\
+#define	TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(REG, CSA)							\
+{														\
+	GBLREF	boolean_t	explicit_update_repl_state;							\
+	GBLREF	gv_key		*gv_currkey;									\
+														\
+	if (!IS_EXPLICIT_UPDATE && !explicit_update_repl_state && REPL_ALLOWED(CSA))				\
+	{													\
+		unsigned char	buff[MAX_ZWR_KEY_SZ], *end;							\
+														\
+		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))			\
+			end = &buff[MAX_ZWR_KEY_SZ - 1];							\
+		rts_error(VARLSTCNT(8) ERR_TRIGREPLSTATE, 2, DB_LEN_STR(REG), ERR_GVIS, 2, end - buff, buff);	\
+	}													\
 }
 
 #define	TRIG_PROCESS_JNL_STR_NODEFLAGS(NODEFLAGS)			\

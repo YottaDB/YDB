@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,32 +16,33 @@
 #include "toktyp.h"
 #include "cmd.h"
 
-GBLREF char	window_token;
-
 int m_zattach(void)
 {
 	oprtype	x;
 	triple	*triptr;
+	DCL_THREADGBL_ACCESS;
 
-	if (window_token == TK_EOL || window_token == TK_SPACE)
+	SETUP_THREADGBL_ACCESS;
+	if ((TK_EOL == TREF(window_token)) || (TK_SPACE == TREF(window_token)))
 	{
 		triptr = newtriple(OC_ZATTACH);
 		triptr->operand[0] = put_str("",0);
 		return TRUE;
 	}
 	else
-	switch (strexpr(&x))
 	{
-	case EXPR_FAIL:
-		return FALSE;
-	case EXPR_GOOD:
-		triptr = newtriple(OC_ZATTACH);
-		triptr->operand[0] = x;
-		return TRUE;
-	case EXPR_INDR:
-		make_commarg(&x,indir_zattach);
-		return TRUE;
+		switch (expr(&x, MUMPS_STR))
+		{
+		case EXPR_FAIL:
+			return FALSE;
+		case EXPR_GOOD:
+			triptr = newtriple(OC_ZATTACH);
+			triptr->operand[0] = x;
+			return TRUE;
+		case EXPR_INDR:
+			make_commarg(&x,indir_zattach);
+			return TRUE;
+		}
 	}
-
 	return FALSE; /* This should never get executed, added to make compiler happy */
 }

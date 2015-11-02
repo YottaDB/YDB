@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,60 +30,54 @@ UNIX_ONLY(GBLDEF) VMS_ONLY(LITDEF) int (*indir_fcn[])() = {
 #include "indir.h"
 };
 
-GBLREF char			window_token;
 GBLREF stack_frame		*frame_pointer;
 GBLREF unsigned short 		proc_act_type;
 
+error_def	(ERR_INDEXTRACHARS);
+
 void	op_commarg(mval *v, unsigned char argcode)
 {
-	bool		rval;
-	mstr		*obj, object;
+	int		rval;
 	icode_str	indir_src;
-	error_def	(ERR_INDEXTRACHARS);
+	mstr		*obj, object;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(v);
-	assert(argcode >=3 && argcode < SIZEOF(indir_fcn) / SIZEOF(indir_fcn[0]));
+	assert((3 <= argcode) && (SIZEOF(indir_fcn) / SIZEOF(indir_fcn[0]) > argcode));
 	indir_src.str = v->str;
 	indir_src.code = argcode;
-	if (NULL == (obj = cache_get(&indir_src)))
+	if (NULL == (obj = cache_get(&indir_src)))	/* NOTE assignment */
 	{
+		obj = &object;
 		if (((indir_do == argcode) || (indir_goto == argcode)) &&
-		    (frame_pointer->type & SFT_COUNT) && v->str.len && (v->str.len < MAX_MIDENT_LEN) &&
+		    (frame_pointer->type & SFT_COUNT) && v->str.len && (MAX_MIDENT_LEN > v->str.len) &&
 		    !proc_act_type && do_indir_do(v, argcode))
-		{
 			return;
-		}
 		comp_init(&v->str);
 		for (;;)
 		{
-			if (!(rval = (*indir_fcn[argcode])()))
+			if (EXPR_FAIL == (rval = (*indir_fcn[argcode])()))	/* NOTE assignment */
 				break;
-			if (TK_EOL == window_token)
+			if (TK_EOL == TREF(window_token))
 				break;
-			if (TK_COMMA == window_token)
+			if (TK_COMMA == TREF(window_token))
 				advancewindow();
 			else
 			{	/* Allow trailing spaces/comments that we will ignore */
-				while (TK_SPACE == window_token)
+				while (TK_SPACE == TREF(window_token))
 					advancewindow();
-				if (TK_EOL == window_token)
+				if (TK_EOL == TREF(window_token))
 					break;
 				rts_error(VARLSTCNT(1) ERR_INDEXTRACHARS);
 			}
 		}
-		if (comp_fini(rval, &object, OC_RET, 0, v->str.len))
-		{
-			indir_src.str.addr = v->str.addr;	/* we reassign because v->str.addr
-								might have been changed by stp_gcol() */
-			cache_put(&indir_src, &object);
-			comp_indr(&object);
-			if (indir_linetail == argcode)
-				frame_pointer->type = SFT_COUNT;
-		}
-	} else
-	{
-		comp_indr(obj);
-		if (indir_linetail == argcode)
-			frame_pointer->type = SFT_COUNT;
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, 0, v->str.len))
+			return;
+		indir_src.str.addr = v->str.addr;	/* reassign because stp_gcol might have changed v->str.addr */
+		cache_put(&indir_src, obj);
 	}
+	comp_indr(obj);
+	if (indir_linetail == argcode)
+		frame_pointer->type = SFT_COUNT;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,7 @@
 #include "jnl.h"
 #include "gt_timer.h"		/* for TID definition */
 #include "timers.h"		/* for TIM_DEFER_DBSYNC #define */
+#include "have_crit.h"
 #include "wcs_clean_dbsync.h"
 
 GBLREF	uint4			process_id;
@@ -39,7 +40,8 @@ void	wcs_clean_dbsync_timer(sgmnt_addrs *csa)
 	 * its wcs_wtstart). But this is considered infrequent enough to be better than skipping writing an
 	 * epoch due to incorrect cnl->wcsflu_pid.
 	 */
-	if (process_id != csa->nl->wcsflu_pid && FALSE == csa->dbsync_timer)
+	if (!process_exiting && (process_id != csa->nl->wcsflu_pid) && (FALSE == csa->dbsync_timer))
 		START_DBSYNC_TIMER(csa, TIM_DEFER_DBSYNC);
 	return;
 }
+

@@ -43,6 +43,8 @@ GBLREF	gd_region	*gv_cur_region;
 GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 
+error_def(ERR_GVGETFAIL);
+
 boolean_t gvcst_get(mval *v)
 {
 	blk_hdr_ptr_t	bp;

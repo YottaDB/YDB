@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -179,7 +179,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #endif
 	job_launched = FALSE;
 	par_pid = process_id;
-	if (-1 == (child_pid = fork()))
+	if (-1 == (child_pid = fork()))	/* BYPASSOK: we die after creating a child, no FORK_CLEAN needed */
 	{
 		if (EAGAIN == errno || ENOMEM == errno)
 			job_try_again = TRUE;
@@ -247,7 +247,8 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 					LEN_AND_LIT("Error setting session id for the Job."), errno);
 
 		joberr = joberr_frk;
-		if (0 != (child_pid = fork()))		/* clone self and exit */
+		/* clone self and exit */
+		if (0 != (child_pid = fork()))	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
 		{
 			/* This is still the middle process.  */
 			if (0 > child_pid)

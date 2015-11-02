@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2010 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2011 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -21,9 +21,15 @@ LOAD
 	i debug u @useio
 ; header
 	s label=$ze(rec,1,12)
+	s olabel=label
 	s mach=$p($zver," ",4)
 	s seghasencrflag=FALSE
 	if ($e(label,0,9)="GTCGBDUNX"),$e(label,$l(label)-1,99)>5 s seghasencrflag=TRUE
+	s reghasv543fields=FALSE
+	if ($e(label,0,9)="GTCGBDUNX"),$e(label,$l(label)-1,99)>6 s reghasv543fields=TRUE
+	set v542=0
+	i (label="GTCGBLDIR009")!(label="GTCGBDUNX006")!(label="GTCGBDUNX106") s label=hdrlab,v542=1,update=1	;autoconvert
+	i (v542=1) n SIZEOF d v542init
 	set v534=0
 	i (label="GTCGBDUNX105")!((label="GTCGBDUNX005")&(mach="IA64")) s label=hdrlab,v534=1,update=1   ;autoconvert
 	i (v534=1) n SIZEOF d v534init
@@ -108,12 +114,18 @@ LOAD
 ; templates
 	k tmpreg,tmpseg
 	d cretmps
-	f s="ALLOCATION","BEFORE_IMAGE","BUFFER_SIZE" d tmpreg(s)
+	i (reghasv543fields=TRUE) d tmpreg("ALIGNSIZE")
+	f s="ALLOCATION" d tmpreg(s)
+	i (reghasv543fields=TRUE) d tmpreg("AUTOSWITCHLIMIT")
+	f s="BEFORE_IMAGE","BUFFER_SIZE" d tmpreg(s)
 	i 'v30 d tmpreg("COLLATION_DEFAULT")
+	i (reghasv543fields=TRUE) d tmpreg("EPOCH_INTERVAL")
 	f s="EXTENSION","FILE_NAME" d tmpreg(s)
 	f s="JOURNAL","KEY_SIZE","NULL_SUBSCRIPTS","RECORD_SIZE" d tmpreg(s) ;,"STOP_ENABLE"
 	; need to handle versioning
 	i 'v44&'v30 d tmpreg("STDNULLCOLL")
+	i (reghasv543fields=TRUE) d tmpreg("SYNC_IO")
+	i (reghasv543fields=TRUE) d tmpreg("YIELD_LIMIT")
 	; minimum allocation/extension was changed in V54001; check if default current value is lower and if so adjust it
 	i tmpreg("ALLOCATION")<minreg("ALLOCATION")  s tmpreg("ALLOCATION")=minreg("ALLOCATION"),update=1
 	i tmpreg("EXTENSION")<minreg("EXTENSION")  s tmpreg("EXTENSION")=minreg("EXTENSION"),update=1
@@ -195,9 +207,21 @@ region:
 	s regs(s,"ALLOCATION")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4					; journal options
 	; check if allocation is below new minimums (changed in V54001) if so adjust it to be at least that much
 	i regs(s,"ALLOCATION")<minreg("ALLOCATION")  s regs(s,"ALLOCATION")=minreg("ALLOCATION"),update=1
-	s regs(s,"EXTENSION")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
+	s regs(s,"EXTENSION")=$$bin2num($ze(rec,rel,rel+SIZEOF("reg_jnl_deq")-1)),rel=rel+SIZEOF("reg_jnl_deq")
 	; check if allocation is below new minimums (changed in V54001) if so adjust it to be at least that much
 	i regs(s,"EXTENSION")<minreg("EXTENSION")  s regs(s,"EXTENSION")=minreg("EXTENSION"),update=1
+	i (reghasv543fields=TRUE)  d
+	. s regs(s,"AUTOSWITCHLIMIT")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+	. s regs(s,"ALIGNSIZE")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+	. s regs(s,"EPOCH_INTERVAL")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+	. s regs(s,"SYNC_IO")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+	. s regs(s,"YIELD_LIMIT")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+	e  d
+	. s regs(s,"AUTOSWITCHLIMIT")=8388600
+	. s regs(s,"ALIGNSIZE")=2048
+	. s regs(s,"EPOCH_INTERVAL")=300
+	. s regs(s,"SYNC_IO")=0
+	. s regs(s,"YIELD_LIMIT")=8
 	s regs(s,"BUFFER_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s regs(s,"BEFORE_IMAGE")=$$bin2num($ze(rec,rel)),rel=rel+1
 	i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")				; 4 chars
@@ -212,8 +236,7 @@ region:
 	s l=$$bin2num($ze(rec,rel)),rel=rel+1 ;jnl_file_len
 	s regs(s,"FILE_NAME")=$ze(rec,rel,rel+l-1),rel=rel+SIZEOF("file_spec")
 	i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")				; reserved
-	i (gtm64=TRUE) s rel=rel+12
-	e  s rel=rel+8
+	s rel=rel+SIZEOF("gd_region_padding")
 	s abs=abs+SIZEOF("gd_region")
 	q
 segment:
@@ -312,10 +335,13 @@ CREATE
 	s am=tmpacc d maktseg
 	q
 cretmps:
+	s tmpreg("ALIGNSIZE")=2048
 	s tmpreg("ALLOCATION")=2048
+	s tmpreg("AUTOSWITCHLIMIT")=8388600
 	s tmpreg("BEFORE_IMAGE")=1
 	s tmpreg("BUFFER_SIZE")=128
 	s tmpreg("COLLATION_DEFAULT")=0
+	s tmpreg("EPOCH_INTERVAL")=300
 	s tmpreg("EXTENSION")=2048
 	s tmpreg("FILE_NAME")=""
 	s tmpreg("JOURNAL")=0
@@ -323,6 +349,8 @@ cretmps:
 	s tmpreg("NULL_SUBSCRIPTS")=0
 	s tmpreg("RECORD_SIZE")=256
 	s tmpreg("STDNULLCOLL")=0
+	s tmpreg("SYNC_IO")=0
+	s tmpreg("YIELD_LIMIT")=8
 	;s tmpreg("STOP_ENABLED")=1
 	s tmpseg("BG","ACCESS_METHOD")="BG"
 	s tmpseg("BG","ALLOCATION")=100
@@ -380,6 +408,8 @@ v44init:
 	s SIZEOF("rec_hdr")=3
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
+	s SIZEOF("reg_jnl_deq")=2
+	s SIZEOF("gd_region_padding")=8
 	s MAXNAMLN=SIZEOF("mident"),MAXREGLN=16,MAXSEGLN=16
 	i ver'="VMS" s SIZEOF("blk_hdr")=8
 	e  s SIZEOF("blk_hdr")=7
@@ -396,6 +426,8 @@ v5ft1init:
 	s SIZEOF("rec_hdr")=3
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
+	s SIZEOF("reg_jnl_deq")=2
+	s SIZEOF("gd_region_padding")=8
 	i ver'="VMS" s SIZEOF("blk_hdr")=8
 	e  s SIZEOF("blk_hdr")=7
 	q
@@ -411,6 +443,9 @@ v532init:
 	s SIZEOF("rec_hdr")=3
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
+	s SIZEOF("reg_jnl_deq")=2
+	i (gtm64=TRUE) s SIZEOF("gd_region_padding")=12
+	e  s SIZEOF("gd_region_padding")=8
 	;s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32
 	;s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
 	i ver'="VMS" s SIZEOF("blk_hdr")=16
@@ -428,6 +463,9 @@ v533init:
 	s SIZEOF("rec_hdr")=3
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
+	s SIZEOF("reg_jnl_deq")=2
+	i (gtm64=TRUE) s SIZEOF("gd_region_padding")=12
+	e  s SIZEOF("gd_region_padding")=8
 	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32
 	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
 	i ver'="VMS" s SIZEOF("blk_hdr")=16
@@ -446,6 +484,38 @@ v534init:
         s SIZEOF("rec_hdr")=3
         s SIZEOF("dsk_blk")=512
         s SIZEOF("max_str")=32767
+        s SIZEOF("reg_jnl_deq")=2
+	i (gtm64=TRUE) s SIZEOF("gd_region_padding")=12
+	e  s SIZEOF("gd_region_padding")=8
+        s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32   ; maximum name length allowed is 31 characters
+        s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
+        q
+v542init:
+        i (olabel="GTCGBLDIR009")!(olabel="GTCGBDUNX006") d		; 32-bit
+        . s SIZEOF("am_offset")=324
+        . s SIZEOF("file_spec")=256
+        . s SIZEOF("gd_header")=16
+        . s SIZEOF("gd_contents")=44
+        . s SIZEOF("gd_map")=36
+        . s SIZEOF("gd_region")=332
+        . s SIZEOF("gd_region_padding")=8
+        . if (olabel="GTCGBLDIR009") s SIZEOF("gd_segment")=336		; VMS
+        . e  s SIZEOF("gd_segment")=340
+        e  d								; 64-bit
+        . s SIZEOF("am_offset")=332
+        . s SIZEOF("file_spec")=256
+        . s SIZEOF("gd_header")=16
+        . s SIZEOF("gd_contents")=80
+        . s SIZEOF("gd_map")=40
+        . s SIZEOF("gd_region")=344
+        . s SIZEOF("gd_region_padding")=12
+        . s SIZEOF("gd_segment")=360
+        s SIZEOF("mident")=32
+        s SIZEOF("blk_hdr")=16
+        s SIZEOF("rec_hdr")=3
+        s SIZEOF("dsk_blk")=512
+        s SIZEOF("max_str")=32767
+        s SIZEOF("reg_jnl_deq")=2
         s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32   ; maximum name length allowed is 31 characters
         s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
         q

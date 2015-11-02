@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,6 +140,17 @@ boolean_t cli_disallow_dse_change(void)
 								|| d_c_cli_present("RSIZ"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = d_c_cli_present("RECORD") && d_c_cli_present("OFFSET");
+	CLI_DIS_CHECK_N_RESET;
+	return FALSE;
+}
+
+boolean_t cli_disallow_dse_chng_fhead(void)
+{
+	int		disallow_return_value = 0;
+
+	disallow_return_value = d_c_cli_present("STRM_NUM") && !d_c_cli_present("STRM_REG_SEQNO");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = !d_c_cli_present("STRM_NUM") && d_c_cli_present("STRM_REG_SEQNO");
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }

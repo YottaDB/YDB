@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -128,7 +128,7 @@ void dbc_write_command_file(phase_static_area *psa, char_ptr_t cmd)
 	{
 		save_errno = errno;
 		errmsg = STRERROR(save_errno);
-		rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fprintf()"), CALLFROM,
+		rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fprintf()"), CALLFROM, /* BYPASSOK */
 			  ERR_TEXT, 2, RTS_ERROR_TEXT(errmsg));
 	}
 	rc = CHMOD((char_ptr_t)psa->tmpcmdfile, S_IRUSR + S_IWUSR + S_IXUSR + S_IRGRP + S_IROTH); /* Change to 744 */
@@ -546,7 +546,7 @@ int dbc_read_dbblk(phase_static_area *psa, int blk_num, enum gdsblk_type blk_typ
 				       ((gdsblk_read == blk_set_p->usage) ? blk_set_p->old_buff : blk_set_p->new_buff),
 				       psa->dbc_cs_data->blk_size);
 				blk_set_p->blk_num = -1;	/* Effectively invalidate this (now) older cache entry */
-				DBC_DEBUG(("DBC_DEBUG: Found block in inactive cache differemt slot (%d) for blk_index %d\n", \
+				DBC_DEBUG(("DBC_DEBUG: Found block in inactive cache differemt slot (%d) for blk_index %d\n",
 					   blk_index, psa->block_depth));
 			} else
 			{
@@ -568,7 +568,7 @@ int dbc_read_dbblk(phase_static_area *psa, int blk_num, enum gdsblk_type blk_typ
 						   correct configuration */
 						dbc_init_blk(psa, blk_set_p, blk_set_p->blk_num, gdsblk_read, blk_set_p->blk_len,
 							     blk_set_p->blk_levl);
-						DBC_DEBUG(("DBC_DEBUG: Found block in inactive cache same slot for blk_index" \
+						DBC_DEBUG(("DBC_DEBUG: Found block in inactive cache same slot for blk_index"
 							   " %d\n", psa->block_depth));
 						break;
 					default:
@@ -590,7 +590,7 @@ int dbc_read_dbblk(phase_static_area *psa, int blk_num, enum gdsblk_type blk_typ
 	DBC_DEBUG(("DBC_DEBUG: Reading in database block 0x%x into blk_index %d\n", blk_num, psa->block_depth));
 	psa->fc->op = FC_READ;
 	psa->fc->op_buff = (sm_uc_ptr_t)blk_set_new_p->old_buff;
-	psa->fc->op_pos = psa->dbc_cs_data->start_vbn + (psa->dbc_cs_data->blk_size / DISK_BLOCK_SIZE) * blk_num;
+	psa->fc->op_pos = psa->dbc_cs_data->start_vbn + ((gtm_int64_t)(psa->dbc_cs_data->blk_size / DISK_BLOCK_SIZE) * blk_num);
 	psa->fc->op_len = psa->dbc_cs_data->blk_size;	/* In case length field was modified during a file-extension */
 	dbcertify_dbfilop(psa);				/* Read data/index block (no return if error) */
 	/* Now that we know some value, call initialize again to set the values the way we want */
@@ -744,7 +744,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 					   " key record\n"));
 				return blk_index;
 			}
-			DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Recursing down a level via star key record at offset 0x%lx\n", \
+			DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Recursing down a level via star key record at offset 0x%lx\n",
 				   (rec_p - blk_p)));
 			GET_ULONG(blk_ptr, rec_p + VMS_ONLY(3) UNIX_ONLY(4));
 			blk_index = dbc_read_dbblk(psa, blk_ptr, blk_type);
@@ -759,7 +759,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 		{	/* Found our record - If the record is in an index block, recurse. Else return the record we found */
 			if (gdsblk_gvtleaf == blk_set_p->blk_type || min_levl == blk_levl)
 			{	/* This is a terminal block. It is the end of the road */
-				DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Reached minimum block level (or leaf level) -- matching" \
+				DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Reached minimum block level (or leaf level) -- matching"
 					   " scan was a normal keyed record at offset 0x%lx\n", (rec_p - blk_p)));
 				return blk_index;
 			}
@@ -767,7 +767,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 			   this record is known to contain a pointer to another block. Read the block in and
 			   recurse to continue the search for the key.
 			*/
-			DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Recursing down a level via keyed index record at offset 0x%lx\n", \
+			DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Recursing down a level via keyed index record at offset 0x%lx\n",
 				   (rec_p - blk_p)));
 			GET_ULONG(blk_ptr, (rec_p + SIZEOF(rec_hdr) + blk_set_p->curr_blk_key->end
 					   - ((rec_hdr *)rec_p)->cmpc + 1));

@@ -22,33 +22,34 @@
 #include "op.h"
 #include "rtnhdr.h"
 #include "valid_mname.h"
+#include "fullbool.h"
 
-GBLREF	symval			*curr_symval;
-GBLREF	char			window_token;
-GBLREF	mval			**ind_source_sp, **ind_source_top;
-GBLREF	mval			**ind_result_sp, **ind_result_top;
+GBLREF	symval	*curr_symval;
 
 error_def(ERR_INDMAXNEST);
 error_def(ERR_VAREXPECTED);
 
 void	op_indget(mval *dst, mval *target, mval *value)
 {
-	bool		rval;
-	mstr		object, *obj;
+	icode_str	indir_src;
+	int		rval;
+	ht_ent_mname	*tabent;
+	mstr		*obj, object;
 	oprtype		v;
 	triple		*s, *src, *oldchain, tmpchain, *r, *triptr;
-	icode_str	indir_src;
 	var_tabent	targ_key;
-	ht_ent_mname	*tabent;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if ((TREF(ind_source_sp) >= TREF(ind_source_top)) || (TREF(ind_result_sp) >= TREF(ind_result_top)))
+		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp & ind_source_sp */
 	MV_FORCE_DEFINED(value);
 	MV_FORCE_STR(target);
 	indir_src.str = target->str;
 	indir_src.code = indir_get;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
+		obj = &object;
 		if (valid_mname(&target->str))
 		{
 			targ_key.var_name = target->str;
@@ -63,76 +64,68 @@ void	op_indget(mval *dst, mval *target, mval *value)
 		}
 		comp_init(&target->str);
 		src = newtriple(OC_IGETSRC);
-		switch (window_token)
+		switch (TREF(window_token))
 		{
-			case TK_IDENT:
-				if (rval = lvn(&v, OC_SRCHINDX, 0))
+		case TK_IDENT:
+			if (EXPR_FAIL != (rval = lvn(&v, OC_SRCHINDX, 0)))	/* NOTE assignment */
+			{
+				s = newtriple(OC_FNGET2);
+				s->operand[0] = v;
+				s->operand[1] = put_tref(src);
+			}
+			break;
+		case TK_CIRCUMFLEX:
+			if (EXPR_FAIL != (rval = gvn()))			/* NOTE assignment */
+			{
+				r = newtriple(OC_FNGVGET1);
+				s = newtriple(OC_FNGVGET2);
+				s->operand[0] = put_tref(r);
+				s->operand[1] = put_tref(src);
+			}
+			break;
+		case TK_ATSIGN:
+			TREF(saw_side_effect) = TREF(shift_side_effects);
+			if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
+			{
+				dqinit(&tmpchain, exorder);
+				oldchain = setcurtchain(&tmpchain);
+				if (EXPR_FAIL != (rval = indirection(&v)))	/* NOTE assignment */
 				{
-					s = newtriple(OC_FNGET2);
+					s = newtriple(OC_INDGET);
+					s->operand[0] = v;
+					s->operand[1] = put_tref(src);
+					newtriple(OC_GVSAVTARG);
+					setcurtchain(oldchain);
+					dqadd(TREF(expr_start), &tmpchain, exorder);
+					TREF(expr_start) = tmpchain.exorder.bl;
+					triptr = newtriple(OC_GVRECTARG);
+					triptr->operand[0] = put_tref(TREF(expr_start));
+				} else
+					setcurtchain(oldchain);
+			} else
+			{
+				if (EXPR_FAIL != (rval = indirection(&v)))	/* NOTE assignment */
+				{
+					s = newtriple(OC_INDGET);
 					s->operand[0] = v;
 					s->operand[1] = put_tref(src);
 				}
-				break;
-			case TK_CIRCUMFLEX:
-				if (rval = gvn())
-				{
-					r = newtriple(OC_FNGVGET1);
-					s = newtriple(OC_FNGVGET2);
-					s->operand[0] = put_tref(r);
-					s->operand[1] = put_tref(src);
-				}
-				break;
-			case TK_ATSIGN:
-				if (TREF(shift_side_effects))
-				{
-					dqinit(&tmpchain, exorder);
-					oldchain = setcurtchain(&tmpchain);
-					if (rval = indirection(&v))
-					{
-						s = newtriple(OC_INDGET);
-						s->operand[0] = v;
-						s->operand[1] = put_tref(src);
-						newtriple(OC_GVSAVTARG);
-						setcurtchain(oldchain);
-						dqadd(TREF(expr_start), &tmpchain, exorder);
-						TREF(expr_start) = tmpchain.exorder.bl;
-						triptr = newtriple(OC_GVRECTARG);
-						triptr->operand[0] = put_tref(TREF(expr_start));
-					} else
-						setcurtchain(oldchain);
-				} else
-				{
-					if (rval = indirection(&v))
-					{
-						s = newtriple(OC_INDGET);
-						s->operand[0] = v;
-						s->operand[1] = put_tref(src);
-					}
-				}
-				break;
-			default:
-				stx_error(ERR_VAREXPECTED);
-				break;
+			}
+			break;
+		default:
+			stx_error(ERR_VAREXPECTED);
+			rval = EXPR_FAIL;
+			break;
 		}
 		v = put_tref(s);
-		if (comp_fini(rval, &object, OC_IRETMVAL, &v, target->str.len))
-		{
-			indir_src.str.addr = target->str.addr;
-			cache_put(&indir_src, &object);
-			if (ind_source_sp + 1 >= ind_source_top || ind_result_sp + 1 >= ind_result_top)
-				rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-
-			*ind_result_sp++ = dst;
-			*ind_source_sp++ = value;
-			comp_indr(&object);
-		}
-	} else
-	{
-		if (ind_source_sp + 1 >= ind_source_top || ind_result_sp + 1 >= ind_result_top)
-			rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-
-		*ind_result_sp++ = dst;
-		*ind_source_sp++ = value;
-		comp_indr(obj);
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &v, target->str.len))
+			return;
+		indir_src.str.addr = target->str.addr;
+		cache_put(&indir_src, obj);
+		/* Fall into code activation below */
 	}
+	*(TREF(ind_result_sp))++ = dst;
+	*(TREF(ind_source_sp))++ = value;
+	comp_indr(obj);
+	return;
 }

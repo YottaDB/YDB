@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,6 +52,8 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	sf->mpc = transfer_addr;
 	sf->flags = 0;
 	sf->for_ctrl_stack = NULL;
+	sf->ret_value = NULL;
+	sf->dollar_test = -1;
 #ifdef HAS_LITERAL_SECT
 	sf->literal_ptr = (int4 *)LITERAL_ADR(rtn_base);
 #endif

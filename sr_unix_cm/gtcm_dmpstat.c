@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,8 @@ static char rcsid[] = "$Header:$";
 #include "gtm_time.h"
 #include "gtcm.h"
 #include "eintr_wrappers.h"
+#include "gtmio.h"
+#include "have_crit.h"
 #ifdef __MVS__
 #include "gtm_stat.h"
 #include "gtm_zos_io.h"
@@ -135,7 +137,7 @@ int gtcm_dmpstat(int sig)
     gtcm_ltime = (int4)t;
     omi_nxact2 = 0;
 
-    fflush(fp);
+    FFLUSH(fp);
     FCLOSE(fp, status);
 
     return 0;

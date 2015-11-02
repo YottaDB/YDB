@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,6 +72,26 @@ UNIX_ONLY(static sem_info	*sem_inf;)
 
 UNIX_ONLY(static void mupip_upgrade_cleanup(void);)
 
+error_def(ERR_BADDBVER);
+error_def(ERR_DBFILOPERR);
+error_def(ERR_DBMAXREC2BIG);
+error_def(ERR_DBMINRESBYTES);
+error_def(ERR_DBNOTGDS);
+error_def(ERR_DBOPNERR);
+error_def(ERR_DBPREMATEOF);
+error_def(ERR_DBRDONLY);
+error_def(ERR_PREMATEOF);
+error_def(ERR_MUINFOUINT4);
+error_def(ERR_MUINFOUINT8);
+error_def(ERR_MUNODBNAME);
+error_def(ERR_MUNOUPGRD);
+error_def(ERR_MUPGRDSUCC);
+error_def(ERR_MUSTANDALONE);
+error_def(ERR_MUUPGRDNRDY);
+error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+ZOS_ONLY(error_def(ERR_BADTAG);)
+
 void mupip_upgrade(void)
 {
 	char		db_fn[MAX_FN_LEN + 1];
@@ -95,33 +115,13 @@ void mupip_upgrade(void)
 	DEBUG_ONLY(int norm_vbn;)
 	unsigned char	new_master_map[MASTER_MAP_SIZE_V4];
 
-	error_def(ERR_BADDBVER);
-	error_def(ERR_DBFILOPERR);
-	error_def(ERR_DBMAXREC2BIG);
-	error_def(ERR_DBMINRESBYTES);
-	error_def(ERR_DBNOTGDS);
-	error_def(ERR_DBOPNERR);
-	error_def(ERR_DBPREMATEOF);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_PREMATEOF);
-	error_def(ERR_MUINFOUINT4);
-	error_def(ERR_MUINFOUINT8);
-	error_def(ERR_MUNODBNAME);
-	error_def(ERR_MUNOUPGRD);
-	error_def(ERR_MUPGRDSUCC);
-	error_def(ERR_MUSTANDALONE);
-	error_def(ERR_MUUPGRDNRDY);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_TEXT);
-	ZOS_ONLY(error_def(ERR_BADTAG);)
-
 	/* Structure checks .. */
 #ifndef __ia64
 	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
 #endif
 
-	UNIX_ONLY(sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * 2);
-		  memset(sem_inf, 0, SIZEOF(sem_info) * 2);
+	UNIX_ONLY(sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * FTOK_ID_CNT);
+		  memset(sem_inf, 0, SIZEOF(sem_info) * FTOK_ID_CNT);
 		  atexit(mupip_upgrade_cleanup));
 	db_fn_len = SIZEOF(db_fn);
 	if (!cli_get_str("FILE", db_fn, &db_fn_len))

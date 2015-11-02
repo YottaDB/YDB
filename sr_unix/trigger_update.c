@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,11 +15,13 @@
 #include "gdsroot.h"			/* for gdsfhead.h */
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"			/* For gvcst_protos.h */
+#include "dpgbldir.h"
 #include "gvcst_protos.h"
 #include "rtnhdr.h"
 #include "io.h"
 #include "iormdef.h"
 #include "hashtab_str.h"
+#include "wbox_test_init.h"
 #include "gv_trigger.h"
 #include "trigger_delete_protos.h"
 #include "trigger.h"
@@ -52,6 +54,7 @@
 #include "stack_frame.h"
 #include "tp_frame.h"
 #include "t_retry.h"
+#include "gtmimagename.h"
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*first_sgm_info;
@@ -64,11 +67,20 @@ GBLREF	int			tprestart_state;
 GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	boolean_t		dollar_ztrigger_invoked;
-GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 GBLREF	trans_num		local_tn;
+GBLREF	unsigned int		t_tries;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+#ifdef DEBUG
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#endif
 
+error_def(ERR_DBROLLEDBACK);
+error_def(ERR_TEXT);
+error_def(ERR_TPRETRY);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRIGDEFBAD);
+error_def(ERR_TRIGMODINTP);
+error_def(ERR_TRIGMODREGNOTRW);
 
 LITREF	mval			gvtr_cmd_mval[GVTR_CMDTYPES];
 LITREF	int4			gvtr_cmd_mask[GVTR_CMDTYPES];
@@ -263,9 +275,39 @@ LITREF	char 			*trigger_subs[];
 	return TRIG_FAILURE;													\
 }
 
-error_def(ERR_TPRETRY);
-error_def(ERR_TRIGDEFBAD);
-error_def(ERR_TRIGMODINTP);
+/* This error macro is used for all definition errors where the target is ^#t(GVN,<index>,<required subscript>) */
+#define HASHT_GVN_DEFINITION_RETRY_OR_ERROR(INDEX,SUBSCRIPT)					\
+{												\
+	if (CDB_STAGNATE > t_tries)								\
+		t_retry(cdb_sc_triggermod);							\
+	else											\
+	{											\
+		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
+		/* format "INDEX,SUBSCRIPT" of ^#t(GVN,INDEX,SUBSCRIPT) in the error message */	\
+		SET_PARAM_STRING(util_buff, util_len, INDEX, SUBSCRIPT);			\
+		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,			\
+			trigvn_len, trigvn, util_len, util_buff);				\
+	}											\
+}
+
+/* This error macro is used for all definition errors where the target is ^#t(GVN,<#LABEL|#COUNT|#CYCLE>) */
+#define HASHT_DEFINITION_RETRY_OR_ERROR(SUBSCRIPT,MOREINFO)	\
+{								\
+	if (CDB_STAGNATE > t_tries)				\
+		t_retry(cdb_sc_triggermod);			\
+	else							\
+	{							\
+		HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO);	\
+	}							\
+}
+
+#define HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO)					\
+{											\
+	assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
+	rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,		\
+		trigvn_len, trigvn, LEN_AND_LIT(SUBSCRIPT),				\
+		ERR_TEXT, 2, RTS_ERROR_TEXT(MOREINFO));					\
+}
 
 STATICFNDEF boolean_t validate_label(char *trigvn, int trigvn_len)
 {
@@ -274,11 +316,8 @@ STATICFNDEF boolean_t validate_label(char *trigvn, int trigvn_len)
 
 	SETUP_THREADGBL_ACCESS;
 	BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL));
-	if (!gvcst_get(&trigger_label))
-	{	/* There has to be a #LABEL */
-		assert(FALSE);
-		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, trigvn_len, trigvn, LEN_AND_LIT("\"#LABEL\""));
-	}
+	if (!gvcst_get(&trigger_label)) /* There has to be a #LABEL */
+		HASHT_DEFINITION_RETRY_OR_ERROR("\"#LABEL\"","#LABEL was not found")
 	return ((trigger_label.str.len == STRLEN(HASHT_GBL_CURLABEL))
 		&& (0 == memcmp(trigger_label.str.addr, HASHT_GBL_CURLABEL, trigger_label.str.len)));
 }
@@ -415,7 +454,9 @@ STATICFNDEF int4 add_trigger_hash_entry(char *trigvn, int trigvn_len, char *cmd_
 	SETUP_THREADGBL_ACCESS;
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
-	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
+	if (gv_cur_region->read_only)
+		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+ 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	set_cmp = (NULL != strchr(cmd_value, 'S'));
 	mv_indx_ptr = &mv_indx;
 	num_len = 0;
@@ -514,13 +555,8 @@ STATICFNDEF boolean_t trigger_already_exists(char *trigvn, int trigvn_len, char 
 			i2mval(&trigindx, set_indx);
 			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigindx, trigger_subs[TRIGNAME_SUB],
 					STRLEN(trigger_subs[TRIGNAME_SUB]));
-			if (!gvcst_get(setname))
-			{	/* There has to be a name value */
-				assert(FALSE);
-				SET_PARAM_STRING(util_buff, util_len, set_indx, ",\"TRIGNAME\"");
-				rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, trigvn_len, trigvn,
-					  util_len, util_buff);
-			}
+			if (!gvcst_get(setname)) /* There has to be a name value */
+				HASHT_GVN_DEFINITION_RETRY_OR_ERROR(set_indx, ",\"TRIGNAME\"");
 			set_name_match = ((value_len[TRIGNAME_SUB] == (setname->str.len - 1))
 				&& (0 == memcmp(setname->str.addr, values[TRIGNAME_SUB], value_len[TRIGNAME_SUB])));
 		}
@@ -536,13 +572,8 @@ STATICFNDEF boolean_t trigger_already_exists(char *trigvn, int trigvn_len, char 
 			i2mval(&trigindx, kill_indx);
 			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigindx, trigger_subs[CMD_SUB],
 							 STRLEN(trigger_subs[CMD_SUB]));
-			if (!gvcst_get(&val))
-			{	/* There has to be a command string */
-				assert(FALSE);
-				SET_PARAM_STRING(util_buff, util_len, kill_indx, ",\"CMD\"");
-				rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, trigvn_len, trigvn,
-					  util_len, util_buff);
-			}
+			if (!gvcst_get(&val))	/* There has to be a command string */
+				HASHT_GVN_DEFINITION_RETRY_OR_ERROR(kill_indx, ",\"CMD\"");
 			db_has_S = (NULL != memchr(val.str.addr, 'S', val.str.len));
 			db_has_K = ((NULL != memchr(val.str.addr, 'K', val.str.len)) ||
 				    (NULL != memchr(val.str.addr, 'R', val.str.len)));
@@ -558,13 +589,8 @@ STATICFNDEF boolean_t trigger_already_exists(char *trigvn, int trigvn_len, char 
 			/* $get(^#t(trigvn,trigindx,"TRIGNAME") */
 			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigindx, trigger_subs[TRIGNAME_SUB],
 							 STRLEN(trigger_subs[TRIGNAME_SUB]));
-			if (!gvcst_get(killname))
-			{	/* There has to be a name string */
-				assert(FALSE);
-				SET_PARAM_STRING(util_buff, util_len, kill_indx, ",\"TRIGNAME\"");
-				rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, trigvn_len, trigvn,
-					  util_len, util_buff);
-			}
+			if (!gvcst_get(killname)) /* There has to be a name string */
+				HASHT_GVN_DEFINITION_RETRY_OR_ERROR(kill_indx, ",\"TRIGNAME\"");
 			kill_name_match = ((value_len[TRIGNAME_SUB] == (killname->str.len - 1))
 				&& (0 == memcmp(killname->str.addr, values[TRIGNAME_SUB], value_len[TRIGNAME_SUB])));
 		}
@@ -828,12 +854,8 @@ STATICFNDEF int4 modify_record(char *trigvn, int trigvn_len, char add_delete, in
 	retval = 0;
 	i2mval(&trigindx, trigger_index);
 	BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigindx, trigger_subs[CMD_SUB], STRLEN(trigger_subs[CMD_SUB]));
-	if (!gvcst_get(&val))
-	{	/* There has to be a command string */
-		assert(FALSE);
-		SET_PARAM_STRING(util_buff, util_len, trigger_index, ",\"CMD\"");
-		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, trigvn_len, trigvn, util_len, util_buff);
-	}
+	if (!gvcst_get(&val)) /* There has to be a command string */
+		HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigger_index, ",\"CMD\"");
 	memcpy(trig_cmds, val.str.addr, val.str.len);
 	trig_cmds[val.str.len] = '\0';
 	/* get(^#t(GVN,trigindx,"OPTIONS") */
@@ -962,6 +984,8 @@ STATICFNDEF int4 gen_trigname_sequence(char *trigvn, int trigvn_len, mval *trigg
 	}
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
+	if (gv_cur_region->read_only)
+		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 == user_trigname_len)
 	{	/* autogenerated name */
@@ -1194,6 +1218,8 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	gbl_name.addr = trigvn;
 	gbl_name.len = trigvn_len;
 	GV_BIND_NAME_ONLY(gd_header, &gbl_name);
+	if (gv_cur_region->read_only)
+		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	csa = gv_target->gd_csa;
 	/* Now that the gv_target of the global the trigger refers to is setup, check if we are attempting to modify/delete a
 	 * trigger for a global that has already had a trigger fire in this transaction. For these single-region (at a time)
@@ -1276,8 +1302,8 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 								   (0 != (updates & SUB_UPDATE_NAME)) ||
 								   (0 != (updates & SUB_UPDATE_OPTIONS)) ||
 								   (0 != (updates & ADD_UPDATE_OPTIONS)))
-							{ /* should not get here when modifying a matched KILL hash */
-								assert(FALSE); /* NAME and OPTIONS cannot change on K-type match*/
+							{ /* NAME and OPTIONS cannot change on K-type match */
+								assertpro(FALSE);
 							} else if (0 != (updates & DELETE_REC))
 							{
 								if (0 == trig_stats[STATS_ERROR])
@@ -1294,13 +1320,20 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 											    &set_trigger_hash, &kill_trigger_hash,
 											    &reportname, &reportnamealt)))
 								{ /* SET trigger found previously is not found again */
-									assert(FALSE);
-									trig_stats[STATS_ERROR]++;
-									util_out_print_gtmio("Previously found trigger on ^!AD ," \
-											     "named !AD but cannot find it again",
-											     FLUSH, trigvn_len, trigvn,
-											     reportnamealt.str.len,
-											     reportnamealt.str.addr);
+									if (CDB_STAGNATE > t_tries)
+										t_retry(cdb_sc_triggermod);
+									else
+									{
+										assert(WBTEST_HELPOUT_TRIGDEFBAD == \
+												gtm_white_box_test_case_number);
+										trig_stats[STATS_ERROR]++;
+										util_out_print_gtmio("Previously found trigger on" \
+												     "^!AD ,named !AD but cannot " \
+												     "find it again",
+												     FLUSH, trigvn_len, trigvn,
+												     reportnamealt.str.len,
+												     reportnamealt.str.addr);
+									}
 									return TRIG_FAILURE;
 								}
 							} else
@@ -1547,32 +1580,27 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	return TRIG_SUCCESS;
 }
 
-STATICFNDEF boolean_t trigger_update_rec_helper(char *trigger_rec, uint4 len, boolean_t noprompt, uint4 *trig_stats,
-						boolean_t lcl_implicit_tpwrap)
+STATICFNDEF boolean_t trigger_update_rec_helper(char *trigger_rec, uint4 len, boolean_t noprompt, uint4 *trig_stats)
 {
 	enum cdb_sc		cdb_status;
 	boolean_t		trigger_status;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (lcl_implicit_tpwrap)
-		ESTABLISH_RET(trigger_tpwrap_ch, TRIG_FAILURE);
+	ESTABLISH_RET(trigger_tpwrap_ch, TRIG_FAILURE);
 	trigger_status = trigger_update_rec(trigger_rec, len, TRUE, trig_stats, NULL, NULL);
-	if (lcl_implicit_tpwrap)
+	if (TRIG_SUCCESS == trigger_status)
 	{
-		if (TRIG_SUCCESS == trigger_status)
-		{
-			GVTR_OP_TCOMMIT(cdb_status);
-			if (cdb_sc_normal != cdb_status)
-				t_retry(cdb_status);	/* won't return */
-		} else
-		{	/* Record cannot be committed - undo everything */
-			assert(donot_INVOKE_MUMTSTART);
-			DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);
-			OP_TROLLBACK(-1);		/* returns but kills implicit transaction */
-		}
-		REVERT;
+		GVTR_OP_TCOMMIT(cdb_status);
+		if (cdb_sc_normal != cdb_status)
+			t_retry(cdb_status);	/* won't return */
+	} else
+	{	/* Record cannot be committed - undo everything */
+		assert(donot_INVOKE_MUMTSTART);
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);
+		OP_TROLLBACK(-1);		/* returns but kills implicit transaction */
 	}
+	REVERT;
 	return trigger_status;
 }
 
@@ -1583,9 +1611,12 @@ boolean_t trigger_update(char *trigger_rec, uint4 len)
 	boolean_t		trigger_status = TRIG_FAILURE;
 	mval			ts_mv;
 	int			loopcnt;
+	DEBUG_ONLY(unsigned int	lcl_t_tries;)
+	enum cdb_sc		failure;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+
 	for (i = 0; NUM_STATS > i; i++)
 		trig_stats[i] = 0;
 	ts_mv.mvtype = MV_STR;
@@ -1607,9 +1638,24 @@ boolean_t trigger_update(char *trigger_rec, uint4 len)
 		for (loopcnt = 0; ; loopcnt++)
 		{
 			assert(donot_INVOKE_MUMTSTART);	/* Make sure still set */
-			trigger_status = trigger_update_rec_helper(trigger_rec, len, TRUE, trig_stats, TRUE);
+			DEBUG_ONLY(lcl_t_tries = t_tries);
+			trigger_status = trigger_update_rec_helper(trigger_rec, len, TRUE, trig_stats);
 			if (0 == dollar_tlevel)
 				break;
+			assert(0 < t_tries);
+			assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
+			failure = t_fail_hist[t_tries - 1];
+			assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
+				|| !gv_target || !gv_target->root);
+			assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
+				|| !IS_MCODE_RUNNING || TREF(dollar_zonlnrlbk));
+			if (cdb_sc_onln_rlbk2 == failure)
+				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than trying again. Since this
+			 * is ^#t global, we don't need to GVCST_ROOT_SEARCH before continuing with the next restart because the
+			 * trigger load logic already takes care of doing INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED before doing the
+			 * actual trigger load
+			 */
 			util_out_print_gtmio("RESTART has invalidated this transaction's previous output.  New output follows.",
 					     FLUSH);
 			/* We expect the above function to return with either op_tcommit or a tp_restart invoked.
@@ -1623,7 +1669,7 @@ boolean_t trigger_update(char *trigger_rec, uint4 len)
 		}
 	} else
 	{
-		trigger_status = trigger_update_rec_helper(trigger_rec, len, TRUE, trig_stats, FALSE);
+		trigger_status = trigger_update_rec(trigger_rec, len, TRUE, trig_stats, NULL, NULL);
 		assert(0 < dollar_tlevel);
 	}
 	return (TRIG_FAILURE == trigger_status);

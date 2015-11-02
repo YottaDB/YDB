@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,12 @@
 GBLREF gd_region        *gv_cur_region;
 GBLREF boolean_t	need_no_standalone;
 
+error_def(ERR_FILEEXISTS);
+error_def(ERR_FILEPARSE);
+error_def(ERR_JNLFILNOTCHG);
+error_def(ERR_JNLFNF);
+error_def(ERR_MUSTANDALONE);
+error_def(ERR_PREVJNLLINKSET);
 
 uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 {
@@ -49,13 +55,6 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 	char		buf[JNL_NAME_SIZE], full_buf[JNL_NAME_SIZE], prev_buf[JNL_NAME_SIZE];
 	char		jnl_fn[JNL_NAME_SIZE];
 	mstr		jnlfile, jnldef;
-
-	error_def(ERR_JNLFILNOTCHG);
-	error_def(ERR_FILEEXISTS);
-	error_def(ERR_MUSTANDALONE);
-	error_def(ERR_FILEPARSE);
-	error_def(ERR_JNLFNF);
-	error_def(ERR_PREVJNLLINKSET);
 
 	buf_len = SIZEOF(buf);
 	/* check for standalone */
@@ -110,8 +109,10 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 		}
 		header->prev_jnl_file_name_length = full_buf_len;
 		memcpy(header->prev_jnl_file_name, full_buf, full_buf_len);
-		gtm_putmsg(VARLSTCNT(6) ERR_PREVJNLLINKSET, 4, prev_buf_len, prev_buf,
-			header->prev_jnl_file_name_length, header->prev_jnl_file_name);
+		gtm_putmsg(VARLSTCNT(6) ERR_PREVJNLLINKSET, 4, prev_buf_len, prev_buf, header->prev_jnl_file_name_length,
+			header->prev_jnl_file_name);
+		send_msg(VARLSTCNT(6) ERR_PREVJNLLINKSET, 4, prev_buf_len, prev_buf, header->prev_jnl_file_name_length,
+			header->prev_jnl_file_name);
 	} else if (CLI_NEGATED == cli_present("PREVJNLFILE"))
 	{
 		util_out_print("prev_jnl_file name changed from !AD to NULL", TRUE,
@@ -143,6 +144,7 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 		memcpy(prev_buf, header->data_file_name, prev_buf_len);
 		memcpy(header->data_file_name, full_buf, full_buf_len);
 		header->data_file_name_length = full_buf_len;
+		header->data_file_name[full_buf_len] = '\0';	/* null terminate string just in case somebody cares */
 		util_out_print("data_file_name changed from !AD to !AD", TRUE,
 				prev_buf_len, prev_buf, header->data_file_name_length, header->data_file_name);
 	}

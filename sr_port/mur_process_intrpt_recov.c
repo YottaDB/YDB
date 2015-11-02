@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,7 @@
 #include "gtmio.h"
 #include "gtmmsg.h"
 #include "wcs_flu.h"	/* for wcs_flu() prototype */
+#include "wbox_test_init.h"
 
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF	mur_gbls_t		murgbl;
@@ -60,18 +61,24 @@ error_def(ERR_TEXT);
 
 uint4 mur_process_intrpt_recov()
 {
-	jnl_ctl_list		*jctl, *last_jctl;
-	reg_ctl_list		*rctl, *rctl_top;
-	int			rename_fn_len, save_name_len;
-	char			prev_jnl_fn[MAX_FN_LEN + 1], rename_fn[MAX_FN_LEN + 1], save_name[MAX_FN_LEN + 1];
-	jnl_create_info		jnl_info;
-	uint4			status, status2;
-	uint4			max_autoswitchlimit, max_jnl_alq, max_jnl_deq, freeblks;
-	sgmnt_data_ptr_t	csd;
-#if defined(VMS)
-	io_status_block_disk	iosb;
-#endif
-	boolean_t		jfh_changed;
+	jnl_ctl_list			*jctl, *last_jctl;
+	reg_ctl_list			*rctl, *rctl_top;
+	int				rename_fn_len, save_name_len, idx;
+	char				prev_jnl_fn[MAX_FN_LEN + 1], rename_fn[MAX_FN_LEN + 1], save_name[MAX_FN_LEN + 1];
+	jnl_create_info			jnl_info;
+	uint4				status, status2;
+	uint4				max_autoswitchlimit, max_jnl_alq, max_jnl_deq, freeblks;
+	sgmnt_data_ptr_t		csd;
+	UNIX_ONLY(
+		jnl_private_control	*jpc;
+		jnl_buffer_ptr_t	jbp;
+	)
+	VMS_ONLY(
+		io_status_block_disk	iosb;
+	)
+	boolean_t			jfh_changed;
+	jnl_record		*jnlrec;
+	jnl_file_header		*jfh;
 
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
@@ -83,13 +90,14 @@ uint4 mur_process_intrpt_recov()
 		max_jnl_alq = max_jnl_deq = max_autoswitchlimit = 0;
 		for (last_jctl = NULL ; (NULL != jctl); last_jctl = jctl, jctl = jctl->next_gen)
 		{
-			if (max_autoswitchlimit < jctl->jfh->autoswitchlimit)
+			jfh = jctl->jfh;
+			if (max_autoswitchlimit < jfh->autoswitchlimit)
 			{	/* Note that max_jnl_alq, max_jnl_deq are not the maximum journal allocation/extensions across
 				 * generations, but rather the allocation/extension corresponding to the maximum autoswitchlimit.
 				 */
-				max_autoswitchlimit = jctl->jfh->autoswitchlimit;
-				max_jnl_alq         = jctl->jfh->jnl_alq;
-				max_jnl_deq         = jctl->jfh->jnl_deq;
+				max_autoswitchlimit = jfh->autoswitchlimit;
+				max_jnl_alq         = jfh->jnl_alq;
+				max_jnl_deq         = jfh->jnl_deq;
 			}
 			/* Until now, "rctl->blks_to_upgrd_adjust" holds the number of V4 format newly created bitmap blocks
 			 * seen in INCTN records in backward processing. It is possible that backward processing might have
@@ -97,9 +105,9 @@ uint4 mur_process_intrpt_recov()
 			 * journal files. The journal file-header has a separate field "prev_recov_blks_to_upgrd_adjust" which
 			 * maintains exactly this count. Therefore adjust the rctl counter accordingly.
 			 */
-			assert(!jctl->jfh->prev_recov_blks_to_upgrd_adjust || !jctl->jfh->recover_interrupted);
-			assert(!jctl->jfh->prev_recov_blks_to_upgrd_adjust || jctl->jfh->prev_recov_end_of_data);
-			rctl->blks_to_upgrd_adjust += jctl->jfh->prev_recov_blks_to_upgrd_adjust;
+			assert(!jfh->prev_recov_blks_to_upgrd_adjust || !jfh->recover_interrupted);
+			assert(!jfh->prev_recov_blks_to_upgrd_adjust || jfh->prev_recov_end_of_data);
+			rctl->blks_to_upgrd_adjust += jfh->prev_recov_blks_to_upgrd_adjust;
 		}
 		if (max_autoswitchlimit > last_jctl->jfh->autoswitchlimit)
 		{
@@ -112,11 +120,50 @@ uint4 mur_process_intrpt_recov()
 			assert(csd->jnl_deq         == last_jctl->jfh->jnl_deq);
 			assert(csd->autoswitchlimit == last_jctl->jfh->autoswitchlimit);
 		}
-		/* now that rctl->blks_to_upgrd_adjust is completely computed, use that to increment filehdr blks_to_upgrd. */
-		csd->blks_to_upgrd += rctl->blks_to_upgrd_adjust;
-		if (csd->blks_to_upgrd)
-			csd->fully_upgraded = FALSE;
 		jctl = rctl->jctl_turn_around;
+		/* Get a pointer to the turn around point EPOCH record */
+		jnlrec = rctl->mur_desc->jnlrec;
+		assert(JRT_EPOCH == jnlrec->prefix.jrec_type);
+		assert(jctl->turn_around_time == jnlrec->prefix.time);
+		assert(jctl->turn_around_seqno == jnlrec->jrec_epoch.jnl_seqno);
+		assert(jctl->turn_around_tn == jnlrec->prefix.tn);
+		assert(jctl->rec_offset == jctl->turn_around_offset);
+		/* Reset file-header "blks_to_upgrd" counter to the turn around point epoch value. Adjust this to include
+		 * the number of new V4 format bitmaps created by post-turnaround-point db file extensions.
+		 * The adjustment value is maintained in rctl->blks_to_upgrd_adjust.
+		 */
+		csd->blks_to_upgrd = jnlrec->jrec_epoch.blks_to_upgrd;
+		csd->blks_to_upgrd += rctl->blks_to_upgrd_adjust;
+#		ifdef GTM_TRIGGER
+		/* online rollback can potentially take the database to a point in the past where the triggers that were
+		 * previously installed are no longer a part of the current database state and so any process that restarts
+		 * AFTER online rollback completes SHOULD reload triggers and the only way to do that is by incrementing the
+		 * db_trigger_cycle in the file header.
+		 */
+		if (jgbl.onlnrlbk && (0 < csd->db_trigger_cycle))
+		{	/* check for non-zero db_trigger_cycle is to prevent other processes (continuing after online rollback)
+			 * to establish implicit TP (on seeing the trigger cycle mismatch) when there are actually no triggers
+			 * installed in the database (because there were none at the start of online rollback).
+			 */
+			csd->db_trigger_cycle++;
+			if (0 == csd->db_trigger_cycle)
+				csd->db_trigger_cycle = 1;	/* Don't allow cycle set to 0 which means uninitialized */
+		}
+#		endif
+		assert((WBTEST_ALLOW_ARBITRARY_FULLY_UPGRADED == gtm_white_box_test_case_number) ||
+			(FALSE == jctl->turn_around_fullyupgraded) || (TRUE == jctl->turn_around_fullyupgraded));
+		/* Set csd->fully_upgraded to FALSE if:
+		 * a) The turn around EPOCH had the fully_upgraded field set to FALSE
+		 * OR
+		 * b) If csd->blks_to_upgrd counter is non-zero. This field can be non-zero even if the turnaround EPOCH's
+		 * fully_upgraded field is TRUE. This is possible if the database was downgraded to V4 (post turnaround EPOCH)
+		 * format and database extensions happened causing new V4 format bitmap blocks to be written. The count of V4
+		 * format bitmap blocks is maintained ONLY as part of INCTN records (with INCTN opcode SET_JNL_FILE_CLOSE_EXTEND)
+		 * noted down in rctl->blks_to_upgrd_adjust counter as part of BACKWARD processing which are finally added to
+		 * csd->blks_to_upgrd.
+		 */
+		if (!jctl->turn_around_fullyupgraded || csd->blks_to_upgrd)
+			csd->fully_upgraded = FALSE;
 		csd->trans_hist.early_tn = jctl->turn_around_tn;
 		csd->trans_hist.curr_tn = csd->trans_hist.early_tn;	/* INCREMENT_CURR_TN macro not used but noted in comment
 									 * to identify all places that set curr_tn */
@@ -143,16 +190,64 @@ uint4 mur_process_intrpt_recov()
 		 * Therefore every block that was newly allocated as part of those file extensions should be considered FREE
 		 * for the current calculations except for the local bitmap blocks which are BUSY the moment they are created.
 		 */
-		assert(rctl->trnarnd_total_blks <= csd->trans_hist.total_blks);
-		csd->trans_hist.free_blocks = rctl->trnarnd_free_blocks + (csd->trans_hist.total_blks - rctl->trnarnd_total_blks)
+		assert(jnlrec->jrec_epoch.total_blks <= csd->trans_hist.total_blks);
+		csd->trans_hist.free_blocks = jnlrec->jrec_epoch.free_blocks
+			+ (csd->trans_hist.total_blks - jnlrec->jrec_epoch.total_blks)
 			- DIVIDE_ROUND_UP(csd->trans_hist.total_blks, BLKS_PER_LMAP)
-			+ DIVIDE_ROUND_UP(rctl->trnarnd_total_blks, BLKS_PER_LMAP);
+			+ DIVIDE_ROUND_UP(jnlrec->jrec_epoch.total_blks, BLKS_PER_LMAP);
+		assert(!csd->blks_to_upgrd || !csd->fully_upgraded);
 		assert((freeblks = mur_blocks_free(rctl)) == csd->trans_hist.free_blocks);
-		if (dba_bg == csd->acc_meth)
-			/* This is taken from bt_refresh() */
-			((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn = jctl->turn_around_tn - 1;
+		/* Update strm_reg_seqno[] in db file header to reflect the turn around point.
+		 * Before updating "strm_reg_seqno", make sure value is saved into "save_strm_reg_seqno".
+		 * This is relied upon by the function "mur_get_max_strm_reg_seqno" in case of interrupted rollback.
+		 */
+		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		{
+			if (!csd->save_strm_reg_seqno[idx])
+				csd->save_strm_reg_seqno[idx] = csd->strm_reg_seqno[idx];
+			csd->strm_reg_seqno[idx] = jnlrec->jrec_epoch.strm_seqno[idx];
+		}
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_FSYNC_DB);
+		assert(cs_addrs->ti->curr_tn == jctl->turn_around_tn);
+#		ifdef UNIX
+		if (jgbl.onlnrlbk)
+		{
+			if (dba_bg == cs_addrs->hdr->acc_meth)
+			{	/* dryclean the cache (basically reset the cycle fields in all teh cache records) so as to make
+				 * GT.M processes that only does 'reads' to require crit and hence realize that online rollback
+				 * is in progress
+				 */
+				bt_refresh(cs_addrs, FALSE); /* sets earliest bt TN to be the turn around TN */
+				db_csh_ref(cs_addrs, FALSE);
+			}
+			assert(NULL != cs_addrs->jnl);
+			jpc = cs_addrs->jnl;
+			assert(NULL != jpc->jnl_buff);
+			jbp = jpc->jnl_buff;
+			/* Since Rollback simulates the journal record along with the timestamp at which the update was made, it
+			 * sets jgbl.dont_reset_gbl_jrec_time to TRUE so that during forward processing t_end or tp_tend does not
+			 * reset the gbl_jrec_time to reflect the current time. But, with Online Rollback, one can have the shared
+			 * memory up and running and hence can have jbp->prev_jrec_time to be the time of the most recent journal
+			 * update made. Later in t_end/tp_tend, ADJUST_GBL_JREC_TIME is invoked which ensures that if ever
+			 * gbl_jrec_time (the time of the current update) is less than jbp->prev_jrec_time (time of the latest
+			 * journal update), dont_reset_gbl_jrec_time better be FALSE. But, this assert will trip since Rollback
+			 * sets the latter to TRUE. To fix this, set jbp->prev_jrec_time to the turn around time stamp. This way
+			 * we are guaranteed that all the updates done in the forward processing will have a timestamp that is
+			 * greater than the turn around timestamp
+			 */
+			jbp->prev_jrec_time = jctl->turn_around_time;
+		} else if (dba_bg == csd->acc_meth)
+		{	/* set earliest bt TN to be the turn-around TN (taken from bt_refresh()) */
+			((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn = cs_addrs->ti->curr_tn - 1;
+		}
+#		else
+		if (dba_bg == csd->acc_meth)
+		{	/* set earliest bt TN to be the turn-around TN (taken from bt_refresh()) */
+			((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn = cs_addrs->ti->curr_tn - 1;
+		}
+#		endif
 		csd->turn_around_point = FALSE;
+		assert(((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn == cs_addrs->ti->curr_tn - 1);
 		/* In case this is MM and wcs_flu() remapped an extended database, reset rctl->csd */
 		assert((dba_mm == cs_data->acc_meth) || (rctl->csd == cs_data));
 		rctl->csd = cs_data;
@@ -189,8 +284,13 @@ uint4 mur_process_intrpt_recov()
 		assert(NULL != rctl->jctl_turn_around);
 		jctl = rctl->jctl_turn_around; /* points to journal file which has current recover's turn around point */
 		assert(0 != jctl->turn_around_offset);
-		jctl->jfh->turn_around_offset = jctl->turn_around_offset;	/* save progress in file header for 	*/
-		jctl->jfh->turn_around_time = jctl->turn_around_time;		/* possible re-issue of recover 	*/
+		jfh = jctl->jfh;
+		jfh->turn_around_offset = jctl->turn_around_offset;	/* save progress in file header for 	*/
+		jfh->turn_around_time = jctl->turn_around_time;		/* possible re-issue of recover 	*/
+		UNIX_ONLY(
+			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+				jfh->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
+		)
 		jfh_changed = TRUE;
 		for ( ; NULL != jctl; jctl = jctl->next_gen)
 		{	/* setup the next_jnl links. note that in the case of interrupted recovery, next_jnl links
@@ -199,14 +299,15 @@ uint4 mur_process_intrpt_recov()
 			 * generation journal file that needs its next_jnl link set. this is why we do the next_jnl
 			 * link setup even in the case of interrupted recovery although in most cases it is unnecessary.
 			 */
+			jfh = jctl->jfh;
 			if (NULL != jctl->next_gen)
 			{
-				jctl->jfh->next_jnl_file_name_length = jctl->next_gen->jnl_fn_len;
-				memcpy(jctl->jfh->next_jnl_file_name, jctl->next_gen->jnl_fn, jctl->next_gen->jnl_fn_len);
+				jfh->next_jnl_file_name_length = jctl->next_gen->jnl_fn_len;
+				memcpy(jfh->next_jnl_file_name, jctl->next_gen->jnl_fn, jctl->next_gen->jnl_fn_len);
 				jfh_changed = TRUE;
 			} else
-				assert(0 == jctl->jfh->next_jnl_file_name_length); /* null link from latest generation */
-			if (jctl->jfh->turn_around_offset && (jctl != rctl->jctl_turn_around))
+				assert(0 == jfh->next_jnl_file_name_length); /* null link from latest generation */
+			if (jfh->turn_around_offset && (jctl != rctl->jctl_turn_around))
 			{	/* It is possible that the current recovery has a turn-around-point much before the
 				 * previously interrupted recovery. If it happens to be a previous generation journal
 				 * file then we have to reset the original turn-around-point to be zero in the journal
@@ -218,13 +319,13 @@ uint4 mur_process_intrpt_recov()
 				 */
 				assert(!jctl->turn_around_offset);
 				assert(rctl->recov_interrupted);	/* rctl->jfh_recov_interrupted can fail */
-				jctl->jfh->turn_around_offset = 0;
-				jctl->jfh->turn_around_time = 0;
+				jfh->turn_around_offset = 0;
+				jfh->turn_around_time = 0;
 				jfh_changed = TRUE;
 			}
 			if (jfh_changed)
 			{
-				DO_FILE_WRITE(jctl->channel, 0, jctl->jfh, REAL_JNL_HDR_LEN, jctl->status, jctl->status2);
+				DO_FILE_WRITE(jctl->channel, 0, jfh, REAL_JNL_HDR_LEN, jctl->status, jctl->status2);
 				if (SS_NORMAL != jctl->status)
 				{
 					assert(FALSE);
@@ -269,6 +370,17 @@ uint4 mur_process_intrpt_recov()
 			gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 			return jnl_info.status;
 		}
+#		ifdef UNIX
+		if (jgbl.onlnrlbk)
+		{
+			cs_addrs = rctl->csa;
+			/* Mimic what jnl_file_close in case of cleanly a closed journal file */
+			jpc = cs_addrs->jnl; /* the previous loop makes sure cs_addrs->jnl->jnl_buff is valid*/
+			NULLIFY_JNL_FILE_ID(cs_addrs);
+			jpc->jnl_buff->cycle++; /* so that, all other processes knows to switch to newer journal file */
+			jpc->cycle--; /* decrement cycle so jnl_ensure_open() knows to reopen the journal */
+		}
+#		endif
 		if (NULL != rctl->jctl_alt_head) /* remove the journal files created by last interrupted recover process */
 		{
 			mur_rem_jctls(rctl);

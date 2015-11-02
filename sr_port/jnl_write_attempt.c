@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -166,8 +166,6 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
 				jnl_send_oper(jpc, ERR_JNLFLUSH);
 				send_msg(VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, CURRENT_WRITER);
-				stuck_cnt++;
-				GET_C_STACK_FROM_SCRIPT("JNLPROCSTUCK", process_id, CURRENT_WRITER, stuck_cnt);
 				send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Journal IO writer changed during wait"));
 				VMS_ONLY(jb->io_in_prog = 0);
 				UNIX_ONLY(COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +61,8 @@
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_imagetype_init.h"
 #include "gtm_threadgbl_init.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -79,6 +81,8 @@ GBLDEF CLI_ENTRY		*cmd_ary = &lke_cmd_ary[0];	/* Define cmd_ary to be the LKE sp
 
 static bool lke_process(int argc);
 static void display_prompt(void);
+
+error_def(ERR_CTRLC);
 
 int main (int argc, char *argv[])
 {
@@ -124,8 +128,6 @@ static bool lke_process(int argc)
 	bool		flag = FALSE;
 	int		res;
 	static int	save_stderr = SYS_STDERR;
-
-	error_def(ERR_CTRLC);
 
 	ESTABLISH_RET(util_ch, TRUE);
 	if (util_interrupt)
@@ -175,6 +177,6 @@ static bool lke_process(int argc)
 static void display_prompt(void)
 {
 	PRINTF("LKE> ");
-	fflush(stdout);
+	FFLUSH(stdout);
 }
 

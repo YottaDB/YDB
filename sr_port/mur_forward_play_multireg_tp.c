@@ -41,6 +41,8 @@ GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 
+error_def(ERR_JNLREADEOF);
+
 /* Now that we are ready to apply the multi-region TP transaction, check the most recent "forw_multi->recstat" status
  * and propagate that to all the participating "rctl"s in the first_tp_rctl list. Use the following macro to implement that.
  */
@@ -65,8 +67,6 @@ uint4	mur_forward_play_multireg_tp(forw_multi_struct *forw_multi, reg_ctl_list *
 	boolean_t		tcom_played, first_tcom, deleted;
 	ht_ent_int8		*tabent;
 	forw_multi_struct	*cur_forw_multi, *prev_forw_multi;
-
-	error_def(ERR_JNLREADEOF);
 
 	save_rctl = rctl;	/* save input "rctl" (needed at end) */
 	assert(!save_rctl->forw_eof_seen);
@@ -149,15 +149,13 @@ uint4	mur_forward_play_multireg_tp(forw_multi_struct *forw_multi, reg_ctl_list *
 		if (SS_NORMAL != status)
 			return status;
 		if (rctl->forw_eof_seen)
-		{
 			DELETE_RCTL_FROM_UNPROCESSED_LIST(rctl);
-			if (NULL != rctl->forw_multi)
-			{	/* Possible if we did not see TCOM. But has to be a BROKEN tn in that case.
-				 * Treat this region as having completed token processing.
-				 */
-				assert(BROKEN_TN == recstat);
-				MUR_FORW_TOKEN_REMOVE(rctl);
-			}
+		if (NULL != rctl->forw_multi)
+		{	/* Possible if we did not see TCOM. But has to be a BROKEN tn in that case.
+			 * Treat this region as having completed token processing.
+			 */
+			assert(BROKEN_TN == recstat);
+			MUR_FORW_TOKEN_REMOVE(rctl);
 		}
 	} while (next_rctl != rctl);
 	assert((num_tcoms == num_participants) || (BROKEN_TN == recstat));

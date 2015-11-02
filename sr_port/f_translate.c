@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,29 +15,30 @@
 #include "toktyp.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
-LITREF mval literal_null ;
+LITREF mval literal_null;
 
-int f_translate( oprtype *a, opctype op)
+int f_translate(oprtype *a, opctype op)
 {
-	triple	*args[3];
-	int 	i;
-	bool	more_args;
+	boolean_t	more_args;
+	int		i;
+	triple		*args[3];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	args[0] = maketriple(op);
-	if (!expr(&(args[0]->operand[0])))
+	if (EXPR_FAIL == expr(&(args[0]->operand[0]), MUMPS_EXPR))
 		return FALSE;
 	for (i = 1 , more_args = TRUE ; i < 3 ; i++)
 	{
 		args[i] = newtriple(OC_PARAMETER);
 		if (more_args)
 		{
-			if (window_token != TK_COMMA)
+			if (TK_COMMA != TREF(window_token))
 				more_args = FALSE;
 			else
 			{
 				advancewindow();
-				if (!expr(&(args[i]->operand[0])))
+				if (EXPR_FAIL == expr(&(args[i]->operand[0]), MUMPS_EXPR))
 					return FALSE;
 			}
 		}

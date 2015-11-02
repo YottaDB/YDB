@@ -28,7 +28,6 @@
 #include "op.h"
 #include "tp_timeout.h"
 #include "ctrlc_handler.h"
-#include "mprof.h"
 #include "gtm_startup_chk.h"
 #include "gtm_startup.h"
 #include "jobchild_init.h"
@@ -98,40 +97,39 @@ int gtm_main (int argc, char **argv, char **envp)
 	err_init(stop_image_conditional_core);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	cli_lex_setup(argc, argv);
-	/*	put the arguments into buffer, then clean up the token buffer
-		cli_gettoken() copies all arguments except the first one argv[0]
-		into the buffer (cli_lex_in_ptr->in_str).
-		i.e. command line: "/usr/library/V990/mumps -run somefile"
-		the buffer cli_lex_in_ptr->in_str == "-run somefile"	*/
+	/* put the arguments into buffer, then clean up the token buffer
+	 * cli_gettoken() copies all arguments except the first one argv[0]
+	 * into the buffer (cli_lex_in_ptr->in_str).
+	 * i.e. command line: "/usr/library/V990/mumps -run somefile"
+	 * the buffer cli_lex_in_ptr->in_str == "-run somefile"
+	 */
 	if (1 < argc)
 		cli_gettoken(&eof);
-	/*	cli_gettoken() extracts the first token into cli_token_buf (in tok_extract())
-		which should be done in parse_cmd(), So, reset the token buffer here to make
-		parse_cmd() starts from the first token
+	/* cli_gettoken() extracts the first token into cli_token_buf (in tok_extract())
+	 * which should be done in parse_cmd(), So, reset the token buffer here to make
+	 * parse_cmd() starts from the first token
 	*/
 	cli_token_buf[0] = '\0';
-	/*	insert the "MUMPS " in the parsing buffer the buffer is now:
-		cli_lex_in_ptr->in_str == "MUMPS -run somefile"
-		we didnot change argv[0]
+	/* insert the "MUMPS " in the parsing buffer the buffer is now:
+	 * cli_lex_in_ptr->in_str == "MUMPS -run somefile"
+	 * we didnot change argv[0]
 	*/
 	ptr = cli_lex_in_ptr->in_str;
 	memmove(strlen("MUMPS ") + ptr, ptr, strlen(ptr) + 1);	/* BYPASSOK */
 	MEMCPY_LIT(ptr, "MUMPS ");
-
-	/*	reset the argument buffer pointer, it's changed in cli_gettoken() call above    */
-	/*	do NOT reset to 0(NULL) to avoid fetching cmd line args into buffer again       */
-	/*	cli_lex_in_ptr->tp is the pointer to indicate current position in the buffer    */
-	/*	cli_lex_in_ptr->in_str                                                          */
+	/* reset the argument buffer pointer, it's changed in cli_gettoken() call above
+	 * do NOT reset to 0(NULL) to avoid fetching cmd line args into buffer again
+	 * cli_lex_in_ptr->tp is the pointer to indicate current position in the buffer
+	 * cli_lex_in_ptr->in_str
+	 */
 	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
 	parse_ret = parse_cmd();
 	if (parse_ret && (EOF != parse_ret))
 		rts_error(VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
-
 	if (cli_present("DIRECT_MODE"))
 		invocation_mode = MUMPS_DIRECT;
 	else if (cli_present("RUN"))
 		invocation_mode = MUMPS_RUN;
-
 	gtm_chk_dist(argv[0]);
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	init_gtm();

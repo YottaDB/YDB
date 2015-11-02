@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@
 #include "repl_shutdcode.h"
 #include "repl_sem.h"
 #include "repl_log.h"
+#include "repl_instance.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
@@ -61,15 +62,15 @@ int gtmsource_mode_change(int to_mode)
 	assert(ROOTPRIMARY_UNSPECIFIED != gtmsource_options.rootprimary);
 	if ((GTMSOURCE_MODE_ACTIVE == to_mode)
 			&& (ROOTPRIMARY_SPECIFIED == gtmsource_options.rootprimary) && jnlpool.jnlpool_ctl->upd_disabled)
-	{	/* ACTIVATE is specified with ROOTPRIMARY on a journal pool that was created with PROPAGATEPRIMARY.
-		 * This is a case of transition from propagating primary to root primary. Enable updates in this journal pool
-		 * and append a triple to the replication instance file. The function "gtmsource_rootprimary_init" does just that.
+	{	/* ACTIVATE is specified with ROOTPRIMARY on a journal pool that was created with PROPAGATEPRIMARY. This is a
+		 * case of transition from propagating primary to root primary. Enable updates in this journal pool and append
+		 * a histinfo record to the replication instance file. The function "gtmsource_rootprimary_init" does just that.
 		 */
 		gtmsource_rootprimary_init(jnlpool.jnlpool_ctl->jnl_seqno);
 	}
 	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-	grab_lock(jnlpool.jnlpool_dummy_reg);
+	GRAB_LOCK(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
 	/* Any ACTIVATE/DEACTIVATE versus ROOTPRIMARY/PROPAGATE incompatibilities have already been checked in the
 	 * function "jnlpool_init" so go ahead and document the impending activation/deactivation and return.
 	 * This flag will be eventually detected by the concurrently running source server which will then change mode.

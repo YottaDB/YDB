@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,29 +17,30 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char		window_token, director_token;
-GBLREF mident		window_ident;
 GBLREF boolean_t	run_time;
 GBLREF mident		routine_name;
 LITREF mident		zero_ident;
 
+error_def(ERR_LABELEXPECTED);
+error_def(ERR_RTNNAME);
+
 int m_zprint(void)
 {
-	oprtype	lab1, lab2, off1, off2, rtn;
-	triple	*ref, *next;
-	bool	got_some;
+	boolean_t	got_some;
+	oprtype		lab1, lab2, off1, off2, rtn;
+	triple		*next, *ref;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_LABELEXPECTED);
-	error_def(ERR_RTNNAME);
-
+	SETUP_THREADGBL_ACCESS;
 	got_some = FALSE;
 	lab1 = put_str(zero_ident.addr, zero_ident.len);
 	off1 = put_ilit(0);
-	if (window_token != TK_EOL && window_token != TK_SPACE && !lref(&lab1,&off1,TRUE,indir_zprint,TRUE,&got_some))
-		return FALSE;
-	if (lab1.oprclass == TRIP_REF && lab1.oprval.tref->opcode == OC_COMMARG)
+	if ((TK_EOL != TREF(window_token)) && (TK_SPACE != TREF(window_token))
+		&& !lref(&lab1, &off1, TRUE, indir_zprint, TRUE, &got_some))
+			return FALSE;
+	if ((TRIP_REF == lab1.oprclass) && (OC_COMMARG == lab1.oprval.tref->opcode))
 		return TRUE;
-	if (window_token != TK_CIRCUMFLEX)
+	if (TK_CIRCUMFLEX != TREF(window_token))
 	{	/* Routine not specified, use current routine */
 		if (!run_time)
 			rtn = put_str(routine_name.addr, routine_name.len);
@@ -49,27 +50,27 @@ int m_zprint(void)
 	{
 		got_some = TRUE;
 		advancewindow();
-		switch(window_token)
+		switch (TREF(window_token))
 		{
-			case TK_IDENT:
-#				ifdef GTM_TRIGGER
-				if (TK_HASH == director_token)
-					/* Coagulate tokens as necessary (and available) to allow '#' in the rtn name */
-					advwindw_hash_in_mname_allowed();
-#				endif
-				rtn = put_str(window_ident.addr, window_ident.len);
-				advancewindow();
-				break;
-			case TK_ATSIGN:
-				if (!indirection(&rtn))
-					return FALSE;
-				break;
-			default:
-				stx_error(ERR_RTNNAME);
+		case TK_IDENT:
+#			ifdef GTM_TRIGGER
+			if (TK_HASH == TREF(director_token))
+				/* Coagulate tokens as necessary (and available) to allow '#' in the rtn name */
+				advwindw_hash_in_mname_allowed();
+#			endif
+			rtn = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
+			advancewindow();
+			break;
+		case TK_ATSIGN:
+			if (!indirection(&rtn))
 				return FALSE;
+			break;
+		default:
+			stx_error(ERR_RTNNAME);
+			return FALSE;
 		}
 	}
-	if (window_token == TK_COLON)
+	if (TK_COLON == TREF(window_token))
 	{
 		if (!got_some)
 		{
@@ -79,7 +80,7 @@ int m_zprint(void)
 		lab2 = put_str(zero_ident.addr, zero_ident.len);
 		off2 = put_ilit(0);
 		advancewindow();
-		if (!lref(&lab2,&off2,TRUE,indir_zprint,FALSE,&got_some))
+		if (!lref(&lab2, &off2, TRUE, indir_zprint, FALSE, &got_some))
 			return FALSE;
 		if (!got_some)
 		{
@@ -106,5 +107,4 @@ int m_zprint(void)
 	next->operand[1] = put_tref(ref);
 	ref->operand[0] = off2;
 	return TRUE;
-
 }

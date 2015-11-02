@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,20 +55,20 @@ void db_auto_upgrade(gd_region *reg)
 	/* zero is a legitimate value for csd->mutex_spin_parms.mutex_spin_sleep_mask; so can't detect if need re-initialization */
 
 	/* Auto upgrade based on minor database version number. This code currently only does auto upgrade and does not
-	   do auto downgrade although that certainly is possible to implement if necessary. For now, if the current version
-	   is at a lower level than the minor db version, we do nothing.
-
-	   Note the purpose of the minor_dbver field is so that some part of gtm (either runtime, or conversion utility) some
-	   time and several versions down the road from now knows by looking at this field what fields in the fileheader are
-	   valid so it is important that the minor db version be updated each time the fileheader is updated and this routine
-	   correspondingly updated. SE 5/2006.
-	*/
+	 * do auto downgrade although that certainly is possible to implement if necessary. For now, if the current version
+	 * is at a lower level than the minor db version, we do nothing.
+	 *
+	 * Note the purpose of the minor_dbver field is so that some part of gtm (either runtime, or conversion utility) some
+	 * time and several versions down the road from now knows by looking at this field what fields in the fileheader are
+	 * valid so it is important that the minor db version be updated each time the fileheader is updated and this routine
+	 * correspondingly updated. SE 5/2006.
+	 */
 	if (csd->minor_dbver < GDSMVCURR)
 	{	/* In general, the method for adding new versions is:
-		   1) If there are no automatic updates for this version, it is optional to add the version to the switch
-		      statement below. Those there are more for example at this time (through V53000).
-		   2) Update (or add) a case for the previous version to update any necessary fields.
-		*/
+		 * 1) If there are no automatic updates for this version, it is optional to add the version to the switch
+		 *    statement below. Those there are more for example at this time (through V53000).
+		 * 2) Update (or add) a case for the previous version to update any necessary fields.
+		 */
 		if (!csd->opened_by_gtmv53 && !csd->db_got_to_v5_once)
 		{
 			csd->opened_by_gtmv53 = TRUE;
@@ -103,15 +103,28 @@ void db_auto_upgrade(gd_region *reg)
 		 * e) Add assert(FALSE) and break (like it was before)
 		 */
 		switch(csd->minor_dbver)
-		{
+		{	/* Note that handling for any fields introduced in a version will not go in the "switch-case" block
+			 * of code introduced for the new version but will go in the PREVIOUS "switch-case" block.
+			 */
 			case GDSMV51000:		/* Multi-site replication available */
 			case GDSMV52000:		/* Unicode */
 			case GDSMV53000:		/* M-Itanium release */
 				gvstats_rec_upgrade(csa); /* Move GVSTATS information to new place in file header */
-			case GDSMV54002: 		/* Backward recovery related fields */
+			case GDSMV54002:
+				/* GT.M V54002B introduced jnl_eov_tn for backward recovery */
 				csd->jnl_eovtn = csd->trans_hist.curr_tn;
+			case GDSMV54002B:
+				/* GT.M V55000 introduced strm_reg_seqno, save_strm_reg_seqno, intrpt_recov_resync_strm_seqno
+				 * AND obsoleted dualsite_resync_seqno. For new fields, we are guaranteed they are
+				 * zero (in formerly unused sections of the file header) so no need for any initialization.
+				 * For obsoleted fields, it would be good to clear them here so we dont run into issues later.
+				 */
+				UNIX_ONLY(csd->filler_seqno = 0;)	/* was "dualsite_resync_seqno" in pre-V55000 versions */
+				/* In addition, V55000 introduced before_trunc_total_blks for MUPIP REORG -TRUNCATE.
+				 * Since it is a new field no initialization necessary.
+				 */
 				break;
-			case GDSMV54003:
+			case GDSMV55000:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

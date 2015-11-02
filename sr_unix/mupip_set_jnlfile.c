@@ -37,7 +37,7 @@
 #include "eintr_wrappers.h"
 #include "util.h"
 #include "mu_rndwn_file.h"
-#include "ftok_sems.h"
+#include "db_ipcs_reset.h"
 
 GBLREF gd_region        *gv_cur_region;
 GBLREF boolean_t	need_no_standalone;

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2011 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -97,17 +97,18 @@ out     s rf=%ZR(%ZR)_$tr($e(%ZR),"%","_")_$e(%ZR,2,9999)_".m"
 reof    u %ZD w ! c rf
 rnoopen i $zs'["EOF" w !,$p($zs,",",2,999),!
         q
-frmt    i '%ZC s t1=0 d                         ;strip comments
-        . f  s t1=$f(x,";",t1) q:'t1  i $l($e(x,1,t1),"""")#2 d  q
-        . . i $e(x,t1)'=";" s x=$e(x,1,t1-2)
-        i '$l(x) s x=" " q
-        i $e(x)=";" s x=" "_x                   ;if lonely comment, provide ls
-        s t1=0
-        f  s t1=$f(x,$c(9),t1) q:'t1  d         ;convert <TAB>s to spaces
-        . s x=$e(x,1,t1-2)_$j("",8-(t1-2#8))_$e(x,t1,9999)
-        f t1=$l(x):-1:0 q:$e(x,t1)'=" "         ;strip trailing spaces
-        s x=$e(x,1,t1)
-        q
+frmt    new stripped set stripped=0
+        if '%ZC set t1=0 do                         ;strip comments
+        . for  set t1=$find(x,";",t1) quit:'t1  if $length($extract(x,1,t1-1),"""")#2 do  quit
+        . . if $extract(x,t1)'=";" set x=$extract(x,1,t1-2) if '$length($translate(x," "_$char(9))) set x="",stripped=1
+        if '$length(x),stripped quit
+        ;kill stripped
+        if '$length(x) set x=" " quit
+        if $extract(x)=";" set x=" "_x                   ;if lonely comment, provide ls
+        set t1=0
+        for  set t1=$find(x,$char(9),t1) quit:'t1  do         ;convert <TAB>s to spaces
+        . set x=$extract(x,1,t1-2)_$justify("",8-(t1-2#8))_$extract(x,t1,9999)
+        quit
         ;
 ERR     u $p w !,$p($zs,",",2,99),!
         s $ec=""

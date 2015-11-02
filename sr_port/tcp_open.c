@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,6 +62,15 @@ const char *hstrerror(int err);
 
 GBLREF tcp_library_struct       tcp_routines;
 
+error_def(ERR_INVADDRSPEC);
+error_def(ERR_IPADDRREQ);
+error_def(ERR_SETSOCKOPTERR);
+error_def(ERR_SOCKINIT);
+error_def(ERR_SYSCALL);
+error_def(ERR_SOCKACPT);
+error_def(ERR_SOCKLISTEN);
+error_def(ERR_TEXT);
+
 int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /* host needs to be NULL terminated */
 {
 	boolean_t		no_time_left = FALSE, error_given = FALSE;
@@ -81,20 +90,10 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 	int 			save_errno, errlen;
 	const char		*terrptr;
 
-	error_def(ERR_INVADDRSPEC);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_IPADDRREQ);
-	error_def(ERR_SOCKINIT);
-	error_def(ERR_SETSOCKOPTERR);
-  	error_def(ERR_SOCKLISTEN);
-  	error_def(ERR_SOCKACPT);
-  	error_def(ERR_TEXT);
-
 	temp_sin_addr = 0;
 	msg_string.len = SIZEOF(msg_buffer);
 	msg_string.addr = msg_buffer;
 	memset((char *)&sin, 0, SIZEOF(struct sockaddr_in));
-
 	/* ============================= initialize structures ============================== */
 	if (NULL != host)
 	{
@@ -106,13 +105,13 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			adptr = iotcp_name2ip(host);
 			if (NULL == adptr)
 			{
-#if !defined(__hpux) && !defined(__MVS__)
+#				if !defined(__hpux) && !defined(__MVS__)
 				terrptr = HSTRERROR(h_errno);
 				rts_error(VARLSTCNT(6) ERR_INVADDRSPEC, 0, ERR_TEXT, 2, LEN_AND_STR(terrptr));
-#else
+#				else
 				/* Grumble grumble HPUX and z/OS don't have hstrerror() */
 				rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);
-#endif
+#				endif
 				return -1;
 			}
 			SPRINTF(addr, "%s", adptr);
@@ -126,7 +125,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			return  -1;
 		}
 	}
-
 	if (passive)
 		/* We can only listen on our own system */
 		sin.sin_addr.s_addr = INADDR_ANY;
@@ -144,9 +142,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 	sin.sin_port = GTM_HTONS(port);
 	sin.sin_family = AF_INET;
 
-
 	/* ============================== do the connection ============================== */
-
 	if (passive)
 	{
 		struct timeval  utimeout, save_utimeout;
@@ -193,7 +189,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			assert(FALSE);
 			return -1;
 		}
-
 		if (NO_M_TIMEOUT != timeout)
 		{
 			msec_timeout = timeout2msec(timeout);
@@ -249,17 +244,19 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			save_errno = errno;
 			if (-1 == sock)
 			{
-#ifdef __hpux
-			/*ENOBUFS in HP-UX is either because of a memory problem or when we have received a RST just
-			after a SYN before an accept call. Normally this is not fatal and is just a transient state.
-			Hence exiting just after a single error of this kind should not be done. So retry in case
-			of HP-UX and ENOBUFS error. */
+#				ifdef __hpux
+				/* ENOBUFS in HP-UX is either because of a memory problem or when we have received a RST just
+				 * after a SYN before an accept call. Normally this is not fatal and is just a transient state.
+				 * Hence exiting just after a single error of this kind should not be done. So retry in case
+				 * of HP-UX and ENOBUFS error.
+				 */
 				if (ENOBUFS == save_errno)
 				{
 					retry_num = 0;
 					while (HPUX_MAX_RETRIES > retry_num)
-					{
-				/*In case of succeeding with select in first go, accept will still get 5ms time difference*/
+					{	/* In case of succeeding with select in first go, accept will still get 5ms time
+						 * difference.
+						 */
 						SHORT_SLEEP(5);
 						for ( ; HPUX_MAX_RETRIES > retry_num; retry_num++)
 						{
@@ -300,7 +297,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 					}
 				}
 				if (-1 == sock)
-#endif
+#				endif
 				{
 					(void)tcp_routines.aa_close(lsock);
 					errptr = (char *)STRERROR(save_errno);
@@ -311,9 +308,9 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				}
 			}
 			SPRINTF(&temp_addr[0], "%s", tcp_routines.aa_inet_ntoa(peer.sin_addr));
-#ifdef	DEBUG_ONLINE
+#			ifdef	DEBUG_ONLINE
 			PRINTF("Connection is from : %s\n", &temp_addr[0]);
-#endif
+#			endif
 			/* Check if connection is from whom we want it to be from. Note that this is not a robust check
 			   (potential for multiple IP addrs for a resolved name but workarounds for this exist so not a lot
 			   of effort has been expended here at this time. Especially since the check is easily spoofed with
@@ -332,8 +329,8 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				}
 				if (!error_given)
 				{
-					util_out_print("Connection from !AD rejected and ignored", TRUE,
-						       LEN_AND_STR(&temp_addr[0]));
+					util_out_print("Connection from !AD rejected and ignored (expected from !AD)", TRUE,
+						       LEN_AND_STR(&temp_addr[0]), LEN_AND_STR(&addr[0]));
 					error_given = TRUE;
 				}
 			}
@@ -363,7 +360,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				assert(FALSE);
 				return -1;
 			}
-			/*      allow multiple connections to the same IP address */
+			/* Allow multiple connections to the same IP address */
 			if      (-1 == tcp_routines.aa_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
 			{
 				save_errno = errno;
@@ -415,6 +412,5 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			return -1;
 		}
 	}
-
 	return sock;
 }

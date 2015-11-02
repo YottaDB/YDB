@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,7 @@
 #include "lke.h"
 #include "lke_getcli.h"
 #include "gtmmsg.h"
+#include "min_max.h"
 
 #define NOFLUSH 0
 #define FLUSH	1
@@ -47,7 +48,14 @@ GBLREF	gd_addr		*gd_header;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	short		crash_count;
 
+error_def(ERR_UNIMPLOP);
+error_def(ERR_TEXT);
 error_def(ERR_NOREGION);
+error_def(ERR_BADREGION);
+error_def(ERR_NOLOCKMATCH);
+error_def(ERR_LOCKSPACEUSE);
+error_def(ERR_LOCKSPACEFULL);
+error_def(ERR_LOCKSPACEINFO);
 
 void	lke_show(void)
 {
@@ -59,10 +67,8 @@ void	lke_show(void)
 	char 			regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
 	mlk_ctldata_ptr_t	ctl;
 	mstr			reg, node, one_lock;
-
-	error_def(ERR_UNIMPLOP);
-	error_def(ERR_TEXT);
-
+	int			shr_sub_len = 0;
+	float			ls_free = 0;	/* Free space in bottleneck subspace */
 	/* Get all command parameters */
 	reg.addr = regbuf;
 	reg.len = SIZEOF(regbuf);
@@ -70,7 +76,6 @@ void	lke_show(void)
 	node.len = SIZEOF(nodebuf);
 	one_lock.addr = one_lockbuf;
 	one_lock.len = SIZEOF(one_lockbuf);
-
 	if (lke_getcli(&all, &wait, &interactive, &pid, &reg, &node, &one_lock, &memory, &nocrit, &exact) == 0)
 		return;
 
@@ -110,24 +115,46 @@ void	lke_show(void)
 				if (!nocrit && !was_crit)
 					grab_crit(gv_cur_region);
 				longcpy((uchar_ptr_t)ctl, (uchar_ptr_t)cs_addrs->lock_addrs[0], ls_len);
+				assert((ctl->max_blkcnt > 0) && (ctl->max_prccnt > 0) && ((ctl->subtop - ctl->subbase) > 0));
 				if (!nocrit && !was_crit)
 					rel_crit(gv_cur_region);
+				shr_sub_len = 0;
 				locks = ctl->blkroot == 0 ?
 						FALSE:
 						lke_showtree(NULL, (mlk_shrblk_ptr_t)R2A(ctl->blkroot), all, wait, pid,
-												one_lock, memory);
+							     one_lock, memory, &shr_sub_len);
+				/* lock space usage consists of: control_block + nodes(locks) +  processes + substrings */
+				/* any of those subspaces can be bottleneck.
+				 * Therefore we will report the subspace which is running out.
+				 */
+				ls_free = MIN(((float)ctl->blkcnt) / ctl->max_blkcnt, ((float)ctl->prccnt) / ctl->max_prccnt);
+				ls_free = MIN(1-(((float)shr_sub_len) / (ctl->subtop - ctl->subbase)), ls_free);
+				ls_free *= 100;	/* Scale to [0-100] range. (couldn't do this inside util_out_print) */
+				if (ls_free < 1) /* No memory? Notify user. */
+				{
+					gtm_putmsg(VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(gv_cur_region));
+					if (ctl->subtop > ctl->subfree)
+						gtm_putmsg(VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(gv_cur_region),
+							 (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
+							 (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" not "));
+					else
+						gtm_putmsg(VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(gv_cur_region),
+							 (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
+							 (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" "));
+				}
 				free(ctl);
 			} else
 			{
-				util_out_print(NULL, RESET);
-				util_out_print("Region is not BG, MM, or CM", FLUSH);
+				gtm_putmsg(VARLSTCNT(2) ERR_BADREGION, 0);
 				locks = TRUE;
 			}
 			if (!locks)
 			{
-				util_out_print(NULL, RESET);
-				util_out_print("No locks were found in !AD", FLUSH, REG_LEN_STR(gv_cur_region));
+				gtm_putmsg(VARLSTCNT(4) ERR_NOLOCKMATCH, 2, REG_LEN_STR(gv_cur_region));
 			}
+			assert((ls_free <= 100) && (ls_free >= 0));
+			gtm_putmsg(VARLSTCNT(4) ERR_LOCKSPACEUSE, 2, ((int)ls_free),
+				       cs_addrs->hdr->lock_space_size/OS_PAGELET_SIZE);
 		}
 	}
 

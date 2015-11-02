@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,15 +22,14 @@
 #include "cdbg_dump.h"
 #include "gtmdbglvl.h"
 
-GBLREF boolean_t	run_time;
-GBLREF triple		t_orig;
-GBLREF mlabel		*mlabtab;
-GBLREF command_qualifier cmd_qlf;
-GBLREF uint4		gtmDebugLevel;
+GBLREF boolean_t		run_time;
+GBLREF triple			t_orig;
+GBLREF mlabel			*mlabtab;
+GBLREF command_qualifier	cmd_qlf;
+GBLREF uint4			gtmDebugLevel;
 
 error_def(ERR_LABELMISSING);
 error_def(ERR_LABELUNKNOWN);
-error_def(ERR_FMLLSTPRESENT);
 error_def(ERR_FMLLSTMISSING);
 error_def(ERR_ACTLSTTOOLONG);
 
@@ -57,7 +56,7 @@ int resolve_ref(int errknt)
 		{
 			COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););
 			COMPDBG(cdbg_dump_triple(x, 0);)
-			for (n = x->operand ; n < ARRAYTOP(x->operand); n++)
+			for (n = x->operand; n < ARRAYTOP(x->operand); n++)
 			{
 				if (n->oprclass == INDR_REF)
 					*n = *(n->oprval.indr);
@@ -74,7 +73,7 @@ int resolve_ref(int errknt)
 					continue;
 				case MNXL_REF:
 					mxl = n->oprval.mlin->child;
-						y = mxl ? mxl->externalentry : 0;
+					y = mxl ? mxl->externalentry : 0;
 					if (!y)
 					{	/* ignore vacuuous DO sp sp */
 						x->opcode = OC_NOOP;
@@ -89,21 +88,8 @@ int resolve_ref(int errknt)
 					y = mlbx->ml ? mlbx->ml->externalentry : 0;
 					if (y)
 					{
-						if (mlbx->formalcnt == NO_FORMALLIST)
-						{
-							n->oprclass = TJMP_REF;
-							n->oprval.tref = y;
-						} else
-						{
-							errknt++;
-							stx_error(ERR_FMLLSTPRESENT, 2, mlbx->mvname.len, mlbx->mvname.addr);
-							TREF(source_error_found) = 0;
-							y = newtriple(OC_RTERROR);
-							y->operand[0] = put_ilit(ERR_FMLLSTPRESENT);
-							y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
-							n->oprval.tref = y;
-							n->oprclass = TJMP_REF;
-						}
+						n->oprclass = TJMP_REF;
+						n->oprval.tref = y;
 					} else
 					{
 						errknt++;
@@ -190,26 +176,24 @@ int resolve_ref(int errknt)
 
 
 /* If for example there are nested $SELECT routines feeding a value to a SET $PIECE/$EXTRACT, this nested checking is
-   necessary to make sure no OC_PASSTHRUs remain in the parameter chain to get turned into OC_NOOPs that will
-   cause GTMASSERTs in emit_code.
-*/
+ * necessary to make sure no OC_PASSTHRUs remain in the parameter chain to get turned into OC_NOOPs that will
+ * cause GTMASSERTs in emit_code.
+ */
 void resolve_tref(triple *curtrip, oprtype *opnd)
 {
 	triple	*tripref;
 	tbp	*tripbp;
 
-	if (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode)
+	if (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode)		/* note the assignment */
 	{
 		assert(tripref->operand[0].oprclass == TRIP_REF);
 		do
-		{	/* As many OC_PASSTHRUs as are stacked, we will devour */
+			/* As many OC_PASSTHRUs as are stacked, we will devour */
 			*opnd = tripref->operand[0];
-		} while (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode);
+		while (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode);	/* note the assignment */
 	}
-
 	COMPDBG(PRINTF(" ** Passthru replacement: Operand at 0x%08lx replaced by operand at 0x%08lx\n",
 		       opnd, &tripref->operand[0]););
-
 	tripbp = (tbp *) mcalloc(SIZEOF(tbp));
 	tripbp->bpt = curtrip;
 	dqins(&opnd->oprval.tref->backptr, que, tripbp);

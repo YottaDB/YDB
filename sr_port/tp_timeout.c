@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,53 +51,65 @@
  */
 
 #include "mdef.h"
+
+#include "gtm_stdio.h"
 #if defined (VMS)
-#include "efn.h"
-#include <ssdef.h>
+#  include "efn.h"
+#  include <ssdef.h>
 #endif
+
+/* tp_timeout.h needs to be included to potentially define DEBUG_TPTIMEOUT_DEFERRAL */
+#include "tp_timeout.h"
+#ifdef DEBUG_TPTIMEOUT_DEFERRAL
+#  include "gtm_time.h"
+#endif
+
 #include "outofband.h"
 #include "gt_timer.h"
 #include "xfer_enum.h"
-#include "tp_timeout.h"
 #include "deferred_events.h"
 #include "op.h"
 #include "fix_xfer_entry.h"
+#include "error_trap.h"
 
-/* ------------------------------------------------------------------
- * Macro for timer ID
- * ------------------------------------------------------------------
+#define TP_TIMER_ID (TID)&tp_start_timer
+
+/* If debugging timeout deferral, it is helpful to timestamp the messages. Encapsulate our debugging macro with
+ * enough processing to be able to do that.
  */
-#define TP_TIMER_ID (TID) &tp_start_timer
+#ifdef DEBUG_TPTIMEOUT_DEFERRAL
+#  define TIME_EXT_FMT "%T"
+#  define DBGWTIME(x) 									\
+{											\
+	time_t		now;								\
+	struct tm	*tm_struct;							\
+	char		asccurtime[10];							\
+	size_t		len;								\
+	now = time(NULL);								\
+	tm_struct = localtime(&now);							\
+	STRFTIME(asccurtime, SIZEOF(asccurtime), TIME_EXT_FMT, tm_struct, len);		\
+	DBGTPTDFRL(x);									\
+}
+#else
+#  define DBGWTIME(x)
+#endif
 
-/* =============================================================================
- * EXTERNAL VARIABLES
- * =============================================================================
- */
-GBLREF xfer_entry_t     xfer_table[];
-GBLREF volatile int4	outofband;
+/* External variables */
+GBLREF dollar_ecode_type	dollar_ecode;
+GBLREF mval			dollar_etrap;
+GBLREF mval			dollar_ztrap;
+GBLREF volatile int4		outofband;
+GBLREF xfer_entry_t     	xfer_table[];
+GBLREF boolean_t		in_timed_tn;
+GBLREF boolean_t		tp_timeout_set_xfer;
+GBLREF boolean_t		tp_timeout_deferred;
+GBLREF boolean_t		dollar_zininterrupt;
+GBLREF boolean_t		ztrap_explicit_null;
 
-void tptimeout_set(int4 dummy_param);
+error_def(ERR_TPTIMEOUT);
 
-
-/* =============================================================================
- * FILE-SCOPE VARIABLES
- * =============================================================================
- */
-
-/*	------------------------------------------------------------
- * 	Shared between timer handler and main process
- *	------------------------------------------------------------
- */
-
-/* "Are we currently in a timed transaction?" It does not change asynchronously */
-static boolean_t 		in_timed_tn = FALSE;
-
-
-/*	"Did timeout succeed in setting xfer_table?"
- * 	 (vs. lose to another event)
- */
-GBLDEF	volatile boolean_t 	tp_timeout_set_xfer = FALSE;
-
+STATICFNDCL void tptimeout_set(int4 dummy_param);
+STATICFNDCL void tp_expire_now(void);
 
 /* =============================================================================
  * FILE-SCOPE FUNCTIONS
@@ -113,16 +125,13 @@ GBLDEF	volatile boolean_t 	tp_timeout_set_xfer = FALSE;
  * - Static because it's for internal use only.
  * ------------------------------------------------------------------
  */
-static void tp_expire_now() /* Param list is empty, not void,
-			       * to avoid mixing K&R with ANSI */
+STATICFNDEF void tp_expire_now(void)
 {
+	DBGWTIME((stderr, "%s tp_expire_now: Driving xfer_set_handlers\n" VMS_ONLY("\n"),
+		  asccurtime));
 	assert(in_timed_tn);
-/*	Consider logging operator message here.
- *	(ditto for network errors, etc -- log when arrive, handle later).
- */
 	tp_timeout_set_xfer = xfer_set_handlers(outofband_event, &tptimeout_set, 0);
 }
-
 
 /* ------------------------------------------------------------------
  * Set transfer table for synchronous handling of TP timeout.
@@ -134,12 +143,36 @@ static void tp_expire_now() /* Param list is empty, not void,
  *    tp_timeout header file, because it's not for general use.
  * ------------------------------------------------------------------
  */
-void tptimeout_set(int4 dummy_param)
+STATICFNDEF void tptimeout_set(int4 dummy_param)
 {
-#if defined (VMS)
-	int4 status;
-#endif
+	VMS_ONLY(int4 status;)
 
+#	ifdef UNIX
+	/* TP timeout deferral is UNIX-only. This is because the mechanism becomes much more complicated on VMS
+	 * due to the mixing of timers and TP timeout, both of which use the same event flag so don't play well
+	 * together. It could be fixed for VMS with some perhaps non-trivial work but with VMS approaching EOL,
+	 * the effort was deemed unnecessary.
+	 */
+	if (((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)) UNIX_ONLY( || dollar_zininterrupt))
+	{	/* Error handling or job interrupt is in effect - defer tp timeout
+		 * until $ECODE is cleared and/or we have unrolled the job interrupt
+		 * frame
+		 */
+		assert(!tp_timeout_deferred);	/* Note: even though we come back thru tptimeout_set() from op_svput and
+						 * other places when tp_timeout_deferred was known to be true, we shouldn't
+						 * come back through with the above conditions letting us in THIS block. So
+						 * We should only be coming through here via the initial timeout where we
+						 * should be garranteed this flag is OFF.
+						 */
+		tp_timeout_deferred = TRUE;
+		DBGWTIME((stderr, "%s tptimeout_set: TP timeout deferred\n" VMS_ONLY("\n"), asccurtime));
+		return;
+	} else
+	{
+		DBGWTIME((stderr, "%s tptimeout_set: TP timeout *NOT* deferred - ecode index: %d  etrap: %d\n"  VMS_ONLY("\n"),
+			  asccurtime, dollar_ecode.index, ETRAP_IN_EFFECT));
+	}
+#	endif
 	if (tptimeout != outofband)
 	{
 		FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
@@ -149,20 +182,20 @@ void tptimeout_set(int4 dummy_param)
 		FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
 		FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
 		outofband = tptimeout;
-		VMS_ONLY(
-			status = sys$setef(efn_outofband);
-			assert(SS$_WASCLR == status);
-			if (status != SS$_WASCLR && status != SS$_WASSET)
-				GTMASSERT;
-			sys$wake(0,0);
-		)
+#		ifdef VMS
+		/* Set event flag now that intercept is in place */
+		status = sys$setef(efn_outofband);
+		assert(SS$_WASCLR == status);
+		assertpro((SS$_WASCLR == status) || (SS$_WASSET == status));
+		sys$wake(0,0);
+#		endif
+	} else
+	{
+		DBGWTIME((stderr, "%s tptimeout_set: tptimeout outofband already set\n" VMS_ONLY("\n"), asccurtime));
 	}
+	UNIX_ONLY(tp_timeout_deferred = FALSE);	/* Clear flag now that intercept setup or already installed */
 }
 
-/* =============================================================================
- * EXPORTED FUNCTIONS
- * =============================================================================
- */
 /* ------------------------------------------------------------------
  * Start timer (Clear -> Set-timer)
  *
@@ -178,8 +211,9 @@ void tptimeout_set(int4 dummy_param)
 void tp_start_timer(int4 timeout_seconds)
 {
 	assert(!in_timed_tn);
+	DBGWTIME((stderr, "%s tp_start_timer: Starting timer for tptimeout\n" VMS_ONLY("\n"), asccurtime));
 	in_timed_tn = TRUE;
-	start_timer(TP_TIMER_ID, 1000*timeout_seconds, &tp_expire_now, 0, NULL);
+	start_timer(TP_TIMER_ID, (1000 * timeout_seconds), &tp_expire_now, 0, NULL);
 }
 
 /* ------------------------------------------------------------------
@@ -204,13 +238,10 @@ void tp_start_timer(int4 timeout_seconds)
  */
 void tp_clear_timeout(void)
 {
-         boolean_t tp_timeout_check = FALSE;
+	boolean_t tp_timeout_check = FALSE;
 
-#ifdef DEBUG_DEFERRED
-#include "gtm_stdio.h"
-	 FPRINTF(stderr,"\nTPCT: \n");
-#endif
-
+	DBGWTIME((stderr, "%s tp_clear_timeout: Transaction complete - clearing tptimeout\n" VMS_ONLY("\n"), asccurtime));
+	tp_timeout_deferred = FALSE;
 	if (in_timed_tn)
 	{
 		/* ------------------------------------------------
@@ -225,7 +256,6 @@ void tp_clear_timeout(void)
 		 * ------------------------------------------------
 		 */
 		cancel_timer(TP_TIMER_ID);
-
 		/* --------------------------------------------
 		 * For unambiguous states, clear this flag
 		 * after cancelling timer and before clearing
@@ -233,7 +263,6 @@ void tp_clear_timeout(void)
 		 * --------------------------------------------
 		 */
 		in_timed_tn = FALSE;
-
 		/* -----------------------------------------------------
 		 * Should clear xfer settings only if set them.
 		 * -----------------------------------------------------
@@ -252,9 +281,8 @@ void tp_clear_timeout(void)
 			 */
 
 		        tp_timeout_check = xfer_reset_if_setter(outofband_event);
-#ifdef DEBUG_DEFERRED
-			FPRINTF(stderr,"\nTPCT: passed reset of xfer table\n");
-#endif
+			DBGWTIME((stderr, "%s tp_clear_timeout: tptimeout timer had already popped - clearing driver "
+				  "indicicator\n" VMS_ONLY("\n"), asccurtime));
 			assert(tp_timeout_check);
 			tp_timeout_set_xfer = FALSE;
 		} else
@@ -281,20 +309,20 @@ void tp_clear_timeout(void)
 			 *      or otherwise (e.g. at exit).
 			 * ----------------------------------------------------
 			 */
-
 			; /* (There's nothing to do) */
-
 		}
 	}
 }
 
-
-
 /*
- * Used in transfer table for signaling exception
+ * Routine is driven at tp timeout recognition point by outofband_action().
  */
 void tp_timeout_action(void)
 {
-	error_def(ERR_TPTIMEOUT);
+	/* Since tp timeout error is about to be driven, reset the interrupt mechanism before
+	 * any error handler gets driven so we don't trip another call inside the error handler.
+	 */
+	DBGWTIME((stderr, "%s tp_timeout_action: Driving TP timeout error\n" VMS_ONLY("\n"), asccurtime));
+	tp_clear_timeout();
 	rts_error(VARLSTCNT(1) ERR_TPTIMEOUT);
 }

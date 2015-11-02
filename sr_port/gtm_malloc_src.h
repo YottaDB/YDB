@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,6 +67,7 @@
 #include "gtm_malloc.h"
 #include "have_crit.h"
 #ifdef UNIX
+#include "gtmio.h"
 #include "deferred_signal_handler.h"
 #endif
 
@@ -237,12 +238,12 @@ typedef struct
 #  define TRACE_MALLOC(addr, len, tn) 											\
 {															\
 	if (GDL_SmTrace & gtmDebugLevel)										\
-		DBGFPF((stdout, "Malloc at 0x%lx of %ld bytes from 0x%lx (tn=%ld)\n", addr, len, CALLERID, tn));	\
+		DBGFPF((stderr, "Malloc at 0x%lx of %ld bytes from 0x%lx (tn=%ld)\n", addr, len, CALLERID, tn));	\
 }
 #  define TRACE_FREE(addr, len, tn)											\
 {															\
 	if (GDL_SmTrace & gtmDebugLevel)										\
-		DBGFPF((stdout,"Free at 0x%lx of %d bytes from 0x%lx (tn=%ld)\n", addr, len, CALLERID, tn));		\
+		DBGFPF((stderr, "Free at 0x%lx of %d bytes from 0x%lx (tn=%ld)\n", addr, len, CALLERID, tn));		\
 }
 #else
 #  define INCR_CNTR(x)
@@ -255,7 +256,7 @@ typedef struct
 #  define TRACE_FREE(addr, len, tn)
 #endif
 #ifdef DEBUG_SM
-#  define DEBUGSM(x) (PRINTF x, fflush(stdout))
+#  define DEBUGSM(x) (PRINTF x, FFLUSH(stdout))
 # else
 #  define DEBUGSM(x)
 #endif
@@ -433,6 +434,13 @@ GMR_ONLY(STATICD	uint4	reentMallocs;)		/* Total number of reentrant mallocs made
 GMR_ONLY(STATICD	uint4	deferFreePending;)	/* Total number of frees that were deferred */
 #endif
 
+error_def(ERR_INVMEMRESRV);
+error_def(ERR_MEMORYRECURSIVE);
+UNIX_ONLY(error_def(ERR_MEMORY);)
+UNIX_ONLY(error_def(ERR_SYSCALL);)
+VMS_ONLY(error_def(ERR_FREEMEMORY);)
+VMS_ONLY(error_def(ERR_VMSMEMORY);)
+
 /* Macro to return an index into the TwoTable for a given size (round up to next power of two)
    Use the size2Index table to get the proper index. This table is indexed by the number of
    storage "blocks" being requested. A storage block is the size of the smallest power of two
@@ -457,6 +465,13 @@ void raise_gtmmemory_error_dbg(void);
 size_t gtm_bestfitsize_dbg(size_t);
 #endif
 
+VMS_ONLY(error_def(ERR_FREEMEMORY);)
+error_def(ERR_INVMEMRESRV);
+UNIX_ONLY(error_def(ERR_MEMORY);)
+error_def(ERR_MEMORYRECURSIVE);
+VMS_ONLY(error_def(ERR_VMSMEMORY);)
+UNIX_ONLY(error_def(ERR_SYSCALL);)
+
 /* Initialize the storage manangement system. Things to initialize:
 
    - Initialize size2Index table. This table is used to convert a malloc request size
@@ -473,8 +488,6 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	char		*ascNum;
 	storElem	*uStor;
 	int		i, sizeIndex, testSize, blockSize, save_errno;
-
-	error_def(ERR_INVMEMRESRV);
 
 	/* WARNING!! Since this is early initialization, the following asserts are not well behaved if they do
 	   indeed trip. The best that can be hoped for is they give a condition handler exhausted error on
@@ -558,8 +571,6 @@ storElem *findStorElem(int sizeIndex)	/* Note renamed to findStorElem_dbg when i
 	storExtHdr	*sEHdr;
 	int		hdrSize;
 	unsigned int	i;
-
-	UNIX_ONLY(error_def(ERR_SYSCALL);)
 
 	++sizeIndex;
 	DEBUG_ONLY(hdrSize = OFFSETOF(storElem, userStorage));	/* Size of storElem header */
@@ -650,7 +661,6 @@ void processDeferredFrees()	/* Note renamed to processDeferredFrees_dbg when inc
 {
 	int		dqIndex;
 	storElem	*uStor, *uStorNext;
-	VMS_ONLY(error_def(ERR_FREEMEMORY);)
 
 	assert(0 == gtmMallocDepth);
 	do
@@ -691,9 +701,6 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 	int		sizeIndex, i, hdrSize;
 	unsigned char	*trailerMarker;
 	boolean_t	reentered;
-
-	UNIX_ONLY(error_def(ERR_SYSCALL);)
-	error_def(ERR_MEMORYRECURSIVE);
 
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
@@ -874,11 +881,6 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 	unsigned char	*trailerMarker;
 	int 		sizeIndex, hdrSize, saveIndex, dqIndex, freedElemCnt;
 	gtm_msize_t	saveSize, allocSize;
-
-	error_def(ERR_MEMORYRECURSIVE);
-	UNIX_ONLY(error_def(ERR_MEMORY);)
-	VMS_ONLY(error_def(ERR_FREEMEMORY);)
-	VMS_ONLY(error_def(ERR_VMSMEMORY);)
 
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
@@ -1126,9 +1128,6 @@ void release_unused_storage(void)	/* Note renamed to release_unused_storage_dbg 
 void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg when included in gtm_malloc_dbg.c */
 {
 	void	*addr;
-
-	VMS_ONLY(error_def(ERR_VMSMEMORY);)
-	UNIX_ONLY(error_def(ERR_MEMORY);)
 
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
@@ -1410,7 +1409,7 @@ void printMallocInfo(void)
 
 	if (GDL_SmStats & gtmDebugLevel)
 	{
-		FPRINTF(stderr,"\nMalloc small storage performance:\n");
+		FPRINTF(stderr, "\nMalloc small storage performance:\n");
 		FPRINTF(stderr,
 			"Total mallocs: %d, total frees: %d, total extents: %d, total rmalloc bytes: %ld,"
 			" max rmalloc bytes: %ld\n",
@@ -1421,10 +1420,14 @@ void printMallocInfo(void)
 		FPRINTF(stderr,
 			"Maximum extents: %d, Current extents: %d, Released extents: %d\n", maxExtents, curExtents,
 			(totalExtents - curExtents));
-		GMR_ONLY(FPRINTF(stderr,"Total reentrant mallocs: %d, total deferred frees: %d\n", reentMallocs, deferFreePending);)
-		FPRINTF(stderr,"\nQueueSize   Mallocs     Frees    Splits  Combines    CurCnt    MaxCnt    CurCnt    MaxCnt\n");
-		FPRINTF(stderr,  "                                                      Free      Free      Alloc     Alloc\n");
-		FPRINTF(stderr,  "-----------------------------------------------------------------------------------------\n");
+		GMR_ONLY(
+			FPRINTF(stderr,
+				"Total reentrant mallocs: %d, total deferred frees: %d\n",
+				reentMallocs, deferFreePending);
+		)
+		FPRINTF(stderr, "\nQueueSize   Mallocs     Frees    Splits  Combines    CurCnt    MaxCnt    CurCnt    MaxCnt\n");
+		FPRINTF(stderr,   "                                                      Free      Free      Alloc     Alloc\n");
+		FPRINTF(stderr,   "-----------------------------------------------------------------------------------------\n");
 		{
 			for (i = 0; i <= MAXINDEX + 1; ++i)
 			{
@@ -1437,30 +1440,30 @@ void printMallocInfo(void)
 	}
 	if (GDL_SmDumpTrace & gtmDebugLevel)
 	{
-		FPRINTF(stderr,"\nMalloc Storage Traceback:   gtm_malloc() addr: 0x"gmaAdr"\n", &gtm_malloc);
-		FPRINTF(stderr,"TransNumber "gmaFill" AllocAddr        Size "gmaFill" CallerAddr\n");
-		FPRINTF(stderr,"------------------------------------------------"gmaLine gmaLine"\n");
+		FPRINTF(stderr, "\nMalloc Storage Traceback:   gtm_malloc() addr: 0x"gmaAdr"\n", &gtm_malloc);
+		FPRINTF(stderr, "TransNumber "gmaFill" AllocAddr        Size "gmaFill" CallerAddr\n");
+		FPRINTF(stderr, "------------------------------------------------"gmaLine gmaLine"\n");
 		for (i = 0,j = smLastMallocIndex; i < MAXSMTRACE; ++i,--j)/* Loop through entire table, start with last elem used */
 		{
 			if (0 > j)					   /* Wrap as necessary */
 				j = MAXSMTRACE - 1;
 			if (0 != smMallocs[j].smTn)
-				FPRINTF(stderr,"%9d    0x"gmaAdr"  %10d   0x"gmaAdr"\n",
+				FPRINTF(stderr, "%9d    0x"gmaAdr"  %10d   0x"gmaAdr"\n",
 					smMallocs[j].smTn, smMallocs[j].smAddr,	smMallocs[j].smSize, smMallocs[j].smCaller);
 		}
-		FPRINTF(stderr,"\n\nFree Storage Traceback:\n");
-		FPRINTF(stderr,"TransNumber  "gmaFill" FreeAddr        Size "gmaFill" CallerAddr\n");
-		FPRINTF(stderr,"------------------------------------------------"gmaLine gmaLine"\n");
+		FPRINTF(stderr, "\n\nFree Storage Traceback:\n");
+		FPRINTF(stderr, "TransNumber  "gmaFill" FreeAddr        Size "gmaFill" CallerAddr\n");
+		FPRINTF(stderr, "------------------------------------------------"gmaLine gmaLine"\n");
 		for (i = 0, j = smLastFreeIndex; i < MAXSMTRACE; ++i, --j)/* Loop through entire table, start with last elem used */
 		{
 			if (0 > j)					  /* Wrap as necessary */
 				j = MAXSMTRACE - 1;
 			if (0 != smFrees[j].smTn)
-				FPRINTF(stderr,"%9d    0x"gmaAdr"  %10d   0x"gmaAdr"\n",
+				FPRINTF(stderr, "%9d    0x"gmaAdr"  %10d   0x"gmaAdr"\n",
 					smFrees[j].smTn, smFrees[j].smAddr, smFrees[j].smSize, smFrees[j].smCaller);
 		}
-		FPRINTF(stderr,"\n");
-		fflush(stderr);
+		FPRINTF(stderr, "\n");
+		FFLUSH(stderr);
 	}
 	printMallocDump();
 }
@@ -1476,9 +1479,9 @@ void printMallocDump(void)
 
 	if (GDL_SmDump & gtmDebugLevel)
 	{
-		FPRINTF(stderr,"\nMalloc Storage Dump:   gtm_malloc() addr: 0x"gmaAdr"\n", &gtm_malloc);
-		FPRINTF(stderr,gmaFill"Malloc Addr  "gmaFill"   Alloc From     Malloc Size   Trans Number\n");
-		FPRINTF(stderr," ----------------------------------------------------------"gmaLine gmaLine"\n");
+		FPRINTF(stderr, "\nMalloc Storage Dump:   gtm_malloc() addr: 0x"gmaAdr"\n", &gtm_malloc);
+		FPRINTF(stderr, gmaFill"Malloc Addr  "gmaFill"   Alloc From     Malloc Size   Trans Number\n");
+		FPRINTF(stderr, " ----------------------------------------------------------"gmaLine gmaLine"\n");
 		/* Looping for each allocated queue */
 		for (eHdr = &allocStorElemQs[0], i = 0; i <= (MAXINDEX + 1); ++i, ++eHdr)
 		{
@@ -1488,7 +1491,7 @@ void printMallocDump(void)
 					&uStor->userStorage.userStart, uStor->allocatedBy, uStor->allocLen, uStor->smTn);
 			}
 		}
-		fflush(stderr);
+		FFLUSH(stderr);
 	}
 }
 #endif

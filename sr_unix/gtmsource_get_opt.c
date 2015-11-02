@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,10 @@
 
 GBLREF	gtmsource_options_t	gtmsource_options;
 
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_REPLINSTSECLEN);
+error_def(ERR_REPLINSTSECUNDF);
+
 int gtmsource_get_opt(void)
 {
 	boolean_t	secondary, dotted_notation, log, log_interval_specified, connect_parms_badval;
@@ -69,10 +73,6 @@ int gtmsource_get_opt(void)
 	struct hostent	*sec_hostentry;
 	unsigned short	log_file_len, filter_cmd_len;
 	unsigned short	secondary_len, inst_name_len, statslog_val_len, update_val_len, connect_parms_str_len;
-
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_REPLINSTSECLEN);
-	error_def(ERR_REPLINSTSECUNDF);
 
 	memset((char *)&gtmsource_options, 0, SIZEOF(gtmsource_options));
 	gtmsource_options.start = (CLI_PRESENT == cli_present("START"));
@@ -89,12 +89,12 @@ int gtmsource_get_opt(void)
 	gtmsource_options.jnlpool = (CLI_PRESENT == cli_present("JNLPOOL"));
 	secondary = (CLI_PRESENT == cli_present("SECONDARY"));
 	gtmsource_options.rootprimary = ROOTPRIMARY_UNSPECIFIED; /* to indicate unspecified state */
-	if (CLI_PRESENT == cli_present("ROOTPRIMARY"))
+	if ((CLI_PRESENT == cli_present("ROOTPRIMARY")) || (CLI_PRESENT == cli_present("UPDOK")))
 		gtmsource_options.rootprimary = ROOTPRIMARY_SPECIFIED;
-	else if (CLI_PRESENT == cli_present("PROPAGATEPRIMARY"))
+	else if ((CLI_PRESENT == cli_present("PROPAGATEPRIMARY")) || (CLI_PRESENT == cli_present("UPDNOTOK")))
 		gtmsource_options.rootprimary = PROPAGATEPRIMARY_SPECIFIED;
 	else
-	{	/* Neither ROOTPRIMARY nor PROPAGATEPRIMARY specified. Assume default values.
+	{	/* Neither ROOTPRIMARY (or UPDOK) nor PROPAGATEPRIMARY (or UPDNOTOK) specified. Assume default values.
 		 * Assume ROOTPRIMARY for -START -SECONDARY (active source server start) and -ACTIVATE commands.
 		 * Assume PROPAGATEPRIMARY for -START -PASSIVE (passive source server start) and -DEACTIVATE commands.
 		 */

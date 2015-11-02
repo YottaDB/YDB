@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,7 @@
 #  include "gv_trigger_protos.h"
 #  include "mv_stent.h"
 #  include "stringpool.h"
+#  include "trigger.h"
 #endif
 #include "tp_frame.h"
 #include "tp_restart.h"
@@ -59,6 +60,7 @@
 #include "tp_set_sgm.h"		/* for tp_set_sgm prototype */
 #include "op_tcommit.h"		/* for op_tcommit prototype */
 #include "have_crit.h"
+#include "gvcst_protos.h"
 
 LITREF	mval	literal_null;
 
@@ -77,6 +79,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	uint4			update_trans;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -92,47 +95,53 @@ GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger co
 GBLREF	mval			dollar_ztwormhole;
 #endif
 
+error_def(ERR_DBROLLEDBACK);
+error_def(ERR_GVZTRIGFAIL);
+error_def(ERR_TPRETRY);
+error_def(ERR_ZTRIGNOTRW);
+
 #ifndef GTM_TRIGGER
+error_def(ERR_UNIMPLOP);
+
 void op_ztrigger(void)
 {
-	error_def(ERR_UNIMPLOP);
-
 	rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
 }
 #else
 void op_ztrigger(void)
 {
-	node_local_ptr_t	cnl;
-	sgmnt_addrs		*csa;
-	sgmnt_data_ptr_t	csd;
-	enum cdb_sc		cdb_status;
-	jnl_format_buffer	*jfb, *ztworm_jfb;
-	uint4			nodeflags;
-	boolean_t		write_logical_jnlrecs, jnl_format_done;
-	boolean_t		is_tpwrap;
-	boolean_t		lcl_implicit_tstart;	/* local copy of the global variable "implicit_tstart" */
-	gtm_trigger_parms	trigparms;
-	gvt_trigger_t		*gvt_trigger;
-	gvtr_invoke_parms_t	gvtr_parms;
-	int			gtm_trig_status, rc;
-	unsigned char		*save_msp;
-	mv_stent		*save_mv_chain;
+	node_local_ptr_t		cnl;
+	sgmnt_addrs			*csa;
+	sgmnt_data_ptr_t		csd;
+	enum cdb_sc			cdb_status;
+	jnl_format_buffer		*jfb, *ztworm_jfb;
+	uint4				nodeflags;
+	boolean_t			write_logical_jnlrecs, jnl_format_done;
+	boolean_t			is_tpwrap;
+	boolean_t			lcl_implicit_tstart;	/* local copy of the global variable "implicit_tstart" */
+	gtm_trigger_parms		trigparms;
+	gvt_trigger_t			*gvt_trigger;
+	gvtr_invoke_parms_t		gvtr_parms;
+	int				gtm_trig_status, rc;
+	unsigned int			idx;
+	unsigned char			*save_msp;
+	mv_stent			*save_mv_chain;
 #	ifdef DEBUG
-	boolean_t		is_mm;
+	boolean_t			is_mm;
+	GTMTRIG_ONLY(enum cdb_sc	save_cdb_status;)
 #	endif
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_TPRETRY);
-	error_def(ERR_GVZTRIGFAIL);
-
+	if (gv_cur_region->read_only)
+		rts_error(VARLSTCNT(4) ERR_ZTRIGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
 	save_msp = NULL;
 	DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth));
-
 	TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(gv_cur_region, csa);
-	assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));
-	if (!dollar_tlevel || (gtm_trigger_depth == tstart_trigger_depth))
+	if (IS_EXPLICIT_UPDATE)
 	{	/* This is an explicit update. Set ztwormhole_used to FALSE. Note that we initialize this only at the
 		 * beginning of the transaction and not at the beginning of each try/retry. If the application used
 		 * $ztwormhole in any retsarting try of the transaction, we consider it necessary to write the
@@ -140,7 +149,6 @@ void op_ztrigger(void)
 		 */
 		ztwormhole_used = FALSE;
 	}
-
 	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl);
 	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
@@ -150,7 +158,6 @@ void op_ztrigger(void)
 	assert(NULL != update_array_ptr);
 	assert(0 != update_array_size);
 	assert(update_array + update_array_size >= update_array_ptr);
-
 	for (;;)
 	{
 		assert(csd == cs_data);	/* assert csd is in sync with cs_data even if there were MM db file extensions */
@@ -189,7 +196,6 @@ void op_ztrigger(void)
 				trigparms.ztvalue_new = NULL;
 				gvtr_parms.gvtr_cmd = GVTR_CMDTYPE_ZTRIGGER;
 				gvtr_parms.gvt_trigger = gvt_trigger;
-				/* gvtr_parms.duplicate_set : No need to initialize as it is SET-specific */
 				/* Now that we have filled in minimal information, let "gvtr_match_n_invoke" do the rest */
 				gtm_trig_status = gvtr_match_n_invoke(&trigparms, &gvtr_parms);
 				assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
@@ -222,15 +228,8 @@ void op_ztrigger(void)
 			 * is treated in the same order in the secondary (trigger supporting platform) irrespective of whether
 			 * the secondary has defined triggers or not for the global that is being updated.
 			 */
-			if (!dollar_tlevel)
-			{
-				nodeflags = 0;
-				if (skip_dbtriggers)
-					nodeflags |= JS_SKIP_TRIGGERS_MASK;
-				assert(!jnl_format_done);
-				jfb = jnl_format(JNL_ZTRIG, gv_currkey, NULL, nodeflags);
-				assert(NULL != jfb);
-			} else if (!jnl_format_done)
+			assert(dollar_tlevel);
+			if (!jnl_format_done)
 			{
 				nodeflags = 0;
 				if (skip_dbtriggers)
@@ -285,6 +284,35 @@ void op_ztrigger(void)
 			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 			assert(0 == rc && TPRESTART_STATE_NORMAL == tprestart_state);
 		}
+#		ifdef GTM_TRIGGER
+		assert(0 < t_tries);
+		if (lcl_implicit_tstart)
+		{
+			assert((cdb_sc_normal != cdb_status) || (ERR_TPRETRY == gtm_trig_status));
+			if (cdb_sc_normal == cdb_status)
+			{
+				DEBUG_ONLY(save_cdb_status = cdb_status);
+				cdb_status = t_fail_hist[t_tries - 1]; /* get the last restart code */
+			}
+			assert(((cdb_sc_onln_rlbk1 != cdb_status) && (cdb_sc_onln_rlbk2 != cdb_status))
+				|| (TREF(dollar_zonlnrlbk) && !gv_target->root));
+			if (cdb_sc_onln_rlbk1 == cdb_status)
+			{	/* We are implicit transaction and online rollback update the database but did NOT take us to a
+				 * different logical state. We've already done the restart, but the root is now reset to zero. Do
+				 * root search to establish the new root
+				 */
+				ASSERT_BEGIN_OF_FRESH_TP_TRANS; /* ensures gvcst_root_search is the first thing done in the
+								 * restarted transaction */
+				GVCST_ROOT_SEARCH;
+			} else if (cdb_sc_onln_rlbk2 == cdb_status)
+			{	/* Database was taken back to a different logical state and we are an implicit TP transaction.
+				 * Issue DBROLLEDBACK error that the application programmer can catch and do the necessary stuff.
+				 */
+				assert(gtm_trigger_depth == tstart_trigger_depth);
+				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+			}
+		}
+#		endif
 		assert(!skip_INVOKE_RESTART); /* if set to TRUE above, should have been reset by t_retry */
 		/* At this point, we can be in TP only if we implicitly did a tstart in op_ztrigger trying to drive a trigger.
 		 * Assert that. So reinvoke the T_BEGIN call only in case of TP. For non-TP, update_trans is unaffected by

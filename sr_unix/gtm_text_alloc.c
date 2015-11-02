@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,8 @@
 #include "caller_id.h"
 #include "gtm_text_alloc.h"
 #include "gtmdbglvl.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
@@ -90,9 +92,9 @@ error_def(ERR_TRNLOGFAIL);
 #define CALLERID ((unsigned char *)caller_id())
 #ifdef DEBUG
 #  define TRACE_TXTALLOC(addr,len) {if (GDL_SmTrace & gtmDebugLevel) \
- 			FPRINTF(stdout,"TxtAlloc at 0x"lvaddr" of %ld bytes from 0x"lvaddr"\n", addr, len, CALLERID);}
+ 			FPRINTF(stderr, "TxtAlloc at 0x"lvaddr" of %ld bytes from 0x"lvaddr"\n", addr, len, CALLERID);}
 #  define TRACE_TXTFREE(addr,len)   {if (GDL_SmTrace & gtmDebugLevel) \
-			FPRINTF(stdout,"TxtFree at 0x"lvaddr" of %ld bytes from 0x"lvaddr"\n", addr, len, CALLERID);}
+			FPRINTF(stderr, "TxtFree at 0x"lvaddr" of %ld bytes from 0x"lvaddr"\n", addr, len, CALLERID);}
 #else
 #  define TRACE_TXTALLOC(addr, len)
 #  define TRACE_TXTFREE(addr, len)
@@ -236,7 +238,7 @@ void gtm_text_free(void *addr)
 #define REAL_ALLOC		-2
 
 #ifdef DEBUG_SM
-#  define DEBUGSM(x) (PRINTF x, fflush(stdout))
+#  define DEBUGSM(x) (PRINTF x, FFLUSH(stdout))
 # else
 #  define DEBUGSM(x)
 #endif
@@ -570,16 +572,16 @@ void printAllocInfo(void)
 
 	if (0 == totalAllocs)
 		return;		/* Nothing to report -- likely a utility that doesn't use mmap */
-	FPRINTF(stderr,"\nMmap small storage performance:\n");
+	FPRINTF(stderr, "\nMmap small storage performance:\n");
 	FPRINTF(stderr,
 		"Total allocs: %d, total frees: %d, total ralloc bytes: %ld, max ralloc bytes: %ld\n",
 		totalAllocs, totalFrees, totalRallocGta, rAllocMax);
 	FPRINTF(stderr,
 		"Total (currently) allocated (includes overhead): %ld, Total (currently) used (no overhead): %ld\n",
 		totalAllocGta, totalUsedGta);
-	FPRINTF(stderr,"\nQueueSize    Allocs     Frees    Splits  Combines    CurCnt    MaxCnt\n");
-	FPRINTF(stderr,  "                                                      Free       Free\n");
-	FPRINTF(stderr,  "---------------------------------------------------------------------\n");
+	FPRINTF(stderr, "\nQueueSize    Allocs     Frees    Splits  Combines    CurCnt    MaxCnt\n");
+	FPRINTF(stderr,   "                                                      Free       Free\n");
+	FPRINTF(stderr,   "---------------------------------------------------------------------\n");
 	{
 		for (i = 0; i <= MAXINDEX + 1; ++i)
 		{

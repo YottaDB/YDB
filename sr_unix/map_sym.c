@@ -29,10 +29,11 @@
 	return FALSE;				\
 }
 
+error_def(ERR_COLLFNMISSING);
+
 /* Maps all the collation related symbols from the act shared library.
  * Return TRUE/FALSE based on mapping success.
  */
-
 boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 {
 	mstr   		fspec_trans;
@@ -40,7 +41,6 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 	int    		status;
 	void_ptr_t 	handle;
 	boolean_t	coll_lib_found;
-	error_def(ERR_COLLFNMISSING);
 
 	static MSTR_CONST(xform_sym_1, "gtm_ac_xform_1");
 	static MSTR_CONST(xback_sym_1, "gtm_ac_xback_1");
@@ -48,7 +48,6 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 	static MSTR_CONST(xback_sym, "gtm_ac_xback");
 	static MSTR_CONST(verify_sym, "gtm_ac_verify");
 	static MSTR_CONST(version_sym, "gtm_ac_version");
-
 	coll_lib_found = FALSE;
 	if (SS_NORMAL != (status = TRANS_LOG_NAME(fspec, &fspec_trans, buffer, SIZEOF(buffer), do_sendmsg_on_log2long)))
 		return FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,9 +56,11 @@ void exfun_frame (void)
 			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
 	}
 	sf->temps_ptr = msp;
-	assert (msp < stackbase);
-	memset (msp, 0, sf->rvector->temp_size);
+	assert(msp < stackbase);
+	memset(msp, 0, sf->rvector->temp_size);
 	sf->for_ctrl_stack = NULL;
+	sf->ret_value = NULL;
+	sf->dollar_test = -1;
 	sf->old_frame_pointer = frame_pointer;
 	frame_pointer = sf;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));

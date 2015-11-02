@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,15 +24,14 @@
 #include "filestruct.h"
 #include "gtm_stat.h"
 #include "eintr_wrappers.h"
-#include "mu_file_size.h"
 
-unsigned int mu_file_size(file_control *fc)
+error_def(ERR_DBFILOPERR);
+
+unsigned int gds_file_size(file_control *fc)
 {
 	unix_db_info	*udi;
 	int		fstat_res;
 	struct stat	stat_buf;
-
-	error_def(ERR_DBFILOPERR);
 
 	udi = (unix_db_info *)fc->file_info;
 	FSTAT_FILE(udi->fd, &stat_buf, fstat_res);

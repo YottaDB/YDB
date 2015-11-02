@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001,2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,42 +48,44 @@
 #include "gtmmsg.h"
 #include "repl_instance.h"
 #include "mu_rndwn_repl_instance.h"
+#include "util.h"
 
-GBLDEF	bool		in_backup;
+GBLREF	bool		in_backup;
 GBLREF	bool		error_mupip;
 GBLREF	tp_region	*grlist;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	boolean_t	mu_star_specified;
+GBLREF	boolean_t	donot_fflush_NULL;
 
-#define	TMP_BUF_LEN	50
+error_def(ERR_MUFILRNDWNSUC);
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUNODBNAME);
+error_def(ERR_MUNOTALLSEC);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_MUQUALINCOMP);
+error_def(ERR_TEXT);
 
 void mupip_rundown(void)
 {
 	int			exit_status;
-	boolean_t		region, file;
+	boolean_t		region, file, arg_present;
 	tp_region		*rptr, single;
 	replpool_identifier	replpool_id;
 	unsigned int		full_len;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_MUNODBNAME);
-	error_def(ERR_MUNOTALLSEC);
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_TEXT);
-	error_def(ERR_MUQUALINCOMP);
-	error_def(ERR_MUFILRNDWNSUC);
-	error_def(ERR_MUJPOOLRNDWNSUC);
-	error_def(ERR_MURPOOLRNDWNSUC);
-	error_def(ERR_MUJPOOLRNDWNFL);
-	error_def(ERR_MURPOOLRNDWNFL);
-
+	SETUP_THREADGBL_ACCESS;
 	exit_status = SS_NORMAL;
-	file = (cli_present("FILE") == CLI_PRESENT);
-	region = (cli_present("REGION") == CLI_PRESENT);
-
-	if (file == region && TRUE == file)
+	file = (CLI_PRESENT == cli_present("FILE"));
+	region = (CLI_PRESENT == cli_present("REGION"));
+	arg_present = (0 != TREF(parms_cnt));
+	if ((file == region) && (TRUE == file))
 		mupip_exit(ERR_MUQUALINCOMP);
-
+	if (arg_present && !file && !region)
+	{
+		util_out_print("MUPIP RUNDOWN only accepts a parameter when -FILE or -REGION is specified.", TRUE);
+		mupip_exit(ERR_MUPCLIERR);
+	}
 	if (region)
 	{
 		gvinit();
@@ -145,6 +147,16 @@ void mupip_rundown(void)
 		}
 	} else
 	{
+		/* Both "mu_rndwn_all" and "mu_rndwn_sem_all" do POPEN which opens an input stream (of type "FILE *").
+		 * We have noticed that on HPUX, a call to "fflush(NULL)" (done inside gtm_putmsg which is called from
+		 * the above two functions at various places) causes unread (but buffered) data from the input stream
+		 * to be cleared/consumed resulting in incomplete processing of the input list of ipcs. To avoid this
+		 * we set this global variable. That causes gtm_putmsg to skip the fflush(NULL). We dont have an issue
+		 * with out-of-order mixing of stdout and stderr streams (like is there with replication server logfiles)
+		 * and so it is okay for this global variable to be set to TRUE for the entire lifetime of the argumentless
+		 * rundown command. See <C9J02_003091_mu_rndwn_all_premature_termination_on_HPUX>.
+		 */
+		donot_fflush_NULL = TRUE;
 		exit_status = mu_rndwn_all();
 		if (SS_NORMAL == exit_status)
 			exit_status = mu_rndwn_sem_all();

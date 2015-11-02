@@ -25,8 +25,6 @@
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF mident		routine_name;
-GBLREF char		window_token;
-GBLREF mident		window_ident;
 
 error_def(ERR_LABELEXPECTED);
 error_def(ERR_RTNNAME);
@@ -39,7 +37,9 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 	mstr 		rtn_str, lbl_str;
 	triple 		*ref, *next, *rettrip;
 	boolean_t	same_rout;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	rtnname.len = labname.len = 0;
 	rtnname.addr = &rtn_text[0];
 	labname.addr = &lab_text[0];
@@ -49,136 +49,135 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 	 * known use of textname TRUE - in m_zgoto).
 	 */
 	assert(!(can_commarg && textname));
-	switch (window_token)
+	switch (TREF(window_token))
 	{
-		case TK_INTLIT:
-			int_label();
-			/* caution: fall through */
-		case TK_IDENT:
-			memcpy(labname.addr, window_ident.addr, window_ident.len);
-			labname.len = window_ident.len;
-			advancewindow();
-			if ((TK_PLUS != window_token) && (TK_CIRCUMFLEX != window_token) && !IS_MCODE_RUNNING && can_commarg)
-			{
-				rettrip = newtriple(op1);
-				rettrip->operand[0] =  put_mlab(&labname);
-				return rettrip;
-			}
-			label.oprclass = 0;
-			break;
-		case TK_ATSIGN:
-			if(!indirection(&label))
-				return NULL;
-			if ((TK_PLUS != window_token) && (TK_CIRCUMFLEX != window_token) && (TK_COLON != window_token)
-			    && can_commarg)
-			{
-				rettrip = ref = maketriple(OC_COMMARG);
-				ref->operand[0] = label;
-				ref->operand[1] = put_ilit(commargcode);
-				ins_triple(ref);
-				return rettrip;
-			}
-			labname.len = 0;
-			break;
-		case TK_PLUS:
-			stx_error(ERR_LABELEXPECTED);
+	case TK_INTLIT:
+		int_label();
+		/* caution: fall through */
+	case TK_IDENT:
+		memcpy(labname.addr, (TREF(window_ident)).addr, (TREF(window_ident)).len);
+		labname.len = (TREF(window_ident)).len;
+		advancewindow();
+		if ((TK_PLUS != TREF(window_token)) && (TK_CIRCUMFLEX != TREF(window_token)) && !IS_MCODE_RUNNING && can_commarg)
+		{
+			rettrip = newtriple(op1);
+			rettrip->operand[0] =  put_mlab(&labname);
+			return rettrip;
+		}
+		label.oprclass = 0;
+		break;
+	case TK_ATSIGN:
+		if(!indirection(&label))
 			return NULL;
-		default:
-			labname.len = 0;
-			label.oprclass = 0;
-			break;
+		if ((TK_PLUS != TREF(window_token)) && (TK_CIRCUMFLEX != TREF(window_token)) && (TK_COLON != TREF(window_token))
+		    && can_commarg)
+		{
+			rettrip = ref = maketriple(OC_COMMARG);
+			ref->operand[0] = label;
+			ref->operand[1] = put_ilit(commargcode);
+			ins_triple(ref);
+			return rettrip;
+		}
+		labname.len = 0;
+		break;
+	case TK_PLUS:
+		stx_error(ERR_LABELEXPECTED);
+		return NULL;
+	default:
+		labname.len = 0;
+		label.oprclass = 0;
+		break;
 	}
-	if (!labref && (TK_PLUS == window_token))
+	if (!labref && (TK_PLUS == TREF(window_token)))
 	{	/* Have line offset specified */
 		advancewindow();
-		if (!intexpr(&offset))
+		if (EXPR_FAIL == expr(&offset, MUMPS_INT))
 			return NULL;
 	} else
 		offset.oprclass = 0;
-	if (TK_CIRCUMFLEX == window_token)
+	if (TK_CIRCUMFLEX == TREF(window_token))
 	{	/* Have a routine name specified */
 		advancewindow();
-		switch(window_token)
+		switch (TREF(window_token))
 		{
-			case TK_IDENT:
-				MROUT2XTERN(window_ident.addr, rtnname.addr, window_ident.len);
-				rtn_str.len = rtnname.len = window_ident.len;
-				rtn_str.addr = rtnname.addr;
-				advancewindow();
-				if (!IS_MCODE_RUNNING)
-				{	/* Triples for indirect code */
-					same_rout = (MIDENT_EQ(&rtnname, &routine_name) && can_commarg);
-					if (!textname)
-					{	/* Resolve routine and label names to addresses for most calls */
-						if (!label.oprclass && !offset.oprclass)
-						{	/* Routine only (no label or offset) */
-							if (same_rout)
-							{
-								rettrip = newtriple(op1);
-								rettrip->operand[0] =  put_mlab(&labname);
-							} else
-							{
-								rettrip = maketriple(op2);
-								if (rtnname.addr[0] == '%')
-									rtnname.addr[0] = '_';
-								rettrip->operand[0] = put_cdlt(&rtn_str);
-								mlabel2xtern(&lbl_str, &rtnname, &labname);
-								rettrip->operand[1] = put_cdlt(&lbl_str);
-								ins_triple(rettrip);
-							}
-							return rettrip;
-						} else if (!same_rout)
+		case TK_IDENT:
+			MROUT2XTERN((TREF(window_ident)).addr, rtnname.addr, (TREF(window_ident)).len);
+			rtn_str.len = rtnname.len = (TREF(window_ident)).len;
+			rtn_str.addr = rtnname.addr;
+			advancewindow();
+			if (!IS_MCODE_RUNNING)
+			{	/* Triples for indirect code */
+				same_rout = (MIDENT_EQ(&rtnname, &routine_name) && can_commarg);
+				if (!textname)
+				{	/* Resolve routine and label names to addresses for most calls */
+					if (!label.oprclass && !offset.oprclass)
+					{	/* Routine only (no label or offset) */
+						if (same_rout)
 						{
-							rte1 = put_str(rtn_str.addr, rtn_str.len);
+							rettrip = newtriple(op1);
+							rettrip->operand[0] =  put_mlab(&labname);
+						} else
+						{
+							rettrip = maketriple(op2);
 							if (rtnname.addr[0] == '%')
 								rtnname.addr[0] = '_';
-							routine = put_cdlt(&rtn_str);
-							ref = newtriple(OC_RHDADDR);
-							ref->operand[0] = rte1;
-							ref->operand[1] = routine;
-							routine = put_tref(ref);
-						} else
-							routine = put_tref(newtriple(OC_CURRHD));
-					} else
-					{	/* Return the actual names used */
-						if (!label.oprclass && !offset.oprclass)
-						{	/* Routine only (no label or offset) */
-							rettrip = maketriple(op2);
-							rettrip->operand[0] = put_str(rtn_str.addr, rtn_str.len);
-							ref = newtriple(OC_PARAMETER);
-							ref->operand[0] = put_str(labname.addr, labname.len);
-							ref->operand[1] = put_ilit(0);
-							rettrip->operand[1] = put_tref(ref);
+							rettrip->operand[0] = put_cdlt(&rtn_str);
+							mlabel2xtern(&lbl_str, &rtnname, &labname);
+							rettrip->operand[1] = put_cdlt(&lbl_str);
 							ins_triple(rettrip);
-							return rettrip;
-						} else
-							routine = put_str(rtn_str.addr, rtn_str.len);
-					}
-
-				} else
-				{	/* Triples for normal compiled code */
-					routine = put_str(rtn_str.addr, rtn_str.len);
-					if (!textname)
-					{	/* If not returning text name, convert text name to routine header address */
-						ref = newtriple(OC_RHDADDR1);
-						ref->operand[0] = routine;
+						}
+						return rettrip;
+					} else if (!same_rout)
+					{
+						rte1 = put_str(rtn_str.addr, rtn_str.len);
+						if (rtnname.addr[0] == '%')
+							rtnname.addr[0] = '_';
+						routine = put_cdlt(&rtn_str);
+						ref = newtriple(OC_RHDADDR);
+						ref->operand[0] = rte1;
+						ref->operand[1] = routine;
 						routine = put_tref(ref);
-					}
+					} else
+						routine = put_tref(newtriple(OC_CURRHD));
+				} else
+				{	/* Return the actual names used */
+					if (!label.oprclass && !offset.oprclass)
+					{	/* Routine only (no label or offset) */
+						rettrip = maketriple(op2);
+						rettrip->operand[0] = put_str(rtn_str.addr, rtn_str.len);
+						ref = newtriple(OC_PARAMETER);
+						ref->operand[0] = put_str(labname.addr, labname.len);
+						ref->operand[1] = put_ilit(0);
+						rettrip->operand[1] = put_tref(ref);
+						ins_triple(rettrip);
+						return rettrip;
+					} else
+						routine = put_str(rtn_str.addr, rtn_str.len);
 				}
-				break;
-			case TK_ATSIGN:
-				if (!indirection(&routine))
-					return NULL;
+			} else
+			{	/* Triples for normal compiled code */
+				routine = put_str(rtn_str.addr, rtn_str.len);
 				if (!textname)
 				{	/* If not returning text name, convert text name to routine header address */
 					ref = newtriple(OC_RHDADDR1);
 					ref->operand[0] = routine;
 					routine = put_tref(ref);
 				}
-				break;
-			default:
-				stx_error(ERR_RTNNAME);
+			}
+			break;
+		case TK_ATSIGN:
+			if (!indirection(&routine))
 				return NULL;
+			if (!textname)
+			{	/* If not returning text name, convert text name to routine header address */
+				ref = newtriple(OC_RHDADDR1);
+				ref->operand[0] = routine;
+				routine = put_tref(ref);
+			}
+			break;
+		default:
+			stx_error(ERR_RTNNAME);
+			return NULL;
 		}
 	} else
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,12 +16,13 @@
 
 #include "io.h"
 #include "gtmsecshr.h"
+#include "secshr_client.h"
 #include "send_msg.h"
+
+error_def(ERR_NOSUCHPROC);
 
 int continue_proc(pid_t pid)
 {
-	error_def(ERR_NOSUCHPROC);
-
 	if (0 == kill(pid, SIGCONT))
 		return(0);
 	else if (ESRCH == errno)

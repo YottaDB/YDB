@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +54,7 @@
 #ifdef UNIX
 #include "gtmrecv.h"
 #include "deferred_signal_handler.h"
+#include "repl_instance.h"
 #endif
 
 /* Include prototypes */
@@ -125,17 +126,23 @@ GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block 
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	boolean_t		block_is_free;
+GBLREF	boolean_t		gv_play_duplicate_kills;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 #endif
 #ifdef UNIX
 GBLREF	recvpool_addrs		recvpool;
+GBLREF	int4			strm_index;
+#endif
+#ifdef DEBUG
+GBLREF	boolean_t		mupip_jnl_recover;
 #endif
 
 error_def(ERR_GVKILLFAIL);
 error_def(ERR_GVPUTFAIL);
 error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLFLUSH);
+error_def(ERR_JRTNULLFAIL);
 error_def(ERR_NOTREPLICATED);
 error_def(ERR_TEXT);
 
@@ -196,11 +203,17 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	DEBUG_ONLY(unsigned int	tot_jrec_size;)
 	jnlpool_ctl_ptr_t	jpl, tjpl;
 	boolean_t		replication = FALSE;
-	boolean_t		is_mm, release_crit = FALSE;
+#	ifdef UNIX
+	boolean_t		supplementary = FALSE;	/* this variable is initialized ONLY if "replication" is TRUE. */
+	seq_num			strm_seqno, next_strm_seqno;
+#	endif
+	boolean_t		is_mm;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
 	boolean_t		write_inctn = FALSE;	/* set to TRUE in case writing an inctn record is necessary */
 	boolean_t		decremented_currtn, retvalue, busy2free_seen, recompute_cksum, cksum_needed;
+	boolean_t		recycled2free_seen;
+	boolean_t		in_mu_truncate = FALSE;
 	blk_hdr_ptr_t		old_block;
 	unsigned int		bsiz, crindex;
 	jnl_tm_t		save_gbl_jrec_time;
@@ -208,6 +221,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	uint4			prev_cr_array_index;
 #	ifdef DEBUG
 	boolean_t		ready2signal_gvundef_lcl;
+	enum cdb_sc		prev_status;
 	GTMCRYPT_ONLY(
 		blk_hdr_ptr_t	save_old_block;
 	)
@@ -221,7 +235,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(hist1 != hist2);
+	/* Currently, the only callers of t_end with NULL histories are the update process and journal recovery when they
+	 * are about to process a JRT_NULL record. Assert that.
+	 */
+	assert((hist1 != hist2) || (ERR_JRTNULLFAIL == t_err) && (NULL == hist1)
+					&& update_trans && (is_updproc || jgbl.forw_phase_recovery));
 	DEBUG_ONLY(
 		/* Store global variable ready2signal_gvundef in a local variable and reset the global right away to ensure that
 		 * the global value does not incorrectly get carried over to the next call of "t_end".
@@ -233,15 +251,32 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	csd = csa->hdr;
 	cnl = csa->nl;
 	is_mm = (dba_mm == csd->acc_meth);
+#	ifdef GTM_TRUNCATE
+	in_mu_truncate = (cnl != NULL && process_id == cnl->trunc_pid);
+#	endif
 	status = cdb_sc_normal;
+	/* The only cases where we set csa->hold_onto_crit to TRUE are the following :
+	 * (a) jgbl.onlnrlbk
+	 * (b) DSE CRIT -SEIZE (and any command that follows it), DSE CHANGE -BLOCK, DSE ALL -SEIZE (and any command that follows)
+	 *	and DSE MAPS -RESTORE_ALL. Since we cannot distinguish between different DSE qualifiers, we use IS_DSE_IMAGE.
+	 * (c) gvcst_redo_root_search in the final retry.
+	 *
+	 * Since we don't expect hold_onto_crit to be set by any other utility/function, the below assert is valid and is intended
+	 * to catch cases where the field is inadvertently set to TRUE.
+	 */
+	assert(!csa->hold_onto_crit || IS_DSE_IMAGE UNIX_ONLY(|| jgbl.onlnrlbk || TREF(in_gvcst_redo_root_search)));
 	assert(cs_data == csd);
 	assert((t_tries < CDB_STAGNATE) || csa->now_crit);
 	assert(!dollar_tlevel);
 	/* whenever cw_set_depth is non-zero, ensure update_trans is also non-zero */
 	assert(!cw_set_depth || (UPDTRNS_DB_UPDATED_MASK == update_trans));
-	assert(cw_set_depth || !update_trans || gvdupsetnoop); /* whenever cw_set_depth is zero, ensure that update_trans
-								* is FALSE except when set noop optimization is enabled */
+	/* whenever cw_set_depth is zero, ensure that update_trans is FALSE except when it is a duplicate set or a duplicate kill
+	 * or a NULL journal record.
+	 */
+	assert(cw_set_depth || !update_trans || ((ERR_GVPUTFAIL == t_err) && gvdupsetnoop)
+		|| (ERR_JRTNULLFAIL == t_err) || ((ERR_GVKILLFAIL == t_err) && gv_play_duplicate_kills));
 	assert(0 == cr_array_index);
+	assert(!gv_cur_region->read_only || !update_trans);
 	cr_array_index = 0;	/* be safe and reset it in PRO even if it is not zero */
 	if (csd->wc_blocked || (is_mm && (csa->total_blks != csa->ti->total_blks)))
 	{ /* If blocked, or we have MM and file has been extended, force repair */
@@ -249,7 +284,15 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		goto failed_skip_revert;
 	} else
 	{
-		if (!update_trans && (start_tn == csa->ti->early_tn))
+		/* See if we can take a fast path for read transactions based on the following conditions :
+		 * 1. If the transaction number hasn't changed since we read the blocks from the disk or cache
+		 * 2. If NO concurrent online rollback is running. This is needed because we don't want read transactions
+		 *    to succeed. The issue with this check is that for a rollback that was killed, the PID will be non-zero.
+		 *    In that case, we might skip the fast path and go ahead and do the validation. The validation logic
+		 *    gets crit anyways and so will salvage the lock and do the necessary recovery and issue DBFLCORRP if
+		 *    it notices that csd->file_corrupt is TRUE.
+		 */
+		if (!update_trans && (start_tn == csa->ti->early_tn) UNIX_ONLY(&& (0 == csa->nl->onln_rlbk_pid)))
 		{	/* read with no change to the transaction history */
 			n_blks_validated = 0;
 			VALIDATE_CYCLE(is_mm, hist1);	/* updates n_blks_validated */
@@ -261,6 +304,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			if (unhandled_stale_timer_pop)
 				process_deferred_stale();
 			CWS_RESET;
+			assert(!csa->now_crit || csa->hold_onto_crit); /* shouldn't hold crit unless asked to */
 			t_tries = 0;	/* commit was successful so reset t_tries */
 			INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_readonly, 1);
 			INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_blkread, n_blks_validated);
@@ -268,22 +312,27 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		}
 	}
 	busy2free_seen = FALSE;
-	if ((0 != cw_set_depth)
-			&& ((gds_t_writemap == cw_set[0].mode)
-				|| ((gds_t_busy2free == cw_set[0].mode) && (gds_t_writemap == cw_set[1].mode))))
-	{	/* freeing a block from gvcst_kill or reorg, or upgrading/downgrading a block by reorg */
-		cw_depth = 0;
+	recycled2free_seen = FALSE;
+	cw_depth = cw_set_depth;
+	cw_bmp_depth = cw_depth;
+	if (0 != cw_set_depth)
+	{
 		if (gds_t_writemap == cw_set[0].mode)
-			cw_bmp_depth = 0;
-		else
 		{
+			cw_depth = 0;
+			cw_bmp_depth = 0;
+		} else if ((gds_t_busy2free == cw_set[0].mode) && (gds_t_writemap == cw_set[1].mode))
+		{
+			cw_depth = 0;
 			busy2free_seen = TRUE;
 			cw_bmp_depth = 1;
+		} else if ((gds_t_recycled2free == cw_set[0].mode) && (gds_t_writemap == cw_set[1].mode))
+		{
+			assert(process_id == cnl->trunc_pid && in_mu_truncate); /* In phase 1 of MUPIP REORG -TRUNCATE */
+			cw_depth = 1;
+			recycled2free_seen = TRUE;
+			cw_bmp_depth = 1;
 		}
-	} else
-	{
-		cw_depth = cw_set_depth;
-		cw_bmp_depth = cw_depth;
 	}
 #	ifdef GTM_SNAPSHOT
 	if (update_trans && SNAPSHOTS_IN_PROG(cnl))
@@ -447,28 +496,68 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			}
 		} else
 			grab_crit(gv_cur_region);
+	} else
+	{	/* We expect the process to be in its final retry as it is holding crit. The only exception is if hold_onto_crit
+		 * is TRUE but in that case we dont expect csd->freeze to be TRUE so we dont care much about that case. The other
+		 * exception is if this is DSE which gets crit even without being in the final retry. In that case, skip the check
+		 * about whether we are about to update a frozen db. DSE is the only utility allowed to update frozen databases.
+		 */
+		assert((CDB_STAGNATE == t_tries) || csa->hold_onto_crit || IS_DSE_IMAGE);
+		if (csd->freeze && update_trans && !IS_DSE_IMAGE)
+		{	/* We are about to update a frozen database. This is possible in rare cases even though
+			 * we waited for the freeze to be lifted in t_retry (see GTM-7004). Restart in this case.
+			 */
+			status = cdb_sc_needcrit;
+			goto failed;
+		}
 	}
-	/* We should never proceed to update a frozen database. Only exception is DSE where we want the ability to freeze a
-	 * database for every process that wants to update the database except for DSE.
-	 */
+	/* We should never proceed to update a frozen database. Only exception is DSE */
 	assert(!update_trans || !csd->freeze || IS_DSE_IMAGE);
-        if (is_mm && ((csa->hdr != csd) || (csa->total_blks != csa->ti->total_blks)))
+#	ifdef UNIX
+	/* We never expect to come here with file_corrupt set to TRUE (in case of an online rollback) because
+	 * grab_crit done above will make sure of that. The only exception is RECOVER/ROLLBACK itself coming
+	 * here in the forward phase
+	 */
+	assert(!csd->file_corrupt || mupip_jnl_recover);
+	if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
+	{	/* A concurrent Online Rollback occurred. Restart to be safe. */
+		assert(!mupip_jnl_recover);
+		/* Note: We don't assert that CDB_STAGNATE > t_tries because we can detect an online rollback even in the final
+		 * retry.
+		 */
+		status = cdb_sc_onln_rlbk1;
+		if (csa->db_onln_rlbkd_cycle != csa->nl->db_onln_rlbkd_cycle)
+			status = cdb_sc_onln_rlbk2; /* database was rolled back to a different logical state */
+		SYNC_ONLN_RLBK_CYCLES;
+		goto failed;
+	}
+	/* We should never proceed to commit if the global variable - only_reset_clues_if_onln_rlbk - is TRUE AND if the prior
+	 * retry was due to ONLINE ROLLBACK. This way, we ensure that, whoever set the global variable knows to handle ONLINE
+	 * ROLLBACK and resets it before returning control to the application.
+	 */
+	DEBUG_ONLY(prev_status = (0 < t_tries) ? t_fail_hist[t_tries - 1] : cdb_sc_normal);
+	assert((cdb_sc_normal == prev_status) || ((cdb_sc_onln_rlbk1 != prev_status) && (cdb_sc_onln_rlbk2 != prev_status))
+		|| (!TREF(only_reset_clues_if_onln_rlbk)));
+#	endif
+	if (is_mm && ((csa->hdr != csd) || (csa->total_blks != csa->ti->total_blks)))
         {       /* If MM, check if wcs_mm_recover was invoked as part of the grab_crit done above OR if
                  * the file has been extended. If so, restart.
                  */
                 status = cdb_sc_helpedout;      /* force retry with special status so philanthropy isn't punished */
-		if ((CDB_STAGNATE - 1) == t_tries)
-			release_crit = TRUE;
                 goto failed;
         }
-	/* Any retry transition where the destination state is the 3rd retry, we don't want to release crit,
-	 * i.e. for 2nd to 3rd retry transition or 3rd to 3rd retry transition.
-	 * Therefore we need to release crit only if (CDB_STAGNATE - 1) > t_tries
-	 * But 2nd to 3rd retry transition doesn't occur if in 2nd retry we get jnlstatemod, jnlclose, bkupss_statemod,
-	 * helpedout, or cacheprob code.
-	 * Hence the variable release_crit to track the above.
-	 */
-	release_crit = (CDB_STAGNATE - 1) > t_tries;
+#	ifdef GTM_TRUNCATE
+	assert(csa->total_blks);
+	if (csa->ti->total_blks < csa->total_blks)
+	{
+		/* File has been truncated since this process entered t_end or last called gdsfilext. I.e., the file is smaller
+		 * than its last known size and we might have allocated blocks beyond csa->ti->total_blks. Restart. */
+		assert(dba_mm != csd->acc_meth);
+		assert(CDB_STAGNATE > t_tries); /* On the final retry, should have crit and truncate can't happen */
+		status = cdb_sc_truncate;
+		goto failed;
+	}
+#	endif
 	assert(!cw_depth || update_trans);
 #	ifdef GTM_TRIGGER
 	if (!skip_dbtriggers)
@@ -480,17 +569,17 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			 * with concurrent triggers definition updates
 			 * The following asserts verify that:
 			 * (1) Activities on a replicating instance don't see concurrent trigger changes as update
-			 * process is the only updater in the replicating instance.
+			 * process is the only updater in the replicating instance. The only exception is if this
+			 * is a supplementary root primary instance. In that case, the update process coexists with
+			 * GT.M processes and hence can see restarts due to concurrent trigger changes.
 			 * (2) Journal recover operates in standalone mode. So, it should NOT see any concurrent
 			 * trigger changes as well
 			 */
-			assert(!is_updproc);
+			assert(!is_updproc || jnlpool.repl_inst_filehdr->is_supplementary && !jnlpool.jnlpool_ctl->upd_disabled);
 			assert(!jgbl.forw_phase_recovery);
 			assert(cycle > csa->db_trigger_cycle);
 			/* csa->db_trigger_cycle will be set to csd->db_trigger_cycle in t_retry */
 			status = cdb_sc_triggermod;
-			if ((CDB_STAGNATE - 1) == t_tries)
-				release_crit = TRUE;
 			goto failed;
 		}
 	}
@@ -518,8 +607,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				 */
 				csa->repl_state = csd->repl_state;
 				status = cdb_sc_jnlstatemod;
-				if ((CDB_STAGNATE - 1) == t_tries)
-					release_crit = TRUE;
 				goto failed;
 			}
 		}
@@ -557,8 +644,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				 * this backup_in_prog state change to be so rare that it is ok to restart.
 				 */
 				status = cdb_sc_bkupss_statemod;
-				if ((CDB_STAGNATE - 1) == t_tries)
-					release_crit = TRUE;
 				goto failed;
 			}
 		}
@@ -571,8 +656,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 			BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_hist);
 			status = cdb_sc_cacheprob;
-			if ((CDB_STAGNATE - 1) == t_tries)
-				release_crit = TRUE;
 			goto failed;
 		}
 		if (inctn_invalid_op != inctn_opcode)
@@ -723,15 +806,18 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				cs = t1->cse;
 				if (cs)
 				{
-					if (n_gds_t_op > cs->mode)
+					if (n_gds_t_op > cs->mode && gds_t_recycled2free != cs->mode) /* don't pass histories... */
 					{
 						assert(update_trans);
 						assert(gds_t_busy2free  > gds_t_committed);
 						assert(gds_t_busy2free  < n_gds_t_op);
 						assert(gds_t_write_root > gds_t_committed);
 						assert(gds_t_write_root < n_gds_t_op);
+						assert(gds_t_recycled2free > gds_t_committed);
+						assert(gds_t_recycled2free < n_gds_t_op);
 						assert((gds_t_committed > cs->mode)
-							|| busy2free_seen && (gds_t_busy2free == cs->mode));
+							|| (busy2free_seen && (gds_t_busy2free == cs->mode))
+							|| (recycled2free_seen && gds_t_recycled2free == cs->mode));
 						PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 						/* If cs->mode is gds_t_busy2free, then the corresponding cache-record needs
 						 * to be pinned to write the before-image right away but this cse is not going
@@ -742,6 +828,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						 * first one in the cr_array.
 						 */
 						assert((gds_t_busy2free != cs->mode) || (1 == cr_array_index));
+						assert((gds_t_recycled2free != cs->mode) || (1 == cr_array_index));
 					}
 					t1->cse = NULL;	/* reset for next transaction */
 				}
@@ -758,7 +845,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	 * resetting the clue just before doing the next gvcst_search. The mu_reorg* routines already take care of this reset
 	 * (in fact, this is asserted in gvcst_search too). So we can allow invalid clues here in that special case.
 	 */
-	if (!mu_reorg_process && (NULL != gv_target) && gv_target->clue.end) /* gv_target can be NULL in case of DSE MAPS etc. */
+	if (!mu_reorg_process && (NULL != gv_target) && gv_target->clue.end && !in_mu_truncate)
+		/* gv_target can be NULL in case of DSE MAPS etc. */
 		DEBUG_GVT_CLUE_VALIDATE(gv_target);	/* Validate that gvt has valid first_rec, clue & last_rec fields */
 #	endif
 	/* Assert that if gtm_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
@@ -880,7 +968,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				 * and did not rely on it for constructing the transaction. Restart if
 				 * block is not present in cache now or is being read in currently.
 				 */
-				if ((gds_t_acquired == cs->mode) && (NULL != cs->old_block))
+				if ((gds_t_acquired == cs->mode || gds_t_recycled2free == cs->mode) && (NULL != cs->old_block))
 				{
 					assert(read_before_image == ((JNL_ENABLED(csa) && csa->jnl_before_image)
 								     || csa->backup_in_prog
@@ -964,28 +1052,62 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			}
 		}
 		/* if we are not writing an INCTN record, we better have a non-zero cw_depth.
-		 * the only two exceptions are that
+		 * the only known exceptions are
 		 * 	a) if we were being called from gvcst_put for a duplicate SET
-		 * 	b) if we were called from DSE MAPS
-		 * in case (a), we want to write logical SET journal records and replicate them.
-		 * in case (b), we do not want to replicate them. we want to assert that is_replicator is FALSE in this case.
+		 * 	b) if we were being called from gvcst_kill for a duplicate KILL
+		 * 	c) if we were called from DSE MAPS
+		 * 	d) if we were being called from gvcst_jrt_null.
+		 * in case (a) and (b), we want to write logical SET or KILL journal records and replicate them.
+		 * in case (c), we do not want to replicate them. we want to assert that is_replicator is FALSE in this case.
 		 * the following assert achieves that purpose.
 		 */
 		assert((inctn_invalid_op != inctn_opcode) || cw_depth
-				|| !is_replicator				/* exception case (b) */
-				|| (ERR_GVPUTFAIL == t_err) && gvdupsetnoop);	/* exception case (a) */
+				|| !is_replicator						/* exception case (c) */
+				|| (ERR_GVPUTFAIL == t_err) && gvdupsetnoop			/* exception case (a) */
+				|| (ERR_JRTNULLFAIL == t_err)					/* exception case (d) */
+				|| (ERR_GVKILLFAIL == t_err) && gv_play_duplicate_kills);	/* exception case (b) */
 		if (REPL_ALLOWED(csa) && is_replicator && (inctn_invalid_op == inctn_opcode))
 		{
 			replication = TRUE;
 			jpl = jnlpool_ctl;
 			tjpl = temp_jnlpool_ctl;
 			repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+			/* No concurrent online rollbacks can happen at this point due to grab_crit (done above). So, the jnlpool
+			 * should be in sync. There is one exception though. If this is GT.CM GNP Server and the last client
+			 * disconnected, the server invokes gtcmd_rundown which in-turn invokes gds_rundown thereby running down
+			 * all active databases at this point but leaves the journal pool up and running. Now, if an online rollback
+			 * is attempted, it increments the onln_rlbk_cycle in the journal pool, but repl_csa->onln_rlbk_cycle is not
+			 * synced yet. So, the grab_crit done above will NOT detect a concurrent online rollback and it doesn't need
+			 * to because the rollback happened AFTER the rundown. So, in this case sync the repl_csa->onln_rlbk_cycle
+			 * with the journal pool cycle (now that we have crit). Also, assert that this is the only case we know of
+			 * for the cycles to be out-of-sync. This is all needed in DBG only, as in PRO jnlpool_ctl->onln_rlbk_cycle
+			 * is used only by the replication servers (which GT.CM is not) and so even if it continues with an
+			 * out-of-sync repl_csa->onln_rlbk_cycle, t_end logic does the right thing.
+			 * Note: The below assert is better kept in the GRAB_LOCK macro but is not currently done because image_type
+			 * variable is needed which is of type enum gtmImageTypes which is NOT available wherever GRAB_LOCK is used.
+			 * Until we move the GRAB_LOCK macro to a separate header, keep the assert here.
+			 */
+			UNIX_ONLY(
+				assert((repl_csa->onln_rlbk_cycle == jnlpool_ctl->onln_rlbk_cycle) || IS_GTCM_GNP_SERVER_IMAGE);
+				DEBUG_ONLY(repl_csa->onln_rlbk_cycle = jnlpool_ctl->onln_rlbk_cycle);
+			)
 			if (!repl_csa->hold_onto_crit)
-				grab_lock(jnlpool.jnlpool_dummy_reg);
+				GRAB_LOCK(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
 			assert(repl_csa->now_crit);
-			QWASSIGN(tjpl->write_addr, jpl->write_addr);
-			QWASSIGN(tjpl->write, jpl->write);
-			QWASSIGN(tjpl->jnl_seqno, jpl->jnl_seqno);
+			tjpl->write_addr = jpl->write_addr;
+			tjpl->write = jpl->write;
+			tjpl->jnl_seqno = jpl->jnl_seqno;
+#			ifdef UNIX
+			if (INVALID_SUPPL_STRM != strm_index)
+			{	/* Need to also update supplementary stream seqno */
+				supplementary = TRUE;
+				assert(0 <= strm_index);
+				/* assert(strm_index < ARRAYSIZE(tjpl->strm_seqno)); */
+				strm_seqno = jpl->strm_seqno[strm_index];
+				ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(strm_index);
+			} else
+				supplementary = FALSE;
+#			endif
 			INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size));
 			assert(jgbl.cumul_jnl_rec_len);
 			tmp_cumul_jnl_rec_len = (uint4)(jgbl.cumul_jnl_rec_len + SIZEOF(jnldata_hdr_struct));
@@ -995,8 +1117,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				assert(tjpl->write == tjpl->jnlpool_size);
 				tjpl->write = 0;
 			}
-			assert(QWEQ(jpl->early_write_addr, jpl->write_addr));
-			QWADDDW(jpl->early_write_addr, jpl->write_addr, tmp_cumul_jnl_rec_len);
+			assert(jpl->early_write_addr == jpl->write_addr);
+			jpl->early_write_addr = jpl->write_addr + tmp_cumul_jnl_rec_len;
 			/* Source server does not read in crit. It relies on early_write_addr, the transaction
 			 * data, lastwrite_len, write_addr being updated in that order. To ensure this order,
 			 * we have to force out early_write_addr to its coherency point now. If not, the source
@@ -1026,6 +1148,14 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			 * (if it decides to switch to a new journal file)
 			 */
 			ADJUST_GBL_JREC_TIME(jgbl, jbp);
+			if (replication)
+			{	/* Make sure timestamp of this seqno is >= timestamp of previous seqno. Note: The below macro
+				 * invocation should be done AFTER the ADJUST_GBL_JREC_TIME call as the below resets
+				 * jpl->prev_jnlseqno_time. Doing it the other way around would mean the reset will happen
+				 * with a potentially lower value than the final adjusted time written in the jnl record.
+				 */
+				ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jpl);
+			}
 			/* Note that jnl_ensure_open can call cre_jnl_file which
 			 * in turn assumes jgbl.gbl_jrec_time is set. Also jnl_file_extend can call
 			 * jnl_write_epoch_rec which in turn assumes jgbl.gbl_jrec_time is set.
@@ -1056,16 +1186,12 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 							jnl_status);
 						assert((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa)));
 						status = cdb_sc_jnlclose;
-						if ((CDB_STAGNATE - 1) == t_tries)
-							release_crit = TRUE;
 						goto failed;
 					} else if (EXIT_ERR == jnl_file_extend(jpc, total_jnl_rec_size))
 					{
 						assert(csd == csa->hdr);	/* jnl_file_extend() shouldn't reset csd in MM */
 						assert((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa)));
 						status = cdb_sc_jnlclose;
-						if ((CDB_STAGNATE - 1) == t_tries)
-							release_crit = TRUE;
 						goto failed;
 					}
 					assert(csd == csa->hdr);	/* If MM, csd shouldn't have been reset */
@@ -1133,7 +1259,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 							 *	csd->db_got_to_v5_once has not yet become TRUE. Once it is
 							 *	TRUE, block frees will write PBLK only when the block is reused.
 							 */
-							assert((gds_t_write_root == mode) || (gds_t_busy2free == mode));
+							assert((gds_t_write_root == mode) || (gds_t_busy2free == mode)
+								|| (gds_t_recycled2free == mode));
 							if ((gds_t_write_root == mode)
 								|| (gds_t_busy2free == mode) && csd->db_got_to_v5_once)
 							continue;
@@ -1231,9 +1358,14 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			{
 				assert(!replication || !jgbl.forw_phase_recovery);
 				if (replication)
-					QWASSIGN(jnl_fence_ctl.token, tjpl->jnl_seqno);
-				else if (!jgbl.forw_phase_recovery)
-					QWASSIGN(jnl_fence_ctl.token, seq_num_zero);
+				{
+					jnl_fence_ctl.token = tjpl->jnl_seqno;
+					UNIX_ONLY(
+						if (supplementary)
+							jnl_fence_ctl.strm_seqno = SET_STRM_INDEX(strm_seqno, strm_index);
+					)
+				} else if (!jgbl.forw_phase_recovery)
+					jnl_fence_ctl.token = seq_num_zero;
 				/* In case of forw-phase of recovery, token would have been set by mur_output_record */
 				jnl_write_logical(csa, non_tp_jfb_ptr);
 			} else
@@ -1247,33 +1379,35 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			assert(!JNL_ENABLED(csa) && REPL_WAS_ENABLED(csa));
 			if (0 == jnl_fence_ctl.level)
 			{
-				QWASSIGN(jnl_fence_ctl.token, tjpl->jnl_seqno);
+				jnl_fence_ctl.token = tjpl->jnl_seqno;
+				UNIX_ONLY(
+					if (supplementary)
+						jnl_fence_ctl.strm_seqno = SET_STRM_INDEX(strm_seqno, strm_index);
+				)
 				jnl_write_logical(csa, non_tp_jfb_ptr);
 			} else
 				jnl_write_ztp_logical(csa, non_tp_jfb_ptr);
 		}
 		if (replication)
 		{
-			QWINCRBY(tjpl->jnl_seqno, seq_num_one);
-			QWASSIGN(csa->hdr->reg_seqno, tjpl->jnl_seqno);
-			if (is_updproc)
-			{
-				VMS_ONLY(
-					QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
-					QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
-				)
-				UNIX_ONLY(
-					assert(REPL_PROTO_VER_UNINITIALIZED !=
-						recvpool.gtmrecv_local->last_valid_remote_proto_ver);
-					if (REPL_PROTO_VER_DUALSITE ==
-						recvpool.gtmrecv_local->last_valid_remote_proto_ver)
-					{
-						QWINCRBY(jgbl.max_dualsite_resync_seqno, seq_num_one);
-						QWASSIGN(csa->hdr->dualsite_resync_seqno,
-							jgbl.max_dualsite_resync_seqno);
-					}
-				)
-			}
+			tjpl->jnl_seqno++;
+			assert(csa->hdr->reg_seqno < tjpl->jnl_seqno);
+			csa->hdr->reg_seqno = tjpl->jnl_seqno;
+			UNIX_ONLY(
+				if (supplementary)
+				{
+					next_strm_seqno = strm_seqno + 1;
+					/* tjpl->strm_seqno[strm_index] = next_strm_seqno; */
+					csa->hdr->strm_reg_seqno[strm_index] = next_strm_seqno;
+				}
+			)
+			VMS_ONLY(
+				if (is_updproc)
+				{
+					jgbl.max_resync_seqno++;
+					csa->hdr->resync_seqno = jgbl.max_resync_seqno;
+				}
+			)
 		}
 		csa->prev_free_blks = csa->ti->free_blocks;
 		csa->t_commit_crit = T_COMMIT_CRIT_PHASE1;
@@ -1387,15 +1521,29 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		assert((gds_t_busy2free == cw_set[0].mode) && cr_array_index && (cw_set[0].blk == cr_array[0]->blk));
 		assert(process_id == cr_array[0]->in_cw_set);
 		UNPIN_CACHE_RECORD(cr_array[0]); /* need to do this BEFORE releasing crit as we have no other lock on this buffer */
+	} else if (recycled2free_seen)
+	{
+		assert(gds_t_recycled2free == cw_set[0].mode);
+		assert(!is_mm);
+		if (read_before_image)
+		{
+			assert(cr_array_index == 2);
+			assert(cw_set[0].blk = cr_array[1]->blk);
+			assert(process_id == cr_array[1]->in_cw_set);
+			UNPIN_CACHE_RECORD(cr_array[1]);
+		} else
+		{
+			assert(cr_array_index == 1);
+			/* Never pinned it in the first place */
+		}
 	}
 	if (!csa->hold_onto_crit)
 		rel_crit(gv_cur_region);
 	assert(!replication || update_trans);
 	if (replication)
 	{
-		assert(QWGT(jpl->early_write_addr, jpl->write_addr));
-		assert(tmp_cumul_jnl_rec_len == (tjpl->write - jpl->write +
-			(tjpl->write > jpl->write ? 0 : jpl->jnlpool_size)));
+		assert(jpl->early_write_addr > jpl->write_addr);
+		assert(tmp_cumul_jnl_rec_len == (tjpl->write - jpl->write + (tjpl->write > jpl->write ? 0 : jpl->jnlpool_size)));
 		/* the following statements should be atomic */
 		jnl_header = (jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jpl->write);
 		jnl_header->jnldata_len = tmp_cumul_jnl_rec_len;
@@ -1405,6 +1553,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		 * this path.  If there is an update, then both the indices should be 1.
 		 */
 		INT8_ONLY(assert(jgbl.cumul_index == jgbl.cu_jnl_index));
+		UNIX_ONLY(
+			if (supplementary)
+				jpl->strm_seqno[strm_index] = next_strm_seqno;
+		)
 		jpl->lastwrite_len = jnl_header->jnldata_len;
 		/* For systems with UNORDERED memory access (example, ALPHA, POWER4, PA-RISC 2.0), on a
 		 * multi processor system, it is possible that the source server notices the change in
@@ -1416,8 +1568,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		SHM_WRITE_MEMORY_BARRIER;
 		jpl->write = tjpl->write;
 		/* jpl->write_addr should be updated before updating jpl->jnl_seqno as secshr_db_clnup relies on this */
-		QWINCRBYDW(jpl->write_addr, jnl_header->jnldata_len);
-		assert(QWEQ(jpl->early_write_addr, jpl->write_addr));
+		jpl->write_addr += jnl_header->jnldata_len;
+		assert(jpl->early_write_addr == jpl->write_addr);
 		jpl->jnl_seqno = tjpl->jnl_seqno;
 		if (!repl_csa->hold_onto_crit)
 			rel_lock(jnlpool.jnlpool_dummy_reg);
@@ -1511,6 +1663,11 @@ skip_cr_array:
 	cw_set_depth = 0;
 	update_trans = 0;
 	CWS_RESET;
+	/* although we have the same assert at the beginning of "skip_cr_array" label, the below assert ensures that we did not grab
+	 * crit in between (in process_deferred_stale() or backup_buffer_flush() or wcs_timer_start()). The assert at the beginning
+	 * of the loop is needed as well to ensure that if we are done with the commit, we should have released crit
+	 */
+	assert(!csa->now_crit || csa->hold_onto_crit);
 	t_tries = 0;	/* commit was successful so reset t_tries */
 	assert(0 == cr_array_index);
 	return dbtn;
@@ -1523,8 +1680,10 @@ failed_skip_revert:
 	assert(!retvalue); 			/* if it was, then we would have done a "goto skip_cr_array:" instead */
 	if (NULL != gv_target)	/* gv_target can be NULL in case of DSE MAPS command etc. */
 		gv_target->clue.end = 0;
-	if (release_crit && csa->now_crit && !csa->hold_onto_crit)
-		rel_crit(gv_cur_region);
+	/* t_commit_cleanup releases crit as long as the transition is from 2nd to 3rd retry or 3rd to 3rd retry. The only exception
+	 * is if hold_onto_crit is set to TRUE in which case t_commit_cleanup honors it. Assert accordingly.
+	 */
+	assert(!csa->now_crit || !NEED_TO_RELEASE_CRIT(t_tries) || csa->hold_onto_crit);
 	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
 	t_retry(status);
 	/* in the retry case, we do not do a CWS_RESET as cw_stagnate is used only in the

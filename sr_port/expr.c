@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,30 +12,35 @@
 #include "mdef.h"
 #include "compiler.h"
 #include "opcode.h"
+#include "fullbool.h"
 
-int expr(oprtype *a)
+int expr(oprtype *a, int m_type)
 {
-	triple *triptr;
-	int4 rval;
+	int	rval;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (!(TREF(expr_depth))++)
 		TREF(expr_start) = TREF(expr_start_orig) = NULL;
-	if (!(rval = eval_expr(a)))
+	if (EXPR_FAIL == (rval = eval_expr(a)))		/* NOTE assignment */
 	{
 		TREF(expr_depth) = 0;
 		return FALSE;
 	}
-	coerce(a,OCT_MVAL);
+	coerce(a, (MUMPS_INT == m_type) ? OCT_MINT : OCT_MVAL);
 	ex_tail(a);
-	if (!(--(TREF(expr_depth))))
-		TREF(shift_side_effects) = FALSE;
 	if (TREF(expr_start) != TREF(expr_start_orig))
 	{
-		triptr = newtriple(OC_GVRECTARG);
-		triptr->operand[0] = put_tref(TREF(expr_start));
+		assert(TREF(shift_side_effects));
+		assert((OC_GVSAVTARG == (TREF(expr_start))->opcode));
+		if ((OC_GVSAVTARG == (TREF(expr_start))->opcode) && (GTM_BOOL == TREF(gtm_fullbool)))
+		{
+			if ((OC_GVRECTARG != (TREF(curtchain))->exorder.bl->opcode)
+			  || ((TREF(curtchain))->exorder.bl->operand[0].oprval.tref != TREF(expr_start)))
+				newtriple(OC_GVRECTARG)->operand[0] = put_tref(TREF(expr_start));
+		}
 	}
+	if (!(--(TREF(expr_depth))))
+		TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;
 	return rval;
-
 }

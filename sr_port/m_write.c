@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,39 +22,41 @@
 #include "cmd.h"
 #include "rwformat.h"
 
-GBLREF char window_token;
 GBLREF spdesc stringpool;
 GBLREF bool devctlexp;
 
+error_def(ERR_STRINGOFLOW);
+
 #define STO_LLPTR(X) (llptr ? *++llptr = (X) : 0)
 #define LITLST_TOP (&litlst[(SIZEOF(litlst) / SIZEOF(triple *)) - 2])
+
 int m_write(void)
 {
-	error_def(ERR_STRINGOFLOW);
-	oprtype x,*oprptr;
-	mval lit;
-	mstr *msp;
-	int  lnx;
-	char *cp;
-	triple *ref, *t1;
-	triple *litlst[128], **llptr, **ptx, **ltop;
+	char	*cp;
+	int	lnx;
+	mval	lit;
+	mstr	*msp;
+	oprtype	*oprptr, x;
+	triple	*litlst[128], **llptr, **ltop, **ptx, *ref, *t1;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	llptr = litlst;
 	ltop = 0;
 	*llptr = 0;
 	for (;;)
 	{
 		devctlexp = FALSE;
-		switch(window_token)
+		switch (TREF(window_token))
 		{
 		case TK_ASTERISK:
 			advancewindow();
-			if (!intexpr(&x))
+			if (EXPR_FAIL == expr(&x, MUMPS_INT))
 				return FALSE;
-			assert(x.oprclass == TRIP_REF);
+			assert(TRIP_REF == x.oprclass);
 			ref = newtriple(OC_WTONE);
 			ref->operand[0] = x;
-			STO_LLPTR((x.oprval.tref->opcode == OC_ILIT) ? ref : 0);
+			STO_LLPTR((OC_ILIT == x.oprval.tref->opcode) ? ref : 0);
 			break;
 		case TK_QUESTION:
 		case TK_EXCLAIMATION:
@@ -65,29 +67,28 @@ int m_write(void)
 			STO_LLPTR(0);
 			break;
 		default:
-			switch (strexpr(&x))
+			switch (expr(&x, MUMPS_STR))
 			{
 			case EXPR_FAIL:
 				return FALSE;
 			case EXPR_GOOD:
-				assert(x.oprclass == TRIP_REF);
+				assert(TRIP_REF == x.oprclass);
 				if (devctlexp)
 				{
 					ref = newtriple(OC_WRITE);
 					ref->operand[0] = x;
 					STO_LLPTR(0);
 				} else if (x.oprval.tref->opcode == OC_CAT)
-				{
-					wrtcatopt(x.oprval.tref,&llptr,LITLST_TOP);
-				} else
+					wrtcatopt(x.oprval.tref, &llptr, LITLST_TOP);
+				else
 				{
 					ref = newtriple(OC_WRITE);
 					ref->operand[0] = x;
-					STO_LLPTR((x.oprval.tref->opcode == OC_LIT) ? ref : 0);
+					STO_LLPTR((OC_LIT == x.oprval.tref->opcode) ? ref : 0);
 				}
 				break;
 			case EXPR_INDR:
-				make_commarg(&x,indir_write);
+				make_commarg(&x, indir_write);
 				STO_LLPTR(0);
 				break;
 			default:
@@ -95,10 +96,10 @@ int m_write(void)
 			}
 			break;
 		}
-		if (window_token != TK_COMMA)
+		if (TK_COMMA != TREF(window_token))
 			break;
 		advancewindow();
-		if (llptr >= LITLST_TOP)
+		if (LITLST_TOP <= llptr)
 		{
 			*++llptr = 0;
 			ltop = llptr;
@@ -113,27 +114,20 @@ int m_write(void)
 		if (*ptx && *(ptx + 1))
 		{
 			lit.mvtype = MV_STR;
-			lit.str.addr = cp = (char * ) stringpool.free;
+			lit.str.addr = cp = (char *)stringpool.free;
 			for (t1 = ref = *ptx++ ; ref ; ref = *ptx++)
 			{
-				if (ref->opcode == OC_WRITE)
+				if (OC_WRITE == ref->opcode)
 				{
 					msp = &(ref->operand[0].oprval.tref->operand[0].oprval.mlit->v.str);
 					lnx = msp->len;
-					if ( cp + lnx > (char *) stringpool.top)
-					{	stx_error(ERR_STRINGOFLOW);
-						return FALSE;
-					}
+					ENSURE_STP_FREE_SPACE(lnx);
 					memcpy(cp, msp->addr, lnx);
 					cp += lnx;
-				}
-				else
+				} else
 				{
-					assert(ref->opcode == OC_WTONE);
-					if (cp + 1 > (char *) stringpool.top)
-					{	stx_error(ERR_STRINGOFLOW);
-						return FALSE;
-					}
+					assert(OC_WTONE == ref->opcode);
+					ENSURE_STP_FREE_SPACE(1);
 					*cp++ = ref->operand[0].oprval.tref->operand[0].oprval.ilit;
 				}
 				ref->operand[0].oprval.tref->opcode = OC_NOOP;

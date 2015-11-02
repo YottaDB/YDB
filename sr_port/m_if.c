@@ -19,13 +19,10 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-GBLREF triple *curtchain;
-
-error_def(ERR_SPOREOL);
 error_def(ERR_INDEXTRACHARS);
+error_def(ERR_SPOREOL);
 
-	typedef struct jmpchntype
+typedef struct jmpchntype
 {
 	struct
 	{
@@ -46,12 +43,12 @@ int m_if(void)
 	ifpos_in_chain = TREF(pos_in_chain);
 	jmpchain = (jmpchn*)mcalloc(SIZEOF(jmpchn));
 	dqinit(jmpchain,link);
-	if (TK_EOL == window_token)
+	if (TK_EOL == TREF(window_token))
 		return TRUE;
 	is_commarg = (1 == TREF(last_source_column));
 	FOR_END_OF_SCOPE(0, x);
 	assert(INDR_REF == x.oprclass);
-	if (TK_SPACE == window_token)
+	if (TK_SPACE == TREF(window_token))
 	{
 		jmpref = newtriple(OC_JMPTCLR);
 		jmpref->operand[0] = x;
@@ -64,9 +61,9 @@ int m_if(void)
 		for (;;)
 		{
 			ta_opr = (oprtype *)mcalloc(SIZEOF(oprtype));
-			if (!bool_expr((bool)TRUE, ta_opr))
+			if (!bool_expr(TRUE, ta_opr))
 				return FALSE;
-			if (((OC_JMPNEQ == (ref0 = curtchain->exorder.bl)->opcode))
+			if (((OC_JMPNEQ == (ref0 = (TREF(curtchain))->exorder.bl)->opcode))
 				&& (OC_COBOOL == (ref1 = ref0->exorder.bl)->opcode)
 				&& (OC_INDGLVN == (ref2 = ref1->exorder.bl)->opcode))
 			{
@@ -76,14 +73,9 @@ int m_if(void)
 				ref2->opcode = OC_COMMARG;
 				ref2->operand[1] = put_ilit((mint)indir_if);
 			}
-			t_set = (OC_JMPTSET == curtchain->exorder.bl->opcode);
+			t_set = (OC_JMPTSET == (TREF(curtchain))->exorder.bl->opcode);
 			if (!t_set)
 				newtriple(OC_CLRTEST);
-			if (TREF(expr_start) != TREF(expr_start_orig))
-			{
-				triptr = newtriple(OC_GVRECTARG);
-				triptr->operand[0] = put_tref(TREF(expr_start));
-			}
 			jmpref = newtriple(OC_JMP);
 			jmpref->operand[0] = x;
 			nxtjmp = (jmpchn *)mcalloc(SIZEOF(jmpchn));
@@ -94,30 +86,25 @@ int m_if(void)
 			{
 				if (!t_set)
 					newtriple(OC_SETTEST);
-				if (TREF(expr_start) != TREF(expr_start_orig))
-				{
-					triptr = newtriple(OC_GVRECTARG);
-					triptr->operand[0] = put_tref(TREF(expr_start));
-				}
 				first_time = FALSE;
 			}
-			if (TK_COMMA != window_token)
+			if (TK_COMMA != TREF(window_token))
 				break;
 			advancewindow();
 		}
 	}
 	if (is_commarg)
 	{
-		while(TK_SPACE == window_token)		/* Eat up trailing white space */
+		while (TK_SPACE == TREF(window_token))		/* Eat up trailing white space */
 			advancewindow();
-		if (TK_EOL != window_token)
+		if (TK_EOL != TREF(window_token))
 		{
 			stx_error(ERR_INDEXTRACHARS);
 			return FALSE;
 		}
 		return TRUE;
 	}
-	if ((TK_EOL != window_token) && (TK_SPACE != window_token))
+	if ((TK_EOL != TREF(window_token)) && (TK_SPACE != TREF(window_token)))
 	{
 		stx_error(ERR_SPOREOL);
 		return FALSE;

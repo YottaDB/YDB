@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,8 +82,7 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	memcpy(lblname_buff, lblname.str.addr, lblname.str.len);
 	lblname.str.addr = lblname_buff;
 	DBGEHND((stdout, "op_zgoto: rtnname: %.*s  lblname: %.*s  offset: %d  level: %d\n",
-		 rtnname.str.len, rtnname.str.addr, lblname.str.len, lblname.str.addr,
-		 offset, level));
+		 rtnname.str.len, rtnname.str.addr, lblname.str.len, lblname.str.addr, offset, level));
 	/* Validate entryref before do any unwinding */
 	if (0 == rtnname.str.len)
 	{	/* If no routine name given, take it from the currently running routine unless the label name
@@ -161,8 +160,7 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		 * find the base frame. This frame contains the same rvector pointer that the level 1 stack frame routine has so
 		 * it needs to also be rewritten once we link our new "1st routine". Find the base frame we will be modifying.
 		 */
-		for (base_frame = frame_pointer;
-		     ((NULL != base_frame) && (NULL != base_frame->old_frame_pointer));
+		for (base_frame = frame_pointer; ((NULL != base_frame) && (NULL != base_frame->old_frame_pointer));
 		     base_frame = base_frame->old_frame_pointer);
 		assert(NULL != base_frame);
 		rtnhdr = op_rhdaddr(&rtnname, NULL);
@@ -177,12 +175,19 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		assert(level == dollar_zlevel());
 	}
 	/* Convert current stack frame to the frame for the entry ref we want to branch to */
-	flush_jmp(rtnhdr, (unsigned char *)LINKAGE_ADR(rtnhdr), LINE_NUMBER_ADDR(rtnhdr, USHBIN_ONLY(*)lnrptr));
+	USHBIN_ONLY(flush_jmp(rtnhdr, (unsigned char *)LINKAGE_ADR(rtnhdr), LINE_NUMBER_ADDR(rtnhdr, *lnrptr)));
+	/* on non-shared binary calculate the transfer address to be passed to flush_jmp as follows:
+	 * 	1) get the number stored at lnrptr; this is the offset to the line number entry
+	 *	2) add the said offset to the address of the routine header; this is the address of line number entry
+	 *	3) dereference the said address to get the line number of the actual program
+	 *	4) add the said line number to the address of the routine header
+	 */
+	NON_USHBIN_ONLY(flush_jmp(rtnhdr, (unsigned char *)LINKAGE_ADR(rtnhdr),
+		(unsigned char *)((int)rtnhdr + *(int *)((int)rtnhdr + *lnrptr))));
 	DBGEHND((stderr, "op_zgoto: Resuming at frame 0x"lvaddr" with type 0x%04lx\n", frame_pointer, frame_pointer->type));
 #	ifdef GTM_TRIGGER
 	if (goframes_unwound_trigger)
-	{
-		/* If goframes() called by golevel unwound a trigger base frame, we must use MUM_TSTART to unroll the
+	{	/* If goframes() called by golevel unwound a trigger base frame, we must use MUM_TSTART to unroll the
 		 * C stack before invoking the return frame. Otherwise we can just return and avoid the overhead that
 		 * MUM_TSTART incurs.
 		 */

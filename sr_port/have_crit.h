@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,11 @@
 #ifndef HAVE_CRIT_H_INCLUDED
 #define HAVE_CRIT_H_INCLUDED
 
+#include <signal.h>				/* needed for VSIG_ATOMIC_T */
+#ifdef UNIX
+#include <deferred_signal_handler.h>
+#endif
+
 /* states of CRIT passed as argument to have_crit() */
 #define CRIT_IN_COMMIT		0x00000001
 #define CRIT_NOT_TRANS_REG	0x00000002
@@ -21,10 +26,17 @@
 #define	CRIT_IN_WTSTART		0x00000010	/* check if csa->in_wtstart is true */
 
 /* Note absence of any flags is default value which finds if any region
-   or the replication pool have crit or are getting crit. It returns
-   when one is found without checking further.
+ * or the replication pool have crit or are getting crit. It returns
+ * when one is found without checking further.
 */
 #define CRIT_HAVE_ANY_REG	0x00000000
+
+#ifdef DEBUG
+#include "wbox_test_init.h"
+#endif
+#ifdef UNIX
+#include "gt_timer.h"
+#endif
 
 typedef enum
 {
@@ -40,10 +52,16 @@ typedef enum
 	INTRPT_IN_ZLIB_CMP_UNCMP,
 	INTRPT_IN_TRIGGER_NOMANS_LAND,	/* State where have trigger base frame but no trigger (exec) frame */
 	INTRPT_IN_MUR_OPEN_FILES,
+	INTRPT_IN_TRUNC,
 	INTRPT_NUM_STATES,
+	INTRPT_IN_SET_NUM_ADD_PROCS,
+	INTRPT_IN_SYSCONF,
+	INTRPT_NO_TIMER_EVENTS,		/* State where primary reason for deferral is to avoid timer pops */
+	INTRPT_IN_FFLUSH		/* Deferring interrupts during fflush */
 } intrpt_state_t;
 
 GBLREF	intrpt_state_t	intrpt_ok_state;
+GBLREF	boolean_t	deferred_timers_check_needed;
 
 /* Macro to check if we are in a state that is ok to interrupt (or to do deferred signal handling).
  * We do not want to interrupt if the global variable intrpt_ok_state indicates it is not ok to interrupt,
@@ -65,9 +83,21 @@ GBLREF	intrpt_state_t	intrpt_ok_state;
 	GBLREF	VSIG_ATOMIC_T	forced_exit;								\
 	GBLREF	volatile int4	gtmMallocDepth;								\
 													\
-	if (forced_exit && !process_exiting && OK_TO_INTERRUPT)						\
-		UNIX_ONLY(deferred_signal_handler();)							\
-		VMS_ONLY(sys$exit(exi_condition);)							\
+	if (forced_exit)										\
+	{												\
+		if (!process_exiting && OK_TO_INTERRUPT)						\
+		{											\
+			UNIX_ONLY(deferred_signal_handler();)						\
+			VMS_ONLY(sys$exit(exi_condition);)						\
+		}											\
+	} 												\
+	UNIX_ONLY(											\
+	else if (deferred_timers_check_needed)								\
+	{												\
+		if (!process_exiting && OK_TO_INTERRUPT)						\
+			check_for_deferred_timers();							\
+        }												\
+	)												\
 }
 
 /* Macro to cause deferrable interrupts to be deferred recording the cause.
@@ -121,4 +151,3 @@ GBLREF	intrpt_state_t	intrpt_ok_state;
 uint4 have_crit(uint4 crit_state);
 
 #endif /* HAVE_CRIT_H_INCLUDED */
-

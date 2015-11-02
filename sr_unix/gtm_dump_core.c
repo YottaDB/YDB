@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@ void gtm_dump_core(void)
 	char                    newname[20];
 	int                     suffix, status;
 	struct stat             fs1;
+	sigset_t		unblock_sigquit;
 
 	/* Scrub any encryption related information before taking a core dump */
 	GTMCRYPT_ONLY(GTMCRYPT_CLOSE;)
@@ -58,6 +59,11 @@ void gtm_dump_core(void)
 				status = -1;                            /* Yes, reset status for another iteration */
 		}
 	}
+	/* Even if signals are disabled at this point (for instance online rollback), the SIGQUIT below will be useless. So,
+	 * unblock SIGQUIT unconditionally as we are anyways about to die.
+	 */
+	sigaddset(&unblock_sigquit, SIGQUIT);
+	sigprocmask(SIG_UNBLOCK, &unblock_sigquit, NULL);
 	kill(getpid(), SIGQUIT);
 	sleep(60);	/* In case of async kill */
 	_exit(1);

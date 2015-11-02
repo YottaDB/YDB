@@ -18,7 +18,7 @@ bool lke_get_answ(char *prompt);
 bool lke_showlock(struct CLB *lnk, mlk_shrblk_ptr_t tree, mstr *name, bool all, bool wait,
 	bool interactive, int4 pid, mstr one_lock, boolean_t exact);
 bool lke_showtree(struct CLB *lnk, mlk_shrblk_ptr_t tree, bool all, bool wait, pid_t pid,
-	mstr one_lock, bool memory);
+		  mstr one_lock, bool memory, int *shr_sub_size);
 void lke_exit(void);
 void lke_clear(void);
 void lke_help(void);

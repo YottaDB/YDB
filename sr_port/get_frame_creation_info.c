@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,6 @@
 #include "mdef.h"
 
 #include "rtnhdr.h"
-#include "mv_stent.h"
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "error_trap.h"
@@ -23,7 +22,6 @@
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	spdesc			stringpool;
-GBLREF	mv_stent		*mv_chain;
 
 #ifdef UNIX
 LITDEF 	mstr	createdby_text[3] = {{0, LEN_AND_LIT("DO")}, {0, LEN_AND_LIT("XECUTE")}, {0, LEN_AND_LIT("$$")}};
@@ -36,13 +34,12 @@ LITDEF 	mstr	createdby_text[3] = {{LEN_AND_LIT("DO")}, {LEN_AND_LIT("XECUTE")}, 
 void	get_frame_creation_info(int level, int cur_zlevel, mval *result)
 {
 	int		count;
-	stack_frame	*fp, *previous;
-	mv_stent	*mvc;
+	stack_frame	*fp;
 
 	assert(0 < level);
 	assert(level < cur_zlevel);
 	count = cur_zlevel;
-	for (previous = NULL, fp = frame_pointer;  ; previous = fp, fp = fp->old_frame_pointer)
+	for (fp = frame_pointer; ; fp = fp->old_frame_pointer)
 	{
 		if (NULL == fp->old_frame_pointer)
 		{
@@ -63,28 +60,13 @@ void	get_frame_creation_info(int level, int cur_zlevel, mval *result)
 		if (count == level)
 			break;
 	}
+	assert(fp && (fp->type & SFT_COUNT));
 	if (fp->flags & SFF_INDCE)
 		result->str = createdby_text[CREATEDBY_XECUTE];
+	else if (fp->ret_value)
+		result->str = createdby_text[CREATEDBY_FUNCTION];
 	else
-	{
-		for (mvc = mv_chain; ; mvc = (mv_stent *) (mvc->mv_st_next + (char *) mvc))
-		{
-			if ((mvc >= (mv_stent *)fp) || (!mvc->mv_st_next))
-			{
-				assert(mvc->mv_st_next);
-				result->str = createdby_text[CREATEDBY_DO];
-				break;
-			}
-			if (mvc <= (mv_stent *)previous)
-				continue;
-			if ((MVST_PARM == mvc->mv_st_type) && mvc->mv_st_cont.mvs_parm.ret_value)
-			{
-				assert(mvc->mv_st_next);
-				result->str = createdby_text[CREATEDBY_FUNCTION];
-				break;
-			}
-		}
-	}
+		result->str = createdby_text[CREATEDBY_DO];
 	s2pool(&result->str);
 	assert(((unsigned char *)result->str.addr + result->str.len) == stringpool.free);
 }

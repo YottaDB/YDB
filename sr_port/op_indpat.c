@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,40 +20,36 @@
 #include "op.h"
 
 GBLREF short int 		source_column;
-GBLREF mval 			**ind_result_sp, **ind_result_top;
-GBLREF char 			window_token;
+
+error_def(ERR_INDMAXNEST);
 
 void	op_indpat(mval *v, mval *dst)
 {
-	bool		rval;
+	int		rval;
+	icode_str	indir_src;
 	mstr		*obj, object;
 	oprtype		x;
-	icode_str	indir_src;
-	error_def(ERR_INDMAXNEST);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	if (TREF(ind_result_sp) >= TREF(ind_result_top))
+		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp */
 	MV_FORCE_STR(v);
 	indir_src.str = v->str;
 	indir_src.code = indir_pattern;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
+		obj = &object;
 		comp_init(&v->str);
 		source_column = 1;	/* to coordinate with scanner redirection*/
-		rval = compile_pattern(&x,window_token == TK_ATSIGN);
-		if (comp_fini(rval, &object, OC_IRETMVAL, &x, v->str.len))
-		{
-			indir_src.str.addr = v->str.addr;
-			cache_put(&indir_src, &object);
-			*ind_result_sp++ = dst;
-			if (ind_result_sp >= ind_result_top)
-				rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-			comp_indr(&object);
-		}
+		rval = compile_pattern(&x, (TK_ATSIGN == TREF(window_token)));
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &x, v->str.len))
+			return;
+		indir_src.str.addr = v->str.addr;
+		cache_put(&indir_src, obj);
+		/* Fall into code activation below */
 	}
-	else
-	{
-		*ind_result_sp++ = dst;
-		if (ind_result_sp >= ind_result_top)
-			rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-		comp_indr(obj);
-	}
+	*(TREF(ind_result_sp))++ = dst;				/* Where to store return value */
+	comp_indr(obj);
+	return;
 }

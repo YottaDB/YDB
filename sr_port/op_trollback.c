@@ -51,6 +51,10 @@ GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 GBLREF	boolean_t		implicit_trollback;
 GBLREF	tp_frame		*tp_pointer;
 
+error_def(ERR_TLVLZERO);
+error_def(ERR_TROLLBK2DEEP);
+error_def(ERR_INVROLLBKLVL);
+
 #define	RESTORE_GV_CUR_REGION						\
 {									\
 	gv_cur_region = save_cur_region;				\
@@ -59,17 +63,13 @@ GBLREF	tp_frame		*tp_pointer;
 
 void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by which we need to rollback : BYPASSOK */
 {
+	boolean_t	lcl_implicit_trollback = FALSE;
 	uint4		newlevel;
-	tp_region	*tr;
 	gd_region	*save_cur_region;	/* saved copy of gv_cur_region before tp_clean_up/tp_incr_clean_up modifies it */
 	gd_region	*curreg;
-	sgmnt_addrs	*csa;
-	boolean_t	lcl_implicit_trollback = FALSE;
 	gv_key		*gv_orig_key_ptr;
-
-	error_def(ERR_TLVLZERO);
-	error_def(ERR_TROLLBK2DEEP);
-	error_def(ERR_INVROLLBKLVL);
+	sgmnt_addrs	*csa;
+	tp_region	*tr;
 
 	if (implicit_trollback)
 	{
@@ -159,6 +159,11 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	} else
 	{
 		tp_incr_clean_up(newlevel);
+		if (gv_currkey != NULL)
+		{
+			gv_currkey->base[0] = '\0';
+			gv_currkey->end = gv_currkey->prev = 0;
+		}
 		RESTORE_GV_CUR_REGION;
 		tp_unwind(newlevel, ROLLBACK_INVOCATION, NULL);
 	}

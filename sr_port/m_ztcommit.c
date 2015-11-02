@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,23 +15,21 @@
 #include "toktyp.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-
 int m_ztcommit(void)
 {
 	triple *head;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	head = maketriple(OC_ZTCOMMIT);
-	if (window_token == TK_EOL || window_token == TK_SPACE)
+	if ((TK_EOL == TREF(window_token)) || (TK_SPACE == TREF(window_token)))
 	{
 		head->operand[0] = put_ilit(1);
 		ins_triple(head);
 		return TRUE;
 	}
-
-	if (!intexpr(&head->operand[0]))
+	if (EXPR_FAIL == expr(&head->operand[0], MUMPS_INT))
 		return FALSE;
-
 	ins_triple(head);
 	return TRUE;
 }

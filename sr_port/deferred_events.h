@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,14 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+/* Uncomment below to enable tracing of deferred events */
+/* #define DEBUG_DEFERRED_EVENT */
+#ifdef DEBUG_DEFERRED_EVENT
+# define DBGDFRDEVNT(x) DBGFPF(x)
+#else
+# define DBGDFRDEVNT(x)
+#endif
 
 /* --------------------------------------------
  * Async. events that can be deferred
@@ -90,13 +98,8 @@ boolean_t xfer_reset_if_setter(int4 event_type);
  */
 
 void ctrap_set(int4);
-
 void ctrlc_set(int4);
-
 void ctrly_set(int4);
-
-void tp_timeout_defer(int4);
-
 void tt_write_error_set(int4);
 
 /* ------------------------------------------------------------------

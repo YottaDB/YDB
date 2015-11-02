@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,7 @@
 #include "mdq.h"
 #include "mprof.h"
 #include "mv_stent.h"
+#include "find_mvstent.h"	/* needed for zintcmd_active */
 #include "stack_frame.h"
 #include "stp_parms.h"
 #include "stringpool.h"
@@ -92,6 +93,8 @@
 #include "have_crit.h"
 #include "alias.h"
 #include "zroutines.h"
+#include "trace_table.h"
+#include "parm_pool.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"

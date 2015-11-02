@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,8 +40,10 @@
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
-GBLREF	boolean_t		print_offset;		/* set to TRUE if -DETAIL is specified */
+GBLREF	boolean_t		detail_specified;		/* set to TRUE if -DETAIL is specified */
 GBLREF	uint4			section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
+
+error_def(ERR_MUPCLIERR);
 
 int gtmsource_jnlpool(void)
 {
@@ -49,13 +51,16 @@ int gtmsource_jnlpool(void)
 	gtm_uint64_t		value;
 	boolean_t		value_present;
 
-	error_def(ERR_MUPCLIERR);
-
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	assert(NULL == jnlpool.gtmsource_local);
+	if (CLI_PRESENT == cli_present("NAME"))
+	{
+		util_out_print("Error: NAME cannot be used with JNLPOOL", TRUE);
+		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+	}
 	if (CLI_PRESENT == cli_present("SHOW"))
 	{
-		print_offset = (CLI_PRESENT == cli_present("DETAIL"));
+		detail_specified = (CLI_PRESENT == cli_present("DETAIL"));
 		section_offset = 0;
 		repl_inst_dump_jnlpoolctl(jnlpool.jnlpool_ctl);
 		section_offset = (uint4)((sm_uc_ptr_t)jnlpool.repl_inst_filehdr - (sm_uc_ptr_t)jnlpool.jnlpool_ctl);

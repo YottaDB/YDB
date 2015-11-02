@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,9 +26,13 @@
 #endif
 GBLREF  jnl_process_vector	*prc_vec;
 GBLREF 	jnl_gbls_t		jgbl;
+#ifdef UNIX
+GBLREF	int4			strm_index;
+#endif
 
-void jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header)
+void jfh_from_jnl_info(jnl_create_info *info, jnl_file_header *header)
 {
+	int		idx;
 	trans_num	db_tn;
 
 	/**** We will write journal file header, epoch and eof in order ****/
@@ -75,4 +79,22 @@ void jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header)
 	GTMCRYPT_ONLY(
 		GTMCRYPT_COPY_HASH(info, header);
 	)
+#	ifdef UNIX
+	if (INVALID_SUPPL_STRM != strm_index)
+	{
+		assert(MAX_SUPPL_STRMS == ARRAYSIZE(header->strm_start_seqno));
+		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+			header->strm_start_seqno[idx] = info->csd->strm_reg_seqno[idx];
+		if (jgbl.forw_phase_recovery)
+		{	/* If MUPIP JOURNAL -ROLLBACK, might need to do additional processing. See macro definition for comments */
+			MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(info->csd, header->strm_start_seqno);
+		}
+		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+			header->strm_end_seqno[idx] = header->strm_start_seqno[idx];
+	} else
+	{
+		memset(&header->strm_start_seqno[0], 0, SIZEOF(header->strm_start_seqno));
+		memset(&header->strm_end_seqno[0], 0, SIZEOF(header->strm_end_seqno));
+	}
+#	endif
 }

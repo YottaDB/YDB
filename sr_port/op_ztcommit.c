@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,11 +42,15 @@ GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 
+error_def(ERR_REPLOFFJNLON);
+error_def(ERR_TRANSMINUS);
+error_def(ERR_TRANSNOSTART);
+
 void    op_ztcommit(int4 n)
 {
 	boolean_t			replication, yes_jnl_no_repl;
 	uint4				jnl_status;
-        sgmnt_addrs			*csa, *csa_next, *new_fence_list, *repl_csa, *tcsa, **tcsa_insert;
+        sgmnt_addrs			*csa, *csa_next, *new_fence_list, *tcsa, **tcsa_insert;
 	gd_region			*save_gv_cur_region;
 	jnl_private_control		*jpc;
 	sgmnt_data_ptr_t		csd;
@@ -54,11 +58,7 @@ void    op_ztcommit(int4 n)
 	jnl_tm_t			save_gbl_jrec_time;
 	int4				prev_index;
         static struct_jrec_ztcom	ztcom_record = {{JRT_ZTCOM, ZTCOM_RECLEN, 0, 0, 0},
-						0, 0, 0, {ZTCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
-
-	error_def(ERR_TRANSMINUS);
-	error_def(ERR_TRANSNOSTART);
-	error_def(ERR_REPLOFFJNLON);
+						0, 0, 0, 0, {ZTCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
 
 	assert(ZTCOM_RECLEN == ztcom_record.suffix.backptr);
         if (n < 0)
@@ -153,9 +153,6 @@ void    op_ztcommit(int4 n)
 	{
 		if (yes_jnl_no_repl) /* journal is ON but replication is OFF for a region in the replicated instance */
 			rts_error(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(save_gv_cur_region));
-		repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
-		if (!repl_csa->hold_onto_crit)
-			grab_lock(jnlpool.jnlpool_dummy_reg);
 	}
 	for (csa = new_fence_list; JNL_FENCE_LIST_END != csa; csa = csa->next_fenced)
 	{
@@ -175,8 +172,6 @@ void    op_ztcommit(int4 n)
 	 * the same timestamp is written in the ZTCOM record for ALL regions (which is currently required by journal recovery).
 	 */
 	assert(save_gbl_jrec_time == jgbl.gbl_jrec_time);
-	if (replication && !repl_csa->hold_onto_crit)
-		rel_lock(jnlpool.jnlpool_dummy_reg);
 	for (csa = new_fence_list; JNL_FENCE_LIST_END != csa; csa = csa_next)
 	{       /* do the waits in a separate loop to prevent spreading out the transaction */
 		if (!jgbl.forw_phase_recovery)

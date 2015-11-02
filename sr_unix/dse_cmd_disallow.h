@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@ boolean_t cli_disallow_dse_add(void);
 boolean_t cli_disallow_dse_all(void);
 boolean_t cli_disallow_dse_cache(void);
 boolean_t cli_disallow_dse_change(void);
+boolean_t cli_disallow_dse_chng_fhead(void);
 boolean_t cli_disallow_dse_crit(void);
 boolean_t cli_disallow_dse_dump(void);
 boolean_t cli_disallow_dse_find(void);

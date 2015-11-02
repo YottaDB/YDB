@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 	sm_uc_ptr_t		jnldata_base;
 	jnldata_hdr_ptr_t	jnl_header;
 	qw_num			read_addr, avail_data_qw;
-	seq_num			read_jnl_seqno, jnl_seqno, next_read_seqno, next_triple_seqno;
+	seq_num			read_jnl_seqno, jnl_seqno, next_read_seqno, next_histinfo_seqno;
 
 	jctl = jnlpool.jnlpool_ctl;
 	jnlpool_size = jctl->jnlpool_size;
@@ -77,13 +77,13 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 		read_addr = gtmsource_local->read_addr;
 		assert(stop_read_at > read_addr); /* there should be data to be read, if not how did we end up here? */
 		read_jnl_seqno = gtmsource_local->read_jnl_seqno;
-		assert(read_jnl_seqno <= gtmsource_local->next_triple_seqno);
-		if (read_jnl_seqno == gtmsource_local->next_triple_seqno)
-		{	/* Should signal a REPL_NEW_TRIPLE message to be sent first before sending any more seqnos across */
-			gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SEND_NEW_TRIPLE;
+		assert(read_jnl_seqno <= gtmsource_local->next_histinfo_seqno);
+		if (read_jnl_seqno == gtmsource_local->next_histinfo_seqno)
+		{	/* Request a REPL_HISTREC message be sent first before sending any more seqnos across */
+			gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SEND_NEW_HISTINFO;
 			return 0;
 		}
-		next_triple_seqno = gtmsource_local->next_triple_seqno;
+		next_histinfo_seqno = gtmsource_local->next_histinfo_seqno;
 		next_read_seqno = read_jnl_seqno;
 		if (jnlpool_hasnt_overflowed(jctl, jnlpool_size, read_addr))
 		{	/* No overflow yet. Before we read the content (including the jnldata_len read below), we have to ensure
@@ -125,8 +125,8 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 							num_tr_read = 1;
 						)
 						next_read_seqno++;
-						assert(next_read_seqno <= next_triple_seqno);
-						if ((read_multiple) && (next_read_seqno < next_triple_seqno))
+						assert(next_read_seqno <= next_histinfo_seqno);
+						if ((read_multiple) && (next_read_seqno < next_histinfo_seqno))
 						{	/* Although stop_read_at - read_addr contains no partial transaction, it
 							 * is possible that stop_read_at - read_addr is more than maxbufflen, and
 							 * hence we read fewer bytes than stop_read_at - read_addr; scan what we
@@ -159,9 +159,9 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 									)
 									next_read_seqno++;
 									tr_p += tr_len;
-									if (next_read_seqno >= next_triple_seqno)
-									{	/* Dont read more than boundary of next triple */
-										assert(next_read_seqno == next_triple_seqno);
+									if (next_read_seqno >= next_histinfo_seqno)
+									{	/* Dont read more than boundary of next histinfo */
+										assert(next_read_seqno == next_histinfo_seqno);
 										break;
 									}
 								} else
@@ -190,27 +190,30 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 						REPL_DPRINT4("Read %u : Next read : %u : %s\n", read,
 							(0 > wrap_size) ? read + jnldata_len : wrap_size,
 							(0 > wrap_size) ? "" : " READ WRAPPED");
-						assert(next_read_seqno <= next_triple_seqno);
-						/* Before sending the seqnos, check if a new triple got concurrently written */
-						assert(gtmsource_local->next_triple_num <= gtmsource_local->num_triples);
-						if ((gtmsource_local->next_triple_num == gtmsource_local->num_triples)
-							&& (gtmsource_local->num_triples != jnlpool.repl_inst_filehdr->num_triples))
-						{	/* We are sending seqnos of the last triple (that is open-ended) and
-							 * there has been at least one triple concurrently added to this instance
-							 * file compared to what is in our private memory. Set the next triple's
-							 * start_seqno and redo the read with the new "next_triple_seqno".
+						assert(next_read_seqno <= next_histinfo_seqno);
+						/* Before sending the seqnos, check if a new histinfo got concurrently written */
+						assert(gtmsource_local->next_histinfo_num <= gtmsource_local->num_histinfo);
+						if ((gtmsource_local->next_histinfo_num == gtmsource_local->num_histinfo)
+							&& (gtmsource_local->num_histinfo
+									!= jnlpool.repl_inst_filehdr->num_histinfo))
+						{	/* We are sending seqnos of the last histinfo (that is open-ended) and
+							 * there has been at least one histinfo concurrently added to this instance
+							 * file compared to what is in our private memory. Set the next histinfo's
+							 * start_seqno and redo the read with the new "next_histinfo_seqno".
 							 */
-							assert(MAX_SEQNO == gtmsource_local->next_triple_seqno);
-							gtmsource_set_next_triple_seqno(TRUE);
-								/* Set the next triple's start_seqno and redo the read */
+							assert(MAX_SEQNO == gtmsource_local->next_histinfo_seqno);
+							gtmsource_set_next_histinfo_seqno(TRUE);
+								/* Set the next histinfo's start_seqno and redo the read */
 							if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
-								return 0;/* Connection reset in "gtmsource_set_next_triple_seqno" */
+							{	/* Connection reset in "gtmsource_set_next_histinfo_seqno" */
+								return 0;
+							}
 							continue;
 						}
 						read = ((0 > wrap_size) ? read + jnldata_len : wrap_size);
 						read_addr += jnldata_len;
 						read_jnl_seqno = next_read_seqno;
-						assert(read_jnl_seqno <= gtmsource_local->next_triple_seqno);
+						assert(read_jnl_seqno <= gtmsource_local->next_histinfo_seqno);
 						assert(stop_read_at >= read_addr);
 						assert(jnl_seqno >= read_jnl_seqno - 1);
 						/* In the rare case when we read the transaction read_jnl_seqno just as

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -28,7 +28,7 @@ msf_typ_off		=	32
 msf_flags_off		=	34
 msf_for_ctrl_stack	=	36
 
-msf_frame_size		=	40
+msf_frame_size		=	44
 
 SFT_COUNT		=	0x01
 SFT_DM			=	0x02
@@ -36,7 +36,6 @@ SFT_REP_OP		=	0x04
 SFT_ZBRK_ACT		=	0x08
 SFT_DEV_ACT		=	0x10
 SFT_ZTRAP		=	0x20
-SFT_EXTFUN		=	0x40
 SFT_ZSTEP_ACT		=	0x80
 SFT_ZINTR		=	0x100
 

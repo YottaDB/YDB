@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,17 +33,16 @@ GBLREF unsigned char	*stackbase, *stacktop, *stackwarn, *msp;
 GBLREF mv_stent		*mv_chain;
 GBLREF stack_frame	*frame_pointer;
 
+error_def(ERR_STACKUNDERFLO);
+
 void fgncal_unwind(void)
 {
 	mv_stent	*mvc;
 
-	error_def(ERR_STACKUNDERFLO);
-
-	assert(msp <= stackbase && msp > stacktop);
-	assert(mv_chain <= (mv_stent *)stackbase && mv_chain > (mv_stent *)stacktop);
-	assert(frame_pointer <= (stack_frame*)stackbase && frame_pointer > (stack_frame *)stacktop);
-
-	while (frame_pointer && frame_pointer < (stack_frame *)fgncal_stack)
+	assert((msp <= stackbase) && (msp > stacktop));
+	assert((mv_chain <= (mv_stent *)stackbase) && (mv_chain > (mv_stent *)stacktop));
+	assert((frame_pointer <= (stack_frame*)stackbase) && (frame_pointer > (stack_frame *)stacktop));
+	while (frame_pointer && (frame_pointer < (stack_frame *)fgncal_stack))
 	{
 #		ifdef GTM_TRIGGER
 		if (SFT_TRIGR & frame_pointer->type)
@@ -52,7 +51,7 @@ void fgncal_unwind(void)
 #		endif
 			op_unwind();
 	}
-	for (mvc = mv_chain ; mvc < (mv_stent *) fgncal_stack ; )
+	for (mvc = mv_chain; mvc < (mv_stent *)fgncal_stack; )
 	{
 		unw_mv_ent(mvc);
 		mvc = (mv_stent *)(mvc->mv_st_next + (char *) mvc);
@@ -61,5 +60,4 @@ void fgncal_unwind(void)
 	msp = fgncal_stack;
 	if (msp > stackbase)
 		rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
-
 }

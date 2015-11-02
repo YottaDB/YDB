@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,8 +20,6 @@
 #include "rtnhdr.h"
 #include "zbreak.h"
 
-USHBIN_ONLY(static lnr_tabent *ind_lnr;)
-
 error_def(ERR_LABELMISSING);
 error_def(ERR_LABELONLY);
 error_def(ERR_OFFSETINV);
@@ -30,7 +28,9 @@ USHBIN_ONLY(lnr_tabent **) NON_USHBIN_ONLY(lnr_tabent *)op_labaddr(rhdtyp *routi
 {
 	rhdtyp		*real_routine, *routine_hdr;
 	lnr_tabent	*answer, *first_line;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(label);
 #	if defined (__alpha) && defined (__vms)
 	if (PDSC_FLAGS == ((proc_desc *)routine)->flags) /* it's a procedure descriptor, not a routine header */
@@ -51,9 +51,17 @@ USHBIN_ONLY(lnr_tabent **) NON_USHBIN_ONLY(lnr_tabent *)op_labaddr(rhdtyp *routi
 	answer += offset;
 	if ((answer < first_line) || (answer >= (first_line + real_routine->lnrtab_len)))
 		rts_error(VARLSTCNT(5) ERR_OFFSETINV, 3, label->str.len, label->str.addr, offset);
+	/* Return the address for line number entry pointer/offset, so that the adjacent location in memory holds has_parms. */
 	USHBIN_ONLY(
-		ind_lnr = answer;
-		return &ind_lnr;
+		(TREF(lab_proxy)).lnr_adr = answer;
+		return &((TREF(lab_proxy)).lnr_adr);
 	);
-	NON_USHBIN_ONLY(return answer);
+	NON_USHBIN_ONLY(
+		/* On non-shared-binary, calculate the offset to the corresponding lnr_tabent record by subtracting
+		 * the base address (routine header) from line number entry's address, and save the result in
+		 * lab_ln_ptr field of lab_tabent structure.
+		 */
+		(TREF(lab_proxy)).lab_ln_ptr = (int4)answer - (int4)real_routine;
+		return &((TREF(lab_proxy)).lab_ln_ptr);
+	);
 }

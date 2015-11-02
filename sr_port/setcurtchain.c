@@ -13,7 +13,6 @@
 
 #include "compiler.h"
 
-GBLDEF	triple		*curtchain;
 GBLREF	int4		pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
 GBLREF	triple		t_orig;
 
@@ -23,9 +22,9 @@ triple *setcurtchain(triple *x)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	y = curtchain;
-	curtchain = x;
-	if (pending_errtriplecode && (curtchain == &t_orig))
+	y = TREF(curtchain);
+	TREF(curtchain) = x;
+	if (pending_errtriplecode && (TREF(curtchain) == &t_orig))
 	{	/* A compile error was seen while curtchain was temporarily switched and hence an ins_errtriple did not
 		 * insert a OC_RTERROR triple then. Now that curtchain is back in the same chain as pos_in_chain, reissue
 		 * the ins_errtriple call.

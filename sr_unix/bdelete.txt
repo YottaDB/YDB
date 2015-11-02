@@ -1,0 +1,89 @@
+#################################################################
+#								#
+#	Copyright 2011 Fidelity Information Services, Inc       #
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+# Do not add any blank lines after this comment
+pro:
+CHK2LEV.o
+CHKOP.o
+GENDASH.o
+GENOUT.o
+GTMDefinedTypesInit.m
+GTMDefinedTypesInit.o
+GTMHELP.o
+GTMHLPLD.o
+LOADOP.o
+LOADVX.o
+lowerc_cp
+MSG.o
+TTTGEN.o
+TTTSCAN.o
+V5CBSU.m
+V5CBSU.o
+arch.gtc
+configure
+dbcertify
+gdedefaults.gtc
+gtm.gtc
+gtmbase.gtc
+gtmcshrc.gtc
+gtmhelp.dmp
+gtminstall
+gtmprofile.gtc
+gtmprofile_preV54000.gtc
+map
+mumps.gld
+obj
+
+pro/gtmsecshrdir:
+
+pro/plugin/gtmcrypt:
+build.sh
+gpgagent.tab
+gtmcrypt_dbk_ref.h
+gtmcrypt_interface.h
+gtmcrypt_pk_ref.h
+gtmcrypt_ref.h
+gtmcrypt_sym_ref.h
+gtmxc_types.h
+install.sh
+ld_verbose.out
+libgtmcrypt.dll
+libgtmcrypt.dll.map
+libgtmcrypt.so
+libgtmcrypt.so.map
+libgtmcrypt.x
+maskpass.map
+maskpass.x
+
+pro/utf8:
+CHK2LEV.o
+CHKOP.o
+GENDASH.o
+GENOUT.o
+GTMDefinedTypesInit.m -> ../GTMDefinedTypesInit.m
+GTMDefinedTypesInit.o
+GTMHELP.o
+GTMHLPLD.o
+LOADOP.o
+LOADVX.o
+MSG.o
+TTTGEN.o
+TTTSCAN.o
+V5CBSU.m -> ../V5CBSU.m
+V5CBSU.o
+arch.gtc -> ../arch.gtc
+configure -> ../configure
+dbcertify -> ../dbcertify
+gtmhelp.dmp -> ../gtmhelp.dmp
+gtminstall -> ../gtminstall
+lowerc_cp -> ../lowerc_cp
+map -> ../map
+mumps.gld -> ../mumps.gld
+obj -> ../obj

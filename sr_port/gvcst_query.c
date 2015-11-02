@@ -40,6 +40,8 @@ GBLREF gv_key		*gv_currkey, *gv_altkey;
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 
+error_def(ERR_GVQUERYFAIL);
+
 bool gvcst_query(void)
 {
 	boolean_t	found, two_histories;

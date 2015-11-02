@@ -48,6 +48,10 @@ GBLREF	sm_uc_ptr_t		jnldata_base;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		is_src_server;
+
+error_def(ERR_JNLWRTNOWWRTR);
+error_def(ERR_JNLWRTDEFER);
 
 #ifdef DEBUG
 /* The fancy ordering of operators/operands in the JNL_SPACE_AVAILABLE calculation is to avoid overflows. */
@@ -117,15 +121,16 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	char			*mumps_node_ptr;
 #	endif
 
-	error_def(ERR_JNLWRTNOWWRTR);
-	error_def(ERR_JNLWRTDEFER);
-
 	reg = jpc->region;
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	is_replicated = jrt_is_replicated[rectype];
 	/* Ensure that no replicated journal record is written by this routine if REPL-WAS_ENABLED(csa) is TRUE */
 	assert((JNL_ENABLED(csa) && !REPL_WAS_ENABLED(csa)) || !is_replicated);
+	/* Assert that the only journal records that the source server ever writes are PINI/PFIN/EPOCH/EOF
+	 * which it does at the very end when the database is about to be shut down
+	 */
+	assert(!is_src_server || (JRT_EOF == rectype) || (JRT_PINI == rectype) || (JRT_EPOCH == rectype) || (JRT_PFIN == rectype));
 	assert(csa->now_crit  ||  (csd->clustered  &&  csa->nl->ccp_state == CCST_CLOSED));
 	assert(rectype > JRT_BAD  &&  rectype < JRT_RECTYPES && JRT_ALIGN != rectype);
 	jb = jpc->jnl_buff;
@@ -203,7 +208,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			if (0 == jpc->pini_addr && JRT_PINI != rectype)
 			{	/* This can happen only if jnl got switched in jnl_file_extend above.
 				 * We can't proceed now since the jnl record that we are writing now contains pini_addr	information
-				 * 	pointing to the older journal which is inappropriate if written into the new journal.
+				 * pointing to the older journal which is inappropriate if written into the new journal.
 				 */
 				GTMASSERT;
 			}
@@ -332,7 +337,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		if (0 == jpc->pini_addr && JRT_PINI != rectype)
 		{	/* This can happen only if jnl got switched in jnl_file_extend above.
 			 * We can't proceed now since the jnl record that we are writing now contains pini_addr	information
-			 * 	pointing to the older journal which is inappropriate if written into the new journal.
+			 * pointing to the older journal which is inappropriate if written into the new journal.
 			 */
 			GTMASSERT;
 		}
@@ -419,7 +424,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	{	/* If the database is encrypted, then at this point jfb->buff will contain encrypted
 		 * data which we don't want to to push into the jnlpool. Instead, we make use of the
 		 * alternate alt_buff which is guaranteed to contain the original unencrypted data.
-		 * */
+		 */
 		if (jrt_fixed_size[rectype])
 			ptr = (char *)jnl_rec;
 		else
@@ -477,6 +482,4 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			return;
 		}
 	)
-	if (dba_mm == reg->dyn.addr->acc_meth)
-		jnl_mm_timer(csa, reg);
 }

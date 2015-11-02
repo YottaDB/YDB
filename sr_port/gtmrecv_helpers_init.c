@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,10 @@ GBLREF	recvpool_addrs		recvpool;
 GBLREF	FILE			*gtmrecv_log_fp;
 GBLREF	uint4			process_id;
 
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_RECVPOOLSETUP);
+error_def(ERR_TEXT);
+
 static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 {
 	int			save_errno, save_shutdown;
@@ -75,15 +79,12 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	$DESCRIPTOR(cmd_desc_reader, UPDHELPER_READER_CMD_STR);
 	$DESCRIPTOR(cmd_desc_writer, UPDHELPER_WRITER_CMD_STR);
 #endif
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_TEXT);
 
 	upd_helper_ctl = recvpool.upd_helper_ctl;
 	save_shutdown = helper->helper_shutdown;
 	helper->helper_shutdown = NO_SHUTDOWN;
 #ifdef UNIX
-	if (0 > (helper_pid = fork()))
+	if (0 > (helper_pid = fork()))	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
 	{
 		save_errno = errno;
 		helper->helper_shutdown = save_shutdown;
@@ -123,7 +124,7 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	}
 #elif defined(VMS)
 	/* Create detached server and write startup commands to it */
-	i2hex(helper - upd_helper_ctl->helper_list, mbx_suffix, SIZEOF(mbx_suffix) - 1);
+	i2hex(helper - upd_helper_ctl->helper_list, LIT_AND_LEN(mbx_suffix));
 	mbx_suffix[SIZEOF(mbx_suffix) - 1] = '\0';
 	/* A mailbox is created per helper, and the mailbox name is assigned to a logical. This logical will persist until the
 	 * helper terminates. So, we need to assign a unique logical per helper. Hence the suffix. */

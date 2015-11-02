@@ -56,8 +56,8 @@ GBLREF command_qualifier cmd_qlf;
 GBLREF tp_frame		*tp_pointer;
 GBLREF uint4		dollar_tlevel;
 GBLREF int4		zdir_form;
-GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF boolean_t	badchar_inhibit;
+GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database blocks */
 GBLREF int		gv_fillfactor;
 GBLREF int4		gtm_max_sockets;
 

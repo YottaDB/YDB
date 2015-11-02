@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,9 @@
 
 #include <stdarg.h>
 #include <errno.h>
+#include "gtmio.h"
 #include "gtm_stdio.h"
+#include "have_crit.h"
 
 #include "cmidef.h"
 
@@ -32,6 +34,6 @@ void cmi_dprint(char *cs, ...)
 	VFPRINTF(stderr, cs, ap, rc);
 	assert(0 <= rc);
 	va_end(ap);
-	fflush(stderr);
+	FFLUSH(stderr);
 #endif
 }

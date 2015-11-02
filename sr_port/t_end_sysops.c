@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,7 @@
 #include "memcoherency.h"
 #include "repl_sp.h"		/* for F_CLOSE (used by JNL_FD_CLOSE) */
 #include "have_crit.h"
+#include "gt_timer.h"
 
 #if defined(VMS)
 #include "efn.h"
@@ -66,7 +67,6 @@
 
 #elif defined(UNIX)
 #include "aswp.h"
-#include "gt_timer.h"
 #include "gtmio.h"
 #include "io.h"			/* for gtmsecshr.h */
 #include "performcaslatchcheck.h"
@@ -104,6 +104,11 @@
 #ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
 #endif
+
+error_def(ERR_DBFILERR);
+error_def(ERR_GBLOFLOW);
+UNIX_ONLY(error_def(ERR_TEXT);)
+error_def(ERR_WCBLOCKED);
 
 /* Set the cr->ondsk_blkver to the csd->desired_db_format */
 #define SET_ONDSK_BLKVER(cr, csd, ctn)											\
@@ -186,6 +191,10 @@ GBLREF	cw_set_element		cw_set[];
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		unhandled_stale_timer_pop;
+GBLREF	void			(*wcs_stale_fptr)();
+#ifdef UNIX
+GBLREF	jnl_gbls_t		jgbl;
+#endif
 
 void fileheader_sync(gd_region *reg)
 {
@@ -194,18 +203,15 @@ void fileheader_sync(gd_region *reg)
 	node_local_ptr_t	cnl;
 	th_index_ptr_t		cti;
 	int4			high_blk;
-#if defined(UNIX)
+#	if defined(UNIX)
 	size_t			flush_len, sync_size, rounded_flush_len;
 	int4			save_errno;
 	unix_db_info		*gds_info;
-
-	error_def(ERR_DBFILERR);
-	error_def(ERR_TEXT);
-#elif defined(VMS)
+#	elif defined(VMS)
 	file_control		*fc;
 	int4			flush_len;
 	vms_gds_info		*gds_info;
-#endif
+#	endif
 
 	gds_info = FILE_INFO(reg);
 	csa = &gds_info->s_addrs;
@@ -315,8 +321,10 @@ void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 	change_bmm = FALSE;
 	/* assert that cs->reference_cnt is 0 if we are in MUPIP REORG UPGRADE/DOWNGRADE */
 	assert(!mu_reorg_upgrd_dwngrd_in_prog || (0 == reference_cnt));
-	/* assert that if cs->reference_cnt is 0, then we are in MUPIP REORG UPGRADE/DOWNGRADE or DSE MAPS or DSE CHANGE -BHEAD */
-	assert(mu_reorg_upgrd_dwngrd_in_prog || dse_running || (0 != reference_cnt));
+	/* assert that if cs->reference_cnt is 0, then we are in MUPIP REORG UPGRADE/DOWNGRADE or DSE MAPS or DSE CHANGE -BHEAD
+	 * or MUPIP REORG -TRUNCATE */
+	assert(mu_reorg_upgrd_dwngrd_in_prog || dse_running || (0 != reference_cnt)
+		GTM_TRUNCATE_ONLY(|| (NULL != csa->nl && process_id == csa->nl->trunc_pid)));
 	if (0 < reference_cnt)
 	{	/* Blocks were allocated in this bitmap. Check if local bitmap became full as a result. If so update mastermap. */
 		bml_full = bml_find_free(0, (SIZEOF(blk_hdr) + (is_mm ? lclmap : ((sm_uc_ptr_t)GDS_REL2ABS(lclmap)))), total_blks);
@@ -384,12 +392,12 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	GTM_SNAPSHOT_ONLY(
 		snapshot_context_ptr_t	lcl_ss_ctx;
 	)
-#if defined(VMS)
+#	if defined(VMS)
 	unsigned int		status;
 	io_status_block_disk	iosb;
-#endif
-#if defined(UNIX)
-#	if !defined(UNTARGETED_MSYNC) && !defined(NO_MSYNC)
+#	endif
+#	if defined(UNIX)
+#	  if !defined(UNTARGETED_MSYNC) && !defined(NO_MSYNC)
 	/* The earlier_dirty and mmblkr arrays should be declared as
 	 *     boolean_t    earlier_dirty[DIVIDE_ROUND_UP(MAX_DB_BLK_SIZE, MSYNC_ADDR_INCS) + 1]
 	 * but MSYNC_ADDR_INCS is based on OS_PAGE_SIZE which reduces to a function call and therefore can't be
@@ -408,10 +416,8 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 		unix_db_info	*udi;
 		int4		save_errno;
 #		endif
-	error_def(ERR_DBFILERR);
-	error_def(ERR_TEXT);
+#	  endif
 #	endif
-#endif
 
 	assert(cs_addrs->now_crit);
 	assert((gds_t_committed > cs->mode) && (gds_t_noop < cs->mode));
@@ -478,8 +484,9 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 					earlier_dirty[indx] = FALSE;
 					mmblkr[indx] = cur_mmblkr;
 					/* Here we cannot call LOCK_NEW_BUFF_FOR_UPDATE directly, because in wcs_wtstart
-					   csr->dirty is reset before it releases the LOCK in the buffer.
-					   To avoid this very small window followings are needed. */
+					 * csr->dirty is reset before it releases the LOCK in the buffer.
+					 * To avoid this very small window followings are needed.
+					 */
 					for (ocnt = 1; ; ocnt++)
 					{
 						LOCK_BUFF_FOR_UPDATE(mmblkr[indx], n, &cs_addrs->nl->db_latch);
@@ -758,10 +765,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	sm_uc_ptr_t		blk_ptr, backup_blk_ptr;
 	sm_off_t		backup_cr_off;
 	uint4			in_cw_set;
-
-	error_def(ERR_DBFILERR);
 #	endif
-	error_def(ERR_WCBLOCKED);
 
 	csa = cs_addrs;		/* Local access copies */
 	csd = csa->hdr;
@@ -772,7 +776,8 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	assert(0 != ctn);
 	assert(csa->now_crit);
 	blkid = cs->blk;
-	assert((0 <= blkid) && (blkid < csa->ti->total_blks));
+	/* assert changed to assertpro 2/15/2012. can be changed back once reorg truncate has been running for say 3 to 4 years */
+	assertpro((0 <= blkid) && (blkid < csa->ti->total_blks));
 	INCR_DB_CSH_COUNTER(csa, n_bgmm_updates, 1);
 	bt = bt_put(gv_cur_region, blkid);
 	GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_BTPUTNULL, bt, NULL);
@@ -1077,8 +1082,8 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 						BG_TRACE_PRO(blkd_made_empty);
 					}
 					/* Currently we compare out-of-crit "cr->buffaddr->tn" with the "hist->tn"
-					 * to see if a block has been modified since the time we did our read.
-					 *  (places are t_qread, tp_hist, gvcst_search and gvcst_put). In VMS,
+					 * to see if a block has been modified since the time we did our read
+					 * (places are t_qread, tp_hist, gvcst_search and gvcst_put). In VMS,
 					 * if a cache-record is currently being written to disk, and we need to
 					 * update it, we find out another free cache-record and twin the two
 					 * and make all changes only in the newer twin. Because of this, if we
@@ -1319,8 +1324,6 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		snapshot_context_ptr_t	lcl_ss_ctx = NULL;
 	)
 
-	error_def(ERR_WCBLOCKED);
-
 	mode = cs->mode;
 	cr = cs->cr;
 	/* Make sure asserts that were valid before letting go of this cache-record in phase1 are still so */
@@ -1342,6 +1345,15 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	csd = csa->hdr;
 	cnl = csa->nl;
 	blkid = cs->blk;
+	/* The following assert should NOT go off, even with the possibility of concurrent truncates. The cases are:
+	 * 1. blkid is a bitmap block. In this case, we've held crit since last checking for a truncate.
+	 * 2. a non-bitmap block. We might not have crit at this point. A concurrent truncate may very well have happened,
+	 *    BUT it should not have truncated as far as this block. Here's why: the bitmap block corresponding to blkid has
+	 *    already been marked busy, which would signal (via highest_lbm_with_busy_blk) an ongoing mu_truncate to pull back.
+	 *    The remaining possibility is that mu_truncate began after the bitmap block was marked busy. But in this case,
+	 *    mu_truncate would see (in phase 1) that blkid has been marked busy. Another process could not have freed blkid
+	 *    in the bitmap because this process has pinned blkid's corresponding buffer.
+	 */
 	assert((0 <= blkid) && (blkid < csa->ti->total_blks));
 	GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_PHASE2FAIL, cr, NULL);
 	DEBUG_ONLY(
@@ -1399,8 +1411,10 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	} else
 	{	/* either it is a non-local bit-map or we are in dse_maps or MUPIP RECOVER writing an AIMG record */
 		assert((0 != (blkid & (BLKS_PER_LMAP - 1))) || write_after_image);
-		/* we should NOT be in crit for phase2 except dse_maps/dse_chng_bhead OR if cse has a non-zero recompute list */
-		assert(!csa->now_crit || cs->recompute_list_head || dse_running);
+		/* we should NOT be in crit for phase2 except dse_maps/dse_chng_bhead OR if cse has a non-zero recompute list. The
+		 * only exception to this is ONLINE ROLLBACK which holds crit for the entire duration
+		 */
+		assert(!csa->now_crit || cs->recompute_list_head || dse_running UNIX_ONLY(|| jgbl.onlnrlbk));
 		if (FALSE == cs->done)
 		{	/* if the current block has not been built (from being referenced in TP) */
 			if (NULL != cs->new_buff)
@@ -1567,8 +1581,6 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	jnl_private_control	*jpc;
 #	endif
 
-	error_def(ERR_GBLOFLOW);
-
 	assert(reg->open); /* there is no reason we know of why a region should be closed at this point */
 	if (!reg->open)    /* in pro, be safe though and dont touch an already closed region */
 		return;
@@ -1588,6 +1600,7 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 			reg_parm = (UINTPTR_T)reg;
 			csa->timer = TRUE;
 			INCR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
+			wcs_stale_fptr = &wcs_stale;
 			start_timer((TID)reg,
 				    csd->flush_time[0] * (dba_bg == acc_meth ? 1 : csd->defer_time),
 				    &wcs_stale, SIZEOF(reg_parm), (char *)&reg_parm);
@@ -1630,7 +1643,8 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	}
 #	endif
 	/* If we are being called from a timer driven routine, it is not possible to do IO at this time
-	 * because the state of the machine (crit check, lseekio, etc.) is not being checked here. */
+	 * because the state of the machine (crit check, lseekio, etc.) is not being checked here.
+	 */
 	if (FALSE == io_ok)
 		return;
 #	ifdef UNIX
@@ -1803,7 +1817,8 @@ void	wcs_stale(gd_region *reg)
 	}
 	/* To restore to former glory, don't use TP_CHANGE_REG, 'coz we might mistakenly set cs_addrs and cs_data to NULL
 	 * if the region we are restoring has been closed. Don't use tp_change_reg 'coz we might be ripping out the structures
-	 * needed in tp_change_reg in gv_rundown. */
+	 * needed in tp_change_reg in gv_rundown.
+	 */
 	gv_cur_region = save_region;
 	cs_addrs = save_csaddrs;
 	cs_data = save_csdata;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,10 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	short		crash_count;
 
 error_def(ERR_NOREGION);
-
+error_def(ERR_UNIMPLOP);
+error_def(ERR_TEXT);
+error_def(ERR_BADREGION);
+error_def(ERR_NOLOCKMATCH);
 
 void	lke_clear(void)
 {
@@ -59,9 +62,6 @@ void	lke_clear(void)
 	char		regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
 	mlk_ctldata_ptr_t	ctl;
 	mstr		reg, node, one_lock;
-
-	error_def(ERR_UNIMPLOP);
-	error_def(ERR_TEXT);
 
 	/* Get all command parameters */
 	reg.addr = regbuf;
@@ -117,15 +117,13 @@ void	lke_clear(void)
 					rel_crit(gv_cur_region);
 			} else
 			{
-				util_out_print(NULL, RESET);
-				util_out_print("Region is not BG, MM, or CM", FLUSH);
+				gtm_putmsg(VARLSTCNT(2) ERR_BADREGION, 0);
 				locks = TRUE;
 			}
 
 			if (!locks)
 			{
-				util_out_print(NULL, RESET);
-				util_out_print("No locks were found in !AD", FLUSH, REG_LEN_STR(gv_cur_region));
+				gtm_putmsg(VARLSTCNT(4) ERR_NOLOCKMATCH, 2, REG_LEN_STR(gv_cur_region));
 			}
 		}
 	}

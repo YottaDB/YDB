@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,12 +39,17 @@ typedef struct
 # define IS_TRIGGER_RTN(RTNNAME, RSLT) 												\
 { 																\
 	unsigned char	*cptr, *cptr_top;											\
-	for (cptr = (unsigned char *)(RTNNAME)->addr, cptr_top = cptr + (RTNNAME)->len - 1; cptr <= cptr_top; --cptr_top)	\
+																\
+	if (0 < (RTNNAME)->len)													\
 	{															\
-		if ('#' == *cptr_top)												\
-			break;													\
-	}															\
-	RSLT = !(cptr > cptr_top);												\
+		for (cptr = (unsigned char *)(RTNNAME)->addr, cptr_top = cptr + (RTNNAME)->len - 1; cptr <= cptr_top; --cptr_top) \
+		{														\
+			if ('#' == *cptr_top)											\
+				break;												\
+		}														\
+		RSLT = !(cptr > cptr_top);											\
+	} else															\
+		RSLT = FALSE;													\
 }
 #else
 # define IS_TRIGGER_RTN(RTNNAME, RSLT) RSLT = FALSE

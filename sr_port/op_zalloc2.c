@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,8 @@
 #include "mlk_unlock.h"
 #include "mlk_unpend.h"
 #include "outofband.h"
+#include "mv_stent.h"
+#include "find_mvstent.h"
 #include "lk_check_own.h"
 #include "gvcmx.h"
 #include "gvcmz.h"
@@ -43,6 +45,8 @@ GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 GBLREF	uint4		process_id;
 GBLREF	int4		outofband;
+GBLREF	unsigned char	*restart_pc, *restart_ctxt;
+GBLREF	mv_stent	*mv_chain;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
 GBLREF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
 
@@ -70,7 +74,11 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 	unsigned short	locks_bckout, locks_done;
 	int4		msec_timeout;	/* timeout in milliseconds */
 	mlk_pvtblk	*pvt_ptr1, *pvt_ptr2, **prior;
+	ABS_TIME	cur_time, end_time, remain_time;
+	mv_stent	*mv_zintcmd;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	gotit = -1;
 	cm_action = CM_ZALLOCATES;
 	timer_on = (NO_M_TIMEOUT != timeout);
@@ -81,24 +89,57 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 	{
 		msec_timeout = timeout2msec(timeout);
 		if (0 == msec_timeout)
+		{
 			out_of_time = TRUE;
-		else
-			start_timer((TID)&timer_on, msec_timeout, wake_alarm, 0, NULL);
+			timer_on = FALSE;
+		} else
+		{
+			mv_zintcmd = find_mvstent_cmd(ZINTCMD_LOCK, restart_pc, restart_ctxt, FALSE);
+			if (mv_zintcmd)
+			{
+				remain_time = mv_zintcmd->mv_st_cont.mvs_zintcmd.end_or_remain;
+				cur_time = sub_abs_time(&end_time, &cur_time);/* remaining time to wait */
+				if (0 <= remain_time.at_sec)
+					msec_timeout = (int4)(remain_time.at_sec * 1000 + remain_time.at_usec / 1000);
+				else
+					msec_timeout = 0;
+				TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last
+					= mv_zintcmd->mv_st_cont.mvs_zintcmd.restart_pc_prior;
+				TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last
+					= mv_zintcmd->mv_st_cont.mvs_zintcmd.restart_ctxt_prior;
+				TAREF1(zintcmd_active, ZINTCMD_LOCK).count--;
+				assert(0 <= TAREF1(zintcmd_active, ZINTCMD_LOCK).count);
+				if (mv_chain == mv_zintcmd)
+					POP_MV_STENT(); /* just pop if top of stack */
+				else
+				{       /* flag as not active */
+					mv_zintcmd->mv_st_cont.mvs_zintcmd.command = ZINTCMD_NOOP;
+					mv_zintcmd->mv_st_cont.mvs_zintcmd.restart_pc_check = NULL;
+				}
+			}
+			if (0 < msec_timeout)
+			{
+				sys_get_curr_time(&cur_time);
+				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+				start_timer((TID)&timer_on, msec_timeout, wake_alarm, 0, NULL);
+			} else
+			{
+				out_of_time = TRUE;
+				timer_on = FALSE;
+			}
+		}
 	}
 	lckclr();
 	for (blocked = FALSE;  !blocked;)
-	{
-		/* if this is a request for a remote node */
+	{	/* if this is a request for a remote node */
 		if (remlkreq)
 		{
 			if (gotit >= 0)
 				gotit = gvcmx_resremlk(cm_action);
 			else
-				gotit = gvcmx_reqremlk(cm_action, timeout);
-
+				gotit = gvcmx_reqremlk(cm_action, msec_timeout);	/* REQIMMED if 2nd arg == 0 */
 			if (!gotit)
-			{
-				/* only REQIMMED returns false */
+			{	/* only REQIMMED returns false */
 				blocked = TRUE;
 				break;
 			}
@@ -134,15 +175,18 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 		if (dollar_tlevel && (CDB_STAGNATE <= t_tries))
 		{
 			mlk_unpend(pvt_ptr1);		/* Eliminated the dangling request block */
-			if (timer_on)
+			if (timer_on && !out_of_time)
+			{
 				cancel_timer((TID)&timer_on);
+				timer_on = FALSE;
+			}
 			t_retry(cdb_sc_needlock);	/* release crit to prevent a deadlock */
 		}
 
 		for (;;)
 		{
 			if (out_of_time || outofband)
-			{	/* if time expired  ||  control-c encountered */
+			{	/* if time expired || control-c, tptimeout, jobinterrupt encountered */
 				if (outofband || !lk_check_own(pvt_ptr1))
 				{	/* If CTL-C, check lock owner */
 					if (pvt_ptr1->nodptr)		/* Get off pending list to be sent a wake */
@@ -156,8 +200,41 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 					}
 					if (outofband)
 					{
-						cancel_timer((TID)&timer_on);
-						outofband_action(FALSE);
+						if (timer_on && !out_of_time)
+						{
+							cancel_timer((TID)&timer_on);
+							timer_on = FALSE;
+						}
+						if (!out_of_time && (NO_M_TIMEOUT != timeout))
+						{	/* get remain = end_time - cur_time */
+							sys_get_curr_time(&cur_time);
+							remain_time = sub_abs_time(&end_time, &cur_time);
+							if (0 <= remain_time.at_sec)
+								msec_timeout = (int4)(remain_time.at_sec * 1000
+									+ remain_time.at_usec / 1000);
+							else
+								msec_timeout = 0;      /* treat as out_of_time */
+							if (0 >= msec_timeout)
+							{
+								out_of_time = TRUE;
+								timer_on = FALSE;	/* as if LOCK :0 */
+								break;
+							}
+							PUSH_MV_STENT(MVST_ZINTCMD);
+							mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = end_time;
+							mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = restart_ctxt;
+							mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = restart_pc;
+							/* save current information from zintcmd_active */
+							mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_prior
+								= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last;
+							mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_prior
+								= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last;
+							TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last = restart_pc;
+							TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last = restart_ctxt;
+							TAREF1(zintcmd_active, ZINTCMD_LOCK).count++;
+							mv_chain->mv_st_cont.mvs_zintcmd.command = ZINTCMD_LOCK;
+							outofband_action(FALSE);	/* no return */
+						}
 					}
 					break;
 				}
@@ -176,7 +253,7 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 				lk_check_own(pvt_ptr1);		/* clear an abandoned owner */
 			hiber_start_wait_any(LOCK_SELF_WAKE);
 		}
-		if (blocked  &&  out_of_time)
+		if (blocked && out_of_time)
 			break;
 	}
 	if (remlkreq)
@@ -184,9 +261,10 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 		gvcmz_clrlkreq();
 		remlkreq = FALSE;
 	}
-	if (timer_on)
-	{
-		cancel_timer((TID)&timer_on);
+	if (NO_M_TIMEOUT != timeout)
+	{	/* was timed or immediate */
+		if (timer_on && !out_of_time)
+			cancel_timer((TID)&timer_on);
 		if (blocked)
 		{
 			for (prior = &mlk_pvt_root;  *prior;)

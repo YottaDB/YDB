@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,19 +61,26 @@
 #include "gtm_zos_io.h"
 #endif
 
-GBLDEF repl_ctl_element	*repl_ctl_list = NULL;
+GBLDEF repl_ctl_element		*repl_ctl_list = NULL;
 
-GBLREF jnlpool_addrs	jnlpool;
-GBLREF seq_num		seq_num_zero;
+GBLREF jnlpool_addrs		jnlpool;
+GBLREF seq_num			seq_num_zero;
 
-GBLREF gd_addr          *gd_header;
-GBLREF gd_region        *gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF gd_addr			*gd_header;
+GBLREF gd_region		*gv_cur_region;
+GBLREF sgmnt_addrs		*cs_addrs;
 
-GBLREF int		gtmsource_log_fd;
-GBLREF FILE		*gtmsource_log_fp;
-GBLREF int		gtmsource_statslog_fd;
-GBLREF FILE		*gtmsource_statslog_fp;
+GBLREF int			gtmsource_log_fd;
+GBLREF FILE			*gtmsource_log_fp;
+GBLREF int			gtmsource_statslog_fd;
+GBLREF FILE			*gtmsource_statslog_fp;
+#ifdef UNIX
+GBLREF gtmsource_state_t	gtmsource_state;
+GBLREF uint4			process_id;
+#endif
+
+error_def(ERR_JNLFILOPN);
+error_def(ERR_JNLNOREPL);
 
 repl_buff_t *repl_buff_create(uint4 buffsize, uint4 jnl_fs_block_size);
 
@@ -197,8 +204,6 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 #endif
 	uint4			jnl_fs_block_size;
 
-	error_def(ERR_JNLFILOPN);
-
 	status = SS_NORMAL;
 	jnl_status = 0;
 
@@ -217,6 +222,19 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		was_crit = csa->now_crit;
 		if (!was_crit)
 			grab_crit(reg);
+#		ifdef UNIX
+		if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
+		{	/* Concurrent online rollback. Possible only if we are called from gtmsource_update_zqgblmod_seqno_and_tn
+			 * in which case we don't hold the gtmsource_srv_latch. Assert that.
+			 */
+			assert(process_id != jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
+			SYNC_ONLN_RLBK_CYCLES;
+			gtmsource_onln_rlbk_clnup();
+			if (!was_crit)
+				rel_crit(reg);
+			return -1;
+		}
+#		endif
 		/* Although replication may be WAS_ON, it is possible that source server has not yet sent records
 		 * that were generated when replication was ON. We have to open and read this journal file to
 		 * cover such a case. But in the WAS_ON case, do not ask for a jnl_ensure_open to be done since
@@ -282,7 +300,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 			CHECK_JNL_FILE_IS_USABLE(tmp_jfh, status, FALSE, 0, NULL); /* FALSE => NO gtm_putmsg even if errors */
 		assert(SS_NORMAL == status);
 	}
-	if (SS_NORMAL != status)
+	if ((SS_NORMAL != status) || (!REPL_ALLOWED(tmp_jfh)))
 	{
 		/* We need tmp_ctl->jnl_fn to issue the error but want to free up tmp_ctl before the error.
 		 * So copy jnl_fn into local buffer before the error.
@@ -292,14 +310,17 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		assert(lcl_jnl_fn_len < ARRAYSIZE(lcl_jnl_fn));
 		memcpy(lcl_jnl_fn, tmp_ctl->jnl_fn, lcl_jnl_fn_len);
 		lcl_jnl_fn[lcl_jnl_fn_len] = '\0';
-		assert(FALSE);
+		assert(!REPL_ALLOWED(tmp_jfh));
 		free(tmp_ctl);
 		tmp_ctl = NULL;
 		if (NULL != tmp_jfh_base)
 			free(tmp_jfh_base);
 		tmp_jfh = NULL;
 		tmp_jfh_base = NULL;
-		rts_error(VARLSTCNT(7) ERR_JNLFILOPN, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg), status);
+		if (SS_NORMAL != status)
+			rts_error(VARLSTCNT(7) ERR_JNLFILOPN, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg), status);
+		else
+			rts_error(VARLSTCNT(6) ERR_JNLNOREPL, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg));
 	}
 	assert(SS_NORMAL == status);	/* so jnl_fs_block_size is guaranteed to have been initialized */
 	tmp_ctl->repl_buff = repl_buff_create(tmp_jfh->alignsize, jnl_fs_block_size);
@@ -365,6 +386,7 @@ int gtmsource_ctl_init(void)
 	memset((char_ptr_t)repl_ctl_list, 0, SIZEOF(*repl_ctl_list));
 	prev_ctl = repl_ctl_list;
 
+	UNIX_ONLY(assert(GTMSOURCE_HANDLE_ONLN_RLBK != gtmsource_state)); /* can't come here without handling online rollback */
 	region_top = gd_header->regions + gd_header->n_regions;
 	for (reg = gd_header->regions; reg < region_top; reg++)
 	{
@@ -374,7 +396,11 @@ int gtmsource_ctl_init(void)
 		if (REPL_ALLOWED(csd))
 		{
 			status = repl_ctl_create(&tmp_ctl, reg, 0, NULL, TRUE);
-			assert(SS_NORMAL == status);
+			assert((SS_NORMAL == status) UNIX_ONLY(|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)));
+			UNIX_ONLY(
+				if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+					return -1;
+			)
 			prev_ctl->next = tmp_ctl;
 			tmp_ctl->prev = prev_ctl;
 			tmp_ctl->next = NULL;
@@ -419,6 +445,7 @@ int gtmsource_ctl_close(void)
 	sgmnt_addrs		*csa;
 	int			status;
 
+	UNIX_ONLY(gtmsource_stop_jnl_release_timer();)
 	if (repl_ctl_list)
 	{
 		for (ctl = repl_ctl_list->next; NULL != ctl; ctl = repl_ctl_list->next)

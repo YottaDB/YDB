@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 #include <sys/types.h>
 
 error_def(ERR_TPNOTACID);
-															\
+
 /* HEADER-FILE-DEPENDENCIES : hashtab_int4.h */
 
 #define JNL_LIST_INIT_ALLOC		16		/* initial allocation for si->jnl_list */
@@ -152,7 +152,7 @@ typedef struct sgm_info_struct
 				cur_tp_hist_size,
 				total_jnl_rec_size,
 				cr_array_size;
-	boolean_t		fresh_start;
+	boolean_t		tp_set_sgm_done;
 	int4			crash_count;
 	boolean_t		backup_block_saved;
 	sgmnt_addrs		*kip_csa;
@@ -292,6 +292,31 @@ typedef struct tp_region_struct
 	}													\
 }
 
+#ifdef UNIX
+/* Following macro resets clues and root block number of all the gv_targets accessed in the life-time of this process. This is
+ * needed whenever a process during its transaction (TP or Non-TP) validation phase detects that a concurrent Online Rollback
+ * started and completed in the meantime, the transaction should NOT go for commit, but should restart to ensure the clues and
+ * root block numbers are reset so that the restarted transaction uses the up-to-date information.
+ */
+#  define RESET_ALL_GVT_CLUES											\
+{														\
+	GBLREF	gv_namehead	*gv_target_list;								\
+	GBLREF	gv_namehead	*reorg_gv_target;								\
+														\
+	gv_namehead		*gvnh;										\
+														\
+	for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)					\
+	{													\
+		gvnh->clue.end = 0;										\
+		assert((NULL != gvnh->gd_csa) || (reorg_gv_target == gvnh));					\
+		if (gvnh->gd_csa && (gvnh != gvnh->gd_csa->dir_tree))						\
+			gvnh->root = 0;										\
+		/* Cleanup any block-split info (of created block #) in gvtarget histories */			\
+		TP_CLEANUP_GVNH_SPLIT_IF_NEEDED(gvnh, 0);							\
+	}													\
+}
+#endif
+
 typedef struct ua_list_struct
 {
 	struct ua_list_struct
@@ -311,7 +336,6 @@ typedef struct gv_orig_key_struct
 	int4	gv_orig_key[TP_MAX_NEST + 1][DIVIDE_ROUND_UP((SIZEOF(gv_key) + MAX_KEY_SZ + 1), SIZEOF(int4))];
 }gv_orig_key_array;
 
-GBLREF	int4		tprestart_syslog_delta;
 GBLREF	block_id	t_fail_hist_blk[];
 GBLREF	gd_region	*tp_fail_hist_reg[];
 GBLREF	gv_namehead	*tp_fail_hist[];
@@ -319,9 +343,62 @@ GBLREF	int4		tp_fail_n;
 GBLREF	int4		tp_fail_level;
 GBLREF	trans_num	tp_fail_histtn[], tp_fail_bttn[];
 
+#ifdef ENABLE_EXTENDED_RESTART_TRACE_HIST
+
+/* The following structure stores information pertaining to the most recent invocation of t_retry OR tp_restart. Maintain a 512
+ * element array per-process to track the recent t_retry and tp_restart invocations.  Instead of keeping track of dollar_tlevel,
+ * keep track of the current csa which is always Non-NULL for Non-TP. For TP, csa can be NULL but store it as NULL in the history
+ * as there are multiple regions involved anyways.
+ */
+typedef struct trans_restart_hist_struct
+{
+	uint4			t_tries;
+	enum cdb_sc		retry_code;
+	caddr_t			call_from;
+	union
+	{
+		trans_num	curr_tn;	/* used if replication disabled */
+		seq_num		jnl_seqno;	/* used if replication enabled */
+	} seq_or_tn;
+	sgmnt_addrs		*csa;		/* NULL if TP, Non-NULL if Non-TP */
+} trans_restart_hist_t;
+
+# define TRANS_RESTART_HIST_ARRAY_SZ		512
+
+# define TRACE_TRANS_RESTART(RETRY_CODE)								\
+{													\
+	GBLREF	jnlpool_addrs	jnlpool;								\
+	GBLREF	unsigned int	t_tries;								\
+	GBLREF	unsigned int	dollar_tlevel;								\
+	GBLREF	sgmnt_addrs	*cs_addrs;								\
+													\
+	uint4			curidx;									\
+	trans_restart_hist_t	*this_restart_hist;							\
+													\
+	assert(dollar_tlevel || (NULL != cs_addrs));							\
+	curidx = ++(TREF(trans_restart_hist_index));							\
+	if (TRANS_RESTART_HIST_ARRAY_SZ <= curidx)							\
+		curidx = TREF(trans_restart_hist_index) = 0;						\
+	this_restart_hist = (TADR(trans_restart_hist_array) + curidx);					\
+	this_restart_hist->t_tries = t_tries;								\
+	this_restart_hist->retry_code = RETRY_CODE;							\
+	this_restart_hist->call_from = (caddr_t)caller_id();						\
+	if (NULL != jnlpool.jnlpool_ctl)								\
+		this_restart_hist->seq_or_tn.jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;		\
+	else												\
+		this_restart_hist->seq_or_tn.curr_tn = (NULL != cs_addrs) ? cs_addrs->ti->curr_tn : 0;	\
+	this_restart_hist->csa = dollar_tlevel ? NULL : cs_addrs;					\
+}
+#else
+# define TRACE_TRANS_RESTART(RETRY_CODE)
+#endif
+
 #define TP_TRACE_HIST(X, Y) 										\
 {													\
-	if (tprestart_syslog_delta)									\
+	DCL_THREADGBL_ACCESS;										\
+													\
+	SETUP_THREADGBL_ACCESS;										\
+	if (TREF(tprestart_syslog_delta))								\
 	{												\
 		tp_fail_hist_reg[t_tries] = gv_cur_region;						\
 		t_fail_hist_blk[t_tries] = ((block_id)X); 						\
@@ -331,7 +408,10 @@ GBLREF	trans_num	tp_fail_histtn[], tp_fail_bttn[];
 
 #define TP_TRACE_HIST_MOD(X, Y, n, csd, histtn, bttn, level)						\
 {													\
-	if (tprestart_syslog_delta)									\
+	DCL_THREADGBL_ACCESS;										\
+													\
+	SETUP_THREADGBL_ACCESS;										\
+	if (TREF(tprestart_syslog_delta))								\
 	{												\
 		tp_fail_hist_reg[t_tries] = gv_cur_region;						\
 		t_fail_hist_blk[t_tries] = ((block_id)X);						\
@@ -705,7 +785,6 @@ GBLREF	trans_num	tp_fail_histtn[], tp_fail_bttn[];
 	GBLREF	sgm_info	*sgm_info_ptr;										\
 	GBLREF	sgmnt_addrs	*cs_addrs;										\
 	GBLREF	uint4		t_err;											\
-	error_def(err_code);												\
 															\
 	if (!dollar_tlevel)												\
 		t_begin(err_code, UPDTRNS_DB_UPDATED_MASK);								\
@@ -724,8 +803,6 @@ GBLREF	trans_num	tp_fail_histtn[], tp_fail_bttn[];
 	GBLREF	sgm_info	*sgm_info_ptr;										\
 	GBLREF	sgmnt_addrs	*cs_addrs;										\
 															\
-	error_def(err_code);												\
-															\
 	if (!dollar_tlevel)												\
 		t_begin(err_code, 0);											\
 	else														\
@@ -739,7 +816,7 @@ GBLREF	trans_num	tp_fail_histtn[], tp_fail_bttn[];
 GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 
-#define	IS_TP_AND_FINAL_RETRY 	(dollar_tlevel && (CDB_STAGNATE <= t_tries))
+#define	IS_TP_AND_FINAL_RETRY 		(dollar_tlevel && (CDB_STAGNATE <= t_tries))
 
 #define	TP_REL_CRIT_ALL_REG							\
 {										\
@@ -788,6 +865,11 @@ GBLREF	unsigned int	t_tries;
 		send_msg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(CALLER_STR), zpos.str.len, zpos.str.addr);		\
 	}														\
 }
+
+/* Any retry transition where the destination state is the 3rd retry, we don't want to release crit, i.e. for 2nd to 3rd retry
+ * transition or 3rd to 3rd retry transition. Therefore we need to release crit only if (CDB_STAGNATE - 1) > t_tries.
+ */
+#define NEED_TO_RELEASE_CRIT(T_TRIES)		((CDB_STAGNATE - 1) > T_TRIES)
 
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 void tp_clean_up(boolean_t rollback_flag);

@@ -49,7 +49,7 @@
  ************************************************************/
 
 static readonly CLI_PARM dse_ftime_parm_values[] = {
-{ "FLUSH_TIME", 1 }
+	{ "FLUSH_TIME", 1, PARM_REQ}
 };
 
 static readonly CLI_ENTRY dse_add_qual[] = {
@@ -172,6 +172,8 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 { "SLEEP_SPIN_COUNT",          0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "SPIN_SLEEP_TIME",           0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "STDNULLCOLL",               0, 0, 0, 		    true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "STRM_NUM",                  0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "STRM_REG_SEQNO",            0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "TIMERS_PENDING",            0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "TOTAL_BLKS",                0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "TRIGGER_FLUSH",             0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
@@ -187,15 +189,15 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 };
 
 static readonly CLI_ENTRY dse_change_qual[] = {
-{ "BLOCK",      0,              0,               0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "BSIZ",       0,              0,               0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "CMPC",       dse_chng_rhead, 0,               0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "FILEHEADER", dse_chng_fhead, dse_cfhead_qual, 0, 0, 0, 0, VAL_DISALLOWED, 0, 0,       0,       0       },
-{ "LEVEL",      0,              0,               0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "OFFSET",     dse_chng_rhead, 0,               0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "RECORD",     dse_chng_rhead, 0,               0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "RSIZ",       dse_chng_rhead, 0,               0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "TN",         0,              0,               0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "BLOCK",      0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "BSIZ",       0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "CMPC",       dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "FILEHEADER", dse_chng_fhead, dse_cfhead_qual, 0, 0, cli_disallow_dse_chng_fhead, 0, VAL_DISALLOWED, 0, 0,       0,       0       },
+{ "LEVEL",      0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "OFFSET",     dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "RECORD",     dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "RSIZ",       dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "TN",         0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
 { 0 }
 };
 
@@ -223,20 +225,21 @@ static readonly CLI_ENTRY dse_rdmp_qual[] = {
 };
 
 static readonly CLI_ENTRY dse_fdmp_qual[] = {
-{ "ALL",         0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
-{ "BACKUP",      0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "BASIC",       0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "BG_TRC",      0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "DB_CSH",      0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "ENVIRONMENT", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "GVSTATS",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "JOURNAL",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "MIXEDMODE",   0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "RETRIES",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "SNAPSHOT",    0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "TPBLKMOD",    0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "TPRETRIES",   0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "UPDPROC",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "ALL",           0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
+{ "BACKUP",        0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "BASIC",         0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "BG_TRC",        0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "DB_CSH",        0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "ENVIRONMENT",   0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "GVSTATS",       0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "JOURNAL",       0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "MIXEDMODE",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "RETRIES",       0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "SNAPSHOT",      0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "SUPPLEMENTARY", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "TPBLKMOD",      0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "TPRETRIES",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "UPDPROC",       0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
 { 0 }
 };
 
@@ -261,7 +264,7 @@ static readonly CLI_ENTRY dse_eval_qual[] = {
 };
 
 static readonly CLI_PARM dse_freg_parm_values[] = {
-{ "REGION", "*" }
+	{ "REGION", "*", PARM_REQ}
 };
 
 static readonly CLI_ENTRY dse_find_qual[] = {

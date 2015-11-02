@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,13 +12,15 @@
 #include "mdef.h"
 #include "op.h"
 
-GBLREF mval **ind_source_sp, **ind_source_array;
-
 void op_igetsrc(mval *v)
 {
-	ind_source_sp--;
-	assert(ind_source_sp >= ind_source_array);
-	*v = **ind_source_sp;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	(TREF(ind_source_sp))--;
+	assert(TREF(ind_source_sp) < TREF(ind_source_top));
+	assert(TREF(ind_source_sp) >= TREF(ind_source_array));
+	*v = **(TREF(ind_source_sp));
 	v->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 	return;
 }

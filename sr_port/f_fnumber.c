@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,26 +16,27 @@
 #include "mdq.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
+error_def(ERR_COMMA);
 
-int f_fnumber( oprtype *a, opctype op)
+int f_fnumber(oprtype *a, opctype op)
 {
 	triple *ref, *next, *r;
 	oprtype z;
-	error_def(ERR_COMMA);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
-	if (!numexpr(&r->operand[0]))
+	if (EXPR_FAIL == expr(&r->operand[0], MUMPS_NUM))
 		return FALSE;
-	if (window_token != TK_COMMA)
+	if (TK_COMMA != TREF(window_token))
 	{
 		stx_error(ERR_COMMA);
 		return FALSE;
 	}
 	advancewindow();
-	if (!strexpr(&r->operand[1]))
+	if (EXPR_FAIL == expr(&r->operand[1], MUMPS_STR))
 		return FALSE;
-	if (window_token != TK_COMMA)
+	if (TK_COMMA != TREF(window_token))
 	{
 		ref = newtriple(OC_FORCENUM);
 		ref->operand[0] = r->operand[0];
@@ -43,7 +44,7 @@ int f_fnumber( oprtype *a, opctype op)
 	} else
 	{
 		advancewindow();
-		if (!intexpr(&z))
+		if (EXPR_FAIL == expr(&z, MUMPS_INT))
 			return FALSE;
 		ref = newtriple(OC_FNJ3);
 		ref->operand[0] = r->operand[0];

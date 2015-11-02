@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@
  ************************************************************/
 
 static readonly CLI_PARM mumps_parm[] = {
-{"INFILE", "What file: "}
+	{"INFILE", "What file: ", PARM_REQ}
 };
 
 static readonly CLI_ENTRY mumps_qual[] = {

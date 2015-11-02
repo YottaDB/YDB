@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,12 @@
 
 #include "mdef.h"
 
-#include <termios.h>
 #include <errno.h>
 
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
+#include "gtm_termios.h"
+
 #include "eintr_wrappers.h"
 #include "mu_term_setup.h"
 
@@ -59,21 +60,25 @@ void mu_reset_term_characterstics(void)
 {
 	int tcsetattr_res;
 
-	Tcsetattr(STDIN_FILENO, TCSAFLUSH, &term_in, tcsetattr_res);
+	/* Do not use TCSAFLUSH as it drains all buffered (but yet unprocessed) input in the terminal
+	 * even if that was for the next command at the shell prompt. TCSANOW seems to do what we want
+	 * (which is to reset terminal characteristics right away).
+	 */
+	Tcsetattr(STDIN_FILENO, TCSANOW, &term_in, tcsetattr_res);
 	if (get_stdin_charc_pass && (-1 == tcsetattr_res))
 	{
 		PERROR("tcsetattr :");
 		FPRINTF(stderr, "Unable to set terminal characterstics for standard in\n");
 	}
 
-	Tcsetattr(STDOUT_FILENO, TCSAFLUSH, &term_out, tcsetattr_res);
+	Tcsetattr(STDOUT_FILENO, TCSANOW, &term_out, tcsetattr_res);
 	if (get_stdout_charc_pass && (-1 == tcsetattr_res))
 	{
 		PERROR("tcsetattr :");
 		FPRINTF(stderr, "Unable to set terminal characterstics for standard out\n");
 	}
 
-	Tcsetattr(STDERR_FILENO, TCSAFLUSH, &term_err, tcsetattr_res);
+	Tcsetattr(STDERR_FILENO, TCSANOW, &term_err, tcsetattr_res);
 	if (get_stderr_charc_pass && (-1 == tcsetattr_res))
 	{
 		PERROR("tcsetattr :");

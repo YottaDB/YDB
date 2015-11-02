@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -33,12 +33,17 @@
 # PUBLIC	op_extcall
 ENTRY op_extcall
 	putframe
-	addl	$4,%esp
-	popl	%edx
-	popl	%eax
+	addl	$4,%esp			# burn return pc
+	popl	%edx			# routine hdr addr
+	popl	%eax			# label addr
 	cmpl	$0,%eax
 	je	l2
-l1:	movl	(%eax),%eax
+l1:	movl	(%eax),%eax		# get the line number offset
+	cmpl	$0,%eax
+	je	l4
+	addl	mrt_curr_ptr(%edx),%eax
+	addl	%edx,%eax		# get the line number pointer
+	movl	(%eax),%eax		# get the line number
 	addl	mrt_curr_ptr(%edx),%eax
 	addl	%edx,%eax
 	pushl	%eax

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 #include "rtnhdr.h"
 #include "error.h"
 #include "mv_stent.h"
+#include "find_mvstent.h"	/* for zintcmd_active */
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -51,6 +52,7 @@
 #endif
 #include "stack_frame.h"
 #include "alias.h"
+#include "tp_timeout.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -86,11 +88,11 @@ GBLREF int			mumps_status;
 GBLREF boolean_t		run_time;
 GBLREF int4			gtm_trigger_depth;
 GBLREF symval			*trigr_symval_list;
-#ifdef DEBUG
+#  ifdef DEBUG
 GBLREF gv_trigger_t		*gtm_trigdsc_last;		/* For debugging purposes - parms gtm_trigger called with */
 GBLREF gtm_trigger_parms	*gtm_trigprm_last;
 GBLREF ch_ret_type		(*ch_at_trigger_init)();
-#endif
+#  endif
 #endif
 GBLREF unsigned char		*restart_pc, *restart_ctxt;
 GBLREF mval			*alias_retarg;
@@ -102,15 +104,15 @@ GBLREF gvzwrite_datablk		*gvzwrite_block;
 GBLREF lvzwrite_datablk		*lvzwrite_block;
 GBLREF zshow_out		*zwr_output;
 GBLREF zwr_hash_table		*zwrhtab;
+GBLREF boolean_t		tp_timeout_deferred;
 
 #define FREEIFALLOC(ADR) if (NULL != (ADR)) free(ADR)
 
-mval	*unw_mv_ent(mv_stent *mv_st_ent)
+void unw_mv_ent(mv_stent *mv_st_ent)
 {
 	lv_blk			*lp, *lpnext;
 	lv_val			*lvval_ptr;
 	symval			*symval_ptr, *sym;
-	mval			*ret_value;
 	ht_ent_mname		*hte;
 	lv_xnew_var		*xnewvar, *xnewvarnext;
 	d_socket_struct		*dsocketptr;
@@ -119,6 +121,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 	UNIX_ONLY(d_rm_struct	*rm_ptr;)
 	socket_interrupt 	*sockintr;
 	socket_struct		*socketptr;
+	zintcmd_ops		zintcmd_command;
 	UNIX_ONLY(d_tt_struct	*tt_ptr;)
 	DBGRFCT_ONLY(mident_fixed vname;)
 	DCL_THREADGBL_ACCESS;
@@ -129,12 +132,11 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 	{
 		case MVST_MSAV:
 			*mv_st_ent->mv_st_cont.mvs_msav.addr = mv_st_ent->mv_st_cont.mvs_msav.v;
-			if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_etrap)
+			if (&dollar_etrap == mv_st_ent->mv_st_cont.mvs_msav.addr)
 			{
-				if (dollar_etrap.str.len)
-					ztrap_explicit_null = FALSE;
+				ztrap_explicit_null = FALSE;
 				dollar_ztrap.str.len = 0;
-			} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_ztrap)
+			} else if (&dollar_ztrap == mv_st_ent->mv_st_cont.mvs_msav.addr)
 			{
 				if (STACK_ZTRAP_EXPLICIT_NULL == dollar_ztrap.str.len)
 				{
@@ -143,9 +145,14 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 				} else
 					ztrap_explicit_null = FALSE;
 				dollar_etrap.str.len = 0;
+				if (tp_timeout_deferred UNIX_ONLY( && !dollar_zininterrupt))
+					/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and we are not in a
+					 * job interrupt, the timeout can no longer be deferred and needs to be recognized.
+					 */
+					tptimeout_set(0);
 			} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
 			{
-				if (dollar_zgbldir.str.len != 0)
+				if (0 != dollar_zgbldir.str.len)
 				{
 					gd_header = zgbldir(&dollar_zgbldir);
 					/* update the gd_map */
@@ -160,19 +167,19 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 				if (gv_target)
 					gv_target->clue.end = 0;
 			}
-			return NULL;
+			return;
 		case MVST_MVAL:
 		case MVST_IARR:
 		case MVST_TPHOLD:
 		case MVST_STORIG:
-			return NULL;
+			return;
 		case MVST_LVAL:
 			/* Reduce the reference count of this unanchored lv_val (current usage as callin argument
 			 * holder) and put on free list if no longer in use.
 			 */
 			lvval_ptr = mv_st_ent->mv_st_cont.mvs_lvval;
 			DECR_BASE_REF_NOSYM(lvval_ptr, FALSE);
-			return NULL;
+			return;
 		case MVST_STAB:
 			if (mv_st_ent->mv_st_cont.mvs_stab)
 			{
@@ -194,11 +201,10 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 					/* Note we do not set SFF_UNW_SYMVAL here because this being a trigger related symbol
 					 * table, when it unwinds, so has any possible reference to what was using it.
 					 */
-					return NULL;
+					return;
 				}
 #				endif
-				if (symval_ptr->alias_activity
-				    && ((NULL != symval_ptr->xnew_var_list) || (NULL != alias_retarg)))
+				if (symval_ptr->alias_activity && ((NULL != symval_ptr->xnew_var_list) || (NULL != alias_retarg)))
 					/* Special cleanup for aliases and passed through vars */
 					als_check_xnew_var_aliases(symval_ptr, curr_symval);
 				else
@@ -239,7 +245,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 				free(symval_ptr);
 				frame_pointer->flags |= SFF_UNW_SYMVAL;
 			}
-			return NULL;
+			return;
 		case MVST_NTAB:
 			DEBUG_ONLY(hte = lookup_hashtab_mname(&curr_symval->h_symtab, mv_st_ent->mv_st_cont.mvs_ntab.nam_addr));
 			assert(hte);
@@ -257,14 +263,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			{
 				DECR_BASE_REF_NOSYM(lvval_ptr, FALSE);
 			}
-			return NULL;
-		case MVST_PARM:
-			if (mv_st_ent->mv_st_cont.mvs_parm.mvs_parmlist)
-				free(mv_st_ent->mv_st_cont.mvs_parm.mvs_parmlist);
-			ret_value = mv_st_ent->mv_st_cont.mvs_parm.ret_value;
-			if (ret_value)
-				dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_parm.save_truth;
-			return ret_value;
+			return;
 		case MVST_PVAL:
 			if (mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.hte_addr)
 			{
@@ -301,7 +300,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 				 */
 				if (lvval_ptr)
 					DECR_BASE_REF_NOSYM(lvval_ptr, FALSE);
-				return NULL;
+				return;
 			}
 			/* We could use the LV_FREESLOT macro here but we already know which symbol-table we need to use and
 			 * hence avoid that step by directly invoking the LV_FLIST_ENQUEUE macro instead. We however ensure
@@ -309,7 +308,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			 */
 			assert(curr_symval == LV_GET_SYMVAL(mv_st_ent->mv_st_cont.mvs_pval.mvs_val));
 			LV_FLIST_ENQUEUE(&curr_symval->lv_flist, mv_st_ent->mv_st_cont.mvs_pval.mvs_val);
-			return NULL;
+			return;
 		case MVST_NVAL:
 			assert(mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.hte_addr);
 			DEBUG_ONLY(hte = lookup_hashtab_mname(&curr_symval->h_symtab, &mv_st_ent->mv_st_cont.mvs_nval.name));
@@ -329,7 +328,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			{
 				DECR_BASE_REF_NOSYM(lvval_ptr, FALSE);
 			}
-			return NULL;
+			return;
 		case MVST_STCK:
 		case MVST_STCK_SP:
 			assert(mvs_size[MVST_STCK] == mvs_size[MVST_STCK_SP]);
@@ -339,17 +338,17 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			else
 				*(mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_addr) =
 					(unsigned char *)mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_val;
-			return NULL;
+			return;
 		case MVST_TVAL:
 			dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_tval;
-			return NULL;
+			return;
 		case MVST_ZINTDEV:
 			/* Since the interrupted device frame is popping off, there is no way that the READ
 			 * that was interrupted will be resumed (if it already hasn't been). We don't bother
 			 * to check if it is or isn't. We just reset the device.
 			 */
 			if (NULL == mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
-				return NULL;	/* already processed */
+				return;	/* already processed */
 			switch(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->type)
 			{
 #				ifdef UNIX
@@ -362,7 +361,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 						mv_st_ent->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 						mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 					}
-					return NULL;
+					return;
 				case rm:
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */
@@ -373,7 +372,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 						mv_st_ent->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 						mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 					}
-					return NULL;
+					return;
 #				endif
 				case gtmsocket:
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
@@ -386,7 +385,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 						{	/* clean up socketptr structure */
 							socketptr = (socket_struct *)mv_st_ent->mv_st_cont.mvs_zintdev.socketptr;
 							if (socket_connect_inprogress == socketptr->state
-								&& FD_INVALID != socketptr->sd)
+								&& (FD_INVALID != socketptr->sd))
 								tcp_routines.aa_close(socketptr->sd);
 							if (NULL != socketptr->zff.addr)
 								free(socketptr->zff.addr);
@@ -399,14 +398,25 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 					}
 					mv_st_ent->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 					mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
-					return NULL;
+					return;
 				default:
 					GTMASSERT;	/* No other device should be here */
 			}
 			break;
+		case MVST_ZINTCMD:
+			zintcmd_command = mv_st_ent->mv_st_cont.mvs_zintcmd.command;
+			assert((0 < zintcmd_command) && (ZINTCMD_LAST > zintcmd_command));
+			/* restore previous active interrupted command information */
+			TAREF1(zintcmd_active, zintcmd_command).restart_pc_last
+				= mv_st_ent->mv_st_cont.mvs_zintcmd.restart_pc_prior;
+			TAREF1(zintcmd_active, zintcmd_command).restart_ctxt_last
+				= mv_st_ent->mv_st_cont.mvs_zintcmd.restart_ctxt_prior;
+			TAREF1(zintcmd_active, zintcmd_command).count--;
+			assert(0 <= TAREF1(zintcmd_active, zintcmd_command).count);
+			return;
 		case MVST_ZINTR:
-			/* Restore environment to pre-$zinterrupt evocation. Note the first few elemnents of MVST_ZINTR
-			 * and MVST_TRIGR are the same so the processing of those elements is commonized.
+			/* Restore environment to pre-$zinterrupt evocation. Note the first few elements of MVST_ZINTR
+			 * and MVST_TRIGR are the same, so the processing of those elements is commonized.
 			 */
 			dollar_zininterrupt = FALSE;
 			/* Get rid of old values that may exist */
@@ -419,6 +429,8 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			if (dollar_stack.array)
 				free(dollar_stack.array);
 			/* Restore the old values from dollar_ecode_ci and dollar_stack_ci */
+			DBGEHND((stderr, "unw_mv_ent: Restoring saved error frame 0x"lvaddr" over existing error frame value 0x"
+				 lvaddr"\n", mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save, error_frame));
 			error_frame = mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save;
 			memcpy(&dollar_ecode, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_ecode_save, SIZEOF(dollar_ecode));
 			memcpy(&dollar_stack, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_stack_save, SIZEOF(dollar_stack));
@@ -430,9 +442,8 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			if (extnam_str.len)
 				memcpy(extnam_str.addr, mv_st_ent->mv_st_cont.mvs_trigr.savextref.addr, extnam_str.len);
 #			ifdef GTM_TRIGGER
-			if (MVST_TRIGR != mv_st_ent->mv_st_type)
-				/* MVST_ZINTR common handling ends here */
-				return NULL;
+			if (MVST_TRIGR != mv_st_ent->mv_st_type) /* MVST_ZINTR common handling ends here */
+				return;
 			ztvalue_changed_ptr = mv_st_ent->mv_st_cont.mvs_trigr.ztvalue_changed_ptr;
 			dollar_ztvalue = mv_st_ent->mv_st_cont.mvs_trigr.ztvalue_save;
 			dollar_ztname = mv_st_ent->mv_st_cont.mvs_trigr.ztname_save;
@@ -460,12 +471,21 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			       || (0 < gtm_trigger_depth) && (&mdb_condition_handler == ctxt->ch));
 			active_ch = ctxt;
 			ctxt->ch_active = FALSE;
-#			endif
-			return NULL;
+			if (tp_timeout_deferred && !((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT))
+			    && !dollar_zininterrupt)
+			{	/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and/or we are no
+				 * longer in a job interrupt, the timeout can no longer be deferred and needs to be
+				 * recognized.
+				 */
+				tp_timeout_deferred = FALSE;
+				tptimeout_set(0);
+			}
+#			endif	/* GTM_TRIGGER */
+			return;
 		case MVST_RSTRTPC:
 			restart_pc = mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_pc_save;
 			restart_ctxt = mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_ctxt_save;
-			return NULL;
+			return;
 		case MVST_MRGZWRSV:
 			merge_args = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_merge_args;
 			zwrtacindx = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrtacindx;
@@ -505,10 +525,10 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 				free(zwrhtab);
 			}
 			zwrhtab = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrhtab;
-			return NULL;
+			return;
 		default:
 			GTMASSERT;
 			break;
 	}
-	return NULL; /* This should never get executed, added to make compiler happy */
+	return; /* This should never get executed, added to make compiler happy */
 }

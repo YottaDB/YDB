@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,30 +35,43 @@
 #include "hashtab.h"		/* needed for HT_VALUE_DUMMY */
 #ifdef GTM64
 #include "hashtab_int8.h"
-#else
-#include "hashtab_int4.h"
 #endif /* GTM64 */
+#include "error.h"
+#include "gdscc.h"
+#include "gdskill.h"
+#include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
+#include "tp.h"
 
 #define	MAX_GMAP_ENTRIES_PER_ITER	2 /* maximum increase (could even be negative) in gmap array size per call to global_map */
+
+error_def(ERR_DBRDONLY);
+error_def(ERR_FREEZE);
+error_def(ERR_FREEZECTRL);
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_SELECTSYNTAX);
 
 GBLREF bool		mu_ctrlc_occurred;
 GBLREF bool		mu_ctrly_occurred;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF sgmnt_addrs      *cs_addrs;
+GBLREF tp_region	*grlist;
 
 static readonly unsigned char	percent_lit = '%';
 static readonly unsigned char	tilde_lit = '~';
 
 void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist *gl_head,
-	       int *reg_max_rec, int *reg_max_key, int *reg_max_blk)
+	       int *reg_max_rec, int *reg_max_key, int *reg_max_blk, boolean_t restrict_reg)
 {
-	bool				stashed = FALSE;
+	boolean_t			stashed = FALSE, append_gbl;
 	int				num_quote, len, gmap_size, new_gmap_size, estimated_entries, count, rslt;
 	char				*ptr, *ptr1, *c;
 	mstr				gmap[512], *gmap_ptr, *gmap_ptr_base, gmap_beg, gmap_end;
 	mval				val, curr_gbl_name;
 	glist				*gl_tail, *gl_ptr;
+	tp_region			*rptr;
 #ifdef GTM64
 	hash_table_int8	        	ext_hash;
 	ht_ent_int8                   	*tabent;
@@ -66,13 +79,6 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	hash_table_int4	        	ext_hash;
 	ht_ent_int4                   	*tabent;
 #endif /* GTM64 */
-
-	error_def(ERR_FREEZE);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_SELECTSYNTAX);
-	error_def(ERR_MUNOFINISH);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_FREEZECTRL);
 
 	memset(gmap, 0, SIZEOF(gmap));
 	gmap_size = SIZEOF(gmap) / SIZEOF(gmap[0]);
@@ -207,6 +213,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 		curr_gbl_name.mvtype = MV_STR;
 		curr_gbl_name.str = *gmap_ptr++;
 		op_gvname(VARLSTCNT(1) &curr_gbl_name);
+		append_gbl = TRUE;
 		if (dba_cm == gv_cur_region->dyn.addr->acc_meth)
 		{	util_out_print("Can not select globals from region !AD across network",TRUE,gv_cur_region->rname_len,
 					gv_cur_region->rname);
@@ -277,12 +284,34 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 			gl_ptr->name.str.len = curr_gbl_name.str.len;
 			memcpy(gl_ptr->nbuf, curr_gbl_name.str.addr, curr_gbl_name.str.len);
 			gl_ptr->next = 0;
-			gl_tail->next = gl_ptr;
-			gl_tail = gl_ptr;
-			if (*reg_max_rec < cs_data->max_rec_size) *reg_max_rec = cs_data->max_rec_size;
-                        if (*reg_max_key < cs_data->max_key_size) *reg_max_key = cs_data->max_key_size;
-                        if (*reg_max_blk < cs_data->blk_size) *reg_max_blk = cs_data->blk_size;
-			op_gvname(VARLSTCNT(1) &gl_tail->name);
+			if (append_gbl)
+			{
+				if (*reg_max_rec < cs_data->max_rec_size)
+					*reg_max_rec = cs_data->max_rec_size;
+				if (*reg_max_key < cs_data->max_key_size)
+					*reg_max_key = cs_data->max_key_size;
+				if (*reg_max_blk < cs_data->blk_size)
+					*reg_max_blk = cs_data->blk_size;
+			}
+			op_gvname(VARLSTCNT(1) &gl_ptr->name);
+			if (restrict_reg)
+			{ /* Only select globals in specified regions */
+				append_gbl = FALSE;
+				for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
+				{
+					if (gv_cur_region == rptr->reg)
+					{
+						append_gbl = TRUE;
+						break;
+					}
+				}
+			}
+			if (append_gbl)
+			{
+				gl_tail->next = gl_ptr;
+				gl_tail = gl_ptr;
+			} else
+				free(gl_ptr);
 			op_gvorder(&curr_gbl_name);
 			if (0 == curr_gbl_name.str.len)
 			{

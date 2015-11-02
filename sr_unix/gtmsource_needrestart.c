@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,17 +28,18 @@
 #include "util.h"
 #include "cli.h"
 #include "repl_log.h"
+#include "repl_instance.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF 	gtmsource_options_t	gtmsource_options;
 
+error_def(ERR_MUPCLIERR);
+
 int gtmsource_needrestart(void)
 {
 	gtmsource_local_ptr_t	gtmsource_local;
 	sgmnt_addrs		*repl_csa;
-
-	error_def(ERR_MUPCLIERR);
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 
@@ -54,7 +55,7 @@ int gtmsource_needrestart(void)
 			gtmsource_options.secondary_instname);
 	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-	grab_lock(jnlpool.jnlpool_dummy_reg);
+	GRAB_LOCK(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
 	if ((NULL != gtmsource_local) && (gtmsource_local->connect_jnl_seqno >= jnlpool.jnlpool_ctl->start_jnl_seqno))
 		util_out_print("Secondary Instance [!AZ] DOES NOT NEED to be restarted", TRUE, gtmsource_local->secondary_instname);
 	else

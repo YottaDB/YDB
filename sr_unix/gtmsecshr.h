@@ -120,7 +120,6 @@ enum gtmsecshr_ack_type{
 void	gtmsecshr_log(char *, int), gtmsecshr_exit(int, boolean_t), gtmsecshr_init(void), gtmsecshr_sig_init(void);
 void	gtmsecshr_switch_log_file(int);
 int	gtmsecshr_open_log_file(void), gtmsecshr_getenv(char *, char **);
-int 	send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int path_len);
 int 	service_request(gtmsecshr_mesg *);
 int4	gtmsecshr_sock_init(int caller);
 void	gtmsecshr_sock_cleanup(int);

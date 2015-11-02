@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,27 +36,27 @@ static readonly unsigned char tst_param_index[27] =
 	0,   0,   0,   0,   0,   2,   4,   4,   4,   4,   4,   4,   4
 };
 
-GBLREF char 	window_token;
-GBLREF mident 	window_ident;
+error_def(ERR_RPARENMISSING);
+error_def(ERR_TSTRTPARM);
+error_def(ERR_VAREXPECTED);
 
 int m_tstart(void)
 {
-	triple *ser, *tid, *ref, *varlst, *varp, *varnext, *fetch, *s;
-	oprtype tmparg;
-	int	count, n;
-	bool	has_ser, has_tid, has_lpar, bad_parse;
-	mval	dummyid;
-	error_def(ERR_RPARENMISSING);
-	error_def(ERR_VAREXPECTED);
-	error_def(ERR_TSTRTPARM);
+	boolean_t	bad_parse, has_lpar, has_ser, has_tid;
+	int		count, n;
+	mval		dummyid;
+	oprtype		tmparg;
+	triple		*fetch, *ref, *s, *ser, *tid, *varlst, *varnext, *varp;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	count = -1;	/* indicates not restartable */
 	varlst = newtriple(OC_PARAMETER);
-	switch (window_token)
+	switch (TREF(window_token))
 	{
 	case TK_IDENT:
 		count = 1;
-		varlst->operand[1] = put_str(window_ident.addr, window_ident.len);
+		varlst->operand[1] = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
 		advancewindow();
 		break;
 	case TK_ASTERISK:
@@ -66,7 +66,7 @@ int m_tstart(void)
 	case TK_ATSIGN:
 		if (!indirection(&tmparg))
 			return FALSE;
-		if (window_token == TK_COLON)
+		if (TK_COLON == TREF(window_token))
 		{
 			ref = newtriple(OC_COMMARG);
 			ref->operand[0] = tmparg;
@@ -88,11 +88,11 @@ int m_tstart(void)
 		for(count = 0; ;)
 		{
 			advancewindow();
-			switch (window_token)
+			switch (TREF(window_token))
 			{
 			case TK_IDENT:
 				varnext = newtriple(OC_PARAMETER);
-				varnext->operand[0] = put_str(window_ident.addr, window_ident.len);
+				varnext->operand[0] = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
 				varp->operand[1] = put_tref(varnext);
 				varp = varnext;
 				advancewindow();
@@ -115,10 +115,10 @@ int m_tstart(void)
 				stx_error(ERR_VAREXPECTED);
 				return FALSE;
 			}
-			if (window_token != TK_COMMA)
+			if (TK_COMMA != TREF(window_token))
 				break;
 		}
-		if (window_token != TK_RPAREN)
+		if (TK_RPAREN != TREF(window_token))
 		{
 			stx_error(ERR_RPARENMISSING);
 			return FALSE;
@@ -129,17 +129,18 @@ int m_tstart(void)
 	varlst->operand[0] = put_ilit(count);
 	has_ser = has_tid = FALSE;
 	tid = newtriple(OC_PARAMETER);
-	if (window_token == TK_COLON)
+	if (TK_COLON == TREF(window_token))
 	{	advancewindow();
-		if (has_lpar = (window_token == TK_LPAREN))
+		if (has_lpar = (TK_LPAREN == TREF(window_token)))
 			advancewindow();
 		for(;;)
 		{
 			bad_parse = TRUE;
-			if (window_token == TK_IDENT)
+			if (TK_IDENT == TREF(window_token))
 			{
-				if ((n = namelook(tst_param_index, tst_param_names, window_ident.addr, window_ident.len)) >= 0)
-				{
+				if ((0 <= (n = namelook(tst_param_index, tst_param_names, (TREF(window_ident)).addr,
+					(TREF(window_ident)).len))))
+				{	/* NOTE assignment above */
 					if (n < 2 && !has_ser)
 					{	has_ser = TRUE;
 						bad_parse = FALSE;
@@ -148,9 +149,9 @@ int m_tstart(void)
 					else if (!has_tid)
 					{
 						advancewindow();
-						if (window_token == TK_EQUAL)
+						if (TK_EQUAL == TREF(window_token))
 						{	advancewindow();
-							if (!expr(&tid->operand[0]))
+							if (EXPR_FAIL == expr(&tid->operand[0], MUMPS_EXPR))
 								return FALSE;
 							has_tid = TRUE;
 							bad_parse = FALSE;
@@ -159,19 +160,22 @@ int m_tstart(void)
 				}
 			}
 			if (bad_parse)
-			{	stx_error(ERR_TSTRTPARM);
+			{
+				stx_error(ERR_TSTRTPARM);
 				return FALSE;
 			}
-			if (!has_lpar || window_token == TK_RPAREN)
+			if (!has_lpar || (TK_RPAREN == TREF(window_token)))
 				break;
-			if (window_token != TK_COLON)
-			{	stx_error(ERR_TSTRTPARM);
+			if (TK_COLON != TREF(window_token))
+			{
+				stx_error(ERR_TSTRTPARM);
 				return FALSE;
 			}
 			advancewindow();
 		}
 		if (has_lpar)
-		{	assert(window_token == TK_RPAREN);
+		{
+			assert(TK_RPAREN == TREF(window_token));
 			advancewindow();
 		}
 	}
@@ -182,17 +186,8 @@ int m_tstart(void)
 		tid->operand[0] = put_lit(&dummyid);
 	}
 	tid->operand[1] = put_tref(varlst);
-/*	ser = newtriple(OC_PARAMETER);
-	ser->operand[0] = put_ilit(has_ser);
-	ser->operand[1] = put_tref(tid);
-	s = newtriple(OC_TSTARTPC);
-	ref = newtriple(OC_TSTART);
-	ref->operand[0] = put_tref(s);
-	ref->operand[1] = put_tref(ser);
-*/
 	ref = newtriple(OC_TSTART);
 	ref->operand[0] = put_ilit(has_ser);
 	ref->operand[1] = put_tref(tid);
-
 	return TRUE;
 }

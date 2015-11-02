@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,31 +21,31 @@
 #include "deviceparameters.h"
 #include "op.h"
 
-GBLREF mval			**ind_result_sp, **ind_result_top;
-GBLREF char			window_token;
-
-LITREF mval 			literal_null;
+error_def(ERR_INDMAXNEST);
+error_def(ERR_INDEXTRACHARS);
 
 void	op_inddevparms(mval *devpsrc, int4 ok_iop_parms,  mval *devpiopl)
 {
-	bool		rval;
-	mstr		*obj, object;
-	oprtype		devpopr;
-	triple		*indref;
-	oprtype		plist;
+	int	rval;
 	icode_str	indir_src;
-	error_def(ERR_INDMAXNEST);
-	error_def(ERR_INDEXTRACHARS);
+	mstr		*obj, object;
+	oprtype		devpopr, plist;
+	triple		*indref;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	if (TREF(ind_result_sp) >= TREF(ind_result_top))
+		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp */
 	MV_FORCE_STR(devpsrc);
 	indir_src.str = devpsrc->str;
 	indir_src.code = indir_devparms;
-	if (NULL == (obj = cache_get(&indir_src)))
+	if (NULL == (obj = cache_get(&indir_src)))				/* NOTE assignment */
 	{	/* No cached version, compile it now */
+		obj = &object;
 		comp_init(&devpsrc->str);
-		if (TK_ATSIGN == window_token)
+		if (TK_ATSIGN == TREF(window_token))
 		{	/* For the indirection-obsessive */
-			if (rval = indirection(&devpopr))	/* Note assignment */
+			if (EXPR_FAIL != (rval = indirection(&devpopr)))	/* NOTE assignment */
 			{
 				indref = newtriple(OC_INDDEVPARMS);
 				indref->operand[0] = devpopr;
@@ -53,16 +53,14 @@ void	op_inddevparms(mval *devpsrc, int4 ok_iop_parms,  mval *devpiopl)
 				plist = put_tref(indref);
 			}
 		} else	/* We have the parm string to process now */
-			rval = (bool)deviceparameters(&plist, ok_iop_parms);
-		if (!comp_fini(rval, &object, OC_IRETMVAL, &plist, devpsrc->str.len))
+			rval = deviceparameters(&plist, ok_iop_parms);
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &plist, devpsrc->str.len))
 			return;
 		indir_src.str.addr = devpsrc->str.addr;
-		cache_put(&indir_src, &object);
-		obj = &object;
+		cache_put(&indir_src, obj);
 		/* Fall into code activation below */
 	}
-	*ind_result_sp++ = devpiopl;		/* Where to store return value */
-	if (ind_result_sp >= ind_result_top)
-		rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
+	*(TREF(ind_result_sp))++ = devpiopl;			/* Where to store return value */
 	comp_indr(obj);
+	return;
 }

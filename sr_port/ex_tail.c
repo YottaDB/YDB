@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,26 +24,26 @@ void ex_tail(oprtype *opr)
 	opctype c;
 	unsigned short w;
 
-	assert(opr->oprclass == TRIP_REF);
+	assert(TRIP_REF == opr->oprclass);
 	t = opr->oprval.tref;
 	c = t->opcode;
 	w = oc_tab[c].octype;
 	if (w & OCT_EXPRLEAF)
 		return;
-	assert(t->operand[0].oprclass == TRIP_REF);
-	assert(t->operand[1].oprclass == TRIP_REF || t->operand[1].oprclass == 0);
+	assert(TRIP_REF == t->operand[0].oprclass);
+	assert((TRIP_REF == t->operand[1].oprclass) || (NOCLASS == t->operand[1].oprclass));
 	if (!(w & OCT_BOOL))
 	{
-		for (i = t->operand ; i < ARRAYTOP(t->operand); i++)
-			if (i->oprclass == TRIP_REF)
+		for (i = t->operand; ARRAYTOP(t->operand) > i; i++)
+			if (TRIP_REF == i->oprclass)
 				ex_tail(i);
-		if (c == OC_COMINT && (t1 = t->operand[0].oprval.tref)->opcode == OC_BOOLINIT)
+		if ((OC_COMINT == c) && (OC_BOOLINIT == (t1 = t->operand[0].oprval.tref)->opcode))	/* NOTE assignment */
 			opr->oprval.tref = t1;
 	} else
 	{
-		for (t1 = t ; ; t1 = t2)
+		for (t1 = t; ; t1 = t2)
 		{
-			assert(t1->operand[0].oprclass == TRIP_REF);
+			assert(TRIP_REF == t1->operand[0].oprclass);
 			t2 = t1->operand[0].oprval.tref;
 			if (!(oc_tab[t2->opcode].octype & OCT_BOOL))
 				break;
@@ -52,15 +52,15 @@ void ex_tail(oprtype *opr)
 		dqins(t1->exorder.bl, exorder, bitrip);
 		t2 = t->exorder.fl;
 		assert(&t2->operand[0] == opr);
-		assert(t2->opcode == OC_COMVAL || t2->opcode == OC_COMINT);
-		if (t2->opcode == OC_COMINT)
-			dqdel(t2,exorder);
+		assert((OC_COMVAL == t2->opcode) || (OC_COMINT == t2->opcode));
+		if (OC_COMINT == t2->opcode)
+			dqdel(t2, exorder);
 		t1 = maketriple(OC_BOOLFINI);
 		t1->operand[0] = put_tref(bitrip);
 		opr->oprval.tref = bitrip;
 		dqins(t, exorder, t1);
-		i = (oprtype *) mcalloc(SIZEOF(oprtype));
-		bx_tail(t,(bool) FALSE, i);
+		i = (oprtype *)mcalloc(SIZEOF(oprtype));
+		bx_tail(t, FALSE, i);
 		*i = put_tnxt(t1);
 	}
 	return;

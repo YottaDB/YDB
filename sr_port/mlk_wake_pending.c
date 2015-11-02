@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,7 @@ void mlk_wake_pending(mlk_ctldata_ptr_t ctl,
 			ctop = &ctl->clus_pids[NUM_CLST_LCKS-1];
 			*empty_slot && empty_slot <= ctop; empty_slot++)
 			;
-		for (pr = (mlk_prcblk_ptr_t)R2A(d->pending), lcnt = csa->hdr->lock_space_size / PRC_FACTOR; lcnt; lcnt--)
+		for (pr = (mlk_prcblk_ptr_t)R2A(d->pending), lcnt = ctl->max_prccnt; lcnt; lcnt--)
 		{
 			next = (pr->next) ? (mlk_prcblk_ptr_t)R2A(pr->next) : 0;	/* in case it's deleted */
 			if ((pr->process_id & NODENUMBER)  ==  (process_id & NODENUMBER))
@@ -95,7 +95,7 @@ void mlk_wake_pending(mlk_ctldata_ptr_t ctl,
 			ccp_cluster_lock_wake(reg);
 	} else
 	{
-		for (pr = (mlk_prcblk_ptr_t)R2A(d->pending), lcnt = csa->hdr->lock_space_size / PRC_FACTOR; lcnt; lcnt--)
+		for (pr = (mlk_prcblk_ptr_t)R2A(d->pending), lcnt = ctl->max_prccnt; lcnt; lcnt--)
 		{
 			next = (pr->next) ? (mlk_prcblk_ptr_t)R2A(pr->next) : 0;	/* in case it's deleted */
 			DO_CRIT_WAKE;

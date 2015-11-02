@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +20,8 @@
 #include "mdef.h"
 #include "caller_id.h"
 
-
 caddr_t caller_id(void)
 {
-	return NULL;
+return (caddr_t)((INTPTR_T)-1);
 }
 

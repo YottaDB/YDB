@@ -40,4 +40,5 @@
 #define GDL_PrintSockIntStats	0x00020000	/* (131072) Print Socket interrupt stats on exit */
 #define GDL_SmInitAlloc		0x00040000	/* (262144) Initialize all storage allocated or deallocated with 0xdeadbeef */
 #define GDL_PrintPipeIntStats	0x00080000	/* (524288) Print Pipe/Fifo(rm) interrupt stats on exit */
+#define GDL_IgnoreAvailSpace	0x00100000	/* (1048576) Allow gdsfilext/mu_cre_file (UNIX) to ignore available space */
 #endif

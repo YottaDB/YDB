@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc 	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,10 +23,12 @@
 #include <gpgme.h>			/* gpgme functions */
 #include <gpg-error.h>			/* gcry*_err_t */
 #include <dlfcn.h>
+#include <sys/mman.h>
 #include "gtmxc_types.h"		/* xc_string, xc_status_t and other callin interfaces xc_fileid */
 #include "gtmcrypt_interface.h"		/* Function prototypes for gtmcrypt*.* functions */
 #include "gtmcrypt_ref.h"
 #include "gtmcrypt_pk_ref.h"
+#include "gtmcrypt_sym_ref.h"
 
 static char	*gtm_passwd;
 static char	*gtm_passwd_env;
@@ -35,68 +37,117 @@ gpgme_ctx_t	pk_crypt_ctx;
 
 extern char	err_string[ERR_STRLEN];
 
-/* Take a masked/unmasked passwd and convert it to the other form by doing an XOR operation.
+#ifdef __sparc /* for some reason sun does not provide a prototype */
+int setenv(const char* name, const char *value, int overwrite);
+#endif
+
+/* Take a masked/unmasked password and convert it to the other form by doing an XOR operation via an XOR mask.
+ * XOR MASK:
+ * If the gtm_obfuscation_key exists and points to a file that has readable contents, the XOR mask is the
+ * SHA-512 hash of the contents of that file.
+ * Otherwise, within a pre-zero'ed buffer the length of the password the contents of the USER environment
+ * variable is left-justified and the decimal representation of the inode of the mumps executable is
+ * right-justified. The XOR mask is the SHA-512 hash of the contents of that buffer.
+ * 	<PASSWORDLEN>
+ *	USER0000INODE ---SHA-512--> XOR mask
  * MASKING:
- * The original gtm_passwd value is XOR'ed with the inode number of mumps executable and the
- * the value of the env variable $USER (which contains the username of the current user logged in).
- * This information is then converted to the hex form for easy viewing and set into the environment
+ * The original password value is XOR'ed with the XOR mask, converted to it's hex representation (for easy
+ * viewing) and set into the gtm_passwd environment variable. This can then be used by job'ed off child
+ * processes.
  * UNMASKING:
- * The gtm_passwd set in the environment is un hexed (after masking, the passwd is set in the hex
- * form). This gtm_passwd value is then XOR'ed with the inode number of the executable and the
- * env variable $USER (which contains the username of the current user). This information is then
- * stored in the gtm_passwd variable for future access. Note the environment variable ($gtm_passwd) still
- * contains only the masked password and hence safety of the passwd is still guarenteed.
-
- Note that always, if the username and(or) the inode number is lesser than the length of the un hexed gtm_passwd,
- the position of their values are left and right justified with respect to the gtm_passwd value. A typical example
- is shown below.
-
- *	G T M P A S S W D 	*/
-/*	^ ^ ^ ^ ^ ^ ^ ^ ^	*/
-/*	U S E R 0 0 0 0 0	*/
-/*	^ ^ ^ ^ ^ ^ ^ ^ ^	*/
-/*	0 0 0 0 I N O D E	*/
-/*	-----------------	*/
+ * The contents of the gtm_passwd environment variable converted into its binary representation (from its
+ * hex representation). This gtm_passwd value is then XOR'ed with the XOR mask.
+ */
 
 int gc_pk_mask_unmask_passwd(char *in, char *out, int len)
 {
 	char		*ptr;
-	char		tmp[GTM_PASSPHRASE_MAX], inode[GTM_PASSPHRASE_MAX], user[GTM_PASSPHRASE_MAX], mumps_ex[GTM_PATH_MAX];
+	char		tmp[GTM_PASSPHRASE_MAX], mumps_ex[GTM_PATH_MAX], tobehashed[GTM_PASSPHRASE_MAX], hash[GTMCRYPT_HASH_LEN];
 	int		passwd_len, ilen, status, i;
 	struct stat	stat_info;
+	int 		fd;
+	char 		*p;
+	int 		have_hash;
 
+	have_hash = FALSE;
 	passwd_len = len < GTM_PASSPHRASE_MAX ? len : GTM_PASSPHRASE_MAX;
-	memset(inode, 0, passwd_len);
-	memset(user, 0, passwd_len);
-	memset(mumps_ex, 0, GTM_PATH_MAX);
-	GC_GETENV(ptr, "USER", status);
+
+	GC_GETENV(ptr, "gtm_obfuscation_key", status);
 	if (GC_SUCCESS == status)
 	{
-		strncpy(user, ptr, passwd_len);
-		GC_GETENV(ptr, "gtm_dist", status);
-		if (GC_SUCCESS == status)
+		fd = open(ptr, O_RDONLY);
+		if (fd != -1)
+			if (fstat(fd, &stat_info) != -1)
+				if (S_ISREG(stat_info.st_mode))
+				{
+					p = mmap(0,stat_info.st_size, PROT_READ, MAP_SHARED, fd, 0);
+					if (p != MAP_FAILED)
+					{
+#						ifdef USE_OPENSSL
+						EVP_Digest(p, stat_info.st_size, (unsigned char *)hash, NULL, EVP_sha512(), NULL);
+#						elif defined USE_GCRYPT
+						GC_SYM_INIT;
+						gcry_md_hash_buffer(GCRY_MD_SHA512, hash, p, stat_info.st_size );
+#						endif
+						have_hash = TRUE;
+						munmap(p, stat_info.st_size);
+					}
+				}
+		close(fd);
+	}
+
+	if (!have_hash)
+	{
+		memset(tobehashed, 0, passwd_len);
+		memset(mumps_ex, 0, GTM_PATH_MAX);
+		GC_GETENV(ptr, "USER", status);
+		if (GC_SUCCESS != status)
 		{
-			sprintf(mumps_ex, "%s/%s", ptr, "mumps");
-			if (0 == stat(mumps_ex, &stat_info))
+			GC_ENV_UNSET_ERROR("USER");
+			return GC_FAILURE;
+		}
+		else
+		{
+			strncpy(tobehashed, ptr, passwd_len);
+			GC_GETENV(ptr, "gtm_dist", status);
+			if (GC_SUCCESS != status)
 			{
-				sprintf(tmp, "%ld", (long) stat_info.st_ino);
-				ilen = (int)strlen(tmp);
-				if (ilen < passwd_len)
-					strncpy(inode + (passwd_len - ilen), tmp, ilen);
-				else
-					strncpy(inode, tmp, passwd_len);
-			} else
-			{
-				sprintf(err_string, "Cannot find MUMPS executable in %s", ptr);
+				GC_ENV_UNSET_ERROR("gtm_dist");
 				return GC_FAILURE;
 			}
-			for (i = 0; i < passwd_len; i++)
-				out[i] = in[i] ^ inode[i] ^ user[i];
-			return GC_SUCCESS;
-		} else
-			GC_ENV_UNSET_ERROR("gtm_dist");
+			else
+			{
+				sprintf(mumps_ex, "%s/%s", ptr, "mumps");
+				if (0 == stat(mumps_ex, &stat_info))
+				{
+					sprintf(tmp, "%ld", (long) stat_info.st_ino);
+					ilen = (int)strlen(tmp);
+					if (ilen < passwd_len)
+						strncpy(tobehashed + (passwd_len - ilen), tmp, ilen);
+					else
+						strncpy(tobehashed, tmp, passwd_len);
+				} else
+				{
+					sprintf(err_string, "Cannot find MUMPS executable in %s", ptr);
+					return GC_FAILURE;
+				}
+#				ifdef USE_OPENSSL
+				EVP_Digest(tobehashed, passwd_len, (unsigned char *)hash, NULL, EVP_sha512(), NULL);
+#				elif defined USE_GCRYPT
+				GC_SYM_INIT;
+				gcry_md_hash_buffer(GCRY_MD_SHA512, hash, tobehashed, passwd_len );
+#				endif
+				have_hash = TRUE;
+			}
+		}
 	}
-	GC_ENV_UNSET_ERROR("USER");
+	if (have_hash)
+	{
+		for (i = 0; i < passwd_len; i++)
+			out[i] = in[i] ^ hash[i % GTMCRYPT_HASH_LEN];
+		return GC_SUCCESS;
+	}
+
 	return GC_FAILURE;
 }
 
@@ -232,15 +283,22 @@ int gc_pk_crypt_passphrase_callback(void *opaque, const char *uid_hint,
 			const char *passphrase_info, int last_was_bad,
 			int fd)
 {
+	int write_ret;
 	assert(0 != fd);
 	assert(NULL != gtm_passwd);
 	/* This is just being cautious. We would have thrown the appropriate error message
 	 * if gtm_passwd have been zero length'ed one.
 	 */
 	assert(0 != strlen(gtm_passwd));
-	write(fd, gtm_passwd, strlen(gtm_passwd));
-	write(fd, "\n", 1);
-	return 0;
+	write_ret = write(fd, gtm_passwd, strlen(gtm_passwd));
+	if (strlen(gtm_passwd) == write_ret)
+	{
+		write_ret = write(fd, "\n", 1);
+		if (1 == write_ret)
+			return 0;
+	}
+	/* Problem with one of the writes so let gpgme know */
+	return -1;
 }
 
 /* Given the structure that holds the plain data, this function reads through the structure and retrieves the plain text. We

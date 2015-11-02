@@ -75,7 +75,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	SETUP_THREADGBL_ACCESS;
 	csa = *csaptr;
 	assert(csa->dbsync_timer);	/* to ensure no duplicate dbsync timers */
-	CANCEL_DBSYNC_TIMER(csa, TRUE);	/* reset csa->dbsync_timer now that the dbsync timer has popped */
+	CANCEL_DBSYNC_TIMER(csa);	/* reset csa->dbsync_timer now that the dbsync timer has popped */
 	assert(!csa->dbsync_timer);
 	reg = csa->region;
 	/* Don't know how this can happen, but if region is closed, just return in PRO. */
@@ -208,7 +208,8 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	if (dbsync_defer_timer)
 	{
 		assert(SIZEOF(INTPTR_T) == SIZEOF(csa));
-		START_DBSYNC_TIMER(csa, TIM_DEFER_DBSYNC);
+		if (!csa->dbsync_timer)
+			START_DBSYNC_TIMER(csa, TIM_DEFER_DBSYNC);
 	}
 	/* To restore to former glory, don't use TP_CHANGE_REG, 'coz we might mistakenly set cs_addrs and cs_data to NULL
 	 * if the region we are restoring to has been closed. Don't use tp_change_reg 'coz we might be ripping out the structures

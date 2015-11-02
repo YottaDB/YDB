@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ void mu_int_write(block_id blk, uchar_ptr_t ptr)
 	 * not fully upgraded from V4 to V5, we will be writing the entrie block size. This is due to the block upgrades between
 	 * V4 and V5 that can happen in the unencrypted versions of the database. */
 	fc->op_len = UNIX_ONLY(mu_int_data.fully_upgraded ? SIZEOF(blk_hdr) : ) mu_int_data.blk_size;
-	fc->op_pos = mu_int_ovrhd + (mu_int_data.blk_size / DISK_BLOCK_SIZE * blk);
+	fc->op_pos = mu_int_ovrhd + ((gtm_int64_t)mu_int_data.blk_size / DISK_BLOCK_SIZE * blk);
 	dbfilop(fc);
 	DEBUG_ONLY(reformat_buffer_in_use--;)
 	assert(0 == reformat_buffer_in_use);

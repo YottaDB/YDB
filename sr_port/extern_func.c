@@ -19,10 +19,8 @@
 #include "mmemory.h"
 #endif
 
-GBLREF char director_token;
 GBLREF char *lexical_ptr;
 GBLREF unsigned char *source_buffer;
-GBLREF char window_token;
 
 error_def(ERR_RTNNAME);
 
@@ -34,12 +32,12 @@ error_def(ERR_RTNNAME);
 /* compiler parse to AVT module for external functions ($&)  */
 int extern_func(oprtype *a)
 {
+	boolean_t	have_ident;
 	char		*extref;
+	int		cnt, actcnt;
 	mstr		extentry, package;
 	oprtype 	*nxtopr;
 	triple		*calltrip, *ref;
-	boolean_t	have_ident;
-	int		cnt, actcnt;
 #	ifdef VMS
 	char		*extsym, *extern_symbol;
 	oprtype		tabent;
@@ -47,31 +45,31 @@ int extern_func(oprtype *a)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert (TK_AMPERSAND == window_token);
+	assert (TK_AMPERSAND == TREF(window_token));
 	advancewindow();
 	cnt = 0;
 	extref = (char *)&source_buffer[TREF(last_source_column) - 1];
 	package.len = 0;
 	package.addr = NULL;
-	if (have_ident = (window_token == TK_IDENT))	/* assignment */
+	if (have_ident = (TK_IDENT == TREF(window_token)))			/* NOTE assignment */
 	{
-		if (TK_PERIOD == director_token)
+		if (TK_PERIOD == TREF(director_token))
 		{	/* if ident is a package reference, then take it off */
 			package.addr = extref;
 			package.len = INTCAST(lexical_ptr - extref - 1);
-			VMS_ONLY(package.len = ((package.len > MAX_EXTREF) ? MAX_EXTREF : package.len));
+			VMS_ONLY(package.len = ((MAX_EXTREF < package.len) ? MAX_EXTREF : package.len));
 			extref = lexical_ptr;
 			advancewindow();		/* get to . */
 			advancewindow();		/* to next token */
-			if (have_ident = (TK_IDENT == window_token))	/* assignment */
+			if (have_ident = (TK_IDENT == TREF(window_token)))	/* NOTE assignment */
 				advancewindow();
 		} else
 			advancewindow();
 	}
-	if (TK_CIRCUMFLEX == window_token)
+	if (TK_CIRCUMFLEX == TREF(window_token))
 	{
 		advancewindow();
-		if (TK_IDENT == window_token)
+		if (TK_IDENT == TREF(window_token))
 		{
 			have_ident = TRUE;
 			advancewindow();
@@ -85,7 +83,7 @@ int extern_func(oprtype *a)
 	extentry.len = INTCAST((char *)&source_buffer[TREF(last_source_column) - 1] - extref);
 	extentry.len = INTCAST(extentry.len > MAX_EXTREF ? MAX_EXTREF : extentry.len);
 	extentry.addr = extref;
-#ifdef VMS_CASE_SENSITIVE_MACROS
+#	ifdef VMS_CASE_SENSITIVE_MACROS
 	if (!run_time)
 	{	/* this code is disabled because the
 		 * external call table macros are not case sensitive
@@ -108,16 +106,16 @@ int extern_func(oprtype *a)
 		tabent = put_cdlt(&extentry);
 	} else
 	{
-#endif
+#	endif
 #	ifdef VMS
 		ref = newtriple(OC_FGNLOOKUP);
 		ref->operand[0] = put_str(package.addr, package.len);
 		ref->operand[1] = put_str(extentry.addr, extentry.len);
 		tabent = put_tref(ref);
 #	endif
-#ifdef VMS_CASE_SENSITIVE_MACROS
+#	ifdef VMS_CASE_SENSITIVE_MACROS
 	}
-#endif
+#	endif
 	calltrip = maketriple(a ? OC_FNFGNCAL : OC_FGNCAL);
 	nxtopr = &calltrip->operand[1];
 	ref = newtriple(OC_PARAMETER);
@@ -132,7 +130,7 @@ int extern_func(oprtype *a)
 	nxtopr = &ref->operand[1];
 	cnt++;
 #	endif
-	if (TK_LPAREN != window_token)
+	if (TK_LPAREN != TREF(window_token))
 	{
 		ref = newtriple(OC_PARAMETER);
 		ref->operand[0] = put_ilit(0);

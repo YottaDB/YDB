@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,6 +86,14 @@ GBLREF	volatile int4	fast_lock_count;
 static 	volatile uint4 		save_dskspace_msg_counter = 0;
 GBLDEF	volatile uint4		dskspace_msg_counter = 1;	/* not static since used in dskspace_msg_timer.c */
 
+error_def(ERR_DBFILERR);
+error_def(ERR_JNLFSYNCERR);
+error_def(ERR_JNLWRTDEFER);
+error_def(ERR_JNLWRTNOWWRTR);
+error_def(ERR_GBLOFLOW);
+error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+
 int4	wcs_wtstart(gd_region *region, int4 writes)
 {
 	blk_hdr_ptr_t		bp, save_bp;
@@ -117,13 +125,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		boolean_t	is_encrypted;
 		blk_hdr_ptr_t	enc_bp;
 	)
-	error_def(ERR_DBFILERR);
-	error_def(ERR_JNLFSYNCERR);
-	error_def(ERR_TEXT);
-	error_def(ERR_JNLWRTNOWWRTR);
-	error_def(ERR_JNLWRTDEFER);
-	error_def(ERR_GBLOFLOW);
-	error_def(ERR_SYSCALL);
 
 	udi = FILE_INFO(region);
 	csa = &udi->s_addrs;
@@ -137,11 +138,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 #	endif
 
 	BG_TRACE_ANY(csa, wrt_calls);	/* Calls to wcs_wtstart */
-	if (csd->wc_blocked)
-	{
-		BG_TRACE_ANY(csa, wrt_blocked);
-		return err_status;
-	}
 	/* If *this* process is already in wtstart, we won't interrupt it do it again */
 	if (csa->in_wtstart)
 	{
@@ -168,17 +164,16 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		max_writes = csd->n_wrt_per_flu;	/* else, max writes is how many blocks there are */
 	jpc = csa->jnl;
 	assert(!JNL_ALLOWED(csd) || NULL != jpc);	/* if journaling is allowed, we better have non-null csa->jnl */
-
+	if (JNL_ENABLED(csd) && (NULL != jpc) && (NOJNL != jpc->channel))
+	{	/* Before flushing the database buffers, give journal flushing a nudge. Any failures in writing to the
+		 * journal are not handled here since the main purpose of wcs_wtstart is to flush the database buffers
+		 * (not journal buffers). The journal issue will be caught later (in jnl_flush or some other jnl routine)
+		 * and appropriate errors, including triggering jnl_file_lost (if JNLCNTRL error) will be issued there.
+		 */
+		jnl_qio_start(jpc);
+	}
 	if (!is_mm)
 	{
-		if (JNL_ENABLED(csd) && (NULL != jpc) && (NOJNL != jpc->channel))
-		{	/* Before flushing the database buffers, give journal flushing a nudge. Any failures in writing to the
-			 * journal are not handled here since the main purpose of wcs_wtstart is to flush the database buffers
-			 * (not journal buffers). The journal issue will be caught later (in jnl_flush or some other jnl routine)
-			 * and appropriate errors, including triggering jnl_file_lost (if JNLCNTRL error) will be issued there.
-			 */
-			jnl_qio_start(jpc);
-		}
 		ahead = &csa->acc_meth.bg.cache_state->cacheq_active;
 		cr_lo = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
 		cr_hi = cr_lo + csd->n_bts;
@@ -224,7 +219,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			assert(!CR_NOT_ALIGNED(cr, cr_lo) && !CR_NOT_IN_RANGE(cr, cr_lo, cr_hi));
 			if (CR_BLKEMPTY == csr->blk)
 			{	/* must be left by t_commit_cleanup - removing it from the queue and the following
-				   completes the cleanup */
+				 * completes the cleanup
+				 */
 				assert(0 != csr->dirty);
 				assert(csr->data_invalid);
 
@@ -316,7 +312,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 								 csr->blk));
 					if (csd->blk_size > reformat_buffer_len)
 					{	/* Buffer not big enough (or does not exist) .. get a new one releasing
-						   old if it exists */
+						 * old if it exists
+						 */
 						assert(1 == fast_lock_count);	/* should not be in a nested free/malloc */
 						if (reformat_buffer)
 							free(reformat_buffer);	/* Different blksized databases in use
@@ -374,7 +371,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				}
 			} else
 			{
-#if defined(TARGETED_MSYNC)
+#				if defined(TARGETED_MSYNC)
 			        bp = (blk_hdr_ptr_t)(csa->db_addrs[0] + (sm_off_t)csr->blk * MSYNC_ADDR_INCS);
 				if ((sm_uc_ptr_t)bp > csa->db_addrs[1])
 					save_errno = ERR_GBLOFLOW;
@@ -385,7 +382,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					if (-1 == msync((caddr_t)bp, MSYNC_ADDR_INCS, MS_ASYNC))
 						save_errno = errno;
 				}
-#elif !defined(NO_MSYNC)
+#				elif !defined(NO_MSYNC)
 				bp = (blk_hdr_ptr_t)(csa->acc_meth.mm.base_addr + (sm_off_t)csr->blk * csd->blk_size);
 				if ((sm_uc_ptr_t)bp > csa->db_addrs[1])
 					save_errno = ERR_GBLOFLOW;
@@ -400,7 +397,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					/* Do db write without timer protect (not needed --  wtstart not reenterable in one task) */
 					LSEEKWRITE(udi->fd, offset, bp, size, save_errno);
 				}
-#endif
+#				endif
 			}
 			if (0 != save_errno)
 			{
@@ -427,7 +424,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			++n2;
 			BG_TRACE_ANY(csa, wrt_count);
 			/* Detect whether queue has become empty. Defer action (calling wcs_clean_dbsync)
-			 * to end of routine, since we still hold the lock on the cache-record */
+			 * to end of routine, since we still hold the lock on the cache-record
+			 */
 			queue_empty = !SUB_ENT_FROM_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock);
 			INCR_CNT(&cnl->wc_in_free, &cnl->wc_var_lock);
 			if (!is_mm)
@@ -438,11 +436,11 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			csr->dirty = 0;
 			CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
 			/* Note we are still under protection of wbuf_dqd lock at this point. Reason we keep
-			   it so long is so that all the counters are updated along with the queue being correct.
-			   The result of not doing this previously is that wcs_recover was NOT called when we
-			   got interrupted just prior to the counter adjustment leaving wcs_active_lvl out of
-			   sync with the actual count on the queue which caused an assert failure in wcs_flu. SE 11/2000
-			*/
+			 * it so long is so that all the counters are updated along with the queue being correct.
+			 * The result of not doing this previously is that wcs_recover was NOT called when we
+			 * got interrupted just prior to the counter adjustment leaving wcs_active_lvl out of
+			 * sync with the actual count on the queue which caused an assert failure in wcs_flu. SE 11/2000
+			 */
 		}
 	}
 	csa->wbuf_dqd--;
@@ -457,7 +455,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		 * no purpose to the existing timer. A new one would anyways be started whenever the last dirty cache
 		 * record in the current active queue is flushed. Cancel the previous one.
 		 */
-		CANCEL_DBSYNC_TIMER(csa, FALSE);
+		CANCEL_DBSYNC_TIMER(csa);
 	}
 	DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
 	CLEAR_WTSTART_PID(cnl, index);

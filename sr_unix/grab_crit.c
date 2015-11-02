@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,29 +30,42 @@
 #include "gtm_stdio.h"
 #include "gt_timer.h"
 #include "wbox_test_init.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "jnl.h"
 #endif
+#include "gtmimagename.h"
+#include "error.h"
 
 GBLREF	volatile int4		crit_count;
 GBLREF	short			crash_count;
 GBLREF	uint4 			process_id;
 GBLREF	node_local_ptr_t	locknl;
-GBLREF	boolean_t		hold_onto_locks;
+#ifdef DEBUG
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnl_gbls_t		jgbl;
+#endif
+GBLREF	boolean_t		mupip_jnl_recover;
 
-error_def(ERR_DBCCERR);
 error_def(ERR_CRITRESET);
+error_def(ERR_DBCCERR);
+error_def(ERR_DBFLCORRP);
 
 void	grab_crit(gd_region *reg)
 {
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;
 	node_local_ptr_t        cnl;
+	sgmnt_data_ptr_t	csd;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
+	DEBUG_ONLY(sgmnt_addrs	*jnlpool_csa;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
+	csd = csa->hdr;
 	cnl = csa->nl;
 #	ifdef DEBUG
 	if (gtm_white_box_test_case_enabled
@@ -67,14 +80,25 @@ void	grab_crit(gd_region *reg)
 		cnl->wbox_test_seq_num = 3;
 	}
 #	endif
-	assert(!hold_onto_locks && !csa->hold_onto_crit);
+	assert(!csa->hold_onto_crit);
 	if (!csa->now_crit)
 	{
+#		ifdef DEBUG
+		if (NULL != jnlpool.jnlpool_ctl)
+		{	/* We should never request crit on a database region while already holding the lock on the journal pool.
+			 * Not following the protocol (obtaining lock on journal pool AFTER obtaining crit on database region),
+			 * can lead to potential deadlocks
+			 */
+			assert((jnlpool.jnlpool_dummy_reg && jnlpool.jnlpool_dummy_reg->open) || jgbl.onlnrlbk);
+			jnlpool_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+			assert(!jnlpool_csa->now_crit);
+		}
+#		endif
 		assert(0 == crit_count);
 		crit_count++;	/* prevent interrupts */
 		TREF(grabbing_crit) = reg;
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csa->hdr->mutex_spin_parms;
+		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csd->mutex_spin_parms;
 		status = mutex_lockw(reg, mutex_spin_parms, crash_count);
 #		ifdef DEBUG
 		if (gtm_white_box_test_case_enabled
@@ -115,7 +139,9 @@ void	grab_crit(gd_region *reg)
 		TREF(grabbing_crit) = NULL;
 		crit_count = 0;
 	}
-	if (csa->hdr->wc_blocked)
+	if (csd->file_corrupt && !mupip_jnl_recover)
+		rts_error(VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
+	if (csd->wc_blocked)
 		wcs_recover(reg);
 	return;
 }

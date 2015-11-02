@@ -51,7 +51,7 @@
 #include "mu_gv_cur_reg_init.h"
 #include "gvcst_protos.h"	/* for gvcst_init prototype */
 #include "timers.h"
-#include "ftok_sems.h"
+#include "db_ipcs_reset.h"
 #include "wcs_flu.h"
 #include "gds_rundown.h"
 #include "change_reg.h"

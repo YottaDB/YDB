@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,9 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 
 #define BPL	SIZEOF(int4)*8/BML_BITS_PER_BLK					/* blocks masked by a int4 */
 
+error_def(ERR_DBRDERR);
+error_def(ERR_DYNUPGRDFAIL);
+
 int4 mur_blocks_free(reg_ctl_list *rctl)
 {
 	int4		x;
@@ -48,9 +51,6 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 	uint4 		*dskmap, map_blk_size;
 	file_control 	*db_ctl;
 	enum db_ver	dummy_ondskblkver;
-
-	error_def(ERR_DBRDERR);
-	error_def(ERR_DYNUPGRDFAIL);
 
 	db_ctl = rctl->db_ctl;
 	cs_data = rctl->csd;
@@ -66,7 +66,7 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 	{
 		bnum = i * cs_data->bplmap;
 		db_ctl->op = FC_READ;
-		db_ctl->op_pos = cs_data->start_vbn + (cs_data->blk_size / DISK_BLOCK_SIZE * bnum);
+		db_ctl->op_pos = cs_data->start_vbn + ((gtm_int64_t)cs_data->blk_size / DISK_BLOCK_SIZE * bnum);
 		status = dbfilop(db_ctl);
 		if (SYSCALL_ERROR(status))
 			rts_error(VARLSTCNT(5) ERR_DBRDERR, 2, DB_LEN_STR(gv_cur_region), status);

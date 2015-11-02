@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,7 @@ GBLREF boolean_t	dont_want_core;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
 error_def(ERR_MEMORY);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_GTMCHECK);

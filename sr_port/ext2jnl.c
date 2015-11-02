@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,9 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	muextract_type	exttype;
 	enum jnl_record_type	rectype;
 	jrec_suffix	*suffix;
+	seq_num		strm_seqno;
 	uint4		nodeflags;
+	uint4		strm_num;
 	DEBUG_ONLY(uint4	tcom_num = 0;)
 
 	ext_stop = ptr + strlen(ptr) + 1;
@@ -200,10 +202,17 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	assert(NULL != ptr);
 	ptr = strtok(NULL, "\\");		/* get the client pid field */
 	assert(NULL != ptr);
-	ptr = strtok(NULL, "\\");		/* get the token or jnl_seqno */
+	ptr = strtok(NULL, "\\");		/* get the token/jnl_seqno field */
 	assert(NULL != ptr);
 	rec->jrec_null.jnl_seqno = asc2l((uchar_ptr_t)ptr,STRLEN(ptr));
-
+	ptr = strtok(NULL, "\\");		/* get the strm_num field */
+	assert(NULL != ptr);
+	strm_num = asc2l((uchar_ptr_t)ptr,STRLEN(ptr));
+	ptr = strtok(NULL, "\\");		/* get the strm_seqno field */
+	assert(NULL != ptr);
+	strm_seqno = asc2l((uchar_ptr_t)ptr,STRLEN(ptr));
+	UNIX_ONLY(rec->jrec_null.strm_seqno = SET_STRM_INDEX(strm_seqno, strm_num);)
+	VMS_ONLY(rec->jrec_null.strm_seqno = strm_seqno;)
 	switch(exttype)
 	{
 		case MUEXT_NULL:
@@ -246,7 +255,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		rec->jrec_set_kill.mumps_node.length = gv_currkey->end;
 		memcpy(rec->jrec_set_kill.mumps_node.text, gv_currkey->base, gv_currkey->end);
 		temp_reclen = (int)(FIXED_UPD_RECLEN + rec->jrec_set_kill.mumps_node.length + SIZEOF(jnl_str_len_t));
-		if (IS_KILL_ZKILL(rectype))
+		if (IS_KILL_ZKILL_ZTRIG(rectype))
 		{
 			temp_reclen += JREC_SUFFIX_SIZE;
 			reclen = ROUND_UP2(temp_reclen, JNL_REC_START_BNDRY);

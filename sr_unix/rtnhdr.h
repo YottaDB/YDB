@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,13 +14,13 @@
 /* rtnhdr.h - routine header for shared binary Unix platforms */
 
 /* There are several references to this structure from assembly language; these include:
-
-	From Unix:	g_msf.si
-
-   Any changes to the routine header must be reflected in those files as well.
-
-   Warning: the list above may not be complete.
-*/
+ *
+ * From Unix:	g_msf.si
+ *
+ * Any changes to the routine header must be reflected in those files as well.
+ *
+ * Warning: the list above may not be complete.
+ */
 
 /* Variable table entry */
 typedef mname_entry var_tabent; /* the actual variable name is stored in the literal text pool */
@@ -31,9 +31,18 @@ typedef int4 lnr_tabent;
 /* Label table entry */
 typedef struct
 {
-	mident		lab_name;	/* The name of the label */
-	lnr_tabent	*lnr_adr;	/* Pointer to lnrtab entry offset into code for this label */
+	mident			lab_name;	/* The name of the label */
+	lnr_tabent		*lnr_adr;	/* Pointer to lnrtab entry offset into code for this label */
+	boolean_t		has_parms;	/* Flag to indicate whether the callee has a formallist */
+	GTM64_ONLY(int4		filler;)
 } lab_tabent;
+
+/* Label table entry proxy for run-time linking */
+typedef struct
+{
+	lnr_tabent		*lnr_adr;	/* Pointer to lnrtab entry offset into code for this label */
+	boolean_t		has_parms;	/* Flag to indicate whether the callee has a formallist */
+} lab_tabent_proxy;
 
 /* Linkage table entry */
 typedef struct
@@ -41,30 +50,32 @@ typedef struct
 	char_ptr_t	ext_ref;	/* Address (quadword on alpha) this linkage entry resolves to or NULL */
 } lnk_tabent;
 
-/*	rhead_struct is the routine header; it occurs at the beginning of the
-	object code part of each module. Since this structure may be resident in
-	a shared library, this structure is considered inviolate. Therefore there is
-	a process-private version of this header that is modified as necessary and
-	always points to the current version.
-
-	The routine header is initialized when a module is first linked into
-	an executable. The fields marked with "(#)" are updated when the routine
-	is replaced by a newer version via explicit zlink.
-*/
+/* rhead_struct is the routine header; it occurs at the beginning of the
+ * object code part of each module. Since this structure may be resident in
+ * a shared library, this structure is considered inviolate. Therefore there is
+ * a process-private version of this header that is modified as necessary and
+ * always points to the current version.
+ *
+ * The routine header is initialized when a module is first linked into
+ * an executable. The fields marked with "(#)" are updated when the routine
+ * is replaced by a newer version via explicit zlink.
+ */
 typedef struct	rhead_struct
 {
 	char			jsb[RHEAD_JSB_SIZE];	/* GTM_CODE object marker */
 	void_ptr_t		shlib_handle;		/* Null if header not for shared object. Non-zero means header is
-							   describing shared library resident routine and this is its handle.
-							   Note this is an 8 byte field on Tru64 (hence its position near top). */
+							 * describing shared library resident routine and this is its handle.
+							 * Note this is an 8 byte field on Tru64 (hence its position near top).
+							 */
 	mstr			src_full_name;		/* (#) fully qualified path of routine source code */
 	uint4			compiler_qlf;		/* bit flags of compiler qualifiers used (see cmd_qlf.h) */
 	uint4			objlabel;		/* Object code level/label (see objlable.h).
-							   Note: this field must be the 10th word (11th on Tru64) on 32-bit
-							   environments so that incr_link() can deference object label from old
-							   (pre-V5 32-bit) objects as well. In 64-bit environments though, this
-							   situation wouldn't occur since dlopen() would/should have failed
-							   when a 32-bit shared library is loaded */
+							 * Note: this field must be the 10th word (11th on Tru64) on 32-bit
+							 * environments so that incr_link() can deference object label from old
+							 * (pre-V5 32-bit) objects as well. In 64-bit environments though, this
+							 * situation wouldn't occur since dlopen() would/should have failed
+							 * when a 32-bit shared library is loaded
+							 */
 	mident			routine_name;		/* external routine name */
 	var_tabent		*vartab_adr;		/* (#) address of variable table (offset in original rtnhdr) */
 	int4			vartab_len;		/* (#) number of variable table entries */
@@ -137,21 +148,19 @@ typedef struct
 #define CODE_OFFSET(rtnhdr, addr) ((char *)(addr) - (char *)(rtnhdr->ptext_adr))
 
 /* Macro to determine if given address is inside code segment. Note that even though
-   the PTEXT_END_ADR macro is the address of end_of_code + 1, we still want a <= check
-   here because in many cases, the address being tested is the RETURN address from a
-   call that was done as the last instruction in the code segment. Sometimes this call
-   is to an error or it could be the implicit quit. On HPUX, the delay slot for the
-   implicit quit call at the end of the module can also cause the problem. Without
-   the "=" check also being there, the test will fail when it should succeed.
-*/
+ * the PTEXT_END_ADR macro is the address of end_of_code + 1, we still want a <= check
+ * here because in many cases, the address being tested is the RETURN address from a
+ * call that was done as the last instruction in the code segment. Sometimes this call
+ * is to an error or it could be the implicit quit. On HPUX, the delay slot for the
+ * implicit quit call at the end of the module can also cause the problem. Without
+ * the "=" check also being there, the test will fail when it should succeed.
+ */
 #define ADDR_IN_CODE(caddr, rtnhdr) (PTEXT_ADR((rtnhdr)) <= (caddr) && (caddr) <= PTEXT_END_ADR((rtnhdr)))
 
 /* Types that are different depending on shared/unshared unix binaries */
 #define LABENT_LNR_OFFSET lnr_adr
 
-/*
- * Format of a relocation datum.
- */
+/* Format of a relocation datum. */
 struct	relocation_info
 {
 		 int	r_address;	/* address which is relocated */
@@ -165,8 +174,7 @@ struct	rel_table
 	struct relocation_info	r;
 };
 
-/*
- * Format of a symbol table entry; this file is included by <a.out.h>
+/* Format of a symbol table entry; this file is included by <a.out.h>
  * and should be used if you aren't interested the a.out header
  * or relocation information.
  */
@@ -186,9 +194,7 @@ struct	sym_table
 	unsigned char		name[1];
 };
 
-/*
- * Simple values for n_type.
- */
+/* Simple values for n_type. */
 #define	N_TEXT	0x04		/* text */
 #define	N_EXT	0x01		/* external bit, or'ed in */
 

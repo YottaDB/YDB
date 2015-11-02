@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,12 +17,11 @@
 
 int m_zcompile(void)
 {
-	oprtype	x;
 	triple	*triptr;
+	oprtype	x;
 
-	if(!strexpr(&x))
+	if(EXPR_FAIL == expr(&x, MUMPS_STR))
 		return FALSE;
-
 	triptr = newtriple(OC_ZCOMPILE);
 	triptr->operand[0] = x;
 	triptr->operand[1] = put_ilit(FALSE);	/* mExtReqd arg */

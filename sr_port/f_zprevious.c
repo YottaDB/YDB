@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,25 +16,24 @@
 #include "toktyp.h"
 #include "mdq.h"
 #include "advancewindow.h"
+#include "fullbool.h"
 
-GBLREF char		window_token, director_token;
-GBLREF mident		window_ident;
+error_def(ERR_VAREXPECTED);
 
-int f_zprevious( oprtype *a, opctype op)
+int f_zprevious(oprtype *a, opctype op)
 {
-	triple *oldchain, tmpchain, *r, *triptr;
-	error_def(ERR_VAREXPECTED);
+	triple *oldchain, *r, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
-	switch (window_token)
+	switch (TREF(window_token))
 	{
 	case TK_IDENT:
-		if (director_token != TK_LPAREN)
+		if (TK_LPAREN != TREF(director_token))
 		{
 			r->opcode = OC_FNLVPRVNAME;
-			r->operand[0] = put_str(window_ident.addr, window_ident.len);
+			r->operand[0] = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
 			ins_triple(r);
 			advancewindow();
 			break;
@@ -50,7 +49,8 @@ int f_zprevious( oprtype *a, opctype op)
 		ins_triple(r);
 		break;
 	case TK_ATSIGN:
-		if (TREF(shift_side_effects))
+		TREF(saw_side_effect) = TREF(shift_side_effects);
+		if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);

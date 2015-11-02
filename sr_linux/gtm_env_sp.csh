@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -204,11 +204,15 @@ if ( $?gtm_version_change == "1" ) then
 	setenv 	gt_ld_options_all_exe	"-rdynamic -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus"
 	setenv	gt_ld_options_all_exe	"$gt_ld_options_all_exe -Wl,--version-script,gtmexe_symbols.export"
 
-	# optimize for all 64bit platforms
-        setenv	gt_ld_syslibs		" -lrt -lelf -lncurses -lm -ldl"
+  	# optimize for all 64bit platforms
+ 	#
+ 	# -lrt doesn't work to pull in semaphores with GCC 4.6, so use -lpthread.
+ 	# Add -lc in front of -lpthread to avoid linking in thread-safe versions
+ 	# of libc routines from libpthread.
+        setenv	gt_ld_syslibs		" -lelf -lncurses -lm -ldl -lc -lpthread -lrt"
 	if ( 32 == $gt_build_type ) then
 		# 32bit x86_64 and ia32 - decided at the beginning of the file
-		setenv  gt_ld_syslibs           " -lrt -lncurses -lm -ldl"
+		setenv  gt_ld_syslibs           " -lncurses -lm -ldl -lc -lpthread -lrt"
 	endif
 	if ( "cygwin" == $platform_only ) then
 		setenv  gt_ld_syslibs           "-lncurses -lm -lcrypt"

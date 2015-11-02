@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,23 +20,23 @@
 #define CANCEL_ONE -1
 #define CANCEL_ALL -2
 
-GBLREF char 	window_token;
-GBLREF mident 	window_ident;
 LITREF mident 	zero_ident;
+
+error_def(ERR_VAREXPECTED);
 
 int m_zwatch(void)
 {
+	boolean_t	is_count;
+	opctype		op;
+	oprtype		count, name,action;
+	triple		*next, *ref;
+	DCL_THREADGBL_ACCESS;
 
-	triple *ref,*next;
-	opctype op;
-	oprtype name,action,count;
-	bool is_count;
-	error_def(ERR_VAREXPECTED);
-
-	if (window_token == TK_MINUS)
+	SETUP_THREADGBL_ACCESS;
+	if (TK_MINUS == TREF(window_token))
 	{
 		advancewindow();
-		switch(window_token)
+		switch (TREF(window_token))
 		{
 		case TK_ASTERISK:
 			name = put_str(zero_ident.addr, zero_ident.len);
@@ -44,7 +44,7 @@ int m_zwatch(void)
 			advancewindow();
 			break;
 		case TK_IDENT:
-			name = put_str(window_ident.addr, window_ident.len);
+			name = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
 			count = put_ilit(CANCEL_ONE);
 			advancewindow();
 			break;
@@ -59,26 +59,24 @@ int m_zwatch(void)
 		}
 		action = put_str("",0);
 		op = OC_WATCHREF;
-	}
-	else
+	} else
 	{
-		if (window_token == TK_EQUAL)
+		if (TK_EQUAL == TREF(window_token))
 		{
 			advancewindow();
 			op = OC_WATCHMOD;
-		}
-		else
+		} else
 			op = OC_WATCHREF;
-		switch(window_token)
+		switch (TREF(window_token))
 		{
 		case TK_IDENT:
-			name = put_str(window_ident.addr, window_ident.len);
+			name = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
 			advancewindow();
 			break;
 		case TK_ATSIGN:
 			if (!indirection(&name))
 				return FALSE;
-			if (op == OC_WATCHREF && window_token != TK_COLON)
+			if ((OC_WATCHREF == op) && (TK_COLON != TREF(window_token)))
 			{
 				ref = maketriple(OC_COMMARG);
 				ref->operand[0] = name;
@@ -91,32 +89,29 @@ int m_zwatch(void)
 			stx_error(ERR_VAREXPECTED);
 			return FALSE;
 		}
-		if (window_token != TK_COLON)
+		if (TK_COLON != TREF(window_token))
 		{
 			action = put_str("",0);
 			count = put_ilit(0);
-		}
-		else
+		} else
 		{
 			advancewindow();
-			if (window_token == TK_COLON)
+			if (TK_COLON == TREF(window_token))
 			{
 				is_count = TRUE;
-				action = put_str("",0);
-			}
-			else
+				action = put_str("", 0);
+			} else
 			{
-				if (!strexpr(&action))
+				if (EXPR_FAIL == expr(&action, MUMPS_STR))
 					return FALSE;
-				is_count = window_token == TK_COLON;
+				is_count = (TK_COLON == TREF(window_token));
 			}
 			if (is_count)
 			{
 				advancewindow();
-				if (!intexpr(&count))
+				if (EXPR_FAIL == expr(&count, MUMPS_INT))
 					return FALSE;
-			}
-			else
+			} else
 				count = put_ilit(0);
 		}
 	}
@@ -127,5 +122,4 @@ int m_zwatch(void)
 	next->operand[0] = action;
 	next->operand[1] = count;
 	return TRUE;
-
 }

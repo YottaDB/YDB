@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2010 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2011 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -60,22 +60,28 @@ GDEINIT
 	. s SIZEOF("gd_header")=16
 	. s SIZEOF("gd_contents")=44
 	. s SIZEOF("gd_map")=36
-	. s SIZEOF("gd_region")=332
-	. if ver'="VMS" s SIZEOF("gd_segment")=340
-	. e  s SIZEOF("gd_segment")=336
+	. if ver'="VMS" d
+	. . s SIZEOF("gd_region")=356
+	. . s SIZEOF("gd_region_padding")=10			; not used on VMS
+	. . s SIZEOF("gd_segment")=340
+	. e  d
+	. . s SIZEOF("gd_region")=332
+	. . s SIZEOF("gd_segment")=336
 	e  d
 	. s SIZEOF("am_offset")=332
 	. s SIZEOF("file_spec")=256
 	. s SIZEOF("gd_header")=16
 	. s SIZEOF("gd_contents")=80
 	. s SIZEOF("gd_map")=40
-	. s SIZEOF("gd_region")=344
+	. s SIZEOF("gd_region")=368
+	. s SIZEOF("gd_region_padding")=14
 	. s SIZEOF("gd_segment")=360
 	s SIZEOF("mident")=32
 	s SIZEOF("blk_hdr")=16
 	s SIZEOF("rec_hdr")=3
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
+	s SIZEOF("reg_jnl_deq")=4				; not used on VMS
 	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32	; maximum name length allowed is 31 characters
 	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
 ;
@@ -109,10 +115,24 @@ GDEINIT
 	s minreg("ALLOCATION")=$s(ver'="VMS":200,1:10)
 	s minreg("BEFORE_IMAGE")=0,minreg("COLLATION_DEFAULT")=0,minreg("STDNULLCOLL")=0
 	s minreg("EXTENSION")=0
+	i ver'="VMS" d
+	. s minreg("AUTOSWITCHLIMIT")=4096
+	. s minreg("ALIGNSIZE")=256			; geq RECORD_SIZE
+	. s minreg("EPOCH_INTERVAL")=1
+	. s minreg("SYNC_IO")=0
+	. s minreg("YIELD_LIMIT")=0
 	s minreg("JOURNAL")=0,minreg("KEY_SIZE")=3,minreg("NULL_SUBSCRIPTS")=0
 	s minreg("RECORD_SIZE")=SIZEOF("rec_hdr")+4
 	s maxreg("ALLOCATION")=TWO(24),maxreg("BEFORE_IMAGE")=1,maxreg("BUFFER_SIZE")=2000
-	s maxreg("COLLATION_DEFAULT")=255,maxreg("STDNULLCOLL")=1,maxreg("EXTENSION")=HEX(4)-1
+	s maxreg("COLLATION_DEFAULT")=255,maxreg("STDNULLCOLL")=1
+	i ver="VMS"  s maxreg("EXTENSION")=HEX(4)-1
+	e  d
+	. s maxreg("EXTENSION")=1073741823
+	. s maxreg("AUTOSWITCHLIMIT")=8388607
+	. s maxreg("ALIGNSIZE")=4194304
+	. s maxreg("EPOCH_INTERVAL")=32767
+	. s maxreg("SYNC_IO")=1
+	. s maxreg("YIELD_LIMIT")=2048
 	s maxreg("JOURNAL")=1,maxreg("KEY_SIZE")=255,maxreg("NULL_SUBSCRIPTS")=2
 	s maxreg("RECORD_SIZE")=SIZEOF("max_str")
 ; segments
@@ -148,6 +168,8 @@ syntabi:
 	s syntab("ADD","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("ADD","REGION","JOURNAL","ALLOCATION")="REQUIRED"
 	s syntab("ADD","REGION","JOURNAL","ALLOCATION","TYPE")="TNUMBER"
+	s syntab("ADD","REGION","JOURNAL","AUTOSWITCHLIMIT")="REQUIRED"
+	s syntab("ADD","REGION","JOURNAL","AUTOSWITCHLIMIT","TYPE")="TNUMBER"
 	s syntab("ADD","REGION","JOURNAL","BUFFER_SIZE")="REQUIRED"
 	s syntab("ADD","REGION","JOURNAL","BUFFER_SIZE","TYPE")="TNUMBER"
 	s syntab("ADD","REGION","JOURNAL","BEFORE_IMAGE")="NEGATABLE"
@@ -199,6 +221,8 @@ syntabi:
 	s syntab("CHANGE","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("CHANGE","REGION","JOURNAL","ALLOCATION")="REQUIRED"
 	s syntab("CHANGE","REGION","JOURNAL","ALLOCATION","TYPE")="TNUMBER"
+	s syntab("CHANGE","REGION","JOURNAL","AUTOSWITCHLIMIT")="REQUIRED"
+	s syntab("CHANGE","REGION","JOURNAL","AUTOSWITCHLIMIT","TYPE")="TNUMBER"
 	s syntab("CHANGE","REGION","JOURNAL","BUFFER_SIZE")="REQUIRED"
 	s syntab("CHANGE","REGION","JOURNAL","BUFFER_SIZE","TYPE")="TNUMBER"
 	s syntab("CHANGE","REGION","JOURNAL","BEFORE_IMAGE")="NEGATABLE"
@@ -247,6 +271,8 @@ syntabi:
 	s syntab("TEMPLATE","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("TEMPLATE","REGION","JOURNAL","ALLOCATION")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","ALLOCATION","TYPE")="TNUMBER"
+	s syntab("TEMPLATE","REGION","JOURNAL","AUTOSWITCHLIMIT")="REQUIRED"
+	s syntab("TEMPLATE","REGION","JOURNAL","AUTOSWITCHLIMIT","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","JOURNAL","BUFFER_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","BUFFER_SIZE","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","JOURNAL","BEFORE_IMAGE")="NEGATABLE"
@@ -339,8 +365,8 @@ VMS
 	q
 
 UNIX:
-	s hdrlab="GTCGBDUNX006"         ; must be concurrently maintained in gbldirnam.h!!!
-        i (gtm64=TRUE) s hdrlab="GTCGBDUNX106" ; the high order digit is a 64-bit flag
+	s hdrlab="GTCGBDUNX007"         ; must be concurrently maintained in gbldirnam.h!!!
+	i (gtm64=TRUE) s hdrlab="GTCGBDUNX107" ; the high order digit is a 64-bit flag
 	s tfile="$gtmgbldir"
 	s accmeth="\BG\MM"
 	s helpfile="$gtm_dist/gdehelp.gld"

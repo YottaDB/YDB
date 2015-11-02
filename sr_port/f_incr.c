@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,24 +19,19 @@
 #include "fullbool.h"
 #include "show_source_line.h"
 
-GBLREF triple		*curtchain;
-GBLREF char		window_token;
+error_def(ERR_VAREXPECTED);
 
 int f_incr(oprtype *a, opctype op)
 {
-	boolean_t	ok, save_shift;
+	boolean_t	ok;
 	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	oprtype		*increment;
 	triple		incrchain, *oldchain, *r, *savptr, targchain, tmpexpr, *triptr;
-	error_def(ERR_VAREXPECTED);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
 	/* may need to evaluate the increment (2nd arg) early and use result later: prepare to juggle triple chains */
-	save_shift = TREF(shift_side_effects);
-	if (GTM_BOOL != TREF(gtm_fullbool))
-		TREF(shift_side_effects) = FALSE;	/* if no short circuit, only the outermost should juggle */
 	dqinit(&targchain, exorder);	/* a place for the operation and the target */
 	dqinit(&incrchain, exorder);	/* a place for the increment */
 	dqinit(&tmpexpr, exorder);	/* a place to juggle the shifted chain in case it's active */
@@ -44,7 +39,7 @@ int f_incr(oprtype *a, opctype op)
 	savptr = TREF(expr_start_orig);	/* but make sure expr_start_orig == expr_start since this is a new chain */
 	TREF(expr_start_orig) = TREF(expr_start) = &tmpexpr;
 	oldchain = setcurtchain(&targchain);	/* save the result of the first argument 'cause it evaluates 2nd */
-	switch (window_token)
+	switch (TREF(window_token))
 	{
 	case TK_IDENT:
 		/* $INCREMENT() performs an implicit $GET() on a first argument lvn so we use OC_PUTINDX because
@@ -77,12 +72,12 @@ int f_incr(oprtype *a, opctype op)
 	TREF(expr_start_orig) = savptr;
 	increment = &r->operand[1];
 	setcurtchain(&incrchain);	/* now to the increment expr, which must evaluate before the glvn in $INCR(glvn,expr) */
-	if (window_token != TK_COMMA)
+	if (TK_COMMA != TREF(window_token))
 		*increment = put_ilit(1);	/* default optional increment to 1 */
 	else
 	{
 		advancewindow();
-		if (!strexpr(increment))
+		if (EXPR_FAIL == expr(increment, MUMPS_NUM))
 		{
 			setcurtchain(oldchain);
 			return FALSE;
@@ -100,11 +95,10 @@ int f_incr(oprtype *a, opctype op)
 		triptr = newtriple(OC_GVRECTARG);	/* restore the result of the last gvn to preserve $referece (the naked) */
 		triptr->operand[0] = put_tref(TREF(expr_start));
 	}
-	TREF(shift_side_effects) = save_shift;
-	if (!save_shift || ((GTM_BOOL == TREF(gtm_fullbool)) && (OC_INDINCR != r->opcode)))
+	if (!TREF(shift_side_effects) || (GTM_BOOL != TREF(gtm_fullbool)) || (OC_INDINCR != r->opcode))
 	{	/* put it on the end of the main chain as there's no reason to play more with the ordering */
 		setcurtchain(oldchain);
-		triptr = curtchain->exorder.bl;
+		triptr = (TREF(curtchain))->exorder.bl;
 		dqadd(triptr, &incrchain, exorder);	/* this is a violation of info hiding */
 	} else	/* need full side effects or indirect 1st argument so put everything on the shift chain */
 	{	/* add the chain after "expr_start" which may be much before "curtchain" */

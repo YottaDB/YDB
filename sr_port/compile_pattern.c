@@ -19,25 +19,27 @@
 #include "advancewindow.h"
 #include "compile_pattern.h"
 #include "patcode.h"
+#include "fullbool.h"
 
 GBLREF spdesc		stringpool;
 GBLREF char		*lexical_ptr;
 GBLREF unsigned char	*source_buffer;
 GBLREF short int	source_column;
 
-int compile_pattern(oprtype *opr, bool is_indirect)
+int compile_pattern(oprtype *opr, boolean_t is_indirect)
 {
+	int		status;
 	ptstr		retstr;
 	mval		retmval;
 	mstr		instr;
-	int		status;
-	triple		*oldchain, tmpchain, *ref, *triptr;
+	triple		*oldchain, *ref, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (is_indirect)
 	{
-		if (TREF(shift_side_effects))
+		TREF(saw_side_effect) = TREF(shift_side_effects);
+		if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);

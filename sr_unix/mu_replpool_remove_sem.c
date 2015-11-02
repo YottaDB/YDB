@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,69 +44,134 @@
 #include "mu_rndwn_replpool.h"
 #include "ftok_sems.h"
 
+#define DO_CLNUP_AND_RETURN(SAVE_ERRNO, INSTFILENAME, INSTFILELEN, SEM_ID, FAILED_OP)	\
+{														\
+	gtm_putmsg(VARLSTCNT(5) ERR_REPLACCSEM, 3, SEM_ID, INSTFILELEN, INSTFILENAME);				\
+	gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT(FAILED_OP), CALLFROM, SAVE_ERRNO);			\
+	return -1;												\
+}
+
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	gd_region		*gv_cur_region;
+GBLREF	jnl_gbls_t		jgbl;
+#ifdef UNIX
+GBLREF	boolean_t	holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
+#endif
 
-/*
- * Description:
- * 	Grab ftok semaphore on replication instance file
- *	Release all replication semaphores for the instance (both jnlpool and recvpool)
- * 	Release ftok semaphore
- * Parameters:
- * Return Value: TRUE, if succsessful
- *	         FALSE, if fails.
- */
-boolean_t mu_replpool_remove_sem(boolean_t immediate)
+error_def(ERR_REPLACCSEM);
+
+int mu_replpool_remove_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, boolean_t remove_sem)
 {
-	char            *instfilename;
-	gd_region	*replreg;
-	unix_db_info	*udi;
-	unsigned int	full_len;
-	int		save_errno;
+	int			save_errno, instfilelen, status, sem_id, semval;
+	uint4			semnum;
+	char			*instfilename;
+	gd_region		*replreg;
+	DEBUG_ONLY(unix_db_info	*udi;)
 
-	error_def(ERR_REPLFTOKSEM);
-	error_def(ERR_REPLACCSEM);
-
-	/*
-	 * JNL POOL SEMAPHORES
-	 */
+	assert((NULL != jnlpool.jnlpool_dummy_reg) && (jnlpool.jnlpool_dummy_reg == recvpool.recvpool_dummy_reg));
 	replreg = jnlpool.jnlpool_dummy_reg;
-	assert(NULL != replreg);
+	DEBUG_ONLY(udi = FILE_INFO(jnlpool.jnlpool_dummy_reg));
+	assert(udi->grabbed_ftok_sem || jgbl.mur_rollback); /* Rollback already holds standalone access so no need for ftok lock */
 	instfilename = (char *)replreg->dyn.addr->fname;
-	full_len = replreg->dyn.addr->fname_len;
-	if (0 == full_len)
-		return TRUE;
-	/* "mu_replpool_grab_sem" would have already created the ftok semaphore and incremented the counter.
-	 * So use "ftok_sem_lock" instead of "ftok_sem_get" and do not increment the counter.
-	 */
-	if (!ftok_sem_lock(replreg, FALSE, FALSE))
-		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instfilename);
-	if (0 != remove_sem_set(SOURCE))
+	instfilelen = replreg->dyn.addr->fname_len;
+	assert((NULL != instfilename) && (0 != instfilelen) && ('\0' == instfilename[instfilelen]));
+	assert((JNLPOOL_SEGMENT == pool_type) || (RECVPOOL_SEGMENT == pool_type));
+	if (JNLPOOL_SEGMENT == pool_type)
 	{
-		save_errno = REPL_SEM_ERRNO;
-		if (!ftok_sem_release(replreg, TRUE, TRUE))
-			gtm_putmsg(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instfilename);
-		udi = FILE_INFO(replreg);
-		rts_error(VARLSTCNT(6) ERR_REPLACCSEM, 3, udi->semid, full_len, instfilename, save_errno);
-	}
-	repl_inst_jnlpool_reset();
-	/*
-	 * RECV POOL SEMAPHORES
-	 */
-	replreg = recvpool.recvpool_dummy_reg;
-	assert(replreg);
-	if (0 != remove_sem_set(RECV))
+		sem_id = repl_inst_filehdr->jnlpool_semid;
+		semval = semctl(sem_id, SRC_SERV_COUNT_SEM, GETVAL);
+		assert((1 == semval) || jgbl.onlnrlbk); /* semval MUST be 1 because we incremented in mu_replpool_grab_sem and we
+							 * never released it. Only exception is if we are ONLINE ROLLBACK */
+		remove_sem &= (1 == semval); /* we can remove the sem if the caller intends to and the counter semaphore is 1 */
+		if (0 < semval)
+		{
+			status = decr_sem(SOURCE, SRC_SERV_COUNT_SEM);
+			if (SS_NORMAL != status)
+			{
+				save_errno = errno;
+				DO_CLNUP_AND_RETURN(save_errno, instfilename, instfilelen, sem_id, "semop()");
+			}
+		} else if (-1 == semval)
+		{
+			save_errno = errno;
+			DO_CLNUP_AND_RETURN(save_errno, instfilename, instfilelen, sem_id, "semctl()");
+		}
+		holds_sem[SOURCE][SRC_SERV_COUNT_SEM] = FALSE;
+		assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
+		assert(1 == semctl(sem_id, JNL_POOL_ACCESS_SEM, GETVAL)); /* we hold the access control semaphore */
+		status = rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
+		assert(SS_NORMAL == status); /* We hold it. So, we should be able to release it */
+		holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] = FALSE;
+		/* Now that we have released the access control semaphore, see if we can remove the semaphore altogether from the
+		 * system. For this, we should be holding the FTOK on the replication instance AND the counter semaphore should be
+		 * 0. If we are called from mu_rndwn_repl_instance, we are guaranteed we will be holding the FTOK. But, if we are
+		 * ROLLBACK (online or noonline), we need not hold the FTOK, if somebody else (possibly a source or receiver server
+		 * startup command) is holding it. In that case, we don't remove the semaphore, because any process that is waiting
+		 * on the access control will now get an EIDRM error which is NOT user friendly. So, just release the access
+		 * control and let the waiting process do the clean up.
+		 */
+		if (remove_sem)
+		{
+			status = remove_sem_set(SOURCE);
+			if (SS_NORMAL != status)
+			{
+				save_errno = errno;
+				DO_CLNUP_AND_RETURN(save_errno, instfilename, instfilelen, sem_id, "sem_rmid()");
+			}
+			repl_inst_filehdr->jnlpool_semid = INVALID_SEMID;
+			repl_inst_filehdr->jnlpool_semid_ctime = 0;
+		}
+	} else
 	{
-		save_errno = REPL_SEM_ERRNO;
-		if (!ftok_sem_release(replreg, TRUE, TRUE))
-			gtm_putmsg(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instfilename);
-		udi = FILE_INFO(replreg);
-		rts_error(VARLSTCNT(6) ERR_REPLACCSEM, 3, udi->semid, full_len, instfilename, save_errno);
+		sem_id = repl_inst_filehdr->recvpool_semid;
+		for (semnum = RECV_SERV_COUNT_SEM; semnum <= UPD_PROC_COUNT_SEM; semnum++)
+		{
+			semval = semctl(sem_id, semnum, GETVAL);
+			assert((1 == semval) || jgbl.onlnrlbk);
+			remove_sem &= (1 == semval);
+			if (0 < semval)
+			{
+				status = decr_sem(RECV, semnum);
+				if (SS_NORMAL != status)
+				{
+					save_errno = errno;
+					DO_CLNUP_AND_RETURN(save_errno, instfilename, instfilelen, sem_id, "semop()");
+				}
+			} else if (-1 == semval)
+			{
+				save_errno = errno;
+				DO_CLNUP_AND_RETURN(save_errno, instfilename, instfilelen, sem_id, "semctl()");
+			}
+			holds_sem[RECV][semnum] = FALSE;
+		}
+		assert(holds_sem[RECV][RECV_POOL_ACCESS_SEM] && holds_sem[RECV][RECV_SERV_OPTIONS_SEM]);
+		assert(1 == semctl(sem_id, RECV_POOL_ACCESS_SEM, GETVAL) && (1 == semctl(sem_id, RECV_SERV_OPTIONS_SEM, GETVAL)));
+		status = rel_sem_immediate(RECV, RECV_SERV_OPTIONS_SEM);
+		assert(SS_NORMAL == status); /* We hold it. So, we should be able to release it */
+		status = rel_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
+		assert(SS_NORMAL == status); /* We hold it. So, we should be able to release it */
+		holds_sem[RECV][RECV_POOL_ACCESS_SEM] = FALSE;
+		holds_sem[RECV][RECV_SERV_OPTIONS_SEM] = FALSE;
+		/* Now that we have released the access control semaphore, see if we can remove the semaphore altogether from the
+		 * system. For this, we should be holding the FTOK on the replication instance AND the counter semaphore should be
+		 * 0. If we are called from mu_rndwn_repl_instance, we are guaranteed we will be holding the FTOK. But, if we are
+		 * ROLLBACK (online or noonline), we need not hold the FTOK, if somebody else (possibly a source or receiver server
+		 * startup command) is holding it. In that case, we don't remove the semaphore, because any process that is waiting
+		 * on the access control will now get an EIDRM error which is NOT user friendly. So, just release the access
+		 * control and let the waiting process do the clean up.
+		 */
+		if (remove_sem)
+		{
+			status = remove_sem_set(RECV);
+			if (SS_NORMAL != status)
+			{
+				save_errno = errno;
+				DO_CLNUP_AND_RETURN(save_errno, instfilename, instfilelen, sem_id, "sem_rmid()");
+			}
+			repl_inst_filehdr->recvpool_semid = INVALID_SEMID;
+			repl_inst_filehdr->recvpool_semid_ctime = 0;
+		}
 	}
-	repl_inst_recvpool_reset();
-	/* Release ftok semaphore and decrement counter that was incremented in "mu_replpool_grab_sem" now that we are exiting */
-	if (!ftok_sem_release(replreg, TRUE, immediate))
-		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instfilename);
-	return TRUE;
+	return SS_NORMAL;
 }

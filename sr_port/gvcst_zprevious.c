@@ -43,6 +43,8 @@ GBLREF int4		gv_keysize;
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 
+error_def(ERR_GVORDERFAIL);
+
 bool gvcst_zprevious(void)
 {
 	static gv_key	*zprev_temp_key;

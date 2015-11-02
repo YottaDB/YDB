@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,14 +44,14 @@ int gtmrecv_get_opt(void)
 {
 
 	boolean_t	log, log_interval_specified;
-	unsigned short 	log_file_len, filter_cmd_len;
+	unsigned short 	log_file_len, filter_cmd_len, instfilename_len, instname_len;
 	boolean_t	buffsize_status;
 	boolean_t	filter;
 	int		status;
 	unsigned short	statslog_val_len;
 	char		statslog_val[4]; /* "ON" or "OFF" */
 	uint4		n_readers, n_helpers;
-	boolean_t	cmplvl_status;
+	boolean_t	cmplvl_status, autorollback;
 
 	gtmrecv_options.start = (CLI_PRESENT == cli_present("START"));
 	gtmrecv_options.shut_down = (CLI_PRESENT == cli_present("SHUTDOWN"));
@@ -61,8 +61,55 @@ int gtmrecv_get_opt(void)
 	gtmrecv_options.changelog = (CLI_PRESENT == cli_present("CHANGELOG"));
 	gtmrecv_options.updateonly = (CLI_PRESENT == cli_present("UPDATEONLY"));
 	gtmrecv_options.updateresync = (CLI_PRESENT == cli_present("UPDATERESYNC"));
+#	ifdef UNIX
+	gtmrecv_options.reuse_specified = (CLI_PRESENT == cli_present("REUSE"));
+	gtmrecv_options.resume_specified = (CLI_PRESENT == cli_present("RESUME"));
+	/* -UPDATERESYNC=<instance_filename> and optional -REUSE=<instance_name> is supported only in Unix */
+	if (gtmrecv_options.updateresync)
+	{
+		instfilename_len = SIZEOF(gtmrecv_options.updresync_instfilename) - 1;	/* keep 1 byte for trailing NULL */
+		/* Treat -UPDATERESYNC (with no value) as if -UPDATERESYNC="" was specified */
+		if (!cli_get_str("UPDATERESYNC", gtmrecv_options.updresync_instfilename, &instfilename_len))
+		{
+			instfilename_len = 0;
+			if (gtmrecv_options.reuse_specified)
+			{
+				util_out_print("Error: REUSE qualifier not allowed if UPDATERESYNC qualifier has no value", TRUE);
+				return (-1);
+			}
+		} else if (gtmrecv_options.reuse_specified)
+		{
+			instname_len = SIZEOF(gtmrecv_options.reuse_instname) - 1;	/* keep 1 byte for trailing NULL */
+			if (!cli_get_str("REUSE", gtmrecv_options.reuse_instname, &instname_len))
+			{
+				util_out_print("Error parsing REUSE qualifier", TRUE);
+				return (-1);
+			} else
+			{
+				assert(SIZEOF(gtmrecv_options.reuse_instname) > instname_len);
+				gtmrecv_options.reuse_instname[instname_len] = '\0';
+			}
+		}
+		assert(SIZEOF(gtmrecv_options.updresync_instfilename) > instfilename_len);
+		gtmrecv_options.updresync_instfilename[instfilename_len] = '\0';
+		if (gtmrecv_options.resume_specified)
+		{
+			if (!cli_get_int("RESUME", &gtmrecv_options.resume_strm_num))
+			{
+				util_out_print("Error parsing RESUME qualifier", TRUE);
+				return (-1);
+			}
+			if ((0 >= gtmrecv_options.resume_strm_num) || (MAX_SUPPL_STRMS <= gtmrecv_options.resume_strm_num))
+			{
+				util_out_print("RESUME qualifier should specify a stream number between 1 and 15 (both inclusive)",
+					TRUE);
+				return (-1);
+			}
+		}
+	}
+	gtmrecv_options.noresync = (CLI_PRESENT == cli_present("NORESYNC"));
+#	endif
 	gtmrecv_options.helpers = (CLI_PRESENT == cli_present("HELPERS"));
-
 	gtmrecv_options.listen_port = 0; /* invalid port; indicates listenport not specified */
 	if (gtmrecv_options.start && CLI_PRESENT == cli_present("LISTENPORT"))
 	{
@@ -83,6 +130,11 @@ int gtmrecv_get_opt(void)
 		} else
 			gtmrecv_options.buffsize = DEFAULT_RECVPOOL_SIZE;
 #		ifdef UNIX
+		/* Check if -autorollback is specified (default is -noautorollback) */
+		autorollback = cli_present("AUTOROLLBACK");
+		gtmrecv_options.autorollback = autorollback ? (CLI_NEGATED != autorollback) : FALSE;
+		if (gtmrecv_options.autorollback)
+			gtmrecv_options.autorollback_verbose = cli_present("AUTOROLLBACK.VERBOSE");
 		/* Check if compression level is specified */
 		if (cmplvl_status = (CLI_PRESENT == cli_present("CMPLVL")))
 		{
@@ -174,9 +226,9 @@ int gtmrecv_get_opt(void)
 #ifdef UNIX
 		cli_strupper(statslog_val);
 #endif
-		if (0 == strcmp(statslog_val, "ON"))
+		if (0 == STRCMP(statslog_val, "ON"))
 			gtmrecv_options.statslog = TRUE;
-		else if (0 == strcmp(statslog_val, "OFF"))
+		else if (0 == STRCMP(statslog_val, "OFF"))
 			gtmrecv_options.statslog = FALSE;
 		else
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@ GBLREF	seq_num			seq_num_zero;
 void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 {
 	struct_jrec_upd		*jrec;
+	struct_jrec_null	*jrec_null;
 	GTMCRYPT_ONLY(
 		struct_jrec_upd	*jrec_alt;
 	)
@@ -57,9 +58,11 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 	assert((0 != jpc->pini_addr) || REPL_WAS_ENABLED(csa));
 	assert(jgbl.gbl_jrec_time || REPL_WAS_ENABLED(csa));
 	assert(csa->now_crit);
-	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(jfb->rectype));
+	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(jfb->rectype) || (JRT_NULL == jfb->rectype));
 	assert(!IS_ZTP(jfb->rectype));
 	jrec = (struct_jrec_upd *)jfb->buff;
+	assert(OFFSETOF(struct_jrec_null, prefix) == OFFSETOF(struct_jrec_upd, prefix));
+	assert(SIZEOF(jrec_null->prefix) == SIZEOF(jrec->prefix));
 	jrec->prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
 	jrec->prefix.tn = csa->ti->curr_tn;
 	jrec->prefix.time = jgbl.gbl_jrec_time;
@@ -67,13 +70,19 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 	/* t_end/tp_tend/mur_output_record has already set token/jnl_seqno into jnl_fence_ctl.token */
 	assert((0 != jnl_fence_ctl.token) || (!dollar_tlevel && !jgbl.forw_phase_recovery && !REPL_ENABLED(csa))
 		|| (!dollar_tlevel && jgbl.forw_phase_recovery && (repl_open != csa->hdr->intrpt_recov_repl_state)));
-	QWASSIGN(jrec->token_seq.token, jnl_fence_ctl.token);
+	assert(OFFSETOF(struct_jrec_null, jnl_seqno) == OFFSETOF(struct_jrec_upd, token_seq));
+	assert(SIZEOF(jrec_null->jnl_seqno) == SIZEOF(jrec->token_seq));
+	jrec->token_seq.token = jnl_fence_ctl.token;
+	assert(OFFSETOF(struct_jrec_null, strm_seqno) == OFFSETOF(struct_jrec_upd, strm_seqno));
+	assert(SIZEOF(jrec_null->strm_seqno) == SIZEOF(jrec->strm_seqno));
+	jrec->strm_seqno = jnl_fence_ctl.strm_seqno;
 #	ifdef GTM_CRYPT
 	if (REPL_ALLOWED(csa))
 	{
 		jrec_alt = (struct_jrec_upd *)jfb->alt_buff;
 		jrec_alt->prefix = jrec->prefix;
-		QWASSIGN(jrec_alt->token_seq, jrec->token_seq);
+		jrec_alt->token_seq = jrec->token_seq;
+		jrec_alt->strm_seqno = jrec->strm_seqno;
 	}
 #	endif
 	JNL_WRITE_APPROPRIATE(csa, jpc, jfb->rectype, (jnl_record *)jrec, NULL, jfb);

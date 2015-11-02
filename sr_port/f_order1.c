@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,70 +16,70 @@
 #include "toktyp.h"
 #include "mdq.h"
 #include "advancewindow.h"
+#include "fullbool.h"
 
-GBLREF char window_token, director_token;
-GBLREF mident window_ident;
+error_def(ERR_VAREXPECTED);
 
-int f_order1( oprtype *a, opctype op)
+int f_order1(oprtype *a, opctype op)
 {
-	triple *oldchain, tmpchain, *r, *triptr;
-	error_def(ERR_VAREXPECTED);
+	triple *oldchain, *r, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
-	switch (window_token)
+	switch (TREF(window_token))
 	{
-		case TK_IDENT:
-			if (director_token != TK_LPAREN)
-			{
-				r->opcode = OC_FNLVNAME;
-				r->operand[0] = put_str(window_ident.addr, window_ident.len);
-				r->operand[1] = put_ilit(0);	/* FALSE - do not return aliased vars with no value */
-				ins_triple(r);
-				advancewindow();
-				break;
-			}
-			if (!lvn(&(r->operand[0]), OC_SRCHINDX, r))
-				return FALSE;
+	case TK_IDENT:
+		if (TK_LPAREN != TREF(director_token))
+		{
+			r->opcode = OC_FNLVNAME;
+			r->operand[0] = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
+			r->operand[1] = put_ilit(0);	/* FALSE - do not return aliased vars with no value */
 			ins_triple(r);
+			advancewindow();
 			break;
-		case TK_CIRCUMFLEX:
-			if (!gvn())
-				return FALSE;
-			r->opcode = OC_GVORDER;
-			ins_triple(r);
-			break;
-		case TK_ATSIGN:
-			if (TREF(shift_side_effects))
-			{
-				dqinit(&tmpchain, exorder);
-				oldchain = setcurtchain(&tmpchain);
-				if (!indirection(&(r->operand[0])))
-				{
-					setcurtchain(oldchain);
-					return FALSE;
-				}
-				r->operand[1] = put_ilit((mint)indir_fnorder1);
-				ins_triple(r);
-				newtriple(OC_GVSAVTARG);
-				setcurtchain(oldchain);
-				dqadd(TREF(expr_start), &tmpchain, exorder);
-				TREF(expr_start) = tmpchain.exorder.bl;
-				triptr = newtriple(OC_GVRECTARG);
-				triptr->operand[0] = put_tref(TREF(expr_start));
-			} else
-			{
-				if (!indirection(&(r->operand[0])))
-					return FALSE;
-				r->operand[1] = put_ilit((mint)indir_fnorder1);
-				ins_triple(r);
-			}
-			r->opcode = OC_INDFUN;
-			break;
-		default:
-			stx_error(ERR_VAREXPECTED);
+		}
+		if (!lvn(&(r->operand[0]), OC_SRCHINDX, r))
 			return FALSE;
+		ins_triple(r);
+		break;
+	case TK_CIRCUMFLEX:
+		if (!gvn())
+			return FALSE;
+		r->opcode = OC_GVORDER;
+		ins_triple(r);
+		break;
+	case TK_ATSIGN:
+		TREF(saw_side_effect) = TREF(shift_side_effects);
+		if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
+		{
+			dqinit(&tmpchain, exorder);
+			oldchain = setcurtchain(&tmpchain);
+			if (!indirection(&(r->operand[0])))
+			{
+				setcurtchain(oldchain);
+				return FALSE;
+			}
+			r->operand[1] = put_ilit((mint)indir_fnorder1);
+			ins_triple(r);
+			newtriple(OC_GVSAVTARG);
+			setcurtchain(oldchain);
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
+			triptr = newtriple(OC_GVRECTARG);
+			triptr->operand[0] = put_tref(TREF(expr_start));
+		} else
+		{
+			if (!indirection(&(r->operand[0])))
+				return FALSE;
+			r->operand[1] = put_ilit((mint)indir_fnorder1);
+			ins_triple(r);
+		}
+		r->opcode = OC_INDFUN;
+		break;
+	default:
+		stx_error(ERR_VAREXPECTED);
+		return FALSE;
 	}
 	*a = put_tref(r);
 	return TRUE;

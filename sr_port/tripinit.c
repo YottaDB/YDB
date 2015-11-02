@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ void tripinit(void)
 	memset(&mcavailptr->data[0], 0, mcavail);
 	TREF(expr_depth) = 0;
 	TREF(expr_start) = TREF(expr_start_orig) = NULL;
-	TREF(shift_side_effects) = FALSE;
+	TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;
 	mlitmax = mlmax = mvmax = 0;
 	mlabtab = NULL;
 	mvartab = NULL;

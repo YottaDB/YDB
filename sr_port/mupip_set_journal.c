@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,8 @@
 #include "min_max.h"		/* for MAX and JNL_MAX_RECLEN macro */
 #include "gtm_rename.h"		/* for cre_jnl_file_intrpt_rename() prototype */
 #include "send_msg.h"
+#include "gtmio.h"
+#include "is_file_identical.h"
 
 #define	DB_OR_REG_SIZE	MAX(STR_LIT_LEN(FILE_STR), STR_LIT_LEN(REG_STR)) + 1 /* trailing null byte */
 
@@ -66,31 +68,32 @@ GBLREF	char			*jnl_state_lit[];
 GBLREF	char			*repl_state_lit[];
 GBLREF	jnl_gbls_t		jgbl;
 
-error_def(ERR_DBPRIVERR);
-error_def(ERR_DBOPNERR);
-error_def(ERR_DBRDERR);
-error_def(ERR_DBFILERR);
-error_def(ERR_JNLBUFFTOOSM);
-error_def(ERR_JNLRDONLY);
-error_def(ERR_MUSTANDALONE);
-error_def(ERR_FILEEXISTS);
-error_def(ERR_PREVJNLLINKCUT);
-error_def(ERR_JNLFNF);
-error_def(ERR_JNLSTATE);
-error_def(ERR_REPLSTATE);
-error_def(ERR_JNLNOCREATE);
-error_def(ERR_JNLCREATE);
 error_def(ERR_BEFOREIMG);
-error_def(ERR_UNIMPLOP);
-error_def(ERR_TEXT);
-error_def(ERR_MUNOFINISH);
-error_def(ERR_FILEPARSE);
-error_def(ERR_MUPCLIERR);
+error_def(ERR_DBFILERR);
+error_def(ERR_DBOPNERR);
+error_def(ERR_DBPRIVERR);
+error_def(ERR_DBRDERR);
+error_def(ERR_FILEEXISTS);
 error_def(ERR_FILENAMETOOLONG);
-error_def(ERR_JNLSWITCHTOOSM);
-error_def(ERR_JNLSWITCHSZCHG);
-error_def(ERR_JNLINVSWITCHLMT);
+error_def(ERR_FILEPARSE);
 error_def(ERR_JNLALIGNTOOSM);
+error_def(ERR_JNLALLOCGROW);
+error_def(ERR_JNLBUFFTOOSM);
+error_def(ERR_JNLCREATE);
+error_def(ERR_JNLFNF);
+error_def(ERR_JNLINVSWITCHLMT);
+error_def(ERR_JNLNOCREATE);
+error_def(ERR_JNLRDONLY);
+error_def(ERR_JNLSTATE);
+error_def(ERR_JNLSWITCHSZCHG);
+error_def(ERR_JNLSWITCHTOOSM);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_MUSTANDALONE);
+error_def(ERR_PREVJNLLINKCUT);
+error_def(ERR_REPLSTATE);
+error_def(ERR_TEXT);
+error_def(ERR_UNIMPLOP);
 
 VMS_ONLY(static  const   unsigned short  zero_fid[3];)
 
@@ -115,7 +118,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	int			db_reg_name_len, db_or_reg_len, jnl_buffer_size;
 	set_jnl_options		jnl_options;
 	boolean_t		curr_jnl_present,	/* for current state 2, is current journal present? */
-				newjnlfiles, jnlname_same,
+				jnl_points_to_db, keep_prev_link, safe_to_switch, newjnlfiles, jnlname_same,
 				this_iter_prevlinkcut_error, do_prevlinkcut_error;
 	enum jnl_state_codes	jnl_curr_state;
 	enum repl_state_codes	repl_curr_state;
@@ -124,6 +127,12 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	jnl_tm_t		save_gbl_jrec_time;
+#	ifdef UNIX
+	int			jnl_fd;
+	jnl_file_header		header;
+	int4			status1;
+	uint4			status2;
+#	endif
 
 	assert(SGMNT_HDR_LEN == ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
 	memset(&jnl_info, 0, SIZEOF(jnl_info));
@@ -134,7 +143,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		gtm_putmsg(VARLSTCNT(1) ERR_MUPCLIERR);
 		return ERR_MUPCLIERR;
 	}
-	if (region && NULL == grlist)
+	if (region && (NULL == grlist))
 	{	/* region and grlist are set by mu_getlst() invoked from mupip_set() */
 		assert(FALSE);
 		util_out_print("Invalid region name specified on command line. Can't continue any further", TRUE);
@@ -451,6 +460,14 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 				exit_status |= EXIT_ERR;
 				break;
+#ifdef UNIX
+			} else if (jnl_info.alloc + jnl_info.extend > jnl_info.autoswitchlimit
+					&& jnl_info.alloc != jnl_info.autoswitchlimit)
+			{
+				gtm_putmsg(VARLSTCNT(8) ERR_JNLALLOCGROW, 6, jnl_info.alloc, jnl_info.autoswitchlimit,
+						"database file", DB_LEN_STR(gv_cur_region));
+				jnl_info.alloc = jnl_info.autoswitchlimit;
+#endif
 			} else
 			{
 				align_autoswitch = ALIGNED_ROUND_DOWN(jnl_info.autoswitchlimit, jnl_info.alloc, jnl_info.extend);
@@ -506,27 +523,102 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				exit_status |= EXIT_ERR;
 				break;
 			}
-			jnlname_same = (jnl_info.jnl_len == csd->jnl_file_len &&
-				(0 == memcmp(jnl_info.jnl, csd->jnl_file_name, jnl_info.jnl_len))) ? TRUE : FALSE;
+			jnlname_same = ((jnl_info.jnl_len == csd->jnl_file_len)
+				&& (0 == memcmp(jnl_info.jnl, csd->jnl_file_name, jnl_info.jnl_len))) ? TRUE : FALSE;
+			jnlfile.addr = (char *)csd->jnl_file_name;
+			jnlfile.len = csd->jnl_file_len;
+			if (!jnlname_same)
+			{
+				if (FILE_STAT_ERROR == (curr_stat_res = gtm_file_stat(&jnlfile, NULL, NULL, TRUE, &status)))
+				{
+					gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, jnlfile.len, jnlfile.addr, status);
+					if (newjnlfiles)
+						gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+					exit_status |= EXIT_ERR;
+					break;
+				}
+			} else
+				curr_stat_res = new_stat_res; /* new_stat_res is already set */
+#			ifdef UNIX
+			if (newjnlfiles)
+			{
+				jnl_points_to_db = FALSE;
+				if (FILE_PRESENT & curr_stat_res)
+				{	/* Check if the journal file (if any) pointed to by the db file exists and points back to
+					 * this database file.
+					 */
+					assert('\0' == jnlfile.addr[jnlfile.len]);
+					jnlfile.addr[jnlfile.len] = '\0';	/* just in case above assert is FALSE */
+					OPENFILE(jnlfile.addr, O_RDONLY, jnl_fd);
+				} else if (FILE_PRESENT & new_stat_res)
+				{	/* Check if the new journal file (that we know exists) points back to this database file.
+					 * If not, the journal file prev links should be cut in the new journal file.
+					 */
+					assert('\0' == jnl_info.jnl[jnl_info.jnl_len]);
+					jnl_info.jnl[jnl_info.jnl_len] = '\0';	/* just in case above assert is FALSE */
+					OPENFILE((char *)jnl_info.jnl, O_RDONLY, jnl_fd);
+				} else
+					jnl_fd = FD_INVALID;
+				if (0 <= jnl_fd)
+				{
+					DO_FILE_READ(jnl_fd, 0, &header, SIZEOF(header), status1, status2);
+					if (SS_NORMAL == status1)
+					{
+						CHECK_JNL_FILE_IS_USABLE(&header, status1, FALSE, 0, NULL);
+							/* FALSE => NO gtm_putmsg even if errors */
+						if ((SS_NORMAL == status1)
+							&& ARRAYSIZE(header.data_file_name) > header.data_file_name_length)
+						{
+							assert('\0' == header.data_file_name[header.data_file_name_length]);
+							header.data_file_name[header.data_file_name_length] = '\0';
+							assert('\0' == jnl_info.fn[jnl_info.fn_len]);
+							jnl_info.fn[jnl_info.fn_len] = '\0';
+							if (is_file_identical((char *)header.data_file_name,
+												(char *)jnl_info.fn))
+								jnl_points_to_db = TRUE;
+						}
+					}
+				}
+				/* If journal file we are about to create exists, allow the switch only it is safe to do so.
+				 * This way we prevent multiple environments from interfering with each other through a
+				 * common journal file name. Also this way we disallow switching to a user-specified new
+				 * journal file that already exists (say the database file itself due to a commandline typo).
+				 */
+				if (FILE_PRESENT & curr_stat_res)
+				{
+					keep_prev_link = jnl_points_to_db;
+					safe_to_switch = (jnlname_same && keep_prev_link);
+				} else if (FILE_PRESENT & new_stat_res)
+				{
+					keep_prev_link = FALSE;
+					/* In this case, the current jnl file does not exist. And so the prevlinks are
+					 * going to be cleared in the new jnl file. Therefore it is safe to rename the
+					 * existing new jnl file (in order to create the jnl file we want) as long as
+					 * it points back to this db.
+					 */
+					safe_to_switch = jnl_points_to_db;
+				} else
+				{
+					keep_prev_link = FALSE;	/* since current and new jnl file both dont exist */
+					safe_to_switch = TRUE;	/* since current and new jnl file both dont exist */
+				}
+				if ((FILE_PRESENT & new_stat_res) && !safe_to_switch)
+				{
+					gtm_putmsg(VARLSTCNT(4) ERR_FILEEXISTS, 2, jnl_info.jnl_len, jnl_info.jnl);
+					gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+					exit_status |= EXIT_ERR;
+					break;
+				}
+			}
+#			else
+			keep_prev_link = TRUE;
+#			endif
 			if (jnl_open != jnl_curr_state)
 				curr_jnl_present = FALSE;
 			else
-			{ 	/* We expect that a journal file for this region is present when
-				 * current journal state is jnl_open ("2"). See if it is really present.*/
-				if (!jnlname_same)
-				{
-					jnlfile.addr = (char *)csd->jnl_file_name;
-					jnlfile.len = csd->jnl_file_len;
-					if (FILE_STAT_ERROR == (curr_stat_res = gtm_file_stat(&jnlfile, NULL, NULL, TRUE, &status)))
-					{
-						gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, jnlfile.len, jnlfile.addr, status);
-						if (newjnlfiles)
-							gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
-						exit_status |= EXIT_ERR;
-						break;
-					}
-				} else
-					curr_stat_res = new_stat_res; /* new_stat_res is already set */
+			{	/* We expect that a journal file for this region is present when
+				 * current journal state is jnl_open ("2"). See if it is really present.
+				 */
 				curr_jnl_present = (FILE_PRESENT & curr_stat_res) ? TRUE : FALSE;
 				if (curr_jnl_present)
 				{
@@ -594,19 +686,22 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				{
 					if (!(jnl_info.repl_state == repl_open && repl_open != repl_curr_state))
 					{ /* record the back link */
-						if (jnl_options.filename_specified &&
-							!jnlname_same && (FILE_PRESENT & new_stat_res))
+#						ifdef VMS
+						if (!jnlname_same && (FILE_PRESENT & new_stat_res))
 						{
 							gtm_putmsg(VARLSTCNT(4) ERR_FILEEXISTS, 2, jnl_info.jnl_len, jnl_info.jnl);
 							gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 							exit_status |= EXIT_ERR;
 							break;
 						}
-						/* Save journal link */
-						jnl_info.prev_jnl_len = csd->jnl_file_len;
-						memcpy(prev_jnl_fn, csd->jnl_file_name, jnl_info.prev_jnl_len);
-						prev_jnl_fn[jnl_info.prev_jnl_len] = '\0';
-						jnl_info.no_prev_link = FALSE;
+#						endif
+						if (keep_prev_link)
+						{	/* Save journal link */
+							jnl_info.prev_jnl_len = csd->jnl_file_len;
+							memcpy(prev_jnl_fn, csd->jnl_file_name, jnl_info.prev_jnl_len);
+							prev_jnl_fn[jnl_info.prev_jnl_len] = '\0';
+							jnl_info.no_prev_link = FALSE;
+						}
 					}
 				}
 				if ((jnl_closed == jnl_curr_state) && (NULL != cs_addrs->nl))
@@ -633,11 +728,13 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				gtm_putmsg(VARLSTCNT(10) ERR_JNLCREATE, 8, jnl_info.jnl_len, jnl_info.jnl,
 					db_or_reg_len, db_or_reg, db_reg_name_len, db_reg_name,
 					LEN_AND_STR(before_image_lit[(jnl_info.before_images ? 1 : 0)]));
-				if ((!curr_jnl_present && jnl_open == jnl_curr_state) ||
-						(curr_jnl_present && jnl_info.no_prev_link) || this_iter_prevlinkcut_error)
+				if ((!curr_jnl_present && (jnl_open == jnl_curr_state))
+					|| (curr_jnl_present && jnl_info.no_prev_link) || this_iter_prevlinkcut_error)
 				{
-					gtm_putmsg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
-					send_msg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+					gtm_putmsg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4,
+						jnl_info.jnl_len, jnl_info.jnl, DB_LEN_STR(gv_cur_region));
+					send_msg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4,
+						jnl_info.jnl_len, jnl_info.jnl, DB_LEN_STR(gv_cur_region));
 				}
                         }
 			/* Following jnl_before_image, jnl_state, repl_state are unique charecteristics per region */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,23 +37,24 @@ GBLREF io_pair			io_curr_device, io_std_device;
 GBLREF va_list			last_va_list_ptr;	/* set by util_format */
 #endif
 
+error_def(ERR_ACTLSTTOOLONG);
+error_def(ERR_BADCASECODE);
+error_def(ERR_BADCHAR);
+error_def(ERR_BADCHSET);
+error_def(ERR_CEBIGSKIP);
+error_def(ERR_CENOINDIR);
+error_def(ERR_CETOOLONG);
+error_def(ERR_CETOOMANY);
+error_def(ERR_CEUSRERROR);
+error_def(ERR_FMLLSTMISSING);
+error_def(ERR_FMLLSTPRESENT);
+error_def(ERR_FOROFLOW);
+error_def(ERR_INVCMD);
+error_def(ERR_INVDLRCVAL);
+error_def(ERR_LABELMISSING);
 error_def(ERR_SRCLIN);
 error_def(ERR_SRCLOC);
 error_def(ERR_SRCNAM);
-error_def(ERR_LABELMISSING);
-error_def(ERR_FMLLSTPRESENT);
-error_def(ERR_FMLLSTMISSING);
-error_def(ERR_FOROFLOW);
-error_def(ERR_ACTLSTTOOLONG);
-error_def(ERR_BADCHSET);
-error_def(ERR_BADCASECODE);
-error_def(ERR_INVDLRCVAL);
-error_def(ERR_CETOOMANY);
-error_def(ERR_CEUSRERROR);
-error_def(ERR_CEBIGSKIP);
-error_def(ERR_CETOOLONG);
-error_def(ERR_CENOINDIR);
-error_def(ERR_BADCHAR);
 
 void stx_error(int in_error, ...)
 {
@@ -71,12 +72,13 @@ void stx_error(int in_error, ...)
 	va_start(args, in_error);
 	/* In case of a IS_STX_WARN type of parsing error, we resume parsing so it is important NOT to reset
 	 * the following global variables
-	 * 	a) shift_side_effects
-	 *	b) source_error_found
+	 * 	a) saw_side_effect
+	 * 	b) shift_side_effects
+	 *	c) source_error_found
 	 */
 	is_stx_warn = (CGP_PARSE == cg_phase) && IS_STX_WARN(in_error) GTMTRIG_ONLY( && !TREF(trigger_compile));
 	if (!is_stx_warn)
-		TREF(shift_side_effects) = FALSE;
+		TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;
 	if (run_time)
 	{	/* If the current error is of type STX_WARN then do not issue an error at compile time. Insert
 		 * triple to issue the error at runtime. If and when this codepath is reached at runtime (M command
@@ -101,11 +103,10 @@ void stx_error(int in_error, ...)
 			va_end(args);
 			rts_error(VARLSTCNT(6) in_error, cnt, arg1, arg2, arg3, arg4);
 		} else if ((ERR_LABELMISSING == in_error)
-				|| (ERR_FMLLSTPRESENT == in_error)
-				|| (ERR_FMLLSTMISSING == in_error)
-				|| (ERR_ACTLSTTOOLONG == in_error)
-				|| (ERR_BADCHSET == in_error)
-				|| (ERR_BADCASECODE == in_error))
+			|| (ERR_FMLLSTMISSING == in_error)
+			|| (ERR_ACTLSTTOOLONG == in_error)
+			|| (ERR_BADCHSET == in_error)
+			|| (ERR_BADCASECODE == in_error))
 		{
 			cnt = va_arg(args, VA_ARG_TYPE);
 			assert(cnt == 2);
@@ -125,7 +126,7 @@ void stx_error(int in_error, ...)
 			va_end(args);
 			rts_error(VARLSTCNT(1) in_error);
 		}
-	} else if (CGP_PARSE == cg_phase)
+	} else if (CGP_PARSE == cg_phase && ERR_INVCMD != in_error)
 		ins_errtriple(in_error);
 	assert(!run_time);	/* From here on down, should never go ahead with printing compile-error while in run_time */
 	flush_pio();
@@ -141,7 +142,7 @@ void stx_error(int in_error, ...)
 		&& (ERR_CETOOLONG != in_error)
 		&& (ERR_CENOINDIR != in_error))
 	{
-		TREF(source_error_found) = (int4 )in_error;
+		TREF(source_error_found) = (int4)in_error;
 	}
 	list = (cmd_qlf.qlf & CQ_LIST) != 0;
 	warn = (cmd_qlf.qlf & CQ_WARNINGS) != 0;
@@ -150,7 +151,7 @@ void stx_error(int in_error, ...)
 		va_end(args);
 		return;
 	}
-	if (list && io_curr_device.out == io_std_device.out)
+	if (list && (io_curr_device.out == io_std_device.out))
 		warn = FALSE;		/* if listing is going to $P, don't double output */
 	if (ERR_BADCHAR == in_error)
 	{
@@ -171,11 +172,10 @@ void stx_error(int in_error, ...)
 			list_line(buf);
 		arg1 = arg2 = arg3 = arg4 = 0;
 	} else if ((ERR_LABELMISSING == in_error)
-			|| (ERR_FMLLSTPRESENT == in_error)
-			|| (ERR_FMLLSTMISSING == in_error)
-			|| (ERR_ACTLSTTOOLONG == in_error)
-			|| (ERR_BADCHSET == in_error)
-			|| (ERR_BADCASECODE == in_error))
+		|| (ERR_FMLLSTMISSING == in_error)
+		|| (ERR_ACTLSTTOOLONG == in_error)
+		|| (ERR_BADCHSET == in_error)
+		|| (ERR_BADCASECODE == in_error))
 	{
 		cnt = va_arg(args, VA_ARG_TYPE);
 		assert(cnt == 2);

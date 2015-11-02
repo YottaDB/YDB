@@ -20,19 +20,17 @@
 #include "cmd.h"
 
 GBLREF	boolean_t	run_time;
-GBLREF	char		window_token;
 
 error_def(ERR_ACTOFFSET);
 
 int m_do(void)
 {
-	triple		tmpchain, *oldchain, *obp, *ref0, *tripsize,
-			*triptr, *ref1, *calltrip, *routineref, *labelref;
 	oprtype		*cr;
+	triple		*calltrip, *labelref, *obp, *oldchain, *ref0, *ref1, *routineref, tmpchain, *triptr, *tripsize;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if ((TK_SPACE == window_token) || (TK_EOL == window_token))
+	if ((TK_SPACE == TREF(window_token)) || (TK_EOL == TREF(window_token)))
 	{
 		if (!run_time)	/* DO SP SP is a noop at run time */
 		{
@@ -41,7 +39,7 @@ int m_do(void)
 			calltrip->operand[1] = put_ocnt();
 		}
 		return TRUE;
-	} else if (TK_AMPERSAND == window_token)
+	} else if (TK_AMPERSAND == TREF(window_token))
 	{
 		if (!extern_func(0))
 			return FALSE;
@@ -54,7 +52,7 @@ int m_do(void)
 	setcurtchain(oldchain);
 	if (!calltrip)
 		return FALSE;
-	if (TK_LPAREN == window_token)
+	if (TK_LPAREN == TREF(window_token))
 	{
 		if (OC_CALL == calltrip->opcode)
 		{
@@ -128,11 +126,11 @@ int m_do(void)
 				calltrip->opcode = OC_FORLCLDO;
 		}
 	}
-	if (TK_COLON == window_token)
+	if (TK_COLON == TREF(window_token))
 	{
 		advancewindow();
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
-		if (!bool_expr((bool) FALSE, cr))
+		if (!bool_expr(FALSE, cr))
 			return FALSE;
 		if (TREF(expr_start) != TREF(expr_start_orig))
 		{

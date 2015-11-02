@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,19 +64,18 @@ GBLREF	boolean_t		pool_init;
 
 int gtmrecv_endupd(void)
 {
-	VMS_ONLY(uint4	savepid;) UNIX_ONLY(pid_t savepid;)
+	pid_t 		savepid;
 	int		exit_status;
-	UNIX_ONLY(pid_t	waitpid_res;)
+	pid_t		waitpid_res;
 
 	repl_log(stdout, TRUE, TRUE, "Initiating shut down of Update Process\n");
 	recvpool.upd_proc_local->upd_proc_shutdown = SHUTDOWN;
 	/* Wait for update process to shut down */
-	while(recvpool.upd_proc_local->upd_proc_shutdown == SHUTDOWN &&
-	      (savepid = UNIX_ONLY((pid_t))recvpool.upd_proc_local->upd_proc_pid) > 0 &&
-	      is_proc_alive(savepid, 0))
+	while((SHUTDOWN == recvpool.upd_proc_local->upd_proc_shutdown)
+		&& (0 < (savepid = (pid_t)recvpool.upd_proc_local->upd_proc_pid)) && is_proc_alive(savepid, 0))
 	{
 		SHORT_SLEEP(GTMRECV_WAIT_FOR_UPD_SHUTDOWN);
-		UNIX_ONLY(WAITPID(savepid, &exit_status, WNOHANG, waitpid_res);) /* Release defunct update process if dead */
+		WAITPID(savepid, &exit_status, WNOHANG, waitpid_res); /* Release defunct update process if dead */
 	}
 	exit_status = recvpool.upd_proc_local->upd_proc_shutdown;
 	if (SHUTDOWN == exit_status)
@@ -105,35 +104,22 @@ int gtmrecv_endupd(void)
 
 int gtmrecv_end1(boolean_t auto_shutdown)
 {
-	uint4		savepid;
-	int		exit_status;
-	seq_num		log_seqno, log_seqno1;
+	int4		strm_idx;
+	int		exit_status, idx;
 	int		fclose_res, rc;
-#ifdef VMS
-	int4		status;
-#endif
+	seq_num		log_seqno, log_seqno1, jnlpool_seqno, jnlpool_strm_seqno[MAX_SUPPL_STRMS];
+	uint4		savepid;
 
 	exit_status = gtmrecv_end_helpers(TRUE);
 	exit_status = gtmrecv_endupd();
-	QWASSIGN(log_seqno, recvpool.recvpool_ctl->jnl_seqno);
-	QWASSIGN(log_seqno1, recvpool.upd_proc_local->read_jnl_seqno);
+	log_seqno = recvpool.recvpool_ctl->jnl_seqno;
+	log_seqno1 = recvpool.upd_proc_local->read_jnl_seqno;
+	strm_idx = recvpool.gtmrecv_local->strm_index;
 	/* Detach from receive pool */
 	recvpool.gtmrecv_local->shutdown = exit_status;
 	recvpool.gtmrecv_local->recv_serv_pid = 0;
-	UNIX_ONLY(
-		if (recvpool.recvpool_ctl && 0 > SHMDT(recvpool.recvpool_ctl))
-			repl_log(stderr, TRUE, TRUE, "Error detaching from Receive Pool : %s\n", REPL_STR_ERROR);
-	)
-	VMS_ONLY(
-		if (recvpool.recvpool_ctl)
-		{
-			if (SS$_NORMAL != (status = detach_shm(recvpool.shm_range)))
-				repl_log(stderr, TRUE, TRUE, "Error detaching from recvpool : %s\n", REPL_STR_ERROR);
-			if (!auto_shutdown && (SS$_NORMAL != (status = signoff_from_gsec(recvpool.shm_lockid))))
-				repl_log(stderr, TRUE, TRUE, "Error dequeueing lock on recvpool global section : %s\n",
-														REPL_STR_ERROR);
-		}
-	)
+	if (recvpool.recvpool_ctl && 0 > SHMDT(recvpool.recvpool_ctl))
+		repl_log(stderr, TRUE, TRUE, "Error detaching from Receive Pool : %s\n", REPL_STR_ERROR);
 	recvpool.recvpool_ctl = NULL;
 	assert((NULL != jnlpool_ctl) && (jnlpool_ctl == jnlpool.jnlpool_ctl));
 	if (NULL != jnlpool.jnlpool_ctl)
@@ -142,18 +128,18 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 		 * only process updating those fields.
 		 */
 		jnlpool.jnlpool_ctl->primary_instname[0] = '\0';
-		jnlpool.jnlpool_ctl->primary_is_dualsite = FALSE;
 		jnlpool.jnlpool_ctl->gtmrecv_pid = 0;
+		jnlpool_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
+		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+			jnlpool_strm_seqno[idx] = jnlpool.jnlpool_ctl->strm_seqno[idx];
 		/* Also take this opportunity to detach from the journal pool except in the auto_shutdown case. This is because
 		 * the fields "jnlpool_ctl->repl_inst_filehdr->recvpool_semid" and "jnlpool_ctl->repl_inst_filehdr->recvpool_shmid"
 		 * need to be reset by "gtmrecv_jnlpool_reset" (called from "gtmrecv_shutdown") which is invoked a little later.
 		 */
 		if (!auto_shutdown)
 		{
-			UNIX_ONLY(
-				if (0 > SHMDT(jnlpool.jnlpool_ctl))
-					repl_log(stderr, TRUE, TRUE, "Error detaching from Journal Pool : %s\n", REPL_STR_ERROR);
-			)
+			if (0 > SHMDT(jnlpool.jnlpool_ctl))
+				repl_log(stderr, TRUE, TRUE, "Error detaching from Journal Pool : %s\n", REPL_STR_ERROR);
 			jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
 			jnlpool.repl_inst_filehdr = NULL;
 			jnlpool.gtmsrc_lcl_array = NULL;
@@ -161,7 +147,8 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 			jnlpool.jnldata_base = NULL;
 			pool_init = FALSE;
 		}
-	}
+	} else
+		jnlpool_seqno = 0;
 	gtmrecv_free_msgbuff();
 	gtmrecv_free_filter_buff();
 	recvpool.recvpool_ctl = NULL;
@@ -170,11 +157,25 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 	if (FD_INVALID != gtmrecv_sock_fd)
 		CLOSEFILE_RESET(gtmrecv_sock_fd, rc);	/* resets "gtmrecv_sock_fd" to FD_INVALID */
-	QWDECRBYDW(log_seqno, 1);
-	QWDECRBYDW(log_seqno1, 1);
-	repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Last recvd tr num : %llu  Tr Total : %llu  Msg Total : %llu\n",
+	repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Current Jnlpool Seqno : %llu\n", jnlpool_seqno);
+	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+	{
+		if (jnlpool_strm_seqno[idx])
+			repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Stream # %d : Current Jnlpool Stream Seqno : %llu\n",
+				idx, jnlpool_strm_seqno[idx]);
+	}
+	if (0 < strm_idx)
+		repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Receiver server has Stream # %d\n", strm_idx);
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Current Update process Read Seqno : %llu\n", log_seqno1);
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n", log_seqno);
+	/* If log_seqno/log_seqno1 is 0, then do not decrement it as that will be interpreted as a huge positive seqno. Keep it 0 */
+	if (log_seqno)
+		log_seqno--;
+	if (log_seqno1)
+		log_seqno1--;
+	repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Last Recvd Seqno : %llu  Jnl Total : %llu  Msg Total : %llu\n",
 			log_seqno, repl_recv_data_processed, repl_recv_data_recvd);
-	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Last tr num processed by update process : %llu\n", log_seqno1);
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Last Seqno processed by update process : %llu\n", log_seqno1);
 	gtm_event_log_close();
 	if (gtmrecv_filter & EXTERNAL_FILTER)
 		repl_stop_filter();

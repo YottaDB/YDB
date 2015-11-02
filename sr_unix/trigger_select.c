@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,9 +47,12 @@
 #include "hashtab_int4.h"		/* needed for tp.h */
 #include "jnl.h"			/* needed for tp.h */
 #include "tp.h"
+#include "t_retry.h"
 #include "io_params.h"
 #include "min_max.h"			/* Needed for MIN */
 #include "gtmimagename.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -145,7 +148,12 @@ LITREF	char 			*trigger_subs[];
 	select_status = TRIG_FAILURE;							\
 }
 
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUPCLIERR);
 error_def(ERR_TRIGDEFBAD);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_MUNOACTION);
+
 
 STATICDEF char *triggerfile_quals[] = {"-name=", "", "-commands=", "-options=", "-delim=", "-zdelim=", "-pieces=", "-xecute="};
 
@@ -218,9 +226,14 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 		BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL));
 		if (!gvcst_get(&trigger_value))
 		{	/* There has to be a #LABEL */
-			assert(FALSE);
-			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len, gbl_name, gbl_name_len, gbl_name,
-				LEN_AND_LIT("\"#LABEL\""));
+			if (CDB_STAGNATE > t_tries)
+				t_retry(cdb_sc_triggermod);
+			else
+			{
+				assert(FALSE);
+				rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len, gbl_name, gbl_name_len, gbl_name,
+					LEN_AND_LIT("\"#LABEL\""));
+			}
 		}
 		skip_chars = 1;
 		if ((trigger_value.str.len != STRLEN(HASHT_GBL_CURLABEL))
@@ -235,9 +248,14 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 		BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHCYCLE, LITERAL_HASHCYCLE_LEN);
 		if (!gvcst_get(&trigger_value))
 		{	/* There has to be a #CYCLE */
-			assert(FALSE);
-			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len, gbl_name, gbl_name_len, gbl_name,
-				LEN_AND_LIT("\"#CYCLE\""));
+			if (CDB_STAGNATE > t_tries)
+				t_retry(cdb_sc_triggermod);
+			else
+			{
+				assert(FALSE);
+				rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len, gbl_name, gbl_name_len, gbl_name,
+					LEN_AND_LIT("\"#CYCLE\""));
+			}
 		}
 		assert(MAX_DIGITS_IN_INT >= trigger_value.str.len);
 		memcpy(cycle, trigger_value.str.addr, trigger_value.str.len);
@@ -564,9 +582,6 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 	};
 	static readonly unsigned char	no_param = (unsigned char)iop_eol;
 
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_MUNOACTION);
-
 	/* make a local copy of the select list and use it to avoid string-pool problems */
 	if (MAX_BUFF_SIZE <= select_list_len)
 		return TRIG_FAILURE;
@@ -584,7 +599,7 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 		if (IS_MUPIP_IMAGE)
 		{
 			PRINTF("\n");
-			fflush(NULL);
+			FFLUSH(NULL);
 			op_val.str.len = io_std_device.out->trans_name->len;
 			op_val.str.addr = io_std_device.out->trans_name->dollar_io;
 		} else

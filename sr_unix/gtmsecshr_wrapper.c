@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
  */
 #undef malloc
 #include "gtm_unistd.h"
+#include "gtm_stat.h"
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
@@ -24,6 +25,7 @@
 #ifndef __MVS__
 #include <malloc.h>
 #endif
+#include <errno.h>
 
 #define ROOTUID 0
 #define ROOTGID 0
@@ -42,7 +44,9 @@
 #define GTM_ZOS_AUTOCVT_ON "ON"
 #endif
 
-#define SUB_PATH_TO_GTMSECSHR "/gtmsecshrdir/gtmsecshr"
+#define	SUB_PATH_TO_GTMSECSHRDIR "/gtmsecshrdir"
+#define	REL_PATH_TO_CURDIR "."
+#define	REL_PATH_TO_GTMSECSHR "./gtmsecshr"
 #define	GTMSECSHR_BASENAME "/gtmsecshr"
 
 #ifdef __osf__
@@ -133,11 +137,14 @@ int main()
 {
 	int ret, status;
 	char * env_var_ptr;
+	struct stat gtm_secshrdir_stat;
+	struct stat gtm_secshr_stat;
 
 	char gtm_dist_val[MAX_ENV_VAR_VAL_LEN];
 	char gtm_log_val[MAX_ENV_VAR_VAL_LEN];
 	char gtm_tmp_val[MAX_ENV_VAR_VAL_LEN];
 	char gtm_dbglvl_val[MAX_ENV_VAR_VAL_LEN];
+	char gtm_secshrdir_path[MAX_ENV_VAR_VAL_LEN];
 	char gtm_secshr_path[MAX_ENV_VAR_VAL_LEN];
 	char gtm_secshr_orig_path[MAX_ENV_VAR_VAL_LEN];
 
@@ -152,16 +159,21 @@ int main()
 	/* get the ones we need */
 	if (env_var_ptr = getenv(GTM_DIST))
 	{
-		if ((MAX_ALLOWABLE_LEN < strlen(env_var_ptr) + strlen(SUB_PATH_TO_GTMSECSHR)))
+		if (MAX_ALLOWABLE_LEN < strlen(env_var_ptr) + STR_LIT_LEN(SUB_PATH_TO_GTMSECSHRDIR) +
+					  STR_LIT_LEN(GTMSECSHR_BASENAME))
 		{
 			syslog(LOG_USER | LOG_INFO, "gtm_dist env var too long. gtmsecshr will not be started.\n");
 			ret = -1;
 		} else
 		{
 			strcpy(gtm_dist_val,env_var_ptr);
-			/* point the path to the real gtmsecshr */
+			/* point the path to the real gtmsecshr - for display purposes only */
 			strcpy(gtm_secshr_path, env_var_ptr);
-			strcat(gtm_secshr_path, SUB_PATH_TO_GTMSECSHR);
+			strcat(gtm_secshr_path, SUB_PATH_TO_GTMSECSHRDIR);
+			strcat(gtm_secshr_path, GTMSECSHR_BASENAME);
+			/* point the path to the real gtmsecshrdir */
+			strcpy(gtm_secshrdir_path, env_var_ptr);
+			strcat(gtm_secshrdir_path, SUB_PATH_TO_GTMSECSHRDIR);
 		}
 	} else
 	{
@@ -271,13 +283,33 @@ int main()
 
 	if (!ret)
 	{	/* go to root */
-		if (-1 == setuid(ROOTUID))
+		if (-1 == CHDIR(gtm_secshrdir_path))
+			syslog(LOG_USER | LOG_INFO, "chdir failed on %s, errno %d. gtmsecshr will not be started.\n",
+				gtm_secshrdir_path, errno);
+		else if (-1 == Stat(REL_PATH_TO_CURDIR, &gtm_secshrdir_stat))
+			syslog(LOG_USER | LOG_INFO, "stat failed on %s, errno %d. gtmsecshr will not be started.\n",
+				gtm_secshrdir_path, errno);
+		else if (ROOTUID != gtm_secshrdir_stat.st_uid)
+			syslog(LOG_USER | LOG_INFO, "%s not owned by root. gtmsecshr will not be started.\n", gtm_secshrdir_path);
+		else if (gtm_secshrdir_stat.st_mode & 0277)
+			syslog(LOG_USER | LOG_INFO, "%s permissions incorrect (%04o). gtmsecshr will not be started.\n",
+				gtm_secshrdir_path, gtm_secshrdir_stat.st_mode & 0777);
+		else if (-1 == Stat(REL_PATH_TO_GTMSECSHR, &gtm_secshr_stat))
+			syslog(LOG_USER | LOG_INFO, "stat failed on %s, errno %d. gtmsecshr will not be started.\n",
+				gtm_secshr_path, errno);
+		else if (ROOTUID != gtm_secshr_stat.st_uid)
+			syslog(LOG_USER | LOG_INFO, "%s not owned by root. gtmsecshr will not be started.\n", gtm_secshr_path);
+		else if (gtm_secshr_stat.st_mode & 022)
+			syslog(LOG_USER | LOG_INFO, "%s writable. gtmsecshr will not be started.\n", gtm_secshr_path);
+		else if (!(gtm_secshr_stat.st_mode & 04000))
+			syslog(LOG_USER | LOG_INFO, "%s not set-uid. gtmsecshr will not be started.\n", gtm_secshr_path);
+		else if (-1 == setuid(ROOTUID))
 			syslog(LOG_USER | LOG_INFO, "setuid failed. gtmsecshr will not be started.\n");
 		else
 		{	/* call the real gtmsecshr, but have ps display the original gtmsecshr location */
 			strcpy(gtm_secshr_orig_path, gtm_dist_val);
 			strcat(gtm_secshr_orig_path, GTMSECSHR_BASENAME);
-			ret = execl(gtm_secshr_path, gtm_secshr_orig_path, NULL);
+			ret = execl(REL_PATH_TO_GTMSECSHR, gtm_secshr_orig_path, NULL);
 			if (-1 == ret)
 				syslog(LOG_USER | LOG_INFO, "execl of %s failed\n", gtm_secshr_path);
 		}

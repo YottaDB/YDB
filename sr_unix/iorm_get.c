@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@
 #include "stringpool.h"
 #include "gt_timer.h"
 #include "gtmio.h"
+#include "have_crit.h"
 #include "eintr_wrappers.h"
 #include "wake_alarm.h"
 #include "min_max.h"
@@ -40,6 +41,10 @@ GBLREF  boolean_t       gtm_utf8_mode;
 GBLREF	volatile int4	outofband;
 LITREF	mstr		chset_names[];
 
+error_def(ERR_BOMMISMATCH);
+error_def(ERR_IOEOF);
+error_def(ERR_SYSCALL);
+
 /*	check initial len bytes of buffer for a BOM
  *	if CHSET_UTF16, set ichset to BOM or BE if no BOM
  *	return the number of bytes to skip
@@ -47,7 +52,6 @@ LITREF	mstr		chset_names[];
 int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, int len)
 {
 	int	bom_bytes = 0;
-	error_def(ERR_BOMMISMATCH);
 
 	switch (*chset)
 	{
@@ -108,8 +112,6 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 	d_rm_struct	*rm_ptr;
 	int		fildes;
 	boolean_t	pipe_or_fifo = FALSE;
-
-	error_def(ERR_SYSCALL);
 
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	if (rm_ptr->pipe || rm_ptr->fifo)
@@ -215,9 +217,6 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 	gtm_chset_t	chset;
 	int		fildes;
 	boolean_t	pipe_or_fifo = FALSE;
-
-	error_def(ERR_IOEOF);
-	error_def(ERR_SYSCALL);
 
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);

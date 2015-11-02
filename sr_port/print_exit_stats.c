@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,8 @@
 #include "gtm_malloc.h"
 #include "gtm_text_alloc.h"
 #include "mmemory.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 GBLREF	uint4		gtmDebugLevel;		/* Debug level (0 = using default sm module so with
 						 * a DEBUG build, even level 0 implies basic debugging).

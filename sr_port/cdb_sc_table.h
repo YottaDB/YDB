@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2003, 2010 Fidelity Information Services, Inc        *
+ *      Copyright 2003, 2012 Fidelity Information Services, Inc        *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -92,3 +92,7 @@ CDB_SC_LCHAR_ENTRY(cdb_sc_crbtmismatch,     TRUE,  'k') /* 'k'  cr->blk and bt->
 CDB_SC_LCHAR_ENTRY(cdb_sc_phase2waitfail,   TRUE,  'l') /* 'l'  wcs_phase2_commit_wait timed out when called from t_qread */
 CDB_SC_LCHAR_ENTRY(cdb_sc_inhibitkills,     FALSE, 'm') /* 'm'  t_end/tp_tend found inhibit_kills counter greater than zero */
 CDB_SC_LCHAR_ENTRY(cdb_sc_triggermod,       FALSE, 'n') /* 'n'  csd->db_trigger_cycle changed since start of of transaction */
+CDB_SC_LCHAR_ENTRY(cdb_sc_onln_rlbk1,       FALSE, 'o') /* 'o'  csa->onln_rlbk_cycle changed since start of transaction */
+CDB_SC_LCHAR_ENTRY(cdb_sc_onln_rlbk2,       FALSE, 'p') /* 'p'  csa->db_onln_rlbkd_cycle changed since start of transaction */
+CDB_SC_LCHAR_ENTRY(cdb_sc_truncate,         FALSE, 'q') /* 'q'  t_end or tp_tend (bg) - found the database truncated where it wanted to allocate blocks */
+CDB_SC_LCHAR_ENTRY(cdb_sc_gvtrootmod,       FALSE, 'r') /* 'r'  gvcst_kill found a need to redo the gvcst_root_search */

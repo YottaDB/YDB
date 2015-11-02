@@ -88,7 +88,7 @@ void dse_dmp_fhead (void)
 {
 	boolean_t		jnl_buff_open;
 	unsigned char		util_buff[MAX_UTIL_LEN], buffer[MAXNUMLEN];
-	int			util_len, rectype, time_len, index, idx;
+	int			util_len, rectype, time_len, index;
 	uint4			jnl_status;
 	enum jnl_state_codes	jnl_state;
 	gds_file_id		zero_fid;
@@ -255,8 +255,7 @@ void dse_dmp_fhead (void)
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */
                 util_out_print(0, TRUE);
-		UNIX_ONLY(util_out_print("  Dualsite Resync Seqno  0x!16@XQ", FALSE, &csd->dualsite_resync_seqno);)
-		VMS_ONLY(util_out_print("                                           ", FALSE);)
+		util_out_print("                                           ", FALSE);
 		util_out_print("  DB Current Minor Version      !4UL", TRUE, csd->minor_dbver);
 		util_out_print("  Blks Last Record Backup        0x!XL", FALSE, csd->last_rec_bkup_last_blk);
 		util_out_print("  Last GT.M Minor Version       !4UL", TRUE, csd->last_mdb_ver);
@@ -299,6 +298,18 @@ void dse_dmp_fhead (void)
 		GET_HASH_IN_HEX(csd->encryption_hash, outbuf, GTMCRYPT_HASH_HEX_LEN);
 		util_out_print("  Database file encryption hash  !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
 	}
+#	ifdef UNIX
+	if (NEED_TO_DUMP("SUPPLEMENTARY"))
+	{
+                util_out_print(0, TRUE);
+		assert(MAX_SUPPL_STRMS == ARRAYSIZE(csd->strm_reg_seqno));
+		for (index = 0; index < MAX_SUPPL_STRMS; index++)
+		{
+			if (csd->strm_reg_seqno[index])
+				util_out_print("  Stream !2UL: Reg Seqno   0x!16@XQ", TRUE, index, &csd->strm_reg_seqno[index]);
+		}
+	}
+#	endif
 	if (NEED_TO_DUMP("ENVIRONMENT"))
 	{
                 util_out_print(0, TRUE);
@@ -398,22 +409,35 @@ void dse_dmp_fhead (void)
 		util_out_print("  jnl solid tn    0x!16@XQ", TRUE, &csd->jnl_eovtn);
 		for (rectype = JRT_BAD + 1; rectype < JRT_RECTYPES - 1; rectype++)
 		{
-			util_out_print("  Jnl Rec Type    !5AZ      !7UL      ", FALSE, jrt_label[rectype],
+			util_out_print("  Jnl Rec Type    !5AZ   0x!XL      ", FALSE, jrt_label[rectype],
 				jb->reccnt[rectype]);
 			rectype++;
-			util_out_print("  Jnl Rec Type    !5AZ      !7UL", TRUE, jrt_label[rectype], jb->reccnt[rectype]);
+			util_out_print("  Jnl Rec Type    !5AZ   0x!XL", TRUE, jrt_label[rectype], jb->reccnt[rectype]);
 		}
 		if (rectype != JRT_RECTYPES)
-			util_out_print("  Jnl Rec Type    !5AZ      !7UL", TRUE, jrt_label[rectype], jb->reccnt[rectype]);
+			util_out_print("  Jnl Rec Type    !5AZ   0x!XL", TRUE, jrt_label[rectype], jb->reccnt[rectype]);
 		util_out_print(0, TRUE);
 		util_out_print("  Recover interrupted          !AD", FALSE, 5, (csd->recov_interrupted ? " TRUE" : "FALSE"));
 		util_out_print("      ", FALSE);
 		util_out_print("  INTRPT resolve time   !12UL", TRUE, csd->intrpt_recov_tp_resolve_time);
-		util_out_print("  INTRPT seqno    0x!16@XQ", FALSE, &csd->intrpt_recov_resync_seqno);
+		util_out_print("  INTRPT jnl_state      !12UL", FALSE, csd->intrpt_recov_jnl_state);
 		util_out_print("      ", FALSE);
-		util_out_print("  INTRPT jnl_state      !12UL", TRUE, csd->intrpt_recov_jnl_state);
-		util_out_print("  INTRPT repl_state     !12UL", FALSE, csd->intrpt_recov_repl_state);
-		util_out_print(0, TRUE);
+		util_out_print("  INTRPT repl_state     !12UL", TRUE, csd->intrpt_recov_repl_state);
+		util_out_print("  INTRPT seqno    0x!16@XQ", TRUE, &csd->intrpt_recov_resync_seqno);
+		UNIX_ONLY(
+			for (index = 0; index < MAX_SUPPL_STRMS; index++)
+			{
+				if (csd->intrpt_recov_resync_strm_seqno[index])
+					util_out_print("  INTRPT strm_seqno :   Stream #  !2UL        Stream Seqno    0x!16@XQ",
+						TRUE, index, &csd->intrpt_recov_resync_strm_seqno[index]);
+			}
+			for (index = 0; index < MAX_SUPPL_STRMS; index++)
+			{
+				if (csd->intrpt_recov_resync_strm_seqno[index])
+					util_out_print("  SAVE   strm_seqno :   Stream #  !2UL        Region Seqno    0x!16@XQ",
+						TRUE, index, &csd->save_strm_reg_seqno[index]);
+			}
+		)
 	}
 	if (NEED_TO_DUMP("BACKUP"))
 	{

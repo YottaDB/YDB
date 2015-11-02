@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -210,7 +210,6 @@ endif
 helpfile_list:=$(filter %.hlp, $(allfiles_list))
 sh_list:=$(filter %.sh, $(allfiles_list))
 gtc_list:=$(filter %.gtc, $(allfiles_list))
-csh_files:=$(filter lower%.csh upper%.csh, $(allfiles_list))
 list_files:=$(filter %.list, $(allfiles_list))
 msgfile_list:=$(filter %.msg, $(allfiles_list))
 plugin_ksh_file:=$(filter %.ksh, $(allfiles_list))
@@ -319,7 +318,7 @@ ifdef gt_ar_gtmrpc_name
 gt_ar_gtmrpc_name_target=../lib$(gt_ar_gtmrpc_name).a
 endif
 
-postbuild=$(gt_ar_gtmrpc_name_target) dotcsh dotsh helpfiles hfiles gtcmconfig cpplugin_scripts cpplugin_file cpplugin_mfile\
+postbuild=$(gt_ar_gtmrpc_name_target) dotsh helpfiles hfiles gtcmconfig cpplugin_scripts cpplugin_file cpplugin_mfile\
 	../mumps.gld ../gtmhelp.dat ../gdehelp.dat build_plugin_lib
 
 all:	links mfiles mcompiles testit $(postbuild)
@@ -365,9 +364,6 @@ mcompiles:
 
 pluginbuild:
 	mkdir -p plugin/gtmcrypt; cp ../sr_unix/gtmcrypt_ref.h plugin/gtmcrypt/; cp ../sr_unix/gtmcrypt_ref.c plugin/gtmcrypt/;
-dotcsh: $(csh_files)
-	cp -f $^ ..
-	cd ..;chmod +x $(notdir $^)
 
 dotsh: $(sh_targets)
 	cp -f $^ ..
@@ -474,7 +470,7 @@ endif
 ../semstat2: $(semstat2_obj)
 	$(gt-ld)
 
-../ftok: $(ftok_obj)
+../ftok: $(ftok_obj) libmumps.a
 	$(gt-ld)
 
 # build GT.M shared library(libgtmshr) from PIC-compiled .o files

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,7 @@
 #include "hashtab_str.h"
 #include "compiler.h"
 #include "gt_timer.h"
+#include "have_crit.h"
 
 GBLREF	parmblk_struct 		*param_list;
 GBLREF  stack_frame     	*frame_pointer;
@@ -74,6 +75,15 @@ GBLREF  uint4			dollar_tlevel;
 GBLREF	int			process_exiting;
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 
+error_def(ERR_CALLINAFTERXIT);
+error_def(ERR_CIMAXLEVELS);
+error_def(ERR_CINOENTRY);
+error_def(ERR_CIRCALLNAME);
+error_def(ERR_CITPNESTED);
+error_def(ERR_INVGTMEXIT);
+error_def(ERR_MAXACTARG);
+error_def(ERR_MAXSTRLEN);
+
 static callin_entry_list* get_entry(const char* call_name)
 {	/* Lookup in a hashtable for entry corresponding to routine name */
 	ht_ent_str      *callin_entry;
@@ -88,14 +98,6 @@ static callin_entry_list* get_entry(const char* call_name)
 	return (callin_entry ? callin_entry->value : NULL);
 }
 
-error_def(ERR_CALLINAFTERXIT);
-error_def(ERR_CIMAXLEVELS);
-error_def(ERR_CINOENTRY);
-error_def(ERR_CIRCALLNAME);
-error_def(ERR_CITPNESTED);
-error_def(ERR_INVGTMEXIT);
-error_def(ERR_MAXSTRLEN);
-
 int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var)
 {
 	va_list			var;
@@ -103,9 +105,8 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	mstr			label, routine;
 	int			has_return, i;
 	rhdtyp          	*base_addr;
-	unsigned char   	*transfer_addr;
 	uint4			inp_mask, out_mask, mask;
-	uint4			label_offset, *lnr_entry;
+	uint4			*lnr_entry;
 	mval			arg_mval, *arg_ptr;
 	enum xc_types		arg_type;
 	gtm_string_t		*mstr_parm;
@@ -117,6 +118,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	boolean_t 		added;
 	stringkey       	symkey;
 	ht_ent_str		*syment;
+	intrpt_state_t		old_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -138,9 +140,9 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 			return status;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-	if (msp < fgncal_stack) /* unwind all arguments left on the stack by previous gtm_ci */
+	if (msp < fgncal_stack)	/* unwind all arguments left on the stack by previous gtm_ci */
 		fgncal_unwind();
-	if (!TREF(ci_table)) /* load the call-in table only once from env variable GTMCI  */
+	if (!TREF(ci_table))	/* load the call-in table only once from env variable GTMCI  */
 	{
 		TREF(ci_table) = citab_parse();
 		if (!TREF(callin_hashtab))
@@ -173,32 +175,35 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	} else
 		entry = callin_handle;
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
-	job_addr(&routine, &label, 0, (char **)&base_addr, (char **)&transfer_addr);
+	/* 3rd argument is NULL because we will get lnr_adr via lab_proxy */
+	job_addr(&routine, &label, 0, (char **)&base_addr, NULL);
 	memset(&param_blk, 0, SIZEOF(param_blk));
 	param_blk.rtnaddr = (void *)base_addr;
 	/* lnr_entry below is a pointer to the code offset for this label from the
 	 * beginning of text base(on USHBIN platforms) or from the beginning of routine
 	 * header (on NON_USHBIN platforms).
 	 * On NON_USHBIN platforms -- 2nd argument to EXTCALL is this pointer
-	 * On USHBIN -- 2nd argument to EXTCALL is the pointer to this pointer (&lnr_entry) */
-	lnr_entry = &label_offset;
-	*lnr_entry = (uint4)CODE_OFFSET(base_addr, transfer_addr);
-	param_blk.labaddr = USHBIN_ONLY(&)lnr_entry;
+	 * On USHBIN -- 2nd argument to EXTCALL is the pointer to this pointer (&lnr_entry)
+	 */
+	/* Assign the address for line number entry storage, so that the adjacent address holds has_parms value. */
+	param_blk.labaddr = &(TREF(lab_proxy)).LABENT_LNR_OFFSET;
 	param_blk.argcnt = entry->argcnt;
+	if (MAX_ACTUALS < param_blk.argcnt)
+		rts_error(VARLSTCNT(1) ERR_MAXACTARG);
 	has_return = (xc_void == entry->return_type) ? 0 : 1;
 	if (has_return)
-	{	/* create mval slot for return value */
+	{	/* Create mval slot for return value */
 		param_blk.retaddr = (void *)push_lvval(&arg_mval);
 		va_arg(var, void *);	/* advance va_arg */
 	} else
 		param_blk.retaddr = 0;
 	inp_mask = entry->input_mask;
 	out_mask = entry->output_mask;
-	for (i=0, mask = ~inp_mask; i < entry->argcnt; ++i, mask>>=1)
-	{	/* copy pass-by-value arguments - since only first MAXIMUM_PARAMETERS could be O/IO,
-		   any additional params will be treated as Input-only (I).
-		   inp_mask is inversed to achieve this.
-		*/
+	for (i = 0, mask = ~inp_mask; i < entry->argcnt; ++i, mask >>= 1)
+	{	/* Copy pass-by-value arguments - since only first MAX_ACTUALS could be O/IO,
+		 * any additional params will be treated as Input-only (I).
+		 * inp_mask is inversed to achieve this.
+		 */
 		arg_mval.mvtype = MV_XZERO;
 		if (mask & 1)
 		{ 	/* output-only(O) params : advance va_arg pointer */
@@ -259,10 +264,18 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
                                         i2usmval(&arg_mval, va_arg(var, gtm_uint_t));
                                         break;
 				case xc_long:
+#ifdef GTM64
+					l2mval(&arg_mval, (long)va_arg(var, gtm_long_t));
+#else
 					i2mval(&arg_mval, (int)va_arg(var, gtm_long_t));
+#endif
 					break;
 				case xc_ulong:
+#ifdef GTM64
+					ul2mval(&arg_mval, (unsigned long)va_arg(var, gtm_ulong_t));
+#else
 					i2usmval(&arg_mval, (int)va_arg(var, gtm_ulong_t));
+#endif
 					break;
                                 case xc_int_star:
                                         i2mval(&arg_mval, *va_arg(var, gtm_int_t *));
@@ -271,10 +284,18 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
                                         i2usmval(&arg_mval, *va_arg(var, gtm_uint_t *));
                                         break;
 				case xc_long_star:
+#ifdef GTM64
+					l2mval(&arg_mval, (long)*va_arg(var, gtm_long_t *));
+#else
 					i2mval(&arg_mval, (int)*va_arg(var, gtm_long_t *));
+#endif
 					break;
 				case xc_ulong_star:
+#ifdef GTM64
+					ul2mval(&arg_mval, (unsigned long)*va_arg(var, gtm_ulong_t *));
+#else
 					i2usmval(&arg_mval, (int)*va_arg(var, gtm_ulong_t *));
+#endif
 					break;
 				case xc_float: /* fall through */
 				case xc_double:
@@ -322,9 +343,12 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		? (void (*)())CODE_ADDRESS_TYPE(op_extcall)
 		: (void (*)())CODE_ADDRESS_TYPE(op_extexfun);
 	/* the params block needs to be stored & restored across multiple
-	   gtm environments. So instead of storing explicitely, setting the
-	   global param_list to point to local param_blk will do the job */
+	 * gtm environments. So instead of storing explicitely, setting the
+	 * global param_list to point to local param_blk will do the job
+	 */
 	param_list = &param_blk;
+	old_intrpt_state = intrpt_ok_state;
+	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT; /* reset interrupt state for the new M session */
 	save_var_on_cstack_ptr = var_on_cstack_ptr;
 	var_on_cstack_ptr = NULL; /* reset var_on_cstack_ptr for the new M environment */
 	assert(frame_pointer->flags & SFF_CI);
@@ -335,17 +359,18 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	dm_start(); /* kick off execution */
 	REVERT;
 
+	intrpt_ok_state = old_intrpt_state; /* restore the old interrupt state */
 	var_on_cstack_ptr = save_var_on_cstack_ptr; /* restore the old environment's var_on_cstack_ptr */
 	if (1 != mumps_status)
 	{	/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
-		   it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
-		   or zero on returning from ZGOTO 0 (ci_ret_code_quit)
-		*/
+		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
+		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit)
+		 */
 		return mumps_status;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	/* convert mval args passed by reference to C types */
-	for (i=0; i <= entry->argcnt; ++i)
+	for (i = 0; i <= entry->argcnt; ++i)
 	{
 		if (0 == i) /* special case for return value */
 		{
@@ -356,13 +381,14 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 			arg_type = entry->return_type;
 		} else
 		{
-			arg_ptr = &param_blk.args[i-1]->v;
+			arg_ptr = &param_blk.args[i - 1]->v;
 			mask = out_mask;
-			arg_type = entry->parms[i-1];
+			arg_type = entry->parms[i - 1];
 			out_mask >>= 1;
 		}
 		/* Do not process parameters that are either input-only(I) or output(O/IO)
-		 * parameters that are not modified by the M routine. */
+		 * parameters that are not modified by the M routine.
+		 */
 		if (!(mask & 1) || !MV_DEFINED(arg_ptr))
 		{
 			switch (arg_type)
@@ -411,7 +437,6 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 					va_end(temp_var);
 					GTMASSERT;
 			}
-
 		} else
 		{	/* Process all output (O/IO) parameters modified by the M routine */
 			switch (arg_type)
@@ -504,7 +529,8 @@ int gtm_init()
 		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,
-		 * the unwind logic in gtmci_ch() will get rid of the whole stack. */
+		 * the unwind logic in gtmci_ch() will get rid of the whole stack.
+		 */
 		msp = (unsigned char *)-1L;
 		GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
 	}
@@ -518,16 +544,18 @@ int gtm_init()
 		assert(frame_pointer->flags & SFF_CI);
 		TREF(gtmci_nested_level) = 1;
 	} else if (!(frame_pointer->flags & SFF_CI))
-	{	/* Nested call-in: setup a new CI environment (SFF_CI frame on top of base-frame) */
-		/* Mark the beginning of the new stack so that initialization errors in
-		 * call-in frame do not unwind entries of the previous stack (see gtmci_ch).*/
+	{	/* Nested call-in: setup a new CI environment (SFF_CI frame on top of base-frame).
+		 * Mark the beginning of the new stack so that initialization errors in
+		 * call-in frame do not unwind entries of the previous stack (see gtmci_ch).
+		 */
 		fgncal_stack = msp;
 		/* generate CIMAXLEVELS error if gtmci_nested_level > CALLIN_MAX_LEVEL */
 		if (CALLIN_MAX_LEVEL < TREF(gtmci_nested_level))
 			rts_error(VARLSTCNT(3) ERR_CIMAXLEVELS, 1, TREF(gtmci_nested_level));
 		/* Disallow call-ins within a TP boundary since TP restarts are not supported
 		 * currently across nested call-ins. When we implement TP restarts across call-ins,
-		 * this error needs be changed to a Warning or Notification */
+		 * this error needs be changed to a Warning or Notification
+		 */
 		if (dollar_tlevel)
 			rts_error(VARLSTCNT(1) ERR_CITPNESTED);
 		base_addr = make_cimode();
@@ -540,7 +568,8 @@ int gtm_init()
 	/* Now that GT.M is initialized. Mark the new stack pointer (msp) so that errors
 	 * while executing an M routine do not unwind stack below this mark. It important that
 	 * the call-in frames (SFF_CI), that hold nesting information (eg. $ECODE/$STACK data
-	 * of the previous stack), are kept from being unwound. */
+	 * of the previous stack), are kept from being unwound.
+	 */
 	fgncal_stack = msp;
 	REVERT;
 	return 0;
@@ -561,7 +590,7 @@ int gtm_exit()
 	/* Now get rid of the whole M stack - end of GT.M environment */
 	while (NULL != frame_pointer)
 	{
-		while (NULL != frame_pointer && !(frame_pointer->flags & SFF_CI))
+		while ((NULL != frame_pointer) && !(frame_pointer->flags & SFF_CI))
 		{
 #			ifdef GTM_TRIGGER
 			if (SFT_TRIGR & frame_pointer->type)
@@ -578,11 +607,11 @@ int gtm_exit()
 	}
 	gtm_exit_handler(); /* rundown all open database resource */
 	/* If libgtmshr was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
-	   the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
-	   'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
-	   our exit handler has already been called. Linux and Solaris don't need this, looking at the
-	   other platforms we support to see if resolutions can be found. SE 05/2007
-	*/
+	 * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
+	 * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
+	 * our exit handler has already been called. Linux and Solaris don't need this, looking at the
+	 * other platforms we support to see if resolutions can be found. SE 05/2007
+	 */
 #ifdef _AIX
 	unatexit(gtm_exit_handler);
 #endif
@@ -601,13 +630,13 @@ void gtm_zstatus(char *msg, int len)
 
 #ifdef _AIX
 /* If libgtmshr was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
-   the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
-   'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
-   our exit handler has already been called. Linux and Solaris don't need this, looking at the
-   other platforms we support to see if resolutions can be found. This routine will be called
-   by the OS when libgtmshr is unloaded. Specified with the -binitfini loader option on AIX
-   to be run when the shared library is unloaded. 06/2007 SE
-*/
+ * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
+ * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
+ * our exit handler has already been called. Linux and Solaris don't need this, looking at the
+ * other platforms we support to see if resolutions can be found. This routine will be called
+ * by the OS when libgtmshr is unloaded. Specified with the -binitfini loader option on AIX
+ * to be run when the shared library is unloaded. 06/2007 SE
+ */
 void gtmci_cleanup(void)
 {	/* This code is only for callin cleanup */
 	if (MUMPS_CALLIN != invocation_mode)

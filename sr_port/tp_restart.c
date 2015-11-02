@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,13 +54,15 @@
 #include "gtmsource.h"		/* for jnlpool_addrs structure definition */
 #include "wbox_test_init.h"
 #include "gtmimagename.h"
+#include "have_crit.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #endif
+#ifdef ENABLE_EXTENDED_RESTART_TRACE_HIST
+#include "caller_id.h"
+#endif
 
-GBLDEF	int4			tprestart_syslog_limit;			/* limit TPRESTARTs */
-GBLDEF	int4			tprestart_syslog_delta; 		/* limit TPRESTARTs */
 GBLDEF	trans_num		tp_fail_histtn[CDB_MAX_TRIES], tp_fail_bttn[CDB_MAX_TRIES];
 GBLDEF	int4			tp_fail_n, tp_fail_level;
 GBLDEF	int4			n_pvtmods, n_blkmods;
@@ -90,21 +92,28 @@ GBLREF	bool			caller_id_flag;
 GBLREF	unsigned char		*tpstackbase, *tpstacktop;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	sgmnt_data		*cs_data;
 GBLREF	symval			*curr_symval;
-GBLREF	boolean_t		hold_onto_locks;
 GBLREF	trans_num		tstart_local_tn;	/* copy of global variable "local_tn" at op_tstart time */
 #ifdef VMS
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
-GBLREF	boolean_t	tp_restart_fail_sig_used;
+GBLREF	boolean_t		tp_restart_fail_sig_used;
+#else
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	sgmnt_addrs		*cs_addrs_list;
+GBLREF	boolean_t		is_updproc;
 #endif
 #ifdef GTM_TRIGGER
-GBLREF	int		tprestart_state;	/* When triggers restart, multiple states possible. See tp_restart.h */
-GBLREF	mval		dollar_ztwormhole;	/* Previous value (mval) restored on restart */
-GBLREF	mval		dollar_ztslate;
-LITREF	mval		literal_null;
+GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible. See tp_restart.h */
+GBLREF	mval			dollar_ztwormhole;	/* Previous value (mval) restored on restart */
+GBLREF	mval			dollar_ztslate;
+LITREF	mval			literal_null;
 #endif
 
+#ifdef UNIX
+error_def(ERR_GVFAILCORE);
+error_def(ERR_REPLONLNRLBK);
+#endif
 error_def(ERR_TLVLZERO);
 error_def(ERR_TPFAIL);
 error_def(ERR_TPLOCKRESTMAX);
@@ -112,7 +121,6 @@ error_def(ERR_TPRESTART);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRESTLOC);
 error_def(ERR_TRESTNOT);
-UNIX_ONLY(error_def(ERR_GVFAILCORE));
 
 #define	GVNAME_UNKNOWN		"*UNKNOWN"
 
@@ -123,11 +131,11 @@ CONDITION_HANDLER(tp_restart_ch)
 {
 	START_CH;
 	/* On Unix, there is only one set of the signal info and this error will handily replace it. For VMS,
-	   far more subterfuge is required. We will save the signal information and paramters and overlay the
-	   TPRETRY signal information with it so that the signal will be handled properly. Note also that since
-	   VMS does not support triggers, no special avoidance of the below needs to occur when we are dealing with
-	   a trigger unwind initiated rethrow.
-	*/
+	 * far more subterfuge is required. We will save the signal information and paramters and overlay the
+	 * TPRETRY signal information with it so that the signal will be handled properly. Note also that since
+	 * VMS does not support triggers, no special avoidance of the below needs to occur when we are dealing with
+	 * a trigger unwind initiated rethrow.
+	 */
 #	ifdef VMS
 	assert(TPRESTART_ARG_CNT >= sig->chf$is_sig_args);
 	if (NULL == tp_restart_fail_sig)
@@ -144,7 +152,6 @@ CONDITION_HANDLER(tp_restart_ch)
 /* Note that adding a new rts_error in "tp_restart" might need a change to the INVOKE_RESTART macro in tp.h and
  * TPRESTART_ARG_CNT in errorsp.h (sl_vvms). See comment in tp.h for INVOKE_RESTART macro for the details.
  */
-
 int tp_restart(int newlevel, boolean_t handle_errors_internally)
 {
 	unsigned char		*cp;
@@ -161,6 +168,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	gd_region		*restart_reg, *reg;
 	int			tprestart_rc;
 	enum cdb_sc		status;
+	UNIX_ONLY(boolean_t	issue_REPLONLNRLBK;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -205,7 +213,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	{	/* Only do if a normal invocation - otherwise we've already done this code for this TP restart */
 #	endif
 		/* Increment restart counts for each region in this transaction */
-		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
+		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 		{
 			reg = tr->reg;
 			if (reg->open)
@@ -237,8 +245,13 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			}
 		}
 		status = t_fail_hist[t_tries];
-		if (tprestart_syslog_delta && (((TREF(tp_restart_count))++ < tprestart_syslog_limit)
-			|| (0 == ((TREF(tp_restart_count) - tprestart_syslog_limit) % tprestart_syslog_delta))))
+		/* The only reason online rollback ends up restarting is if some process set wc_blocked outside crit or the prior
+		 * transaction had commit errors and secshr_db_clnup set wc_blocked to TRUE. But, that's possible only if white box
+		 * test cases to induce Phase 1 and Phase 2 commit errors are set. So, assert accordingly
+		 */
+		UNIX_ONLY(assert(!jgbl.onlnrlbk || WB_COMMIT_ERR_ENABLED));
+		if (TREF(tprestart_syslog_delta) && (((TREF(tp_restart_count))++ < TREF(tprestart_syslog_limit))
+			|| (0 == ((TREF(tp_restart_count) - TREF(tprestart_syslog_limit)) % TREF(tprestart_syslog_delta)))))
 		{
 			if (NULL != tp_fail_hist[t_tries])
 				gvname_mstr = tp_fail_hist[t_tries]->gvname.var_name;
@@ -289,6 +302,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		TAREF1(tp_restart_failhist_arry, (TREF(tp_restart_failhist_indx))++) = status;
 		if (FAIL_HIST_ARRAY_SIZE <= TREF(tp_restart_failhist_indx))
 			TREF(tp_restart_failhist_indx) = 0;
+		TRACE_TRANS_RESTART(status);
 #		endif
 		/* the following code is similar, but not identical, to code in t_retry,
 		 * which should also be maintained in parallel
@@ -314,6 +328,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 						 * cache-recovery to fix the shared memory structures. Since we hold crit,
 						 * so no need to grab/rel crit. Call wcs_recover right away.
 						 */
+						assert(!csa->hold_onto_crit UNIX_ONLY(|| jgbl.onlnrlbk));
 						DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE);
 						wcs_recover(sgm_info_ptr->gv_cur_region);
 						DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE);
@@ -340,7 +355,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				 * now is a retry.
 				 */
 				assert(CDB_STAGNATE == t_tries);
-				for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
+				for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 				{	/* regions might not have been opened if we t_retried in gvcst_init(). dont
 					 * rel_crit in that case.
 					 */
@@ -350,8 +365,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 						DEBUG_ONLY(csa = &FILE_INFO(reg)->s_addrs;)
 						assert(!csa->hold_onto_crit);
 						rel_crit(reg);  /* to ensure deadlock safe order, release all regions
-								 * before retry
-								 */
+								 * before retry */
 					}
 				}
 				DEBUG_ONLY(
@@ -396,6 +410,13 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			 * beginning of final retry) since jnl state changes are considered infrequent that too in the final retry
 			 */
 			case cdb_sc_jnlstatemod:
+#			ifdef UNIX
+			/* cdb_sc_onln_rlbk[1,2] are possible in the final retry. See comment below that explains why. So, decrement
+			 * t_tries to account for later increment
+			 */
+			case cdb_sc_onln_rlbk1:
+			case cdb_sc_onln_rlbk2:
+#			endif
 			case cdb_sc_optrestart:
 				if (CDB_STAGNATE <= t_tries)
 				{
@@ -408,17 +429,18 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				{
 					hist_index = t_tries;
 					t_tries = 0;
+					assert(0 != have_crit(CRIT_HAVE_ANY_REG)); /* we should still be holding crit */
 					assert(gtm_white_box_test_case_enabled
-					       && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
-#						ifdef UNIX
+					    && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
+#					ifdef UNIX
 					send_msg(VARLSTCNT(5) ERR_TPFAIL, 2, hist_index, t_fail_hist, ERR_GVFAILCORE);
 					/* Generate core only if not triggering this codepath using white-box tests */
-#					ifdef DEBUG
-					if (!gtm_white_box_test_case_enabled
-					    || (WBTEST_TP_HIST_CDB_SC_BLKMOD != gtm_white_box_test_case_number))
+					DEBUG_ONLY(
+						if (!gtm_white_box_test_case_enabled
+						    || (WBTEST_TP_HIST_CDB_SC_BLKMOD != gtm_white_box_test_case_number))
+					)
+							gtm_fork_n_core();
 #					endif
-						gtm_fork_n_core();
-#						endif
 					VMS_ONLY(send_msg(VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist));
 					rts_error(VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist);
 					return 0; /* for the compiler only -- never executed */
@@ -443,14 +465,14 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		{	/* If there are any regions that haven't yet been opened, open them before attempting for crit on
 			 * all. Since we don't hold any crit locks now, we can rest assured this cannot cause a deadlock.
 			 * The only exception (to holding crit) currently is mupip journal rollback/recovery if online when
-			 * we will be holding crit on all regions but in that case we should have opened all necessary
-			 * regions at process startup (and set "hold_onto_locks" to TRUE) so we should not be here at all.
-			 * Assert this.
+			 * we will be holding crit on all regions but in that case we should NOT have restarted in the first
+			 * place as all the concurrent GT.M processes will be hung waiting for crit. The only exception is
+			 * if some process set wc_blocked outside crit and we restarted to do cache recovery (which is asserted
+			 * above)
 			 */
-			assert(!hold_onto_locks);
 			if (num_closed)
 			{
-				for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
+				for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 				{	/* to open region use gv_init_reg() instead of gvcst_init() since that does extra
 					 * manipulations with gv_keysize, gv_currkey and gv_altkey.
 					 */
@@ -464,7 +486,33 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 			}
 			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE);
-			tp_tend_status = tp_crit_all_regions();	/* grab crits on all regions */
+			UNIX_ONLY(if (!jgbl.onlnrlbk))
+				tp_tend_status = tp_crit_all_regions();	/* grab crits on all regions */
+			/* else online rollback in which case we already hold crit on all regions */
+			/* It is possible we came into tp_restart to handle a different restart code but as part of the final
+			 * retry detected an Online Rollback. If so, we shouldn't go into the final retry with this out-of-sync
+			 * state as tp_tend will detect this out-of-sync during validation causing restart in the final
+			 * retry resulting in TPFAIL. So, check for a concurrent Online Rollback and handle it if needed. It is
+			 * enough to check any region as Online Rollback will increment the cycle field ON all the regions
+			 * unconditionally
+			 */
+#			ifdef UNIX
+			if (cs_addrs_list && (cs_addrs_list->onln_rlbk_cycle != cs_addrs_list->nl->onln_rlbk_cycle))
+			{	/* We came in to handle a different restart code in the penultimate retry and grab_crit before going
+				 * to final retry. As part of grabbing crit, we detected an online rollback. Although we could treat
+				 * this as just an online rollback restart and handle it by syncing cycles, but by doing so, we will
+				 * loose the information that an online rollback happened when we go back to gvcst_{put,kill}. This
+				 * is usually fine except when we are in implicit TP (due to triggers). In case of implicit TP,
+				 * gvcst_{put,kill} has specific code to handle online rollback differently than other restart codes
+				 * Because of this reason, we don't want to sync cycles but instead continue with the final retry.
+				 * t_end/tp_tend/tp_hist will notice the cycle mismatch and will restart (once more) in final retry
+				 * with the appropriate cdb_sc code which gvcst_put/gvcst_kill will intercept and act accordingly.
+				 * Even if we are not syncing cycles, we need to reset the clues and root block numbers so that we
+				 * proceeds smoothly in the final retry.
+				 */
+				RESET_ALL_GVT_CLUES;
+			}
+#			endif
 			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE);
 			assert(FALSE != tp_tend_status);
 			/* pick up all MM extension information */
@@ -489,16 +537,36 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	tf = (tp_frame *)(tpstackbase - (newlevel * SIZEOF(tp_frame)));
 	assert(NULL != tf);
 	assert(tpstacktop < (unsigned char *)tf);
+	UNIX_ONLY(issue_REPLONLNRLBK = FALSE);
 #	ifdef GTM_TRIGGER
 	if (TPRESTART_STATE_NORMAL == tprestart_state)
 	{	/* Only if normal tp_restart call - else we've already done this for this tp_restart */
 #	endif
 		/* Before we get too far unwound here, if this is a nonrestartable transaction,
-		   let's record where we are for the message later on. */
+		 * let's record where we are for the message later on.
+		 */
 		if (FALSE == tf->restartable && IS_MCODE_RUNNING)
 			getzposition(TADR(tp_restart_entryref));
 		/* Do a rollback type cleanup (invalidate gv_target clues of read as well as updated blocks) */
 		tp_clean_up(TRUE);
+		/* Note: At this point, we are ready to begin the next retry. While we can sync the trigger cycles now to avoid
+		 * further restarts, we don't need to because tp_set_sgm (done for each region that is updated in a TP transaction)
+		 * does the syncing anyways.
+		 */
+#		ifdef UNIX
+		assert(cdb_sc_normal != status);
+		if ((cdb_sc_onln_rlbk1 == status) || (cdb_sc_onln_rlbk2 == status))
+		{	/* restarted due to online rollback */
+			RESET_ALL_GVT_CLUES;
+			assert(!TREF(only_reset_clues_if_onln_rlbk));
+			if (IS_MCODE_RUNNING)
+			{
+				assert(!is_updproc);
+				(TREF(dollar_zonlnrlbk))++;
+			}
+			issue_REPLONLNRLBK = is_updproc;
+		}
+#		endif
 #	ifdef GTM_TRIGGER
 	}
 	if (TPRESTART_STATE_TPUNW >= tprestart_state)
@@ -583,7 +651,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	/* Our stack frames are unwound to the correct frame but there could be mv_stents pushed on after we last (re)started
 	 * this transaction. We need to get rid of them to get back to the correct restart state.
 	 */
-	for (mvc = mv_chain;  mvc < tf->mvc;)
+	for (mvc = mv_chain; mvc < tf->mvc;)
 	{	/* Make sure we don't unwind the MVST_TPHOLD for our target level */
 		assert((MVST_TPHOLD != mvc->mv_st_type) || ((newlevel - 1) != mvc->mv_st_cont.mvs_tp_holder.tphold_tlevel));
 		DBGEHND((stderr, "tp_restart: unwinding mv_stent addr 0x"lvaddr" type %d\n", mvc, mvc->mv_st_type));
@@ -657,6 +725,13 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	assert(MAX_TRESTARTS > (dollar_trestart - TREF(tp_restart_dont_counts))); /* a magic number limit for restarts */
 	if (!dollar_trestart)		/* in case of a wrap */
 		dollar_trestart--;
+	UNIX_ONLY(
+		/* Now that we are done with all the cleanup related to this restart, issue rts_error if we are update process.
+		 * updproc_ch knows to handle this SIGNAL.
+		 */
+		if (issue_REPLONLNRLBK)
+			rts_error(VARLSTCNT(1) ERR_REPLONLNRLBK);
+	)
 	if (handle_errors_internally)
 		REVERT;
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart: completed\n")));

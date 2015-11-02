@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -79,10 +79,6 @@ error:	movl	ERR_GTMCHECK(REG_IP),REG32_ARG1
 long:	movq	REG64_ACCUM,msf_mpc_off(REG64_ARG2)
 	addl	REG32_ARG1, msf_mpc_off(REG64_ARG2)
 cont:	call	exfun_frame
-	movq	frame_pointer(REG_IP),REG64_SCRATCH1
-	movq	msf_old_frame_off(REG64_SCRATCH1),REG64_ACCUM
-	movq	REG64_ACCUM,frame_pointer(REG_IP)
-	movq	REG64_SCRATCH1,sav_msf(REG_FRAME_POINTER)
 
 	movl	act_cnt(REG_FRAME_POINTER),REG32_ACCUM
 	cmpl	$0,REG32_ACCUM                          #arg0, arg1, arg2 are stored in rbp
@@ -111,11 +107,10 @@ no_arg:	movl	act_cnt(REG_FRAME_POINTER), REG32_ARG4	#Actual Arg cnt
 	movl	REG32_ACCUM, REG32_ARG0			#Totalcount = Act count +4
 	movb	$0,REG8_ACCUM				# variable length argument
 	call	push_parm				# push_parm (total, $T, ret_value, mask, argc [,arg1, arg2, ...]);
-done:	movq	sav_msf(REG_FRAME_POINTER),REG64_ACCUM
-	movq	REG64_ACCUM,frame_pointer(REG_IP)
-	orw	$SFT_EXTFUN,msf_typ_off(REG64_ACCUM)
-	movq	msf_temps_ptr_off(REG64_ACCUM),REG_FRAME_TMP_PTR
+done:	movq    frame_pointer(REG_IP),REG64_SCRATCH1
+	movq	msf_temps_ptr_off(REG64_SCRATCH1),REG_FRAME_TMP_PTR
 retlab:	leave
+	movq    REG64_SCRATCH1,REG_FRAME_POINTER
 	popq	REG_XFER_TABLE
 	ret
 # op_exfun ENDP

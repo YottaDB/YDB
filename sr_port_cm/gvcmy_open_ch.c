@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,16 +23,17 @@
 GBLREF	gv_key	*gv_currkey, *gv_altkey;
 GBLREF	gd_addr	*gd_header;
 
+error_def(ERR_ASSERT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_MEMORY);
+error_def(ERR_VMSMEMORY);
+
 CONDITION_HANDLER(gvcmy_open_ch)
 {
-	error_def(ERR_GTMCHECK);
-	error_def(ERR_GTMASSERT);
-	error_def(ERR_ASSERT);
-        error_def(ERR_MEMORY);
-        error_def(ERR_VMSMEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_OUTOFSPACE);
-
 	START_CH;
 	if (DUMPABLE)
 	{ /* don't disturb state so that the core reflects the "bad" state */

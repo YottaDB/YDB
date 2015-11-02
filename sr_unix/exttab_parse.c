@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -361,7 +361,7 @@ static void	put_mstr(mstr *src, mstr *dst)
 }
 
 /* utility to convert an array of bool's to a bit mask */
-static uint4	array_to_mask(boolean_t ar[MAXIMUM_PARAMETERS], int n)
+static uint4	array_to_mask(boolean_t ar[MAX_ACTUALS], int n)
 {
 	uint4	mask = 0;
 	int	i;
@@ -377,13 +377,13 @@ static uint4	array_to_mask(boolean_t ar[MAXIMUM_PARAMETERS], int n)
 /* Note: need condition handler to clean-up allocated structures and close intput file in the event of an error */
 struct extcall_package_list	*exttab_parse(mval *package)
 {
-	int		parameter_alloc_values[MAXIMUM_PARAMETERS], parameter_count, ret_pre_alloc_val, i, fclose_res;
+	int		parameter_alloc_values[MAX_ACTUALS], parameter_count, ret_pre_alloc_val, i, fclose_res;
 	int		len, keywordlen;
-	boolean_t	is_input[MAXIMUM_PARAMETERS], is_output[MAXIMUM_PARAMETERS], got_status;
+	boolean_t	is_input[MAX_ACTUALS], is_output[MAX_ACTUALS], got_status;
 	mstr		callnam, rtnnam, clnuprtn;
 	mstr 		val, trans;
 	void_ptr_t	pakhandle;
-	enum xc_types	ret_tok, parameter_types[MAXIMUM_PARAMETERS], pr;
+	enum xc_types	ret_tok, parameter_types[MAX_ACTUALS], pr;
 	char		str_buffer[MAX_TABLINE_LEN], *tbp, *end;
 	char		str_temp_buffer[MAX_TABLINE_LEN];
 	FILE		*ext_table_file_handle;
@@ -554,7 +554,7 @@ struct extcall_package_list	*exttab_parse(mval *package)
 		callnam.len = INTCAST(end - tbp);
 		tbp = scan_space(end);
 		tbp = scan_space(tbp);
-		for (parameter_count = 0;(MAXIMUM_PARAMETERS > parameter_count) && (')' != *tbp); parameter_count++)
+		for (parameter_count = 0;(MAX_ACTUALS > parameter_count) && (')' != *tbp); parameter_count++)
 		{
 			star_found = FALSE;
 			/* must have comma if this is not the first parameter, otherwise '(' */
@@ -647,7 +647,7 @@ callin_entry_list*	citab_parse (void)
 	int			parameter_count, i, fclose_res;
 	uint4			inp_mask, out_mask, mask;
 	mstr			labref, callnam;
-	enum xc_types		ret_tok, parameter_types[MAXIMUM_PARAMETERS], pr;
+	enum xc_types		ret_tok, parameter_types[MAX_ACTUALS], pr;
 	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end;
 	FILE			*ext_table_file_handle;
 	callin_entry_list	*entry_ptr, *save_entry_ptr = 0;
@@ -697,7 +697,7 @@ callin_entry_list*	citab_parse (void)
 		inp_mask = out_mask = 0;
 		for (parameter_count = 0; (*tbp && ')' != *tbp); parameter_count++)
 		{
-			if (MAXIMUM_PARAMETERS <= parameter_count)
+			if (MAX_ACTUALS <= parameter_count)
 				ext_stx_error(ERR_CIMAXPARAM, ext_table_file_name);
 			/* must have comma if this is not the first parameter, otherwise '(' */
 			if (((0 == parameter_count)?'(':',') != *tbp++)

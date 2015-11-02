@@ -89,6 +89,7 @@
 #include "alias.h"
 #include "cenable.h"
 #include "gtmimagename.h"
+#include "mprof.h"
 
 GBLDEF void			(*restart)() = &mum_tstart;
 #ifdef __MVS__
@@ -96,11 +97,9 @@ GBLDEF void			(*restart)() = &mum_tstart;
  * which points to mdb_condition_handler. We can use this function pointer to get
  * the address of mdb_condition_handler in ESTABLSH assembly macro.
  */
-GBLDEF ch_ret_type      (*mdb_condition_handler_ptr)(int arg) = &mdb_condition_handler;
+GBLDEF ch_ret_type		(*mdb_condition_handler_ptr)(int arg) = &mdb_condition_handler;
 #endif
 
-GBLREF mval 			**ind_result_array, **ind_result_sp, **ind_result_top;
-GBLREF mval 			**ind_source_array, **ind_source_sp, **ind_source_top;
 GBLREF rtn_tabent		*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
 GBLREF int4			break_message_mask;
 GBLREF stack_frame 		*frame_pointer;
@@ -136,7 +135,6 @@ GBLREF ch_ret_type		(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch 
 GBLREF ch_ret_type		(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
 GBLREF enum gtmImageTypes	image_type;
 GBLREF int			init_xfer_table(void);
-
 
 OS_PAGE_SIZE_DECLARE
 
@@ -178,7 +176,8 @@ void gtm_startup(struct startup_vector *svec)
 	mstack_ptr = (unsigned char *)malloc(svec->user_stack_size);
 	msp = stackbase = mstack_ptr + svec->user_stack_size - mvs_size[MVST_STORIG];
 	/* mark the stack base so that if error occur during call-in gtm_init(), the unwind
-	   logic in gtmci_ch() will get rid of the stack completely */
+	 * logic in gtmci_ch() will get rid of the stack completely
+	 */
 	fgncal_stack = stackbase;
 	mv_chain = (mv_stent *)msp;
 	mv_chain->mv_st_type = MVST_STORIG;	/* Initialize first (anchor) mv_stent so doesn't do anything */
@@ -194,12 +193,12 @@ void gtm_startup(struct startup_vector *svec)
 	stp_init(svec->user_strpl_size);
 	if (svec->user_indrcache_size > MAX_INDIRECTION_NESTING || svec->user_indrcache_size < MIN_INDIRECTION_NESTING)
 		svec->user_indrcache_size = MIN_INDIRECTION_NESTING;
-	ind_result_array = (mval **)malloc(SIZEOF(mval *) * svec->user_indrcache_size);
-	ind_source_array = (mval **)malloc(SIZEOF(mval *) * svec->user_indrcache_size);
-	ind_result_sp = ind_result_array;
-	ind_result_top = ind_result_sp + svec->user_indrcache_size;
-	ind_source_sp = ind_source_array;
-	ind_source_top = ind_source_sp + svec->user_indrcache_size;
+	TREF(ind_result_array) = (mval **)malloc(SIZEOF(mval *) * svec->user_indrcache_size);
+	TREF(ind_source_array) = (mval **)malloc(SIZEOF(mval *) * svec->user_indrcache_size);
+	TREF(ind_result_sp) = TREF(ind_result_array);
+	TREF(ind_result_top) = TREF(ind_result_sp) + svec->user_indrcache_size;
+	TREF(ind_source_sp) = TREF(ind_source_array);
+	TREF(ind_source_top) = TREF(ind_source_sp) + svec->user_indrcache_size;
 	rts_stringpool = stringpool;
 	TREF(compile_time) = FALSE;
 	/* assert that is_replicator and run_time is properly set by gtm_imagetype_init invoked at process entry */
@@ -231,10 +230,10 @@ void gtm_startup(struct startup_vector *svec)
 	zcall_init();
 	cmd_qlf.qlf = glb_cmd_qlf.qlf;
 	cache_init();
-#ifdef __sun
+#	ifdef __sun
 	if (NULL != GETENV(PACKAGE_ENV_TYPE))	/* chose xcall (default) or rpc zcall */
 		xfer_table[xf_fnfgncal] = (xfer_entry_t)op_fnfgncal_rpc;  /* using RPC */
-#endif
+#	endif
 	msp -= SIZEOF(stack_frame);
 	frame_pointer = (stack_frame *)msp;
 	memset(frame_pointer,0, SIZEOF(stack_frame));
@@ -324,6 +323,8 @@ void gtm_startup(struct startup_vector *svec)
 	curr_symval->alias_activity = TRUE;
 	lvzwr_init((enum zwr_init_types)0, (mval *)NULL);
 	curr_symval->alias_activity = FALSE;
+	if ((NULL != (TREF(mprof_env_gbl_name)).str.addr))
+		turn_tracing_on(TADR(mprof_env_gbl_name), TRUE, (TREF(mprof_env_gbl_name)).str.len > 0);
 	return;
 }
 

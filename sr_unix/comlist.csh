@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2011 Fidelity Infromation Services, Inc #
+#	Copyright 2001, 2012 Fidelity Infromation Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -72,7 +72,7 @@ echo "Value after reset : gtmroutines=""$gtmroutines"""
 echo "--------------------------------------------"
 echo ""
 
-set comlist_status = 0
+@ comlist_status = 0
 
 set dollar_sign = \$
 
@@ -191,6 +191,7 @@ case "gtm_bta":
 	setenv	comlist_gt_as	"`alias gt_as_bta` $p1"
 	setenv	comlist_gt_cc	"`alias gt_cc_bta` $p2"
 	version $p4 b
+	@ comlist_status = $status
 	set p3 = $gtm_bta
 	breaksw
 
@@ -198,6 +199,7 @@ case "gtm_dbg":
 	setenv	comlist_gt_as	"`alias gt_as_dbg` $p1"
 	setenv	comlist_gt_cc	"`alias gt_cc_dbg` $p2"
 	version $p4 d
+	@ comlist_status = $status
 	set p3 = $gtm_dbg
 	breaksw
 
@@ -205,6 +207,7 @@ case "gtm_pro":
 	setenv	comlist_gt_as	"`alias gt_as_pro` $p1"
 	setenv	comlist_gt_cc	"`alias gt_cc_pro` $p2"
 	version $p4 p
+	@ comlist_status = $status
 	set p3 = $gtm_pro
 	breaksw
 
@@ -216,6 +219,10 @@ default:
 
 endsw
 
+if (0 != $comlist_status) then
+	echo "version command failed -- aborting build"
+	goto comlist.END
+endif
 
 echo ""
 echo "Assembler-related aliases:"
@@ -276,19 +283,14 @@ cd $p3
 chmod +w *		# this allows the rm to work without prompting for an override
 rm *
 
-cp $gtm_tools/lowerc.sh lowerc
 cp $gtm_tools/lowerc_cp.sh lowerc_cp
-cp $gtm_tools/upperc.sh upperc
-cp $gtm_tools/upperc_cp.sh upperc_cp
 if ( "$HOSTOS" == "SunOS" ) then
 	cp $gtm_tools/gtminstall_Solaris.sh gtminstall
 else
 	cp $gtm_tools/gtminstall.sh gtminstall
 endif
 
-cp $gtm_tools/{lowerc,upperc}*.csh .
-
-chmod +x {lowerc,upperc,gtminstall}*
+chmod +x {lowerc,gtminstall}*
 
 cp $gtm_tools/*.gtc .
 mv configure{.gtc,}
@@ -438,7 +440,8 @@ echo ""
 
 #Do not compile gtmcrypt_ref.c, maskpass.c, gtm_threadgbl_deftypes.c
 #$gtm_tools/buildplugin.csh will take care of compilation and building of the reference plugin and the supporting files.
-find $gs[1] \( -name 'gtmcrypt*_ref.c' -o -name 'maskpass.c' -o -name 'omi_sx_play.c' -o -name 'gtm_threadgbl_deftypes.c' \) -prune -o -name '*.c' -print | \
+find $gs[1] \( -name 'gtmcrypt*_ref.c' -o -name 'maskpass.c' -o -name 'omi_sx_play.c' -o \
+	-name 'gtm_threadgbl_deftypes.c' \) -prune -o -name '*.c' -print | \
 	sort | xargs -n25 $shell $gtm_tools/gt_cc.csh
 
 # Special compilation for omi_sx_play.c
@@ -653,23 +656,27 @@ endif
 if ((0 != $status) || (! -e GTMDefinedTypesInit.m)) then
 	@ savestatus = $status
 	if (`expr $gtm_verno \>= V900`) @ comlist_status = $savestatus  # note no errors for development versions
-	echo "gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m - see log in $gtm_obj/gengtmdeftypes.log" >> $gtm_log/error.`basename $gtm_exe`.log
+	echo "gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m - see log in $gtm_obj/gengtmdeftypes.log" >> \
+	$gtm_log/error.`basename $gtm_exe`.log
 endif
 if (-e GTMDefinedTypesInit.m) then
-	cp -f GTMDefinedTypesInit.m $gtm_pct/GTMDefinedTypesInit${bldtype}.m   # Need a different name for each build type as they can be different
+	# Need a different name for each build type as they can be different
+	cp -f GTMDefinedTypesInit.m $gtm_pct/GTMDefinedTypesInit${bldtype}.m
 	./mumps GTMDefinedTypesInit.m
 	if (0 != $status) then
-		@ comlist_status = $status
+		if (`expr $gtm_verno \>= V900`) @ comlist_status = $status
 		echo "Failed to compile $gtm_exe/GTMDefinedTypes.m" >> $gtm_log/error.`basename $gtm_exe`.log
 	endif
 	# If we have a utf8 dir (created by buildaux.csh called from buildbdp.csh above), add a link to it for GTMDefinedTypesInit.m
 	if (-e $gtm_dist/utf8) then
-		ln -s $gtm_dist/GTMDefinedTypesInit.m $gtm_dist/utf8/GTMDefinedTypesInit.m
+		if (! -e $gtm_dist/utf8/GTMDefinedTypesInit.m) then
+		    ln -s $gtm_dist/GTMDefinedTypesInit.m $gtm_dist/utf8/GTMDefinedTypesInit.m
+		endif
 		pushd utf8
 		# mumps executable not yet linked to utf8 dir so access it in parent directory
 		../mumps GTMDefinedTypesInit.m
 		if (0 != $status) then
-			@ comlist_status = $status
+			if (`expr $gtm_verno \>= V900`) @ comlist_status = $status
 			echo "Failed to compile $gtm_exe/GTMDefinedTypes.m" >> $gtm_log/error.`basename $gtm_exe`.log
 		endif
 		popd

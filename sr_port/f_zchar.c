@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,36 +25,37 @@
 #endif
 #include "advancewindow.h"
 
-GBLREF char window_token;
 GBLREF spdesc stringpool;
+
+error_def(ERR_FCHARMAXARGS);
+error_def(ERR_TEXT);
 
 int f_zchar(oprtype *a, opctype op)
 {
-	triple 		*root, *last, *curr;
-	oprtype 	argv[CHARMAXARGS], *argp;
-	mval 		v;
 	boolean_t 	all_lits;
 	char 		*c;
-	int 		argc, i;
 	unsigned char	*tmp_ptr;
+	int 		argc, i;
 	unsigned int	tmp_len;
+	mval 		v;
+	oprtype 	argv[CHARMAXARGS], *argp;
+	triple 		*curr, *last, *root;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_FCHARMAXARGS);
-	error_def(ERR_TEXT);
-
+	SETUP_THREADGBL_ACCESS;
 	all_lits = TRUE;
 	argp = &argv[0];
 	argc = 0;
 	for (;;)
 	{
-		if (!intexpr(argp))
+		if (EXPR_FAIL == expr(argp, MUMPS_INT))
 			return FALSE;
-		assert(argp->oprclass == TRIP_REF);
-		if (argp->oprval.tref->opcode != OC_ILIT)
+		assert(TRIP_REF == argp->oprclass);
+		if (OC_ILIT != argp->oprval.tref->opcode)
 			all_lits = FALSE;
 		argc++;
 		argp++;
-		if (window_token != TK_COMMA)
+		if (TK_COMMA != TREF(window_token))
 			break;
 		advancewindow();
 		if (argc >= CHARMAXARGS)

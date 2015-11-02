@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "iosp.h"
 #include "error.h"
 #include "mupip_exit.h"
+#include "gtmmsg.h"
 
 GBLREF	boolean_t	mupip_exit_status_displayed;
 
@@ -26,7 +27,7 @@ void mupip_exit(int4 stat)
 	{
 		if (error_condition != stat)		/* If message not already put out.. */
 		{
-			dec_err(VARLSTCNT(1) stat);
+			gtm_putmsg(VARLSTCNT(1) stat);
 			tmp_severity =  SEVMASK(stat);
 		} else
 			tmp_severity = severity;

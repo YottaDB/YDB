@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,21 +15,21 @@
 #include "toktyp.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
-
-int f_zgetsyi( oprtype *a, opctype op)
+int f_zgetsyi(oprtype *a, opctype op)
 {
 	triple *r;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
-	if (!strexpr(&(r->operand[0])))
+	if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_STR))
 		return FALSE;
-	if (window_token != TK_COMMA)
+	if (TK_COMMA != TREF(window_token))
 		r->operand[1] = put_str("",0);
 	else
 	{
 		advancewindow();
-		if (!strexpr(&r->operand[1]))
+		if (EXPR_FAIL == expr(&r->operand[1], MUMPS_STR))
 			return FALSE;
 	}
 	ins_triple(r);

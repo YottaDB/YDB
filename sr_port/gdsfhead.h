@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,9 @@
 #include "gtm_string.h"
 #include "send_msg.h"
 #include "iosp.h"
+#ifdef UNIX
+#include "repl_instance.h"
+#endif
 #ifdef VMS
 #include "iosb_disk.h"
 #endif
@@ -34,17 +37,20 @@
 
 error_def(ERR_DBCRERR);
 error_def(ERR_DBENDIAN);
+error_def(ERR_DBFLCORRP);
 error_def(ERR_GVIS);
 error_def(ERR_GVSUBOFLOW);
 error_def(ERR_REPLINSTMISMTCH);
+error_def(ERR_REPLREQROLLBACK);
 error_def(ERR_SCNDDBNOUPD);
+error_def(ERR_SRVLCKWT2LNG);
 error_def(ERR_SSATTACHSHM);
 error_def(ERR_SSFILOPERR);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TNTOOLARGE);
 error_def(ERR_TNWARN);
-																\
+
 /* all this record's fields should exactly be the first members of the cache_rec in the same order */
 typedef struct mmblk_rec_struct
 {
@@ -868,6 +874,7 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 {																\
 	unsigned char		instfilename_copy[MAX_FN_LEN + 1];								\
 	sm_uc_ptr_t		jnlpool_instfilename;										\
+	int4			jnlpool_shmid;											\
 																\
 	GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;										\
 	GBLREF	boolean_t		is_replicator;										\
@@ -891,19 +898,33 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 			}													\
 			UNIX_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instfilename;)			\
 			VMS_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.gtmgbldir;)			\
-			if (STRCMP(CNL->replinstfilename, jnlpool_instfilename))						\
-			{	/* Replication instance file mismatch. Issue error. But before that detach from journal pool.	\
+			if (STRCMP(CNL->replinstfilename, jnlpool_instfilename)							\
+				UNIX_ONLY(|| (CNL->jnlpool_shmid != jnlpool.repl_inst_filehdr->jnlpool_shmid)))			\
+			{													\
+				/* Replication instance filename or jnlpool shmid mismatch. Two possibilities.			\
+				 * (a) Database has already been bound with a replication instance file name that is different	\
+				 *	from the instance file name used by the current process.				\
+				 * (b) Database has already been bound with a jnlpool shmid and another jnlpool is about to	\
+				 *	be bound with the same database. Disallow this mixing of multiple jnlpools.		\
+				 * Note that (b) is Unix-only. In VMS, we dont check the shmids currently.			\
+				 * Issue error. But before that detach from journal pool.					\
 				 * Copy replication instance file name in journal pool to temporary memory before detaching.	\
+				 * Actually case (b) subsumes (a) so we assert that below. But in pro we handle both cases	\
+				 *	just in case.										\
 				 */												\
+				UNIX_ONLY(assert(CNL->jnlpool_shmid != jnlpool.repl_inst_filehdr->jnlpool_shmid);)		\
 				UNIX_ONLY(assert(SIZEOF(instfilename_copy) == SIZEOF(jnlpool_ctl->jnlpool_id.instfilename)));	\
 				VMS_ONLY(assert(SIZEOF(instfilename_copy) == SIZEOF(jnlpool_ctl->jnlpool_id.gtmgbldir)));	\
 				memcpy(&instfilename_copy[0], jnlpool_instfilename, SIZEOF(instfilename_copy));			\
+				assert(SIZEOF(jnlpool_shmid) == SIZEOF(CNL->jnlpool_shmid));					\
+				UNIX_ONLY(jnlpool_shmid = jnlpool.repl_inst_filehdr->jnlpool_shmid;)				\
+				VMS_ONLY(jnlpool_shmid = 0;)	/* print shmid of 0 for VMS as it is actually a string */	\
 				assert(NULL != jnlpool.jnlpool_ctl);								\
 				jnlpool_detach();										\
 				assert(NULL == jnlpool.jnlpool_ctl);								\
 				assert(FALSE == pool_init);									\
-				rts_error(VARLSTCNT(8) ERR_REPLINSTMISMTCH, 6, LEN_AND_STR(instfilename_copy),			\
-					DB_LEN_STR(gv_cur_region), LEN_AND_STR(CNL->replinstfilename));				\
+				rts_error(VARLSTCNT(10) ERR_REPLINSTMISMTCH, 8, LEN_AND_STR(instfilename_copy), jnlpool_shmid,	\
+					DB_LEN_STR(gv_cur_region), LEN_AND_STR(CNL->replinstfilename), CNL->jnlpool_shmid);	\
 			}													\
 			CSA->replinst_matches_db = TRUE;									\
 		}														\
@@ -1365,7 +1386,11 @@ typedef struct sgmnt_data_struct
 	char		filler_256[8];
 	/************* FIELDS SET WHEN DB IS OPEN ********************************/
 	char		now_running[MAX_REL_NAME];/* for active version stamp */
-	uint4		owner_node;		/* Node on cluster that "owns" the file */
+#	ifdef VMS
+	uint4		owner_node;		/* Node on cluster that "owns" the file -- applies to VMS only */
+#	else
+	uint4		filler_owner_node;	/* 4-byte filler - since owner_node is maintained on VMS only */
+#	endif
 	uint4		image_count;		/* for db freezing. Set to "process_id" on Unix and "image_count" on VMS */
 	uint4		freeze;			/* for db freezing. Set to "getuid"     on Unix and "process_id"  on VMS */
 	int4		kill_in_prog;		/* counter for multi-crit kills that are not done yet */
@@ -1482,11 +1507,7 @@ typedef struct sgmnt_data_struct
 	int4		repl_state;		/* state of replication whether open/closed/was_open */
 	boolean_t	multi_site_open;	/* Set to TRUE the first time a process opens the database using
 						 * a GT.M version that supports multi-site replication. FALSE until then */
-	seq_num		dualsite_resync_seqno;	/* Last known seqno communicated with the other side of the replication pipe.
-						 * This field is maintained as long as the other side is still running a
-						 * dual-site GT.M version. Once all replication instances in a configuration
-						 * are upgraded to the multi-site GT.M version, this field is no longer used.
-						 */
+	seq_num		filler_seqno;		/* formerly dualsite_resync_seqno but removed once dual-site support was dropped */
 	char		filler_repl[16];	/* to ensure this section has 64-byte multiple size */
 #endif
 	/************* TP RELATED FIELDS ********************/
@@ -1517,7 +1538,12 @@ typedef struct sgmnt_data_struct
 	boolean_t	recov_interrupted;	/* whether a MUPIP JOURNAL RECOVER/ROLLBACK on this db got interrupted */
 	int4		intrpt_recov_jnl_state;	/* journaling state at start of interrupted recover/rollback */
 	int4		intrpt_recov_repl_state;/* replication state at start of interrupted recover/rollback */
-	char		filler_1k[40];
+	/************* TRUNCATE RELATED FIELDS ****************/
+	uint4		before_trunc_total_blks;	/* Used in recover_truncate to detect interrupted truncate */
+	uint4		after_trunc_total_blks;		/* All these fields are used to repair interrupted truncates */
+	uint4		before_trunc_free_blocks;
+	uint4		before_trunc_file_size;		/* File size before truncate in terms of disk blocks */
+	char		filler_1k[24];
 	/************* HUGE CHARACTER ARRAYS **************/
 	unsigned char	jnl_file_name[JNL_NAME_SIZE];	/* journal file name */
 	unsigned char	reorg_restart_key[256];         /* 1st key of a leaf block where reorg was done last time */
@@ -1534,23 +1560,30 @@ typedef struct sgmnt_data_struct
 #	define TAB_BG_TRC_REC(A,B)	bg_trc_rec_cntr	B##_cntr;
 #	include "tab_bg_trc_rec.h"
 #	undef TAB_BG_TRC_REC
-	char		bg_trc_rec_cntr_filler[ 600 - (SIZEOF(bg_trc_rec_cntr) * n_bg_trc_rec_types)];
+	char		bg_trc_rec_cntr_filler[600 - (SIZEOF(bg_trc_rec_cntr) * n_bg_trc_rec_types)];
 
 	/************* DB_CSH_ACCT_REC RELATED FIELDS ***********/
 #	define	TAB_DB_CSH_ACCT_REC(A,B,C)	db_csh_acct_rec	A;
 #	include "tab_db_csh_acct_rec.h"
 #	undef TAB_DB_CSH_ACCT_REC
-	char		db_csh_acct_rec_filler_4k[ 248 - (SIZEOF(db_csh_acct_rec) * n_db_csh_acct_rec_types)];
+	char		db_csh_acct_rec_filler_4k[248 - (SIZEOF(db_csh_acct_rec) * n_db_csh_acct_rec_types)];
 
 	/************* GVSTATS_REC RELATED FIELDS ***********/
 	gvstats_rec_t	gvstats_rec;
-	char		gvstats_rec_filler_4k_plus_512[ 512 - SIZEOF(gvstats_rec_t)];
-	char		filler_5k_minus_16[512 - 16];
+	char		gvstats_rec_filler_4k_plus_512[512 - SIZEOF(gvstats_rec_t)];
+	char		filler_4k_plus_512[368];	/* Note: this filler array should START at offset 4K+512. So any additions
+							 * of new fields should happen at the END of this filler array and
+							 * the filler array size correspondingly adjusted.
+							 */
+	/************* INTERRUPTED RECOVERY RELATED FIELDS continued ****************/
+	seq_num		intrpt_recov_resync_strm_seqno[MAX_SUPPL_STRMS];/* resync/fetchresync jnl_seqno of interrupted rollback
+									 * corresponding to each non-supplementary stream.
+									 */
 	/************* DB CREATION AND UPGRADE CERTIFICATION FIELDS ***********/
 	enum db_ver	creation_db_ver;		/* Major DB version at time of creation */
 	enum mdb_ver	creation_mdb_ver;		/* Minor DB version at time of creation */
 	enum db_ver	certified_for_upgrade_to;	/* Version the database is certified for upgrade to */
-	int		filler_5k;
+	int4		filler_5k;
 	/************* SECSHR_DB_CLNUP RELATED FIELDS (now moved to node_local) ***********/
 	int4		secshr_ops_index_filler;
 	int4		secshr_ops_array_filler[255];	/* taking up 1k */
@@ -1558,7 +1591,15 @@ typedef struct sgmnt_data_struct
 	compswap_time_field next_upgrd_warn;	/* Time when we can send the next upgrade warning to the operator log */
 	boolean_t	is_encrypted;
 	uint4		db_trigger_cycle;	/* incremented every MUPIP TRIGGER command that changes ^#t global contents */
-	char		filler_7k[992];
+	/************* SUPPLEMENTARY REPLICATION INSTANCE RELATED FIELDS ****************/
+	seq_num		strm_reg_seqno[MAX_SUPPL_STRMS];	/* the jnl seqno of the last update to this region for a given
+								 * supplementary stream -- 8-byte aligned */
+	seq_num		save_strm_reg_seqno[MAX_SUPPL_STRMS];	/* a copy of strm_reg_seqno[] before it gets changed in
+								 * "mur_process_intrpt_recov". Used only by journal recovery.
+								 * See comment in "mur_get_max_strm_reg_seqno" function for
+								 * purpose of this field. Must also be 8-byte aligned.
+								 */
+	char		filler_7k[736];
 	char		filler_8k[1024];
 	/********************************************************/
 	/* Master bitmap immediately follows. Tells whether the local bitmaps have any free blocks or not. */
@@ -1619,6 +1660,39 @@ typedef struct
 #define FC_WRITE 1
 #define FC_OPEN 2
 #define FC_CLOSE 3
+
+#define DO_BADDBVER_CHK(REG, TSD)								\
+{												\
+	if (MEMCMP_LIT(TSD->label, GDS_LABEL))							\
+	{											\
+		if (memcmp(TSD->label, GDS_LABEL, GDS_LABEL_SZ - 3))				\
+			rts_error(VARLSTCNT(4) ERR_DBNOTGDS, 2, DB_LEN_STR(REG));		\
+		else										\
+			rts_error(VARLSTCNT(4) ERR_BADDBVER, 2, DB_LEN_STR(REG));		\
+	}											\
+}
+
+#define DO_DB_HDR_CHECK(REG, TSD)								\
+{												\
+	GBLREF	boolean_t	mupip_jnl_recover;						\
+	uint4			gtm_errcode = 0;						\
+												\
+	if (TSD->createinprogress)								\
+		gtm_errcode = ERR_DBCREINCOMP;							\
+	if (TSD->file_corrupt && !mupip_jnl_recover)						\
+		gtm_errcode = ERR_DBFLCORRP;							\
+	if ((dba_mm == TSD->acc_meth) && TSD->blks_to_upgrd)					\
+		gtm_errcode = ERR_MMNODYNUPGRD;							\
+	if (0 != gtm_errcode)									\
+	{											\
+		if (IS_DSE_IMAGE)								\
+		{										\
+			gtm_errcode = MAKE_MSG_WARNING(gtm_errcode);				\
+			gtm_putmsg(VARLSTCNT(4) gtm_errcode, 2, DB_LEN_STR(REG));		\
+		} else										\
+			rts_error(VARLSTCNT(4) gtm_errcode, 2, DB_LEN_STR(REG));		\
+	}											\
+}
 
 typedef struct	file_control_struct
 {
@@ -1711,7 +1785,16 @@ typedef struct	gd_region_struct
 	/* deleted gbl_lk_root and lcl_lk_root, obsolete fields */
 
 	uint4			jnl_alq;
+#ifdef UNIX
+	uint4			jnl_deq;
+	uint4			jnl_autoswitchlimit;
+	uint4			jnl_alignsize;		/* not used, reserved */
+	int4			jnl_epoch_interval;	/* not used, reserved */
+	int4			jnl_sync_io;		/* not used, reserved */
+	int4			jnl_yield_lmt;		/* not used, reserved */
+#else
 	unsigned short		jnl_deq;
+#endif
 	short			jnl_buffer_size;
 	bool			jnl_before_image;
 	bool			opening;
@@ -1789,7 +1872,8 @@ typedef struct	sgmnt_addrs_struct
 	size_t		fullblockwrite_len;	/* Length of a full block write */
 	uint4		total_blks;		/* Last we knew, file was this big. Used to
 						 * signal MM processing file was extended and
-						 * needs to be remapped.                     */
+						 * needs to be remapped. Also now used to detect
+						 * file truncates with BG. */
 	uint4		prev_free_blks;
 	/* The following uint4's are treated as bools but must be 4 bytes to avoid interaction between
 	   bools in interrupted routines and possibly lost data */
@@ -1847,11 +1931,21 @@ typedef struct	sgmnt_addrs_struct
 						 * to denote the '$' in $ZTRIGGER() */
 	boolean_t	hold_onto_crit;		/* TRUE currently for dse if a CRIT -SEIZE has been done on this region.
 						 * Set to FALSE by a DSE CRIT -RELEASE done on this region. Will also be TRUE in
-						 * case of ONLINE ROLLBACK when that is implemented. Any code that can be invoked
-						 * by both DSE and ROLLBACK should use csa->hold_onto_crit. Any code that can be
-						 * invoked only by ROLLBACK can use the global variable "hold_onto_locks" as that
-						 * is faster (avoids the csa-> dereference) and encompasses all database regions.
+						 * case of ONLINE ROLLBACK. Any code that can be invoked by both DSE and ROLLBACK
+						 * should use csa->hold_onto_crit.
 						 */
+	boolean_t	dse_crit_seize_done;	/* TRUE if DSE does a CRIT -SEIZE for this region. Set to FALSE when CRIT -RELEASE
+						 * or CRIT -REMOVE is done. Other than the -SEIZE and -RELEASE window, if any other
+						 * DSE module sets csa->hold_onto_crit to TRUE (like dse_b_dmp) but encounters a
+						 * runtime error before getting a chance to do a rel_crit, preemptive_ch should know
+						 * to release crit even if hold_onto_crit is set to TRUE and so will rely on this
+						 * variable
+						 */
+#	ifdef UNIX
+	uint4		onln_rlbk_cycle;	/* local copy of cnl->onln_rlbk_cycle */
+	uint4		db_onln_rlbkd_cycle;	/* local copy of cnl->db_onln_rlbkd_cycle */
+	boolean_t	dbinit_shm_created;	/* TRUE if shared memory for this region was created by this process */
+#	endif
 } sgmnt_addrs;
 
 typedef struct	gd_binding_struct
@@ -2775,8 +2869,28 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	}										\
 }
 
-#define INVALID_SEMID -1
-#define INVALID_SHMID -1L
+#define INVALID_SEMID			-1
+#define INVALID_SHMID 			-1L
+#define NEW_DBINIT_SHM_IPC_MASK		(1 << 0)	/* 1 if db_init created a new shared memory (no pre-existing one) */
+#define NEW_DBINIT_SEM_IPC_MASK		(1 << 1)	/* 1 if db_init created a new access control semaphore */
+
+#define RESET_SHMID_CTIME(X)		\
+{					\
+	(X)->shmid = INVALID_SHMID;	\
+	(X)->gt_shm_ctime.ctime = 0;	\
+}
+
+#define RESET_SEMID_CTIME(X)		\
+{					\
+	(X)->semid = INVALID_SEMID;	\
+	(X)->gt_sem_ctime.ctime = 0;	\
+}
+
+#define RESET_IPC_FIELDS(X)		\
+{					\
+	RESET_SHMID_CTIME(X);		\
+	RESET_SEMID_CTIME(X);		\
+}
 
 #if defined(UNIX)
 #define DB_FSYNC(reg, udi, csa, db_fsync_in_prog, save_errno)					\
@@ -2934,7 +3048,7 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	assert((-1 != CNL->ss_shmid) && 						\
 		(LCL_SS_CTX->attach_shmid == CNL->ss_shmid));				\
 	assert(NULL != LCL_SS_CTX->start_shmaddr);					\
-	assert(0 == strcmp(LCL_SS_CTX->shadow_file, ss_shm_ptr->ss_info.shadow_file));	\
+	assert(0 == STRCMP(LCL_SS_CTX->shadow_file, ss_shm_ptr->ss_info.shadow_file));	\
 	assert(-1 != LCL_SS_CTX->shdw_fd);						\
 }
 #else
@@ -3094,6 +3208,22 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 
 #define BLK_HDR_EMPTY(bp) ((0 == (bp)->bsiz) && (0 == (bp)->tn))
 
+#ifdef GTM_TRUNCATE
+/* Reduction in free blocks after truncating from a to b total blocks: a = old_total (larger), b = new_total */
+# define DELTA_FREE_BLOCKS(a, b)	((a - b) - (DIVIDE_ROUND_UP(a, BLKS_PER_LMAP) - DIVIDE_ROUND_UP(b, BLKS_PER_LMAP)))
+# define WRITE_EOF_BLOCK(reg, csd, new_total, status)									\
+{															\
+	off_t		new_eof;											\
+	char		*buff;												\
+															\
+	new_eof = ((off_t)(csd->start_vbn - 1) * DISK_BLOCK_SIZE) + ((off_t)new_total * csd->blk_size);			\
+	buff = (char *)malloc(DISK_BLOCK_SIZE);										\
+	memset(buff, 0, DISK_BLOCK_SIZE);										\
+	LSEEKWRITE(FILE_INFO(reg)->fd, new_eof, buff, DISK_BLOCK_SIZE, status);						\
+	free(buff);													\
+}
+#endif
+
 typedef enum
 {
 	REG_FREEZE_SUCCESS,
@@ -3101,29 +3231,189 @@ typedef enum
 	REG_HAS_KIP
 }freeze_status;
 
+#define ASSERT_BEGIN_OF_FRESH_TP_TRANS												\
+{																\
+	GBLREF	sgm_info	*first_sgm_info;										\
+	GBLREF	sgm_info	*sgm_info_ptr;											\
+																\
+	assert((NULL != first_sgm_info) && (first_sgm_info == sgm_info_ptr) && (NULL == first_sgm_info->next_sgm_info)		\
+			&& (0 == sgm_info_ptr->num_of_blks));									\
+}
+
+#define GVCST_ROOT_SEARCH													\
+{	/* gvcst_root_search is invoked to establish the root block of a given global (pointed to by gv_target). We always	\
+	 * expect the root block of the directory tree to be 1 and so must never come here with gv_target pointing to directory	\
+	 * tree. Assert that.													\
+	 */															\
+	assert((NULL != gv_target) && (DIR_ROOT != gv_target->root));								\
+	if (!gv_target->root)													\
+		gvcst_root_search();												\
+}
+
 #define GV_BIND_NAME_ONLY(ADDR, TARG)	gv_bind_name(ADDR, TARG)
 
-#define GV_BIND_NAME_AND_ROOT_SEARCH(ADDR, TARG)				\
-{										\
-	enum db_acc_method	acc_meth;					\
-	GBLREF gd_region	*gv_cur_region;					\
-	GBLREF gv_namehead	*gv_target;					\
-										\
-	GV_BIND_NAME_ONLY(ADDR, TARG);						\
-	acc_meth = gv_cur_region->dyn.addr->acc_meth;				\
-	if ((dba_bg == acc_meth) || (dba_mm == acc_meth))			\
-	{									\
-		if ((0 == gv_target->root) || (DIR_ROOT == gv_target->root))	\
-			gvcst_root_search();					\
-	}									\
+#define GV_BIND_NAME_AND_ROOT_SEARCH(ADDR, TARG)										\
+{																\
+	enum db_acc_method	acc_meth;											\
+	GBLREF gd_region	*gv_cur_region;											\
+	GBLREF gv_namehead	*gv_target;											\
+																\
+	GV_BIND_NAME_ONLY(ADDR, TARG);												\
+	acc_meth = gv_cur_region->dyn.addr->acc_meth;										\
+	if ((dba_bg == acc_meth) || (dba_mm == acc_meth))									\
+		GVCST_ROOT_SEARCH;												\
 }
+
+
+#ifdef UNIX
+
+/* When invoking GRAB_LOCK, use one of the following parameters.
+ * GRAB_LOCK_ONLY - use when the code expects an online rollback, but wants to handle it separately (like updproc.c)
+ * ASSERT_NO_ONLINE_ROLLBACK - use when the code doesn't expect online rollback (because it holds some other lock (like crit))
+ * HANDLE_CONCUR_ONLINE_ROLLBACK - use when the code expects online rollback, but wants the macro to handle it (currently used only
+ * 				   for the source server)
+ */
+#define	GRAB_LOCK_ONLY				0x01
+#define ASSERT_NO_ONLINE_ROLLBACK		0x02
+#define HANDLE_CONCUR_ONLINE_ROLLBACK		0x03
+
+# define SYNC_ONLN_RLBK_CYCLES													\
+{																\
+	GBLREF	sgmnt_addrs		*cs_addrs_list;										\
+	GBLREF	jnlpool_addrs		jnlpool;										\
+																\
+	sgmnt_addrs			*lcl_csa;										\
+	DCL_THREADGBL_ACCESS;													\
+																\
+	SETUP_THREADGBL_ACCESS;													\
+	if (!TREF(only_reset_clues_if_onln_rlbk))										\
+	{															\
+		for (lcl_csa = cs_addrs_list; NULL != lcl_csa; lcl_csa= lcl_csa->next_csa)					\
+		{														\
+			lcl_csa->onln_rlbk_cycle = lcl_csa->nl->onln_rlbk_cycle;						\
+			lcl_csa->db_onln_rlbkd_cycle = lcl_csa->nl->db_onln_rlbkd_cycle;					\
+			lcl_csa->db_trigger_cycle = lcl_csa->hdr->db_trigger_cycle;						\
+		}														\
+		if (NULL != jnlpool.jnlpool_ctl)										\
+		{														\
+			lcl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;						\
+			lcl_csa->onln_rlbk_cycle = jnlpool.jnlpool_ctl->onln_rlbk_cycle;					\
+		}														\
+	}															\
+}
+# define ABORT_TRANS_IF_GBL_EXIST_NOMORE(LCL_T_TRIES, TN_ABORTED)								\
+{																\
+	DEBUG_ONLY(GBLREF unsigned int		t_tries;)									\
+	DEBUG_ONLY(GBLREF unsigned char		t_fail_hist[CDB_MAX_TRIES];)							\
+	GBLREF	gd_region			*gv_cur_region;									\
+	GBLREF	sgmnt_addrs			*cs_addrs;									\
+	GBLREF	gv_namehead			*gv_target;									\
+																\
+	DEBUG_ONLY(enum cdb_sc			failure;)									\
+																\
+	assert(0 < t_tries);													\
+	assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));							\
+	DEBUG_ONLY(failure = t_fail_hist[t_tries - 1]);										\
+	assert(NULL != gv_target);												\
+	TN_ABORTED = FALSE;													\
+	if (!gv_target->root)													\
+	{	/* online rollback took us back to a prior logical state where the global that existed when we came into	\
+		 * mu_reorg or mu_extr_getblk, no longer exists. Consider this as the end of the tree and return to the		\
+		 * caller with the appropriate code. The caller knows to continue with the next global				\
+		 */														\
+		assert(cdb_sc_onln_rlbk2 == failure);										\
+		/* abort the current transaction */										\
+		t_abort(gv_cur_region, cs_addrs);										\
+		TN_ABORTED = TRUE;												\
+	}															\
+}
+# define GRAB_LOCK(REG, ACT)													\
+{																\
+	GBLREF	jnlpool_addrs		jnlpool;										\
+	GBLREF	boolean_t		is_src_server;										\
+																\
+	sgmnt_addrs			*lcl_repl_csa;										\
+	unix_db_info			*udi;											\
+	boolean_t			cycle_mismatch;										\
+																\
+	udi = FILE_INFO(REG);													\
+	lcl_repl_csa = &udi->s_addrs;												\
+	grab_lock(REG);														\
+	if (GRAB_LOCK_ONLY != ACT)												\
+	{															\
+		cycle_mismatch = (lcl_repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle);			\
+		assert((ASSERT_NO_ONLINE_ROLLBACK != ACT) || !cycle_mismatch);							\
+		if ((HANDLE_CONCUR_ONLINE_ROLLBACK == ACT) && cycle_mismatch)							\
+		{														\
+			assert(is_src_server);											\
+			SYNC_ONLN_RLBK_CYCLES;											\
+			gtmsource_onln_rlbk_clnup();										\
+			rel_lock(REG);												\
+		}														\
+	}															\
+}
+# define GRAB_GTMSOURCE_SRV_LATCH(GTMSOURCE_LOCAL, MAX_EPOCH_INTERVAL)								\
+{																\
+	GBLREF	boolean_t		is_src_server;										\
+	GBLREF	jnlpool_addrs		jnlpool;										\
+																\
+	sgmnt_addrs			*lcl_repl_csa;										\
+	unix_db_info			*udi;											\
+																\
+	assert(is_src_server);													\
+	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);										\
+	lcl_repl_csa = &udi->s_addrs;												\
+	assert(!lcl_repl_csa->now_crit); /* should not hold journal pool lock at this point */					\
+	if (!grab_gtmsource_srv_latch(&GTMSOURCE_LOCAL->gtmsource_srv_latch, 2 * MAX_EPOCH_INTERVAL))				\
+		rts_error(VARLSTCNT(5) ERR_SRVLCKWT2LNG, 2, 2 * MAX_EPOCH_INTERVAL, GTMSOURCE_LOCAL->gtmsource_pid);		\
+	if (jnlpool.repl_inst_filehdr->file_corrupt)										\
+	{	/* Journal pool indicates an abnormally terminated online rollback. Cannot continue until			\
+		 * the rollback command is re-run to bring the journal pool/file and instance file to a				\
+		 * consistent state.												\
+		 */														\
+		/* No need to release the latch before rts_error (mupip_exit_handler will do it for us) */			\
+		rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),						\
+				ERR_TEXT, 2, LEN_AND_LIT("file_corrupt field in instance file header is set to TRUE"));		\
+	}															\
+	if (lcl_repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle)						\
+	{															\
+		SYNC_ONLN_RLBK_CYCLES;												\
+		gtmsource_onln_rlbk_clnup();											\
+		rel_gtmsource_srv_latch(&GTMSOURCE_LOCAL->gtmsource_srv_latch);							\
+	}															\
+}
+#else
+# define GRAB_LOCK(REG, ACT)	grab_lock(REG)
+# define ABORT_TRANS_IF_GBL_EXIST_NOMORE(LCL_T_TRIES, TN_ABORTED)
+#endif
+
+#define	SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY				\
+{										\
+	uchar_ptr_t		dst_ptr, src_ptr;				\
+										\
+	GBLREF	gv_key		*gv_currkey, *gv_altkey;			\
+	GBLREF	int4		gv_keysize;					\
+										\
+	assert(gv_altkey->top == gv_currkey->top);				\
+	assert(gv_altkey->top == gv_keysize);					\
+	assert(gv_currkey->end < gv_currkey->top);				\
+	dst_ptr = gv_altkey->base;						\
+	src_ptr = gv_currkey->base;						\
+	for ( ; *src_ptr; )							\
+		*dst_ptr++ = *src_ptr++;					\
+	*dst_ptr++ = 0;								\
+	*dst_ptr = 0;								\
+	gv_altkey->end = dst_ptr - gv_altkey->base;				\
+	assert(gv_altkey->end < gv_altkey->top);				\
+}
+
 
 void		assert_jrec_member_offsets(void);
 bt_rec_ptr_t	bt_put(gd_region *r, int4 block);
 void		bt_que_refresh(gd_region *greg);
 void		bt_init(sgmnt_addrs *cs);
 void		bt_malloc(sgmnt_addrs *csa);
-void		bt_refresh(sgmnt_addrs *csa);
+void		bt_refresh(sgmnt_addrs *csa, boolean_t init);
 void		db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd);
 void		grab_crit(gd_region *reg);
 void		grab_lock(gd_region *reg);
@@ -3155,7 +3445,7 @@ bool reg_cmcheck(gd_region *reg);
 void gv_bind_name(gd_addr *addr, mstr *targ);
 
 void db_csh_ini(sgmnt_addrs *cs);
-void db_csh_ref(sgmnt_addrs *cs_addrs);
+void db_csh_ref(sgmnt_addrs *cs_addrs, boolean_t init);
 cache_rec_ptr_t db_csh_get(block_id block);
 cache_rec_ptr_t db_csh_getn(block_id block);
 
@@ -3169,6 +3459,8 @@ bt_rec *ccp_bt_get(sgmnt_addrs *cs_addrs, int4 block);
 unsigned char *mval2subsc(mval *in_val, gv_key *out_key);
 
 int4	dsk_read(block_id blk, sm_uc_ptr_t buff, enum db_ver *ondisk_blkver, boolean_t blk_free);
+
+unsigned int gds_file_size(file_control *fc);
 
 uint4	jnl_flush(gd_region *reg);
 void	jnl_fsync(gd_region *reg, uint4 fsync_addr);

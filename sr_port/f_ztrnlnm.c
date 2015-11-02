@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,59 +15,56 @@
 #include "toktyp.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
-
-int f_ztrnlnm( oprtype *a, opctype op )
+int f_ztrnlnm(oprtype *a, opctype op)
 {
-	triple *r, *last, *ref;
-	int i;
-	bool again;
+	boolean_t	again;
+	int		i;
+	triple		*last, *r, *ref;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	last = r = maketriple(op);
-	if (!strexpr(&r->operand[0]))
+	if (EXPR_FAIL == expr(&r->operand[0], MUMPS_STR))
 		return FALSE;
 	ref = newtriple(OC_PARAMETER);
 	last->operand[1] = put_tref(ref);
-	if (window_token == TK_COMMA)
-	{	advancewindow();
-		if (window_token == TK_COMMA || window_token == TK_RPAREN)
-		{	ref->operand[0] = put_str("",0);
-		}else
-		{	if (!strexpr(&ref->operand[0]))
-				return FALSE;
-		}
-	}else
-	{	ref->operand[0] = put_str("",0);
-	}
+	if (TK_COMMA == TREF(window_token))
+	{
+		advancewindow();
+		if ((TK_COMMA == TREF(window_token)) || (TK_RPAREN == TREF(window_token)))
+			ref->operand[0] = put_str("", 0);
+		else if (EXPR_FAIL == expr(&ref->operand[0], MUMPS_STR))
+			return FALSE;
+	} else
+		ref->operand[0] = put_str("", 0);
 	last = ref;
 	ref = newtriple(OC_PARAMETER);
 	last->operand[1] = put_tref(ref);
-	if (window_token == TK_COMMA)
-	{	advancewindow();
-		if (window_token == TK_COMMA || window_token == TK_RPAREN)
-		{	ref->operand[0] = put_ilit(0);
-		}else
-		{	if (!intexpr(&ref->operand[0]))
-				return FALSE;
-		}
-	}else
-	{	ref->operand[0] = put_ilit(0);
-	}
+	if (TK_COMMA == TREF(window_token))
+	{
+		advancewindow();
+		if ((TK_COMMA == TREF(window_token)) || (TK_RPAREN == TREF(window_token)))
+			ref->operand[0] = put_ilit(0);
+		else if (EXPR_FAIL == expr(&ref->operand[0], MUMPS_INT))
+			return FALSE;
+	} else
+		ref->operand[0] = put_ilit(0);
 	last = ref;
 	again = TRUE;
 	for (i = 0; i < 3; i++)
-	{	ref = newtriple(OC_PARAMETER);
+	{
+		ref = newtriple(OC_PARAMETER);
 		last->operand[1] = put_tref(ref);
-		if (again && window_token == TK_COMMA)
-		{	advancewindow();
-			if (window_token == TK_COMMA || window_token == TK_RPAREN)
-			{	ref->operand[0] = put_str("",0);
-			}else
-			{	if (!strexpr(&ref->operand[0]))
-					return FALSE;
-			}
-		}else
-		{	again = FALSE;
+		if (again && (TK_COMMA == TREF(window_token)))
+		{
+			advancewindow();
+			if ((TK_COMMA == TREF(window_token)) || (TK_RPAREN == TREF(window_token)))
+				ref->operand[0] = put_str("",0);
+			else if (EXPR_FAIL == expr(&ref->operand[0], MUMPS_STR))
+				return FALSE;
+		} else
+		{
+			again = FALSE;
 			ref->operand[0] = put_str("",0);
 		}
 		last = ref;

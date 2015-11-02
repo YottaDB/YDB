@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,6 @@
 #include "interlock.h"
 #include "add_inter.h"
 #include "sleep_cnt.h"
-#include "mu_file_size.h"
 #include "trans_log_name.h"
 #include "mupint.h"
 #include "memcoherency.h"
@@ -71,11 +70,23 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF 	void			(*call_on_signal)();
 GBLREF	int			process_exiting;
 
+error_def(ERR_BUFFLUFAILED);
+error_def(ERR_DBROLLEDBACK);
+error_def(ERR_FILEPARSE);
+error_def(ERR_MAXSSREACHED);
+error_def(ERR_PERMGENFAIL);
+error_def(ERR_SSFILOPERR);
+error_def(ERR_SSTMPCREATE);
+error_def(ERR_SSTMPDIRSTAT);
+error_def(ERR_SSV4NOALLOW);
+error_def(ERR_SYSCALL);
+ZOS_ONLY(error_def(ERR_BADTAG);)
+ZOS_ONLY(error_def(ERR_TEXT);)
+
+
 #define SNAPSHOT_TMP_PREFIX	"gtm_snapshot_"
 #define ISSUE_WRITE_ERROR_AND_EXIT(reg, RC, csa, tempfilename)								\
 {															\
-	error_def(ERR_SSFILOPERR);											\
-															\
 	gtm_putmsg(VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("write"), LEN_AND_STR(tempfilename), RC);		\
 	if (csa->now_crit)												\
 		rel_crit(csa->region);											\
@@ -114,8 +125,6 @@ GBLREF	int			process_exiting;
 
 #define SS_INIT_SHM(SS_SHMSIZE, SS_SHMADDR, SS_SHMID, RESIZE_NEEDED, RC)				\
 {													\
-	error_def(ERR_SYSCALL);										\
-													\
 	RC = 0;												\
 													\
 	if (RESIZE_NEEDED)										\
@@ -214,17 +223,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	mstr			tempdir_log, tempdir_full, tempdir_trans;
 	boolean_t		debug_mupip = FALSE, wait_for_zero_kip, final_retry;
 	now_t			now;
-
-	error_def(ERR_BUFFLUFAILED);
-	error_def(ERR_FILEPARSE);
-	error_def(ERR_MAXSSREACHED);
-	error_def(ERR_SSTMPDIRSTAT);
-	error_def(ERR_SSFILOPERR);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_SSTMPCREATE);
-	error_def(ERR_SSV4NOALLOW);
-	ZOS_ONLY(error_def(ERR_BADTAG);)
-	ZOS_ONLY(error_def(ERR_TEXT);)
+	struct perm_diag_data	pdd;
 
 	assert(IS_MUPIP_IMAGE);
 	assert(NULL != calling_utility);
@@ -387,7 +386,19 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	FSTAT_FILE(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 	assert(-1 != fstat_res);
 	if (-1 != fstat_res)
-		gtm_set_group_and_perm(&stat_buf, &group_id, &perm, (0770 & stat_buf.st_mode));
+		if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_FILE, &pdd) < 0)
+		{
+			send_msg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("snapshot file"),
+				RTS_ERROR_STRING(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fn),
+				PERMGENDIAG_ARGS(pdd));
+			gtm_putmsg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("snapshot file"),
+				RTS_ERROR_STRING(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fn),
+				PERMGENDIAG_ARGS(pdd));
+			UNFREEZE_REGION_IF_NEEDED(csd, reg);
+			return FALSE;
+		}
 
 	if ((-1 == fstat_res) || (-1 == FCHMOD(shdw_fd, perm))
 		|| ((-1 != group_id) && (-1 == fchown(shdw_fd, -1, group_id))))
@@ -494,7 +505,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 					ss_shmid);
 		}
 		/* Write EOF block in the snapshot file */
-		native_size = mu_file_size(reg->dyn.addr->file_cntl);
+		native_size = gds_file_size(reg->dyn.addr->file_cntl);
 		db_file_size = (gtm_int64_t)(native_size) * DISK_BLOCK_SIZE; /* Size of database file in bytes */
 		LSEEKWRITE(shdw_fd, ((off_t)db_file_size + ss_shmsize), eof_marker, EOF_MARKER_SIZE, status);
 		if (0 != status)
@@ -674,9 +685,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	DECR_INHIBIT_KILLS(cnl);
 	/* announce GT.M that it's now ok to write the before images */
 	if (!SNAPSHOTS_IN_PROG(cnl))
-	{
 		cnl->snapshot_in_prog = TRUE;
-	}
 	csa->snapshot_in_prog = TRUE;
 	/* Having a write memory barrier here ensures that whenever GT.M reads a newer value of cnl->ss_shmcycle, it is guaranteed
 	 * that the remaining fields that it reads from the shared memory will be the latest ones.
@@ -685,6 +694,14 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	cnl->ss_shmcycle++;	/* indicate that the ss_shmid field of cnl is being reused */
 	lcl_ss_ctx->ss_shmcycle = cnl->ss_shmcycle;
 	rel_crit(reg);
+	if ((csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle) || csa->nl->onln_rlbk_pid)
+	{	/* A concurrent online rollback happened since we did the gvcst_init. The INTEG is not reliable.
+		 * Cleanup and exit
+		 */
+		gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+		UNFREEZE_REGION_IF_NEEDED(csa, reg);
+		return FALSE;
+	}
 	/* ============= STEP 8: Write the database file header and the master map =============
 	 * Write the database file header at an offset equal to the database shared memory size.
 	 * This is because if we want to preserve the snapshot then we would want to write the

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@ void	mur_extract_blk(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 void	mur_extract_epoch(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
 void    mur_extract_inctn(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
 void	mur_extract_eof(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
+void	mur_extract_trunc(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
 void	mur_extract_pfin(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
 void	mur_extract_pini(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);
 void	mur_extract_tcom(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst);

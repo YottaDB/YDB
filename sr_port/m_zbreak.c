@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,24 +20,25 @@
 #define CANCEL_ONE -1
 #define CANCEL_ALL -2
 
-GBLREF char		window_token, director_token;
-GBLREF mident		window_ident;
 GBLREF boolean_t	run_time;
 GBLREF mident		routine_name;
 LITREF mident		zero_ident;
 
+error_def(ERR_LABELEXPECTED);
+error_def(ERR_RTNNAME);
+
 int m_zbreak(void)
 {
-	triple	*ref, *next;
-	oprtype label, offset, routine, action, count;
-	bool 	cancel, cancel_all, is_count, dummybool;
-	error_def(ERR_LABELEXPECTED);
-	error_def(ERR_RTNNAME);
+	boolean_t	cancel, cancel_all, dummybool, is_count;
+	oprtype		action, count, label, offset, routine;
+	triple		*next, *ref;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	label = put_str((char *)zero_ident.addr, zero_ident.len);
 	cancel_all = FALSE;
 	action = put_str("B", 1);
-	if (window_token == TK_MINUS)
+	if (TK_MINUS == TREF(window_token))
 	{
 		advancewindow();
 		cancel = TRUE;
@@ -47,7 +48,7 @@ int m_zbreak(void)
 		cancel = FALSE;
 		count = put_ilit((mint)0);
 	}
-	if (window_token == TK_ASTERISK)
+	if (TK_ASTERISK == TREF(window_token))
 	{
 		if (cancel)
 		{
@@ -71,7 +72,7 @@ int m_zbreak(void)
 			return FALSE;
 		if (label.oprclass == TRIP_REF && label.oprval.tref->opcode == OC_COMMARG)
 			return TRUE;
-		if (window_token != TK_CIRCUMFLEX)
+		if (TK_CIRCUMFLEX != TREF(window_token))
 		{	/* Routine not specified, assume current routine */
 			if (!run_time)
 				routine = put_str(routine_name.addr, routine_name.len);
@@ -80,43 +81,43 @@ int m_zbreak(void)
 		} else
 		{
 			advancewindow();
-			switch(window_token)
+			switch (TREF(window_token))
 			{
-				case TK_IDENT:
-#					ifdef GTM_TRIGGER
-					if (TK_HASH == director_token)
-						/* Coagulate tokens as necessary (and available) to allow '#' in the rtn name */
-						advwindw_hash_in_mname_allowed();
-#					endif
-					routine = put_str(window_ident.addr, window_ident.len);
-					advancewindow();
-					break;
-				case TK_ATSIGN:
-					if (!indirection(&routine))
-						return FALSE;
-					break;
-				default:
-					stx_error(ERR_RTNNAME);
+			case TK_IDENT:
+#				ifdef GTM_TRIGGER
+				if (TK_HASH == TREF(director_token))
+					/* Coagulate tokens as necessary (and available) to allow '#' in the rtn name */
+					advwindw_hash_in_mname_allowed();
+#				endif
+				routine = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
+				advancewindow();
+				break;
+			case TK_ATSIGN:
+				if (!indirection(&routine))
 					return FALSE;
+				break;
+			default:
+				stx_error(ERR_RTNNAME);
+				return FALSE;
 			}
 		}
-		if (!cancel && window_token == TK_COLON)
+		if (!cancel && (TK_COLON == TREF(window_token)))
 		{
 			advancewindow();
-			if (window_token == TK_COLON)
+			if (TK_COLON == TREF(window_token))
 			{
 				is_count = TRUE;
 				action = put_str("B",1);
 			} else
 			{
-				if (!strexpr(&action))
+				if (EXPR_FAIL == expr(&action, MUMPS_STR))
 					return FALSE;
-				is_count = window_token == TK_COLON;
+				is_count = (TK_COLON == TREF(window_token));
 			}
 			if (is_count)
 			{
 				advancewindow();
-				if (!intexpr(&count))
+				if (EXPR_FAIL == expr(&count, MUMPS_INT))
 					return FALSE;
 			}
 		}

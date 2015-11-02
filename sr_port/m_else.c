@@ -16,8 +16,6 @@
 #include "mmemory.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-
 error_def(ERR_SPOREOL);
 
 int m_else(void)
@@ -27,9 +25,9 @@ int m_else(void)
 
 	SETUP_THREADGBL_ACCESS;
 	elsepos_in_chain = TREF(pos_in_chain);
-	if (TK_EOL == window_token)
+	if (TK_EOL == TREF(window_token))
 		return TRUE;
-	if (TK_SPACE != window_token)
+	if (TK_SPACE != TREF(window_token))
 	{
 		stx_error(ERR_SPOREOL);
 		return FALSE;

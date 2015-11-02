@@ -31,11 +31,10 @@ GBLREF spdesc		stringpool, rts_stringpool, indr_stringpool;
 GBLREF short int	source_column;
 GBLREF char		cg_phase;
 GBLREF unsigned char	*source_buffer;
-GBLREF char		window_token;
 
 error_def(ERR_INDEXTRACHARS);
 
-int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len_t src_len)
+int comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len_t src_len)
 {
 	triple *ref;
 	DCL_THREADGBL_ACCESS;
@@ -43,11 +42,11 @@ int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len
 	SETUP_THREADGBL_ACCESS;
 	if (status)
 	{
-		while (TK_SPACE == window_token)	/* Eat up trailing white space */
+		while (TK_SPACE == TREF(window_token))	/* Eat up trailing white space */
 			advancewindow();
-		if (source_column != src_len + 2  &&  source_buffer[source_column] != '\0')
+		if (((src_len + 2) != source_column)  &&  ('\0' != source_buffer[source_column]))
 		{
-			status = FALSE;
+			status = EXPR_FAIL;
 			stx_error(ERR_INDEXTRACHARS);
 		} else
 		{
@@ -77,7 +76,7 @@ int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len
 			indr_stringpool.free = indr_stringpool.base;
 		}
 	}
-	if (!status)
+	if (EXPR_FAIL == status)
 	{
 		assert(indr_stringpool.base == stringpool.base);
 		indr_stringpool = stringpool;

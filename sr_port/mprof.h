@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,53 +26,52 @@
 #define PROFCALLOC_DSBLKSIZE            8180
 #endif
 
-#define POPULATE_PROFILING_TABLE() { \
+#define POPULATE_PROFILING_TABLE() {				\
 	/* xfer_table[xf_linefetch] = op_mproflinefetch; */	\
-    /*	xfer_table[xf_linefetch] = NON_IA64_ONLY((op_mproflinefetch) IA64_ONLY(CODE_ADDRESS_ASM(op_mproflinestart));*/ \
-	FIX_XFER_ENTRY(xf_linefetch, op_mproflinefetch); \
-   /*	xfer_table[xf_linestart] = NON_IA64_ONLY(op_mproflinestart) IA64_ONLY(CODE_ADDRESS_ASM(op_mproflinestart)); */  \
-	FIX_XFER_ENTRY(xf_linestart, op_mproflinestart) \
-	FIX_XFER_ENTRY(xf_extexfun, op_mprofextexfun); \
-	FIX_XFER_ENTRY(xf_extcall, op_mprofextcall); \
-	FIX_XFER_ENTRY(xf_exfun, op_mprofexfun); \
-	FIX_XFER_ENTRY(xf_callb, op_mprofcallb); \
-	FIX_XFER_ENTRY(xf_calll, op_mprofcalll); \
-	FIX_XFER_ENTRY(xf_callw, op_mprofcallw); \
-	FIX_XFER_ENTRY(xf_callspl, op_mprofcallspl); \
-	FIX_XFER_ENTRY(xf_callspw, op_mprofcallspw); \
-	FIX_XFER_ENTRY(xf_callspb, op_mprofcallspb); \
-	FIX_XFER_ENTRY(xf_forlcldob, op_mprofforlcldob); \
-	FIX_XFER_ENTRY(xf_forlcldow, op_mprofforlcldow); \
-	FIX_XFER_ENTRY(xf_forlcldol, op_mprofforlcldol); \
-	FIX_XFER_ENTRY(xf_forchk1, op_mprofforchk1); \
+	/* xfer_table[xf_linefetch] = NON_IA64_ONLY((op_mproflinefetch) IA64_ONLY(CODE_ADDRESS_ASM(op_mproflinestart));*/	\
+	FIX_XFER_ENTRY(xf_linefetch, op_mproflinefetch);	\
+	/* xfer_table[xf_linestart] = NON_IA64_ONLY(op_mproflinestart) IA64_ONLY(CODE_ADDRESS_ASM(op_mproflinestart)); */	\
+	FIX_XFER_ENTRY(xf_linestart, op_mproflinestart)		\
+	FIX_XFER_ENTRY(xf_extexfun, op_mprofextexfun);		\
+	FIX_XFER_ENTRY(xf_extcall, op_mprofextcall);		\
+	FIX_XFER_ENTRY(xf_exfun, op_mprofexfun);		\
+	FIX_XFER_ENTRY(xf_callb, op_mprofcallb);		\
+	FIX_XFER_ENTRY(xf_calll, op_mprofcalll);		\
+	FIX_XFER_ENTRY(xf_callw, op_mprofcallw);		\
+	FIX_XFER_ENTRY(xf_callspl, op_mprofcallspl);		\
+	FIX_XFER_ENTRY(xf_callspw, op_mprofcallspw);		\
+	FIX_XFER_ENTRY(xf_callspb, op_mprofcallspb);		\
+	FIX_XFER_ENTRY(xf_forlcldob, op_mprofforlcldob);	\
+	FIX_XFER_ENTRY(xf_forlcldow, op_mprofforlcldow);	\
+	FIX_XFER_ENTRY(xf_forlcldol, op_mprofforlcldol);	\
+	FIX_XFER_ENTRY(xf_forchk1, op_mprofforchk1);		\
 }
 
-#define CLEAR_PROFILING_TABLE() { \
-	FIX_XFER_ENTRY(xf_linefetch, op_linefetch); \
-	FIX_XFER_ENTRY(xf_linestart, op_linestart); \
-	FIX_XFER_ENTRY(xf_extexfun, op_extexfun); \
-	FIX_XFER_ENTRY(xf_extcall, op_extcall); \
-	FIX_XFER_ENTRY(xf_exfun, op_exfun); \
-	FIX_XFER_ENTRY(xf_callb, op_callb); \
-	FIX_XFER_ENTRY(xf_callw, op_callw); \
-	FIX_XFER_ENTRY(xf_calll, op_calll); \
-/*	xfer_table[xf_exfun]     = op_exfun; */ \
-	FIX_XFER_ENTRY(xf_callspb, op_callspb); \
-	FIX_XFER_ENTRY(xf_callspw, op_callspw); \
-	FIX_XFER_ENTRY(xf_callspl, op_callspl); \
-	FIX_XFER_ENTRY(xf_forlcldob, op_forlcldob); \
-	FIX_XFER_ENTRY(xf_forlcldow, op_forlcldow); \
-	FIX_XFER_ENTRY(xf_forlcldol, op_forlcldol); \
-	FIX_XFER_ENTRY(xf_forchk1, op_forchk1); \
+#define CLEAR_PROFILING_TABLE() {			\
+	FIX_XFER_ENTRY(xf_linefetch, op_linefetch);	\
+	FIX_XFER_ENTRY(xf_linestart, op_linestart);	\
+	FIX_XFER_ENTRY(xf_extexfun, op_extexfun);	\
+	FIX_XFER_ENTRY(xf_extcall, op_extcall);		\
+	FIX_XFER_ENTRY(xf_exfun, op_exfun);		\
+	FIX_XFER_ENTRY(xf_callb, op_callb);		\
+	FIX_XFER_ENTRY(xf_callw, op_callw);		\
+	FIX_XFER_ENTRY(xf_calll, op_calll);		\
+	/* xfer_table[xf_exfun]     = op_exfun; */	\
+	FIX_XFER_ENTRY(xf_callspb, op_callspb);		\
+	FIX_XFER_ENTRY(xf_callspw, op_callspw);		\
+	FIX_XFER_ENTRY(xf_callspl, op_callspl);		\
+	FIX_XFER_ENTRY(xf_forlcldob, op_forlcldob);	\
+	FIX_XFER_ENTRY(xf_forlcldow, op_forlcldow);	\
+	FIX_XFER_ENTRY(xf_forlcldol, op_forlcldol);	\
+	FIX_XFER_ENTRY(xf_forchk1, op_forchk1);		\
 }
 
-#if defined(VMS) && !defined(__TIME_LOADED)
-struct tms
+typedef struct ext_tms_struct
 {
 	int4	tms_utime;		/* user time */
 	int4	tms_stime;		/* system time */
-};
-#endif
+	int4	tms_etime;		/* elapsed time */
+} ext_tms;
 
 /* holds information identifying a line of/label in the code */
 typedef struct
@@ -83,6 +82,7 @@ typedef struct
 	unsigned int	count;		/* number of executions */
 	unsigned int	sys_time;	/* total system time  */
 	unsigned int	usr_time;	/* total user time */
+	unsigned int	elp_time;	/* total elapsed time */
 	int		loop_level;	/* nesting level; 0 for regular code and 1+ for (nested) loops */
 	char		*raddr;		/* return address used in FORs to record destination after current iteration */
 } trace_entry;
@@ -94,8 +94,8 @@ typedef struct mprof_stack_frame_struct
 	mident				*rout_name;		/* routine name */
 	mident				*label_name;		/* label name */
 	struct mprof_tree_struct	*curr_node;		/* reference to the current tree node in this frame */
-	struct tms			start;			/* user and system time at the beginning of current measurement */
-	struct tms			carryover;		/* user and system time to be subtracted from parent frames */
+	struct ext_tms_struct		start;			/* user and system time at the beginning of current measurement */
+	struct ext_tms_struct		carryover;		/* user and system time to be subtracted from parent frames */
 	int				dummy_stack_count;	/* number of non-label stack frames (IFs and FORs with DO) */
 } mprof_stack_frame;
 
@@ -112,7 +112,7 @@ typedef struct mprof_tree_struct
 
 typedef struct mprof_wrapper_struct
 {
-	struct tms		tprev, tcurr;
+	struct ext_tms_struct	tprev, tcurr;
 	mprof_tree		*head_tblnd, *curr_tblnd;
 	int			curr_num_subscripts;
 	char			**pcavailptr, **pcavailbase;
@@ -123,24 +123,42 @@ typedef struct mprof_wrapper_struct
 	mval			gbl_to_fill;
 } mprof_wrapper;
 
-char 	*pcalloc(unsigned int);
-void	turn_tracing_on(mval *glvn);
+STATICFNDCL void get_entryref_information(boolean_t, trace_entry *);
+STATICFNDCL void parse_gvn(mval *);
+#ifdef UNIX
+STATICFNDCL void times_usec(ext_tms *curr);
+STATICFNDCL void child_times_usec(void);
+#else
+STATICFNDCL void get_cputime(ext_tms *curr);
+#endif
+STATICFNDCL void insert_total_times(boolean_t for_process);
+
+STATICFNDCL mprof_tree *rotate_2(mprof_tree **, int);
+STATICFNDCL mprof_tree *rotate_3(mprof_tree **, int, int);
+STATICFNDCL int mprof_tree_compare(mprof_tree *, trace_entry *);
+STATICFNDCL void mprof_tree_rebalance_path(mprof_tree *, trace_entry *);
+STATICFNDCL void mprof_tree_rebalance(mprof_tree **, trace_entry *);
+
+void	turn_tracing_on(mval *glvn, boolean_t from_env, boolean_t save_gbl);
 void	turn_tracing_off(mval *);
-void	new_prof_frame(int);
-void 	mprof_tree_walk(mprof_tree *);
-void	pcurrpos(void);
 void	forchkhandler(char *return_address);
+void	pcurrpos(void);
+void	new_prof_frame(int);
 void	unw_prof_frame(void);
-mprof_tree *new_node(trace_entry *);
-mprof_tree *new_for_node(trace_entry *, char *);
-void	mprof_tree_print(mprof_tree *tree,int tabs,int longl);
-mprof_tree *mprof_tree_insert(mprof_tree **, trace_entry *);
+char 	*pcalloc(unsigned int);
+void 	mprof_reclaim_slots(void);
 void	crt_gbl(mprof_tree *p, boolean_t is_for);
 void	stack_leak_check(void);
-void	mprof_stack_init(void);
-mprof_stack_frame *mprof_stack_push(void);
-mprof_stack_frame *mprof_stack_pop(void);
-void	mprof_stack_free(void);
+
+mprof_tree	*new_node(trace_entry *);
+mprof_tree	*new_for_node(trace_entry *, char *);
+void		mprof_tree_walk(mprof_tree *);
+mprof_tree	*mprof_tree_insert(mprof_tree **, trace_entry *);
+
+void			mprof_stack_init(void);
+mprof_stack_frame	*mprof_stack_push(void);
+mprof_stack_frame	*mprof_stack_pop(void);
+void			mprof_stack_free(void);
 
 /* functions required for the transfer table manipulations*/
 int op_mproflinefetch(), op_mproflinestart();

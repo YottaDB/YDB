@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,7 +98,8 @@ void preemptive_ch(int preemptive_severe)
 				if (reg->open && !reg->was_open)
 				{
 					csa = &FILE_INFO(reg)->s_addrs;
-					if (csa->now_crit && !csa->hold_onto_crit)
+					assert(csa->hold_onto_crit || !csa->dse_crit_seize_done);
+					if (csa->now_crit && (!csa->hold_onto_crit || !csa->dse_crit_seize_done))
 					{
 						rel_crit(reg);
 						t_abort(reg, csa);	/* cancel mini-transaction if any in progress */

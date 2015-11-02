@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,18 +18,19 @@
 #include "advancewindow.h"
 #include "subscript.h"
 
-GBLREF char window_token;
+error_def(ERR_VAREXPECTED);
 
 int f_name(oprtype *a, opctype op)
 {
-	triple *r;
-	oprtype	*depth;
-	bool	gbl;
-	error_def(ERR_VAREXPECTED);
+	boolean_t	gbl;
+	oprtype		*depth;
+	triple		*r;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
 	gbl = FALSE;
-	switch (window_token)
+	switch (TREF(window_token))
 	{
 	case TK_CIRCUMFLEX:
 		gbl = TRUE;
@@ -51,7 +52,7 @@ int f_name(oprtype *a, opctype op)
 		return FALSE;
 	}
 	/* allow for optional default value */
-	if (window_token != TK_COMMA)
+	if (TK_COMMA != TREF(window_token))
 	{
 		*depth = put_ilit(MAX_LVSUBSCRIPTS + 1);	/* default to maximum number of subscripts allowed by law */
 		/* ideally this should be MAX(MAX_LVSUBSCRIPTS, MAX_GVSUBSCRIPTS) but they are the same so take the easy path */
@@ -59,7 +60,7 @@ int f_name(oprtype *a, opctype op)
 	} else
 	{
 		advancewindow();
-		if (!strexpr(depth))
+		if (EXPR_FAIL == expr(depth, MUMPS_STR))
 			return FALSE;
 	}
 	coerce(depth, OCT_MVAL);

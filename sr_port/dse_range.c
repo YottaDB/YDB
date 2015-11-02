@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,9 @@ GBLREF block_id		patch_path[MAX_BT_DEPTH + 1];
 GBLREF short int	patch_path_count;
 GBLREF bool		patch_find_root_search;
 
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_CTRLC);
+
 void dse_range(void)
 {
     char		lower[256], targ_key[256], upper[256], util_buff[MAX_UTIL_LEN];
@@ -50,10 +53,7 @@ void dse_range(void)
     cache_rec_ptr_t	dummy_cr;
     short int		rsize, size, size1;
     int			cnt, dummy, lower_len, util_len, upper_len;
-    boolean_t		busy_matters, free, got_lonely_star, index, low, lost, star, up, was_crit;
-
-    error_def(ERR_DSEBLKRDFAIL);
-    error_def(ERR_CTRLC);
+    boolean_t		busy_matters, free, got_lonely_star, index, low, lost, star, up, was_crit, was_hold_onto_crit;
 
     if (cli_present("FROM") == CLI_PRESENT)
     {
@@ -113,12 +113,12 @@ void dse_range(void)
     cnt = 0;
     was_crit = cs_addrs->now_crit;
     nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-    DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+    DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
     for (blk = from; blk <= to ;blk++)
     {
 	if (util_interrupt)
 	{
-	    DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+	    DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	    rts_error(VARLSTCNT(1) ERR_CTRLC);
 	    break;
 	}
@@ -229,7 +229,7 @@ void dse_range(void)
 	    util_out_print("!/Blocks in the specified key range:", TRUE);
 	util_out_print("Block:  !8XL Level: !2UL", TRUE, blk, level);
     }
-    DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+    DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
     if (cnt)
 	util_out_print("Found !UL blocks", TRUE, cnt);
     else

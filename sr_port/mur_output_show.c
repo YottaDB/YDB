@@ -43,7 +43,7 @@ GBLREF	mur_gbls_t	murgbl;
 
 LITREF	char		*jrt_label[JRT_RECTYPES];
 
-static	const	char	statistics_fao[] = "   !5AZ    !7UL";
+static	const	char	statistics_fao[] = "   !5AZ !10UL";
 static  const   char	statistics_header[] = "!/Record type    Count";
 static  const   char 	dashes_fao[] = "!#*-";
 
@@ -221,7 +221,26 @@ void	mur_show_header(jnl_ctl_list * jctl)
 	util_out_print(" Turn Around Point Time       !20AD", TRUE, time_len, time_str);
 	util_out_print(" Start Region Sequence Number !20@UQ [0x!16@XQ]", TRUE, &hdr->start_seqno, &hdr->start_seqno);
 	util_out_print(" End Region Sequence Number   !20@UQ [0x!16@XQ]", TRUE, &hdr->end_seqno, &hdr->end_seqno);
-
+	/* Dump stream seqnos for upto 16 streams if any are non-zero.
+	 */
+	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+	{	/* Dump stream seqnos. Dont dump them unconditionally as they will swamp the output.
+		 * We usually expect 1 or 2 streams to have non-zero values so dump it only if non-zero.
+		 * Note that in case the journal file is created for the first time as part of a supplementary instance,
+		 * the stream seqno would be 0 so the start_seqno in the jnl file header could be 0 whereas the end seqno
+		 * could be non-zero. In that case, use the end-seqno to determine if the stream seqno needs to be
+		 * dumped or not. In pro be safe and use both values and dump both if one of them is non-zero.
+		 */
+		assert(!hdr->strm_start_seqno[idx] || hdr->strm_end_seqno[idx]);
+		if (hdr->strm_start_seqno[idx] || hdr->strm_end_seqno[idx])
+		{
+			VMS_ONLY(assert(FALSE);)	/* we expect this field to be unused in VMS */
+			util_out_print(" Stream !2UL : Start RegSeqno   !20@UQ [0x!16@XQ]", TRUE,
+				idx, &hdr->strm_start_seqno[idx], &hdr->strm_start_seqno[idx]);
+			util_out_print(" Stream !2UL : End   RegSeqno   !20@UQ [0x!16@XQ]", TRUE,
+				idx, &hdr->strm_end_seqno[idx], &hdr->strm_end_seqno[idx]);
+		}
+	}
 	util_out_print("!/Process That Created the Journal File:!/", TRUE);
 	mur_show_jpv(&hdr->who_created, TRUE);
 	util_out_print("!/Process That Last Wrote to the Journal File:!/", TRUE);
@@ -324,7 +343,7 @@ void	mur_output_show()
 				util_out_print((caddr_t)dashes_fao, TRUE, STR_LIT_LEN(statistics_header));
 				for (rectype = JRT_BAD;  rectype < JRT_RECTYPES;  ++rectype)
 				{
-					if (JRT_TRIPLE == rectype)
+					if ((JRT_TRIPLE == rectype) || (JRT_HISTREC == rectype))
 					{
 						assert(0 == jctl->jnlrec_cnt[rectype]);
 						continue;

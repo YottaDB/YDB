@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,13 +48,73 @@ GBLREF	uint4		dollar_trestart;
 GBLREF	unsigned int	t_tries;
 GBLREF	gv_namehead	*reset_gv_target;
 GBLREF	boolean_t	mupip_jnl_recover;
+#ifdef UNIX
+# ifdef DEBUG
+GBLREF	boolean_t	is_rcvr_server;
+GBLREF	boolean_t	is_src_server;
+# endif
+GBLREF	jnl_gbls_t	jgbl;
+GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
+GBLREF	trans_num	start_tn;
+GBLREF	uint4		update_trans;
+GBLREF	uint4		t_err;
+#endif
+
+error_def(ERR_GVGETFAIL);
 
 static	mstr	global_collation_mstr;
+
+#ifdef UNIX
+void gvcst_redo_root_search()
+{
+	DEBUG_ONLY(boolean_t	dbg_now_crit;)
+	boolean_t		save_hold_onto_crit;
+	int			idx;
+	trans_num		save_start_tn;
+	uint4			save_update_trans, save_t_err;
+	unsigned char		save_t_fail_hist[CDB_MAX_TRIES];
+	unsigned int		save_t_tries;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	assert(!TREF(in_gvcst_redo_root_search)); /* should never recurse */
+	DEBUG_ONLY(TREF(in_gvcst_redo_root_search) = TRUE;)
+	assert(0 < t_tries);
+	assert(!is_src_server && !is_rcvr_server);
+	assert(!jgbl.onlnrlbk);
+	assert((NULL != gv_target) && !gv_target->root);
+	assert(cs_addrs == gv_target->gd_csa);
+	assert(!dollar_tlevel);
+	save_t_tries = t_tries;
+	for (idx = 0; CDB_MAX_TRIES > idx; idx++)
+		save_t_fail_hist[idx] = t_fail_hist[idx];
+	save_start_tn = start_tn;
+	save_update_trans = update_trans;
+	save_t_err = t_err;
+	DEBUG_ONLY(dbg_now_crit = cs_addrs->now_crit);
+	save_hold_onto_crit = cs_addrs->hold_onto_crit;
+	if (CDB_STAGNATE <= t_tries)
+	{
+		assert(cs_addrs->now_crit);
+		cs_addrs->hold_onto_crit = TRUE;
+	}
+	GVCST_ROOT_SEARCH;
+	assert(cs_addrs->now_crit == dbg_now_crit); /* ensure crit state remains same AFTER gvcst_root_search */
+	/* restore global variables now that we are continuing with the original transaction */
+	t_tries = save_t_tries;
+	cs_addrs->hold_onto_crit = save_hold_onto_crit;
+	for (idx = 0; CDB_MAX_TRIES > idx; idx++)
+		t_fail_hist[idx] = save_t_fail_hist[idx];
+	start_tn = save_start_tn;
+	update_trans = save_update_trans;
+	t_err = save_t_err;
+	DEBUG_ONLY(TREF(in_gvcst_redo_root_search) = FALSE;)
+}
+#endif
 
 void gvcst_root_search(void)
 {
 	srch_blk_status	*h0;
-	uchar_ptr_t	c, c1;
 	sm_uc_ptr_t	rp;
 	unsigned short	rlen, hdr_len;
 	uchar_ptr_t	subrec_ptr;
@@ -66,16 +126,7 @@ void gvcst_root_search(void)
 	block_id	lcl_root;
 
 	assert((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth));
-	assert(gv_altkey->top == gv_currkey->top);
-	assert(gv_altkey->top == gv_keysize);
-	assert(gv_currkey->end < gv_currkey->top);
-	for (c = gv_altkey->base, c1 = gv_currkey->base;  *c1;)
-		*c++ = *c1++;
-	*c++ = 0;
-	*c = 0;
-	gv_altkey->end = c - gv_altkey->base;
-	assert(gv_altkey->end < gv_altkey->top);
-	assert(gv_target != cs_addrs->dir_tree);
+	SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;	/* set up gv_altkey to be just the gblname */
 	save_targ = gv_target;
 	/* Check if "gv_target->gvname" matches "gv_altkey->base". If not, there is a name mismatch (out-of-design situation).
 	 * This check is temporary until we catch the situation that caused D9H02-002641 */

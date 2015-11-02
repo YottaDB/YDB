@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -33,7 +33,7 @@
 # PUBLIC	op_extjmp
 ENTRY op_extjmp
 	putframe
-	addl	$4,%esp
+	addl	$4,%esp			# Burn return pc
 	popl	%edx
 	cmpl	$0,%edx
 	je	l2
@@ -41,7 +41,12 @@ ENTRY op_extjmp
 	cmpl	$0,%eax
 	je	l4
 
-l1:	movl	(%eax),%eax
+l1:	movl	(%eax),%eax		# get line number offset
+	cmpl	$0,%eax
+	je	l4
+	addl	mrt_curr_ptr(%edx),%eax
+	addl	%edx,%eax		# get line number pointer
+	movl	(%eax),%eax		# get line number
 	addl	mrt_curr_ptr(%edx),%eax
 	addl	%edx,%eax
 	pushl	%eax

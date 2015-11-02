@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-#       Copyright 2010, 2011 Fidelity Information Services, Inc       #
+#       Copyright 2010, 2012 Fidelity Information Services, Inc.#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -9,19 +9,23 @@
 #                                                               #
 #################################################################
 # Usage: source "GTMDIST"/gtmprofile
-# Sets up the default environment for single-user use of GT.M.
-# System administrators must review and edit as appropriate for multi-user production environments.
+# Sets up environment for single-user use of GT.M with reasonable defaults.
+# Explicitly specify gtm_chset=UTF-8 before running this for UTF-8 mode.
+# Explicitly specify the gtmdir=directory before sourcing this for simple multi-user environments.
+# System administrators should adapt as appropriate for more complex multi-user and production environments.
 
 # Expects the following environment variables to be set:
 #   $gtm_chset - set to "UTF-8" if GT.M is to run in Unicode mode
 #   $gtm_passwd and $gtm_dbkeys if database encryption is used
 # Attempts to set the following environment variables to reasonable values:
 #   $gtm_dist $gtmgbldir $gtm_icu_version $gtm_log $gtm_principal_editing $gtm_prompt $gtm_retention $gtmroutines $gtm_tmp $gtmver
-# The following shell variables are used and left unset.
-#   $old_gtm_dist $old_gtmroutines $old_gtmver $tmp_gtm_tmp $tmp_passwd
+# The following shell variables are used and left unset:
+#   $old_gtm_dist $old_gtmroutines $old_gtmver $tmp_gtm_shlib $tmp_gtm_tmp $tmp_passwd
+# The following shell variables are used and left set:
+#   $arch
 # ; is used as a separator for sed as being the character most unlikely to be in file names
 
-# Set gtm_arch - GT.M installation script sets the actual architecture for use in this script
+# Set gtm_arch - GT.M installation script sets the actual architecture & shared library extension for use in this script
 arch="ARCH"
 
 # Save gtmroutines if it exists because we need to temporarily override it
@@ -43,8 +47,11 @@ fi
 # Since %XCMD is new, cannot assume that old GT.M version has it
 if [ -n "$gtm_dist" ] ; then
     old_gtm_dist=$gtm_dist
-    if [ -f $gtm_dist/_XCMD.o ] ; then
-        gtmroutines=$gtm_dist ; export gtmroutines
+    if [ -f $gtm_dist/_XCMD.m ] ; then
+	tmp_gtm_shlib=`basename $gtm_dist/libgtmshr.* | cut -d . -f 2` ; export tmp_gtm_shlib
+	if [ -f "$gtm_dist/libgtmutil.$tmp_gtm_shlib" ] ; then gtmroutines="$gtm_dist/libgtmutil.$tmp_gtm_shlib"
+	else gtmroutines=$gtm_dist ; fi
+	export gtmroutines
         old_gtmver=`$gtm_dist/mumps -run %XCMD 'Write $Piece($ZVersion," ",2),"_",$Piece($ZVersion," ",4)'`
     else
         unset old_gtmver
@@ -55,11 +62,17 @@ fi
 # Set gtm_dist - GT.M installation script sets the actual directory name
 gtm_dist="GTMDIST" ; export gtm_dist
 
+# Determine name of shared library file name extension on this platform
+tmp_gtm_shlib=`basename $gtm_dist/libgtmshr.* | cut -d . -f 2` ; export tmp_gtm_shlib
+
 # Idempotence says change the environment only if a new GT.M directory is being pointed to
 # otherwise just restore $gtmroutines and exit
 if [ $gtm_dist != "$old_gtm_dist" ] ; then
 
-    gtmroutines=$gtm_dist ; export gtmroutines # Force $gtmroutines to guarantee access to %XCMD for now; repaired later
+    # Force $gtmroutines to guarantee access to %XCMD for now; repaired later
+    if [ -f "$gtm_dist/libgtmutil.$tmp_gtm_shlib" ] ; then gtmroutines="$gtm_dist/libgtmutil.$tmp_gtm_shlib $gtm_dist"
+    else gtmroutines=$gtm_dist ; fi
+    export gtmroutines
     # Set $gtm_icu_version if icu-config is available - should be set before checking for UTF-8 mode
     # use whence on z/OS and which elsewhere
     if [ "zos" = $arch ] ; then
@@ -80,11 +93,13 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
 	if [ "`echo $gtm_chset|tr utf UTF`" = "UTF-8" -a -d $gtm_dist/utf8 -a $utflocale = en_US.UTF-8 ] ; then
 		gtm_chset_locale=$utflocale; export gtm_chset_locale
 		if [ "`echo Halt | gtm_prompt='GTM>' $gtm_dist/utf8/mumps -dir | tail -n 1`" = 'GTM>' ] ; then
-			gtm_dont_tag_UTF8_ASCII=0; export gtm_dont_tag_UTF8_ASCII
-			gtm_dist=$gtm_dist/utf8 ; gtmroutines=$gtm_dist
+		    gtm_dont_tag_UTF8_ASCII=0; export gtm_dont_tag_UTF8_ASCII
+		    gtm_dist=$gtm_dist/utf8
+		    if [ -f "$gtm_dist/libgtmutil.$tmp_gtm_shlib" ] ; then
+			gtmroutines="$gtm_dist/libgtmutil.$tmp_gtm_shlib $gtm_dist"
+		    else gtmroutines=$gtm_dist ; fi
 		else
-			# undo the set
-			unset gtm_chset_locale
+		    unset gtm_chset_locale  # undo the set
 		fi
 	fi
     else
@@ -95,7 +110,10 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
 		fi
 		echo $LC_CTYPE | grep -i .utf > /dev/null
 		if [ $? = 0 -a "`echo Halt | gtm_prompt='GTM>' $gtm_dist/utf8/mumps -dir | tail -n 1`" = 'GTM>' ] ; then
-			gtm_dist=$gtm_dist/utf8 ; gtmroutines=$gtm_dist
+			gtm_dist=$gtm_dist/utf8
+			if [ -f "$gtm_dist/libgtmutil.$tmp_gtm_shlib" ] ; then
+				gtmroutines="$gtm_dist/libgtmutil.$tmp_gtm_shlib $gtm_dist"
+			else gtmroutines=$gtm_dist ; fi
 		fi
 	fi
     fi
@@ -139,10 +157,20 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
         if [ -n "$old_gtmver" ] ; then
             gtmroutines=`echo $gtmroutines | sed "s;$old_gtmver;$gtmver;"`
         fi
-    elif [ "utf8" = `basename $gtm_dist` ] ; then
-        gtmroutines="$gtmdir/$gtmver/o/utf8($gtmdir/$gtmver/r $gtmdir/r) $gtm_dist"
     else
-        gtmroutines="$gtmdir/$gtmver/o($gtmdir/$gtmver/r $gtmdir/r) $gtm_dist"
+	if [ -f "$gtm_dist/libgtmutil.$tmp_gtm_shlib" ] ; then gtmroutines="$gtm_dist/libgtmutil.$tmp_gtm_shlib $gtm_dist"
+	else gtmroutines=$gtm_dist ; fi
+        if [ "utf8" = `basename $gtm_dist` ] ; then
+	    if [ -d $gtm_dist/plugin/o/utf8 ] ; then
+		gtmroutines=`$gtm_dist/mumps -run %XCMD 'set x=$ztrnlnm("gtm_dist")_"/plugin/o/utf8/*."_$ztrnlnm("tmp_gtm_shlib") for  set y=$zsearch(x) quit:""=y  write y," "'`"$gtm_dist/plugin/o/utf8($gtm_dist/plugin/r) $gtmroutines"
+	    fi
+            gtmroutines=`$gtm_dist/mumps -run %XCMD 'set x=$ztrnlnm("gtmdir")_"/"_$ztrnlnm("gtmver")_"/o/utf8/*."_$ztrnlnm("tmp_gtm_shlib") for  set y=$zsearch(x)  quit:""=y  write y," "'`"$gtmdir/$gtmver/o/utf8($gtmdir/$gtmver/r $gtmdir/r) $gtmroutines"
+	else
+	    if [ -d $gtm_dist/plugin/o ] ; then
+		gtmroutines=`$gtm_dist/mumps -run %XCMD 'set x=$ztrnlnm("gtm_dist")_"/plugin/o/*."_$ztrnlnm("tmp_gtm_shlib") for  set y=$zsearch(x) quit:""=y  write y," "'`"$gtm_dist/plugin/o($gtm_dist/plugin/r) $gtmroutines"
+	    fi
+            gtmroutines=`$gtm_dist/mumps -run %XCMD 'set x=$ztrnlnm("gtmdir")_"/"_$ztrnlnm("gtmver")_"/o/*."_$ztrnlnm("tmp_gtm_shlib") for  set y=$zsearch(x)  quit:""=y  write y," "'`"$gtmdir/$gtmver/o($gtmdir/$gtmver/r $gtmdir/r) $gtmroutines"
+	fi
     fi
     export gtmroutines
 
@@ -222,6 +250,18 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
         gtm_retention=42 ; export gtm_retention
     fi
 
+    # Set environment variables for plugins in $gtm_dist/plugin
+    tmp_gtm_tmp=`uname -s`
+    if [ "HP-UX" = $tmp_gtm_tmp -o "SunOS" = $tmp_gtm_tmp ] ; then
+        tmp_gtm_tmp=/var/tmp/
+    else
+        tmp_gtm_tmp=/tmp/
+    fi
+    tmp_gtm_tmp=$tmp_gtm_tmp`$gtm_dist/mumps -run %XCMD 'write $$%RANDSTR^%RANDSTR(12)'`.tmp
+    $gtm_dist/mumps -run %XCMD 'set x=$ztrnlnm("gtm_dist")_"/plugin/*.xc" for  set y=$zsearch(x,213) quit:""=y  set z=$zparse(y,"NAME") write "GTMXC_",z,"=",y," ; export GTMXC_",z,!' >$tmp_gtm_tmp
+    if [ -s $tmp_gtm_tmp ] ; then . $tmp_gtm_tmp ; fi
+    rm $tmp_gtm_tmp
+
     # Define aliases
     alias dse="$gtm_dist/dse"
     alias gde="$gtm_dist/mumps -run GDE"
@@ -252,4 +292,4 @@ if [ ! -z "${tmp_passwd+isset}" ] ; then
     gtm_passwd=$tmp_passwd ; export gtm_passwd
 fi
 
-unset old_gtm_dist old_gtmver old_gtmroutines tmp_gtm_tmp tmp_passwd
+unset old_gtm_dist old_gtmver old_gtmroutines tmp_gtm_shlib tmp_gtm_tmp tmp_passwd

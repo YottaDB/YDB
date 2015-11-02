@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,21 +35,22 @@ GBLREF uint4			gtmDebugLevel;
    The ERR_MEMORY error now gets same treatment as ERR_STACKOFLOW 2008-01-11 se.
 */
 #undef DUMP
-#define DUMP			(   SIGNAL == (int)ERR_ASSERT		\
-				 || SIGNAL == (int)ERR_GTMASSERT	\
-				 || SIGNAL == (int)ERR_GTMCHECK)
+#define DUMP	(   SIGNAL == (int)ERR_ASSERT		\
+		 || SIGNAL == (int)ERR_GTMASSERT	\
+		 || SIGNAL == (int)ERR_GTMASSERT2	\
+		    || SIGNAL == (int)ERR_GTMCHECK)	/* BYPASSOK */
+
+error_def(ERR_ASSERT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_MEMORY);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_STACKOFLOW);
 
 void ch_cond_core(void)
 {
 	boolean_t	cond_core_signal;
-
-	error_def(ERR_ASSERT);
-	error_def(ERR_GTMASSERT);
-	error_def(ERR_ASSERT);
-	error_def(ERR_GTMCHECK);
-	error_def(ERR_OUTOFSPACE);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_MEMORY);
 
 	cond_core_signal = (ERR_STACKOFLOW == SIGNAL) || (ERR_MEMORY == SIGNAL);
 	if (DUMPABLE && ((cond_core_signal && (GDL_DumpOnStackOFlow & gtmDebugLevel)) || !cond_core_signal) && !SUPPRESS_DUMP)

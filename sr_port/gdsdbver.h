@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,11 +42,11 @@ enum db_ver
 #define GDSVCURR ((enum db_ver)(GDSVLAST - 1))
 
 /* Database minor version as an enum quantity. This is an ever increasing number that may skip actual
-   releases as it is only added to when a file-header field is added or changed or if there is a
-   significant API difference in the version. This number can be incremented only by adding an entry
-   at the end, just before GDSMVLAST. Note these entries need corresponding updates in
-   db_auto_upgrade.c.
-*/
+ * releases as it is only added to when a file-header field is added or changed or if there is a
+ * significant API difference in the version. This number can be incremented only by adding an entry
+ * at the end, just before GDSMVLAST. Note these entries need corresponding updates in
+ * db_auto_upgrade.c.
+ */
 enum mdb_ver
 {
 	GDSMV4,		/* Applies to all V4 versions (no minor versions defined) */
@@ -59,7 +59,12 @@ enum mdb_ver
 	GDSMV53004,	/* New fields(is_encrypted, encryption_hash) for encryption */
 	GDSMV54000,	/* New fields(db_trigger_cycle) for triggers */
 	GDSMV54002,	/* New statistical counter field for ZTRIGGER command */
-	GDSMV54003,	/* New fields(turn_around_point, jnl_eovtn) for backward recovery */
+	GDSMV54002B,	/* New fields(turn_around_point, jnl_eovtn) for backward recovery */
+	GDSMV55000,	/* New fields(strm_reg_seqno, save_strm_reg_seqno, intrpt_recov_resync_strm_seqno)
+			 * 	for supplementary instances.
+			 * New fields(before_trunc_total_blks, after_trunc_total_blks, before_trunc_free_blocks
+			 *	before_trunc_file_size) for fixing interrupted MUPIP REORG -TRUNCATE.
+			 */
 	GDSMVLAST
 };
 #define GDSMVCURR ((enum mdb_ver)(GDSMVLAST - 1))

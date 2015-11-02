@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -230,6 +230,7 @@ typedef struct
 	caddr_t		call_from;
 	enum crit_ops	crit_act;
 	int4		epid;
+	trans_num	curr_tn;
 } crit_trace;
 
 typedef struct
@@ -382,14 +383,30 @@ typedef struct node_local_struct
 	boolean_t	snapshot_in_prog;	 /* Tells GT.M if any snapshots are in progress */
 	uint4		num_snapshots_in_effect; /* how many snapshots are currently in place for this region */
 	uint4		wbox_test_seq_num;	 /* used to coordinate with sequential testing steps */
+	NON_GTM64_ONLY(int4 filler_8byte_align;) /* To align the following member at an 8-byte boundry on 32-bit platforms */
 	uint4		kip_pid_array[MAX_KIP_PID_SLOTS]; /* Processes actively doing kill (0 denotes empty slots) */
 
 	gtm_uint64_t	sec_size;	/* Upon going to larger shared memory sizes, we realized that this does not	*/
 					/* need	to be in the file header but the node local since it can be calculated	*/
 					/* from info in the file header.						*/
-	uint4		filler_8byte_align;
+	int4		jnlpool_shmid;	/* copy of jnlpool.repl_inst_filehdr->jnlpool_shmid to prevent mixing of multiple
+					 * journal pools within the same database.
+					 */
+	boolean_t	lockspacefull_logged;			/* Avoids flooding syslog with LOCKSPACEFULL messages.
+								 * If TRUE: LOCKSPACEFULL is written to the syslog.
+								 * If FALSE: Do not write LOCKSPACEFULL to syslog.
+								 * Set this to FALSE if free space ratio is above
+								 * LOCK_SPACE_FULL_SYSLOG_THRESHOLD (defined in mlk_unlock.h).
+								 * We exclude mlk_shrsub, and only consider mlk_prcblk & mlk_shrblk.
+								 */
+	uint4		trunc_pid;			/* Operating truncate. */
+	block_id	highest_lbm_with_busy_blk;	/* Furthest lmap block known to have had a busy block during truncate. */
 #	if defined(UNIX)
 	ftokhist	ftok_ops_array[FTOK_OPS_ARRAY_SIZE];
+	volatile uint4	onln_rlbk_cycle;	/* incremented everytime an online rollback ends */
+	volatile uint4	db_onln_rlbkd_cycle;	/* incremented everytime an online rollback takes the database back in time */
+	volatile uint4	onln_rlbk_pid;		/* process ID of currently running online rollback. */
+	uint4		dbrndwn_skip_cnt;	/* # of processes that skipped gds_rundown due to a concurrent online rollback */
 #	endif
 } node_local;
 
@@ -421,6 +438,7 @@ typedef struct node_local_struct
 	node_local_ptr_t	cnl;					\
 	boolean_t		in_ast;					\
 	unsigned int		ast_status;				\
+									\
 	assert((NULL != csa) && (NULL !=(csa->nl)));			\
 	cnl = csa->nl;							\
 	coidx = ++cnl->crit_ops_index;					\
@@ -438,6 +456,8 @@ typedef struct node_local_struct
 		)							\
 	cnl->crit_ops_array[coidx].epid = process_id;			\
 	cnl->crit_ops_array[coidx].crit_act = (X);			\
+	cnl->crit_ops_array[coidx].curr_tn = (NULL != csa->hdr) ?	\
+						csa->ti->curr_tn : 0;	\
 }
 
 /* The following macro checks that curr_tn and early_tn are equal right before beginning a transaction commit.

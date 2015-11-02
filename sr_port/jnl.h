@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,10 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+
+error_def(ERR_JNLBADLABEL);
+error_def(ERR_JNLENDIANBIG);
+error_def(ERR_JNLENDIANLITTLE);
 
 #define TID_STR_SIZE		8
 #define JPV_LEN_NODE		16
@@ -48,15 +52,23 @@
  * 		which needs to change to say IF_curTO17 if the earliest supported version changes to V17 or so).
  *
  */
-#define JNL_LABEL_TEXT		"GDSJNL21"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		21
-#define JNL_VER_EARLIEST_REPL	15		/* Replication filter support starts here GDSJNL15 = GT.M V4.4-002 */
-#define JRT_MAX_V15		JRT_AIMG	/* Maximum jnl record type in GDSJNL15 that can be input to replication filter */
-#define JRT_MAX_V17		JRT_AIMG	/* Maximum jnl record type in GDSJNL17 that can be input to replication filter.
-						 * Actually JRT_TRIPLE is a higher record type than JRT_AIMG but it is only
+#define JNL_LABEL_TEXT		"GDSJNL22"	/* see above comment paragraph for todos whenever this is changed */
+#define JNL_VER_THIS		22
+#define JNL_VER_EARLIEST_REPL	17		/* Replication filter support starts here GDSJNL17 = GT.M V5.1-000.
+						 * (even though it should be V5.0-000, since that is pre-multisite,
+						 * the replication connection with V55000 will error out at handshake
+						 * time so V5.1-000 is the minimum that will even reach internal filter code)
+						 */
+#define JRT_MAX_V17		JRT_AIMG	/* Maximum jnl record type in GDSJNL17 or GDSJNL18 that can be input to replication
+						 * filter. Actually JRT_TRIPLE is a higher record type than JRT_AIMG but it is only
 						 * sent through the replication pipe and never seen by filter routines.
 						 */
-#define JRT_MAX_V19		JRT_UZTWORM	/* Maximum jnl record type in GDSJNL19 that can be input to replication filter */
+#define JRT_MAX_V19		JRT_UZTWORM	/* Max jnlrec type in GDSJNL19/GDSJNL20 that can be input to replication filter */
+#define JRT_MAX_V21		JRT_UZTRIG	/* Max jnlrec type in GDSJNL21/GDSJNL22 that can be input to replication filter */
+#define JRT_MAX_V22		JRT_UZTRIG	/* Max jnlrec type in GDSJNL22 that can be input to replication filter.
+						 * Actually JRT_HISTREC is a higher record type than JRT_UZTRIG but it is only
+						 * sent through the replication pipe and never seen by filter routines.
+						 */
 #define	ALIGN_KEY		0xdeadbeef
 
 #ifdef UNIX
@@ -78,10 +90,11 @@
 #define JNL_EXTEND_MIN		0
 #ifdef UNIX
 #define JNL_EXTEND_DEF		2048
+#define JNL_EXTEND_MAX		1073741823
 #else
 #define JNL_EXTEND_DEF		100
-#endif
 #define JNL_EXTEND_MAX		65535
+#endif
 #define JNL_MIN_WRITE		32768
 #define JNL_MAX_WRITE		65536
 /* FE was changed to EB because, the bit pattern there seems to vary more than the one for "FE".
@@ -200,6 +213,9 @@
 
 #define PADDED			PADDING
 
+/* User must enter this string to ask standard input or output. */
+#define	JNL_STDO_EXTR		"-stdout"
+
 #ifdef BIGENDIAN
 #define THREE_LOW_BYTES(x)	((uchar_ptr_t)((uchar_ptr_t)&x + 1))
 #else
@@ -227,6 +243,20 @@
 	}							\
 }
 
+/* This macro is similar to ADJUST_GBL_JREC_TIME except that this ensures ordering of timestamps across
+ * ALL replicated regions in a replicated environment. In VMS, we dont maintain this prev_jnlseqno_time
+ * field.
+ */
+#	define	ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jpl)		\
+{								\
+	if (jgbl.gbl_jrec_time < jpl->prev_jnlseqno_time)	\
+	{							\
+		assert(!jgbl.dont_reset_gbl_jrec_time);		\
+		jgbl.gbl_jrec_time = jpl->prev_jnlseqno_time;	\
+	}							\
+	jpl->prev_jnlseqno_time = jgbl.gbl_jrec_time;		\
+}
+
 /* Check if journal file is usable from the fields in the file header.
  * Currently, the fields tested are LABEL and ENDIANNESS.
  */
@@ -237,25 +267,21 @@
 	boolean_t	check_failed = FALSE;						\
 	uint4		lcl_status;							\
 											\
-	error_def(ERR_JNLBADLABEL);							\
-	error_def(ERR_JNLENDIANLITTLE);							\
-	error_def(ERR_JNLENDIANBIG);							\
-											\
 	assert(JNL_HDR_ENDIAN_OFFSET == OFFSETOF(jnl_file_header, is_little_endian));	\
-	if (0 != MEMCMP_LIT(JFH->label, JNL_LABEL_TEXT))				\
+	if (0 != MEMCMP_LIT((JFH)->label, JNL_LABEL_TEXT))				\
 	{										\
 		lcl_status = ERR_JNLBADLABEL;						\
 		check_failed = TRUE;							\
 	}										\
 	BIGENDIAN_ONLY(									\
-	else if (JFH->is_little_endian)							\
+	else if ((JFH)->is_little_endian)						\
 	{										\
 		lcl_status = ERR_JNLENDIANLITTLE;					\
 		check_failed = TRUE;							\
 	}										\
 	)										\
 	LITTLEENDIAN_ONLY(								\
-	else if (!JFH->is_little_endian)						\
+	else if (!(JFH)->is_little_endian)						\
 	{										\
 		lcl_status = ERR_JNLENDIANBIG;						\
 		check_failed = TRUE;							\
@@ -369,6 +395,9 @@ typedef struct
  	trans_num		eov_tn;		/* curr_tn is saved as eov_tn by jnl_write_epoch. Used by recover/rollback */
 	volatile trans_num	epoch_tn;	/* Transaction number for current epoch */
 	seq_num			end_seqno;		/* reg_seqno saved by jnl_write_epoch. Used by recover/rollback */
+	seq_num			strm_end_seqno[MAX_SUPPL_STRMS]; /* used to keep jfh->strm_end_seqno uptodate with each epoch.
+						 * Unused in VMS but defined so shared memory layout is similar in Unix & VMS.
+						 */
 	int4			min_write_size,	/* if unwritten data gets to this size, write it */
 				max_write_size, /* maximum size of any single write */
 				size;		/* buffer size */
@@ -533,6 +562,7 @@ typedef struct
 	sgmnt_addrs		*fence_list;
 	int			level;
 	token_num		token;
+	seq_num			strm_seqno;	/* valid only in case of replication. uninitialized in case of ZTP */
 } jnl_fence_control;
 
 typedef struct
@@ -612,9 +642,11 @@ typedef struct
 	/* encryption related fields */
 	uint4			is_encrypted;
 	char			encryption_hash[GTMCRYPT_RESERVED_HASH_LEN];
-
+	/* The below two arrays are unused in VMS but defined there to keep the layout similar between Unix & VMS */
+	seq_num			strm_start_seqno[MAX_SUPPL_STRMS];
+	seq_num			strm_end_seqno[MAX_SUPPL_STRMS];
 	/* filler remaining */
-	char			filler[696];
+	char			filler[440];
 } jnl_file_header;
 
 typedef struct
@@ -672,6 +704,12 @@ typedef struct
 					  */
 #define	JS_NULL_ZTWORM_MASK	(1 << 2) /* 1 if $ZTWORMHOLE for this update should be "" string, 0 otherwise */
 #define	JS_SKIP_TRIGGERS_MASK	(1 << 3) /* 1 if MUPIP LOAD update so triggers are not invoked on replay by update process */
+#define	JS_IS_DUPLICATE		(1 << 4) /* 1 if this SET or KILL is a duplicate. In case of a SET, this is a duplicate set.
+					  * In case of a KILL, it is a kill of a non-existing node aka duplicate kill.
+					  * Note that the dupkill occurs only in case of the update process. In case of GT.M,
+					  * the KILL is entirely skipped. In both duplicate sets or kills, only a journal
+					  * record is written, the database is untouched.
+					  */
 #define	JS_MAX_MASK		(1 << 8) /* max of 8 bits we have for mask */
 
 /* Note that even though mumps_node, ztworm_str, ztrig_str and align_str are members defined as type "jnl_string" below,
@@ -721,6 +759,10 @@ typedef struct	/* variable length */
 {
 	jrec_prefix		prefix;
 	token_seq_t		token_seq;	/* must start at 8-byte boundary */
+	seq_num			strm_seqno;	/* non-zero only if this is a supplementary instance in which case this #
+						 * reflects the 60-bit sequence number corresponding to this update on the
+						 * originating primary + higher order 4-bits reflecting the stream #.
+						 */
 	uint4			update_num;	/* 'n' where this is the nth journaled update (across all regions) in this TP
 						 * transaction. n=1 for the first update inside TP, 2 for the second update
 						 * inside TP and so on. Needed so journal recovery and update process can play
@@ -740,6 +782,7 @@ typedef struct	/* variable length */
 {
 	jrec_prefix		prefix;
 	token_seq_t		token_seq;	/* must start at 8-byte boundary */
+	seq_num			strm_seqno;	/* see "struct_jrec_upd" for comment on the purpose of this field */
 	uint4			update_num;	/* 'n' where this is the nth journaled update (across all regions) in this TP
 						 * transaction. n=1 for the first update inside TP, 2 for the second update
 						 * inside TP and so on. Needed so journal recovery and update process can play
@@ -777,6 +820,7 @@ typedef struct	/* fixed length */
 {
 	jrec_prefix		prefix;
 	token_seq_t		token_seq;	/* must start at 8-byte boundary */
+	seq_num			strm_seqno;	/* see "struct_jrec_upd" for comment on the purpose of this field */
 	unsigned short		filler_short;
 	unsigned short		num_participants;	/* # of regions that wrote a TCOM record in their jnl files */
 	char			jnl_tid[TID_STR_SIZE];
@@ -788,6 +832,11 @@ typedef struct	/* fixed length */
 {
 	jrec_prefix		prefix;
 	token_num		token;		/* must start at 8-byte boundary */
+	seq_num			filler_8bytes;	/* To mirror tcom layout. It is ok to waste space because ztcom is
+						 * obsoleted record. This keeps logic (e.g. MUR_TCOM_TOKEN_PROCESSING) faster
+						 * by avoiding if checks (of whether the rectype is TCOM or ZTCOM and accordingly
+						 * taking the appropriate offset).
+						 */
 	unsigned short		filler_short;
 	unsigned short		participants;	/* # of regions that wrote ZTCOM record in their jnl files for this fenced tn */
 	jrec_suffix		suffix;
@@ -851,6 +900,7 @@ typedef struct	/* fixed length */
 {
 	jrec_prefix		prefix;
 	seq_num			jnl_seqno;		/* must start at 8-byte boundary */
+	seq_num			strm_seqno;		/* see "struct_jrec_upd" for comment on the purpose of this field */
 	uint4			filler;
 	jrec_suffix		suffix;
 } struct_jrec_null;
@@ -862,6 +912,11 @@ typedef struct	/* fixed length */
 	uint4			blks_to_upgrd;		/* blocks-to-upgrade counter at time of epoch */
 	uint4			free_blocks;		/* free  blocks counter at time of epoch */
 	uint4			total_blks;		/* total blocks counter at time of epoch */
+	boolean_t		fully_upgraded;		/* cs_data->fully_upgraded at the time of epoch */
+	seq_num			strm_seqno[MAX_SUPPL_STRMS];	/* seqno of each possible supplementary stream at epoch time.
+								 * used by rollback to restore seqnos on the database.
+								 */
+	uint4			filler;			/* so as to make the EPOCH record aligned to 8 byte boundary */
 	jrec_suffix		suffix;
 } struct_jrec_epoch;
 
@@ -873,10 +928,19 @@ typedef struct	/* fixed length */
 	jrec_suffix		suffix;
 } struct_jrec_eof;
 
+typedef struct	/* fixed length */
+{
+	jrec_prefix		prefix;			/* 24 bytes */
+	uint4			orig_total_blks;
+	uint4			orig_free_blocks;
+	uint4			total_blks_after_trunc;
+	jrec_suffix		suffix;			/* 4 bytes */
+} struct_jrec_trunc;
+
 typedef union
 {
 	jrec_prefix			prefix;
-	struct_jrec_upd			jrec_set_kill;
+	struct_jrec_upd			jrec_set_kill;	/* JRT_SET or JRT_KILL or JRT_ZTRIG record will use this format */
 	struct_jrec_ztworm		jrec_ztworm;
 	struct_jrec_blk			jrec_pblk,
 					jrec_aimg;
@@ -890,6 +954,7 @@ typedef union
 	struct_jrec_null		jrec_null;
 	struct_jrec_epoch		jrec_epoch;
 	struct_jrec_eof			jrec_eof;
+	struct_jrec_trunc		jrec_trunc;
 } jnl_record;
 
 
@@ -902,6 +967,7 @@ typedef union
 #define	NULL_RECLEN		SIZEOF(struct_jrec_null)
 #define	EPOCH_RECLEN		SIZEOF(struct_jrec_epoch)
 #define	EOF_RECLEN 		SIZEOF(struct_jrec_eof)
+#define TRUNC_RECLEN		SIZEOF(struct_jrec_trunc)
 /* Macro to access variable size record's fixed part's size */
 #define FIXED_ZTWORM_RECLEN	OFFSETOF(struct_jrec_ztworm, ztworm_str)
 #define FIXED_UPD_RECLEN	OFFSETOF(struct_jrec_upd, mumps_node)
@@ -975,9 +1041,13 @@ typedef	void	(*pini_addr_reset_fnptr)(sgmnt_addrs *csa);
 
 typedef struct
 {
-	token_num			mur_jrec_seqno;		/* This is jnl_seqno */
+	token_num			mur_jrec_seqno;		/* This is jnl_seqno of the current record that backward
+								 * recovery/rollback is playing in its forward phase.
+								 */
+	token_num			mur_jrec_strm_seqno;	/* This is the strm_seqno of the current record that backward
+								 * recovery/rollback is playing in its forward phase.
+								 */
 	VMS_ONLY(seq_num		max_resync_seqno;)	/* for update process and rollback fetchresync */
-	UNIX_ONLY(seq_num		max_dualsite_resync_seqno;)	/* for update process and rollback fetchresync */
 	unsigned short			filler_short;
 	unsigned short			mur_jrec_participants;
 	jnl_tm_t			gbl_jrec_time;
@@ -1020,6 +1090,10 @@ typedef struct
 	uint4				max_tp_ztp_jnl_upd_num;	/* Max of all <jgbl.tp_ztp_jnl_upd_num> values processed in this
 								 * potentially multi-region transaction. Used only by jnl recovery.
 								 */
+	boolean_t			mur_options_forward;	/* a copy of mur_options.forward to be accessible to GT.M runtime */
+#	endif
+#	ifdef UNIX
+	boolean_t			onlnrlbk;		/* TRUE if ONLINE ROLLBACK */
 #	endif
 } jnl_gbls_t;
 
@@ -1051,7 +1125,47 @@ typedef struct
  * Modify the macro GET_JNL_SEQNO if offset of jnl_seqno is changed for any journal records
  */
 #define GET_JNL_SEQNO(j)	(((jnl_record *)(j))->jrec_null.jnl_seqno)
+#define GET_STRM_SEQNO(j)	(((jnl_record *)(j))->jrec_null.strm_seqno)
 #define GET_REPL_JNL_SEQNO(j)	(IS_REPLICATED(((jrec_prefix *)j)->jrec_type) ? GET_JNL_SEQNO(j) : 0)
+
+/* For MUPIP JOURNAL -ROLLBACK, getting the strm_reg_seqno from the file header is not as straightforward
+ * as accessing csd->strm_reg_seqno[idx]. This is because it increments this field in mur_output_record even
+ * before we reach t_end/tp_tend. That is done for convenience of the implementation. But this assumes that the
+ * commit has actually completed. Therefore, in case we need to invoke jnl_file_extend() inside t_end/tp_tend even
+ * before the commit, we would see an incorrect value of csd->strm_reg_seqno[idx]. In that case, we use the
+ * global variable jgbl.mur_jrec_strm_seqno to identify if the strm_reg_seqno[idx] value is 1 more than that and
+ * if so return 1 lesser than that as the real strm_reg_seqno[idx]. This is used by routines that write journal
+ * records (EPOCH, jfh->strm_end_seqno etc.) to write the correct strm_seqno. Not doing so will cause the strm_seqno
+ * to be higher than necessary and confuse everything else (including rollback) as far as replication is concerned.
+ * Note: We check for process_exiting to differentiate between calls made from mur_close_files() to before. Once we
+ * reach mur_close_files, we should no longer be in an active transaction and so we dont need to make any adjustments.
+ * VMS does not support supplementary instances so the below macro does not apply there at all.
+ */
+#ifdef UNIX
+#define	MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(CSD, DST)				\
+{										\
+	int			strm_num;					\
+	seq_num			strm_seqno;					\
+										\
+	GBLREF	int		process_exiting;				\
+										\
+	if (jgbl.mur_jrec_strm_seqno && !process_exiting)			\
+	{									\
+		assert(jgbl.mur_rollback);					\
+		VMS_ONLY(assert(FALSE);)					\
+		strm_seqno = jgbl.mur_jrec_strm_seqno;				\
+		strm_num = GET_STRM_INDEX(strm_seqno);				\
+		strm_seqno = GET_STRM_SEQ60(strm_seqno);			\
+		if (CSD->strm_reg_seqno[strm_num] == (strm_seqno + 1))		\
+		{								\
+			assert(DST[strm_num] == (strm_seqno + 1));		\
+			DST[strm_num] = strm_seqno;				\
+		}								\
+	}									\
+}
+#else
+#define	MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(CSD, DST)
+#endif
 
 /* Given a journal record, GET_TN returns the tn field
  */
@@ -1253,6 +1367,7 @@ void	jnl_write_inctn_rec(sgmnt_addrs *csa);
 void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb);
 void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb);
 void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record);
+void	jnl_write_trunc_rec(sgmnt_addrs *csa, uint4 orig_total_blks, uint4 orig_free_blocks, uint4 total_blks_after_trunc);
 void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, jnl_format_buffer *jfb);
 
 jnl_format_buffer	*jnl_format(jnl_action_code opcode, gv_key *key, mval *val, uint4 nodeflags);
@@ -1275,7 +1390,6 @@ boolean_t  mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info
 uint4	mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *jnl_info, mu_set_rlist *rptr);
 void	mupip_set_journal_fname(jnl_create_info *jnl_info);
 uint4	mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname);
-void	jnl_setver(void);
 void	jnl_extr_init(void);
 int 	exttime(uint4 time, char *buffer, int extract_len);
 char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec);

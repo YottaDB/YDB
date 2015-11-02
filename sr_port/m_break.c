@@ -15,14 +15,12 @@
 #include "toktyp.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-
 int m_break(void)
 {
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if ((TK_SPACE != window_token) && (TK_EOL != window_token))
+	if ((TK_SPACE != TREF(window_token)) && (TK_EOL != TREF(window_token)))
 		if (!m_xecute())
 			return FALSE;
 	newtriple(OC_BREAK);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,45 +17,43 @@
 #include "advancewindow.h"
 #include "gtm_utf8.h"
 
-GBLREF	char		window_token;
 GBLREF	spdesc		stringpool;
 GBLREF	boolean_t	badchar_inhibit;
 GBLREF	boolean_t	gtm_utf8_mode;
 
+error_def(ERR_FCHARMAXARGS);
+error_def(ERR_INVDLRCVAL);
+
 int f_char(oprtype *a, opctype op)
 {
-	triple 		*root, *last, *curr;
-	oprtype 	argv[CHARMAXARGS], *argp;
-	mval		 v;
 	boolean_t 	all_lits;
 	unsigned char 	*base, *outptr, *tmpptr;
-	int 		argc, ch, size, char_len;
+	int 		argc, ch, char_len, size;
+	mval		v;
+	oprtype 	*argp, argv[CHARMAXARGS];
+	triple 		*curr, *last, *root;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_FCHARMAXARGS);
-	error_def(ERR_INVDLRCVAL);
-
-	/* If we are not in UTF8 mode, we need to reroute to the $ZCHAR function to
-	   handle things correctly.
-	*/
+	SETUP_THREADGBL_ACCESS;
+	/* If we are not in UTF8 mode, we need to reroute to the $ZCHAR function to handle things correctly */
 	if (!gtm_utf8_mode)
 		return f_zchar(a, op);
-
 	all_lits = TRUE;
 	argp = &argv[0];
 	argc = 0;
 	for (;;)
 	{
-		if (!intexpr(argp))
+		if (EXPR_FAIL == expr(argp, MUMPS_INT))
 			return FALSE;
-		assert(argp->oprclass == TRIP_REF);
-		if (argp->oprval.tref->opcode != OC_ILIT)
+		assert(TRIP_REF == argp->oprclass);
+		if (OC_ILIT != argp->oprval.tref->opcode)
 			all_lits = FALSE;
 		argc++;
 		argp++;
-		if (window_token != TK_COMMA)
+		if (TK_COMMA != TREF(window_token))
 			break;
 		advancewindow();
-		if (argc >= CHARMAXARGS)
+		if (CHARMAXARGS <= argc)
 		{
 			stx_error(ERR_FCHARMAXARGS);
 			return FALSE;
@@ -70,7 +68,7 @@ int f_char(oprtype *a, opctype op)
 		for (outptr = base, char_len = 0; argc > 0; --argc, argp++)
 		{	/* For each wide char value, convert to unicode chars in stringpool buffer */
 			ch = argp->oprval.tref->operand[0].oprval.ilit;
-			if (ch >= 0)
+			if (0 <= ch)
 			{ /* As per the M standard, negative code points should map to no characters */
 				tmpptr = UTF8_WCTOMB(ch, outptr);
 				assert(tmpptr - outptr <= 4);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,6 +78,16 @@ GBLREF	bool			online;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		debug_mupip;
 
+error_def(ERR_BCKUPBUFLUSH);
+error_def(ERR_COMMITWAITSTUCK);
+error_def(ERR_DBCCERR);
+error_def(ERR_DBROLLEDBACK);
+error_def(ERR_ERRCALL);
+error_def(ERR_PERMGENFAIL);
+error_def(ERR_TEXT);
+error_def(ERR_TMPFILENOCRE);
+ZOS_ONLY(error_def(ERR_BADTAG);)
+
 bool	mubfilcpy (backup_reg_list *list)
 {
 	mstr			*file, tempfile;
@@ -97,14 +107,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	ZOS_ONLY(int		realfiletag;)
 	int			group_id;
 	int			perm;
-
-	error_def(ERR_BCKUPBUFLUSH);
-	error_def(ERR_COMMITWAITSTUCK);
-	error_def(ERR_DBCCERR);
-	error_def(ERR_ERRCALL);
-	error_def(ERR_TEXT);
-	error_def(ERR_TMPFILENOCRE);
-	ZOS_ONLY(error_def(ERR_BADTAG);)
+	struct perm_diag_data	pdd;
 
 	file = &(list->backup_file);
 	file->addr[file->len] = '\0';
@@ -212,9 +215,21 @@ bool	mubfilcpy (backup_reg_list *list)
 	}
 	FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 	if (-1 != fstat_res)
-		gtm_set_group_and_perm(&stat_buf, &group_id, &perm, (0770 & stat_buf.st_mode));
+		if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_FILE, &pdd) < 0)
+		{
+			send_msg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
+				RTS_ERROR_STRING(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
+				PERMGENDIAG_ARGS(pdd));
+			gtm_putmsg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
+				RTS_ERROR_STRING(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
+				PERMGENDIAG_ARGS(pdd));
+			if (online)
+				cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
+			CLEANUP_AND_RETURN_FALSE;
+		}
 	/* setup new group and permissions if indicated by the security rules.
-	 * Use 0770 anded with current mode for the new mode if  if masked permission selected.
 	 */
 	if ((-1 == fstat_res) || (-1 == FCHMOD(backup_fd, perm)) || ((-1 != group_id) && (-1 == fchown(backup_fd, -1, group_id))))
 	{
@@ -229,11 +244,17 @@ bool	mubfilcpy (backup_reg_list *list)
 	if (-1 == gtm_zos_tag_to_policy(backup_fd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG( tempfilename, realfiletag, TAG_BINARY, errno);
 #endif
-
 	if (online)
 	{
 		cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
-
+		if ((cs_addrs->onln_rlbk_cycle != cs_addrs->nl->onln_rlbk_cycle) ||
+			(0 != cs_addrs->nl->onln_rlbk_pid))
+		{	/* A concurrent online rollback happened since we did the gvcst_init. The backup is not reliable.
+			 * Cleanup and exit
+			 */
+			gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+			CLEANUP_AND_RETURN_FALSE;
+		}
 		/* if there has been an extend, truncate it */
 		FSTAT_FILE(backup_fd, &stat_buf, fstat_res);
 		if (-1 == fstat_res)

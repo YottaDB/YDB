@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@ void tp_set_sgm(void)
 	si = csa->sgm_info_ptr;
 	assert(si->tp_csa == csa);
 	assert(si->tp_csd == cs_data);
-	if (si->fresh_start)
+	if (!si->tp_set_sgm_done)
 	{
 		si->next_sgm_info = first_sgm_info;
 		first_sgm_info = si;
@@ -63,7 +63,12 @@ void tp_set_sgm(void)
 		GTMTRIG_ONLY(csa->db_trigger_cycle = csa->hdr->db_trigger_cycle);
 		GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_set_sgm: Updating csa->db_trigger_cycle to %d\n",
 				       csa->db_trigger_cycle)));
-		si->fresh_start = FALSE;
+#		ifdef GTM_TRUNCATE
+		/* see t_retry for comment */
+		if (dba_mm != csa->hdr->acc_meth)
+			csa->total_blks = csa->ti->total_blks;
+#		endif
+		si->tp_set_sgm_done = TRUE;
 		assert(0 == si->update_trans);
 	}
 	DBG_CHECK_IN_FIRST_SGM_INFO_LIST(si);

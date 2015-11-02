@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,6 +51,7 @@
 #include "gvcst_blk_build.h"
 #include "jnl_write.h"
 #include "op_tcommit.h"
+#include "gvcst_jrt_null.h"	/* for gvcst_jrt_null prototype */
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
@@ -68,6 +69,8 @@ GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF  jnl_process_vector	*prc_vec;
 GBLREF 	mur_gbls_t		murgbl;
 
+error_def(ERR_JNLBADRECFMT);
+
 /* This routine is called only for recover and rollback (that is, mur_options.update).
  * It applies the set/kill/zkill, tcom, inctn, and aimg records during forward processing.
  * Some fields like jnl_seqno, rec_seqno and prefix.time are saved here from original journal files.
@@ -77,6 +80,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 	mval			mv;
 	jnl_record		*rec;
 	char			*val_ptr;
+	int			strm_num;
 	uint4			dummy;
 	off_jnl_t		pini_addr;
 	jnl_string		*keystr;
@@ -86,6 +90,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 	boolean_t		jnl_enabled, was_crit;
 	struct_jrec_null	null_record;
 	gd_region		*reg;
+	seq_num			strm_seqno;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	jnl_ctl_list		*jctl;
@@ -96,13 +101,22 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		int		crypt_status;
 	)
 
-	error_def(ERR_JNLBADRECFMT);
-
 	assert(mur_options.update);
 	rec = rctl->mur_desc->jnlrec;
 	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
-	if (JRT_ALIGN == rectype || JRT_EOF == rectype || JRT_EPOCH == rectype || JRT_PBLK == rectype || JRT_PINI == rectype)
-		return SS_NORMAL;
+	switch (rectype)
+	{
+		case JRT_ALIGN:
+		case JRT_EOF:
+		case JRT_EPOCH:
+		case JRT_PBLK:
+		case JRT_PINI:
+		case JRT_TRUNC:
+			return SS_NORMAL;
+			break;
+		default:
+			break;
+	}
 	jgbl.gbl_jrec_time = rec->prefix.time;
 	pini_addr = rec->prefix.pini_addr;
 	reg = rctl->gd;
@@ -124,9 +138,22 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		rctl->mur_plst = plst;
 		if (mur_options.rollback && IS_REPLICATED(rectype))
 		{
-			jgbl.mur_jrec_seqno = ((struct_jrec_upd *)rec)->token_seq.jnl_seqno;
+			jgbl.mur_jrec_seqno = GET_JNL_SEQNO(rec);
 			if (jgbl.mur_jrec_seqno >= murgbl.consist_jnl_seqno)
+			{
+				assert(murgbl.losttn_seqno >= (jgbl.mur_jrec_seqno + 1));
 				murgbl.consist_jnl_seqno = jgbl.mur_jrec_seqno + 1;
+			}
+			UNIX_ONLY(
+				jgbl.mur_jrec_strm_seqno = GET_STRM_SEQNO(rec);
+				if (strm_seqno = jgbl.mur_jrec_strm_seqno)	/* caution: assignment */
+				{	/* maintain csd->strm_reg_seqno */
+					strm_num = GET_STRM_INDEX(strm_seqno);
+					strm_seqno = GET_STRM_SEQ60(strm_seqno);
+					assert(csd->strm_reg_seqno[strm_num] <= (strm_seqno + 1));
+					csd->strm_reg_seqno[strm_num] = strm_seqno + 1;
+				}
+			)
 		}
 	}
 	if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
@@ -135,6 +162,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		if (jnl_enabled)
 		{
 			jnl_fence_ctl.token = rec->jrec_set_kill.token_seq.token;
+			jnl_fence_ctl.strm_seqno = rec->jrec_set_kill.strm_seqno;
 			jgbl.tp_ztp_jnl_upd_num = rec->jrec_set_kill.update_num;
 			DEBUG_ONLY(jgbl.max_tp_ztp_jnl_upd_num = MAX(jgbl.max_tp_ztp_jnl_upd_num, jgbl.tp_ztp_jnl_upd_num);)
 			jgbl.mur_jrec_nodeflags = keystr->nodeflags;
@@ -224,6 +252,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		{	/* Format the ZTWORM journal record */
 			assert(dollar_tlevel);	/* op_tstart should already have been done by mur_forward */
 			jnl_fence_ctl.token = rec->jrec_ztworm.token_seq.token;
+			jnl_fence_ctl.strm_seqno = rec->jrec_ztworm.strm_seqno;
 			jgbl.tp_ztp_jnl_upd_num = rec->jrec_ztworm.update_num;
 			DEBUG_ONLY(jgbl.max_tp_ztp_jnl_upd_num = MAX(jgbl.max_tp_ztp_jnl_upd_num, jgbl.tp_ztp_jnl_upd_num);)
 			jgbl.mur_jrec_nodeflags = 0;
@@ -246,6 +275,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 			if (jnl_enabled)
 			{
 				jnl_fence_ctl.token = rec->jrec_tcom.token_seq.token;
+				jnl_fence_ctl.strm_seqno = rec->jrec_tcom.strm_seqno;
 				jgbl.mur_jrec_participants = rec->jrec_tcom.num_participants;
 				memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE);
 			}
@@ -258,6 +288,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		if (jnl_enabled)
 		{
 			jnl_fence_ctl.token = rec->jrec_ztcom.token;
+			jnl_fence_ctl.strm_seqno = 0;	/* strm_seqno is only for replication & ZTCOM does not work with replic */
 			jgbl.mur_jrec_participants = rec->jrec_ztcom.participants;
 		}
 		jnl_fence_ctl.level = 1;
@@ -342,39 +373,8 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		}
 		break;
 	case JRT_NULL:
-		if (jnl_enabled)
-		{
-			if (FALSE == ((was_crit = rctl->csa->now_crit)))
-				grab_crit(reg);
-			/* MUPIP RECOVER should be the only one updating the database so journal state not expected to changes */
-			assert(JNL_ENABLED(csd));
-			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
-			jnl_status = jnl_ensure_open();
-			if (0 == jnl_status)
-			{
-				csa->ti->early_tn = csa->ti->curr_tn + 1;
-				if (0 == csa->jnl->pini_addr)
-					jnl_put_jrt_pini(csa);
-				null_record.prefix.jrec_type = JRT_NULL;
-				null_record.prefix.forwptr = null_record.suffix.backptr = NULL_RECLEN;
-				null_record.prefix.time = jgbl.gbl_jrec_time;
-				null_record.prefix.tn = csa->ti->curr_tn;
-				null_record.prefix.pini_addr = csa->jnl->pini_addr;
-				null_record.prefix.checksum = INIT_CHECKSUM_SEED;
-				null_record.jnl_seqno = jgbl.mur_jrec_seqno;
-				null_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-				jnl_write(csa->jnl, JRT_NULL, (jnl_record *)&null_record, NULL, NULL);
-			} else
-			{
-				if (SS_NORMAL != csa->jnl->status)
-					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), csa->jnl->status);
-				else
-					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
-			}
-			INCREMENT_CURR_TN(csd);
-			if (!was_crit)
-				rel_crit(reg);
-		}
+		assert(cs_addrs == rctl->csa);
+		gvcst_jrt_null();
 		break;
 	default:
 		assert(FALSE);

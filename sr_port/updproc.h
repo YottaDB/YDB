@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,9 +26,9 @@ enum upd_bad_trans_type
 	upd_bad_val_size,
 	upd_fence_bad_t_num,
 	upd_nofence_bad_tupd_num,
-	upd_bad_triple_len,
-	upd_bad_triple_start_seqno1,
-	upd_bad_triple_start_seqno2,
+	upd_bad_histinfo_len,
+	upd_bad_histinfo_start_seqno1,
+	upd_bad_histinfo_start_seqno2,
 	upd_fence_bad_ztworm_t_num,
 	upd_bad_key
 };

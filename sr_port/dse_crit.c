@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,8 @@ GBLREF uint4			process_id;
 GBLREF short			crash_count;
 GBLREF gd_addr			*original_header;
 
+error_def(ERR_DBRDONLY);
+
 #define MAX_UTIL_LEN 80
 
 void dse_crit(void)
@@ -43,8 +45,6 @@ void dse_crit(void)
 	char			util_buff[MAX_UTIL_LEN];
 	boolean_t		crash = FALSE, cycle = FALSE, owner = FALSE;
 	gd_region		*save_region, *r_local, *r_top;
-
-	error_def(ERR_DBRDONLY);
 
 	crash = ((cli_present("CRASH") == CLI_PRESENT) || (cli_present("RESET") == CLI_PRESENT));
 	cycle = (CLI_PRESENT == cli_present("CYCLE"));
@@ -60,6 +60,7 @@ void dse_crit(void)
 		crash_count = cs_addrs->critical->crashcnt;
 		grab_crit(gv_cur_region);
 		cs_addrs->hold_onto_crit = TRUE;	/* need to do this AFTER grab_crit */
+		cs_addrs->dse_crit_seize_done = TRUE;
 		util_out_print("!/Seized write critical section.!/", TRUE);
 		if (!cycle)
 			return;
@@ -76,10 +77,16 @@ void dse_crit(void)
 		crash_count = cs_addrs->critical->crashcnt;
 		if (cs_addrs->now_crit)
 		{	/* user wants crit to be released unconditionally so "was_crit" not checked like everywhere else */
+			assert(cs_addrs->hold_onto_crit && cs_addrs->dse_crit_seize_done);
+			cs_addrs->dse_crit_seize_done = FALSE;
 			cs_addrs->hold_onto_crit = FALSE;	/* need to do this before the rel_crit */
 			rel_crit(gv_cur_region);
 			util_out_print("!/Released write critical section.!/", TRUE);
 		}
+#		ifdef DEBUG
+		else
+			assert(!cs_addrs->hold_onto_crit && !cs_addrs->dse_crit_seize_done);
+#		endif
 		return;
 	}
 	if (cli_present("INIT") == CLI_PRESENT)
@@ -116,6 +123,7 @@ void dse_crit(void)
 			 * TRUE. Set that back to FALSE now that we are going to release control of crit.
 			 */
 			cs_addrs->hold_onto_crit = FALSE;	/* need to do this before the rel_crit */
+			cs_addrs->dse_crit_seize_done = FALSE;
 			rel_crit(gv_cur_region);
 			util_out_print("!/Removed owner of write critical section!/", TRUE);
 		} else
@@ -124,6 +132,7 @@ void dse_crit(void)
 			 * TRUE. Set that back to FALSE now that we are going to release control of crit.
 			 */
 			cs_addrs->hold_onto_crit = FALSE;	/* need to do this before the rel_crit */
+			cs_addrs->dse_crit_seize_done = FALSE;
 			rel_crit(gv_cur_region);
 			util_out_print("!/Removed owner of write critical section!/", TRUE);
 			util_out_print("!/WARNING: No recovery because database is MM.!/", TRUE);

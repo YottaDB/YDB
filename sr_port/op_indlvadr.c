@@ -26,21 +26,20 @@
 GBLREF	boolean_t		mstr_native_align;
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	stack_frame		*frame_pointer;
-GBLREF	char			window_token;
 
 error_def(ERR_VAREXPECTED);
 
 void	op_indlvadr(mval *target)
 {
-	boolean_t		rval;
-	char			*ptr;
-	icode_str		indir_src;
-	mname_entry		*targ_key;
-	mstr			object, *obj;
-	mval			*saved_indx;
-	oprtype			v;
-	triple			*s;
-	uint4			align_padlen, len;
+	char		*ptr;
+	icode_str	indir_src;
+	int		rval;
+	mname_entry	*targ_key;
+	mstr		*obj, object;
+	mval		*saved_indx;
+	oprtype		v;
+	triple		*s;
+	uint4		align_padlen, len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -50,8 +49,9 @@ void	op_indlvadr(mval *target)
 	saved_indx = NULL;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
+		obj = &object;
 		comp_init(&target->str);
-		switch (window_token)
+		switch (TREF(window_token))
 		{
 		case TK_IDENT:
 			rval = lvn(&v, OC_SAVPUTINDX, NULL);
@@ -77,7 +77,7 @@ void	op_indlvadr(mval *target)
 			}
 			break;
 		case TK_ATSIGN:
-			if (rval = indirection(&v))
+			if (EXPR_FAIL != (rval = indirection(&v)))	/* NOTE assignment */
 			{	/* if the indirection nests, for_ctrl_indr_subs doesn't matter until we get the "real" lvn */
 				s = newtriple(OC_INDLVADR);
 				s->operand[0] = v;
@@ -86,33 +86,33 @@ void	op_indlvadr(mval *target)
 			break;
 		default:
 			stx_error(ERR_VAREXPECTED);
+			rval = EXPR_FAIL;
 			break;
 		}
-		if (comp_fini(rval, &object, OC_IRETMVAD, &v, target->str.len))
-		{ 	/* before cache and execute, tack a little something on at end of object */
-			assert(indir_src.str.addr == target->str.addr);
-			len = SIZEOF(uint4) * 2;
-			if (NULL != saved_indx)
-				len += SIZEOF(mval) + SIZEOF(mname_entry) + SIZEOF(mident_fixed); /* overlength, but ends aligned */
-			align_padlen = mstr_native_align ? PADLEN(stringpool.free, NATIVE_WSIZE) : 0;
-			len += align_padlen;
-			ptr = object.addr + object.len + align_padlen;
-			assert((char *)stringpool.free - align_padlen == ptr);
-			assert(ptr + len <= (char *)stringpool.top); /* ind_code, called by comp_fini, reserves to prevent gc */
-			if (NULL != saved_indx)
-			{	/* it's an unsubscripted name, so save the name infomation with the cached object */
-				memcpy(ptr, (char *)saved_indx, SIZEOF(mval) + saved_indx->str.len);
-				ptr += (len - (SIZEOF(uint4) * 2));
-				*(uint4 *)ptr = align_padlen;
-			}
-			ptr += SIZEOF(uint4);
-			*(uint4 *)ptr = len;
-			stringpool.free += len;
-			assert((ptr + SIZEOF(uint4)) == (char *)stringpool.free);
-			object.len += len;
-			cache_put(&indir_src, &object);		/* this copies the "extended" object to the cache */
-			comp_indr(&object);
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAD, &v, target->str.len))
+			return;
+		/* before cache and execute, tack a little something on at end of object */
+		assert(indir_src.str.addr == target->str.addr);
+		len = SIZEOF(uint4) * 2;
+		if (NULL != saved_indx)
+			len += SIZEOF(mval) + SIZEOF(mname_entry) + SIZEOF(mident_fixed); /* overlength, but ends aligned */
+		align_padlen = mstr_native_align ? PADLEN(stringpool.free, NATIVE_WSIZE) : 0;
+		len += align_padlen;
+		ptr = obj->addr + obj->len + align_padlen;
+		assert((char *)stringpool.free - align_padlen == ptr);
+		assert(ptr + len <= (char *)stringpool.top); /* ind_code, called by comp_fini, reserves to prevent gc */
+		if (NULL != saved_indx)
+		{	/* it's an unsubscripted name, so save the name infomation with the cached object */
+			memcpy(ptr, (char *)saved_indx, SIZEOF(mval) + saved_indx->str.len);
+			ptr += (len - (SIZEOF(uint4) * 2));
+			*(uint4 *)ptr = align_padlen;
 		}
+		ptr += SIZEOF(uint4);
+		*(uint4 *)ptr = len;
+		stringpool.free += len;
+		assert((ptr + SIZEOF(uint4)) == (char *)stringpool.free);
+		obj->len += len;
+		cache_put(&indir_src, obj);		/* this copies the "extended" object to the cache */
 	} else
 	{	/* if cached, the object has stuff at the end that might need pulling into the run-time context */
 		ptr = (char *)(obj->addr + obj->len);
@@ -141,7 +141,7 @@ void	op_indlvadr(mval *target)
 			assert(*(uint4 *)(obj->addr + obj->len - SIZEOF(uint4)) == len);
 			MANAGE_FOR_INDX(frame_pointer, TREF(for_nest_level), saved_indx);
 		}
-		comp_indr(obj);
 	}
+	comp_indr(obj);
 	return;
 }

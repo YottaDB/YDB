@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -102,7 +102,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	recvpool.upd_proc_local->upd_proc_shutdown = NO_SHUTDOWN;
 
 #ifdef UNIX
-	if (0 > (upd_pid = fork()))
+	if (0 > (upd_pid = fork()))	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
 	{
 		recvpool.upd_proc_local->upd_proc_shutdown = save_upd_status;
 		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,

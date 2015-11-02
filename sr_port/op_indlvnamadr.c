@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,55 +18,49 @@
 #include "hashtab_objcode.h"
 #include "op.h"
 
-GBLREF char			window_token;
-GBLREF mident			window_ident;
+error_def(ERR_VAREXPECTED);
 
 void	op_indlvnamadr(mval *target)
 {
-	error_def(ERR_VAREXPECTED);
-	bool		rval;
-	mstr		object, *obj;
+	icode_str	indir_src;
+	int		rval;
+	mstr		*obj, object;
 	oprtype		v;
 	triple		*s;
-	icode_str	indir_src;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(target);
 	indir_src.str = target->str;
 	indir_src.code = indir_lvnamadr;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
+		obj = &object;
 		comp_init(&target->str);
-		switch (window_token)
+		switch (TREF(window_token))
 		{
 		case TK_IDENT:
 			rval = EXPR_GOOD;
-			v = put_mvar(&window_ident);
-			if (comp_fini(rval, &object, OC_IRETMVAD, &v, target->str.len))
-			{
-				indir_src.str.addr = target->str.addr;
-				cache_put(&indir_src, &object);
-				comp_indr(&object);
-			}
+			v = put_mvar(&(TREF(window_ident)));
 			break;
 		case TK_ATSIGN:
-			if (rval = indirection(&v))
+			if (EXPR_FAIL != (rval = indirection(&v)))	/* NOTE assignment */
 			{
 				s = newtriple(OC_INDLVNAMADR);
 				s->operand[0] = v;
 				v = put_tref(s);
-				if (comp_fini(rval, &object, OC_IRETMVAD, &v, target->str.len))
-				{
-					indir_src.str.addr = target->str.addr;
-					cache_put(&indir_src, &object);
-					comp_indr(&object);
-				}
 			}
 			break;
 		default:
 			stx_error(ERR_VAREXPECTED);
+			rval = EXPR_FAIL;
 			break;
 		}
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAD, &v, target->str.len))
+			return;
+		indir_src.str.addr = target->str.addr;
+		cache_put(&indir_src, obj);
 	}
-	else
-		comp_indr(obj);
+	comp_indr(obj);
+	return;
 }

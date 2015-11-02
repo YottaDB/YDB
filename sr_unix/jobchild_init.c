@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,15 +38,15 @@
 
 #define FILE_NAME_SIZE	255
 
-GBLREF	stack_frame	*frame_pointer;
-GBLREF	uint4		process_id;
+LITDEF char 		interactive_mode_buf[] = "INTERACTIVE";
+LITDEF char 		other_mode_buf[] = "OTHER";
 
-error_def (ERR_RUNPARAMERR);
-error_def (ERR_TEXT);
+GBLREF stack_frame	*frame_pointer;
+GBLREF uint4		process_id;
+
+error_def(ERR_RUNPARAMERR);
+error_def(ERR_TEXT);
 error_def(ERR_SYSCALL);
-
-LITDEF char interactive_mode_buf[] = "INTERACTIVE";
-LITDEF char other_mode_buf[] = "OTHER";
 
 CONDITION_HANDLER(job_init_ch)
 {
@@ -55,36 +55,30 @@ CONDITION_HANDLER(job_init_ch)
 	NEXTCH;
 }
 
-/*
- * ---------------------------------------------------------
- * Child process test and initialization.
- * If this copy of GTM is a child process,
- * then initialize the child.
- * ---------------------------------------------------------
- */
-
+/* Child process test and initialization. If this copy of GTM is a child process, then initialize the child. */
 void jobchild_init(void)
 {
 	unsigned int	status;
-	job_params_type		jparms;
+	job_params_type	jparms;
 	unsigned char	*transfer_addr;		/* Transfer data */
 	rhdtyp		*base_addr;
 	unsigned short	i, arg_len;
 	char		run_file_name[FILE_NAME_SIZE + 2], *c;
 	gcall_args	job_arglist;
 	mval		job_args[MAX_ACTUALS];
+	mstr		routine, label;
+	int		offset;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(job_init_ch);
-	/*
-	 * Check if environment variable ppid - job parent pid
-	 * exists. If it does not, we are a regular gtm process,
-	 * else, we are a child process of a job command.
+	/* Check if environment variable ppid - job parent pid exists. If it does not, we are a regular
+	 * gtm process; else, we are a child process of a job command.
 	 */
 	if ((c = GETENV(CHILD_FLAG_ENV)) && strlen(c))
-	{	/* We are a Jobbed process Get Job parameters and set up environment to run the Job command */
-		/* Clear the environment variable so that subsequent child mumps processes can start normal initialization. */
+	{	/* We are a Jobbed process Get Job parameters and set up environment to run the Job command.
+		 * Clear the environment variable so that subsequent child mumps processes can start normal initialization.
+		 */
 		if (PUTENV(CLEAR_CHILD_FLAG_ENV))
 		{
 			util_out_print("Unable to clear gtmj0 process !UL exiting.", TRUE, process_id);
@@ -93,22 +87,17 @@ void jobchild_init(void)
 		/* read parameters into parameter structure */
 		ojchildparms(&jparms, &job_arglist, job_args);
 		/* Execute the command to be run before executing the actual M routine */
-		if (jparms.startup.len)
-		{
-			if (0 != SYSTEM(jparms.startup.addr))
-			{
-				rts_error(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("STARTUP command failed"));
-			}
-		}
-		/* Set up job's input, output and error files.  Redirect them, if necessary. */
-		/* It is needed since the middle process would not have always done this(under jobpid == TRUE cases) */
+		if (jparms.startup.len && (0 != SYSTEM(jparms.startup.addr)))
+			rts_error(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("STARTUP command failed"));
+		/* Set up job's input, output and error files.  Redirect them, if necessary.
+		 * It is needed since the middle process would not have always done this(under jobpid == TRUE cases)
+		 */
 		if (!(status = ojchildioset(&jparms)))
 			rts_error(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Failed to set STDIN/OUT/ERR for the job"));
 		job_addr(&jparms.routine, &jparms.label, jparms.offset, (char **)&base_addr, (char **)&transfer_addr);
 		/* Set process priority */
 		if (jparms.baspri)
-		{
-			/* send message to system log if nice fails */
+		{	/* send message to system log if nice fails */
 			if (-1 == nice((int)jparms.baspri))
 				send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("nice"), CALLFROM, errno);
 		}
@@ -136,13 +125,9 @@ void jobchild_init(void)
 		if (jparms.logfile.len)
 			free(jparms.logfile.addr);
 	} else
-	{
-		/* If we are not a child, setup a dummy mumps routine */
+	{	/* If we are not a child, setup a dummy mumps routine */
 		if (MUMPS_RUN == invocation_mode)
 		{
-			mstr	routine, label;
-			int	offset;
-
 			arg_len = FILE_NAME_SIZE;
 			if (!cli_get_str("INFILE", run_file_name, &arg_len))
 				rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
@@ -169,9 +154,6 @@ void jobchild_init(void)
 		SET_CI_ENV(ci_ret_code_exit);
 	}
 	if (job_arglist.callargs)
-	{
 		callg((INTPTR_T (*)(intszofptr_t cnt, ...))push_parm, (gparam_list *)&job_arglist);
-		frame_pointer->type |= SFT_EXTFUN;
-	}
 	REVERT;
 }

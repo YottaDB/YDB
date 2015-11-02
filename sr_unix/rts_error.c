@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,26 +27,26 @@ GBLREF boolean_t	dont_want_core;
 #define FLUSH	1
 #define RESET	2
 
+error_def(ERR_ASSERT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_MEMORY);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_REPEATERROR);
+error_def(ERR_REPLONLNRLBK);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_TPRETRY);
+
 /* ----------------------------------------------------------------------------------------
  *  WARNING:	For chained error messages, all messages MUST be followed by an fao count;
  *  =======	zero MUST be specified if there are no parameters.
  * ----------------------------------------------------------------------------------------
  */
-
 int rts_error(int argcnt, ...)
 {
 	int 		msgid;
 	va_list		var;
-
-	error_def(ERR_TPRETRY);
-	error_def(ERR_ASSERT);
-	error_def(ERR_GTMASSERT);
-	error_def(ERR_ASSERT);
-	error_def(ERR_GTMCHECK);
-        error_def(ERR_MEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_OUTOFSPACE);
-	error_def(ERR_REPEATERROR);
 
 	if (-1 == gtm_errno)
 		gtm_errno = errno;
@@ -61,7 +61,7 @@ int rts_error(int argcnt, ...)
 	if (DUMPABLE)
 		PRN_ERROR;
 	/* This is simply a place holder msg to signal tp restart or otherwise rethrow an error */
-	if (ERR_TPRETRY == msgid || ERR_REPEATERROR == msgid)
+	if (ERR_TPRETRY == msgid || ERR_REPEATERROR == msgid || ERR_REPLONLNRLBK == msgid)
 	{
 		error_condition = msgid;
 		/* util_out_print(NULL, RESET);	Believe this is superfluous housecleaning. SE 9/2000 */

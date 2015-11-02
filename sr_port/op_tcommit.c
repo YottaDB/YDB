@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,7 +93,6 @@ GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transact
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF	boolean_t		block_is_free;
-GBLREF	boolean_t		hold_onto_locks;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 GBLREF	int4			gtm_trigger_depth;
@@ -111,7 +110,7 @@ error_def(ERR_TCOMMITDISALLOW);
 
 enum cdb_sc	op_tcommit(void)
 {
-	boolean_t		blk_used, is_mm;
+	boolean_t		blk_used, is_mm, was_crit;
 	sm_uc_ptr_t		bmp;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
 	unsigned int		ctn;
@@ -212,8 +211,8 @@ enum cdb_sc	op_tcommit(void)
 				/* whenever si->first_cw_set is non-NULL, ensure that si->update_trans is non-zero */
 				assert((NULL == si->first_cw_set) || si->update_trans);
 				/* Whenever si->first_cw_set is NULL, ensure that si->update_trans is FALSE
-				 * except (1) when the duplicate set noop optimization is enabled in which case also ensure
-				 * that if the database is journaled, at least one journal record is being written or
+				 * except (1) when there are duplicate sets in which case also ensure that if the database
+				 * is journaled, at least one journal record is being written or
 				 * (2) when there has been a ZTRIGGER in this transaction.
 				 */
 				assert((NULL != si->first_cw_set) || !si->update_trans
@@ -268,7 +267,12 @@ enum cdb_sc	op_tcommit(void)
 								cw_depth, first_cse, &si->cw_set_depth)))
 							{
 								assert(is_mm);
+								was_crit = csa->now_crit;
+								if (!csa->hold_onto_crit && !was_crit)
+									grab_crit(si->gv_cur_region); /* for wcs_mm_recover */
 								wcs_mm_recover(si->gv_cur_region);
+								if (!csa->hold_onto_crit && !was_crit)
+									rel_crit(si->gv_cur_region);
 								delta = (sm_long_t)((sm_uc_ptr_t)csa->hdr - (sm_uc_ptr_t)csd);
 								csd = csa->hdr;
 								/* update cse's update array and old_block */
@@ -421,7 +425,7 @@ enum cdb_sc	op_tcommit(void)
 				GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return status = %d\n", status));)
 				return status;	/* return status to caller who cares about it */
 			}
-			assert(hold_onto_locks || (0 == have_crit(CRIT_HAVE_ANY_REG)));
+			assert(UNIX_ONLY(jgbl.onlnrlbk ||) (0 == have_crit(CRIT_HAVE_ANY_REG)));
 			csa = jnl_fence_ctl.fence_list;
 			if ((JNL_FENCE_LIST_END != csa) && jgbl.wait_for_jnl_hard && !is_updproc && !mupip_jnl_recover)
 			{	/* For mupip journal recover all transactions applied during forward phase are treated as
@@ -439,14 +443,14 @@ enum cdb_sc	op_tcommit(void)
 			}
 		} else if ((CDB_STAGNATE <= t_tries) && (NULL != tp_reg_list))
 		{	/* this is believed to be a case of M-lock work with no database work. release crit on all regions */
-			assert(!hold_onto_locks); /* if hold_onto_locks is TRUE, we should not be here releasing crit at all */
+			UNIX_ONLY(assert(!jgbl.onlnrlbk)); /* online rollback cannot reach here */
 			for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 			{
 				assert(FILE_INFO(tr->reg)->s_addrs.now_crit);
 				rel_crit(tr->reg);
 			}
 		}
-		assert(hold_onto_locks || (0 == have_crit(CRIT_HAVE_ANY_REG)));
+		assert(UNIX_ONLY(jgbl.onlnrlbk ||) (0 == have_crit(CRIT_HAVE_ANY_REG)));
 		/* Commit was successful */
 		dollar_trestart = 0;
 		t_tries = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -501,6 +501,14 @@ void op_svget(int varnum, mval *v)
 		case SV_ZTLEVEL:
 #			ifdef GTM_TRIGGER
 			MV_FORCE_MVAL(v, gtm_trigger_depth);
+			break;
+#			else
+			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZONLNRLBK:
+#			ifdef UNIX
+			count = TREF(dollar_zonlnrlbk);
+			MV_FORCE_MVAL(v, count);
 			break;
 #			else
 			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);

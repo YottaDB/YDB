@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2010 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2011 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -47,12 +47,12 @@ DBGCOMX u $i:exception="" s $et="" zm (gdeerr("VERIFY")\2*2):"FAILED"
 comfile:
 	d GETTOK^GDESCAN,TFSPEC^GDEPARSE
 	s (comfile,comfile(comlevel+1))=$zparse(value,"","",".COM")
-	i '$l($zsearch(comfile)),'$l($zsearch(comfile)) zm gdeerr("FNF"):comfile
+	i '$l($zsearch(comfile)),'$l($zsearch(comfile)) zm gdeerr("FILENOTFND"):comfile
 	e  o comfile:(read:exc="zg "_$zl_":comeof") zm gdeerr("EXECOM"):comfile d SCRIPT
 comeof	c comfile s comlevel=$select(comlevel>1:comlevel-1,1:0)
 	i comlevel>0 s comfile=comfile(comlevel) zm gdeerr("EXECOM"):comfile
 	e  u @useio
-	i $p($zs,",",3)'["%GTM-E-IOEOF",$p($zs,",",3)'["FNF" w !,$p($zs,",",3,9999),!
+	i $p($zs,",",3)'["%GTM-E-IOEOF",$p($zs,",",3)'["FILENOTFND" w !,$p($zs,",",3,9999),!
 	q
 SCRIPT:
 	s comlevel=comlevel+1

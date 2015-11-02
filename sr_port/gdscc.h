@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,6 +97,7 @@ enum gds_t_mode
 	gds_t_committed,	/* t_end   relies on this particular placement */
 	gds_t_write_root,	/* t_end   relies on this being AFTER gds_t_committed */
 	gds_t_busy2free,	/* t_end   relies on this being AFTER gds_t_committed */
+	gds_t_recycled2free,	/* t_end   relies on this being AFTER gds_t_committed */
 	n_gds_t_op,		/* tp_tend and other routines rely on this being BEFORE kill_t* modes and AFTER all gds_t_* modes */
 	kill_t_create,		/* tp_tend relies on this being AFTER n_gds_t_op */
 	kill_t_write,		/* tp_tend relies on this being AFTER n_gds_t_op */

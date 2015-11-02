@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,14 +37,17 @@
 #include "gt_timer.h"
 #include "gtm_stdio.h"
 #include "wbox_test_init.h"
+#include "is_proc_alive.h"
 #endif
 
-GBLREF uint4		process_id;
-error_def(ERR_JNLFSYNCERR);
+GBLREF	uint4		process_id;
+GBLREF	jnl_gbls_t	jgbl;
+
 error_def(ERR_FSYNCTIMOUT);
-error_def(ERR_TEXT);
 error_def(ERR_JNLFRCDTERM);
+error_def(ERR_JNLFSYNCERR);
 error_def(ERR_JNLFSYNCLSTCK);
+error_def(ERR_TEXT);
 
 #define CURRENT_WRITER jb->fsync_in_prog_latch.u.parts.latch_pid
 
@@ -57,11 +60,17 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	sgmnt_data_ptr_t	csd;
 	int4			lck_state;
 	int			fsync_ret, save_errno;
+	DEBUG_ONLY(uint4	onln_rlbk_pid;)
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	jpc = csa->jnl;
 	jb  = jpc->jnl_buff;
-
+	/* If a concurrent online rollback is running, we should never be here since online rollback at the start flushes all the
+	 * dirty buffers and ensures that the journal buffers are all synced to disk. So, there is no need for GT.M processes to
+	 * reach here with a concurrent online rollback. Assert to that effect.
+	 */
+	DEBUG_ONLY(onln_rlbk_pid = csa->nl->onln_rlbk_pid);
+	assert(jgbl.onlnrlbk || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, 0));
 	if ((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc))
 	{
 		csd = csa->hdr;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,17 +13,9 @@
 
 #include "gtm_unistd.h"		/* for close() */
 
-#ifdef UNIX
 #include "gtm_ipc.h"
 #include <sys/shm.h>
 #include <sys/sem.h>
-#elif defined(VMS)
-#include <ssdef.h>
-#include <psldef.h>
-#include <descrip.h> /* Required for gtmsource.h */
-#else
-#error Unsupported platform
-#endif
 #include <errno.h>
 #include "gtm_inet.h"
 #include "gtm_string.h"
@@ -45,12 +37,7 @@
 #include "jnl.h"
 #include "repl_filter.h"
 #include "repl_sem.h"
-#ifdef VMS
-#include "repl_shm.h"
-#endif
-#ifdef UNIX
 #include "mutex.h"
-#endif
 #include "repl_log.h"
 #include "repl_comm.h"
 
@@ -75,43 +62,29 @@ GBLREF	boolean_t		pool_init;
 
 int gtmsource_end1(boolean_t auto_shutdown)
 {
-	int		exit_status;
-	seq_num		log_seqno, log_seqno1, diff_seqno;
+	int		exit_status, idx;
+	seq_num		read_jnl_seqno, jnlpool_seqno, diff_seqno, jnlpool_strm_seqno[MAX_SUPPL_STRMS];
 	int		fclose_res;
 	sgmnt_addrs	*repl_csa;
-#ifdef VMS
-	int4		status;
-#endif
 
 	gtmsource_ctl_close();
 	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke and "rel_lock" unconditionally */
 	rel_lock(jnlpool.jnlpool_dummy_reg);
-	UNIX_ONLY(mutex_cleanup(jnlpool.jnlpool_dummy_reg);)
+	mutex_cleanup(jnlpool.jnlpool_dummy_reg);
 	exit_status = NORMAL_SHUTDOWN;
 	if (!auto_shutdown)
 		jnlpool.gtmsource_local->shutdown = NORMAL_SHUTDOWN;
-	QWASSIGN(log_seqno, jnlpool.gtmsource_local->read_jnl_seqno);
-	QWASSIGN(log_seqno1, jnlpool.jnlpool_ctl->jnl_seqno);
+	read_jnl_seqno = jnlpool.gtmsource_local->read_jnl_seqno;
+	jnlpool_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
+	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		jnlpool_strm_seqno[idx] = jnlpool.jnlpool_ctl->strm_seqno[idx];
 	jnlpool.gtmsource_local->gtmsource_pid = 0;
 	jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
 	if (!auto_shutdown)
 	{	/* Detach from journal pool */
-		UNIX_ONLY(
-			if (jnlpool.jnlpool_ctl && 0 > SHMDT(jnlpool.jnlpool_ctl))
-				repl_log(gtmsource_log_fp, FALSE, TRUE, "Error detaching from journal pool : %s\n", REPL_STR_ERROR);
-		)
-		VMS_ONLY(
-			if (jnlpool.jnlpool_ctl)
-			{
-				if (SS$_NORMAL != (status = detach_shm(jnlpool.shm_range)))
-					repl_log(stderr, TRUE, TRUE, "Error detaching from jnlpool : %s\n", REPL_STR_ERROR);
-				jnlpool.jnlpool_ctl = NULL;
-				if (!auto_shutdown && (SS$_NORMAL != (status = signoff_from_gsec(jnlpool.shm_lockid))))
-					repl_log(stderr, TRUE, TRUE, "Error dequeueing lock on jnlpool global section : %s\n",
-														REPL_STR_ERROR);
-			}
-		)
+		if (jnlpool.jnlpool_ctl && 0 > SHMDT(jnlpool.jnlpool_ctl))
+			repl_log(gtmsource_log_fp, FALSE, TRUE, "Error detaching from journal pool : %s\n", REPL_STR_ERROR);
 		jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
 		jnlpool.repl_inst_filehdr = NULL;
 		jnlpool.gtmsrc_lcl_array = NULL;
@@ -124,15 +97,24 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	gtmsource_free_filter_buff();
 	gtmsource_stop_heartbeat();
 	repl_close(&gtmsource_sock_fd);
-	if (QWNE(log_seqno, seq_num_zero))
-		QWDECRBYDW(log_seqno, 1);
-	if (QWNE(log_seqno1, seq_num_zero))
-		QWDECRBYDW(log_seqno1, 1);
-	QWSUB(diff_seqno, log_seqno1, log_seqno);
-	repl_log(gtmsource_log_fp, TRUE, FALSE, "REPL INFO - Last written tr num into jnlpool : %llu", log_seqno1);
-	repl_log(gtmsource_log_fp, FALSE, FALSE, "  Last sent tr num : %llu", log_seqno);
-	repl_log(gtmsource_log_fp, FALSE, TRUE, "  Number of unsent tr : %llu\n", diff_seqno);
-	repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Tr Total : %llu  Msg Total : %llu  CmpMsg Total : %llu\n",
+	if (jnlpool_seqno)
+	{
+		repl_log(gtmsource_log_fp, TRUE, FALSE, "REPL INFO - Current Jnlpool Seqno : %llu\n", jnlpool_seqno);
+		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		{
+			if (jnlpool_strm_seqno[idx])
+				repl_log(gtmsource_log_fp, TRUE, FALSE, "REPL INFO - Stream # %d : Current Jnlpool Stream Seqno "
+					": %llu\n", idx, jnlpool_strm_seqno[idx]);
+		}
+		jnlpool_seqno--;
+	}
+	if (read_jnl_seqno)
+		read_jnl_seqno--;
+	diff_seqno = jnlpool_seqno - read_jnl_seqno;
+	repl_log(gtmsource_log_fp, TRUE, FALSE, "REPL INFO - Last Seqno written in jnlpool : %llu", jnlpool_seqno);
+	repl_log(gtmsource_log_fp, FALSE, FALSE, "  Last Seqno sent : %llu", read_jnl_seqno);
+	repl_log(gtmsource_log_fp, FALSE, TRUE, "  Number of unsent Seqno : %llu\n", 0 < diff_seqno ? diff_seqno : 0);
+	repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Jnl Total : %llu  Msg Total : %llu  CmpMsg Total : %llu\n",
 		 repl_source_data_sent, repl_source_msg_sent, repl_source_cmp_sent);
 	if (gtmsource_filter & EXTERNAL_FILTER)
 		repl_stop_filter();

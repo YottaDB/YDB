@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,8 @@ static char     rcsid[] = "$Header:$";
 
 #include "gtcm.h"
 #include "omi.h"
+#include "gtmio.h"
+#include "have_crit.h"
 #include "rc.h"
 
 typedef struct rc_clnt_err rc_clnt_err;

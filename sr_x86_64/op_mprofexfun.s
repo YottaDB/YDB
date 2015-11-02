@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -40,16 +40,13 @@
 .extern	push_parm
 .extern	rts_error
 
-JMP_Jb		=	0x0eb
-JMP_Jv		=	0x0e9
-
-arg2_off        =       -72
-arg1_off        =       -64
-arg0_off        =       -56
-act_cnt         =       -48
-mask_arg        =       -44
-ret_val         =       -40
-rtn_pc          =       -32
+arg2_off	=	-72
+arg1_off	=	-64
+arg0_off	=	-56
+act_cnt		=	-48
+mask_arg	=	-44
+ret_val		=	-40
+rtn_pc		=	-32
 
 sav_esi		=	-8
 sav_ebx		=	-16
@@ -81,9 +78,6 @@ long:	movq    REG64_ACCUM,msf_mpc_off(REG64_ARG2)
         addl    REG32_ARG1, msf_mpc_off(REG64_ARG2)
 cont:	call	exfun_frame_sp
 	movq    frame_pointer(REG_IP),REG64_SCRATCH1
-        movq    msf_old_frame_off(REG64_SCRATCH1),REG64_ACCUM
-        movq    REG64_ACCUM,frame_pointer(REG_IP)
-        movq    REG64_SCRATCH1,sav_msf(REG_FRAME_POINTER)
 
         movl    act_cnt(REG_FRAME_POINTER),REG32_ACCUM
         cmpl    $0,REG32_ACCUM                          #arg0, arg1, arg2 are stored in rbp
@@ -112,13 +106,10 @@ no_arg: movl    act_cnt(REG_FRAME_POINTER), REG32_ARG4  #Actual Arg cnt
 	movl    REG32_ACCUM, REG32_ARG0                 #Totalcount = Act count +4
 	movb    $0,REG8_ACCUM             		# variable length argument
 	call	push_parm				# push_parm (total, $T, ret_value, mask, argc [,arg1, arg2, ...]);
-done:	movq    sav_msf(REG_FRAME_POINTER),REG64_ACCUM
-        movq    REG64_ACCUM,frame_pointer(REG_IP)
-	orw	$SFT_EXTFUN,msf_typ_off(REG64_ACCUM)
-	movq    msf_temps_ptr_off(REG64_ACCUM),REG_FRAME_TMP_PTR
-retlab:	#movl   act_cnt(REG_FRAME_POINTER),REG32_RET0
-	#addl   $4,REG32_RET0
-	leave
+done:	movq    frame_pointer(REG_IP),REG64_SCRATCH1
+	movq	msf_temps_ptr_off(REG64_SCRATCH1),REG_FRAME_TMP_PTR
+retlab:	leave
+	movq    REG64_SCRATCH1,REG_FRAME_POINTER
 	popq	REG_XFER_TABLE
 	ret
 # op_mprofexfun ENDP

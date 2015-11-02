@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,10 @@ GBLREF	boolean_t		unhandled_stale_timer_pop;
 GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
 GBLREF	cw_set_element		cw_set[];
 
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEFAIL);
+error_def(ERR_DBRDONLY);
+
 void dse_chng_bhead(void)
 {
 	block_id		blk;
@@ -78,10 +82,6 @@ void dse_chng_bhead(void)
 	int			crypt_status;
 	blk_hdr_ptr_t		bp, save_bp, save_old_block;
 #	endif
-
-	error_def(ERR_DSEBLKRDFAIL);
-	error_def(ERR_DSEFAIL);
-	error_def(ERR_DBRDONLY);
 
         if (gv_cur_region->read_only)
                 rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -201,7 +201,7 @@ void dse_chng_bhead(void)
 		/* Pass the desired tn as argument to bg_update/mm_update below */
 		BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, tn);
 		was_hold_onto_crit = csa->hold_onto_crit;
-		csa->hold_onto_crit = TRUE;
+		csa->hold_onto_crit = TRUE; /* need this so t_end doesn't release crit (see below comment for why) */
 		t_end(&dummy_hist, NULL, tn);
 #		ifdef GTM_CRYPT
 		if (csd->is_encrypted && (tn < csa->ti->curr_tn))
@@ -219,7 +219,8 @@ void dse_chng_bhead(void)
 			 * buffer and therefore use that to write the pblk, which is incorrect since it does not yet contain the
 			 * tn update. The consequence of this is would be writing an older before-image PBLK) record to the
 			 * journal file. To prevent this situation, we update the encryption buffer here (before releasing crit)
-			 * using logic like that in wcs_wtstart to ensure it is in sync with the regular global buffer.
+			 * using logic like that in wcs_wtstart to ensure it is in sync with the regular global buffer. To ensure
+			 * that t_end doesn't release crit, we set csa->hold_onto_crit to TRUE
 			 * Note:
 			 * Although we use cw_set[0] to access the global buffer corresponding to the block number being updated,
 			 * cw_set_depth at this point is 0 because t_end resets it. This is considered safe since cw_set is a
@@ -244,8 +245,7 @@ void dse_chng_bhead(void)
 				memcpy(save_bp, bp, bp->bsiz);
 		}
 #		endif
-		if (!was_hold_onto_crit)
-			csa->hold_onto_crit = FALSE;
+		csa->hold_onto_crit = was_hold_onto_crit;
 		if (!was_crit)
 			rel_crit(gv_cur_region);
 		if (unhandled_stale_timer_pop)

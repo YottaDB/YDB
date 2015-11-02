@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-
+#include <stddef.h>
 #include "gtm_string.h"		/* for memcpy */
 
 #include "gdsroot.h"
@@ -42,6 +42,7 @@
 #include "t_retry.h"
 #include "gvusr.h"
 
+
 #ifdef VMS
 	GBLREF uint4	image_count;
 	GBLREF int4	login_time[2];
@@ -53,6 +54,11 @@ GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 GBLREF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLREF  tp_region	*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
+
+error_def(ERR_LOCKSPACEFULL);
+error_def(ERR_LOCKSPACEINFO);
+error_def(ERR_GCBEFORE);
+error_def(ERR_GCAFTER);
 
 /*
  * ------------------------------------------------------
@@ -71,7 +77,7 @@ uint4 mlk_lock(mlk_pvtblk *p,
 	mlk_ctldata_ptr_t	ctl;
 	mlk_shrblk_ptr_t	d;
 	int			siz, retval, status;
-	bool			blocked, was_crit;
+	boolean_t		blocked, was_crit, have_space;
 	sgmnt_addrs		*csa;
 	connection_struct	*curr_entry;	/* for GT.CM GNP server */
 
@@ -97,10 +103,21 @@ uint4 mlk_lock(mlk_pvtblk *p,
 		   that already contains the consideration for the length byte. This is so we get
 		   room to put a bunch of nicely aligned blocks so the compiler can give us its
 		   best shot at efficient code. */
-		siz = p->subscript_cnt * (3 + SIZEOF(mlk_shrsub) - 1) + p->total_length;
+		siz = MLK_PVTBLK_SHRSUB_SIZE(p, p->subscript_cnt);
+		assert(siz >= 0);
+		assert(ctl->blkcnt >= 0);
+		have_space = TRUE;
 		if (ctl->subtop - ctl->subfree < siz || ctl->blkcnt < p->subscript_cnt)
+		{
 			mlk_garbage_collect(ctl, siz, p);
-		blocked = mlk_shrblk_find(p, &d, auxown);
+			/* If there isn't any created space after garbage collection, don't attempt to lock anything. */
+			if (ctl->subtop - ctl->subfree < siz || ctl->blkcnt < p->subscript_cnt)
+				have_space = FALSE;
+		}
+		if (have_space)
+			blocked = mlk_shrblk_find(p, &d, auxown);
+		else
+			d = NULL;
 		if (NULL != d)
 		{
 			if (d->owner)
@@ -147,7 +164,25 @@ uint4 mlk_lock(mlk_pvtblk *p,
 					retval = 0;
 				}
 			}
-		} /* else: Needed to create a shrblk but no space was available. Resource starve */
+		} else if (!csa->nl->lockspacefull_logged)
+		{ 	/* Needed to create a shrblk but no space was available. Resource starve. Print LOCKSPACEFULL to syslog
+			 * and prevent printing LOCKSPACEFULL until (free space)/(lock space) ratio is above
+			 * LOCK_SPACE_FULL_SYSLOG_THRESHOLD.
+			 */
+			csa->nl->lockspacefull_logged = TRUE;
+			send_msg(VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(p->region));
+			if (ctl->subtop - ctl->subfree >= siz)
+			{
+				send_msg(VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(p->region),
+					 (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
+					 (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" not "));
+			} else
+			{
+				send_msg(VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(p->region),
+					 (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
+					 (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" "));
+			}
+		}
 		if (FALSE == was_crit)
 			rel_crit(p->region);
 		if (!retval)

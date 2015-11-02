@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,63 +18,63 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
+error_def(ERR_RPARENMISSING);
 
 int m_zallocate(void)
 {
 
-	triple *ref;
-	oprtype indopr;
-	bool indirect;
+	boolean_t	indirect;
+	oprtype		indopr;
+	triple		*ref;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_RPARENMISSING);
-
+	SETUP_THREADGBL_ACCESS;
 	newtriple(OC_RESTARTPC);
 	indirect = FALSE;
 	newtriple(OC_LKINIT);
-	switch(window_token)
+	switch (TREF(window_token))
 	{
-		case TK_ATSIGN:
-			if (!indirection(&indopr))
-				return FALSE;
-			ref = newtriple(OC_COMMARG);
-			ref->operand[0] = indopr;
-			if (TK_COLON != window_token)
-			{
-				ref->operand[1] = put_ilit((mint)indir_zallocate);
-				return TRUE;
-			}
-			ref->operand[1] = put_ilit((mint)indir_nref);
-			indirect = TRUE;
-			break;
-		case TK_LPAREN:
-			do
-			{
-				advancewindow();
-				if (EXPR_FAIL == nref())
-					return FALSE;
-			} while (TK_COMMA == window_token);
-			if (TK_RPAREN != window_token)
-			{
-				stx_error(ERR_RPARENMISSING);
-				return FALSE;
-			}
+	case TK_ATSIGN:
+		if (!indirection(&indopr))
+			return FALSE;
+		ref = newtriple(OC_COMMARG);
+		ref->operand[0] = indopr;
+		if (TK_COLON != TREF(window_token))
+		{
+			ref->operand[1] = put_ilit((mint)indir_zallocate);
+			return TRUE;
+		}
+		ref->operand[1] = put_ilit((mint)indir_nref);
+		indirect = TRUE;
+		break;
+	case TK_LPAREN:
+		do
+		{
 			advancewindow();
-			break;
-		default:
 			if (EXPR_FAIL == nref())
 				return FALSE;
-			break;
+		} while (TK_COMMA == TREF(window_token));
+		if (TK_RPAREN != TREF(window_token))
+		{
+			stx_error(ERR_RPARENMISSING);
+			return FALSE;
+		}
+		advancewindow();
+		break;
+	default:
+		if (EXPR_FAIL == nref())
+			return FALSE;
+		break;
 	}
 	ref = maketriple(OC_ZALLOCATE);
-	if (TK_COLON != window_token)
+	if (TK_COLON != TREF(window_token))
 	{
 		ref->operand[0] = put_ilit(NO_M_TIMEOUT);
 		ins_triple(ref);
 	} else
 	{
 		advancewindow();
-		if (!intexpr(&(ref->operand[0])))
+		if (EXPR_FAIL == expr(&(ref->operand[0]), MUMPS_INT))
 			return EXPR_FAIL;
 		ins_triple(ref);
 		newtriple(OC_TIMTRU);

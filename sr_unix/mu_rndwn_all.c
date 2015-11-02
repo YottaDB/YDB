@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,7 @@
 #include "send_msg.h"
 #include "do_shmat.h"	/* for do_shmat() prototype */
 #include "shmpool.h" /* Needed for the shmpool structures */
+#include "error.h"
 #ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
 #endif
@@ -83,17 +84,82 @@ STATICFNDCL boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, i
 STATICFNDCL boolean_t validate_replpool_shm_entry(shm_parms *parm_buff, replpool_id_ptr_t replpool_id, int *tmp_exit_status);
 STATICFNDCL shm_parms *get_shm_parm(char *entry);
 STATICFNDCL char *parse_shm_entry(char *entry, int which_field);
+STATICFNDCL void mu_rndwn_all_helper(shm_parms *parm_buff, char *fname, int *exit_status, int *tmp_exit_status);
+
+STATICDEF	boolean_t	mu_rndwn_all_helper_error = FALSE;
+
+/* This condition handler is necessary so the argumentless "mupip rundown" does not terminate in case of an error
+ * while processing one ipc. Instead it moves on to the next ipc. The only exception is fatal errors (SEVERE)
+ * where it might not be safe to continue processing so we transfer control to a higher level condition handler.
+ */
+CONDITION_HANDLER(mu_rndwn_all_helper_ch)
+{
+	START_CH;
+	mu_rndwn_all_helper_error = TRUE;
+	PRN_ERROR;
+	if (SEVERITY == SEVERE)
+	{
+		NEXTCH;
+	} else
+		UNWIND(NULL, NULL);
+}
+
+STATICFNDEF void mu_rndwn_all_helper(shm_parms *parm_buff, char *fname, int *exit_status, int *tmp_exit_status)
+{
+	replpool_identifier	replpool_id;
+	boolean_t 		ret_status;
+	uchar_ptr_t		ret_ptr;
+	char			shmid_buff[TMP_BUF_LEN];
+
+	ESTABLISH(mu_rndwn_all_helper_ch);
+	if (validate_db_shm_entry(parm_buff, fname, tmp_exit_status))
+	{
+		if (SS_NORMAL == *tmp_exit_status)
+		{	/* shm still exists */
+			mu_gv_cur_reg_init();
+			gv_cur_region->dyn.addr->fname_len = strlen(fname);
+			STRNCPY_STR(gv_cur_region->dyn.addr->fname, fname, gv_cur_region->dyn.addr->fname_len);
+			if (mu_rndwn_file(gv_cur_region, FALSE))
+				gtm_putmsg(VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));
+			else
+				*exit_status = ERR_MUNOTALLSEC;
+			mu_gv_cur_reg_free();
+		} else
+		{	/* shm has been cleaned up by "validate_db_shm_entry" so no need of any more cleanup here */
+			assert(ERR_SHMREMOVED == *tmp_exit_status);
+			*tmp_exit_status = SS_NORMAL;	/* reset tmp_exit_status for below logic to treat this as normal */
+		}
+	} else if ((SS_NORMAL == *tmp_exit_status)
+		&& validate_replpool_shm_entry(parm_buff, (replpool_id_ptr_t)&replpool_id, tmp_exit_status))
+	{
+		if (SS_NORMAL == *tmp_exit_status)
+		{
+			assert(JNLPOOL_SEGMENT == replpool_id.pool_type || RECVPOOL_SEGMENT == replpool_id.pool_type);
+			ret_status = mu_rndwn_repl_instance(&replpool_id, TRUE, FALSE);
+			ret_ptr = i2asc((uchar_ptr_t)shmid_buff, parm_buff->shmid);
+			*ret_ptr = '\0';
+			gtm_putmsg(VARLSTCNT(6) (JNLPOOL_SEGMENT == replpool_id.pool_type) ?
+				(ret_status ? ERR_MUJPOOLRNDWNSUC : ERR_MUJPOOLRNDWNFL) :
+				(ret_status ? ERR_MURPOOLRNDWNSUC : ERR_MURPOOLRNDWNFL),
+				4, LEN_AND_STR(shmid_buff), LEN_AND_STR(replpool_id.instfilename));
+			if (!ret_status)
+				*exit_status = ERR_MUNOTALLSEC;
+		} else
+		{	/* shm has been cleaned up by "validate_replpool_shm_entry" so no need of any more cleanup here */
+			assert(ERR_SHMREMOVED == *tmp_exit_status);
+			*tmp_exit_status = SS_NORMAL;	/* reset tmp_exit_status for below logic to treat this as normal */
+		}
+	}
+	REVERT;
+}
 
 int mu_rndwn_all(void)
 {
 	int 			save_errno, fname_len, exit_status = SS_NORMAL, shmid, tmp_exit_status;
 	char			entry[MAX_ENTRY_LEN];
 	FILE			*pf;
-	char			*fname, *fgets_res, shmid_buff[TMP_BUF_LEN];
-	boolean_t 		ret_status;
-	replpool_identifier	replpool_id;
+	char			*fname, *fgets_res;
 	shm_parms		*parm_buff;
-	uchar_ptr_t		ret_ptr;
 
 	if (NULL == (pf = POPEN(IPCS_CMD_STR ,"r")))
         {
@@ -111,41 +177,17 @@ int mu_rndwn_all(void)
 			exit_status = ERR_MUNOTALLSEC;
 			continue;
 		}
-		if (validate_db_shm_entry(parm_buff, fname, &tmp_exit_status))
-		{
-			if (SS_NORMAL == tmp_exit_status)
-			{	/* shm still exists */
-				mu_gv_cur_reg_init();
-				gv_cur_region->dyn.addr->fname_len = strlen(fname);
-				STRNCPY_STR(gv_cur_region->dyn.addr->fname, fname, gv_cur_region->dyn.addr->fname_len);
-				if (mu_rndwn_file(gv_cur_region, FALSE))
-				{
-					gtm_putmsg(VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, gv_cur_region->dyn.addr->fname_len,
-							gv_cur_region->dyn.addr->fname);
-				} else
-					exit_status = ERR_MUNOTALLSEC;
-				mu_gv_cur_reg_free();
-			} else
-			{	/* shm has been cleaned up by "validate_db_shm_entry" so no need of any more cleanup here */
-				assert(ERR_SHMREMOVED == tmp_exit_status);
-				tmp_exit_status = SS_NORMAL;	/* reset tmp_exit_status for below logic to treat this as normal */
-			}
-		} else if ((SS_NORMAL == tmp_exit_status)
-			&& validate_replpool_shm_entry(parm_buff, (replpool_id_ptr_t)&replpool_id, &tmp_exit_status))
-		{
-			assert(JNLPOOL_SEGMENT == replpool_id.pool_type || RECVPOOL_SEGMENT == replpool_id.pool_type);
-			ret_status = mu_rndwn_repl_instance(&replpool_id, TRUE, FALSE);
-			ret_ptr = i2asc((uchar_ptr_t)shmid_buff, parm_buff->shmid);
-			*ret_ptr = '\0';
-			gtm_putmsg(VARLSTCNT(6) (JNLPOOL_SEGMENT == replpool_id.pool_type) ?
-				(ret_status ? ERR_MUJPOOLRNDWNSUC : ERR_MUJPOOLRNDWNFL) :
-				(ret_status ? ERR_MURPOOLRNDWNSUC : ERR_MURPOOLRNDWNFL),
-				4, LEN_AND_STR(shmid_buff), LEN_AND_STR(replpool_id.instfilename));
-			if (!ret_status)
-				exit_status = ERR_MUNOTALLSEC;
-		}
+		mu_rndwn_all_helper(parm_buff, fname, &exit_status, &tmp_exit_status);
 		if ((SS_NORMAL == exit_status) && (SS_NORMAL != tmp_exit_status))
 			exit_status = tmp_exit_status;
+		if (mu_rndwn_all_helper_error)
+		{	/* Encountered a runtime error while processing this ipc. Make sure we return with
+			 * MUNOTALLSEC and reset this static variable before starting processing on next ipc.
+			 */
+			mu_rndwn_all_helper_error = FALSE;
+			if (SS_NORMAL == exit_status)
+				exit_status = ERR_MUNOTALLSEC;
+		}
 		if (NULL != parm_buff)
 			free(parm_buff);
 	}
@@ -194,7 +236,9 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 	{
 		if (!memcmp(nl_addr->label, GDS_LABEL, GDS_LABEL_SZ - 3))
 		{
-			util_out_print("!AD -> Incorrect database version.", TRUE, fname_len, fname);
+			util_out_print("Cannot rundown shmid = !UL for database !AD as it has format !AD "
+				"but this mupip uses format !AD", TRUE, parm_buff->shmid,
+				fname_len, fname, GDS_LABEL_SZ - 1, nl_addr->label, GDS_LABEL_SZ - 1, GDS_LABEL);
 			*exit_stat = ERR_MUNOTALLSEC;
 		}
 		shmdt((void *)start_addr);
@@ -202,9 +246,9 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 	}
 	if (memcmp(nl_addr->now_running, gtm_release_name, gtm_release_name_len + 1))
 	{
-		util_out_print("!AD -> Attempt to access with version !AD, while already using !AD.",
-				TRUE, fname_len, fname, gtm_release_name_len, gtm_release_name,
-				LEN_AND_STR(nl_addr->now_running));
+		util_out_print("Cannot rundown shmid !UL for database !AD -> Attempt to access with version !AD, "
+			"while already using !AD.", TRUE, parm_buff->shmid, fname_len, fname,
+			gtm_release_name_len, gtm_release_name, LEN_AND_STR(nl_addr->now_running));
 		*exit_stat = ERR_MUNOTALLSEC;
 		shmdt((void *)start_addr);
 		return FALSE;
@@ -214,8 +258,20 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 	 * points back to a database whose file header does not have this shmid.
 	 */
 	if (-1 == Stat(fname, &st_buff))
-		remove_shmid = TRUE;
-	else
+	{
+		if (ENOENT == errno)
+			remove_shmid = TRUE;
+		else
+		{	/* Stat errored out e.g. due to file permissions. Log that */
+			save_errno = errno;
+			util_out_print("Cannot rundown shmid !UL for database file !AD as stat() on the file"
+				" returned the following error", TRUE, parm_buff->shmid, fname_len, fname);
+			gtm_putmsg(VARLSTCNT(1) save_errno);
+			*exit_stat = ERR_MUNOTALLSEC;
+			shmdt((void *)start_addr);
+			return FALSE;
+		}
+	} else
 	{
 		mu_gv_cur_reg_init();
 		gv_cur_region->dyn.addr->fname_len = strlen(fname);
@@ -268,16 +324,17 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 	{
 		if (0 != shm_rmid(parm_buff->shmid))
 		{
+			save_errno = errno;
 			gtm_putmsg(VARLSTCNT(8) ERR_DBFILERR, 2, fname_len, fname,
 				   ERR_TEXT, 2, RTS_ERROR_TEXT("Error removing shared memory"));
 			util_out_print("!AD -> Error removing shared memory for shmid = !UL", TRUE, fname_len, fname,
 				parm_buff->shmid);
-			save_errno = errno;
 			gtm_putmsg(VARLSTCNT(1) save_errno);
 			*exit_stat = ERR_MUNOTALLSEC;
 			return FALSE;
 		}
-		send_msg(VARLSTCNT(3) ERR_SHMREMOVED, 1, parm_buff->shmid);
+		gtm_putmsg(VARLSTCNT(5) ERR_SHMREMOVED, 3, parm_buff->shmid, fname_len, fname);
+		send_msg(VARLSTCNT(5) ERR_SHMREMOVED, 3, parm_buff->shmid, fname_len, fname);
 		*exit_stat = ERR_SHMREMOVED;
 	} else
 		*exit_stat = SS_NORMAL;
@@ -293,59 +350,111 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
  */
 boolean_t validate_replpool_shm_entry(shm_parms *parm_buff, replpool_id_ptr_t replpool_id, int *exit_stat)
 {
-	sm_uc_ptr_t		start_addr;
+	boolean_t		remove_shmid;
 	int			fd;
-	int			rc;
+	repl_inst_hdr		repl_instance;
+	sm_uc_ptr_t		start_addr;
+	int			save_errno, status;
 
-	if (NULL != parm_buff)
-	{	/* Check for the bare minimum size of the replic shared segment that we expect */
-		/* if (parm_buff->sgmnt_siz < (SIZEOF(replpool_identifier) + MIN(MIN_JNLPOOL_SIZE, MIN_RECVPOOL_SIZE))) */
-		if (parm_buff->sgmnt_siz < MIN(MIN_JNLPOOL_SIZE, MIN_RECVPOOL_SIZE))
-			return FALSE;
-		if (IPC_PRIVATE != parm_buff->key)
-			return FALSE;
-		/* we do not need to lock the shm for reading the rundown information as
-		 * the other rundowns (if any) can also be allowed to share reading the
-		 * same info concurrently.
-		 */
-		if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(parm_buff->shmid, 0, SHM_RND)))
-			return FALSE;
-		memcpy((void *)replpool_id, (void *)start_addr, SIZEOF(replpool_identifier));
-		if (memcmp(replpool_id->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 1))
+	if (NULL == parm_buff)
+		return FALSE;
+	/* Check for the bare minimum size of the replic shared segment that we expect */
+	/* if (parm_buff->sgmnt_siz < (SIZEOF(replpool_identifier) + MIN(MIN_JNLPOOL_SIZE, MIN_RECVPOOL_SIZE))) */
+	if (parm_buff->sgmnt_siz < MIN(MIN_JNLPOOL_SIZE, MIN_RECVPOOL_SIZE))
+		return FALSE;
+	if (IPC_PRIVATE != parm_buff->key)
+		return FALSE;
+	/* we do not need to lock the shm for reading the rundown information as
+	 * the other rundowns (if any) can also be allowed to share reading the
+	 * same info concurrently.
+	 */
+	if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(parm_buff->shmid, 0, SHM_RND)))
+		return FALSE;
+	memcpy((void *)replpool_id, (void *)start_addr, SIZEOF(replpool_identifier));
+	/* Even though we could be looking at a replication pool structure that has been created by an older version
+	 * or newer version of GT.M, the format of the "replpool_identifier" structure is expected to be the same
+	 * across all versions so we can safely dereference the "label" and "instfilename" fields in order to generate
+	 * user-friendly error messages. Asserts for the layout are in "mu_rndwn_repl_instance" (not here) with a
+	 * comment there as to why that location was chosen.
+	 */
+	if (memcmp(replpool_id->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 1))
+	{
+		if (!memcmp(replpool_id->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 3))
 		{
-			if (!memcmp(replpool_id->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 3))
-			{
-				util_out_print("Incorrect replpool version (shm id = !UL).", TRUE, parm_buff->shmid);
-				*exit_stat = ERR_MUNOTALLSEC;
-			}
-			shmdt((void *)start_addr);
-			return FALSE;
+			util_out_print("Cannot rundown replpool shmid = !UL as it has format !AD "
+				"created by !AD but this mupip is version and uses format !AD",
+				TRUE, parm_buff->shmid, GDS_LABEL_SZ - 1, replpool_id->label,
+				LEN_AND_STR(replpool_id->now_running), gtm_release_name_len, gtm_release_name,
+				GDS_LABEL_SZ - 1, GDS_RPL_LABEL);
+			*exit_stat = ERR_MUNOTALLSEC;
 		}
-		assert(JNLPOOL_SEGMENT == replpool_id->pool_type || RECVPOOL_SEGMENT == replpool_id->pool_type);
-		if(JNLPOOL_SEGMENT != replpool_id->pool_type && RECVPOOL_SEGMENT != replpool_id->pool_type)
-		{
-			shmdt((void *)start_addr);
-			return FALSE;
-		}
-		/* If we can open instance file, we can use it to rundown the replication instance.
-		 * We do this checking here, because later repl_inst_read will issue rts_error, if it cannot open.
-		 * We do not want to change repl_inst_read, which is used by others too.
-		 * As a result currently, mupip rundown will not continue to next shared memory segment
-		 * for this kind of transient error.
-		 * We need to change all rts_error to gtm_putmsg in the code path of mupip rundown
-		 * for future enhancement. - Layek - 5/1/1.
-		 */
-		OPENFILE(replpool_id->instfilename, O_RDONLY, fd);	/* check if we can open it */
-		if (FD_INVALID == fd)
-		{
-			shmdt((void *)start_addr);
-			return FALSE;
-		}
-		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		shmdt((void *)start_addr);
-		return TRUE;
+		return FALSE;
 	}
-	return FALSE;
+	assert(JNLPOOL_SEGMENT == replpool_id->pool_type || RECVPOOL_SEGMENT == replpool_id->pool_type);
+	if(JNLPOOL_SEGMENT != replpool_id->pool_type && RECVPOOL_SEGMENT != replpool_id->pool_type)
+	{
+		shmdt((void *)start_addr);
+		return FALSE;
+	}
+	/* Check if instance filename reported in shared memory still exists. If not, clean this
+	 * shared memory section without even invoking "mu_rndwn_repl_instance" as that expects
+	 * the instance file to exist. Same case if shared memory points back to an instance file
+	 * whose file header does not have this shmid.
+	 */
+	OPENFILE(replpool_id->instfilename, O_RDONLY, fd);	/* check if we can open it */
+	if (FD_INVALID == fd)
+	{
+		if (ENOENT == errno)
+			remove_shmid = TRUE;
+		else
+		{	/* open() errored out e.g. due to file permissions. Log that */
+			save_errno = errno;
+			util_out_print("Cannot rundown replpool shmid !UL for instance file"
+				" !AD as open() on the file returned the following error",
+				TRUE, parm_buff->shmid, LEN_AND_STR(replpool_id->instfilename));
+			gtm_putmsg(VARLSTCNT(1) save_errno);
+			*exit_stat = ERR_MUNOTALLSEC;
+			shmdt((void *)start_addr);
+			return FALSE;
+		}
+	} else
+	{
+		LSEEKREAD(fd, 0, &repl_instance, SIZEOF(repl_inst_hdr), status);
+		if (0 != status)
+		{
+			save_errno = errno;
+			util_out_print("!AD -> Error with LSEEKREAD for shmid = !UL", TRUE,
+				LEN_AND_STR(replpool_id->instfilename), parm_buff->shmid);
+			gtm_putmsg(VARLSTCNT(1) save_errno);
+			*exit_stat = ERR_MUNOTALLSEC;
+			shmdt((void *)start_addr);
+			return FALSE;
+		}
+		if (repl_instance.jnlpool_shmid != parm_buff->shmid)
+			remove_shmid = TRUE;
+		else
+			remove_shmid = FALSE;
+		CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
+	}
+	shmdt((void *)start_addr);
+	if (remove_shmid)
+	{
+		if (0 != shm_rmid(parm_buff->shmid))
+		{
+			save_errno = errno;
+			util_out_print("!AD -> Error removing shared memory for shmid = !UL",
+				TRUE, LEN_AND_STR(replpool_id->instfilename), parm_buff->shmid);
+			gtm_putmsg(VARLSTCNT(1) save_errno);
+			*exit_stat = ERR_MUNOTALLSEC;
+			return FALSE;
+		}
+		gtm_putmsg(VARLSTCNT(5) ERR_SHMREMOVED, 3, parm_buff->shmid, LEN_AND_STR(replpool_id->instfilename));
+		send_msg(VARLSTCNT(5) ERR_SHMREMOVED, 3, parm_buff->shmid, LEN_AND_STR(replpool_id->instfilename));
+		*exit_stat = ERR_SHMREMOVED;
+	} else
+		*exit_stat = SS_NORMAL;
+	return TRUE;
 }
 
 /* Gets all the required fields in shm_parms struct for a given shm entry */

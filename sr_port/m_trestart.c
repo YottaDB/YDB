@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,14 +15,15 @@
 #include "toktyp.h"
 #include "cmd.h"
 
-GBLREF char window_token;
+error_def(ERR_SPOREOL);
 
 int m_trestart(void)
 {
 	triple	*ref;
-	error_def(ERR_SPOREOL);
+	DCL_THREADGBL_ACCESS;
 
-	if (window_token != TK_EOL && window_token != TK_SPACE)
+	SETUP_THREADGBL_ACCESS;
+	if ((TK_EOL != TREF(window_token)) && (TK_SPACE != TREF(window_token)))
 	{
 		stx_error(ERR_SPOREOL);
 		return FALSE;

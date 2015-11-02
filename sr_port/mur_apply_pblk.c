@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,14 +41,30 @@
 #if defined(UNIX)
 #include "gtm_unistd.h"
 #include "gdsbgtr.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include <signal.h>
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	volatile int4		db_fsync_in_prog;	/* for DB_FSYNC macro usage */
+GBLREF	sigset_t		block_sigsent;
+GBLREF	boolean_t		blocksig_initialized;
+GBLREF	jnlpool_addrs		jnlpool;
 #endif
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF	mur_gbls_t		murgbl;
 GBLREF	mur_opt_struct 		mur_options;
 GBLREF	seq_num			seq_num_zero;
 GBLREF 	jnl_gbls_t		jgbl;
+
+error_def(ERR_JNLREAD);
+error_def(ERR_JNLREADBOF);
+error_def(ERR_JNLBADRECFMT);
+error_def(ERR_NOPREVLINK);
+error_def(ERR_MUINFOUINT4);
+error_def(ERR_MUINFOUINT8);
+error_def(ERR_MUINFOSTR);
+error_def(ERR_DBFSYNCERR);
+error_def(ERR_ORLBKNOSTP);
 
 uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 {
@@ -62,17 +78,7 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 	enum jnl_record_type 	rectype;
 	int			save_errno;
 	jnl_record		*jnlrec;
-
         UNIX_ONLY(unix_db_info   *udi;)
-
-	error_def(ERR_JNLREAD);
-	error_def(ERR_JNLREADBOF);
-	error_def(ERR_JNLBADRECFMT);
-	error_def(ERR_NOPREVLINK);
-	error_def(ERR_MUINFOUINT4);
-	error_def(ERR_MUINFOUINT8);
-	error_def(ERR_MUINFOSTR);
-	error_def(ERR_DBFSYNCERR);
 
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
@@ -129,7 +135,8 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 				 * out in mur_back_process() itself so we do not need to write it again here.
 				 */
 				rctl->csd->intrpt_recov_tp_resolve_time = jgbl.mur_tp_resolve_time;
-				rctl->csd->intrpt_recov_resync_seqno = (murgbl.resync_seqno ? murgbl.resync_seqno : 0);
+				rctl->csd->intrpt_recov_resync_seqno = murgbl.resync_seqno;
+				MUR_SAVE_RESYNC_STRM_SEQNO(rctl, rctl->csd);
 				/* flush the changed csd to disk */
 				fc = rctl->gd->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
@@ -232,21 +239,7 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 							jctl->turn_around_offset = jctl->rec_offset;
 							jctl->turn_around_time = jnlrec->prefix.time;
 							jctl->turn_around_seqno = jnlrec->jrec_epoch.jnl_seqno;
-							jctl->turn_around_tn = ((jrec_prefix *)jnlrec)->tn;
-							/* Reset file-header "blks_to_upgrd" counter to the turn around point
-							 * epoch value.  Later in mur_process_intrpt_recov, this will be updated
-							 * to include the number of new V4 format bitmaps created by
-							 * post-turnaround-point db file extensions.
-							 * This will also be flushed to disk in that routine.
-							 * The adjustment value is maintained in rctl->blks_to_upgrd_adjust.
-							 */
-							rctl->csd->blks_to_upgrd = jnlrec->jrec_epoch.blks_to_upgrd;
-							/* Now that we know the final turn-around point, store free_blocks and
-							 * total_blks counter from epoch record for later processing in
-							 * mur_process_intrpt_recov (to determine free_blocks counter).
-							 */
-							rctl->trnarnd_free_blocks = jnlrec->jrec_epoch.free_blocks;
-							rctl->trnarnd_total_blks = jnlrec->jrec_epoch.total_blks;
+							jctl->turn_around_tn = jnlrec->prefix.tn;
 							break;
 						}
 					} else
@@ -321,7 +314,8 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 	struct_jrec_blk		pblkrec;
 	uchar_ptr_t		pblkcontents, pblk_jrec_start;
 	int4			size, fbw_size, fullblockwrite_len, blks_in_lmap;
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa, *repl_csa;
+	node_local		*cnl;
 	sgmnt_data_ptr_t	csd;
 	jnl_record		*jnlrec;
 	GTMCRYPT_ONLY(
@@ -329,6 +323,7 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 		int		crypt_status;
 		blk_hdr_ptr_t	bp;
 	)
+	UNIX_ONLY(sigset_t	savemask;)
 
 	/* In case of a LOSTTNONLY rollback, it is still possible to reach here if one region has NOBEFORE_IMAGE
 	 * while another has BEFORE_IMAGE. Any case do NOT apply PBLKs.
@@ -376,7 +371,7 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 	 * therefore, it will not cause a conflict with the write cache, as the cache will be empty
 	 */
 	db_ctl->op = FC_WRITE;
-	db_ctl->op_pos = (csd->blk_size / DISK_BLOCK_SIZE) * pblkrec.blknum + csd->start_vbn;
+	db_ctl->op_pos = ((gtm_int64_t)(csd->blk_size / DISK_BLOCK_SIZE) * pblkrec.blknum) + csd->start_vbn;
 	/* Use jrec size even if downgrade may have shrunk block. If the block has an integ error, we don't run into any trouble. */
 	size = pblkrec.bsiz;
 	assert(size <= csd->blk_size);
@@ -446,6 +441,20 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 		}
 	}
 #	endif
-	rctl->db_updated = TRUE;
+	rctl->db_updated = TRUE; /* updated database corresponding to this region */
+#	ifdef UNIX
+	if (!murgbl.incr_onln_rlbk_cycle && jgbl.onlnrlbk)
+	{
+		murgbl.incr_onln_rlbk_cycle = TRUE;
+		/* Now that we have started updating the database, do NOT honor any more interrupts like MUPIP STOP */
+		assert(NULL != jnlpool.repl_inst_filehdr);
+		send_msg(VARLSTCNT(1) ERR_ORLBKNOSTP);
+		gtm_putmsg(VARLSTCNT(1) ERR_ORLBKNOSTP);
+		assert(blocksig_initialized); /* set to TRUE at process startup time */
+		savemask = block_sigsent;
+		sigdelset(&savemask, SIGALRM); /* Block all signals except SIGALRM */
+		sigprocmask(SIG_BLOCK, &savemask, NULL); /* No more MUPIP STOPs until completion */
+	}
+#	endif
 	return (dbfilop(db_ctl));
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,27 +19,27 @@
 
 #define REPL_DPRINT1(p)			{ \
 						FPRINTF(stderr, p); \
-				         	fflush(stderr); \
+				         	FFLUSH(stderr); \
 					}
 #define REPL_DPRINT2(p, q)		{ \
 						FPRINTF(stderr, p, q); \
-						fflush(stderr); \
+						FFLUSH(stderr); \
 					}
 #define REPL_DPRINT3(p, q, r)		{ \
 						FPRINTF(stderr, p, q, r); \
-						fflush(stderr); \
+						FFLUSH(stderr); \
 					}
 #define REPL_DPRINT4(p, q, r, s)	{ \
 						FPRINTF(stderr, p, q, r, s); \
-						fflush(stderr); \
+						FFLUSH(stderr); \
 					}
 #define REPL_DPRINT5(p, q, r, s, t)	{ \
 						FPRINTF(stderr, p, q, r, s, t);\
-						fflush(stderr); \
+						FFLUSH(stderr); \
 					}
 #define REPL_DPRINT6(p, q, r, s, t, u)	{ \
 						FPRINTF(stderr, p, q, r, s, t, u);\
-						fflush(stderr); \
+						FFLUSH(stderr); \
 					}
 #ifdef REPL_EXTRA_DEBUG
 

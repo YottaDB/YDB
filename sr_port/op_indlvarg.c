@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,19 +19,21 @@
 #include "op.h"
 #include "valid_mname.h"
 
-GBLREF	mval			**ind_result_sp, **ind_result_top;
+error_def(ERR_INDMAXNEST);
+error_def(ERR_VAREXPECTED);
 
 void	op_indlvarg(mval *v, mval *dst)
 {
-	bool		rval;
+	icode_str	indir_src;
+	int		rval;
 	mstr		*obj, object;
 	oprtype		x;
 	triple		*ref;
-	icode_str	indir_src;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_INDMAXNEST);
-	error_def(ERR_VAREXPECTED);
-
+	SETUP_THREADGBL_ACCESS;
+	if (TREF(ind_result_sp) >= TREF(ind_result_top))
+		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp */
 	MV_FORCE_STR(v);
 	if (v->str.len < 1)
 		rts_error(VARLSTCNT(1) ERR_VAREXPECTED);
@@ -41,39 +43,29 @@ void	op_indlvarg(mval *v, mval *dst)
 		dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 		return;
 	}
-	if (*v->str.addr == '@')
+	if (*v->str.addr != '@')
+		rts_error(VARLSTCNT(1) ERR_VAREXPECTED);
+	indir_src.str = v->str;
+	indir_src.code = indir_lvarg;
+	if (NULL == (obj = cache_get(&indir_src)))
 	{
-		indir_src.str = v->str;
-		indir_src.code = indir_lvarg;
-		if (NULL == (obj = cache_get(&indir_src)))
+		obj = &object;
+		obj->addr = v->str.addr;
+		obj->len  = v->str.len;
+		comp_init(obj);
+		if (EXPR_FAIL != (rval = indirection(&x)))	/* NOTE assignment */
 		{
-			object.addr = v->str.addr;
-			object.len  = v->str.len;
-			comp_init(&object);
-			if (rval = indirection(&x))
-			{
-				ref = newtriple(OC_INDLVARG);
-				ref->operand[0] = x;
-				x = put_tref(ref);
-			}
-			if (comp_fini(rval, &object, OC_IRETMVAL, &x, object.len))
-			{
-				indir_src.str.addr = v->str.addr;
-				cache_put(&indir_src, &object);
-				*ind_result_sp++ = dst;
-				if (ind_result_sp >= ind_result_top)
-					rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-				comp_indr(&object);
-				return;
-			}
-		} else
-		{
-			*ind_result_sp++ = dst;
-			if (ind_result_sp >= ind_result_top)
-				rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-			comp_indr(obj);
-			return;
+			ref = newtriple(OC_INDLVARG);
+			ref->operand[0] = x;
+			x = put_tref(ref);
 		}
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &x, obj->len))
+			return;
+		indir_src.str.addr = v->str.addr;
+		cache_put(&indir_src, obj);
+		/* Fall into code activation below */
 	}
-	rts_error(VARLSTCNT(1) ERR_VAREXPECTED);
+	*(TREF(ind_result_sp))++ = dst;				/* Where to store return value */
+	comp_indr(obj);
+	return;
 }

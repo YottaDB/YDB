@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,25 +17,26 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
+error_def(ERR_FCHARMAXARGS);
 
 int m_view(void)
 {
-
 	oprtype argv[CHARMAXARGS], *argp;
-	triple *view, *parm, *parm1;
 	unsigned short count;
-	error_def(ERR_FCHARMAXARGS);
+	triple *view, *parm, *parm1;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	argp = &argv[0];
 	count = 0;
-	switch (expr(argp))
+	switch (expr(argp, MUMPS_EXPR))
 	{
 	case EXPR_FAIL:
 		return FALSE;
 	case EXPR_INDR:
-		if (window_token != TK_COLON)
-		{	make_commarg(argp,indir_view);
+		if (TK_COLON != TREF(window_token))
+		{
+			make_commarg(argp, indir_view);
 			return TRUE;
 		}
 		/* caution: fall through */
@@ -48,14 +49,12 @@ int m_view(void)
 		argp++;
 		break;
 	}
-
 	for (;;)
 	{
-		if (window_token != TK_COLON)
+		if (TK_COLON != TREF(window_token))
 			break;
-
 		advancewindow();
-		if (!expr(argp))
+		if (EXPR_FAIL == expr(argp, MUMPS_EXPR))
 			return FALSE;
 		parm1 = newtriple(OC_PARAMETER);
 		parm->operand[1] = put_tref(parm1);
@@ -63,7 +62,7 @@ int m_view(void)
 		parm = parm1;
 		count++;
 		argp++;
-		if (count >= CHARMAXARGS)
+		if (CHARMAXARGS <= count)
 		{
 			stx_error(ERR_FCHARMAXARGS);
 			return FALSE;

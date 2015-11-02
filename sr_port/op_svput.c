@@ -44,6 +44,7 @@
 #include "gtm_newintrinsic.h"
 #include "filestruct.h"		/* needed for jnl.h */
 #include "jnl.h"
+#include "tp_timeout.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #endif
@@ -66,12 +67,14 @@ GBLREF mval		dollar_zerror;
 GBLREF mval		dollar_zyerror;
 GBLREF mval		dollar_system;
 GBLREF mval		dollar_zinterrupt;
+GBLREF boolean_t	dollar_zininterrupt;
 GBLREF boolean_t	ztrap_new;
 GBLREF stack_frame	*error_frame;
 GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF mval		dollar_ztexit;
 GBLREF boolean_t	dollar_ztexit_bool;
 GBLREF boolean_t	dollar_zquit_anyway;
+GBLREF boolean_t	tp_timeout_deferred;
 #ifdef GTM_TRIGGER
 GBLREF mval		*dollar_ztvalue;
 GBLREF boolean_t	*ztvalue_changed_ptr;
@@ -205,6 +208,11 @@ void op_svput(int varnum, mval *v)
 			}
 			if (ztrap_form & ZTRAP_POP)
 				ztrap_save_ctxt();
+			if (tp_timeout_deferred && !dollar_zininterrupt)
+				/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and no job interrupt is in
+				 * effect, the timeout need no longer be deferred and can be recognized.
+				 */
+				tptimeout_set(0);
 			break;
 		case SV_ZSTATUS:
 			MV_FORCE_STR(v);
@@ -271,6 +279,11 @@ void op_svput(int varnum, mval *v)
 			{
 				NULLIFY_DOLLAR_ECODE;	/* reset $ECODE related variables to correspond to $ECODE = NULL state */
 				NULLIFY_ERROR_FRAME;	/* we are no more in error-handling mode */
+				if (tp_timeout_deferred && !dollar_zininterrupt)
+					/* A tp timeout was deferred. Now that we are clear of error handling and no job interrupt
+					 * is in process, allow the timeout to be recognized.
+					 */
+					tptimeout_set(0);
 			}
 			break;
 		case SV_ETRAP:

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,10 +20,10 @@
  * 		-- time_for_read	pointer to the timeout structure used by select()
  * 		-- extra_status		reports either a timeout or a lost-of-connection
  * 	return:
- * 		-- got some stuff to return 					return number of bytes received
- * 		-- got nothing and timed out					return 0
- * 		-- lost-of-connection						return -2
- * 		-- error condition						return -1, with errno set
+ * 		-- got some stuff to return 		return number of bytes received
+ * 		-- got nothing and timed out		return 0
+ * 		-- loss-of-connection			return -2
+ * 		-- error condition			return -1, with errno set
  *	side note:
  * 		-- use our own buffer if the requested size is smaller than our own buffer size
  * 		-- use the caller's buffer if the requested size is bigger than our own buffer
@@ -69,6 +69,11 @@ static int fcntl_res;
 */
 #define MAX_SNR_IO		50
 
+#ifdef DEBUG
+/* hold gettimeofday before and after select to debug AIX spin */
+static	struct timeval tvbefore, tvafter;
+#endif
+
 GBLREF	io_pair 		io_curr_device;
 GBLREF	bool			out_of_time;
 GBLREF	spdesc 			stringpool;
@@ -85,20 +90,19 @@ ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, i
 	ssize_t		bytesread, recvsize;
 	void		*recvbuff;
 
-	SOCKET_DEBUG2(PRINTF("socsnr: socketptr: %08lx  buffer: %08lx  maxlength: %d,  flags: %d\n",
-			    socketptr, buffer, maxlength, flags); DEBUGSOCKFLUSH);
+	DBGSOCK((stdout, "socsnr: socketptr: 0x"lvaddr"  buffer: 0x"lvaddr"  maxlength: %d,  flags: %d\n",
+		 socketptr, buffer, maxlength, flags));
 	/* ====================== use leftover from the previous read, if there is any ========================= */
 	assert(maxlength > 0);
 	if (socketptr->buffered_length > 0)
 	{
-		SOCKET_DEBUG2(PRINTF("socsnr: read from buffer - buffered_length: %d\n", socketptr->buffered_length);
-			     DEBUGSOCKFLUSH);
+		DBGSOCK2((stdout, "socsnr: read from buffer - buffered_length: %d\n", socketptr->buffered_length));
 		bytesread = MIN(socketptr->buffered_length, maxlength);
 		memcpy(buffer, (void *)(socketptr->buffer + socketptr->buffered_offset), bytesread);
 		socketptr->buffered_offset += bytesread;
 		socketptr->buffered_length -= bytesread;
-		SOCKET_DEBUG2(PRINTF("socsnr: after buffer read - buffered_offset: %d  buffered_length: %d\n",
-				    socketptr->buffered_offset, socketptr->buffered_length); DEBUGSOCKFLUSH);
+		DBGSOCK2((stdout, "socsnr: after buffer read - buffered_offset: %d  buffered_length: %d\n",
+			  socketptr->buffered_offset, socketptr->buffered_length));
 		return bytesread;
 	}
 	/* ===================== decide on which buffer to use and the size of the recv ======================== */
@@ -112,13 +116,13 @@ ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, i
 		recvsize = maxlength;
 	}
 	VMS_ONLY(recvsize = MIN(recvsize, VMS_MAX_TCP_IO_SIZE));
-	SOCKET_DEBUG2(PRINTF("socsnr: recvsize set to %d\n", recvsize); DEBUGSOCKFLUSH);
+	DBGSOCK2((stdout, "socsnr: recvsize set to %d\n", recvsize));
 
 	/* =================================== select and recv ================================================= */
 	assert(0 == socketptr->buffered_length);
 	socketptr->buffered_length = 0;
 	bytesread = (int)iosocket_snr_io(socketptr, recvbuff, recvsize, flags, time_for_read);
-	SOCKET_DEBUG2(PRINTF("socsnr: bytes read from recv: %d  timeout: %d\n", bytesread, out_of_time); DEBUGSOCKFLUSH);
+	DBGSOCK2((stdout, "socsnr: bytes read from recv: %d  timeout: %d\n", bytesread, out_of_time));
 	if (0 < bytesread)
 	{	/* -------- got something this time ----------- */
 		if (recvbuff == socketptr->buffer)
@@ -130,19 +134,13 @@ ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, i
 				memcpy(buffer, socketptr->buffer, maxlength);
 				socketptr->buffered_length = bytesread - maxlength;
 				bytesread = socketptr->buffered_offset = maxlength;
-				SOCKET_DEBUG2(PRINTF("socsnr: Buffer updated post read - buffered_offset: %d  "
-						     "buffered_length: %d\n",
-						     socketptr->buffered_offset, socketptr->buffered_length); DEBUGSOCKFLUSH);
+				DBGSOCK2((stdout, "socsnr: Buffer updated post read - buffered_offset: %d  "
+					  "buffered_length: %d\n", socketptr->buffered_offset, socketptr->buffered_length));
 			}
 		}
 	}
 	return bytesread;
 }
-
-#ifdef DEBUG
-/* hold gettimeofday before and after select to debug AIX spin */
-static	struct timeval tvbefore, tvafter;
-#endif
 
 /* Do the IO dirty work. Note the return value can be from either select() or recv().
    This would be a static routine but that just makes it harder to debug.
@@ -158,10 +156,9 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 	struct pollfd	poll_fdlist[1];
 #endif
 
-	SOCKET_DEBUG2(PRINTF("socsnrio: Socket read request - socketptr: %08lx  buffer: %08lx  maxlength: %d  flags: %d  ",
-			     socketptr, buffer, maxlength, flags); DEBUGSOCKFLUSH);
-	SOCKET_DEBUG2(PRINTF("time_for_read->at_sec: %d  usec: %d\n", time_for_read->at_sec, time_for_read->at_usec);
-		      DEBUGSOCKFLUSH);
+	DBGSOCK2((stdout, "socsnrio: Socket read request - socketptr: 0x"lvaddr"  buffer: 0x"lvaddr"  maxlength: %d  flags: %d  ",
+		  socketptr, buffer, maxlength, flags));
+	DBGSOCK2((stdout, "time_for_read->at_sec: %d  usec: %d\n", time_for_read->at_sec, time_for_read->at_usec));
 	DEBUG_ONLY(gettimeofday(&tvbefore, NULL);)
 #ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
         FD_ZERO(&tcp_fd);
@@ -178,12 +175,12 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 #endif
 	real_errno = errno;
 	DEBUG_ONLY(gettimeofday(&tvafter, NULL);)
-	SOCKET_DEBUG2(PRINTF("socsnrio: Select return code: %d :: errno: %d\n", status, real_errno); DEBUGSOCKFLUSH);
+	DBGSOCK2((stdout, "socsnrio: Select return code: %d :: errno: %d\n", status, real_errno));
         if (0 < status)
 	{
                 bytesread = tcp_routines.aa_recv(socketptr->sd, buffer, maxlength, flags);
 		real_errno = errno;
-		SOCKET_DEBUG2(PRINTF("socsnrio: aa_recv return code: %d :: errno: %d\n", bytesread, errno); DEBUGSOCKFLUSH);
+		DBGSOCK2((stdout, "socsnrio: aa_recv return code: %d :: errno: %d\n", bytesread, errno));
 		if ((0 == bytesread) ||
 		    ((-1 == bytesread) && (ECONNRESET == real_errno || EPIPE == real_errno || EINVAL == real_errno)))
                 {       /* ----- lost connection ------- */
@@ -191,10 +188,10 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
                                 errno = ECONNRESET;
                         return (ssize_t)(-2);
                 }
-		SOCKET_DEBUG2(errno = real_errno);
+		DBGSOCK_ONLY2(errno = real_errno);
                 return bytesread;
 	}
-	SOCKET_DEBUG2(errno = real_errno);
+	DBGSOCK_ONLY2(errno = real_errno);
 	return (ssize_t)status;
 }
 
@@ -211,25 +208,30 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 	char	*readptr;
 
 	assert(CHSET_M != iod->ichset);
-	SOCKET_DEBUG2(PRINTF("socsnrupb: Enter prebuffer: buffered_length: %d  wait_for_input: %d\n",
-			    socketptr->buffered_length, wait_for_input); DEBUGSOCKFLUSH);
+	DBGSOCK((stdout, "socsnrupb: Enter prebuffer: buffered_length: %d  wait_for_input: %d\n",
+		 socketptr->buffered_length, wait_for_input));
 	/* See if there is *anything* in the buffer */
 	if (0 == socketptr->buffered_length)
 	{	/* Buffer is empty, read at least one char into it so we can check how many we need */
 		do
 		{
 			bytesread = (int)iosocket_snr_io(socketptr, socketptr->buffer, socketptr->buffer_size, flags,
-				time_for_read);
-			SOCKET_DEBUG2(real_errno = errno);
-			SOCKET_DEBUG2(PRINTF("socsnrupb: Buffer empty - bytes read: %d  errno: %d\n", bytesread, real_errno);
-				      DEBUGSOCKFLUSH);
-			SOCKET_DEBUG2(errno = real_errno);
-		} while (((-1 == bytesread && EINTR == errno) || (0 == bytesread && wait_for_input)) &&
-			 !out_of_time && 0 == outofband);
+							 time_for_read);
+			DBGSOCK_ONLY2(real_errno = errno);
+			DBGSOCK2((stdout, "socsnrupb: Buffer empty - bytes read: %d  errno: %d\n", bytesread, real_errno));
+			DBGSOCK_ONLY2(errno = real_errno);
+		} while (((-1 == bytesread && EINTR == errno) || (0 == bytesread && wait_for_input))
+			 && !out_of_time && 0 == outofband);
 		if (out_of_time || 0 != outofband)
 		{
-			SOCKET_DEBUG(if (out_of_time) PRINTF("socsnrupb: Returning due to timeout\n");
-				     else PRINTF("socsnrupb: Returning due to outofband\n"); DEBUGSOCKFLUSH);
+			DBGSOCK_ONLY(if (out_of_time)
+				      {
+					      DBGSOCK((stdout, "socsnrupb: Returning due to timeout\n"));
+				      } else
+				      {
+					      DBGSOCK((stdout, "socsnrupb: Returning due to outofband\n"));
+				      }
+			);
 			if (0 < bytesread)
 			{	/* If we read anything, be sure to consider it buffered */
 				socketptr->buffered_length = bytesread;
@@ -239,10 +241,9 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 		}
 		if (0 >= bytesread)
 		{
-			SOCKET_DEBUG2(real_errno = errno);
-			SOCKET_DEBUG2(PRINTF("socsnrupb: Returning due to error code %d  errno: %d\n", bytesread, real_errno);
-				     DEBUGSOCKFLUSH);
-			SOCKET_DEBUG2(errno = real_errno);
+			DBGSOCK_ONLY2(real_errno = errno);
+			DBGSOCK2((stdout, "socsnrupb: Returning due to error code %d  errno: %d\n", bytesread, real_errno));
+			DBGSOCK_ONLY2(errno = real_errno);
 			return bytesread;
 		}
 		socketptr->buffered_length = bytesread;
@@ -286,7 +287,7 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			GTMASSERT;
 	}
 	mblen++;	/* Include first char we were looking at in the required byte length */
-	SOCKET_DEBUG2(PRINTF("socsnrupb: Length of char: %d\n", mblen); DEBUGSOCKFLUSH);
+	DBGSOCK2((stdout, "socsnrupb: Length of char: %d\n", mblen));
 	if (socketptr->buffered_length < mblen)
 	{	/* Still insufficient chars in the buffer for our utf character. Read some more in. */
 		if ((socketptr->buffered_offset + mblen) > socketptr->buffer_size)
@@ -296,7 +297,7 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			   buffer so we have plenty of room. Since this is at most 3 bytes, this is not
 			   a major performance concern.
 			*/
-			SOCKET_DEBUG2(PRINTF("socsnrupb: Char won't fit in buffer, slide it down\n"); DEBUGSOCKFLUSH);
+			DBGSOCK2((stdout, "socsnrupb: Char won't fit in buffer, slide it down\n"));
 			assert(SIZEOF(int) > socketptr->buffered_length);
 			assert(socketptr->buffered_offset > socketptr->buffered_length); /* Assert no overlap */
 			memcpy(socketptr->buffer, (socketptr->buffer + socketptr->buffered_offset), socketptr->buffered_length);
@@ -304,13 +305,13 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 		}
 		while (socketptr->buffered_length < mblen)
 		{
-			SOCKET_DEBUG2(PRINTF("socsnrupb: Top of read loop for char - buffered_length: %d\n",
-					     socketptr->buffered_length); DEBUGSOCKFLUSH);
+			DBGSOCK2((stdout, "socsnrupb: Top of read loop for char - buffered_length: %d\n",
+				  socketptr->buffered_length));
 			readptr = socketptr->buffer + socketptr->buffered_offset + socketptr->buffered_length;
 			readlen = socketptr->buffer_size - socketptr->buffered_offset - socketptr->buffered_length;
 			assert(0 < readlen);
 			bytesread = (int)iosocket_snr_io(socketptr, readptr, readlen, flags, time_for_read);
-			SOCKET_DEBUG2(PRINTF("socsnrupb: Read %d chars\n", bytesread); DEBUGSOCKFLUSH);
+			DBGSOCK2((stdout, "socsnrupb: Read %d chars\n", bytesread));
 			if (0 > bytesread)
 			{       /* Some error occurred. Check for restartable condition. */
 				if (EINTR == errno)
@@ -325,11 +326,9 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			socketptr->buffered_length += bytesread;
 		}
 	}
-	SOCKET_DEBUG2(PRINTF("socsnrupb: Returning char length %d -- buffered_length: %d\n", mblen, socketptr->buffered_length);
-		      DEBUGSOCKFLUSH);
+	DBGSOCK((stdout, "socsnrupb: Returning char length %d -- buffered_length: %d\n", mblen, socketptr->buffered_length));
 	return mblen;
 }
-
 
 /* Place len bytes pointed by buffer back into socketptr's internal buffer */
 /* Side effect: suppose the last snr was with a length > internal buffer size, we would not have used the internal buffer. For
@@ -340,6 +339,7 @@ void iosocket_unsnr(socket_struct *socketptr, unsigned char *buffer, size_t len)
 {
 	char	*new_buff;
 
+	DBGSOCK((stdout, "iosunsnr: ** Requeueing %d bytes\n", len));
 	if (socketptr->buffered_length + len <= socketptr->buffer_size)
 	{
 		if (socketptr->buffered_length > 0)

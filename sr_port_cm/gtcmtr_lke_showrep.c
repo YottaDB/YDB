@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,7 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 		dnode.addr = sreq->node;
 		if (lke_ctl->blkroot != 0)
 			(void)lke_showtree(lnk, (mlk_shrblk_ptr_t)R2A(lke_ctl->blkroot), sreq->all, sreq->wait, sreq->pid, dnode,
-						FALSE);
+					   FALSE, NULL);
 		free(lke_ctl);
 	}
 	srep.code = CMMS_U_LKESHOW;

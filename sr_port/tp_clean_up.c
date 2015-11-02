@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -354,7 +354,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 			}
 			si->cr_array_index = 0;			/* reinitialize si->cr_array */
 			si->last_tp_hist = si->first_tp_hist;		/* reinitialize the tp history */
-			si->fresh_start = TRUE;
+			si->tp_set_sgm_done = FALSE;
 			si->tlvl_info_head = NULL;
 			next_si = si->next_sgm_info;
 			si->next_sgm_info = NULL;
@@ -426,8 +426,10 @@ void	tp_clean_up(boolean_t rollback_flag)
 	tp_allocation_clue = gtm_tp_allocation_clue + 1;
 	sgm_info_ptr = NULL;
 	first_sgm_info = NULL;
-	/* ensure that we don't have crit on any region at the end of a TP transaction (be it GT.M or MUPIP) */
-	assert((CDB_STAGNATE == t_tries) || (0 == have_crit(CRIT_HAVE_ANY_REG)));
+	/* ensure that we don't have crit on any region at the end of a TP transaction (be it GT.M or MUPIP). The only exception
+	 * is ONLINE ROLLBACK which holds crit for the entire duration
+	 */
+	assert((CDB_STAGNATE == t_tries) || (0 == have_crit(CRIT_HAVE_ANY_REG)) UNIX_ONLY(|| jgbl.onlnrlbk));
 	/* Now that this transaction try is done (need to start a fresh try in case of a restart; in case of commit the entire
 	 * transaction is done) ensure first_tp_si_by_ftok is NULL at end of tp_clean_up as this field is relied upon by
 	 * secshr_db_clnup and t_commit_cleanup to determine if we have an ongoing transaction. In case of a successfully

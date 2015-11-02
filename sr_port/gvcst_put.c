@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,6 +127,7 @@ GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 
+GTMTRIG_ONLY(error_def(ERR_DBROLLEDBACK);)
 error_def(ERR_GVINCRISOLATION);
 error_def(ERR_GVIS);
 error_def(ERR_GVPUTFAIL);
@@ -289,6 +290,7 @@ void	gvcst_put(mval *val)
 								 * used to restore "post_incr_mval" in case of TP restarts */
 	mval			*lcl_val;			/* local copy of "val" at function entry.
 								 * used to restore "val" in case of TP restarts */
+	DEBUG_ONLY(enum cdb_sc	save_cdb_status;)
 #	endif
 #	ifdef DEBUG
 	char			dbg_valbuff[256];
@@ -324,7 +326,9 @@ void	gvcst_put(mval *val)
 	boolean_t		is_fresh_tn_start;
 	boolean_t		is_mm;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	is_dollar_incr = in_gvcst_incr;
 	in_gvcst_incr = FALSE;
 	csa = cs_addrs;
@@ -334,8 +338,7 @@ void	gvcst_put(mval *val)
 	DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth);)
 #	ifdef GTM_TRIGGER
 	TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(gv_cur_region, csa);
-	assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));
-	if (!dollar_tlevel || (gtm_trigger_depth == tstart_trigger_depth))
+	if (IS_EXPLICIT_UPDATE)
 	{	/* This is an explicit update. Set ztwormhole_used to FALSE. Note that we initialize this only at the
 		 * beginning of the transaction and not at the beginning of each try/retry. If the application used
 		 * $ztwormhole in any retsarting try of the transaction, we consider it necessary to write the
@@ -415,6 +418,7 @@ tn_restart:
 	{
 		GVTR_INIT_AND_TPWRAP_IF_NEEDED(csa, csd, gv_target, gvt_trigger, lcl_implicit_tstart, is_tpwrap, ERR_GVPUTFAIL);
 		assert(gvt_trigger == gv_target->gvt_trigger);
+		assert(gv_target == save_targ); /* gv_target should NOT have been mutated by the trigger reads */
 		if (is_tpwrap)
 		{	/* The above call to GVTR_INIT* macro created a TP transaction (by invoking op_tstart).
 			 * Save all pertinent global variable information that needs to be restored in case of
@@ -476,6 +480,7 @@ tn_restart:
 		{
 			tp_get_cw(si->first_cw_set, (int)curr_chain.cw_index, &cse);
 			tp_root = cse->blk;
+			assert(tp_root);
 		}
 	}
 	if (0 == tp_root)
@@ -484,12 +489,7 @@ tn_restart:
 		 * If we decide to restart due to a concurrency conflict, remember to reset gv_target->root to 0 before restarting.
 		 */
 		gv_target = dir_tree = csa->dir_tree;
-		for (cp1 = temp_key->base, cp2 = gv_altkey->base;  0 != *cp1;)
-			*cp2++ = *cp1++;
-		*cp2++ = 0;
-		*cp2 = 0;
-		gv_altkey->end = cp2 - gv_altkey->base;
-		assert(gv_altkey->end <= gv_altkey->top);
+		SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;	/* set up gv_altkey to be just the gblname */
 		dir_hist = &gv_target->hist;
 		status = gvcst_search(gv_altkey, NULL);
 		RESET_GV_TARGET_LCL(save_targ);
@@ -743,12 +743,17 @@ tn_restart:
 #			endif
 			new_rec_size = cur_val_offset + value.len;
 			delta = new_rec_size - rec_size;
-			if (!delta && gvdupsetnoop && value.len
+			if (!delta && value.len
 				&& !memcmp(value.addr, (sm_uc_ptr_t)rp + new_rec_size - value.len, value.len))
 			{
 				duplicate_set = TRUE;
-				succeeded = TRUE;
-				break;	/* duplicate SET */
+				if (gvdupsetnoop)
+				{	/* We do not want to touch the DB Blocks in case of a duplicate set unless the
+					 * dupsetnoop optimization is disabled. Since it is enabled, let us break right away.
+					 */
+					succeeded = TRUE;
+					break;	/* duplicate SET */
+				}
 			}
 			next_rec_shrink = 0;
 		}
@@ -1780,9 +1785,10 @@ tn_restart:
 				}
 			}
 			assert(temp_key->end < temp_key->top);
+			assert(1 <= temp_key->end);
 			assert(KEY_DELIMITER == temp_key->base[temp_key->end]);
 			assert(KEY_DELIMITER == temp_key->base[temp_key->end - 1]);
-			assert(KEY_DELIMITER != temp_key->base[temp_key->end - 2]);
+			assert((2 > temp_key->end) || (KEY_DELIMITER != temp_key->base[temp_key->end - 2]));
 			bq = bh + 1;
 			if (HIST_TERMINATOR != bq->blk_num)
 			{	/* Not root;  write blocks and continue */
@@ -1927,6 +1933,8 @@ tn_restart:
 		nodeflags = 0;
 		if (skip_dbtriggers)
 			nodeflags |= JS_SKIP_TRIGGERS_MASK;
+		if (duplicate_set)
+			nodeflags |= JS_IS_DUPLICATE;
 		assert(!jnl_format_done || !is_dollar_incr && (JNL_SET == non_tp_jfb_ptr->ja.operation));
 		if (need_extra_block_split)
                         inctn_opcode = inctn_gvcstput_extra_blk_split;
@@ -2038,6 +2046,8 @@ tn_restart:
 			nodeflags = 0;
 			if (skip_dbtriggers)
 				nodeflags |= JS_SKIP_TRIGGERS_MASK;
+			if (duplicate_set)
+				nodeflags |= JS_IS_DUPLICATE;
 			ja_val = (!is_dollar_incr ? val : post_incr_mval);
 			write_logical_jnlrecs = JNL_WRITE_LOGICAL_RECS(csa);
 #			ifdef GTM_TRIGGER
@@ -2077,7 +2087,6 @@ tn_restart:
 					trigparms.ztdata_new = key_exists ? &literal_one : &literal_zero;
 					gvtr_parms.gvtr_cmd = GVTR_CMDTYPE_SET;
 					gvtr_parms.gvt_trigger = gvt_trigger;
-					gvtr_parms.duplicate_set = duplicate_set;
 					/* Now that we have filled in minimal information, let "gvtr_match_n_invoke" do the rest */
 					gtm_trig_status = gvtr_match_n_invoke(&trigparms, &gvtr_parms);
 					assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
@@ -2167,27 +2176,25 @@ retry:
 	 */
 	RESTORE_ZERO_GVT_ROOT_ON_RETRY(lcl_root, gv_target, tp_root, dir_hist, dir_tree);
 #	ifdef GTM_TRIGGER
-	if (!skip_dbtriggers)
+	if (lcl_implicit_tstart)
 	{
-		if (lcl_implicit_tstart)
-		{
-			assert(!skip_INVOKE_RESTART);
-			assert((cdb_sc_normal != status) || (ERR_TPRETRY == gtm_trig_status));
-			if (cdb_sc_normal != status)
-				skip_INVOKE_RESTART = TRUE; /* causes t_retry to invoke only tp_restart without any rts_error */
-			/* else: t_retry has already been done by gtm_trigger so no need to do it again for this try */
-			/* If an implicitly TP wrapped transaction is restarting, restore things to what they were
-			 * at entry into gvcst_put. Note that we could have done multiple iterations of gvcst_put for
-			 * extra_block_split/retry/ztval_gvcst_put_redo.
-			 */
-			ztval_gvcst_put_redo = FALSE;
-			skip_hasht_read = FALSE;
-			val = lcl_val;
-			/* $increment related fields need to be restored */
-			is_dollar_incr = lcl_is_dollar_incr;
-			post_incr_mval = lcl_post_incr_mval;
-			increment_delta_mval = lcl_increment_delta_mval;
-		}
+		assert(!skip_dbtriggers);
+		assert(!skip_INVOKE_RESTART);
+		assert((cdb_sc_normal != status) || (ERR_TPRETRY == gtm_trig_status));
+		if (cdb_sc_normal != status)
+			skip_INVOKE_RESTART = TRUE; /* causes t_retry to invoke only tp_restart without any rts_error */
+		/* else: t_retry has already been done by gtm_trigger so no need to do it again for this try */
+		/* If an implicitly TP wrapped transaction is restarting, restore things to what they were
+		 * at entry into gvcst_put. Note that we could have done multiple iterations of gvcst_put for
+		 * extra_block_split/retry/ztval_gvcst_put_redo.
+		 */
+		ztval_gvcst_put_redo = FALSE;
+		skip_hasht_read = FALSE;
+		val = lcl_val;
+		/* $increment related fields need to be restored */
+		is_dollar_incr = lcl_is_dollar_incr;
+		post_incr_mval = lcl_post_incr_mval;
+		increment_delta_mval = lcl_increment_delta_mval;
 	}
 #	endif
 	assert((cdb_sc_normal != status) GTMTRIG_ONLY(|| lcl_implicit_tstart));
@@ -2207,6 +2214,25 @@ retry:
 		rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 		assert(0 == rc GTMTRIG_ONLY(&& TPRESTART_STATE_NORMAL == tprestart_state));
 	}
+#	ifdef GTM_TRIGGER
+	assert(0 < t_tries);
+	assert((cdb_sc_normal != status) || (ERR_TPRETRY == gtm_trig_status));
+	if (cdb_sc_normal == status)
+	{
+		DEBUG_ONLY(save_cdb_status = status);
+		status = t_fail_hist[t_tries - 1]; /* get the last restart code */
+	}
+	assert(((cdb_sc_onln_rlbk1 != status) && (cdb_sc_onln_rlbk2 != status))
+		|| (TREF(dollar_zonlnrlbk) && !gv_target->root));
+	if ((cdb_sc_onln_rlbk2 == status) && lcl_implicit_tstart)
+	{	/* Database was taken back to a different logical state and we are an implicit TP transaction.
+		 * Issue DBROLLEDBACK error that the application programmer can catch and do the necessary stuff.
+		 */
+		assert(gtm_trigger_depth == tstart_trigger_depth);
+		rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+	}
+	/* Note: In case of cdb_sc_onln_rlbk1, the restart logic will take care of doing the root search */
+#	endif
 	GTMTRIG_ONLY(assert(!skip_INVOKE_RESTART);) /* if set to TRUE a few statements above, should have been reset by t_retry */
 	/* At this point, we can be in TP only if we implicitly did a tstart in gvcst_put (as part of a trigger update).
 	 * Assert that. Since the t_retry/tp_restart would have reset si->update_trans, we need to set it again.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2010 Fidelity Information Services, LLC.	*
+ *	Copyright 2005, 2011 Fidelity Information Services, LLC.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,8 +26,8 @@ void dbcertify_certify_phase(void);
  *********************************************************************/
 
 static readonly CLI_PARM dbscan_parm[] = {
-	{ "REGION", "Region:"},
-	{ "", "" }
+	{ "REGION", "Region:", PARM_REQ},
+	{ "", "", PARM_REQ}
 };
 
 static	CLI_ENTRY	dbscan_qual[] = {
@@ -42,8 +42,8 @@ static	CLI_ENTRY	dbscan_qual[] = {
 };
 
 static readonly CLI_PARM dbcertify_parm[] = {
-	{ "P1OUTFILE", "SCAN output file:"},
-	{ "", "" }
+	{ "P1OUTFILE", "SCAN output file:", PARM_REQ},
+	{ "", "", PARM_REQ}
 };
 
 static	CLI_ENTRY	dbcertify_qual[] = {

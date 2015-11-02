@@ -22,11 +22,11 @@
 GBLREF mstr	env_gtm_env_xlate;
 GBLREF mval	dollar_zdir;
 
-error_def(ERR_XTRNTRANSERR);
-error_def(ERR_XTRNTRANSDLL);
-error_def(ERR_XTRNRETVAL);
-error_def(ERR_XTRNRETSTR);
 error_def(ERR_TEXT);
+error_def(ERR_XTRNRETSTR);
+error_def(ERR_XTRNRETVAL);
+error_def(ERR_XTRNTRANSDLL);
+error_def(ERR_XTRNTRANSERR);
 
 mval* gtm_env_translate(mval* val1, mval* val2, mval* val_xlated)
 {

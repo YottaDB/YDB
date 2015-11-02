@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,11 +29,21 @@
 #include "file_input.h"
 #include "load.h"
 #include "mu_outofband_setup.h"
+#include <gtm_fcntl.h>
+#include <errno.h>
 
 GBLREF	int		gv_fillfactor;
 GBLREF	bool		mupip_error_occurred;
 GBLREF	boolean_t	is_replicator;
 GBLREF	boolean_t	skip_dbtriggers;
+GBLREF	mstr		sys_input;
+
+error_def(ERR_MUPCLIERR);
+error_def(ERR_LOADEDBG);
+error_def(ERR_LOADBGSZ);
+error_def(ERR_LOADBGSZ2);
+error_def(ERR_LOADEDSZ);
+error_def(ERR_LOADEDSZ2);
 
 void mupip_cvtgbl(void)
 {
@@ -44,22 +54,34 @@ void mupip_cvtgbl(void)
 	int		i, format;
 	uint4	        cli_status;
 	gtm_int64_t	begin_i8, end_i8;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_LOADEDBG);
-	error_def(ERR_LOADBGSZ);
-	error_def(ERR_LOADBGSZ2);
-	error_def(ERR_LOADEDSZ);
-	error_def(ERR_LOADEDSZ2);
-
+	SETUP_THREADGBL_ACCESS;
+	/* If an online rollback occurs when we are loading up the database with new globals and takes us back to a prior logical
+	 * state, then we should not continue with the load. The reason being that the application might rely on certain globals to
+	 * be present before loading others and that property could be voilated if online rollback takes the database back to a
+	 * completely different logical state. Set the variable issue_DBROLLEDBACK_anyways that forces the restart logic to issue
+	 * an rts_error the first time it detects an online rollback (that takes the database to a prior logical state).
+	 */
+	TREF(issue_DBROLLEDBACK_anyways) = TRUE;
 	is_replicator = TRUE;
 	skip_dbtriggers = TRUE;
-	fn_len = 256;
-	if (!cli_get_str("FILE", fn, &fn_len))
-		mupip_exit(ERR_MUPCLIERR);
-	file_input_init(fn, fn_len);
+	fn_len = SIZEOF(fn);
+	if (cli_present("STDIN"))
+	{
+		/* User wants to load from standard input */
+		assert(SIZEOF(fn) > sys_input.len);
+		memcpy(fn, sys_input.addr, sys_input.len);
+		fn_len = sys_input.len;
+		assert(-1 != fcntl(fileno(stdin), F_GETFD));
+		/* Check if both file name and -STDIN specified. */
+		if (cli_get_str("FILE", fn, &fn_len))
+			mupip_exit(ERR_MUPCLIERR);
+	} else if (!cli_get_str("FILE", fn, &fn_len))  /* User wants to read from a file. */
+		mupip_exit(ERR_MUPCLIERR); /* Neither -STDIN nor file name specified. */
 	if (mupip_error_occurred)
 		exit(-1);
+	file_input_init(fn, fn_len);
 	mu_outofband_setup();
 	if ((cli_status = cli_present("BEGIN")) == CLI_PRESENT)
 	{

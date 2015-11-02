@@ -45,7 +45,7 @@ void mur_process_seqno_table(seq_num *min_broken_seqno, seq_num *losttn_seqno)
 {
 	size_t		seq_arr_size, index, seqno_span, byte, offset;
 	jnl_tm_t	min_time;
-	seq_num		min_brkn_seqno, min_resolve_seqno, max_resolve_seqno;
+	seq_num		min_brkn_seqno, min_resolve_seqno, max_resolve_seqno, lcl_losttn_seqno, stop_rlbk_seqno;
 	unsigned char	*seq_arr, bit;
 	multi_struct	*multi;
 	ht_ent_int8	*curent, *topent;
@@ -67,7 +67,19 @@ void mur_process_seqno_table(seq_num *min_broken_seqno, seq_num *losttn_seqno)
 			assert(NULL == (multi_struct *)multi->next);
 		}
 	}
-	if (*losttn_seqno >= min_resolve_seqno)
+	lcl_losttn_seqno = *losttn_seqno;
+	if (murgbl.resync_seqno)
+		stop_rlbk_seqno = murgbl.resync_seqno;	/* do not process after resync_seqno */
+	else
+		stop_rlbk_seqno = MAXUINT8;/* allow default rollback to continue forward processing till last valid record */
+	assert(lcl_losttn_seqno <= min_resolve_seqno); /* Usually it will be ==; but it can be < as found in C9D11-002465 */
+	/* If the losttn seqno is equal to the min_resolve_seqno, then determine the first seqno that is missing (gap) from
+	 * min_resolve_seqno to max_resolve_seqno. Since this involves some computation, avoid this if we know for sure
+	 * the losttn_seqno cannot eventually lie in the (min,max) range. This is possible if one of stop_rlbk_seqno or
+	 * min_brkn_seqno is lesser than the min_resolve_seqno (in this case that will be the eventual value of losttn_seqno).
+	 */
+	if ((lcl_losttn_seqno >= min_resolve_seqno)
+		&& (stop_rlbk_seqno >= min_resolve_seqno) && (min_brkn_seqno >= min_resolve_seqno))
 	{	/* Update losttn_seqno to the first seqno gap from min_resolve_seqno to max_resolve_seqno */
 		assert(max_resolve_seqno >= min_resolve_seqno);
 		seqno_span = (max_resolve_seqno - min_resolve_seqno + 1);
@@ -116,17 +128,18 @@ void mur_process_seqno_table(seq_num *min_broken_seqno, seq_num *losttn_seqno)
 		if (index < seq_arr_size)
 			offset += first_zerobit_position[seq_arr[index]]; /* Step 3 */
 		free(seq_arr);
-		*losttn_seqno = min_resolve_seqno + offset;
+		lcl_losttn_seqno = min_resolve_seqno + offset;
 		/* Assert that losttn_seqno is within the range of min and max resolve sequence numbers. However, if all
 		 * the sequence numbers in the range [min_resolve_seqno, max_resolve_seqno] are found in the hash table,
 		 * then losttn_seqno is max_resolve_seqno + 1. Adjust assert accordingly.
 		 */
-		assert((*losttn_seqno >= min_resolve_seqno) && (*losttn_seqno <= (max_resolve_seqno + 1)));
+		assert((lcl_losttn_seqno >= min_resolve_seqno) && (lcl_losttn_seqno <= (max_resolve_seqno + 1)));
 	}
-	if (*losttn_seqno > murgbl.stop_rlbk_seqno)
-		*losttn_seqno = murgbl.stop_rlbk_seqno;
-	if (*losttn_seqno > min_brkn_seqno)
-		*losttn_seqno = min_brkn_seqno;
+	if (lcl_losttn_seqno > stop_rlbk_seqno)
+		lcl_losttn_seqno = stop_rlbk_seqno;
+	if (lcl_losttn_seqno > min_brkn_seqno)
+		lcl_losttn_seqno = min_brkn_seqno;
+	*losttn_seqno = lcl_losttn_seqno;
 	*min_broken_seqno = min_brkn_seqno;
 	mur_multi_rehash();	/* To release memory and shorten the table */
 	return;

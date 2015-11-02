@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2011 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -8,22 +8,10 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
-SHELL=/bin/sh
-export SHELL
-ext=.m
-for i in $*
-do
-	base=`basename $i $ext`
-	if test $i != $base
-	then {
-		newf=`echo $base | tr '[A-Z]' '[a-z]'`
-		if test $base != $newf
-		then {
-			dir=`dirname $i`
-			echo $dir/$i "---> " $dir/$newf$ext
-			mv $i $dir/$newf$ext
-		}
-		fi
-	}
-	fi
-done
+# Do not add any blank lines after this comment
+pro/map:
+pro/obj:
+pro/plugin:
+pro/plugin/o:
+pro/plugin/o/utf8:
+pro/plugin/r:

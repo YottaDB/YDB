@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -520,7 +520,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			/* LEFT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			save_blk_piece_len = (int)(new_leftblk_top_off - SIZEOF(blk_hdr) - old_blk1_last_rec_size);
-			if (old_blk1_base + SIZEOF(blk_hdr) + save_blk_piece_len >= new_blk2_top)
+			if ((old_blk1_base + SIZEOF(blk_hdr) + save_blk_piece_len >= new_blk2_top) || (0 > save_blk_piece_len))
 			{
 				assert(t_tries < CDB_STAGNATE);
 				return cdb_sc_blkmod;
@@ -550,7 +550,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				BLK_SEG(bs_ptr2, newblk2_first_key, newblk2_first_keysz);
 				save_blk_piece_len = (int)(gv_target->hist.h[level].curr_rec.offset -
 					new_leftblk_top_off  - (new_blk2_rem - new_blk2_frec_base));
-				if (new_blk2_rem + save_blk_piece_len >=  new_blk2_top )
+				if ((new_blk2_rem + save_blk_piece_len >= new_blk2_top) || (0 > save_blk_piece_len))
 				{
 					assert(t_tries < CDB_STAGNATE);
 					return cdb_sc_blkmod;

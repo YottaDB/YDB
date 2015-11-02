@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,17 @@ GBLREF	short	astq_dyn_avail;
 static	const	unsigned short	zero_fid[3];
 #endif
 
+#ifdef UNIX
+GBLREF 	jnl_gbls_t	jgbl;
+#endif
+
+error_def(ERR_JNLCLOSE);
+error_def(ERR_JNLFLUSH);
+error_def(ERR_JNLFSYNCERR);
+error_def(ERR_JNLWRERR);
+error_def(ERR_PREMATEOF);
+error_def(ERR_TEXT);
+
 void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 {
 	jnl_file_header		*header;
@@ -68,15 +79,8 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	struct_jrec_eof		eof_record;
 	off_jnl_t		eof_addr;
 	uint4			status, read_write_size;
-	int			rc, save_errno;
+	int			rc, save_errno, idx;
 	uint4			jnl_fs_block_size;
-
-	error_def(ERR_JNLCLOSE);
-	error_def(ERR_JNLFLUSH);
-	error_def(ERR_JNLFSYNCERR);
-	error_def(ERR_JNLWRERR);
-	error_def(ERR_PREMATEOF);
-	error_def(ERR_TEXT);
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
@@ -88,7 +92,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	jpc = csa->jnl;
 #if defined(UNIX)
 	if (csa->dbsync_timer)
-		CANCEL_DBSYNC_TIMER(csa, FALSE);
+		CANCEL_DBSYNC_TIMER(csa);
 #elif defined(VMS)
 	/* See comment about ordering of the two statements below, in similar code in gds_rundown */
 	if (csa->dbsync_timer)
@@ -132,6 +136,14 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 			header->eov_tn = eof_record.prefix.tn;
 			assert(header->eov_tn >= header->bov_tn);
 			header->end_seqno = eof_record.jnl_seqno;
+#			ifdef UNIX
+			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+				header->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
+			if (jgbl.forw_phase_recovery)
+			{	/* If MUPIP JOURNAL -ROLLBACK, might need some adjustment. See macro definition for comments */
+				MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(csd, header->strm_end_seqno);
+			}
+#			endif
 			header->crash = FALSE;
 			DO_FILE_WRITE(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 			if (SYSCALL_ERROR(jpc->status))

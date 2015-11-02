@@ -21,6 +21,15 @@
 
 #include <sys/types.h>
 #include <errno.h>
+#include "have_crit.h"
+#include "gt_timer.h"
+#if defined(DEBUG) && defined(UNIX)
+#include "io.h"
+#include "gtm_stdio.h"
+#include "wcs_sleep.h"
+#include "deferred_signal_handler.h"
+#include "wbox_test_init.h"
+#endif
 
 #define ACCEPT_SOCKET(SOCKET, ADDR, LEN, RC)	\
 {						\
@@ -277,5 +286,28 @@
 	  RC = sigprocmask(FUNC, NEWSET, OLDSET);	\
 	} while (-1 == RC && EINTR == errno);		\
 }
+
+#if defined(DEBUG) && defined(UNIX)
+#define SYSCONF(PARM, RC)							\
+{										\
+	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF);					\
+	if (gtm_white_box_test_case_enabled					\
+		&& (WBTEST_SYSCONF_WRAPPER == gtm_white_box_test_case_number))	\
+	{									\
+		DBGFPF((stderr, "will sleep indefinitely now\n"));		\
+		while (TRUE)							\
+			LONG_SLEEP(60);						\
+	}									\
+	RC = sysconf(PARM);							\
+	ENABLE_INTERRUPTS(INTRPT_IN_SYSCONF);					\
+}
+#else
+#define SYSCONF(PARM, RC)							\
+{										\
+	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF);					\
+	RC = sysconf(PARM);							\
+	ENABLE_INTERRUPTS(INTRPT_IN_SYSCONF);					\
+}
+#endif
 
 #endif

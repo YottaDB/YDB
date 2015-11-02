@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,11 +19,11 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include "gtm_unistd.h"		/* for execlp() and fork() */
-#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_unistd.h"		/* for execlp and fork */
+#include "gtm_stdlib.h"		/* for exit */
 #include "gtm_stdio.h"		/* for SPRINTF */
 
-#include <sys/wait.h>		/* for wait() */
+#include <sys/wait.h>		/* for wait */
 
 #include "gtcm.h"
 
@@ -42,8 +42,10 @@
 #include "gtm_fcntl.h"
 #endif /* defined(DEBUG) */
 
-#include "gt_timer.h"	/* for cancel_timer() and start_timer() and TID declaration atleast */
+#include "gt_timer.h"	/* for cancel_timer and start_timer and TID declaration at least */
 #include "error.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
@@ -60,6 +62,8 @@ GBLREF int		per_conn_servtime;
 
 void	hang_handler(void);
 void	gcore_server(void);
+
+error_def(ERR_OMISERVHANG);
 
 void gtcm_loop(omi_conn_ll *cll)
 {
@@ -215,7 +219,6 @@ void gtcm_loop(omi_conn_ll *cll)
 
 void hang_handler(void)
 {
-	error_def(ERR_OMISERVHANG);
 	OMI_DBG_STMP;
 	OMI_DBG((omi_debug, "%s: server appears to be hung...generating core file...\n",
 		 SRVR_NAME));
@@ -237,7 +240,7 @@ void gcore_server(void)
 		dump_rc_hist();
 	}
 
-	pid=fork();
+	pid=fork();	/* BYPASSOK: we are dumping a core, so no FORK_CLEAN needed */
 	if (pid < 0)	/* fork error */
 	{
 		OMI_DBG((omi_debug,

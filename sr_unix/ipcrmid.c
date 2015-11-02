@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include <errno.h>
 #include "io.h"
 #include "gtmsecshr.h"
+#include "secshr_client.h"
 #include "gtmmsg.h"
 #include "ipcrmid.h"
 
@@ -28,7 +29,8 @@
  */
 int sem_rmid(int ipcid)
 {
-	int 	status;
+	int status;
+
 	if (-1 == semctl(ipcid, 0, IPC_RMID))
 	{
 		if (EPERM != errno)
@@ -50,7 +52,8 @@ int sem_rmid(int ipcid)
 /* Remove a shared memory id */
 int shm_rmid(int ipcid)
 {
-	int 	status;
+	int status;
+
 	if (-1 == shmctl(ipcid, IPC_RMID, NULL))
 	{
 		if (EPERM != errno)

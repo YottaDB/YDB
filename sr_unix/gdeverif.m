@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2009 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2011 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -61,7 +61,7 @@ seg1:	i '$d(segs(SEGMENT,"ACCESS_METHOD")) s verified=0 zm $$info(gdeerr("QUALRE
 	f  s s=$o(segs(SEGMENT,s)) q:'$l(s)  s squals(s)=segs(SEGMENT,s)
 	f  s s=$o(minseg(am,s)) q:'$l(s)  i '$d(squals(s)) s verified=0 zm $$info(gdeerr("QUALREQD")):s,gdeerr("SEGIS"):am:SEGMENT
 	f  s s=$o(maxseg(am,s)) q:'$l(s)  i '$d(squals(s)) s verified=0 zm $$info(gdeerr("QUALREQD")):s,gdeerr("SEGIS"):am:SEGMENT
-	i "MM"=am,1=squals("ENCRYPTION_FLAG") s verified=0 zm $$info(gdeerr("ENCNOMM")):s,gdeerr("SEGIS"):am:SEGMENT
+	i "MM"=am,1=squals("ENCRYPTION_FLAG") s verified=0 zm $$info(gdeerr("CRYPTNOMM")):s,gdeerr("SEGIS"):am:SEGMENT
 	s x=$$SQUALS(am,.squals)
 	q
 usereg:	n REGION,NAME s REGION=""
@@ -121,6 +121,16 @@ buf2blk:	i REGION="TEMPLATE","USER"[am,am'=tmpacc q
 mmbichk:	i REGION="TEMPLATE",am="MM",tmpacc'="MM" q
 	i am="MM" s verified=0 zm gdeerr("MMNOBEFORIMG"),gdeerr("REGIS"):REGION,gdeerr("SEGIS"):am:SEGMENT
 	q
+allocchk(rquals)
+	n ext,alloc,asl,qn
+	s qn="EXTENSION",ext=$s($d(rquals(qn)):rquals(qn),$d(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
+	s qn="ALLOCATION",alloc=$s($d(rquals(qn)):rquals(qn),$d(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
+	s qn="AUTOSWITCHLIMIT",asl=$s($d(rquals(qn)):rquals(qn),$d(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
+	i $d(alloc),$d(asl),alloc>asl s verified=0 zm gdeerr("VALTOOBIG"):alloc:asl_" (AUTOSWITCHLIMIT)":"ALLOCATION" q
+	i $d(ext),$d(alloc),$d(asl),alloc'=asl,ext+alloc>asl d
+	. s rquals("ALLOCATION")=asl
+	. zm gdeerr("JNLALLOCGROW"):alloc:asl:"region":REGION
+	q
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
 ; called from GDEADD.M and GDECHANG.M
@@ -134,6 +144,7 @@ RQUALS(rquals)
 	s s="KEY_SIZE",s=$s($d(rquals(s)):rquals(s),$d(regs(REGION,s)):regs(REGION,s),1:tmpreg(s))
 	s x="RECORD_SIZE",x=$s($d(rquals(x)):rquals(x),$d(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
 	i s+4>x s verified=0 zm gdeerr("KEYSIZIS"):s,gdeerr("KEYTOOBIG"):x:x-4,gdeerr("REGIS"):REGION
+	d allocchk(.rquals)
 	i REGION="TEMPLATE" s s=tmpseg(tmpacc,"BLOCK_SIZE"),f=tmpseg(tmpacc,"RESERVED_BYTES")
 	e  s s="DYNAMIC_SEGMENT",s=$s($d(rquals(s)):rquals(s),$d(regs(REGION,s)):regs(REGION,s),1:0)
 	e  q:'$d(segs(s)) verified n SEGMENT,am d

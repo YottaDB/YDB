@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef __COMPILE_PATTERN_H__
 #define __COMPILE_PATTERN_H__
 
-int compile_pattern(oprtype *z, bool is_indirect);
+int compile_pattern(oprtype *z, boolean_t is_indirect);
 
 #endif

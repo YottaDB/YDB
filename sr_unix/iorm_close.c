@@ -24,10 +24,13 @@
 #include "eintr_wrappers.h"
 #include "gtmio.h"
 #include "iosp.h"
+#include "string.h"
+#include "stringpool.h"
 
 GBLREF io_pair		io_curr_device;
 GBLREF io_pair		io_std_device;
 GBLREF	boolean_t	gtm_pipe_child;
+error_def(ERR_CLOSEFAIL);
 
 LITREF unsigned char	io_params_size[];
 
@@ -47,8 +50,8 @@ void iorm_close(io_desc *iod, mval *pp)
 	int  		wait_status, rc;
 	unsigned int	*dollarx_ptr;
 	unsigned int	*dollary_ptr;
-
-	error_def(ERR_CLOSEFAIL);
+	char 		*savepath2 = 0;
+	int		path2len;
 
 	assert (iod->type == rm);
 	if (iod->state != dev_open)
@@ -100,7 +103,18 @@ void iorm_close(io_desc *iod, mval *pp)
 				if (-1 == stat_res)
 					rts_error(VARLSTCNT(1) errno);
 				if (CYGWIN_ONLY(rm_ptr->fifo ||) fstatbuf.st_ino == statbuf.st_ino)
-				{	if (LINK(path, path2) == -1)
+				{
+					/* make a copy of path2 so we can null terminate it */
+					path2len = (int)*((unsigned char *)(pp->str.addr + p_offset));
+					assert(stringpool.free >= stringpool.base);
+					ENSURE_STP_FREE_SPACE(path2len + 1);
+					savepath2 = (char *)stringpool.free;
+					memcpy(savepath2, path2, path2len);
+					savepath2[path2len] = '\0';
+					stringpool.free += path2len + 1;
+					assert(stringpool.free >= stringpool.base);
+					assert(stringpool.free <= stringpool.top);
+					if (LINK(path, savepath2) == -1)
 						rts_error(VARLSTCNT(1) errno);
 					if (UNLINK(path) == -1)
 						rts_error(VARLSTCNT(1) errno);
@@ -177,14 +191,14 @@ void iorm_close(io_desc *iod, mval *pp)
 	/* reap the forked shell process if a pipe - it will be a zombie, otherwise*/
 	if (rm_ptr->pipe_pid > 0)
 	{
-		/* if child process will not go away then have to kill shell in order to reap */
-		/* Don't reap if in a child process creating a new pipe */
+		/* Don't reap if in a child process creating a new pipe or if in parent and independent is set */
 		if (FALSE == gtm_pipe_child)
 		{
-			if (rm_ptr->independent)
-				kill(rm_ptr->pipe_pid,SIGKILL);
-			WAITPID(rm_ptr->pipe_pid, &wait_status, 0, done_pid);
-			assert(done_pid == rm_ptr->pipe_pid);
+			if (!rm_ptr->independent)
+			{
+				WAITPID(rm_ptr->pipe_pid, &wait_status, 0, done_pid);
+				assert(done_pid == rm_ptr->pipe_pid);
+			}
 		}
 
 		if (rm_ptr->stderr_child)

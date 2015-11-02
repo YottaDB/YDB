@@ -177,7 +177,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			}
 			break;
 		case iop_rewind:
-			if (iod->state == dev_open && !rm_ptr->fifo && !rm_ptr->pipe)
+			if (iod->state == dev_open && !rm_ptr->fifo && !rm_ptr->pipe && 1 != rm_ptr->fildes)
 			{
 				iorm_flush(iod);
 				if (lseek(rm_ptr->fildes, (off_t)0, SEEK_SET) == -1)
@@ -224,7 +224,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			}
 			break;
 		case iop_truncate:
-			if (!rm_ptr->fifo && !rm_ptr->pipe)
+			if (!rm_ptr->fifo && !rm_ptr->pipe && 1 != rm_ptr->fildes)
 			{
 				int ftruncate_res;
 				if (fseek(rm_ptr->filstr, (long)rm_ptr->file_pos, SEEK_SET) == -1)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,10 +44,11 @@
 #include "repl_dbg.h"
 
 GBLREF	boolean_t	pool_init;
-GBLREF	boolean_t	repl_allowed;
 GBLREF	gd_addr		*gd_header;
 GBLREF	recvpool_addrs	recvpool;
 
+error_def(ERR_RECVPOOLSETUP);
+error_def(ERR_TEXT);
 error_def(ERR_UPDATEFILEOPEN);
 
 int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
@@ -57,9 +58,6 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	gld_dbname_list		*curr;
-
-	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_TEXT);
 
 	VMS_ONLY(recvpool_init(UPDPROC, FALSE, FALSE);)
 	UNIX_ONLY(recvpool_init(UPDPROC, FALSE);)
@@ -79,21 +77,18 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Receive pool semop error"), REPL_SEM_ERRNO);
 	}
+	jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
 	gvinit();	/* get the desired global directory and update the gd_map */
 	*gld_db_files = read_db_files_from_gld(gd_header);/* read all the database files to be opened in this global directory */
 	if (!updproc_open_files(gld_db_files, start_jnl_seqno)) /* open and initialize all regions */
 		mupip_exit(ERR_UPDATEFILEOPEN);
-	if (repl_allowed)
+	for (curr = *gld_db_files;  NULL != curr; curr = curr->next)
 	{
-		jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
-	        for (curr = *gld_db_files;  NULL != curr; curr = curr->next)
-		{
-			csa = &FILE_INFO(curr->gd)->s_addrs;
-			csd = csa->hdr;
-			csa->n_pre_read_trigger = (int)((csd->n_bts * (float)csd->reserved_for_upd / csd->avg_blks_per_100gbl) *
-										csd->pre_read_trigger_factor / 100.0);
-			REPL_DPRINT2("csa->nl->n_pre_read_trigger = %x", csa->n_pre_read_trigger);
-		}
+		csa = &FILE_INFO(curr->gd)->s_addrs;
+		csd = csa->hdr;
+		csa->n_pre_read_trigger = (int)((csd->n_bts * (float)csd->reserved_for_upd / csd->avg_blks_per_100gbl) *
+									csd->pre_read_trigger_factor / 100.0);
+		REPL_DPRINT2("csa->nl->n_pre_read_trigger = %x", csa->n_pre_read_trigger);
 	}
 	return UPDPROC_STARTED;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -131,7 +131,6 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	DO_FILE_READ(jpc->channel, header->end_of_data - adjust, eof_rec_buffer, read_size, jpc->status, jpc->status2);
 	if (SS_NORMAL != jpc->status)
 	{
-		assert(FALSE);
 		return ERR_JNLRDERR;
 	}
 	if (header->prev_recov_end_of_data)

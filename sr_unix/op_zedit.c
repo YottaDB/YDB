@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -157,7 +157,7 @@ void op_zedit(mval *v, mval *p)
 	act.sa_flags = 0;
 	act.sa_handler = SIG_IGN;
 	sigaction(SIGINT, &act, &intr);
-	childid = fork();
+	childid = fork();	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
 	if (childid)
 	{
 		waitid = (int)childid;

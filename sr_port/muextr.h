@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,6 +76,7 @@ typedef muext_hash_hdr	*muext_hash_hdr_ptr_t;
 #define V3_BIN_HEADER_SZ	87
 #define EXTR_HEADER_LEVEL(extr_lbl)	*(extr_lbl + SIZEOF(BIN_HEADER_LABEL) - 2)
 					/* the assumption here is - level wont go beyond a single char representation */
+#define MAX_BIN_WRT		ROUND_DOWN(MAX_RMS_RECORDSIZE, SIZEOF(int))
 
 char *mu_extr_ident(mstr *a);
 void  mu_extract(void);
@@ -89,6 +90,7 @@ boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format);
 #ifdef UNIX
 #define WRITE_BIN_EXTR_BLK(BUFF, BSIZE)		\
 {						\
+	GBLREF	io_pair		io_curr_device;	\
 	mval	val;				\
 	val.mvtype = MV_STR;			\
 	val.str.addr = (char *)(&BSIZE);	\
@@ -98,6 +100,8 @@ boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format);
 	val.str.addr = (char *)(BUFF);		\
 	val.str.len = BSIZE;			\
 	op_write(&val);				\
+	io_curr_device.out->dollar.x = 0;	\
+	io_curr_device.out->dollar.y = 0;	\
 }
 #define WRITE_EXTR_LINE(BUFF, BSIZE)		\
 {						\
@@ -109,17 +113,30 @@ boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format);
 	op_wteol(1);				\
 }
 #elif defined(VMS)
-#define WRITE_BIN_EXTR_BLK(PTR, SIZE) 			\
-{							\
-	int status;					\
-	(outrab)->rab$l_rbf = (unsigned char *)(PTR);	\
-	(outrab)->rab$w_rsz = (SIZE);			\
-	status = sys$put((outrab));			\
-	if (!(status & 1)) 				\
-	{						\
-		rts_error(VARLSTCNT(1) status);		\
-		mupip_exit(status);			\
-	}						\
+#define WRITE_BIN_EXTR_BLK(PTR, SIZE) 						\
+{										\
+	unsigned short size;							\
+	int status;								\
+	if (MAX_BIN_WRT < (SIZE))						\
+		size = MAX_BIN_WRT;						\
+	else									\
+		size = (SIZE);							\
+	(outrab)->rab$w_rsz = size;						\
+	(outrab)->rab$l_rbf = (unsigned char *)(PTR);				\
+	status = sys$put((outrab));						\
+	if ((MAX_BIN_WRT < (SIZE)) && (RMS$_NORMAL == status))			\
+	{									\
+		assert(MAX_BIN_WRT == size);					\
+		(outrab)->rab$w_rsz = (SIZE) - MAX_BIN_WRT;			\
+		(outrab)->rab$l_rbf = (unsigned char *)(PTR);			\
+		(outrab)->rab$l_rbf += MAX_BIN_WRT;				\
+		status = sys$put((outrab));					\
+	}									\
+	if (!(status & 1)) 							\
+	{									\
+		rts_error(VARLSTCNT(1) status);					\
+		mupip_exit(status);						\
+	}									\
 }
 #define WRITE_EXTR_LINE(PTR, SIZE) 			\
 {							\
@@ -127,7 +144,7 @@ boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format);
 	(outrab)->rab$l_rbf = (unsigned char *)(PTR);	\
 	(outrab)->rab$w_rsz = (SIZE);			\
 	status = sys$put((outrab));			\
-	if (status != RMS$_NORMAL) \
+	if (status != RMS$_NORMAL)			\
 		rts_error(VARLSTCNT(1) status);		\
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,10 +106,11 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	 */
 	if ((0 != pTarg->clue.end) && ((CDB_STAGNATE > t_tries) || !dollar_tlevel || (pTarg->read_local_tn == local_tn)))
 	{	/* Have non-zero clue. Check if it is usable for the current search key. If so validate clue then and use it. */
-		/* In t_end, we skipped validating the clue in case of reorg due to the assumption that reorg never
-		 * uses the clue i.e. it nullifies the clue before calling gvcst_search. Assert that here.
+		/* In t_end, we skipped validating the clue in case of reorg due to the assumption that reorg never uses the clue
+		 * i.e. it nullifies the clue before calling gvcst_search. However, it doesn't reset the clue for directory tree
+		 * and so continue using the clue if called for root search. Assert accordingly.
 		 */
-		assert(!mu_reorg_process);
+		assert(!mu_reorg_process UNIX_ONLY(|| (pTarg->gd_csa->dir_tree == pTarg)));
 		INCR_DB_CSH_COUNTER(cs_addrs, n_gvcst_srch_clues, 1);
 		status = cdb_sc_normal;	/* clue is usable unless proved otherwise */
 		if (NULL != pHist)

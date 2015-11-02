@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,16 +9,10 @@
  *								*
  ****************************************************************/
 
-#include "mdef.h"
-#include "gdsroot.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsbt.h"
-#include "gdsfhead.h"
-#include "get_root.h"
+#ifndef __GVCST_JRT_NULL_H__
+#define __GVCST_JRT_NULL_H__
 
-GBLREF gv_namehead	*gv_target;
+void	gvcst_jrt_null(void);
 
-int get_root(void)
-{	return(gv_target->root);
-}
+#endif
+

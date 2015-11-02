@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2010 Fidelity Information Services, Inc.*
+ *	Copyright 2002, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,6 +111,8 @@ boolean_t cli_disallow_mupip_journal(void)
 	disallow_return_value =  (d_c_cli_present("RESYNC") || d_c_cli_present("FETCHRESYNC"))
 					&& !d_c_cli_present("ROLLBACK");
 	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  d_c_cli_present("RSYNC_STRM") && !d_c_cli_present("RESYNC");
+	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("LOSTTRANS") && !(d_c_cli_present("RECOVER")
 									|| d_c_cli_present("ROLLBACK")
 									|| d_c_cli_present("EXTRACT"));
@@ -161,6 +163,8 @@ boolean_t cli_disallow_mupip_journal(void)
 										|| d_c_cli_present("ROLLBACK")
 										|| d_c_cli_present("VERIFY"));
 	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("ONLINE") && !d_c_cli_present("ROLLBACK"));
+	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
 
@@ -174,15 +178,15 @@ boolean_t cli_disallow_mupip_reorg(void)
 				|| d_c_cli_present("FILL_FACTOR")
 				|| d_c_cli_present("INDEX_FILL_FACTOR")
 				|| d_c_cli_present("RESUME")
-				|| d_c_cli_present("USER_DEFINED_REORG")) && (d_c_cli_present("UPGRADE")
-										|| d_c_cli_present("DOWNGRADE"));
+				|| d_c_cli_present("USER_DEFINED_REORG")
+				|| d_c_cli_present("TRUNCATE")) && (d_c_cli_present("UPGRADE")
+									|| d_c_cli_present("DOWNGRADE"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = d_c_cli_present("UPGRADE") && d_c_cli_present("DOWNGRADE");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("UPGRADE") || d_c_cli_present("DOWNGRADE")) && !d_c_cli_present("REGION");
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value = (d_c_cli_present("REGION")
-				|| d_c_cli_present("SAFEJNL")
+	disallow_return_value = (d_c_cli_present("SAFEJNL")
 				|| d_c_cli_negated("SAFEJNL")
 				|| d_c_cli_present("STARTBLK")
 				|| d_c_cli_present("STOPBLK")) && !(d_c_cli_present("UPGRADE")
@@ -222,11 +226,17 @@ boolean_t cli_disallow_mupip_replic_editinst(void)
 
 	*cli_err_str_ptr = 0;
 
-	/* any MUPIP REPLIC -EDITINSTANCE command should contain one of CHANGE or SHOW */
-	disallow_return_value = !(d_c_cli_present("CHANGE") || d_c_cli_present("SHOW"));
+	/* any MUPIP REPLIC -EDITINSTANCE command should contain one of CHANGE or SHOW or NAME */
+	disallow_return_value = !(d_c_cli_present("CHANGE") || d_c_cli_present("SHOW") || d_c_cli_present("NAME"));
 	CLI_DIS_CHECK_N_RESET;
 	/* CHANGE and SHOW are mutually exclusive */
 	disallow_return_value = (d_c_cli_present("CHANGE") && d_c_cli_present("SHOW"));
+	CLI_DIS_CHECK_N_RESET;
+	/* CHANGE and NAME are mutually exclusive */
+	disallow_return_value = (d_c_cli_present("CHANGE") && d_c_cli_present("NAME"));
+	CLI_DIS_CHECK_N_RESET;
+	/* SHOW and NAME are mutually exclusive */
+	disallow_return_value = (d_c_cli_present("SHOW") && d_c_cli_present("NAME"));
 	CLI_DIS_CHECK_N_RESET;
 	/* OFFSET, SIZE and VALUE is compatible only with CHANGE */
 	disallow_return_value = (!d_c_cli_present("CHANGE")
@@ -271,7 +281,17 @@ boolean_t cli_disallow_mupip_replic_receive(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("START") && d_c_cli_present("LISTENPORT") && !d_c_cli_present("LOG"));
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value = (!d_c_cli_present("START") && (d_c_cli_present("LISTENPORT") || d_c_cli_present("UPDATERESYNC")));
+	disallow_return_value = (!d_c_cli_present("START") && (d_c_cli_present("LISTENPORT")
+								|| d_c_cli_present("UPDATERESYNC")
+								|| d_c_cli_present("NORESYNC")));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("UPDATERESYNC") && d_c_cli_present("NORESYNC"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (!d_c_cli_present("UPDATERESYNC") && d_c_cli_present("REUSE"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (!d_c_cli_present("UPDATERESYNC") && d_c_cli_present("RESUME"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("REUSE") && d_c_cli_present("RESUME"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (!(d_c_cli_present("START") || d_c_cli_present("SHUTDOWN")) && d_c_cli_present("UPDATEONLY"));
 	CLI_DIS_CHECK_N_RESET;
@@ -287,6 +307,8 @@ boolean_t cli_disallow_mupip_replic_receive(void)
 	disallow_return_value = (!d_c_cli_present("START") && (d_c_cli_present("BUFFSIZE")
 								|| d_c_cli_present("CMPLVL")
 								|| d_c_cli_present("FILTER")));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("AUTOROLLBACK") && !d_c_cli_present("LISTENPORT") && !d_c_cli_present("START"));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
@@ -356,11 +378,13 @@ boolean_t cli_disallow_mupip_replic_source(void)
 	/* One of LOG or LOG_INTERVAL needs to be specified with CHANGELOG */
 	disallow_return_value = (d_c_cli_present("CHANGELOG") && !d_c_cli_present("LOG") && !d_c_cli_present("LOG_INTERVAL"));
 	CLI_DIS_CHECK_N_RESET;
-	/* ROOTPRIMARY and PROPAGATEPRIMARY are mutually exclusive */
-	disallow_return_value = (d_c_cli_present("ROOTPRIMARY") && d_c_cli_present("PROPAGATEPRIMARY"));
+	/* ROOTPRIMARY (or UPDOK) and PROPAGATEPRIMARY (or UPDNOTOK) are mutually exclusive */
+	disallow_return_value = ((d_c_cli_present("ROOTPRIMARY") || d_c_cli_present("UPDNOTOK"))
+					&& (d_c_cli_present("PROPAGATEPRIMARY") || d_c_cli_present("UPDNOTOK")));
 	CLI_DIS_CHECK_N_RESET;
 	/* ROOTPRIMARY and PROPAGATEPRIMARY are allowed only along with START, ACTIVATE or DEACTIVATE qualifiers */
-	disallow_return_value = ((d_c_cli_present("ROOTPRIMARY") || d_c_cli_present("PROPAGATEPRIMARY"))
+	disallow_return_value = ((d_c_cli_present("ROOTPRIMARY") || d_c_cli_present("PROPAGATEPRIMARY")
+						|| d_c_cli_present("UPDOK") || d_c_cli_present("UPDNOTOK"))
 					&& !(d_c_cli_present("START")
 						|| d_c_cli_present("ACTIVATE")
 						|| d_c_cli_present("DEACTIVATE")));

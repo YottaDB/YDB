@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,50 +18,48 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
+error_def(ERR_RPARENMISSING);
 
 int m_zdeallocate(void)
 {
 
-	triple *ref;
-	oprtype indopr;
-	bool indirect;
+	oprtype		indopr;
+	triple		*ref;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_RPARENMISSING);
-
-	indirect = FALSE;
+	SETUP_THREADGBL_ACCESS;
 	newtriple(OC_LKINIT);
-	switch(window_token)
+	switch(TREF(window_token))
 	{
-		case TK_EOL:
-		case TK_SPACE:
-			break;
-		case TK_ATSIGN:
-			if (!indirection(&indopr))
-				return FALSE;
-			ref = newtriple(OC_COMMARG);
-			ref->operand[0] = indopr;
-			ref->operand[1] = put_ilit((mint)indir_zdeallocate);
-			return TRUE;
-			break;
-		case TK_LPAREN:
-			do
-			{
-				advancewindow();
-				if (EXPR_FAIL == nref())
-					return FALSE;
-			} while (TK_COMMA == window_token);
-			if (TK_RPAREN != window_token)
-			{
-				stx_error(ERR_RPARENMISSING);
-				return FALSE;
-			}
+	case TK_EOL:
+	case TK_SPACE:
+		break;
+	case TK_ATSIGN:
+		if (!indirection(&indopr))
+			return FALSE;
+		ref = newtriple(OC_COMMARG);
+		ref->operand[0] = indopr;
+		ref->operand[1] = put_ilit((mint)indir_zdeallocate);
+		return TRUE;
+		break;
+	case TK_LPAREN:
+		do
+		{
 			advancewindow();
-			break;
-		default:
 			if (EXPR_FAIL == nref())
 				return FALSE;
-			break;
+		} while (TK_COMMA == TREF(window_token));
+		if (TK_RPAREN != TREF(window_token))
+		{
+			stx_error(ERR_RPARENMISSING);
+			return FALSE;
+		}
+		advancewindow();
+		break;
+	default:
+		if (EXPR_FAIL == nref())
+			return FALSE;
+		break;
 	}
 	ref = newtriple(OC_ZDEALLOCATE);
 	ref->operand[0] = put_ilit(NO_M_TIMEOUT);

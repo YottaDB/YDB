@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,14 @@ GBLREF	int			socketus_interruptus;
 GBLREF	d_socket_struct		*newdsocket;	/* in case jobinterrupt */
 GBLREF	int4			gtm_max_sockets;
 
+error_def(ERR_SOCKINIT);
+error_def(ERR_OPENCONN);
+error_def(ERR_TEXT);
+error_def(ERR_GETSOCKOPTERR);
+error_def(ERR_SETSOCKOPTERR);
+error_def(ERR_ZINTRECURSEIO);
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
 
 boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz)
 {
@@ -61,16 +69,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
         mv_stent        *mv_zintdev;
 	GTM_SOCKLEN_TYPE	sockbuflen;
 
-	error_def(ERR_SOCKINIT);
-	error_def(ERR_OPENCONN);
-	error_def(ERR_TEXT);
-	error_def(ERR_GETSOCKOPTERR);
-	error_def(ERR_SETSOCKOPTERR);
-	error_def(ERR_ZINTRECURSEIO);
-	error_def(ERR_STACKCRIT);
-	error_def(ERR_STACKOFLOW);
-
-	SOCKET_DEBUG(PRINTF("socconn: ************* Entering socconn - timepar: %d\n",timepar); DEBUGSOCKFLUSH);
+	DBGSOCK((stdout, "socconn: ************* Entering socconn - timepar: %d\n",timepar));
         /* check for validity */
 	dsocketptr = socketptr->dev;
         assert(NULL != dsocketptr);
@@ -93,7 +92,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
                         rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
                 if (sockwhich_connect != sockintr->who_saved)
                         GTMASSERT;      /* ZINTRECURSEIO should have caught */
-                SOCKET_DEBUG(PRINTF("socconn: *#*#*#*#*#*#*#  Restarted interrupted connect\n"); DEBUGSOCKFLUSH);
+                DBGSOCK((stdout, "socconn: *#*#*#*#*#*#*#  Restarted interrupted connect\n"));
                 mv_zintdev = io_find_mvstent(iod, FALSE);
                 if (mv_zintdev)
                 {
@@ -114,10 +113,9 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
                                 mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
                                 mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
                         }
-                        SOCKET_DEBUG(PRINTF("socconn: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec);
-                                     DEBUGSOCKFLUSH);
+                        DBGSOCK((stdout, "socconn: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec));
                 } else
-                        SOCKET_DEBUG(PRINTF("socconn: no mv_stent found !!\n"); DEBUGSOCKFLUSH);
+                        DBGSOCK((stdout, "socconn: no mv_stent found !!\n"));
                 real_dsocketptr->mupintr = dsocketptr->mupintr = FALSE;
                 real_sockintr->who_saved = sockintr->who_saved = sockwhich_invalid;
         } else if (timepar != NO_M_TIMEOUT)
@@ -362,8 +360,8 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 			return FALSE;	/* caller will close socket */
 		if (res < 0 && outofband)	/* if connected delay outofband */
 		{
-			SOCKET_DEBUG(PRINTF("socconn: outofband interrupt received (%d) -- "
-						"queueing mv_stent for wait intr\n", outofband); DEBUGSOCKFLUSH);
+			DBGSOCK((stdout, "socconn: outofband interrupt received (%d) -- "
+				 "queueing mv_stent for wait intr\n", outofband));
 			if (need_connect)
 			{	/* no connect in progress */
 				tcp_routines.aa_close(socketptr->sd);	/* Don't leave a dangling socket around */
@@ -394,9 +392,8 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 			mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
 			mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
 			socketus_interruptus++;
-			SOCKET_DEBUG(PRINTF("socconn: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
-						end_time.at_sec, end_time.at_usec, socketus_interruptus);
-						DEBUGSOCKFLUSH);
+			DBGSOCK((stdout, "socconn: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
+				 end_time.at_sec, end_time.at_usec, socketus_interruptus));
 			outofband_action(FALSE);
 			GTMASSERT;      /* Should *never* return from outofband_action */
 			return FALSE;   /* For the compiler.. */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
 #include "gtm_string.h"
 
 #include <stddef.h>	/* for "offsetof" macro */
@@ -34,6 +35,7 @@
 #include "gtmsource.h"
 #include "gtmrecv.h"
 #include "repl_inst_dump.h"
+#include "repl_log.h"		/* for "repl_log" prototype */
 
 LITDEF	char	state_array[][23] = {
 			"DUMMY_STATE",
@@ -48,17 +50,17 @@ LITDEF	char	state_array[][23] = {
 
 #define	PREFIX_FILEHDR			"HDR "
 #define	PREFIX_SRCLCL			"SLT #!2UL : "
-#define	PREFIX_TRIPLEHIST		"HST #!7UL : "
+#define	PREFIX_HISTINFO			"HST #!7UL : "
 #define	PREFIX_JNLPOOLCTL		"CTL "
 #define	PREFIX_SOURCELOCAL		"SRC #!2UL : "
 
 #define	FILEHDR_TITLE_STRING		"File Header"
 #define	SRCLCL_TITLE_STRING		"Source Server Slots"
-#define	TRIPLEHIST_TITLE_STRING		"History Records (triples)"
+#define	HISTINFO_TITLE_STRING		"History Records (histinfo structures)"
 #define	JNLPOOLCTL_TITLE_STRING		"Journal Pool Control Structure"
 #define	SOURCELOCAL_TITLE_STRING	"Source Server Structures"
 
-#define	PRINT_BOOLEAN(printstr, value, index)							\
+#define	PRINT_BOOLEAN(printstr, value, index)								\
 {													\
 	char	*string;										\
 													\
@@ -105,18 +107,21 @@ LITDEF	char	state_array[][23] = {
 		util_out_print( printstr "   INVALID", TRUE);				\
 }
 
-#define	PRINT_OFFSET_HEADER			if (print_offset) { util_out_print("Offset     Size", TRUE); }
+#define	PRINT_OFFSET_HEADER			if (detail_specified) { util_out_print("Offset     Size", TRUE); }
 #define	PRINT_OFFSET_PREFIX(offset, size)								\
-	if (print_offset) { util_out_print("0x!XL 0x!4XW ", FALSE, offset + section_offset, size); };
+	if (detail_specified) { util_out_print("0x!XL 0x!4XW ", FALSE, offset + section_offset, size); };
 
 GBLREF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
 
 void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance)
 {
-	char		*string;
 	char		dststr[MAX_DIGITS_IN_INT], dstlen;
+	char		*string;
+	int4		minorver, nodename_len, last_histinfo_num;
+	int		idx, strm_idx, offset;
+	repl_inst_uuid	*strm_group_info;
+	seq_num		strm_seqno;
 	uchar_ptr_t	nodename_ptr;
-	int4		minorver, nodename_len;
 
 	util_out_print("", TRUE);
 	PRINT_DASHES;
@@ -174,23 +179,63 @@ void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance)
 	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, recvpool_shmid_ctime), SIZEOF(repl_instance->recvpool_shmid_ctime));
 	PRINT_TIME( PREFIX_FILEHDR "Receive Pool Shm Create Time      ", repl_instance->recvpool_shmid_ctime);
 
-	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, created_time), SIZEOF(repl_instance->created_time));
-	PRINT_TIME( PREFIX_FILEHDR "Instance File Create Time         ", repl_instance->created_time);
-
-	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, created_nodename[0]), SIZEOF(repl_instance->created_nodename));
+	/**************** Dump the "inst_info" structure member ****************/
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, inst_info) + offsetof(repl_inst_uuid, created_nodename[0]),
+				SIZEOF(repl_instance->inst_info.created_nodename));
 	/* created_nodename can contain upto MAX_NODENAME_LEN characters. If it consumes the entire array, then
 	 * the last character will NOT be null terminated. Check and set the array length to be used for the call
 	 * to util_out_print
 	 */
-	nodename_ptr = repl_instance->created_nodename;
+	nodename_ptr = repl_instance->inst_info.created_nodename;
+	DBG_CHECK_CREATED_NODENAME(nodename_ptr);
 	nodename_len = ('\0' == nodename_ptr[MAX_NODENAME_LEN - 1]) ? STRLEN((char *)nodename_ptr) : MAX_NODENAME_LEN;
 	util_out_print( PREFIX_FILEHDR "Instance File Created Nodename        !R16AD", TRUE,
 		nodename_len, nodename_ptr);
 
-	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, this_instname[0]), SIZEOF(repl_instance->this_instname));
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, inst_info) + offsetof(repl_inst_uuid, this_instname[0]),
+				SIZEOF(repl_instance->inst_info.this_instname));
 	util_out_print( PREFIX_FILEHDR "Instance Name                          !R15AD", TRUE,
-		LEN_AND_STR((char *)repl_instance->this_instname));
+		LEN_AND_STR((char *)repl_instance->inst_info.this_instname));
 
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, inst_info) + offsetof(repl_inst_uuid, created_time),
+				SIZEOF(repl_instance->inst_info.created_time));
+	PRINT_TIME( PREFIX_FILEHDR "Instance File Create Time         ", repl_instance->inst_info.created_time);
+
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, inst_info) + offsetof(repl_inst_uuid, creator_pid),
+				SIZEOF(repl_instance->inst_info.creator_pid));
+	util_out_print( PREFIX_FILEHDR "Instance File Creator Pid                   !10UL [0x!XL]", TRUE,
+		repl_instance->inst_info.creator_pid, repl_instance->inst_info.creator_pid);
+
+	/**************** Dump the "lms_group_info" structure member only if it is non-null ****************/
+	if (IS_REPL_INST_UUID_NON_NULL(repl_instance->lms_group_info))
+	{
+		PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, lms_group_info) + offsetof(repl_inst_uuid, created_nodename[0]),
+					SIZEOF(repl_instance->lms_group_info.created_nodename));
+		/* created_nodename can contain upto MAX_NODENAME_LEN characters. If it consumes the entire array, then
+		 * the last character will NOT be null terminated. Check and set the array length to be used for the call
+		 * to util_out_print
+		 */
+		nodename_ptr = repl_instance->lms_group_info.created_nodename;
+		DBG_CHECK_CREATED_NODENAME(nodename_ptr);
+		nodename_len = ('\0' == nodename_ptr[MAX_NODENAME_LEN - 1]) ? STRLEN((char *)nodename_ptr) : MAX_NODENAME_LEN;
+		util_out_print( PREFIX_FILEHDR "LMS Group Created Nodename            !R16AD", TRUE,
+			nodename_len, nodename_ptr);
+
+		PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, lms_group_info) + offsetof(repl_inst_uuid, this_instname[0]),
+					SIZEOF(repl_instance->lms_group_info.this_instname));
+		util_out_print( PREFIX_FILEHDR "LMS Group Instance Name                !R15AD", TRUE,
+			LEN_AND_STR((char *)repl_instance->lms_group_info.this_instname));
+
+		PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, lms_group_info) + offsetof(repl_inst_uuid, creator_pid),
+					SIZEOF(repl_instance->lms_group_info.creator_pid));
+		util_out_print( PREFIX_FILEHDR "LMS Group Creator Pid                       !10UL [0x!XL]", TRUE,
+			repl_instance->lms_group_info.creator_pid, repl_instance->lms_group_info.creator_pid);
+
+		PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, lms_group_info) + offsetof(repl_inst_uuid, created_time),
+					SIZEOF(repl_instance->lms_group_info.created_time));
+		PRINT_TIME( PREFIX_FILEHDR "LMS Group Create Time             ", repl_instance->lms_group_info.created_time);
+	}
+	/**************** Dump the remaining members ****************/
 	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, jnl_seqno), SIZEOF(repl_instance->jnl_seqno));
 	util_out_print( PREFIX_FILEHDR "Journal Sequence Number           !20@UQ [0x!16@XQ]", TRUE,
 			&repl_instance->jnl_seqno, &repl_instance->jnl_seqno);
@@ -199,16 +244,92 @@ void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance)
 	util_out_print( PREFIX_FILEHDR "Root Primary Cycle                          !10UL [0x!XL]", TRUE,
 		repl_instance->root_primary_cycle, repl_instance->root_primary_cycle);
 
-	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, num_triples), SIZEOF(repl_instance->num_triples));
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, num_histinfo), SIZEOF(repl_instance->num_histinfo));
 	util_out_print( PREFIX_FILEHDR "Number of used history records              !10UL [0x!XL]", TRUE,
-		repl_instance->num_triples, repl_instance->num_triples);
+		repl_instance->num_histinfo, repl_instance->num_histinfo);
 
-	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, num_alloc_triples), SIZEOF(repl_instance->num_alloc_triples));
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, num_alloc_histinfo), SIZEOF(repl_instance->num_alloc_histinfo));
 	util_out_print( PREFIX_FILEHDR "Allocated history records                   !10UL [0x!XL]", TRUE,
-		repl_instance->num_alloc_triples, repl_instance->num_alloc_triples);
+		repl_instance->num_alloc_histinfo, repl_instance->num_alloc_histinfo);
 
 	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, crash), SIZEOF(repl_instance->crash));
 	PRINT_BOOLEAN(PREFIX_FILEHDR "Crash                                       !R10AZ", repl_instance->crash, -1);
+
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, was_rootprimary), SIZEOF(repl_instance->was_rootprimary));
+	PRINT_BOOLEAN(PREFIX_FILEHDR "Root Primary                                !R10AZ", repl_instance->was_rootprimary, -1);
+
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, is_supplementary), SIZEOF(repl_instance->is_supplementary));
+	PRINT_BOOLEAN(PREFIX_FILEHDR "Supplementary Instance                      !R10AZ", repl_instance->is_supplementary, -1);
+
+	/**************** Dump the supplementary information ONLY if it is a supplementary instance ****************/
+	if (repl_instance->is_supplementary)
+	{
+		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		{	/* Dump information for each stream as long as it contains valid data. */
+			assert(SIZEOF(last_histinfo_num) == SIZEOF(repl_instance->last_histinfo_num[0]));
+			last_histinfo_num = repl_instance->last_histinfo_num[idx];
+			if (INVALID_HISTINFO_NUM != last_histinfo_num)
+			{
+				PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, last_histinfo_num[0])
+					+ (idx * SIZEOF(last_histinfo_num)), SIZEOF(last_histinfo_num));
+				util_out_print( PREFIX_FILEHDR "STRM !2UL: Last history record number         !10UL [0x!XL]", TRUE,
+					idx, last_histinfo_num, last_histinfo_num);
+			}
+			assert(SIZEOF(strm_seqno) == SIZEOF(repl_instance->strm_seqno[0]));
+			strm_seqno = repl_instance->strm_seqno[idx];
+			if (strm_seqno)
+			{
+				PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, strm_seqno[0]) + (idx * SIZEOF(strm_seqno)),
+					SIZEOF(strm_seqno));
+				util_out_print( PREFIX_FILEHDR "STRM !2UL: Journal Sequence Number  !20@UQ [0x!16@XQ]", TRUE,
+					idx, &strm_seqno, &strm_seqno);
+			}
+			assert(ARRAYSIZE(repl_instance->strm_group_info) == (MAX_SUPPL_STRMS - 1));
+			/**************** Dump the "strm_group_info" structure member only if it is non-null ****************/
+			if (idx)
+			{
+				strm_idx = idx - 1;
+				strm_group_info = &repl_instance->strm_group_info[strm_idx];
+				assert(SIZEOF(*strm_group_info) == SIZEOF(repl_instance->strm_group_info[0]));
+				if (IS_REPL_INST_UUID_NON_NULL(*strm_group_info))
+				{
+					offset = offsetof(repl_inst_hdr, strm_group_info[0])
+							+ (strm_idx * SIZEOF(*strm_group_info));
+					PRINT_OFFSET_PREFIX(offset + offsetof(repl_inst_uuid, created_nodename[0]),
+						SIZEOF(strm_group_info->created_nodename));
+					/* created_nodename can contain upto MAX_NODENAME_LEN characters. If it consumes the entire
+					 * array, then the last character will NOT be null terminated. Check and set the array
+					 * length to be used for the call to util_out_print.
+					 */
+					nodename_ptr = strm_group_info->created_nodename;
+					DBG_CHECK_CREATED_NODENAME(nodename_ptr);
+					nodename_len = ('\0' == nodename_ptr[MAX_NODENAME_LEN - 1])
+						? STRLEN((char *)nodename_ptr) : MAX_NODENAME_LEN;
+					util_out_print( PREFIX_FILEHDR "STRM !2UL: Group Created Nodename       !R16AD", TRUE,
+						idx, nodename_len, nodename_ptr);
+
+					PRINT_OFFSET_PREFIX(offset + offsetof(repl_inst_uuid, this_instname[0]),
+						SIZEOF(strm_group_info->this_instname));
+					util_out_print( PREFIX_FILEHDR "STRM !2UL: Group Instance Name          !R16AD", TRUE,
+						idx, LEN_AND_STR((char *)strm_group_info->this_instname));
+
+					PRINT_OFFSET_PREFIX(offset + offsetof(repl_inst_uuid, creator_pid),
+						SIZEOF(strm_group_info->creator_pid));
+					util_out_print( PREFIX_FILEHDR "STRM !2UL: Group Creator Pid                  "
+						"!10UL [0x!XL]", TRUE, idx,
+						strm_group_info->creator_pid, strm_group_info->creator_pid);
+
+					PRINT_OFFSET_PREFIX(offset + offsetof(repl_inst_uuid, created_time),
+						SIZEOF(strm_group_info->created_time));
+					util_out_print( PREFIX_FILEHDR "STRM !2UL: ", FALSE, idx);
+					PRINT_TIME( "Group Create Time        ", strm_group_info->created_time);
+				}
+
+			}
+		}
+	}
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, file_corrupt), SIZEOF(repl_instance->file_corrupt));
+	PRINT_BOOLEAN(PREFIX_FILEHDR "Corrupt                                     !R10AZ", repl_instance->file_corrupt, -1);
 }
 
 void	repl_inst_dump_gtmsrclcl(gtmsrc_lcl_ptr_t gtmsrclcl_ptr)
@@ -248,59 +369,180 @@ void	repl_inst_dump_gtmsrclcl(gtmsrc_lcl_ptr_t gtmsrclcl_ptr)
 	}
 }
 
-void	repl_inst_dump_triplehist(char *inst_fn, int4 num_triples)
+void	repl_inst_dump_history_records(char *inst_fn, int4 num_histinfo)
 {
-	int4		idx;
+	int4		idx, idx2, last_histnum;
 	off_t		offset;
-	repl_triple	curtriple;
+	repl_histinfo	curhistinfo;
 	jnl_proc_time	whole_time;
 	int		time_len;
 	char		time_str[LENGTH_OF_TIME + 1];
 	boolean_t	first_time = TRUE;
+	unsigned char	*created_nodename;
 
-	for (idx = 0; idx < num_triples; idx++, offset += SIZEOF(repl_triple))
+	for (idx = 0; idx < num_histinfo; idx++, offset += SIZEOF(repl_histinfo))
 	{
 		if (first_time)
 		{
 			util_out_print("", TRUE);
 			first_time = FALSE;
 			PRINT_DASHES;
-			util_out_print(TRIPLEHIST_TITLE_STRING, TRUE);
+			util_out_print(HISTINFO_TITLE_STRING, TRUE);
 			PRINT_DASHES;
-			offset = REPL_INST_TRIPLE_OFFSET;
+			offset = REPL_INST_HISTINFO_START;
 		} else
 			PRINT_DASHES;
-		repl_inst_read(inst_fn, (off_t)offset, (sm_uc_ptr_t)&curtriple, SIZEOF(repl_triple));
+		repl_inst_read(inst_fn, (off_t)offset, (sm_uc_ptr_t)&curhistinfo, SIZEOF(repl_histinfo));
 		PRINT_OFFSET_HEADER;
 
-		PRINT_OFFSET_PREFIX(offsetof(repl_triple, root_primary_instname[0]), SIZEOF(curtriple.root_primary_instname));
-		util_out_print(PREFIX_TRIPLEHIST "Root Primary Instance Name  !R15AD", TRUE, idx,
-			LEN_AND_STR((char *)curtriple.root_primary_instname));
+		PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, root_primary_instname[0]), SIZEOF(curhistinfo.root_primary_instname));
+		util_out_print(PREFIX_HISTINFO "Root Primary Instance Name  !R15AD", TRUE, idx,
+			LEN_AND_STR((char *)curhistinfo.root_primary_instname));
 
-		PRINT_OFFSET_PREFIX(offsetof(repl_triple, start_seqno), SIZEOF(curtriple.start_seqno));
-		util_out_print(PREFIX_TRIPLEHIST "Start Sequence Number  !20@UQ [0x!16@XQ]", TRUE, idx,
-			&curtriple.start_seqno, &curtriple.start_seqno);
+		PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, start_seqno), SIZEOF(curhistinfo.start_seqno));
+		util_out_print(PREFIX_HISTINFO "Start Sequence Number  !20@UQ [0x!16@XQ]", TRUE, idx,
+			&curhistinfo.start_seqno, &curhistinfo.start_seqno);
 
-		PRINT_OFFSET_PREFIX(offsetof(repl_triple, root_primary_cycle), SIZEOF(curtriple.root_primary_cycle));
-		util_out_print(PREFIX_TRIPLEHIST "Root Primary Cycle               !10UL [0x!XL]", TRUE, idx,
-			curtriple.root_primary_cycle, curtriple.root_primary_cycle);
+		PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, strm_seqno), SIZEOF(curhistinfo.strm_seqno));
+		util_out_print(PREFIX_HISTINFO "Stream Sequence Number !20@UQ [0x!16@XQ]", TRUE, idx,
+			&curhistinfo.strm_seqno, &curhistinfo.strm_seqno);
 
-		PRINT_OFFSET_PREFIX(offsetof(repl_triple, created_time), SIZEOF(curtriple.created_time));
-		JNL_WHOLE_FROM_SHORT_TIME(whole_time, curtriple.created_time);
+		PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, root_primary_cycle), SIZEOF(curhistinfo.root_primary_cycle));
+		util_out_print(PREFIX_HISTINFO "Root Primary Cycle               !10UL [0x!XL]", TRUE, idx,
+			curhistinfo.root_primary_cycle, curhistinfo.root_primary_cycle);
+
+		PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, creator_pid), SIZEOF(curhistinfo.creator_pid));
+		util_out_print(PREFIX_HISTINFO "Creator Process ID               !10UL [0x!XL]", TRUE, idx,
+			curhistinfo.creator_pid, curhistinfo.creator_pid);
+
+		PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, created_time), SIZEOF(curhistinfo.created_time));
+		JNL_WHOLE_FROM_SHORT_TIME(whole_time, curhistinfo.created_time);
 		time_len = format_time(whole_time, time_str, SIZEOF(time_str), SHORT_TIME_FORMAT);
-		util_out_print(PREFIX_TRIPLEHIST "Creation Time          "TIME_DISPLAY_FAO, TRUE, idx,
+		util_out_print(PREFIX_HISTINFO "Creation Time          "TIME_DISPLAY_FAO, TRUE, idx,
 			time_len, time_str);
 
-		PRINT_OFFSET_PREFIX(offsetof(repl_triple, rcvd_from_instname[0]), SIZEOF(curtriple.rcvd_from_instname));
-		util_out_print(PREFIX_TRIPLEHIST "Received from Instance      !R15AD", TRUE, idx,
-			LEN_AND_STR((char *)curtriple.rcvd_from_instname));
-		section_offset += SIZEOF(repl_triple);
+		PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, histinfo_num), SIZEOF(curhistinfo.histinfo_num));
+		util_out_print(PREFIX_HISTINFO "History Number                   !10UL [0x!XL]", TRUE, idx,
+			curhistinfo.histinfo_num, curhistinfo.histinfo_num);
+		assert(curhistinfo.histinfo_num == idx);
+
+		PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, prev_histinfo_num), SIZEOF(curhistinfo.prev_histinfo_num));
+		util_out_print(PREFIX_HISTINFO "Previous History Number          !10SL [0x!XL]", TRUE, idx,
+			curhistinfo.prev_histinfo_num, curhistinfo.prev_histinfo_num);
+		assert(curhistinfo.histinfo_num == idx);
+
+		PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, strm_index), SIZEOF(curhistinfo.strm_index));
+		util_out_print(PREFIX_HISTINFO "Stream #                                 !2UL [0x!XL]", TRUE, idx,
+			curhistinfo.strm_index, curhistinfo.strm_index);
+
+		PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, history_type), SIZEOF(curhistinfo.history_type));
+		util_out_print(PREFIX_HISTINFO "History record type                      !2UL [0x!XL]", TRUE, idx,
+			curhistinfo.history_type, curhistinfo.history_type);
+
+		/* Assert that lms_group is filled in for non-zero stream #s and not for zero stream #s */
+		assert(!curhistinfo.strm_index && IS_REPL_INST_UUID_NULL(curhistinfo.lms_group)
+			|| curhistinfo.strm_index && IS_REPL_INST_UUID_NON_NULL(curhistinfo.lms_group));
+		/* Assert that UPDATERESYNC type of history record is possible only in non-zero stream #s */
+		assert((HISTINFO_TYPE_UPDRESYNC != curhistinfo.history_type) || curhistinfo.strm_index);
+		/* Do not print "lms_group" info for all history records as it will clutter the output.
+		 * Print it only in case of HISTINFO_TYPE_UPDRESYNC as that is the only case when it changes.
+		 * between history records belonging to the same stream #.
+		 */
+		if (HISTINFO_TYPE_UPDRESYNC == curhistinfo.history_type)
+		{
+			DBG_CHECK_CREATED_NODENAME(curhistinfo.lms_group.created_nodename);
+			PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, lms_group) + offsetof(repl_inst_uuid, created_nodename[0]),
+				SIZEOF(curhistinfo.lms_group.created_nodename));
+			if (curhistinfo.lms_group.created_nodename[MAX_NODENAME_LEN -1])
+			{
+				assert(16 == MAX_NODENAME_LEN); /* because of the !R16AD hardcoding below */
+				util_out_print(PREFIX_HISTINFO "LMS Group Created Nodename !R16AD", TRUE, idx,
+					MAX_NODENAME_LEN, (char *)curhistinfo.lms_group.created_nodename);
+			} else
+				util_out_print(PREFIX_HISTINFO "LMS Group Created Nodename  !R15AD", TRUE, idx,
+					LEN_AND_STR((char *)curhistinfo.lms_group.created_nodename));
+
+			PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, lms_group) + offsetof(repl_inst_uuid, this_instname[0]),
+				SIZEOF(curhistinfo.lms_group.this_instname));
+			util_out_print(PREFIX_HISTINFO "LMS Group Instance Name     !R15AD", TRUE, idx,
+				LEN_AND_STR((char *)curhistinfo.lms_group.this_instname));
+
+			PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, lms_group) + offsetof(repl_inst_uuid, created_time),
+				SIZEOF(curhistinfo.lms_group.created_time));
+			JNL_WHOLE_FROM_SHORT_TIME(whole_time, curhistinfo.lms_group.created_time);
+			time_len = format_time(whole_time, time_str, SIZEOF(time_str), SHORT_TIME_FORMAT);
+			util_out_print(PREFIX_HISTINFO "LMS Group Creation Time"TIME_DISPLAY_FAO, TRUE, idx,
+				time_len, time_str);
+
+			PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, lms_group) + offsetof(repl_inst_uuid, creator_pid),
+				SIZEOF(curhistinfo.lms_group.creator_pid));
+			util_out_print(PREFIX_HISTINFO "LMS Group Creator PID            !10UL [0x!XL]", TRUE, idx,
+				curhistinfo.lms_group.creator_pid, curhistinfo.lms_group.creator_pid);
+		}
+		for (idx2 = 0; idx2 < MAX_SUPPL_STRMS; idx2++)
+		{
+			last_histnum = curhistinfo.last_histinfo_num[idx2];
+			assert(SIZEOF(last_histnum) == SIZEOF(curhistinfo.last_histinfo_num[idx2]));
+			if (INVALID_HISTINFO_NUM != last_histnum)
+			{
+				PRINT_OFFSET_PREFIX(offsetof(repl_histinfo, last_histinfo_num[0]) + (idx2 * SIZEOF(last_histnum)),
+					SIZEOF(last_histnum));
+				util_out_print(PREFIX_HISTINFO "Stream !2UL: Last History Number   !10UL [0x!XL]", TRUE, idx,
+					idx2, last_histnum, last_histnum);
+			}
+		}
+		section_offset += SIZEOF(repl_histinfo);
 	}
+}
+
+void	repl_dump_histinfo(FILE *log_fp, boolean_t stamptime, boolean_t flush, char *start_text, repl_histinfo *cur_histinfo)
+{
+	unsigned char		nodename_buff[MAX_NODENAME_LEN + 1], *created_nodename;
+
+	repl_log(log_fp, stamptime, flush, "%s : Start Seqno = %llu [0x%llx] : Stream Seqno = %llu [0x%llx] : "
+		"Root Primary = [%s] : Cycle = [%d] : Creator pid = %d : Created time = %d [0x%x] : History number = %d : "
+		"Prev History number = %d : Stream # = %d : History type = %d\n", start_text,
+		cur_histinfo->start_seqno, cur_histinfo->start_seqno, cur_histinfo->strm_seqno, cur_histinfo->strm_seqno,
+		cur_histinfo->root_primary_instname, cur_histinfo->root_primary_cycle, cur_histinfo->creator_pid,
+		cur_histinfo->created_time, cur_histinfo->created_time, cur_histinfo->histinfo_num,
+		cur_histinfo->prev_histinfo_num, cur_histinfo->strm_index, cur_histinfo->history_type);
+	/* Assert that lms_group is filled in for non-zero stream #s and not for zero stream #s */
+	assert(!cur_histinfo->strm_index && IS_REPL_INST_UUID_NULL(cur_histinfo->lms_group)
+		|| cur_histinfo->strm_index && IS_REPL_INST_UUID_NON_NULL(cur_histinfo->lms_group));
+	/* Assert that UPDATERESYNC type of history record is possible only in non-zero stream #s */
+	assert((HISTINFO_TYPE_UPDRESYNC != cur_histinfo->history_type) || cur_histinfo->strm_index);
+	/* Do not print "lms_group" info for all history records as it will clutter the output.
+	 * Print it only in case of HISTINFO_TYPE_UPDRESYNC as that is the only case when it changes
+	 * between history records belonging to the same stream #.
+	 */
+	if (HISTINFO_TYPE_UPDRESYNC == cur_histinfo->history_type)
+	{	/* history record that also contains NEW lms group info (due to -UPDATERESYNC) */
+		DBG_CHECK_CREATED_NODENAME(cur_histinfo->lms_group.created_nodename);
+		assert(MAX_NODENAME_LEN == SIZEOF(cur_histinfo->lms_group.created_nodename));
+		if ('\0' == cur_histinfo->lms_group.created_nodename[MAX_NODENAME_LEN - 1])
+			created_nodename = &cur_histinfo->lms_group.created_nodename[0];
+		else
+		{
+			created_nodename = &nodename_buff[0];
+			memcpy(created_nodename, cur_histinfo->lms_group.created_nodename, MAX_NODENAME_LEN);
+			created_nodename[MAX_NODENAME_LEN] = '\0';
+		}
+		repl_log(log_fp, stamptime, flush, "History has non-zero Supplementary Stream LMS Group Content : "
+			"LMS Group Nodename = [%s] : LMS Group Instance Name = [%s] : "
+			"Creator pid = %d : Created time = %d [0x%x]\n",
+			created_nodename, cur_histinfo->lms_group.this_instname,
+			cur_histinfo->lms_group.creator_pid,
+			cur_histinfo->lms_group.created_time, cur_histinfo->lms_group.created_time);
+	}
+	/* Do not print "last_histinfo_num" output as that is not of concern to the user and only clutters the output */
 }
 
 void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 {
-	char	*string;
+	char			*string;
+	repl_conn_info_t	*this_side;
+	int			idx;
+	seq_num			strm_seqno;
 
 	util_out_print("", TRUE);
 	PRINT_DASHES;
@@ -343,9 +585,9 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 	util_out_print( PREFIX_JNLPOOLCTL "Journal Seqno                     !20@UQ [0x!16@XQ]", TRUE,
 		&jnlpool_ctl->jnl_seqno, &jnlpool_ctl->jnl_seqno);
 
-	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, last_triple_seqno), SIZEOF(jnlpool_ctl->last_triple_seqno));
-	util_out_print( PREFIX_JNLPOOLCTL "Last Triple Seqno                 !20@UQ [0x!16@XQ]", TRUE,
-		&jnlpool_ctl->last_triple_seqno, &jnlpool_ctl->last_triple_seqno);
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, last_histinfo_seqno), SIZEOF(jnlpool_ctl->last_histinfo_seqno));
+	util_out_print( PREFIX_JNLPOOLCTL "Last histinfo Seqno               !20@UQ [0x!16@XQ]", TRUE,
+		&jnlpool_ctl->last_histinfo_seqno, &jnlpool_ctl->last_histinfo_seqno);
 
 	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, jnldata_base_off), SIZEOF(jnlpool_ctl->jnldata_base_off));
 	util_out_print( PREFIX_JNLPOOLCTL "Journal Data Base Offset                    !10UL [0x!XL]", TRUE,
@@ -370,12 +612,6 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, upd_disabled), SIZEOF(jnlpool_ctl->upd_disabled));
 	PRINT_BOOLEAN(PREFIX_JNLPOOLCTL "Updates Disabled                !R22AZ", jnlpool_ctl->upd_disabled, -1);
 
-	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, primary_is_dualsite), SIZEOF(jnlpool_ctl->primary_is_dualsite));
-	PRINT_BOOLEAN(PREFIX_JNLPOOLCTL "Primary is Dual Site            !R22AZ", jnlpool_ctl->primary_is_dualsite, -1);
-
-	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, secondary_is_dualsite), SIZEOF(jnlpool_ctl->secondary_is_dualsite));
-	PRINT_BOOLEAN(PREFIX_JNLPOOLCTL "Secondary is Dual Site          !R22AZ", jnlpool_ctl->secondary_is_dualsite, -1);
-
 	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, lastwrite_len), SIZEOF(jnlpool_ctl->lastwrite_len));
 	util_out_print( PREFIX_JNLPOOLCTL "Last Write Length (in bytes)                !10UL [0x!XL]", TRUE,
 		jnlpool_ctl->lastwrite_len, jnlpool_ctl->lastwrite_len);
@@ -391,16 +627,71 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 	util_out_print( PREFIX_JNLPOOLCTL "Zqgblmod Seqno                    !20@UQ [0x!16@XQ]", TRUE,
 		&jnlpool_ctl->max_zqgblmod_seqno, &jnlpool_ctl->max_zqgblmod_seqno);
 
-	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, this_proto_ver), SIZEOF(jnlpool_ctl->this_proto_ver));
-	util_out_print( PREFIX_JNLPOOLCTL "Source Server Protocol Version                     !3UL [0x!2XB]", TRUE,
-			jnlpool_ctl->this_proto_ver, jnlpool_ctl->this_proto_ver);
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, prev_jnlseqno_time), SIZEOF(jnlpool_ctl->prev_jnlseqno_time));
+	PRINT_TIME( PREFIX_JNLPOOLCTL "Prev JnlSeqno Time                ", jnlpool_ctl->prev_jnlseqno_time);
+
+	/**************** Dump the "this_side" structure member ****************/
+	this_side = &jnlpool_ctl->this_side;
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, this_side) + offsetof(repl_conn_info_t, proto_ver),
+				SIZEOF(this_side->proto_ver));
+	util_out_print( PREFIX_JNLPOOLCTL "Protocol Version                                   !3UL [0x!XL]", TRUE,
+			this_side->proto_ver, this_side->proto_ver);
+
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, this_side) + offsetof(repl_conn_info_t, jnl_ver),
+				SIZEOF(this_side->jnl_ver));
+	util_out_print( PREFIX_JNLPOOLCTL "Journal Version                                    !3UL [0x!XL]", TRUE,
+			this_side->jnl_ver, this_side->jnl_ver);
+
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, this_side) + offsetof(repl_conn_info_t, is_std_null_coll),
+				SIZEOF(this_side->is_std_null_coll));
+	PRINT_BOOLEAN(PREFIX_JNLPOOLCTL "Standard Null Collation         !R22AZ", this_side->is_std_null_coll, -1);
+
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, this_side) + offsetof(repl_conn_info_t, trigger_supported),
+				SIZEOF(this_side->trigger_supported));
+	PRINT_BOOLEAN(PREFIX_JNLPOOLCTL "Trigger Supported               !R22AZ", this_side->trigger_supported, -1);
+
+	/* The following 3 members of "this_side" dont make sense as the structure reflects properties of this instance whereas
+	 * these 3 members require connection with the remote side in order to make sense. So skip dumping them.
+	 *	this_side->cross_endian
+	 *	this_side->endianness_known
+	 *	this_side->null_subs_xform
+	 */
+
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, this_side) + offsetof(repl_conn_info_t, is_supplementary),
+				SIZEOF(this_side->is_supplementary));
+	PRINT_BOOLEAN(PREFIX_JNLPOOLCTL "Supplementary Instance          !R22AZ", this_side->is_supplementary, -1);
+	/**************** Dump the "strm_seqno" structure member if this is a supplementary instance ****************/
+	if (this_side->is_supplementary)
+	{
+		assert(SIZEOF(strm_seqno) == SIZEOF(jnlpool_ctl->strm_seqno[0]));
+		assert(MAX_SUPPL_STRMS == ARRAYSIZE(jnlpool_ctl->strm_seqno));
+		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		{
+			strm_seqno = jnlpool_ctl->strm_seqno[idx];
+			if (strm_seqno)
+			{
+				PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, strm_seqno[0]) + idx * SIZEOF(strm_seqno),
+					SIZEOF(strm_seqno));
+				util_out_print( PREFIX_JNLPOOLCTL "Stream !2UL: Journal Seqno          !20@UQ [0x!16@XQ]", TRUE,
+					idx, &strm_seqno, &strm_seqno);
+			}
+		}
+	}
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, onln_rlbk_pid), SIZEOF(jnlpool_ctl->onln_rlbk_pid));
+	util_out_print( PREFIX_JNLPOOLCTL "Online Rollback PID               !20UL [0x!XL]", TRUE,
+		jnlpool_ctl->onln_rlbk_pid, jnlpool_ctl->onln_rlbk_pid);
+
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, onln_rlbk_cycle), SIZEOF(jnlpool_ctl->onln_rlbk_cycle));
+	util_out_print( PREFIX_JNLPOOLCTL "Online Rollback Cycle             !20UL [0x!XL]", TRUE,
+		jnlpool_ctl->onln_rlbk_cycle, jnlpool_ctl->onln_rlbk_cycle);
 }
 
 void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 {
-	int		idx;
-	char		*string;
-	boolean_t	first_time = TRUE;
+	int			idx;
+	char			*string;
+	boolean_t		first_time = TRUE;
+	repl_conn_info_t	*remote_side;
 
 	for (idx = 0; idx < NUM_GTMSRC_LCL; idx++, gtmsourcelocal_ptr++)
 	{
@@ -461,10 +752,42 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 		util_out_print( PREFIX_SOURCELOCAL "Journal record Compression Level !15UL", TRUE, idx,
 			gtmsourcelocal_ptr->repl_zlib_cmp_level);
 
-		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, remote_proto_ver),
-			SIZEOF(gtmsourcelocal_ptr->remote_proto_ver));
-		util_out_print( PREFIX_SOURCELOCAL "Receiver Server Protocol Version             !3UL [0x!2XB]", TRUE, idx,
-			gtmsourcelocal_ptr->remote_proto_ver, gtmsourcelocal_ptr->remote_proto_ver);
+		/**************** Dump the "remote_side" structure member ****************/
+		remote_side = &gtmsourcelocal_ptr->remote_side;
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, remote_side) + offsetof(repl_conn_info_t, proto_ver),
+					SIZEOF(remote_side->proto_ver));
+		util_out_print( PREFIX_SOURCELOCAL "Remote Protocol Version                      !3SL [0x!XL]", TRUE,
+				idx, remote_side->proto_ver, remote_side->proto_ver);
+
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, remote_side) + offsetof(repl_conn_info_t, jnl_ver),
+					SIZEOF(remote_side->jnl_ver));
+		util_out_print( PREFIX_SOURCELOCAL "Remote Journal Version                       !3UL [0x!XL]", TRUE,
+				idx, remote_side->jnl_ver, remote_side->jnl_ver);
+
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, remote_side) + offsetof(repl_conn_info_t, is_std_null_coll),
+					SIZEOF(remote_side->is_std_null_coll));
+		PRINT_BOOLEAN(PREFIX_SOURCELOCAL "Remote has Standard Null Collation  !R12AZ", remote_side->is_std_null_coll, idx);
+
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, remote_side) + offsetof(repl_conn_info_t, trigger_supported),
+					SIZEOF(remote_side->trigger_supported));
+		PRINT_BOOLEAN(PREFIX_SOURCELOCAL "Remote Supports Triggers            !R12AZ", remote_side->trigger_supported, idx);
+
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, remote_side) + offsetof(repl_conn_info_t, cross_endian),
+					SIZEOF(remote_side->cross_endian));
+		PRINT_BOOLEAN(PREFIX_SOURCELOCAL "Remote is Cross Endian              !R12AZ", remote_side->cross_endian, idx);
+
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, remote_side) + offsetof(repl_conn_info_t, endianness_known),
+					SIZEOF(remote_side->endianness_known));
+		PRINT_BOOLEAN(PREFIX_SOURCELOCAL "Remote Endianness Known             !R12AZ", remote_side->endianness_known, idx);
+
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, remote_side) + offsetof(repl_conn_info_t, null_subs_xform),
+					SIZEOF(remote_side->null_subs_xform));
+		PRINT_BOOLEAN(PREFIX_SOURCELOCAL "Remote needs Null Subs Xform        !R12AZ", remote_side->null_subs_xform, idx);
+
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, remote_side) + offsetof(repl_conn_info_t, is_supplementary),
+					SIZEOF(remote_side->is_supplementary));
+		PRINT_BOOLEAN(PREFIX_SOURCELOCAL "Remote is Supplementary Instance    !R12AZ", remote_side->is_supplementary, idx);
+		/**************** "remote_side" structure member dump done ****************/
 
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, read_state), SIZEOF(gtmsourcelocal_ptr->read_state));
 		string = (READ_POOL == gtmsourcelocal_ptr->read_state) ? "POOL" :
@@ -494,27 +817,29 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 		util_out_print( PREFIX_SOURCELOCAL "Connect Sequence Number     !20@UQ [0x!16@XQ]", TRUE, idx,
 			&gtmsourcelocal_ptr->connect_jnl_seqno, &gtmsourcelocal_ptr->connect_jnl_seqno);
 
-		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, num_triples), SIZEOF(gtmsourcelocal_ptr->num_triples));
-		util_out_print( PREFIX_SOURCELOCAL "Number of Triples                     !10UL [0x!XL]", TRUE, idx,
-			gtmsourcelocal_ptr->num_triples, gtmsourcelocal_ptr->num_triples);
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, num_histinfo), SIZEOF(gtmsourcelocal_ptr->num_histinfo));
+		util_out_print( PREFIX_SOURCELOCAL "Number of histinfo structures         !10UL [0x!XL]", TRUE, idx,
+			gtmsourcelocal_ptr->num_histinfo, gtmsourcelocal_ptr->num_histinfo);
 
-		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, next_triple_num), SIZEOF(gtmsourcelocal_ptr->next_triple_num));
-		util_out_print( PREFIX_SOURCELOCAL "Next Triple Number                    !10UL [0x!XL]", TRUE, idx,
-			gtmsourcelocal_ptr->next_triple_num, gtmsourcelocal_ptr->next_triple_num);
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, next_histinfo_num),
+			SIZEOF(gtmsourcelocal_ptr->next_histinfo_num));
+		util_out_print( PREFIX_SOURCELOCAL "Next histinfo Number                  !10UL [0x!XL]", TRUE, idx,
+			gtmsourcelocal_ptr->next_histinfo_num, gtmsourcelocal_ptr->next_histinfo_num);
 
-		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, next_triple_seqno),
-			SIZEOF(gtmsourcelocal_ptr->next_triple_seqno));
-		util_out_print( PREFIX_SOURCELOCAL "Next Triple Seqno           !20@UQ [0x!16@XQ]", TRUE, idx,
-			&gtmsourcelocal_ptr->next_triple_seqno, &gtmsourcelocal_ptr->next_triple_seqno);
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, next_histinfo_seqno),
+			SIZEOF(gtmsourcelocal_ptr->next_histinfo_seqno));
+		util_out_print( PREFIX_SOURCELOCAL "Next histinfo Seqno         !20@UQ [0x!16@XQ]", TRUE, idx,
+			&gtmsourcelocal_ptr->next_histinfo_seqno, &gtmsourcelocal_ptr->next_histinfo_seqno);
 
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, last_flush_resync_seqno),
 			SIZEOF(gtmsourcelocal_ptr->last_flush_resync_seqno));
 		util_out_print( PREFIX_SOURCELOCAL "Last Flush Resync Seqno     !20@UQ [0x!16@XQ]", TRUE, idx,
 			&gtmsourcelocal_ptr->last_flush_resync_seqno, &gtmsourcelocal_ptr->last_flush_resync_seqno);
 
-		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, send_new_triple), SIZEOF(gtmsourcelocal_ptr->send_new_triple));
-		PRINT_BOOLEAN( PREFIX_SOURCELOCAL "Send New Triple                         !R8AZ",
-			gtmsourcelocal_ptr->send_new_triple, idx);
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, send_new_histrec),
+			SIZEOF(gtmsourcelocal_ptr->send_new_histrec));
+		PRINT_BOOLEAN( PREFIX_SOURCELOCAL "Send New histinfo                       !R8AZ",
+			gtmsourcelocal_ptr->send_new_histrec, idx);
 
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, send_losttn_complete),
 			SIZEOF(gtmsourcelocal_ptr->send_losttn_complete));
@@ -614,7 +939,7 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 			gtmsourcelocal_ptr->shutdown, gtmsourcelocal_ptr->shutdown);
 
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, shutdown_time), SIZEOF(gtmsourcelocal_ptr->shutdown_time));
-		util_out_print( PREFIX_SOURCELOCAL "Shutdown Time in seconds              !10UL [0x!XL]", TRUE, idx,
+		util_out_print( PREFIX_SOURCELOCAL "Shutdown Time in seconds              !10SL [0x!XL]", TRUE, idx,
 			gtmsourcelocal_ptr->shutdown_time, gtmsourcelocal_ptr->shutdown_time);
 
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, filter_cmd[0]), SIZEOF(gtmsourcelocal_ptr->filter_cmd));

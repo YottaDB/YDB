@@ -17,26 +17,28 @@
 #include "mmemory.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
+error_def(ERR_COLON);
+error_def(ERR_SELECTFALSE);
+
 LITREF octabstruct oc_tab[];
 
-int f_select( oprtype *a, opctype op )
+int f_select(oprtype *a, opctype op)
 {
-	triple tmpchain, *oldchain, *ref, *r, *save_start, *save_start_orig, *triptr;
-	oprtype *cnd, tmparg, endtrip, target;
-	opctype old_op;
-	unsigned int save_depth;
-	boolean_t first_time, save_shift;
-	error_def(ERR_COLON);
-	error_def(ERR_SELECTFALSE);
+	boolean_t	first_time, save_saw_side, save_shift;
+	unsigned int	save_depth;
+	opctype		old_op;
+	oprtype		*cnd, endtrip, target, tmparg;
+	triple		*oldchain, *r, *ref, *save_start, *save_start_orig, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	save_shift = TREF(shift_side_effects);
+	save_saw_side = TREF(saw_side_effect);
 	save_depth = TREF(expr_depth);
 	save_start = TREF(expr_start);
 	save_start_orig = TREF(expr_start_orig);
 	TREF(shift_side_effects) = FALSE;
+	TREF(saw_side_effect) = FALSE;
 	TREF(expr_depth) = 0;
 	TREF(expr_start) = TREF(expr_start_orig) = NULL;
 	if (save_shift)
@@ -50,13 +52,13 @@ int f_select( oprtype *a, opctype op )
 	for (;;)
 	{
 		cnd = (oprtype *)mcalloc(SIZEOF(oprtype));
-		if (!bool_expr((bool) FALSE, cnd))
+		if (!bool_expr(FALSE, cnd))
 		{
 			if (save_shift)
 				setcurtchain(oldchain);
 			return FALSE;
 		}
-		if (TK_COLON != window_token)
+		if (TK_COLON != TREF(window_token))
 		{
 			if (save_shift)
 				setcurtchain(oldchain);
@@ -64,7 +66,7 @@ int f_select( oprtype *a, opctype op )
 			return FALSE;
 		}
 		advancewindow();
-		if (!expr(&tmparg))
+		if (EXPR_FAIL == expr(&tmparg, MUMPS_EXPR))
 		{
 			if (save_shift)
 				setcurtchain(oldchain);
@@ -98,7 +100,7 @@ int f_select( oprtype *a, opctype op )
 		ref = newtriple(OC_JMP);
 		ref->operand[0] = endtrip;
 		tnxtarg(cnd);
-		if (TK_COMMA != window_token)
+		if (TK_COMMA != TREF(window_token))
 			break;
 		advancewindow();
 	}
@@ -109,6 +111,7 @@ int f_select( oprtype *a, opctype op )
 	ins_triple(r);
 	assert(!TREF(expr_depth));
 	TREF(shift_side_effects) = save_shift;
+	TREF(saw_side_effect) = save_saw_side;
 	TREF(expr_depth) = save_depth;
 	TREF(expr_start) = save_start;
 	TREF(expr_start_orig) = save_start_orig;

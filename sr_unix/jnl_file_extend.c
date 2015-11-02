@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	sgmnt_data_ptr_t	csd;
 	char			prev_jnl_fn[JNL_NAME_SIZE];
 	uint4			jnl_status = 0, status;
-	int			new_blocks, result;
+	int			new_blocks, warn_blocks, result;
 	GTM_BAVAIL_TYPE		avail_blocks;
 	uint4			aligned_tot_jrec_size, count;
 	uint4			jnl_fs_block_size, read_write_size;
@@ -84,9 +84,9 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	assert(csa->now_crit || (csd->clustered && (CCST_CLOSED == csa->nl->ccp_state)));
 	assert(&FILE_INFO(jpc->region)->s_addrs == csa);
 	assert(csa->jnl_state == csd->jnl_state);
-	if (!JNL_ENABLED(csa) || (NOJNL == jpc->channel) || (JNL_FILE_SWITCHED(jpc)))
-		GTMASSERT;	/* crit and messing with the journal file - how could it have vanished? */
-	if (!csd->jnl_deq)
+	assertpro(JNL_ENABLED(csa) && (NOJNL != jpc->channel) && (!JNL_FILE_SWITCHED(jpc)));
+		/* crit and messing with the journal file - how could it have vanished? */
+	if (!csd->jnl_deq || (csd->jnl_alq + csd->jnl_deq > csd->autoswitchlimit))
 	{
 		assert(DIVIDE_ROUND_UP(total_jnl_rec_size, DISK_BLOCK_SIZE) <= csd->jnl_alq);
 		assert(csd->jnl_alq == csd->autoswitchlimit);
@@ -110,7 +110,11 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 		need_extend = FALSE;
 		if (SS_NORMAL == (status = disk_block_available(jpc->channel, &avail_blocks, TRUE)))
 		{
-			if ((new_blocks * EXTEND_WARNING_FACTOR) > avail_blocks)
+			warn_blocks = (csd->jnl_alq + csd->jnl_deq > csd->autoswitchlimit)
+					? ((csd->jnl_deq > csd->autoswitchlimit) ? csd->jnl_deq : csd->autoswitchlimit)
+					: new_blocks;
+
+			if ((warn_blocks * EXTEND_WARNING_FACTOR) > avail_blocks)
 			{
 				if (new_blocks > avail_blocks)
 				{	/* if we cannot satisfy the request, it is an error */
@@ -121,7 +125,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					break;
 				} else
 					send_msg(VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, JNL_LEN_STR(csd),
-						(avail_blocks - new_blocks));
+						(avail_blocks - warn_blocks));
 			}
 		} else
 			send_msg(VARLSTCNT(5) ERR_JNLFILEXTERR, 2, JNL_LEN_STR(csd), status);
@@ -192,16 +196,19 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 						rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
 				}
 				assert(jb->filesize == csd->jnl_alq);
-				aligned_tot_jrec_size = ALIGNED_ROUND_UP(MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size),
-										csd->jnl_alq, csd->jnl_deq);
-				if (aligned_tot_jrec_size > csd->jnl_alq)
-				{	/* need to extend more than initial allocation in the new journal file
-					 * to accommodate the current transaction.
-					 */
-					new_blocks = aligned_tot_jrec_size - csd->jnl_alq;
-					assert(new_blocks);
-					assert(0 == new_blocks % csd->jnl_deq);
-					need_extend = TRUE;
+				if (csd->jnl_alq + csd->jnl_deq <= csd->autoswitchlimit)
+				{
+					aligned_tot_jrec_size = ALIGNED_ROUND_UP(MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size),
+											csd->jnl_alq, csd->jnl_deq);
+					if (aligned_tot_jrec_size > csd->jnl_alq)
+					{	/* need to extend more than initial allocation in the new journal file
+						 * to accommodate the current transaction.
+						 */
+						new_blocks = aligned_tot_jrec_size - csd->jnl_alq;
+						assert(new_blocks);
+						assert(0 == new_blocks % csd->jnl_deq);
+						need_extend = TRUE;
+					}
 				}
 			} else
 			{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,8 @@
 #include "gdsfilext.h"
 #include "bm_getfree.h"
 #include "gtmimagename.h"
+#include "gtmdbglvl.h"
+#include "min_max.h"
 
 #define	      GDSFILEXT_CLNUP { if (need_to_restore_mask)				\
 					sigprocmask(SIG_SETMASK, &savemask, NULL);	\
@@ -71,7 +73,7 @@ GBLREF	unsigned int	t_tries;
 GBLREF	jnl_gbls_t	jgbl;
 GBLREF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
-GBLREF  boolean_t	have_standalone_access;
+GBLREF	uint4		gtmDebugLevel;
 
 error_def(ERR_DBFILERR);
 error_def(ERR_DBFILEXT);
@@ -102,10 +104,12 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 
-#if !defined(MM_FILE_EXT_OK)
-	if (!have_standalone_access && (dba_mm == cs_addrs->hdr->acc_meth))
+	assert((cs_addrs->nl == NULL) || (process_id != cs_addrs->nl->trunc_pid)); /* mu_truncate shouldn't extend file... */
+	udi = FILE_INFO(gv_cur_region);
+#	if !defined(MM_FILE_EXT_OK)
+	if (!udi->grabbed_access_sem && (dba_mm == cs_addrs->hdr->acc_meth))
 		return (uint4)(NO_FREE_SPACE); /* should this be changed to show extension not allowed ? */
-#endif
+#	endif
 
 	/* Both blocks and total blocks are unsigned ints so make sure we aren't asking for huge numbers that will
 	   overflow and end up doing silly things.
@@ -128,20 +132,24 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			- DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, bplmap);
 	new_blocks = blocks + new_bit_maps;
 	assert(0 < (int)new_blocks);
-	udi = FILE_INFO(gv_cur_region);
 	if (0 != (save_errno = disk_block_available(udi->fd, &avail_blocks, FALSE)))
 	{
 		send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
 		rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
 	} else
 	{
-		avail_blocks = avail_blocks / (cs_data->blk_size / DISK_BLOCK_SIZE);
-		if ((blocks * EXTEND_WARNING_FACTOR) > avail_blocks)
-		{
-			send_msg(VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, DB_LEN_STR(gv_cur_region),
-					(uint4)(avail_blocks - ((new_blocks <= avail_blocks) ? new_blocks : 0)));
-			if (blocks > (uint4)avail_blocks)
-				return (uint4)(NO_FREE_SPACE);
+		if (!(gtmDebugLevel & GDL_IgnoreAvailSpace))
+		{	/* Bypass this space check if debug flag above is on. Allows us to create a large sparce DB
+			 * in space it could never fit it if wasn't sparse. Needed for some tests.
+			 */
+			avail_blocks = avail_blocks / (cs_data->blk_size / DISK_BLOCK_SIZE);
+			if ((blocks * EXTEND_WARNING_FACTOR) > avail_blocks)
+			{
+				send_msg(VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, DB_LEN_STR(gv_cur_region),
+					 (uint4)(avail_blocks - ((new_blocks <= avail_blocks) ? new_blocks : 0)));
+				if (blocks > (uint4)avail_blocks)
+					return (uint4)(NO_FREE_SPACE);
+			}
 		}
 	}
 	cs_addrs->extending = TRUE;
@@ -192,7 +200,8 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	{
 		/* somebody else has already extended it, since we are in crit, this is trust-worthy
 		 * however, in case of MM, we still need to remap the database */
-		assert(cs_data->trans_hist.total_blks > filesize);
+		assert((cs_data->trans_hist.total_blks > filesize) GTM_TRUNCATE_ONLY( || (dba_mm != cs_addrs->hdr->acc_meth)));
+		/* For BG, someone else could have truncated or extended - we have no idea */
 		GDSFILEXT_CLNUP;
 		return (SS_NORMAL);
 	}
@@ -431,6 +440,10 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		gds_map_moved(cs_addrs->db_addrs[0], old_base[0], old_base[1], new_eof);
                 cs_addrs->total_blks = new_total;       /* Local copy to test if file has extended */
  	}
+#	ifdef GTM_TRUNCATE
+ 		/* Used with BG to detect concurrent truncates in t_end and tp_tend */
+ 		cs_addrs->total_blks = MAX(cs_addrs->total_blks, new_total);
+#	endif
 	assert(0 < (int)blocks);
 	assert(0 < (int)(cs_addrs->ti->free_blocks + blocks));
 	cs_addrs->ti->free_blocks += blocks;

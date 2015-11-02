@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,9 +18,6 @@
 #include "advancewindow.h"
 #include "cmd.h"
 #include "lv_val.h"
-
-GBLREF	char		window_token;
-GBLREF	triple		*curtchain;
 
 error_def(ERR_EQUAL);
 error_def(ERR_FOROFLOW);
@@ -93,16 +90,16 @@ int m_for(void)
 {
 	unsigned int	arg_cnt, arg_index, for_stack_level;
 	oprtype		arg_eval_addr[MAX_FORARGS], increment[MAX_FORARGS], terminate[MAX_FORARGS],
-			arg_next_addr, arg_value, dummy, *body, control_variable,
+			arg_next_addr, arg_value, dummy, control_variable,
 			*iteration_start_addr, iteration_start_addr_indr, *not_even_once_addr;
 	triple		*eval_next_addr[MAX_FORARGS], *control_ref,
-			*forchk1opc, forpos_in_chain, *init_ref, *ref, *step_ref, *term_ref;
+			*forchk1opc, forpos_in_chain, *init_ref, *ref, *step_ref, *term_ref, *var_ref;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	forpos_in_chain = TREF(pos_in_chain);
 	FOR_PUSH();
-	if (TK_SPACE == window_token)
+	if (TK_SPACE == TREF(window_token))
 	{	/* "argumentless" form */
 		FOR_END_OF_SCOPE(1, dummy);
 		ref = newtriple(OC_FORCHK1);
@@ -122,7 +119,7 @@ int m_for(void)
 	for_stack_level = (TREF(for_stack_ptr) - TADR(for_stack));
 	init_ref = newtriple(OC_FORNESTLVL);
 	init_ref->operand[0] = put_ilit(for_stack_level);
-	if (TK_ATSIGN == window_token)
+	if (TK_ATSIGN == TREF(window_token))
 	{
 		if (!indirection(&control_variable))
 		{
@@ -136,7 +133,7 @@ int m_for(void)
 	} else
 	{
 		/* The following relies on the fact that lvn() always generates an OC_VAR triple first */
-		control_ref = curtchain->exorder.bl;
+		control_ref = (TREF(curtchain))->exorder.bl;
 		if (!lvn(&control_variable, OC_SAVPUTINDX, NULL))
 		{
 			FOR_POP(BLOWN_FOR);
@@ -145,7 +142,7 @@ int m_for(void)
 		assert(OC_VAR == control_ref->exorder.fl->opcode);
 		assert(MVAR_REF == control_ref->exorder.fl->operand[0].oprclass);
 	}
-	if (TK_EQUAL != window_token)
+	if (TK_EQUAL != TREF(window_token))
 	{
 		stx_error(ERR_EQUAL);
 		FOR_POP(BLOWN_FOR);
@@ -170,7 +167,7 @@ int m_for(void)
 			FOR_POP(BLOWN_FOR);
 			return FALSE;
 		}
-		assert((TK_COMMA == window_token) || (TK_EQUAL == window_token));
+		assert((TK_COMMA == TREF(window_token)) || (TK_EQUAL == TREF(window_token)));
 		advancewindow();
 		tnxtarg(&arg_eval_addr[arg_cnt]);		/* put location of this arg eval in arg_eval_addr array */
 		if (NULL != not_even_once_addr)
@@ -178,13 +175,13 @@ int m_for(void)
 			*not_even_once_addr = arg_eval_addr[arg_cnt];
 			not_even_once_addr = NULL;
 		}
-		if (EXPR_FAIL == expr(&arg_value))	/* starting (possibly only) value */
+		if (EXPR_FAIL == expr(&arg_value, MUMPS_EXPR))	/* starting (possibly only) value */
 		{
 			FOR_POP(BLOWN_FOR);
 			return FALSE;
 		}
 		assert(TRIP_REF == arg_value.oprclass);
-		if (TK_COLON != window_token)
+		if (TK_COLON != TREF(window_token))
 		{	/* list point value? */
 			increment[arg_cnt].oprclass = terminate[arg_cnt].oprclass = 0;
 			DEAL_WITH_DANGER(for_stack_level, control_variable, arg_value);
@@ -194,32 +191,34 @@ int m_for(void)
 			init_ref->operand[0] = arg_value;
 			newtriple(OC_CONUM)->operand[0] = put_tref(init_ref);	/* make start numeric */
 			advancewindow();				/* past the first colon */
-			if (EXPR_FAIL == expr(&increment[arg_cnt]))	/* pick up step */
+			var_ref = (TREF(curtchain))->exorder.bl;
+			if (EXPR_FAIL == expr(&increment[arg_cnt], MUMPS_EXPR))	/* pick up step */
 			{
 				FOR_POP(BLOWN_FOR);
 				return FALSE;
 			}
 			assert(TRIP_REF == increment[arg_cnt].oprclass);
 			ref = increment[arg_cnt].oprval.tref;
-			if (OC_LIT != ref->opcode)
+			if (OC_LIT != var_ref->exorder.fl->opcode)
 			{
 				if (!TAREF1(for_temps, for_stack_level))
 					TAREF1(for_temps, for_stack_level) = TRUE;
-				if (OC_VAR == ref->opcode)
-				{
+				if (OC_VAR == var_ref->exorder.fl->opcode)
+				{	/* The above relies on lvn() always generating an OC_VAR triple first - asserted earlier */
 					step_ref = newtriple(OC_STOTEMP);
 					step_ref->operand[0] = put_tref(ref);
 					increment[arg_cnt] = put_tref(step_ref);
 				}
 			}
-			if (TK_COLON != window_token)
+			if (TK_COLON != TREF(window_token))
 			{
 				DEAL_WITH_DANGER(for_stack_level, control_variable, put_tref(init_ref));
 				terminate[arg_cnt].oprclass = 0;	/* no termination on iteration for this arg */
 			} else
 			{
 				advancewindow();	/* past the second colon */
-				if (EXPR_FAIL == expr(&terminate[arg_cnt]))		/* termination control value */
+				var_ref = (TREF(curtchain))->exorder.bl;
+				if (EXPR_FAIL == expr(&terminate[arg_cnt], MUMPS_EXPR))		/* termination control value */
 				{
 					FOR_POP(BLOWN_FOR);
 					return FALSE;
@@ -230,8 +229,8 @@ int m_for(void)
 				{
 					if (!TAREF1(for_temps, for_stack_level))
 						TAREF1(for_temps, for_stack_level) = TRUE;
-					if (OC_VAR == ref->opcode)
-					{
+					if (OC_VAR == var_ref->exorder.fl->opcode)
+					{	/* The above relies on lvn() always generating an OC_VAR triple first */
 						term_ref = newtriple(OC_STOTEMP);
 						term_ref->operand[0] = put_tref(ref);
 						terminate[arg_cnt] = put_tref(term_ref);
@@ -249,7 +248,7 @@ int m_for(void)
 				not_even_once_addr = newtriple(OC_JMPGTR)->operand;
 			}
 		}
-		if ((0 < arg_cnt) || (TK_COMMA == window_token))
+		if ((0 < arg_cnt) || (TK_COMMA == TREF(window_token)))
 		{
 			if (!TAREF1(for_temps, for_stack_level))
 				TAREF1(for_temps, for_stack_level) = TRUE;
@@ -257,7 +256,7 @@ int m_for(void)
 				arg_next_addr = put_tref(newtriple(OC_CDADDR));
 			(eval_next_addr[arg_cnt] = newtriple(OC_LDADDR))->destination = arg_next_addr;
 		}
-		if (TK_COMMA != window_token)
+		if (TK_COMMA != TREF(window_token))
 			break;
 		newtriple(OC_JMP)->operand[0] = iteration_start_addr_indr;
 	}
@@ -265,9 +264,7 @@ int m_for(void)
 		 FOR_END_OF_SCOPE(1, *not_even_once_addr);	/* 1 means down a level */
 	forchk1opc = newtriple(OC_FORCHK1);	/* FORCHK1 is a do-nothing routine used by the out-of-band mechanism */
 	*iteration_start_addr = put_tjmp(forchk1opc);
-	body = (oprtype *)mcalloc(SIZEOF(oprtype));
-	tnxtarg(body);
-	if ((TK_EOL != window_token) && (TK_SPACE != window_token))
+	if ((TK_EOL != TREF(window_token)) && (TK_SPACE != TREF(window_token)))
 	{
 		stx_error(ERR_SPOREOL);
 		FOR_POP(BLOWN_FOR);

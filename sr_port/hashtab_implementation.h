@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,8 @@ Restrictions :
 #include "mdef.h"
 #include "gtm_malloc.h"		/* For raise_gtmmemory_error() definition */
 #include "bit_set.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 LITREF	int		ht_sizes[];
 
@@ -198,7 +200,7 @@ LITREF	int		ht_sizes[];
 
 #if DEBUGHASHTABLE
 /* Debug FPRINTF with pre and post requisite flushing of appropriate streams  */
-#define DBGHASHTAB(x) {flush_pio(); FPRINTF x; fflush(stderr);}
+#define DBGHASHTAB(x) {flush_pio(); FPRINTF x; FFLUSH(stderr);}
 #else
 #define DBGHASHTAB(x)
 #endif
@@ -295,6 +297,9 @@ void FREE_HASHTAB(HASH_TABLE *table);
 void REINITIALIZE_HASHTAB(HASH_TABLE *table);
 void COMPACT_HASHTAB(HASH_TABLE *table);
 
+error_def(ERR_HTOFLOW);
+error_def(ERR_HTSHRINKFAIL);
+
 /* This is used by external callers to initially setup the hash table. */
 void INIT_HASHTAB(HASH_TABLE *table, int minsize, boolean_t dont_compact, boolean_t dont_keep_spare_table)
 {
@@ -318,7 +323,6 @@ STATICFNDEF void INIT_HASHTAB_INTL(HASH_TABLE *table, int minsize, HASH_TABLE *o
 	unsigned int 	cur_ht_size, prior_size;
 	int 		index;
 	boolean_t	dont_keep_spare_table;
-	error_def(ERR_HTOFLOW);
 	DBGHASHTAB((stderr, "INIT_HASHTAB:table(%lx) minsize(%d) old_table(%lx)\n", table, minsize, old_table));
 
 	/* If this is the first time the hash table is being initialized (old_table == NULL), then look up the
@@ -656,7 +660,6 @@ void REINITIALIZE_HASHTAB(HASH_TABLE *table)
  */
 void COMPACT_HASHTAB(HASH_TABLE *table)
 {
- 	error_def	(ERR_HTSHRINKFAIL);
 	HT_ENT	*oldbase;
 
 	DBGHASHTAB((stderr, "COMPACT_HASHTAB: table(%lx)\n", table));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,9 @@ GBLREF unsigned char	cw_set_depth;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgm_info		*sgm_info_ptr;
 GBLREF uint4		dollar_tlevel;
+#ifdef GTM_TRUNCATE
+GBLREF unsigned int	t_tries;
+#endif
 
 void t_write_map (
 		srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
@@ -73,8 +76,7 @@ void t_write_map (
 	cs->mode = gds_t_writemap;
 	cs->blk_checksum = 0;
 	cs->blk = blkhist->blk_num;
-	if (cs->blk >= csa->ti->total_blks)
-		GTMASSERT;
+	assert((cs->blk < csa->ti->total_blks) GTM_TRUNCATE_ONLY(|| (CDB_STAGNATE > t_tries)));
 	cs->old_block = blkhist->buffaddr;
 	cs->was_free = FALSE; /* t_write_map operates on BUSY blocks and hence cs->was_free is set to FALSE unconditionally */
 	old_block = (blk_hdr_ptr_t)cs->old_block;

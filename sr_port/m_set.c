@@ -37,21 +37,18 @@
 #endif
 
 GBLREF boolean_t	badchar_inhibit;
-GBLREF triple		*curtchain;
-GBLREF char		director_token, window_token;
-GBLREF mident		director_ident, window_ident;
 GBLREF boolean_t	gtm_utf8_mode;
 
-error_def(ERR_INVSVN);
-error_def(ERR_VAREXPECTED);
-error_def(ERR_RPARENMISSING);
-error_def(ERR_EQUAL);
-error_def(ERR_COMMA);
-error_def(ERR_SVNOSET);
-error_def(ERR_NOALIASLIST);
 error_def(ERR_ALIASEXPECTED);
-error_def(ERR_DZWRNOPAREN);
+error_def(ERR_COMMA);
 error_def(ERR_DZWRNOALIAS);
+error_def(ERR_DZWRNOPAREN);
+error_def(ERR_EQUAL);
+error_def(ERR_INVSVN);
+error_def(ERR_NOALIASLIST);
+error_def(ERR_RPARENMISSING);
+error_def(ERR_SVNOSET);
+error_def(ERR_VAREXPECTED);
 
 LITREF unsigned char	svn_index[], fun_index[];
 LITREF nametabent	svn_names[], fun_names[];
@@ -124,21 +121,19 @@ int m_set(void)
 	   * target is valid. It is initialized to -1 before the start of the parse.
 	   */
 
-	int		index, setop, delimlen;
-	int		first_val_lit, last_val_lit, nakedzalias;
-	boolean_t	first_is_lit, last_is_lit, got_lparen, delim1char, is_extract, valid_char;
-	boolean_t 	alias_processing, have_lh_alias;
+	boolean_t	alias_processing, delim1char, first_is_lit, got_lparen, have_lh_alias, is_extract, last_is_lit, valid_char;
+	boolean_t	parse_warn;	/* set to TRUE in case of an invalid SVN etc. */
+	boolean_t	curtchain_switched;	/* set to TRUE if a setcurtchain was done */
+	boolean_t	temp_subs_was_FALSE;
+	int		delimlen, first_val_lit, index, last_val_lit, nakedzalias, setop;
+	int		first_setleft_invalid;	/* set to TRUE if the first setleft target is invalid */
 	opctype		put_oc;
-	oprtype		v, delimval, firstval, lastval, *result, resptr;
+	oprtype		delimval, firstval, lastval, resptr, *result, v;
 	triple		*curtargchain, *delimiter, discardcurtchain, *first, *get, *jmptrp1, *jmptrp2, *last, *obp, *put;
 	triple		*s, *s0, *s1, save_targchain, *save_curtchain, *save_curtchain1, *sub, targchain, *tmp;
 	mint		delimlit;
 	mval		*delim_mval;
 	mvar		*mvarptr;
-	boolean_t	parse_warn;	/* set to TRUE in case of an invalid SVN etc. */
-	boolean_t	curtchain_switched;	/* set to TRUE if a setcurtchain was done */
-	int		first_setleft_invalid;	/* set to TRUE if the first setleft target is invalid */
-	boolean_t	temp_subs_was_FALSE;
 	union
 	{
 		uint4		unichar_val;
@@ -156,9 +151,9 @@ int m_set(void)
 	 * and will trigger an error. This is because the source and targets of aliases require different values and references
 	 * than normal sets do and thus cannot be mixed.
 	 */
-	if (alias_processing = (TK_ASTERISK == window_token))
+	if (alias_processing = (TK_ASTERISK == TREF(window_token)))
 		advancewindow();
-	if (got_lparen = (TK_LPAREN == window_token))
+	if (got_lparen = (TK_LPAREN == TREF(window_token)))
 	{
 		if (alias_processing)
 			stx_error(ERR_NOALIASLIST);
@@ -219,51 +214,224 @@ int m_set(void)
 		jmptrp1 = jmptrp2 = NULL;
 		delim1char = is_extract = FALSE;
 		allow_dzwrtac_as_mident();	/* Allows $ZWRTACxxx as target to be treated as an mident */
-		switch (window_token)
+		switch (TREF(window_token))
 		{
-			case TK_IDENT:
-				/* A slight diversion first. If this is a $ZWRTAC set (indication of $ in first char
-				 * is currently enough to signify that), then we need to check a few conditions first.
-				 * If this is a "naked $ZWRTAC", meaning no numeric suffix, then this is a flag that
-				 * all the $ZWRTAC vars in the local variable tree need to be kill *'d which will not
-				 * be generating a SET instruction. First we need to verify that fact and make sure
-				 * we are not in PARENs and not doing alias processing. Note *any* value can be
-				 * specified as the source but while it will be evaluated, it is NOT stored anywhere.
-				 */
-				if ('$' == *window_ident.addr)
-				{	/* We have a $ZWRTAC<xx> target */
-					if (got_lparen)
-						/* We don't allow $ZWRTACxxx to be specified in a parenthesized list.
-						 * Verify that first
-						 */
-						SYNTAX_ERROR(ERR_DZWRNOPAREN);
-					if (STR_LIT_LEN(DOLLAR_ZWRTAC) == window_ident.len)
-					{	/* Ok, this is a naked $ZWRTAC targeted set */
-						if (alias_processing)
-							SYNTAX_ERROR(ERR_DZWRNOALIAS);
-						nakedzalias = TRUE;
-						/* This opcode doesn't really need args but it is easier to fit in with the rest
-						 * of m_set processing to pass it the result arg, which there may actually be
-						 * a use for someday..
-						 */
-						put = maketriple(OC_CLRALSVARS);
-						put->operand[0] = resptr;
-						dqins(targchain.exorder.bl, exorder, put);
-						advancewindow();
-						break;
-					}
+		case TK_IDENT:
+			/* A slight diversion first. If this is a $ZWRTAC set (indication of $ in first char
+			 * is currently enough to signify that), then we need to check a few conditions first.
+			 * If this is a "naked $ZWRTAC", meaning no numeric suffix, then this is a flag that
+			 * all the $ZWRTAC vars in the local variable tree need to be kill *'d which will not
+			 * be generating a SET instruction. First we need to verify that fact and make sure
+			 * we are not in PARENs and not doing alias processing. Note *any* value can be
+			 * specified as the source but while it will be evaluated, it is NOT stored anywhere.
+			 */
+			if ('$' == *(TREF(window_ident)).addr)
+			{	/* We have a $ZWRTAC<xx> target */
+				if (got_lparen)
+					/* We don't allow $ZWRTACxxx to be specified in a parenthesized list.
+					 * Verify that first
+					 */
+					SYNTAX_ERROR(ERR_DZWRNOPAREN);
+				if (STR_LIT_LEN(DOLLAR_ZWRTAC) == (TREF(window_ident)).len)
+				{	/* Ok, this is a naked $ZWRTAC targeted set */
+					if (alias_processing)
+						SYNTAX_ERROR(ERR_DZWRNOALIAS);
+					nakedzalias = TRUE;
+					/* This opcode doesn't really need args but it is easier to fit in with the rest
+					 * of m_set processing to pass it the result arg, which there may actually be
+					 * a use for someday..
+					 */
+					put = maketriple(OC_CLRALSVARS);
+					put->operand[0] = resptr;
+					dqins(targchain.exorder.bl, exorder, put);
+					advancewindow();
+					break;
 				}
-				/* If we are doing alias processing, there are two possibilities:
-				 *  1) LHS is unsubscripted - it is an alias variable being created or replaced. Need to parse
-				 *  the varname as if this were a regular set.
-				 *  2) LHS is subscripted - it is an alias container variable being created or replaced. The
-				 *  processing here is to pass the base variable index to the store routine so bypass the
-				 *  lvn() call.
+			}
+			/* If we are doing alias processing, there are two possibilities:
+			 *  1) LHS is unsubscripted - it is an alias variable being created or replaced. Need to parse
+			 *  the varname as if this were a regular set.
+			 *  2) LHS is subscripted - it is an alias container variable being created or replaced. The
+			 *  processing here is to pass the base variable index to the store routine so bypass the
+			 *  lvn() call.
+			 */
+			if (!alias_processing || (TK_LPAREN == TREF(director_token)))
+			{	/* Normal variable processing or we have a lh alias container */
+				if (!lvn(&v, OC_PUTINDX, 0))
+					SYNTAX_ERROR_NOREPORT_HERE;
+				if (OC_PUTINDX == v.oprval.tref->opcode)
+				{
+					dqdel(v.oprval.tref, exorder);
+					dqins(targchain.exorder.bl, exorder, v.oprval.tref);
+					sub = v.oprval.tref;
+					put_oc = OC_PUTINDX;
+					if (TREF(temp_subs))
+						m_set_create_temporaries(sub, put_oc);
+				}
+			} else
+			{	/* Have alias variable. Argument is index into var table rather than pointer to var */
+				have_lh_alias = TRUE;
+				/* We only want the variable index in this case. Since the entire hash structure to which
+				 * this variable is going to be pointing to is changing, doing anything that calls fetch()
+				 * is somewhat pointless so we avoid it by just accessing the variable information
+				 * directly.
 				 */
-				if (!alias_processing || TK_LPAREN == director_token)
-				{	/* Normal variable processing or we have a lh alias container */
+				mvarptr = get_mvaddr(&(TREF(window_ident)));
+				v = put_ilit(mvarptr->mvidx);
+				advancewindow();
+			}
+			/* Determine correct storing triple */
+			put = maketriple((!alias_processing ? OC_STO : (have_lh_alias ? OC_SETALS2ALS : OC_SETALSIN2ALSCT)));
+			put->operand[0] = v;
+			put->operand[1] = resptr;
+			dqins(targchain.exorder.bl, exorder, put);
+			break;
+		case TK_CIRCUMFLEX:
+			if (alias_processing)
+				SYNTAX_ERROR(ERR_ALIASEXPECTED);
+			s1 = (TREF(curtchain))->exorder.bl;
+			if (!gvn())
+				SYNTAX_ERROR_NOREPORT_HERE;
+			for (sub = (TREF(curtchain))->exorder.bl; sub != s1; sub = sub->exorder.bl)
+			{
+				put_oc = sub->opcode;
+				if ((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc) || (OC_GVEXTNAM == put_oc))
+					break;
+			}
+			assert((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc) || (OC_GVEXTNAM == put_oc));
+			dqdel(sub, exorder);
+			dqins(targchain.exorder.bl, exorder, sub);
+			if (TREF(temp_subs))
+				m_set_create_temporaries(sub, put_oc);
+			put = maketriple(OC_GVPUT);
+			put->operand[0] = resptr;
+			dqins(targchain.exorder.bl, exorder, put);
+			break;
+		case TK_ATSIGN:
+			if (alias_processing)
+				SYNTAX_ERROR(ERR_ALIASEXPECTED);
+			if (!indirection(&v))
+				SYNTAX_ERROR_NOREPORT_HERE;
+			if (!got_lparen && (TK_EQUAL != TREF(window_token)))
+			{
+				assert(!curtchain_switched);
+				put = newtriple(OC_COMMARG);
+				put->operand[0] = v;
+				put->operand[1] = put_ilit(indir_set);
+				return TRUE;
+			}
+			put = maketriple(OC_INDSET);
+			put->operand[0] = v;
+			put->operand[1] = resptr;
+			dqins(targchain.exorder.bl, exorder, put);
+			break;
+		case TK_DOLLAR:
+			if (alias_processing)
+				SYNTAX_ERROR(ERR_ALIASEXPECTED);
+			advancewindow();
+			if (TK_IDENT != TREF(window_token))
+				SYNTAX_ERROR(ERR_VAREXPECTED);
+			if (TK_LPAREN != TREF(director_token))
+			{	/* Look for intrinsic special variables */
+				s1 = (TREF(curtchain))->exorder.bl;
+				if (0 > (index = namelook(svn_index, svn_names, (TREF(window_ident)).addr,
+					(TREF(window_ident)).len)))
+				{	/* NOTE assignment above */
+					STX_ERROR_WARN(ERR_INVSVN);	/* sets "parse_warn" to TRUE */
+				} else if (!svn_data[index].can_set)
+				{
+					STX_ERROR_WARN(ERR_SVNOSET);	/* sets "parse_warn" to TRUE */
+				}
+				advancewindow();
+				if (!parse_warn)
+				{
+					if ((SV_ETRAP != svn_data[index].opcode) && (SV_ZTRAP != svn_data[index].opcode))
+					{	/* Setting of $ZTRAP or $ETRAP must go through opp_svput because they
+						 * may affect the stack pointer. All others directly to op_svput().
+						 */
+						put = maketriple(OC_SVPUT);
+					} else
+						put = maketriple(OC_PSVPUT);
+					put->operand[0] = put_ilit(svn_data[index].opcode);
+					put->operand[1] = resptr;
+					dqins(targchain.exorder.bl, exorder, put);
+				} else
+				{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
+					 * (invoked by stx_error). To maintain consistency with the "if" portion of
+					 * this code, we need to move this triple to the "targchain".
+					 */
+					tmp = (TREF(curtchain))->exorder.bl; /* corresponds to put_ilit(FALSE) in ins_errtriple */
+					tmp = tmp->exorder.bl;	/* corresponds to put_ilit(in_error) in ins_errtriple */
+					tmp = tmp->exorder.bl;	/* corresponds to newtriple(OC_RTERROR) in ins_errtriple */
+					assert(OC_RTERROR == tmp->opcode);
+					dqdel(tmp, exorder);
+					dqins(targchain.exorder.bl, exorder, tmp);
+					CHKTCHAIN(&targchain);
+				}
+				break;
+			}
+			/* Only 4 function names allowed on left side: $[Z]Piece and $[Z]Extract */
+			index = namelook(fun_index, fun_names, (TREF(window_ident)).addr, (TREF(window_ident)).len);
+			if (0 > index)
+			{
+				STX_ERROR_WARN(ERR_INVFCN);	/* sets "parse_warn" to TRUE */
+				/* OC_RTERROR triple would have been inserted in "curtchain" by ins_errtriple
+				 * (invoked by stx_error). We need to switch it to "targchain" to be consistent
+				 * with every other codepath in this module.
+				 */
+				tmp = (TREF(curtchain))->exorder.bl; /* corresponds to put_ilit(FALSE) in ins_errtriple */
+				tmp = tmp->exorder.bl;	/* corresponds to put_ilit(in_error) in ins_errtriple */
+				tmp = tmp->exorder.bl;	/* corresponds to newtriple(OC_RTERROR) in ins_errtriple */
+				assert(OC_RTERROR == tmp->opcode);
+				dqdel(tmp, exorder);
+				dqins(targchain.exorder.bl, exorder, tmp);
+				CHKTCHAIN(&targchain);
+				advancewindow();	/* skip past the function name */
+				advancewindow();	/* skip past the left paren */
+				/* Parse the remaining arguments until corresponding RIGHT-PAREN/SPACE/EOL is reached */
+				if (!parse_until_rparen_or_space())
+					SYNTAX_ERROR_NOREPORT_HERE;
+			} else
+			{
+				switch (fun_data[index].opcode)
+				{
+				case OC_FNPIECE:
+					setop = OC_SETPIECE;
+					break;
+				case OC_FNEXTRACT:
+					is_extract = TRUE;
+					setop = OC_SETEXTRACT;
+					break;
+				case OC_FNZPIECE:
+					setop = OC_SETZPIECE;
+					break;
+				case OC_FNZEXTRACT:
+					is_extract = TRUE;
+					setop = OC_SETZEXTRACT;
+					break;
+				default:
+					SYNTAX_ERROR(ERR_VAREXPECTED);
+				}
+				advancewindow();
+				advancewindow();
+				/* Although we see the get (target) variable first, we need to save it's processing
+				 * on another chain -- the targchain -- because the retrieval of the target is bypassed
+				 * and the naked indicator is not reset if the first/last parameters are not set in a
+				 * logical manner (must be > 0 and first <= last). So the evaluation order is
+				 * delimiter (if $piece), first, last, RHS of the set and then the target if applicable.
+				 * Set up primary action triple now since it is ref'd by the put triples generated below.
+				 */
+				s = maketriple(setop);
+				/* Even for SET[Z]PIECE and SET[Z]EXTRACT, the SETxxxxx opcodes
+				 * do not do the final store, they only create the final value TO be
+				 * stored so generate the triples that will actually do the store now.
+				 * Note we are still building triples on the original curtchain.
+				 */
+				switch (TREF(window_token))
+				{
+				case TK_IDENT:
 					if (!lvn(&v, OC_PUTINDX, 0))
-						SYNTAX_ERROR_NOREPORT_HERE;
+						SYNTAX_ERROR(ERR_VAREXPECTED);
 					if (OC_PUTINDX == v.oprval.tref->opcode)
 					{
 						dqdel(v.oprval.tref, exorder);
@@ -273,430 +441,252 @@ int m_set(void)
 						if (TREF(temp_subs))
 							m_set_create_temporaries(sub, put_oc);
 					}
-				} else
-				{	/* Have alias variable. Argument is index into var table rather than pointer to var */
-					have_lh_alias = TRUE;
-					/* We only want the variable index in this case. Since the entire hash structure to which
-					 * this variable is going to be pointing to is changing, doing anything that calls fetch()
-					 * is somewhat pointless so we avoid it by just accessing the variable information
-					 * directly.
-					 */
-					mvarptr = get_mvaddr(&window_ident);
-					v = put_ilit(mvarptr->mvidx);
-					advancewindow();
-				}
-				/* Determine correct storing triple */
-				put = maketriple((!alias_processing ? OC_STO :
-						  (have_lh_alias ? OC_SETALS2ALS : OC_SETALSIN2ALSCT)));
-				put->operand[0] = v;
-				put->operand[1] = resptr;
-				dqins(targchain.exorder.bl, exorder, put);
-				break;
-			case TK_CIRCUMFLEX:
-				if (alias_processing)
-					SYNTAX_ERROR(ERR_ALIASEXPECTED);
-				s1 = curtchain->exorder.bl;
-				if (!gvn())
-					SYNTAX_ERROR_NOREPORT_HERE;
-				for (sub = curtchain->exorder.bl; sub != s1; sub = sub->exorder.bl)
-				{
-					put_oc = sub->opcode;
-					if (OC_GVNAME == put_oc || OC_GVNAKED == put_oc || OC_GVEXTNAM == put_oc)
-						break;
-				}
-				assert(OC_GVNAME == put_oc || OC_GVNAKED == put_oc || OC_GVEXTNAM == put_oc);
-				dqdel(sub, exorder);
-				dqins(targchain.exorder.bl, exorder, sub);
-				if (TREF(temp_subs))
-					m_set_create_temporaries(sub, put_oc);
-				put = maketriple(OC_GVPUT);
-				put->operand[0] = resptr;
-				dqins(targchain.exorder.bl, exorder, put);
-				break;
-			case TK_ATSIGN:
-				if (alias_processing)
-					SYNTAX_ERROR(ERR_ALIASEXPECTED);
-				if (!indirection(&v))
-					SYNTAX_ERROR_NOREPORT_HERE;
-				if (!got_lparen && TK_EQUAL != window_token)
-				{
-					assert(!curtchain_switched);
-					put = newtriple(OC_COMMARG);
+					get = maketriple(OC_FNGET);
+					get->operand[0] = v;
+					put = maketriple(OC_STO);
 					put->operand[0] = v;
-					put->operand[1] = put_ilit(indir_set);
-					return TRUE;
-				}
-				put = maketriple(OC_INDSET);
-				put->operand[0] = v;
-				put->operand[1] = resptr;
-				dqins(targchain.exorder.bl, exorder, put);
-				break;
-			case TK_DOLLAR:
-				if (alias_processing)
-					SYNTAX_ERROR(ERR_ALIASEXPECTED);
-				advancewindow();
-				if (TK_IDENT != window_token)
-					SYNTAX_ERROR(ERR_VAREXPECTED);
-				if (TK_LPAREN != director_token)
-				{	/* Look for intrinsic special variables */
-					s1 = curtchain->exorder.bl;
-					if (0 > (index = namelook(svn_index, svn_names, window_ident.addr, window_ident.len)))
-					{
-						STX_ERROR_WARN(ERR_INVSVN);	/* sets "parse_warn" to TRUE */
-					} else if (!svn_data[index].can_set)
-					{
-						STX_ERROR_WARN(ERR_SVNOSET);	/* sets "parse_warn" to TRUE */
-					}
-					advancewindow();
-					if (!parse_warn)
-					{
-						if (SV_ETRAP != svn_data[index].opcode && SV_ZTRAP != svn_data[index].opcode)
-						{	/* Setting of $ZTRAP or $ETRAP must go through opp_svput because they
-							 * may affect the stack pointer. All others directly to op_svput().
-							 */
-							put = maketriple(OC_SVPUT);
-						} else
-							put = maketriple(OC_PSVPUT);
-						put->operand[0] = put_ilit(svn_data[index].opcode);
-						put->operand[1] = resptr;
-						dqins(targchain.exorder.bl, exorder, put);
-					} else
-					{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
-						 * (invoked by stx_error). To maintain consistency with the "if" portion of
-						 * this code, we need to move this triple to the "targchain".
-						 */
-						tmp = curtchain->exorder.bl; /* corresponds to put_ilit(FALSE) in ins_errtriple */
-						tmp = tmp->exorder.bl;	/* corresponds to put_ilit(in_error) in ins_errtriple */
-						tmp = tmp->exorder.bl;	/* corresponds to newtriple(OC_RTERROR) in ins_errtriple */
-						assert(OC_RTERROR == tmp->opcode);
-						dqdel(tmp, exorder);
-						dqins(targchain.exorder.bl, exorder, tmp);
-						CHKTCHAIN(&targchain);
-					}
+					put->operand[1] = put_tref(s);
 					break;
-				}
-				/* Only 4 function names allowed on left side: $[Z]Piece and $[Z]Extract */
-				index = namelook(fun_index, fun_names, window_ident.addr, window_ident.len);
-				if (0 > index)
-				{
-					STX_ERROR_WARN(ERR_INVFCN);	/* sets "parse_warn" to TRUE */
-					/* OC_RTERROR triple would have been inserted in "curtchain" by ins_errtriple
-					 * (invoked by stx_error). We need to switch it to "targchain" to be consistent
-					 * with every other codepath in this module.
-					 */
-					tmp = curtchain->exorder.bl; /* corresponds to put_ilit(FALSE) in ins_errtriple */
-					tmp = tmp->exorder.bl;	/* corresponds to put_ilit(in_error) in ins_errtriple */
-					tmp = tmp->exorder.bl;	/* corresponds to newtriple(OC_RTERROR) in ins_errtriple */
-					assert(OC_RTERROR == tmp->opcode);
-					dqdel(tmp, exorder);
-					dqins(targchain.exorder.bl, exorder, tmp);
-					CHKTCHAIN(&targchain);
-					advancewindow();	/* skip past the function name */
-					advancewindow();	/* skip past the left paren */
-					/* Parse the remaining arguments until corresponding RIGHT-PAREN/SPACE/EOL is reached */
-					if (!parse_until_rparen_or_space())
+				case TK_ATSIGN:
+					if (!indirection(&v))
+						SYNTAX_ERROR(ERR_VAREXPECTED);
+					get = maketriple(OC_INDGET);
+					get->operand[0] = v;
+					get->operand[1] = put_str(0, 0);
+					put = maketriple(OC_INDSET);
+					put->operand[0] = v;
+					put->operand[1] = put_tref(s);
+					break;
+				case TK_CIRCUMFLEX:
+					s1 = (TREF(curtchain))->exorder.bl;
+					if (!gvn())
 						SYNTAX_ERROR_NOREPORT_HERE;
+					for (sub = (TREF(curtchain))->exorder.bl; sub != s1 ; sub = sub->exorder.bl)
+					{
+						put_oc = sub->opcode;
+						if ((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc) || (OC_GVEXTNAM == put_oc))
+							break;
+					}
+					assert((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc) || (OC_GVEXTNAM == put_oc));
+					dqdel(sub, exorder);
+					dqins(targchain.exorder.bl, exorder, sub);
+					if (TREF(temp_subs))
+						m_set_create_temporaries(sub, put_oc);
+					get = maketriple(OC_FNGVGET);
+					get->operand[0] = put_str(0, 0);
+					put = maketriple(OC_GVPUT);
+					put->operand[0] = put_tref(s);
+					break;
+				default:
+					SYNTAX_ERROR(ERR_VAREXPECTED);
+				}
+				s->operand[0] = put_tref(get);
+				/* Code to fetch args for target triple are on targchain. Put get there now too. */
+				dqins(targchain.exorder.bl, exorder, get);
+				CHKTCHAIN(&targchain);
+				if (!is_extract)
+				{	/* Set $[z]piece */
+					delimiter = newtriple(OC_PARAMETER);
+					s->operand[1] = put_tref(delimiter);
+					first = newtriple(OC_PARAMETER);
+					delimiter->operand[1] = put_tref(first);
+					/* Process delimiter string ($[z]piece only) */
+					if (TK_COMMA != TREF(window_token))
+						SYNTAX_ERROR(ERR_COMMA);
+					advancewindow();
+					if (EXPR_FAIL == expr(&delimval, MUMPS_STR))
+						SYNTAX_ERROR_NOREPORT_HERE;
+					assert(TRIP_REF == delimval.oprclass);
 				} else
+				{	/* Set $[Z]Extract */
+					first = newtriple(OC_PARAMETER);
+					s->operand[1] = put_tref(first);
+				}
+				/* Process first integer value */
+				if (TK_COMMA != TREF(window_token))
+					firstval = put_ilit(1);
+				else
 				{
-					switch(fun_data[index].opcode)
-					{
-						case OC_FNPIECE:
-							setop = OC_SETPIECE;
-							break;
-						case OC_FNEXTRACT:
-							is_extract = TRUE;
-							setop = OC_SETEXTRACT;
-							break;
-						case OC_FNZPIECE:
-							setop = OC_SETZPIECE;
-							break;
-						case OC_FNZEXTRACT:
-							is_extract = TRUE;
-							setop = OC_SETZEXTRACT;
-							break;
-						default:
-							SYNTAX_ERROR(ERR_VAREXPECTED);
-					}
 					advancewindow();
-					advancewindow();
-					/* Although we see the get (target) variable first, we need to save it's processing
-					 * on another chain -- the targchain -- because the retrieval of the target is bypassed
-					 * and the naked indicator is not reset if the first/last parameters are not set in a
-					 * logical manner (must be > 0 and first <= last). So the evaluation order is
-					 * delimiter (if $piece), first, last, RHS of the set and then the target if applicable.
-					 * Set up primary action triple now since it is ref'd by the put triples generated below.
+					if (EXPR_FAIL == expr(&firstval, MUMPS_INT))
+						SYNTAX_ERROR(ERR_COMMA);
+					assert(TRIP_REF == firstval.oprclass);
+				}
+				first->operand[0] = firstval;
+				if (first_is_lit = (OC_ILIT == firstval.oprval.tref->opcode))
+				{
+					assert(ILIT_REF ==firstval.oprval.tref->operand[0].oprclass);
+					first_val_lit = firstval.oprval.tref->operand[0].oprval.ilit;
+				}
+				if (TK_COMMA != TREF(window_token))
+				{	/* There is no "last" value. Only if 1 char literal delimiter and
+					 * no "last" value can we generate shortcut code to op_set[z]p1 entry
+					 * instead of op_set[z]piece. Note if UTF8 mode is in effect, then this
+					 * optimization applies if the literal is one unicode char which may in
+					 * fact be up to 4 bytes but will still be passed as a single unsigned
+					 * integer.
 					 */
-					s = maketriple(setop);
-					/* Even for SET[Z]PIECE and SET[Z]EXTRACT, the SETxxxxx opcodes
-					 * do not do the final store, they only create the final value TO be
-					 * stored so generate the triples that will actually do the store now.
-					 * Note we are still building triples on the original curtchain.
-					 */
-					switch (window_token)
-					{
-						case TK_IDENT:
-							if (!lvn(&v, OC_PUTINDX, 0))
-								SYNTAX_ERROR(ERR_VAREXPECTED);
-							if (OC_PUTINDX == v.oprval.tref->opcode)
-							{
-								dqdel(v.oprval.tref, exorder);
-								dqins(targchain.exorder.bl, exorder, v.oprval.tref);
-								sub = v.oprval.tref;
-								put_oc = OC_PUTINDX;
-								if (TREF(temp_subs))
-									m_set_create_temporaries(sub, put_oc);
-							}
-							get = maketriple(OC_FNGET);
-							get->operand[0] = v;
-							put = maketriple(OC_STO);
-							put->operand[0] = v;
-							put->operand[1] = put_tref(s);
-							break;
-						case TK_ATSIGN:
-							if (!indirection(&v))
-								SYNTAX_ERROR(ERR_VAREXPECTED);
-							get = maketriple(OC_INDGET);
-							get->operand[0] = v;
-							get->operand[1] = put_str(0, 0);
-							put = maketriple(OC_INDSET);
-							put->operand[0] = v;
-							put->operand[1] = put_tref(s);
-							break;
-						case TK_CIRCUMFLEX:
-							s1 = curtchain->exorder.bl;
-							if (!gvn())
-								SYNTAX_ERROR_NOREPORT_HERE;
-							for (sub = curtchain->exorder.bl; sub != s1 ; sub = sub->exorder.bl)
-							{
-								put_oc = sub->opcode;
-								if ((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc)
-								    || (OC_GVEXTNAM == put_oc))
-									break;
-							}
-							assert((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc)
-							       || (OC_GVEXTNAM == put_oc));
-							dqdel(sub, exorder);
-							dqins(targchain.exorder.bl, exorder, sub);
-							if (TREF(temp_subs))
-								m_set_create_temporaries(sub, put_oc);
-							get = maketriple(OC_FNGVGET);
-							get->operand[0] = put_str(0, 0);
-							put = maketriple(OC_GVPUT);
-							put->operand[0] = put_tref(s);
-							break;
-						default:
-							SYNTAX_ERROR(ERR_VAREXPECTED);
-					}
-					s->operand[0] = put_tref(get);
-					/* Code to fetch args for target triple are on targchain. Put get there now too. */
-					dqins(targchain.exorder.bl, exorder, get);
-					CHKTCHAIN(&targchain);
 					if (!is_extract)
-					{	/* Set $[z]piece */
-						delimiter = newtriple(OC_PARAMETER);
-						s->operand[1] = put_tref(delimiter);
-						first = newtriple(OC_PARAMETER);
-						delimiter->operand[1] = put_tref(first);
-						/* Process delimiter string ($[z]piece only) */
-						if (TK_COMMA != window_token)
-							SYNTAX_ERROR(ERR_COMMA);
-						advancewindow();
-						if (!strexpr(&delimval))
-							SYNTAX_ERROR_NOREPORT_HERE;
-						assert(TRIP_REF == delimval.oprclass);
-					} else
-					{	/* Set $[Z]Extract */
-						first = newtriple(OC_PARAMETER);
-						s->operand[1] = put_tref(first);
-					}
-					/* Process first integer value */
-					if (window_token != TK_COMMA)
-						firstval = put_ilit(1);
-					else
 					{
-						advancewindow();
-						if (!intexpr(&firstval))
-							SYNTAX_ERROR(ERR_COMMA);
-						assert(firstval.oprclass == TRIP_REF);
-					}
-					first->operand[0] = firstval;
-					if (first_is_lit = (OC_ILIT == firstval.oprval.tref->opcode))
-					{
-						assert(ILIT_REF ==firstval.oprval.tref->operand[0].oprclass);
-						first_val_lit = firstval.oprval.tref->operand[0].oprval.ilit;
-					}
-					if (TK_COMMA != window_token)
-					{	/* There is no "last" value. Only if 1 char literal delimiter and
-						 * no "last" value can we generate shortcut code to op_set[z]p1 entry
-						 * instead of op_set[z]piece. Note if UTF8 mode is in effect, then this
-						 * optimization applies if the literal is one unicode char which may in
-						 * fact be up to 4 bytes but will still be passed as a single unsigned
-						 * integer.
-						 */
-						if (!is_extract)
-						{
-							delim_mval = &delimval.oprval.tref->operand[0].oprval.mlit->v;
-							valid_char = TRUE;	/* Basic assumption unles proven otherwise */
-							if (delimval.oprval.tref->opcode == OC_LIT &&
-							    (1 == (gtm_utf8_mode ?
-								   MV_FORCE_LEN(delim_mval) : delim_mval->str.len)))
-							{	/* Single char delimiter for set $piece */
-								UNICODE_ONLY(
-									if (gtm_utf8_mode)
-									{	/*  We have a supposed single char delimiter but it
-										 *  must be a valid utf8 char to be used by
-										 *  op_setp1() and MV_FORCE_LEN won't tell us that.
-										 */
-										valid_char = UTF8_VALID(delim_mval->str.addr,
-													(delim_mval->str.addr
-													 + delim_mval->str.len),
-													delimlen);
-										if (!valid_char && !badchar_inhibit)
-											UTF8_BADCHAR(0, delim_mval->str.addr,
-												     (delim_mval->str.addr
-												      + delim_mval->str.len),
-												     0, NULL);
-									}
-									     );
-								if (valid_char || 1 == delim_mval->str.len)
-								{	/* This reference to a one character literal or a single
-									 * byte invalid utf8 character that needs to be turned into
-									 * an explict formated integer literal instead
-									 */
-									unichar.unichar_val = 0;
-									if (!gtm_utf8_mode)
-									{	/* Single byte delimiter */
-										assert(1 == delim_mval->str.len);
-										UNIX_ONLY(s->opcode = OC_SETZP1);
-										VMS_ONLY(s->opcode = OC_SETP1);
-										unichar.unibytes_val[0] = *delim_mval->str.addr;
-									}
-									UNICODE_ONLY(
-								        else
-									{	/* Potentially multiple bytes in one int */
-										assert(SIZEOF(int) >= delim_mval->str.len);
-										memcpy(unichar.unibytes_val,
-										       delim_mval->str.addr,
-										       delim_mval->str.len);
-										s->opcode = OC_SETP1;
-									}
-										     );
-									delimlit = (mint)unichar.unichar_val;
-									delimiter->operand[0] = put_ilit(delimlit);
-									delim1char = TRUE;
+						delim_mval = &delimval.oprval.tref->operand[0].oprval.mlit->v;
+						valid_char = TRUE;	/* Basic assumption unles proven otherwise */
+						if ((OC_LIT == delimval.oprval.tref->opcode)
+							&& (1 == (gtm_utf8_mode ? MV_FORCE_LEN(delim_mval)
+										: delim_mval->str.len)))
+						{	/* Single char delimiter for set $piece */
+#							ifdef UNICODE_SUPPORTED
+							if (gtm_utf8_mode)
+							{	/*  We have a supposed single char delimiter but it
+								 *  must be a valid utf8 char to be used by
+								 *  op_setp1() and MV_FORCE_LEN won't tell us that.
+								 */
+								valid_char = UTF8_VALID(delim_mval->str.addr,
+									(delim_mval->str.addr + delim_mval->str.len), delimlen);
+								if (!valid_char && !badchar_inhibit)
+									UTF8_BADCHAR(0, delim_mval->str.addr,
+										(delim_mval->str.addr + delim_mval->str.len),
+										0, NULL);
+							}
+#							endif
+							if (valid_char || (1 == delim_mval->str.len))
+							{	/* This reference to a one character literal or a single
+								 * byte invalid utf8 character that needs to be turned into
+								 * an explict formated integer literal instead
+								 */
+								unichar.unichar_val = 0;
+								if (!gtm_utf8_mode)
+								{	/* Single byte delimiter */
+									assert(1 == delim_mval->str.len);
+									UNIX_ONLY(s->opcode = OC_SETZP1);
+									VMS_ONLY(s->opcode = OC_SETP1);
+									unichar.unibytes_val[0] = *delim_mval->str.addr;
 								}
+#								ifdef UNICODE_SUPPORTED
+								else
+								{	/* Potentially multiple bytes in one int */
+									assert(SIZEOF(int) >= delim_mval->str.len);
+									memcpy(unichar.unibytes_val,
+									       delim_mval->str.addr,
+									       delim_mval->str.len);
+									s->opcode = OC_SETP1;
+								}
+#								endif
+								delimlit = (mint)unichar.unichar_val;
+								delimiter->operand[0] = put_ilit(delimlit);
+								delim1char = TRUE;
 							}
 						}
-						if (!delim1char)
-						{	/* Was not handled as a single char delim by code above either bcause it
-							 * was (1) not set $piece, or (2) was not a single char delim or (3) it was
-							 * not a VALID utf8 single char delim and badchar was inhibited.
-							 */
-							if (!is_extract)
-								delimiter->operand[0] = delimval;
-							last = newtriple(OC_PARAMETER);
-							first->operand[1] = put_tref(last);
-							last->operand[0] = first->operand[0];	/* start = end range */
-						}
-						/* Generate test sequences for first/last to bypass the set operation if
-						 * first/last are not in a usable form
+					}
+					if (!delim1char)
+					{	/* Was not handled as a single char delim by code above either bcause it
+						 * was (1) not set $piece, or (2) was not a single char delim or (3) it was
+						 * not a VALID utf8 single char delim and badchar was inhibited.
 						 */
-						if (first_is_lit)
-						{
-							if (1 > first_val_lit)
-							{
-								jmptrp1 = maketriple(OC_JMP);
-								DQINSCURTARGCHAIN(jmptrp1);
-							}
-							/* note else no test necessary since first == last and are > 0 */
-						} else
-						{	/* Generate test for first being <= 0 */
-							jmptrp1 = maketriple(OC_COBOOL);
-							jmptrp1->operand[0] = first->operand[0];
-							DQINSCURTARGCHAIN(jmptrp1);
-							jmptrp1 = maketriple(OC_JMPLEQ);
-							DQINSCURTARGCHAIN(jmptrp1);
-						}
-					} else
-					{	/* There IS a last value */
 						if (!is_extract)
 							delimiter->operand[0] = delimval;
 						last = newtriple(OC_PARAMETER);
 						first->operand[1] = put_tref(last);
-						advancewindow();
-						if (!intexpr(&lastval))
-							SYNTAX_ERROR_NOREPORT_HERE;
-						assert(lastval.oprclass == TRIP_REF);
-						last->operand[0] = lastval;
-						/* Generate inline code to test first/last for usability and if found
-						 * lacking, branch around the getchain and the actual store so we avoid
-						 * setting the naked indicator so far as the target gvn is concerned.
-						 */
-						if (last_is_lit = (lastval.oprval.tref->opcode == OC_ILIT))
-						{	/* Case 1: last is a literal */
-							assert(lastval.oprval.tref->operand[0].oprclass  == ILIT_REF);
-							last_val_lit = lastval.oprval.tref->operand[0].oprval.ilit;
-							if (last_val_lit < 1 || (first_is_lit && first_val_lit > last_val_lit))
-							{	/* .. and first is a literal and one or both of them is no good
-								 * so unconditionally branch around the whole thing.
-								 */
-								jmptrp1 = maketriple(OC_JMP);
-								DQINSCURTARGCHAIN(jmptrp1);
-							} /* else case actually handled at next 'if' .. */
-						} else
-						{	/* Last is not literal. Do test if it is greater than 0 */
-							jmptrp1 = maketriple(OC_COBOOL);
-							jmptrp1->operand[0] = last->operand[0];
-							DQINSCURTARGCHAIN(jmptrp1);
-							jmptrp1 = maketriple(OC_JMPLEQ);
+						last->operand[0] = first->operand[0];	/* start = end range */
+					}
+					/* Generate test sequences for first/last to bypass the set operation if
+					 * first/last are not in a usable form
+					 */
+					if (first_is_lit)
+					{
+						if (1 > first_val_lit)
+						{
+							jmptrp1 = maketriple(OC_JMP);
 							DQINSCURTARGCHAIN(jmptrp1);
 						}
-						if (!last_is_lit || !first_is_lit)
-						{	/* Compare to check that last >= first */
-							jmptrp2 = maketriple(OC_VXCMPL);
-							jmptrp2->operand[0] = first->operand[0];
-							jmptrp2->operand[1] = last->operand[0];
-							DQINSCURTARGCHAIN(jmptrp2);
-							jmptrp2 = maketriple(OC_JMPGTR);
-							DQINSCURTARGCHAIN(jmptrp2);
-						}
+						/* note else no test necessary since first == last and are > 0 */
+					} else
+					{	/* Generate test for first being <= 0 */
+						jmptrp1 = maketriple(OC_COBOOL);
+						jmptrp1->operand[0] = first->operand[0];
+						DQINSCURTARGCHAIN(jmptrp1);
+						jmptrp1 = maketriple(OC_JMPLEQ);
+						DQINSCURTARGCHAIN(jmptrp1);
+					}
+				} else
+				{	/* There IS a last value */
+					if (!is_extract)
+						delimiter->operand[0] = delimval;
+					last = newtriple(OC_PARAMETER);
+					first->operand[1] = put_tref(last);
+					advancewindow();
+					if (EXPR_FAIL == expr(&lastval, MUMPS_INT))
+						SYNTAX_ERROR_NOREPORT_HERE;
+					assert(TRIP_REF == lastval.oprclass);
+					last->operand[0] = lastval;
+					/* Generate inline code to test first/last for usability and if found
+					 * lacking, branch around the getchain and the actual store so we avoid
+					 * setting the naked indicator so far as the target gvn is concerned.
+					 */
+					if (last_is_lit = (OC_ILIT == lastval.oprval.tref->opcode))	/* NOTE assignment */
+					{	/* Case 1: last is a literal */
+						assert(ILIT_REF == lastval.oprval.tref->operand[0].oprclass);
+						last_val_lit = lastval.oprval.tref->operand[0].oprval.ilit;
+						if ((1 > last_val_lit) || ((first_is_lit && (first_val_lit > last_val_lit))))
+						{	/* .. and first is a literal and one or both of them is no good
+							 * so unconditionally branch around the whole thing.
+							 */
+							jmptrp1 = maketriple(OC_JMP);
+							DQINSCURTARGCHAIN(jmptrp1);
+						} /* else case actually handled at next 'if' .. */
+					} else
+					{	/* Last is not literal. Do test if it is greater than 0 */
+						jmptrp1 = maketriple(OC_COBOOL);
+						jmptrp1->operand[0] = last->operand[0];
+						DQINSCURTARGCHAIN(jmptrp1);
+						jmptrp1 = maketriple(OC_JMPLEQ);
+						DQINSCURTARGCHAIN(jmptrp1);
+					}
+					if (!last_is_lit || !first_is_lit)
+					{	/* Compare to check that last >= first */
+						jmptrp2 = maketriple(OC_VXCMPL);
+						jmptrp2->operand[0] = first->operand[0];
+						jmptrp2->operand[1] = last->operand[0];
+						DQINSCURTARGCHAIN(jmptrp2);
+						jmptrp2 = maketriple(OC_JMPGTR);
+						DQINSCURTARGCHAIN(jmptrp2);
 					}
 				}
-				if (window_token != TK_RPAREN)
-					SYNTAX_ERROR(ERR_RPARENMISSING);
-				advancewindow();
-				if (!parse_warn)
-				{
-					dqins(targchain.exorder.bl, exorder, s);
-					dqins(targchain.exorder.bl, exorder, put);
-					CHKTCHAIN(&targchain);
-					/* Put result operand on the chain. End of chain depends on whether or not
-					 * we are calling the shortcut or the full set-piece code
-					 */
-					if (delim1char)
-						first->operand[1] = resptr;
-					else
-						last->operand[1] = resptr;
-					/* Set jump targets if we did tests above. The function "tnxtarg" operates on "curtchain"
-					 * but we want to set targets based on "targchain", so temporarily switch them. Should not
-					 * use "save_curtchain" here as it might already be in use.
-					 */
-					save_curtchain1 = setcurtchain(&targchain);
-					if (NULL != jmptrp1)
-						tnxtarg(&jmptrp1->operand[0]);
-					if (NULL != jmptrp2)
-						tnxtarg(&jmptrp2->operand[0]);
-					setcurtchain(save_curtchain1);
-				}
-				break;
-			case TK_ASTERISK:
-				/* The only way an asterisk can be detected here is if we are inside a list so mention this is
-				 * not possible and give error.
+			}
+			if (TK_RPAREN != TREF(window_token))
+				SYNTAX_ERROR(ERR_RPARENMISSING);
+			advancewindow();
+			if (!parse_warn)
+			{
+				dqins(targchain.exorder.bl, exorder, s);
+				dqins(targchain.exorder.bl, exorder, put);
+				CHKTCHAIN(&targchain);
+				/* Put result operand on the chain. End of chain depends on whether or not
+				 * we are calling the shortcut or the full set-piece code
 				 */
-				stx_error(ERR_NOALIASLIST);
-				return FALSE;
-			default:
-				SYNTAX_ERROR(ERR_VAREXPECTED);
+				if (delim1char)
+					first->operand[1] = resptr;
+				else
+					last->operand[1] = resptr;
+				/* Set jump targets if we did tests above. The function "tnxtarg" operates on "curtchain"
+				 * but we want to set targets based on "targchain", so temporarily switch them. Should not
+				 * use "save_curtchain" here as it might already be in use.
+				 */
+				save_curtchain1 = setcurtchain(&targchain);
+				if (NULL != jmptrp1)
+					tnxtarg(&jmptrp1->operand[0]);
+				if (NULL != jmptrp2)
+					tnxtarg(&jmptrp2->operand[0]);
+				setcurtchain(save_curtchain1);
+			}
+			break;
+		case TK_ASTERISK:
+			/* The only way an asterisk can be detected here is if we are inside a list so mention this is
+			 * not possible and give error.
+			 */
+			stx_error(ERR_NOALIASLIST);
+			return FALSE;
+		default:
+			SYNTAX_ERROR(ERR_VAREXPECTED);
 		}
 		if (FIRST_SETLEFT_NOTSEEN == first_setleft_invalid)
 		{
@@ -720,11 +710,11 @@ int m_set(void)
 		assert(FIRST_SETLEFT_NOTSEEN != first_setleft_invalid);
 		if (!got_lparen)
 			break;
-		if (TK_COMMA == window_token)
+		if (TK_COMMA == TREF(window_token))
 			advancewindow();
 		else
 		{
-			if (TK_RPAREN == window_token)
+			if (TK_RPAREN == TREF(window_token))
 			{
 				advancewindow();
 				break;
@@ -732,7 +722,7 @@ int m_set(void)
 				SYNTAX_ERROR(ERR_RPARENMISSING);
 		}
 	}
-	if (TK_EQUAL != window_token)
+	if (TK_EQUAL != TREF(window_token))
 		SYNTAX_ERROR(ERR_EQUAL);
 	advancewindow();
 	assert(FIRST_SETLEFT_NOTSEEN != first_setleft_invalid);
@@ -742,14 +732,14 @@ int m_set(void)
 	 */
 	if (!alias_processing)
 	{	/* Normal case first - evaluate expression creating triples on the current chain */
-		if (!expr(result))
+		if (EXPR_FAIL == expr(result, MUMPS_EXPR))
 			SYNTAX_ERROR_NOREPORT_HERE;
 	} else
 	{	/* Alias processing -- determine which of the three types of sources we have: var, subscripted var or $$func */
 		allow_dzwrtac_as_mident();	/* Allow source of $ZWRTACxxx as an mident */
-		if (TK_IDENT != window_token)
+		if (TK_IDENT != TREF(window_token))
 		{	/* Check if we have a $$func() call source */
-			if (TK_DOLLAR == window_token && TK_DOLLAR == director_token)
+			if ((TK_DOLLAR == TREF(window_token)) && (TK_DOLLAR == TREF(director_token)))
 			{	/* Parse the function only with exfunc(). We definitely do not want an expression */
 				TREF(temp_subs) = TRUE;	/* RHS $$ function detected - need temporary */
 				advancewindow();
@@ -768,10 +758,10 @@ int m_set(void)
 				SYNTAX_ERROR(ERR_ALIASEXPECTED);
 		} else
 		{	/* Alias var source */
-			if ('$' == *window_ident.addr && STR_LIT_LEN(DOLLAR_ZWRTAC) >= window_ident.len)
+			if (('$' == *(TREF(window_ident)).addr) && (STR_LIT_LEN(DOLLAR_ZWRTAC) >= (TREF(window_ident)).len))
 				/* $ZWRTAC is not allowed as a "source" value. Must be a $ZWRTACn<nnn> format */
 				SYNTAX_ERROR(ERR_DZWRNOALIAS);
-			if (TK_LPAREN == director_token)
+			if (TK_LPAREN == TREF(director_token))
 			{	/* Subscripted local variable - have alias container.
 				 * The storing opcode set into the "put" triple at the top of this routine was
 				 * set assuming the source was an alias. Now that we know the source is actually
@@ -801,9 +791,8 @@ int m_set(void)
 	}
 	/* Now add in the left-hand side triples */
 	assert(!curtchain_switched);
-	obp = curtchain->exorder.bl;
+	obp = (TREF(curtchain))->exorder.bl;
 	dqadd(obp, &targchain, exorder);		/* this is a violation of info hiding */
-	CHKTCHAIN(curtchain);
 	/* Check if "temp_subs" was FALSE originally but got set to TRUE as part of evaluating the right hand side
 	 * (for example, if rhs had $$ or $& or $INCR usages). If so need to create temporaries.
 	 */
@@ -844,14 +833,14 @@ void	m_set_create_temporaries(triple *sub, opctype put_oc)
 	if ((OC_GVNAME == put_oc) || (OC_PUTINDX == put_oc))
 	{
 		sub = sb1->oprval.tref;		/* global name */
-		assert(sub->opcode == OC_PARAMETER);
+		assert(OC_PARAMETER == sub->opcode);
 		sb1 = &sub->operand[1];
 	} else if (OC_GVEXTNAM == put_oc)
 	{
 		sub = sb1->oprval.tref;		/* first env */
-		assert(sub->opcode == OC_PARAMETER);
+		assert(OC_PARAMETER == sub->opcode);
 		sb1 = &sub->operand[0];
-		assert(sb1->oprclass == TRIP_REF);
+		assert(TRIP_REF == sb1->oprclass);
 		s0 = sb1->oprval.tref;
 		if ((OC_GETINDX == s0->opcode) || (OC_VAR == s0->opcode))
 		{
@@ -863,9 +852,9 @@ void	m_set_create_temporaries(triple *sub, opctype put_oc)
 		}
 		sb1 = &sub->operand[1];
 		sub = sb1->oprval.tref;		/* second env */
-		assert(sub->opcode == OC_PARAMETER);
+		assert(OC_PARAMETER == sub->opcode);
 		sb1 = &sub->operand[0];
-		assert(sb1->oprclass == TRIP_REF);
+		assert(TRIP_REF == sb1->oprclass);
 		s0 = sb1->oprval.tref;
 		if ((OC_GETINDX == s0->opcode) || (OC_VAR == s0->opcode))
 		{
@@ -877,16 +866,16 @@ void	m_set_create_temporaries(triple *sub, opctype put_oc)
 		}
 		sb1 = &sub->operand[1];
 		sub = sb1->oprval.tref;		/* global name */
-		assert(sub->opcode == OC_PARAMETER);
+		assert(OC_PARAMETER == sub->opcode);
 		sb1 = &sub->operand[1];
 	}
 	while (sb1->oprclass)
 	{
-		assert(sb1->oprclass == TRIP_REF);
+		assert(TRIP_REF == sb1->oprclass);
 		sub = sb1->oprval.tref;
-		assert(sub->opcode == OC_PARAMETER);
+		assert(OC_PARAMETER == sub->opcode);
 		sb1 = &sub->operand[0];
-		assert(sb1->oprclass == TRIP_REF);
+		assert(TRIP_REF == sb1->oprclass);
 		s0 = sb1->oprval.tref;
 		if ((OC_GETINDX == s0->opcode) || (OC_VAR == s0->opcode))
 		{
@@ -916,14 +905,16 @@ void allow_dzwrtac_as_mident(void)
 {
 	char_ptr_t	chrp, chrpmin, chrplast;
 	int		movlen;
+	DCL_THREADGBL_ACCESS;
 
-	if (TK_DOLLAR != window_token)
+	SETUP_THREADGBL_ACCESS;
+	if (TK_DOLLAR != TREF(window_token))
 		return;			/* Couldn't be $ZWRTACxxx without first $ */
-	if (TK_IDENT != director_token)
+	if (TK_IDENT != TREF(director_token))
 		return;			/* Couldn't be $ZWRTACxxx without token 2nd part */
-	if (STR_LIT_LEN("ZWRTAC") > director_ident.len)
+	if (STR_LIT_LEN("ZWRTAC") > (TREF(director_ident)).len)
 		return;			/* Couldn't be $ZALAISxxx without sufficient length of name */
-	if (0 != MEMCMP_LIT(director_ident.addr, "ZWRTAC"))
+	if (0 != MEMCMP_LIT((TREF(director_ident)).addr, "ZWRTAC"))
 		return;			/* Couldn't be $ZWRTACxxx without ZWRTAC as first part of token */
 	/* We need to shift the existing token over 1 byte to make room for insertion of the '$' prefix. Normally,
 	 * we wouldn't want to do this as we are verifying but since if the verification fails the code path will
@@ -931,20 +922,19 @@ void allow_dzwrtac_as_mident(void)
 	 * we do the verification check. Saves us having to scan the line backwards via memmove() again below. So
 	 * verify the token suffix is all numeric while we do our shift.
 	 */
-	movlen = (director_ident.len < MAX_MIDENT_LEN) ? director_ident.len : MAX_MIDENT_LEN - 1;
-	for (chrplast = director_ident.addr + movlen, chrp = chrplast - 1,
-		     chrpmin = director_ident.addr + STR_LIT_LEN("ZWRTAC") - 1;
-	     chrp > chrpmin;
-	     --chrp, --chrplast)
+	movlen = ((MAX_MIDENT_LEN) > (TREF(director_ident)).len) ? (TREF(director_ident)).len : MAX_MIDENT_LEN - 1;
+	for (chrplast = (TREF(director_ident)).addr + movlen, chrp = chrplast - 1,
+		chrpmin = (TREF(director_ident)).addr + STR_LIT_LEN("ZWRTAC") - 1;
+		chrp > chrpmin; --chrp, --chrplast)
 	{
 		if (!ISDIGIT_ASCII((int)*chrp))
 			return;		/* Couldn't be $ZWRTACxxx without all numeric suffix (if exists) */
 		*chrplast = *chrp;
 	}
 	/* Verification (and shift) complete -- finish modifying director token */
-	MEMCPY_LIT(director_ident.addr, DOLLAR_ZWRTAC);
-	director_ident.len = movlen + 1;
+	MEMCPY_LIT((TREF(director_ident)).addr, DOLLAR_ZWRTAC);
+	(TREF(director_ident)).len = movlen + 1;
 	/* Nnw forward the scan to pull director token values into window token for use by our caller */
 	advancewindow();
-	assert(TK_IDENT == window_token);
+	assert(TK_IDENT == TREF(window_token));
 }

@@ -37,7 +37,7 @@
 #include "gtmsecshr.h"
 #include "gds_rundown.h"
 #if defined(UNIX)
-#include "ftok_sems.h"
+#include "db_ipcs_reset.h"
 #endif
 #include "tp_change_reg.h"
 #include "dbfilop.h"

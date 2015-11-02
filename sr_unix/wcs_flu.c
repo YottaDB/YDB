@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,10 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	volatile int4	db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 GBLREF 	jnl_gbls_t	jgbl;
 GBLREF 	bool		in_backup;
-GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
+#ifdef DEBUG
+GBLREF	boolean_t	in_mu_rndwn_file;
+GBLREF	boolean_t	mupip_jnl_recover;
+#endif
 
 error_def(ERR_DBFILERR);
 error_def(ERR_DBFSYNCERR);
@@ -166,7 +169,12 @@ boolean_t wcs_flu(uint4 options)
 	cnl = csa->nl;
 	assert(cnl->glob_sec_init);
 	BG_TRACE_ANY(csa, total_buffer_flush);
-
+	/* If called from online rollback, we will have hold_onto_crit set to TRUE with the only exception when called from
+	 * gds_rundown in which case process_exiting will be TRUE anyways
+	 */
+	assert(!jgbl.onlnrlbk || csa->hold_onto_crit || process_exiting);
+	assert(mupip_jnl_recover || !csa->nl->donotflush_dbjnl);
+	assert(!csa->hold_onto_crit || csa->now_crit);
 	if (!(was_crit = csa->now_crit))	/* Caution: assignment */
 		grab_crit(gv_cur_region);
 	cnl->wcsflu_pid = process_id;
@@ -225,7 +233,8 @@ boolean_t wcs_flu(uint4 options)
 		jpc = csa->jnl;
 		jb = jpc->jnl_buff;
 		/* Assert that we never flush the cache in the midst of a database commit. The only exception is MUPIP RUNDOWN */
-		assert((csa->ti->curr_tn == csa->ti->early_tn) || mu_rndwn_file_dbjnl_flush);
+
+		assert((csa->ti->curr_tn == csa->ti->early_tn) || in_mu_rndwn_file);
 		if (!jgbl.dont_reset_gbl_jrec_time)
 			SET_GBL_JREC_TIME;	/* needed before jnl_ensure_open */
 		/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time (if needed) to maintain time order of jnl
@@ -276,9 +285,10 @@ boolean_t wcs_flu(uint4 options)
 		/* If not mupip rundown, wait for ALL active phase2 commits to complete first.
 		 * In case of mupip rundown, we know no one else is accessing shared memory so no point waiting.
 		 */
-		if (!mu_rndwn_file_dbjnl_flush && cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL))
+		assert(!in_mu_rndwn_file || (0 == cnl->wcs_phase2_commit_pidcnt));
+		if (cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL))
 		{
-			assert(FALSE);
+			assert(WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number); /* see wcs_phase2_commit_wait.c */
 			if (!was_crit)
 				rel_crit(gv_cur_region);
 			return FALSE;	/* we expect the caller to trigger cache-recovery which will fix this counter */

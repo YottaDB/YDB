@@ -46,7 +46,18 @@
 #include "repl_instance.h"
 #include "gtm_rename.h"
 
-GBLREF	boolean_t		in_repl_inst_create;	/* used by repl_inst_read/repl_inst_write */
+GBLREF	boolean_t	in_repl_inst_create;	/* used by repl_inst_read/repl_inst_write */
+GBLREF	uint4		process_id;
+
+error_def(ERR_FILEEXISTS);
+error_def(ERR_FILERENAME);
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_RENAMEFAIL);
+error_def(ERR_REPLINSTACC);
+error_def(ERR_REPLINSTNMLEN);
+error_def(ERR_REPLINSTNMUNDEF);
+error_def(ERR_REPLINSTSTNDALN);
+error_def(ERR_TEXT);
 
 /* Description:
  *	Creates replication instance file.
@@ -64,22 +75,12 @@ void repl_inst_create(void)
 	char			inst_fn[MAX_FN_LEN + 1], inst_name[MAX_FN_LEN + 1];
 	char			machine_name[MAX_MCNAMELEN], buff_unaligned[REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE + 8];
 	char			*buff_8byte_aligned;
-	int			status;
+	int			idx, status;
 	struct stat		stat_buf;
 	repl_inst_hdr_ptr_t	repl_instance;
 	gtmsrc_lcl_ptr_t	gtmsrc_lcl_array;
 	mstr			log_nam, trans_name;
 	uint4			status2;
-
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_RENAMEFAIL);
-	error_def(ERR_REPLINSTACC);
-	error_def(ERR_REPLINSTNMLEN);
-	error_def(ERR_REPLINSTNMUNDEF);
-	error_def(ERR_REPLINSTSTNDALN);
-	error_def(ERR_TEXT);
-	error_def(ERR_FILEEXISTS);
-	error_def(ERR_FILERENAME);
 
 	if (!repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error))
 		GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
@@ -156,7 +157,7 @@ void repl_inst_create(void)
 	/* The instance file consists of 3 parts.
 	 *	File header ("repl_inst_hdr" structure)
 	 *	Array of 16 "gtmsrc_lcl" structures
-	 *	Variable length array of "repl_triple" structures
+	 *	Variable length array of "repl_histinfo" structures
 	 * Of these the last part is not allocated at file creation time. The rest have to be initialized now.
 	 */
 	/************************** Initialize "repl_inst_hdr" section ***************************/
@@ -169,24 +170,43 @@ void repl_inst_create(void)
 	repl_instance->jnlpool_shmid = INVALID_SHMID;
 	repl_instance->recvpool_semid = INVALID_SEMID;
 	repl_instance->recvpool_shmid = INVALID_SHMID;
-	time(&repl_instance->created_time);
+	/********* initialize "inst_info" structure member of "repl_inst_hdr" ***********/
 	/* machine_name was obtained from GETHOSTNAME above. It is an array of MAX_MCNAMELEN (256) bytes. The actual
 	 * machine name might be longer than can fit in the "created_nodename" field which is MAX_NODENAME_LEN (16) in size.
 	 * Take care to copy only as much as needed leaving one character for the null-termination.
 	 */
 	assert(MAX_NODENAME_LEN <= MAX_MCNAMELEN); /* '=' is valid since we have space to store MAX_NODENAME_LEN characters */
-	memcpy(repl_instance->created_nodename, machine_name, MAX_NODENAME_LEN);
+	memcpy(repl_instance->inst_info.created_nodename, machine_name, MAX_NODENAME_LEN);
 	/* if machine_name is less than MAX_NODENAME_LEN then set the last valid character of created_nodename array to '\0' which
 	 * is relied by repl_inst_dump_filehdr
 	 */
 	if (MAX_NODENAME_LEN > STRLEN(machine_name))
-		repl_instance->created_nodename[MAX_NODENAME_LEN - 1] = '\0';
-	memcpy(repl_instance->this_instname, inst_name, inst_name_len);
+		repl_instance->inst_info.created_nodename[MAX_NODENAME_LEN - 1] = '\0';
+	DBG_CHECK_CREATED_NODENAME(repl_instance->inst_info.created_nodename);
+	memcpy(repl_instance->inst_info.this_instname, inst_name, inst_name_len);
+	JNL_SHORT_TIME(repl_instance->inst_info.created_time);
+	assert(process_id == getpid());
+	repl_instance->inst_info.creator_pid = process_id;
+	/* repl_instance->lms_group_info should be initialized to NULL at this point.
+	 * That is the case already because of the memset above. So nothing more needed for now.
+	 */
 	repl_instance->jnl_seqno = 0;
 	repl_instance->root_primary_cycle = 0;
-	repl_instance->num_alloc_triples = 0;
-	repl_instance->num_triples = 0;
+	repl_instance->num_histinfo = 0;
+	repl_instance->num_alloc_histinfo = 0;
 	repl_instance->crash = FALSE;
+	repl_instance->was_rootprimary = FALSE;
+	repl_instance->is_supplementary = cli_present("SUPPLEMENTARY");
+	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		repl_instance->last_histinfo_num[idx] = INVALID_HISTINFO_NUM;
+	/* strm_seqno[] and strm_group_info[] are already initialized to 0 as part of the memset above. Nothing more needed
+	 * except the 0th stream seqno. This needs to be set to 1 so the first local update done on a supplementary instance
+	 * correctly uses the stream seqno of 1. For non-zero stream #s, a UPDATERESYNC= startup of the receiver to be done
+	 * anyways from a supplementary root primary instance and so that will initialize the strm_seqno[] to a non-zero
+	 * value before any updates from that stream occur.
+	 */
+	if (repl_instance->is_supplementary)
+		repl_instance->strm_seqno[0] = 1;	/* Initialize 0th stream starting sequence number */
 	/************************** Initialize "gtmsrc_lcl" section ***************************/
 	memset(gtmsrc_lcl_array, 0, GTMSRC_LCL_SIZE);
 	/************************** Write stuff to file on disk ***********************************/

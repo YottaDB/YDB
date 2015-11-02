@@ -18,6 +18,11 @@
 #include "gtm_stdio.h"	/* this is here due to the need for an SPRINTF,
 			 * which is in turn due the kudge that is the current double2mval routine
 			 */
+#ifdef GTM64
+/* we return strings for >18 digit 64-bit numbers, so pull in stringpool */
+#include "stringpool.h"
+GBLREF spdesc   stringpool;
+#endif
 
 LITREF int4 ten_pwr[];
 
@@ -63,12 +68,42 @@ void i2smval(mval *v, uint4 i)
 	assert(v->m[1] < MANT_HI);
 }
 
+void	xi2mval(mval *v, unsigned int i);
+
 void	i2usmval(mval *v, unsigned int i)
+{
+	v->mvtype = MV_NM;
+	v->sgn = 0;
+
+	xi2mval(v, i);
+}
+
+void	i2mval(mval *v, int i)
+{
+	int4	n;
+
+	v->mvtype = MV_NM;
+	if (i < 0)
+	{
+		v->sgn = 1;
+		n = -i;
+	} else
+	{
+		n = i;
+		v->sgn = 0;
+	}
+
+	xi2mval(v, n);
+}
+
+/* xi2mval does the bulk of the conversion for i2mval and i2usmval.
+ * The primary routines set the sgn flag and pass the absolute value
+ * to xi2mval. */
+
+void	xi2mval(mval *v, unsigned int i)
 {
 	int	exp;
 
-	v->mvtype = MV_NM;
-	v->sgn = 0;
 	if (i < INT_HI)
 	{
 		v->mvtype |= MV_INT;
@@ -93,44 +128,105 @@ void	i2usmval(mval *v, unsigned int i)
 	}
 }
 
-void	i2mval(mval *v, int i)
+#ifdef GTM64
+void	xl2mval(mval *v, unsigned long i);
+
+void	ul2mval(mval *v, unsigned long i)
 {
-	int	exp;
-	int4	n;
+	v->mvtype = MV_NM;
+	v->sgn = 0;
+
+	xl2mval(v, i);
+}
+
+void	l2mval(mval *v, long i)
+{
+	gtm_uint8	absi;
 
 	v->mvtype = MV_NM;
 	if (i < 0)
 	{
 		v->sgn = 1;
-		n = -i;
+		absi = -i;
 	} else
 	{
-		n = i;
 		v->sgn = 0;
+		absi = i;
 	}
-	if (n < INT_HI)
+
+	xl2mval(v, absi);
+}
+
+/* xl2mval does the bulk of the conversion for l2mval and ul2mval.
+ * The primary routines set the sgn flag and pass the absolute value
+ * to xl2mval. In the case of a >18 digit number, xl2mval examines the
+ * sgn flag to determine whether to convert back to signed before string
+ * conversion. */
+
+void	xl2mval(mval *v, unsigned long i)
+{
+	int	exp;
+	uint4	low;
+	uint4	high;
+	char    buf[21];    /* [possible] sign, [up to] 19L/20UL digits, and terminator */
+	int	len;
+
+	if (i < INT_HI)
 	{
 		v->mvtype |= MV_INT;
-		v->m[1] = MV_BIAS * i;
+		v->m[1] = MV_BIAS * (uint4)i;
 	} else
 	{
-		if (n < MANT_HI)
+		if (i < MANT_HI)
 		{
-			for (exp = EXP_IDX_BIAL; n < MANT_LO; exp--)
-				n *= 10;
+			low = 0;
+			high = i;
+			exp = EXP_IDX_BIAL;
+			while (high < MANT_LO)
+			{
+				high *= 10;
+				exp--;
+			}
 			v->e = exp;
-			v->m[0] = 0;
-			v->m[1] = n;
+			v->m[0] = low;
+			v->m[1] = high;
+		} else if (i < (unsigned long)MANT_HI*MANT_HI)
+		{
+			low = i % MANT_HI;
+			high = i / MANT_HI;
+			exp = EXP_IDX_BIAL + 9;
+
+			while (high < MANT_LO)
+			{
+				high = high*10 + low/MANT_LO;
+				low = low%MANT_LO * 10;
+				exp--;
+			}
+			v->e = exp;
+			v->m[0] = low;
+			v->m[1] = high;
 		} else
 		{
-			v->m[0] = (n % 10) * MANT_LO;
-			v->m[1] = n / 10;
-			v->e = EXP_IDX_BIAL + 1;
+			/* the value won't fit in 18 digits, so return a string */
+			if (v->sgn)
+				len = SPRINTF(buf, "%ld", -(long)i);
+			else
+				len = SPRINTF(buf, "%lu", i);
+
+			ENSURE_STP_FREE_SPACE(len);
+			memcpy(stringpool.free, buf, len);
+
+			v->mvtype = MV_STR;
+			v->str.len = len;
+			v->str.addr = (char *)stringpool.free;
+
+			stringpool.free += len;
 		}
-		assert(v->m[1] < MANT_HI);
-		assert(v->m[1] >= MANT_LO);
+		assert(v->mvtype != MV_NM || v->m[1] < MANT_HI);
+		assert(v->mvtype != MV_NM || v->m[1] >= MANT_LO);
 	}
 }
+#endif
 
 double mval2double(mval *v)
 {

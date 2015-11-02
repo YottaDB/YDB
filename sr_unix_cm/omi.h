@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@
 		{							\
 			clock = time((time_t *)0);			\
 			FPRINTF(omi_debug, "%s", ctime(&clock));	\
-			fflush(omi_debug);				\
+			FFLUSH(omi_debug);				\
 		}							\
 	} while (0)
 
@@ -72,7 +72,7 @@
 		if (omi_debug)			\
 		{				\
 			FPRINTF X ;		\
-			fflush(omi_debug);	\
+			FFLUSH(omi_debug);	\
 		}				\
 	} while (0)
 

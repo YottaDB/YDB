@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,69 +17,55 @@
 #include "fnname.h"
 #include "advancewindow.h"
 
-GBLREF char 	window_token;
-GBLREF mident 	window_ident;
+error_def(ERR_COMMA);
+error_def(ERR_EXTGBLDEL);
+error_def(ERR_GBLNAME);
+error_def(ERR_GVNAKEDEXTNM);
+error_def(ERR_MAXNRSUBSCRIPTS);
 
-int name_glvn(bool gblvn, oprtype *a)
+int name_glvn(boolean_t gblvn, oprtype *a)
 {
-	triple 	*ref, *t1, *t2;
-	char	x;
+	boolean_t	vbar;
+	char		x;
+	int		fnname_type;
 	/* Note:  MAX_LVSUBSCRIPTS and MAX_GVSUBSCRIPTS are currently equal.  Should that change,
 			this should also change */
 	oprtype subscripts[MAX_LVSUBSCRIPTS + 1], *sb1, *sb2;
-	int	fnname_type;
-	bool vbar, parse_status;
-	error_def(ERR_COMMA);
-	error_def(ERR_GVNAKEDEXTNM);
-	error_def(ERR_EXTGBLDEL);
-	error_def(ERR_MAXNRSUBSCRIPTS);
-	error_def(ERR_GBLNAME);
+	triple 	*ref, *t1, *t2;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	sb1 = sb2 = subscripts;
 	sb1++;						/* save room for type indicator */
 	if (gblvn)
 	{	fnname_type = FNGBL;
-		if (window_token == TK_LBRACKET || window_token == TK_VBAR)
+		if ((TK_LBRACKET == TREF(window_token)) || (TK_VBAR == TREF(window_token)))
 		{
-			vbar = (window_token == TK_VBAR);
+			vbar = (TK_VBAR == TREF(window_token));
 			if (vbar)
 				fnname_type |= FNVBAR;
 			advancewindow();
-			if (vbar)
-				parse_status = expr(sb1++);
-			else
-				parse_status = expratom(sb1++);
-			if (!parse_status)
-			{
+			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1++)))
 				return FALSE;
-			}
-			if (window_token != TK_COMMA)
+			if (TK_COMMA != TREF(window_token))
 				fnname_type |= FNEXTGBL1;
 			else
 			{
 				fnname_type |= FNEXTGBL2;
 				advancewindow();
-				if (vbar)
-					parse_status = expr(sb1++);
-				else
-					parse_status = expratom(sb1++);
-				if (!parse_status)
-				{
+				if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom(sb1++)))
 					return FALSE;
-				}
 			}
-			if ((!vbar && window_token != TK_RBRACKET) || (vbar && window_token != TK_VBAR))
+			if ((!vbar && (TK_RBRACKET != TREF(window_token))) || (vbar && (TK_VBAR != TREF(window_token))))
 			{
 				stx_error(ERR_EXTGBLDEL);
 				return FALSE;
 			}
 			advancewindow();
 		}
-	}
-	else
+	} else
 		fnname_type = FNLCL;
-
-	if (window_token != TK_IDENT)
+	if (TK_IDENT != TREF(window_token))
 	{
 		assert(fnname_type & FNGBL);
 		if (fnname_type != FNGBL)
@@ -87,35 +73,36 @@ int name_glvn(bool gblvn, oprtype *a)
 			stx_error(ERR_GVNAKEDEXTNM);
 			return FALSE;
 		}
-		if (window_token != TK_LPAREN)
+		if (TK_LPAREN != TREF(window_token))
 		{
 			stx_error(ERR_GBLNAME);
 			return FALSE;
 		}
 		fnname_type = FNNAKGBL;
-	}
-	else
+	} else
 	{
-		*sb1++ = put_str(window_ident.addr, window_ident.len);
+		*sb1++ = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
 		advancewindow();
 	}
-	if (window_token == TK_LPAREN)
+	if (TK_LPAREN == TREF(window_token))
 	{	for (;;)
 		{	if (sb1 - sb2 > MAX_GVSUBSCRIPTS)
-			{	stx_error(ERR_MAXNRSUBSCRIPTS);
+			{
+				stx_error(ERR_MAXNRSUBSCRIPTS);
 				return FALSE;
 			}
 			advancewindow();
-			if (!expr(sb1))
-			{	return FALSE;
-			}
+			if (EXPR_FAIL == expr(sb1, MUMPS_EXPR))
+				return FALSE;
 			sb1++;
-			if ((x = window_token) == TK_RPAREN)
-			{	advancewindow();
+			if (TK_RPAREN == (x = TREF(window_token)))	/* NOTE assignment  */
+			{
+				advancewindow();
 				break;
 			}
-			if (x != TK_COMMA)
-			{	stx_error(ERR_COMMA);
+			if (TK_COMMA != x)
+			{
+				stx_error(ERR_COMMA);
 				return FALSE;
 			}
 		}

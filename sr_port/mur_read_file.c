@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,7 @@ error_def(ERR_BEGSEQGTENDSEQ);
 error_def(ERR_BOVTNGTEOVTN);
 error_def(ERR_GTMASSERT);
 error_def(ERR_JNLBADRECFMT);
+error_def(ERR_JNLFILECLOSERR);
 error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLINVALID);
 error_def(ERR_JNLNOBIJBACK);
@@ -676,7 +677,12 @@ uint4	mur_fread_eof(jnl_ctl_list *jctl, reg_ctl_list *rctl)
 		return SS_NORMAL;
 	}
 	if (!jfh->crash && (SS_NORMAL == mur_prev(jctl, jfh->end_of_data)))
-	{
+	{	/* Even though the jfh->crash field is FALSE, we still need to read the EOF record due to a window in
+		 * cre_jnl_file_common between writing the file header (with crash bit set to FALSE) and writing the
+		 * EOF record. If a process gets killed in such a window, we will end up with a journal file that does
+		 * not have an EOF but yet has the crash bit set to FALSE. So, read the EOF anyways and if we couldn't
+		 * find one, tag this journal file as NOT properly_closed
+		 */
 		rec = rctl->mur_desc->jnlrec;
 		if (JRT_EOF == rec->prefix.jrec_type && rec->prefix.tn >= jfh->bov_tn
 			&& (!mur_options.rollback || ((struct_jrec_eof *)rec)->jnl_seqno >= jfh->end_seqno))
@@ -1062,8 +1068,6 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 
 boolean_t mur_fclose(jnl_ctl_list *jctl)
 {
-	error_def(ERR_JNLFILECLOSERR);
-
 	if (NOJNL == jctl->channel) /* possible if mur_fopen() errored out */
 		return TRUE;
 	if (NULL != jctl->jfh)

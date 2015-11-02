@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,17 +16,15 @@
 #include "compiler.h"
 #include "toktyp.h"
 
-GBLREF char 	window_token;
-GBLREF mval 	window_mval;
-GBLREF mident 	window_ident;
-
 void int_label(void)
 {
 	int len;
+	DCL_THREADGBL_ACCESS;
 
-	window_token = TK_IDENT;
-	len = window_mval.str.len;
+	SETUP_THREADGBL_ACCESS;
+	TREF(window_token) = TK_IDENT;
+	len = (TREF(window_mval)).str.len;
 	len = (len < MAX_MIDENT_LEN) ? len: MAX_MIDENT_LEN;
-	memcpy(window_ident.addr, window_mval.str.addr, len);
-	window_ident.len = len;
+	memcpy((TREF(window_ident)).addr, (TREF(window_mval)).str.addr, len);
+	(TREF(window_ident)).len = len;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,14 @@ GBLREF mstr			chset_names[];
 GBLREF UConverter		*chset_desc[];
 GBLREF spdesc			stringpool;
 
+error_def(ERR_SOCKWRITE);
+error_def(ERR_TEXT);
+error_def(ERR_CURRSOCKOFR);
+error_def(ERR_ZFF2MANY);
+error_def(ERR_DELIMSIZNA);
+error_def(ERR_ZINTRECURSEIO);
+UNIX_ONLY(error_def(ERR_NOPRINCIO);)
+
 void	iosocket_write(mstr *v)
 {
 	iosocket_write_real(v, TRUE);
@@ -57,15 +65,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	d_socket_struct *dsocketptr;
 	socket_struct	*socketptr;
 
-	error_def(ERR_SOCKWRITE);
-	error_def(ERR_TEXT);
-	error_def(ERR_CURRSOCKOFR);
-	error_def(ERR_ZFF2MANY);
-	error_def(ERR_DELIMSIZNA);
-	error_def(ERR_ZINTRECURSEIO);
-	UNIX_ONLY(error_def(ERR_NOPRINCIO);)
-
-	SOCKET_DEBUG2(PRINTF("socwrite: ************************** Top of iosocket_write\n"); DEBUGSOCKFLUSH);
+	DBGSOCK2((stdout, "socwrite: ************************** Top of iosocket_write\n"));
 	iod = io_curr_device.out;
 	assert(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
@@ -91,12 +91,12 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	   */
 		if (CHSET_UTF16 == iod->ochset)
 		{
-			SOCKET_DEBUG2(PRINTF("socwrite: First write UTF16 -- writing BOM\n"); DEBUGSOCKFLUSH);
+			DBGSOCK2((stdout, "socwrite: First write UTF16 -- writing BOM\n"));
 			iod->ochset = CHSET_UTF16BE; /* per Unicode standard, assume big endian when endian
 							format is unspecified */
 			get_chset_desc(&chset_names[iod->ochset]);
 			DOTCPSEND(socketptr->sd, UTF16BE_BOM, UTF16BE_BOM_LEN, flags, status);
-			SOCKET_DEBUG2(PRINTF("socwrite: TCP send of BOM-BE with rc %d\n", status); DEBUGSOCKFLUSH);
+			DBGSOCK2((stdout, "socwrite: TCP send of BOM-BE with rc %d\n", status));
 			if (0 != status)
 			{
 				SOCKERROR(iod, dsocketptr, socketptr, ERR_SOCKWRITE, status);
@@ -172,12 +172,12 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 		tempv = *v;
 	if (0 != (in_b_len = tempv.len))
 	{
-		SOCKET_DEBUG2(PRINTF("socwrite: starting output loop (%d bytes) - iodwidth: %d  wrap: %d\n",
-				     in_b_len, iod->width, iod->wrap); DEBUGSOCKFLUSH);
+		DBGSOCK2((stdout, "socwrite: starting output loop (%d bytes) - iodwidth: %d  wrap: %d\n",
+			  in_b_len, iod->width, iod->wrap));
 		for (out = tempv.addr;  ; out += b_len)
 		{
-			SOCKET_DEBUG2(PRINTF("socwrite: ---------> Top of write loop $x: %d  $y: %d  in_b_len: %d\n",
-					     iod->dollar.x, iod->dollar.y, in_b_len); DEBUGSOCKFLUSH);
+			DBGSOCK2((stdout, "socwrite: ---------> Top of write loop $x: %d  $y: %d  in_b_len: %d\n",
+				  iod->dollar.x, iod->dollar.y, in_b_len));
 			if (!iod->wrap)
 				b_len = in_b_len;
 			else
@@ -190,8 +190,8 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 					{
 						DOTCPSEND(socketptr->sd, socketptr->odelimiter0.addr, socketptr->odelimiter0.len,
 								(socketptr->urgent ? MSG_OOB : 0) | flags, status);
-						SOCKET_DEBUG2(PRINTF("socwrite: TCP send of %d byte delimiter with rc %d\n",
-								     socketptr->odelimiter0.len, status); DEBUGSOCKFLUSH);
+						DBGSOCK2((stdout, "socwrite: TCP send of %d byte delimiter with rc %d\n",
+							  socketptr->odelimiter0.len, status));
 						if (0 != status)
 						{
 							SOCKERROR(iod, dsocketptr, socketptr, ERR_SOCKWRITE, status);
@@ -204,9 +204,8 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 					}
 					iod->dollar.y++;
 					iod->dollar.x = 0;
-					SOCKET_DEBUG2(PRINTF("socwrite: $x > width - wrote delimiter: %d  $x: %d  $y: %d\n",
-							     (0 < socketptr->n_delimiter), iod->dollar.x, iod->dollar.y);
-						      DEBUGSOCKFLUSH);
+					DBGSOCK2((stdout, "socwrite: $x > width - wrote delimiter: %d  $x: %d  $y: %d\n",
+						  (0 < socketptr->n_delimiter), iod->dollar.x, iod->dollar.y));
 				}
 				if ((START != iod->esc_state) || ((int)(iod->dollar.x + in_b_len) <= (int)iod->width))
 				{ /* enough room even in the worst case, i.e., if width - dollar.x can accommodate in_b_len chars,
@@ -226,13 +225,13 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 						assert(-1 != mb_len);
 						mb_len++;
 					}
-					SOCKET_DEBUG2(PRINTF("socwrite: computing string length in chars: in_b_len: %d"
-							     "  mb_len: %d\n", in_b_len, mb_len); DEBUGSOCKFLUSH);
+					DBGSOCK2((stdout, "socwrite: computing string length in chars: in_b_len: %d  mb_len: %d\n",
+						  in_b_len, mb_len));
 				}
 			}
 			assert(0 != b_len);
 			DOTCPSEND(socketptr->sd, out, b_len, (socketptr->urgent ? MSG_OOB : 0) | flags, status);
-			SOCKET_DEBUG2(PRINTF("socwrite: TCP data send of %d bytes with rc %d\n", b_len, status); DEBUGSOCKFLUSH);
+			DBGSOCK2((stdout, "socwrite: TCP data send of %d bytes with rc %d\n", b_len, status));
 			if (0 != status)
 			{
 				SOCKERROR(iod, dsocketptr, socketptr, ERR_SOCKWRITE, status);
@@ -243,15 +242,14 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 				prin_out_dev_failure = FALSE;
 #endif
 			dollarx(iod, (uchar_ptr_t)out, (uchar_ptr_t)out + b_len);
-			SOCKET_DEBUG2(PRINTF("socwrite: $x/$y updated by dollarx():  $x: %d  $y: %d  filter: %d  escape:  %d\n",
-					     iod->dollar.x, iod->dollar.y, iod->write_filter, iod->esc_state);
-				     DEBUGSOCKFLUSH);
+			DBGSOCK2((stdout, "socwrite: $x/$y updated by dollarx():  $x: %d  $y: %d  filter: %d  escape:  %d\n",
+				  iod->dollar.x, iod->dollar.y, iod->write_filter, iod->esc_state));
 			in_b_len -= b_len;
 			if (0 >= in_b_len)
 				break;
 		}
 		iod->dollar.za = 0;
 	}
-	SOCKET_DEBUG2(PRINTF("socwrite: <--------- Leaving iosocket_write\n"); DEBUGSOCKFLUSH);
+	DBGSOCK2((stdout, "socwrite: <--------- Leaving iosocket_write\n"));
 	return;
 }

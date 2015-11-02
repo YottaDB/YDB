@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,35 +15,33 @@
 #include "toktyp.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
-
-int f_zparse( oprtype *a, opctype op)
+int f_zparse(oprtype *a, opctype op)
 {
-	triple *ref, *last, *r;
-	bool again;
-	int i;
+	boolean_t	again;
+	int		i;
+	triple		*last, *r, *ref;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	last = r = maketriple(op);
-	if (!strexpr(&(r->operand[0])))
+	if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_STR))
 		return FALSE;
 	again = TRUE;
-	for(i = 0; i < 4 ;i++)
+	for (i = 0; i < 4 ;i++)
 	{
 		ref = newtriple(OC_PARAMETER);
 		last->operand[1] = put_tref(ref);
-		if(again && window_token == TK_COMMA)
+		if (again && TK_COMMA == TREF(window_token))
 		{
 			advancewindow();
-			if (window_token == TK_COMMA)
-			{	ref->operand[0] = put_str("",0);
-			}
-			else if(!strexpr(&ref->operand[0]))
+			if (TK_COMMA == TREF(window_token))
+				ref->operand[0] = put_str("", 0);
+			else if (EXPR_FAIL == expr(&ref->operand[0], MUMPS_STR))
 				return FALSE;
-		}
-		else
+		} else
 		{
 			again = FALSE;
-			ref->operand[0] = put_str("",0);
+			ref->operand[0] = put_str("", 0);
 		}
 		last = ref;
 	}

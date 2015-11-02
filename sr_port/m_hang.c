@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,14 +16,14 @@
 #include "toktyp.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-
 int m_hang(void)
 {
-	triple *triptr;
 	oprtype ot;
+	triple *triptr;
+	DCL_THREADGBL_ACCESS;
 
-	switch (numexpr(&ot))
+	SETUP_THREADGBL_ACCESS;
+	switch (expr(&ot, MUMPS_NUM))
 	{
 	case EXPR_FAIL:
 		return FALSE;
@@ -34,7 +34,8 @@ int m_hang(void)
 	case EXPR_INDR:
 		make_commarg(&ot, indir_hang);
 		return TRUE;
+	default:
+		GTMASSERT;
 	}
-
 	return FALSE; /* This should never get executed, added to make compiler happy */
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,11 +38,12 @@
 LITREF  char	gtm_release_name[];
 LITREF  int4	gtm_release_name_len;
 
+error_def(ERR_MUINFOUINT8);
+
 /* Downgrade header from v5.0-000 to v4.x */
 void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 {
 	time_t	temp_time;
-	error_def(ERR_MUINFOUINT8);
 
 	memset(v15_csd, 0, SIZEOF(v15_sgmnt_data));
 	MEMCPY_LIT(v15_csd->label, GDS_LABEL_GENERIC);
@@ -78,7 +79,7 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 	v15_csd->last_rec_backup = (v15_trans_num)csd->last_rec_backup;
 	v15_csd->reorg_restart_block = csd->reorg_restart_block;
 	memcpy(v15_csd->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
-	v15_csd->owner_node = csd->owner_node;
+	VMS_ONLY(v15_csd->owner_node = csd->owner_node;)
 	v15_csd->image_count = csd->image_count;
 	v15_csd->kill_in_prog = (csd->kill_in_prog + csd->abandoned_kills);
 	v15_csd->trans_hist.curr_tn = (v15_trans_num) csd->trans_hist.curr_tn;
@@ -126,7 +127,7 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 		v15_csd->resync_tn = csd->resync_tn;
 	)
 	UNIX_ONLY(
-		v15_csd->resync_seqno = (v15_trans_num) csd->dualsite_resync_seqno;
+		v15_csd->resync_seqno = (v15_trans_num)0;
 		if (0 == csd->zqgblmod_seqno)
 		{	/* Special value 0 of zqgblmod_seqno in multisite version corresponds to resync seqno of 1 in dualsite */
 			v15_csd->old_resync_seqno = 1;

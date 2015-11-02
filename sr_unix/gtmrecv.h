@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,22 +94,24 @@ enum
 #define GTMRECV_TCP_RECV_BUFSIZE_INCR	(32   * 1024)	/* attempt to get a larger buffer with this increment */
 #define GTMRECV_TCP_RECV_BUFSIZE	(1024 * 1024)	/* desirable to set the buffer size to be able to receive large chunks */
 
-/* Note:  fields shared between the receiver and update processes
-	  really need to have memory barriers or other appropriate
-	  synchronization constructs to ensure changes by one
-	  process are actually seen by the other process.  Cache
-	  line spacing should also be taken into account.
-	  Adding volatile is only a start at this.
-*/
+#define	IS_RCVR_SRVR_FALSE		FALSE
+#define	IS_RCVR_SRVR_TRUE		TRUE
+
+/* Note: fields shared between the receiver and update processes
+ *	really need to have memory barriers or other appropriate
+ *	synchronization constructs to ensure changes by one
+ *	process are actually seen by the other process.  Cache
+ *	line spacing should also be taken into account.
+ *	Adding volatile is only a start at this.
+ */
 
 typedef struct
 {
 	replpool_identifier	recvpool_id;	/* Shared memory identification */
-	volatile seq_num	start_jnl_seqno;/* The sequence number with which operations started. Initialized by recvr srvr */
 	volatile seq_num	jnl_seqno; 	/* Sequence number of the next transaction expected to be received from source
 			    	 		 * server. Updated by Receiver Server */
 	seq_num			old_jnl_seqno;	/* Stores the value of jnl_seqno before it is set to 0 when upd crash/shut */
-	boolean_t		std_null_coll;	/* Null collation setting for secondary, set by update process, used by recv srvr */
+	repl_conn_info_t	this_side;	/* Replication connection details of this side/instance */
 	uint4			recvdata_base_off; 	/* Receive pool offset from where journal data starts */
 	uint4			recvpool_size; 	/* Available space for journal data in bytes */
 	volatile uint4 		write;		/* Relative offset from recvdata_base_off for for the next journal record to be
@@ -119,14 +121,55 @@ typedef struct
 						 * wraps. Used for detecting space used in the receive pool */
 	uint4			initialized;	/* Boolean, has receive pool been initialized? */
 	uint4			fresh_start;	/* Boolean, fresh_start or crash_start? */
-	repl_triple		last_rcvd_triple;	/* Triple info from the last received REPL_NEW_TRIPLE message */
-	repl_triple		last_valid_triple;	/* Triple info corresponding to last logical record written into
-							 * receive pool by the receiver. This is almost always the same as
-							 * last_rcvd_triple except in the window between receiving a
-							 * new triple and the first logical records corresponding to it.
+	repl_histinfo		last_rcvd_histinfo;	/* history from the last received REPL_HISTREC message */
+	repl_histinfo		last_valid_histinfo;	/* history corresponding to last logical record written
+							 * into receive pool by the receiver. This is almost always
+							 * the same as last_rcvd_histinfo except in the window
+							 * between receiving a new REPL_HISTREC and the first
+							 * logical records corresponding to it.
 							 */
-	volatile seq_num	max_dualsite_resync_seqno; /* Resync Seqno of this instance assuming remote primary is dualsite */
+	repl_histinfo		last_rcvd_strm_histinfo[MAX_SUPPL_STRMS];	/* same as last_rcvd_histinfo but for each
+										 * non-supplementary stream. Used only in a
+										 * propagating supplementary instance.
+										 */
+	repl_histinfo		last_valid_strm_histinfo[MAX_SUPPL_STRMS];	/* same as last_valid_histinfo but for each
+										 * non-supplementary stream. Used only in a
+										 * propagating supplementary instance.
+										 */
+	boolean_t		is_valid_strm_histinfo[MAX_SUPPL_STRMS];	/* TRUE if corresponding entry in
+										 * "last_rcvd_strm_histinfo[]" array is valid
+										 */
+	uint4			max_strm_histinfo;	/* maximum valid index in "is_valid_strm_histinfo" array */
+	boolean_t		insert_strm_histinfo;	/* true for a supplementary propagating primary if the receiver
+							 * has to insert REPL_HISTREC records for each valid stream
+							 * into the receive pool.
+							 */
 } recvpool_ctl_struct;
+
+#define	INSERT_STRM_HISTINFO_FALSE	FALSE
+#define	INSERT_STRM_HISTINFO_TRUE	TRUE
+
+#define	GTMRECV_CLEAR_CACHED_HISTINFO(RECVPOOL_CTL, JNLPOOL, JNLPOOL_CTL, INSERT_STRM_HISTINFO)				\
+{															\
+	memset(&RECVPOOL_CTL->last_rcvd_histinfo, 0, SIZEOF(RECVPOOL_CTL->last_rcvd_histinfo));				\
+	memset(&RECVPOOL_CTL->last_valid_histinfo, 0, SIZEOF(RECVPOOL_CTL->last_valid_histinfo));			\
+	assert(NULL != JNLPOOL.repl_inst_filehdr);									\
+	assert(NULL != JNLPOOL.jnlpool_ctl);										\
+	assert(JNLPOOL_CTL == JNLPOOL.jnlpool_ctl);									\
+	if (JNLPOOL.repl_inst_filehdr->is_supplementary && JNLPOOL_CTL->upd_disabled)					\
+	{	/* The below fields are used only in case of a supplementary instance where updates are disabled.	\
+		 * So avoid initializing them in any other case.							\
+		 */													\
+		memset(&RECVPOOL_CTL->last_rcvd_strm_histinfo[0], 0, SIZEOF(RECVPOOL_CTL->last_rcvd_strm_histinfo));	\
+		memset(&RECVPOOL_CTL->last_valid_strm_histinfo[0], 0, SIZEOF(RECVPOOL_CTL->last_valid_strm_histinfo));	\
+		memset(&RECVPOOL_CTL->is_valid_strm_histinfo[0], 0, SIZEOF(RECVPOOL_CTL->is_valid_strm_histinfo));	\
+		RECVPOOL_CTL->max_strm_histinfo = 0;									\
+		assert((0 == RECVPOOL_CTL->jnl_seqno)									\
+			|| (0 < RECVPOOL_CTL->jnl_seqno) && (RECVPOOL_CTL->jnl_seqno >= JNLPOOL_CTL->jnl_seqno));	\
+		assert(0 < JNLPOOL_CTL->jnl_seqno);									\
+		RECVPOOL_CTL->insert_strm_histinfo = INSERT_STRM_HISTINFO;						\
+	}														\
+}
 
 /*
  * The following structure contains Update Process related data items.
@@ -147,9 +190,10 @@ typedef struct
 	volatile uint4	bad_trans;		/* Boolean, set by Update Process that it received a bad transaction record */
 	volatile uint4	changelog;		/* Boolean - change the log file */
 	int4		start_upd;		/* Used to communicate upd only startup values */
-	boolean_t	updateresync;		/* Same as gtmrecv_options update resync */
 	volatile uint4	log_interval;		/* Interval (in seqnos) at which update process logs its progress */
 	char		log_file[MAX_FN_LEN + 1];
+	volatile uint4	onln_rlbk_flg;		/* Set to TRUE every time update process sees an online rollback. Set to FALSE ONLY
+						 * by receiver server */
 } upd_proc_local_struct;
 
 /*
@@ -173,22 +217,26 @@ typedef struct
 	volatile uint4	restart;		/* Used by receiver server to coordinate crash restart with update process */
 	volatile uint4	changelog;		/* Boolean - change the log file */
 	volatile uint4	log_interval;		/* Interval (in seqnos) at which receiver logs its progress */
-	char		remote_proto_ver;	/* Protocol version of the source server. Need to be signed in order to be able to
-						 * do signed comparisons of this with the macros REPL_PROTO_VER_DUALSITE (0)
-						 * and REPL_PROTO_VER_UNINITIALIZED (-1) */
-	char		last_valid_remote_proto_ver;/* Protocol version of the last source server that communicated with
-						 * this receiver server. This is a copy of "remote_proto_ver" taken whenever
-						 * the receiver server establishes connection with the source server. It is
-						 * almost always the same as "remote_proto_ver" except when the receiver has
-						 * lost connection with the source server in which case the latter will
-						 * be uninitialized while the former will stay unchanged. Need to be signed in
-						 * order to be able to do signed comparisons of this with the macros
-						 * REPL_PROTO_VER_DUALSITE (0) and REPL_PROTO_VER_UNINITIALIZED (-1).
-						 */
-	char		filler_align_16[6];	/* Make it 16 byte aligned before big character arrays begin */
 	char		filter_cmd[MAX_FILTER_CMD_LEN];	/* Receiver filters incoming records using this process */
 	char		log_file[MAX_FN_LEN + 1];	/* File to log receiver progress */
 	char		statslog_file[MAX_FN_LEN + 1];	/* File to log statistics */
+	repl_conn_info_t	remote_side;	/* Details of the remote side/instance of the connection */
+	int4		strm_index;
+	boolean_t	updateresync;		/* Copy of gtmrecv_options.updateresync; This is cleared once first history
+						 * record gets applied on the receiver after the first connect with a source.
+						 */
+	boolean_t	noresync;		/* Copy of gtmrecv_options.noresync; This is cleared once first history
+						 * record gets applied on the receiver after the first connect with a source.
+						 */
+	int		updresync_instfile_fd;	/* fd of the instance file name specified in -UPDATERESYNC= */
+	int4		updresync_num_histinfo;	/* "num_histinfo" member of instance file header from -UPDATERESYNC=<INSTFILE> */
+	boolean_t	updresync_cross_endian;	/* is the -updateresync instance file cross endian relative to current instance */
+	int4		updresync_num_histinfo_strm[MAX_SUPPL_STRMS];	/* "last_histinfo_num[]" member of instance file header
+									 * from -UPDATERESYNC=<INSTFILE> */
+	repl_inst_uuid	updresync_lms_group;	/* "lms_group_info" member of instance file header from -UPDATERESYNC=<INSTFILE> */
+	seq_num		updresync_jnl_seqno;	/* "jnl_seqno" member of instance file header from -UPDATERESYNC=<INSTFILE> */
+	repl_inst_uuid	remote_lms_group;	/* "lms_group_info" member of remote instance file header.
+						 * Initialized only if the receiving instance is a supplementary root primary. */
 } gtmrecv_local_struct;
 
 #ifdef VMS
@@ -301,52 +349,61 @@ typedef struct
 	int4		shutdown_time;
 	int4		listen_port;
 	boolean_t	updateresync;
+	boolean_t	noresync;
 	uint4		rcvr_log_interval;
 	uint4		upd_log_interval;
 	boolean_t	helpers;
+	boolean_t	reuse_specified;
+	boolean_t	resume_specified;
+	int4		resume_strm_num;
 	int4		n_readers;
 	int4		n_writers;
 	int4		cmplvl;
 	char            log_file[MAX_FN_LEN + 1];
+	char		updresync_instfilename[MAX_FN_LEN + 1];
 	char            filter_cmd[MAX_FILTER_CMD_LEN];
+	char		reuse_instname[MAX_INSTNAME_LEN];
+	boolean_t	autorollback;
+	boolean_t	autorollback_verbose;
 } gtmrecv_options_t;
 
 #include "gtm_inet.h"
 
 /********** Receiver server function prototypes **********/
-int	gtmrecv(void);
-int	gtmrecv_changelog(void);
-int	gtmrecv_checkhealth(void);
-int	gtmrecv_comm_init(in_port_t port);
-int	gtmrecv_end1(boolean_t auto_shutdown);
-int	gtmrecv_endupd(void);
-void	gtmrecv_end(void);
-int	gtmrecv_get_opt(void);
-int	gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned char *buffp);
-int	gtmrecv_poll_actions(int pending_data_len, int buff_unprocessed, unsigned char *buffp);
-void	gtmrecv_process(boolean_t crash_restart);
-int	gtmrecv_showbacklog(void);
-int	gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status);
-void	gtmrecv_sigstop(void);
-void	gtmrecv_autoshutdown(void);
-int	gtmrecv_statslog(void);
-int	gtmrecv_ipc_cleanup(boolean_t auto_shutdown, int *exit_status);
-int	gtmrecv_start_updonly(void);
-int	gtmrecv_upd_proc_init(boolean_t fresh_start);
-int	gtmrecv_wait_for_detach(void);
-void	gtmrecv_exit(int exit_status);
-int	gtmrecv_alloc_msgbuff(void);
-void	gtmrecv_free_msgbuff(void);
-int	gtmrecv_alloc_filter_buff(int bufsiz);
-void	gtmrecv_free_filter_buff(void);
-int	is_updproc_alive(void);
-int	is_srv_alive(int srv_type);
-int	is_recv_srv_alive(void);
-void	recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup);
-void	gtmrecv_reinit_logseqno(void);
-int	gtmrecv_helpers_init(int n_readers, int n_writers);
-int	gtmrecv_start_helpers(int n_readers, int n_writers);
-void	gtmrecv_reap_helpers(boolean_t wait);
-int	gtmrecv_end_helpers(boolean_t is_rcvr_srvr);
+int		gtmrecv(void);
+int		gtmrecv_changelog(void);
+int		gtmrecv_checkhealth(void);
+int		gtmrecv_comm_init(in_port_t port);
+int		gtmrecv_end1(boolean_t auto_shutdown);
+int		gtmrecv_endupd(void);
+void		gtmrecv_end(void);
+int		gtmrecv_get_opt(void);
+int		gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned char *buffp);
+int		gtmrecv_poll_actions(int pending_data_len, int buff_unprocessed, unsigned char *buffp);
+void		gtmrecv_process(boolean_t crash_restart);
+int		gtmrecv_showbacklog(void);
+int		gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status);
+void		gtmrecv_sigstop(void);
+void		gtmrecv_autoshutdown(void);
+int		gtmrecv_statslog(void);
+int		gtmrecv_ipc_cleanup(boolean_t auto_shutdown, int *exit_status);
+int		gtmrecv_start_updonly(void);
+int		gtmrecv_upd_proc_init(boolean_t fresh_start);
+int		gtmrecv_wait_for_detach(void);
+void		gtmrecv_exit(int exit_status);
+int		gtmrecv_alloc_msgbuff(void);
+void		gtmrecv_free_msgbuff(void);
+int		gtmrecv_alloc_filter_buff(int bufsiz);
+void		gtmrecv_free_filter_buff(void);
+int		is_updproc_alive(void);
+int		is_srv_alive(int srv_type);
+int		is_recv_srv_alive(void);
+void		recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup);
+void		gtmrecv_reinit_logseqno(void);
+int		gtmrecv_helpers_init(int n_readers, int n_writers);
+int		gtmrecv_start_helpers(int n_readers, int n_writers);
+void		gtmrecv_reap_helpers(boolean_t wait);
+int		gtmrecv_end_helpers(boolean_t is_rcvr_srvr);
+void		gtmrecv_onln_rlbk_clnup(void);
 
 #endif

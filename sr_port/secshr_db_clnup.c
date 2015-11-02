@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -194,11 +194,15 @@ GBLREF	boolean_t		dse_running;
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	gd_region		*gv_cur_region;		/* for the LOCK_HIST macro in the RELEASE_BUFF_UPDATE_LOCK macro */
 GBLREF	node_local_ptr_t	locknl;			/* set explicitly before invoking RELEASE_BUFF_UPDATE_LOCK macro */
+GBLREF	int4			strm_index;
+GBLREF	jnl_gbls_t		jgbl;
 #endif
 
 #ifdef DEBUG
 GBLREF	sgmnt_addrs		*cs_addrs;
 #endif
+
+error_def(ERR_WCBLOCKED);
 
 typedef enum
 {
@@ -255,8 +259,6 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 		snapshot_context_ptr_t	lcl_ss_ctx;
 		cache_rec_ptr_t		snapshot_cr;
 	)
-
-	error_def(ERR_WCBLOCKED);
 
 	if (NULL == get_next_gdr_addrs)
 		return;
@@ -742,11 +744,12 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					{
 						assert(n_gds_t_op != cs->mode);
 						if (n_gds_t_op > cs->mode)
-						{	/* Currently there are only two possibilities and both are in NON-TP.
-							 * In either case, no need to do any block update so simulate commit.
+						{	/* Currently there are only three possibilities and each is in NON-TP.
+							 * In each case, no need to do any block update so simulate commit.
 							 */
 							assert(!tp_update_underway);
-							assert((gds_t_write_root == cs->mode) || (gds_t_busy2free == cs->mode));
+							assert((gds_t_write_root == cs->mode) || (gds_t_busy2free == cs->mode)
+									|| (gds_t_recycled2free == cs->mode));
 							/* Check if BG AND gds_t_busy2free and if so UNPIN corresponding
 							 * cache-record. This needs to be done only if we hold crit as otherwise
 							 * it means we have already done it in t_end. But to do this we need to
@@ -1080,7 +1083,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								blk_hdr_ptr = (blk_hdr_ptr_t)cs->old_block;
 								assert(GDS_ANY_REL2ABS(csa, cr->buffaddr)
 										== (sm_uc_ptr_t)blk_hdr_ptr);
-								if ((cr->blk >= cnl->nbb)
+								if (!cs->was_free && (cr->blk >= cnl->nbb)
 									&& (0 == csa->shmpool_buffer->failed)
 									&& (blk_hdr_ptr->tn < csa->shmpool_buffer->backup_tn)
 									&& (blk_hdr_ptr->tn >= csa->shmpool_buffer->inc_backup_tn))
@@ -1733,35 +1736,43 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				assert(csd->trans_hist.early_tn == csd->trans_hist.curr_tn);
 				if (GTM_PROBE(CRIT_SPACE, csa->critical, WRITE))
 				{
-					/* Release crit but since it involves modifying more than one field, make sure
-					 * we prevent interrupts while in this code. The global variable "crit_count"
-					 * does this for us. See similar usage in rel_crit.c. We currently use this here
-					 * only for Unix because in VMS, a global variable in GTMSHR is not accessible
-					 * in GTMSECSHR image easily unless passed through init_secshr_addrs. Since in
-					 * VMS, if we are here, we are already in a kernel level routine, we will not be
-					 * interrupted by user level timer handlers (wcs_stale or wcs_clean_dbsync_ast)
-					 * that care about the consistency of the crit values so it is okay not to
-					 * explicitly prevent interrupts using "crit_count" in VMS.
+					/* ONLINE ROLLBACK can come here holding crit ONLY due to commit errors but NOT during
+					 * process exiting as secshr_db_clnup during process exiting is always preceded by
+					 * mur_close_files which does the rel_crit anyways. Assert that.
 					 */
-					UNIX_ONLY(
-						assert(0 == crit_count);
-						crit_count++;	/* prevent interrupts */
-					)
-					if (cnl->in_crit == rundown_process_id)
-						cnl->in_crit = 0;
-					csa->hold_onto_crit = FALSE;	/* reset this just before csa->now_crit is reset */
-					UNIX_ONLY(
-						DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-						mutex_unlockw(reg, crash_count);/* roll forward step (11) */
-						assert(!csa->now_crit);
-						DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
-						crit_count = 0;
-					)
-					VMS_ONLY(
-						mutex_stoprelw(csa->critical);	/* roll forward step (11) */
-						csa->now_crit = FALSE;
-					)
-					UNSUPPORTED_PLATFORM_CHECK;
+					UNIX_ONLY(assert(!csa->hold_onto_crit || !jgbl.onlnrlbk || !is_exiting));
+					if (!csa->hold_onto_crit || is_exiting)
+					{ 	/* Release crit but since it involves modifying more than one field, make sure
+						 * we prevent interrupts while in this code. The global variable "crit_count"
+						 * does this for us. See similar usage in rel_crit.c. We currently use this here
+						 * only for Unix because in VMS, a global variable in GTMSHR is not accessible
+						 * in GTMSECSHR image easily unless passed through init_secshr_addrs. Since in
+						 * VMS, if we are here, we are already in a kernel level routine, we will not be
+						 * interrupted by user level timer handlers (wcs_stale or wcs_clean_dbsync_ast)
+						 * that care about the consistency of the crit values so it is okay not to
+						 * explicitly prevent interrupts using "crit_count" in VMS.
+						 */
+						UNIX_ONLY(
+							assert(0 == crit_count);
+							crit_count++;	/* prevent interrupts */
+							CRIT_TRACE(crit_ops_rw); /* see gdsbt.h for comment on placement */
+						)
+						if (cnl->in_crit == rundown_process_id)
+							cnl->in_crit = 0;
+						UNIX_ONLY(
+							csa->hold_onto_crit = FALSE;
+							DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
+							mutex_unlockw(reg, crash_count);/* roll forward step (11) */
+							assert(!csa->now_crit);
+							DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
+							crit_count = 0;
+						)
+						VMS_ONLY(
+							mutex_stoprelw(csa->critical);	/* roll forward step (11) */
+							csa->now_crit = FALSE;
+						)
+						UNSUPPORTED_PLATFORM_CHECK;
+					}
 				} else
 				{
 					SECSHR_ACCOUNTING(6);
@@ -1807,6 +1818,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			/* All releases done now. Double check latch is really cleared */
 			if (GTM_PROBE(CRIT_SPACE, csa->critical, WRITE))
 			{
+				/* as long as csa->hold_onto_crit is FALSE, we should have released crit if we held it at entry */
+				assert(!csa->now_crit || csa->hold_onto_crit);
 				SALVAGE_UNIX_LATCH_DBCRIT(&csa->critical->semaphore, is_exiting, csa->hdr->wc_blocked);
 				SALVAGE_UNIX_LATCH(&csa->critical->crashcnt_latch, is_exiting);
 				SALVAGE_UNIX_LATCH(&csa->critical->prochead.latch, is_exiting);
@@ -1835,9 +1848,18 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						jh = (jnldata_hdr_ptr_t)((sm_uc_ptr_t)jpl + JNLDATA_BASE_OFF + jpl->write);
 						if (GTM_PROBE(SIZEOF(*jh), jh, WRITE) && 0 != (jsize = jpl->jnlpool_size))
 						{	/* Below chunk of code mirrors  what is done in t_end/tp_tend */
-							/* Begin atomic stmnts */
+							/* Begin atomic stmnts. Follow same order as in t_end/tp_tend */
 							jh->jnldata_len = cumul_jnl_rec_len;
 							jh->prev_jnldata_len = jpl->lastwrite_len;
+#							ifdef UNIX
+							if (INVALID_SUPPL_STRM != strm_index)
+							{	/* Need to also update supplementary stream seqno */
+								assert(0 <= strm_index);
+								/* assert(strm_index < ARRAYSIZE(tjpl->strm_seqno)); */
+								ASSERT_INST_FILE_HDR_HAS_HISTREC_FOR_STRM(strm_index);
+								jpl->strm_seqno[strm_index]++;
+							}
+#							endif
 							jpl->lastwrite_len = cumul_jnl_rec_len;
 							SECSHR_SHM_WRITE_MEMORY_BARRIER;
 							/* Emulate
@@ -1861,22 +1883,33 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				if ((GTM_PROBE(NODE_LOCAL_SIZE_DBS, cnl, WRITE)) &&
 					(GTM_PROBE(CRIT_SPACE, csa->critical, WRITE)))
 				{
-					if (cnl->in_crit == rundown_process_id)
-						cnl->in_crit = 0;
-					csa->hold_onto_crit = FALSE;	/* reset this just before csa->now_crit is reset */
-					UNIX_ONLY(
-						DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-						mutex_unlockw(reg, 0);		/* roll forward step (12) */
-						assert(!csa->now_crit);
-						DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
-					)
-					VMS_ONLY(
-						mutex_stoprelw(csa->critical);	/* roll forward step (12) */
-						csa->now_crit = FALSE;
-					)
-					/* the above takes care of rolling forward step (12) of the commit flow */
+					/* ONLINE ROLLBACK can come here holding crit ONLY due to commit errors but NOT during
+					 * process exiting as secshr_db_clnup during process exiting is always preceded by
+					 * mur_close_files which does the rel_crit anyways. Assert that.
+					 */
+					UNIX_ONLY(assert(!csa->hold_onto_crit || !jgbl.onlnrlbk || !is_exiting));
+					if (!csa->hold_onto_crit || is_exiting)
+					{
+						UNIX_ONLY(CRIT_TRACE(crit_ops_rw)); /* see gdsbt.h for comment on placement */
+						if (cnl->in_crit == rundown_process_id)
+							cnl->in_crit = 0;
+						UNIX_ONLY(
+							csa->hold_onto_crit = FALSE;
+							DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
+							mutex_unlockw(reg, 0);		/* roll forward step (12) */
+							assert(!csa->now_crit);
+							DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
+						)
+						VMS_ONLY(
+							mutex_stoprelw(csa->critical);	/* roll forward step (12) */
+							csa->now_crit = FALSE;
+						)
+						/* the above takes care of rolling forward step (12) of the commit flow */
+					}
 				}
 			}
+			/* as long as csa->hold_onto_crit is FALSE, we should have released crit if we held it at entry */
+			UNIX_ONLY(assert(!csa->now_crit || csa->hold_onto_crit));
 		}
 	}
 	return;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,10 +23,10 @@
 #include "alloc_reg.h"
 #include "cdbg_dump.h"
 
-#define MAX_TEMP_COUNT 128
+#define MAX_TEMP_COUNT		128
 
-GBLDEF int4 sa_temps[VALUED_REF_TYPES];
-GBLDEF int4 sa_temps_offset[VALUED_REF_TYPES];
+GBLDEF int4			sa_temps[VALUED_REF_TYPES];
+GBLDEF int4			sa_temps_offset[VALUED_REF_TYPES];
 
 GBLREF int			mvmax;
 GBLREF triple			t_orig;
@@ -48,14 +48,14 @@ error_def(ERR_TMPSTOREMAX);
 
 void alloc_reg(void)
 {
-	triple	*x, *y, *ref;
-	tbp	*b;
-	oprtype *j;
-	opctype opc, opx;
-	char	tempcont[VALUED_REF_TYPES][MAX_TEMP_COUNT], dest_type;
-	int	r, c, temphigh[VALUED_REF_TYPES];
-	unsigned int oct;
-	int4	size;
+	triple		*x, *y, *ref;
+	tbp		*b;
+	oprtype 	*j;
+	opctype 	opc, opx;
+	char		tempcont[VALUED_REF_TYPES][MAX_TEMP_COUNT], dest_type;
+	int		r, c, temphigh[VALUED_REF_TYPES];
+	unsigned int	oct;
+	int4		size;
 
 	memset(&tempcont[0][0], 0, SIZEOF(tempcont));
 	memset(&temphigh[0], -1, SIZEOF(temphigh));
@@ -72,20 +72,21 @@ void alloc_reg(void)
 			case OC_PARAMETER:
 				continue;
 			case OC_LINESTART:
-				/* If the next triple is also a LINESTART, then this is a comment line.  Therefore
-				   eliminate this LINESTART */
+				/* If the next triple is also a LINESTART, then this is a comment line.
+				 * Therefore eliminate this LINESTART
+				 */
 				opx = x->exorder.fl->opcode;
-				if ((OC_LINESTART == opx) || (OC_LINEFETCH == opx) || (OC_ISFORMAL == opx))
+				if ((OC_LINESTART == opx) || (OC_LINEFETCH == opx))
 				{
 					opc = x->opcode = OC_NOOP;
 					COMPDBG(PRINTF("   ** Converting triple to NOOP (rsn 1) **\n"););
 					continue;	/* continue, because 'normal' NOOP continues from this switch */
 				}
 				/* There is a special case in the case of NOLINE_ENTRY being specified. If a blank line is followed
-				   by a line with a label and that label generates fetch information, the generated triple sequence
-				   will be LINESTART (from blank line), ILIT (count from PREVIOUS fetch), LINEFETCH. We will detect
-				   that sequence here and change the LINESTART to a NOOP.
-				*/
+				 * by a line with a label and that label generates fetch information, the generated triple sequence
+				 * will be LINESTART (from blank line), ILIT (count from PREVIOUS fetch), LINEFETCH. We will detect
+				 * that sequence here and change the LINESTART to a NOOP.
+				 */
 				if (!(cmd_qlf.qlf & CQ_LINE_ENTRY) && (OC_ILIT == opx) && (NULL != x->exorder.fl->exorder.fl)
 				    && (OC_LINEFETCH == x->exorder.fl->exorder.fl->opcode))
 				{
@@ -96,8 +97,7 @@ void alloc_reg(void)
 				break;
 			case OC_LINEFETCH:
 			case OC_FETCH:
-				assert((TRIP_REF == x->operand[0].oprclass)
-				       && (OC_ILIT == x->operand[0].oprval.tref->opcode));
+				assert((TRIP_REF == x->operand[0].oprclass) && (OC_ILIT == x->operand[0].oprval.tref->opcode));
 				if (x->operand[0].oprval.tref->operand[0].oprval.ilit == mvmax)
 				{
 					x->operand[0].oprval.tref->operand[0].oprval.ilit = 0;
@@ -179,10 +179,10 @@ void alloc_reg(void)
 				} else
 				{
 					oct &= OCT_VALUE | OCT_MVADDR;
-					assert ((OCT_MVAL == oct) || (OCT_MINT == oct) || ((OCT_MVADDR | OCT_MVAL) == oct)
+					assert((OCT_MVAL == oct) || (OCT_MINT == oct) || ((OCT_MVADDR | OCT_MVAL) == oct)
 						|| (OCT_CDADDR == oct));
-					r = (OCT_MVAL == oct) ? TVAL_REF : (((OCT_MVADDR | OCT_MVAL) == oct) ? TVAD_REF
-									    : ((OCT_MINT == oct) ? TINT_REF : TCAD_REF));
+					r = (OCT_MVAL == oct) ? TVAL_REF : (((OCT_MVADDR | OCT_MVAL) == oct)
+						? TVAD_REF : ((OCT_MINT == oct) ? TINT_REF : TCAD_REF));
 					for (c = 0; tempcont[r][c] && (MAX_TEMP_COUNT > c); c++)
 						;
 					if (MAX_TEMP_COUNT <= c)
@@ -202,7 +202,7 @@ void alloc_reg(void)
 			x->destination = x->destination.oprval.tref->destination;
 		}
 	}
-	for (r = 0; VALUED_REF_TYPES > r ;r++)
+	for (r = 0; VALUED_REF_TYPES > r; r++)
 		sa_temps[r] = temphigh[r] + 1;
 	sa_temps_offset[TVAR_REF] = sa_temps[TVAR_REF] * sa_class_sizes[TVAR_REF];
 	size = sa_temps[TVAL_REF] * sa_class_sizes[TVAL_REF];

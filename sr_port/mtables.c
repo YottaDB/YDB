@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,7 +140,7 @@ LITDEF unsigned char mvs_size[] =
 	MV_SIZE(mvs_stab),
 	MV_SIZE(mvs_iarr),
 	MV_SIZE(mvs_ntab),
-	MV_SIZE(mvs_parm),
+	MV_SIZE(mvs_zintcmd),
 	MV_SIZE(mvs_pval),
 	MV_SIZE(mvs_stck),
 	MV_SIZE(mvs_nval),
@@ -172,7 +172,7 @@ LITDEF boolean_t mvs_save[] =
 	TRUE,	/* MVST_STAB */
 	FALSE,	/* MVST_IARR */
 	TRUE,	/* MVST_NTAB */
-	TRUE,	/* MVST_PARM */
+	FALSE,	/* MVST_ZINTCMD */
 	TRUE,	/* MVST_PVAL */
 	FALSE,	/* MVST_STCK */
 	TRUE,	/* MVST_NVAL */
@@ -213,19 +213,19 @@ LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 
 LITDEF mval literal_batch       = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, TP_BATCH_SHRT, (char *)TP_BATCH_ID, 0, 0);
 
 #ifdef GTM_TRIGGER
-LITDEF mval literal_hasht	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, HASHT_GBLNAME_LEN    , (char *)HASHT_GBLNAME    , 0, 0);
-LITDEF mval literal_hashlabel	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHLABEL_LEN, (char *)LITERAL_HASHLABEL, 0, 0);
-LITDEF mval literal_hashcycle	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHCYCLE_LEN, (char *)LITERAL_HASHCYCLE, 0, 0);
-LITDEF mval literal_hashcount	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHCOUNT_LEN, (char *)LITERAL_HASHCOUNT, 0, 0);
-LITDEF mval literal_cmd		= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_CMD_LEN      , (char *)LITERAL_CMD      , 0, 0);
-LITDEF mval literal_gvsubs	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_GVSUBS_LEN   , (char *)LITERAL_GVSUBS   , 0, 0);
-LITDEF mval literal_options	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_OPTIONS_LEN  , (char *)LITERAL_OPTIONS  , 0, 0);
-LITDEF mval literal_delim	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_DELIM_LEN    , (char *)LITERAL_DELIM    , 0, 0);
-LITDEF mval literal_zdelim	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_ZDELIM_LEN   , (char *)LITERAL_ZDELIM   , 0, 0);
-LITDEF mval literal_pieces	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_PIECES_LEN   , (char *)LITERAL_PIECES   , 0, 0);
-LITDEF mval literal_trigname	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_TRIGNAME_LEN , (char *)LITERAL_TRIGNAME , 0, 0);
-LITDEF mval literal_xecute	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_XECUTE_LEN   , (char *)LITERAL_XECUTE   , 0, 0);
-LITDEF mval literal_chset	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_CHSET_LEN    , (char *)LITERAL_CHSET    , 0, 0);
+LITDEF mval literal_hasht	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, HASHT_GBLNAME_LEN    , (char *)HASHT_GBLNAME    , 0, 0);	/* BYPASSOK */
+LITDEF mval literal_hashlabel	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHLABEL_LEN, (char *)LITERAL_HASHLABEL, 0, 0);	/* BYPASSOK */
+LITDEF mval literal_hashcycle	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHCYCLE_LEN, (char *)LITERAL_HASHCYCLE, 0, 0);	/* BYPASSOK */
+LITDEF mval literal_hashcount	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHCOUNT_LEN, (char *)LITERAL_HASHCOUNT, 0, 0);	/* BYPASSOK */
+LITDEF mval literal_cmd		= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_CMD_LEN      , (char *)LITERAL_CMD      , 0, 0);	/* BYPASSOK */
+LITDEF mval literal_gvsubs	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_GVSUBS_LEN   , (char *)LITERAL_GVSUBS   , 0, 0);	/* BYPASSOK */
+LITDEF mval literal_options	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_OPTIONS_LEN  , (char *)LITERAL_OPTIONS  , 0, 0);	/* BYPASSOK */
+LITDEF mval literal_delim	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_DELIM_LEN    , (char *)LITERAL_DELIM    , 0, 0);	/* BYPASSOK */
+LITDEF mval literal_zdelim	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_ZDELIM_LEN   , (char *)LITERAL_ZDELIM   , 0, 0);	/* BYPASSOK */
+LITDEF mval literal_pieces	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_PIECES_LEN   , (char *)LITERAL_PIECES   , 0, 0);	/* BYPASSOK */
+LITDEF mval literal_trigname	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_TRIGNAME_LEN , (char *)LITERAL_TRIGNAME , 0, 0);	/* BYPASSOK */
+LITDEF mval literal_xecute	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_XECUTE_LEN   , (char *)LITERAL_XECUTE   , 0, 0);	/* BYPASSOK */
+LITDEF mval literal_chset	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_CHSET_LEN    , (char *)LITERAL_CHSET    , 0, 0);	/* BYPASSOK */
 
 LITDEF mval gvtr_cmd_mval[GVTR_CMDTYPES] = {
 /* Define GVTR_CMD_SET, GVTR_CMD_KILL etc. */
@@ -290,9 +290,9 @@ LITDEF char gtm_version[]        = GTM_VERSION;
 LITDEF int4 gtm_version_len      = SIZEOF(GTM_VERSION) - 1;
 
 /* Indexed by enum db_ver in gdsdbver.h. Note that a db_ver value can be -1 but only in
-   the internal context of incremental/stream backup so the value should never appear where
-   this table is being indexed (suggest asserts for index being > 0 at usage points).
-*/
+ * the internal context of incremental/stream backup so the value should never appear where
+ * this table is being indexed (suggest asserts for index being > 0 at usage points).
+ */
 LITDEF char *gtm_dbversion_table[] =
 {
 	"V4",
@@ -393,12 +393,22 @@ LITDEF int ht_sizes[] =
 	24978257, 29168903, 34062629, 39777391, 46450931, 54244103, 0
 };
 
+#ifdef UNIX
+/* Primarily used by gtm_trigger_complink() */
+LITDEF char 	alphanumeric_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+					'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
+					'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+					't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7',
+					'8', '9', '\0'};
+LITDEF int	alphanumeric_table_len = (SIZEOF(alphanumeric_table) - 1);
+#endif
+
 #ifdef DEBUG
 /* These instructions follow the definitions made
-   in vxi.h and were generated from them. Where
-   skips were made in the definitions, the string
-   "*N/A*  " is placed in the table.
-*/
+ * in vxi.h and were generated from them. Where
+ * skips were made in the definitions, the string
+ * "*N/A*  " is placed in the table.
+ */
 LITDEF char vxi_opcode[][6] =
 {
 	"HALT  ",

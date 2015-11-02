@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,13 +16,14 @@
 
 #define	DASHES_NO_OFFSET	"----------------------------------------------------------"
 #define	DASHES_YES_OFFSET	"----------------------------------------------------------------------------"
-#define	PRINT_DASHES		util_out_print(print_offset ? DASHES_YES_OFFSET : DASHES_NO_OFFSET, TRUE)
+#define	PRINT_DASHES		util_out_print(detail_specified ? DASHES_YES_OFFSET : DASHES_NO_OFFSET, TRUE)
 
-GBLREF	boolean_t	print_offset;
+GBLREF	boolean_t	detail_specified;
 
 void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance);
 void	repl_inst_dump_gtmsrclcl(gtmsrc_lcl_ptr_t gtmsrclcl_ptr);
-void	repl_inst_dump_triplehist(char *inst_fn, int4 num_triples);
+void	repl_inst_dump_history_records(char *inst_fn, int4 num_histinfo);
+void	repl_dump_histinfo(FILE *log_fp, boolean_t stamptime, boolean_t flush, char *start_text, repl_histinfo *cur_histinfo);
 void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl);
 void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,23 +35,19 @@
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 
+error_def(ERR_MUPCLIERR);
+error_def(ERR_TEXT);
+
 int gtmsource_losttncomplete(void)
 {
 	int			idx;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
-	sgmnt_addrs	*repl_csa;
-
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_TEXT);
+	sgmnt_addrs		*repl_csa;
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
-	/* We dont need the access control semaphore here. So release it first and avoid any potential deadlocks. */
-	if (0 != rel_sem(SOURCE, JNL_POOL_ACCESS_SEM))
-		rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in source server losttncomplete rel_sem"),
-				REPL_SEM_ERRNO);
 	assert(NULL == jnlpool.gtmsource_local);
 	repl_log(stderr, TRUE, TRUE, "Initiating LOSTTNCOMPLETE operation on instance [%s]\n",
-		jnlpool.repl_inst_filehdr->this_instname);
+		jnlpool.repl_inst_filehdr->inst_info.this_instname);
 	/* If this is a root primary instance, propagate this information to secondaries as well so they reset zqgblmod_seqno to 0.
 	 * If propagating primary, no need to send this to tertiaries as the receiver on the tertiary cannot have started with
 	 * non-zero "zqgblmod_seqno" to begin with (PRIMARYNOTROOT error would have been issued).
@@ -60,7 +56,7 @@ int gtmsource_losttncomplete(void)
 	{
 		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-		grab_lock(jnlpool.jnlpool_dummy_reg);
+		GRAB_LOCK(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
 		jnlpool.jnlpool_ctl->send_losttn_complete = TRUE;
 		gtmsourcelocal_ptr = jnlpool.gtmsource_local_array;
 		for (idx = 0; idx < NUM_GTMSRC_LCL; idx++, gtmsourcelocal_ptr++)
@@ -74,6 +70,11 @@ int gtmsource_losttncomplete(void)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 	}
 	/* Reset zqgblmod_seqno and zqgblmod_tn to 0 in this instance as well */
-	repl_inst_reset_zqgblmod_seqno_and_tn();
+	if (SS_NORMAL != repl_inst_reset_zqgblmod_seqno_and_tn())
+	{	/* Only reason we know of the above function returning error is in case of an online rollback. But, that's not
+		 * possible because we hold the access control semaphore at this point which online rollback needs at startup.
+		 */
+		assert(FALSE);
+	}
 	return (NORMAL_SHUTDOWN);
 }

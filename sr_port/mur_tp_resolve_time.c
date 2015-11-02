@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,17 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 		/* Assumption : It is guaranteed to see an EPOCH in every
 		 * "rctl->jctl->jfh->epoch_interval + MAX_EPOCH_DELAY" seconds. */
 		assert(max_lvrec_time >= rctl->jctl->jfh->epoch_interval + MAX_EPOCH_DELAY);
-		reg_tp_resolve_time = max_lvrec_time - rctl->jctl->jfh->epoch_interval - MAX_EPOCH_DELAY;
+		/* Calculate this region's TP resolve time based on the maximum of the last valid record across regions. If the
+		 * region is properly closed (typically this means that the journal file's crash field is FALSE. But, with online
+		 * rollback, crash field being TRUE, does not mean the journal file is crashed (as long as the shared memory for
+		 * that region existed when the region was opened). So, use jctl->properly_closed to determine whether the journal
+		 * file for the region is really crashed. If it is properly closed, the region's TP resolve time is the
+		 * max_lvrec_time. If not, we need to go back by an epoch interval in addition to the MAX_EPOCH_DELAY.
+		 */
+		if (!rctl->jctl->properly_closed)
+			reg_tp_resolve_time = max_lvrec_time - rctl->jctl->jfh->epoch_interval - MAX_EPOCH_DELAY;
+		else
+			reg_tp_resolve_time = max_lvrec_time;
 		if (rctl->lvrec_time > reg_tp_resolve_time)
 			reg_tp_resolve_time = rctl->lvrec_time;
 		if (reg_tp_resolve_time < jgbl.mur_tp_resolve_time)

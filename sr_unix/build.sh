@@ -154,7 +154,7 @@ tabfile
 
 # Compile maskpass.c
 $cc $cc_options $builddir/maskpass.c
-$ld $ld_common -o $builddir/maskpass $builddir/maskpass.o > $builddir/maskpass.map
+$ld $ld_common -o $builddir/maskpass $builddir/maskpass.o $options_libpath $crypto_libs > $builddir/maskpass.map
 bld_status=`expr $bld_status + $?`
 
 # Remove *.o files left over from the compilations above

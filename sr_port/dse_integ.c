@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,8 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 GBLREF block_id		patch_curr_blk;
 
+error_def(ERR_DSEBLKRDFAIL);
+
 #define MAX_UTIL_LEN 40
 
 void dse_integ(void)
@@ -41,9 +43,7 @@ void dse_integ(void)
 	int4		dummy_int, nocrit_present;
 	cache_rec_ptr_t	dummy_cr;
 	int		util_len;
-	boolean_t	was_crit;
-
-	error_def(ERR_DSEBLKRDFAIL);
+	boolean_t	was_crit, was_hold_onto_crit;
 
 	if (CLI_PRESENT == cli_present("BLOCK"))
 	{
@@ -65,13 +65,13 @@ void dse_integ(void)
 	util_out_print(util_buff, TRUE);
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (!(bp = t_qread(patch_curr_blk, &dummy_int, &dummy_cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (TRUE == cert_blk(gv_cur_region, patch_curr_blk, (blk_hdr_ptr_t)bp, 0, FALSE))
 		util_out_print("!/  No errors detected.!/", TRUE);
 	else
 		util_out_print(NULL, TRUE);
-	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	return;
 }

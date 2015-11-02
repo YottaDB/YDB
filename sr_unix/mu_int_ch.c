@@ -18,8 +18,8 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "error.h"
-#include "ftok_sems.h"
 #include "mu_gv_cur_reg_init.h"
+#include "db_ipcs_reset.h"
 
 GBLREF bool		region;
 GBLREF gd_region	*gv_cur_region;

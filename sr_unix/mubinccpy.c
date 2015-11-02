@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -90,6 +90,12 @@ GBLREF	int4			backup_write_errno;
 
 LITREF	mval			literal_null;
 
+error_def(ERR_BCKUPBUFLUSH);
+error_def(ERR_COMMITWAITSTUCK);
+error_def(ERR_DBCCERR);
+error_def(ERR_DBROLLEDBACK);
+error_def(ERR_ERRCALL);
+
 #ifdef DEBUG_INCBKUP
 #  define DEBUG_INCBKUP_ONLY(X) X
 #else
@@ -122,6 +128,13 @@ static	BFILE			*backup;
 void exec_write(BFILE *bf, char *buf, int nbytes);
 void tcp_write(BFILE *bf, char *buf, int nbytes);
 
+error_def(ERR_BCKUPBUFLUSH);
+error_def(ERR_COMMITWAITSTUCK);
+error_def(ERR_DBCCERR);
+error_def(ERR_ERRCALL);
+error_def(ERR_IOEOF);
+error_def(ERR_PERMGENFAIL);
+
 bool	mubinccpy (backup_reg_list *list)
 {
 	mstr			*file;
@@ -153,13 +166,9 @@ bool	mubinccpy (backup_reg_list *list)
 	struct stat		stat_buf;
 	int			group_id;
 	int			perm;
+	struct perm_diag_data	pdd;
 	DEBUG_INCBKUP_ONLY(int	blks_this_lmap;)
 	DEBUG_INCBKUP_ONLY(gtm_uint64_t backup_write_offset = 0;)
-
-	error_def(ERR_BCKUPBUFLUSH);
-	error_def(ERR_COMMITWAITSTUCK);
-	error_def(ERR_DBCCERR);
-	error_def(ERR_ERRCALL);
 
 	assert(list->reg == gv_cur_region);
 	assert(incremental);
@@ -203,10 +212,21 @@ bool	mubinccpy (backup_reg_list *list)
 			{
 				FSTAT_FILE(db_fd, &stat_buf, fstat_res);
 				if (-1 != fstat_res)
-					gtm_set_group_and_perm(&stat_buf, &group_id, &perm, (0770 & stat_buf.st_mode));
-				/* setup new group and permissions if indicated by the security rules.  Use 0770 anded with
-				 * current mode for the new mode if masked permission selected.
-				 */
+					if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_FILE, &pdd) < 0)
+					{
+						send_msg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+							ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
+							RTS_ERROR_STRING(((unix_db_info *)
+								(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
+							PERMGENDIAG_ARGS(pdd));
+						gtm_putmsg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+							ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
+							RTS_ERROR_STRING(((unix_db_info *)
+								(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
+							PERMGENDIAG_ARGS(pdd));
+						CLEANUP_AND_RETURN_FALSE;
+					}
+				/* setup new group and permissions if indicated by the security rules. */
 				if ((-1 == fstat_res) || (-1 == FCHMOD(backup->fd, perm))
 					|| ((-1 != group_id) && (-1 == fchown(backup->fd, -1, group_id))))
 				{
@@ -329,6 +349,13 @@ bool	mubinccpy (backup_reg_list *list)
 		CLEANUP_AND_RETURN_FALSE;
 	}
 	DEBUG_INCBKUP_ONLY(blks_this_lmap = 0);
+	if (cs_addrs->nl->onln_rlbk_pid)
+	{
+		gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+		free(outptr);
+		free(bm_blk_buff);
+		CLEANUP_AND_RETURN_FALSE;
+	}
 	for (blk_num_base = 0;  blk_num_base < header->trans_hist.total_blks;  blk_num_base += blks_per_buff)
 	{
 		if (online && (0 != cs_addrs->shmpool_buffer->failed))
@@ -350,11 +377,11 @@ bool	mubinccpy (backup_reg_list *list)
 		}
 		bptr = (blk_hdr *)bp;
 		/* The blocks we back up will be whatever version they are. There is no implicit conversion in this
-		   part of the backup/restore. Since we aren't even looking at the blocks (and indeed some of these blocks
-		   could potentially contain unintialized garbage data), we set the block version to GDSNOVER to signal
-		   that the block version is unknown. The above applies to "regular" blocks but not to bitmap blocks which
-		   we know are initialized. Because we have to read the bitmap blocks, they will be converted as necessary.
-		*/
+		 * part of the backup/restore. Since we aren't even looking at the blocks (and indeed some of these blocks
+		 * could potentially contain unintialized garbage data), we set the block version to GDSNOVER to signal
+		 * that the block version is unknown. The above applies to "regular" blocks but not to bitmap blocks which
+		 * we know are initialized. Because we have to read the bitmap blocks, they will be converted as necessary.
+		 */
 		for (i = 0; i < blks_per_buff; i++, bptr = (blk_hdr *)((char *)bptr + bsize))
 		{
 			blk_num = blk_num_base + i;
@@ -366,12 +393,19 @@ bool	mubinccpy (backup_reg_list *list)
 					   DB_LEN_STR(gv_cur_region), file->len, file->addr);
 				CLEANUP_AND_RETURN_FALSE;
 			}
+			if (cs_addrs->nl->onln_rlbk_pid)
+			{
+				gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+				free(outptr);
+				free(bm_blk_buff);
+				CLEANUP_AND_RETURN_FALSE;
+			}
 			/* Before we check if this block needs backing up, check if this is a new bitmap block or not. If it is,
-			   we can fall through and back it up as normal. But if this is NOT a bitmap block, use the
-			   existing bitmap to determine if this block has ever been allocated or not. If not, we don't want to
-			   even look at this block. It could be uninitialized which will just make things run slower if we
-			   go to read it and back it up.
-			*/
+			 * we can fall through and back it up as normal. But if this is NOT a bitmap block, use the
+			 * existing bitmap to determine if this block has ever been allocated or not. If not, we don't want to
+			 * even look at this block. It could be uninitialized which will just make things run slower if we
+			 * go to read it and back it up.
+			 */
 			if (0 != ((BLKS_PER_LMAP - 1) & blk_num))
 			{	/* Not a local bitmap block */
 				if (!gvcst_blk_ever_allocated(bm_blk_buff + SIZEOF(blk_hdr),
@@ -394,10 +428,10 @@ bool	mubinccpy (backup_reg_list *list)
 				}
 			} else
 			{	/* This is a bitmap block so save it into our bitmap block buffer. It is used as the
-				   basis of whether or not we have to process a given block or not. We process allocated and
-				   recycled blocks leaving free (never used) blocks alone as they have no data worth saving.
-				   But after saving it, upgrade it to the current format if necessary.
-				*/
+				 * basis of whether or not we have to process a given block or not. We process allocated and
+				 * recycled blocks leaving free (never used) blocks alone as they have no data worth saving.
+				 * But after saving it, upgrade it to the current format if necessary.
+				 */
 #ifdef DEBUG_INCBKUP
 				if (0 != blk_num)	/* Skip first time thorugh loop */
 				{
@@ -429,22 +463,36 @@ bool	mubinccpy (backup_reg_list *list)
 				blk_tn = ((blk_hdr_ptr_t)bm_blk_buff)->tn;
 			}
 			/* The conditions for backing up a block or ignoring it (in order of evaluation):
-
-			   1) If blk is larger than size of db at time backup was initiated, we ignore the block.
-			   2) Always backup blocks 0, 1, and 2 as these are the only blocks that can contain data
-			      and still have a transaction number of 0.
-			   3) For bitmap blocks, if blks_to_upgrd != 0 and the TN is 0 and the block number >=
-			      last_blk_at_last_bkup, then backup the block. This way we get the correct version of
-			      the bitmap block in the restore (otherwise have no clue what version to create them in
-			      as bitmaps are created with a TN of 0 when before image journaling is enabled).
-			   4) If the block TN is below our TN threshold, ignore the block.
-			   5) Else if none of the above conditions, backup the block.
-			*/
+			 * 1) If blk is larger than size of db at time backup was initiated, we ignore the block.
+			 * 2) Always backup blocks 0, 1, and 2 as these are the only blocks that can contain data
+			 *    and still have a transaction number of 0.
+			 * 3) For bitmap blocks, if blks_to_upgrd != 0 and the TN is 0 and the block number >=
+			 *    last_blk_at_last_bkup, then backup the block. This way we get the correct version of
+			 *    the bitmap block in the restore (otherwise have no clue what version to create them in
+			 *    as bitmaps are created with a TN of 0 when before image journaling is enabled).
+			 *    Given the possibility of a db file truncate occurring between backups, it is now possible
+			 *    for gdsfilext to create a new bitmap block such that blk_num < list->last_blk_at_last_bkup.
+			 *    This means the previous state (at the last backup) of a bitmap block with tn=0 is
+			 *    indeterminate: it might have held data and it might have had a different version. So
+			 *    backup all bitmap blocks with tn=0.
+			 *    One concern is that incremental backup files can end up somewhat larger (due to backing
+			 *    up extra bitmap blocks), even if no truncate occurred between backups. Users can zip their
+			 *    incremental backup files which should deflate almost all of the tn=0 bitmap blocks.
+			 *    Future enhancement: Instead of backing up bitmap blocks with tn=0, make a list of the
+			 *    the blk_nums and versions of all such blocks. The bitmap blocks can be created in
+			 *    mupip_restore from that information alone.
+			 * 4) If the block TN is below our TN threshold, ignore the block.
+			 * 5) Else if none of the above conditions, backup the block.
+			 */
 			if (online && (header->trans_hist.curr_tn <= blk_tn))
 				backup_this_blk = FALSE;
-			else if (3 > blk_num || (is_bitmap_blk && 0 != header->blks_to_upgrd && (trans_num)0 == blk_tn
-						 && blk_num >= list->last_blk_at_last_bkup))
+			else if ((3 > blk_num) || (is_bitmap_blk && (0 != header->blks_to_upgrd) && ((trans_num)0 == blk_tn)
+						 && (blk_num >= list->last_blk_at_last_bkup)))
 				backup_this_blk = TRUE;
+#			ifdef GTM_TRUNCATE
+			else if (is_bitmap_blk && ((trans_num)0 == blk_tn))
+				backup_this_blk = TRUE;
+#			endif
 			else if ((blk_tn < list->tn))
 				backup_this_blk = FALSE;
 			else
@@ -473,17 +521,25 @@ bool	mubinccpy (backup_reg_list *list)
 		DEBUG_INCBKUP_ONLY(PRINTF("Dumped %d blks from lcl bitmap blk 0x%016lx\n", blks_this_lmap,
 					  (blk_num & ~(BLKS_PER_LMAP - 1))));
 	}
-
+	if (cs_addrs->nl->onln_rlbk_pid)
+	{
+		gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+		free(outptr);
+		free(bm_blk_buff);
+		CLEANUP_AND_RETURN_FALSE;
+	}
+	/* After this point, if an Online Rollback is detected, the BACKUP will NOT e affected as all the before images it needs
+	 * is already written by GT.M in the temporary file and the resulting BACKUP will be valid*/
 	/* ============================ write saved information for online backup ========================== */
 	if (online && (0 == cs_addrs->shmpool_buffer->failed))
 	{
 		cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 		/* By getting crit here, we ensure that there is no process still in transaction logic that sees
-		   (nbb != BACKUP_NOT_IN_PRORESS). After rel_crit(), any process that enters transaction logic will
-		   see (nbb == BACKUP_NOT_IN_PRORESS) because we just set it to that value. At this point, backup
-		   buffer is complete and there will not be any more new entries in the backup buffer until the next
-		   backup.
-		*/
+		 * (nbb != BACKUP_NOT_IN_PRORESS). After rel_crit(), any process that enters transaction logic will
+		 * see (nbb == BACKUP_NOT_IN_PRORESS) because we just set it to that value. At this point, backup
+		 * buffer is complete and there will not be any more new entries in the backup buffer until the next
+		 * backup.
+		 */
 		assert(!cs_addrs->hold_onto_crit); /* this ensures we can safely do unconditional grab_crit and rel_crit */
 		grab_crit(gv_cur_region);
 		assert(cs_data == cs_addrs->hdr);
@@ -718,7 +774,6 @@ CONDITION_HANDLER(iob_io_error1)
 	int	dummy1, dummy2;
 	char	s[80];
 	char	*fgets_res;
-	error_def(ERR_IOEOF);
 
 	START_CH;
 	if (SIGNAL == ERR_IOEOF)
@@ -741,7 +796,6 @@ CONDITION_HANDLER(iob_io_error2)
 {
 	int	dummy1, dummy2;
 	char	s[80];
-	error_def(ERR_IOEOF);
 
 	START_CH;
 	PRN_ERROR;

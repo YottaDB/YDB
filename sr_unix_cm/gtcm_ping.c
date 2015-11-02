@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,8 @@
 #include <netinet/ip_icmp.h>
 #endif
 #include "omi.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 #if (defined(__CYGWIN__) || defined(__MVS__)) && !defined(ICMP_ECHO)
 /* Note that we may actually need to use Windows sockets for icmp for now */
@@ -99,7 +101,7 @@ int init_ping(void)
     ident = getpid() & 0xFFFF;
     if (!(proto = getprotobyname("icmp")))
     {
-	    (void)fprintf(stderr, "ping: unknown protocol icmp.\n");
+	    FPRINTF(stderr, "ping: unknown protocol icmp.\n");
 	    pingsock = -1;
 	    return pingsock;
     }
@@ -131,7 +133,7 @@ int icmp_ping(int conn)
 
 	if (pingsock < 0)
 	{
-		fprintf(stderr,"icmp_ping:  no ping socket.\n");
+		FPRINTF(stderr,"icmp_ping:  no ping socket.\n");
 		exit(1);
 	}
 	if (getpeername(conn, (struct sockaddr *)&paddr, (GTM_SOCKLEN_TYPE *)&paddr_len) < 0)
@@ -169,7 +171,7 @@ int icmp_ping(int conn)
 		if ((he = gethostbyaddr(paddr.sin_addr.s_addr, SIZEOF(paddr.sin_addr.s_addr), 0)))
 			host = he->h_name;
 #else
-	 (void) sprintf(msg, "%d.%d.%d.%d",
+	 SPRINTF(msg, "%d.%d.%d.%d",
 		   paddr.sin_addr.s_addr >> 24,
 		   paddr.sin_addr.s_addr >> 16 & 0xFF,
 		   paddr.sin_addr.s_addr >> 8 & 0xFF,
@@ -198,7 +200,7 @@ int get_ping_rsp(void)
 
 	if (pingsock < 0)
 	{
-		fprintf(stderr,"icmp_ping:  no ping socket.\n");
+		FPRINTF(stderr,"icmp_ping:  no ping socket.\n");
 		exit(1);
 	}
 	fromlen = SIZEOF(from);
@@ -224,7 +226,7 @@ int get_ping_rsp(void)
 					SIZEOF(from.sin_addr.s_addr), 0)))
 			host = he->h_name;
 #else
-	 (void) sprintf(msg, "%d.%d.%d.%d",
+	 SPRINTF(msg, "%d.%d.%d.%d",
 		   from.sin_addr.s_addr >> 24,
 		   from.sin_addr.s_addr >> 16 & 0xFF,
 		   from.sin_addr.s_addr >> 8 & 0xFF,

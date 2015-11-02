@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +104,8 @@ error_def(ERR_GVPUTFAIL);
 sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out)
 	/* cycle is used in t_end to detect if the buffer has been refreshed since the t_qread */
 {
-	uint4			status, blocking_pid;
+	int4			status;
+	uint4			blocking_pid;
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
 	boolean_t		clustered, hold_onto_crit, was_crit;
@@ -383,6 +384,13 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							rdfail_detail = cdb_sc_lostcr;
 							return (sm_uc_ptr_t)NULL;
 						}
+					}
+					if (-1 == status)
+					{
+						/* could have been concurrent truncate, and we read a blk >= csa->ti->total_blks */
+						/* restart */
+						rdfail_detail = cdb_sc_truncate;
+						return (sm_uc_ptr_t)NULL;
 					} else
 						rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
 				}

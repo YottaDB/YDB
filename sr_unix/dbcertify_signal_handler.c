@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,8 @@
 #include "gdsfhead.h"
 #include "v15_gdsfhead.h"
 #include "gdsblkops.h"
+#include "gtmio.h"
+#include "have_crit.h"
 #include "dbcertify.h"
 
 /* These fields are defined as globals not because they are used globally but
@@ -60,26 +62,26 @@ GBLREF	boolean_t		created_core;
 GBLREF	boolean_t		need_core;
 GBLREF	uint4			process_id;
 GBLREF	volatile int4		exit_state;
-GBLREF	volatile boolean_t	core_in_progress;
+GBLREF	volatile unsigned int	core_in_progress;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	phase_static_area	*psa_gbl;
 
 LITREF	gtmImageName		gtmImageNames[];
 
+error_def(ERR_FORCEDHALT);
+error_def(ERR_KILLBYSIG);
+error_def(ERR_KILLBYSIGUINFO);
+error_def(ERR_KILLBYSIGSINFO1);
+error_def(ERR_KILLBYSIGSINFO2);
+error_def(ERR_KILLBYSIGSINFO3);
+error_def(ERR_KRNLKILL);
+
 void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	boolean_t	exit_now;
 	gtm_sigcontext_t	*context_ptr;
 	void		(*signal_routine)();
-
-	error_def(ERR_KRNLKILL);
-	error_def(ERR_FORCEDHALT);
-	error_def(ERR_KILLBYSIG);
-	error_def(ERR_KILLBYSIGUINFO);
-	error_def(ERR_KILLBYSIGSINFO1);
-	error_def(ERR_KILLBYSIGSINFO2);
-	error_def(ERR_KILLBYSIGSINFO3);
 
 	/* Save parameter value in global variables for easy access in core */
 	dont_want_core = FALSE;		/* (re)set in case we recurse */
@@ -116,7 +118,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 					else
 						exit(sig);
 				}
-				core_in_progress = TRUE;
+				++core_in_progress;
 				DUMP_CORE;
 				GTMASSERT;
 			default:
@@ -281,7 +283,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			}
 			break;
 	} /* switch (sig) */
-	fflush(stdout);
+	FFLUSH(stdout);
 	if (!dont_want_core)
 	{
 		need_core = TRUE;

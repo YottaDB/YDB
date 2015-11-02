@@ -1,6 +1,6 @@
 ##################################################################
 #								#
-#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -46,11 +46,6 @@
 .extern	push_parm
 .extern	rts_error
 
-Grp5_Prefix	=	0x0ff		# escape for CALL_Ev opcode
-CALL_Ev		=	0x010		# CALL_Ev part of ModR/M byte
-reg_opcode_mask	=	0x038
-ISFORMAL	=	0x488		# xf_isformal*8
-
 arg0_off        =       -56
 act_cnt         =       -48
 mask_arg        =       -44
@@ -84,21 +79,12 @@ l1:	movq	0(REG64_ARG1),REG64_ACCUM
 	movslq	0(REG64_ACCUM),REG64_ARG2
 	addq	REG_XFER_TABLE,REG64_ARG2
 
-	movq	mrt_lnk_ptr(REG64_ARG0),REG64_ARG1
-        cmpb    $Grp5_Prefix,0(REG64_ARG2)
-	jne	l6
-	movb	1(REG64_ARG2),REG8_ARG3
-	andb	$reg_opcode_mask,REG8_ARG3
-	cmpb	$CALL_Ev,REG8_ARG3
-	jne	l6
-	cmpl    $ISFORMAL,2(REG64_ARG2)
-	jne	l6
-	call	new_stack_frame
+	addq	$8,REG64_ARG1			# labaddr += 8, to point to has_parms
+	cmpl	$0,0(REG64_ARG1)		# if has_parms == 0, then issue an error
+	je	l6
 
-	movq    frame_pointer(REG_IP),REG64_ARG2
-        movq    msf_old_frame_off(REG64_ARG2),REG64_ACCUM
-        movq    REG64_ACCUM,frame_pointer(REG_IP)
-        movq    REG64_ARG2,sav_msf(REG_FRAME_POINTER)
+	movq	mrt_lnk_ptr(REG64_ARG0),REG64_ARG1
+	call	new_stack_frame
 
         movl    act_cnt(REG_FRAME_POINTER),REG32_ACCUM
 	cmpl    $0,REG32_ACCUM
@@ -120,11 +106,8 @@ no_arg: movl	act_cnt(REG_FRAME_POINTER),REG32_ARG4
 	andl   	$1,REG32_ARG1
 	movl   	act_cnt(REG_FRAME_POINTER),REG32_ARG0
 	addl   	$4,REG32_ARG0			# include: $T(just pushed) plus other 3
-	movb    $0,     REG8_ACCUM             # variable length argument
-	call	push_parm		# push_parm (total, $T, ret_value, mask, argc [,arg1, arg2, ...]);
-	movq    sav_msf(REG_FRAME_POINTER),REG64_ACCUM
-        movq    REG64_ACCUM,frame_pointer(REG_IP)
-        orw     $SFT_EXTFUN,msf_typ_off(REG64_ACCUM)
+	movb    $0,REG8_ACCUM			# variable length argument
+	call	push_parm			# push_parm (total, $T, ret_value, mask, argc [,arg1, arg2, ...]);
 retlab:	leave
 	popq	REG_XFER_TABLE
 	getframe
@@ -132,8 +115,8 @@ retlab:	leave
 
 l3:	cmpq	$0,REG64_ARG1
 	jne	l5
-	subq    $8,REG_SP			 # Pass the SP as 2nd argument to auto_zlink.
-        movq    REG_SP,REG64_ARG1		 # auto_zlink will populate this with labaddr
+	subq    $8,REG_SP			# Pass the SP as 2nd argument to auto_zlink.
+        movq    REG_SP,REG64_ARG1		# auto_zlink will populate this with labaddr
         movq    frame_pointer(REG_IP),REG64_ARG2
         movq    msf_mpc_off(REG64_ARG2),REG64_ARG0
 	call	auto_zlink
@@ -145,7 +128,7 @@ l3:	cmpq	$0,REG64_ARG1
 	jne	l1
 l4:	movl	ERR_GTMCHECK(REG_IP),REG32_ARG1
 	movl	$1,REG32_ARG0
-	movb    $0,     REG8_ACCUM             # variable length argument
+	movb    $0,     REG8_ACCUM		# variable length argument
 	call	rts_error
 	jmp	retlab
 

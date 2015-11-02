@@ -31,12 +31,13 @@
 
 LITREF	mval			literal_ten;
 
-error_def(ERR_TRIGDEFBAD);
-error_def(ERR_GTMASSERT);
 error_def(ERR_ASSERT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
 error_def(ERR_MEMORY);
 error_def(ERR_OUTOFSPACE);
+error_def(ERR_TRIGDEFBAD);
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;

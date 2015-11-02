@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,11 +26,11 @@ error_def(ERR_STACKOFLOW);
 
 void copy_stack_frame(void)
 {
-	register stack_frame *sf;
-	unsigned char	*msp_save;
+	register stack_frame	*sf;
+	unsigned char		*msp_save;
 
 	msp_save = msp;
-	sf = (stack_frame *) (msp -= SIZEOF(stack_frame));
+	sf = (stack_frame *)(msp -= SIZEOF(stack_frame));
 	if (msp <= stackwarn)
 	{
 		if (msp <= stacktop)
@@ -46,6 +46,8 @@ void copy_stack_frame(void)
 	sf->old_frame_pointer = frame_pointer;
 	sf->flags = 0;		/* Don't propagate special flags */
 	sf->for_ctrl_stack = NULL;
+	sf->ret_value = NULL;
+	sf->dollar_test = -1;	/* initialize it with -1 for indication of not yet being used */
 	frame_pointer = sf;
 	DBGEHND((stderr, "copy_stack_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr"\n",
 		 sf, msp_save, msp));

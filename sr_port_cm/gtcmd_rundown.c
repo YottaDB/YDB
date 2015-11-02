@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,11 +104,6 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 			gd_ht_kill(region->reg_hash, TRUE);	/* TRUE to free up the table and the gv_targets it holds too */
 			FREE_CSA_DIR_TREE(cs_addrs);
 			cm_del_gdr_ptr(gv_cur_region);
-		} else if (0 < refcnt)
-		{
-			assert(gv_cur_region->open); /* there is no reason we know of why a region should be closed at this point */
-			if (gv_cur_region->open)     /* in pro, be safe though and dont try running down an already closed region */
-				wcs_timer_start(gv_cur_region, TRUE);
 		}
 		que_next = (cm_region_list *)((unsigned char *)ptr + ptr->regque.fl);
 		que_last = (cm_region_list *)((unsigned char *)ptr + ptr->regque.bl);

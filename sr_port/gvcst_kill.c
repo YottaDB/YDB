@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,6 +92,7 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 GBLREF	stack_frame		*frame_pointer;
+GBLREF	boolean_t		gv_play_duplicate_kills;
 #ifdef GTM_TRIGGER
 GBLREF	int			tprestart_state;
 GBLREF	int4			gtm_trigger_depth;
@@ -99,12 +100,15 @@ GBLREF	int4			tstart_trigger_depth;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
 GBLREF	mval			dollar_ztwormhole;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 #endif
 #ifdef DEBUG
-GBLREF char			*update_array, *update_array_ptr;
-GBLREF uint4			update_array_size; /* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
+GBLREF	char			*update_array, *update_array_ptr;
+GBLREF	uint4			update_array_size; /* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
+GBLREF	jnl_gbls_t		jgbl;
 #endif
 
+GTMTRIG_ONLY(error_def(ERR_DBROLLEDBACK);)
 error_def(ERR_TPRETRY);
 error_def(ERR_GVKILLFAIL);
 
@@ -115,7 +119,8 @@ LITREF	mval	*fndata_table[2][2];
 
 void	gvcst_kill(bool do_subtree)
 {
-	bool			clue, flush_cache;
+	block_id		gvt_root;
+	boolean_t		clue, flush_cache;
 	boolean_t		next_fenced_was_null, write_logical_jnlrecs, jnl_format_done;
 	boolean_t		left_extra, right_extra;
 	cw_set_element		*tp_cse;
@@ -129,12 +134,13 @@ void	gvcst_kill(bool do_subtree)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*left,*right;
-	srch_hist		*alt_hist;
+	srch_hist		*gvt_hist, *alt_hist, *dir_hist;
 	srch_rec_status		*left_rec_stat, local_srch_rec;
 	uint4			segment_update_array_size;
 	unsigned char		*base;
 	int			lcl_dollar_tlevel, rc;
 	uint4			nodeflags;
+	gv_namehead		*save_targ;
 	sgm_info		*si;
 #	ifdef GTM_TRIGGER
 	mint			dlr_data;
@@ -143,10 +149,11 @@ void	gvcst_kill(bool do_subtree)
 	gtm_trigger_parms	trigparms;
 	gvt_trigger_t		*gvt_trigger;
 	gvtr_invoke_parms_t	gvtr_parms;
-	int			gtm_trig_status;
+	int			gtm_trig_status, idx;
 	unsigned char		*save_msp;
 	mv_stent		*save_mv_chain;
 	mval			*ztold_mval = NULL, ztvalue_new, ztworm_val;
+	DEBUG_ONLY(enum cdb_sc	save_cdb_status;)
 #	endif
 #	ifdef DEBUG
 	boolean_t		is_mm;
@@ -161,8 +168,7 @@ void	gvcst_kill(bool do_subtree)
 	DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth));
 	GTMTRIG_ONLY(
 		TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(gv_cur_region, csa);
-		assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));
-		if (!dollar_tlevel || (gtm_trigger_depth == tstart_trigger_depth))
+		if (IS_EXPLICIT_UPDATE)
 		{	/* This is an explicit update. Set ztwormhole_used to FALSE. Note that we initialize this only at the
 			 * beginning of the transaction and not at the beginning of each try/retry. If the application used
 			 * $ztwormhole in any retsarting try of the transaction, we consider it necessary to write the
@@ -190,7 +196,6 @@ void	gvcst_kill(bool do_subtree)
 	assert(NULL != update_array_ptr);
 	assert(0 != update_array_size);
 	assert(update_array + update_array_size >= update_array_ptr);
-	alt_hist = gv_target->alt_hist;
 	GTMTRIG_ONLY(
 		lcl_implicit_tstart = FALSE;
 		trigparms.ztvalue_new = NULL;
@@ -199,6 +204,63 @@ void	gvcst_kill(bool do_subtree)
 	for (;;)
 	{
 		actual_update = 0;
+		/* Need to reinitialize gvt_hist & alt_hist for each try as it might have got set to a value in the previous
+		 * retry that is inappropriate for this try (e.g. gvt_root value changed between tries).
+		 */
+		gvt_hist = &gv_target->hist;
+		gvt_root = gv_target->root;	/* refetch root in case it changed due to retries in this for loop */
+		if (!gvt_root)
+		{
+			assert(gv_play_duplicate_kills);
+			/* No GVT for this global. So nothing to kill. But since we have to play the duplicate kill
+			 * (asserted above) we cannot return at this point. There are two cases.
+			 * (1) If we hold crit on the region at this point, then there is no way a concurrent update
+			 *	could create a GVT for this global. So no ned of any extra history recordkeeping.
+			 * (2) If we dont hold crit though, this scenario is possible. Handle this by searching for
+			 *	the global name in the directory tree and verifying that it is still missing.
+			 *	a) If YES, then pass this history on to t_end/tp_hist as part of the duplicate kill play action.
+			 *	   This way we make sure no other process concurrently creates the GVT while we process this
+			 *	   duplicate kill transaction.
+			 *	b) If NO, then some other process has created a GVT for this global after we started this
+			 *	   transaction. In this case we will have to first get the non-zero root block number of this
+			 *	   GVT and then use it in the rest of this function. Use the function "gvcst_redo_root_search"
+			 *	   for this purpose. It is possible that the root block is set to 0 even after the call to the
+			 *	   above function (because of a concurrent KILL of this GVT after we saw a non-zero value but
+			 *	   before the "gvcst_redo_root_search" invocation). In this case, we are back to square one.
+			 *	   So we redo the logic in this entire comment again each time going through t_retry.
+			 *	   In the 3rd retry, we will get crit and that time we will break out of this block of code
+			 *	   and move on to the real kill.
+			 */
+			alt_hist = NULL;
+			if (csa->now_crit)
+			{	/* Case (1) : Clear history in case this gets passed to t_end/tp_hist later below */
+				gvt_hist->h[0].blk_num = 0;
+			} else
+			{	/* Case (2) : Search for global name in directory tree */
+				save_targ = gv_target;
+				SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;	/* set up gv_altkey to be just the gblname */
+				gv_target = csa->dir_tree;
+				dir_hist = &gv_target->hist;
+				cdb_status = gvcst_search(gv_altkey, NULL);
+				RESET_GV_TARGET_LCL(save_targ);
+				if (cdb_sc_normal != cdb_status)
+				{	/* Retry the transaction. But reset directory tree clue as it is suspect at this point.
+					 * Needed as t_retry only resets clue of gv_target which is not the directory tree anymore.
+					 */
+					csa->dir_tree->clue.end = 0;
+					goto retry;
+				}
+				if ((gv_altkey->end + 1) == dir_hist->h[0].curr_rec.match)
+				{	/* Case (2b) : GVT now exists for this global */
+					cdb_status = cdb_sc_gvtrootmod;
+					goto retry;
+				} else
+				{	/* Case (2a) : GVT does not exist for this global */
+					gvt_hist = dir_hist;	/* validate directory tree history in t_end/tp_hist */
+				}
+			}
+		} else
+			alt_hist = gv_target->alt_hist;
 		DEBUG_ONLY(dbg_research_cnt = 0;)
 		jnl_format_done = FALSE;
 		write_logical_jnlrecs = JNL_WRITE_LOGICAL_RECS(csa);
@@ -206,7 +268,11 @@ void	gvcst_kill(bool do_subtree)
 		gvtr_parms.num_triggers_invoked = 0;	/* clear any leftover value */
 		dlr_data = 0;
 		is_tpwrap = FALSE;
-		if (!skip_dbtriggers) /* No trigger init needed if skip_dbtriggers is TRUE (e.g. mupip load etc.) */
+		/* No trigger init needed if skip_dbtriggers is TRUE (e.g. mupip load etc.).
+		 * Also if gvt_root is 0 (possible only if gv_play_duplicate_kills is TRUE) we want to only journal the
+		 * kill but not touch the database or invoke triggers. So skip triggers in that case too.
+		 */
+		if (!skip_dbtriggers && gvt_root)
 		{
 			GVTR_INIT_AND_TPWRAP_IF_NEEDED(csa, csd, gv_target, gvt_trigger, lcl_implicit_tstart, is_tpwrap,
 							ERR_GVKILLFAIL);
@@ -242,7 +308,6 @@ void	gvcst_kill(bool do_subtree)
 					}
 					gvtr_parms.gvtr_cmd = do_subtree ? GVTR_CMDTYPE_KILL : GVTR_CMDTYPE_ZKILL;
 					gvtr_parms.gvt_trigger = gvt_trigger;
-					/* gvtr_parms.duplicate_set : No need to initialize as it is SET-specific */
 					/* Now that we have filled in minimal information, let "gvtr_match_n_invoke" do the rest */
 					gtm_trig_status = gvtr_match_n_invoke(&trigparms, &gvtr_parms);
 					assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
@@ -286,116 +351,123 @@ void	gvcst_kill(bool do_subtree)
 		}
 		clue = (0 != gv_target->clue.end);
 research:
-		if (cdb_sc_normal != (cdb_status = gvcst_search(gv_currkey, NULL)))
-			goto retry;
-		assert(gv_altkey->top == gv_currkey->top);
-		assert(gv_altkey->top == gv_keysize);
-		end = gv_currkey->end;
-		assert(end < gv_currkey->top);
-		memcpy(gv_altkey, gv_currkey, SIZEOF(gv_key) + end);
-		base = &gv_altkey->base[0];
-		if (do_subtree)
+		if (gvt_root)
 		{
-			base[end - 1] = 1;
-			assert(KEY_DELIMITER == base[end]);
-			base[++end] = KEY_DELIMITER;
-		} else
-		{
-			base[end] = 1;
-			base[++end] = KEY_DELIMITER;
-			base[++end] = KEY_DELIMITER;
-		}
-		gv_altkey->end = end;
-		if (cdb_sc_normal != (cdb_status = gvcst_search(gv_altkey, alt_hist)))
-			goto retry;
-		if (alt_hist->depth != gv_target->hist.depth)
-		{
-			cdb_status = cdb_sc_badlvl;
-			goto retry;
-		}
-		right_extra = FALSE;
-		left_extra = TRUE;
-		for (lev = 0; 0 != gv_target->hist.h[lev].blk_num; ++lev)
-		{
-			left = &gv_target->hist.h[lev];
-			right = &alt_hist->h[lev];
-			assert(0 != right->blk_num);
-			left_rec_stat = left_extra ? &left->prev_rec : &left->curr_rec;
-			if (left->blk_num == right->blk_num)
+			if (cdb_sc_normal != (cdb_status = gvcst_search(gv_currkey, NULL)))
+				goto retry;
+			assert(gv_altkey->top == gv_currkey->top);
+			assert(gv_altkey->top == gv_keysize);
+			end = gv_currkey->end;
+			assert(end < gv_currkey->top);
+			memcpy(gv_altkey, gv_currkey, SIZEOF(gv_key) + end);
+			base = &gv_altkey->base[0];
+			if (do_subtree)
 			{
-				cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat, right->curr_rec,
-								right_extra, &tp_cse);
-				assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
-				assert( dollar_tlevel || (NULL == tp_cse));
-				if (tp_cse)
-					actual_update = UPDTRNS_DB_UPDATED_MASK;
-				if (cdb_sc_normal == cdb_status)
-					break;
-				gv_target->clue.end = 0;/* If need to go up from leaf (or higher), history will cease to be valid */
-				if (clue)
-				{	/* Clue history valid only for data block, need to re-search */
-					clue = FALSE;
-					DEBUG_ONLY(dbg_research_cnt++;)
-					goto research;
-				}
-				if (cdb_sc_delete_parent != cdb_status)
-					goto retry;
-				left_extra = right_extra
-					   = TRUE;
+				base[end - 1] = 1;
+				assert(KEY_DELIMITER == base[end]);
+				base[++end] = KEY_DELIMITER;
 			} else
 			{
-				gv_target->clue.end = 0; /* If more than one block involved, history will cease to be valid */
-				if (clue)
-				{	/* Clue history valid only for data block, need to re-search */
-					clue = FALSE;
-					DEBUG_ONLY(dbg_research_cnt++;)
-					goto research;
+				base[end] = 1;
+				base[++end] = KEY_DELIMITER;
+				base[++end] = KEY_DELIMITER;
+			}
+			gv_altkey->end = end;
+			if (cdb_sc_normal != (cdb_status = gvcst_search(gv_altkey, alt_hist)))
+				goto retry;
+			if (alt_hist->depth != gvt_hist->depth)
+			{
+				cdb_status = cdb_sc_badlvl;
+				goto retry;
+			}
+			right_extra = FALSE;
+			left_extra = TRUE;
+			for (lev = 0; 0 != gvt_hist->h[lev].blk_num; ++lev)
+			{
+				left = &gvt_hist->h[lev];
+				right = &alt_hist->h[lev];
+				assert(0 != right->blk_num);
+				left_rec_stat = left_extra ? &left->prev_rec : &left->curr_rec;
+				if (left->blk_num == right->blk_num)
+				{
+					cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat, right->curr_rec,
+									right_extra, &tp_cse);
+					assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
+					assert( dollar_tlevel || (NULL == tp_cse));
+					if (tp_cse)
+						actual_update = UPDTRNS_DB_UPDATED_MASK;
+					if (cdb_sc_normal == cdb_status)
+						break;
+					gv_target->clue.end = 0; /* If need to go up from leaf (or higher), history wont be valid */
+					if (clue)
+					{	/* Clue history valid only for data block, need to re-search */
+						clue = FALSE;
+						DEBUG_ONLY(dbg_research_cnt++;)
+						goto research;
+					}
+					if (cdb_sc_delete_parent != cdb_status)
+						goto retry;
+					left_extra = right_extra
+						   = TRUE;
+				} else
+				{
+					gv_target->clue.end = 0; /* If more than one block involved, history will not be valid */
+					if (clue)
+					{	/* Clue history valid only for data block, need to re-search */
+						clue = FALSE;
+						DEBUG_ONLY(dbg_research_cnt++;)
+						goto research;
+					}
+					local_srch_rec.offset = ((blk_hdr_ptr_t)left->buffaddr)->bsiz;
+					local_srch_rec.match = 0;
+					cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat,
+										local_srch_rec, FALSE, &tp_cse);
+					assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
+					assert( dollar_tlevel || (NULL == tp_cse));
+					if (tp_cse)
+						actual_update = UPDTRNS_DB_UPDATED_MASK;
+					if (cdb_sc_normal == cdb_status)
+						left_extra = FALSE;
+					else if (cdb_sc_delete_parent == cdb_status)
+					{
+						left_extra = TRUE;
+						cdb_status = cdb_sc_normal;
+					} else
+						goto retry;
+					local_srch_rec.offset = local_srch_rec.match
+							      = 0;
+					cdb_status = gvcst_kill_blk(right, lev, gv_altkey, local_srch_rec, right->curr_rec,
+									right_extra, &tp_cse);
+					assert(!dollar_tlevel || (NULL == tp_cse) || (right->cse == tp_cse));
+					assert( dollar_tlevel || (NULL == tp_cse));
+					if (tp_cse)
+						actual_update = UPDTRNS_DB_UPDATED_MASK;
+					if (cdb_sc_normal == cdb_status)
+						right_extra = FALSE;
+					else if (cdb_sc_delete_parent == cdb_status)
+					{
+						right_extra = TRUE;
+						cdb_status = cdb_sc_normal;
+					} else
+						goto retry;
 				}
-				local_srch_rec.offset = ((blk_hdr_ptr_t)left->buffaddr)->bsiz;
-				local_srch_rec.match = 0;
-				cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat, local_srch_rec, FALSE, &tp_cse);
-				assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
-				assert( dollar_tlevel || (NULL == tp_cse));
-				if (tp_cse)
-					actual_update = UPDTRNS_DB_UPDATED_MASK;
-				if (cdb_sc_normal == cdb_status)
-					left_extra = FALSE;
-				else if (cdb_sc_delete_parent == cdb_status)
-				{
-					left_extra = TRUE;
-					cdb_status = cdb_sc_normal;
-				} else
-					goto retry;
-				local_srch_rec.offset = local_srch_rec.match
-						      = 0;
-				cdb_status = gvcst_kill_blk(right, lev, gv_altkey, local_srch_rec, right->curr_rec,
-								right_extra, &tp_cse);
-				assert(!dollar_tlevel || (NULL == tp_cse) || (right->cse == tp_cse));
-				assert( dollar_tlevel || (NULL == tp_cse));
-				if (tp_cse)
-					actual_update = UPDTRNS_DB_UPDATED_MASK;
-				if (cdb_sc_normal == cdb_status)
-					right_extra = FALSE;
-				else if (cdb_sc_delete_parent == cdb_status)
-				{
-					right_extra = TRUE;
-					cdb_status = cdb_sc_normal;
-				} else
-					goto retry;
 			}
 		}
-		if (!dollar_tlevel)
-		{
-			assert(!jnl_format_done);
-			assert(0 == actual_update); /* for non-TP, tp_cse is NULL even if cw_set_depth is non-zero */
-			if (0 != cw_set_depth)
-				actual_update = UPDTRNS_DB_UPDATED_MASK;
-			/* reset update_trans (to potentially non-zero value) in case it got set to 0 in previous retry */
-			/* do not treat redundant KILL as an update-transaction */
-			update_trans = actual_update;
-		} else
-		{
-			GTMTRIG_ONLY(
+		if (!gv_play_duplicate_kills)
+		{	/* Determine whether the kill is going to update the db or not. If not, skip the kill altogether.
+			 * The variable "actual_update" is set accordingly below.
+			 */
+			if (!dollar_tlevel)
+			{
+				assert(!jnl_format_done);
+				assert(0 == actual_update); /* for non-TP, tp_cse is NULL even if cw_set_depth is non-zero */
+				if (0 != cw_set_depth)
+					actual_update = UPDTRNS_DB_UPDATED_MASK;
+				/* Reset update_trans (to potentially non-zero value) in case it got set to 0 in previous retry. */
+				update_trans = actual_update;
+			} else
+			{
+#				ifdef GTM_TRIGGER
 				if (!actual_update) /* possible only if the node we are attempting to KILL does not exist now */
 				{	/* Note that it is possible that the node existed at the time of the "gvcst_dataget" but
 					 * got killed later when we did the gvcst_search (right after the "research:" label). This
@@ -409,7 +481,7 @@ research:
 					 * the database) since we will be restarting anyways. For ZKILL, check if dlr_data was
 					 * 1 or 11 and for KILL, check if it was 1, 10 or 11.
 					 */
-					DEBUG_ONLY(
+#						ifdef DEBUG
 						if (!gvtr_parms.num_triggers_invoked && (do_subtree ? dlr_data : (dlr_data & 1)))
 						{	/* Triggers were not invoked but still the node that existed a few
 							 * steps above does not exist now. This is a restartable situation.
@@ -418,20 +490,46 @@ research:
 							assert(!skip_dbtriggers);
 							TREF(donot_commit) |= DONOTCOMMIT_GVCST_KILL_ZERO_TRIGGERS;
 						}
-					)
+#						endif
 					if (do_subtree ? dlr_data : (dlr_data & 1))
 						actual_update = UPDTRNS_DB_UPDATED_MASK;
 				}
-			)
-			NON_GTMTRIG_ONLY(assert(!jnl_format_done));
-			assert(!actual_update || si->cw_set_depth
-							GTMTRIG_ONLY(|| gvtr_parms.num_triggers_invoked || TREF(donot_commit)));
-			assert(!(prev_update_trans & ~UPDTRNS_VALID_MASK));
-			if (!actual_update)
-				si->update_trans = prev_update_trans;	/* restore status prior to redundant KILL */
+#				endif
+				NON_GTMTRIG_ONLY(assert(!jnl_format_done));
+				assert(!actual_update || si->cw_set_depth
+						GTMTRIG_ONLY(|| gvtr_parms.num_triggers_invoked || TREF(donot_commit)));
+				assert(!(prev_update_trans & ~UPDTRNS_VALID_MASK));
+				if (!actual_update)
+					si->update_trans = prev_update_trans;	/* restore status prior to redundant KILL */
+			}
+		} else
+		{	/* Since "gv_play_duplicate_kills" is set, irrespective of whether the node/subtree to be
+			 * killed exists or not in the db, consider this as a db-updating kill.
+			 */
+			if (!dollar_tlevel)
+			{
+				assert(!jnl_format_done);
+				assert(0 == actual_update); /* for non-TP, tp_cse is NULL even if cw_set_depth is non-zero */
+				/* See comment above IS_OK_TO_INVOKE_GVCST_KILL macro for why the below assert is the way it is */
+				assert(!jgbl.forw_phase_recovery || cw_set_depth || (JS_IS_DUPLICATE & jgbl.mur_jrec_nodeflags)
+						|| jgbl.mur_options_forward);
+				if (0 != cw_set_depth)
+					actual_update = UPDTRNS_DB_UPDATED_MASK;
+				/* Set update_trans to TRUE unconditionally since we want to play duplicate kills */
+				update_trans = UPDTRNS_DB_UPDATED_MASK;
+			} else
+			{
+				/* See comment above IS_OK_TO_INVOKE_GVCST_KILL macro for why the below assert is the way it is */
+				assert(!jgbl.forw_phase_recovery || actual_update || (JS_IS_DUPLICATE & jgbl.mur_jrec_nodeflags)
+						|| jgbl.mur_options_forward);
+				assert(si->update_trans);
+			}
 		}
-		if (write_logical_jnlrecs && actual_update)
-		{	/* Maintain journal records only if the kill actually resulted in a database update.
+		if (write_logical_jnlrecs && (actual_update || gv_play_duplicate_kills))
+		{	/* Maintain journal records only if the kill actually resulted in a database update OR if
+			 * "gv_play_duplicate_kills" is TRUE. In the latter case, even though no db blocks will be touched,
+			 * it will still increment the db curr_tn and write jnl records.
+			 *
 			 * skip_dbtriggers is set to TRUE for trigger unsupporting platforms. So, nodeflags will be set to skip
 			 * triggers on secondary. This ensures that updates happening in primary (trigger unsupporting platform)
 			 * is treated in the same order in the secondary (trigger supporting platform) irrespective of whether
@@ -442,6 +540,11 @@ research:
 				nodeflags = 0;
 				if (skip_dbtriggers)
 					nodeflags |= JS_SKIP_TRIGGERS_MASK;
+				if (!actual_update)
+				{
+					assert(gv_play_duplicate_kills);
+					nodeflags |= JS_IS_DUPLICATE;
+				}
 				assert(!jnl_format_done);
 				jfb = jnl_format(operation, gv_currkey, NULL, nodeflags);
 				assert(NULL != jfb);
@@ -450,6 +553,11 @@ research:
 				nodeflags = 0;
 				if (skip_dbtriggers)
 					nodeflags |= JS_SKIP_TRIGGERS_MASK;
+				if (!actual_update)
+				{
+					assert(gv_play_duplicate_kills);
+					nodeflags |= JS_IS_DUPLICATE;
+				}
 #				ifdef GTM_TRIGGER
 				/* Do not replicate implicit updates */
 				assert(tstart_trigger_depth <= gtm_trigger_depth);
@@ -468,8 +576,7 @@ research:
 		flush_cache = FALSE;
 		if (!dollar_tlevel)
 		{
-			if ((0 != csd->dsid) && (0 < kill_set_head.used)
-				&& gv_target->hist.h[1].blk_num != alt_hist->h[1].blk_num)
+			if ((0 != csd->dsid) && (0 < kill_set_head.used) && (gvt_hist->h[1].blk_num != alt_hist->h[1].blk_num))
 			{	/* multi-level delete */
 				rc_cpt_inval();
 				flush_cache = TRUE;
@@ -480,7 +587,7 @@ research:
 				if (!csa->now_crit)	/* Do not sleep while holding crit */
 					WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
 			}
-			if ((trans_num)0 == t_end(&gv_target->hist, alt_hist, TN_NOT_SPECIFIED))
+			if ((trans_num)0 == t_end(gvt_hist, alt_hist, TN_NOT_SPECIFIED))
 			{	/* In case this is MM and t_end caused a database extension, reset csd */
 				assert(is_mm || (csd == cs_data));
 				csd = cs_data;
@@ -519,20 +626,22 @@ research:
 #		ifdef GTM_TRIGGER
 		if (lcl_implicit_tstart)
 		{
+			assert(gvt_root);
 			GVTR_OP_TCOMMIT(cdb_status);
 			if (cdb_sc_normal != cdb_status)
                                 goto retry;
 		}
 #		endif
 		INCR_GVSTATS_COUNTER(csa, cnl, n_kill, 1);
-		if (0 != gv_target->clue.end)
+		if (gvt_root && (0 != gv_target->clue.end))
 		{	/* If clue is still valid, then the deletion was confined to a single block */
-			assert(gv_target->hist.h[0].blk_num == alt_hist->h[0].blk_num);
+			assert(gvt_hist->h[0].blk_num == alt_hist->h[0].blk_num);
 			/* In this case, the "right hand" key (which was searched via gv_altkey) was the last search
 			 * and should become the clue.  Furthermore, the curr.match from this last search should be
 			 * the history's curr.match.  However, this record will have been shuffled to the position of
-			 * the "left hand" key, and therefore, the original curr.offset should be left untouched. */
-			gv_target->hist.h[0].curr_rec.match = alt_hist->h[0].curr_rec.match;
+			 * the "left hand" key, and therefore, the original curr.offset should be left untouched.
+			 */
+			gvt_hist->h[0].curr_rec.match = alt_hist->h[0].curr_rec.match;
 			COPY_CURRKEY_TO_GVTARGET_CLUE(gv_target, gv_altkey);
 		}
 		NON_GTMTRIG_ONLY(assert(lcl_dollar_tlevel == dollar_tlevel));
@@ -547,8 +656,9 @@ research:
 				assert(!csd->dsid);
 				ENABLE_WBTEST_ABANDONEDKILL;
 				gvcst_expand_free_subtree(&kill_set_head);
-				/* In case this is MM and gvcst_expand_free_subtree() called gvcst_bmp_mark_free() called t_retry()
-				 * which remapped an extended database, reset csd */
+				/* In case this is MM and "gvcst_expand_free_subtree" called "gvcst_bmp_mark_free"
+				 * which in turn called "t_retry" which remapped an extended database, reset csd.
+				 */
 				assert(is_mm || (csd == cs_data));
 				csd = cs_data;
 				DECR_KIP(csd, csa, kip_csa);
@@ -571,7 +681,7 @@ retry:
 			assert(!skip_INVOKE_RESTART);
 			assert((cdb_sc_normal != cdb_status) || (ERR_TPRETRY == gtm_trig_status));
 			if (cdb_sc_normal != cdb_status)
-				skip_INVOKE_RESTART = TRUE; /* causes t_retry to invoke only tp_restart * without any rts_error */
+				skip_INVOKE_RESTART = TRUE; /* causes t_retry to invoke only tp_restart without any rts_error */
 			/* else: t_retry has already been done by gtm_trigger so no need to do it again for this try */
 		}
 #		endif
@@ -592,6 +702,37 @@ retry:
 			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 			assert(0 == rc GTMTRIG_ONLY(&& TPRESTART_STATE_NORMAL == tprestart_state));
 		}
+#		ifdef GTM_TRIGGER
+		assert(0 < t_tries);
+		if (lcl_implicit_tstart)
+		{
+			assert((cdb_sc_normal != cdb_status) || (ERR_TPRETRY == gtm_trig_status));
+			if (cdb_sc_normal == cdb_status)
+			{
+				DEBUG_ONLY(save_cdb_status = cdb_status);
+				cdb_status = t_fail_hist[t_tries - 1]; /* get the last restart code */
+			}
+			assert(((cdb_sc_onln_rlbk1 != cdb_status) && (cdb_sc_onln_rlbk2 != cdb_status))
+				|| (TREF(dollar_zonlnrlbk) && !gv_target->root));
+			if ((cdb_sc_onln_rlbk1 == cdb_status) || (cdb_sc_gvtrootmod == cdb_status))
+			{
+				assert(NULL != gv_target);
+				ASSERT_BEGIN_OF_FRESH_TP_TRANS; /* ensures gvcst_root_search is the first thing done in the
+								 * restarted transaction */
+				/* We are implicit transaction and online rollback update the database but did NOT take us to a
+				 * different logical state. We've already done the restart, but the root is now reset to zero. Do
+				 * root search to establish the new root
+				 */
+				GVCST_ROOT_SEARCH;
+			} else if (cdb_sc_onln_rlbk2 == cdb_status)
+			{	/* Database was taken back to a different logical state and we are an implicit TP transaction.
+				 * Issue DBROLLEDBACK error that the application programmer can catch and do the necessary stuff.
+				 */
+				assert(gtm_trigger_depth == tstart_trigger_depth);
+				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+			}
+		}
+#		endif
 		GTMTRIG_ONLY(assert(!skip_INVOKE_RESTART)); /* if set to TRUE above, should have been reset by t_retry */
 		/* At this point, we can be in TP only if we implicitly did a tstart in gvcst_kill (as part of a trigger update).
 		 * Assert that. Since the t_retry/tp_restart would have reset si->update_trans, we need to set it again.
@@ -603,15 +744,14 @@ retry:
 			tp_set_sgm();	/* set sgm_info_ptr & first_sgm_info for TP start */
 			T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVKILLFAIL);	/* set update_trans and t_err for wrapped TP */
 		} else
-		{
-			/* We could have entered gvcst_kill trying to kill a global that does not exist but later due to a
+		{	/* We could have entered gvcst_kill trying to kill a global that does not exist but later due to a
 			 * concurrent set, came here for retry. In such a case, update_trans could have been set to 0
 			 * (from actual_update). Reset update_trans to non-zero for the next retry as we expect the kill to
 			 * happen in this retry.
 			 */
 			update_trans = UPDTRNS_DB_UPDATED_MASK;
 		}
-		/* In case this is MM and t_retry() remapped an extended database, reset csd */
+		/* In case this is MM and "t_retry" remapped an extended database, reset csd */
 		assert(is_mm || (csd == cs_data));
 		csd = cs_data;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -303,11 +303,11 @@ void		lvAvlTreeNodeDelete(lvTree *lvt, lvTreeNode *node);
 }
 
 #ifdef TREE_DEBUG
-#        define TREE_DEBUG1(p)			{printf(p);             fflush(stdout);}
-#        define TREE_DEBUG2(p, q)		{printf(p, q);          fflush(stdout);}
-#        define TREE_DEBUG3(p, q, r)		{printf(p, q, r);       fflush(stdout);}
-#        define TREE_DEBUG4(p, q, r, s)		{printf(p, q, r, s);    fflush(stdout);}
-#        define TREE_DEBUG5(p, q, r, s, t)	{printf(p, q, r, s, t); fflush(stdout);}
+#        define TREE_DEBUG1(p)			{printf(p);             FFLUSH(stdout);}
+#        define TREE_DEBUG2(p, q)		{printf(p, q);          FFLUSH(stdout);}
+#        define TREE_DEBUG3(p, q, r)		{printf(p, q, r);       FFLUSH(stdout);}
+#        define TREE_DEBUG4(p, q, r, s)		{printf(p, q, r, s);    FFLUSH(stdout);}
+#        define TREE_DEBUG5(p, q, r, s, t)	{printf(p, q, r, s, t); FFLUSH(stdout);}
 #        define	TREE_DEBUG_ONLY(X)			X
 #else
 #        define TREE_DEBUG1(p)

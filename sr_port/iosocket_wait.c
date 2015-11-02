@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,14 @@ GBLREF stack_frame  	        *frame_pointer;
 GBLREF unsigned char            *stackbase, *stacktop, *msp, *stackwarn;
 GBLREF mv_stent			*mv_chain;
 
+error_def(ERR_SOCKACPT);
+error_def(ERR_SOCKWAIT);
+error_def(ERR_TEXT);
+error_def(ERR_SOCKMAX);
+error_def(ERR_ZINTRECURSEIO);
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
+
 boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 {
 	struct 	timeval  	utimeout;
@@ -66,13 +74,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	boolean_t		zint_restart;
 	mv_stent		*mv_zintdev;
 	int			retry_num;
-        error_def(ERR_SOCKACPT);
-        error_def(ERR_SOCKWAIT);
-        error_def(ERR_TEXT);
-	error_def(ERR_SOCKMAX);
-	error_def(ERR_ZINTRECURSEIO);
-        error_def(ERR_STACKCRIT);
-        error_def(ERR_STACKOFLOW);
 
 	/* check for validity */
         assert(iod->type == gtmsocket);
@@ -91,7 +92,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
                         rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
                 if (sockwhich_wait != sockintr->who_saved)
                         GTMASSERT;      /* ZINTRECURSEIO should have caught */
-                SOCKET_DEBUG(PRINTF("socwait: *#*#*#*#*#*#*#  Restarted interrupted wait\n"); DEBUGSOCKFLUSH);
+                DBGSOCK((stdout, "socwait: *#*#*#*#*#*#*#  Restarted interrupted wait\n"));
                 mv_zintdev = io_find_mvstent(iod, FALSE);
                 if (mv_zintdev)
                 {
@@ -108,10 +109,9 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
                                 mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
                         }
 			zint_restart = TRUE;
-			SOCKET_DEBUG(PRINTF("socwait: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec);
-				     DEBUGSOCKFLUSH);
+			DBGSOCK((stdout, "socwait: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec));
                 } else
-			SOCKET_DEBUG(PRINTF("socwait: no mv_stent found !!\n"); DEBUGSOCKFLUSH);
+			DBGSOCK((stdout, "socwait: no mv_stent found !!\n"));
                 dsocketptr->mupintr = FALSE;
 		sockintr->who_saved = sockwhich_invalid;
         }
@@ -138,7 +138,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	{       /* end_time taken from restart data. Compute what msec_timeout should be so timeout timer
                                    gets set correctly below.
 		*/
-		SOCKET_DEBUG(PRINTF("socwait: Taking timeout end time from wait restart data\n"));
+		DBGSOCK((stdout, "socwait: Taking timeout end time from wait restart data\n"));
 		cur_time = sub_abs_time(&end_time, &cur_time);
 		if (0 > cur_time.at_sec)
 		{
@@ -162,8 +162,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		{
 			if (0 != outofband)
 			{
-				SOCKET_DEBUG(PRINTF("socwait: outofband interrupt received (%d) -- "
-						    "queueing mv_stent for wait intr\n", outofband); DEBUGSOCKFLUSH);
+				DBGSOCK((stdout, "socwait: outofband interrupt received (%d) -- "
+					 "queueing mv_stent for wait intr\n", outofband));
 				PUSH_MV_STENT(MVST_ZINTDEV);
 				mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
 				mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
@@ -172,9 +172,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 				sockintr->end_time_valid = TRUE;
 				dsocketptr->mupintr = TRUE;
 				socketus_interruptus++;
-				SOCKET_DEBUG(PRINTF("socwait: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
-						    end_time.at_sec, end_time.at_usec, socketus_interruptus);
-					     DEBUGSOCKFLUSH);
+				DBGSOCK((stdout, "socwait: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
+					 end_time.at_sec, end_time.at_usec, socketus_interruptus));
 				outofband_action(FALSE);
 				GTMASSERT;      /* Should *never* return from outofband_action */
 				return FALSE;   /* For the compiler.. */
@@ -246,8 +245,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 					{
         	        		          if (0 != outofband)
 			                          {
-                			                  SOCKET_DEBUG(PRINTF("socwait: outofband interrupt received (%d) -- "
-	                                                      "queueing mv_stent for wait intr\n", outofband); DEBUGSOCKFLUSH);
+                			                  DBGSOCK((stdout, "socwait: outofband interrupt received (%d) -- "
+								   "queueing mv_stent for wait intr\n", outofband));
 			                                  PUSH_MV_STENT(MVST_ZINTDEV);
         	        		                  mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
                 	                		  mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
@@ -256,10 +255,9 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		                        	          sockintr->end_time_valid = TRUE;
                 		                	  dsocketptr->mupintr = TRUE;
 			                                  socketus_interruptus++;
-        	        		                  SOCKET_DEBUG(
-							  PRINTF("socwait: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
-                	                                      end_time.at_sec, end_time.at_usec, socketus_interruptus);
-	                                	              DEBUGSOCKFLUSH);
+        	        		                  DBGSOCK((stdout, "socwait: mv_stent queued - endtime: %d/%d  interrupts:"
+								   " %d\n", end_time.at_sec, end_time.at_usec,
+								   socketus_interruptus));
 		        	                          outofband_action(FALSE);
         		        	                  GTMASSERT;      /* Should *never* return from outofband_action */
 		        	                          return FALSE;   /* For the compiler.. */

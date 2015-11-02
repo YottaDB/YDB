@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,6 +67,8 @@
 #include "gtm_zlib.h"
 #include "repl_sort_tr_buff.h"
 #include "replgbl.h"
+#include "gtmsource_srv_latch.h"
+#include "gv_trigger_common.h"
 
 #define MAX_HEXDUMP_CHARS_PER_LINE	26 /* 2 characters per byte + space, 80 column assumed */
 
@@ -127,8 +129,8 @@
 	DCL_THREADGBL_ACCESS;													\
 																\
 	SETUP_THREADGBL_ACCESS;													\
-	if (!(TREF(replgbl)).trig_replic_warning_issued && (TREF(replgbl)).trig_replic_suspect_seqno &&				\
-		!secondary_side_trigger_support)										\
+	if (!(TREF(replgbl)).trig_replic_warning_issued && (TREF(replgbl)).trig_replic_suspect_seqno				\
+		&& !remote_side->trigger_supported)										\
 	{ 	/* Note: The below repl_log text is copied from TRIG2NOTRIG error message content from merrors.msg. Change 	\
 		 * to one should be reflected in another									\
 		 */														\
@@ -141,9 +143,7 @@
 #endif
 
 
-GBLDEF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLDEF	struct timeval		gtmsource_poll_wait, gtmsource_poll_immediate;
-GBLDEF	gtmsource_state_t	gtmsource_state = GTMSOURCE_DUMMY_STATE;
 GBLDEF	repl_msg_ptr_t		gtmsource_msgp = NULL;
 GBLDEF	int			gtmsource_msgbufsiz = 0;
 GBLDEF	repl_msg_ptr_t		gtmsource_cmpmsgp = NULL;
@@ -156,10 +156,8 @@ GBLDEF	qw_num			repl_source_lastlog_data_sent = 0;
 GBLDEF	qw_num			repl_source_lastlog_msg_sent = 0;
 GBLDEF	time_t			repl_source_prev_log_time;
 GBLDEF  time_t			repl_source_this_log_time;
-GBLDEF	gd_region		*gtmsource_mru_reg;
 GBLDEF	time_t			gtmsource_last_flush_time;
-GBLDEF	seq_num			gtmsource_last_flush_reg_seq;
-
+GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	uchar_ptr_t		repl_filter_buff;
 GBLREF	int			repl_filter_bufsiz;
 GBLREF	volatile time_t		gtmsource_now;
@@ -171,7 +169,6 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	repl_ctl_element	*repl_ctl_list;
 GBLREF	gtmsource_options_t	gtmsource_options;
-
 GBLREF	int			gtmsource_log_fd;
 GBLREF	int			gtmsource_statslog_fd;
 GBLREF	FILE			*gtmsource_log_fp;
@@ -180,17 +177,16 @@ GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_filter;
 GBLREF	gd_addr			*gd_header;
 GBLREF	seq_num			seq_num_zero, seq_num_minus_one, seq_num_one;
-GBLREF	unsigned char		jnl_ver, remote_jnl_ver;
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
 GBLREF	unsigned char		jnl_source_rectype, jnl_dest_maxrectype;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
-GBLREF	boolean_t 		primary_side_std_null_coll;
-GBLREF	boolean_t		primary_side_trigger_support;
-GBLREF	boolean_t 		secondary_side_std_null_coll;
 GBLREF	seq_num			lastlog_seqno;
 GBLREF	uint4			log_interval;
 GBLREF	qw_num			trans_sent_cnt, last_log_tr_sent_cnt;
-GBLREF	boolean_t		secondary_side_trigger_support;
+GBLREF	repl_conn_info_t	*this_side, *remote_side;
+GBLREF	int4			strm_index;
+GBLREF	uint4			process_id;
+GBLREF	seq_num			gtmsource_save_read_jnl_seqno;
 
 error_def(ERR_JNLNEWREC);
 error_def(ERR_JNLSETDATA2LONG);
@@ -200,7 +196,6 @@ error_def(ERR_REPLGBL2LONG);
 error_def(ERR_REPLINSTNOHIST);
 error_def(ERR_REPLNOMULTILINETRG);
 error_def(ERR_REPLRECFMT);
-error_def(ERR_REPLUPGRADESEC);
 error_def(ERR_REPLXENDIANFAIL);
 error_def(ERR_SECNODZTRIGINTP);
 error_def(ERR_TRIG2NOTRIG);
@@ -209,7 +204,7 @@ error_def(ERR_TEXT);
 /* Endian converts the given set of journal records (possibly multiple sequence numbers) so that the secondary can consume them
  * as-is. This is done only in the case when the primary is running on a GT.M version less than the GT.M version on secondary
  * side. Otherwise, the secondary takes the responsibility of doing the endian conversion. Note that the endian conversion happens
- * in-place. The below function is based on gtmsource_process.c/repl_tr_endian_convert()
+ * in-place. The below function is based on gtmrecv_process.c/repl_tr_endian_convert()
  */
 static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, seq_num pre_read_seqno)
 {
@@ -221,12 +216,12 @@ static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, se
 	jrec_suffix		*suffixp;
 	jnl_string		*keystr;
 	mstr_len_t		*vallen_ptr;
-	seq_num			good_seqno;
+	/* seq_num		good_seqno; */
 
 	buffp = send_msgp->msg;
 	buflen = send_msgp->len - REPL_MSG_HDRLEN;
 	remaining_len = send_tr_len;
-	QWASSIGN(good_seqno, seq_num_zero);
+	/* QWASSIGN(good_seqno, seq_num_zero); */
 	while (0 < remaining_len)
 	{
 		jlen = buflen;
@@ -254,8 +249,15 @@ static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, se
 			 */
 			suffixp = ((jrec_suffix *)((unsigned char *)rec + reclen - JREC_SUFFIX_SIZE));
 			suffixp->backptr = GTM_BYTESWAP_24(suffixp->backptr);
-			QWASSIGN(good_seqno, rec->jrec_null.jnl_seqno); /* update good_seqno */
+			/* QWASSIGN(good_seqno, rec->jrec_null.jnl_seqno); */ /* update good_seqno */
 			rec->jrec_null.jnl_seqno = GTM_BYTESWAP_64(rec->jrec_null.jnl_seqno);
+			/* At this point, we could have a TCOM or NULL or SET/KILL/ZKILL/ZTRIG type of record.
+			 * Assert that all of them have "strm_seqno" at the exact same offset so we can avoid
+			 * an if/then/else check on the record types in order to endian convert "strm_seqno".
+			 */
+			assert(&rec->jrec_null.strm_seqno == &rec->jrec_set_kill.strm_seqno);
+			assert(&rec->jrec_null.strm_seqno == &rec->jrec_tcom.strm_seqno);
+			rec->jrec_null.strm_seqno = GTM_BYTESWAP_64(rec->jrec_null.strm_seqno);
 			if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
 			{
 				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
@@ -332,8 +334,8 @@ int gtmsource_process(void)
 	boolean_t			xon_wait_logged, prev_catchup, catchup, force_recv_check, already_communicated;
 	double				time_elapsed;
 	seq_num				resync_seqno, zqgblmod_seqno, filter_seqno;
-	gd_region			*reg, *region_top, *gtmsource_upd_reg, *old_upd_reg;
-	sgmnt_addrs			*csa, *repl_csa;
+	gd_region			*reg, *region_top;
+	sgmnt_addrs			*csa;
 	qw_num				backlog_bytes, backlog_count, delta_sent_cnt, delta_data_sent, delta_msg_sent;
 	long				prev_msg_sent = 0;
 	time_t				prev_now = 0, save_now;
@@ -341,24 +343,33 @@ int gtmsource_process(void)
 	struct timeval			poll_wait, poll_immediate;
 	uint4				temp_ulong;
 	unix_db_info			*udi;
-	repl_triple			remote_triple, local_triple;
-	int4				remote_triple_num, local_triple_num, num_triples;
-	seq_num				local_jnl_seqno, dualsite_resync_seqno;
+	repl_histinfo			remote_histinfo, local_histinfo;
+	int4				num_histinfo, max_epoch_interval;
+	seq_num				local_jnl_seqno, tmp_seqno;
 	repl_msg_t			xoff_ack, instnohist_msg, losttncomplete_msg;
 	repl_msg_ptr_t			send_msgp;
 	repl_cmpmsg_ptr_t		send_cmpmsgp;
 	repl_start_reply_msg_ptr_t	reply_msgp;
-	boolean_t			rollback_first, secondary_ahead, secondary_was_rootprimary, secondary_is_dualsite;
-	boolean_t			rcvr_same_endianness, intfilter_error;
+	boolean_t			rollback_first, secondary_ahead, secondary_was_rootprimary;
+	boolean_t			intfilter_error, skip_last_histinfo_check, msg_is_cross_endian, retval;
 	int				semval, cmpret;
 	uLongf				cmpbuflen;
 	int4				msghdrlen;
 	Bytef				*cmpbufptr;
+	char				histdetail[256];
+	gtm_time4_t			tmp_time4;
+	repl_heartbeat_msg_ptr_t	heartbeat_msg;
 	DEBUG_ONLY(uchar_ptr_t		save_inbuff;)
 	DEBUG_ONLY(uchar_ptr_t		save_outbuff;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open);
+	DEBUG_ONLY(
+		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+		assert(!csa->hold_onto_crit); /* so we can do unconditional grab_lock/rel_lock */
+		ASSERT_VALID_JNLPOOL(csa);
+	)
 	assert(REPL_MSG_HDRLEN == SIZEOF(jnldata_hdr_struct)); /* necessary for reading multiple transactions from jnlpool in
 								* a single attempt */
 	jctl = jnlpool.jnlpool_ctl;
@@ -421,10 +432,51 @@ int gtmsource_process(void)
 	 *                    \--------------------->---------/
 	 */
 	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+	/* Before entering the loop find the max EPOCH interval (for use in lock waits) */
+	max_epoch_interval = 0;
+	for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
+	{
+		csa = &FILE_INFO(reg)->s_addrs;
+		if (max_epoch_interval < csa->hdr->epoch_interval)
+			max_epoch_interval = csa->hdr->epoch_interval;
+	}
 	while (TRUE)
 	{
 		assert(!udi->grabbed_ftok_sem);
 		gtmsource_stop_heartbeat();
+		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+		{
+			/* Ensure we don't hold any locks at this moment */
+			assert(process_id != gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
+			assert(!have_crit(CRIT_HAVE_ANY_REG)); /* checks both journal pool lock and database crit lock */
+			assert(FD_INVALID != gtmsource_sock_fd);
+			if (FD_INVALID != gtmsource_sock_fd)
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Closing connection due to ONLINE ROLLBACK\n");
+				repl_close(&gtmsource_sock_fd);
+				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
+			}
+			jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : %llu\n",
+					jnl_seqno);
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Last Seqno sent : %llu\n",
+					gtmsource_local->read_jnl_seqno - 1);
+			/* gtmsource_save_read_jnl_seqno is kept uptodate with gtmsource_local->read_addr and gtmsource_local->read
+			 * fields in gtmsource_onln_rlbk_clnup. But, gtmsource_local->read_jnl_seqno is still pointing to the last
+			 * sequence number that we sent to the receiver (which could have been rolled back now). We don't want to
+			 * continue with a stale value of read_jnl_seqno. So, set it to gtmsource_save_read_jnl_seqno which itself
+			 * is taken from the jnlpool_ctl->jnl_seqno right when we detected the online rollback. We could have set
+			 * this right when we set gtmsource_save_read_jnl_seqno but we don't do that because we want to print the
+			 * old value in the log file but we can't use repl_log/gtmsource_log_fp in gtmsource_onln_rlbk_clnup() as
+			 * it is bundled up as part of libgtmshr.so whereas repl_log is bundled in libmupip.a.
+			 */
+			gtmsource_local->read_jnl_seqno = gtmsource_save_read_jnl_seqno;
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Source Server Read Seqno is now set to : %llu\n",
+					gtmsource_local->read_jnl_seqno);
+			gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+			assert(READ_FILE == gtmsource_local->read_state);
+			gtmsource_ctl_close(); /* can't rely on the journal files anymore since rollback could have touched them */
+		}
 		if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 		{
 			gtmsource_start_jnl_release_timer();
@@ -442,8 +494,7 @@ int gtmsource_process(void)
 			repl_source_prev_log_time = time(NULL);
 		}
 		if (GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state &&
-		    SS_NORMAL != (status = gtmsource_recv_restart(&recvd_seqno, &recvd_msg_type, &recvd_start_flags,
-		    							&rcvr_same_endianness)))
+		    SS_NORMAL != (status = gtmsource_recv_restart(&recvd_seqno, &recvd_msg_type, &recvd_start_flags)))
 		{
 			if (EREPL_RECV == repl_errno)
 			{
@@ -490,34 +541,44 @@ int gtmsource_process(void)
 		 * re-establish the same by continuing to the beginning of this loop. */
 		if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 			continue;
-		assert(REPL_PROTO_VER_UNINITIALIZED < gtmsource_local->remote_proto_ver);
-		secondary_is_dualsite = (REPL_PROTO_VER_DUALSITE == gtmsource_local->remote_proto_ver) ? 1 : 0;
-		if (jctl->upd_disabled)
-		{
-			if (secondary_is_dualsite)
-			{	/* This instance is a Propagating Primary and is trying to connect to a dual-site tertiary.
-				 * Do not allow such a connection.
-				 */
-				repl_log(gtmsource_log_fp, TRUE, FALSE, "Connecting to a dual-site secondary is not allowed "
-					"when the current instance [%s] is a propagating primary instance.\n",
-					jnlpool.repl_inst_filehdr->this_instname);
-				gtm_putmsg(VARLSTCNT(4) ERR_REPLUPGRADESEC, 2,
-					LEN_AND_STR((char *)gtmsource_local->secondary_instname));
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset due to above error\n");
-				repl_close(&gtmsource_sock_fd);
-				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-				gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
-				continue;
+		assert(REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver);
+		assert((GTMSOURCE_SEARCHING_FOR_RESTART == gtmsource_state) || (GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state));
+		/* Receiver runs on a version of GT.M that supports multi-site capability */
+		/* If gtmsource_state == GTMSOURCE_SEARCHING_FOR_RESTART, we have already communicated with the
+		 * receiver and hence checked the instance info so no need to do it again.
+		 */
+		if (GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state)
+		{	/* Get replication instance info */
+			DEBUG_ONLY(secondary_was_rootprimary = -1;)
+			/* Note: As part of the REPL_INSTINFO message, the receiver could be sending a non-zero "strm_jnl_seqno"
+			 * in some cases. If so, it will override "recvd_seqno" we saw before in the REPL_START_JNL_SEQNO message.
+			 */
+			if (!gtmsource_get_instance_info(&secondary_was_rootprimary, &recvd_seqno))
+			{
+				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+					return (SS_NORMAL);
+				else if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+					continue;
+				else
+				{	/* Got a REPL_XOFF_ACK_ME from the receiver. Restart the initial handshake */
+					assert(GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state);
+					continue;
+				}
 			}
+			assert((FALSE == secondary_was_rootprimary) || (TRUE == secondary_was_rootprimary));
 		}
-		assert(gtmsource_state == GTMSOURCE_SEARCHING_FOR_RESTART || gtmsource_state == GTMSOURCE_WAITING_FOR_RESTART);
 		rollback_first = FALSE;
 		secondary_ahead = FALSE;
+		GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+			continue;
 		local_jnl_seqno = jctl->jnl_seqno;
-		dualsite_resync_seqno = jctl->max_dualsite_resync_seqno;
+		rel_lock(jnlpool.jnlpool_dummy_reg);
 		/* Take care to set the flush parameter in repl_log calls below to FALSE until at least the first message
 		 * gets sent back. This is so the fetchresync rollback on the other side does not timeout before receiving
 		 * a response. */
+		assert(0 == GET_STRM_INDEX(recvd_seqno));
+		assert(0 == GET_STRM_INDEX(local_jnl_seqno));
 		repl_log(gtmsource_log_fp, TRUE, FALSE, "Current Journal Seqno of the instance is %llu [0x%llx]\n",
 			local_jnl_seqno, local_jnl_seqno);
 		if (recvd_seqno > local_jnl_seqno)
@@ -527,114 +588,181 @@ int gtmsource_process(void)
 				"Secondary instance journal seqno %llu [0x%llx] is greater than Primary "
 				"instance journal seqno %llu [0x%llx]\n",
 				recvd_seqno, recvd_seqno, local_jnl_seqno, local_jnl_seqno);
-			/* If the secondary is dual-site, the secondary has to roll back to EXACTLY "local_jnl_seqno".
-			 * But if the secondary is multi-site, the determination of the rollback seqno involves comparing
-			 * the triples between the primary and secondary starting down from "local_jnl_seqno-1" (done below).
-			 * In either case, the secondary has to roll back to at most "local_jnl_seqno". Reset "recvd_seqno"
-			 * to this number given that we have already recorded that the secondary is ahead of the primary.
+			/* Since the secondary is at least multi-site, the determination of the rollback seqno involves comparing
+			 * the histinfo records between the primary and secondary starting down from "local_jnl_seqno-1"
+			 * (done below). In either case, the secondary has to roll back to at most "local_jnl_seqno".
+			 * Reset "recvd_seqno" to this number given that we have already recorded that the secondary is
+			 * ahead of the primary.
 			 */
 			recvd_seqno = local_jnl_seqno;
 		}
-		if (secondary_is_dualsite)
-		{
-			repl_log(gtmsource_log_fp, TRUE, FALSE, "Secondary does NOT support multisite functionality.\n");
-			if (START_FLAG_UPDATERESYNC & recvd_start_flags)
-			{	/* -updateresync was specified in the receiver server. */
-				repl_log(gtmsource_log_fp, TRUE, FALSE, "Secondary receiver specified -UPDATERESYNC.\n");
-				local_jnl_seqno = recvd_seqno;
-			} else
-			{
-				repl_log(gtmsource_log_fp, TRUE, FALSE, "Secondary receiver did not specify -UPDATERESYNC.\n");
-				repl_log(gtmsource_log_fp, TRUE, FALSE, "Using Resync Seqno instead of Journal Seqno\n");
-				repl_log(gtmsource_log_fp, TRUE, FALSE, "Current Resync Seqno of the instance is %llu [0x%llx]\n",
-					dualsite_resync_seqno, dualsite_resync_seqno);
-				local_jnl_seqno = dualsite_resync_seqno;
-				if (recvd_seqno > local_jnl_seqno)
-				{
-					secondary_ahead = TRUE;
-					repl_log(gtmsource_log_fp, TRUE, FALSE,
-						"Secondary instance resync seqno %llu [0x%llx] is greater than Primary "
-						"instance resync seqno %llu [0x%llx]\n",
-						recvd_seqno, recvd_seqno, local_jnl_seqno, local_jnl_seqno);
-				}
-			}
-		} else
-		{	/* Receiver runs on a version of GT.M that supports multi-site capability */
-			/* If gtmsource_state == GTMSOURCE_SEARCHING_FOR_RESTART, we have already communicated with the
-			 * receiver and hence checked the instance info so no need to do it again.
+		/* Before setting "next_histinfo_seqno", check if we have at least one histinfo record in the replication instance
+		 * file. The only case when there can be no histinfo records is if this instance is a propagating primary. Assert
+		 * that. In this case, wait for this instance's primary to send the first histinfo record before setting the
+		 * next_histinfo_seqno. Note that we are fetching the value of "num_histinfo" without holding a lock on the instance
+		 * file but that is ok since all we care about is if it is 0 or not. We do not rely on the actual value.
+		 */
+		num_histinfo = jnlpool.repl_inst_filehdr->num_histinfo;
+		assert(0 <= num_histinfo);
+		assert(num_histinfo || jctl->upd_disabled);
+		gtmsource_local->next_histinfo_num = -1;/* Initial value. Reset by the call to "gtmsource_set_next_histinfo_seqno"
+							 * invoked in turn by "gtmsource_send_new_histrec" down below */
+		if (jctl->upd_disabled && !num_histinfo)
+		{	/* Wait for corresponding primary to send a new histinfo record and the receiver server on this instance
+			 * to write that to the replication instance file.
 			 */
-			if (GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state)
-			{	/* Get replication instance info */
-				DEBUG_ONLY(secondary_was_rootprimary = -1;)
-				if (!gtmsource_get_instance_info(&secondary_was_rootprimary))
+			assert(-1 == gtmsource_local->next_histinfo_num);
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server waiting for first history record to be written by "
+				"update process\n");
+			do
+			{
+				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_FIRSTHISTINFO);
+				gtmsource_poll_actions(FALSE);
+				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+					return (SS_NORMAL);
+				num_histinfo = jnlpool.repl_inst_filehdr->num_histinfo;
+				if (num_histinfo)	/* Number of histinfos is non-zero */
+					break;
+			} while (TRUE);
+			repl_log(gtmsource_log_fp, TRUE, TRUE,
+				"First history record written by update process. Source server proceeding.\n");
+		}
+		/* Now get the latest histinfo record from the secondary. There are a few exceptions though.
+		 * 	1) If we came here because of a BAD_TRANS or CMP2UNCMP message from the receiver server.
+		 *		In this case, we have already been communicating with the receiver so no need to
+		 *		compare the histinfo record between primary and secondary.
+		 *	2) If receiver server was started with -UPDATERESYNC and receiver is running pre-V55000.
+		 *		In this case there is no history record on the receiver side to compare against.
+		 *		In case the receiver is post-V55000, the -UPDATERESYNC would have required an instance
+		 *		file name as the value which would be used towards history record verification.
+		 *	3) If receiver server was started with -UPDATERESYNC and receiver is >= V55000 and at a seqno
+		 *		which is EQUAL to the earliest seqno for which we have a history record on the primary.
+		 *		We have	no way of verifying histories since we definitely dont have the history record
+		 *		for the receiver side seqno. Since -updateresync was used, assume they are in sync and
+		 *		start replicating from the earliest seqno for which we have a history record on the primary.
+		 *	4) If recvd_seqno is 1. In this case, the receiver instance has been created afresh so its instance
+		 *		file is empty and we are guaranteed there is nothing to compare. So no point requesting it.
+		 *		Besides, this is a very common situation in practice that requiring -updateresync in this
+		 *		case seems user-unfriendly so we will let this one go by without a -updateresync particularly
+		 *		because there is no harm that can happen by allowing two such instances to connect/replicate.
+		 */
+		assert(0 != recvd_seqno);
+		if (1 == recvd_seqno)
+			skip_last_histinfo_check = TRUE;
+		else
+		{
+			if ((GTMSOURCE_WAITING_FOR_RESTART != gtmsource_state) && already_communicated)
+				skip_last_histinfo_check = TRUE;
+			else if (START_FLAG_UPDATERESYNC & recvd_start_flags)
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_START_JNL_SEQNO message has "
+					"START_FLAG_UPDATERESYNC bit set\n");
+				if (REPL_PROTO_VER_SUPPLEMENTARY > remote_side->proto_ver)
+					skip_last_histinfo_check = TRUE;
+				else
+				{
+					assert(jnlpool.repl_inst_filehdr->num_histinfo); /* should be at least 1 history record */
+					/* If -updateresync is specified and receiver instance seqno is exactly equal to the
+					 * start_seqno of the earliest history record in the instance file, then skip last
+					 * histinfo check. Note that in case both source and receiver instances are supplementary,
+					 * we should be looking at the 0th stream only. Even in that case, we are guaranteed that
+					 * the 0th history record in the instance file corresponds to the 0th stream. So it is
+					 * safe to look at the start_seqno of just the 0th history record in all cases.
+					 */
+					GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+						continue;
+					status = repl_inst_histinfo_get(0, &local_histinfo);
+					assert(0 == status); /* Since we pass histinfo_num of 0 which is >=0 and < num_histinfo */
+					rel_lock(jnlpool.jnlpool_dummy_reg);
+					if (local_histinfo.start_seqno == recvd_seqno)
+						skip_last_histinfo_check = TRUE;
+					else
+						skip_last_histinfo_check = FALSE;
+				}
+			} else
+				skip_last_histinfo_check = FALSE;
+		}
+		if (!skip_last_histinfo_check)
+		{	/* Find histinfo record in the local instance file corresponding to seqno "recvd_seqno-1" */
+			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+				continue;
+			assert(recvd_seqno <= local_jnl_seqno);
+			assert(recvd_seqno <= jctl->jnl_seqno);
+			assert((INVALID_SUPPL_STRM == strm_index) || (0 == strm_index));
+			status = repl_inst_histinfo_find_seqno(recvd_seqno, strm_index, &local_histinfo);
+			rel_lock(jnlpool.jnlpool_dummy_reg);
+			assert((0 != status) || (local_histinfo.start_seqno < recvd_seqno));
+			if (0 != status)
+			{	/* If recvd_seqno is the earliest history record's start_seqno and -udpateresync was
+				 * specified, assume the two instances are in sync. Otherwise issue error and close connection.
+				 * Send this error status to the receiver server before closing the connection.
+				 * This way the receiver will know to shut down rather than loop back trying to
+				 * reconnect. This avoids an infinite loop of connection open and closes
+				 * between the source server and receiver server.
+				 */
+				assert(ERR_REPLINSTNOHIST == status); /* only error returned by "repl_inst_histinfo_find_seqno" */
+				assert((INVALID_HISTINFO_NUM == local_histinfo.histinfo_num)
+						|| (local_histinfo.start_seqno >= recvd_seqno));
+				if (!(START_FLAG_UPDATERESYNC & recvd_start_flags)
+					|| (INVALID_HISTINFO_NUM == local_histinfo.histinfo_num)
+					|| (local_histinfo.start_seqno > recvd_seqno))
+				{	/* recvd_seqno is PRIOR to the starting seqno of the instance file.
+					 * In that case, issue error and close the connection.
+					 */
+
+					SPRINTF(histdetail, "seqno "INT8_FMT" "INT8_FMTX, recvd_seqno - 1, recvd_seqno - 1);
+					gtm_putmsg(VARLSTCNT(6) ERR_REPLINSTNOHIST, 4,
+							LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
+					instnohist_msg.type = REPL_INST_NOHIST;
+					instnohist_msg.len = MIN_REPL_MSGLEN;
+					memset(&instnohist_msg.msg[0], 0, SIZEOF(instnohist_msg.msg));
+					gtmsource_repl_send((repl_msg_ptr_t)&instnohist_msg, "REPL_INST_NOHIST",
+						MAX_SEQNO, INVALID_SUPPL_STRM);
+					repl_log(gtmsource_log_fp, TRUE, TRUE,
+					       "Connection reset due to above REPLINSTNOHIST error\n");
+					repl_close(&gtmsource_sock_fd);
+					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
+					gtmsource_state = gtmsource_local->gtmsource_state
+						= GTMSOURCE_WAITING_FOR_CONNECTION;
+					continue;
+				}
+				assert((0 == local_histinfo.histinfo_num) && (local_histinfo.start_seqno == recvd_seqno));
+			}
+			if (local_histinfo.start_seqno < recvd_seqno)
+			{
+				/* Find histinfo record in the remote instance file corresponding to seqno "recvd_seqno-1" */
+				retval = gtmsource_get_remote_histinfo(recvd_seqno, &remote_histinfo);
+				if (retval)
+				{
+					assert(remote_histinfo.start_seqno < recvd_seqno);
+					/* Check if primary and secondary have same histinfo for "recvd_seqno-1" */
+					rollback_first = !gtmsource_is_histinfo_identical(&remote_histinfo, &local_histinfo,
+												recvd_seqno, OK_TO_LOG_TRUE);
+					/* If local and remote sides are supplementary (i.e. P->Q replication), verify each
+					 * stream level history as well. Do this only if the remote side is a receiver server
+					 * (i.e. not rollback) and if we still intend on sending a REPL_WILL_RESTART_WITH_INFO
+					 * message.
+					 */
+					assert(this_side->is_supplementary == jnlpool.repl_inst_filehdr->is_supplementary);
+					if (this_side->is_supplementary && remote_side->is_supplementary
+							&& (REPL_START_JNL_SEQNO == recvd_msg_type)
+							&& !rollback_first && !secondary_ahead)
+						retval = gtmsource_check_remote_strm_histinfo(recvd_seqno, &rollback_first);
+				}
+				if (!retval)
 				{
 					if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 						return (SS_NORMAL);
-					else if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+					else if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+							|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 						continue;
 					else
-					{	/* Got a REPL_XOFF_ACK_ME from the receiver. Restart the initial handshake */
+					{	/* Got a REPL_XOFF_ACK_ME from receiver. Restart the initial handshake */
 						assert(GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state);
 						continue;
 					}
-				}
-				assert((FALSE == secondary_was_rootprimary) || (TRUE == secondary_was_rootprimary));
-			}
-			/* Now get the latest triple information from the secondary. There are three exceptions though.
-			 * 	1) If we came here because of a BAD_TRANS or CMP2UNCMP message from the receiver server.
-			 *		In this case, we have already been communicating with the receiver so no need to
-			 *		compare the triple information between primary and secondary.
-			 *	2) If receiver server was started with -UPDATERESYNC. In this case there is no triple
-			 *		history on the secondary to compare.
-			 *	3) If receiver server is at seqno 1, there is no history that can exist. We can safely
-			 *		start sending journal records from seqno 1.
-			 */
-			assert(0 != recvd_seqno);
-			if ((1 < recvd_seqno) && ((GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state) || !already_communicated)
-				&& (!(START_FLAG_UPDATERESYNC & recvd_start_flags)))
-			{
-				if (1 < recvd_seqno)
-				{	/* Find the triple in the local instance file corresponding to seqno "recvd_seqno-1" */
-					if (!gtmsource_get_triple_info(recvd_seqno, &remote_triple, &remote_triple_num))
-					{
-						if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
-							return (SS_NORMAL);
-						else if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
-							continue;
-						else
-						{	/* Got a REPL_XOFF_ACK_ME from receiver. Restart the initial handshake */
-							assert(GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state);
-							continue;
-						}
-					}
-					assert(remote_triple.start_seqno < recvd_seqno);
-					repl_inst_ftok_sem_lock();
-					assert(recvd_seqno <= local_jnl_seqno);
-					assert(recvd_seqno <= jctl->jnl_seqno);
-					status = repl_inst_wrapper_triple_find_seqno(recvd_seqno, &local_triple, &local_triple_num);
-					repl_inst_ftok_sem_release();
-					if (0 != status)
-					{	/* Close the connection. The function call above would have issued the error. */
-						assert(ERR_REPLINSTNOHIST == status);
-						/* Send this error status to the receiver server before closing the connection.
-						 * This way the receiver will know to shut down rather than loop back trying to
-						 * reconnect. This avoids an infinite loop of connection open and closes
-						 * between the source server and receiver server.
-						 */
-						instnohist_msg.type = REPL_INST_NOHIST;
-						instnohist_msg.len = MIN_REPL_MSGLEN;
-						memset(&instnohist_msg.msg[0], 0, SIZEOF(instnohist_msg.msg));
-						gtmsource_repl_send((repl_msg_ptr_t)&instnohist_msg, "REPL_INST_NOHIST", MAX_SEQNO);
-						repl_log(gtmsource_log_fp, TRUE, TRUE,
-						       "Connection reset due to above REPLINSTNOHIST error\n");
-						repl_close(&gtmsource_sock_fd);
-						SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-						gtmsource_state = gtmsource_local->gtmsource_state
-							= GTMSOURCE_WAITING_FOR_CONNECTION;
-						continue;
-					}
-					/* Check if primary and secondary have same triple information for "recvd_seqno-1" */
-					rollback_first = !gtmsource_is_triple_identical(&remote_triple, &local_triple, recvd_seqno);
 				}
 			}
 		}
@@ -644,71 +772,102 @@ int gtmsource_process(void)
 		reply_msgp->len = MIN_REPL_MSGLEN;
 		reply_msgp->proto_ver = REPL_PROTO_VER_THIS;
 		reply_msgp->node_endianness = NODE_ENDIANNESS;
+		reply_msgp->is_supplementary = jnlpool.repl_inst_filehdr->is_supplementary;
 		assert((1 != recvd_seqno) || !rollback_first);
-		if (GTMSOURCE_SEARCHING_FOR_RESTART == gtmsource_state || REPL_START_JNL_SEQNO == recvd_msg_type)
+		if ((GTMSOURCE_SEARCHING_FOR_RESTART == gtmsource_state) || (REPL_START_JNL_SEQNO == recvd_msg_type))
 		{
-			rollback_first = (rollback_first || secondary_ahead);
 			gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SEARCHING_FOR_RESTART;
-			if (!rollback_first)
-			{
+			/* If the last histinfo record in both instances are NOT the same ("rollback_first" is TRUE)
+			 * (possible only if the secondary is multi-site), or if secondary is ahead of the primary
+			 * ("secondary_ahead" is TRUE) we do want the secondary to rollback first. Issue message to
+			 * do rollback fetchresync. There is one exception though. And that is if -NORESYNC was
+			 * specified on the receiver side. In this case, determine the resync/common point by comparing
+			 * local and remote histinfo records from the tail of the instance file until we reach
+			 * one seqno whose histinfo information is identical in both.
+			 * Use this as the common point to send a REPL_WILL_RESTART_WITH_INFO message.
+			 */
+			if (!rollback_first && !secondary_ahead)
 				resync_seqno = recvd_seqno;
-				srch_status = gtmsource_srch_restart(resync_seqno, recvd_start_flags);
-				assert(resync_seqno == gtmsource_local->read_jnl_seqno);
-				assert(SS_NORMAL == srch_status);
+			else if (START_FLAG_NORESYNC & recvd_start_flags)
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_START_JNL_SEQNO message has "
+					"START_FLAG_NORESYNC bit set\n");
+				assert(!skip_last_histinfo_check);
+				assert(1 != recvd_seqno);
+				if (!rollback_first)
+				{
+					assert(secondary_ahead);
+					assert(recvd_seqno == local_jnl_seqno);
+					/* The primary and secondary are in sync as of "recvd_seqno" the jnl seqno of the
+					 * primary. So that is the common point. Send it across.
+					 */
+					resync_seqno = recvd_seqno;
+				} else
+				{
+					resync_seqno = gtmsource_find_resync_seqno(&local_histinfo, &remote_histinfo);
+					assert((MAX_SEQNO != resync_seqno) || (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+						|| (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+						|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state));
+					rollback_first = FALSE;
+				}
 			} else
-			{	/* If the last triples in both instances are NOT the same ("rollback_first" is TRUE)
-				 * (possible only if the secondary is multi-site), or if secondary is ahead of the primary
-				 * ("secondary_ahead" is TRUE) (possible whether secondary is dual-site or multi-site) we
-				 * do want the secondary to rollback first. Issue message to do rollback fetchresync.
-				 */
+			{	/* Ask secondary to issue a fetchresync rollback */
 				repl_log(gtmsource_log_fp, TRUE, FALSE,
 					"Secondary instance needs to first do MUPIP JOURNAL ROLLBACK FETCHRESYNC\n");
 				resync_seqno = local_jnl_seqno;
+				rollback_first = TRUE;
 			}
-			QWASSIGN(*(seq_num *)&reply_msgp->start_seqno[0], resync_seqno);
-			if (!rollback_first)
+			if (MAX_SEQNO != resync_seqno)
 			{
-				reply_msgp->type = REPL_WILL_RESTART_WITH_INFO;
-				reply_msgp->jnl_ver = jnl_ver;
-				temp_ulong = (0 == primary_side_std_null_coll) ?  START_FLAG_NONE : START_FLAG_COLL_M;
-				GTMTRIG_ONLY(
-					assert(primary_side_trigger_support);
-					temp_ulong |= START_FLAG_TRIGGER_SUPPORT;
-				)
-				PUT_ULONG(reply_msgp->start_flags, temp_ulong);
-				recvd_start_flags = START_FLAG_NONE;
-				gtmsource_repl_send((repl_msg_ptr_t)reply_msgp, "REPL_WILL_RESTART_WITH_INFO", resync_seqno);
-			} else
-			{	/* Secondary needs to first do FETCHRESYNC rollback to synchronize with primary */
-				reply_msgp->type = REPL_ROLLBACK_FIRST;
-				gtmsource_repl_send((repl_msg_ptr_t)reply_msgp, "REPL_ROLLBACK_FIRST", resync_seqno);
+				QWASSIGN(*(seq_num *)&reply_msgp->start_seqno[0], resync_seqno);
+				if (!rollback_first)
+				{
+					GRAB_GTMSOURCE_SRV_LATCH(gtmsource_local, max_epoch_interval);
+					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+						continue;
+					srch_status = gtmsource_srch_restart(resync_seqno, recvd_start_flags);
+					rel_gtmsource_srv_latch(&gtmsource_local->gtmsource_srv_latch);
+					assert(resync_seqno == gtmsource_local->read_jnl_seqno);
+					assert(SS_NORMAL == srch_status);
+					reply_msgp->type = REPL_WILL_RESTART_WITH_INFO;
+					reply_msgp->jnl_ver = this_side->jnl_ver;
+					temp_ulong = (0 == this_side->is_std_null_coll) ?  START_FLAG_NONE : START_FLAG_COLL_M;
+					GTMTRIG_ONLY(
+						assert(this_side->trigger_supported);
+						temp_ulong |= START_FLAG_TRIGGER_SUPPORT;
+					)
+					PUT_ULONG(reply_msgp->start_flags, temp_ulong);
+					recvd_start_flags = START_FLAG_NONE;
+					gtmsource_repl_send((repl_msg_ptr_t)reply_msgp, "REPL_WILL_RESTART_WITH_INFO",
+						resync_seqno, INVALID_SUPPL_STRM);
+				} else
+				{	/* Secondary needs to first do FETCHRESYNC rollback to synchronize with primary */
+					reply_msgp->type = REPL_ROLLBACK_FIRST;
+					gtmsource_repl_send((repl_msg_ptr_t)reply_msgp, "REPL_ROLLBACK_FIRST",
+						resync_seqno, INVALID_SUPPL_STRM);
+				}
 			}
 		} else
 		{	/* REPL_FETCH_RESYNC received and state is WAITING_FOR_RESTART */
 			if (rollback_first || secondary_ahead)
 			{	/* Primary and Secondary are currently not in sync */
 				if (!rollback_first)
-				{	/* In the case of a multisite secondary, we know the secondary is ahead of the primary
-					 * in terms of journal seqno but the last triples are identical. This means that the
-					 * secondary is in sync with the primary until the primary's journal seqno
-					 * ("local_jnl_seqno") which should be the new resync seqno. In the case of a dualsite
-					 * secondary, we know that the secondary's jnl seqno is ahead of the primary's resync
-					 * seqno which should be the seqno for the secondary to rollback to. In this case,
-					 * "local_jnl_seqno" would have been reset already to "jctl->max_dualsite_resync_seqno"
-					 * above so we can use that.
+				{	/* We know the secondary is ahead of the primary in terms of journal seqno but the last
+					 * histinfo records are identical. This means that the secondary is in sync with the
+					 * primary until the primary's journal seqno ("local_jnl_seqno") which should be the new
+					 * resync seqno.
 					 */
 					resync_seqno = local_jnl_seqno;
 				} else
 				{	/* Determine the resync seqno between this primary and secondary by comparing
-					 * local and remote triples from the tail of the instance file until we reach
-					 * one seqno whose triple information is identical in both.
+					 * local and remote histinfo records from the tail of the instance file until we reach
+					 * one seqno whose histinfo information is identical in both.
 					 */
-					assert(!secondary_is_dualsite);
 					assert(1 != recvd_seqno);
-					resync_seqno = gtmsource_find_resync_seqno(&local_triple, local_triple_num,
-											&remote_triple, remote_triple_num);
+					resync_seqno = gtmsource_find_resync_seqno(&local_histinfo, &remote_histinfo);
 					assert((MAX_SEQNO != resync_seqno) || (GTMSOURCE_CHANGING_MODE == gtmsource_state)
-						|| (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state));
+						|| (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+						|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state));
 				}
 			} else
 			{	/* Primary and Secondary are in sync upto "recvd_seqno". Send it back as the new resync seqno. */
@@ -719,78 +878,38 @@ int gtmsource_process(void)
 				assert(GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state && REPL_FETCH_RESYNC == recvd_msg_type);
 				reply_msgp->type = REPL_RESYNC_SEQNO;
 				QWASSIGN(*(seq_num *)&reply_msgp->start_seqno[0], resync_seqno);
-				gtmsource_repl_send((repl_msg_ptr_t)reply_msgp, "REPL_RESYNC_SEQNO", resync_seqno);
+				gtmsource_repl_send((repl_msg_ptr_t)reply_msgp, "REPL_RESYNC_SEQNO",
+					resync_seqno, INVALID_SUPPL_STRM);
 			}
 		}
 		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 			return (SS_NORMAL);	/* "gtmsource_repl_send" or "gtmsource_find_resync_seqno" did not complete */
-		if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+		if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 			continue;	/* "gtmsource_repl_send" or "gtmsource_find_resync_seqno" did not complete */
 		assert(MAX_SEQNO != resync_seqno);
-		/* Now that the initial communication with the secondary has happened, do additional checks if the secondary
-		 * is found to be dualsite. If so, update fields in the journal pool to reflect that. Get the appropriate
-		 * lock before updating those fields.
-		 */
-		if (secondary_is_dualsite)
-		{	/* Successfully connected to a dual-site secondary. Check that there are no other source
-			 * servers running. If yes, issue REPLUPGRADESEC error.
-			 */
-			repl_inst_ftok_sem_lock();
-			semval = get_sem_info(SOURCE, SRC_SERV_COUNT_SEM, SEM_INFO_VAL);
-			if (-1 == semval)
-			{
-				repl_inst_ftok_sem_release();
-				repl_log(gtmsource_log_fp, TRUE, FALSE,
-					"Error fetching source server count semaphore value : %s\n", REPL_SEM_ERROR);
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset due to above error\n");
-				repl_close(&gtmsource_sock_fd);
-				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-				gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
-				continue;
-			} else if (1 < semval)
-			{	/* There are source servers running on this instance other than us. Cannot connect to a
-				 * dual-site secondary in this case as well.
-				 */
-				repl_inst_ftok_sem_release();
-				repl_log(gtmsource_log_fp, TRUE, FALSE, "Multiple source servers cannot be running while "
-					"connecting to dual-site secondary.\n");
-				gtm_putmsg(VARLSTCNT(4) ERR_REPLUPGRADESEC, 2,
-					LEN_AND_STR((char *)gtmsource_local->secondary_instname));
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset due to above error\n");
-				repl_close(&gtmsource_sock_fd);
-				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-				gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
-				continue;
-			}
-			/* At this point, we are the only source server running (guaranteed by the ftok lock we are holding)
-			 * and are connected to a dual-site secondary. Update the "jctl" structure to reflect this.
-			 */
-			jctl->secondary_is_dualsite = TRUE;
-			repl_inst_ftok_sem_release();
-		}
 		/* After having established connection, initialize a few fields in the gtmsource_local
 		 * structure and flush those changes to the instance file on disk.
 		 */
-		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
-		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-		grab_lock(jnlpool.jnlpool_dummy_reg);
+		GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+			continue;
 		gtmsource_local->connect_jnl_seqno = jctl->jnl_seqno;
 		gtmsource_local->send_losttn_complete = jctl->send_losttn_complete;
-		rel_lock(jnlpool.jnlpool_dummy_reg);
 		/* Now that "connect_jnl_seqno" has been updated, flush it to corresponding gtmsrc_lcl on disk */
-		repl_inst_ftok_sem_lock();
-		repl_inst_flush_gtmsrc_lcl();	/* this requires the ftok semaphore to be held */
-		repl_inst_ftok_sem_release();
+		repl_inst_flush_gtmsrc_lcl();	/* this requires the jnlpool lock to be held */
+		rel_lock(jnlpool.jnlpool_dummy_reg);
 		if (REPL_WILL_RESTART_WITH_INFO != reply_msgp->type)
 		{
 			assert(reply_msgp->type == REPL_RESYNC_SEQNO || reply_msgp->type == REPL_ROLLBACK_FIRST);
-			if ((REPL_RESYNC_SEQNO == reply_msgp->type) && (secondary_is_dualsite || secondary_was_rootprimary))
+			if ((REPL_RESYNC_SEQNO == reply_msgp->type) && secondary_was_rootprimary)
 			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sent REPL_RESYNC_SEQNO message with SEQNO %llu\n",
-					 (*(seq_num *)&reply_msgp->start_seqno[0]));
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sent REPL_RESYNC_SEQNO message with SEQNO %llu [0x%llx]\n",
+					(*(seq_num *)&reply_msgp->start_seqno[0]), (*(seq_num *)&reply_msgp->start_seqno[0]));
 				region_top = gd_header->regions + gd_header->n_regions;
 				assert(NULL != jnlpool.jnlpool_dummy_reg);
-				repl_inst_ftok_sem_lock();
+				GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+				if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+					continue;
 				zqgblmod_seqno = jctl->max_zqgblmod_seqno;
 				if (0 == zqgblmod_seqno)
 				{	/* If zqgblmod_seqno in all file headers is 0, it implies that this is the first
@@ -801,18 +920,22 @@ int gtmsource_process(void)
 					 */
 					zqgblmod_seqno = MAX_SEQNO;	/* actually 0xFFFFFFFFFFFFFFFF (max possible seqno) */
 					/* Reset any pending MUPIP REPLIC -SOURCE -LOSTTNCOMPLETE */
-					grab_lock(jnlpool.jnlpool_dummy_reg);
 					jctl->send_losttn_complete = FALSE;
 					gtmsource_local->send_losttn_complete = jctl->send_losttn_complete;
-					rel_lock(jnlpool.jnlpool_dummy_reg);
 				}
+				rel_lock(jnlpool.jnlpool_dummy_reg);
 				REPL_DPRINT2("BEFORE FINDING RESYNC - zqgblmod_seqno is %llu", zqgblmod_seqno);
 				REPL_DPRINT2(", curr_seqno is %llu\n", jctl->jnl_seqno);
 				if (zqgblmod_seqno > resync_seqno)
 				{	/* reset "zqgblmod_seqno" and "zqgblmod_tn" in all fileheaders to "resync_seqno" */
-					gtmsource_update_zqgblmod_seqno_and_tn(resync_seqno);
+					if (SS_NORMAL != gtmsource_update_zqgblmod_seqno_and_tn(resync_seqno))
+					{
+						assert(GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state);
+						if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+							continue;
+					}
+
 				}
-				repl_inst_ftok_sem_release();
 			}
 			/* Could send a REPL_CLOSE_CONN message here */
 			/* It is expected that on receiving this msg, the Receiver Server will break the connection and exit. */
@@ -828,7 +951,7 @@ int gtmsource_process(void)
 		gtmsource_local->repl_zlib_cmp_level = repl_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* no compression by default */
 		if (!gtmsource_received_cmp2uncmp_msg && (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level))
 		{
-			if (REPL_PROTO_VER_MULTISITE_CMP <= gtmsource_local->remote_proto_ver)
+			if (REPL_PROTO_VER_MULTISITE_CMP <= remote_side->proto_ver)
 			{	/* Receiver server is running a version of GT.M that supports compression of replication stream.
 				 * Send test message with compressed data to check if it is able to decompress properly. If so,
 				 * enable compression on the replication pipe. Compression level set in repl_zlib_cmp_level.
@@ -866,53 +989,28 @@ int gtmsource_process(void)
 		assert(1 <= gtmsource_local->read_jnl_seqno);
 		/* Now that "gtmsource_local->read_jnl_seqno" is initialized, ensure the first send gets logged. */
 		gtmsource_reinit_logseqno();
-		/* Before setting "next_triple_seqno", check if we have at least one triple in the replication instance file.
-		 * The only case when there can be no triples is if this instance is a propagating primary. Assert that.
-		 * In this case, wait for this instance's primary to send the first triple before setting the next_triple_seqno.
-		 * Note that we are fetching the value of "num_triples" without holding a lock on the instance file but that is
-		 * ok since all we care about is if it is 0 or not. We do not rely on the actual value until we get the ftok lock.
-		 */
-		num_triples = jnlpool.repl_inst_filehdr->num_triples;
-		assert(0 <= num_triples);
-		assert(num_triples || jctl->upd_disabled);
-		gtmsource_local->next_triple_num = -1;	/* Initial value. Reset by the call to "gtmsource_set_next_triple_seqno"
-							 * invoked in turn by "gtmsource_send_new_triple" down below */
-		if (jctl->upd_disabled && !num_triples)
-		{	/* Wait for corresponding primary to send a new triple and the receiver server on this instance
-			 * to write that to the replication instance file.
-			 */
-			assert(-1 == gtmsource_local->next_triple_num);
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server waiting for first triple to be written by "
-				"update process\n");
-			do
-			{
-				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_FIRSTTRIPLE);
-				gtmsource_poll_actions(FALSE);
-				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
-					return (SS_NORMAL);
-				num_triples = jnlpool.repl_inst_filehdr->num_triples;
-				if (num_triples)	/* Number of triples is non-zero */
-					break;
-			} while (TRUE);
-			repl_log(gtmsource_log_fp, TRUE, TRUE,
-				"First triple written by update process. Source server proceeding.\n");
-		}
 		gtmsource_init_heartbeat();
 		/* Internal filters are needed as long as the filter format of the originating side is greater or equal to the
 		 * filter format of the secondary side
 		 */
-		if ((jnl_ver >= remote_jnl_ver) && (IF_NONE != repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL]))
+		if ((this_side->jnl_ver >= remote_side->jnl_ver)
+			&& (IF_NONE != repl_filter_cur2old[remote_side->jnl_ver - JNL_VER_EARLIEST_REPL]))
 		{
-			assert(IF_INVALID != repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
-			assert(IF_INVALID != repl_filter_old2cur[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
+			assert(IF_INVALID != repl_filter_cur2old[remote_side->jnl_ver - JNL_VER_EARLIEST_REPL]);
+			assert(IF_INVALID != repl_filter_old2cur[remote_side->jnl_ver - JNL_VER_EARLIEST_REPL]);
 			/* reverse transformation should exist */
-			assert(IF_NONE != repl_filter_old2cur[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
-			if (FALSE != ((TREF(replgbl)).null_subs_xform = (primary_side_std_null_coll &&
-					!secondary_side_std_null_coll || secondary_side_std_null_coll &&
-					!primary_side_std_null_coll)))
-				(TREF(replgbl)).null_subs_xform = (primary_side_std_null_coll ?
+			assert(IF_NONE != repl_filter_old2cur[remote_side->jnl_ver - JNL_VER_EARLIEST_REPL]);
+			if (this_side->is_std_null_coll != remote_side->is_std_null_coll)
+				remote_side->null_subs_xform = (this_side->is_std_null_coll ?
 							STDNULL_TO_GTMNULL_COLL : GTMNULL_TO_STDNULL_COLL);
+			else
+				remote_side->null_subs_xform = FALSE;
 			gtmsource_filter |= INTERNAL_FILTER;
+			/* Any time the ^#t global format version is bumped, the below assert will trip. This way, anyone who bumps
+			 * the trigger label ensures that the internal filter routines in repl_filter.c are accordingly changed to
+			 * downgrade triggers before sending them across to a receiver that understands ONLY the prior ^#t format.
+			 */
+			assert(0 == MEMCMP_LIT(HASHT_GBL_CURLABEL, "2"));
 			gtmsource_alloc_filter_buff(gtmsource_msgbufsiz);
 		} else
 		{
@@ -923,30 +1021,15 @@ int gtmsource_process(void)
 		catchup = FALSE;
 		force_recv_check = TRUE;
 		xon_wait_logged = FALSE;
-		if (secondary_is_dualsite)
-		{
-			gtmsource_upd_reg = gtmsource_mru_reg = NULL;
-			for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions;
-				reg < region_top; reg++)
-			{
-				csa = &FILE_INFO(reg)->s_addrs;
-				if (REPL_ALLOWED(csa->hdr))
-				{
-					if (NULL == gtmsource_upd_reg)
-						gtmsource_upd_reg = gtmsource_mru_reg = reg;
-					else if (csa->hdr->reg_seqno > FILE_INFO(gtmsource_mru_reg)->s_addrs.hdr->reg_seqno)
-						gtmsource_mru_reg = reg;
-				}
-			}
-		}
-		/* Flush "gtmsource_local->read_jnl_seqno" and db file header "dualsite_resync_seqnos" to disk right now.
+		/* Flush "gtmsource_local->read_jnl_seqno" to disk right now.
 		 * This will serve as a reference point for next timed flush to occur.
 		 */
 		gtmsource_flush_fh(gtmsource_local->read_jnl_seqno);
-		if (secondary_is_dualsite)
-			gtmsource_last_flush_reg_seq = jctl->jnl_seqno;
-		gtmsource_local->send_new_triple = TRUE;	/* Send new triple unconditionally at start of connection */
-		gtmsource_local->next_triple_seqno = MAX_SEQNO;	/* Initial value. Reset by "gtmsource_send_new_triple" below */
+		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+			continue;
+		gtmsource_local->send_new_histrec = TRUE;	/* Send new histinfo unconditionally at start of connection */
+		gtmsource_local->next_histinfo_seqno = MAX_SEQNO; /* Initial value. Reset by "gtmsource_send_new_histrec" below */
+		assert(-1 == gtmsource_local->next_histinfo_num);
 		while (TRUE)
 		{
 			gtmsource_poll_actions(TRUE);
@@ -958,25 +1041,27 @@ int gtmsource_process(void)
 			{	/* Send LOSTTNCOMPLETE across to the secondary and reset flag to FALSE */
 				losttncomplete_msg.type = REPL_LOSTTNCOMPLETE;
 				losttncomplete_msg.len = MIN_REPL_MSGLEN;
-				gtmsource_repl_send((repl_msg_ptr_t)&losttncomplete_msg, "REPL_LOSTTNCOMPLETE", MAX_SEQNO);
-				grab_lock(jnlpool.jnlpool_dummy_reg);
+				gtmsource_repl_send((repl_msg_ptr_t)&losttncomplete_msg, "REPL_LOSTTNCOMPLETE",
+					MAX_SEQNO, INVALID_SUPPL_STRM);
+				GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+				if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+					break; /* the outerloop will continue */
 				gtmsource_local->send_losttn_complete = FALSE;
 				rel_lock(jnlpool.jnlpool_dummy_reg);
 			}
-			if (gtmsource_local->send_new_triple)
-			{	/* We are at the beginning of a new triple boundary. Send a REPL_NEW_TRIPLE message
-				 * before sending journal records for seqnos corresponding to this triple.
+			if (gtmsource_local->send_new_histrec)
+			{	/* We are at the beginning of a new histinfo record boundary. Send a REPL_HISTREC message
+				 * before sending journal records for seqnos corresponding to this histinfo.
 				 */
-				if (REPL_PROTO_VER_MULTISITE <= gtmsource_local->remote_proto_ver)
-				{	/* Remote version supports multi-site functionality. Send REPL_NEW_TRIPLE and friends */
-					gtmsource_send_new_triple(rcvr_same_endianness);
-					if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
-						return (SS_NORMAL);
-					if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
-						break;
-					assert(FALSE == gtmsource_local->send_new_triple);
-				} else
-					gtmsource_local->send_new_triple = FALSE;	/* Simulate a false new triple send */
+				assert(REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver);
+				/* Remote version supports multi-site functionality. Send REPL_HISTREC and friends */
+				gtmsource_send_new_histrec();
+				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+					return (SS_NORMAL);
+				if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+					|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+					break;
+				assert(FALSE == gtmsource_local->send_new_histrec);
 			}
 			/* If the backlog is high, we want to avoid communication overhead as much as possible. We switch
 			 * our communication mode to *catchup* mode, wherein we don't wait for the pipe to become ready to
@@ -989,24 +1074,30 @@ int gtmsource_process(void)
 			prev_catchup = catchup;
 			assert(jctl->write_addr >= gtmsource_local->read_addr);
 			backlog_bytes = jctl->write_addr - gtmsource_local->read_addr;
+			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+				break; /* the outerloop will continue */
 			jnl_seqno = jctl->jnl_seqno;
+			rel_lock(jnlpool.jnlpool_dummy_reg);
 			assert(jnl_seqno >= pre_read_seqno - 1); /* jnl_seqno >= pre_read_seqno is the most common case;
 								      * see gtmsource_readpool() for when the rare case can occur */
 			backlog_count = (jnl_seqno >= pre_read_seqno) ? (jnl_seqno - pre_read_seqno) : 0;
 			catchup = (BACKLOG_BYTES_THRESHOLD <= backlog_bytes || BACKLOG_COUNT_THRESHOLD <= backlog_count);
 			if (!prev_catchup && catchup) /* transition from non catchup to catchup */
 			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server entering catchup mode at Seqno : %llu "
-					 "Current backlog : %llu Backlog size in journal pool : %llu bytes\n", pre_read_seqno,
-					 backlog_count, backlog_bytes);
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server entering catchup mode at Seqno %llu "
+					"[0x%llx] : Current backlog %llu [0x%llx] : Backlog size in journal pool %llu [0x%llx] "
+					"bytes\n", pre_read_seqno, pre_read_seqno, backlog_count, backlog_count,
+					backlog_bytes, backlog_bytes);
 				prev_now = gtmsource_now;
 				prev_msg_sent = repl_source_msg_sent;
 				force_recv_check = TRUE;
 			} else if (prev_catchup && !catchup) /* transition from catchup to non catchup */
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server returning to regular mode from catchup mode "
-					 "at Seqno : %llu Current backlog : %llu Backlog size in journal pool : %llu bytes\n",
-					 pre_read_seqno, backlog_count, backlog_bytes);
+					 "at Seqno %llu [0x%llx] : Current backlog %llu [0x%llx] : Backlog size in journal pool "
+					 " %llu [0x%llx] bytes\n", pre_read_seqno, pre_read_seqno, backlog_count, backlog_count,
+					backlog_bytes, backlog_bytes);
 				if (gtmsource_msgbufsiz - MAX_REPL_MSGLEN > 2 * OS_PAGE_SIZE)
 				{/* We have expanded the buffer by too much (could have been avoided had we sent one transaction
 				  * at a time while reading from journal files); let's revert back to our initial buffer size.
@@ -1073,6 +1164,28 @@ int gtmsource_process(void)
 			force_recv_check = FALSE;
 			if (SS_NORMAL == status && 0 != recvd_len)
 			{	/* Process the received control message */
+				assert(MIN_REPL_MSGLEN == recvd_len);
+				/* One is not always guaranteed the received message is in source native endian format.
+				 * See endianness related comments in gtmsource_recv_restart for why. So be safe and handle
+				 * it just like how gtmsource_recv_restart does. The below check works as all messages we
+				 * expect at this point have a fixed length of MIN_REPL_MSGLEN.
+				 */
+				msg_is_cross_endian = (((unsigned)MIN_REPL_MSGLEN < (unsigned)gtmsource_msgp->len)
+						&& ((unsigned)MIN_REPL_MSGLEN == GTM_BYTESWAP_32((unsigned)gtmsource_msgp->len)));
+				if (msg_is_cross_endian)
+				{
+					gtmsource_msgp->type = GTM_BYTESWAP_32(gtmsource_msgp->type);
+					gtmsource_msgp->len = GTM_BYTESWAP_32(gtmsource_msgp->len);
+				}
+				assert(MIN_REPL_MSGLEN == gtmsource_msgp->len);
+				assert(remote_side->endianness_known);
+				/* Even though we know the endianness of the remote side at this point, we use
+				 * msg_is_cross_endian as it should be a safer alternative in case of messages
+				 * like REPL_XOFF_ACK_ME where the receiver (particularly pre-V55000 versions)
+				 * is not careful to send in a consistent endian format across versions. So we
+				 * use the endianness of this particular message rather than the endianness of
+				 * the connection.
+				 */
 				switch(gtmsource_msgp->type)
 				{
 					case REPL_XOFF:
@@ -1085,9 +1198,13 @@ int gtmsource_process(void)
 						if (REPL_XOFF_ACK_ME == gtmsource_msgp->type)
 						{
 							xoff_ack.type = REPL_XOFF_ACK;
-							QWASSIGN(*(seq_num *)&xoff_ack.msg[0], *(seq_num *)&gtmsource_msgp->msg[0]);
+							tmp_seqno = *(seq_num *)&gtmsource_msgp->msg[0];
+							if (msg_is_cross_endian)
+								tmp_seqno = GTM_BYTESWAP_64(tmp_seqno);
+							*(seq_num *)&xoff_ack.msg[0] = tmp_seqno;
 							xoff_ack.len = MIN_REPL_MSGLEN;
-							gtmsource_repl_send((repl_msg_ptr_t)&xoff_ack, "REPL_XOFF_ACK", MAX_SEQNO);
+							gtmsource_repl_send((repl_msg_ptr_t)&xoff_ack, "REPL_XOFF_ACK",
+								MAX_SEQNO, INVALID_SUPPL_STRM);
 							if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 								return (SS_NORMAL);	/* "gtmsource_repl_send" did not complete */
 							if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
@@ -1120,6 +1237,8 @@ int gtmsource_process(void)
 					case REPL_CMP2UNCMP:
 					case REPL_START_JNL_SEQNO:
 						QWASSIGN(recvd_seqno, *(seq_num *)&gtmsource_msgp->msg[0]);
+						if (msg_is_cross_endian)
+							recvd_seqno = GTM_BYTESWAP_64(recvd_seqno);
 						gtmsource_state = gtmsource_local->gtmsource_state
 							= GTMSOURCE_SEARCHING_FOR_RESTART;
 						if ((REPL_BADTRANS == gtmsource_msgp->type)
@@ -1129,25 +1248,40 @@ int gtmsource_process(void)
 							recvd_start_flags = START_FLAG_NONE;
 							if (REPL_BADTRANS == gtmsource_msgp->type)
 								repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_BADTRANS "
-									"message with SEQNO %llu\n", recvd_seqno);
+									"message with SEQNO %llu [0x%llx]\n",
+									recvd_seqno, recvd_seqno);
 							else
 							{
 								repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_CMP2UNCMP "
-									"message with SEQNO %llu\n", recvd_seqno);
+									"message with SEQNO %llu [0x%llx]\n",
+									recvd_seqno, recvd_seqno);
 								repl_log(gtmsource_log_fp, TRUE, FALSE,
 									"Defaulting to NO compression for this connection\n");
 								gtmsource_received_cmp2uncmp_msg = TRUE;
 							}
 						} else
 						{
-							already_communicated = FALSE;
 							recvd_start_flags = ((repl_start_msg_ptr_t)gtmsource_msgp)->start_flags;
+							if (msg_is_cross_endian)
+								recvd_start_flags = GTM_BYTESWAP_32(recvd_start_flags);
+							already_communicated = FALSE;
 							repl_log(gtmsource_log_fp, TRUE, TRUE,
-								 "Received REPL_START_JNL_SEQNO message with SEQNO %llu. Possible "
-								 "crash of recvr/update process\n", recvd_seqno);
+								"Received REPL_START_JNL_SEQNO message with SEQNO %llu [0x%llx]. "
+								"Possible crash of recvr/update process\n",
+								recvd_seqno, recvd_seqno);
 						}
 						break;
 					case REPL_HEARTBEAT:
+						if (msg_is_cross_endian)
+						{
+							heartbeat_msg = (repl_heartbeat_msg_ptr_t)gtmsource_msgp;
+							tmp_seqno = *(seq_num *)&heartbeat_msg->ack_seqno[0];
+							tmp_seqno = GTM_BYTESWAP_64(tmp_seqno);
+							*(seq_num *)&heartbeat_msg->ack_seqno[0] = tmp_seqno;
+							tmp_time4 = *(gtm_time4_t *)&heartbeat_msg->ack_time[0];
+							tmp_time4 = GTM_BYTESWAP_32(tmp_time4);
+							*(gtm_time4_t *)&heartbeat_msg->ack_time[0] = tmp_time4;
+						}
 						gtmsource_process_heartbeat((repl_heartbeat_msg_ptr_t)gtmsource_msgp);
 						break;
 					default:
@@ -1204,7 +1338,11 @@ int gtmsource_process(void)
 					xon_wait_logged = TRUE;
 				}
 				if (GTMSOURCE_FH_FLUSH_INTERVAL <= difftime(gtmsource_now, gtmsource_last_flush_time))
+				{
 					gtmsource_flush_fh(gtmsource_local->read_jnl_seqno);
+					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+						break; /* the outerloop will continue */
+				}
 				continue;
 			}
 			if (GTMSOURCE_SEARCHING_FOR_RESTART  == gtmsource_state ||
@@ -1217,21 +1355,28 @@ int gtmsource_process(void)
 			if (force_recv_check) /* we want to poll the incoming pipe for possible XOFF */
 				continue;
 			assert(pre_read_seqno == gtmsource_local->read_jnl_seqno);
+			GRAB_GTMSOURCE_SRV_LATCH(gtmsource_local, max_epoch_interval);
+			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+				break; /* the outerloop will continue */
 			tot_tr_len = gtmsource_get_jnlrecs(&gtmsource_msgp->msg[0], &data_len,
 							   gtmsource_msgbufsiz - REPL_MSG_HDRLEN,
 							   !(gtmsource_filter & EXTERNAL_FILTER));
+			rel_gtmsource_srv_latch(&gtmsource_local->gtmsource_srv_latch);
+			/* It is safe to send the journal records as we are guaranteed NO online rollback happened in between
+			 * and so we won't be sending garbage
+			 */
 			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 				return (SS_NORMAL);
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 				break;
-			if (GTMSOURCE_SEND_NEW_TRIPLE == gtmsource_state)
-			{	/* This is a signal from "gtmsource_get_jnlrecs" that a REPL_NEW_TRIPLE message has to be sent
-				 * first before sending any more seqnos across. Set "gtmsource_local->send_new_triple" to TRUE.
+			if (GTMSOURCE_SEND_NEW_HISTINFO == gtmsource_state)
+			{	/* This is a signal from "gtmsource_get_jnlrecs" to send a REPL_HISTREC message first
+				 * before sending any more seqnos across. Set "gtmsource_local->send_new_histrec" to TRUE.
 				 */
 				assert(0 == tot_tr_len);
-				gtmsource_local->send_new_triple = TRUE;	/* Will cause a new triple to be sent first */
+				gtmsource_local->send_new_histrec = TRUE; /* Will cause a new histinfo record to be sent first */
 				gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SENDING_JNLRECS;
-				continue;	/* Send a REPL_NEW_TRIPLE message first and then send journal records */
+				continue;	/* Send a REPL_HISTREC message first and then send journal records */
 			}
 			post_read_seqno = gtmsource_local->read_jnl_seqno;
 			if (0 <= tot_tr_len)
@@ -1316,7 +1461,8 @@ int gtmsource_process(void)
 					assert((REPL_TR_JNL_RECS == send_msgp->type)
 							&& (0 == (send_msgp->len % JNL_REC_START_BNDRY)));
 					/* At this point send_msgp is the buffer to be sent and send_tr_len is the send size */
-					if (!rcvr_same_endianness && (jnl_ver < remote_jnl_ver))
+					assert(remote_side->endianness_known);
+					if (remote_side->cross_endian && (this_side->jnl_ver < remote_side->jnl_ver))
 					{	/* Cross-endian replication with GT.M version on primary being lesser than that
 						 * the secondary. Do the endian conversion in the primary so that the secondary
 						 * can consume it as-is.
@@ -1375,7 +1521,7 @@ int gtmsource_process(void)
 					 * sequence number from where the source server should start sending. So, even if
 					 * the source server notes down a higher value of journal sequence number in
 					 * jnlpool.gtmsource_local->read_jnl_seqno, it is not a problem since the receiver
-					 * server will communicate the appropriate sequence number as part of the triple
+					 * server will communicate the appropriate sequence number as part of the histinfo
 					 * exchange.
 					 */
 					REPL_SEND_LOOP(gtmsource_sock_fd, send_msgp, send_tr_len, catchup, &poll_immediate)
@@ -1384,12 +1530,18 @@ int gtmsource_process(void)
 						if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 						{
 							gtmsource_flush_fh(post_read_seqno);
+							if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+								break;
 							return (SS_NORMAL);
 						}
 					}
+					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+						break; /* the outerloop will continue */
 					if (SS_NORMAL != status)
 					{
 						gtmsource_flush_fh(post_read_seqno);
+						if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+							break; /* the outerloop will continue */
 						if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
 						{
 							repl_log(gtmsource_log_fp, TRUE, TRUE,
@@ -1425,7 +1577,7 @@ int gtmsource_process(void)
 						 * be behind the receiver server's journal sequence number. But, that is
 						 * okay since as part of reconnection (when the source server comes back up),
 						 * the receiever server will communicate the appropriate sequence number as
-						 * part of the triple exchange.
+						 * part of the histinfo exchange.
 						 */
 						assert((EREPL_INTLFILTER_BADREC == repl_errno)
 							|| (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
@@ -1435,36 +1587,12 @@ int gtmsource_process(void)
 						INT_FILTER_RTS_ERROR(filter_seqno); /* no return */
 					}
 					jnlpool.gtmsource_local->read_jnl_seqno = post_read_seqno;
-					if (secondary_is_dualsite)
-					{	/* Record the "last sent seqno" in file header of most recently updated region
-						 * and one region picked in round robin order. Updating one region is sufficient
-						 * since the system's resync_seqno is computed to be the maximum of file header
-						 * resync_seqno across all regions. We choose to update multiple regions to
-						 * increase the odds of not losing information in case of a system crash.
-						 */
-						UPDATE_DUALSITE_RESYNC_SEQNO(gtmsource_mru_reg, pre_read_seqno, post_read_seqno);
-						if (gtmsource_mru_reg != gtmsource_upd_reg)
-							UPDATE_DUALSITE_RESYNC_SEQNO(gtmsource_upd_reg, pre_read_seqno,
-								post_read_seqno);
-						old_upd_reg = gtmsource_upd_reg;
-						do
-						{	/* select next region in round robin order */
-							gtmsource_upd_reg++;
-							if (gtmsource_upd_reg >= gd_header->regions + gd_header->n_regions)
-								gtmsource_upd_reg = gd_header->regions;
-									/* wrap back to first region */
-						} while (gtmsource_upd_reg != old_upd_reg && /* back to the original region? */
-								!REPL_ALLOWED(FILE_INFO(gtmsource_upd_reg)->s_addrs.hdr));
-						/* Also update "max_dualsite_resync_seqno" in the journal pool. This needs to
-						 * be maintained uptodate since this is what gets checked whenever the source
-						 * server receives a "go back" request (REPL_BADTRANS or REPL_START_JNL_SEQNO).
-						 * No need to hold a lock on the jnlpool to do this update as we are guaranteed
-						 * to be the ONLY source server running (due to secondary being dual-site).
-						 */
-						jctl->max_dualsite_resync_seqno = post_read_seqno;
-					}
 					if (GTMSOURCE_FH_FLUSH_INTERVAL <= difftime(gtmsource_now, gtmsource_last_flush_time))
+					{
 						gtmsource_flush_fh(post_read_seqno);
+						if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+							break; /* the outerloop will continue */
+					}
 					repl_source_cmp_sent += (qw_num)send_tr_len;
 					repl_source_msg_sent += (qw_num)pre_cmpmsglen;
 					repl_source_data_sent += (qw_num)(pre_cmpmsglen)
@@ -1480,11 +1608,15 @@ int gtmsource_process(void)
 						assert(jnl_seqno >= post_read_seqno - 1);
 						diff_seqno = (jnl_seqno >= post_read_seqno) ?
 								(jnl_seqno - post_read_seqno) : 0;
-						repl_log(gtmsource_log_fp, FALSE, FALSE, "REPL INFO - Tr num : %llu", log_seqno);
-						repl_log(gtmsource_log_fp, FALSE, FALSE, "  Tr Total : %llu  Msg Total : %llu"
-							"  CmpMsg Total : %llu  ", repl_source_data_sent, repl_source_msg_sent,
-							repl_source_cmp_sent);
-						repl_log(gtmsource_log_fp, FALSE, TRUE, "Current backlog : %llu\n", diff_seqno);
+						repl_log(gtmsource_log_fp, FALSE, FALSE, "REPL INFO - Seqno : %llu [0x%llx]",
+							log_seqno, log_seqno);
+						repl_log(gtmsource_log_fp, FALSE, FALSE, "  Jnl Total : %llu [0x%llx] Msg Total :"
+							" %llu [0x%llx] CmpMsg Total : %llu [0x%llx] ",
+							repl_source_data_sent, repl_source_data_sent,
+							repl_source_msg_sent, repl_source_msg_sent,
+							repl_source_cmp_sent, repl_source_cmp_sent);
+						repl_log(gtmsource_log_fp, FALSE, TRUE, "Current backlog : %llu [0x%llx]\n",
+							diff_seqno, diff_seqno);
 						/* gtmsource_now is updated by the heartbeat protocol every heartbeat
 						 * interval. To cut down on calls to time(), we use gtmsource_now as the
 						 * time to figure out if we have to log statistics. This works well as the
@@ -1510,9 +1642,10 @@ int gtmsource_process(void)
 							delta_msg_sent = repl_source_msg_sent
 										- repl_source_lastlog_msg_sent;
 							repl_log(gtmsource_log_fp, TRUE, FALSE, "REPL INFO since last log : "
-								"Time elapsed : %00.f  Tr sent : %llu  Tr bytes : %llu  "
-								"Msg bytes : %llu\n", time_elapsed,
-								delta_sent_cnt, delta_data_sent, delta_msg_sent);
+								"Time elapsed : %00.f  Tr sent : %llu [0x%llx]  Tr bytes : %llu "
+								"[0x%llx]  Msg bytes : %llu [0x%llx]\n", time_elapsed,
+								delta_sent_cnt, delta_sent_cnt, delta_data_sent, delta_data_sent,
+								delta_msg_sent, delta_msg_sent);
 							repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO since last log : "
 								"Time elapsed : %00.f  Tr sent/s : %f  Tr bytes/s : %f  "
 								"Msg bytes/s : %f\n", time_elapsed,
@@ -1530,6 +1663,8 @@ int gtmsource_process(void)
 				} else /* data_len == 0 */
 				{	/* nothing to send */
 					gtmsource_flush_fh(post_read_seqno);
+					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+						break; /* the outerloop will continue */
 					poll_time = poll_wait;
 					rel_quant(); /* give up processor and let other processes run */
 				}

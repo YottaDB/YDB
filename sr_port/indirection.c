@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,21 +16,19 @@
 #include "subscript.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
+error_def(ERR_LPARENMISSING);
+error_def(ERR_MAXNRSUBSCRIPTS);
+error_def(ERR_RPARENMISSING);
 
 int indirection(oprtype *a)
 {
-	triple		*ref,*next;
-	oprtype		subs[MAX_INDSUBSCRIPTS];
-	oprtype		x,*sb1,*sb2;
 	char		c;
-	error_def(ERR_MAXNRSUBSCRIPTS);
-	error_def(ERR_RPARENMISSING);
-	error_def(ERR_LPARENMISSING);
+	oprtype		*sb1, *sb2, subs[MAX_INDSUBSCRIPTS], x;
+	triple		*next, *ref;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(window_token == TK_ATSIGN);
+	assert(TK_ATSIGN == TREF(window_token));
 	if (!(TREF(expr_depth))++)
 		TREF(expr_start) = TREF(expr_start_orig) = NULL;
 	advancewindow();
@@ -39,14 +37,15 @@ int indirection(oprtype *a)
 		TREF(expr_depth) = 0;
 		return FALSE;
 	}
-	coerce(a,OCT_MVAL);
+	coerce(a, OCT_MVAL);
 	ex_tail(a);
 	if (!(--(TREF(expr_depth))))
 		TREF(shift_side_effects) = FALSE;
-	if (window_token == TK_ATSIGN)
+	TREF(saw_side_effect) = TREF(shift_side_effects);	/* TRUE or FALSE, at this point they're the same */
+	if (TK_ATSIGN == TREF(window_token))
 	{
 		advancewindow();
-		if (window_token != TK_LPAREN)
+		if (TK_LPAREN != TREF(window_token))
 		{
 			stx_error(ERR_LPARENMISSING);
 			return FALSE;
@@ -55,20 +54,20 @@ int indirection(oprtype *a)
 		sb1 = sb2 = subs;
 		for (;;)
 		{
-			if (sb1 >= ARRAYTOP(subs))
+			if (ARRAYTOP(subs) <= sb1)
 			{
 				stx_error(ERR_MAXNRSUBSCRIPTS);
 				return FALSE;
 			}
 			advancewindow();
-			if (!expr(sb1++))
+			if (EXPR_FAIL == expr(sb1++, MUMPS_EXPR))
 				return FALSE;
-			if ((c = window_token) == TK_RPAREN)
+			if (TK_RPAREN == (c = TREF(window_token)))	/* NOTE assignment */
 			{
 				advancewindow();
 				break;
 			}
-			if (c != TK_COMMA)
+			if (TK_COMMA != c)
 			{
 				stx_error(ERR_RPARENMISSING);
 				return FALSE;
@@ -90,5 +89,4 @@ int indirection(oprtype *a)
 		}
 	}
 	return TRUE;
-
 }

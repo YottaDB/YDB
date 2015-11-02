@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,32 +68,32 @@
 #define WAIT_FOR_FILE_TIME	100 /* msec */
 #define WAIT_FOR_BLOCK_TIME	100 /* msec */
 
-#define IOCTL(FDESC, REQUEST, ARG, RC) \
-{ \
-	do \
-	{ \
-		RC = ioctl(FDESC, REQUEST, ARG); \
-	} while(-1 == RC && EINTR == errno); \
-	if (-1 != RC) \
-		RC = 0; \
-	else \
-		RC = errno; \
+#define IOCTL(FDESC, REQUEST, ARG, RC)			\
+{							\
+	do						\
+	{						\
+		RC = ioctl(FDESC, REQUEST, ARG);	\
+	} while(-1 == RC && EINTR == errno);		\
+	if (-1 != RC)					\
+		RC = 0;					\
+	else						\
+		RC = errno;				\
 }
 
-#define OPENFILE(FNAME, FFLAGS, FDESC) \
-{ \
-	do \
-	{ \
-		FDESC = OPEN(FNAME, FFLAGS); \
-	} while(-1 == FDESC && EINTR == errno); \
+#define OPENFILE(FNAME, FFLAGS, FDESC)			\
+{							\
+	do						\
+	{						\
+		FDESC = OPEN(FNAME, FFLAGS);		\
+	} while(-1 == FDESC && EINTR == errno);		\
 }
 
-#define OPENFILE3(FNAME, FFLAGS, FMODE, FDESC) \
-{ \
-	do \
-	{ \
-		FDESC = OPEN3(FNAME, FFLAGS, FMODE); \
-	} while(-1 == FDESC && EINTR == errno); \
+#define OPENFILE3(FNAME, FFLAGS, FMODE, FDESC)		\
+{							\
+	do						\
+	{						\
+		FDESC = OPEN3(FNAME, FFLAGS, FMODE);	\
+	} while(-1 == FDESC && EINTR == errno);		\
 }
 
 /* OPENFILE4 not needed - io_open_try handles interrupts */
@@ -304,11 +304,11 @@
 
 #if defined(__osf__) || defined(_AIX) || defined(__sparc) || defined(__linux__) || defined(__hpux) || \
 	defined(__CYGWIN__) || defined(__MVS__)
-/* These platforms are known to support pread/pwrite. MVS is unknown and so gets the old support.
-
-   Note !! pread and pwrite do NOT (on most platforms) set the file pointer like lseek/read/write would
-   so they are NOT a drop in replacement !!
-*/
+/* These platforms are known to support pread/pwrite.
+ * !!!!!!!!!!!!!! Note !!!!!!!!!!!!!!
+ * pread and pwrite do NOT (on most platforms) set the file pointer like lseek/read/write would,
+ * so they are NOT a drop-in replacement !!
+ */
 
 #define NOPIO_ONLY(X)
 
@@ -327,35 +327,35 @@
 # endif
 #endif
 
-#define LSEEKREAD(FDESC, FPTR, FBUFF, FBUFF_LEN, RC) \
-{ \
-	ssize_t			gtmioStatus; \
-	size_t			gtmioBuffLen; \
-	off_t			gtmioPtr; \
-	sm_uc_ptr_t		gtmioBuff; \
-	gtmioBuffLen = FBUFF_LEN; \
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
-	gtmioPtr = (off_t)(FPTR); \
-	for (;;) \
-	{ \
-		if (-1 != (gtmioStatus = pread(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr))) \
-		{ \
-			gtmioBuffLen -= gtmioStatus; \
-			if (0 == gtmioBuffLen || 0 == gtmioStatus) \
-				break; \
-			gtmioBuff += gtmioStatus; \
-			gtmioPtr += gtmioStatus; \
-			continue; \
-		} \
-		if (EINTR != errno) \
-			break; \
-	} \
-	if (0 == gtmioBuffLen) \
-		RC = 0; \
-	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */ \
-		RC = errno; \
-	else \
-		RC = -1;		/* Something kept us from reading what we wanted */ \
+#define LSEEKREAD(FDESC, FPTR, FBUFF, FBUFF_LEN, RC)						\
+{												\
+	ssize_t			gtmioStatus;							\
+	size_t			gtmioBuffLen;							\
+	off_t			gtmioPtr;							\
+	sm_uc_ptr_t		gtmioBuff;							\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	gtmioPtr = (off_t)(FPTR);								\
+	for (;;)										\
+	{											\
+		if (-1 != (gtmioStatus = pread(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr)))	\
+		{										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
+				break;								\
+			gtmioBuff += gtmioStatus;						\
+			gtmioPtr += gtmioStatus;						\
+			continue;								\
+		}										\
+		if (EINTR != errno)								\
+			break;									\
+	}											\
+	if (0 == gtmioBuffLen)									\
+		RC = 0;										\
+	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else											\
+		RC = -1;		/* Something kept us from reading what we wanted */	\
 }
 
 /* The below macro is almost the same as LSEEKREAD except it has an extra parameter where the number of
@@ -394,98 +394,107 @@
 		RC = -1;		/* Something kept us from reading what we wanted */	\
 }
 
-#define LSEEKWRITE(FDESC, FPTR, FBUFF, FBUFF_LEN, RC) \
-{ \
-	ssize_t			gtmioStatus; \
-	size_t			gtmioBuffLen; \
-	off_t			gtmioPtr; \
-	sm_uc_ptr_t		gtmioBuff; \
-	gtmioBuffLen = FBUFF_LEN; \
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
-	gtmioPtr = (off_t)(FPTR); \
-	for (;;) \
-	{ \
-		if (-1 != (gtmioStatus = pwrite(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr))) \
-		{ \
-			gtmioBuffLen -= gtmioStatus; \
-			if (0 == gtmioBuffLen) \
-				break; \
-			gtmioBuff += gtmioStatus; \
-			gtmioPtr += gtmioStatus; \
-			continue; \
-		} \
-		if (EINTR != errno) \
-			break; \
-	} \
-	if (0 == gtmioBuffLen) \
-		RC = 0; \
-	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */ \
-		RC = errno; \
-	else \
-		RC = -1;		/* Something kept us from writing what we wanted */ \
+#define LSEEKWRITE(FDESC, FPTR, FBUFF, FBUFF_LEN, RC)						\
+{												\
+	ssize_t			gtmioStatus;							\
+	size_t			gtmioBuffLen;							\
+	off_t			gtmioPtr;							\
+	sm_uc_ptr_t		gtmioBuff;							\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	gtmioPtr = (off_t)(FPTR);								\
+	for (;;)										\
+	{											\
+		if (-1 != (gtmioStatus = pwrite(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr)))	\
+		{										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if (0 == gtmioBuffLen)							\
+				break;								\
+			gtmioBuff += gtmioStatus;						\
+			gtmioPtr += gtmioStatus;						\
+			continue;								\
+		}										\
+		if (EINTR != errno)								\
+			break;									\
+	}											\
+	if (0 == gtmioBuffLen)									\
+		RC = 0;										\
+	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else											\
+		RC = -1;		/* Something kept us from writing what we wanted */	\
 }
 
 #else /* real lseek and read/write - still need to protect against interrupts inbetween calls */
+/* Using lseek/read/write path instead of faster pread/pwrite path */
+
+#ifndef __MVS__
+#warning "Using lseek/read/write path instead of faster pread/pwrite path"
+#endif
 
 #define NOPIO_ONLY(X) X
 
 /* Note array is not initialized but first IO to a given file descriptor will initialize that element */
-#define GET_LSEEK_FLAGS_ARRAY						\
-{									\
-	GBLREF	boolean_t	*lseekIoInProgress_flags;		\
-	if ((boolean_t *)0 == lseekIoInProgress_flags)								\
-		lseekIoInProgress_flags = (boolean_t *)malloc(sysconf(_SC_OPEN_MAX) * SIZEOF(boolean_t));	\
+#define GET_LSEEK_FLAGS_ARRAY									\
+{												\
+	GBLREF	boolean_t	*lseekIoInProgress_flags;					\
+	int4	sc_open_max;									\
+	if ((boolean_t *)0 == lseekIoInProgress_flags)						\
+	{											\
+		SYSCONF(_SC_OPEN_MAX, sc_open_max);						\
+		lseekIoInProgress_flags = (boolean_t *)malloc(sc_open_max * SIZEOF(boolean_t));	\
+	}											\
 }
 
-#define GET_LSEEK_FLAG(FDESC, VAL) \
-{ \
-	GBLREF	boolean_t	*lseekIoInProgress_flags; \
-	GET_LSEEK_FLAGS_ARRAY; \
-	VAL = lseekIoInProgress_flags[(FDESC)]; \
+#define GET_LSEEK_FLAG(FDESC, VAL)				\
+{								\
+	GBLREF	boolean_t	*lseekIoInProgress_flags;	\
+	GET_LSEEK_FLAGS_ARRAY;					\
+	VAL = lseekIoInProgress_flags[(FDESC)];			\
 }
 
-#define SET_LSEEK_FLAG(FDESC, VAL) \
-{ \
-	GBLREF	boolean_t	*lseekIoInProgress_flags; \
-	GET_LSEEK_FLAGS_ARRAY; \
-	lseekIoInProgress_flags[(FDESC)] = VAL; \
+#define SET_LSEEK_FLAG(FDESC, VAL)				\
+{								\
+	GBLREF	boolean_t	*lseekIoInProgress_flags;	\
+	GET_LSEEK_FLAGS_ARRAY;					\
+	lseekIoInProgress_flags[(FDESC)] = VAL;			\
 }
 
-#define LSEEKREAD(FDESC, FPTR, FBUFF, FBUFF_LEN, RC) \
-{ \
-	GBLREF boolean_t	*lseekIoInProgress_flags; \
-	ssize_t			gtmioStatus; \
-	size_t			gtmioBuffLen; \
-	off_t			gtmioPtr; \
-	sm_uc_ptr_t		gtmioBuff; \
-	SET_LSEEK_FLAG(FDESC, TRUE); \
-	gtmioBuffLen = FBUFF_LEN; \
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
-	gtmioPtr = (off_t)(FPTR); \
-	for (;;) \
-	{ \
-		if (-1 != (gtmioStatus = (ssize_t)lseek(FDESC, gtmioPtr, SEEK_SET))) \
-		{ \
-			if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen))) \
-			{ \
-				gtmioBuffLen -= gtmioStatus; \
-				if (0 == gtmioBuffLen || 0 == gtmioStatus) \
-					break; \
-				gtmioBuff += gtmioStatus; \
-				gtmioPtr += gtmioStatus; \
-				continue; \
-			} \
-		} \
-		if (EINTR != errno) \
-			break; \
-	} \
-	if (0 == gtmioBuffLen) \
-		RC = 0; \
-	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */ \
-		RC = errno; \
-	else \
-		RC = -1;		/* Something kept us from reading what we wanted */ \
-	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */ \
+#define LSEEKREAD(FDESC, FPTR, FBUFF, FBUFF_LEN, RC)					\
+{											\
+	GBLREF boolean_t	*lseekIoInProgress_flags;				\
+	ssize_t			gtmioStatus;						\
+	size_t			gtmioBuffLen;						\
+	off_t			gtmioPtr;						\
+	sm_uc_ptr_t		gtmioBuff;						\
+	SET_LSEEK_FLAG(FDESC, TRUE);							\
+	gtmioBuffLen = FBUFF_LEN;							\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);						\
+	gtmioPtr = (off_t)(FPTR);							\
+	for (;;)									\
+	{										\
+		if (-1 != (gtmioStatus = (ssize_t)lseek(FDESC, gtmioPtr, SEEK_SET)))	\
+		{									\
+			if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))	\
+			{								\
+				gtmioBuffLen -= gtmioStatus;				\
+				if (0 == gtmioBuffLen || 0 == gtmioStatus)		\
+					break;						\
+				gtmioBuff += gtmioStatus;				\
+				gtmioPtr += gtmioStatus;				\
+				continue;						\
+			}								\
+		}									\
+		if (EINTR != errno)							\
+			break;								\
+	}										\
+	if (0 == gtmioBuffLen)								\
+		RC = 0;									\
+	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */		\
+		RC = errno;								\
+	else										\
+		RC = -1;		/* Something kept us from reading what we wanted */	\
+	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */	\
 }
 
 /* The below macro is almost the same as LSEEKREAD except it has an extra parameter where the number of
@@ -530,201 +539,199 @@
 	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */	\
 }
 
-#define LSEEKWRITE(FDESC, FPTR, FBUFF, FBUFF_LEN, RC) \
-{ \
-	GBLREF boolean_t	*lseekIoInProgress_flags; \
-	ssize_t			gtmioStatus; \
-	size_t			gtmioBuffLen; \
-	off_t			gtmioPtr; \
-	sm_uc_ptr_t		gtmioBuff; \
-	SET_LSEEK_FLAG(FDESC, TRUE); \
-	gtmioBuffLen = FBUFF_LEN; \
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
-	gtmioPtr = (off_t)(FPTR); \
-	for (;;) \
-	{ \
-		if (-1 != (gtmioStatus = (ssize_t)lseek(FDESC, gtmioPtr, SEEK_SET))) \
-		{ \
-			if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen))) \
-			{ \
-				gtmioBuffLen -= gtmioStatus; \
-				if (0 == gtmioBuffLen) \
-					break; \
-				gtmioBuff += gtmioStatus; \
-				gtmioPtr += gtmioStatus; \
-				continue; \
-			} \
-		} \
-		if (EINTR != errno) \
-			break; \
-	} \
-	if (0 == gtmioBuffLen) \
-		RC = 0; \
-	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */ \
-		RC = errno; \
-	else \
-		RC = -1;		/* Something kept us from writing what we wanted */ \
-	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */ \
+#define LSEEKWRITE(FDESC, FPTR, FBUFF, FBUFF_LEN, RC) 						\
+{												\
+	GBLREF boolean_t	*lseekIoInProgress_flags;					\
+	ssize_t			gtmioStatus;							\
+	size_t			gtmioBuffLen;							\
+	off_t			gtmioPtr;							\
+	sm_uc_ptr_t		gtmioBuff;							\
+	SET_LSEEK_FLAG(FDESC, TRUE);								\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	gtmioPtr = (off_t)(FPTR);								\
+	for (;;)										\
+	{											\
+		if (-1 != (gtmioStatus = (ssize_t)lseek(FDESC, gtmioPtr, SEEK_SET)))		\
+		{										\
+			if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen)))	\
+			{									\
+				gtmioBuffLen -= gtmioStatus;					\
+				if (0 == gtmioBuffLen)						\
+					break;							\
+				gtmioBuff += gtmioStatus;					\
+				gtmioPtr += gtmioStatus;					\
+				continue;							\
+			}									\
+		}										\
+		if (EINTR != errno)								\
+			break;									\
+	}											\
+	if (0 == gtmioBuffLen)									\
+		RC = 0;										\
+	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else											\
+		RC = -1;		/* Something kept us from writing what we wanted */	\
+	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */	\
 }
 #endif /* if old lseekread/writes */
 
-#define DOREADRC(FDESC, FBUFF, FBUFF_LEN, RC) \
-{ \
-	ssize_t		gtmioStatus; \
-	size_t		gtmioBuffLen; \
-	sm_uc_ptr_t	gtmioBuff; \
-	gtmioBuffLen = FBUFF_LEN; \
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
-	for (;;) \
-	{ \
-		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen))) \
-		{ \
-			gtmioBuffLen -= gtmioStatus; \
-			if (0 == gtmioBuffLen || 0 == gtmioStatus) \
-				break; \
-			gtmioBuff += gtmioStatus; \
-		} \
-		else if (EINTR != errno) \
-			break; \
-	} \
-	if (-1 == gtmioStatus)		/* Had legitimate error - return it */ \
-		RC = errno; \
-	else if (0 == gtmioBuffLen) \
-		RC = 0; \
-	else \
-		RC = -1;		/* Something kept us from reading what we wanted */ \
+#define DOREADRC(FDESC, FBUFF, FBUFF_LEN, RC)							\
+{												\
+	ssize_t		gtmioStatus;								\
+	size_t		gtmioBuffLen;								\
+	sm_uc_ptr_t	gtmioBuff;								\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	for (;;)										\
+	{											\
+		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))			\
+		{										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
+				break;								\
+			gtmioBuff += gtmioStatus;						\
+		}										\
+		else if (EINTR != errno)							\
+			break;									\
+	}											\
+	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else if (0 == gtmioBuffLen)								\
+		RC = 0;										\
+	else											\
+		RC = -1;		/* Something kept us from reading what we wanted */	\
 }
 
-#define DOREADRL(FDESC, FBUFF, FBUFF_LEN, RLEN) \
-{ \
-	ssize_t		gtmioStatus; \
-	size_t		gtmioBuffLen; \
-	sm_uc_ptr_t	gtmioBuff; \
-	gtmioBuffLen = FBUFF_LEN; \
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
-	for (;;) \
-	{ \
-		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen))) \
-		{ \
-			gtmioBuffLen -= gtmioStatus; \
-			if (0 == gtmioBuffLen || 0 == gtmioStatus) \
-				break; \
-			gtmioBuff += gtmioStatus; \
-		} \
-		else if (EINTR != errno) \
-		  break; \
-	} \
-	if (-1 != gtmioStatus) \
-		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually read */ \
-	else						/* Had legitimate error - return it */ \
-		RLEN = -1; \
+#define DOREADRL(FDESC, FBUFF, FBUFF_LEN, RLEN)							\
+{												\
+	ssize_t		gtmioStatus;								\
+	size_t		gtmioBuffLen;								\
+	sm_uc_ptr_t	gtmioBuff;								\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	for (;;)										\
+	{											\
+		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))			\
+		{										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
+				break;								\
+			gtmioBuff += gtmioStatus;						\
+		}										\
+		else if (EINTR != errno)							\
+		  break;									\
+	}											\
+	if (-1 != gtmioStatus)									\
+		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually read */	\
+	else						/* Had legitimate error - return it */	\
+		RLEN = -1;									\
 }
 
-#define DOREADRLTO2(FDESC, FBUFF, FBUFF_LEN, TOFLAG, BLOCKED_IN, ISPIPE, FLAGS, RLEN, \
-		    TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT, UTF_VAR_PF, PIPE_OR_FIFO) \
-{ \
-	ssize_t		gtmioStatus; \
-	int		skip_read = FALSE;\
-	int		tfcntl_res;\
-	size_t		gtmioBuffLen; \
-	sm_uc_ptr_t	gtmioBuff; \
-	gtmioBuffLen =	(size_t)FBUFF_LEN; \
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
-	for (;;) \
-	{ \
-		/* if it is a read x:0 on a pipe and it is not blocked (always the case when starting a read)\
-		   then try and read one char.	If it succeeds then turn on blocked io and read the rest\
-		   of the line.*/\
-		if (ISPIPE && (FALSE == *BLOCKED_IN))			\
-		{\
-			for (;;)\
-			{\
-				if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, 1))) \
-				{ \
-					if (0 == gtmioStatus) /* end of file */\
-					{\
-						skip_read = TRUE;\
-						break;\
-					}\
-					FCNTL3(FDESC, F_SETFL, FLAGS, tfcntl_res); \
-					if (0 > tfcntl_res) \
-						rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);\
-					*BLOCKED_IN = TRUE;		\
-					if (PIPE_ZERO_TIMEOUT) \
-					{\
-						TOFLAG = FALSE;	\
-						/* Set a timer for 1 sec so atomic read x:0 will still work on\
-						   loaded systems but timeout on incomplete reads.  Any characters\
-						   read to this point will be returned. */ \
-						*MSEC_TIMEOUT = timeout2msec(1);\
-						start_timer(TIMER_ID, *MSEC_TIMEOUT, wake_alarm, 0, NULL); \
-					}				\
-					gtmioBuffLen -= gtmioStatus; \
-					gtmioBuff += gtmioStatus;\
-					/* if only asked to read 1 character then skip additional read */\
-					if (0 == gtmioBuffLen)\
-						skip_read = TRUE;\
-					break;\
-				} \
-				else if (EINTR != errno || TOFLAG)\
-				{\
-					skip_read = TRUE;\
-					break;\
-				}\
-			}\
-		}\
-		/* if we didn't read 1 character or it's an error don't read anymore now */\
-		if (TRUE == skip_read) break;\
-		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen))) \
-		{ \
-			gtmioBuffLen -= gtmioStatus; \
-			if (0 == gtmioBuffLen || 0 == gtmioStatus) \
-				break; \
-			gtmioBuff += gtmioStatus; \
+#define DOREADRLTO2(FDESC, FBUFF, FBUFF_LEN, TOFLAG, BLOCKED_IN, ISPIPE, FLAGS, RLEN,				\
+		    TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT, UTF_VAR_PF, PIPE_OR_FIFO)	\
+{														\
+	ssize_t		gtmioStatus;										\
+	int		skip_read = FALSE;									\
+	int		tfcntl_res;										\
+	size_t		gtmioBuffLen;										\
+	sm_uc_ptr_t	gtmioBuff;										\
+	gtmioBuffLen =	(size_t)FBUFF_LEN;									\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);									\
+	for (;;)												\
+	{													\
+		/* if it is a read x:0 on a pipe and it is not blocked (always the case when starting a read)	\
+		   then try and read one char.	If it succeeds then turn on blocked io and read the rest	\
+		   of the line.*/										\
+		if (ISPIPE && (FALSE == *BLOCKED_IN))								\
+		{												\
+			for (;;)										\
+			{											\
+				if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, 1)))				\
+				{										\
+					if (0 == gtmioStatus) /* end of file */					\
+					{									\
+						skip_read = TRUE;						\
+						break;								\
+					}									\
+					FCNTL3(FDESC, F_SETFL, FLAGS, tfcntl_res);				\
+					if (0 > tfcntl_res)							\
+						rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);	\
+					*BLOCKED_IN = TRUE;							\
+					if (PIPE_ZERO_TIMEOUT)							\
+					{									\
+						TOFLAG = FALSE;							\
+						/* Set a timer for 1 sec so atomic read x:0 will still work on	\
+						   loaded systems but timeout on incomplete reads.  Any characters	\
+						   read to this point will be returned. */ 			\
+						*MSEC_TIMEOUT = timeout2msec(1);				\
+						start_timer(TIMER_ID, *MSEC_TIMEOUT, wake_alarm, 0, NULL);	\
+					}									\
+					gtmioBuffLen -= gtmioStatus;						\
+					gtmioBuff += gtmioStatus;						\
+					/* if only asked to read 1 character then skip additional read */	\
+					if (0 == gtmioBuffLen)							\
+						skip_read = TRUE;						\
+					break;									\
+				} else if (EINTR != errno || TOFLAG)						\
+				{										\
+					skip_read = TRUE;							\
+					break;									\
+				}										\
+			}											\
+		}												\
+		/* if we didn't read 1 character or it's an error don't read anymore now */			\
+		if (TRUE == skip_read) break;									\
+		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))					\
+		{												\
+			gtmioBuffLen -= gtmioStatus;								\
+			if (0 == gtmioBuffLen || 0 == gtmioStatus)						\
+				break;										\
+			gtmioBuff += gtmioStatus;								\
 		/* If it is pipe or fifo, read data that is currently available. If pipe contains data less than 		\
 		   the CHUNK_SIZE, no need to read once again since it is in BLOCKING mode, in which case it will return -1.	\
 		   So in the first read itself (after a successful read) break from the infinite loop. This variable is TRUE    \
 		   if DOREADRLTO2 macro is called for a CHUNK_SIZE read. In other places (eg: iorm_get) it will be FALSE.	\
-		   */											 			\
-			if (UTF_VAR_PF)	\
-				break;	\
-		} \
-		else if (EINTR != errno || TOFLAG) \
-		  break; \
-		if (PIPE_OR_FIFO && outofband)	\
-			break;\
-	} \
-	if (-1 != gtmioStatus) \
-		RLEN = (int)(FBUFF_LEN - gtmioBuffLen);		/* Return length actually read */ \
-	else						/* Had legitimate error - return it */ \
-	{\
-		/* Store the number of bytes read in this invocation before we error out */ \
-		*TOT_BYTES_READ = (int)(FBUFF_LEN - gtmioBuffLen); \
-		RLEN = -1;						\
-	}								\
+		   */											 	\
+			if (UTF_VAR_PF)										\
+				break;										\
+		} else if (EINTR != errno || TOFLAG)								\
+			break;											\
+		if (PIPE_OR_FIFO && outofband)									\
+			break;											\
+	}													\
+	if (-1 != gtmioStatus)											\
+		RLEN = (int)(FBUFF_LEN - gtmioBuffLen);		/* Return length actually read */		\
+	else						/* Had legitimate error - return it */			\
+	{													\
+		/* Store the number of bytes read in this invocation before we error out */			\
+		*TOT_BYTES_READ = (int)(FBUFF_LEN - gtmioBuffLen);						\
+		RLEN = -1;											\
+	}													\
 }
 
-#define DOWRITE(FDESC, FBUFF, FBUFF_LEN) \
-{ \
-	ssize_t		gtmioStatus; \
-	size_t		gtmioBuffLen; \
-	sm_uc_ptr_t	gtmioBuff; \
-	gtmioBuffLen = FBUFF_LEN; \
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
-	assert(0 != gtmioBuffLen);	\
-	for (;;) \
-	{ \
-		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen))) \
-		{ \
-			gtmioBuffLen -= gtmioStatus; \
-			if (0 == gtmioBuffLen) \
-				break; \
-			gtmioBuff += gtmioStatus; \
-		} \
-		else if (EINTR != errno) \
-		  break; \
-	} \
-	/* GTMASSERT? */ \
+#define DOWRITE(FDESC, FBUFF, FBUFF_LEN)						\
+{											\
+	ssize_t		gtmioStatus;							\
+	size_t		gtmioBuffLen;							\
+	sm_uc_ptr_t	gtmioBuff;							\
+	gtmioBuffLen = FBUFF_LEN;							\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);						\
+	assert(0 != gtmioBuffLen);							\
+	for (;;)									\
+	{										\
+		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen)))	\
+		{									\
+			gtmioBuffLen -= gtmioStatus;					\
+			if (0 == gtmioBuffLen)						\
+				break;							\
+			gtmioBuff += gtmioStatus;					\
+		}									\
+		else if (EINTR != errno)						\
+		  break;								\
+	}										\
+	/* GTMASSERT? */								\
 }
 
 #define DOWRITERC(FDESC, FBUFF, FBUFF_LEN, RC)							\
@@ -763,29 +770,29 @@
 		RC = -1;		/* Something kept us from writing what we wanted */	\
 }
 
-#define DOLLAR_DEVICE_SET(DEVPTR,STATUS)				\
-{									\
-	len = SIZEOF(ONE_COMMA) - 1;					\
-	memcpy(DEVPTR->dollar_device, ONE_COMMA, len);			\
-	errptr = (char *)STRERROR(STATUS);				\
-	/* make sure there is room for the 1, and the null at the end */ \
-	errlen = MIN(STRLEN(errptr), SIZEOF(DEVPTR->dollar_device) - SIZEOF(ONE_COMMA)); \
-	memcpy(&DEVPTR->dollar_device[len], errptr, errlen);		\
-	DEVPTR->dollar_device[len + errlen] = '\0';			\
+#define DOLLAR_DEVICE_SET(DEVPTR,STATUS)							\
+{												\
+	len = SIZEOF(ONE_COMMA) - 1;								\
+	memcpy(DEVPTR->dollar_device, ONE_COMMA, len);						\
+	errptr = (char *)STRERROR(STATUS);							\
+	/* make sure there is room for the 1, and the null at the end */			\
+	errlen = MIN(STRLEN(errptr), SIZEOF(DEVPTR->dollar_device) - SIZEOF(ONE_COMMA));	\
+	memcpy(&DEVPTR->dollar_device[len], errptr, errlen);					\
+	DEVPTR->dollar_device[len + errlen] = '\0';						\
 }
 
-#define DOLLAR_DEVICE_WRITE(DEVPTR,STATUS)					\
+#define DOLLAR_DEVICE_WRITE(DEVPTR,STATUS)						\
 {											\
 	int	len;									\
-	int	errlen;								\
+	int	errlen;									\
 	char	*errptr;								\
 	/* save error in $device */							\
-	if (EAGAIN == STATUS)							\
+	if (EAGAIN == STATUS)								\
 	{										\
-		len = SIZEOF(ONE_COMMA_UNAVAILABLE);				\
-		memcpy(DEVPTR->dollar_device, ONE_COMMA_UNAVAILABLE, len);	\
+		len = SIZEOF(ONE_COMMA_UNAVAILABLE);					\
+		memcpy(DEVPTR->dollar_device, ONE_COMMA_UNAVAILABLE, len);		\
 	} else										\
-		DOLLAR_DEVICE_SET(DEVPTR,STATUS);				\
+		DOLLAR_DEVICE_SET(DEVPTR,STATUS);					\
 }
 
 #define DOWRITERL(FDESC, FBUFF, FBUFF_LEN, RLEN)						\
@@ -826,6 +833,8 @@
 
 #define DO_FILE_READ(CHANNEL, OFFSET, READBUFF, LEN, STATUS1, STATUS2)		\
 {										\
+	error_def(ERR_PREMATEOF);						\
+										\
 	STATUS2 = SS_NORMAL;							\
 	LSEEKREAD(CHANNEL, OFFSET, READBUFF, LEN, STATUS1);			\
 	if (-1 == STATUS1)							\
@@ -834,16 +843,19 @@
 
 #define DO_FILE_WRITE(CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1, STATUS2)	\
 {										\
+	error_def(ERR_PREMATEOF);						\
+										\
 	STATUS2 = SS_NORMAL;							\
 	LSEEKWRITE(CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1);			\
 	if (-1 == STATUS1)							\
 		STATUS1 = ERR_PREMATEOF;					\
 }
 
-typedef struct {
-int	fd;
-mstr	v;
-}file_pointer;
+typedef struct
+{
+	int	fd;
+	mstr	v;
+} file_pointer;
 
 /* WRITEPIPE is a work-around for a problem found in z/OS where the kernel doesn't seem to
  * break up writes into small enough pieces, requiring that we do it ourselves.  The fix is
@@ -885,6 +897,13 @@ mstr	v;
 		RC = 0;										\
 	else											\
 		RC = -1;		/* Something kept us from writing what we wanted */	\
+}
+
+#define FFLUSH(STREAM)					\
+{							\
+	DEFER_INTERRUPTS(INTRPT_IN_FFLUSH);		\
+	fflush(STREAM);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_FFLUSH);		\
 }
 
 #endif

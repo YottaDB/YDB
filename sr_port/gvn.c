@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,53 +16,54 @@
 #include "subscript.h"
 #include "mdq.h"
 #include "advancewindow.h"
+#include "fullbool.h"
 
-GBLREF char		window_token;
-GBLREF mident		window_ident;
+error_def(ERR_EXPR);
+error_def(ERR_EXTGBLDEL);
+error_def(ERR_GBLNAME);
+error_def(ERR_GVNAKEDEXTNM);
+error_def(ERR_MAXNRSUBSCRIPTS);
+error_def(ERR_RPARENMISSING);
 
 int gvn(void)
 {
-	triple		*ref, *t1, *oldchain, tmpchain, *triptr, *s;
-	oprtype		subscripts[MAX_GVSUBSCRIPTS], *sb1, *sb2;
-	boolean_t	shifting, vbar, parse_status;
-	opctype		ox;
+	boolean_t	parse_status, shifting, vbar;
 	char		x;
-	error_def(ERR_MAXNRSUBSCRIPTS);
-	error_def(ERR_RPARENMISSING);
-	error_def(ERR_GBLNAME);
-	error_def(ERR_EXTGBLDEL);
-	error_def(ERR_GVNAKEDEXTNM);
-	error_def(ERR_EXPR);
+	opctype		ox;
+	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS];
+	triple		*oldchain, *ref, *s, *t1, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(window_token == TK_CIRCUMFLEX);
+	assert(TK_CIRCUMFLEX == TREF(window_token));
 	advancewindow();
 	sb1 = sb2 = subscripts;
 	ox = 0;
-	if (shifting = TREF(shift_side_effects))
+	if (shifting = (TREF(shift_side_effects) && GTM_BOOL == TREF(gtm_fullbool)))	/* NOTE assignment */
 	{
 		dqinit(&tmpchain, exorder);
 		oldchain = setcurtchain(&tmpchain);
 	}
-	if (window_token == TK_LBRACKET || window_token == TK_VBAR)
-	{	vbar = (window_token == TK_VBAR);
+	if ((TK_LBRACKET == TREF(window_token)) || (TK_VBAR == TREF(window_token)))
+	{
+		vbar = (TK_VBAR == TREF(window_token));
 		advancewindow();
 		if (vbar)
-			parse_status = expr(sb1++);
+			parse_status = expr(sb1++, MUMPS_EXPR);
 		else
 			parse_status = expratom(sb1++);
 		if (!parse_status)
-		{	stx_error(ERR_EXPR);
+		{
+			stx_error(ERR_EXPR);
 			if (shifting)
 				setcurtchain(oldchain);
 			return FALSE;
 		}
-		if (window_token == TK_COMMA)
+		if (TK_COMMA == TREF(window_token))
 		{
 			advancewindow();
 			if (vbar)
-				parse_status = expr(sb1++);
+				parse_status = expr(sb1++, MUMPS_EXPR);
 			else
 				parse_status = expratom(sb1++);
 			if (!parse_status)
@@ -73,8 +74,9 @@ int gvn(void)
 			}
 		} else
 			*sb1++ = put_str(0,0);
-		if ((!vbar && window_token != TK_RBRACKET) || (vbar && window_token != TK_VBAR))
-		{	stx_error(ERR_EXTGBLDEL);
+		if ((!vbar && (TK_RBRACKET != TREF(window_token))) || (vbar && (TK_VBAR != TREF(window_token))))
+		{
+			stx_error(ERR_EXTGBLDEL);
 			if (shifting)
 				setcurtchain(oldchain);
 			return FALSE;
@@ -82,11 +84,11 @@ int gvn(void)
 		advancewindow();
 		ox = OC_GVEXTNAM;
 	}
-	if (window_token == TK_IDENT)
+	if (TK_IDENT == TREF(window_token))
 	{
 		if (!ox)
 			ox = OC_GVNAME;
-		*sb1++ = put_str(window_ident.addr, window_ident.len);
+		*sb1++ = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
 		advancewindow();
 	} else
 	{	if (ox)
@@ -96,7 +98,7 @@ int gvn(void)
 				setcurtchain(oldchain);
 			return FALSE;
 		}
-		if (window_token != TK_LPAREN)
+		if (TK_LPAREN != TREF(window_token))
 		{
 			stx_error(ERR_GBLNAME);
 			if (shifting)
@@ -105,7 +107,7 @@ int gvn(void)
 		}
 		ox = OC_GVNAKED;
 	}
-	if (window_token == TK_LPAREN)
+	if (TK_LPAREN == TREF(window_token))
 		for (;;)
 		{
 			if (sb1 >= ARRAYTOP(subscripts))
@@ -116,23 +118,23 @@ int gvn(void)
 				return FALSE;
 			}
 			advancewindow();
-			if (!expr(sb1))
+			if (EXPR_FAIL == expr(sb1, MUMPS_EXPR))
 			{
 				if (shifting)
 					setcurtchain(oldchain);
 				return FALSE;
 			}
-			assert(sb1->oprclass == TRIP_REF);
+			assert(TRIP_REF == sb1->oprclass);
 			s = sb1->oprval.tref;
-			if (s->opcode == OC_LIT)
+			if (OC_LIT == s->opcode)
 				*sb1 = make_gvsubsc(&s->operand[0].oprval.mlit->v);
 			sb1++;
-			if ((x = window_token) == TK_RPAREN)
+			if (TK_RPAREN == (x = TREF(window_token)))	/* NOTE assignment */
 			{
 				advancewindow();
 				break;
 			}
-			if (x != TK_COMMA)
+			if (TK_COMMA != x)
 			{
 				stx_error(ERR_RPARENMISSING);
 				if (shifting)

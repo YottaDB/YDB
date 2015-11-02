@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2010 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2011 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -75,7 +75,9 @@ onejnl:
 	w !,BOL,?x(1),s,?x(2),$s($l(regs(s,"FILE_NAME")):regs(s,"FILE_NAME"),1:"<based on DB file-spec>")
 	i $x'<(x(3)-1) w !,BOL
 	w ?x(3),$s(regs(s,"BEFORE_IMAGE"):"Y",1:"N"),?x(4),$j(regs(s,"BUFFER_SIZE"),5)
-	w ?x(5),$j(regs(s,"ALLOCATION"),10),?x(6),$j(regs(s,"EXTENSION"),5)
+	w ?x(5),$j(regs(s,"ALLOCATION"),10)
+	i ver="VMS" w ?x(6),$j(regs(s,"EXTENSION"),5)
+	e  w ?x(6),$j(regs(s,"EXTENSION"),10),?x(7),$j(regs(s,"AUTOSWITCHLIMIT"),13)
 	w !,BOL
 	q
 regionc:
@@ -89,6 +91,7 @@ regionc:
 	. i regs(s,"JOURNAL") d
 	.. w " "_delim_"JOURNAL=(",$s(regs(s,"BEFORE_IMAGE"):"",1:"NO"),"BEFORE_IMAGE",",BUFFER_SIZE=",tmpreg("BUFFER_SIZE")
 	.. w ",ALLOCATION=",regs(s,"ALLOCATION"),",EXTENSION=",regs(s,"EXTENSION")
+	.. i ver'="VMS" w ",AUTOSWITCHLIMIT=",regs(s,"AUTOSWITCHLIMIT")
 	.. i $l(regs(s,"FILE_NAME")) w ",FILE=""",regs(s,"FILE_NAME"),""""
 	.. w ")"
 	. else  w " "_delim_"NOJOURNAL"
@@ -198,7 +201,9 @@ tmpjnlbd:
 	w !,BOL,?x(1),"<default>",?x(2),$s($l(tmpreg("FILE_NAME")):tmpreg("FILE_NAME"),1:"<based on DB file-spec>")
 	i $x'<(x(3)-1) w !,BOL
 	w ?x(3),$s(tmpreg("BEFORE_IMAGE"):"Y",1:"N"),?x(4),$j(tmpreg("BUFFER_SIZE"),5)
-	w ?x(5),$j(tmpreg("ALLOCATION"),10),?x(6),$j(tmpreg("EXTENSION"),5)
+	w ?x(5),$j(tmpreg("ALLOCATION"),10)
+	i ver="VMS" w ?x(6),$j(tmpreg("EXTENSION"),5)
+	e  w ?x(6),$j(tmpreg("EXTENSION"),10),?x(7),$j(tmpreg("AUTOSWITCHLIMIT"),13)
 	w !,BOL
 	q
 templatec:
@@ -215,7 +220,9 @@ templatec:
 	i tmpreg("JOURNAL") d
 	. w !,"TEMPLATE "_delim_"REGION "_delim_"JOURNAL=("
 	. w $s(tmpreg("BEFORE_IMAGE"):"",1:"NO"),"BEFORE_IMAGE,BUFFER_SIZE=",tmpreg("BUFFER_SIZE")
-	. w ",ALLOCATION=",tmpreg("ALLOCATION"),",EXTENSION=",tmpreg("EXTENSION"),")"
+	. w ",ALLOCATION=",tmpreg("ALLOCATION"),",EXTENSION=",tmpreg("EXTENSION")
+	. i ver'="VMS" w ",AUTOSWITCHLIMIT=",tmpreg("AUTOSWITCHLIMIT")
+	. w ")"
 	i $l(tmpreg("FILE_NAME")) w ",FILE=",tmpreg("FILE_NAME")
 	w !,BOL
 	q
@@ -236,11 +243,13 @@ regionhd:
 	w !,BOL,?x(1),$tr($j("",114)," ","-")
 	q
 jnlhd:
-	s x(0)=26,x(1)=1,x(2)=33,x(3)=59,x(4)=65,x(5)=71,x(6)=82,x(7)=88
+	s x(0)=26,x(1)=1,x(2)=33,x(3)=59,x(4)=65,x(5)=71,x(6)=82,x(7)=$s(ver="VMS":88,1:91)
 	w !,BOL,!,BOL,?x(0),"*** JOURNALING INFORMATION ***"
 	w !,BOL,?x(1),"Region",?x(2),"Jnl File (def ext: .mjl)"
-	w ?x(3),"Before",?x(4),$j("Buff",5),?x(5),$j("Alloc",10),?x(6),"Exten" ;?x(7),"Stop"
-	w !,BOL,?x(1),$tr($j("",87)," ","-")
+	w ?x(3),"Before",?x(4),$j("Buff",5),?x(5),$j("Alloc",10)
+	i ver="VMS" w ?x(6),"Exten" 									;?x(7),"Stop"
+	e  w ?x(6),$j("Exten",10),?x(7),$j("AutoSwitch",13)
+	w !,BOL,?x(1),$tr($j("",$s(ver="VMS":87,1:104))," ","-")
 	q
 seghd:
 	s x(0)=32,x(1)=1,x(2)=33,x(3)=53,x(4)=57,x(5)=61,x(6)=67,x(7)=78,x(8)=84

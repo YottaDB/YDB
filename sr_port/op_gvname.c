@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,8 +83,7 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 			if (dollar_tlevel)
 				tp_set_sgm();
 			assert(INVALID_GV_TARGET != gv_target);
-			if ((!gv_target->root) || (DIR_ROOT == gv_target->root))
-				gvcst_root_search();
+			GVCST_ROOT_SEARCH;
 		}
 	} else
 	{

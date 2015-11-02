@@ -42,13 +42,6 @@ GBLREF	symval		*curr_symval;
 GBLREF	boolean_t	gtm_utf8_mode;
 GBLREF	spdesc		stringpool;
 
-error_def(ERR_ASSERT);
-error_def(ERR_GTMASSERT);
-error_def(ERR_GTMCHECK);
-error_def(ERR_INVSTRLEN);
-error_def(ERR_MEMORY);
-error_def(ERR_STACKOFLOW);
-
 LITREF mval	literal_null;
 
 STATICFNDCL		CONDITION_HANDLER(fnzsrch_ch);
@@ -56,6 +49,14 @@ STATICFNDCL		CONDITION_HANDLER(dir_ch);
 STATICFNDCL int		pop_top(lv_val *src, mval *res);
 
 void		dir_srch(parse_blk *pfil);
+
+error_def(ERR_ASSERT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_INVSTRLEN);
+error_def(ERR_MEMORY);
+error_def(ERR_STACKOFLOW);
 
 int op_fnzsearch(mval *file, mint indx, mval *ret)
 {

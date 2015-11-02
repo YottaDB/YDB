@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,28 +20,25 @@
 #include "cmd.h"
 #include "rwformat.h"
 
-GBLREF triple		*curtchain;
-GBLREF mval		window_mval;
-GBLREF char		window_token;
+error_def(ERR_RWARG);
 
 int m_read(void)
 {
-	oprtype		x, *timeout;
-	opctype		read_oc, put_oc;
-	triple		*ref, tmpchain, *s1, *sub, *put;
 	boolean_t	local;
-	error_def(ERR_RWARG);
+	opctype		put_oc, read_oc;
+	oprtype		*timeout, x;
+	triple		*put, *ref, *s1, *sub, tmpchain;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	TREF(temp_subs) = FALSE;
 	local = TRUE;
 	dqinit(&tmpchain, exorder);
-	switch(window_token)
+	switch (TREF(window_token))
 	{
 	case TK_ASTERISK:
 		advancewindow();
-		switch(window_token)
+		switch (TREF(window_token))
 		{
 		default:
 		case TK_IDENT:
@@ -60,10 +57,10 @@ int m_read(void)
 			break;
 		case TK_CIRCUMFLEX:
 			local = FALSE;
-			s1 = curtchain->exorder.bl;
+			s1 = (TREF(curtchain))->exorder.bl;
 			if (!gvn())
 				return FALSE;
-			for (sub = curtchain->exorder.bl;  sub != s1;  sub = sub->exorder.bl)
+			for (sub = (TREF(curtchain))->exorder.bl;  sub != s1;  sub = sub->exorder.bl)
 			{
 				put_oc = sub->opcode;
 				if ((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc) || (OC_GVEXTNAM == put_oc))
@@ -83,7 +80,7 @@ int m_read(void)
 			dqins(tmpchain.exorder.bl, exorder, put);
 			break;
 		}
-		if (TK_HASH == window_token)
+		if (TK_HASH == TREF(window_token))
 		{
 			stx_error(ERR_RWARG);
 			return FALSE;
@@ -96,7 +93,7 @@ int m_read(void)
 	case TK_SLASH:
 		return rwformat();
 	case TK_STRLIT:
-		x = put_lit(&window_mval);
+		x = put_lit(&(TREF(window_mval)));
 		advancewindow();
 		ref = newtriple(OC_WRITE);
 		ref->operand[0] = x;
@@ -119,10 +116,10 @@ int m_read(void)
 	case TK_CIRCUMFLEX:
 		local = FALSE;
 		read_oc = OC_READ;
-		s1 = curtchain->exorder.bl;
+		s1 = (TREF(curtchain))->exorder.bl;
 		if (!gvn())
 			return FALSE;
-		for (sub = curtchain->exorder.bl;  sub != s1;  sub = sub->exorder.bl)
+		for (sub = (TREF(curtchain))->exorder.bl;  sub != s1;  sub = sub->exorder.bl)
 		{
 			put_oc = sub->opcode;
 			if ((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc) || (OC_GVEXTNAM == put_oc))
@@ -137,7 +134,7 @@ int m_read(void)
 	case TK_ATSIGN:
 		if (!indirection(&x))
 			return FALSE;
-		if ((TK_COLON != window_token) && (TK_HASH != window_token))
+		if ((TK_COLON != TREF(window_token)) && (TK_HASH != TREF(window_token)))
 		{
 			ref = maketriple(OC_COMMARG);
 			ref->operand[0] = x;
@@ -154,11 +151,11 @@ int m_read(void)
 		stx_error(ERR_RWARG);
 		return FALSE;
 	}
-	if (TK_HASH == window_token)
+	if (TK_HASH == TREF(window_token))
 	{
 		advancewindow();
 		ref = maketriple(OC_READFL);
-		if (!intexpr(&ref->operand[0]))
+		if (EXPR_FAIL == expr(&ref->operand[0], MUMPS_INT))
 			return FALSE;
 		timeout = &ref->operand[1];
 	} else
@@ -166,25 +163,20 @@ int m_read(void)
 		ref = maketriple(read_oc);
 		timeout = &ref->operand[0];
 	}
-	if (TK_COLON != window_token)
+	if (TK_COLON != TREF(window_token))
 	{
 		*timeout = put_ilit(NO_M_TIMEOUT);
 		ins_triple(ref);
 	} else
 	{
 		advancewindow();
-		if (!intexpr(timeout))
+		if (EXPR_FAIL == expr(timeout, MUMPS_INT))
 			return FALSE;
 		ins_triple(ref);
 		newtriple(OC_TIMTRU);
 	}
-	if (local)
-		put->operand[1] = put_tref(ref);
-	else
-		put->operand[0] = put_tref(ref);
-
-	ref = curtchain->exorder.bl;
+	put->operand[local ? 1 : 0] = put_tref(ref);
+	ref = (TREF(curtchain))->exorder.bl;
 	dqadd(ref, &tmpchain, exorder);		/*this is a violation of info hiding*/
-
 	return TRUE;
 }

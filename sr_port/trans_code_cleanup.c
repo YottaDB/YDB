@@ -32,6 +32,7 @@ GBLREF	spdesc		rts_stringpool;
 GBLREF	mval		dollar_ztrap, dollar_etrap;
 GBLREF	mstr		*err_act;
 GBLREF	io_desc		*active_device;
+GBLREF	boolean_t	ztrap_explicit_null;
 
 error_def(ERR_STACKCRIT);
 error_def(ERR_ERRWZTRAP);
@@ -41,7 +42,7 @@ error_def(ERR_ERRWIOEXC);
 void trans_code_cleanup(void)
 {
 	stack_frame	*fp, *fpprev;
-	uint4		err;
+	uint4		errmsg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -53,16 +54,13 @@ void trans_code_cleanup(void)
 	if (SFT_ZTRAP == proc_act_type)
 	{
 		if (0 < dollar_ztrap.str.len)
-			err = (int)ERR_ERRWZTRAP;
+			errmsg = ERR_ERRWZTRAP;
 		else
-		{
-			assert(0 < dollar_etrap.str.len);
-			err = (int)ERR_ERRWETRAP;
-		}
+			errmsg = ERR_ERRWETRAP;
 	} else if (SFT_DEV_ACT == proc_act_type)
-		err = ERR_ERRWIOEXC;
+		errmsg = ERR_ERRWIOEXC;
 	else
-		err = 0;
+		errmsg = 0;
 	proc_act_type = 0;
 	if (TREF(compile_time))
 	{
@@ -81,18 +79,20 @@ void trans_code_cleanup(void)
 			break;
 		if (fp->type & SFT_COUNT)
 		{
-			assert(NULL != err_act);
-			if ((ERR_ERRWZTRAP == err) || (ERR_ERRWETRAP == err))
+			if ((ERR_ERRWZTRAP == errmsg) || (ERR_ERRWETRAP == errmsg))
 			{	/* Whether ETRAP or ZTRAP we want to rethrow the error at one level down */
 				SET_ERROR_FRAME(fp);	/* reset error_frame to point to the closest counted frame */
 				assert(fp->flags & SFF_ETRAP_ERR);
 				/* Turn off any device exception related flags now that we are going to handle errors using
 				 * $ETRAP or $ZTRAP AT THE PARENT LEVEL only (no more device exceptions).
 				 */
-				fp->flags &= SFF_DEV_ACT_ERR_OFF;
 				dollar_ztrap.str.len = 0;
+				ztrap_explicit_null = FALSE;
+				fp->flags &= SFF_DEV_ACT_ERR_OFF;
+				fp->flags &= SFF_ZTRAP_ERR_OFF;
 				err_act = &dollar_etrap.str;
-			} else if (ERR_ERRWIOEXC == err)
+				break;
+			} else if (ERR_ERRWIOEXC == errmsg)
 			{	/* Error while compiling device exception. Set SFF_ETRAP_ERR bit so control is transferred to
 				 * error_return() which in turn will rethrow the error AT THE SAME LEVEL in order to try and
 				 * use $ZTRAP or $ETRAP whichever is active. Also set the SFF_DEV_ACT_ERR bit to signify this
@@ -102,20 +102,30 @@ void trans_code_cleanup(void)
 				 */
 				fp->flags |= (SFF_DEV_ACT_ERR | SFF_ETRAP_ERR);
 				assert(NULL == active_device);	/* mdb_condition_handler should have reset it */
-			} else if ((ERR_ERRWZBRK == err) || (ERR_ERRWEXC == err))
+				break;
+			} else if ((ERR_ERRWZBRK == errmsg) || (ERR_ERRWEXC == errmsg))
 			{	/* For typical exceptions in ZBREAK and ZSTEP, get back to direct mode */
 				dm_setup();
+				break;
 			} else
-			{	/* The only other value of err that we know possible is ERR_ERRWZINTR. But we dont expect
-				 * to be in trans_code_cleanup in that case so assert false for any other value of err.
+			{	/* The only known way to be here is if the command is a command given in direct mode as
+				 * mdb_condition_handler won't drive an error handler in that case which would be caught in
+				 * one of the above conditions. Not breaking out of the loop here means the frame will just
+				 * unwind and we'll break on the direct mode frame which will be redriven. If the parent frame
+				 * is not a direct mode frame, we'll assert in debug or break in pro and just continue.
+				 * to direct mode.
 				 */
-				assert(FALSE);
+				assert(fp->flags && (SFF_INDCE));
+				if (!fp->old_frame_pointer || !(fp->old_frame_pointer->type & SFT_DM))
+				{
+					assert(FALSE);
+					break;
+				}
 			}
-			break;
 		}
 		if (fp->type)
 		{
-			SET_ERR_CODE(fp, err);
+			SET_ERR_CODE(fp, errmsg);
 		}
 		/* If this frame is indicated for cache cleanup, do that cleanup
 		 * now before we get rid of the pointers used by that cleanup.
@@ -128,6 +138,6 @@ void trans_code_cleanup(void)
 				       frame_pointer)));
 	}
 	TREF(transform) = TRUE;
-	if (err)
-		dec_err(VARLSTCNT(1) err);
+	if (0 != errmsg)
+		dec_err(VARLSTCNT(1) errmsg);
 }

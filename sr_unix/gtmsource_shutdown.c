@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,6 +66,10 @@ GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	boolean_t		pool_init;
 GBLREF	gd_addr			*gd_header;
 
+error_def(ERR_JNLPOOLSETUP);
+error_def(ERR_REPLFTOKSEM);
+error_def(ERR_TEXT);
+
 int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 {
 	boolean_t		all_dead, first_time, regrab_lock;
@@ -74,10 +78,6 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	int4			index, maxindex, lcnt, num_src_servers_running;
 	unix_db_info		*udi;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
-
-	error_def(ERR_JNLPOOLSETUP);
-	error_def(ERR_REPLFTOKSEM);
-	error_def(ERR_TEXT);
 
 	/* Significance of shutdown field in gtmsource_local:
 	 * This field is initially set to NO_SHUTDOWN. When a command to shut down the source server is issued,
@@ -122,7 +122,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 		}
 		/* Wait for source server(s) to die. But release ftok semaphore and jnlpool access control semaphore before
 		 * waiting as the concurrently running source server(s) might need these (e.g. if it is about to call the
-		 * function "gtmsource_set_next_triple_seqno").
+		 * function "gtmsource_set_next_histinfo_seqno").
 		 */
 		if (0 != rel_sem(SOURCE, JNL_POOL_ACCESS_SEM))
 			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in source server shutdown rel_sem"),

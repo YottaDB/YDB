@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +9,14 @@
  *								*
  ****************************************************************/
 
+
+
+
+
+
+
+
+/* start at line 20 to make arithmetic (add 20) easy for those debugging compilation */
 OPCODE_DEF(OC_NOOP, (OCT_CGSKIP))
 OPCODE_DEF(OC_PARAMETER, (OCT_CGSKIP))
 OPCODE_DEF(OC_VAR, (OCT_MVADDR | OCT_MVAL | OCT_CGSKIP | OCT_EXPRLEAF))
@@ -201,7 +209,6 @@ OPCODE_DEF(OC_ZPREVIOUS, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZPREVIOUS, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_GVQUERY, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNQUERY, (OCT_MVAL | OCT_EXPRLEAF))
-OPCODE_DEF(OC_ISFORMAL, (OCT_NULL))
 OPCODE_DEF(OC_BINDPARM, (OCT_NULL))
 OPCODE_DEF(OC_RETARG, (OCT_NULL))
 OPCODE_DEF(OC_EXFUN, (OCT_MVAL | OCT_EXPRLEAF))

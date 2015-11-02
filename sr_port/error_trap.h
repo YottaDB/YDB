@@ -1,5 +1,5 @@
 /****************************************************************
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #define ERROR_TRAP_H
 
 #define IS_ETRAP	(err_act == &dollar_etrap.str)
+#define ETRAP_IN_EFFECT (!ztrap_explicit_null && (0 == dollar_ztrap.str.len))
 
 #define	DOLLAR_ECODE_MAXINDEX	32	/* maximum of 32 ecodes in $ECODE */
 #define	DOLLAR_STACK_MAXINDEX	256	/* maximum of 256 levels will be stored for $STACK(level) */
@@ -85,11 +86,12 @@ typedef struct
 }
 
 /* nullify "error_frame" */
-#define	NULLIFY_ERROR_FRAME				\
-{							\
-	GBLREF	stack_frame		*error_frame;	\
-							\
-	error_frame = NULL;				\
+#define	NULLIFY_ERROR_FRAME											\
+{														\
+	GBLREF	stack_frame	*error_frame;									\
+														\
+	error_frame = NULL;											\
+	DBGEHND((stderr, "%s: Nullifying previous error_frame (was 0x"lvaddr")\n", __FILE__, error_frame));	\
 }
 
 /* Set "error_frame" to point to "frame_pointer" and mark it as an error frame type. This is an indication that
@@ -97,13 +99,17 @@ typedef struct
  */
 #define SET_ERROR_FRAME(fp)								\
 {											\
-	GBLREF	stack_frame		*error_frame;					\
+	GBLREF	stack_frame	*error_frame;						\
 											\
 	fp->flags |= SFF_ETRAP_ERR;							\
 	error_frame = fp;								\
+	DBGEHND((stderr, "%s: Setting error_frame as 0x"lvaddr"\n", __FILE__, fp));	\
 }
 
-/* invoke the function error_return() if the necessity of error-rethrow is detected */
+/* invoke the function error_return() if the necessity of error-rethrow is detected. Note the extra
+ * "&" value on the various assert(FALSE) type statements. This allows us to know which of these asserts
+ * failed.
+ */
 #define	INVOKE_ERROR_RET_IF_NEEDED										\
 {														\
 	GBLREF	dollar_ecode_type	dollar_ecode;								\
@@ -117,21 +123,22 @@ typedef struct
 			{	/* this is an error frame and $ECODE is non-NULL during QUIT out of this frame. \
 				 * rethrow the error at lower level */						\
 				(*dollar_ecode.error_return_addr)();						\
-				/* We dont expect the above call to return in Unix since we either rethrow	\
-				 * the error or do a MUM_TSTART which unwinds the C-stack. But in VMS, we dont	\
+				/* While error_return does not usually return in UNIX, it can if we are 	\
+				 * unwinding a job-interrupt frame because error rethrowing terminates when a	\
+				 * job-interrupt frame is unwound which instead of re-throwing in the 		\
+				 * interrupted frame sends an error to the operator log. But in VMS, we dont	\
 				 * do the latter so it is possible if the current frame is of type SFT_DM that	\
-				 * we dont rethrow and dont do a MUM_TSTART as well. Assert accordingly.	\
+				 * we don't rethrow and don't do a MUM_TSTART either. Assert accordingly.	\
 				 */										\
-				UNIX_ONLY(assert(FALSE);)	/* this should not return */			\
 				VMS_ONLY(assert(SFT_DM & frame_pointer->type);)					\
 			} else											\
 			{											\
-				assert(FALSE);									\
+				assert(FALSE & 2);								\
 				NULLIFY_ERROR_FRAME;	/* don't know how we reached here. reset it in PRO */	\
 			}											\
 		} else if (error_frame < frame_pointer)								\
 		{												\
-			assert(FALSE);										\
+			assert(FALSE & 3);									\
 			NULLIFY_ERROR_FRAME;	/* don't know how we reached here. reset it in PRO */		\
 		}												\
 	}													\

@@ -140,20 +140,37 @@ void	get_frame_place_mcode(int level, stack_mode_t mode, int cur_zlevel, mval *r
 				result->str.len = STRLEN(UTIL_BASE_FRAME_CODE);
 			}
 		} else
-		{	/* code picked up from cache_cleanup(). any changes here might need to be reflected there */
-			vp = (INTPTR_T *)fp->ctxt;
-			assert(NULL != vp);
-			vp--;
-			if ((GTM_OMAGIC << 16) + OBJ_LABEL != *vp)	/* Validate backward linkage */
-				GTMASSERT;
-			vp--;
-			irtnhdr = (ihdtyp *)((char *)vp + *vp);
-			indce = irtnhdr->indce;
-			assert(NULL != indce);
-			assert(0 < indce->refcnt);	/* currently used in the M stack better have a non-zero refcnt */
-			result->str = indce->src.str;
-			s2pool(&result->str);
-			assert(((unsigned char *)result->str.addr + result->str.len) == stringpool.free);
+		{
+			/* We think we are looking for an indirect invocation (mpc not in routine expected) but if the
+			 * indirect flag is not on, then it's something else and trying to dig out indirect information
+			 * is going to cause this process to explode. So some simple validation first and if it is not
+			 * an indirect, deal with that fact.
+			 */
+			if (fp->flags & SFF_INDCE)
+			{	/* This is a real indirect - dig a bit to find the cache header and the actual code.
+				 * Note, this code picked up from cache_cleanup(). any changes here might need to be
+				 * reflected there.
+				 */
+				vp = (INTPTR_T *)fp->ctxt;
+				assert(NULL != vp);
+				vp--;
+				assertpro(((GTM_OMAGIC << 16) + OBJ_LABEL) == *vp);	/* Validate backward linkage */
+				vp--;
+				irtnhdr = (ihdtyp *)((char *)vp + *vp);
+				indce = irtnhdr->indce;
+				assert(NULL != indce);
+				assert(0 < indce->refcnt);	/* currently used in the M stack better have a non-zero refcnt */
+				result->str = indce->src.str;
+				s2pool(&result->str);
+				assert(((unsigned char *)result->str.addr + result->str.len) == stringpool.free);
+			} else
+			{	/* Not a real indirect. The mpc may have been reset by error handling to various assembler
+				 * routines or it just may be broken. Whatever the reason, the value to return is that the
+				 * code address and thus the code itself is not available so make an appropriate return.
+				 */
+				result->str.addr = "N/A";
+				result->str.len = SIZEOF("N/A") - 1;
+			}
 		}
 	}
 	return;

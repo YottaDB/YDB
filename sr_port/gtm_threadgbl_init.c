@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +68,7 @@
 #include "mdq.h"
 #include "mprof.h"
 #include "mv_stent.h"
+#include "find_mvstent.h"	/* needed for zintcmd_active */
 #include "stack_frame.h"
 #include "stp_parms.h"
 #include "stringpool.h"
@@ -92,7 +93,7 @@
 #include "op.h"
 #include "gtmsecshr.h"
 #include "error_trap.h"
-#include "patcode.h"	/* for pat_everything and sizeof_pat_everything */
+#include "patcode.h"		/* for pat_everything and sizeof_pat_everything */
 #include "source_file.h"	/* for REV_TIME_BUFF_LEN */
 #include "mupipbckup.h"
 #include "dpgbldir.h"
@@ -100,12 +101,14 @@
 #include "have_crit.h"
 #include "alias.h"
 #include "zroutines.h"
+#include "parm_pool.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "gtmrecv.h"
 #include "replgbl.h"
+#include "trace_table.h"
 
 /* FOR MERGE RELATED GLOBALS */
 #include "gvname_info.h"
@@ -115,7 +118,7 @@
 # include "cli.h"
 # include "invocation_mode.h"
 # include "fgncal.h"
-# include "parse_file.h"		/* for MAX_FBUFF */
+# include "parse_file.h"	/* for MAX_FBUFF */
 # include "repl_sem.h"
 # include "gtm_zlib.h"
 # include "zro_shlibs.h"
@@ -206,12 +209,14 @@ void gtm_threadgbl_init(void)
 	gtm_threadgbl_true = (gtm_threadgbl_true_t *)gtm_threadgbl;
 
 	/* Add specific initializations if other than 0s here using the TREF() family of macros: */
-	MEMCPY_LIT(TADR(prombuf), DEFAULT_PROMPT);
+	(TREF(director_ident)).addr = TADR(director_string);
+	TREF(for_stack_ptr) = TADR(for_stack);
 	(TREF(gtmprompt)).addr = TADR(prombuf);
 	(TREF(gtmprompt)).len = SIZEOF(DEFAULT_PROMPT) - 1;
 	TREF(lv_null_subs) = LVNULLSUBS_OK;	/* UNIX: set in gtm_env_init_sp(), VMS: set in gtm$startup() - init'd here
 							 * in case alternative invocation methods bypass gtm_startup()
 							 */
-	TREF(for_stack_ptr) = TADR(for_stack);
+	MEMCPY_LIT(TADR(prombuf), DEFAULT_PROMPT);
 	(TREF(replgbl)).jnl_release_timeout = DEFAULT_JNL_RELEASE_TIMEOUT;
+	(TREF(window_ident)).addr = TADR(window_string);
 }

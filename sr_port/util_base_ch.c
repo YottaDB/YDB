@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,20 @@ GBLREF boolean_t		dont_want_core;
 GBLREF int4            		exi_condition;
 GBLREF int4            		error_condition;
 
+error_def(ERR_ASSERT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_MEMORY);
+error_def(ERR_VMSMEMORY);
+#ifdef VMS
+error_def(ERR_MUNOFINISH);
+error_def(ERR_DSENOFINISH);
+error_def(ERR_LKENOFINISH);
+#endif
+
 CONDITION_HANDLER(util_base_ch)
 {
 	sgmnt_addrs	*csa;
@@ -47,18 +61,6 @@ CONDITION_HANDLER(util_base_ch)
 		unsigned char	msginfo[4];
 		unsigned char	msg_buff[MAX_MSG_SIZE + 1];
 		$DESCRIPTOR(msgbuf, msg_buff);
-	)
-	error_def(ERR_GTMCHECK);
-	error_def(ERR_ASSERT);
-	error_def(ERR_GTMASSERT);
-        error_def(ERR_MEMORY);
-        error_def(ERR_VMSMEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_OUTOFSPACE);
-	VMS_ONLY(
-		error_def(ERR_MUNOFINISH);
-		error_def(ERR_DSENOFINISH);
-		error_def(ERR_LKENOFINISH);
 	)
 
 	START_CH;

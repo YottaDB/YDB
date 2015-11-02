@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,6 +65,9 @@ GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 
+error_def(ERR_BLKCNTEDITFAIL);
+error_def(ERR_JNLREADEOF);
+
 static	void	(* const extraction_routine[])() =
 {
 #define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	extract_rtn,
@@ -92,9 +95,6 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	forw_multi_struct	*forw_multi;
 	multi_struct 		*multi;
 
-	error_def(ERR_JNLREADEOF);
-	error_def(ERR_BLKCNTEDITFAIL);
-
 	skip_dbtriggers = TRUE;	/* do not want to invoke any triggers for updates done by journal recovery */
 	murgbl.extr_buff = (char *)malloc(murgbl.max_extr_record_length);
 	for (recstat = (enum broken_type)0; recstat < TOT_EXTR_TYPES; recstat++)
@@ -109,6 +109,9 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	murgbl.min_broken_time = min_broken_time;
 	murgbl.min_broken_seqno = min_broken_seqno;
 	murgbl.losttn_seqno = losttn_seqno;
+	DEBUG_ONLY(murgbl.save_losttn_seqno = losttn_seqno;) /* keep save_losttn_seqno in sync at start of mur_forward.
+							      * an assert in mur_close_files later checks this did not change.
+							      */
 	assert(!mur_options.rollback || (murgbl.losttn_seqno <= murgbl.min_broken_seqno));
 	prev_rctl = NULL;
 	rctl_start = NULL;
@@ -128,8 +131,17 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			assert(jctl->reg_ctl == rctl);
 			jctl->rec_offset = jctl->turn_around_offset;
 			jgbl.mur_jrec_seqno = jctl->turn_around_seqno;
-			if (mur_options.rollback && murgbl.consist_jnl_seqno < jgbl.mur_jrec_seqno)
+			if (mur_options.rollback && (murgbl.consist_jnl_seqno < jgbl.mur_jrec_seqno))
+			{	/* Assert that murgbl.losttn_seqno is never lesser than jgbl.mur_jrec_seqno (the turnaround
+				 * point seqno) as this is what murgbl.consist_jnl_seqno is going to be set to and will
+				 * eventually be the post-rollback seqno. If this condition is violated, the result of the
+				 * recovery is a compromised database (the file header will indicate a Region Seqno which
+				 * is not necessarily correct since seqnos prior to it might be absent in the database).
+				 * Therefore, this is an out-of-design situation with respect to rollback and so stop it.
+				 */
+				assert(murgbl.losttn_seqno >= jgbl.mur_jrec_seqno);
 				murgbl.consist_jnl_seqno = jgbl.mur_jrec_seqno;
+			}
 			assert(murgbl.consist_jnl_seqno <= murgbl.losttn_seqno);
 			assert((NULL != rctl->jctl_turn_around) || (0 == jctl->rec_offset));
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ TAB_BG_TRC_REC("  Reserved filler bg_trc", reserved_bgtrcrec1)		/* Reserved fill
 TAB_BG_TRC_REC("  Reserved filler bg_trc", reserved_bgtrcrec2)		/* Reserved filler to match length of VMS section */
 TAB_BG_TRC_REC("  Reserved filler bg_trc", reserved_bgtrcrec3)		/* Reserved filler to match length of VMS section */
 TAB_BG_TRC_REC("  Lost block recovery   ", lost_block_recovery)		/* Performing lost block recovery in gds_rundown  */
-TAB_BG_TRC_REC("  <unused unix unique   ", unused_unix_unique)          /* Available for use as unique unix counter */
+TAB_BG_TRC_REC("  WcBlocked onln_rlbk   ", wc_blocked_onln_rlbk)	/* Set by online rollback due to incomplete wcs_flu */
 #else
 # error Unsupported platform
 #endif

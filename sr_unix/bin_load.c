@@ -238,7 +238,7 @@ void bin_load(uint4 begin, uint4 end)
 	util_out_print("Beginning LOAD at record number: !UL\n", TRUE, begin);
 	max_data_len = 0;
 	max_subsc_len = 0;
-	key_count = 0;
+	global_key_count = key_count = 0;
 	rec_count = begin - 1;
 	extr_collseq = db_collseq = NULL;
 	need_xlation = FALSE;
@@ -273,7 +273,6 @@ void bin_load(uint4 begin, uint4 end)
 			rec_count--;	/* Decrement as this record does not count as a record for loading purposes */
 			continue;
 		}
-		global_key_count = 1;
 		rp = (rec_hdr*)(ptr);
 #		ifdef GTM_CRYPT
 		if ('5' <= hdr_lvl)
@@ -305,7 +304,7 @@ void bin_load(uint4 begin, uint4 end)
 			db_collhdr.ver = gv_target->ver;
 			db_collhdr.nct = gv_target->nct;
 		}
-		GET_SHORT(rec_len, &rp->rsiz);
+		GET_USHORT(rec_len, &rp->rsiz);
 		if (rp->cmpc != 0 || v.str.len > rec_len || mupip_error_occurred)
 		{
 			bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
@@ -315,6 +314,7 @@ void bin_load(uint4 begin, uint4 end)
 		}
 		if (new_gvn)
 		{
+			global_key_count = 1;
 			if ((db_collhdr.act != extr_collhdr.act || db_collhdr.ver != extr_collhdr.ver
 				|| db_collhdr.nct != extr_collhdr.nct
 				|| gv_cur_region->std_null_coll != extr_std_null_coll))
@@ -360,7 +360,7 @@ void bin_load(uint4 begin, uint4 end)
 		new_gvn = FALSE;
 		for (; rp < (rec_hdr*)btop; rp = (rec_hdr*)((unsigned char *)rp + rec_len))
 		{
-			GET_SHORT(rec_len, &rp->rsiz);
+			GET_USHORT(rec_len, &rp->rsiz);
 			if (rec_len + (unsigned char *)rp > btop)
 			{
 				bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);

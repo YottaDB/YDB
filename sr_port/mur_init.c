@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,9 +36,9 @@
 
 GBLREF 	jnl_gbls_t	jgbl;
 GBLREF	mur_gbls_t	murgbl;
-GBLREF	boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF	void		(*call_on_signal)();
 GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
+GBLREF	boolean_t	gv_play_duplicate_kills;
 
 #define	FREE_AND_NULLIFY_BUDDY_LIST(LIST)	\
 {						\
@@ -64,8 +64,7 @@ GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
  * Function Name: mur_init()							       	*
  * Input: None										*
  * Output: None										*
- *											*
- * *************************************************************************************/
+ ****************************************************************************************/
 
 void mur_init(void)
 {
@@ -82,13 +81,12 @@ void mur_init(void)
 	/* pini_list hash table of a jnl_ctl_list is initialized in mur_fopen */
 	/* FAB of a jnl_ctl_list is initialized in mur_fopen */
 	murgbl.resync_seqno = 0; 		/* interrupted rollback set this to non-zero value later */
-	murgbl.stop_rlbk_seqno = MAXUINT8;	/* allow default rollback to continue forward processing till last valid record */
 	jgbl.mupip_journal = TRUE;	/* this is a MUPIP JOURNAL command */
-	/* Disable optimization to avoid multiple updates to the database and journal for duplicate sets.
-	 * This is because, just like the update process, MUPIP JOURNAL RECOVER/ROLLBACK is supposed to simulate GTM
-	 * update activity else there will be transaction-number mismatch in the database.
+	/* Write journal records for KILL even if node does not exist in this database. This way if any process had
+	 * written a KILL record for a no-op kill (a kill of a node that does not exist; this is currently possible in
+	 * the update process), recovery does the exact same thing and thereby keeps the db/jnl in sync.
 	 */
-	gvdupsetnoop = FALSE;
+	gv_play_duplicate_kills = TRUE;
 	/* Because journal recovery operates with no one else touching the database, t_tries is going to be
 	 * directly set to CDB_STAGNATE for every TP transaction (in op_tstart). So initialize
 	 * t_fail_hist[0] through t_fail_hist[CDB_STAGNATE-1] to '0' for display purposes.

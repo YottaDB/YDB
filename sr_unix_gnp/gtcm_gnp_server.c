@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -160,8 +160,12 @@ static void gtcm_gnp_server_actions(void)
 	char			reply;
 	connection_struct	*prev_curr_entry;
 	CMI_MUTEX_DECL;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(gtcm_ch);
+
+	TREF(issue_DBROLLEDBACK_anyways) = TRUE; /* to let t_retry issue DBROLLEDBACK error for GT.CM as well */
 	while (!cm_shutdown)
 	{
 		if (switch_log)
@@ -443,7 +447,7 @@ int main(int argc, char **argv, char **envp)
 	gtcm_connection = FALSE;
         if (!no_fork)
         {
-		DO_FORK(pid);
+		FORK_CLEAN(pid);
                 if (0 > pid)
                 {
 			rts_error(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Error forking gnp server into the background"), errno);

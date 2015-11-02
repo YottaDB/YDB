@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,12 +25,14 @@
 #include "filestruct.h"			/* needed for jnl.h */
 #include "jnl.h"			/* needed for tp.h */
 #include "tp.h"
+#include "t_retry.h"
 #include "gdsblk.h"
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
 #include "format_targ_key.h"		/* for COPY_SUBS_TO_GVCURRKEY */
 #include "targ_alloc.h"			/* for SETUP_TRIGGER_GLOBAL & SWITCH_TO_DEFAULT_REGION */
 #include "hashtab_str.h"
+#include "wbox_test_init.h"
 #include "trigger_delete_protos.h"
 #include "trigger.h"
 #include "trigger_incr_cycle.h"
@@ -57,11 +59,26 @@ GBLREF	trans_num		local_tn;
 LITREF	mval			literal_hasht;
 LITREF	char 			*trigger_subs[];
 
+error_def(ERR_TEXT);
 error_def(ERR_TRIGDEFBAD);
 error_def(ERR_TRIGMODINTP);
 error_def(ERR_TRIGNAMBAD);
+error_def(ERR_TRIGMODREGNOTRW);
 
 #define MAX_CMD_LEN		20	/* Plenty of room for S,K,ZK,ZTK */
+
+/* This error macro is used for all definition errors where the target is ^#t("TRHASH",<HASH>) */
+#define TRHASH_DEFINITION_RETRY_OR_ERROR(HASH)						\
+{											\
+	if (CDB_STAGNATE > t_tries)							\
+		t_retry(cdb_sc_triggermod);						\
+	else										\
+	{										\
+		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);	\
+		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,		\
+			LEN_AND_LIT("\"#TRHASH\""),HASH->str.len, HASH->str.addr);	\
+	}										\
+}
 
 #define SEARCH_AND_KILL_BY_HASH(TRIGVN, TRIGVN_LEN, HASH, TRIG_INDEX)								\
 {																\
@@ -77,9 +94,7 @@ error_def(ERR_TRIGNAMBAD);
 		gvcst_kill(FALSE);												\
 	} else															\
 	{	/* There has to be a #TRHASH entry */										\
-		assert(FALSE);													\
-		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, TRIGVN_LEN, TRIGVN, LEN_AND_LIT("\"#TRHASH\""), HASH->str.len,	\
-			HASH->str.addr);											\
+		TRHASH_DEFINITION_RETRY_OR_ERROR(HASH);										\
 	}															\
 }
 
@@ -100,6 +115,8 @@ STATICFNDEF void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **value
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
 	assert(0 != gv_target->root);
+	if (gv_cur_region->read_only)
+		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	if (NULL != strchr(values[CMD_SUB], 'S'))
 	{
 		SEARCH_AND_KILL_BY_HASH(trigvn, trigvn_len, set_hash, match_index)
@@ -147,6 +164,8 @@ STATICFNDEF void cleanup_trigger_name(char *trigvn, int trigvn_len, char *trigge
 	SWITCH_TO_DEFAULT_REGION;
 	if (0 != gv_target->root)
 	{
+		if (gv_cur_region->read_only)
+			rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 		if (is_auto_name)
 		{
 			/* $get(^#t("#TNAME",<trunc_name>,"#TNCOUNT")) */
@@ -206,13 +225,20 @@ STATICFNDEF int4 update_trigger_name_value(int trigvn_len, char *trig_name, int 
 		return PUT_SUCCESS;
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
+	if (gv_cur_region->read_only)
+		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	assert(0 != gv_target->root);
 	/* $get(^#t("#TNAME",^#t(GVN,index,"#TRIGNAME")) */
 	BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name, trig_name_len - 1);
 	if (!gvcst_get(&trig_gbl))
 	{	/* There has to be a #TNAME entry */
-		assert(FALSE);
-		rts_error(VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""), trig_name_len - 1, trig_name);
+		if (CDB_STAGNATE > t_tries)
+			t_retry(cdb_sc_triggermod);
+		else
+		{
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			rts_error(VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""), trig_name_len - 1, trig_name);
+		}
 	}
 	len = STRLEN(trig_gbl.str.addr) + 1;
 	assert(MAX_MIDENT_LEN >= len);
@@ -251,52 +277,21 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 	SETUP_THREADGBL_ACCESS;
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
+	if (gv_cur_region->read_only)
+		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	assert(0 != gv_target->root);
 	if (NULL != strchr(values[CMD_SUB], 'S'))
 	{
-		if (search_trigger_hash(trigvn, trigvn_len, set_hash, old_trig_index, &hash_index))
-		{
-			MV_FORCE_UMVAL(&mv_hash, set_hash->hash_code);
-			MV_FORCE_MVAL(&mv_hash_indx, hash_index);
-			BUILD_HASHT_SUB_MSUB_MSUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash, mv_hash_indx);
-			if (!gvcst_get(&key_val))
-			{	/* There has to be a #TRHASH entry */
-				assert(FALSE);
-				rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, LEN_AND_LIT("\"#TRHASH\""),
-					set_hash->str.len, set_hash->str.addr);
-			}
-			assert((MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT) >= key_val.str.len);
-			len = STRLEN(key_val.str.addr);
-			memcpy(tmp_str, key_val.str.addr, len);
-			ptr = tmp_str + len;
-			*ptr++ = '\0';
-			num_len = 0;
-			I2A(ptr, num_len, new_trig_index);
-			len += num_len + 1;
-			SET_TRIGGER_GLOBAL_SUB_MSUB_MSUB_STR(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash, mv_hash_indx,
-				tmp_str, len, result);
-			if (PUT_SUCCESS != result)
-			{
-				RESTORE_TRIGGER_REGION_INFO;
-				return result;
-			}
-		} else
+		if (!search_trigger_hash(trigvn, trigvn_len, set_hash, old_trig_index, &hash_index))
 		{	/* There has to be an entry with the old hash value, we just looked it up */
-			assert(FALSE);
-			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, LEN_AND_LIT("\"#TRHASH\""),
-				set_hash->str.len, set_hash->str.addr);
+			TRHASH_DEFINITION_RETRY_OR_ERROR(set_hash);
 		}
-	}
-	if (search_trigger_hash(trigvn, trigvn_len, kill_hash, old_trig_index, &hash_index))
-	{
-		MV_FORCE_UMVAL(&mv_hash, kill_hash->hash_code);
+		MV_FORCE_UMVAL(&mv_hash, set_hash->hash_code);
 		MV_FORCE_MVAL(&mv_hash_indx, hash_index);
 		BUILD_HASHT_SUB_MSUB_MSUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash, mv_hash_indx);
 		if (!gvcst_get(&key_val))
 		{	/* There has to be a #TRHASH entry */
-			assert(FALSE);
-			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, LEN_AND_LIT("\"#TRHASH\""),
-				kill_hash->str.len, kill_hash->str.addr);
+			TRHASH_DEFINITION_RETRY_OR_ERROR(set_hash);
 		}
 		assert((MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT) >= key_val.str.len);
 		len = STRLEN(key_val.str.addr);
@@ -313,11 +308,32 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 			RESTORE_TRIGGER_REGION_INFO;
 			return result;
 		}
-	} else
+	}
+	if (!search_trigger_hash(trigvn, trigvn_len, kill_hash, old_trig_index, &hash_index))
 	{	/* There has to be an entry with the old hash value, we just looked it up */
-		assert(FALSE);
-		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, LEN_AND_LIT("\"#TRHASH\""), kill_hash->str.len,
-			kill_hash->str.addr);
+		TRHASH_DEFINITION_RETRY_OR_ERROR(kill_hash);
+	}
+	MV_FORCE_UMVAL(&mv_hash, kill_hash->hash_code);
+	MV_FORCE_MVAL(&mv_hash_indx, hash_index);
+	BUILD_HASHT_SUB_MSUB_MSUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash, mv_hash_indx);
+	if (!gvcst_get(&key_val))
+	{	/* There has to be a #TRHASH entry */
+		TRHASH_DEFINITION_RETRY_OR_ERROR(kill_hash);
+	}
+	assert((MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT) >= key_val.str.len);
+	len = STRLEN(key_val.str.addr);
+	memcpy(tmp_str, key_val.str.addr, len);
+	ptr = tmp_str + len;
+	*ptr++ = '\0';
+	num_len = 0;
+	I2A(ptr, num_len, new_trig_index);
+	len += num_len + 1;
+	SET_TRIGGER_GLOBAL_SUB_MSUB_MSUB_STR(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash, mv_hash_indx,
+		tmp_str, len, result);
+	if (PUT_SUCCESS != result)
+	{
+		RESTORE_TRIGGER_REGION_INFO;
+		return result;
 	}
 	RESTORE_TRIGGER_REGION_INFO;
 	return PUT_SUCCESS;
@@ -368,6 +384,8 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 		trigger_name_len--;
 	/* $data(^#t) */
 	SWITCH_TO_DEFAULT_REGION;
+	if (gv_cur_region->read_only)
+		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 == gv_target->root)
 	{
@@ -397,6 +415,8 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 			gbl_name.addr = trigvn;
 			gbl_name.len = trigvn_len;
 			GV_BIND_NAME_ONLY(gd_header, &gbl_name);
+			if (gv_cur_region->read_only)
+				rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 			csa = gv_target->gd_csa;
 			SETUP_TRIGGER_GLOBAL;
 			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
@@ -610,11 +630,20 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 					assert (xecute_idx >= 2); /* multi-line trigger, indices 0, 1 and 2 MUST be defined */
 				} else
 				{
-					/* in PRO this is a nasty case that will result in an access violation
-					 * because data that should be present is not. In the next go around
-					 * with trigger installation this case should be handled better */
-					assert(!((TRIGNAME_SUB == sub_indx) || (CMD_SUB == sub_indx) ||
-						 (CHSET_SUB == sub_indx))); /* these should not be zero length */
+					if (((TRIGNAME_SUB == sub_indx) || (CMD_SUB == sub_indx) ||
+						 (CHSET_SUB == sub_indx)))
+					{ /* CMD, NAME and CHSET cannot be zero length */
+						if (CDB_STAGNATE > t_tries)
+							t_retry(cdb_sc_triggermod);
+						else
+						{
+							assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+							rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
+									trigvn_len, trigvn, trigvn_len, trigvn,
+									STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
+						}
+					}
+					/* OPTIONS, PIECES and DELIM can be zero */
 					trig_len = 0;
 				}
 				if (NUM_SUBS > sub_indx)
@@ -703,6 +732,8 @@ void trigger_delete_all(void)
 			rts_error(VARLSTCNT(1) ERR_TRIGMODINTP);
 	}
 	SWITCH_TO_DEFAULT_REGION;
+	if (gv_cur_region->read_only)
+		rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 != gv_target->root)
 	{
@@ -717,27 +748,30 @@ void trigger_delete_all(void)
 	{
 		if (!reg->open)
 			gv_init_reg(reg);
-		if (!reg->read_only)
-		{
-			gv_cur_region = reg;
-			change_reg();
-			csa = cs_addrs;
-			SETUP_TRIGGER_GLOBAL;
-			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
-			/* There might not be any ^#t in this region, so check */
-			if (0 != gv_target->root)
-			{	/* Kill all descendents of ^#t(trigvn, indx) where trigvn is any global with a trigger,
-				 * but skip the "#XYZ" entries. setup ^#t(trigvn,"$") as the PREV key for op_gvorder
-				 */
-				BUILD_HASHT_SUB_CURRKEY(LITERAL_MAXHASHVAL, STRLEN(LITERAL_MAXHASHVAL));
-				TREF(gv_last_subsc_null) = FALSE; /* We know its not null, but prior state is unreliable */
-				while (TRUE)
-				{
-					op_gvorder(&curr_gbl_name);
-					/* quit:$length(curr_gbl_name)=0 */
-					if (0 == curr_gbl_name.str.len)
-						break;
-					/* $get(^#t(curr_gbl_name,#COUNT)) */
+		gv_cur_region = reg;
+		change_reg();
+		csa = cs_addrs;
+		SETUP_TRIGGER_GLOBAL;
+		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
+		/* There might not be any ^#t in this region, so check */
+		if (0 != gv_target->root)
+		{	/* Give error on region only if it has #t global indicating the presence
+			 * of triggers.
+			 */
+			if (reg->read_only)
+				rts_error(VARLSTCNT(4) ERR_TRIGMODREGNOTRW, REG_LEN_STR(reg));
+			/* Kill all descendents of ^#t(trigvn, indx) where trigvn is any global with a trigger,
+			 * but skip the "#XYZ" entries. setup ^#t(trigvn,"$") as the PREV key for op_gvorder
+			 */
+			BUILD_HASHT_SUB_CURRKEY(LITERAL_MAXHASHVAL, STRLEN(LITERAL_MAXHASHVAL));
+			TREF(gv_last_subsc_null) = FALSE; /* We know its not null, but prior state is unreliable */
+			while (TRUE)
+			{
+				op_gvorder(&curr_gbl_name);
+				/* quit:$length(curr_gbl_name)=0 */
+				if (0 == curr_gbl_name.str.len)
+					break;
+				/* $get(^#t(curr_gbl_name,#COUNT)) */
 					BUILD_HASHT_SUB_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len,
 						LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
 					if (gvcst_get(&trigger_count))
@@ -748,7 +782,20 @@ void trigger_delete_all(void)
 						BUILD_HASHT_SUB_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len,
 							LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE));
 						if (!gvcst_get(&trigger_cycle))
-							assert(FALSE); /* Found #COUNT, there must be #CYCLE */
+						{	/* Found #COUNT, there must be #CYCLE */
+							if (CDB_STAGNATE > t_tries)
+								t_retry(cdb_sc_triggermod);
+							else
+							{
+								assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+								rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6,
+										curr_gbl_name.str.len, curr_gbl_name.str.addr,
+										curr_gbl_name.str.len, curr_gbl_name.str.addr,
+										LEN_AND_LIT("\"#CYCLE\""),
+										ERR_TEXT, 2,
+										RTS_ERROR_TEXT("#CYCLE field is missing"));
+							}
+						}
 						mv_cycle_ptr = &trigger_cycle;
 						cycle = MV_FORCE_INT(mv_cycle_ptr);
 						/* kill ^#t(curr_gbl_name) */
@@ -763,15 +810,14 @@ void trigger_delete_all(void)
 					} /* else there is no #COUNT, then no triggers, leave #CYCLE alone */
 					/* get ready for op_gvorder() call for next trigger under ^#t */
 					BUILD_HASHT_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len);
-				}
-				csa->incr_db_trigger_cycle = TRUE;
-				if (dollar_ztrigger_invoked)
-				{	/* increment db_dztrigger_cycle so that next gvcst_put/gvcst_kill in this transaction,
-					 * on this region, will re-read. See trigger_update.c for a comment on why it is okay
-					 * for db_dztrigger_cycle to be incremented more than once in the same transaction
-					 */
-					csa->db_dztrigger_cycle++;
-				}
+			}
+			csa->incr_db_trigger_cycle = TRUE;
+			if (dollar_ztrigger_invoked)
+			{	/* increment db_dztrigger_cycle so that next gvcst_put/gvcst_kill in this transaction,
+				 * on this region, will re-read. See trigger_update.c for a comment on why it is okay
+				 * for db_dztrigger_cycle to be incremented more than once in the same transaction
+				 */
+				csa->db_dztrigger_cycle++;
 			}
 		}
 	}

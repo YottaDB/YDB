@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,8 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	inctn_opcode_t		inctn_opcode;
 
+error_def(ERR_GVKILLFAIL);
+
 void	gvcst_expand_free_subtree(kill_set *ks_head)
 {
 	blk_hdr_ptr_t		bp;
@@ -65,8 +67,6 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 	inctn_opcode_t		save_inctn_opcode;
 	bt_rec_ptr_t		bt;
 
-	error_def(ERR_GVKILLFAIL);
-
 	csa = cs_addrs;
 	csd = cs_data;
 	/* If ever the following assert is removed, "flush_cache" shouldn't be set to FALSE unconditionally as it is now */
@@ -81,6 +81,17 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 			{
 				if (!(was_crit = csa->now_crit))
 					grab_crit(gv_cur_region);
+#				ifdef UNIX
+				if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
+				{	/* Concurrent online rollback. We don't want to continue with rest of the logic to add more
+					 * blocks to the kill-set and do the gvcst_bmp_mark_free. Return to the caller. Since we
+					 * haven't sync'ed the cycles, the next tranasction commit will detect the online rollback
+					 * and the restart logic will handle it appropriately.
+					 */
+					free(temp_buff);
+					return;
+				}
+#				endif
 				if (dollar_tlevel && ksb->flag)
 				{
 					chain.flag = 1;
@@ -160,4 +171,3 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 	}
 	free(temp_buff);
 }
-

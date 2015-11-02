@@ -19,8 +19,9 @@
 #define ZTWORMREC		0x00000008
 #define ZTRIGREC		0x00000800
 
-#define SET_KILL_ZKILL_MASK		(SETREC | KILLREC | ZKILLREC)
-#define SET_KILL_ZKILL_ZTWORM_MASK	(SETREC | KILLREC | ZKILLREC | ZTWORMREC)
+#define SET_KILL_ZKILL_MASK			(SETREC | KILLREC | ZKILLREC)
+#define SET_KILL_ZKILL_ZTWORM_MASK		(SETREC | KILLREC | ZKILLREC | ZTWORMREC)
+#define SET_KILL_ZKILL_ZTWORM_ZTRIG_MASK	(SETREC | KILLREC | ZKILLREC | ZTWORMREC | ZTRIGREC)
 
 #define TUPDREC			0x00000010
 #define UUPDREC			0x00000020
@@ -48,8 +49,10 @@ LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
 #define IS_ZTWORM(rectype)			(jrt_update[rectype] & ZTWORMREC)
 #define IS_ZTRIG(rectype)			(jrt_update[rectype] & ZTRIGREC)
 #define IS_KILL_ZKILL(rectype)			(jrt_update[rectype] & (KILLREC | ZKILLREC))
+#define IS_KILL_ZKILL_ZTRIG(rectype)		(jrt_update[rectype] & (KILLREC | ZKILLREC | ZTRIGREC))
 #define IS_SET_KILL_ZKILL_ZTRIG(rectype)	(jrt_update[rectype] & (SET_KILL_ZKILL_MASK | ZTRIGREC))
-#define IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype)	(jrt_update[rectype] & (SET_KILL_ZKILL_ZTWORM_MASK | ZTRIGREC))
+#define IS_SET_KILL_ZKILL_ZTWORM(rectype)	(jrt_update[rectype] & SET_KILL_ZKILL_ZTWORM_MASK)
+#define IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype)	(jrt_update[rectype] & SET_KILL_ZKILL_ZTWORM_ZTRIG_MASK)
 #define IS_FENCED(rectype)			(jrt_update[rectype] & FENCE_MASK)
 #define IS_TP(rectype)				(jrt_update[rectype] & TPREC_MASK)
 #define IS_ZTP(rectype)				(jrt_update[rectype] & ZTPREC_MASK)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,20 +42,77 @@ int do_indir_do(mval *v, unsigned char argcode)
 		label.str.len = v->str.len;
 		label.str.addr = &ident.c[0];
 		addr = op_labaddr(frame_pointer->rvector, &label, 0);
-		if (argcode == indir_do)
-		{
-			if (is_tracing_on)
-				exfun_frame_sp();
-			else
-				exfun_frame();
-		}
 		current_rhead = CURRENT_RHEAD_ADR(frame_pointer->rvector);
-		frame_pointer->mpc = LINE_NUMBER_ADDR(current_rhead, USHBIN_ONLY(*)addr);
-#ifdef HAS_LITERAL_SECT
+		if (argcode == indir_do)
+		{	/* If we aren't in an indirect, exfun_frame() is the best way to copy the stack frame as it does not
+			 * require re-allocation of the various tables (temps, linkage, literals, etc). But if we are in an
+			 * indirect, the various stackframe fields cannot be copied as the indirect has different values so
+			 * re-create the frame from the values in the routine header via new_stack_frame().
+			 */
+			if (!(frame_pointer->flags & SFF_INDCE))
+			{
+				if (!is_tracing_on)
+					exfun_frame();
+				else
+					exfun_frame_sp();
+			} else
+			{
+				if (!is_tracing_on)
+				{
+					new_stack_frame(CURRENT_RHEAD_ADR(frame_pointer->rvector),
+#							ifdef HAS_LITERAL_SECT
+							(unsigned char *)LINKAGE_ADR(current_rhead),
+#							else
+							PTEXT_ADR(current_rhead),
+#							endif
+							USHBIN_ONLY(LINE_NUMBER_ADDR(current_rhead, *addr))
+							/* On non-shared binary calculate the transfer address to be passed to
+							 * new_stack_frame as follows:
+							 *  1) get the number stored at addr; this is the offset to the line number
+							 *     entry
+							 *  2) add the said offset to the address of the routine header; this is the
+							 *     address of line number entry
+							 *  3) dereference the said address to get the line number of the actual
+							 *     program
+							 *  4) add the said line number to the address of the routine header
+							 */
+							NON_USHBIN_ONLY((unsigned char *)((char *)current_rhead
+								+ *(int4 *)((char *)current_rhead + *addr))));
+
+				} else
+				{
+					new_stack_frame_sp(CURRENT_RHEAD_ADR(frame_pointer->rvector),
+#							   ifdef HAS_LITERAL_SECT
+							   (unsigned char *)LINKAGE_ADR(current_rhead),
+#							   else
+							   PTEXT_ADR(current_rhead),
+#							   endif
+							   USHBIN_ONLY(LINE_NUMBER_ADDR(current_rhead, *addr))
+							   /* On non-shared binary calculate the transfer address to be passed to
+							    * new_stack_frame as follows:
+							    *  1) get the number stored at addr; this is the offset to the line
+							    *     number entry
+							    *  2) add the said offset to the address of the routine header; this is
+							    *     the address of line number entry
+							    *  3) dereference the said address to get the line number of the actual
+							    *     program
+							    *  4) add the said line number to the address of the routine header
+							    */
+							   NON_USHBIN_ONLY((unsigned char *)((char *)current_rhead
+								+ *(int4 *)((char *)current_rhead + *addr))));
+				}
+				return TRUE;
+			}
+		}
+		/* On non-shared binary calculate the mpc pointer similarly to the descriptions above. */
+		frame_pointer->mpc =
+			USHBIN_ONLY(LINE_NUMBER_ADDR(current_rhead, *addr))
+			NON_USHBIN_ONLY((unsigned char *)((char *)current_rhead + *(int4 *)((char *)current_rhead + *addr)));
+#		ifdef HAS_LITERAL_SECT
 		frame_pointer->ctxt = (unsigned char *)LINKAGE_ADR(current_rhead);
-#else
+#		else
 		frame_pointer->ctxt = PTEXT_ADR(current_rhead);
-#endif
+#		endif
 		return TRUE;
 	} else
 		return FALSE;

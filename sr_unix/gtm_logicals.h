@@ -74,6 +74,9 @@
 #define	GTM_PROMPT			"$gtm_prompt"
 #define GTM_BOOLEAN			"$gtm_boolean"
 #define GTM_PROCSTUCKEXEC		"$gtm_procstuckexec"
+#define GTM_TRACE_GROUPS		"$gtm_trace_groups"
+#define GTM_TRACE_TABLE_SIZE		"$gtm_trace_table_size"
+#define GTM_MPROF_TESTING		"$gtm_trace_gbl_name"
 
 /* -------------------------- Unix only --------------------------  */
 
@@ -82,6 +85,7 @@
 #define	GTM_SHMFLAGS			"$gtm_shmatflags"
 #define GTM_TRIGGER_ETRAP		"$gtm_trigger_etrap"
 #define GTM_SNAPTMPDIR			"$gtm_snaptmpdir"
+#define GTM_DB_STARTUP_MAX_WAIT		"$gtm_db_startup_max_wait"
 
 /* Replication */
 #define	GTM_REPL_INSTANCE		"$gtm_repl_instance"

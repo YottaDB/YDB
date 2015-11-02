@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,8 @@
 #include "gtm_stdlib.h"
 
 #include "gtm_time.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 #include "gtcm_sysenv.h"
 #include "gtcm.h"
@@ -173,6 +175,6 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 			chr[j] = '.';
 		FPRINTF(fp,"%16s %x\n", chr, offset);
 	    }
-	fflush(fp);
+	FFLUSH(fp);
 	fclose(fp);
 }

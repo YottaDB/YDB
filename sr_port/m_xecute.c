@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,24 +19,22 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-
 int m_xecute(void)
 {
-	triple tmpchain, *oldchain, *obp, *ref0, *ref1, *triptr;
 	oprtype *cr, x;
+	triple *obp, *oldchain, *ref0, *ref1, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	dqinit(&tmpchain,exorder);
 	oldchain = setcurtchain(&tmpchain);
-	switch (strexpr(&x))
+	switch (expr(&x, MUMPS_STR))
 	{
 	case EXPR_FAIL:
 		setcurtchain(oldchain);
 		return FALSE;
 	case EXPR_INDR:
-		if (window_token != TK_COLON)
+		if (TK_COLON != TREF(window_token))
 		{
 			make_commarg(&x,indir_xecute);
 			break;
@@ -49,11 +47,11 @@ int m_xecute(void)
 		ins_triple(ref0);
 	}
 	setcurtchain(oldchain);
-	if (window_token == TK_COLON)
+	if (TK_COLON == TREF(window_token))
 	{
 		advancewindow();
-		cr = (oprtype *) mcalloc(SIZEOF(oprtype));
-		if (!bool_expr((bool) FALSE,cr))
+		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
+		if (!bool_expr(FALSE, cr))
 			return FALSE;
 		if (TREF(expr_start) != TREF(expr_start_orig))
 		{

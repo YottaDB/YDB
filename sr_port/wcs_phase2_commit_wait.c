@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,12 +29,14 @@
 #include "rel_quant.h"
 #include "send_msg.h"
 #include "gtm_c_stack_trace.h"
+#include "wbox_test_init.h"
+
+error_def(ERR_COMMITWAITPID);
+error_def(ERR_COMMITWAITSTUCK);
 
 #define	SEND_COMMITWAITPID_GET_STACK_IF_NEEDED(BLOCKING_PID, STUCK_CNT, CR, CSA)						\
 {																\
 	GBLREF	uint4	process_id;												\
-																\
-	error_def(ERR_COMMITWAITPID);												\
 																\
 	if (BLOCKING_PID)													\
 	{															\
@@ -59,13 +61,14 @@
 }
 
 GBLREF	uint4		process_id;
-GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
-GBLREF	boolean_t	gtm_white_box_test_case_enabled;
 GBLREF	int		process_exiting;
+#ifdef DEBUG
+GBLREF	boolean_t	in_mu_rndwn_file;
+#endif
 
 #ifdef UNIX
 GBLREF	volatile uint4		heartbeat_counter;
-GBLREF	volatile boolean_t	timer_in_handler;
+GBLREF	volatile int4		timer_stack_count;
 #endif
 
 /* if cr == NULL, wait a maximum of 1 minute for ALL processes actively in bg_update_phase2 to finish.
@@ -100,14 +103,11 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 #	endif
 	static uint4		stuck_cnt = 0; /* stuck_cnt signifies the number of times the same process
 						has called gtmstuckexec for the same condition*/
-	error_def(ERR_COMMITWAITPID);
-	error_def(ERR_COMMITWAITSTUCK);
-
 	DEBUG_ONLY(cr_lo = cr_top = NULL;)
 	crarray_size = SIZEOF(crarray) / SIZEOF(crarray[0]);
 	DEBUG_ONLY(waitarray_size = SIZEOF(waitarray) / SIZEOF(waitarray[0]);)
 
-	assert(!mu_rndwn_file_dbjnl_flush);	/* caller should have avoided calling us if it was mupip rundown */
+	assert(!in_mu_rndwn_file);
 	csd = csa->hdr;
 	/* To avoid unnecessary time spent waiting, we would like to do rel_quants instead of wcs_sleep. But this means
 	 * we need to have some other scheme for limiting the total time slept. We use the heartbeat scheme which currently
@@ -115,15 +115,16 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	 * cases where heartbeat_timer will not pop:
 	 * (a) if we are in the process of exiting (through a call to cancel_timer(0) which cancels all active timers)
 	 * (b) if we are are already in timer_handler. This is possible if the flush timer pops and we end up invoking
-	 *     wcs_clean_dbsync->wcs_flu->wcs_phase2_commit_wait. Since SIGALRM signals in Unix don't nest we cannot use
-	 *     heartbeat scheme in this case as well.
+	 *     wcs_clean_dbsync->wcs_flu->wcs_phase2_commit_wait. But since the heartbeat timer cannot pop as long as
+	 *     timer_in_handler is TRUE (which it will be until at least we exit this function), we cannot use the heartbeat
+	 *     scheme in this case as well.
 	 * Therefore, if heartbeat timer is available and currently active, then use rel_quants. If not, use wcs_sleep.
 	 * We have found that doing rel_quants (instead of sleeps) causes huge CPU usage in Tru64 even if the default spincnt is
 	 * set to 0 and ALL processes are only waiting for one process to finish its phase2 commit. Therefore we choose
 	 * the sleep approach for Tru64. Choosing a spincnt of 0 would choose the sleep approach (versus rel_quant).
 	 */
 #	if (defined(UNIX) && !defined(__osf__))
-	use_heartbeat = (!process_exiting && csd->wcs_phase2_commit_wait_spincnt && !timer_in_handler);
+	use_heartbeat = (!process_exiting && csd->wcs_phase2_commit_wait_spincnt && (1 > timer_stack_count));
 #	else
 	use_heartbeat = FALSE;
 #	endif
@@ -324,8 +325,12 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	/* If called from wcs_recover(), we dont want to assert(FALSE) as it is possible (in case of STOP/IDs) that
 	 * cnl->wcs_phase2_commit_pidcnt is non-zero even though there is no process in phase2 of commit. In this case
 	 * wcs_recover will call wcs_verify which will clear the flag unconditionally and proceed with normal activity.
-	 * So should not assert. If the caller is wcs_recover, then we expect csd->wc_blocked so be non-zero. Assert that.
+	 * So should not assert. If the caller is wcs_recover, then we expect csd->wc_blocked so be non-zero. Assert
+	 * that. If we are called from wcs_flu via ONLINE ROLLBACK, then wc_blocked will NOT be set. Instead, wcs_flu
+	 * will return with a failure status back to ROLLBACK which will invoke wcs_recover and that will take care of
+	 * resetting cnl->wcs_phase2_commit_pidcnt. But, ONLINE ROLLBACK called in a crash situation is done only with
+	 * whitebox test cases. So, assert accordingly.
 	 */
-	assert(csd->wc_blocked);
+	assert(csd->wc_blocked || (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number));
 	return FALSE;
 }

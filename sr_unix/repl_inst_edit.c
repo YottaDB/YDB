@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,14 +34,14 @@
 #include "repl_inst_dump.h"
 
 GBLREF	boolean_t	in_repl_inst_edit;	/* used by an assert in repl_inst_read/repl_inst_write */
-GBLREF	boolean_t	print_offset;		/* set to TRUE if -DETAIL is specified */
+GBLREF	boolean_t	detail_specified;	/* set to TRUE if -DETAIL is specified */
 GBLREF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
+
+error_def(ERR_MUPCLIERR);
+error_def(ERR_SIZENOTVALID8);
 
 void	mupcli_get_offset_size_value(uint4 *offset, uint4 *size, gtm_uint64_t *value, boolean_t *value_present)
 {
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_SIZENOTVALID8);
-
 	if (!cli_get_hex("OFFSET", offset))
 		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
 	if (!cli_get_hex("SIZE", size))
@@ -125,16 +125,15 @@ void	mupcli_edit_offset_size_value(sm_uc_ptr_t buff, uint4 offset, uint4 size, g
  */
 void	repl_inst_edit(void)
 {
-	unsigned short		inst_fn_len;
+	unsigned short		inst_fn_len, instname_len;
 	char			inst_fn[MAX_FN_LEN + 1], buff_unaligned[REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE + 8];
+	char			instname[MAX_INSTNAME_LEN];
 	char			*buff;
 	repl_inst_hdr_ptr_t	repl_instance;
 	gtmsrc_lcl_ptr_t	gtmsrclcl_ptr;
 	uint4			offset, size;
 	gtm_uint64_t		value;
 	boolean_t		value_present;
-
-	error_def(ERR_MUPCLIERR);
 
 	in_repl_inst_edit = TRUE;
 	inst_fn_len = MAX_FN_LEN;
@@ -145,7 +144,7 @@ void	repl_inst_edit(void)
 	buff = (char *)ROUND_UP2((INTPTR_T)buff, 8);
 	if (CLI_PRESENT == cli_present("SHOW"))
 	{
-		print_offset = (CLI_PRESENT == cli_present("DETAIL"));
+		detail_specified = (CLI_PRESENT == cli_present("DETAIL"));
 		repl_inst_read(inst_fn, (off_t)0, (sm_uc_ptr_t)buff, REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE);
 		util_out_print("GTM-I-MUREPLSHOW, SHOW output for replication instance file !AD", TRUE, inst_fn_len, inst_fn);
 		repl_instance = (repl_inst_hdr_ptr_t)&buff[0];
@@ -153,8 +152,8 @@ void	repl_inst_edit(void)
 		repl_inst_dump_filehdr(repl_instance);
 		section_offset = REPL_INST_HDR_SIZE;
 		repl_inst_dump_gtmsrclcl((gtmsrc_lcl_ptr_t)&buff[REPL_INST_HDR_SIZE]);
-		section_offset = REPL_INST_TRIPLE_OFFSET;
-		repl_inst_dump_triplehist(inst_fn, repl_instance->num_triples);
+		section_offset = REPL_INST_HISTINFO_START;
+		repl_inst_dump_history_records(inst_fn, repl_instance->num_histinfo);
 	}
 	if (CLI_PRESENT == cli_present("CHANGE"))
 	{
@@ -163,6 +162,26 @@ void	repl_inst_edit(void)
 		repl_inst_read(inst_fn, (off_t)offset, (sm_uc_ptr_t)buff, size);
 		mupcli_edit_offset_size_value((sm_uc_ptr_t)buff, offset, size, value, value_present);
 		repl_inst_write(inst_fn, (off_t)offset, (sm_uc_ptr_t)buff, size);
+	}
+	if (CLI_PRESENT == cli_present("NAME"))
+	{	/* Edit the instance name */
+		instname_len = MAX_INSTNAME_LEN;
+		assert(MAX_INSTNAME_LEN == SIZEOF(instname));
+		if (!cli_get_str("NAME", instname, &instname_len))
+			rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+		assert(MAX_INSTNAME_LEN >= instname_len);
+		if (MAX_INSTNAME_LEN == instname_len)
+		{
+			util_out_print("Error: Instance name length can be at most 15", TRUE);
+			rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+		}
+		repl_inst_read(inst_fn, (off_t)0, (sm_uc_ptr_t)buff, REPL_INST_HDR_SIZE);
+		repl_instance = (repl_inst_hdr_ptr_t)&buff[0];
+		util_out_print("HDR Instance Name changing from !AZ to !AZ",
+			TRUE, repl_instance->inst_info.this_instname, instname);
+		assert('\0' == instname[instname_len]);
+		memcpy(repl_instance->inst_info.this_instname, instname, instname_len + 1);
+		repl_inst_write(inst_fn, (off_t)0, (sm_uc_ptr_t)buff, REPL_INST_HDR_SIZE);
 	}
 	in_repl_inst_edit = FALSE;
 }

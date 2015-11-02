@@ -24,14 +24,10 @@
 #include "cvtparm.h"
 #include "deviceparameters.h"
 
-GBLREF	char 	window_token;
-GBLREF	mident 	window_ident;
-GBLREF	triple	*curtchain;
-
-error_def(ERR_RPARENMISSING);
-error_def(ERR_DEVPARUNK);
 error_def(ERR_DEVPARINAP);
+error_def(ERR_DEVPARUNK);
 error_def(ERR_DEVPARVALREQ);
+error_def(ERR_RPARENMISSING);
 
 LITREF unsigned char io_params_size[];
 LITREF dev_ctl_struct dev_param_control[];
@@ -523,9 +519,9 @@ int deviceparameters(oprtype *c, char who_calls)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(dev_param_index[26] == (SIZEOF(dev_param_names)/SIZEOF(nametabent)));
-	assert(dev_param_index[26] == (SIZEOF(dev_param_data)/SIZEOF(unsigned char)));
-	is_parm_list = (window_token == TK_LPAREN);
+	assert((SIZEOF(dev_param_names) / SIZEOF(nametabent) == dev_param_index[26]));
+	assert((SIZEOF(dev_param_data) / SIZEOF(unsigned char)) == dev_param_index[26]);
+	is_parm_list = (TK_LPAREN == TREF(window_token));
 	if (is_parm_list)
 		advancewindow();
 	cat_cnt = 0;
@@ -533,9 +529,10 @@ int deviceparameters(oprtype *c, char who_calls)
 	parse_warn = FALSE;
 	for (;;)
 	{
-		if ((window_token != TK_IDENT)
-			|| ((n = namelook(dev_param_index, dev_param_names, window_ident.addr, window_ident.len)) < 0))
-		{
+		if ((TK_IDENT != TREF(window_token))
+			|| (0
+			 > (n = namelook(dev_param_index, dev_param_names, (TREF(window_ident)).addr, (TREF(window_ident)).len))))
+		{	/* NOTE assignment above */
 			STX_ERROR_WARN(ERR_DEVPARUNK);	/* sets "parse_warn" to TRUE */
 			break;
 		}
@@ -549,16 +546,16 @@ int deviceparameters(oprtype *c, char who_calls)
 		*parptr++ = n;
 		if (io_params_size[n])
 		{
-			if (window_token != TK_EQUAL)
+			if (TK_EQUAL != TREF(window_token))
 			{
 				STX_ERROR_WARN(ERR_DEVPARVALREQ);	/* sets "parse_warn" to TRUE */
 				break;
 			}
 			advancewindow();
-			if (!expr(&x))
+			if (EXPR_FAIL == expr(&x, MUMPS_EXPR))
 				return FALSE;
-			assert(x.oprclass == TRIP_REF);
-			if (x.oprval.tref->opcode == OC_LIT)
+			assert(TRIP_REF == x.oprclass);
+			if (OC_LIT == x.oprval.tref->opcode)
 			{
 				/* check to see if this string could overflow (5 is a int4 word plus a parameter code for
 				   safety)  Must check before cvtparm, due to the fact that tmpmval could otherwise
@@ -569,7 +566,7 @@ int deviceparameters(oprtype *c, char who_calls)
 					cat_list[cat_cnt++] = put_str(parstr, INTCAST(parptr - parstr));
 					parptr = parstr;
 				}
-				assert(x.oprval.tref->operand[0].oprclass == MLIT_REF);
+				assert(MLIT_REF == x.oprval.tref->operand[0].oprclass);
 				status = cvtparm(n, &x.oprval.tref->operand[0].oprval.mlit->v, &tmpmval);
 				if (status)
 				{
@@ -593,12 +590,12 @@ int deviceparameters(oprtype *c, char who_calls)
 		}
 		if (!is_parm_list)
 			break;
-		if (window_token == TK_COLON)
+		if (TK_COLON == TREF(window_token))
 		{
 			advancewindow();
 			continue;
 		}
-		else if (window_token == TK_RPAREN)
+		else if (TK_RPAREN == TREF(window_token))
 		{
 			advancewindow();
 			break;
@@ -610,7 +607,7 @@ int deviceparameters(oprtype *c, char who_calls)
 	{	/* Parse the remaining arguments until the corresponding RIGHT-PAREN or SPACE or EOL is reached */
 		if (!parse_until_rparen_or_space())
 			return FALSE;
-		if (window_token == TK_RPAREN)
+		if (TK_RPAREN == TREF(window_token))
 			advancewindow();
 	}
 	*parptr++ = iop_eol;

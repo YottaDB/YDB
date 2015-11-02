@@ -19,6 +19,10 @@
 void		i2smval(mval *v, uint4 i);
 void		i2usmval(mval *v, unsigned int i);
 void		i2mval(mval *v, int i);
+#ifdef GTM64
+void		ul2mval(mval *v, unsigned long i);
+void		l2mval(mval *v, long i);
+#endif
 void		double2mval(mval *dst, double src);
 double		mval2double(mval *v);
 int4		mval2i(mval *v);

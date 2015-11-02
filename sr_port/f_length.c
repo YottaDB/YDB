@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,24 +15,21 @@
 #include "toktyp.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
-
-int f_length( oprtype *a, opctype op)
+int f_length(oprtype *a, opctype op)
 {
 	triple *r;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert((OC_FNLENGTH == op) || (OC_FNZLENGTH == op));
 	r = maketriple(op);
-	if (!strexpr(&(r->operand[0])))
+	if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_STR))
 		return FALSE;
-	if (window_token == TK_COMMA)
+	if (TK_COMMA == TREF(window_token))
 	{
 		advancewindow();
-		if (OC_FNLENGTH == op)
-			r->opcode = OC_FNPOPULATION;      /* This isn't very go information hiding */
-		else
-			r->opcode = OC_FNZPOPULATION;      /* This isn't very go information hiding */
-		if (!strexpr(&(r->operand[1])))
+		r->opcode = (OC_FNLENGTH == op) ? OC_FNPOPULATION : OC_FNZPOPULATION;      /* Not good information hiding */
+		if (EXPR_FAIL == expr(&(r->operand[1]), MUMPS_STR))
 			return FALSE;
 	}
 	ins_triple(r);

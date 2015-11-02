@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -258,7 +258,7 @@ void dbcertify_certify_phase(void)
 						   "- premature exit to main loop\n"));
 					break;
 				}
-				DBC_DEBUG(("DBC_DEBUG: ****************** Reading new p1out record (%d) *****************\n", \
+				DBC_DEBUG(("DBC_DEBUG: ****************** Reading new p1out record (%d) *****************\n",
 					   (rec_num + 1)));
 				dbc_read_p1out(psa, &psa->rhdr, SIZEOF(p1rec));
 				if (0 != psa->rhdr.akey_len)
@@ -278,7 +278,7 @@ void dbcertify_certify_phase(void)
 			++restart_cnt;
 			if (MAX_RESTART_CNT < restart_cnt)
 				GTMASSERT;			/* No idea what could cause this.. */
-			DBC_DEBUG(("DBC_DEBUG: ****************** Restarted transaction (%d) *****************\n", \
+			DBC_DEBUG(("DBC_DEBUG: ****************** Restarted transaction (%d) *****************\n",
 				   (rec_num + 1)));
 			/* "restart_transaction" is either set or cleared by dbc_split_blk() below */
 		}
@@ -909,7 +909,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			/* See if they fit in their respective blocks */
 			if (level_0 || (new_lh_blk_len <= psa->max_blk_len) && (new_rh_blk_len <= psa->max_blk_len))
 			{	/* Method 1 - record goes to left-hand side */
-				DBC_DEBUG(("DBC_DEBUG: Method 1 block lengths: lh: %d  rh: %d  max_blk_len: %d\n", \
+				DBC_DEBUG(("DBC_DEBUG: Method 1 block lengths: lh: %d  rh: %d  max_blk_len: %d\n",
 					   new_lh_blk_len, new_rh_blk_len, psa->max_blk_len));
 				/* New update array for new block */
 				if (level_0)
@@ -1022,8 +1022,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			} else
 			{	/* Recompute sizes for inserted record being in righthand block as per
 				   method (2) */
-				DBC_DEBUG(("DBC_DEBUG: Method 1 created invalid blocks: lh: %d  rh: %d  " \
-					   "max_blk_len: %d -- trying method 2\n", new_lh_blk_len, new_rh_blk_len, \
+				DBC_DEBUG(("DBC_DEBUG: Method 1 created invalid blocks: lh: %d  rh: %d  "
+					   "max_blk_len: %d -- trying method 2\n", new_lh_blk_len, new_rh_blk_len,
 					   psa->max_blk_len));
 				/* By definition we *must* have an inserted record in this path */
 				assert(0 != ins_rec_len);
@@ -1065,7 +1065,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					{
 						if (MAX_RESTART_CNT < restart_cnt)
 							GTMASSERT;		/* No idea what could cause this */
-						DBC_DEBUG(("DBC_DEBUG: *** *** Recursive call to handle too large block 0x%x\n", \
+						DBC_DEBUG(("DBC_DEBUG: *** *** Recursive call to handle too large block 0x%x\n",
 							   restart_blk_set.blk_num));
 						psa->block_depth_hwm = -1;	/* Zaps cache so all blocks are re-read */
 						restart_transaction = dbc_split_blk(psa, restart_blk_set.blk_num,
@@ -1074,7 +1074,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					}
 					return TRUE;	/* This transaction must restart */
 				}
-				DBC_DEBUG(("DBC_DEBUG: Method 2 block lengths: lh: %d  rh: %d  max_blk_len: %d\n", \
+				DBC_DEBUG(("DBC_DEBUG: Method 2 block lengths: lh: %d  rh: %d  max_blk_len: %d\n",
 					   new_lh_blk_len, new_rh_blk_len, psa->max_blk_len));
 
 				/* Start building (new) LHS block - for this index record, the record before the split
@@ -1326,7 +1326,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			}
 			assert(lcl_blk);	/* Shouldn't be zero as that is for the lcl bitmap itself */
 			allocated_blk_num = psa->hint_blk = bitmap_blk_num + lcl_blk;
-			DBC_DEBUG(("DBC_DEBUG: -- The newly allocated block for block index %d is 0x%x\n", \
+			DBC_DEBUG(("DBC_DEBUG: -- The newly allocated block for block index %d is 0x%x\n",
 				   blk_index, allocated_blk_num));
 			/* Fill this block number in the places it needs to be filled */
 			assert(-1 == blk_set_p->blk_num);
@@ -1345,7 +1345,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			blk_sega_p = (blk_segment *)blk_set_p->upd_addr;
 			if (gdsblk_bitmap == blk_set_p->blk_type || gdsblk_read == blk_set_p->usage)
 			{	/* Bitmap blocks are updated in place and of course read blocks have no updates */
-				DBC_DEBUG(("DBC_DEBUG: -- Block index %d bypassed for type (%d) or usage (%d)\n", \
+				DBC_DEBUG(("DBC_DEBUG: -- Block index %d bypassed for type (%d) or usage (%d)\n",
 					   blk_index,  blk_set_p->blk_type, blk_set_p->usage));
 				assert(NULL == blk_sega_p);
 				continue;
@@ -1395,10 +1395,11 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				blk_set_p->new_buff = blk_set_p->old_buff;
 				blk_set_p->old_buff = blk_p;
 			}
-			DBC_DEBUG(("DBC_DEBUG: -- Block index %d being written as block 0x%x\n", blk_index, \
+			DBC_DEBUG(("DBC_DEBUG: -- Block index %d being written as block 0x%x\n", blk_index,
 				   blk_set_p->blk_num));
 			psa->fc->op_buff = blk_set_p->new_buff;
-			psa->fc->op_pos = psa->dbc_cs_data->start_vbn + (blk_size / DISK_BLOCK_SIZE) * blk_set_p->blk_num;
+			psa->fc->op_pos = psa->dbc_cs_data->start_vbn
+				+ ((gtm_int64_t)(blk_size / DISK_BLOCK_SIZE) * blk_set_p->blk_num);
 			dbcertify_dbfilop(psa);
 			if (gdsblk_create == blk_set_p->usage)
 				psa->blks_created++;

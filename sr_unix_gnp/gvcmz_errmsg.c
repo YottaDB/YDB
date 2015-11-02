@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,15 @@ GBLREF unsigned char	*util_outptr;
 GBLREF boolean_t 	created_core;
 GBLREF boolean_t	dont_want_core;
 
+error_def(ERR_ASSERT);
+error_def(ERR_BADSRVRNETMSG);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_MEMORY);
+
 void gvcmz_errmsg(struct CLB *c, bool close)
 {
 	unsigned char	*bufptr, msgnum;
@@ -33,14 +42,6 @@ void gvcmz_errmsg(struct CLB *c, bool close)
 	uint4		status;
 	cmi_descriptor	*desc;
 	link_info 	*li;
-
-	error_def(ERR_BADSRVRNETMSG);
-	error_def(ERR_GTMASSERT);
-	error_def(ERR_GTMCHECK);
-        error_def(ERR_MEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_OUTOFSPACE);
-	error_def(ERR_ASSERT);
 
 	li = (link_info *)c->usr;
 	util_out_print(NULL, RESET);

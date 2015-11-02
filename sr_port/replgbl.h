@@ -20,11 +20,13 @@ typedef struct
 						     * at connection restart (gtmsource_recv_restart) */
 	seq_num		trig_replic_suspect_seqno;  /* The sequence number at which the primary detected a triggered update being
 						     * replicated. */
-	boolean_t	null_subs_xform;	    /* TRUE if the null subscript collation is different between the servers */
-	boolean_t	src_node_same_endianness;   /* TRUE if the source server has the same endianness as the receiver server */
-	boolean_t	src_node_endianness_known;  /* TRUE if the endianness is already found out by the receiver server */
-	boolean_t	srcsrv_vms;		    /* TRUE if the source server is VMS */
 	int4		jnl_release_timeout;	    /* Timeout value for the jnl_release timer, in seconds */
+#	ifdef VMS
+	/* The following field(s) have been moved to the "repl_conn_info_t" structure in Unix. In VMS, given GT.M on this
+	 * platform is in its last days, that effort is not expended so the existing globals continue to stay here as globals.
+	 */
+	boolean_t	null_subs_xform;	    /* TRUE if the null subscript collation is different between the servers */
+#	endif
 } replgbl_t;
 
 #endif

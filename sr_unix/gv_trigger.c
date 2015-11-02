@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@
 #include "hashtab_mname.h"	/* for COMPUTE_HASH_MNAME */
 #include "tp_set_sgm.h"
 #include "t_begin.h"
+#include "t_retry.h"
 #include "tp_restart.h"
 #include "gvcst_protos.h"
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro & PUSH_MV_STENT macros */
@@ -65,6 +66,7 @@ GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	int4			gtm_trigger_depth;
+GBLREF	int4			tstart_trigger_depth;
 GBLREF	uint4			update_trans;
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgm_info		*sgm_info_ptr;
@@ -81,15 +83,18 @@ GBLREF	uint4			dollar_trestart;
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
 
+error_def(ERR_DBROLLEDBACK);
+error_def(ERR_GVKILLFAIL);
+error_def(ERR_GVPUTFAIL);
 error_def(ERR_GVZTRIGFAIL);
 error_def(ERR_INDRMAXLEN);
 error_def(ERR_PATMAXLEN);
 error_def(ERR_TEXT);
+error_def(ERR_TPRETRY);
 error_def(ERR_TRIGDEFBAD);
 error_def(ERR_TRIGINVCHSET);
 error_def(ERR_TRIGIS);
 error_def(ERR_TRIGSUBSCRANGE);
-error_def(ERR_TPRETRY);
 
 LITREF	char	ctypetab[NUM_CHARS];
 LITREF	int4	gvtr_cmd_mask[GVTR_CMDTYPES];
@@ -108,16 +113,6 @@ LITREF	mval	literal_trigname;
 LITREF	mval	literal_chset;
 LITREF	mval	literal_zdelim;
 LITREF	mval	literal_zero;
-
-error_def(ERR_GVZTRIGFAIL);
-error_def(ERR_INDRMAXLEN);
-error_def(ERR_PATMAXLEN);
-error_def(ERR_TEXT);
-error_def(ERR_TPRETRY);
-error_def(ERR_TRIGDEFBAD);
-error_def(ERR_TRIGINVCHSET);
-error_def(ERR_TRIGIS);
-error_def(ERR_TRIGSUBSCRANGE);
 
 #define	GVTR_PARSE_POINT	1
 #define	GVTR_PARSE_LEFT		2
@@ -232,19 +227,61 @@ error_def(ERR_TRIGSUBSCRANGE);
 	}													\
 }
 
-#define SELECT_AND_RANDOMIZE_TRIGGER_CHAIN(gvt_trigger, trigstart, trig_list_offset, type) 			\
-{														\
-	trigstart = (gvt_trigger)->type##_triglist;								\
-	if (NULL != trigstart)											\
-	{	/* Use arbitrary bit from sum of hodgepodge fields that change over time to see if should	\
-		 * rotate the trigger chain by 1 or 2 entries to increase pseudo-randomization.			\
-		 */												\
-		gvt_trigger->type##_triglist = trigstart = trigstart->next_##type;				\
-		if (0 != (0x10 & (process_id + (INTPTR_T)stringpool.free + (INTPTR_T)&trigstart)))		\
-			/* Do a 2nd rotation.. */								\
-			gvt_trigger->type##_triglist = trigstart = trigstart->next_##type;			\
-	}													\
-	trig_list_offset = OFFSETOF(gv_trigger_t, next_##type);							\
+#define SELECT_AND_RANDOMIZE_TRIGGER_CHAIN(gvt_trigger, trigstart, trig_list_offset, type)				\
+{															\
+	trigstart = (gvt_trigger)->type##_triglist;									\
+	if (NULL != trigstart)												\
+	{	/* Use arbitrary bit from sum of hodgepodge fields that change over time to see if should		\
+		 * rotate the trigger chain by 1 or 2 entries to increase pseudo-randomization.				\
+		 */													\
+		gvt_trigger->type##_triglist = trigstart = trigstart->next_##type;					\
+		if (0 != (0x10 & (process_id + (INTPTR_T)stringpool.free + (INTPTR_T)&trigstart))) /* BYPASSOK */	\
+			/* Do a 2nd rotation.. */									\
+			gvt_trigger->type##_triglist = trigstart = trigstart->next_##type;				\
+	}														\
+	trig_list_offset = OFFSETOF(gv_trigger_t, next_##type);								\
+}
+
+/* This error macro is used for all definition errors where the target is ^#t(GVN,<index>,<required subscript>) */
+#define HASHT_GVN_DEFINITION_RETRY_OR_ERROR(INDEX,SUBSCRIPT)					\
+{												\
+	if (CDB_STAGNATE > t_tries)								\
+	{											\
+		GVTR_HASHTGBL_READ_CLEANUP(TRUE);						\
+		t_retry(cdb_sc_triggermod);							\
+	} else											\
+	{											\
+		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
+		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);				\
+		GVTR_HASHTGBL_READ_CLEANUP(TRUE);						\
+		/* format "INDEX,SUBSCRIPT" of ^#t(GVN,INDEX,SUBSCRIPT) in the error message */	\
+		SET_PARAM_STRING(util_buff, util_len, INDEX, SUBSCRIPT);			\
+		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,	\
+			save_var_name_len, save_var_name, util_len, util_buff);			\
+	}											\
+}
+
+/* This error macro is used for all definition errors where the target is ^#t(GVN,<#COUNT|#CYCLE>) */
+#define HASHT_DEFINITION_RETRY_OR_ERROR(SUBSCRIPT,MOREINFO)	\
+{								\
+	if (CDB_STAGNATE > t_tries)				\
+	{							\
+		GVTR_HASHTGBL_READ_CLEANUP(TRUE);		\
+		t_retry(cdb_sc_triggermod);			\
+	} else							\
+	{							\
+		HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO);	\
+	}							\
+}
+
+#define HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO)					\
+{											\
+	assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
+	SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);				\
+	GVTR_HASHTGBL_READ_CLEANUP(TRUE);						\
+	rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,	\
+		save_var_name_len, save_var_name, LEN_AND_LIT(SUBSCRIPT),		\
+		ERR_TEXT, 2, RTS_ERROR_TEXT(MOREINFO));					\
 }
 
 /* This code is modeled around "updproc_ch" in updproc.c */
@@ -272,16 +309,28 @@ CONDITION_HANDLER(gvtr_tpwrap_ch)
 	NEXTCH;
 }
 
-STATICFNDEF void gvtr_db_tpwrap_helper(sgmnt_addrs *csa, int err_code)
+STATICFNDEF void gvtr_db_tpwrap_helper(sgmnt_addrs *csa, int err_code, boolean_t root_srch_needed)
 {
-	enum cdb_sc		status;
-	DEBUG_ONLY(gv_namehead	*save_gv_target;)
+	enum cdb_sc		status, failure;
+#	ifdef DEBUG
+	gv_namehead		*save_gv_target;
+#	endif
 
 	ESTABLISH(gvtr_tpwrap_ch);
-	DEBUG_ONLY(save_gv_target = gv_target;)
+	assert(dollar_tlevel);
+	assert(gv_target != csa->hasht_tree);
+	assert((ERR_GVPUTFAIL == err_code) || (ERR_GVKILLFAIL == err_code) || (ERR_GVZTRIGFAIL == err_code));
+	if (root_srch_needed)
+	{
+		assert(0 < t_tries);
+		assert(ERR_GVPUTFAIL != err_code); /* for SET, gvcst_put does the root search anyways. So, don't do it here */
+		ASSERT_BEGIN_OF_FRESH_TP_TRANS; /* ensures gvcst_root_search is the first thing done in the restarted transaction */
+		GVCST_ROOT_SEARCH; /* any t_retry from gvcst_root_search will transfer control back to gvtr_tpwrap_ch */
+		root_srch_needed = FALSE; /* just to be safe */
+	}
 	gvtr_db_read_hasht(csa);
+	DEBUG_ONLY(save_gv_target = gv_target;)
 	assert(save_gv_target == gv_target); /* ensure gv_target was not inadvertently modified by gvtr_db_read_hasht */
-
 	/* If no triggers are defined for this global and we came in as non-TP and did op_tstart in GVTR_INIT_AND_TPWRAP_IF_NEEDED
 	 * do the op_tcommit. However, do it only for t_tries = 0 for two reasons:
 	 *
@@ -599,10 +648,12 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	memcpy(save_gv_altkey, gv_altkey, SIZEOF(gv_key) + gv_altkey->end);
 	save_gv_last_subsc_null = TREF(gv_last_subsc_null);
 	save_gv_some_subsc_null = TREF(gv_some_subsc_null);
+	DBGTRIGR((stderr, "gvtr_db_read_hasht: begin\n"));
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	gv_currkey->prev = 0;
 	if (0 == gv_target->root)
 	{	/* ^#t global does not exist. Return right away. */
+		DBGTRIGR((stderr, "gvtr_db_read_hasht: no triggers\n"));
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
 		return;
 	}
@@ -652,17 +703,12 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashlabel, ret_mval);
 	if (!is_defined)	/* No triggers exist for "^GBL". Return */
 	{
+		DBGTRIGR((stderr, "gvtr_db_read_hasht: no triggers for ^GBL\n"));
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
 		return;
 	}
 	if ((STR_LIT_LEN(HASHT_GBL_CURLABEL) != ret_mval->str.len) || MEMCMP_LIT(ret_mval->str.addr, HASHT_GBL_CURLABEL))
-	{	/* ^#t("GBL","#LABEL") is NOT expected value so issue error */
-		assert(WBTEST_HELPOUT_TRIGDEFBAD);
-		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
-		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
-			save_var_name_len, save_var_name, LEN_AND_LIT("\"#LABEL\""));
-	}
+		HASHT_DEFINITION_RETRY_OR_ERROR("\"#LABEL\"","#LABEL field is not " HASHT_GBL_CURLABEL);
 	/* So we can go ahead and read other ^#t("GBL") records */
 	/* -----------------------------------------------------------------------------
 	 *          Now read ^#t("GBL","#CYCLE")
@@ -670,38 +716,25 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	 */
 	is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashcycle, ret_mval);
 	if (!is_defined)
-	{	/* ^#t("GBL","#LABEL") is defined but NOT ^#t("GBL","#CYCLE"). ^#t global integrity is suspect */
-		assert(WBTEST_HELPOUT_TRIGDEFBAD);
-		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
-		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-		rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
-			save_var_name_len, save_var_name, LEN_AND_LIT("\"#CYCLE\""),
-			ERR_TEXT, 2, RTS_ERROR_TEXT("#CYCLE field is missing"));
-		return;
-	}
+		HASHT_DEFINITION_RETRY_OR_ERROR("\"#CYCLE\"","#CYCLE field is missing");
 	tmpint4 = mval2i(ret_mval);	/* decimal values are truncated by mval2i so we will accept a #CYCLE of 1.5 as 1 */
-	if (0 >= tmpint4)
-	{	/* ^#t("GBL","#CYCLE") is not a positive integer. Error out */
-		assert(WBTEST_HELPOUT_TRIGDEFBAD);
-		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
-		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-		rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
-			save_var_name_len, save_var_name, LEN_AND_LIT("\"#CYCLE\""),
-			ERR_TEXT, 2, RTS_ERROR_TEXT("#CYCLE field is negative"));
-		return;
-	}
+	if (0 >= tmpint4) /* ^#t("GBL","#CYCLE") is not a positive integer. Error out */
+		HASHT_DEFINITION_ERROR("\"#CYCLE\"","#CYCLE field is negative");
 	cycle = (uint4)tmpint4;
 	/* Check if ^#t("GBL") has previously been read from the db. If so, check if cycle is same as ^#t("GBL","#CYCLE"). */
 	gvt_trigger = gvt->gvt_trigger;
 	if (NULL != gvt_trigger)
 	{
+		DBGTRIGR((stderr, "gvtr_db_read_hasht: gvt_trigger->gv_trigger_cycle = %d \n",gvt_trigger->gv_trigger_cycle));
 		if (gvt_trigger->gv_trigger_cycle == cycle)
 		{	/* Since cycle is same, no need to reinitialize any triggers for "GBL". Can return safely.
 			 * Pass "FALSE" to GVTR_HASHTGBL_READ_CLEANUP macro to ensure gvt->gvt_trigger is NOT freed.
 			 */
+			DBGTRIGR((stderr, "gvtr_db_read_hasht: trigger has been read before\n"));
 			GVTR_HASHTGBL_READ_CLEANUP(FALSE);
 			return;
 		}
+		DBGTRIGR((stderr, "gvtr_db_read_hasht: cycle mismatch, re-initialize triggers\n"));
 		/* Now that we have to reinitialize triggers for "GBL", free up previously allocated structure first */
 		gvtr_free(gvt);
 		assert(NULL == gvt->gvt_trigger);
@@ -719,26 +752,10 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	 */
 	is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashcount, ret_mval);
 	if (!is_defined)
-	{	/* ^#t("GBL","#LABEL") is defined but NOT ^#t("GBL","#COUNT"). ^#t global integrity is suspect */
-		assert(WBTEST_HELPOUT_TRIGDEFBAD);
-		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
-		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-		rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
-			save_var_name_len, save_var_name, LEN_AND_LIT("\"#COUNT\""),
-			ERR_TEXT, 2, RTS_ERROR_TEXT("#COUNT field is missing"));
-		return;
-	}
+		HASHT_DEFINITION_RETRY_OR_ERROR("\"#COUNT\"","#COUNT field is missing");
 	tmpint4 = mval2i(ret_mval);	/* decimal values are truncated by mval2i so we will accept a #COUNT of 1.5 as 1 */
-	if (0 >= tmpint4)
-	{	/* ^#t("GBL","#COUNT") is not a positive integer. Error out */
-		assert(WBTEST_HELPOUT_TRIGDEFBAD);
-		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
-		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-		rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
-			save_var_name_len, save_var_name, LEN_AND_LIT("\"#COUNT\""),
-			ERR_TEXT, 2, RTS_ERROR_TEXT("#COUNT field is negative"));
-		return;
-	}
+	if (0 >= tmpint4) /* ^#t("GBL","#COUNT") is not a positive integer. Error out */
+		HASHT_DEFINITION_ERROR("\"#COUNT\"","#COUNT field is negative");
 	num_gv_triggers = (uint4)tmpint4;
 	gvt_trigger->num_gv_triggers = num_gv_triggers;
 	/* We want a memory store for all the values that are going to be read in from the database. We dont know upfront
@@ -773,15 +790,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		/* Read in ^#t("GBL",1,"TRIGNAME")="GBL#1" */
 		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_trigname, ret_mval);
 		if (!is_defined)
-		{	/* mupip trigger should be making sure trigger name is created */
-			assert(WBTEST_HELPOUT_TRIGDEFBAD);
-			SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
-			GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-			/* Construct 1,"TRIGNAME" for the error message */
-			SET_PARAM_STRING(util_buff, util_len, trigidx, ",\"TRIGNAME\"");
-			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
-				save_var_name_len, save_var_name, util_len, util_buff);
-		}
+			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"TRIGNAME\"");
 		trigdsc->rtn_desc.rt_name = ret_mval->str;	/* Copy trigger name mident */
 		trigdsc->gvt_trigger = gvt_trigger;		/* Save ptr to our main gvt_trigger struct for this trigger. With
 								 * this and given a gv_trigger_t, we can get to the gvt_trigger_t
@@ -799,15 +808,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		/* Read in ^#t("GBL",1,"CMD")="S,K,ZK,ZTK,ZTR" */
 		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_cmd, ret_mval);
 		if (!is_defined)
-		{	/* ^#t("GBL","#COUNT") is set to 1 so ^#t("GBL",1,"CMD") should be defined */
-			assert(WBTEST_HELPOUT_TRIGDEFBAD);
-			SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
-			GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-			/* Construct 1,"CMD" for the error message */
-			SET_PARAM_STRING(util_buff, util_len, trigidx, ",\"CMD\"");
-			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
-				save_var_name_len, save_var_name, util_len, util_buff);
-		}
+			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"CMD\"");
 		/* Initialize trigdsc->cmdmask */
 		ptr = ret_mval->str.addr;
 		ptr_top = ptr + ret_mval->str.len;
@@ -1070,15 +1071,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		/* Read in ^#t("GBL",1,"CHSET")="UTF-8". If CHSET does not match gtm_chset issue error. */
 		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_chset, ret_mval);
 		if (!is_defined)
-		{	/* mupip trigger should have made sure of this */
-			assert(WBTEST_HELPOUT_TRIGDEFBAD);
-			SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
-			GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-			/* Construct 1,"CHSET" for the error message */
-			SET_PARAM_STRING(util_buff, util_len, trigidx, ",\"CHSET\"");
-			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
-				save_var_name_len, save_var_name, util_len, util_buff);
-		}
+			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"CHSET\"");
 		if ((!gtm_utf8_mode && ((STR_LIT_LEN(CHSET_M_STR) != ret_mval->str.len)
 						|| memcmp(ret_mval->str.addr, CHSET_M_STR, STR_LIT_LEN(CHSET_M_STR))))
 			|| (gtm_utf8_mode && ((STR_LIT_LEN(CHSET_UTF8_STR) != ret_mval->str.len)
@@ -1157,6 +1150,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	}
 #	endif
 	GVTR_HASHTGBL_READ_CLEANUP(FALSE);	/* do NOT free gvt->gvt_trigger so pass FALSE */
+	DBGTRIGR((stderr, "gvtr_db_read_hasht: gvt_trigger->gv_trigger_cycle = cycle\n"));
 	gvt_trigger->gv_trigger_cycle = cycle;	/* Now that ^#t has been read, we can safely update "cycle" to the higher value */
 	return;
 }
@@ -1292,6 +1286,7 @@ void	gvtr_free(gv_namehead *gvt)
 	}
 	free(gvt_trigger);
 	gvt->gvt_trigger = NULL;
+	gvt->db_trigger_cycle = 0;	/* Force triggers to be reloaded implicitly if not explicitly done by caller */
 }
 
 /* Initializes triggers for global variable "gvt" from ^#t global. */
@@ -1300,12 +1295,17 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	gv_namehead		*dir_tree;
-	uint4			lcl_t_tries, loopcnt;
+	uint4			lcl_t_tries, save_t_tries, loopcnt;
 	uint4			cycle_start;
+	boolean_t		root_srch_needed;
+	enum cdb_sc		failure;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(dollar_tlevel);		/* A TP wrap should have been done by the caller if needed */
 	assert(!skip_dbtriggers);	/* should not come here if triggers are not supposed to be invoked */
 	assert(gv_target == gvt);
+	save_t_tries = t_tries; /* note down the value of t_tries at the entry to this function */
 	csa = gvt->gd_csa;
 	assert(NULL != csa);	/* database for this gvt better be opened at this point */
 	dir_tree = csa->dir_tree;
@@ -1313,6 +1313,7 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 		return; /* trigger initialization should return for directory tree (e.g. set^%GBLDEF is caller) */
 	csd = csa->hdr;
 	assert((gvt->db_trigger_cycle != cycle) || (gvt->db_dztrigger_cycle < csa->db_dztrigger_cycle));
+	root_srch_needed = FALSE;
 	/* Check if TP was in turn an implicit TP (e.g. created by the GVTR_INIT_AND_TPWRAP_IF_NEEDED macro). */
 	if (tp_is_implicit)
 	{	/* If implicit TP, we need to go through gvtr_db_tpwrap_helper since we don't want any t_retry calls to end up
@@ -1331,13 +1332,14 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 		for (loopcnt = 0; ; loopcnt++)
 		{
 			/* In case of restart in gvtr_db_read_hasht (handled by gvtr_tpwrap_ch), tp_restart will call tp_clean_up
-			 * which will reset sgm_info_ptr to NULL and csa->sgm_info_ptr->fresh_start to TRUE. Call tp_set_sgm
+			 * which will reset sgm_info_ptr to NULL and csa->sgm_info_ptr->tp_set_sgm_done to FALSE. Call tp_set_sgm
 			 * to set sgm_info_ptr and first_sgm_info as gvcst_get relies on this being set. Also re-inits
 			 * csa->db_trigger_cycle to the latest copy from csd->db_trigger_cycle which is important to detect if
 			 * triggers have changed.
 			 */
 			tp_set_sgm();
-			gvtr_db_tpwrap_helper(csa, err_code);
+			gvtr_db_tpwrap_helper(csa, err_code, root_srch_needed);
+			root_srch_needed = FALSE;
 			assert(t_tries >= lcl_t_tries);
 			if (!dollar_tlevel)
 			{	/* Came in as non-tp. Did op_tstart in the caller (GVTR_INIT_AND_TPWRAP_IF_NEEDED).
@@ -1349,7 +1351,8 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 				break;
 			} else
 			{
-				if ((lcl_t_tries == t_tries) && (cdb_sc_normal == t_fail_hist[lcl_t_tries]))
+				failure = t_fail_hist[lcl_t_tries];
+				if ((lcl_t_tries == t_tries) && (cdb_sc_normal == failure))
 				{	/* Read of ^#t completed successfully as there is no change in t_tries.
 					 * Safe to break out of the loop.
 					 */
@@ -1364,6 +1367,21 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 				 * are defined).
 				 */
 				assert(dollar_trestart);
+				/* Before restarting, check if the restart is due to online rollback. If so, based on whether the
+				 * rollback took the database back to a different logical state or not, we need to either issue
+				 * an error OR redo the root search of the original global as online rollback related restart
+				 * resets root block of all gv_targets to zero.
+				 */
+				assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
+						|| (TREF(dollar_zonlnrlbk) && !gv_target->root));
+				if (cdb_sc_onln_rlbk1 == failure)
+				{
+					root_srch_needed = (ERR_GVPUTFAIL != err_code);
+				} else if (cdb_sc_onln_rlbk2 == failure)
+				{
+					assert(tstart_trigger_depth == gtm_trigger_depth);
+					rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+				}
 				/* update lcl_t_tries to reflect the fact that a restart happened */
 				lcl_t_tries = t_tries;
 				t_fail_hist[lcl_t_tries] = cdb_sc_normal;
@@ -1594,14 +1612,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 						ztupd_mval->mvtype = MV_STR;
 							/* now ztupd_mval->str is protected from stp_gcol */
 					}
-				} else if (gvtr_parms->duplicate_set)
-				{	/* No pieces of interest specified AND no change to value.
-					 * Do NOT invoke triggers.
-					 */
-					DBGTRIGR((stderr, "gvtr_match_n_invoke: Turning off ok_to_invoke_trigger #2\n"));
-					ok_to_invoke_trigger = FALSE;
 				}
-				assert(ok_to_invoke_trigger || (0 == ztupd_mval->mvtype));
 			}
 			if (ok_to_invoke_trigger)
 			{

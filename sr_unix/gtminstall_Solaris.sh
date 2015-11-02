@@ -31,6 +31,7 @@
 # 2011-03-08  0.06 K.S. Bhaskar - Make it work when bundled with GT.M V5.4-002
 # 2011-03-10  0.10 K.S. Bhaskar - Incorporate review comments to bundle with V5.4-002 distribution
 # 2011-05-03  0.11 K.S. Bhaskar - Allow for letter suffix releases
+# 2011-10-25  0.12 K.S. Bhaskar - Support option to delete .o files on shared library platforms
 
 # Turn on debugging if set
 if [ "Y" = "$gtm_debug" ] ; then set -x ; fi
@@ -70,6 +71,7 @@ dump_info()
     if [ -n "$gtm_icu_version" ] ; then echo gtm_icu_version " : " $gtm_icu_version ; fi
     if [ -n "$gtm_install_flavor" ] ; then echo gtm_install_flavor " : " $gtm_install_flavor ; fi
     if [ -n "$gtm_installdir" ] ; then echo gtm_installdir " : " $gtm_installdir ; fi
+    if [ -n "$gtm_keep_obj" ] ; then echo gtm_keep_obj " : " $gtm_keep_obj ; fi
     if [ -n "$gtm_lcase_utils" ] ; then echo gtm_lcase_utils " : " $gtm_lcase_utils ; fi
     if [ -n "$gtm_linkenv" ] ; then echo gtm_linkenv " : " $gtm_linkenv ; fi
     if [ -n "$gtm_linkexec" ] ; then echo gtm_linkexec " : " $gtm_linkexec ; fi
@@ -100,13 +102,20 @@ err_exit()
     echo "--group-restriction - limit execution to a group; defaults to unlimited if not specified"
     echo "--help - print this usage information"
     echo "--installdir dirname - directory where GT.M is to be installed; defaults to /usr/lib/fis-gtm/version_platform"
+    m1="--keep-obj - keep .o files"
+    m1="$m1"" of M routines (normally deleted on platforms with GT.M support for routines in shared libraries)"
+    echo "$m1"
     echo "--linkenv dirname - create link in dirname to gtmprofile and gtmcshrc files; incompatible with copyenv"
     echo "--linkexec dirname - create link in dirname to gtm script; incompatible with copyexec"
     echo "--overwrite-existing - install into an existing directory, overwriting contents; defaults to requiring new directory"
-    echo "--prompt-for-group - * GT.M installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
+    m1="--prompt-for-group - * GT.M installation "
+    m1="$m1""script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
+    echo "$m1"
     echo "--ucaseonly-utils -- install only upper case utility program names; defaults to both if not specified"
     echo "--user username - user who should own GT.M installation; default is root"
-    echo "--utf8 ICU_version - install UTF-8 support using specified  major.minor ICU version; specify default to use default version"
+    m1="--utf8 ICU_version - install "
+    m1="$m1""UTF-8 support using specified  major.minor ICU version; specify default to use default version"
+    echo "$m1"
     echo "--verbose - * output diagnostic information as the script executes; default is to run quietly"
     echo "options that take a value (e.g, --group) can be specified as either --option=value or --option value"
     echo "options marked with * are likely to be of interest primarily to GT.M developers"
@@ -129,6 +138,7 @@ mktmpdir()
 
 # Defaults that can be over-ridden by command line options to follow
 if [ -z "$gtm_buildtype" ] ; then gtm_buildtype="pro" ; fi
+if [ -z "$gtm_keep_obj" ] ; then gtm_keep_obj="N" ; fi
 if [ -z "$gtm_dryrun" ] ; then gtm_dryrun="N" ; fi
 if [ -z "$gtm_group_restriction" ] ; then gtm_group_restriction="N" ; fi
 if [ -z "$gtm_lcase_utils" ] ; then gtm_lcase_utils="Y" ; fi
@@ -189,6 +199,7 @@ while [ $# -gt 0 ] ; do
     	        fi
 	    fi
 	    shift ;;
+	--keep-obj) gtm_keep_obj="Y" ; shift ;;
 	--linkenv*) tmp=`echo $1 | cut -s -d = -f 2-`
 	    if [ -n "$tmp" ] ; then gtm_linkenv=$tmp
 	    else if [ 1 -lt "$#" ] ; then gtm_linkenv=$2 ; shift
@@ -230,7 +241,7 @@ while [ $# -gt 0 ] ; do
 done
 if [ "Y" = "$gtm_verbose" ] ; then echo Processed command line ; dump_info ; fi
 
-# Check machine architecture
+# Set environment variables according to machine architecture
 gtm_arch=`uname -m | tr -d _`
 case $gtm_arch in
     sun*) gtm_arch="sparc" ;;
@@ -241,6 +252,7 @@ case $gtm_hostos in
     hp-ux) gtm_hostos="hpux" ;;
     sun*) gtm_hostos="solaris" ;;
 esac
+gtm_shlib_support="Y"
 case ${gtm_hostos}_${gtm_arch} in
     aix*) # no Source Forge dirname
 	gtm_arch="rs6000" # uname -m is not useful on AIX
@@ -254,7 +266,8 @@ case ${gtm_hostos}_${gtm_arch} in
     linux_i686) gtm_sf_dirname="GT.M-x86-Linux"
 	gtm_ftp_dirname="linux"
 	gtm_flavor="i686"
-	gtm_install_flavor="x86" ;;
+	gtm_install_flavor="x86"
+	gtm_shlib_support="N" ;;
     linux_ia64) # no Source Forge dirname
 	gtm_ftp_dirname="linux_ia64"
 	gtm_flavor="ia64"
@@ -323,11 +336,13 @@ else
     gtm_filename=gtm_${tmp}_${gtm_hostos}_${gtm_flavor}_${gtm_buildtype}.tar.gz
     case $gtm_distrib in
 	http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
-	    if { ! wget -qP $gtm_tmp ${gtm_distrib}/files/${gtm_sf_dirname}/${gtm_version}/${gtm_filename} 2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
+	    if { ! wget -qP $gtm_tmp ${gtm_distrib}/files/${gtm_sf_dirname}/${gtm_version}/${gtm_filename} \
+	        2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
 		echo Unable to download GT.M distribution $gtm_filename ; err_exit
 	    fi ;;
 	ftp://*)
-	    if { ! wget -qP $gtm_tmp ${gtm_distrib}/${gtm_ftp_dirname}/${tmp}/${gtm_filename} 2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
+	    if { ! wget -qP $gtm_tmp ${gtm_distrib}/${gtm_ftp_dirname}/${tmp}/${gtm_filename} \
+	        2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
 		echo Unable to download GT.M distribution $gtm_filename ; err_exit
 	    fi ;;
 	*) if [ -f ${gtm_distrib}/${gtm_filename} ] ; then ln -s ${gtm_distrib}/${gtm_filename} $gtm_tmp
@@ -391,6 +406,7 @@ else echo y  >>$gtm_configure_in
     fi
 fi
 echo $gtm_lcase_utils >>$gtm_configure_in
+if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi
 echo n >>$gtm_configure_in
 if [ "Y" = "$gtm_verbose" ] ; then echo Prepared configuration file ; cat $gtm_configure_in ; dump_info ; fi
 

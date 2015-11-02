@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,29 +15,30 @@
 #include "toktyp.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
 LITREF mval literal_null ;
 
-int f_zdate( oprtype *a, opctype op ) /* op is not used */
+int f_zdate(oprtype *a, opctype op) /* op is not used */
 {
-	triple *args[4];
-	int i;
-	bool more_args;
+	boolean_t	more_args;
+	int		i;
+	triple		*args[4];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	args[0] = maketriple(OC_FNZDATE);
-	if (!expr(&(args[0]->operand[0])))
+	if (EXPR_FAIL == expr(&(args[0]->operand[0]), MUMPS_EXPR))
 		return FALSE;
 	for (i = 1 , more_args = TRUE ; i < 4 ; i++)
 	{
 		args[i] = newtriple(OC_PARAMETER);
 		if (more_args)
 		{
-			if (window_token != TK_COMMA)
+			if (TK_COMMA != TREF(window_token))
 				more_args = FALSE;
 			else
 			{
 				advancewindow();
-				if (!expr(&(args[i]->operand[0])))
+				if (EXPR_FAIL == expr(&(args[i]->operand[0]), MUMPS_EXPR))
 					return FALSE;
 			}
 		}

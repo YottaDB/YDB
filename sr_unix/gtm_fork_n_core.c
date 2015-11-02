@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,9 +44,12 @@
 #include "dpgbldir.h"
 
 GBLREF boolean_t	created_core;		/* core file was created */
-GBLREF boolean_t	core_in_progress;
+GBLREF unsigned int	core_in_progress;
 GBLREF int4		exi_condition;
 GBLREF sigset_t		blockalrm;
+
+error_def(ERR_COREINPROGRESS);
+error_def(ERR_NOFORKCORE);
 
 #define MM_MALLOC_ALREADY_TRIED	(sgmnt_data_ptr_t)-1
 
@@ -74,8 +77,6 @@ void gtm_fork_n_core(void)
 	gd_region		*reg, *r_top;
 	gd_addr			*addr_ptr;
 DEBUG_ONLY( struct rlimit rlim;)
-
-	error_def(ERR_NOFORKCORE);
 
 	DEBUG_ONLY(
 	getrlimit(RLIMIT_CORE, &rlim);
@@ -145,7 +146,15 @@ DEBUG_ONLY( struct rlimit rlim;)
 		}
 	}
 #endif
-	core_in_progress = TRUE;
+	if (core_in_progress++)
+	{
+		if (1 == core_in_progress)
+		{	/* only report once */
+			send_msg(VARLSTCNT(1) ERR_COREINPROGRESS, 0);
+			gtm_putmsg(VARLSTCNT(1) ERR_COREINPROGRESS, 0);
+		}
+		return;
+	}
 
 	/* ignore interrupts */
 	sigemptyset(&act.sa_mask);
@@ -156,7 +165,7 @@ DEBUG_ONLY( struct rlimit rlim;)
 	/* block SIGALRM signal */
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
 
-	childid = fork();
+	childid = fork();	/* BYPASSOK: we exit immediately, no FORK_CLEAN needed */
 	if (childid)
 	{
 		if (-1 == childid)
@@ -171,7 +180,7 @@ DEBUG_ONLY( struct rlimit rlim;)
 		/* restore interrupt handler */
 		sigaction(SIGINT, &intr, 0);
 		sigprocmask(SIG_SETMASK, &savemask, NULL);
-		core_in_progress = FALSE;
+		--core_in_progress;
 		if (-1 == waitrc)
 		{	/* If got error from waitpid, core may or may not have been taken. Assume worst & don't set flag */
 			errno = save_errno;

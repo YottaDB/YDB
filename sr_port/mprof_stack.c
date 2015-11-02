@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,8 @@
 #define MPROF_CHUNK_SIZE 8096							/* in pro make each chunk about 8K */
 #endif
 #define MPROF_STACK_ALLOC_CNT (MPROF_CHUNK_SIZE / SIZEOF(mprof_stack_frame))	/* size of allocation chunk in number of frames */
+
+GBLREF int process_exiting;
 
 /* Preallocate space for MPROF_STACK_ALLOC_CNT elements of the stack. */
 void mprof_stack_init(void)
@@ -79,6 +81,8 @@ void mprof_stack_free(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (process_exiting)	/* no point trying to clean after ourselves if we are exiting */
+		return;
 	/* there are no elements on the stack */
 	if (MPROF_STACK_ALLOC_CNT == TREF(mprof_chunk_avail_size))
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,8 +88,7 @@ cw_set_element *t_write (
 	blk = blkhist->blk_num;
 	if (!dollar_tlevel)
 	{
-		if (blk >= csa->ti->total_blks)
-			GTMASSERT;
+		assert((blk < csa->ti->total_blks) GTM_TRUNCATE_ONLY(|| (CDB_STAGNATE > t_tries)));
 		cse = &cw_set[cw_set_depth];
 		cse->mode = gds_t_noop;	/* initialize it to a value that is not "gds_t_committed" before incrementing
 					 * cw_set_depth as secshr_db_clnup relies on it */

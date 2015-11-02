@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,25 @@ LITREF	nametabent		filter_names[];
 LITREF	unsigned char		filter_index[27];
 LITREF 	unsigned char		io_params_size[];
 
+error_def(ERR_ABNCOMPTINC);
+error_def(ERR_ADDRTOOLONG);
+error_def(ERR_ANCOMPTINC);
+error_def(ERR_ACOMPTBINC);
+error_def(ERR_CURRSOCKOFR);
+error_def(ERR_DELIMSIZNA);
+error_def(ERR_ILLESOCKBFSIZE);
+error_def(ERR_SETSOCKOPTERR);
+error_def(ERR_SOCKBFNOTEMPTY);
+error_def(ERR_SOCKNOTFND);
+error_def(ERR_SOCKMAX);
+error_def(ERR_TEXT);
+error_def(ERR_TTINVFILTER);
+error_def(ERR_ZFF2MANY);
+error_def(ERR_DEVPARMNEG);
+error_def(ERR_DELIMWIDTH);
+error_def(ERR_ZINTRECURSEIO);
+error_def(ERR_MRTMAXEXCEEDED);
+
 void	iosocket_use(io_desc *iod, mval *pp)
 {
 	unsigned char	ch, len;
@@ -81,25 +100,6 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	int		save_errno;
 	size_t		d_socket_struct_len;
 	mstr		lcl_zff;
-
-	error_def(ERR_ABNCOMPTINC);
-        error_def(ERR_ADDRTOOLONG);
-	error_def(ERR_ANCOMPTINC);
-	error_def(ERR_ACOMPTBINC);
-	error_def(ERR_CURRSOCKOFR);
-	error_def(ERR_DELIMSIZNA);
-	error_def(ERR_ILLESOCKBFSIZE);
-	error_def(ERR_SETSOCKOPTERR);
-	error_def(ERR_SOCKBFNOTEMPTY);
-	error_def(ERR_SOCKNOTFND);
-	error_def(ERR_SOCKMAX);
-	error_def(ERR_TEXT);
-	error_def(ERR_TTINVFILTER);
-	error_def(ERR_ZFF2MANY);
-	error_def(ERR_DEVPARMNEG);
-	error_def(ERR_DELIMWIDTH);
-	error_def(ERR_ZINTRECURSEIO);
-	error_def(ERR_MRTMAXEXCEEDED);
 
         assert(iod->state == dev_open);
         assert(iod->type == gtmsocket);
@@ -419,22 +419,21 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		/* The delimiter has changed. The iosocket_readfl/write routine won't notice so we have to do
 		   the UTF16xx conversion since we changed it.
 		*/
-		SOCKET_DEBUG2(PRINTF("socuse: Delimiter(s) replaced - num delims: %d  delimiter_len: %d  ichset: %d  ochset: %d\n",
-				     newsocket.n_delimiter, delimiter_len, iod->ichset, iod->ochset); DEBUGSOCKFLUSH);
+		DBGSOCK2((stdout, "socuse: Delimiter(s) replaced - num delims: %d  delimiter_len: %d  ichset: %d  ochset: %d\n",
+			  newsocket.n_delimiter, delimiter_len, iod->ichset, iod->ochset));
 		if  (0 < delimiter_len)
 		{
 			if (!newsocket.first_read && (CHSET_UTF16BE == iod->ichset || CHSET_UTF16LE == iod->ichset))
 			{	/* We have been reading with this socket so convert this new delimiter set */
-				SOCKET_DEBUG2(PRINTF("socuse: Converting new delimiters for input\n"); DEBUGSOCKFLUSH);
+				DBGSOCK2((stdout, "socuse: Converting new delimiters for input\n"));
 				iosocket_delim_conv(&newsocket, iod->ichset);
 			}
 			if (!newsocket.first_write && (CHSET_UTF16BE == iod->ochset || CHSET_UTF16LE == iod->ochset))
 			{	/* We have been writing with this socket so convert the new default output delimiter */
-				SOCKET_DEBUG2(PRINTF("socuse: Converting new delimiters for output\n"); DEBUGSOCKFLUSH);
+				DBGSOCK2((stdout, "socuse: Converting new delimiters for output\n"));
 				if (newsocket.first_read || (CHSET_UTF16BE != iod->ichset && CHSET_UTF16LE != iod->ichset))
 				{	/* Need to do conversion as iosocket_delim_conv above didn't do it for us */
-					SOCKET_DEBUG2(PRINTF("socuse: running convert for write since input didn't do it\n");
-						      DEBUGSOCKFLUSH);
+					DBGSOCK2((stdout, "socuse: running convert for write since input didn't do it\n"));
 					new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset],
 							   &newsocket.delimiter[0], NULL, NULL);
 					if (MAX_DELIM_LEN < new_len)
@@ -444,8 +443,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 					}
 				} else
 				{
-					SOCKET_DEBUG2(PRINTF("socuse: using previous length from read conversion\n");
-						      DEBUGSOCKFLUSH);
+					DBGSOCK2((stdout, "socuse: using previous length from read conversion\n"));
 					new_len = newsocket.idelimiter[0].len;
 				}
                                 newsocket.odelimiter0.len = new_len;
@@ -464,7 +462,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	{	/* ZFF="non-zero-len-string" specified */
                 if (CHSET_UTF16BE == iod->ochset || CHSET_UTF16LE == iod->ochset) /* need conversion of ZFF */
 		{
-			SOCKET_DEBUG2(PRINTF("socuse: Converting zff\n"); DEBUGSOCKFLUSH);
+			DBGSOCK2((stdout, "socuse: Converting zff\n"));
 			lcl_zff.addr = (char *)zff_buffer;
 			lcl_zff.len = zff_len;
 			new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset], &lcl_zff, NULL, NULL);

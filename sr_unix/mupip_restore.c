@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@
 #include "mupip_restore.h"
 #include "gtmmsg.h"
 #include "wcs_sleep.h"
-#include "ftok_sems.h"
+#include "db_ipcs_reset.h"
 #include "gds_blk_downgrade.h"
 #include "shmpool.h"
 #include "min_max.h"
@@ -92,11 +92,9 @@ error_def(ERR_TEXT);
 
 #define CLNUP_AND_EXIT(EXIT_STATUS, INBUF)				\
 {									\
-	DEBUG_ONLY(GBLREF	gd_region	*standalone_reg;)	\
-									\
 	if (INBUF)							\
 		free(INBUF);						\
-	assert(standalone_reg == gv_cur_region);			\
+	assert(FILE_INFO(gv_cur_region)->grabbed_access_sem);		\
 	db_ipcs_reset(gv_cur_region);					\
 	mu_gv_cur_reg_free();						\
 	mupip_exit(EXIT_STATUS);					\
@@ -135,12 +133,15 @@ void mupip_restore(void)
 	trans_num		curr_tn;
 	uint4			ii;
 	block_id		blk_num;
-	bool			extend;
+	boolean_t		extend, truncate;
 	uint4			cli_status;
 	BFILE			*in;
 	int			i, db_fd;
 	uint4			old_blk_size, old_tot_blks, bplmap, old_bit_maps, new_bit_maps;
 	off_t			new_eof, offset;
+#	ifdef GTM_TRUNCATE
+	off_t			new_size;
+#	endif
 	char			buff[DISK_BLOCK_SIZE];
 	char			msg_buffer[1024], *newmap, *newmap_bptr;
 	mstr			msg_string;
@@ -162,10 +163,13 @@ void mupip_restore(void)
 	boolean_t		is_bkup_file_encrypted, is_same_hash = FALSE;
 #	endif
 	ZOS_ONLY(int 		realfiletag;)
+	DEBUG_ONLY(unix_db_info	*udi;)
 
 	extend = TRUE;
 	if (CLI_NEGATED == (cli_status = cli_present("EXTEND")))
 		extend = FALSE;
+	truncate = FALSE;
+	GTM_TRUNCATE_ONLY(truncate = TRUE;)
 	mu_outofband_setup();
 	mu_gv_cur_reg_init();
 	n_len = SIZEOF(db_name);
@@ -178,6 +182,7 @@ void mupip_restore(void)
 		util_out_print("Error securing stand alone access to output file !AD. Aborting restore.", TRUE, n_len, db_name);
 		mupip_exit(ERR_MUPRESTERR);
 	}
+	DEBUG_ONLY(udi = FILE_INFO(gv_cur_region));
 	OPENFILE(db_name, O_RDWR, db_fd);
 	if (FD_INVALID == db_fd)
 	{
@@ -187,10 +192,10 @@ void mupip_restore(void)
 		util_out_print("open : !AZ", TRUE, errptr);
 		CLNUP_AND_EXIT(save_errno, NULL);
 	}
-#ifdef __MVS__
+#	ifdef __MVS__
 	if (-1 == gtm_zos_tag_to_policy(db_fd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG(db_name, realfiletag, TAG_BINARY, errno);
-#endif
+#	endif
 	murgetlst();
 	LSEEKREAD(db_fd, 0, &old_data, SIZEOF(sgmnt_data), save_errno);
 	if (0 != save_errno)
@@ -210,22 +215,18 @@ void mupip_restore(void)
 		CLNUP_AND_EXIT(ERR_MUPRESTERR, NULL);
 	}
 	CHECK_DB_ENDIAN(&old_data, n_len, db_name);
-
 	curr_tn = old_data.trans_hist.curr_tn;
 	old_blk_size = old_data.blk_size;
 	old_tot_blks = old_data.trans_hist.total_blks;
 	old_start_vbn = old_data.start_vbn;
 	bplmap = old_data.bplmap;
-	old_bit_maps = DIVIDE_ROUND_DOWN(old_tot_blks, bplmap);
+	old_bit_maps = DIVIDE_ROUND_UP(old_tot_blks, bplmap);
 	inbuf = (char *)malloc(BACKUP_TEMPFILE_BUFF_SIZE);
 	sblkh_p = (muinc_blk_hdr_ptr_t)inbuf;
-
 	msg_string.addr = msg_buffer;
 	msg_string.len = SIZEOF(msg_buffer);
-
 	memset(&inhead, 0, SIZEOF(inc_header));
 	rest_blks = 0;
-
 	for (ptr = in_files.next;  ptr;  ptr = ptr->next)
 	{	/* --- determine source type --- */
 		type = backup_to_file;
@@ -282,10 +283,10 @@ void mupip_restore(void)
 						TRUE, ptr->input_file.len, ptr->input_file.addr);
 					CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 				}
-#ifdef DEBUG_ONLINE
-				PRINTF("file descriptor for the openned pipe is %d.\n", in->fd);
-				PRINTF("the command passed to gtm_pipe is %s.\n", ptr->input_file.addr);
-#endif
+#				ifdef DEBUG_ONLINE
+				DBGFPF(stdout, "file descriptor for the openned pipe is %d.\n", in->fd);
+				DBGFPF(stdout, "the command passed to gtm_pipe is %s.\n", ptr->input_file.addr);
+#				endif
 				break;
 			case backup_to_tcp:
 				common_read = tcp_read;
@@ -333,7 +334,6 @@ void mupip_restore(void)
 			is_bkup_file_encrypted = inhead.is_encrypted;
 		}
 #		endif
-
 		if (curr_tn != inhead.start_tn)
 		{
 			util_out_print("Transaction in input file !AD does not align with database TN.!/DB: !16@XQ!_"
@@ -343,21 +343,59 @@ void mupip_restore(void)
 		}
 		if (old_blk_size != inhead.blk_size)
 		{
-			util_out_print("Incompatable block size.  Output file !AD has block size !XL,", TRUE, n_len, db_name,
+			util_out_print("Incompatible block size.  Output file !AD has block size !XL,", TRUE, n_len, db_name,
 				       old_blk_size);
 			util_out_print("while input file !AD is from a database with block size !XL,", TRUE, ptr->input_file.len,
 				ptr->input_file.addr, inhead.blk_size);
 			CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 		}
-		new_bit_maps = DIVIDE_ROUND_DOWN(inhead.db_total_blks, bplmap);
+		new_bit_maps = DIVIDE_ROUND_UP(inhead.db_total_blks, bplmap);
 		if (old_tot_blks != inhead.db_total_blks)
 		{
-			if (old_tot_blks > inhead.db_total_blks || !extend)
+			if (old_tot_blks > inhead.db_total_blks && truncate)
 			{
-				totblks = old_tot_blks - DIVIDE_ROUND_UP(old_tot_blks, DISK_BLOCK_SIZE);
-				util_out_print("Incompatable database sizes.  Output file !AD has!/  !UL (!XL hex) total blocks,",
+				/* Truncate occurred between incremental backups. FTRUNCATE the db file to the appropriate size,
+				 * write the EOF block. */
+				new_eof = ((off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE)
+						+ ((off_t)inhead.db_total_blks * old_blk_size);
+				new_size = new_eof + DISK_BLOCK_SIZE;
+				memset(buff, 0, DISK_BLOCK_SIZE);
+				LSEEKWRITE(db_fd, new_eof, buff, DISK_BLOCK_SIZE, status);
+				if (0 != status)
+				{
+					util_out_print("Aborting restore!/", TRUE);
+					util_out_print("lseek or write error : Error accessing output file !AD while truncating.",
+						TRUE, n_len, db_name);
+					totblks = old_tot_blks - old_bit_maps;
+					util_out_print("Output file !AD has!/  !UL (!XL hex) total blocks,",
 						TRUE, n_len, db_name, totblks, totblks);
-				totblks = inhead.db_total_blks - DIVIDE_ROUND_UP(inhead.db_total_blks, DISK_BLOCK_SIZE);
+					totblks = inhead.db_total_blks - new_bit_maps;
+					util_out_print("while input file !AD is from a database with!/  !UL (!XL hex) total blocks",
+						TRUE, ptr->input_file.len, ptr->input_file.addr, totblks, totblks);
+					CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
+				}
+				FTRUNCATE(db_fd, new_size, status);
+				if (0 != status)
+				{
+					util_out_print("Aborting restore!/", TRUE);
+					util_out_print("FTRUNCATE error : Error error truncating output file !AD.",
+						TRUE, n_len, db_name);
+					totblks = old_tot_blks - old_bit_maps;
+					util_out_print("Output file !AD has!/  !UL (!XL hex) total blocks,",
+						TRUE, n_len, db_name, totblks, totblks);
+					totblks = inhead.db_total_blks - new_bit_maps;
+					util_out_print("while input file !AD is from a database with!/  !UL (!XL hex) total blocks",
+						TRUE, ptr->input_file.len, ptr->input_file.addr, totblks, totblks);
+					CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
+				}
+				old_tot_blks = inhead.db_total_blks;
+				old_bit_maps = new_bit_maps;
+			} else if (old_tot_blks > inhead.db_total_blks || !extend)
+			{
+				totblks = old_tot_blks - old_bit_maps;
+				util_out_print("Incompatible database sizes.  Output file !AD has!/  !UL (!XL hex) total blocks,",
+						TRUE, n_len, db_name, totblks, totblks);
+				totblks = inhead.db_total_blks - new_bit_maps;
 				util_out_print("while input file !AD is from a database with!/  !UL (!XL hex) total blocks",
 						TRUE, ptr->input_file.len, ptr->input_file.addr, totblks, totblks);
 				CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
@@ -414,6 +452,7 @@ void mupip_restore(void)
 					free(newmap);
 				}
 				old_tot_blks = inhead.db_total_blks;
+				old_bit_maps = new_bit_maps;
 			}
 		}
 		rsize = SIZEOF(muinc_blk_hdr) + inhead.blk_size;
@@ -472,6 +511,12 @@ void mupip_restore(void)
 			}
 			rest_blks++;
 			blk_num = sblkh_p->blkid;
+			/* Between incremental backups, an extend followed by a truncate could have occurred. The block below
+			 * would have been truncated, so no need to write it. */
+			GTM_TRUNCATE_ONLY(
+				if (blk_num >= old_tot_blks) /* Should be a bitmap block */
+					continue;
+			)
 			/* For blocks that were read during the main backup phase of stream backup, the blocks are
 			   recorded without version (there may even be some garbage blocks in the stream of
 			   indeterminate/invalid format if a bitmap was written out prior to the data blocks that
@@ -548,6 +593,18 @@ void mupip_restore(void)
 			memcpy(((sgmnt_data_ptr_t)inbuf)->encryption_hash, old_data.encryption_hash, GTMCRYPT_HASH_LEN);
 			((sgmnt_data_ptr_t)inbuf)->is_encrypted = old_data.is_encrypted;
 		)
+		assert((udi->semid == old_data.semid) && (udi->gt_sem_ctime == old_data.gt_sem_ctime.ctime)
+			&& (udi->shmid == old_data.shmid) && (udi->gt_shm_ctime == old_data.gt_shm_ctime.ctime));
+		/* Since the file header we are about to write is taken from the BACKUP database, the semid/shmid (and the
+		 * corresponding ctime fields) will be INVALID. But, we want the restor'ed file to continue having standalone
+		 * access until we are done with MUPIP RESTORE (and release the semaphores and clear the file header fields in
+		 * db_ipcs_reset). So, before writing the new file header, set the semid/shmid (and ctime fields) to the semid and
+		 * shmid fields that is currently valid in the system (when we did the mu_rndwn_file).
+		 */
+		((sgmnt_data_ptr_t)inbuf)->semid = old_data.semid;
+		((sgmnt_data_ptr_t)inbuf)->gt_sem_ctime.ctime = old_data.gt_sem_ctime.ctime;
+		((sgmnt_data_ptr_t)inbuf)->shmid = old_data.shmid;
+		((sgmnt_data_ptr_t)inbuf)->gt_shm_ctime.ctime = old_data.gt_shm_ctime.ctime;
 		LSEEKWRITE(db_fd, 0, inbuf, rsize - SIZEOF(int4), save_errno);
 		if (0 != save_errno)
 		{
@@ -627,9 +684,9 @@ STATICFNDEF void exec_read(BFILE *bf, char *buf, int nbytes)
 	assert(nbytes > 0);
 	needed = nbytes;
 	curr = buf;
-#ifdef DEBUG_ONLINE
-	PRINTF("file descriptor is %d and bytes needed is %d\n", bf->fd, needed);
-#endif
+#	ifdef DEBUG_ONLINE
+	DBGFPF(stdout, "file descriptor is %d and bytes needed is %d\n", bf->fd, needed);
+#	endif
 	while(0 != (got = (int)(read(bf->fd, curr, needed))))
 	{
 		if (got == needed)
@@ -668,10 +725,8 @@ STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 
 	needed = nbytes;
 	curr = buf;
-
 	nap.at_sec = 1;
 	nap.at_usec = 0;
-
 	while (1)
 	{
 		FD_ZERO(&fs);
@@ -683,7 +738,6 @@ STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 		save_nap = nap;
 		status = tcp_routines.aa_select(bf->fd + 1, (void *)(&fs), (void *)0, (void *)0, &nap);
 		nap = save_nap;
-
 		if (status > 0)
 		{
 			status = tcp_routines.aa_recv(bf->fd, curr, needed, 0);

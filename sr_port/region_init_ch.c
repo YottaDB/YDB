@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,18 +13,19 @@
 #include "error.h"
 #include "util.h"
 
+error_def(ERR_ASSERT);
+error_def(ERR_CTRLC);
+error_def(ERR_FORCEDHALT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_MEMORY);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_VMSMEMORY);
+
 CONDITION_HANDLER(region_init_ch)
 {
-	error_def(ERR_ASSERT);
-	error_def(ERR_CTRLC);
-	error_def(ERR_FORCEDHALT);
-	error_def(ERR_GTMCHECK);
-	error_def(ERR_GTMASSERT);
-        error_def(ERR_MEMORY);
-        error_def(ERR_VMSMEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_OUTOFSPACE);
-
 	START_CH;
 	if (!(IS_GTM_ERROR(SIGNAL)) || DUMPABLE)
 		NEXTCH;

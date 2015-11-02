@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,6 +94,15 @@ GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	jnl_process_vector	*prc_vec;
 
+ZOS_ONLY(error_def(ERR_BADTAG);)
+error_def(ERR_FILERENAME);
+error_def(ERR_JNLCRESTATUS);
+error_def(ERR_JNLFNF);
+error_def(ERR_PERMGENFAIL);
+error_def(ERR_PREMATEOF);
+error_def(ERR_RENAMEFAIL);
+error_def(ERR_TEXT);
+
 /* Create a journal file from info.
  * If necessary, it renames journal file of same name.
  * Note: jgbl.gbl_jrec_time must be set by callers
@@ -104,8 +113,6 @@ uint4	cre_jnl_file(jnl_create_info *info)
 	int 		org_fn_len, rename_fn_len, fstat;
 	uint4		ustatus;
 	char		*org_fn, rename_fn[MAX_FN_LEN];
-	error_def	(ERR_JNLCRESTATUS);
-	error_def	(ERR_JNLFNF);
 
 	if (!info->no_rename)	/* ***MAY*** be rename is required */
 	{
@@ -177,17 +184,12 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	int			group_id;
 	struct stat		sb;
 	int			perm;
+	struct perm_diag_data	pdd;
 #endif
+	int			idx;
 	trans_num		db_tn;
 	uint4			temp_offset, temp_checksum;
 	uint4			jnl_fs_block_size;
-
-	error_def(ERR_FILERENAME);
-	error_def(ERR_RENAMEFAIL);
-	error_def(ERR_JNLCRESTATUS);
-	error_def(ERR_PREMATEOF);
- 	error_def(ERR_TEXT);
- 	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	jrecbuf = NULL;
 	if (info->no_rename)
@@ -242,9 +244,23 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		return EXIT_ERR;
 	}
 	/* setup new group and permissions if indicated by the security rules.
-	 * Use 0770 anded with current mode for the new mode if it is world writeable.
 	 */
-	gtm_set_group_and_perm(&sb, &group_id, &perm, (0770 & sb.st_mode));
+	if (gtm_set_group_and_perm(&sb, &group_id, &perm, PERM_FILE, &pdd) < 0)
+	{
+		send_msg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+			ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
+			PERMGENDIAG_ARGS(pdd));
+		if (IS_GTM_IMAGE)
+			rts_error(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
+				PERMGENDIAG_ARGS(pdd));
+		else
+			gtm_putmsg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
+				PERMGENDIAG_ARGS(pdd));
+		F_CLOSE(channel, status);
+		return EXIT_ERR;
+	}
 	/* if group not the same then change group of temporary file */
 	if ((-1 != group_id) && (group_id != stat_buf.st_gid) && (-1 == fchown(channel, -1, group_id)))
 	{
@@ -365,11 +381,24 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		epoch_record->blks_to_upgrd = info->blks_to_upgrd;
 		epoch_record->free_blocks   = info->free_blocks;
 		epoch_record->total_blks    = info->total_blks;
+		epoch_record->fully_upgraded = info->csd->fully_upgraded;
 		temp_offset = JNL_HDR_LEN + PINI_RECLEN;
 		temp_checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, temp_offset);
 		epoch_record->prefix.checksum = ADJUST_CHECKSUM(temp_checksum, info->checksum);
 		epoch_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-		QWASSIGN(epoch_record->jnl_seqno, info->reg_seqno);
+		epoch_record->jnl_seqno = info->reg_seqno;
+		UNIX_ONLY(
+			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+				epoch_record->strm_seqno[idx] = info->csd->strm_reg_seqno[idx];
+			if (jgbl.forw_phase_recovery)
+			{	/* If MUPIP JOURNAL -ROLLBACK, might need some adjustment. See macro definition for comments */
+				MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(info->csd, epoch_record->strm_seqno);
+			}
+		)
+		VMS_ONLY(
+			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+				assert(0 == epoch_record->strm_seqno[idx]); /* should have been zeroed already by above memset */
+		)
 		pfin_record = (struct_jrec_pfin *)&jrecbuf[PINI_RECLEN + EPOCH_RECLEN];
 		temp_offset = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN;
 		temp_checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, temp_offset);

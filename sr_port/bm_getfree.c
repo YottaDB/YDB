@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,7 +81,18 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 	uint4		status;
 	srch_blk_status	blkhist;
 
+#	ifdef GTM_TRUNCATE
+	if (dba_mm == cs_data->acc_meth)
+	{
+		total_blks = cs_addrs->total_blks;
+	} else
+	{
+		total_blks = cs_addrs->ti->total_blks;
+		cs_addrs->total_blks = MAX(cs_addrs->total_blks, total_blks);
+	}
+#	else
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
+#	endif
 	if (orig_hint >= total_blks)		/* for TP, hint can be > total_blks */
 		orig_hint = 1;
 	hint = orig_hint;
@@ -105,6 +116,10 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 				return (FILE_EXTENDED);
 			hint = total_blks;
 			total_blks = cs_addrs->ti->total_blks;
+#			ifdef GTM_TRUNCATE
+			assert(dba_mm != cs_data->acc_meth);
+ 			cs_addrs->total_blks = MAX(cs_addrs->total_blks, total_blks);
+#			endif
 			hint_cycled = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 			local_maps = hint_cycled + 2;	/* for (up to) 2 wraps */
 			/*

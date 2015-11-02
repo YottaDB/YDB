@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,17 +15,18 @@
 #include "toktyp.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
+error_def(ERR_COMMA);
 
-int f_fnzbitfind( oprtype *a, opctype op)
+int f_fnzbitfind(oprtype *a, opctype op)
 {
 	triple *r, *parm;
-	error_def(ERR_COMMA);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
-	if (!expr(&(r->operand[0])))      /* bitstring */
+	if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_EXPR))      /* bitstring */
 		return FALSE;
-	if (window_token != TK_COMMA)
+	if (TK_COMMA != TREF(window_token))
 	{
 		stx_error(ERR_COMMA);
 		return FALSE;
@@ -33,17 +34,16 @@ int f_fnzbitfind( oprtype *a, opctype op)
 	parm = newtriple(OC_PARAMETER);
 	r->operand[1] = put_tref(parm);
 	advancewindow();
-	if (!intexpr(&(parm->operand[0])))    /* truthval  */
+	if (EXPR_FAIL == expr(&(parm->operand[0]), MUMPS_INT))    /* truthval  */
 		return FALSE;
-	if (window_token != TK_COMMA)
+	if (TK_COMMA != TREF(window_token))
 		parm->operand[1] = put_ilit(1);
 	else
 	{
 		advancewindow();
-		if (!intexpr(&(parm->operand[1])))    /* position  */
+		if (EXPR_FAIL == expr(&(parm->operand[1]), MUMPS_INT))    /* position  */
 			return FALSE;
 	}
-
 	ins_triple(r);
 	*a = put_tref(r);
 	return TRUE;

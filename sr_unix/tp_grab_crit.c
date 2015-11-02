@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,30 +27,38 @@
 #include "wcs_recover.h"
 #include "caller_id.h"
 #include "is_proc_alive.h"
+#include "gtmimagename.h"
+#include "error.h"
 
 GBLREF	short 			crash_count;
 GBLREF	volatile int4		crit_count;
 GBLREF	uint4 			process_id;
 GBLREF	node_local_ptr_t	locknl;
+GBLREF	boolean_t		mupip_jnl_recover;
+
+error_def(ERR_CRITRESET);
+error_def(ERR_DBCCERR);
+error_def(ERR_DBFLCORRP);
 
 bool	tp_grab_crit(gd_region *reg)
 {
 	unix_db_info 		*udi;
 	sgmnt_addrs  		*csa;
+	sgmnt_data_ptr_t	csd;
+	node_local_ptr_t	cnl;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
 
-	error_def(ERR_CRITRESET);
-	error_def(ERR_DBCCERR);
-
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
+	csd = csa->hdr;
+	cnl = csa->nl;
 	if (!csa->now_crit)
 	{
 		assert(0 == crit_count);
 		crit_count++;	/* prevent interrupts */
-		DEBUG_ONLY(locknl = csa->nl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csa->hdr->mutex_spin_parms;
+		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
+		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csd->mutex_spin_parms;
 		status = mutex_lockwim(reg, mutex_spin_parms, crash_count);
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
@@ -74,10 +82,17 @@ bool	tp_grab_crit(gd_region *reg)
 		 * crit semaphore (making it available for waiters) but does not also clear csa->nl->in_crit since it does not
 		 * hold crit at that point. But in that case, the pid reported in csa->nl->in_crit should be dead. Check that.
 		 */
-		assert((0 == csa->nl->in_crit) || (FALSE == is_proc_alive(csa->nl->in_crit, 0)));
-		csa->nl->in_crit = process_id;
+		assert((0 == cnl->in_crit) || (FALSE == is_proc_alive(cnl->in_crit, 0)));
+		cnl->in_crit = process_id;
 		CRIT_TRACE(crit_ops_gw);		/* see gdsbt.h for comment on placement */
 		crit_count = 0;
+	}
+	if (csd->file_corrupt && !mupip_jnl_recover)
+	{
+		if (!IS_DSE_IMAGE)
+			rts_error(VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
+		else
+			gtm_putmsg(VARLSTCNT(4) MAKE_MSG_WARNING(ERR_DBFLCORRP), 2, DB_LEN_STR(reg));
 	}
 	/* Ideally we do not want to do wcs_recover if we are in interrupt code (as opposed to mainline code).
 	 * This is easily accomplished in VMS with a library function lib$ast_in_prog but in Unix there is no way
@@ -85,7 +100,7 @@ bool	tp_grab_crit(gd_region *reg)
 	 * currently do the cache recovery even in case of interrupt code even though it is a heavyweight operation.
 	 * If it is found to cause issues, this logic has to be re-examined.
 	 */
-	if (csa->hdr->wc_blocked)
+	if (csd->wc_blocked)
 		wcs_recover(reg);
 	return(TRUE);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,13 +25,17 @@
 #include "deferred_signal_handler.h"
 #include "have_crit.h"
 #include "caller_id.h"
+#include "jnl.h"
 
 GBLREF	volatile int4		crit_count;
 GBLREF	uint4 			process_id;
 GBLREF	volatile int		suspend_status;
 GBLREF	node_local_ptr_t	locknl;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
-GBLREF	boolean_t		hold_onto_locks;
+GBLREF	jnl_gbls_t		jgbl;
+
+error_def(ERR_CRITRESET);
+error_def(ERR_DBCCERR);
 
 /* Note about usage of this function : Create dummy gd_region, gd_segment, file_control,
  * unix_db_info, sgmnt_addrs, and allocate mutex_struct (and NUM_CRIT_ENTRY * mutex_que_entry),
@@ -44,12 +48,13 @@ void	rel_lock(gd_region *reg)
 	sgmnt_addrs  		*csa;
 	enum cdb_sc		status;
 
-	error_def(ERR_CRITRESET);
-	error_def(ERR_DBCCERR);
-
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
-	assert(!hold_onto_locks && !csa->hold_onto_crit);
+	/* Assert that we never come into rel_lock with hold_onto_crit being TRUE. The only exception is for online rollback
+	 * when it is done with the actual rollback and is now in mur_close_files to release crit. At this point it will have
+	 * hold_onto_crit set to TRUE.
+	 */
+	assert(!csa->hold_onto_crit || (process_exiting && jgbl.onlnrlbk));
 	if (csa->now_crit)
 	{
 		assert(0 == crit_count);

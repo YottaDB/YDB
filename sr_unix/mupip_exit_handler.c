@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,7 @@
 #include "mupip_exit.h"
 #include "print_exit_stats.h"
 #include "ftok_sems.h"
+#include "db_ipcs_reset.h"
 #include "gtm_unistd.h"
 #include "jnl.h"
 #include "buddy_list.h"
@@ -60,12 +61,12 @@
 #include "repl_shutdcode.h"
 #include "op.h"
 #include "io.h"
+#include "gtmsource_srv_latch.h"
 
 GBLREF	boolean_t		mupip_jnl_recover;
-GBLREF	boolean_t		have_standalone_access;
 GBLREF	boolean_t		need_core;
 GBLREF	boolean_t		created_core;
-GBLREF	boolean_t		core_in_progress;
+GBLREF	unsigned int		core_in_progress;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -87,19 +88,19 @@ GBLREF	int			gtmrecv_statslog_fd;
 GBLREF	FILE			*gtmrecv_statslog_fp;
 GBLREF	int			updproc_log_fd;
 GBLREF	int			updhelper_log_fd;
-GBLREF	gd_region		*standalone_reg;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	upd_helper_entry_ptr_t	helper_entry;
 GBLREF	uint4			dollar_tlevel;
+GBLREF	uint4			process_id;
 
 void close_repl_logfiles(void);
 
 void mupip_exit_handler(void)
 {
 	char		err_log[1024];
-	unix_db_info		*udi;
+	unix_db_info	*udi;
 	FILE		*fp;
 
 	if (exit_handler_active)	/* Don't recurse if exit handler exited */
@@ -110,7 +111,6 @@ void mupip_exit_handler(void)
 	{
 		mur_close_files();
 		mupip_jnl_recover = FALSE;
-		have_standalone_access = FALSE;
 	}
 	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = FALSE;
 	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
@@ -119,6 +119,8 @@ void mupip_exit_handler(void)
 	{
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 		mutex_cleanup(jnlpool.jnlpool_dummy_reg);
+		if (jnlpool.gtmsource_local && (process_id == jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid))
+			rel_gtmsource_srv_latch(&jnlpool.gtmsource_local->gtmsource_srv_latch);
 		SHMDT(jnlpool.jnlpool_ctl);
 		jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
 		pool_init = FALSE;
@@ -126,15 +128,6 @@ void mupip_exit_handler(void)
 	if (dollar_tlevel)
 		OP_TROLLBACK(0);
 	gv_rundown();
-	if (standalone_reg)
-		db_ipcs_reset(standalone_reg);
-	/* have_standalone_access needs to be reset to FALSE in case we came through mupip extend and
-	 * this is one of the platforms that requires standalone access to do a file extension.  In that case
-	 * gv_rundown above requires have_standalone_access to be TRUE for proper operation.  Additionally,
-	 * standalone access was acquired in mupip_extend and now it is no longer needed.
-	 *
-	 */
-	have_standalone_access = FALSE;
 	if (is_updhelper && NULL != helper_entry) /* haven't had a chance to cleanup, must be an abnormal exit */
 	{
 		helper_entry->helper_shutdown = ABNORMAL_SHUTDOWN;
@@ -212,7 +205,7 @@ void mupip_exit_handler(void)
 	io_rundown(RUNDOWN_EXCEPT_STD);
 	if (need_core && !created_core)
 	{
-		core_in_progress = TRUE;
+		++core_in_progress;
 		DUMP_CORE;	/* This will not return */
 	}
 }

@@ -23,7 +23,6 @@
 
 GBLREF	bool			undef_inhibit;
 GBLREF	symval			*curr_symval;
-GBLREF	mval			**ind_result_sp, **ind_result_top;
 LITREF	mval			literal_null;
 
 error_def(ERR_INDMAXNEST);
@@ -31,13 +30,15 @@ error_def(ERR_UNDEF);
 
 void	op_indglvn(mval *v,mval *dst)
 {
-	bool		rval;
+	ht_ent_mname	*tabent;
+	icode_str	indir_src;
+	int		rval;
 	mstr		*obj, object;
 	oprtype		x;
-	icode_str	indir_src;
 	var_tabent	targ_key;
-	ht_ent_mname	*tabent;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(v);
 	indir_src.str = v->str;
 	indir_src.code = indir_glvn;
@@ -62,22 +63,19 @@ void	op_indglvn(mval *v,mval *dst)
 			dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 			return;
 		}
+		if (TREF(ind_result_sp) >= TREF(ind_result_top))
+			rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp */
+		obj = &object;
 		comp_init(&v->str);
 		rval = glvn(&x);
-		if (comp_fini(rval, &object, OC_IRETMVAL, &x, v->str.len))
-		{
-			indir_src.str.addr = v->str.addr;
-			cache_put(&indir_src, &object);
-			*ind_result_sp++ = dst;
-			if (ind_result_sp >= ind_result_top)
-				rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-			comp_indr(&object);
-		}
-	} else
-	{
-		*ind_result_sp++ = dst;
-		if (ind_result_sp >= ind_result_top)
-			rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
-		comp_indr(obj);
-	}
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &x, v->str.len))
+			return;
+		indir_src.str.addr = v->str.addr;
+		cache_put(&indir_src, obj);
+		/* Fall into code activation below */
+	} else if (TREF(ind_result_sp) >= TREF(ind_result_top))
+		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp */
+	*(TREF(ind_result_sp))++ = dst;
+	comp_indr(obj);
+	return;
 }

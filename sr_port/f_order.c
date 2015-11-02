@@ -20,10 +20,7 @@
 #include "mmemory.h"
 #include "advancewindow.h"
 #include "mvalconv.h"
-
-GBLREF	char		window_token, director_token;
-GBLREF	mident		window_ident;
-GBLREF	triple		*curtchain;
+#include "fullbool.h"
 
 /* The following are static triples used to pass information between functions "f_order" and "set_opcode" */
 STATICDEF triple	*gvo2_savtarg1;	/* Save gv_currkey after processing gvn1 in $ORDER(gvn1,expr) */
@@ -31,8 +28,8 @@ STATICDEF triple	*gvo2_savtarg2;	/* Save gv_currkey after processing gvn1 and ex
 					 * the runtime function for $ORDER (OC_GVO2) */
 STATICDEF triple	*gvo2_pre_srchindx_triple;	/* the end of the triple chain before OC_SRCHINDX got inserted */
 
-error_def(ERR_VAREXPECTED);
 error_def(ERR_ORDER2);
+error_def(ERR_VAREXPECTED);
 
 LITDEF	opctype order_opc[last_obj][last_dir] =
 {
@@ -46,15 +43,16 @@ LITDEF	opctype order_opc[last_obj][last_dir] =
 STATICFNDEF boolean_t set_opcode(triple *r, oprtype *result, oprtype *result_ptr, oprtype *second_opr, enum order_obj object)
 {
 	enum order_dir	direction;
-	triple		*s;
-	triple		tmpchain, *oldchain, *x, *tp, *tmptriple, *gvo2_post_srchindx_triple, *t1, *t2;
 	int4		dummy_intval;
+	triple		*gvo2_post_srchindx_triple, *oldchain, *s, *t1, *t2, *tp, tmpchain, *tmptriple, *x;
+	DCL_THREADGBL_ACCESS;
 
-	if (window_token == TK_COMMA)
+	SETUP_THREADGBL_ACCESS;
+	if (TK_COMMA == TREF(window_token))
 	{
 		advancewindow();
 		if (local_sub == object)
-			gvo2_post_srchindx_triple = curtchain->exorder.bl;
+			gvo2_post_srchindx_triple = (TREF(curtchain))->exorder.bl;
 		if (global == object)
 		{	/* Prepare for OC_GVSAVTARG/OC_GVRECTARG processing in case second argument has global references.
 			 * If the first argument to $ORDER is a global variable and the second argument is a literal,
@@ -76,7 +74,7 @@ STATICFNDEF boolean_t set_opcode(triple *r, oprtype *result, oprtype *result_ptr
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);
 		}
-		if (!expr(result_ptr))
+		if (EXPR_FAIL == expr(result_ptr, MUMPS_EXPR))
 		{
 			if (global == object)
 				setcurtchain(oldchain);
@@ -100,7 +98,7 @@ STATICFNDEF boolean_t set_opcode(triple *r, oprtype *result, oprtype *result_ptr
 			if (global == object)
 			{	/* No need for OC_GVSAVTARG/OC_GVRECTARG processing as expr is a constant (no global references) */
 				setcurtchain(oldchain);
-				tmptriple = curtchain->exorder.bl;
+				tmptriple = (TREF(curtchain))->exorder.bl;
 				dqadd(tmptriple, &tmpchain, exorder);
 			}
 		} else
@@ -113,103 +111,99 @@ STATICFNDEF boolean_t set_opcode(triple *r, oprtype *result, oprtype *result_ptr
 				/* Note down the value of gv_currkey at this point */
 				newtriple(OC_GVSAVTARG);
 				/* Add second argument triples */
-				gvo2_savtarg1 = curtchain->exorder.bl;
-				tmptriple = curtchain->exorder.bl;
+				gvo2_savtarg1 = (TREF(curtchain))->exorder.bl;
+				tmptriple = (TREF(curtchain))->exorder.bl;
 				dqadd(tmptriple, &tmpchain, exorder);
 				/* Note down the value of gv_currkey at this point */
 				newtriple(OC_GVSAVTARG);
-				gvo2_savtarg2 = curtchain->exorder.bl;
+				gvo2_savtarg2 = (TREF(curtchain))->exorder.bl;
 			}
 		}
 	} else
 		direction = forward;
-
 	switch (object)
 	{
-		case global:
-			if (direction == undecided)
-				*second_opr = *result;
-			break;
-		case local_name:
-			if (direction == undecided)
-				*second_opr = *result;
-			else if (direction == forward)
-			{	/* The op_fnlvname rtn needs an extra parm - insert it now */
-				assert(OC_FNLVNAME == order_opc[object][direction]);
-				*second_opr = put_ilit(0);	/* Flag not to return aliases with no value */
+	case global:
+		if (direction == undecided)
+			*second_opr = *result;
+		break;
+	case local_name:
+		if (direction == undecided)
+			*second_opr = *result;
+		else if (direction == forward)
+		{	/* The op_fnlvname rtn needs an extra parm - insert it now */
+			assert(OC_FNLVNAME == order_opc[object][direction]);
+			*second_opr = put_ilit(0);	/* Flag not to return aliases with no value */
+		}
+		break;
+	case local_sub:
+		if (direction == undecided)
+		{	/* This is $ORDER(subscripted-local-variable, expr). The normal order of evaluation would be
+			 *
+			 * 1) Evaluate subscripts of local variable
+			 * 2) Do OC_SRCHINDX
+			 * 3) Evaluate expr
+			 * 4) Do OC_FNORDER
+			 *
+			 * But it is possible that the subscripted local-variable is defined only by an extrinsic function
+			 * that is part of "expr". In that case, we should NOT do the OC_SRCHINDX before "expr" gets
+			 * evaluated (as otherwise OC_SRCHINDX will not return the right lv_val structure). That is, the
+			 * order of evaluation should be
+			 *
+			 * 1) Evaluate subscripts of local variable
+			 * 2) Evaluate expr
+			 * 3) Do OC_SRCHINDX
+			 * 4) Do OC_FNORDER
+			 *
+			 * The triples need to be reordered accordingly to implement the above evaluation order.
+			 * This reordering of triples is implemented below by recording the end of the triple chain
+			 * just BEFORE (variable "gvo2_pre_srchindx_triple") and just AFTER (variable
+			 * "gvo2_post_srchindx_triple") parsing the subscripted-local-variable first argument to
+			 * $ORDER. This is done partly in the function "f_order" and partly in "set_opcode". Once these
+			 * are recorded, the second argument "expr" is parsed and the triples generated. After this, we
+			 * start from gvo2_post_srchindx_triple and go back the triple chain until we find the OC_SRCHINDX
+			 * opcode or gvo2_pre_srchindx_triple whichever is earlier (e.g. for unsubscripted names
+			 * OC_SRCHINDX triple is not generated). This portion of the triple chain (that does the
+			 * OC_SRCHINDX computation) is deleted and added at the end of the current triple chain. This
+			 * accomplishes the desired evaluation reordering. Note that the value of the naked indicator is
+			 * not affected by this reordering (since OC_SRCHINDX does not do global references).
+			 */
+			for (tmptriple = gvo2_post_srchindx_triple; (OC_SRCHINDX != tmptriple->opcode);
+			      tmptriple = tmptriple->exorder.bl)
+			{
+				if (tmptriple == gvo2_pre_srchindx_triple)
+					break;
 			}
-			break;
-
-		case local_sub:
-			if (direction == undecided)
-			{	/* This is $ORDER(subscripted-local-variable, expr). The normal order of evaluation would be
-				 *
-				 * 1) Evaluate subscripts of local variable
-				 * 2) Do OC_SRCHINDX
-				 * 3) Evaluate expr
-				 * 4) Do OC_FNORDER
-				 *
-				 * But it is possible that the subscripted local-variable is defined only by an extrinsic function
-				 * that is part of "expr". In that case, we should NOT do the OC_SRCHINDX before "expr" gets
-				 * evaluated (as otherwise OC_SRCHINDX will not return the right lv_val structure). That is, the
-				 * order of evaluation should be
-				 *
-				 * 1) Evaluate subscripts of local variable
-				 * 2) Evaluate expr
-				 * 3) Do OC_SRCHINDX
-				 * 4) Do OC_FNORDER
-				 *
-				 * The triples need to be reordered accordingly to implement the above evaluation order.
-				 * This reordering of triples is implemented below by recording the end of the triple chain
-				 * just BEFORE (variable "gvo2_pre_srchindx_triple") and just AFTER (variable
-				 * "gvo2_post_srchindx_triple") parsing the subscripted-local-variable first argument to
-				 * $ORDER. This is done partly in the function "f_order" and partly in "set_opcode". Once these
-				 * are recorded, the second argument "expr" is parsed and the triples generated. After this, we
-				 * start from gvo2_post_srchindx_triple and go back the triple chain until we find the OC_SRCHINDX
-				 * opcode or gvo2_pre_srchindx_triple whichever is earlier (e.g. for unsubscripted names
-				 * OC_SRCHINDX triple is not generated). This portion of the triple chain (that does the
-				 * OC_SRCHINDX computation) is deleted and added at the end of the current triple chain. This
-				 * accomplishes the desired evaluation reordering. Note that the value of the naked indicator is
-				 * not affected by this reordering (since OC_SRCHINDX does not do global references).
-				 */
-				for (tmptriple = gvo2_post_srchindx_triple; (OC_SRCHINDX != tmptriple->opcode);
-				     tmptriple = tmptriple->exorder.bl)
-				{
-					if (tmptriple == gvo2_pre_srchindx_triple)
-						break;
-				}
-				if (OC_SRCHINDX == tmptriple->opcode)
-				{
-					t1 = tmptriple->exorder.bl;
-					t2 = gvo2_post_srchindx_triple->exorder.fl;
-					dqdelchain(t1,t2,exorder);
-					dqinit(&tmpchain, exorder);
-					tmpchain.exorder.fl = tmptriple;
-					tmpchain.exorder.bl = gvo2_post_srchindx_triple;
-					gvo2_post_srchindx_triple->exorder.fl = &tmpchain;
-					tmptriple->exorder.bl = &tmpchain;
-					tmptriple = curtchain->exorder.bl;
-					dqadd(tmptriple, &tmpchain, exorder);
-				}
-				s = newtriple(OC_PARAMETER);
-				s->operand[0] = *second_opr;
-				s->operand[1] = *result;
-				*second_opr = put_tref(s);
+			if (OC_SRCHINDX == tmptriple->opcode)
+			{
+				t1 = tmptriple->exorder.bl;
+				t2 = gvo2_post_srchindx_triple->exorder.fl;
+				dqdelchain(t1,t2,exorder);
+				dqinit(&tmpchain, exorder);
+				tmpchain.exorder.fl = tmptriple;
+				tmpchain.exorder.bl = gvo2_post_srchindx_triple;
+				gvo2_post_srchindx_triple->exorder.fl = &tmpchain;
+				tmptriple->exorder.bl = &tmpchain;
+				tmptriple = (TREF(curtchain))->exorder.bl;
+				dqadd(tmptriple, &tmpchain, exorder);
 			}
-			break;
-
-		case indir:
-			if (direction == forward)
-				*second_opr = put_ilit((mint)indir_fnorder1);
+			s = newtriple(OC_PARAMETER);
+			s->operand[0] = *second_opr;
+			s->operand[1] = *result;
+			*second_opr = put_tref(s);
+		}
+		break;
+	case indir:
+		if (direction == forward)
+			*second_opr = put_ilit((mint)indir_fnorder1);
+		else
+			if (direction == backward)
+				*second_opr = put_ilit((mint)indir_fnzprevious);
 			else
-				if (direction == backward)
-					*second_opr = put_ilit((mint)indir_fnzprevious);
-				else
-					*second_opr = *result;
-			break;
-
-		default:
-			assert(FALSE);
+				*second_opr = *result;
+		break;
+	default:
+		assert(FALSE);
 	}
 	r->opcode = order_opc[object][direction];
 	return TRUE;
@@ -219,68 +213,67 @@ int f_order(oprtype *a, opctype op)
 {
 	enum order_obj	object;
 	oprtype		result, *result_ptr, *second_opr;
-	triple		tmpchain, *oldchain, *r, *triptr;
+	triple		*oldchain, *r, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	result_ptr = (oprtype *)mcalloc(SIZEOF(oprtype));
 	result = put_indr(result_ptr);
 	r = maketriple(OC_NOOP);	/* We'll fill in the opcode later, when we figure out what it is */
-	switch (window_token)
+	switch (TREF(window_token))
 	{
-		case TK_IDENT:
-			if (director_token == TK_LPAREN)
-			{	/* See comment in "set_opcode" for why we maintain "gvo2_pre_srchindx_triple" here */
-				gvo2_pre_srchindx_triple = curtchain->exorder.bl;
-				if (!lvn(&r->operand[0], OC_SRCHINDX, r))
-					return FALSE;
-				object = local_sub;
-			} else
-			{
-				r->operand[0] = put_str(window_ident.addr, window_ident.len);
-				advancewindow();
-				object = local_name;
-			}
-				second_opr = &r->operand[1];
-			break;
-		case TK_CIRCUMFLEX:
-			if (!gvn())
+	case TK_IDENT:
+		if (TK_LPAREN == TREF(director_token))
+		{	/* See comment in "set_opcode" for why we maintain "gvo2_pre_srchindx_triple" here */
+			gvo2_pre_srchindx_triple = (TREF(curtchain))->exorder.bl;
+			if (!lvn(&r->operand[0], OC_SRCHINDX, r))
 				return FALSE;
-			object = global;
-			second_opr = &r->operand[0];
-			break;
-		case TK_ATSIGN:
-			if (TREF(shift_side_effects))
-			{
-				dqinit(&tmpchain, exorder);
-				oldchain = setcurtchain(&tmpchain);
-				if (!indirection(&r->operand[0]))
-				{
-					setcurtchain(oldchain);
-					return FALSE;
-				}
-
-				if (!set_opcode(r, &result, result_ptr, &r->operand[1], indir))
-					return FALSE;
-				ins_triple(r);
-
-				newtriple(OC_GVSAVTARG);
-				setcurtchain(oldchain);
-				dqadd(TREF(expr_start), &tmpchain, exorder);
-				TREF(expr_start) = tmpchain.exorder.bl;
-				triptr = newtriple(OC_GVRECTARG);
-				triptr->operand[0] = put_tref(TREF(expr_start));
-				*a = put_tref(r);
-				return TRUE;
-			}
-			if (!indirection(&r->operand[0]))
-				return FALSE;
-			object = indir;
+			object = local_sub;
+		} else
+		{
+			r->operand[0] = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
+			advancewindow();
+			object = local_name;
+		}
 			second_opr = &r->operand[1];
-			break;
-		default:
-			stx_error(ERR_VAREXPECTED);
+		break;
+	case TK_CIRCUMFLEX:
+		if (!gvn())
 			return FALSE;
+		object = global;
+		second_opr = &r->operand[0];
+		break;
+	case TK_ATSIGN:
+		TREF(saw_side_effect) = TREF(shift_side_effects);
+		if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
+		{
+			dqinit(&tmpchain, exorder);
+			oldchain = setcurtchain(&tmpchain);
+			if (!indirection(&r->operand[0]))
+			{
+				setcurtchain(oldchain);
+				return FALSE;
+			}
+			if (!set_opcode(r, &result, result_ptr, &r->operand[1], indir))
+				return FALSE;
+			ins_triple(r);
+			newtriple(OC_GVSAVTARG);
+			setcurtchain(oldchain);
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
+			triptr = newtriple(OC_GVRECTARG);
+			triptr->operand[0] = put_tref(TREF(expr_start));
+			*a = put_tref(r);
+			return TRUE;
+		}
+		if (!indirection(&r->operand[0]))
+			return FALSE;
+		object = indir;
+		second_opr = &r->operand[1];
+		break;
+	default:
+		stx_error(ERR_VAREXPECTED);
+		return FALSE;
 	}
 	if (set_opcode(r, &result, result_ptr, second_opr, object))
 	{	/* Restore gv_currkey of the first argument (in case the second expression contained a global reference).

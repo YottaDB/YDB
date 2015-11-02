@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2011 Fidelity Information Services, Inc	!
+!	Copyright 2001, 2012 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -435,9 +435,9 @@ GVZPREVFAIL	<Global variable $ZPREVIOUS function failed.  Failure code: !AD.>/er
 MULTFORMPARM	<This formal parameter is multiply defined>/error/fao=0!/ansi=21
 QUITARGUSE	<Quit cannot take an argument in this context>/error/fao=0!/ansi=16
 NAMEEXPECTED	<A local variable name is expected in this context>/error/fao=0!/ansi=0
-ACTLSTEXP	<Actuallist expected>/error/fao=0!/ansi=11
+UNUSEDMSG438	<ACTLSTEXP: Last used in V5.4-002B>/error/fao=0!/ansi=11
 NOTEXTRINSIC	<Quit does not return to an extrinsic function: argument not allowed>/error/fao=0!/ansi=16
-FMLLSTPRESENT	<The actual list is absent from a call to a label with a formal list: !AD>/error/fao=2!/ansi=11
+UNUSEDMSG440	<FMLLSTPRESENT: Last used in V5.4-002B>/error/fao=0!/ansi=11
 FMLLSTMISSING	<The formal list is absent from a label called with an actual list: !AD>/error/fao=2!/ansi=20
 ACTLSTTOOLONG	<More actual parameters than formal parameters: !AD>/error/fao=2!/ansi=58
 ACTOFFSET	<Actuallist not allowed with offset>/error/fao=0!/ansi=0
@@ -445,7 +445,7 @@ MAXACTARG	<Maximum number of actual arguments exceeded>/error/fao=0!/ansi=0
 GTMDUMPFAIL	<Could not create DUMP FILE>/error/fao=0!/ansi=0
 JNLTMQUAL2	<Time qualifier LOOKBACK_TIME="!AZ" is later than SINCE_TIME="!AZ">/error/fao=2!/ansi=0
 GDINVALID	<Unrecognized Global Directory file format: !AD, expected label: !AD, found: !AD>/error/fao=6!/ansi=0
-ASSERT		<Assert failed in !AD line !UL for expression (!AD) >/fatal/fao=5!/ansi=0
+ASSERT		<Assert failed in !AD line !UL for expression (!AD)>/fatal/fao=5!/ansi=0
 MUFILRNDWNSUC	<File !AD successfully rundown>/info/fao=2!/ansi=0
 LOADEDSZ	<Load error: END too small.  No records loaded.>/error/fao=0!/ansi=0
 QUITARGLST	<Quit cannot take a list of arguments>/error/fao=0!/ansi=16
@@ -757,7 +757,7 @@ INVCTLMNE	<Invalid control mnemonics>/error/fao=0!/ansi=0
 SOCKLISTEN	<Error listening on a socket>/error/fao=0!/ansi=0
 LQLENGTHNA	<Listening queue length !UL not appropriate.  Must be between 1 and 5.>/error/fao=1!/ansi=0
 ADDRTOOLONG	<Socket address !AD of length !UL is longer than the maximum permissible length !UL>/error/fao=4!/ansi=0
-UNUSEDMSG760	<Listen and connect are not compatible>/error/fao=0!/ansi=76
+UNUSEDMSG760	<LSNCONNOTCMP Last used in V5.4-002A>/error/fao=0!/ansi=76
 CPBEYALLOC	<Attempt to copy beyond the allocated buffer>/error/fao=0!/ansi=0
 DBRDONLY	<Database file !AD read only>/error/fao=2!/ansi=0
 DUPTN		<Duplicate transaction found [TN = 0x!16@XQ] at offset 0x!XL in journal file !AD>/warning/fao=4!/ansi=0
@@ -783,7 +783,7 @@ JNLPOOLSETUP	<Journal Pool setup error>/error/fao=0!/ansi=0
 JNLSTATEOFF	<ROLLBACK or RECOVER BACKWARD cannot proceed as database file !AD does not have journaling ENABLED and ON>/error/fao=2!/ansi=0
 RECVPOOLSETUP	<Receive Pool setup error>/error/fao=0!/ansi=0
 REPLCOMM	<Replication subsystem communication failure>/error/fao=0!/ansi=0
-NOREPLCTDREG	<Replication subsystem found no region replicated for global directory !AZ>/warning/fao=1!/ansi=0
+NOREPLCTDREG	<Replication subsystem found no region replicated for !AD !AZ>/warning/fao=3!/ansi=0
 REPLINFO	<!AD>/info/fao=2!/ansi=0
 REPLWARN	<!AD>/warning/fao=2!/ansi=0
 REPLERR		<!AD>/error/fao=2!/ansi=0
@@ -966,7 +966,7 @@ DBTNRESETINC	<WARNING: tn_reset for database is incomplete due to integrity erro
 DBTNLTCTN	<Transaction numbers greater than the current transaction were found>/error/fao=0!/ansi=0
 DBTNRESET	<Cannot reset transaction number for this region>/error/fao=0!/ansi=0
 MUTEXRSRCCLNUP	<Mutex subsystem leftover resource !AD removed>/info/fao=2!/ansi=0
-SEMWT2LONG	<Waited too long for the access control lock for region !AD, lock held by pid, !UL>/error/fao=3!/ansi=0
+SEMWT2LONG	<Process !UL waited !UL second(s) for the !AD lock for region !AD, lock held by pid !UL>/error/fao=7!/ansi=0
 REPLINSTOPEN	<Error opening replication instance file !AD>/error/fao=2!/ansi=0
 REPLINSTCLOSE	<Error closing replication instance file !AD>/error/fao=2!/ansi=0
 JNLNOTFOUND	<File !AD does not exist -- possibly moved or deleted> /info /fao=2!/ansi=0
@@ -1108,11 +1108,11 @@ JNLSTRESTFL	<Failed to restore journaling state for database !AD>/error/fao=2!/a
 JNLALIGNSZCHG	<Journal ALIGNSIZE is rounded up to !UL blocks (closest next higher power of two)>/info/fao=1!/ansi=0
 MAXTRACELEVEL	<The maximum traceable level of !UL has been exceeded. The frame information will not be maintained.>/info/fao=1!/ansi=0
 GVFAILCORE	<A core file is being created for later analysis if necessary>/error/fao=0!/ansi=0
-DBCDBNOCERTIFY	<Database !AD HAS NOT been certified due to the preceeding errors - rerun DBCERTIFY SCAN>/error/fao=2!/ansi=0
+DBCDBNOCERTIFY	<Database !AD HAS NOT been certified due to the preceding errors - rerun DBCERTIFY SCAN>/error/fao=2!/ansi=0
 DBFRZRESETSUC	<Freeze released successfully on database file !AD>/info/fao=2!/ansi=0
 JNLFILEXTERR	<Error during extension of journal file !AD>/error/fao=2!/ansi=0
 JOBEXAMDONE	<GT.M process !UL completed job examine to !AD>/info/fao=3!/ansi=0
-JOBEXAMFAIL	<GT.M process !UL executing $ZJOBEXAM function failed with the preceeding error message>/error/fao=1!/ansi=0
+JOBEXAMFAIL	<GT.M process !UL executing $ZJOBEXAM function failed with the preceding error message>/error/fao=1!/ansi=0
 JOBINTRRQST	<Job interrupt requested>/error/fao=0!/ansi=0
 ERRWZINTR	<Error while processing $ZINTERRUPT>/error/fao=0!/ansi=0
 CLIERR		<!AD>/error/fao=2!/ansi=0
@@ -1192,7 +1192,7 @@ PRIMARYNOTROOT	<Attempted operation not valid on non-root primary instance !AD>/
 DBFRZRESETFL	<Freeze release failed on database file !AD>/error/fao=2!/ansi=0
 JNLCYCLE	<Journal file !AD causes cycle in the journal file generations of database file !AD>/error/fao=4!/ansi=0
 JNLPREVRECOV	<Journal file has nonzero value in prev_recov_end_of_data field>/error/fao=0!/ansi=0
-RESOLVESEQNO	<Resolving until sequence number 0x!16@XQ>/info/fao=1!/ansi=0
+RESOLVESEQNO	<Resolving until sequence number !@ZQ [0x!16@XQ]>/info/fao=2!/ansi=0
 BOVTNGTEOVTN	<Journal file !AD has beginning transaction [0x!16@XQ] which is greater than end transaction [0x!16@XQ]>/error/fao=4!/ansi=0
 BOVTMGTEOVTM	<Journal file !AD has beginning timestamp [0x!16@XQ] greater than end timestamp [0x!16@XQ]>/error/fao=4!/ansi=0
 BEGSEQGTENDSEQ	<Journal file !AD has beginning sequence number [0x!16@XQ] greater than end sequence number [0x!16@XQ]>/error/fao=4!/ansi=0
@@ -1238,7 +1238,7 @@ BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0
 VMSMEMORY2	<Central storage exhausted during allocation of dynamic file descriptor with !UL bytes - check page file quota and page file size>/error/fao=1!/ansi=0
 LOADBGSZ2	<Load error: BEGIN too large.  No records loaded.>/error/fao=0!/ansi=0
 LOADEDSZ2	<Load error: END too large.  No records loaded.>/error/fao=0!/ansi=0
-REPLINSTMISMTCH	<Process has journal pool for !AD open but database !AD corresponds to !AD>/error/fao=6!/ansi=0
+REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
 REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD>/error/fao=4!/ansi=0
 REPLINSTDBMATCH	<Replication instance file !AD has seqno [0x!16@XQ] while database has a different seqno [0x!16@XQ]>/error/fao=4!/ansi=0
 REPLINSTNMSAME	<Primary and Secondary instances have the same replication instance name !AD>/error/fao=2!/ansi=0
@@ -1251,9 +1251,9 @@ REPLINSTSECNONE	<No information found for secondary instance !AD in instance fil
 REPLINSTSECUNDF	<Secondary replication instance name not defined>/error/fao=0!/ansi=0
 REPLINSTSEQORD	<!AD has seqno [0x!16@XQ] which is less than last record seqno [0x!16@XQ] in replication instance file !AD>/error/fao=6!/ansi=0
 REPLINSTSTNDALN	<Could not get exclusive access to replication instance file !AD>/error/fao=2!/ansi=0
-REPLREQROLLBACK	<Replication instance file !AD indicates abnormal shutdown.  Run MUPIP JOURNAL ROLLBACK first>/error/fao=2!/ansi=0
-REPLUPGRADEPRI	<Attempted operation requires primary instance !AD to support multi-site replication>/error/fao=2!/ansi=0
-REPLUPGRADESEC	<Attempted operation requires secondary instance !AD to support multi-site replication>/error/fao=2!/ansi=0
+REPLREQROLLBACK	<Replication instance file !AD indicates abnormal shutdown or an incomplete ROLLBACK. Run MUPIP JOURNAL ROLLBACK first>/error/fao=2!/ansi=0
+UNUSEDMSG1255	<REPLUPGRADEPRI : Last used in V5.4-002B>/error/fao=0!/ansi=0
+UNUSEDMSG1256	<REPLUPGRADESEC : Last used in V5.4-002B>/error/fao=0!/ansi=0
 SRCSRVEXISTS	<Source server for secondary instance !AD is already running with pid !UL>/error/fao=3!/ansi=0
 SRCSRVNOTEXIST	<Source server for secondary instance !AD is not alive>/error/fao=2!/ansi=0
 SRCSRVTOOMANY	<Cannot start more than !UL source servers in replication instance !AD>/error/fao=3!/ansi=0
@@ -1322,7 +1322,7 @@ ICUVERLT36	<!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used
 ICUSYMNOTFOUND	<Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified>/error/fao=2!/ansi=0
 STUCKACT	<Process stuck script invoked: !AD : !AD>/info/fao=4!/ansi=0
 CALLINAFTERXIT	<After a gtm_exit, a process can never create a valid GT.M context>/error/fao=0!/ansi=0
-LOCKSPACEFULL	<No room for LOCK. Use MUPIP SET to increase lock space for region !AD>/error/fao=2!/ansi=0
+LOCKSPACEFULL	<No more room for LOCK slots on database file !AD>/error/fao=2!/ansi=0
 IOERROR		<Error occured while doing !AD in !AD operation -- called from module !AD at line !UL>/error/fao=7!/ansi=0
 MAXSSREACHED	<Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.>/error/fao=3!/ansi=0
 SNAPSHOTNOV4	<Cannot downgrade (to V4) while snapshots are in progress. Currently !UL snapshots are in progress for region !AD.>/error/fao=3!/ansi=0
@@ -1384,9 +1384,81 @@ ZCCLNUPRTNMISNG	<External call: Cleanup routine name missing. Cannot continue>/e
 ZCINVALIDKEYWORD	<External call: Invalid keyword found. Cannot continue>/error/fao=0!/ansi=0
 REPLNOMULTILINETRG	<Sequence number 0x!16@XQ contains a trigger definition too large for transmission to the current replicating instance, which does not support multi-line triggers - stopping replication>/error/fao=1!/ansi=0
 DBSHMNAMEDIFF	<Database file !AD points to shared memory (id = !UL) which points to a different database file !AZ>/error/fao=4!/ansi=0
-SHMREMOVED	<Shared Memory id !UL removed from the system>/info/fao=1!/ansi=0
+SHMREMOVED	<Removed Shared Memory id !UL corresponding to file !AD>/info/fao=3!/ansi=0
 DEVICEWRITEONLY	<Cannot read from a write-only device>/error/fao=0!/ansi=0
 ICUERROR	<ICU returned status !UL which is either unrecognized or inconsistent with the operating context>/error/fao=1!/ansi=0
+ZDATEBADDATE	<$ZDATE() date argument !AD is less than -365 (the $HOROLOG value for 01-JAN-1840) or greater than 364570088 (the $HOROLOG value for 31-DEC-999999)>/error/fao=2!/ansi=0
+ZDATEBADTIME	<$ZDATE() time argument !AD is less than 0 or greater than 86399 (the $HOROLOG value for a second before midnight)>/error/fao=2!/ansi=0
+COREINPROGRESS	<Previous core attempt failed; core generation bypassed>/error/fao=0!/ansi=0
+MAXSEMGETRETRY	<Failed to get ftok semaphore after !UL tries because it is being continually deleted>/error/fao=1!/ansi=0
+JNLNOREPL	<Replication not enabled for journal file !AD (database file !AD)>/error/fao=4!/ansi=0
+JNLRECINCMPL	<Incomplete journal record at disk address 0x!XL for file !AD while attempting to read seqno 0x!16@XQ>/error/fao=4!/ansi=0
+JNLALLOCGROW	<Increased Journal ALLOCATION from [!UL blocks] to [!UL blocks] to match AUTOSWITCHLIMIT for !AZ !AD>/info/fao=5!/ansi=0
+INVTRCGRP	<Invalid trace group specified in $gtm_trace_groups: !AD>/error/fao=2!/ansi=0
+MUINFOUINT6	<!AD : !UL [0x!XL] ; $H=!UL,!UL>/info/fao=6!/ansi=0
+NOLOCKMATCH	<No matching locks were found in !AD>/info/fao=2!/ansi=0
+BADREGION	<Region is not BG, MM, or CM>/error/fao=0!/ansi=0
+LOCKSPACEUSE	<Estimated free lock space: !UL% of !UL pages>/info/fao=2!/ansi=0
+JIUNHNDINT	<An error during $ZINTERRUPT processing was not handled: !AD>/error/fao=2!/ansi=0
+GTMASSERT2	<!AD - Assert failed !AD line !UL for expression (!AD)>/fatal/fao=7!/ansi=0
+ZTRIGNOTRW	<ZTRIGGER cannot operate on read-only region !AD>/error/fao=2!/ansi=0
+TRIGMODREGNOTRW	<Trigger(s) cannot be added/changed/deleted because region !AD is read-only>/error/fao=2!/ansi=0
+INSNOTJOINED	<Replicating Instance !AD is not a member of the same Group as Instance !AD>/error/fao=4!/ansi=0
+INSROLECHANGE	<Supplementary Instance !AD and non-Supplementary Instance !AD belong to the same Group>/error/fao=4!/ansi=0
+INSUNKNOWN	<Supplementary Instance !AD has no instance definition for non-Supplementary Instance !AD>/error/fao=4!/ansi=0
+NORESYNCSUPPLONLY	<NORESYNC only supported for Supplementary Instances>/error/fao=0!/ansi=0
+NORESYNCUPDATERONLY	<NORESYNC qualifier only allowed on a Supplementary Instance which allows local updates>/error/fao=0!/ansi=0
+NOSUPPLSUPPL	<Instance !AD is configured to perform local updates so it cannot receive from Supplementary Instance !AD>/error/fao=4!/ansi=0
+REPL2OLD	<Instance !AD uses a GT.M version that does not support connection with the current version on instance !AD>/error/fao=4!/ansi=0
+RCVR2MANY	<The instance already has the maximum supportable number of receiver servers [!UL] active>/error/fao=1!/ansi=0
+RLBKCONFIGBNDRY	<Rollback encountered journal records indicating current source !AD replaced old source !AD; cannot rollback past sequence number 0x!16@XQ>/error/fao=5!/ansi=0
+SECNOTSUPPLEMENTARY	<!AD is a Supplementary Instance and so cannot act as a source to non-Supplementary Instance !AD >/error/fao=4!/ansi=0
+SUPRCVRNEEDSSUPSRC	<Instance !AD is not configured to perform local updates so it cannot act as a receiver for non-Supplementary Instance !AD>/error/fao=4!/ansi=0
+SYNCTOSAMETYPE	<Source instance !AD and receiver instance !AD must either be both supplementary or both non-supplementary for them to synchronize their state>/error/fao=4!/ansi=0
+TARGINSRUNNING	<Cannot change the instance definition of instance !AD while it is running>/error/fao=2!/ansi=0
+UPDSYNC2MTINS	<Can only UPDATERESYNC with an empty instance file>/error/fao=0!/ansi=0
+UPDSYNCINSTFILE	<Error with instance file name specified in UPDATERESYNC qualifier>/error/fao=0!/ansi=0
+REUSEINSTNAME	<Error with instance name specified in REUSE qualifier>/error/fao=0!/ansi=0
+RCVRMANYSTRMS	<Receiver server now connecting to source stream [!2UL] but had previously connected to a different stream [!2UL]>/error/fao=2!/ansi=0
+RSYNCSTRMVAL	<RSYNC_STRM qualifier can only take on a value from 0 to 15>/error/fao=0!/ansi=0
+RLBKSTRMSEQ	<Stream journal seqno of the instance after rollback is Stream !2UL : Seqno !@ZQ [0x!16@XQ]>/info/fao=3!/ansi=0
+RESOLVESEQSTRM	<Resolving until stream sequence number Stream !2UL : Seqno !@ZQ [0x!16@XQ]>/info/fao=3!/ansi=0
+REPLINSTDBSTRM	<Replication instance file !AD has seqno [0x!16@XQ] for Stream !2UL while database has a different seqno [0x!16@XQ]>/error/fao=5!/ansi=0
+RESUMESTRMNUM	<Error with stream number specified in RESUME qualifier>/error/fao=0!/ansi=0
+ORLBKSTART	<ONLINE ROLLBACK started on instance !AD corresponding to !AD>/info/fao=4!/ansi=0
+ORLBKTERMNTD	<ONLINE ROLLBACK terminated on instance !AD corresponding to !AD with the above errors>/error/fao=4!/ansi=0
+ORLBKCMPLT	<ONLINE ROLLBACK completed successfully on instance !AD corresponding to !AD>/info/fao=4!/ansi=0
+ORLBKNOSTP	<ONLINE ROLLBACK proceeding with database updates. MUPIP STOP will no longer be allowed>/info/fao=0!/ansi=0
+ORLBKFRZPROG	<!AD : waiting for FREEZE on region !AD (!AD) to clear>/info/fao=6!/ansi=0
+ORLBKFRZOVER	<!AD : FREEZE on region !AD (!AD) cleared>/info/fao=6!/ansi=0
+ORLBKNOV4BLK	<Region !AD (!AD) has V4 format blocks. Database upgrade required. ONLINE ROLLBACK cannot continue>/error/fao=4!/ansi=0
+DBROLLEDBACK	<Concurrent ONLINE ROLLBACK detected on one or more regions. The current operation is no longer valid>/error/fao=0!/ansi=0
+DSEWCREINIT	<Database cache reinitialized by DSE for region !AD>/info/fao=2!/ansi=0
+RNDWNSKIPCNT	<A total of !UL process(es) skipped database rundown due to a concurrent ONLINE ROLLBACK>/info/fao=1!/ansi=0
+! The following error message is NOT issued to the user and is only internal to GT.M
+REPLONLNRLBK	<ONLINE ROLLBACK detected. Starting afresh>/error/fao=0!/ansi=0
+!
+SRVLCKWT2LNG	<PID !UL is holding the source server lock. Waited for !UL minute(s). Now exiting>/error/fao=2!/ansi=0
+IGNBMPMRKFREE	<Ignoring bitmap free-up operation for region !AD (!AD) due to concurrent ONLINE ROLLBACK>/info/fao=4!/ansi=0
+PERMGENFAIL	<Failed to determine access permissions to use for creation of !AD for file !AD>/error/fao=4!/ansi=0
+PERMGENDIAG	<Permissions: Proc(uid:!UL,gid:!UL), DB File(uid:!UL,gid:!UL,perm:!AD), Lib File(gid:!UL,perm:!AD), Group Mem(opener:!UL,owner:!UL)>/info/fao=11!/ansi=0
+MUTRUNC1ATIME	<Process with PID !UL already performing truncate in region !AD>/info/fao=3!/ansi=0
+MUTRUNCBACKINPROG	<Truncate detected concurrent backup in progress for region !AD>/info/fao=2!/ansi=0
+MUTRUNCERROR	<Truncate of region !AD encountered service error !AD>/error/fao=4!/ansi=0
+MUTRUNCFAIL	<Truncate failed after reorg>/error/fao=0!/ansi=0
+MUTRUNCNOSPACE	<Region !AD has insufficient space to meet truncate target percentage of !UL>/info/fao=3!/ansi=0
+MUTRUNCNOTBG	<Region !AD does not have access method BG >/error/fao=2!/ansi=0
+MUTRUNCNOV4	<Region !AD is not fully upgraded from V4 format.>/error/fao=2!/ansi=0
+MUTRUNCPERCENT	<Truncate threshold percentage should be from 0 to 99>/error/fao=0!/ansi=0
+MUTRUNCSSINPROG	<Truncate detected concurrent snapshot in progress for region !AD>/info/fao=2!/ansi=0
+MUTRUNCSUCCESS	<Database file !AD truncated from 0x!XL blocks to 0x!XL at transaction 0x!16@XQ>/info/fao=5!/ansi=0
+RSYNCSTRMSUPPLONLY	<RSYNC_STRM qualifier only supported for Supplementary Instances>/error/fao=0!/ansi=0
+STRMNUMIS	<Stream # is !2UL>/info/fao=1!/ansi=0
+STRMNUMMISMTCH1	<Stream !2UL exists on the receiver instance file but is unknown on the source instance>/error/fao=1!/ansi=0
+STRMNUMMISMTCH2	<Stream !2UL exists on the source instance file but is unknown on the receiver instance>/error/fao=1!/ansi=0
+STRMSEQMISMTCH	<Unable to play update on Stream !2UL with seqno [0x!16@XQ] as receiving instance has a different stream seqno [0x!16@XQ]>/error/fao=3!/ansi=0
+LOCKSPACEINFO	<Region: !AD: processes on queue: !UL/!UL; LOCK slots in use: !UL/!UL; name space!ADfull>/info/fao=8!/ansi=0
+JRTNULLFAIL	<Applying NULL journal record failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

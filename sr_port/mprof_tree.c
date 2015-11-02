@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,13 +32,7 @@
 #define NOT_IN_PATH	1
 #define IS_INS_NODE	0
 
-static mident	*tmp_rout_name, *tmp_label_name;
-
-STATICFNDCL mprof_tree *rotate_2(mprof_tree **, int);
-STATICFNDCL mprof_tree *rotate_3(mprof_tree **, int, int);
-STATICFNDCL int mprof_tree_compare(mprof_tree *, trace_entry *);
-STATICFNDCL void mprof_tree_rebalance_path(mprof_tree *, trace_entry *);
-STATICFNDCL void mprof_tree_rebalance(mprof_tree **, trace_entry *);
+STATICDEF mident *tmp_rout_name, *tmp_label_name;
 
 /* Creates a new generic node in the MPROF tree based on the information passed in arg. */
 mprof_tree *new_node(trace_entry *arg)
@@ -46,27 +40,27 @@ mprof_tree *new_node(trace_entry *arg)
 	mprof_tree *tree;
 
 	/* First, we need to pcalloc new space for the label/routine if we have not
-	 * found an occurrence that is in the tree already */
+	 * found an occurrence that is in the tree already
+	 */
 	if (NULL == tmp_rout_name)
 		tmp_rout_name = arg->rout_name;
-	if (NULL != tmp_rout_name && tmp_rout_name == arg->rout_name)
+	if ((NULL != tmp_rout_name) && (tmp_rout_name == arg->rout_name))
 	{
 		arg->rout_name = (mident *)pcalloc(SIZEOF(mident));
 		arg->rout_name->len = tmp_rout_name->len;
 		arg->rout_name->addr = (char *)pcalloc((unsigned int)tmp_rout_name->len);
 		memcpy(arg->rout_name->addr, tmp_rout_name->addr, tmp_rout_name->len);
-
 	}
 	if (NULL == tmp_label_name)
 		tmp_label_name = arg->label_name;
-	if (NULL != tmp_label_name && tmp_label_name == arg->label_name)
+	if ((NULL != tmp_label_name) && (tmp_label_name == arg->label_name))
 	{
 		arg->label_name = (mident *)pcalloc(SIZEOF(mident));
 		arg->label_name->len = tmp_label_name->len;
 		arg->label_name->addr = (char *)pcalloc((unsigned int)tmp_label_name->len);
 		memcpy(arg->label_name->addr, tmp_label_name->addr, tmp_label_name->len);
 	}
-        tree = (mprof_tree *)pcalloc(SIZEOF(mprof_tree));
+	tree = (mprof_tree *)pcalloc(SIZEOF(mprof_tree));
 	tree->e.rout_name = arg->rout_name;
 	tree->e.label_name = arg->label_name;
 	tree->e.line_num = arg->line_num;
@@ -79,7 +73,8 @@ mprof_tree *new_node(trace_entry *arg)
 }
 
 /* Creates a FOR-specific node in the MPROF tree based on the information passed in arg and
- * return_address for this loop. */
+ * return_address for this loop.
+ */
 mprof_tree *new_for_node(trace_entry *arg, char *ret_addr)
 {
 	mprof_tree *node;
@@ -182,7 +177,8 @@ STATICFNDEF mprof_tree *rotate_3(mprof_tree **path_top, int index, int third)
 }
 
 /* Compares the contents of the specified node with the information stored in arg.
- * Returns 0 on a match, 1 if arg was evaluated as "greater" than node, and -1 otherwise. */
+ * Returns 0 on a match, 1 if arg was evaluated as "greater" than node, and -1 otherwise.
+ */
 STATICFNDEF int mprof_tree_compare(mprof_tree *node, trace_entry *arg)
 {
 	int diff;
@@ -226,12 +222,13 @@ STATICFNDEF void mprof_tree_rebalance_path(mprof_tree *path, trace_entry *arg)
 
 	/* Each node in path is currently balanced, so we will descend in the direction
 	 * of the newly inserted node, marking every node as unbalanced in that direction
-	 * along the way. */
+	 * along the way.
+	 */
 	while (path)
 	{
 		if (IS_INS_NODE == path->ins_path_hint)
 			break;
-		if (NULL == path->link[LEFT] || NOT_IN_PATH == path->link[LEFT]->ins_path_hint)
+		if ((NULL == path->link[LEFT]) || (NOT_IN_PATH == path->link[LEFT]->ins_path_hint))
 			dir = RIGHT;
 		else
 			dir = LEFT;
@@ -283,7 +280,8 @@ STATICFNDEF void mprof_tree_rebalance(mprof_tree **path_top, trace_entry *arg)
 }
 
 /* Attempts to find a node that matches arg's specification. If the node is not found, we
- * create one; in either case the pointer to the desired node is returned. */
+ * create one; in either case the pointer to the desired node is returned.
+ */
 mprof_tree  *mprof_tree_insert(mprof_tree **treep, trace_entry *arg)
 {
 	int 		diff, dir;
@@ -314,10 +312,12 @@ mprof_tree  *mprof_tree_insert(mprof_tree **treep, trace_entry *arg)
 		tree->ins_path_hint = IS_INS_NODE;
 		*treep = tree;
 		mprof_tree_rebalance(path_top, arg);
-	}
+	} else
+		mprof_reclaim_slots();
 	/* If the rout_name or label_name already exists in the tree, it would have been changed to point to the reused
 	 * name in the tree. Otherwise, if it doesn't already exist in the tree, new_node() would have created new copies
-	 * and would have changed anyway. */
+	 * and would have changed anyway.
+	 */
 	assert(tmp_rout_name != arg->rout_name);
 	assert(tmp_label_name != arg->label_name);
 	tmp_rout_name = tmp_label_name = NULL;

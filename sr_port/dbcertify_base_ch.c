@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,16 @@ GBLREF int4            		exi_condition;
 GBLREF int4            		error_condition;
 GBLREF enum gtmImageTypes	image_type;
 
+error_def(ERR_ASSERT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_MEMORY);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_VMSMEMORY);
+VMS_ONLY(error_def(ERR_DBCNOFINISH);)
+
 CONDITION_HANDLER(dbcertify_base_ch)
 {
 	VMS_ONLY(
@@ -48,14 +58,6 @@ CONDITION_HANDLER(dbcertify_base_ch)
 		unsigned char	msg_buff[MAX_MSG_SIZE + 1];
 		$DESCRIPTOR(msgbuf, msg_buff);
 	)
-	error_def(ERR_GTMCHECK);
-	error_def(ERR_ASSERT);
-	error_def(ERR_GTMASSERT);
-        error_def(ERR_MEMORY);
-        error_def(ERR_VMSMEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_OUTOFSPACE);
-	VMS_ONLY(error_def(ERR_DBCNOFINISH);)
 
 	START_CH;
 	PRN_ERROR;

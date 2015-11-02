@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,39 +15,38 @@
 #include "indir_enum.h"
 #include "toktyp.h"
 #include "mdq.h"
+#include "fullbool.h"
 
-GBLREF char window_token, director_token;
-GBLREF triple *curtchain;
+error_def(ERR_GVNEXTARG);
+error_def(ERR_LVORDERARG);
+error_def(ERR_VAREXPECTED);
 
-int f_next( oprtype *a, opctype op)
+int f_next(oprtype *a, opctype op)
 {
-	triple *oldchain, tmpchain, *ref, *r, *triptr;
-	error_def(ERR_VAREXPECTED);
-	error_def(ERR_LVORDERARG);
-	error_def(ERR_GVNEXTARG);
+	triple *oldchain, *ref, *r, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
-	switch (window_token)
+	switch (TREF(window_token))
 	{
 	case TK_IDENT:
-		if (director_token != TK_LPAREN)
+		if (TK_LPAREN != TREF(director_token))
 		{
 			stx_error(ERR_LVORDERARG);
 			return FALSE;
 		}
-		if (!lvn(&(r->operand[0]),OC_SRCHINDX,r))
+		if (!lvn(&(r->operand[0]), OC_SRCHINDX,r))
 			return FALSE;
 		ins_triple(r);
 		break;
 	case TK_CIRCUMFLEX:
-		ref = TREF(shift_side_effects) ? TREF(expr_start) : curtchain->exorder.bl;
+		ref = TREF(shift_side_effects) ? TREF(expr_start) : (TREF(curtchain))->exorder.bl;
 		if (!gvn())
 			return FALSE;
 		/* the following assumes OC_LIT and OC_GVNAME are all one
 		 * gets for an unsubscripted global variable reference */
-		if ((TREF(shift_side_effects) ? TREF(expr_start) : curtchain)->exorder.bl->exorder.bl->exorder.bl == ref)
+		if ((TREF(shift_side_effects) ? TREF(expr_start) : TREF(curtchain))->exorder.bl->exorder.bl->exorder.bl == ref)
 		{
 			stx_error(ERR_GVNEXTARG);
 			return FALSE;
@@ -56,7 +55,8 @@ int f_next( oprtype *a, opctype op)
 		ins_triple(r);
 		break;
 	case TK_ATSIGN:
-		if (TREF(shift_side_effects))
+		TREF(saw_side_effect) = TREF(shift_side_effects);
+		if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);

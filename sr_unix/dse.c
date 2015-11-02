@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,6 +66,8 @@
 #include "gtm_imagetype_init.h"
 #include "gtm_threadgbl_init.h"
 #include "wbox_test_init.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -96,6 +98,8 @@ GBLDEF CLI_ENTRY		*cmd_ary = &dse_cmd_ary[0];	/* Define cmd_ary to be the DSE sp
 static bool		dse_process(int argc);
 static void 		display_prompt(void);
 static readonly char	prompt[]="DSE> ";
+
+error_def(ERR_CTRLC);
 
 int main(int argc, char *argv[])
 {
@@ -160,13 +164,12 @@ int main(int argc, char *argv[])
 static void display_prompt(void)
 {
 	PRINTF("DSE> ");
-	fflush(stdout);
+	FFLUSH(stdout);
 }
 
 static bool	dse_process(int argc)
 {
 	int	res;
-	error_def(ERR_CTRLC);
 
 	ESTABLISH_RET(util_ch, TRUE);
 	func = 0;

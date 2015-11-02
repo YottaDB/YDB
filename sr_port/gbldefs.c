@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -151,43 +151,45 @@ GBLDEF	bool		out_of_time;
 GBLDEF	io_pair		io_curr_device;		/* current device	*/
 GBLDEF	io_pair		io_std_device;		/* standard device	*/
 GBLDEF	io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if defined */
-GBLDEF	bool		prin_in_dev_failure = FALSE;
-GBLDEF	bool		prin_out_dev_failure = FALSE;
+GBLDEF	bool		prin_in_dev_failure;
+GBLDEF	bool		prin_out_dev_failure;
 GBLDEF	io_desc		*active_device;
 
-GBLDEF	bool		error_mupip = FALSE,
-			file_backed_up = FALSE,
-			gv_replopen_error = FALSE,
-			gv_replication_error = FALSE,
-			incremental = FALSE,
-			jobpid = FALSE,
-			online = FALSE,
-			record = FALSE,
-			std_dev_outbnd = FALSE,
-			in_mupip_freeze = FALSE,
-	                in_backup = FALSE,
-	                view_debug1 = FALSE,
-	                view_debug2 = FALSE,
-	                view_debug3 = FALSE,
-	                view_debug4 = FALSE,
+GBLDEF	bool		error_mupip,
+			file_backed_up,
+			gv_replopen_error,
+			gv_replication_error,
+			incremental,
+			jobpid,
+			online,
+			record,
+			std_dev_outbnd,
+			in_mupip_freeze,
+	                in_backup,
+	                view_debug1,
+	                view_debug2,
+	                view_debug3,
+	                view_debug4,
 			mupip_error_occurred,
 	                dec_nofac;
 
-GBLDEF	boolean_t	is_updproc = FALSE,
-			is_updhelper = FALSE,
-			mupip_jnl_recover = FALSE,
-			repl_allowed = FALSE,
-			suspend_lvgcol = FALSE,
-			run_time = FALSE,
-			unhandled_stale_timer_pop = FALSE,
-			gtcm_connection = FALSE,
-			is_replicator = FALSE,	/* TRUE => this process can write jnl records to the jnlpool for replicated db */
-	                tp_in_use = FALSE,	/* TRUE => TP has been used by this process and is thus initialized */
+GBLDEF	boolean_t	is_updproc,
+			is_updhelper,
+			mupip_jnl_recover,
+			suspend_lvgcol,
+			run_time,
+			unhandled_stale_timer_pop,
+			gtcm_connection,
+			is_replicator,		/* TRUE => this process can write jnl records to the jnlpool for replicated db */
+	                tp_in_use,		/* TRUE => TP has been used by this process and is thus initialized */
 			dollar_truth = TRUE,
-			have_standalone_access = FALSE,
-			gtm_stdxkill = FALSE;	/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
-
-GBLDEF	VSIG_ATOMIC_T	forced_exit = FALSE;	/* Asynchronous signal/interrupt handler sets this variable to TRUE,
+			gtm_stdxkill,		/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
+			in_timed_tn,		/* TRUE => Timed TP transaction in progress */
+			tp_timeout_deferred;	/* TRUE => A TP timeout has occurred but is deferred */
+GBLDEF	volatile boolean_t tp_timeout_set_xfer;	/* TRUE => A timeout succeeded in setting xfer table intercepts. This flag stays
+						 * a true global unless each thread gets its own xfer table.
+						 */
+GBLDEF	VSIG_ATOMIC_T	forced_exit;		/* Asynchronous signal/interrupt handler sets this variable to TRUE,
 						 * hence the VSIG_ATOMIC_T type in the definition.
 						 */
 GBLDEF	intrpt_state_t	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;	/* any other value implies it is not ok to interrupt */
@@ -205,9 +207,9 @@ GBLDEF	int4		backup_close_errno,
 			forced_exit_err,
 			exit_state,
 			restore_read_errno;
-GBLDEF	volatile int4	outofband, crit_count = 0;
+GBLDEF	volatile int4	outofband, crit_count;
 GBLDEF	int		mumps_status = SS_NORMAL,
-			stp_array_size = 0;
+			stp_array_size;
 GBLDEF	gvzwrite_datablk	*gvzwrite_block;
 GBLDEF	lvzwrite_datablk	*lvzwrite_block;
 GBLDEF	io_log_name	*io_root_log_name;
@@ -263,21 +265,18 @@ GBLDEF	caddr_t		smCallerId;			/* Caller of top level malloc/free */
 GBLDEF	int		process_exiting;
 GBLDEF	int4		dollar_zsystem;
 GBLDEF	int4		dollar_zeditor;
-GBLDEF	boolean_t	sem_incremented = FALSE;
-GBLDEF	boolean_t	new_dbinit_ipc = FALSE;
-GBLDEF	mval		**ind_result_array, **ind_result_sp, **ind_result_top;
-GBLDEF	mval		**ind_source_array, **ind_source_sp, **ind_source_top;
+GBLDEF	boolean_t	sem_incremented;
 GBLDEF	rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
 GBLDEF	int4		break_message_mask;
-GBLDEF	bool		rc_locked = FALSE;
-GBLDEF	boolean_t	certify_all_blocks = FALSE;	/* If flag is set all blocks are checked after they are
+GBLDEF	bool		rc_locked;
+GBLDEF	boolean_t	certify_all_blocks;		/* If flag is set all blocks are checked after they are
 							 * written to the database.  Upon error we stay critical
 							 * and report.  This flag can be set via the MUMPS command
 							 * VIEW "GDSCERT":1. */
 GBLDEF	mval		curr_gbl_root;
 GBLDEF	gd_addr		*original_header;
-GBLDEF	hash_table_str	*complits_hashtab = NULL;
-GBLDEF	hash_table_str	*compsyms_hashtab = NULL;
+GBLDEF	hash_table_str	*complits_hashtab;
+GBLDEF	hash_table_str	*compsyms_hashtab;
 GBLDEF	mem_list	*mem_list_head;
 GBLDEF	boolean_t	debug_mupip;
 GBLDEF	unsigned char	t_fail_hist[CDB_MAX_TRIES];	/* type has to be unsigned char and not enum cdb_sc to ensure single byte */
@@ -285,7 +284,7 @@ GBLDEF	cache_rec_ptr_t	cr_array[((MAX_BT_DEPTH * 2) - 1) * 2];	/* Maximum number
 GBLDEF	unsigned int	cr_array_index;
 GBLDEF	boolean_t	need_core;		/* Core file should be created */
 GBLDEF	boolean_t	created_core;		/* core file was created */
-GBLDEF	boolean_t	core_in_progress;	/* creating core NOW */
+GBLDEF	unsigned int	core_in_progress;	/* creating core NOW if > 0 */
 GBLDEF	boolean_t	dont_want_core;		/* Higher level flag overrides need_core set by lower level rtns */
 GBLDEF	boolean_t	exit_handler_active;	/* recursion prevention */
 GBLDEF	boolean_t	block_saved;
@@ -293,15 +292,7 @@ GBLDEF	boolean_t	block_saved;
 GBLDEF	iconv_t		dse_over_cvtcd = (iconv_t)0;
 #endif
 GBLDEF	gtm_chset_t	dse_over_chset = CHSET_M;
-GBLDEF	char		window_token;
-GBLDEF	mval		window_mval;
-GBLDEF	char		director_token;
-GBLDEF	mval		director_mval;
 LITDEF	MIDENT_DEF(zero_ident, 0, NULL);		/* the null mident */
-static char 		ident_buff1[SIZEOF(mident_fixed)];
-static char 		ident_buff2[SIZEOF(mident_fixed)];
-GBLDEF	MIDENT_DEF(window_ident, 0, &ident_buff1[0]);	/* the current identifier */
-GBLDEF	MIDENT_DEF(director_ident, 0, &ident_buff2[0]);	/* the look-ahead identifier */
 GBLDEF	char		*lexical_ptr;
 GBLDEF	int4		aligned_source_buffer[MAX_SRCLINE / SIZEOF(int4) + 1];
 GBLDEF	unsigned char	*source_buffer = (unsigned char *)aligned_source_buffer;
@@ -328,6 +319,7 @@ GBLDEF	char		**cmd_arg;
 
 #ifdef UNIX
 GBLDEF	volatile uint4	heartbeat_counter = 0;
+GBLDEF	boolean_t	heartbeat_started;
 #endif
 
 /* DEFERRED EVENTS */
@@ -359,9 +351,9 @@ GBLDEF	void			(*tp_timeout_action_ptr)(void) = tp_timeout_action_dummy;
 GBLDEF	void			(*ctrlc_handler_ptr)() = ctrlc_handler_dummy;
 GBLDEF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace) = op_open_dummy;
 GBLDEF	void			(*unw_prof_frame_ptr)(void) = unw_prof_frame_dummy;
-GBLDEF	boolean_t		mu_reorg_process = FALSE;	/* set to TRUE by MUPIP REORG */
-GBLDEF	boolean_t		mu_reorg_in_swap_blk = FALSE;	/* set to TRUE for the duration of the call to "mu_swap_blk" */
-GBLDEF	boolean_t		mu_rndwn_process = FALSE;
+GBLDEF	boolean_t		mu_reorg_process;		/* set to TRUE by MUPIP REORG */
+GBLDEF	boolean_t		mu_reorg_in_swap_blk;		/* set to TRUE for the duration of the call to "mu_swap_blk" */
+GBLDEF	boolean_t		mu_rndwn_process;
 GBLDEF	gv_key			*gv_currkey_next_reorg;
 GBLDEF	gv_namehead		*reorg_gv_target;
 
@@ -376,7 +368,7 @@ GBLDEF	mstr			gtmsecshr_pathname;
 GBLDEF	int			server_start_tries;
 GBLDEF	int			gtmsecshr_log_file;
 GBLDEF	int			gtmsecshr_sockfd = FD_INVALID;
-GBLDEF	boolean_t		gtmsecshr_sock_init_done = FALSE;
+GBLDEF	boolean_t		gtmsecshr_sock_init_done;
 GBLDEF	char			muext_code[MUEXT_MAX_TYPES][2] =
 {
 #	define MUEXT_TABLE_ENTRY(muext_rectype, code0, code1)	{code0, code1},
@@ -385,7 +377,7 @@ GBLDEF	char			muext_code[MUEXT_MAX_TYPES][2] =
 };
 GBLDEF	int			patch_is_fdmp;
 GBLDEF	int			patch_fdmp_recs;
-GBLDEF	boolean_t		horiz_growth = FALSE;
+GBLDEF	boolean_t		horiz_growth;
 GBLDEF	int4			prev_first_off, prev_next_off;
 				/* these two globals store the values of first_off and next_off in cse,
 				 * when there is a blk split at index level. This is to permit rollback
@@ -501,7 +493,6 @@ GBLDEF z_records	zbrk_recs = {NULL, NULL, NULL};
 #ifdef UNIX
 GBLDEF	ipcs_mesg	db_ipcs;		/* For requesting gtmsecshr to update ipc fields */
 GBLDEF	gd_region	*ftok_sem_reg = NULL;	/* Last region for which ftok semaphore is grabbed */
-GBLDEF	gd_region	*standalone_reg = NULL;	/* We have standalone access for this region */
 GBLDEF	int		gtm_non_blocked_write_retries; /* number of retries for non-blocked write to pipe */
 #endif
 
@@ -700,7 +691,7 @@ LITDEF	boolean_t	jrt_is_replicated[JRT_RECTYPES] =
 };
 /* Change the initialization if struct_jrec_tcom in jnl.h changes */
 GBLDEF	struct_jrec_tcom	tcom_record = {{JRT_TCOM, TCOM_RECLEN, 0, 0, 0},
-					0, 0, 0, "", {TCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
+					0, 0, 0, 0, "", {TCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
 GBLDEF	jnl_gbls_t		jgbl;
 GBLDEF	short 		crash_count;
 GBLDEF	trans_num	start_tn;
@@ -715,9 +706,6 @@ GBLDEF	uint4		update_trans;	/* Bitmask indicating among other things whether thi
 					 * Bit-1 is unused for non-TP.
 					 * Bit-2 is 1 if transaction commit in this region is beyond point of rollback.
 					 */
-
-GBLDEF	boolean_t	mu_rndwn_file_dbjnl_flush;	/* to indicate standalone access is available to shared memory so
-							 * wcs_recover() need not increment db curr_tn or write inctn record */
 
 GBLDEF	boolean_t	is_uchar_wcs_code[] = 	/* uppercase failure codes that imply database cache related problem */
 {	/* if any of the following failure codes are seen in the final retry, wc_blocked will be set to trigger cache recovery */
@@ -741,9 +729,10 @@ GBLDEF	boolean_t	is_lchar_wcs_code[] = 	/* lowercase failure codes that imply da
 #undef CDB_SC_LCHAR_ENTRY
 };
 
-GBLDEF	boolean_t	gvdupsetnoop = FALSE;	/* if TRUE, duplicate SETs do not change GDS block (and therefore no PBLK journal
+GBLDEF	boolean_t	gvdupsetnoop = TRUE;	/* if TRUE, duplicate SETs do not change GDS block (and therefore no PBLK journal
 						 * records will be written) although the database transaction number will be
-						 * incremented and logical SET journal records will be written.
+						 * incremented and logical SET journal records will be written. By default, this
+						 * behavior is turned ON. GT.M has a way of turning it off with a VIEW command.
 						 */
 GBLDEF boolean_t	gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
 UNIX_ONLY(GBLDEF int4	gtm_shmflags;)		/* Extra flags for shmat */
@@ -829,7 +818,7 @@ GBLDEF	boolean_t	in_repl_inst_edit = FALSE;	/* used by an assert in repl_inst_re
 GBLDEF	boolean_t	in_repl_inst_create;		/* used by repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];	/* whether a particular replication semaphore is being held
 								 * by the current process or not. */
-GBLDEF	boolean_t	print_offset;		/* Set to TRUE if -DETAIL is specified in MUPIP REPLIC -JNLPOOL or -EDITINST */
+GBLDEF	boolean_t	detail_specified;	/* Set to TRUE if -DETAIL is specified in MUPIP REPLIC -JNLPOOL or -EDITINST */
 GBLDEF	boolean_t	in_mupip_ftok;		/* Used by an assert in repl_inst_read */
 GBLDEF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
 
@@ -1087,7 +1076,8 @@ GBLDEF	boolean_t	skip_dbtriggers = FALSE;	/* Set to FALSE by default (i.e. trigg
 							 * case of journal recovery, this keeps the db and jnl in sync.
 							 */
 
-GBLDEF	boolean_t expansion_failed, retry_if_expansion_fails; /* used by string pool when trying to expand */
+GBLDEF	boolean_t	expansion_failed;		/* used by string pool when trying to expand */
+GBLDEF	boolean_t	retry_if_expansion_fails;	/* used by string pool when trying to expand */
 
 GBLDEF	boolean_t	mupip_exit_status_displayed;	/* TRUE if mupip_exit has already displayed a message for non-zero status.
 							 * Used by mur_close_files to ensure some message gets printed in case
@@ -1100,20 +1090,49 @@ GBLDEF	boolean_t	implicit_trollback = FALSE;	/* Set to TRUE by OP_TROLLBACK macr
 							 * whether it is being called from generated code (opp_trollback.s)
 							 * or from C runtime code.
 							 */
-GBLDEF	boolean_t	hold_onto_locks;		/* Currently TRUE for the lifetime of an online rollback. This means
-							 * a variety of locks (db crit locks, jnlpool crit locks, instance file
-							 * ftok locks, db access control semaphore etc.) are held for an extended
-							 * period of time by rollback until it terminates. To the database runtime
-							 * code, this global primarily signals it NOT to release the crit lock
-							 * on ANY region after each transaction commit. Since online rollback is
-							 * currently supported only in Unix, this variable is set to FALSE in VMS.
-							 * A field "hold_onto_crit" is similarly defined in the "sgmnt_addrs"
-							 * structure. This one pertains specifically to the db/jnlpool crit lock.
-							 * See comment there on how to decide which one to use in the runtime code.
-							 */
 #ifdef DEBUG
 GBLDEF	boolean_t	ok_to_UNWIND_in_exit_handling;	/* see gtm_exit_handler.c for comments */
 GBLDEF	boolean_t	skip_block_chain_tail_check;
+GBLDEF	boolean_t	in_mu_rndwn_file;		/* TRUE if we are in mu_rndwn_file (holding standalone access) */
 #endif
 
 GBLDEF	char		gvcst_search_clue;
+
+#ifdef UNIX
+/* The following are replication related global variables. Ideally if we had a repl_gbls_t structure (like jnl_gbls_t)
+ * this would be a member in that. But since we dont have one and since we need to initialize this specificially to a
+ * non-zero value (whereas usually everything else accepts a 0 default value), this is better kept as a separate global
+ * variable instead of inside a global variable structure.
+ */
+GBLDEF	int4			strm_index = INVALID_SUPPL_STRM;
+						/* # of the supplementary stream if one exists.
+						 * If this process is an update process running on a supplementary
+						 *   replication instance and the journal pool allows updates (that
+						 *   is the instance was started as a root primary), the value of
+						 *   this variable will be anywhere from 1 to 15 once the receiver
+						 *   establishes connection with a non-supplementary source server.
+						 * If this process is a mumps process running on a supplementary
+						 *   replication instance and the journal pool allows updates (that
+						 *   is the instance was started as a root primary), the value of
+						 *   this variable will be 0 to indicate this is the local stream.
+						 * Otherwise, this variable is set to -1 (INVALID_SUPPL_STRM)
+						 * This variable is used by t_end/tp_tend to determine if strm_seqno
+						 *   field in the journal record needs to be filled in or not.
+						 *   It is filled in only if this variable is 0 to 15.
+						 */
+GBLDEF  repl_conn_info_t        *this_side, *remote_side;
+/* Replication related global variables END */
+GBLDEF	seq_num			gtmsource_save_read_jnl_seqno;
+GBLDEF	gtmsource_state_t	gtmsource_state = GTMSOURCE_DUMMY_STATE;
+#endif
+
+GBLDEF	boolean_t	gv_play_duplicate_kills;	/* A TRUE value implies KILLs of non-existent nodes will continue to
+							 * write jnl records and increment the db curr_tn even though they dont
+							 * touch any GDS blocks in the db (i.e. treat it as a duplicate kill).
+							 * Set to TRUE for the update process & journal recovery currently.
+							 * Set to FALSE otherwise.
+							 */
+
+GBLDEF	boolean_t	donot_fflush_NULL = FALSE;	/* Set to TRUE whenever we dont want gtm_putmsg to fflush(NULL). BYPASSOK
+							 * As of Jan 2012, mu_rndwn_all is the only user of this functionality.
+							 */

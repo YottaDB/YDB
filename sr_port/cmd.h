@@ -51,6 +51,7 @@ int m_zedit(void);
 int m_zgoto(void);
 int m_zhalt(void);
 int m_zhelp(void);
+int m_zinvcmd(void);
 int m_zlink(void);
 int m_zmessage(void);
 int m_zprint(void);

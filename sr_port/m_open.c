@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,22 +21,23 @@
 #include "deviceparameters.h"
 #include "mdq.h"
 
-GBLREF char	window_token;
 LITREF mval	literal_null;
 
 int m_open(void)
 {
-	int4		rval;
-	static readonly unsigned char empty_plist[1] = { iop_eol };
-	triple		tmpchain, *ref1, *ref2, *indref;
-	oprtype		sopr, devpopr, plist, timeout, mspace;
-	opctype		opcd;
 	boolean_t	is_timeout, inddevparms;
+	static readonly unsigned char empty_plist[1] = { iop_eol };
+	int		rval;
+	opctype		opcd;
+	oprtype		devpopr, mspace, plist, sopr, timeout;
+	triple		*indref, *ref1, *ref2, tmpchain;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	inddevparms = FALSE;
-	if (!(rval = strexpr(&sopr)))
+	if (EXPR_FAIL == (rval = expr(&sopr, MUMPS_STR)))	/* NOTE assignment */
 		return FALSE;
-	if (TK_COLON != window_token)
+	if (TK_COLON != TREF(window_token))
 	{	/* Single arg specified */
 		if (EXPR_INDR == rval)
 		{	/* All arguments indirect */
@@ -47,50 +48,49 @@ int m_open(void)
 	} else
 	{
 		advancewindow();
-		switch(window_token)
+		switch (TREF(window_token))
 		{
-			case TK_COLON:
-				/* Default device parms */
-				plist = put_str((char *)empty_plist, SIZEOF(empty_plist));
-				break;
-			case TK_ATSIGN:
-				/* Indirect for device parms */
-				if (!indirection(&devpopr))
-					return FALSE;
-				indref = newtriple(OC_INDDEVPARMS);
-				indref->operand[0] = devpopr;
-				indref->operand[1] = put_ilit(IOP_OPEN_OK);
-				inddevparms = TRUE;
-				break;
-			default:
-				/* Literal device parms specified */
-				if (!deviceparameters(&plist, IOP_OPEN_OK))
-					return FALSE;
+		case TK_COLON:
+			/* Default device parms */
+			plist = put_str((char *)empty_plist, SIZEOF(empty_plist));
+			break;
+		case TK_ATSIGN:
+			/* Indirect for device parms */
+			if (!indirection(&devpopr))
+				return FALSE;
+			indref = newtriple(OC_INDDEVPARMS);
+			indref->operand[0] = devpopr;
+			indref->operand[1] = put_ilit(IOP_OPEN_OK);
+			inddevparms = TRUE;
+			break;
+		default:
+			/* Literal device parms specified */
+			if (!deviceparameters(&plist, IOP_OPEN_OK))
+				return FALSE;
 		}
 	}
-
 	/* Code generation for the optional timeout parm */
 	is_timeout = FALSE;
-	if (TK_COLON != window_token)
+	if (TK_COLON != TREF(window_token))
 		timeout = put_ilit(NO_M_TIMEOUT);
 	else
 	{
 		advancewindow();
-		if (TK_COLON == window_token)
+		if (TK_COLON == TREF(window_token))
 			timeout = put_ilit(NO_M_TIMEOUT);
 		else
 		{
 			is_timeout = TRUE;
-			if (!intexpr(&timeout))
+			if (EXPR_FAIL == expr(&timeout, MUMPS_INT))
 				return FALSE;
 		}
 	}
-	if (TK_COLON != window_token)
+	if (TK_COLON != TREF(window_token))
 		mspace = put_lit((mval *)&literal_null);
 	else
 	{
 		advancewindow();
-		if (!expr(&mspace))
+		if (EXPR_FAIL == expr(&mspace, MUMPS_EXPR))
 			return FALSE;
 	}
 	ref1 = newtriple(OC_OPEN);

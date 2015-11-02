@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,4 +87,10 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 	if (non_tp_jfb_ptr)
 		non_tp_jfb_ptr->record_size = 0; /* re-initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */
 	assert(!TREF(donot_commit));
+	assert(!cs_addrs->now_crit || cs_addrs->hold_onto_crit); /* shouldn't hold crit at begin of transaction unless asked to */
+	/* Begin of a fresh transaction. This is analogous to tp_set_sgm done for TP transactions. However, unlike tp_set_sgm,
+	 * we do not sync trigger cycles here. The reasoning is that trigger load events are in-frequent in the field and since
+	 * Non-TP restarts are not as heavy-weight as TP restart, we chose to avoid unconditional memory references here and instead
+	 * take the hit of infrequent restarts due to concurrent trigger loads
+	 */
 }

@@ -18,8 +18,6 @@
 
 #define	INDIR_DUMMY	-1
 
-GBLREF char	window_token;
-
 error_def(ERR_ACTOFFSET);
 
 int exfunc(oprtype *a, boolean_t alias_target)
@@ -29,8 +27,10 @@ int exfunc(oprtype *a, boolean_t alias_target)
 #	if defined(USHBIN_SUPPORTED) || defined(VMS)
 	triple		*tripsize;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
-	assert(TK_DOLLAR == window_token);
+	SETUP_THREADGBL_ACCESS;
+	assert(TK_DOLLAR == TREF(window_token));
 	advancewindow();
 	dqinit(&tmpchain, exorder);
 	oldchain = setcurtchain(&tmpchain);
@@ -100,7 +100,7 @@ int exfunc(oprtype *a, boolean_t alias_target)
 		ref0->operand[0] = calltrip->operand[1];
 		calltrip->operand[1] = put_tref(ref0);
 	}
-	if (TK_LPAREN != window_token)
+	if (TK_LPAREN != TREF(window_token))
 	{
 		masktrip = newtriple(OC_PARAMETER);
 		counttrip = newtriple(OC_PARAMETER);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,29 +16,29 @@
 #include "opcode.h"
 #include "advancewindow.h"
 
-GBLREF char	window_token;
 LITREF mval	literal_null ;
 
 int f_ztrigger(oprtype *a, opctype op)
 {
 	triple	*r, *arg1, *arg2;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
 	arg1 = newtriple(OC_PARAMETER);
 	arg2 = newtriple(OC_PARAMETER);
-	if (!strexpr(&(r->operand[0])))
+	if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_STR))
 		return FALSE;
-	if (TK_COMMA == window_token)
+	if (TK_COMMA == TREF(window_token))
 	{	/* Looking for a 2nd argument */
 		advancewindow();
-		if (!strexpr(&(arg1->operand[0])))
+		if (EXPR_FAIL == expr(&(arg1->operand[0]), MUMPS_STR))
 			return FALSE;
-		if (TK_COMMA == window_token)
+		if (TK_COMMA == TREF(window_token))
 		{
 			advancewindow();
-			if (!strexpr(&(arg2->operand[0])))
+			if (EXPR_FAIL == expr(&(arg2->operand[0]), MUMPS_STR))
 				return FALSE;
-
 		} else
 			arg2->operand[0] = put_lit((mval *)&literal_null);
 	} else

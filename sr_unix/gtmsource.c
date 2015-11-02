@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,7 @@
 #include "mutex.h"
 #include "gtm_zlib.h"
 #include "fork_init.h"
+#include "heartbeat_timer.h"
 
 GBLDEF	boolean_t		gtmsource_logstats = FALSE, gtmsource_pool2file_transition = FALSE;
 GBLDEF	int			gtmsource_filter = NO_FILTER;
@@ -86,8 +87,6 @@ GBLREF	unsigned char		*gtmsource_tcombuff_start;
 GBLREF	uchar_ptr_t		repl_filter_buff;
 GBLREF	int			repl_filter_bufsiz;
 GBLREF	int			gtmsource_srv_count;
-GBLREF	boolean_t		primary_side_std_null_coll;
-GBLREF	boolean_t		primary_side_trigger_support;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
@@ -104,15 +103,16 @@ error_def(ERR_TEXT);
 
 int gtmsource()
 {
+	int			status, log_init_status, waitpid_res, save_errno;
+	char			print_msg[1024], tmpmsg[1024];
 	gd_region		*reg, *region_top;
 	sgmnt_addrs		*csa, *repl_csa;
 	boolean_t		jnlpool_creator, all_files_open, isalive;
-	int			status, log_init_status, waitpid_res, save_errno;
 	pid_t			pid, ppid, procgp;
-	seq_num			read_jnl_seqno;
-	char			print_msg[1024], tmpmsg[1024];
+	seq_num			read_jnl_seqno, jnl_seqno;
 	unix_db_info		*udi;
 	gtmsource_local_ptr_t	gtmsource_local;
+	boolean_t		this_side_std_null_coll;
 
 	memset((uchar_ptr_t)&jnlpool, 0, SIZEOF(jnlpool_addrs));
 	call_on_signal = gtmsource_sigstop;
@@ -171,7 +171,7 @@ int gtmsource()
 	/* Set "child_server_running" to FALSE before forking off child. Wait for it to be set to TRUE by the child. */
 	gtmsource_local = jnlpool.gtmsource_local;
 	gtmsource_local->child_server_running = FALSE;
-	DO_FORK(pid);
+	FORK_CLEAN(pid);
 	if (0 > pid)
 	{
 		save_errno = REPL_SEM_ERRNO;
@@ -228,10 +228,13 @@ int gtmsource()
 	process_id = getpid();
 	/* Reinvoke secshr related initialization with the child's pid */
 	INVOKE_INIT_SECSHR_ADDRS;
-	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool. */
-	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
-	if (!mutex_per_process_init_pid)
-		mutex_per_process_init();
+	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
+	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
+	 * redo the initialization with the child process id.
+	 */
+	assert(mutex_per_process_init_pid && (mutex_per_process_init_pid != process_id));
+	mutex_per_process_init();
+	START_HEARTBEAT_IF_NEEDED;
 	ppid = getppid();
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, NULL, gtmsource_options.log_file, NULL);
 	assert(SS_NORMAL == log_init_status);
@@ -253,14 +256,14 @@ int gtmsource()
 	}
 	/* Determine primary side null subscripts collation order */
 	/* Also check whether all regions have same null collation order */
-	primary_side_std_null_coll = -1;
+	this_side_std_null_coll = -1;
 	for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
 	{
 		csa = &FILE_INFO(reg)->s_addrs;
-		if (primary_side_std_null_coll != csa->hdr->std_null_coll)
+		if (this_side_std_null_coll != csa->hdr->std_null_coll)
 		{
-			if (-1 == primary_side_std_null_coll)
-				primary_side_std_null_coll = csa->hdr->std_null_coll;
+			if (-1 == this_side_std_null_coll)
+				this_side_std_null_coll = csa->hdr->std_null_coll;
 			else
 			{
 				gtm_putmsg(VARLSTCNT(1) ERR_NULLCOLLDIFF);
@@ -280,34 +283,20 @@ int gtmsource()
 			gtmsource_exit(ABNORMAL_SHUTDOWN);
 		}
 	}
-	primary_side_trigger_support = GTMTRIG_ONLY(TRUE;) NON_GTMTRIG_ONLY(FALSE;)
 	/* Initialize source server alive/dead state related fields in "gtmsource_local" before the ftok semaphore is released */
 	gtmsource_local->gtmsource_pid = process_id;
 	gtmsource_local->gtmsource_state = GTMSOURCE_START;
 	if (jnlpool_creator)
 	{
-		gtmsource_seqno_init();
+		gtmsource_seqno_init(this_side_std_null_coll);
 		if (ROOTPRIMARY_SPECIFIED == gtmsource_options.rootprimary)
-		{	/* Created the journal pool as a root primary. Append a triple to the replication instance file.
-			 * Invoke the function "gtmsource_rootprimary_init" to do that. This function though requires that
-			 * we hold the ftok semaphore as we will be updating the instance file. But we have a tricky
-			 * situation in that the parent source server command is holding the ftok semaphore (and that is
-			 * to ensure no one else attaches to the journal pool until the initialization is complete). We
-			 * therefore fake the variable that indicates we hold the ftok semaphore and invoke the function.
-			 * This way we will not fail any asserts that check this variable. This is ok since we know the
-			 * parent is holding the ftok semaphore and waiting for us doing nothing else on the instance file.
+		{	/* Created the journal pool as a root primary. Append a history record to the replication instance file.
+			 * Invoke the function "gtmsource_rootprimary_init" to do that.
 			 */
-#ifndef REPL_DEBUG_NOBACKGROUND
-			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-			assert(!udi->grabbed_ftok_sem);
-			udi->grabbed_ftok_sem = TRUE;
-#endif
 			gtmsource_rootprimary_init(jnlpool.jnlpool_ctl->jnl_seqno);
-#ifndef REPL_DEBUG_NOBACKGROUND
-			udi->grabbed_ftok_sem = FALSE;
-#endif
 		}
 	}
+	/* after this point we can no longer have the case where all the regions are unreplicated/non-journaled. */
 #ifndef REPL_DEBUG_NOBACKGROUND
 	/* It is necessary for every process that is using the ftok semaphore to increment the counter by 1. This is used
 	 * by the last process that shuts down to delete the ftok semaphore when it notices the counter to be 0.
@@ -342,8 +331,14 @@ int gtmsource()
 		process_id, gtmsource_local->secondary_instname);
 	sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 	repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
+	if (jnlpool_creator)
+	{
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Created jnlpool with shmid = [%d] and semid = [%d]\n",
+			jnlpool.repl_inst_filehdr->jnlpool_shmid, jnlpool.repl_inst_filehdr->jnlpool_semid);
+	} else
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Attached to existing jnlpool with shmid = [%d] and semid = [%d]\n",
+			jnlpool.repl_inst_filehdr->jnlpool_shmid, jnlpool.repl_inst_filehdr->jnlpool_semid);
 	gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
-	jnl_setver();
 	do
 	{	/* If mode is passive, go to sleep. Wakeup every now and
 		 * then and check to see if I have to become active */
@@ -363,12 +358,32 @@ int gtmsource()
 		gtmsource_poll_actions(FALSE);
 		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 			continue;
-		SPRINTF(tmpmsg,
-				  "GTM Replication Source Server now in ACTIVE mode using port %d",
-				  gtmsource_local->secondary_port);
+		SPRINTF(tmpmsg, "GTM Replication Source Server now in ACTIVE mode using port %d", gtmsource_local->secondary_port);
 		sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
+		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
+		GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+		{
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Starting afresh due to ONLINE ROLLBACK\n");
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : %llu\n",
+					jnlpool.jnlpool_ctl->jnl_seqno);
+			continue;
+		}
+		QWASSIGN(gtmsource_local->read_addr, jnlpool.jnlpool_ctl->write_addr);
+		gtmsource_local->read = jnlpool.jnlpool_ctl->write;
+		gtmsource_local->read_state = READ_POOL;
+		read_jnl_seqno = gtmsource_local->read_jnl_seqno;
+		assert(read_jnl_seqno <= jnlpool.jnlpool_ctl->jnl_seqno);
+		if (read_jnl_seqno < jnlpool.jnlpool_ctl->jnl_seqno)
+		{
+			gtmsource_local->read_state = READ_FILE;
+			QWASSIGN(gtmsource_save_read_jnl_seqno, jnlpool.jnlpool_ctl->jnl_seqno);
+			gtmsource_pool2file_transition = TRUE; /* so that we read the latest gener jnl files */
+		}
+		rel_lock(jnlpool.jnlpool_dummy_reg);
 		if (SS_NORMAL != (status = gtmsource_alloc_tcombuff()))
 			rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				  RTS_ERROR_LITERAL("Error allocating initial tcom buffer space. Malloc error"), status);
@@ -383,24 +398,7 @@ int gtmsource()
 					gtmsource_exit(ABNORMAL_SHUTDOWN);
 			}
 		}
-		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
-		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-		grab_lock(jnlpool.jnlpool_dummy_reg);
-		QWASSIGN(gtmsource_local->read_addr, jnlpool.jnlpool_ctl->write_addr);
-		gtmsource_local->read = jnlpool.jnlpool_ctl->write;
-		gtmsource_local->read_state = READ_POOL;
-		read_jnl_seqno = gtmsource_local->read_jnl_seqno;
-		assert(read_jnl_seqno <= jnlpool.jnlpool_ctl->jnl_seqno);
-		if (read_jnl_seqno < jnlpool.jnlpool_ctl->jnl_seqno)
-		{
-			gtmsource_local->read_state = READ_FILE;
-			QWASSIGN(gtmsource_save_read_jnl_seqno, jnlpool.jnlpool_ctl->jnl_seqno);
-			gtmsource_pool2file_transition = TRUE; /* so that we read the latest gener jnl files */
-		}
-		rel_lock(jnlpool.jnlpool_dummy_reg);
-
 		gtmsource_process();
-
 		/* gtmsource_process returns only when mode needs to be changed to PASSIVE */
 		assert(gtmsource_state == GTMSOURCE_CHANGING_MODE);
 		gtmsource_ctl_close();

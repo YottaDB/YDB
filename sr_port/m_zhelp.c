@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,43 +17,40 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-
 int m_zhelp (void)
 {
-	triple		*ref;
 	int		rval;
-	oprtype		text, lib;
+	oprtype		lib, text;
+	triple		*ref;
+	DCL_THREADGBL_ACCESS;
 
-	if (window_token == TK_EOL || window_token == TK_SPACE || window_token == TK_COLON)
+	SETUP_THREADGBL_ACCESS;
+	if ((TK_EOL == TREF(window_token)) || (TK_SPACE == TREF(window_token)) || (TK_COLON == TREF(window_token)))
 	{
 		text = put_str("",0);
-		if (window_token == TK_COLON)
+		if (TK_COLON == TREF(window_token))
 		{
 			advancewindow();
-			if (!strexpr(&lib))
+			if (EXPR_FAIL == expr(&lib, MUMPS_STR))
 				return FALSE;
-		}
-		else
+		} else
 			lib = put_str("",0);
-	}
-	else
+	} else
 	{
-		if (!(rval = strexpr(&text)))
+		if (EXPR_FAIL == (rval = expr(&text, MUMPS_STR)))	/* NOTE asignment */
 			return FALSE;
-		if (window_token != TK_COLON)
+		if (TK_COLON != TREF(window_token))
 		{
-			if (rval == EXPR_INDR)
+			if (EXPR_INDR == rval)
 			{
 				make_commarg(&text,indir_zhelp);
 				return TRUE;
 			}
 			lib = put_str("",0);
-		}
-		else
+		} else
 		{
 			advancewindow();
-			if (!strexpr(&lib))
+			if (EXPR_FAIL == expr(&lib, MUMPS_STR))
 				return FALSE;
 		}
 	}

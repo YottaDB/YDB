@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,6 @@
 #include "add_inter.h"
 #include "mutex_deadlock_check.h"
 #include "gt_timer.h"
-#include "heartbeat_timer.h"
 #include "gtmio.h"
 #ifdef DEBUG
 #include "wbox_test_init.h"
@@ -110,10 +109,11 @@ GBLREF int			mutex_sock_fd;
 GBLREF fd_set			mutex_wait_on_descs;
 #endif
 GBLREF	uint4			mutex_per_process_init_pid;
-GBLREF	boolean_t		mu_rndwn_file_dbjnl_flush;
 #ifdef DEBUG
 GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	boolean_t		in_mu_rndwn_file;
 #endif
+GBLREF	jnl_gbls_t		jgbl;
 
 DECLARE_MUTEX_TRACE_CNTRS
 
@@ -805,20 +805,24 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 #	endif
 	uint4			in_crit_pid;
 
+	csa = &FILE_INFO(reg)->s_addrs;
 	/* Check that "mutex_per_process_init" has happened before we try to grab crit and that it was done with our current
 	 * pid (i.e. ensure that even in the case where parent did the mutex init with its pid and did a fork, the child process
 	 * has done a reinitialization with its pid). The only exception is if we are in "mu_rndwn_file" in which case we
 	 * know for sure there is no other pid accessing the database shared memory.
 	 */
-	assert(mutex_per_process_init_pid == process_id || (0 == mutex_per_process_init_pid) && mu_rndwn_file_dbjnl_flush);
+	assert(mutex_per_process_init_pid == process_id || (0 == mutex_per_process_init_pid) && in_mu_rndwn_file);
 	optimistic_attempts = 0;
 	lock_attempts = 0;
 	alert = FALSE;
 	do
 	{
+		in_crit_pid = csa->nl->in_crit;
 		if (MUTEX_LOCK_WRITE == mutex_lock_type)
 		{
 			MUTEX_TRACE_CNTR(mutex_trc_w_atmpts);
+			/* If we are ONLINE ROLLBACK and a prior ONLINE ROLLBACK was killed, salvage the lock immediately */
+			alert = alert | (jgbl.onlnrlbk && in_crit_pid && (in_crit_pid == csa->nl->onln_rlbk_pid));
 			status = write_lock_spin(reg, mutex_spin_parms, crash_count, alert, mutex_lock_type);
 		} else
 		{
@@ -835,13 +839,14 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 #		else
 		alert = (lock_attempts >= max_lock_attempts);
 #		endif
-		csa = &FILE_INFO(reg)->s_addrs;
 		++lock_attempts;
-		if (alert)
-		{
-			in_crit_pid = csa->nl->in_crit;
-			if (in_crit_pid)
-				send_msg(VARLSTCNT(5) ERR_MUTEXLCKALERT, 3, DB_LEN_STR(reg), in_crit_pid); /* Alert the admin */
+		if (alert && in_crit_pid && (in_crit_pid != csa->nl->onln_rlbk_pid))
+		{	/* We've waited long enough. So, issue a message in the syslog. But, we do this only if the holding PID
+			 * is NOT online rollback because the latter (which hold crit on database and journal pool for the entire
+			 * duration) can take arbitrary time to complete and issuing MUTEXLCKALERT frequently in such cases seems
+			 * to add no value.
+			 */
+			send_msg(VARLSTCNT(5) ERR_MUTEXLCKALERT, 3, DB_LEN_STR(reg), in_crit_pid); /* Alert the admin */
 			lock_attempts = 0;
 #			ifdef MUTEX_MSEM_WAKE
 			alert_heartbeat_counter = 0;
@@ -914,7 +919,7 @@ void mutex_salvage(gd_region *reg)
 {
 	sgmnt_addrs	*csa;
 	int		salvage_status;
-	pid_t		holder_pid;
+	pid_t		holder_pid, onln_rlbk_pid;
 	boolean_t	mutex_salvaged;
 	VMS_ONLY(uint4	holder_imgcnt;)
         DCL_THREADGBL_ACCESS;
@@ -992,15 +997,8 @@ void	mutex_per_process_init(void)
 
 	assert(process_id != mutex_per_process_init_pid);
 	mutex_seed_init();
-	/* The heartbeat timer is used
-	 * 	1) To periodically check if we have older generation journal files open and if so to close them.
-	 *	2) By mutex logic to approximately measure the time spent sleeping while waiting for CRIT or MSEMLOCK.
-	 * Linux currently does not support MSEMs. It uses the heartbeat timer only for (1).
-	 */
-	if (0 == mutex_per_process_init_pid)
-		start_timer((TID)&heartbeat_timer, HEARTBEAT_INTERVAL, heartbeat_timer, 0, NULL);
 #	ifndef MUTEX_MSEM_WAKE
-	else
+	if (mutex_per_process_init_pid)
 	{	/* Close socket opened by the first call. But dont delete the socket file as the parent process will do that. */
 		assert(FD_INVALID != mutex_sock_fd);
 		if (FD_INVALID != mutex_sock_fd)

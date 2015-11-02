@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -126,6 +126,7 @@ static readonly char ztwormhole_text[] = "$ZTWORMHOLE";
 static readonly char zusedstor_text[] = "$ZUSEDSTOR";
 static readonly char zversion_text[] = "$ZVERSION";
 static readonly char zyerror_text[] = "$ZYERROR";
+static readonly char zonlnrlbk_text[] = "$ZONLNRLBK";
 static readonly char arrow_text[] = "->";
 
 GBLREF mval		dollar_zdir;
@@ -537,6 +538,16 @@ void zshow_svn(zshow_out *output, int one_sv)
 			mval_write(output, TADR(dollar_zmode), TRUE);
 			if (SV_ALL != one_sv)
 				break;
+		/* CAUTION: fall through */
+#		ifdef UNIX
+		case SV_ZONLNRLBK:
+			count = (int)(TREF(dollar_zonlnrlbk));
+			MV_FORCE_MVAL(&var, count);
+			ZS_VAR_EQU(&x, zonlnrlbk_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+#		endif
 		/* CAUTION: fall through */
 		case SV_ZPATNUMERIC:
 			var.mvtype = MV_STR;

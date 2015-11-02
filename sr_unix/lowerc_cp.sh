@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -11,6 +11,8 @@
 SHELL=/bin/sh
 export SHELL
 ext=.m
+curdir=`pwd`
+utf8=`basename $curdir`
 for i in $*
 do
 	base=`basename $i $ext`
@@ -20,8 +22,13 @@ do
 		if test $base != $newf
 		then {
 			dir=`dirname $i`
-			echo $dir/$i "---> " $dir/$newf$ext
-			cp $i $dir/$newf$ext
+			if [ "utf8" = $utf8 ]; then
+				echo $dir/$i "---> "  $newf$ext "-> "../$newf$ext
+				ln -s ../$newf$ext $newf$ext
+			else
+				echo $dir/$i "---> " $dir/$newf$ext
+				cp $i $dir/$newf$ext
+			fi
 		}
 		fi
 	}

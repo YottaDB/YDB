@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,8 @@
 #include "min_max.h"
 #include "gtcm_write_ast.h"
 #include "io.h"
+#include "gtmio.h"
+#include "have_crit.h"
 #include "iosp.h"
 #include "util.h"
 #include "send_msg.h"
@@ -48,6 +50,9 @@ GBLREF	bool			undef_inhibit;
 
 static 	short			szero = 0;
 
+error_def(ERR_JNLFILOPN);
+error_def(ERR_SERVERERR);
+
 CONDITION_HANDLER(gtcm_ch)
 {
 	unsigned char	msgnum, sevmsgbuf[2048];
@@ -58,9 +63,6 @@ CONDITION_HANDLER(gtcm_ch)
 	now_t		now;	/* for GET_CUR_TIME macro */
 	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 	short		short_len;
-
-	error_def(ERR_SERVERERR);
-	error_def(ERR_JNLFILOPN);
 
 	START_CH;
 	undef_inhibit = FALSE;	/* reset undef_inhibit to the default value in case it got reset temporarily and there was an error.
@@ -87,7 +89,7 @@ CONDITION_HANDLER(gtcm_ch)
 		GET_CUR_TIME;
 		time_str[CTIME_BEFORE_NL] = 0;
 		FPRINTF(gtcm_errfs, "%s: %s", time_str, util_outbuff);
-		fflush(gtcm_errfs);
+		FFLUSH(gtcm_errfs);
 	}
 	orig_severity = SEVERITY;
 	/* Don't let severe error message cause client to necessarily die. Reflect error using ERR_SERVERERR */

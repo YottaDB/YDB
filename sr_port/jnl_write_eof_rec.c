@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,16 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 	assert(jgbl.gbl_jrec_time);
 	eof_record->prefix.time = jgbl.gbl_jrec_time;
 	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa->hdr, jnlpool_ctl); /* debug-only sanity check between seqno of filehdr and jnlpool */
+	UNIX_ONLY(
+		/* In UNIX, mur_close_files, at the beginning sets both jgbl.mur_jrec_seqno and csa->hdr->reg_seqno to
+		 * murgbl.consist_jnl_seqno. Assert that this is indeed the case. However, csa->hdr->reg_seqno is NOT
+		 * maintained by rollback during forward phase of recovery and is set only at mur_close_files whereas
+		 * jgbl.mur_jrec_seqno is maintained all along. So, unless we are called from mur_close_files, we cannot
+		 * rely csa->hdr->reg_seqno and so we can do the equality check only if we are called from mur_close_files
+		 */
+		assert(!jgbl.forw_phase_recovery || !jgbl.mur_rollback || (jgbl.mur_jrec_seqno == csa->hdr->reg_seqno)
+			|| !process_exiting);
+	)
 	if (!jgbl.forw_phase_recovery)
 	{
 		if (REPL_ALLOWED(csa))

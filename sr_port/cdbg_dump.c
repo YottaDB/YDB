@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,8 @@
 #include "cdbg_dump.h"
 #include "stringpool.h"
 #include "cache.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
 LITDEF char *oprtype_names[] =
 {
@@ -100,7 +102,7 @@ void cdbg_dump_triple(triple *dtrip, int indent)
 	cdbg_dump_operand(indent + 1, &dtrip->operand[1], OP_1);
 	if (dtrip->destination.oprclass)
 		cdbg_dump_operand(indent + 1, &dtrip->destination, OP_DEST);
-	fflush(stdout);
+	FFLUSH(stdout);
 }
 
 void cdbg_dump_shrunk_triple(triple *dtrip, int old_size, int new_size)
@@ -109,7 +111,7 @@ void cdbg_dump_shrunk_triple(triple *dtrip, int old_size, int new_size)
 	       oc_tab_graphic[dtrip->opcode], (long unsigned int) dtrip, (long unsigned int) dtrip->exorder.fl,
 	       (long unsigned int) dtrip->exorder.bl, dtrip->src.line, dtrip->src.column, dtrip->rtaddr);
 	PRINTF("    old size: %d  new size: %d  shrinkage: %d\n", old_size, new_size, (old_size - new_size));
-	fflush(stdout);
+	FFLUSH(stdout);
 }
 
 void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
@@ -127,7 +129,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 		PRINTF("%s ** Warning ** Null opr passed as operand\n", cdbg_indent(indent));
 	if (!opr->oprclass)
 	{
-		fflush(stdout);
+		FFLUSH(stdout);
 		return;
 	}
 	/* We have a real oprclass, dump it's info */
@@ -225,7 +227,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 		default:
 			PRINTF("%s   %s bogus reference\n", cdbg_indent(indent), oprtype_type_names[opr->oprclass]);
 	}
-	fflush(stdout);
+	FFLUSH(stdout);
 }
 
 void cdbg_dump_mval(int indent, mval *mv)
@@ -253,7 +255,7 @@ void cdbg_dump_mval(int indent, mval *mv)
 		if (!first)
 			PRINTF(", ");
 		PRINTF("String");
-		fflush(stdout);
+		FFLUSH(stdout);
 		first = FALSE;
 	}
 	if (first)
@@ -281,7 +283,7 @@ void cdbg_dump_mval(int indent, mval *mv)
 		else
 			cdbg_dump_mstr(indent, &mv->str);
 	}
-	fflush(stdout);
+	FFLUSH(stdout);
 }
 
 /* Dump value of a given mstr. Assumes length is non-zero */
@@ -307,7 +309,7 @@ void cdbg_dump_mstr(int indent, mstr *ms)
 	memcpy(buffer, strp, len);
 	buffer[len] = 0;
 	PRINTF("%s   String value: %s\n", cdbg_indent(indent), buffer);
-	fflush(stdout);
+	FFLUSH(stdout);
 	free(buffer);
 }
 
@@ -321,7 +323,7 @@ char *cdbg_indent(int indent)
 		indent_str = malloc(MAX_INDENT);
 	if (MAX_INDENT < indent * 2)
 	{
-		fflush(stdout);
+		FFLUSH(stdout);
 		GTMASSERT;
 	}
 	if (indent > last_indent)

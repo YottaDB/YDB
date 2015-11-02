@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -125,9 +125,9 @@ void ch_trace_point() {return;}
                                         CHTRACEPOINT;										\
 					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--)	; 		\
 					assert(ctxt->ch == &mdb_condition_handler && FALSE == ctxt->save_active_ch->ch_active);	\
-					/* Absolutely critical that this *never* occur hence GTMASSERT */			\
-					if ((SFF_TRIGR_CALLD & frame_pointer->flags) && (0 == proc_act_type)			\
-					    && !(SFF_ETRAP_ERR & frame_pointer->flags)) GTMASSERT;				\
+					/* Absolutely critical that this *never* occur hence assertpro() */			\
+					assertpro(!(SFF_TRIGR_CALLD & frame_pointer->flags) || (0 != proc_act_type)		\
+						  || (SFF_ETRAP_ERR & frame_pointer->flags));					\
 					DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
                                         ctxt->ch_active = FALSE; 								\
 					restart = mum_tstart;									\
@@ -214,7 +214,7 @@ void ch_trace_point() {return;}
 				}
 
 #define DRIVECH(x)		{									\
-					error_def(ERR_TPRETRY);						\
+					error_def(ERR_TPRETRY);		/* BYPASSOK */			\
 					CHTRACEPOINT;							\
 					if (ERR_TPRETRY != error_condition)				\
 						ch_cond_core();						\
@@ -304,9 +304,10 @@ void stop_image_no_core(void);
 
 #define DUMP			(SIGNAL == (int)ERR_ASSERT			\
 				 || SIGNAL == (int)ERR_GTMASSERT		\
+				 || SIGNAL == (int)ERR_GTMASSERT2		\
 				 || SIGNAL == (int)ERR_GTMCHECK	/* BYPASSOK */	\
 				 || SIGNAL == (int)ERR_MEMORY			\
-				 || SIGNAL == (int)ERR_STACKOFLOW )
+				 || SIGNAL == (int)ERR_STACKOFLOW)
 
 /* true if above or SEVERE and GTM error (perhaps add some "system" errors) */
 #define DUMPABLE                ( DUMP ||                                       \
@@ -334,24 +335,27 @@ void ch_overrun(void);
 void util_cond_flush(void);
 void stop_image_ch(void);
 CONDITION_HANDLER(dbopen_ch);
+CONDITION_HANDLER(gtmci_ch);
+CONDITION_HANDLER(gtmci_init_ch);
 CONDITION_HANDLER(gtmsecshr_cond_hndlr);
-CONDITION_HANDLER(mu_extract_handler);
-CONDITION_HANDLER(mu_extract_handler1);
-CONDITION_HANDLER(mupip_upgrade_ch);
+CONDITION_HANDLER(gvtr_tpwrap_ch);
 CONDITION_HANDLER(iob_io_error1);
 CONDITION_HANDLER(iob_io_error2);
+CONDITION_HANDLER(mu_extract_handler);
+CONDITION_HANDLER(mu_extract_handler1);
+CONDITION_HANDLER(mu_rndwn_all_helper_ch);
+CONDITION_HANDLER(mu_rndwn_repl_instance_ch);
+CONDITION_HANDLER(mu_rndwn_replpool_ch);
+CONDITION_HANDLER(mupip_upgrade_ch);
 CONDITION_HANDLER(omi_dbms_ch);
 CONDITION_HANDLER(rc_dbms_ch);
 CONDITION_HANDLER(read_source_ch);
 CONDITION_HANDLER(source_ch);
-CONDITION_HANDLER(gtmci_init_ch);
-CONDITION_HANDLER(gtmci_ch);
-CONDITION_HANDLER(gvtr_tpwrap_ch);
 #ifdef GTM_TRIGGER
-CONDITION_HANDLER(trigger_tpwrap_ch);
 CONDITION_HANDLER(gtm_trigger_ch);
 CONDITION_HANDLER(gtm_trigger_complink_ch);
 CONDITION_HANDLER(op_fnztrigger_ch);
+CONDITION_HANDLER(trigger_tpwrap_ch);
 #endif
 
 #endif

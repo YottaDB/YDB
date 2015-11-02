@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,11 @@
 #include "util.h"
 #include "mupip_exit.h"
 
+error_def(ERR_MUPCLIERR);
+error_def(ERR_NOSELECT);
+error_def(ERR_MUNOACTION);
+error_def(ERR_INVSTRLEN);
+
 void mupip_trigger(void)
 {
 	char		trigger_file_name[MAX_FN_LEN + 1], select_list[MAX_LINE], select_file_name[MAX_FN_LEN + 1];
@@ -38,11 +43,6 @@ void mupip_trigger(void)
 	int		local_errno;
 	struct stat	statbuf;
 	boolean_t	noprompt;
-
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_NOSELECT);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_INVSTRLEN);
 
 	if (CLI_PRESENT == cli_present("TRIGGERFILE"))
 	{
@@ -69,9 +69,7 @@ void mupip_trigger(void)
 		if (FALSE == cli_get_str("FILE", select_file_name, &sf_name_len))
 			mupip_exit(ERR_MUPCLIERR);
 		if (0 == sf_name_len)
-		{
 			select_file_name[0] = '\0';
-		}
 		else if (-1 == Stat((char *)select_file_name, &statbuf))
 		{
 			if (ENOENT != errno)
@@ -80,7 +78,7 @@ void mupip_trigger(void)
 				perror("Error opening output file");
 				mupip_exit(local_errno);
 			}
-		}else
+		} else
 		{
 			util_out_print("Error opening output file: !AD -- File exists", TRUE, sf_name_len, select_file_name);
 			mupip_exit(ERR_MUNOACTION);

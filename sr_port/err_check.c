@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,24 +21,25 @@ LITREF err_ctl laerrors_ctl;	/* Roger thinks that this one is obsolete */
 LITREF err_ctl lperrors_ctl;	/* Roger thinks that this one may be obsolete */
 #endif
 
-const err_ctl *err_check(int errnum)
-{
-	const err_ctl	*all_errors[] = {&merrors_ctl, &gdeerrors_ctl, &cmierrors_ctl, &cmerrors_ctl,
+STATICDEF const err_ctl	*all_errors[] = {&merrors_ctl, &gdeerrors_ctl, &cmierrors_ctl, &cmerrors_ctl,
 #ifdef VMS
 					 &laerrors_ctl, &lperrors_ctl,
 #endif
 					 NULL};
+
+const err_ctl *err_check(int errnum)
+{
 	const err_ctl	*fac;
-	int	errtype;
+	int		errtype;
 
         if (0 > errnum)
-                return 0;
+                return NULL;
 
 	for (errtype = 0; all_errors[errtype]; errtype++)
 	{
 		fac = all_errors[errtype];
-		if ((errnum & FACMASK(fac->facnum)) &&
-			((MSGMASK(errnum, fac->facnum)) <= fac->msg_cnt))
+		if ((errnum & FACMASK(fac->facnum))
+		    && ((MSGMASK(errnum, fac->facnum)) <= fac->msg_cnt))
 			return fac;
 	}
 	return NULL;

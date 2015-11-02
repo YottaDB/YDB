@@ -14,13 +14,14 @@
 #include "error.h"
 
 error_def(ERR_ASSERT);
-error_def(ERR_GTMCHECK);
 error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
 error_def(ERR_MEMORY);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_STACKOFLOW);
 error_def(ERR_TPRETRY);
 error_def(ERR_VMSMEMORY);
-error_def(ERR_STACKOFLOW);
-error_def(ERR_OUTOFSPACE);
 
 CONDITION_HANDLER(fntext_ch)
 {

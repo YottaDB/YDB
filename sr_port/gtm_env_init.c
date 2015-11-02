@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,8 @@
 #include "gdsfhead.h"		/* needed for MAXTOTALBLKS_MAX macro */
 #include "mvalconv.h"
 #include "fullbool.h"
+#include "trace_table.h"
+#include "parse_trctbl_groups.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -50,8 +52,6 @@
 #define SIZEOF_prombuf ggl_prombuf
 
 GBLREF	boolean_t	dollar_zquit_anyway;	/* if TRUE compile QUITs to not care whether or not they're from an extrinsic */
-GBLREF	boolean_t	gvdupsetnoop; 		/* if TRUE, duplicate SETs update journal but not database (except
-						   for curr_tn++) */
 GBLREF	uint4		gtmDebugLevel; 		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
 GBLREF	boolean_t	gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
@@ -70,7 +70,7 @@ void	gtm_env_init(void)
 {
 	mstr			val, trans;
 	boolean_t		ret, is_defined;
-	uint4			tdbglvl, tmsock, reservesize, memsize, cachent;
+	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
 	int4			status;
 	char			buf[MAX_TRANS_NAME_LEN];
 	DCL_THREADGBL_ACCESS;
@@ -79,8 +79,8 @@ void	gtm_env_init(void)
 	if (!TREF(gtm_env_init_done))
 	{
 		/* See if a debug level has been specified. Do this first since gtmDebugLevel needs
-		   to be initialized before any mallocs are done in the system.
-		*/
+		 * to be initialized before any mallocs are done in the system.
+		 */
 		gtmDebugLevel = INITIAL_DEBUG_LEVEL;
 		val.addr = GTM_DEBUG_LEVEL_ENVLOG;
 		val.len = SIZEOF(GTM_DEBUG_LEVEL_ENVLOG) - 1;
@@ -93,13 +93,6 @@ void	gtm_env_init(void)
 				tdbglvl |= GDL_SmBackfill | GDL_SmChkAllocBackfill;
 			gtmDebugLevel |= tdbglvl;
 		}
-		/* Duplicate Set Noop environment/logical */
-		val.addr = GTM_GVDUPSETNOOP;
-		val.len = SIZEOF(GTM_GVDUPSETNOOP) - 1;
-		assert(FALSE == gvdupsetnoop);	/* should have been set to FALSE in gbldefs.c */
-		ret = logical_truth_value(&val, FALSE, &is_defined);
-		if (is_defined)
-			gvdupsetnoop = ret; /* if the logical is not defined, we want gvdupsetnoop to take its default value */
 		/* gtm_boolean environment/logical */
 		val.addr = GTM_BOOLEAN;
 		val.len = SIZEOF(GTM_BOOLEAN) - 1;
@@ -111,6 +104,30 @@ void	gtm_env_init(void)
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
 			undef_inhibit = ret; /* if the logical is not defined, we want undef_inhibit to take its default value */
+		/* gtm_trace_gbl_name environment; it controls implicit MPROF testing */
+		val.addr = GTM_MPROF_TESTING;
+		val.len = SIZEOF(GTM_MPROF_TESTING) - 1;
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		{	/* Note assignment above */
+			if (SIZEOF(buf) >= trans.len)
+			{
+				if (('0' == (char)(*trans.addr)) || (0 == trans.len))
+				{
+					(TREF(mprof_env_gbl_name)).str.len = 0;
+					/* this malloc is just so that mprof_env_gbl_name.str.addr is not NULL for subsequent
+					 * checks in gtm_startup.c and gtm$startup.c
+					 */
+					(TREF(mprof_env_gbl_name)).str.addr = malloc(1);
+				} else
+				{
+					(TREF(mprof_env_gbl_name)).str.len = trans.len;
+					(TREF(mprof_env_gbl_name)).str.addr = malloc(trans.len);
+					memcpy((TREF(mprof_env_gbl_name)).str.addr, trans.addr, trans.len);
+				}
+				(TREF(mprof_env_gbl_name)).mvtype = MV_STR;
+			}
+		} else
+			(TREF(mprof_env_gbl_name)).str.addr = NULL;
 #		ifdef DEBUG
 		/* GTM_GVUNDEF_FATAL environment/logical */
 		val.addr = GTM_GVUNDEF_FATAL;
@@ -206,9 +223,44 @@ void	gtm_env_init(void)
 				memcpy((TREF(gtmprompt)).addr, trans.addr, trans.len);
 			}
 		}
+		/* Initialize $gtm_tprestart_log_first */
+		val.addr = GTM_TPRESTART_LOG_LIMIT;
+		val.len = STR_LIT_LEN(GTM_TPRESTART_LOG_LIMIT);
+		TREF(tprestart_syslog_limit) = trans_numeric(&val, &is_defined, TRUE);
+		if (0 > TREF(tprestart_syslog_limit))
+			TREF(tprestart_syslog_limit) = 0;
+		/* Initialize $gtm_tprestart_log_delta */
+		val.addr = GTM_TPRESTART_LOG_DELTA;
+		val.len = STR_LIT_LEN(GTM_TPRESTART_LOG_DELTA);
+		TREF(tprestart_syslog_delta) = trans_numeric(&val, &is_defined, TRUE);
+		if (0 > TREF(tprestart_syslog_delta))
+			TREF(tprestart_syslog_delta) = 0;
+		/* See if this is a GT.M Development environment, not a production environment */
 		if (GETENV("gtm_environment_init"))
-		{
-			TREF(gtm_environment_init) = TRUE;
+			TREF(gtm_environment_init) = TRUE; /* in-house */
+		/* See if a trace table is desired. If we have been asked to trace one or more groups, we also
+		 * see if a specific size has been specified. A default size is provided.
+		 */
+		val.addr = GTM_TRACE_GROUPS;
+		val.len = SIZEOF(GTM_TRACE_GROUPS) - 1;
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		{	/* Trace-group(s) have been declared - figure out which ones */
+			assert(SIZEOF(buf) > trans.len);
+			parse_trctbl_groups(&trans);
+			if (0 != TREF(gtm_trctbl_groups))
+			{	/* At least one valid group was specified */
+				val.addr = GTM_TRACE_TABLE_SIZE;
+				val.len = SIZEOF(GTM_TRACE_TABLE_SIZE) - 1;
+				trctblsize = trans_numeric(&val, &is_defined, TRUE);
+				if (0 < (trctblsize = (0 < trctblsize) ? trctblsize : TRACE_TABLE_SIZE_DEFAULT)) /* assignment! */
+				{
+					trctblbytes = trctblsize * SIZEOF(trctbl_entry);
+					TREF(gtm_trctbl_start) = malloc(trctblbytes);
+					TREF(gtm_trctbl_end) = TREF(gtm_trctbl_start) + trctblsize;
+					TREF(gtm_trctbl_cur) = TREF(gtm_trctbl_start) - 1; /* So doesn't skip 1st entry */
+					memset(TREF(gtm_trctbl_start), 0, trctblbytes);
+				}
+			}
 		}
 		/* Platform specific initializations */
 		gtm_env_init_sp();

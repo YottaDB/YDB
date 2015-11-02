@@ -34,9 +34,9 @@
 * Whenever SIZEOF needs to be used in expressions involving 64-bit integer quantities, use ((long)SIZEOF(...)).
 */
 #if defined(__MVS__)
-# define SIZEOF(X) ((int)(sizeof(X)))
+# define SIZEOF(X) ((int)(sizeof(X)))	/* BYPASSOK */
 #else
-# define SIZEOF(X) ((long)sizeof(X))
+# define SIZEOF(X) ((long)sizeof(X))	/* BYPASSOK */
 #endif
 
 typedef enum
@@ -71,7 +71,7 @@ typedef gcry_cipher_hd_t	crypt_key_t;
 #define GTM_PASSWD		"gtm_passwd"
 #define GTM_DBKEYS		"gtm_dbkeys"
 #define DOT_GTM_DBKEYS		"."GTM_DBKEYS
-#define PASSWD_EMPTY		"Environment variable gtm_passwd set to empty string. Password prompting not allowed for utilites"
+#define PASSWD_EMPTY		"Environment variable gtm_passwd set to empty string. Password prompting not allowed for utilities"
 #define GTM_PATH_MAX		1024
 #define GTM_KEY_MAX		32
 #define GTMCRYPT_HASH_LEN	64
@@ -147,14 +147,14 @@ gtm_zstatus_fptr_t		gtm_zstatus_fptr;
 gtm_is_file_identical_fptr_t	gtm_is_file_identical_fptr;
 gtm_xcfileid_free_fptr_t	gtm_xcfileid_free_fptr;
 
-#define DLSYM_ERR_AND_EXIT(fptr_type, fptr, func_name)					\
-{											\
-	fptr = (fptr_type)dlsym(handle, func_name);					\
-	if (NULL == fptr)								\
-	{										\
-		snprintf(err_string, ERR_STRLEN, "Enable to resolve %s ", func_name);	\
-		return GC_FAILURE;							\
-	}										\
+#define DLSYM_ERR_AND_EXIT(fptr_type, fptr, func_name)							\
+{													\
+	fptr = (fptr_type)dlsym(handle, func_name);							\
+	if (NULL == fptr)										\
+	{												\
+		snprintf(err_string, ERR_STRLEN, "Enable to resolve %s ", func_name);	/* BYPASSOK */	\
+		return GC_FAILURE;									\
+	}												\
 }
 
 #define GC_MALLOC(blk, len, type)			\
@@ -176,13 +176,13 @@ gtm_xcfileid_free_fptr_t	gtm_xcfileid_free_fptr;
 /* Following makes sure that at no point we are in the encryption library without gtmcrypt_init getting called
  * prior to the current call
  */
-#define GC_VERIFY_INITED													\
-{																\
-	if (!gtmcrypt_inited)													\
-	{															\
-		snprintf(err_string, ERR_STRLEN, "%s", "Encryption library has not been initialized");				\
-		return GC_FAILURE;												\
-	}															\
+#define GC_VERIFY_INITED												\
+{															\
+	if (!gtmcrypt_inited)												\
+	{														\
+		snprintf(err_string, ERR_STRLEN, "%s", "Encryption library has not been initialized");	/* BYPASSOK */	\
+		return GC_FAILURE;											\
+	}														\
 }
 
 #define GC_IF_INITED_RETURN				\
@@ -205,11 +205,11 @@ gtm_xcfileid_free_fptr_t	gtm_xcfileid_free_fptr;
 		b[i/2] = (unsigned char)(GC_INT(a[i]) * 16 + GC_INT(a[i + 1]));	\
 }
 
-#define GC_HEX(a, b, len)					\
-{								\
-	int i;							\
-	for (i = 0; i < len; i+=2)				\
-		sprintf(b + i, "%02X", (unsigned char)a[i/2]);	\
+#define GC_HEX(a, b, len)							\
+{										\
+	int i;									\
+	for (i = 0; i < len; i+=2)						\
+		sprintf(b + i, "%02X", (unsigned char)a[i/2]);	/* BYPASSOK */	\
 }
 
 #define GC_GETENV(ptr, key, RC)									\
@@ -219,9 +219,9 @@ gtm_xcfileid_free_fptr_t	gtm_xcfileid_free_fptr;
 		RC = GC_FAILURE;								\
 }
 
-#define GC_ENV_UNSET_ERROR(key)									\
-{												\
-	snprintf(err_string, ERR_STRLEN, "Environment variable %s not set", key);		\
+#define GC_ENV_UNSET_ERROR(key)										\
+{													\
+	snprintf(err_string, ERR_STRLEN, "Environment variable %s not set", key);	/* BYPASSOK */	\
 }
 
 /* Allocate a single block, and try reusing the same everytime this macro is called */

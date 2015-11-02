@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 #include "gt_timer.h"
 #include "gtmimagename.h"
 #include "dpgbldir.h"
+#include "have_crit.h"
 
 GBLREF	volatile uint4		heartbeat_counter;
 GBLREF	boolean_t		is_src_server;
@@ -54,7 +55,8 @@ void heartbeat_timer(void)
 	 *		the midst of a journal file switch is tricky so we check if the process is in
 	 *		crit for this region and if so we skip the close this time and wait for the next heartbeat.
 	 */
-	if (!is_src_server && (0 == heartbeat_counter % NUM_HEARTBEATS_FOR_OLDERJNL_CHECK))
+	if ((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && !is_src_server
+		&& (0 == heartbeat_counter % NUM_HEARTBEATS_FOR_OLDERJNL_CHECK))
 	{
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 		{

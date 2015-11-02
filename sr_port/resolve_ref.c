@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,15 +22,14 @@
 #include "cdbg_dump.h"
 #include "gtmdbglvl.h"
 
-GBLREF boolean_t	run_time;
-GBLREF triple		t_orig;
-GBLREF mlabel		*mlabtab;
-GBLREF command_qualifier cmd_qlf;
-GBLREF uint4		gtmDebugLevel;
+GBLREF boolean_t		run_time;
+GBLREF triple			t_orig;
+GBLREF mlabel			*mlabtab;
+GBLREF command_qualifier	cmd_qlf;
+GBLREF uint4			gtmDebugLevel;
 
 error_def(ERR_LABELMISSING);
 error_def(ERR_LABELUNKNOWN);
-error_def(ERR_FMLLSTPRESENT);
 error_def(ERR_FMLLSTMISSING);
 error_def(ERR_ACTLSTTOOLONG);
 
@@ -56,7 +55,7 @@ int resolve_ref(int errknt)
 		{
 			COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););
 			COMPDBG(cdbg_dump_triple(curtrip, 0););
-			for (opnd = curtrip->operand ; opnd < ARRAYTOP(curtrip->operand); opnd++)
+			for (opnd = curtrip->operand; opnd < ARRAYTOP(curtrip->operand); opnd++)
 			{
 				if (INDR_REF == opnd->oprclass)
 					*opnd = *(opnd->oprval.indr);
@@ -71,42 +70,28 @@ int resolve_ref(int errknt)
 					tripbp->bpt = curtrip;
 					dqins(&opnd->oprval.tref->jmplist, que, tripbp);
 					continue;
-				case MNXL_REF:
+				case MNXL_REF:	/* external reference to the routine (not within the routine) */
 					mxl = opnd->oprval.mlin->child;
 					if (mxl)
 						tripref = mxl->externalentry;
 					else
 						tripref = 0;
 					if (!tripref)
-					{	/* ignore vacuuous DO sp sp */
+					{	/* ignore vacuous DO sp sp */
 						curtrip->opcode = OC_NOOP;
 						break;
 					}
 					opnd->oprclass = TJMP_REF;
 					opnd->oprval.tref = tripref;
 					break;
-				case MLAB_REF:
+				case MLAB_REF:	/* target label should have no parms; this is DO without parens or args */
 					assert(!run_time);
 					mlbx = opnd->oprval.lab;
 					tripref = mlbx->ml ? mlbx->ml->externalentry : 0;
 					if (tripref)
 					{
-						if (NO_FORMALLIST == mlbx->formalcnt)
-						{
-							opnd->oprclass = TJMP_REF;
-							opnd->oprval.tref = tripref;
-						} else
-						{
-							errknt++;
-							stx_error(ERR_FMLLSTPRESENT, 2, mlbx->mvname.len, mlbx->mvname.addr);
-							TREF(source_error_found) = 0;
-							tripref = newtriple(OC_RTERROR);
-							tripref->operand[0] = put_ilit(ERR_FMLLSTPRESENT);
-							/* This is a subroutine/func reference */
-							tripref->operand[1] = put_ilit(TRUE);
-							opnd->oprval.tref = tripref;
-							opnd->oprclass = TJMP_REF;
-						}
+						opnd->oprclass = TJMP_REF;
+						opnd->oprval.tref = tripref;
 					} else
 					{
 						errknt++;
@@ -202,26 +187,24 @@ int resolve_ref(int errknt)
 
 
 /* If for example there are nested $SELECT routines feeding a value to a SET $PIECE/$EXTRACT, this nested checking is
-   necessary to make sure no OC_PASSTHRUs remain in the parameter chain to get turned into OC_NOOPs that will
-   cause GTMASSERTs in emit_code.
-*/
+ * necessary to make sure no OC_PASSTHRUs remain in the parameter chain to get turned into OC_NOOPs that will
+ * cause GTMASSERTs in emit_code.
+ */
 void resolve_tref(triple *curtrip, oprtype *opnd)
 {
 	triple	*tripref;
 	tbp	*tripbp;
 
-	if (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode)
+	if (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode)		/* note the assignment */
 	{
 		assert(TRIP_REF == tripref->operand[0].oprclass);
 		do
 		{	/* As many OC_PASSTHRUs as are stacked, we will devour */
 			*opnd = tripref->operand[0];
-		} while (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode);
+		} while (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode);	/* note the assignment */
 	}
-
 	COMPDBG(PRINTF(" ** Passthru replacement: Operand at 0x%08lx replaced by operand at 0x%08lx\n",
 		       (long unsigned int) opnd, (long unsigned int)&tripref->operand[0]););
-
 	tripbp = (tbp *)mcalloc(SIZEOF(tbp));
 	tripbp->bpt = curtrip;
 	dqins(&opnd->oprval.tref->backptr, que, tripbp);

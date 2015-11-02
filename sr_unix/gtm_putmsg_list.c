@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +20,12 @@
 #include "util_out_print_vaparm.h"
 #include "gtmmsg.h"
 #include "gtm_putmsg_list.h"
+#include "gtmimagename.h"	/* needed for IS_GTM_IMAGE macro */
+#include "gtmio.h"		/* needed for FFLUSH macro */
 #include "io.h"
 
-GBLREF va_list	last_va_list_ptr;
+GBLREF	boolean_t	donot_fflush_NULL;
+GBLREF	va_list		last_va_list_ptr;
 
 #define	NOFLUSH	0
 #define FLUSH	1
@@ -44,8 +47,14 @@ void gtm_putmsg_list(int arg_count, va_list var)
 	const err_msg	*msg;
 	const err_ctl	*ctl;
 
+	/* Before starting to write to stderr, make sure all other buffered streams are flushed.
+	 * This way we avoid out-of-order logging issues with multiple streams mapping to the same file
+	 * e.g. stdout/stderr could both end up in the same file. We do this now only for the utilities
+	 * (and not mumps) since the implications of that change (is it safe or not) are not yet clear.
+	 */
+	if (!IS_GTM_IMAGE && !donot_fflush_NULL)
+		FFLUSH(NULL);
 	assert(0 < arg_count);
-
 	util_out_print(NULL, RESET);
 	first_error = TRUE;
 	flush_pio();

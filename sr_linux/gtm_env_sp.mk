@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-#       Copyright 2001, 2011 Fidelity Information Services, Inc #
+#       Copyright 2001, 2012 Fidelity Information Services, Inc #
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -126,21 +126,21 @@ gt_ld_options_pro=-Wl,-M
 gt_ld_shl_linker=cc
 gt_ld_shl_options=-shared
 gt_ld_shl_suffix=.so
-gt_ld_syslibs= -lrt -lelf -lncurses -lm -ldl
 gt_ld_sysrtns=
 
 ifeq ($(gt_build_type),32)
 gt_ld_m_shl_options=
-gt_ld_syslibs= -lrt -lncurses -lm -ldl
 endif
 
-
 # -lrt for async I/O in mupip recover/rollback
+# -lrt doesn't work to pull in semaphores with GCC 4.6, so use -lpthread.
+# Add -lc in front of -lpthread to avoid linking in thread-safe versions
+# of libc routines from libpthread.
 ifeq ($(gt_build_type), 64)
-gt_ld_syslibs=-lrt -lelf -lncurses -lm -ldl
+gt_ld_syslibs=-lrt -lelf -lncurses -lm -ldl -lc -lpthread
 else
 ifeq ($(gt_os_type),Linux)
-gt_ld_syslibs=-lrt -lncurses -lm -ldl
+gt_ld_syslibs=-lrt -lncurses -lm -ldl -lc -lpthread
 else
 gt_ld_syslibs=-lncurses -lm -lcrypt
 endif
@@ -183,7 +183,8 @@ endef
 #
 define gt-dep
         @echo $*.o $*.d : '\' > $@; \
-        echo $(notdir $(filter-out /usr/include% /usr/lib% /usr/local/include% /usr/local/lib/%, $(filter %.c %.h,$(shell $(gt_cc_compiler) -M $(gt_cc_options) $(gt_cc_dep_option) $<)))) >> $@
+        echo $(notdir $(filter-out /usr/include% /usr/lib% /usr/local/include% /usr/local/lib/%, \
+			$(filter %.c %.h,$(shell $(gt_cc_compiler) -M $(gt_cc_options) $(gt_cc_dep_option) $<)))) >> $@
 endef
 define gt-export
         @echo "{" >$@

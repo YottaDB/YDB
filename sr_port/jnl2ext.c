@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,22 @@
 #define	DELIMIT_CURR	*curr++ = '\\';
 #define ZERO_TIME_DELIM	"0,0\\"
 #define PIDS_DELIM	"0\\0\\"
+
+#define	JNL2EXT_STRM_SEQNO(CURR, STRM_SEQNO)				\
+{									\
+	seq_num		lcl_strm_seqno;					\
+	uint4		lcl_strm_num;					\
+									\
+	DELIMIT_CURR;							\
+	lcl_strm_seqno = STRM_SEQNO;					\
+	UNIX_ONLY(lcl_strm_num = GET_STRM_INDEX(lcl_strm_seqno);)	\
+	VMS_ONLY(lcl_strm_num = 0;)					\
+	CURR = (char *)i2ascl((uchar_ptr_t)CURR, lcl_strm_num);		\
+	DELIMIT_CURR;							\
+	UNIX_ONLY(lcl_strm_seqno = GET_STRM_SEQ60(lcl_strm_seqno);)	\
+	VMS_ONLY(lcl_strm_seqno = 0;)					\
+	CURR = (char *)i2ascl((uchar_ptr_t)CURR, lcl_strm_seqno);	\
+}
 
 /*
  * Generic function to convert a journal record into an extract format record.
@@ -100,10 +116,10 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 		return ext_buff;
 	}
 	curr = ext_buff;
-	/* The following assumes the journal extract format is "GDSJEX05". Whenever that changes (in mur_jnl_ext.c),
+	/* The following assumes the journal extract format is "GDSJEX06". Whenever that changes (in mur_jnl_ext.c),
 	 * the below code as well as ext2jnl.c needs to change. Add an assert to let us know of that event.
 	 */
-	assert(!MEMCMP_LIT(JNL_EXTR_LABEL,"GDSJEX05"));
+	assert(!MEMCMP_LIT(JNL_EXTR_LABEL,"GDSJEX06"));
 	if (IS_TUPD(rectype))
 	{
 		if (FALSE == first_tstart)
@@ -118,6 +134,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 			MEMCPY_LIT(curr, PIDS_DELIM);
 			curr += STR_LIT_LEN(PIDS_DELIM);
 			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_set_kill.token_seq.jnl_seqno);
+			JNL2EXT_STRM_SEQNO(curr, rec->jrec_set_kill.strm_seqno);	/* Note: updates "curr" */
 			*curr++ = '\n';
 			*curr = '\0';
 			first_tstart = TRUE;
@@ -140,6 +157,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 			MEMCPY_LIT(curr, PIDS_DELIM);
 			curr += STR_LIT_LEN(PIDS_DELIM);
 			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_tcom.token_seq.jnl_seqno);
+			JNL2EXT_STRM_SEQNO(curr, rec->jrec_tcom.strm_seqno);	/* Note: updates "curr" */
 			DELIMIT_CURR;
 			*curr = '1'; /* Only ONE TSTART..TCOM in the external filter format */
 			curr++;
@@ -178,6 +196,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	MEMCPY_LIT(curr, PIDS_DELIM);
 	curr += STR_LIT_LEN(PIDS_DELIM);
 	curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_set_kill.token_seq.jnl_seqno);
+	JNL2EXT_STRM_SEQNO(curr, rec->jrec_set_kill.strm_seqno);	/* Note: updates "curr" */
 	if (rectype == JRT_NULL)
 	{
 		*curr++ = '\n';

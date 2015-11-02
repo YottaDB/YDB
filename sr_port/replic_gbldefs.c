@@ -41,15 +41,18 @@
 GBLDEF	unsigned char	*gtmsource_tcombuff_start = NULL;
 GBLDEF	unsigned char	*repl_filter_buff = NULL;
 GBLDEF	int		repl_filter_bufsiz = 0;
-GBLDEF	unsigned char	jnl_ver, remote_jnl_ver;
 GBLDEF	unsigned int	jnl_source_datalen, jnl_dest_maxdatalen;
 GBLDEF	unsigned char	jnl_source_rectype, jnl_dest_maxrectype;
 GBLDEF	char		*ext_stop;
 GBLDEF	char		*jb_stop;
+GBLDEF	seq_num		lastlog_seqno;
+GBLDEF	qw_num		trans_sent_cnt, last_log_tr_sent_cnt, trans_recvd_cnt, last_log_tr_recvd_cnt;
+GBLDEF	upd_helper_entry_ptr_t	helper_entry;
+
+#ifdef VMS
+GBLDEF	unsigned char	jnl_ver, remote_jnl_ver;
 GBLDEF	boolean_t	primary_side_std_null_coll;
 GBLDEF	boolean_t	primary_side_trigger_support;
 GBLDEF	boolean_t	secondary_side_std_null_coll;
 GBLDEF	boolean_t	secondary_side_trigger_support;
-GBLDEF	seq_num		lastlog_seqno;
-GBLDEF	qw_num		trans_sent_cnt, last_log_tr_sent_cnt, trans_recvd_cnt, last_log_tr_recvd_cnt;
-GBLDEF	upd_helper_entry_ptr_t	helper_entry;
+#endif

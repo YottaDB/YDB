@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,8 @@
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 
+error_def(ERR_DSEBLKRDFAIL);
+
 #define MAX_UTIL_LEN 80
 
 void dse_f_free(void)
@@ -41,10 +43,9 @@ void dse_f_free(void)
 	sm_uc_ptr_t	lmap_base;
 	int4		bplmap, total_blks;
 	int4		util_len, master_bit, lmap_bit, hint_over_bplmap, hint_mod_bplmap;
-	boolean_t	was_crit;
+	boolean_t	was_crit, was_hold_onto_crit;
 	int4		dummy_int, nocrit_present;
 	cache_rec_ptr_t	dummy_cr;
-	error_def(ERR_DSEBLKRDFAIL);
 
 	if (cs_addrs->hdr->bplmap == 0)
 	{	util_out_print("Cannot perform free block search:  bplmap field of file header is zero.", TRUE);
@@ -68,7 +69,7 @@ void dse_f_free(void)
 	in_last_bmap = (master_bit == (cs_addrs->ti->total_blks / bplmap));
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if(!(lmap_base = t_qread(master_bit * bplmap, &dummy_int, &dummy_cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (master_bit == hint_over_bplmap)
@@ -88,7 +89,7 @@ void dse_f_free(void)
 		util_len += 39;
 		util_buff[util_len] = 0;
 		util_out_print(util_buff, TRUE);
-		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 		return;
 	}
 	memcpy(util_buff, "!/Next free block is ", 21);
@@ -98,6 +99,6 @@ void dse_f_free(void)
 	util_len += 3;
 	util_buff[util_len] = 0;
 	util_out_print(util_buff, TRUE);
-	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	return;
 }

@@ -61,7 +61,7 @@ void	clean_mem(char *name)
 	else
 	{
 		path2.addr[path2.len] = '\0';
-		if ((msg_key = ftok(path2.addr, GTM_ID)) == -1)
+		if ((msg_key = FTOK(path2.addr, GTM_ID)) == -1)
 			perror("shmclean: Error with ftok");
 		else
 		{
@@ -107,7 +107,7 @@ void	database_clean(char *path)
 	int	shmid;
 	int	semid;
 
-	if ((d_key = ftok(path, GTM_ID)) == -1)
+	if ((d_key = FTOK(path, GTM_ID)) == -1)
 	{
 		perror("Error with database ftok");
 		PRINTF("File: %s\n", path);

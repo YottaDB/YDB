@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,19 +66,40 @@ UNIX_ONLY(static sem_info	*sem_inf;)
 
 UNIX_ONLY(static void mupip_downgrade_cleanup(void);)
 
+error_def(ERR_BADDBVER);
+error_def(ERR_DBFILOPERR);
+error_def(ERR_DBNOTGDS);
+error_def(ERR_DBOPNERR);
+error_def(ERR_DBPREMATEOF);
+error_def(ERR_PREMATEOF);
+error_def(ERR_DBRDONLY);
+error_def(ERR_MUINFOUINT4);
+error_def(ERR_MUINFOUINT8);
+error_def(ERR_MUPGRDSUCC);
+error_def(ERR_MUNODBNAME);
+error_def(ERR_MUNODWNGRD);
+error_def(ERR_MUDWNGRDTN);
+error_def(ERR_MUDWNGRDNOTPOS);
+error_def(ERR_MUDWNGRDNRDY);
+error_def(ERR_MUSTANDALONE);
+error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+ZOS_ONLY(error_def(ERR_BADTAG);)
+
 void mupip_downgrade(void)
 {
 	char		db_fn[MAX_FN_LEN + 1];
 	unsigned short	db_fn_len; 	/* cli_get_str expects short */
 	fd_type		channel;
 	int		save_errno, csd_size;
-	int		fstat_res;
+	int		fstat_res, idx;
 	int4		status, rc;
 	uint4		status2;
 	off_t 		file_size;
 	v15_sgmnt_data	v15_csd;
 	sgmnt_data	csd;
 #ifdef UNIX
+	boolean_t	recovery_interrupted;
  	struct stat    	stat_buf;
 #elif VMS
 	struct FAB	mupfab;
@@ -87,31 +108,11 @@ void mupip_downgrade(void)
 	ZOS_ONLY(int	realfiletag;)
 	unsigned char	new_master_map[MASTER_MAP_SIZE_V4];
 
-	error_def(ERR_BADDBVER);
-	error_def(ERR_DBFILOPERR);
-	error_def(ERR_DBNOTGDS);
-	error_def(ERR_DBOPNERR);
-	error_def(ERR_DBPREMATEOF);
-	error_def(ERR_PREMATEOF);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_MUINFOUINT4);
-	error_def(ERR_MUINFOUINT8);
-	error_def(ERR_MUPGRDSUCC);
-	error_def(ERR_MUNODBNAME);
-	error_def(ERR_MUNODWNGRD);
-	error_def(ERR_MUDWNGRDTN);
-	error_def(ERR_MUDWNGRDNOTPOS);
-	error_def(ERR_MUDWNGRDNRDY);
-	error_def(ERR_MUSTANDALONE);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_TEXT);
-	ZOS_ONLY(error_def(ERR_BADTAG);)
-
 	/* Structure checks .. */
 	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
 
-	UNIX_ONLY(sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * 2);
-		  memset(sem_inf, 0, SIZEOF(sem_info) * 2);
+	UNIX_ONLY(sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * FTOK_ID_CNT);
+		  memset(sem_inf, 0, SIZEOF(sem_info) * FTOK_ID_CNT);
 		  atexit(mupip_downgrade_cleanup);
 		  );
 	db_fn_len = SIZEOF(db_fn) - 1;
@@ -214,8 +215,17 @@ void mupip_downgrade(void)
 		gtm_putmsg(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Database corrupt"));
 		mupip_exit(ERR_MUNODWNGRD);
 	}
+	UNIX_ONLY(
+		recovery_interrupted = FALSE;
+		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		{
+			if (csd.intrpt_recov_resync_strm_seqno[idx])
+				recovery_interrupted = TRUE;
+		}
+	)
 	if (csd.intrpt_recov_tp_resolve_time || csd.intrpt_recov_resync_seqno || csd.recov_interrupted
-						|| csd.intrpt_recov_jnl_state || csd.intrpt_recov_repl_state)
+						|| csd.intrpt_recov_jnl_state || csd.intrpt_recov_repl_state
+						UNIX_ONLY(|| recovery_interrupted))
 	{
 		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Recovery was interrupted"));

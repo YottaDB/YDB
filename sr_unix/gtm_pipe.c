@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@
 
 	Returns	--
 
-		-1	:	fork() error
+		-1	:	fork error
 		-2	:	pipe() error
 		other	:	the file descriptor serving as one end of the pipe
 */
@@ -52,7 +52,7 @@ int gtm_pipe(char *command, pipe_type pt)
 		PERROR("pipe : ");
 		return -2;
 	}
-	if (-1 == (child_pid = fork()))
+	if (-1 == (child_pid = fork()))	/* BYPASSOK: we exit immediately, no FORK_CLEAN needed */
 	{
 		PERROR("fork : ");
 		return -1;

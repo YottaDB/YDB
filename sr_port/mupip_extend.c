@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,36 +39,38 @@
 #include "gtmmsg.h"
 #include "gdsfilext.h"
 #include "wcs_backoff.h"
-#if !defined(MM_FILE_EXT_OK)
-#include "mu_rndwn_file.h"	/* for STANDALONE macro */
+#if defined(VMS) || defined(MM_FILE_EXT_OK)
+#define DB_IPCS_RESET(REG)
+#else
+#include "mu_rndwn_file.h"
+#include "db_ipcs_reset.h"
+#define DB_IPCS_RESET(REG)			\
+{						\
+	if (dba_mm == REG->dyn.addr->acc_meth)	\
+		db_ipcs_reset(REG);		\
+}
 #endif
 
 GBLREF gd_addr		*gd_header;
 GBLREF gd_region 	*gv_cur_region;
 GBLREF sgmnt_addrs 	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
-#if !defined(MM_FILE_EXT_OK)
-GBLREF boolean_t	have_standalone_access;
-#endif
+
+error_def(ERR_DBOPNERR);
+error_def(ERR_DBRDONLY);
+error_def(ERR_JNLFILOPN);
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUNODBNAME);
+error_def(ERR_NOREGION);
+error_def(ERR_TEXT);
 
 void mupip_extend(void)
 {
 	unsigned short	r_len;
 	char		regionname[MAX_RN_LEN];
-	uint4		bplmap, bit_maps, blocks, i, old_total, total;
-	uint4		status;
-	int		fd;
+	uint4		bplmap, bit_maps, blocks, i, old_total, total, status;
 	int4		tblocks;
-
-	error_def(ERR_DBOPNERR);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_MUNODBNAME);
-	error_def(ERR_NOREGION);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_JNLFILOPN);
-#ifdef VMS
-	error_def(ERR_TEXT);
-#endif
+	int		fd;
 
 	r_len = SIZEOF(regionname);
 	if (cli_get_str("REG_NAME", regionname, &r_len) == FALSE)
@@ -104,7 +106,7 @@ void mupip_extend(void)
 		util_out_print("!/Can't EXTEND region !AD across network",TRUE, REG_LEN_STR(gv_cur_region));
 		mupip_exit(ERR_MUNOACTION);
 	}
-#if !defined(MM_FILE_EXT_OK)
+#	if !defined(MM_FILE_EXT_OK) && defined(UNIX)
 	if (dba_mm == gv_cur_region->dyn.addr->acc_meth)
 	{
 		FILE_CNTL_INIT(gv_cur_region->dyn.addr);
@@ -114,13 +116,14 @@ void mupip_extend(void)
 				TRUE, DB_LEN_STR(gv_cur_region));
 			mupip_exit(ERR_MUNOACTION);
 		}
-		have_standalone_access = TRUE;
+		assert((FILE_INFO(gv_cur_region))->grabbed_access_sem); /* we should have standalone access */
 	}
-#endif
-	gvcst_init(gv_cur_region);				/* This should not happen as extend works on only */
-	if (gv_cur_region->was_open)				/* one region at a time, but handle for safety */
-	{
+#	endif
+	gvcst_init(gv_cur_region);
+	if (gv_cur_region->was_open)
+	{	/* This should not happen as extend works on only one region at a time, but handle for safety */
 		gtm_putmsg(VARLSTCNT(4) ERR_DBOPNERR, 2, DB_LEN_STR(gv_cur_region));
+		DB_IPCS_RESET(gv_cur_region);
 		mupip_exit(ERR_MUNOACTION);
 	}
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
@@ -131,6 +134,7 @@ void mupip_extend(void)
 		{
 			util_out_print("The extension size on file !AD is zero, no extension done.",TRUE,
 				DB_LEN_STR(gv_cur_region));
+			DB_IPCS_RESET(gv_cur_region);
 			mupip_exit(ERR_MUNOACTION);
 		}
 		blocks = cs_addrs->hdr->extension_size;
@@ -139,6 +143,7 @@ void mupip_extend(void)
 	if (gv_cur_region->read_only)
 	{
 		gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+		DB_IPCS_RESET(gv_cur_region);
 		mupip_exit(ERR_MUNOACTION);
 	}
 	switch(gv_cur_region->dyn.addr->acc_meth)
@@ -153,6 +158,7 @@ void mupip_extend(void)
 				rel_crit(gv_cur_region);
 				util_out_print("The extension failed on file !AD; check disk space and permissions.", TRUE,
 					DB_LEN_STR(gv_cur_region));
+				DB_IPCS_RESET(gv_cur_region);
 				mupip_exit(ERR_MUNOACTION);
 			} else
 				assert(SS_NORMAL == status);
@@ -166,5 +172,6 @@ void mupip_extend(void)
 	}
 	util_out_print("Extension successful, file !AD extended by !UL blocks.  Total blocks = !UL.",TRUE,
 		DB_LEN_STR(gv_cur_region), total - old_total - bit_maps, total - DIVIDE_ROUND_UP(total, bplmap));
+	DB_IPCS_RESET(gv_cur_region); /* final cleanup (for successful case) before exit */
 	mupip_exit(SS_NORMAL);
 }

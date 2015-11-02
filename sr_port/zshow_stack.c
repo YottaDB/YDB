@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,11 @@
 #define DEVERR_FRAME		"    (Device Error)"
 #define DIR_MODE_MESS		"    (Direct mode) "
 #define UNK_LOC_MESS		"        Indirection"
+#define INDR_OVERFLOW		"        (Max indirect frames per counted frame exceeded for ZSHOW ""S"" -"	\
+                                " some indirect frames not processed)"
 
 #define MAX_FRAME_MESS_LEN	20	/* Maximum length of any of the frame messages above */
+#define MAX_INDR_PER_COUNTED	64	/* Maximum number of indirect frames printed per counted frame */
 
 #define HAS_TRANS_CODE_ERR(fp)	(fp->flags & SFF_ZTRAP_ERR || fp->flags & SFF_DEV_ACT_ERR)
 
@@ -34,12 +37,12 @@ GBLREF stack_frame *frame_pointer;
 
 void zshow_stack(zshow_out *output)
 {
-	bool		line_reset;
+	boolean_t	line_reset;
 	unsigned char	*addr;
-	unsigned short	nocount_frames[64], *nfp;
+	unsigned short	nocount_frames[MAX_INDR_PER_COUNTED], *nfp;
 	stack_frame	*fp;
 	mstr 		v;
-	unsigned char	buff[MAX_ENTRYREF_LEN + MAX_FRAME_MESS_LEN];
+	unsigned char	buff[MAX_ENTRYREF_LEN + SIZEOF(INDR_OVERFLOW)];
 
 	v.addr = (char *)&buff[0];
 	flush_pio();
@@ -59,7 +62,11 @@ void zshow_stack(zshow_out *output)
 		}
 		if (!(fp->type & SFT_COUNT) || (fp->type & SFT_ZINTR))
 		{
-			*nfp++ = fp->type;
+			if (nfp < &nocount_frames[MAX_INDR_PER_COUNTED])
+				/* If room in array, save indirect frame type */
+				*nfp++ = fp->type;
+			else
+				nocount_frames[MAX_INDR_PER_COUNTED - 1] = 0xffff;	/* Indicate array overflow */
 			if (fp->type & SFT_ZTRAP || fp->type & SFT_DEV_ACT || HAS_TRANS_CODE_ERR(fp))
 				line_reset = TRUE;
 		} else
@@ -106,6 +113,10 @@ void zshow_stack(zshow_out *output)
 						case (SFT_COUNT | SFT_ZINTR):
 							MEMCPY_LIT(&buff[v.len], ZINTR_FRAME);
 							v.len += SIZEOF(DIR_MODE_MESS) - 1;
+							break;
+						case 0xffff:
+							MEMCPY_LIT(&buff[v.len], INDR_OVERFLOW);
+							v.len += SIZEOF(INDR_OVERFLOW) - 1;
 							break;
 						default:
 							break;

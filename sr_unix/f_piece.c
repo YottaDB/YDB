@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,26 +17,27 @@
 #include "opcode.h"
 #include "toktyp.h"
 #include "advancewindow.h"
-#include "gtm_utf8.h"
 #include "fnpc.h"
+#include "gtm_utf8.h"
 
-GBLREF char		window_token;
 GBLREF boolean_t	gtm_utf8_mode;
 GBLREF boolean_t	badchar_inhibit;
 
+error_def(ERR_COMMA);
+
 int f_piece(oprtype *a, opctype op)
 {
-	mval		*delim_mval;
-	triple		*delimiter, *first, *last, *r;
-	oprtype		x;
 	delimfmt	unichar;
+	mval		*delim_mval;
+	oprtype		x;
+	triple		*delimiter, *first, *last, *r;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_COMMA);
-
+	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
-	if (!strexpr(&(r->operand[0])))
+	if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_STR))
 		return FALSE;
-	if (window_token != TK_COMMA)
+	if (TK_COMMA != TREF(window_token))
 	{
 		stx_error(ERR_COMMA);
 		return FALSE;
@@ -46,20 +47,20 @@ int f_piece(oprtype *a, opctype op)
 	r->operand[1] = put_tref(delimiter);
 	first = newtriple(OC_PARAMETER);
 	delimiter->operand[1] = put_tref(first);
-	if (!strexpr(&x))
+	if (EXPR_FAIL == expr(&x, MUMPS_STR))
 		return FALSE;
-	if (window_token != TK_COMMA)
+	if (TK_COMMA != TREF(window_token))
 		first->operand[0] = put_ilit(1);
 	else
 	{
 		advancewindow();
-		if (!intexpr(&(first->operand[0])))
+		if (EXPR_FAIL == expr(&(first->operand[0]), MUMPS_INT))
 			return FALSE;
 	}
-	assert(x.oprclass == TRIP_REF);
-	if (window_token != TK_COMMA && x.oprval.tref->opcode == OC_LIT &&
-	    (1 == ((gtm_utf8_mode && OC_FNZPIECE != op) ?  MV_FORCE_LEN(&x.oprval.tref->operand[0].oprval.mlit->v) :
-		   x.oprval.tref->operand[0].oprval.mlit->v.str.len)))
+	assert(TRIP_REF == x.oprclass);
+	if ((TK_COMMA != TREF(window_token)) && (OC_LIT == x.oprval.tref->opcode)
+		 && (1 == ((gtm_utf8_mode && (OC_FNZPIECE != op))  ?   MV_FORCE_LEN(&x.oprval.tref->operand[0].oprval.mlit->v)
+								   : x.oprval.tref->operand[0].oprval.mlit->v.str.len)))
 	{	/* Potential shortcut to op_fnzp1 or op_fnp1. Make some further checks */
 		delim_mval = &x.oprval.tref->operand[0].oprval.mlit->v;
 		/* Both valid chars of char_len 1 and invalid chars of byte length 1 get the fast path */
@@ -80,20 +81,19 @@ int f_piece(oprtype *a, opctype op)
 		return TRUE;
 	}
 	/* Fall into here if (1) have multi-char delimiter or (2) an invalid utf8 sequence of bytelen > 1
-	   This generates the longer form call to op_fnpiece/op_fnzpiece.
-	*/
+	 * This generates the longer form call to op_fnpiece/op_fnzpiece.
+	 */
 	delimiter->operand[0] = x;
 	last = newtriple(OC_PARAMETER);
 	first->operand[1] = put_tref(last);
-	if (window_token != TK_COMMA)
+	if (TK_COMMA != TREF(window_token))
 		last->operand[0] = first->operand[0];
 	else
 	{
 		advancewindow();
-		if (!intexpr(&(last->operand[0])))
+		if (EXPR_FAIL == expr(&(last->operand[0]), MUMPS_INT))
 			return FALSE;
 	}
-
 	ins_triple(r);
 	*a = put_tref(r);
 	return TRUE;

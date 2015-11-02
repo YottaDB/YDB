@@ -49,7 +49,7 @@ GBLREF	int4			exi_condition;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	boolean_t		need_core;			/* Core file should be created */
 GBLREF	boolean_t		created_core;			/* core file was created */
-GBLREF	boolean_t		core_in_progress;
+GBLREF	unsigned int		core_in_progress;
 GBLREF	boolean_t		dont_want_core;
 GBLREF	int4			process_id;
 GBLREF	boolean_t		exit_handler_active;
@@ -131,7 +131,7 @@ void gtm_exit_handler(void)
 	print_exit_stats();
 	if (need_core && !created_core && !dont_want_core)	/* We needed to core */
 	{
-		core_in_progress = TRUE;
+		++core_in_progress;
 		DUMP_CORE;		/* This will not return */
 	}
 }

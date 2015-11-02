@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,9 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF 	jnl_gbls_t		jgbl;
 #endif
 
+error_def(ERR_DUPTN);
+error_def(ERR_JNLTPNEST);
+
 static	void	(* const extraction_routine[])() =
 {
 #define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	extract_rtn,
@@ -79,7 +82,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	int4			rec_image_count = 0;	/* This is a dummy variable for UNIX */
 	uint4			status;
 	mval			mv;
-	seq_num 		rec_token_seq;
+	seq_num 		rec_token_seq, rec_strm_seqno, resync_strm_seqno;
 	jnl_record		*rec;
 	jnl_string		*keystr;
 	multi_struct 		*multi;
@@ -91,9 +94,9 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 		int4		crypt_status;
 	)
 	forw_multi_struct	*forw_multi;
-
-	error_def(ERR_DUPTN);
-	error_def(ERR_JNLTPNEST);
+#	if (defined(DEBUG) && defined(UNIX))
+	int4			strm_idx;
+#	endif
 
 	assert(!rctl->forw_eof_seen);
 	jctl = rctl->jctl;
@@ -129,8 +132,27 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 		return SS_NORMAL;
 	rec_token_seq = (REC_HAS_TOKEN_SEQ(rectype)) ? GET_JNL_SEQNO(rec) : 0;
 	process_losttn = rctl->process_losttn;
-	if (!process_losttn && mur_options.rollback && (rec_token_seq >= murgbl.losttn_seqno))
-		process_losttn = rctl->process_losttn = TRUE;
+	if (!process_losttn && mur_options.rollback)
+	{
+		if (rec_token_seq >= murgbl.losttn_seqno)
+			process_losttn = rctl->process_losttn = TRUE;
+#		if (defined(UNIX) && defined(DEBUG))
+		if ((rec_token_seq < murgbl.losttn_seqno) && murgbl.resync_strm_seqno_nonzero && IS_REPLICATED(rectype))
+		{
+			assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype) || IS_COM(rectype) || (JRT_NULL == (rectype)));
+			assert(&rec->jrec_set_kill.strm_seqno == &rec->jrec_null.strm_seqno);
+			assert(&rec->jrec_set_kill.strm_seqno == &rec->jrec_tcom.strm_seqno);
+			rec_strm_seqno = GET_STRM_SEQNO(rec);
+			if (rec_strm_seqno)
+			{
+				strm_idx = GET_STRM_INDEX(rec_strm_seqno);
+				rec_strm_seqno = GET_STRM_SEQ60(rec_strm_seqno);
+				resync_strm_seqno = murgbl.resync_strm_seqno[strm_idx];
+				assert(!resync_strm_seqno || (rec_strm_seqno < resync_strm_seqno));
+			}
+		}
+#		endif
+	}
 	/* Note: Broken transaction determination is done below only based on the records that got selected as
 	 * part of the mur_options.selection criteria. Therefore depending on whether a broken transaction gets
 	 * selected or not, future complete transactions might either go to the lost transaction or extract file.
@@ -301,11 +323,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 					assert(added);
 				}
 			}
-			if ((0 == gv_target->root) || (DIR_ROOT == gv_target->root))
-			{
-				assert(gv_target != cs_addrs->dir_tree);
-				gvcst_root_search();
-			}
+			GVCST_ROOT_SEARCH;
 		}
 	}
 	if (GOOD_TN == recstat)

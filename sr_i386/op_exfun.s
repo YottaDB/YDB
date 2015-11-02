@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -85,10 +85,6 @@ byte_off:
 long:	movl	%eax,msf_mpc_off(%edx)
 	addl	$5,msf_mpc_off(%edx)
 cont:	call	exfun_frame
-	movl	frame_pointer,%edx
-	movl	msf_old_frame_off(%edx),%eax
-	movl	%eax,frame_pointer
-	movl	%edx,sav_msf(%ebp)
 	leal	ret_val(%ebp),%esi
 	movl	%esp,%edi
 	movl	act_cnt(%ebp),%eax
@@ -102,10 +98,8 @@ cont:	call	exfun_frame
 	addl	$4,%eax
 	pushl	%eax			# push total count
 	call	push_parm		# push_parm ($T, ret_value, mask, argc [,arg1, arg2, ...]);
-done:	movl	sav_msf(%ebp),%eax
-	movl	%eax,frame_pointer
-	orw	$SFT_EXTFUN,msf_typ_off(%eax)
-	movl	msf_temps_ptr_off(%eax),%edi
+done:	movl	frame_pointer,%edx
+	movl	msf_temps_ptr_off(%edx),%edi
 retlab:	leal	sav_ebx(%ebp),%esp
 	movl	rtn_pc(%ebp),%edx
 	movl	act_cnt(%ebp),%eax

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2009 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2011 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -12,7 +12,7 @@ gdemsgin:	;message initialization - equate global symbols to numeric values
 GDEMSGIN
 	s gdeerr("BLKSIZ512")=150503435
 	s gdeerr("EXECOM")=150503443
-	s gdeerr("FNF")=150503451
+	s gdeerr("FILENOTFND")=150503451
 	s gdeerr("GDCREATE")=150503459
 	s gdeerr("GDECHECK")=150503467
 	s gdeerr("GDUNKNFMT")=150503475
@@ -65,5 +65,6 @@ GDEMSGIN
 	s gdeerr("INVGBLDIR")=150503851
 	s gdeerr("WRITEERROR")=150503859
 	s gdeerr("NONASCII")=150503866
-	s gdeerr("ENCNOMM")=150503874
+	s gdeerr("CRYPTNOMM")=150503874
+	s gdeerr("JNLALLOCGROW")=150503883
 	q

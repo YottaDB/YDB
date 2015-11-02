@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2001, 2010 Fidelity Information Services, Inc *
+ *      Copyright 2001, 2012 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -43,10 +43,14 @@ JNL_TABLE_ENTRY (JRT_TZKILL,  mur_extract_set,   "TZKILL ", ZKILLREC|TUPDREC,  F
 JNL_TABLE_ENTRY (JRT_UZKILL,  mur_extract_set,   "UZKILL ", ZKILLREC|UUPDREC,  FALSE, TRUE)   /* 24: Like TZKILL, but not the first */
 JNL_TABLE_ENTRY (JRT_INCTN,   mur_extract_inctn, "INCTN  ", NA,                TRUE,  FALSE)  /* 25: Increment curr_tn only, no logical update */
 JNL_TABLE_ENTRY (JRT_AIMG,    mur_extract_blk,   "AIMG   ", NA,                FALSE, FALSE)  /* 26: After-image physical journal transaction */
-JNL_TABLE_ENTRY (JRT_TRIPLE,  NULL,              "TRIPLE ", NA,                TRUE,  TRUE)   /* 27: A REPL_NEW_TRIPLE message minus the 8-byte message
+JNL_TABLE_ENTRY (JRT_TRIPLE,  NULL,              "TRIPLE ", NA,                TRUE,  TRUE)   /* 27: A REPL_OLD_TRIPLE message minus the 8-byte message
 											       *     header ("type" and "len"). Only used in the
 											       *     replication pipe. Never part of a journal file. */
 JNL_TABLE_ENTRY (JRT_TZTWORM, mur_extract_set,   "TZTWORM", ZTWORMREC|TUPDREC, FALSE, TRUE)   /* 28: If $ZTWORMHOLE is first record in TP */
 JNL_TABLE_ENTRY (JRT_UZTWORM, mur_extract_set,   "UZTWORM", ZTWORMREC|UUPDREC, FALSE, TRUE)   /* 29: Like TZTWORM but not the first record in TP */
 JNL_TABLE_ENTRY (JRT_TZTRIG,  mur_extract_set,	 "TZTRIG ", ZTRIGREC|TUPDREC,  FALSE, TRUE)   /* 30: If ZTRIGGER is first record in TP */
 JNL_TABLE_ENTRY (JRT_UZTRIG,  mur_extract_set,	 "UZTRIG ", ZTRIGREC|UUPDREC,  FALSE, TRUE)   /* 31: Like TZTRIG but not the first record in TP */
+JNL_TABLE_ENTRY (JRT_HISTREC, NULL,              "HISTREC", NA,                TRUE,  TRUE)   /* 32: A REPL_HISTREC message minus the 8-byte message
+											       *     header ("type" and "len"). Only used in the
+											       *     replication pipe. Never part of a journal file. */
+JNL_TABLE_ENTRY (JRT_TRUNC,   mur_extract_trunc, "TRUNC  ", NA,                TRUE,  FALSE)  /* 33: Record DB file truncate details */

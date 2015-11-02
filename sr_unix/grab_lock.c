@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,11 +23,21 @@
 #include "deferred_signal_handler.h"
 #include "caller_id.h"
 #include "is_proc_alive.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "repl_instance.h"
+#include "jnl.h"
 
 GBLREF	volatile int4		crit_count;
 GBLREF	uint4			process_id;
 GBLREF	node_local_ptr_t	locknl;
-GBLREF	boolean_t		hold_onto_locks;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnl_gbls_t		jgbl;
+
+error_def(ERR_DBCCERR);
+error_def(ERR_CRITRESET);
+error_def(ERR_REPLREQROLLBACK);
+error_def(ERR_TEXT);
 
 /* Note about usage of this function : Create dummy gd_region, gd_segment, file_control,
  * unix_db_info, sgmnt_addrs, and allocate mutex_struct (and NUM_CRIT_ENTRY * mutex_que_entry),
@@ -41,12 +51,9 @@ void	grab_lock(gd_region *reg)
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
 
-	error_def(ERR_DBCCERR);
-	error_def(ERR_CRITRESET);
-
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
-	assert(!hold_onto_locks && !csa->hold_onto_crit);
+	assert(!csa->hold_onto_crit);
 	if (!csa->now_crit)
 	{
 		assert(0 == crit_count);
@@ -80,6 +87,14 @@ void	grab_lock(gd_region *reg)
 		csa->nl->in_crit = process_id;
 		CRIT_TRACE(crit_ops_gw);		/* see gdsbt.h for comment on placement */
 		crit_count = 0;
+	}
+	if (jnlpool.repl_inst_filehdr->file_corrupt && !jgbl.onlnrlbk)
+	{	/* Journal pool indicates an abnormally terminated online rollback. Cannot continue until the rollback command is
+		 * re-run to bring the journal pool/file and instance file to a consistent state.
+		 */
+		/* No need to do rel_lock before rts_error (mupip_exit_handler will do it for us) */
+		rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
+				ERR_TEXT, 2, LEN_AND_LIT("file_corrupt field in instance file header is set to TRUE"));
 	}
 	return;
 }

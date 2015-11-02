@@ -37,6 +37,8 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 
+error_def(ERR_GBLMODFAIL);
+
 bool	gvcst_gblmod(mval *v)
 {
 	bool		gblmod;

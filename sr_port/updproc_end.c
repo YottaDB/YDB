@@ -75,19 +75,45 @@ GBLREF	boolean_t	        pool_init;
 GBLREF	jnlpool_addrs	        jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	void                    (*call_on_signal)();
+GBLREF	FILE			*updproc_log_fp;
 
 void  updproc_stop(boolean_t exit)
 {
 	int4		status;
-	int		fclose_res;
+	int		fclose_res, idx;
+	seq_num		log_seqno, log_seqno1, jnlpool_seqno, jnlpool_strm_seqno[MAX_SUPPL_STRMS];
 	sgmnt_addrs	*repl_csa;
+	UNIX_ONLY(
+		int4	strm_idx;
+	)
 
 	call_on_signal = NULL;	/* Don't reenter on error */
 	if (pool_init)
 	{
 		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 		assert(!repl_csa->hold_onto_crit);
+		jnlpool_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
+		UNIX_ONLY(
+			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+				jnlpool_strm_seqno[idx] = jnlpool.jnlpool_ctl->strm_seqno[idx];
+		)
+		log_seqno = recvpool.recvpool_ctl->jnl_seqno;
+		log_seqno1 = recvpool.upd_proc_local->read_jnl_seqno;
+		UNIX_ONLY(strm_idx = recvpool.gtmrecv_local->strm_index;)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
+		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : %llu\n", jnlpool_seqno);
+#		ifdef UNIX
+		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		{
+			if (jnlpool_strm_seqno[idx])
+				repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Stream # %d : Current Jnlpool Stream Seqno "
+					": %llu\n", idx, jnlpool_strm_seqno[idx]);
+		}
+		if (0 < strm_idx)
+			repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Update process has Stream # %d\n", strm_idx);
+#		endif
+		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Update process Read Seqno : %llu\n", log_seqno1);
+		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n", log_seqno);
 		/* nullify jnlpool_ctl before detaching from jnlpool since if it is the other way, we might be interrupted
 		 * by the periodic timer routines and end up in jnl_write_epoch_rec() routine that dereferences jnlpool_ctl
 		 * since it is non-NULL although it has been detached from and is no longer valid memory.

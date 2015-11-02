@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -172,7 +172,8 @@ void op_gvorder (mval *v)
 					found = FALSE;
 					break;
 				}
-				if ((gv_target->root != 0) && (gvcst_data() != 0))
+				/* For effective truncates, we want to be able to move empty data blocks in reorg */
+				if ((gv_target->root != 0) && (TREF(want_empty_gvts) || gvcst_data() != 0))
 					break;
 				*(&gv_currkey->base[0] + gv_currkey->end - 1) = 1;
 				*(&gv_currkey->base[0] + gv_currkey->end + 1) = 0;

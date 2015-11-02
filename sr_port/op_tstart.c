@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,6 +92,7 @@ GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	uint4			tstartcycle;
 GBLREF	char			*update_array_ptr;
 GBLREF	ua_list			*curr_ua, *first_ua;
+GBLREF	int4			dollar_zmaxtptime;
 #ifdef GTM_TRIGGER
 GBLREF	mval			dollar_ztwormhole;
 GBLREF	int4			gtm_trigger_depth;
@@ -106,9 +107,6 @@ GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_crea
 #define NORESTART -1
 #define ALLLOCAL  -2
 #define TP_STACK_SIZE ((TP_MAX_NEST + 1) * SIZEOF(tp_frame))	/* Size of TP stack frame with no-overflow pad */
-
-/*** temporary ***/
-GBLREF int4	    		dollar_zmaxtptime;
 
 void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 {
@@ -128,7 +126,6 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	va_list			varlst, lvname;
 	tp_region		*tr, *tr_next;
 	sgm_info		*si;
-	int4			tmout_sec;
 	tlevel_info		*tli, *new_tli, *prev_tli;
 	global_tlvl_info	*gtli, *new_gtli, *prev_gtli;
 	kill_set		*ks, *prev_ks;
@@ -199,9 +196,10 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			 */
 			t_tries = (FALSE == mupip_jnl_recover) ? 0 : CDB_STAGNATE;
 			t_fail_hist[t_tries] = cdb_sc_normal;
-			/* ensure that we don't have crit on any region at the beginning of a TP transaction
-			 * (be it GT.M or MUPIP) */
-			assert(0 == have_crit(CRIT_HAVE_ANY_REG));
+			/* ensure that we don't have crit on any region at the beginning of a TP transaction (be it GT.M or MUPIP).
+			 * The only exception is ONLINE ROLLBACK which holds crit for the entire duration
+			 */
+			assert(0 == have_crit(CRIT_HAVE_ANY_REG) UNIX_ONLY(|| jgbl.onlnrlbk));
 		}
 #		ifdef GTM_TRIGGER
 		else
@@ -581,24 +579,9 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		else
 			si->tlvl_info_head = new_tli;
 	}
-	/* ------------------------------------------------------------------
-	 * Start TP timer if set to non-default value
-	 * ------------------------------------------------------------------
-	 */
-	tmout_sec = dollar_zmaxtptime;
-	assert(0 <= tmout_sec);
-	if (0 < tmout_sec)
-	{
-		/* ------------------------------------------------------------------
-		 * Only start timer at outer level
-		 * ------------------------------------------------------------------
-		 */
-		if (1 == dollar_tlevel)
-			(*tp_timeout_start_timer_ptr)(tmout_sec);
-		else
-		{
-			/* Confirm that timeout already pending, else warning */
-		}
-	}
+	/* If starting first TP level, also start TP timer if set to non-default value */
+	assert(0 <= dollar_zmaxtptime);
+	if ((0 < dollar_zmaxtptime) && (1 == dollar_tlevel))
+		(*tp_timeout_start_timer_ptr)(dollar_zmaxtptime);
 	DBGRFCT((stderr, "\nop_tstart: complete\n"));
 }

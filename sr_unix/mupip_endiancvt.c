@@ -60,7 +60,6 @@
 #include "mupip_endiancvt.h"
 #include "gtmmsg.h"
 #include "wcs_sleep.h"
-#include "ftok_sems.h"
 #include "gvcst_lbm_check.h"		/* gvcst_blk_ever_allocated */
 #include "shmpool.h"
 #include "min_max.h"
@@ -68,6 +67,7 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+#include "db_ipcs_reset.h"
 
 GBLREF	gd_region		*gv_cur_region;
 
@@ -140,18 +140,15 @@ boolean_t	endian_match_key(end_gv_key *gv_key1, int blk_levl, end_gv_key *key2);
 block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key);
 
 /* If we acquired standalone access, we need to release it before we exit. Ideally, mupip_exit_handler should take care of doing
- * it. But, since we free up memory allocated to gv_cur_region before exiting out of this module, db_ipcs_reset done in mupip_exit
- * will cause invalid memory references since standalone_reg (used by db_ipcs_reset) is a pointer to gv_cur_region. One solution
- * would be to do gv_cur_region free up AFTER db_ipcs_reset in mupip_exit_handler but since various code path sets gv_cur_region,
- * the implication of such a change is not clear at this point.
+ * it. But, since we free up memory allocated to gv_cur_region before exiting out of this module. An alternative would be to free
+ * gv_cur_region AFTER db_ipcs_reset in mupip_exit_handler but since various code paths set gv_cur_region, the implication of such
+ * a change is not clear at this writing.
  */
 #define DO_STANDALONE_CLNUP_IF_NEEDED(ENDIAN_NATIVE)			\
 {									\
-	DEBUG_ONLY(GBLREF	gd_region	*standalone_reg;)	\
-									\
 	if (ENDIAN_NATIVE)						\
 	{	/* release standalone access */				\
-		assert(gv_cur_region == standalone_reg);		\
+		assert(FILE_INFO(gv_cur_region)->grabbed_access_sem);	\
 		db_ipcs_reset(gv_cur_region);				\
 		mu_gv_cur_reg_free();					\
 	}								\
@@ -603,7 +600,7 @@ void mupip_endiancvt(void)
 
 void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 {
-	int	n;
+	int	idx;
 	time_t	ctime;
 
 	SWAP_SD4(blk_size);
@@ -654,7 +651,6 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(last_com_bkup_last_blk);
 	SWAP_SD4(last_rec_bkup_last_blk);
 	SWAP_SD4(reorg_restart_block);
-	SWAP_SD4(owner_node);		/* should be zero when not open	*/
 	new->image_count = 0;		/* should be zero when db is not open so reset it unconditionally */
 	new->freeze = 0;		/* should be zero when db is not open so reset it unconditionally */
 	SWAP_SD4(kill_in_prog);
@@ -738,10 +734,8 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	if (!new_is_native)
 		SWAP_SD4(repl_state);
 	SWAP_SD4(multi_site_open);
-	SWAP_SD8(dualsite_resync_seqno);
-
-	for (n = 0; n < ARRAYSIZE(old->tp_cdb_sc_blkmod); n++)
-		new->tp_cdb_sc_blkmod[n] = 0;
+	for (idx = 0; idx < ARRAYSIZE(old->tp_cdb_sc_blkmod); idx++)
+		new->tp_cdb_sc_blkmod[idx] = 0;
 	SWAP_SD4(jnl_alq);
 	SWAP_SD4(jnl_deq);
 	SWAP_SD4(jnl_buffer_size);
@@ -762,6 +756,12 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(recov_interrupted);
 	SWAP_SD4(intrpt_recov_jnl_state);
 	SWAP_SD4(intrpt_recov_repl_state);
+	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+	{
+		SWAP_SD8(strm_reg_seqno[idx]);
+		SWAP_SD8(intrpt_recov_resync_strm_seqno[idx]);
+		SWAP_SD8(save_strm_reg_seqno[idx]);
+	}
 	SWAP_SD4(is_encrypted);
 #define TAB_BG_TRC_REC(A,B)	new->B##_cntr = (bg_trc_rec_cntr) 0; new->B##_tn = (bg_trc_rec_tn) 0;
 #include "tab_bg_trc_rec.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,16 +14,16 @@
 #include "compiler.h"
 #include "mdq.h"
 
-GBLREF triple *curtchain;
-
 void ins_triple(triple *x)
 {
 	triple	*y;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Need to pass a temporary variable "y" (instead of "curtchain->exorder.bl") to the dqins macro as it will
 	 * otherwise result in incorrect queue insertion.
 	 */
-	y = curtchain->exorder.bl;
+	y = (TREF(curtchain))->exorder.bl;
 	dqins(y,exorder,x);
-	CHKTCHAIN(curtchain);
+	CHKTCHAIN(TREF(curtchain));
 }

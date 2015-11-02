@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,10 +16,17 @@
 
 #include "jnl_typedef.h"	/* for IS_VALID_JRECTYPE macro */
 
-#define JNL_EXTR_LABEL		"GDSJEX05"	/* format of the simple journal extract */
-#define JNL_DET_EXTR_LABEL	"GDSJDX05"	/* format of the detailed journal extract */
+#if defined(UNIX)
+#include "dollarh.h"	    /* for dollarh function */
+#elif defined(VMS)
+#include "op.h"	    /* for dollarh function */
+#endif
+
+#define JNL_EXTR_LABEL		"GDSJEX06"	/* format of the simple journal extract */
+#define JNL_DET_EXTR_LABEL	"GDSJDX06"	/* format of the detailed journal extract */
 
 error_def(ERR_MUINFOSTR);
+error_def(ERR_MUINFOUINT6);
 error_def(ERR_MUINFOUINT4);
 error_def(ERR_MUINFOUINT8);
 error_def(ERR_MUJNLSTAT);
@@ -30,6 +37,22 @@ error_def(ERR_MUJNLSTAT);
 	ptr = (char *)i2ascl((uchar_ptr_t)ptr, I);			\
 	extract_len += (int)(ptr - &murgbl.extr_buff[extract_len]);	\
 	murgbl.extr_buff[extract_len++] = '\\';				\
+}
+
+#define	EXT_STRM_SEQNO(SEQ)					\
+{								\
+	seq_num	input_seq, lcl_strm_seqno;			\
+	uint4	lcl_strm_num;					\
+								\
+	input_seq = SEQ;					\
+	/* display high order 4-bit strm_num */			\
+	UNIX_ONLY(lcl_strm_num = GET_STRM_INDEX(input_seq);)	\
+	VMS_ONLY(lcl_strm_num = 0;)				\
+	EXTINT(lcl_strm_num);					\
+	/* display low order 60-bit strm_seqno */		\
+	UNIX_ONLY(lcl_strm_seqno = GET_STRM_SEQ60(input_seq);)	\
+	VMS_ONLY(lcl_strm_seqno = 0;)				\
+	EXTQW(lcl_strm_seqno);					\
 }
 
 #define EXTINT(I)							\
@@ -188,17 +211,19 @@ error_def(ERR_MUJNLSTAT);
 		REC_IMAGE_COUNT = plst->jpv.jpv_image_count;					\
 }
 
-/* Note that JRT_TRIPLE is NOT considered a valid rectype by this macro. This is because this macro is not used
- * by the update process and receiver server, the only processes which see this journal record type. Anyone
- * else that sees this record type (update process reader, mupip journal etc.) should treat this as an invalid record type.
+/* Note that JRT_TRIPLE and JRT_HISTREC are NOT considered valid rectypes by this macro.
+ * This is because this macro is not used by the update process and receiver server, the only
+ * processes which see this journal record type. Anyone else that sees this record type (update
+ * process reader, mupip journal etc.) should treat this as an invalid record type.
  */
 #define IS_VALID_RECTYPE(JREC)									\
 (												\
-	IS_VALID_JRECTYPE((JREC)->prefix.jrec_type) && (JRT_TRIPLE != (JREC)->prefix.jrec_type) \
+	IS_VALID_JRECTYPE((JREC)->prefix.jrec_type) && (JRT_TRIPLE != (JREC)->prefix.jrec_type)	\
+		&& (JRT_HISTREC != (JREC)->prefix.jrec_type)					\
 )
 
 #define IS_VALID_LEN_FROM_PREFIX(JREC, JFH)							\
-( /* length within range */									\
+(	/* length within range */								\
 	(ROUND_DOWN2((JREC)->prefix.forwptr, JNL_REC_START_BNDRY) == (JREC)->prefix.forwptr) &&	\
 	(JREC)->prefix.forwptr > MIN_JNLREC_SIZE  &&						\
 	(JREC)->prefix.forwptr <= (JFH)->max_jrec_len						\
@@ -243,6 +268,52 @@ error_def(ERR_MUJNLSTAT);
 		STATUS = SS_NORMAL;			\
 	}						\
 }
+
+#ifdef UNIX
+#define	MUR_SAVE_RESYNC_STRM_SEQNO(RCTL, CSD)									\
+{														\
+	int		idx;											\
+	seq_num		strm_seqno;										\
+														\
+	GBLREF       mur_gbls_t      murgbl;									\
+														\
+	assert(CSD == RCTL->csd);										\
+	if (murgbl.resync_strm_seqno_nonzero)									\
+	{													\
+		if (!rctl->recov_interrupted)									\
+		{	/* Recovery on this database was not previously interrupted. So note down		\
+			 * the resync_strm_seqno specified as input (if any) in file header.			\
+			 */											\
+			DEBUG_ONLY(										\
+				for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)					\
+					assert(!CSD->intrpt_recov_resync_strm_seqno[idx]);			\
+			)											\
+			idx = murgbl.resync_strm_index;								\
+			if (INVALID_SUPPL_STRM != idx)								\
+			{											\
+				assert((0 <= idx) && (MAX_SUPPL_STRMS > idx));					\
+				DEBUG_ONLY(strm_seqno = CSD->intrpt_recov_resync_strm_seqno[idx];)		\
+				(CSD)->intrpt_recov_resync_strm_seqno[idx] = murgbl.resync_strm_seqno[idx];	\
+			}											\
+		} else												\
+		{	/* Recovery on this database was previously interrupted. Although we know which		\
+			 * stream seqno was specified for this round of rollback, we dont know which		\
+			 * streams were specified in previous interrupted rollbacks. So set all the		\
+			 * stream #s in the file header based on murgbl.resync_strm_seqno[] which has		\
+			 * already been computed taking into account ALL region file headers.			\
+			 */											\
+			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)						\
+			{											\
+				DEBUG_ONLY(strm_seqno = CSD->intrpt_recov_resync_strm_seqno[idx];)		\
+				assert(!strm_seqno || (strm_seqno >= murgbl.resync_strm_seqno[idx]));		\
+				CSD->intrpt_recov_resync_strm_seqno[idx] = murgbl.resync_strm_seqno[idx];	\
+			}											\
+		}												\
+	}													\
+}
+#else
+#define	MUR_SAVE_RESYNC_STRM_SEQNO(RCTL, CSD)
+#endif
 
 #define	SHOW_NONE		0
 #define SHOW_HEADER		1
@@ -320,10 +391,21 @@ typedef struct
 	int			broken_cnt;		/* Number of broken entries */
 	int			max_extr_record_length;	/* maximum size of zwr-format extracted journal record */
 	seq_num			resync_seqno;		/* is 0, if consistent rollback and no interrupted recovery */
-	seq_num			stop_rlbk_seqno;	/* Where fetch_resync/resync rollback stop to apply to database */
 	seq_num			consist_jnl_seqno;	/* Simulate replication server's sequence number */
 	/* the following 3 variables are stored in a global so "mur_forward_play_cur_jrec" function can see it as well */
-	seq_num			losttn_seqno;		/* losttn seqno passed from mupip_recover to mur_forward */
+	seq_num			losttn_seqno;		/* The smallest seqno of a GOOD transaction that will NOT be played
+							 * forward by rollback/recovery due either because it found a broken
+							 * seqno before this one or because -resync specified a smaller seqno.
+							 * In mur_back_process, this is set to 1 more than the HIGHEST logical
+							 * record seqno found JUST BEFORE the tp_resolve_time across ALL regions
+							 * that are being rolled back. This value is passed to the function
+							 * mur_process_seqno_table which then checks if a journal record with this
+							 * seqno was found during backward processing and added to the hashtable
+							 * If yes, this would be equal to smallest seqno added to hashtable aka
+							 * min_resolve_seqno. This function adjusts the losttn_seqno further
+							 * and eventually passes it to mur_forward/mur_forward_play_cur_jrec
+							 * which knows not to play any GOOD seqno that is >= murgbl.losttn_seqno
+							 */
 	seq_num			min_broken_seqno;	/* min broken seqno passed from mupip_recover to mur_forward */
 	jnl_tm_t		min_broken_time;	/* min broken time passed from mupip_recover to mur_forward */
 	hash_table_int8		token_table;		/* hashtable created during backward & used in forward phase of recovery */
@@ -335,16 +417,23 @@ typedef struct
 	jnl_process_vector	*prc_vec;		/* for recover process */
 	void			*file_info[TOT_EXTR_TYPES];/* for a pointer to a structure described in filestruct.h */
 #	ifdef UNIX
+	repl_conn_info_t	remote_side;		/* Details of remote side connection in case of a -FETCHRESYNC rollback */
 	boolean_t		was_rootprimary;	/* Whether this instance was previously a root primary. Set by
 							 * "gtmrecv_fetchresync" */
-	char			remote_proto_ver;	/* Protocol version of the source server with which a -FETCHRESYNC
-							 * rollback communicates. Need to be "signed char" in order to be
-							 * able to do signed comparisons of this with the macros
-							 * REPL_PROTO_VER_DUALSITE (0) and REPL_PROTO_VER_UNINITIALIZED (-1)
-							 */
-	char			filler_align_4[3];
+	int4			resync_strm_index;	/* the stream # corresponding to -resync or -fetchresync seqno */
+	seq_num			resync_strm_seqno[MAX_SUPPL_STRMS];
+							/* same as resync_seqno but seqno corresponds to a specific update stream */
+	boolean_t		resync_strm_seqno_nonzero; /* TRUE if at least one of resync_strm_seqno[16] entries is non-zero */
 #	endif
 	boolean_t		extr_file_create[TOT_EXTR_TYPES];
+	boolean_t		incr_onln_rlbk_cycle;	/* TRUE if we applied at least one PBLK */
+	boolean_t		incr_db_rlbkd_cycle;	/* TRUE if the database is effectively taken back in time */
+#	ifdef DEBUG
+	seq_num			save_losttn_seqno;	/* A copy of murgbl.losttn_seqno at start of mur_forward. We later check
+							 * that this was not tampered with during forward phase of recovery.
+							 */
+	seq_num			save_resync_seqno;	/* A copy of murgbl.resync_seqno at start of mur_back_process */
+#	endif
 } mur_gbls_t;
 
 typedef struct multi_element_struct
@@ -436,7 +525,20 @@ typedef struct jnl_ctl_list_struct
 	boolean_t			is_same_hash_as_db;	/* to indicate whether the db and the jnl file share
 								 * the same encryption key. */
 #	endif
+	boolean_t			turn_around_fullyupgraded; /* EPOCH record's fully_upgraded field */
 } jnl_ctl_list;
+
+/* This structure is used to only pass parameters for the function "mur_back_processing_one_region" */
+typedef struct
+{
+	jnl_ctl_list	*jctl;
+	seq_num 	rec_token_seq;
+	boolean_t	first_epoch;
+	uint4		status;
+	jnl_ctl_list	**jjctl;
+	boolean_t	apply_pblk;
+	seq_num		*pre_resolve_seqno;
+} mur_back_opt_t;
 
 typedef struct
 {
@@ -508,8 +610,6 @@ typedef struct reg_ctl_list_struct
 	boolean_t		jfh_recov_interrupted;	/* Whether latest generation journal file was created by recover */
 	int4			blks_to_upgrd_adjust;	/* Delta to adjust turn around point's blks_to_upgrd counter with.
 							 * This will include all bitmaps created in V4 format by gdsfilext */
-	uint4			trnarnd_free_blocks;	/* Free_blocks counter stored in the turnaround point epoch record */
-	uint4			trnarnd_total_blks;	/* Total_blks  counter stored in the turnaround point epoch record */
 	struct pini_list	*mur_plst;		/* pini_addr hash-table entry of currently simulating GT.M process
 						 	 * for this region (used only if jgbl.forw_phase_recovery) */
 	mur_read_desc_t		*mur_desc;		/* Region specific structure storing last mur_read_file* context.
@@ -545,10 +645,11 @@ typedef struct reg_ctl_list_struct
 							 * unconditionally used those to restore the corresponding csd fields
 							 * resulting in journaling/replication getting incorrectly turned OFF. */
 #	ifdef DEBUG
-	boolean_t			deleted_from_unprocessed_list;
-	jnl_ctl_list 			*last_processed_jctl;
-	uint4				last_processed_rec_offset;
+	boolean_t		deleted_from_unprocessed_list;
+	jnl_ctl_list 		*last_processed_jctl;
+	uint4			last_processed_rec_offset;
 #	endif
+	boolean_t		db_present;		/* TRUE if database pointed by curr->gd is present or not */
 } reg_ctl_list;
 
 typedef struct redirect_list_struct
@@ -620,6 +721,14 @@ typedef struct
 	char			*extr_fn[TOT_EXTR_TYPES];
 	int			extr_fn_len[TOT_EXTR_TYPES];
 } mur_opt_struct;
+
+typedef struct onln_rlbk_reg_list_struct
+{
+	struct onln_rlbk_reg_list_struct	*fPtr;
+	struct gd_region_struct		*reg;
+	gd_id				unique_file_id;
+	struct reg_ctl_list_struct	*rctl;
+} onln_rlbk_reg_list;
 
 /* This macro is invoked whenever all records of a region have been processed. It deletes the current region
  * from the list of unprocessed regions thereby removing this from the list of regions examined whenever a
@@ -884,10 +993,13 @@ typedef struct
 #define MUR_TOKEN_LOOKUP(token, image_count, rec_time, fence) mur_token_lookup(token, image_count, rec_time, fence)
 #endif
 
-#define PRINT_VERBOSE_STAT(JCTL, MODULE)									\
-{														\
-	GBLREF 	jnl_gbls_t	jgbl;										\
-														\
+#define PRINT_VERBOSE_STAT(JCTL, MODULE)   									\
+{										   				\
+	GBLREF 	jnl_gbls_t	jgbl;			   							\
+	UNIX_ONLY(                             									\
+	uint4 days;                            									\
+	time_t seconds;)											\
+	VMS_ONLY(mval val;)											\
 	if (mur_options.verbose)										\
 	{													\
 		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4,   LEN_AND_LIT("Module"),				\
@@ -899,21 +1011,29 @@ typedef struct
 		if (!jgbl.forw_phase_recovery)									\
 		{												\
 			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Turn around Offset"), 	\
-				JCTL->turn_around_offset, JCTL->turn_around_offset);				\
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Turn around timestamp"), 	\
-				JCTL->turn_around_time, JCTL->turn_around_time);				\
+				JCTL->turn_around_offset, JCTL->turn_around_offset);   				\
+			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Turn around timestamp"),	\
+				JCTL->turn_around_time, JCTL->turn_around_time);  				\
 			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("    Turn around transaction"),	\
-				&JCTL->turn_around_tn, &JCTL->turn_around_tn);					\
+				&JCTL->turn_around_tn, &JCTL->turn_around_tn);  				\
 			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("    Turn around seqno"), 	\
-				&JCTL->turn_around_seqno, &JCTL->turn_around_seqno);				\
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Tp_resolve_time"), 	\
-				jgbl.mur_tp_resolve_time, jgbl.mur_tp_resolve_time);				\
+				&JCTL->turn_around_seqno, &JCTL->turn_around_seqno);   				\
+			UNIX_ONLY(										\
+				dollarh(jgbl.mur_tp_resolve_time, &days, &seconds);        			\
+				gtm_putmsg(VARLSTCNT(8) ERR_MUINFOUINT6, 6, LEN_AND_LIT("    Tp_resolve_time"), \
+				jgbl.mur_tp_resolve_time, jgbl.mur_tp_resolve_time, days, seconds);		\
+			)	 										\
+			VMS_ONLY(										\
+				op_horolog(&val);	                                                 	\
+            			gtm_putmsg(VARLSTCNT(8) ERR_MUINFOUINT6, 6,  LEN_AND_LIT("    Tp_resolve_time"),\
+                		jgbl.mur_tp_resolve_time, jgbl.mur_tp_resolve_time, val.str.len, val.str.addr)	\
+			);     											\
 			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Token total"), 		\
-				murgbl.token_table.count, murgbl.token_table.count);				\
+			murgbl.token_table.count, murgbl.token_table.count);					\
 			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Token broken"), 		\
-				murgbl.broken_cnt, murgbl.broken_cnt);						\
-		}												\
-	}													\
+				murgbl.broken_cnt, murgbl.broken_cnt);  					\
+		}								   				\
+	}									   				\
 }
 
 #define PRINT_VERBOSE_TAIL_BAD(JCTL)									\
@@ -928,10 +1048,56 @@ typedef struct
 	}												\
 }
 
+#define ASSERT_HOLD_REPLPOOL_SEMS				\
+{								\
+	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);		\
+	assert(holds_sem[SOURCE][SRC_SERV_COUNT_SEM]);		\
+	assert(holds_sem[RECV][RECV_POOL_ACCESS_SEM]);		\
+	assert(holds_sem[RECV][RECV_SERV_COUNT_SEM]);		\
+	assert(holds_sem[RECV][UPD_PROC_COUNT_SEM]);		\
+	assert(holds_sem[RECV][RECV_SERV_OPTIONS_SEM]);		\
+}
+
+#define ASSERT_DONOT_HOLD_REPLPOOL_SEMS				\
+{								\
+	assert(!holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);	\
+	assert(!holds_sem[SOURCE][SRC_SERV_COUNT_SEM]);		\
+	assert(!holds_sem[RECV][RECV_POOL_ACCESS_SEM]);		\
+	assert(!holds_sem[RECV][RECV_SERV_COUNT_SEM]);		\
+	assert(!holds_sem[RECV][UPD_PROC_COUNT_SEM]);		\
+	assert(!holds_sem[RECV][RECV_SERV_OPTIONS_SEM]);	\
+}
+
+#define ASSERT_VALID_JNLPOOL(CSA)										\
+{														\
+	GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;								\
+	GBLREF	jnlpool_addrs		jnlpool;								\
+														\
+	assert(CSA && CSA->critical && CSA->nl); /* should have been setup in mu_rndwn_replpool */		\
+	assert(jnlpool_ctl && (jnlpool_ctl == jnlpool.jnlpool_ctl));						\
+	assert(CSA->critical == (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE));	\
+	assert(CSA->nl == (node_local_ptr_t) ((sm_uc_ptr_t)CSA->critical + CRIT_SPACE				\
+		+ SIZEOF(mutex_spin_parms_struct)));								\
+	assert(jnlpool_ctl->filehdr_off);									\
+	assert(jnlpool_ctl->srclcl_array_off > jnlpool.jnlpool_ctl->filehdr_off);				\
+	assert(jnlpool_ctl->sourcelocal_array_off > jnlpool.jnlpool_ctl->srclcl_array_off);			\
+	assert(jnlpool.repl_inst_filehdr == (repl_inst_hdr_ptr_t) ((sm_uc_ptr_t)jnlpool_ctl			\
+			+ jnlpool_ctl->filehdr_off));								\
+	assert(jnlpool.gtmsrc_lcl_array == (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool_ctl				\
+			+ jnlpool_ctl->srclcl_array_off));							\
+	assert(jnlpool.gtmsource_local_array == (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool_ctl		\
+					+ jnlpool_ctl->sourcelocal_array_off));					\
+}
+
 /* Prototypes */
+#ifdef UNIX
+seq_num			mur_get_max_strm_reg_seqno(int strm_index);
+#endif
+
 void			jnlext_write(fi_type *file_info, char *buffer, int length);
 uint4			mur_apply_pblk(boolean_t apply_intrpt_pblk);
 boolean_t 		mur_back_process(boolean_t apply_pblk, seq_num *pre_resolve_seqno);
+uint4			mur_back_processing_one_region(mur_back_opt_t *mur_back_options);
 uint4 			mur_back_processing(jnl_ctl_list **jjctl, boolean_t apply_pblk, seq_num *pre_resolve_seqno,
 				jnl_tm_t alt_tp_resolve_time);
 uint4 			mur_block_count_correct(reg_ctl_list *rctl);

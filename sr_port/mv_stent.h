@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,8 @@ typedef struct
 } mvs_ntab_struct;
 
 /* PVAL includes NTAB plus a pointer to the new value created which may or may not be in the hashtable anymore
- * by the time this is unstacked but it needs to be cleaned up when the frame pops. */
+ * by the time this is unstacked but it needs to be cleaned up when the frame pops.
+ */
 typedef struct
 {
 	lv_val		*mvs_val;	/* lv_val created to hold new value */
@@ -50,21 +51,6 @@ typedef struct
 	DEBUG_ONLY(var_tabent	name;)	/* name.var_name.addr points to whatever the original vartab entry points to */
 } mvs_nval_struct;
 
-/* Structure put on stack to effect transfer of arguments to called M routines */
-typedef struct
-{
-	uint4			mask;
-	unsigned int		actualcnt;
-	struct lv_val_struct	*actuallist[1];
-} parm_blk;
-
-typedef struct
-{
-	boolean_t		save_truth;
-	mval			*ret_value;
-	parm_blk		*mvs_parmlist;
-} mvs_parm_struct;
-
 typedef struct
 {
 	struct io_desc_struct	*io_ptr;	/* associated device structure */
@@ -75,7 +61,8 @@ typedef struct
 
 typedef struct
 {	/* Note the top of this structure is a partial version of mvs_trigr_struct so needs to map into the top
-	 * of that structure (below) since cleanups share the same code */
+	 * of that structure (below) since cleanups share the same code
+	 */
 	boolean_t		saved_dollar_truth;
 	GTM64_ONLY(int4		filler;)		/* Alignment */
 	mval			savtarg;		/* Current gv_currkey */
@@ -123,7 +110,8 @@ typedef struct
 
 typedef struct
 {	/* When MERGE and/or ZWRITE nests (due to trigger or $ZINTRPT firing), the globals used need to be saved to
-	 * prevent collisions and restored when this frame pops. */
+	 * prevent collisions and restored when this frame pops.
+	 */
 	int					save_merge_args;
 	uint4					save_zwrtacindx;
 	boolean_t				save_in_zwrite;
@@ -149,8 +137,34 @@ typedef struct
 	unsigned char		*restart_ctxt_save;
 } mvs_rstrtpc_struct;
 
+/* zintcmd* entries are for timed commands other than I/O which can be
+ * interrupted.  Without an identifying structure such as the device
+ * structure, we use the restart_pc/ctxt values which must be save
+ * immediately before the commands opcode via a call to op_restartpc
+ * in ttt.txt (e.g. HANG) or generated via the m_ routine (e.g. LOCK.)
+ */
+typedef enum zintcmd_ops_enum
+{
+	ZINTCMD_NOOP = 0,
+	ZINTCMD_HANG,
+	ZINTCMD_LOCK,		/* also used for ZALLOCATE */
+	ZINTCMD_LAST
+} zintcmd_ops;
+
+typedef struct
+{
+	zintcmd_ops	command;
+	ABS_TIME	end_or_remain;	/* HANG = end_time, LOCK = remaining */
+	unsigned char	*restart_pc_check;	/* of interrupted command */
+	unsigned char	*restart_ctxt_check;
+	unsigned char	*restart_pc_prior;	/* from zintcmd_active before */
+	unsigned char	*restart_ctxt_prior;	/* this entry was put on stack */
+} mvs_zintcmd_struct;
+
 /* Homogenous mv_stent structure containing all types. This structure is never allocated as is but is allocated
- * on the M stack using the size for the size defined in mvs_size[] array in mtables.c */
+ * on the M stack using the size for the size defined in mvs_size[] array in mtables.c
+ * Note that since mvs_size is unsigned char, the sizeof each struct must be under 256 bytes
+ */
 typedef struct mv_stent_struct
 {
 	unsigned int 			mv_st_type : 6;		/* Max type is 63 */
@@ -177,7 +191,6 @@ typedef struct mv_stent_struct
 			int4		mvs_stck_size;
 		} mvs_stck;
 		mvs_ntab_struct		mvs_ntab;
-		mvs_parm_struct		mvs_parm;
 		mvs_zintdev_struct	mvs_zintdev;
 		mvs_pval_struct		mvs_pval;
 		mvs_nval_struct		mvs_nval;
@@ -186,24 +199,26 @@ typedef struct mv_stent_struct
 	  	mvs_tphold_struct	mvs_tp_holder;
 		mvs_rstrtpc_struct	mvs_rstrtpc;
 		mvs_mrgzwrsv_struct	mvs_mrgzwrsv;
+		mvs_zintcmd_struct	mvs_zintcmd;
 		int4			mvs_tval;
 		int4			mvs_storig;
 	} mv_st_cont;
 } mv_stent;
 
-mval *unw_mv_ent(mv_stent *mv_st_ent);
+void unw_mv_ent(mv_stent *mv_st_ent);
 void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 
 #define MVST_MSAV	0	/* An mval and an address to store it at pop time, most
 				 * often used to save/restore new'd intrinsic variables.
 				 * This is important because the restore addr is fixed,
-				 * and no extra work is required to resolve it. */
+				 * and no extra work is required to resolve it.
+				 */
 #define MVST_MVAL	1	/* An mval which will be dropped at pop time */
 #define MVST_STAB	2	/* A symbol table */
 #define MVST_IARR	3	/* An array of (literal or temp) mval's and mstr's on the stack, due to indirection */
 #define	MVST_NTAB	4	/* A place to save old name hash table values during parameter passed functions (used for dotted
 				 * parm/alias)  */
-#define	MVST_PARM	5	/* A pointer to a parameter passing block */
+#define MVST_ZINTCMD	5	/* Non IO timed commands when ZINTR */
 #define	MVST_PVAL	6	/* A temporary mval for formal parameters or NEW'd variable */
 #define	MVST_STCK	7	/* save value of stackwarn or save an object of generic C struct */
 #define MVST_NVAL	8	/* A temporary mval for indirect news */
@@ -212,46 +227,43 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #define MVST_ZINTR	11	/* Environmental save for $zinterrupt */
 #define MVST_ZINTDEV	12	/* In I/O when ZINTR, mstr input to now protected */
 #define	MVST_STCK_SP	13	/* same as the MVST_STCK type except that it needs special handling in flush_jmp.c
-				 * (see comment there) */
+				 * (see comment there)
+				 */
 #define MVST_LVAL	14	/* Same as MVST_MVAL except we are pushing an lv_val instead of an mval */
 #define MVST_TRIGR	15	/* Used to save the base environment for Trigger execution */
 #define MVST_RSTRTPC	16	/* Used to save/restore the restartpc/context across error or jobinterrupt frames */
 #define MVST_STORIG	17	/* This is the origin mv_stent placed on the stack during initialization */
 #define MVST_MRGZWRSV	18	/* Block used to save merge/zwrite control blocks when one or more of them nest */
+#define	MVST_LAST	18	/* update this, mvs_size and mvs_save in mtables.c, and switches in unw_mv_ent.c,
+				 * stp_gcol_src.h, and get_ret_targ.c when adding a new MVST type */
 
 /* Variation of ROUND_UP2 macro that doesn't have the checking that generates a GTMASSERT. This is necessary because the
- * MV_SIZE macro is used in a static table initializer so cannot have executable (non-constant) code in it */
+ * MV_SIZE macro is used in a static table initializer so cannot have executable (non-constant) code in it
+ */
 #define ROUND_UP2_NOCHECK(VALUE,MODULUS) (((VALUE) + ((MODULUS) - 1)) & ~((MODULUS) - 1))
 #define MV_SIZE(X) \
         ROUND_UP2_NOCHECK(((SIZEOF(*mv_chain) - SIZEOF(mv_chain->mv_st_cont) + SIZEOF(mv_chain->mv_st_cont.X))), NATIVE_WSIZE)
 
-/* Declare those global variables and error messages that are used by the PUSH_MV_STENT and POP_MV_STENT macros */
-LITREF	unsigned char	mvs_size[];
-GBLREF	unsigned char	*stackbase, *stacktop, *stackwarn, *msp;
-GBLREF	mv_stent	*mv_chain;
-error_def(ERR_STACKCRIT);
-error_def(ERR_STACKOFLOW);
-
-#define PUSH_MV_STENT(T) (((msp -= mvs_size[T]) <= stackwarn) ? \
-	((msp <= stacktop) ? (msp += mvs_size[T]/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) : \
-	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) : \
-	(((mv_stent *) msp)->mv_st_type = T , \
-	((mv_stent *) msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)), \
+#define PUSH_MV_STENT(T) (((msp -= mvs_size[T]) <= stackwarn) ?							\
+	((msp <= stacktop) ? (msp += mvs_size[T]/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) :	\
+	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) :								\
+	(((mv_stent *) msp)->mv_st_type = T ,									\
+	((mv_stent *) msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)),				\
 	mv_chain = (mv_stent *) msp)
 
-#define PUSH_MV_STCK(size, st_type) (((msp -= (mvs_size[st_type] + (size))) <= stackwarn) ? \
-	((msp <= stacktop) ? (msp += (mvs_size[st_type] + (size))/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) : \
-	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) : \
-	(((mv_stent *) msp)->mv_st_type = st_type, \
-	((mv_stent *) msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)), \
+#define PUSH_MV_STCK(size, st_type) (((msp -= (mvs_size[st_type] + (size))) <= stackwarn) ?					\
+	((msp <= stacktop) ? (msp += (mvs_size[st_type] + (size))/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) :	\
+	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) :										\
+	(((mv_stent *) msp)->mv_st_type = st_type,										\
+	((mv_stent *) msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)),						\
 	mv_chain = (mv_stent *) msp)
 
 #ifdef DEBUG
-#define POP_MV_STENT() (assert(msp == (unsigned char *) mv_chain), \
-	msp += mvs_size[mv_chain->mv_st_type], \
+#define POP_MV_STENT() (assert(msp == (unsigned char *) mv_chain),		\
+	msp += mvs_size[mv_chain->mv_st_type],					\
 	mv_chain = (mv_stent *)((char *) mv_chain + mv_chain->mv_st_next))
 #else
-#define POP_MV_STENT() (msp += mvs_size[mv_chain->mv_st_type], \
+#define POP_MV_STENT() (msp += mvs_size[mv_chain->mv_st_type],			\
 	mv_chain = (mv_stent *)((char *) mv_chain + mv_chain->mv_st_next))
 #endif
 
@@ -278,4 +290,13 @@ error_def(ERR_STACKOFLOW);
 	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrhtab = zwrhtab;			\
 	zwrhtab = NULL;									\
 }
+
+/* Declare those global variables and error messages that are used by the PUSH_MV_STENT and POP_MV_STENT macros */
+LITREF	unsigned char	mvs_size[];
+GBLREF	unsigned char	*stackbase, *stacktop, *stackwarn, *msp;
+GBLREF	mv_stent	*mv_chain;
+
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
+
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,22 +62,11 @@ error_def(ERR_DBRDONLY);
 error_def(ERR_SIZENOTVALID8);
 error_def(ERR_FREEZECTRL);
 
-#define	CLNUP_CRIT					\
-{							\
-	if (!was_crit)					\
-	{						\
-		if (nocrit_present)			\
-			cs_addrs->now_crit = FALSE;	\
-		else					\
-			rel_crit(gv_cur_region);	\
-	}						\
-}
-
 void dse_chng_fhead(void)
 {
 	int4		x, index_x, save_x;
 	unsigned short	buf_len;
-	bool		was_crit;
+	boolean_t	was_crit, was_hold_onto_crit;
 	boolean_t	override = FALSE;
 	int4		nocrit_present;
 	int4		location_present, value_present, size_present, size;
@@ -103,13 +92,7 @@ void dse_chng_fhead(void)
 	memset(buf, 0, MAX_LINE);
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = TRUE;
-		else
-			grab_crit(gv_cur_region);
-	}
+	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (CLI_PRESENT == cli_present("OVERRIDE"))
 		override = TRUE;
 #ifdef VMS
@@ -121,7 +104,7 @@ void dse_chng_fhead(void)
 		&& !override)
 #endif
 	{
-		CLNUP_CRIT;
+		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
                 util_out_print("Region: !AD  is frozen by another user, not releasing freeze.",
                                         TRUE, REG_LEN_STR(gv_cur_region));
                 rts_error(VARLSTCNT(4) ERR_FREEZE, 2, REG_LEN_STR(gv_cur_region));
@@ -135,7 +118,7 @@ void dse_chng_fhead(void)
 		location_present = TRUE;
 		if (!cli_get_hex("LOCATION", &location))
 		{
-			CLNUP_CRIT;
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 			return;
 		}
 	}
@@ -144,7 +127,7 @@ void dse_chng_fhead(void)
 		location_present = TRUE;
 		if (!cli_get_hex("HEXLOCATION", &location))
 		{
-			CLNUP_CRIT;
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 			return;
 		}
 	}
@@ -153,7 +136,7 @@ void dse_chng_fhead(void)
 		location_present = TRUE;
 		if (!cli_get_int("DECLOCATION", (int4 *)&location))
 		{
-			CLNUP_CRIT;
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 			return;
 		}
 	}
@@ -163,7 +146,7 @@ void dse_chng_fhead(void)
 		size_present = TRUE;
 		if (!cli_get_int("SIZE", &size))
 		{
-			CLNUP_CRIT;
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 			return;
 		}
 	}
@@ -173,7 +156,7 @@ void dse_chng_fhead(void)
 		value_present = TRUE;
 		if (!cli_get_hex64("VALUE", (gtm_uint64_t *)&value))
 		{
-			CLNUP_CRIT;
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 			return;
 		}
 	}
@@ -182,7 +165,7 @@ void dse_chng_fhead(void)
 		value_present = TRUE;
 		if (!cli_get_hex64("HEXVALUE", &value))
 		{
-			CLNUP_CRIT;
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 			return;
 		}
 	}
@@ -191,7 +174,7 @@ void dse_chng_fhead(void)
 		value_present = TRUE;
 		if (!cli_get_uint64("DECVALUE", (gtm_uint64_t *)&value))
 		{
-			CLNUP_CRIT;
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 			return;
 		}
 	}
@@ -202,7 +185,7 @@ void dse_chng_fhead(void)
 		if (!((SIZEOF(char) == size) || (SIZEOF(short) == size) || (SIZEOF(int4) == size) ||
 			(SIZEOF(gtm_int64_t) == size)))
 		{
-			CLNUP_CRIT;
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
                         rts_error(VARLSTCNT(1) ERR_SIZENOTVALID8);
 		}
 		if ((0 > (int4)size) || ((uint4)SGMNT_HDR_LEN < (uint4)location)
@@ -267,8 +250,7 @@ void dse_chng_fhead(void)
 		else
 		{
 			cs_addrs->hdr->blk_size = ((x/DISK_BLOCK_SIZE) + 1) * DISK_BLOCK_SIZE;
-			CLNUP_CRIT;
-			rts_error(VARLSTCNT(4) ERR_BLKSIZ512, 2, x, cs_addrs->hdr->blk_size);
+			gtm_putmsg(VARLSTCNT(4) ERR_BLKSIZ512, 2, x, cs_addrs->hdr->blk_size);
 		}
 	}
 	if ((CLI_PRESENT == cli_present("RECORD_MAX_SIZE")) && (cli_get_int("RECORD_MAX_SIZE", &x)))
@@ -422,6 +404,16 @@ void dse_chng_fhead(void)
 	/* ---------- End ------ CURRENT_TN/MAX_TN/WARN_MAX_TN processing -------- */
 	if (CLI_PRESENT == cli_present("REG_SEQNO") && cli_get_hex64("REG_SEQNO", (gtm_uint64_t *)&seq_no))
 		cs_addrs->hdr->reg_seqno = seq_no;
+	UNIX_ONLY(
+		if (CLI_PRESENT == cli_present("STRM_NUM"))
+		{
+			assert(CLI_PRESENT == cli_present("STRM_REG_SEQNO"));
+			if (cli_get_int("STRM_NUM", &x) && (0 <= x) && (MAX_SUPPL_STRMS > x)
+					&& (CLI_PRESENT == cli_present("STRM_REG_SEQNO"))
+					&& cli_get_hex64("STRM_REG_SEQNO", (gtm_uint64_t *)&seq_no))
+				cs_addrs->hdr->strm_reg_seqno[x] = seq_no;
+		}
+	)
 	VMS_ONLY(
 		if (CLI_PRESENT == cli_present("RESYNC_SEQNO") && cli_get_hex64("RESYNC_SEQNO", (gtm_uint64_t *)&seq_no))
 			cs_addrs->hdr->resync_seqno = seq_no;
@@ -433,8 +425,6 @@ void dse_chng_fhead(void)
 			cs_addrs->hdr->zqgblmod_seqno = seq_no;
 		if (CLI_PRESENT == cli_present("ZQGBLMOD_TN") && cli_get_hex64("ZQGBLMOD_TN", &tn))
 			cs_addrs->hdr->zqgblmod_tn = tn;
-		if (CLI_PRESENT == cli_present("DUALSITE_RESYNC_SEQNO") && cli_get_hex64("DUALSITE_RESYNC_SEQNO", &seq_no))
-			cs_addrs->hdr->dualsite_resync_seqno = seq_no;
 	)
 	if (CLI_PRESENT == cli_present("STDNULLCOLL"))
 	{
@@ -764,6 +754,6 @@ void dse_chng_fhead(void)
 		else
 			cs_addrs->hdr->writer_trigger_factor = x;
 	}
-	CLNUP_CRIT;
+	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	return;
 }

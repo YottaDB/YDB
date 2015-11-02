@@ -148,7 +148,14 @@ void op_merge(void)
 		{	/*==================== MERGE ^gvn1=^gvn2 =====================*/
 			if (mglvnp->gblp[IND2]->s_gv_target->nct != mglvnp->gblp[IND1]->s_gv_target->nct)
 				rts_error(VARLSTCNT(1) ERR_NCTCOLLDIFF);
-			merge_desc_check(); /* will not proceed if one is descendant of another */
+			/* if self merge then NOOP*/
+			if (!merge_desc_check()) /* will not proceed if one is descendant of another */
+			{
+				gvname_env_restore(mglvnp->gblp[IND1]);	 /* store destination as naked indicator in gv_currkey */
+				POP_MV_STENT();	/* value */
+				merge_args = 0;	/* Must reset to zero to reuse the Global */
+				return;
+			}
 			nullcoll_src = mglvnp->gblp[IND2]->s_gv_cur_region->std_null_coll;
 			nullcoll_dst = mglvnp->gblp[IND1]->s_gv_cur_region->std_null_coll;
 			if (1 == dollardata_src || 11 == dollardata_src)
@@ -170,7 +177,7 @@ void op_merge(void)
 			{
 				if (outofband)
 				{
-					gvname_env_restore(mglvnp->gblp[IND1]);	 /* naked indicator is restored into gv_currkey */
+					gvname_env_restore(mglvnp->gblp[IND1]); /* naked indicator is restored into gv_currkey */
 					outofband_action(FALSE);
 				}
 				/* Restore last key under ^gvn2 we worked */
@@ -344,7 +351,13 @@ void op_merge(void)
 		if (MARG1_IS_LCL(merge_args))
 		{	/*==================== MERGE lvn1=lvn2 =====================*/
 			assert(mglvnp->lclp[IND1]);
-			merge_desc_check(); /* will not proceed if one is descendant of another */
+			/* if self merge then NOOP */
+			if (!merge_desc_check()) /* will not proceed if one is descendant of another */
+			{
+				POP_MV_STENT();	/* value */
+				merge_args = 0;	/* Must reset to zero to reuse the Global */
+				return;
+			}
 			output.buff = (char *)buff;
 			output.ptr = output.buff;
 			output.out_var.lv.lvar = mglvnp->lclp[IND1];

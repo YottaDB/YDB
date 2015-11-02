@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@
 #include "repl_msg.h"		/* for gtmsource.h */
 #include "gtmsource.h"		/* for jnlpool_addrs structure definition */
 #include "send_msg.h"
+#include "have_crit.h"
 
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	cw_set_element		cw_set[];
@@ -57,6 +58,11 @@ GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	uint4			update_trans;
 GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
+#ifdef UNIX
+GBLREF	jnl_gbls_t		jgbl;
+#endif
+
+error_def(ERR_DBCOMMITCLNUP);
 
 #define	RESET_EARLY_TN_IF_NEEDED(csa)						\
 {										\
@@ -91,15 +97,14 @@ GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the T
 
 boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 {
-	boolean_t	update_underway, reg_seqno_reset = FALSE;
-	cache_rec_ptr_t	cr;
-	sgm_info	*si;
-	sgmnt_addrs	*csa, *jpl_csa = NULL;
-	char		*trstr;
-	gd_region	*xactn_err_region, *jpl_reg = NULL;
-	cache_rec_ptr_t	*tp_cr_array;
-
-	error_def(ERR_DBCOMMITCLNUP);
+	boolean_t			update_underway, reg_seqno_reset = FALSE, release_crit;
+	cache_rec_ptr_t			cr;
+	sgm_info			*si;
+	sgmnt_addrs			*csa, *jpl_csa = NULL;
+	char				*trstr;
+	gd_region			*xactn_err_region, *jpl_reg = NULL;
+	cache_rec_ptr_t			*tp_cr_array;
+	DEBUG_ONLY(unsigned int		lcl_t_tries;)
 
 	assert(cdb_sc_normal != status);
 	xactn_err_region = gv_cur_region;
@@ -148,6 +153,12 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	}
 	if (!update_underway)
 	{	/* Rollback (undo) the transaction. the comments below refer to step numbers as documented in secshr_db_clnup */
+		/* If we are here due to a restart (in t_end or tp_tend), we release crit as long as it is not the transition
+		 * from 2nd to 3rd retry or 3rd to 3rd retry. However, if we are here because of a runtime error in t_end or tp_tend
+		 * at a point where the transaction can be rolled backwards (update_underway = FALSE), we release crit before going
+		 * to the error trap thereby avoiding any unintended crit hangs.
+		 */
+		release_crit = (0 == signal) ? NEED_TO_RELEASE_CRIT(t_tries) : TRUE;
 		if ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
 		{
 			csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
@@ -161,7 +172,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 					jnlpool_ctl->early_write_addr = jnlpool_ctl->write_addr; /* step (3) gets undone here */
 				}
 				assert(jnlpool_ctl->write == jnlpool_ctl->write_addr % jnlpool_ctl->jnlpool_size);
-				if (CDB_STAGNATE > t_tries)
+				if (!csa->hold_onto_crit)
 					jpl_reg = jnlpool.jnlpool_dummy_reg;	/* note down to release crit later */
 			}
 		}
@@ -171,6 +182,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			 * regions and are in the final retry. In this case using "first_sgm_info" will guarantee that
 			 * we release crit on all the regions.
 			 */
+			DEBUG_ONLY(lcl_t_tries = t_tries);
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
 			{
 				TP_CHANGE_REG(si->gv_cur_region);
@@ -188,9 +200,17 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 				ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa->hdr, jnlpool_ctl); /* debug-only sanity check between
 											  * seqno of filehdr and jnlpool */
 				/* Do not release crit on the region until reg_seqno has been reset above. */
-				if (!csa->hold_onto_crit)
+				assert(!csa->hold_onto_crit UNIX_ONLY(|| jgbl.onlnrlbk));
+				if (!csa->hold_onto_crit && release_crit)
 					rel_crit(gv_cur_region); /* step (1) of the commit logic is iteratively undone here */
 			}
+			/* If final retry and released crit (in the above loop), decrement t_tries to ensure that we dont have an
+			 * out-of-design situation (with crit not being held in the final retry).
+			 */
+			if (release_crit && (CDB_STAGNATE <= t_tries))
+				TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK; /* t_tries untouched for rollback and recover */
+			UNIX_ONLY(assert(!jgbl.onlnrlbk || (lcl_t_tries == t_tries)));
+			assert((lcl_t_tries == t_tries) || (t_tries == (CDB_STAGNATE - 1)));
 			/* Do not release crit on jnlpool until reg_seqno has been reset above */
 			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);/* step (2) of the commit logic is undone here */
 		} else
@@ -205,13 +225,29 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			}
 			/* Do not release crit on jnlpool or the region until reg_seqno has been reset above */
 			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);/* step (2) of the commit logic is undone here */
-			if (!csa->hold_onto_crit)
+			if (!csa->hold_onto_crit && release_crit)
 				rel_crit(gv_cur_region);	/* step (1) of the commit logic is undone here */
 		}
-		if ((t_tries < CDB_STAGNATE) && unhandled_stale_timer_pop)
+		DEBUG_ONLY(
+			csa = (NULL == jpl_reg) ? NULL : &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+			assert((NULL == csa) || !csa->now_crit || csa->hold_onto_crit);
+		)
+		/* Do any pending buffer flush (wcs_wtstart) if we missed a flush timer. We should do this ONLY if we don't hold
+		 * crit. Use release_crit for that purpose. The only case where release_crit is TRUE but we still hold crit is if
+		 * the process wants to hold onto crit (for instance, DSE or ONLINE ROLLBACK). In that case, do the flush anyways.
+		 */
+		assert(!release_crit || (0 == have_crit(CRIT_HAVE_ANY_REG))
+			UNIX_ONLY(|| jgbl.onlnrlbk) || (!dollar_tlevel && cs_addrs->hold_onto_crit));
+		if (release_crit && unhandled_stale_timer_pop)
 			process_deferred_stale();
 	} else
-	{	/* Roll forward (complete the partial commit of) the transaction by invoking secshr_db_clnup() */
+	{	/* Roll forward (complete the partial commit of) the transaction by invoking secshr_db_clnup(). At this point, we
+		 * don't know of any reason why signal should be 0 as that would indicate that we encountered a runtime error in
+		 * t_end/tp_tend and yet decided to roll forward the transaction. So, assert accordingly and if ever this happens,
+		 * we need to revisit the commit logic and fix the error as we are past the point where we no longer can roll-back
+		 * the transaction.
+		 */
+		assert(0 == signal);
 		send_msg(VARLSTCNT(8) ERR_DBCOMMITCLNUP, 6, process_id, process_id, signal, trstr, DB_LEN_STR(xactn_err_region));
 		/* if t_ch() (a condition handler) was driving this routine, then doing send_msg() here is not a good idea
 		 * as it will overlay the current error message string driving t_ch(), but this case is an exception since

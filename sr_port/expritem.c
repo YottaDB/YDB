@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,27 +10,21 @@
  ****************************************************************/
 
 #include "mdef.h"
-
 #include "compiler.h"
-#include "svnames.h"
+#include "mdq.h"
 #include "opcode.h"
 #include "toktyp.h"
+#include "svnames.h"
 #include "nametabtyp.h"
 #include "funsvn.h"
 #include "advancewindow.h"
-#include "mdq.h"
 #include "stringpool.h"
 #include "namelook.h"
 #include "fullbool.h"
 #include "show_source_line.h"
 
 GBLREF	bool		devctlexp;
-GBLREF	char		director_token;
-GBLREF	triple		*curtchain;
 GBLREF	boolean_t	run_time;
-GBLREF	mident		window_ident;
-GBLREF	mval		window_mval;
-GBLREF	char		window_token;
 
 error_def(ERR_BOOLSIDEFFECT);
 error_def(ERR_EXPR);
@@ -47,6 +41,21 @@ LITREF	mval		literal_null;
 #ifndef UNICODE_SUPPORTED
 #define f_char f_zchar
 #endif
+
+#define ENCOUNTERED_SIDE_EFFECT										\
+{	/* Needs #include "show_source_line" and #include "fullbool.h" */				\
+	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];					\
+													\
+	if (TREF(shift_side_effects))									\
+	{												\
+		TREF(saw_side_effect) = TRUE;								\
+		if (!run_time && (FULL_BOOL_WARN == TREF(gtm_fullbool)))				\
+		{	/* warnings requested by by gtm_fullbool and enabled by eval_expr */		\
+			show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);		\
+			dec_err(VARLSTCNT(1) ERR_BOOLSIDEFFECT);					\
+		}											\
+	}												\
+}
 
 /* note that svn_index array provides indexes into this array for each letter of the
  * alphabet so changes here should be reflected there.
@@ -94,6 +103,7 @@ LITDEF nametabent svn_names[] =
 	,{ 2, "ZL*" }
 	,{ 8, "ZMAXTPTI*" }
 	,{ 3, "ZMO*" }
+	,{ 5, "ZONLN*"}
 	,{ 5, "ZPATN" }, {8, "ZPATNUME*" }
 	,{ 4, "ZPOS*" }
 	,{ 5, "ZPROC*" }
@@ -126,7 +136,7 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 89	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 90	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -173,6 +183,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZLEVEL, FALSE, ALL_SYS }
 	,{ SV_ZMAXTPTIME, TRUE, ALL_SYS }
 	,{ SV_ZMODE, FALSE, ALL_SYS }
+	,{ SV_ZONLNRLBK, FALSE, UNIX_OS }
 	,{ SV_ZPATNUMERIC, FALSE, ALL_SYS }, { SV_ZPATNUMERIC, FALSE, ALL_SYS }
 	,{ SV_ZPOS, FALSE, ALL_SYS }
 	,{ SV_ZPROC, FALSE, ALL_SYS }
@@ -444,10 +455,9 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 int expritem(oprtype *a)
 {
 	int 		i, index, sv_opcode;
-	triple 		*oldchain, *ref, tmpchain, *triptr;
-	boolean_t	parse_warn, save_shift;
+	triple 		*oldchain, *ref, tmpchain;
+	boolean_t	parse_warn;
 	oprtype 	x1;
-	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	unsigned char 	type;
 	DCL_THREADGBL_ACCESS;
 
@@ -456,178 +466,147 @@ int expritem(oprtype *a)
 	assert(SIZEOF(svn_names)/SIZEOF(nametabent) == SIZEOF(svn_data)/SIZEOF(svn_data_type)); /* are all SVNs covered? */
 	assert(fun_index[26] == (SIZEOF(fun_names)/SIZEOF(nametabent)));
 	assert(SIZEOF(fun_names)/SIZEOF(nametabent) == SIZEOF(fun_data)/SIZEOF(fun_data_type)); /* are all functions covered? */
-	if (i = tokentable[window_token].uo_type)	/* Note assignment */
+	if (i = tokentable[TREF(window_token)].uo_type)		/* NOTE assignment */
 	{
-		type = tokentable[window_token].opr_type;
+		type = tokentable[TREF(window_token)].opr_type;
 		advancewindow();
-		if ((OC_NEG == i) && ((TK_NUMLIT == window_token) || (TK_INTLIT == window_token)))
+		if ((OC_NEG == i) && ((TK_NUMLIT == TREF(window_token)) || (TK_INTLIT == TREF(window_token))))
 		{
-			assert(MV_IS_NUMERIC(&window_mval));
-			if (window_mval.mvtype & MV_INT)
-				window_mval.m[1] = -window_mval.m[1];
+			assert(MV_IS_NUMERIC(&(TREF(window_mval))));
+			if ((TREF(window_mval)).mvtype & MV_INT)
+				(TREF(window_mval)).m[1] = -(TREF(window_mval)).m[1];
 			else
-				window_mval.sgn = 1;
-			if (TK_NUMLIT == window_token)
-				n2s(&window_mval);
+				(TREF(window_mval)).sgn = 1;
+			if (TK_NUMLIT == TREF(window_token))
+				n2s(&(TREF(window_mval)));
 		} else
 		{
 			if (!expratom(&x1))
 				return FALSE;
-			coerce(&x1,type);
-			ref = newtriple((opctype) i);
+			coerce(&x1, type);
+			ref = newtriple((opctype)i);
 			ref->operand[0] = x1;
 			*a = put_tref(ref);
 			return TRUE;
 		}
 	}
-	switch(i = window_token)	/* Note assignment */
+	switch (i = TREF(window_token))				/* NOTE assignment */
 	{
-		case TK_INTLIT:
-			n2s(&window_mval);
-		case TK_NUMLIT:
-		case TK_STRLIT:
-			*a = put_lit(&window_mval);
+	case TK_INTLIT:
+		n2s(&(TREF(window_mval)));
+	case TK_NUMLIT:
+	case TK_STRLIT:
+		*a = put_lit(&(TREF(window_mval)));
+		advancewindow();
+		return TRUE;
+	case TK_LPAREN:
+		advancewindow();
+		if (eval_expr(a) && TK_RPAREN == TREF(window_token))
+		{
 			advancewindow();
 			return TRUE;
-		case TK_LPAREN:
+		}
+		stx_error(ERR_RPARENMISSING);
+		return FALSE;
+	case TK_DOLLAR:
+		if ((TK_DOLLAR == TREF(director_token)) || (TK_AMPERSAND == TREF(director_token)))
+		{
+			ENCOUNTERED_SIDE_EFFECT;
+			TREF(temp_subs) = TRUE;
 			advancewindow();
-			if (eval_expr(a) && TK_RPAREN == window_token)
+			if ((TK_DOLLAR == TREF(window_token)) ? (EXPR_FAIL == exfunc(a, FALSE))
+							      : (EXPR_FAIL == extern_func(a)))
+				return FALSE;
+		} else
+		{
+			advancewindow();
+			if (TK_IDENT != TREF(window_token))
 			{
-				advancewindow();
-				return TRUE;
+				stx_error(ERR_FCNSVNEXPECTED);
+				return FALSE;
 			}
-			stx_error(ERR_RPARENMISSING);
-			return FALSE;
-		case TK_DOLLAR:
-			if ((TK_DOLLAR == director_token) || (TK_AMPERSAND == director_token))
+			parse_warn = FALSE;
+			if (TK_LPAREN == TREF(director_token))
 			{
-				if ((-TRUE == TREF(shift_side_effects)) && !run_time && (FULL_BOOL_WARN == TREF(gtm_fullbool)))
-				{	/* warnings requested by by gtm_fullbool and enabled by -TRUE from eval_expr */
-					show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
-					dec_err(VARLSTCNT(1) ERR_BOOLSIDEFFECT);
-				}
-				advancewindow();
-				dqinit(&tmpchain, exorder);	/* a new chain in case we need to juggle things */
-				oldchain = setcurtchain(&tmpchain);
-				save_shift = TREF(shift_side_effects);
-				if (GTM_BOOL != TREF(gtm_fullbool))	/* if no short circuit, only the outermost should juggle */
-					TREF(shift_side_effects) = FALSE;
-				TREF(temp_subs) = TRUE;
-				if ((TK_DOLLAR == window_token) ? !exfunc(a, FALSE) : !extern_func(a))
+				index = namelook(fun_index, fun_names, (TREF(window_ident)).addr, (TREF(window_ident)).len);
+				if (index < 0)
 				{
-					setcurtchain(oldchain);
-					return FALSE;
-				}
-				TREF(shift_side_effects) = save_shift;
-				if (!save_shift || (GTM_BOOL == TREF(gtm_fullbool)))
-				{	/* put it on the end of the main chain as there's no reason to play with the ordering */
-					setcurtchain(oldchain);
-					triptr = curtchain->exorder.bl;
-					dqadd(triptr, &tmpchain, exorder);	/* this is a violation of info hiding */
-				} else /* put on the shift chain to get side effects in boolean expression */
-				{	/* add the chain after "expr_start" which may be much before "curtchain" */
-					ref = newtriple(OC_GVSAVTARG);
-					dqadd(TREF(expr_start), &tmpchain, exorder);	/* this is a violation of info hiding */
-					TREF(expr_start) = tmpchain.exorder.bl;
-					setcurtchain(oldchain);
-					triptr = newtriple(OC_GVRECTARG);
-					triptr->operand[0] = put_tref(ref);
-				}
-			} else
-			{
-				advancewindow();
-				if (TK_IDENT != window_token)
-				{
-					stx_error(ERR_FCNSVNEXPECTED);
-					return FALSE;
-				}
-				parse_warn = FALSE;
-				if (TK_LPAREN == director_token)
-				{
-					index = namelook(fun_index, fun_names, window_ident.addr, window_ident.len);
-					if (index < 0)
-					{
-						STX_ERROR_WARN(ERR_INVFCN);	/* sets "parse_warn" to TRUE */
-					} else
-					{
-						assert(SIZEOF(fun_names) / SIZEOF(fun_data_type) > index);
-						if (!VALID_FUN(index))
-						{
-							STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
-						} else if (OC_FNINCR == fun_data[index].opcode)
-						{	/* $INCR is used. This can operate on undefined local variables
-							 * and make them defined. If used in a SET where the left and right
-							 * side of the = operator use this variable (as a subscript on the left
-							 * and as input to the $INCR function on the right), we want an UNDEF
-							 * error to show up which means we need to set "temp_subs" to TRUE.
-							 */
-							TREF(temp_subs) = TRUE;
-							if ((-TRUE == TREF(shift_side_effects)) && !run_time
-								&& (FULL_BOOL_WARN == TREF(gtm_fullbool))) /* warnings requested */
-							{	/* by gtm_fullbool and enabled by -TRUE from eval_expr  */
-								show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
-								dec_err(VARLSTCNT(1) ERR_BOOLSIDEFFECT);
-							}
-						}
-					}
-					advancewindow();
-					advancewindow();
-					if (!parse_warn)
-					{
-						assert(OPCODE_COUNT > fun_data[index].opcode);
-						if (!(boolean_t)((*fun_parse[index])(a, fun_data[index].opcode)))
-							return FALSE;
-					} else
-					{
-						*a = put_lit((mval *)&literal_null);
-						/* Parse the remaining arguments until the corresponding RIGHT-PAREN/SPACE/EOL
-						   is reached */
-						if (!parse_until_rparen_or_space())
-							return FALSE;
-					}
-					if (TK_RPAREN != window_token)
-					{
-						stx_error(ERR_RPARENMISSING);
-						return FALSE;
-					}
-					advancewindow();
+					STX_ERROR_WARN(ERR_INVFCN);	/* sets "parse_warn" to TRUE */
 				} else
 				{
-					index = namelook(svn_index, svn_names, window_ident.addr, window_ident.len);
-					if (0 > index)
+					assert(SIZEOF(fun_names) / SIZEOF(fun_data_type) > index);
+					if (!VALID_FUN(index))
 					{
-						STX_ERROR_WARN(ERR_INVSVN);	/* sets "parse_warn" to TRUE */
-					} else
-					{
-						assert(SIZEOF(svn_names) / SIZEOF(svn_data_type) > index);
-						if (!VALID_SVN(index))
-						{
-							STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
-						}
+						STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
+					} else if ((OC_FNINCR == fun_data[index].opcode) || (OC_FNZCALL == fun_data[index].opcode))
+					{	/* $INCR is used. This can operate on undefined local variables
+						 * and make them defined. If used in a SET where the left and right
+						 * side of the = operator use this variable (as a subscript on the left
+						 * and as input to the $INCR function on the right), we want an UNDEF
+						 * error to show up which means we need to set "temp_subs" to TRUE.
+						 */
+						TREF(temp_subs) = TRUE;
+						ENCOUNTERED_SIDE_EFFECT;
 					}
-					advancewindow();
-					if (!parse_warn)
-					{
-						sv_opcode = svn_data[index].opcode;
-						assert(SV_NUM_SV > sv_opcode);
-						if (SV_TEST == sv_opcode)
-							*a = put_tref(newtriple(OC_GETTRUTH));
-						else
-						{
-							if (sv_opcode == SV_X || sv_opcode == SV_Y)
-								devctlexp = TRUE;
-							ref = newtriple(OC_SVGET);
-							ref->operand[0] = put_ilit(sv_opcode);
-							*a = put_tref(ref);
-						}
-					} else
-						*a = put_lit((mval *)&literal_null);
 				}
+				advancewindow();
+				advancewindow();
+				if (!parse_warn)
+				{
+					assert(OPCODE_COUNT > fun_data[index].opcode);
+					if (!(boolean_t)((*fun_parse[index])(a, fun_data[index].opcode)))
+						return FALSE;
+				} else
+				{
+					*a = put_lit((mval *)&literal_null);
+					/* Parse the remaining arguments until the corresponding RIGHT-PAREN/SPACE/EOL
+					   is reached */
+					if (!parse_until_rparen_or_space())
+						return FALSE;
+				}
+				if (TK_RPAREN != TREF(window_token))
+				{
+					stx_error(ERR_RPARENMISSING);
+					return FALSE;
+				}
+				advancewindow();
+			} else
+			{
+				index = namelook(svn_index, svn_names, (TREF(window_ident)).addr, (TREF(window_ident)).len);
+				if (0 > index)
+				{
+					STX_ERROR_WARN(ERR_INVSVN);	/* sets "parse_warn" to TRUE */
+				} else
+				{
+					assert(SIZEOF(svn_names) / SIZEOF(svn_data_type) > index);
+					if (!VALID_SVN(index))
+					{
+						STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
+					}
+				}
+				advancewindow();
+				if (!parse_warn)
+				{
+					sv_opcode = svn_data[index].opcode;
+					assert(SV_NUM_SV > sv_opcode);
+					if (SV_TEST == sv_opcode)
+						*a = put_tref(newtriple(OC_GETTRUTH));
+					else
+					{
+						if (sv_opcode == SV_X || sv_opcode == SV_Y)
+							devctlexp = TRUE;
+						ref = newtriple(OC_SVGET);
+						ref->operand[0] = put_ilit(sv_opcode);
+						*a = put_tref(ref);
+					}
+				} else
+					*a = put_lit((mval *)&literal_null);
 			}
-			return TRUE;
-		case TK_COLON:
-			stx_error(ERR_EXPR);
-			return FALSE;
+		}
+		return TRUE;
+	case TK_COLON:
+		stx_error(ERR_EXPR);
+		return FALSE;
 	}
 	return FALSE;
 }

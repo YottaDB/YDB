@@ -35,7 +35,7 @@
 #include <_Ccsid.h>
 #endif
 
-LITREF mstr	     	chset_names[];
+LITREF mstr		chset_names[];
 LITREF nametabent	dev_param_names[];
 LITREF unsigned char	dev_param_index[];
 LITREF zshow_index	zshow_param_index[];
@@ -71,8 +71,9 @@ void zshow_devices(zshow_out *output)
 	io_termmask	*mask_out;
 	int4		i, j, ii, jj;
 	boolean_t	first;
-	sm_uc_ptr_t	delim_buff_sm;
-	unsigned short  delim_len_sm;
+	unsigned char	delim_buff_sm[MAX_DELIM_LEN];
+	unsigned short	delim_len_sm;
+	char		delim_mstr_buff[(MAX_DELIM_LEN * MAX_ZWR_EXP_RATIO) + 11];
 	mstr		delim;
 	int		delim_len, tmpport;
 	static readonly char space8_text[] = "        ";
@@ -101,12 +102,12 @@ void zshow_devices(zshow_out *output)
 	static readonly char delimiter_text[] = "DELIMITER ";
 	static readonly char nodelimiter_text[] = "NODELIMITER ";
 	static readonly char local_text[] = "LOCAL=";
-        static readonly char remote_text[] = "REMOTE=";
-        static readonly char total_text[] = "TOTAL=";
-        static readonly char current_text[] = "CURRENT=";
-        static readonly char passive_text[] = "PASSIVE ";
-        static readonly char active_text[] = "ACTIVE ";
-        static readonly char socket_text[] = "SOCKET";
+	static readonly char remote_text[] = "REMOTE=";
+	static readonly char total_text[] = "TOTAL=";
+	static readonly char current_text[] = "CURRENT=";
+	static readonly char passive_text[] = "PASSIVE ";
+	static readonly char active_text[] = "ACTIVE ";
+	static readonly char socket_text[] = "SOCKET";
 	static readonly char descriptor_text[] = "DESC=";
 	static readonly char trap_text[] = "TRAP ";
 	static readonly char notrap_text[] = "NOTRAP ";
@@ -127,7 +128,7 @@ void zshow_devices(zshow_out *output)
 	char   csname[_CSNAME_LEN_MAX + 1], *csptr;
 #endif
 	static readonly char zsh_socket_state[][10] =
-		{       "CONNECTED"
+		{	"CONNECTED"
 			,"LISTENING"
 			,"BOUND"
 			,"CREATED"
@@ -440,13 +441,13 @@ void zshow_devices(zshow_out *output)
 							switch ((unsigned int)l->iod->file_tag)
 							{
 							case TAG_UNTAGGED:
-								ZS_STR_OUT(&v,  untagged_text);
+								ZS_STR_OUT(&v, untagged_text);
 								break;
 							case TAG_EBCDIC:
-								ZS_STR_OUT(&v,  ebcdic_text);
+								ZS_STR_OUT(&v, ebcdic_text);
 								break;
 							case TAG_BINARY:
-								ZS_STR_OUT(&v,  binary_text);
+								ZS_STR_OUT(&v, binary_text);
 								break;
 							default:
 								if (-1 == __toCSName((__ccsid_t)l->iod->file_tag, csname))
@@ -472,8 +473,7 @@ void zshow_devices(zshow_out *output)
 #endif
 						break;
 					case gtmsocket:
-						delim_buff_sm = (sm_uc_ptr_t)malloc(MAX_DELIM_LEN);
-						delim.addr = (char *)malloc(MAX_DELIM_LEN * 7);
+						delim.addr = delim_mstr_buff;
 						delim_len = 0;
 						ZS_STR_OUT(&v, socket_text);
 						dsocketptr = (d_socket_struct *)l->iod->dev_sp;
@@ -650,6 +650,7 @@ void zshow_devices(zshow_out *output)
 									format2zwr(delim_buff_sm, delim_len_sm,
 										   (uchar_ptr_t)delim.addr, &delim_len);
 									delim.len = (unsigned short)delim_len;
+									assert(SIZEOF(delim_mstr_buff) >= delim_len);
 									zshow_output(output, &delim);
 									ZS_ONE_OUT(&v, space_text);
 								}

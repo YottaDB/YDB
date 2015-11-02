@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,32 +19,32 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char		window_token;
-GBLREF mident		window_ident;
 GBLREF boolean_t	run_time;
 GBLREF mident		routine_name;
 LITREF mident		zero_ident;
 
+error_def(ERR_COMMAORRPAREXP);
+error_def(ERR_JOBACTREF);
+error_def(ERR_MAXACTARG);
+error_def(ERR_RTNNAME);
+
 int m_job(void)
 {
-	int	argcnt;
-	triple *ref,*next;
-	oprtype label, offset, routine, plist, timeout, arglst, *argptr, argval;
-	static readonly unsigned char empty_plist[1] = { jp_eol };
-	bool is_timeout,dummybool;
+	boolean_t	is_timeout, dummybool;
+	static		readonly unsigned char empty_plist[1] = { jp_eol };
+	int		argcnt;
+	oprtype		arglst, *argptr, argval, label, offset, routine, plist, timeout;
+	triple		*next, *ref;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_MAXACTARG);
-	error_def(ERR_RTNNAME);
-	error_def(ERR_COMMAORRPAREXP);
-	error_def(ERR_JOBACTREF);
-
+	SETUP_THREADGBL_ACCESS;
 	label = put_str(zero_ident.addr, zero_ident.len);
 	offset = put_ilit((mint)0);
 	if (!lref(&label, &offset, FALSE, indir_job, TRUE, &dummybool))
 		return FALSE;
 	if ((TRIP_REF == label.oprclass) && (OC_COMMARG == label.oprval.tref->opcode))
 		return TRUE;
-	if (TK_CIRCUMFLEX != window_token)
+	if (TK_CIRCUMFLEX != TREF(window_token))
 	{
 		if (!run_time)
 			routine = put_str(routine_name.addr, routine_name.len);
@@ -53,10 +53,10 @@ int m_job(void)
 	} else
 	{
 		advancewindow();
-		switch(window_token)
+		switch (TREF(window_token))
 		{
 		case TK_IDENT:
-			routine = put_str(window_ident.addr, window_ident.len);
+			routine = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
 			advancewindow();
 			break;
 		case TK_ATSIGN:
@@ -69,47 +69,47 @@ int m_job(void)
 		}
 	}
 	argcnt = 0;
-	if (TK_LPAREN == window_token)
+	if (TK_LPAREN == TREF(window_token))
 	{
 		advancewindow();
 		argptr = &arglst;
-		do
+		while (TK_RPAREN != TREF(window_token))
 		{
-			if (argcnt > MAX_ACTUALS)
+			if (MAX_ACTUALS < argcnt)
 			{
 				stx_error(ERR_MAXACTARG);
 				return FALSE;
 			}
-			if (TK_PERIOD == window_token)
+			if (TK_PERIOD == TREF(window_token))
 			{
 				stx_error(ERR_JOBACTREF);
 				return FALSE;
 			}
-			if ((TK_COMMA == window_token) || (TK_RPAREN == window_token))
+			if (TK_COMMA == TREF(window_token))
 			{
 				ref = newtriple(OC_NULLEXP);
 				argval = put_tref(ref);
-			} else if (!expr(&argval))
+			} else if (EXPR_FAIL == expr(&argval, MUMPS_EXPR))
 				return FALSE;
 			ref = newtriple(OC_PARAMETER);
 			ref->operand[0] = argval;
 			*argptr = put_tref(ref);
 			argptr = &ref->operand[1];
 			argcnt++;
-			if (TK_COMMA == window_token)
+			if (TK_COMMA == TREF(window_token))
 				advancewindow();
-			else if (TK_RPAREN != window_token)
+			else if (TK_RPAREN != TREF(window_token))
 			{
 				stx_error(ERR_COMMAORRPAREXP);
 				return FALSE;
 			}
-		} while (TK_RPAREN != window_token);
+		}
 		advancewindow();	/* jump over close paren */
 	}
-	if (TK_COLON == window_token)
+	if (TK_COLON == TREF(window_token))
 	{
 		advancewindow();
-		if (TK_COLON == window_token)
+		if (TK_COLON == TREF(window_token))
 		{
 			is_timeout = TRUE;
 			plist = put_str((char *)empty_plist,SIZEOF(empty_plist));
@@ -117,12 +117,12 @@ int m_job(void)
 		{
 			if (!jobparameters(&plist))
 				return FALSE;
-			is_timeout = (TK_COLON == window_token);
+			is_timeout = (TK_COLON == TREF(window_token));
 		}
 		if (is_timeout)
 		{
 			advancewindow();
-			if (!intexpr(&timeout))
+			if (EXPR_FAIL == expr(&timeout, MUMPS_INT))
 				return FALSE;
 		} else
 			timeout = put_ilit(NO_M_TIMEOUT);

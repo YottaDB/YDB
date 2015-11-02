@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,17 +14,16 @@
 
 /* fgncalsp.h - UNIX foreign calls (d &package.label) */
 
-#define MAXIMUM_PARAMETERS	32	/* maximum number of parameters allowed to be passed between C and M */
-#define MAX_NAME_LENGTH		255	/* maximum length of file name */
-#define PACKAGE_ENV_PREFIX	"GTMXC"	/* prefix for environemnt variable containing
-					   external call table name */
-#define CALLIN_ENV_NAME		"GTMCI"	/* call-in table environment variable */
-#define MAX_ERRSTR_LEN		1024	/* maximum length of the error string returned
-					   by dlerror(). Couldn't find any system
-					   defined length, 1024 is just arbitrary */
-#define MAX_TABLINE_LEN		1024	/* maximum length of a line estimated to be sufficient
-					   to specify MAXIMUM_PARAMETERS parameters in the
-					   callin/xcall table */
+#define MAX_NAME_LENGTH		255	/* Maximum length of file name */
+#define PACKAGE_ENV_PREFIX	"GTMXC"	/* Prefix for environemnt variable containing
+					 * external call table name */
+#define CALLIN_ENV_NAME		"GTMCI"	/* Call-in table environment variable */
+#define MAX_ERRSTR_LEN		1024	/* Maximum length of the error string returned
+					 * by dlerror(). Couldn't find any system
+					 * defined length, 1024 is just arbitrary */
+#define MAX_TABLINE_LEN		1024	/* Maximum length of a line estimated to be sufficient
+					 * to specify MAX_ACTUALS parameters in the
+					 * callin/xcall table */
 
 #define	UNKNOWN_SYSERR 		"unknown system error"
 #define COPY_DLLERR_MSG(err_ptr, err_buf)					\
@@ -139,7 +138,7 @@ typedef struct parmblk_struct
 	int4    argcnt;
 	void    *rtnaddr, *labaddr, *retaddr;
 	int4    mask;
-	lv_val	*args[MAXIMUM_PARAMETERS];
+	lv_val	*args[MAX_ACTUALS];
 } parmblk_struct;
 
 #include "rtnhdr.h"

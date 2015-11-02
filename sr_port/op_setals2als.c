@@ -31,14 +31,13 @@ GBLREF uint4		dollar_tlevel;
 GBLREF lv_val		*active_lv;
 
 /* Operation - The destination variable becomes a new alias of the source variable:
-
-   1) Index into the variable name table to get the variable name for the new alias (destination).
-   2) Create the hash for the variable and look up in hash table (adding if not yet created).
-   3) See if hash entry has a value pointer. If yes and same as source var, we are done (NOOP).
-   4) If var exists, if alias reduce refcnt, else delete the existing var.
-   5) Reset hashtable to point to new lv_val.
-   6) Mark the affected symval (and any preceeding it) as having had symval activity.
-*/
+ * 1) Index into the variable name table to get the variable name for the new alias (destination).
+ * 2) Create the hash for the variable and look up in hash table (adding if not yet created).
+ * 3) See if hash entry has a value pointer. If yes and same as source var, we are done (NOOP).
+ * 4) If var exists, if alias reduce refcnt, else delete the existing var.
+ * 5) Reset hashtable to point to new lv_val.
+ * 6) Mark the affected symval (and any preceding it) as having had symval activity.
+ */
 void op_setals2als(lv_val *srclv, int destindx)
 {
 	ht_ent_mname	*tabent;

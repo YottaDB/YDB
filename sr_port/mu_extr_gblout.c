@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,11 +18,12 @@
 #elif defined(VMS)
 #include <rms.h>
 #include <ssdef.h>
+#include "iormdef.h"
 #else
 #error UNSUPPORTED PLATFORM
 #endif
 #include "gtm_string.h"
-
+#include "io.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -42,6 +43,7 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+
 #define INTEG_ERROR_RETURN 							\
 {										\
 	gtm_putmsg(VARLSTCNT(4) ERR_EXTRFAIL, 2, gn->str.len, gn->str.addr); 	\
@@ -50,14 +52,17 @@
 
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
+GBLREF	gd_addr			*gd_header;
+GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	gd_region		*gv_cur_region;
-GBLREF	gd_addr			*gd_header;
 
-static readonly unsigned char gt_lit[] = "TOTAL";
+error_def(ERR_EXTRFAIL);
+error_def(ERR_RECORDSTAT);
+
+STATICDEF readonly unsigned char gt_lit[] = "TOTAL";
 
 #if defined(UNIX) && defined(GTM_CRYPT)
 boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format, muext_hash_hdr_ptr_t hash_array,
@@ -70,32 +75,31 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 #error UNSUPPORTED PLATFORM
 #endif
 {
-	boolean_t 	beg_key;
-	int		gname_size, data_len, des_len, fmtd_key_len;
-	short		out_size;
-	unsigned short	rec_size;
-	sm_uc_ptr_t 	cp1, blktop, rectop;
 	blk_hdr_ptr_t 	bp;
+	boolean_t 	beg_key;
+	int		data_len, des_len, fmtd_key_len, gname_size;
 	rec_hdr_ptr_t 	rp, save_rp;
-	unsigned char  	*keytop, *cp2, last, current;
+	sm_uc_ptr_t 	blktop, cp1, rectop;
+	unsigned char  	*cp2, current, *keytop, last;
+	unsigned short	out_size, rec_size;
 	static gv_key	*beg_gv_currkey; 	/* this is used to check key out of order condition */
+	static int	max_zwr_len = 0;
 	static unsigned char	*private_blk = NULL, *zwr_buffer = NULL, *key_buffer = NULL;
 	static uint4	private_blksz = 0;
-	static int	max_zwr_len = 0;
 
 #	ifdef GTM_CRYPT
-	static sgmnt_data_ptr_t		prev_csd;
-	static gtmcrypt_key_t		encr_key_handle;
-	static int4			index, prev_allocated_size;
-	int				init_status, crypt_status;
 	char				*inbuf;
 	gd_region			*reg, *reg_top;
+	int				crypt_status, init_status;
+	static gtmcrypt_key_t		encr_key_handle;
+	static int4			index, prev_allocated_size;
+	static sgmnt_data_ptr_t		prev_csd;
 	static unsigned char		*unencrypted_blk_buff;
 #	endif
-	error_def(ERR_EXTRFAIL);
-	error_def(ERR_RECORDSTAT);
 
 	op_gvname(VARLSTCNT(1) gn);	/* op_gvname() must be done before any usage of cs_addrs or, gv_currkey */
+	if (0 == gv_target->root)
+		return TRUE; /* possible if ROLLBACK ended up physically removing a global from the database */
 	if (NULL == key_buffer)
 		key_buffer = (unsigned char *)malloc(MAX_ZWR_KEY_SZ);
 	if (ZWR_EXP_RATIO(cs_addrs->hdr->max_rec_size) > max_zwr_len)

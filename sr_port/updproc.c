@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,7 @@
 #ifdef UNIX
 #include "repl_instance.h"
 #include "gtmio.h"
+#include "repl_inst_dump.h"		/* for "repl_dump_histinfo" prototype */
 #endif
 #ifdef GTM_TRIGGER
 #include "rtnhdr.h"			/* for rtn_tabent in gv_trigger.h */
@@ -97,8 +98,11 @@
 #include "op_tcommit.h"
 #include "error_trap.h"
 #include "tp_frame.h"
+#include "gvcst_jrt_null.h"	/* for gvcst_jrt_null prototype */
 
-#define	MAX_IDLE_HARD_SPINS	1000	/* Fail-safe count to avoid hanging CPU in tight loop while it's idle */
+#define	MAX_IDLE_HARD_SPINS		1000	/* Fail-safe count to avoid hanging CPU in tight loop while it's idle */
+#define	UPDPROC_WAIT_FOR_READJNLSEQNO	100	/* ms */
+#define UPDPROC_WAIT_FOR_STARTJNLSEQNO	100	/* ms */
 
 GBLREF	uint4			dollar_tlevel;
 #ifdef DEBUG
@@ -111,11 +115,10 @@ GBLREF  sgmnt_addrs             *cs_addrs;
 GBLREF 	sgmnt_data_ptr_t 	cs_data;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	boolean_t		is_updproc;
 GBLREF	seq_num			seq_num_zero, seq_num_one;
 GBLREF  gd_addr                 *gd_header;
-GBLREF  boolean_t               repl_allowed;
 GBLREF	FILE	 		*updproc_log_fp;
 GBLREF	void			(*call_on_signal)();
 GBLREF	sgm_info		*first_sgm_info;
@@ -126,11 +129,10 @@ GBLREF	gv_namehead		*reset_gv_target;
 #ifdef VMS
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
 GBLREF	boolean_t		tp_restart_fail_sig_used;
+GBLREF	boolean_t		secondary_side_std_null_coll;
 #endif
 GBLREF	boolean_t		is_replicator;
 GBLREF	jnl_gbls_t		jgbl;
-GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
-GBLREF	boolean_t		secondary_side_std_null_coll;
 GBLREF	boolean_t		disk_blk_read;
 GBLREF	seq_num			lastlog_seqno;
 GBLREF	uint4			log_interval;
@@ -142,6 +144,11 @@ GBLREF	mval			dollar_ztwormhole;
 #endif
 GBLREF	boolean_t		skip_dbtriggers;
 GBLREF	gv_namehead		*gv_target;
+GBLREF	boolean_t		gv_play_duplicate_kills;
+#ifdef UNIX
+GBLREF		int4			strm_index;
+STATICDEF	boolean_t		set_onln_rlbk_flg;
+#endif
 
 LITREF	mval			literal_hasht;
 static	boolean_t		updproc_continue = TRUE;
@@ -151,12 +158,71 @@ error_def(ERR_GVIS);
 error_def(ERR_REC2BIG);
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_REPEATERROR);
+error_def(ERR_REPLONLNRLBK);
 error_def(ERR_SECONDAHEAD);
+error_def(ERR_STRMSEQMISMTCH);
 error_def(ERR_TEXT);
-error_def(ERR_TPRETRY);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRIGDEFNOSYNC);
 error_def(ERR_UPDREPLSTATEOFF);
+
+/* The below logic does "jnl_ensure_open" and other pre-requisites. This code is very similar to t_end.c */
+#define	DO_JNL_ENSURE_OPEN(CSA, JPC)									\
+{													\
+	jnl_buffer_ptr_t	jbp;									\
+	uint4			jnl_status;								\
+													\
+	assert(CSA = &FILE_INFO(gv_cur_region)->s_addrs);	/* so we can use gv_cur_region below */	\
+	assert(JPC == CSA->jnl);									\
+	SET_GBL_JREC_TIME;	/* needed for jnl_put_jrt_pini() */					\
+	jbp = JPC->jnl_buff;										\
+	/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order	\
+	 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write		\
+	 * journal records (if it decides to switch to a new journal file).				\
+	 */												\
+	ADJUST_GBL_JREC_TIME(jgbl, jbp);								\
+	/* Make sure timestamp of this seqno is >= timestamp of previous seqno. Note: The below		\
+	 * macro invocation should be done AFTER the ADJUST_GBL_JREC_TIME call as the below resets	\
+	 * jpl->prev_jnlseqno_time. Doing it the other way around would mean the reset will happen	\
+	 * with a potentially lower value than the final adjusted time written in the jnl record.	\
+	 */												\
+	ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jnlpool_ctl);						\
+	if (JNL_ENABLED(CSA))										\
+	{												\
+		jnl_status = jnl_ensure_open();								\
+		if (0 == jnl_status)									\
+		{											\
+			if (0 == JPC->pini_addr)							\
+				jnl_put_jrt_pini(CSA);							\
+		} else											\
+		{											\
+			if (SS_NORMAL != JPC->status)							\
+				rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(CSA->hdr),		\
+					DB_LEN_STR(gv_cur_region), JPC->status);			\
+			else										\
+				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(CSA->hdr),		\
+					DB_LEN_STR(gv_cur_region));					\
+		}											\
+	}												\
+}
+
+#ifdef UNIX
+# define UPDPROC_ONLN_RLBK_CLNUP(REG)									\
+{													\
+	sgmnt_addrs		*csa;									\
+													\
+	assert(0 != have_crit(CRIT_HAVE_ANY_REG));							\
+	csa = &FILE_INFO(REG)->s_addrs;									\
+	assert(csa->now_crit);										\
+	SYNC_ONLN_RLBK_CYCLES;										\
+	if (REG == jnlpool.jnlpool_dummy_reg)								\
+		rel_lock(REG);										\
+	else												\
+		rel_crit(REG);										\
+	RESET_ALL_GVT_CLUES;										\
+	rts_error(VARLSTCNT(1) ERR_REPLONLNRLBK); /* transfers control back to updproc_ch */		\
+}
+#endif
 
 CONDITION_HANDLER(updproc_ch)
 {
@@ -170,7 +236,7 @@ CONDITION_HANDLER(updproc_ch)
 #		if defined(DEBUG) && defined(DEBUG_UPDPROC_TPRETRY)
 		assert(FALSE);
 #		endif
-		repl_log(updproc_log_fp, TRUE, TRUE, " ----> TPRETRY for sequence number "INT8_FMT" "INT8_FMTX" \n",
+		repl_log(updproc_log_fp, TRUE, TRUE, " ----> TPRETRY for sequence number "INT8_FMT" "INT8_FMTX"\n",
 			INT8_PRINT(recvpool.upd_proc_local->read_jnl_seqno),
 			INT8_PRINTX(recvpool.upd_proc_local->read_jnl_seqno));
 		/* This is a kludge. We can come here from 2 places.
@@ -182,13 +248,15 @@ CONDITION_HANDLER(updproc_ch)
 		if (first_sgm_info GTMTRIG_ONLY( || (TPRESTART_STATE_NORMAL != tprestart_state)))
 		{
 			VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
-			rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS);
+			rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS); /* any nested errors will set SIGNAL accordingly */
 			assert(0 == rc);			/* No partials restarts can happen at this final level */
 			GTMTRIG_ONLY(assert(TPRESTART_STATE_NORMAL == tprestart_state));
 			NON_GTMTRIG_ONLY(assert(INVALID_GV_TARGET == reset_gv_target);)
 			reset_gv_target = INVALID_GV_TARGET; /* see "trigger_item_tpwrap_ch" similar code for why this is needed */
 #			ifdef UNIX
-			if (ERR_TPRETRY == SIGNAL)		/* (signal value undisturbed) */
+			if (ERR_REPLONLNRLBK == SIGNAL) /* tp_restart did rts_error(ERR_REPLONLNRLBK) */
+				set_onln_rlbk_flg = TRUE;
+			if ((ERR_TPRETRY == SIGNAL) || (ERR_REPLONLNRLBK == SIGNAL))
 #			elif defined VMS
 			if (!tp_restart_fail_sig_used)		/* If tp_restart ran clean */
 #			else
@@ -217,6 +285,13 @@ CONDITION_HANDLER(updproc_ch)
 	else if (ERR_REPEATERROR == SIGNAL)
 		SIGNAL = dollar_ecode.error_last_ecode;	/* Error rethrown from a trigger */
 #	endif
+#	ifdef UNIX
+	else if (ERR_REPLONLNRLBK == SIGNAL)
+	{
+		set_onln_rlbk_flg = TRUE;
+		UNWIND(NULL, NULL);
+	}
+#	endif
 	NEXTCH;
 }
 
@@ -230,15 +305,18 @@ int updproc(void)
 	seq_num			jnl_seqno; /* the current jnl_seq no of the Update process */
 	seq_num			start_jnl_seqno;
 	uint4			status;
-	gld_dbname_list 	*gld_db_files;
+	gld_dbname_list 	*gld_db_files, *curr;
+	recvpool_ctl_ptr_t	recvpool_ctl;
 #	ifdef VMS
 	char			proc_name[PROC_NAME_MAXLEN + 1];
 	struct dsc$descriptor_s proc_name_desc;
 #	endif
+	upd_proc_local_ptr_t	upd_proc_local;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	call_on_signal = updproc_sigstop;
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &updproc_ch);
-
 #	ifdef VMS
 	/* Get a meaningful process name */
 	proc_name_desc.dsc$w_length = get_proc_name(LIT_AND_LEN("GTMUPD"), getpid(), proc_name);
@@ -248,54 +326,162 @@ int updproc(void)
 	if (SS$_NORMAL != (status = sys$setprn(&proc_name_desc)))
 		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Unable to change update process name"), status);
+#	else
+	/* In the update process, we want every replicated update from an originating instances to end up in a replicated region
+	 * on this (the receiving) instance. If not, we will issue a UPDREPLSTATEOFF error. But it is possible that replication
+	 * was turned ON at that time (since we dont hold crit at the time we do the UPDREPLSTATEOFF check) but later got turned
+	 * OFF (for example due to no disk space for journal files etc.) just before the actual application of the update.
+	 * In that case, the UPDREPLSTATEOFF error would not have been issued but there is still an issue in that an update from
+	 * the primary got applied to a non-replicated database on the secondary. We prevent this out-of-sync situation from
+	 * happening in the first place, by ensuring "jnl_file_lost" (the function that is invoked to turn journaling OFF) issues
+	 * a runtime error and does not turn journaling off.
+	 */
+	TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_ERRORS;
 #	endif
 	is_updproc = TRUE;
 	is_replicator = TRUE;	/* as update process goes through t_end() and can write jnl recs to the jnlpool for replicated db */
+	gv_play_duplicate_kills = TRUE;	/* needed to ensure seqnos are kept in sync between source and receiver instances */
 	NON_GTMTRIG_ONLY(skip_dbtriggers = TRUE;)
-	gvdupsetnoop = FALSE;	/* disable optimization to avoid multiple updates to the database and journal for duplicate sets */
-	/* if duplicate SETs cause multiple updates to the database and journal in the primary, we want to do the same
-	 * here in order to maintain the jnl_seqno in sync. note that the primary can run the VIEW "GVDUPSETNOOP" command
-	 * to enable/disable this feature on a per-process basis so it is not under our control. if the primary does run with
-	 * this feature enabled, then we will not be receiving journal records for the duplicate set anyways so running with
-	 * this flag always set to FALSE does not hurt.
-	 */
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool)); /* For util_base_ch and mupip_exit */
 	if (updproc_init(&gld_db_files, &start_jnl_seqno) == UPDPROC_EXISTS) /* we got the global directory header already */
 		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Update Process already exists"));
 	/* Initialization of all the relevant global datastructures and allocation for TP */
 	mu_gv_stack_init();
-	recvpool.upd_proc_local->read = 0;
-	recvpool.recvpool_ctl->std_null_coll = secondary_side_std_null_coll;
-	jnl_seqno = start_jnl_seqno;
-	UNIX_ONLY(
-		recvpool.recvpool_ctl->max_dualsite_resync_seqno = jgbl.max_dualsite_resync_seqno;
-	)
-	recvpool.recvpool_ctl->jnl_seqno = jnl_seqno;
-	recvpool.upd_proc_local->read_jnl_seqno = jnl_seqno;
-	if (repl_allowed)
-	{	/* Check if the secondary is ahead of the primary */
-		VMS_ONLY(
-			if (jnlpool_ctl->jnl_seqno > start_jnl_seqno && jnlpool_ctl->upd_disabled)
+	upd_proc_local = recvpool.upd_proc_local;
+	recvpool_ctl = recvpool.recvpool_ctl;
+	while (TRUE)
+	{
+		upd_proc_local->read = 0;
+		jnl_seqno = start_jnl_seqno;
+		upd_proc_local->read_jnl_seqno = 0;
+		SHM_WRITE_MEMORY_BARRIER;	/* Ensure upd_proc_local->read_jnl_seqno update is visible to the receiver server
+						 * BEFORE recvpool_ctl->jnl_seqno update. This way we ensure whenever it gets to the
+						 * stage where it sets upd_proc_local->read_jnl_seqno to a non-zero value (possible
+						 * in the case of a non-supplementary -> supplementary replication connection),
+						 * its update will happen AFTER of the update process update to "read_jnl_seqno"
+						 * and not the other way around.
+						 */
+		recvpool_ctl->jnl_seqno = jnl_seqno;
+#		ifdef UNIX
+		/* At this point, the receiver server will see the non-zero jnl_seqno and start communicating with a source server.
+		 * But if this is a supplementary root primary instance, the current instance jnl_seqno is not what the receiver
+		 * will ask the source to start sending transactions from. It has to first figure out what non-supplementary
+		 * stream# (strm_index) the connecting source maps to and find out the current strm_seqno[strm_index] in the
+		 * instance file header. All this processing involves the receiver server. Until it finishes this processing, the
+		 * update process cannot proceed. Wait for this to finish and update local copy of seqnos accordingly. The receiver
+		 * server will set upd_proc_local->read_jnl_seqno to a non-zero value to signal completion of this step.
+		 */
+		if (jnlpool.repl_inst_filehdr->is_supplementary && !jnlpool.jnlpool_ctl->upd_disabled)
+		{
+			repl_log(updproc_log_fp, TRUE, TRUE, "Waiting for Receiver Server to write read_jnl_seqno\n");
+			while (!upd_proc_local->read_jnl_seqno)
 			{
-				repl_log(updproc_log_fp, TRUE, TRUE,
-					"JNLSEQNO last updated by  update process = "INT8_FMT" "INT8_FMTX" \n",
-					INT8_PRINT(start_jnl_seqno), INT8_PRINTX(start_jnl_seqno));
-				repl_log(updproc_log_fp, TRUE, TRUE,
-					"JNLSEQNO of last transaction written to journal pool = "INT8_FMT" "INT8_FMTX" \n",
-					INT8_PRINT(jnlpool_ctl->jnl_seqno), INT8_PRINTX(jnlpool_ctl->jnl_seqno));
-				rts_error(VARLSTCNT(1) ERR_SECONDAHEAD);
+				SHORT_SLEEP(UPDPROC_WAIT_FOR_READJNLSEQNO);
+				if (SHUTDOWN == upd_proc_local->upd_proc_shutdown)
+				{
+					updproc_end();
+					return(SS_NORMAL);
+				}
+				if (GTMRECV_NO_RESTART != recvpool.gtmrecv_local->restart)
+				{	/* wait for restart to become GTMRECV_NO_RESTART (set by the Receiver Server) */
+					if (GTMRECV_RCVR_RESTARTED == recvpool.gtmrecv_local->restart)
+					{
+						recvpool_ctl->jnl_seqno = jnl_seqno;
+						assert(0 == upd_proc_local->read);
+						recvpool.gtmrecv_local->restart = GTMRECV_UPD_RESTARTED;
+						recvpool.upd_helper_ctl->first_done = FALSE;
+						recvpool.upd_helper_ctl->pre_read_offset = 0;
+					}
+				}
 			}
-		)
-		UNIX_ONLY(
-			/* The SECONDAHEAD check is performed in the receiver server after it has connected with the source
-			 * server. This is because the check is relevant only if the source server is dualsite. That is
-			 * not known now but instead at connection time. Hence the deferred check.
+			/* Ensure all updates done by the receiver server BEFORE setting
+			 * upd_proc_local->read_jnl_seqno are visible once we see the updated read_jnl_seqno.
 			 */
-			assert(jnlpool_ctl->jnl_seqno == start_jnl_seqno);
-		)
+			SHM_READ_MEMORY_BARRIER;
+			repl_log(updproc_log_fp, TRUE, TRUE, "Receiver Server wrote upd_proc_local->read_jnl_seqno = "
+				"%llu [0x%llx]\n", upd_proc_local->read_jnl_seqno, upd_proc_local->read_jnl_seqno);
+			repl_log(updproc_log_fp, TRUE, TRUE, "Receiver Server wrote stream # = %d\n",
+					recvpool.gtmrecv_local->strm_index);
+			jnl_seqno = upd_proc_local->read_jnl_seqno;
+			assert(0 == GET_STRM_INDEX(jnl_seqno));
+			start_jnl_seqno = jnl_seqno;
+			strm_index = recvpool.gtmrecv_local->strm_index;
+		}
+#		endif
+		upd_proc_local->read_jnl_seqno = jnl_seqno;
+		/* Check if the secondary is ahead of the primary */
+#		ifdef VMS
+		if ((jnlpool_ctl->jnl_seqno > start_jnl_seqno) && jnlpool_ctl->upd_disabled)
+		{
+			repl_log(updproc_log_fp, TRUE, TRUE,
+				"JNLSEQNO last updated by  update process = "INT8_FMT" "INT8_FMTX"\n",
+				INT8_PRINT(start_jnl_seqno), INT8_PRINTX(start_jnl_seqno));
+			repl_log(updproc_log_fp, TRUE, TRUE,
+				"JNLSEQNO of last transaction written to journal pool = "INT8_FMT" "INT8_FMTX"\n",
+				INT8_PRINT(jnlpool_ctl->jnl_seqno), INT8_PRINTX(jnlpool_ctl->jnl_seqno));
+			rts_error(VARLSTCNT(1) ERR_SECONDAHEAD);
+		}
+#		else
+		/* The SECONDAHEAD check is performed in the receiver server after it has connected with the source
+		 * server. This is because the check is relevant only if the source server is dualsite. That is
+		 * not known now but instead at connection time. Hence the deferred check.
+		 * Note: In the case of supplementary root primary instances, the jnl_seqno of the jnlpool is the
+		 * unified seqno across all the non-supplementary streams as well as the local stream of updates.
+		 * But the receive pool jnl_seqno is the seqno of the specific non-supplementary stream. So those
+		 * cannot be compared at all. But they are guaranteed to be equal in all other cases. Assert that.
+		 */
+		assert((jnlpool_ctl->jnl_seqno == start_jnl_seqno)
+			|| (jnlpool.repl_inst_filehdr->is_supplementary && !jnlpool.jnlpool_ctl->upd_disabled));
+#		endif
+		UNIX_ONLY(assert(updproc_continue && !set_onln_rlbk_flg));
+		while (updproc_continue UNIX_ONLY(&& !set_onln_rlbk_flg))
+			updproc_actions(gld_db_files);
+#		ifdef UNIX
+		if (set_onln_rlbk_flg)
+		{	/* A concurrent online rollback happened which drove the updproc_ch and called us. Need to let the receiver
+			 * server know about it and set up the sequence numbers
+			 */
+			start_jnl_seqno = jnlpool_ctl->jnl_seqno;
+			repl_log(updproc_log_fp, TRUE, TRUE, "Starting afresh due to ONLINE ROLLBACK\n");
+			repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : %llu\n", start_jnl_seqno);
+			repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Update process Read Seqno : %llu\n",
+					upd_proc_local->read_jnl_seqno);
+			repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n",
+					recvpool_ctl->jnl_seqno);
+
+			assert(recvpool_ctl->jnl_seqno);
+			upd_proc_local->onln_rlbk_flg = TRUE;
+			/* receiver server eventually sees the above flag, drains the replication pipe, closes the connection and
+			 * restarts. But, before that it sets recvpool_ctl->jnl_seqno to 0. We wait until receiver server resets
+			 * this field. This way, when we go back to the beginning of the for loop to set recvpool_ctl->jnl_seqno
+			 * to start_jnl_seqno, our update will not be lost.
+			 */
+			repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Waiting for receiver server to reset "
+					"recvpool_ctl->jnl_seqno\n");
+			while (recvpool_ctl->jnl_seqno)
+			{
+				SHORT_SLEEP(UPDPROC_WAIT_FOR_STARTJNLSEQNO);
+				if (SHUTDOWN == upd_proc_local->upd_proc_shutdown)
+				{
+					updproc_end();
+					return(SS_NORMAL);
+				}
+			}
+			set_onln_rlbk_flg = FALSE;
+			/* Since we are going to start afresh, do a OP_TROLLBACK if we are in TP. This brings the global variables
+			 * dollar_tlevel, dollar_trestart all to a known state thereby erasing any history of lingering TP artifacts
+			 */
+			if (dollar_tlevel)
+			{
+				OP_TROLLBACK(0);
+				assert(!dollar_tlevel);
+				assert(!dollar_trestart);
+			}
+		} else
+#		endif
+		if (!updproc_continue)
+			break;
 	}
-	while (updproc_continue)
-		updproc_actions(gld_db_files);
 	updproc_end();
 	return(SS_NORMAL);
 }
@@ -314,11 +500,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	int			key_len, rec_len, backptr;
 	char			fn[MAX_FN_LEN];
 	sm_uc_ptr_t		readaddrs;	/* start of current rec in pool */
-	struct_jrec_null	null_record;
-	jnldata_hdr_ptr_t	jnl_header;
 	boolean_t		incr_seqno;
-	seq_num			temp_df_seqnum;
-	uint4			jnl_status = 0;
+	seq_num			jnlpool_ctl_seqno, rec_strm_seqno, strm_seqno;
 	char			*val_ptr;
 	jnl_string		*keystr;
 	mstr			mname;
@@ -328,14 +511,15 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa, *repl_csa;
 	sgmnt_data_ptr_t	csd;
 	char	           	gv_mname[MAX_KEY_SZ];
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, scan_char, next_char;
 	boolean_t		log_switched = FALSE;
-	static	seq_num		seqnum_diff = 0;
+#	ifdef UNIX
+	boolean_t		suppl_root_primary, suppl_propagate_primary;
+#	endif
 	jnl_private_control	*jpc;
-	jnl_buffer_ptr_t	jbp;
 	gld_dbname_list		*curr;
 	gd_region		*save_reg;
 	int4			wtstart_errno;
@@ -343,8 +527,10 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	uint4			idle_flush_count = 0;	/* Number of times buffers were flushed without an intermediate sleep */
 	uint4			write_wrap, cntr, last_nullsubs, last_subs, keyend;
 	UNIX_ONLY(
-		repl_triple		triple;
-		repl_triple_jnl_ptr_t	triplecontent;
+		repl_histinfo			histinfo;
+		repl_old_triple_jnl_ptr_t	input_old_triple;
+		repl_histrec_jnl_ptr_t		input_histjrec;
+		uint4				expected_rec_len;
 	)
 #	ifdef GTM_TRIGGER
 	uint4			nodeflags;
@@ -354,6 +540,14 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+#	ifdef UNIX
+	assert((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open);
+	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+	DEBUG_ONLY(
+		assert(!repl_csa->hold_onto_crit); /* so we can do unconditional grab_lock/rel_lock below */
+		ASSERT_VALID_JNLPOOL(repl_csa);
+	)
+#	endif
 	ESTABLISH(updproc_ch);
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
@@ -366,41 +560,32 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	jnl_seqno = upd_proc_local->read_jnl_seqno;
 	log_interval = upd_proc_local->log_interval;
 	lastlog_seqno = jnl_seqno - log_interval; /* to ensure we log the first transaction */
+#	ifdef UNIX
+	if (jnlpool.repl_inst_filehdr->is_supplementary)
+	{
+		if (!jnlpool.jnlpool_ctl->upd_disabled)
+		{
+			suppl_root_primary = TRUE;
+			suppl_propagate_primary = FALSE;
+		} else
+		{
+			suppl_root_primary = FALSE;
+			suppl_propagate_primary = TRUE;
+		}
+	} else
+	{
+		suppl_root_primary = FALSE;
+		suppl_propagate_primary = FALSE;
+	}
+#	endif
 	while (TRUE)
 	{
 		incr_seqno = FALSE;
-		if (repl_allowed)
-		{	/* An UPDREPLSTATEOFF error is issued BEFORE applying an update to a non-replicated database.
-			 * But it is possible that replication was turned ON at that time (since we dont hold crit
-			 * at the time we do the UPDREPLSTATEOFF check) but later got turned OFF (for example due to
-			 * no disk space for journal files etc.) just before the actual application of the update.
-			 * In that case, the UPDREPLSTATEOFF error would not have been issued but there is still an
-			 * issue in that an update from the primary got applied to a non-replicated database on the
-			 * secondary. This will be caught by the below test which checks that the journal seqno of
-			 * the secondary AFTER applying each incoming transaction matches the journal seqno of the
-			 * next incoming transaction.
-			 */
-			temp_df_seqnum = upd_proc_local->read_jnl_seqno - jnlpool_ctl->jnl_seqno;
-			if ((0 != temp_df_seqnum) && (seqnum_diff != temp_df_seqnum))
-			{
-				seqnum_diff = temp_df_seqnum;
-				repl_log(updproc_log_fp, TRUE, TRUE,
-					"JNLSEQNO last updated by  update process = "INT8_FMT" "INT8_FMTX" \n",
-					INT8_PRINT(upd_proc_local->read_jnl_seqno),
-					INT8_PRINTX(upd_proc_local->read_jnl_seqno));
-				repl_log(updproc_log_fp, TRUE, TRUE,
-					"JNLSEQNO of last transaction written to journal pool = "INT8_FMT" "INT8_FMTX" \n",
-					INT8_PRINT(jnlpool_ctl->jnl_seqno), INT8_PRINTX(jnlpool_ctl->jnl_seqno));
-				repl_log(updproc_log_fp, TRUE, TRUE, "Number of transactions from Primary which did NOT update "
-					"JNLSEQNO on Secondary is "INT8_FMT" "INT8_FMTX" \n",
-					INT8_PRINT(temp_df_seqnum), INT8_PRINTX(temp_df_seqnum));
-			}
-		}
+		UNIX_ONLY(assert(0 == GET_STRM_INDEX(jnl_seqno));)
 		if (SHUTDOWN == upd_proc_local->upd_proc_shutdown)
 			break;
 		if (GTMRECV_NO_RESTART != gtmrecv_local->restart)
-		{
-			/* wait for restart to become GTMRECV_NO_RESTART (set by the Receiver Server) */
+		{	/* wait for restart to become GTMRECV_NO_RESTART (set by the Receiver Server) */
 			if (GTMRECV_RCVR_RESTARTED == gtmrecv_local->restart)
 			{
 				recvpool.recvpool_ctl->jnl_seqno = jnl_seqno;
@@ -446,11 +631,12 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		 * is non-zero, it is possible tupd_num is 0 in case we come here after a TP restart.
 		 */
 		assert((dollar_tlevel && (tupd_num || dollar_trestart)) || !dollar_tlevel && !tupd_num);
-		if (upd_proc_local->bad_trans
+		if (upd_proc_local->bad_trans UNIX_ONLY(|| upd_proc_local->onln_rlbk_flg)
 			|| (!dollar_tlevel && (FALSE == recvpool.recvpool_ctl->wrapped)
 				&& (temp_write = recvpool.recvpool_ctl->write) == upd_proc_local->read))
-		{	/* bad-trans OR nothing to process. In case of the former, wait until receiver resets bad_trans.
-			 * In the latter, wait until data is available in the receive pool.
+		{	/* bad-trans OR online rollback OR nothing to process. In case of bad_trans or online rollback, wait for
+			 * the receiver to reset the corresponding fields. In case there is nothing to process, wait until data
+			 * is available in the receive pool.
 			 * Note that we check two shared memory fields "recvpool_ctl->wrapped" and "recvpool_ctl->write" in
 			 * that order. The receiver server updates them in the opposite order when it sets "wrapped" to TRUE.
 			 * So it is possible we read an uptodate value of "write" but an outofdate value of "wrapped". This
@@ -480,10 +666,17 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					 * never get a ERR_GBLOFLOW error there.  Therefore the file extension check below is
 					 * done only in Unix.
 					 */
-					UNIX_ONLY(
-						if ((dba_mm == cs_data->acc_meth) && (ERR_GBLOFLOW == wtstart_errno))
-							wcs_recover(gv_cur_region);
-					)
+#					ifdef UNIX
+					if ((dba_mm == cs_data->acc_meth) && (ERR_GBLOFLOW == wtstart_errno))
+					{
+						assert(!cs_addrs->hold_onto_crit);
+						grab_crit(gv_cur_region);
+						if (cs_addrs->onln_rlbk_cycle != cs_addrs->nl->onln_rlbk_cycle)
+							UPDPROC_ONLN_RLBK_CLNUP(gv_cur_region); /* No return */
+						wcs_recover(gv_cur_region);
+						rel_crit(gv_cur_region);
+					}
+#					endif
 					buffers_flushed = TRUE;
 				}
 			}
@@ -500,6 +693,13 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				idle_flush_count = 0;
 				SHORT_SLEEP(10);
 			}
+#			ifdef UNIX
+			if (!upd_proc_local->onln_rlbk_flg && (repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle))
+			{	/* A concurrent online rollback happened. Start afresh */
+				GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+				UPDPROC_ONLN_RLBK_CLNUP(jnlpool.jnlpool_dummy_reg); /* No return */
+			} /* else onln_rlbk_flag is already set and the receiver should take the next appropriate action */
+#			endif
 			continue;
 		}
 		idle_flush_count = 0;
@@ -529,10 +729,10 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			}
 			DEBUG_ONLY(
 				repl_log(updproc_log_fp, TRUE, FALSE,
-				       "-- Wrapping -- read = %ld :: write_wrap = %ld :: upd_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
+				       "-- Wrapping -- read = %ld :: write_wrap = %ld :: upd_jnl_seqno = "INT8_FMT" "INT8_FMTX"\n",
 					temp_read, write_wrap, INT8_PRINT(jnl_seqno),INT8_PRINTX(jnl_seqno));
 				repl_log(updproc_log_fp, TRUE, TRUE,
-					"-------------> wrapped = %ld :: write = %ld :: recv_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
+					"-------------> wrapped = %ld :: write = %ld :: recv_jnl_seqno = "INT8_FMT" "INT8_FMTX"\n",
 					recvpool.recvpool_ctl->wrapped, recvpool.recvpool_ctl->write,
 					INT8_PRINT(recvpool.recvpool_ctl->jnl_seqno),
 					INT8_PRINTX(recvpool.recvpool_ctl->jnl_seqno));
@@ -560,71 +760,160 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 		rec_len = rec->prefix.forwptr;
 		assert(IS_REPLICATED(rectype));
-		UNIX_ONLY(
+#		ifdef UNIX
+		if ((JRT_TRIPLE == rectype) || (JRT_HISTREC == rectype))
+		{	/* Source server has sent a REPL_TRIPLE or REPL_HISTREC message in the middle of logical journal
+			 * records. Construct the repl_histrec structure from the input message and add this history
+			 * record to the replication instance file. In case of REPL_TRIPLE message, the source server
+			 * is running a pre-supplementary version of GT.M so null-fill those fields in the history
+			 * record that did not exist in that older version.
+			 */
 			if (JRT_TRIPLE == rectype)
-			{	/* Source server has sent a REPL_NEW_TRIPLE message in the middle of logical journal records.
-				 * Construct the triple from the input message and add it to the replication instance file.
+			{
+				repl_log(updproc_log_fp, TRUE, TRUE, "Processing REPL_TRIPLE message\n");
+				input_old_triple = (repl_old_triple_jnl_ptr_t)readaddrs;
+				histinfo.start_seqno = input_old_triple->start_seqno;
+				histinfo.strm_seqno = 0;
+				memcpy(histinfo.root_primary_instname, input_old_triple->instname, MAX_INSTNAME_LEN - 1);
+				histinfo.root_primary_cycle = input_old_triple->cycle;
+				histinfo.creator_pid = 0;
+				histinfo.created_time = 0;
+				histinfo.strm_index = 0;
+				histinfo.history_type = HISTINFO_TYPE_NORMAL;
+				NULL_INITIALIZE_REPL_INST_UUID(histinfo.lms_group);
+				/* The following fields will be initialized in the "repl_inst_histinfo_add" function call below.
+				 *	histinfo.histinfo_num
+				 *	histinfo.prev_histinfo_num
+				 *	histinfo.last_histinfo_num[]
 				 */
-				repl_log(updproc_log_fp, TRUE, TRUE, "Processing REPL_NEW_TRIPLE message\n");
-				triplecontent = (repl_triple_jnl_ptr_t)readaddrs;
-				memset(&triple, 0, SIZEOF(triple));
-				triple.start_seqno = triplecontent->start_seqno;
-				memcpy(triple.root_primary_instname, triplecontent->instname, MAX_INSTNAME_LEN - 1);
-				triple.root_primary_cycle = triplecontent->cycle;
-				memcpy(triple.rcvd_from_instname, triplecontent->rcvd_from_instname, MAX_INSTNAME_LEN - 1);
-				repl_log(updproc_log_fp, TRUE, TRUE, "New Triple Content : Start Seqno = %llu [0x%llx] : "
-					"Root Primary = [%s] : Cycle = [%d] : Received from instance = [%s]\n",
-					triple.start_seqno, triple.start_seqno, triple.root_primary_instname,
-					triple.root_primary_cycle, triple.rcvd_from_instname);
-				if (SIZEOF(repl_triple_jnl_t) != rec_len)
+				expected_rec_len = SIZEOF(repl_old_triple_jnl_t);
+			} else
+			{
+				repl_log(updproc_log_fp, TRUE, TRUE, "Processing REPL_HISTREC message\n");
+				input_histjrec = (repl_histrec_jnl_ptr_t)readaddrs;
+				histinfo = input_histjrec->histcontent;
+				expected_rec_len = SIZEOF(repl_histrec_jnl_t);
+			}
+			if (expected_rec_len != rec_len)
+			{
+				bad_trans_type = upd_bad_histinfo_len;
+				assert(FALSE);
+			} else if (histinfo.start_seqno != recvpool.upd_proc_local->read_jnl_seqno)
+			{
+				bad_trans_type = upd_bad_histinfo_start_seqno1;
+				assert(FALSE);
+			} else if (histinfo.start_seqno > recvpool_ctl->jnl_seqno)
+			{
+				bad_trans_type = upd_bad_histinfo_start_seqno2;
+				assert(FALSE);
+			} else
+				bad_trans_type = upd_good_record;
+			if (upd_good_record != bad_trans_type)
+			{	/* Signal a BADTRANS */
+				repl_log(updproc_log_fp, TRUE, TRUE,
+					"-> Bad trans :: bad_trans_type = %ld type = %ld len = %ld "
+					"start_seqno = %llu [0x%llx] upd_read_seqno = %llu [0x%llx] "
+					"recvpool_jnl_seqno = %llu [0x%llx]\n",
+					bad_trans_type, rectype, rec_len, histinfo.start_seqno, histinfo.start_seqno,
+					recvpool.upd_proc_local->read_jnl_seqno, recvpool.upd_proc_local->read_jnl_seqno,
+					recvpool_ctl->jnl_seqno, recvpool_ctl->jnl_seqno);
+				upd_proc_local->bad_trans = TRUE;
+				assert(!dollar_tlevel);
+				if (dollar_tlevel)
 				{
-					bad_trans_type = upd_bad_triple_len;
-					assert(FALSE);
-				} else if (triple.start_seqno != recvpool.upd_proc_local->read_jnl_seqno)
-				{
-					bad_trans_type = upd_bad_triple_start_seqno1;
-					assert(FALSE);
-				} else if (triple.start_seqno > recvpool_ctl->jnl_seqno)
-				{
-					bad_trans_type = upd_bad_triple_start_seqno2;
-					assert(FALSE);
-				} else
-					bad_trans_type = upd_good_record;
-				if (upd_good_record != bad_trans_type)
-				{	/* Signal a BADTRANS */
-					repl_log(updproc_log_fp, TRUE, TRUE,
-						"-> Bad trans :: bad_trans_type = %ld type = %ld len = %ld "
-						"start_seqno = %llu [0x%llx] upd_read_seqno = %llu [0x%llx] "
-						"recvpool_jnl_seqno = %llu [0x%llx]\n",
-						bad_trans_type, rectype, rec_len, triple.start_seqno, triple.start_seqno,
-						recvpool.upd_proc_local->read_jnl_seqno, recvpool.upd_proc_local->read_jnl_seqno,
-						recvpool_ctl->jnl_seqno, recvpool_ctl->jnl_seqno);
-					upd_proc_local->bad_trans = TRUE;
-					assert(!dollar_tlevel);
-					if (dollar_tlevel)
-					{
-						repl_log(updproc_log_fp, TRUE, TRUE, "OP_TROLLBACK IS CALLED "
-							"-->Bad trans :: dollar_tlevel = %ld\n", dollar_tlevel);
-						OP_TROLLBACK(0);
-					}
-					readaddrs = recvpool.recvdata_base;
-					upd_proc_local->read = 0;
-					temp_read = 0;
-					temp_write = 0;
-					upd_rec_seqno = tupd_num = tcom_num = 0;
-					continue;
+					repl_log(updproc_log_fp, TRUE, TRUE, "OP_TROLLBACK IS CALLED "
+						"-->Bad trans :: dollar_tlevel = %ld\n", dollar_tlevel);
+					OP_TROLLBACK(0);
 				}
-				/* Now that we have constructed the triple, add it to the instance file. */
-				repl_inst_ftok_sem_lock();
-				repl_inst_triple_add(&triple);
-				repl_inst_ftok_sem_release();
-				/* Update pointers to indicate this record is now processed and move on to the next. */
-				readaddrs += rec_len;
-				temp_read += rec_len;
-				upd_proc_local->read = temp_read;
+				readaddrs = recvpool.recvdata_base;
+				upd_proc_local->read = 0;
+				temp_read = 0;
+				temp_write = 0;
+				upd_rec_seqno = tupd_num = tcom_num = 0;
 				continue;
 			}
-		)
+			if (jnlpool.repl_inst_filehdr->is_supplementary)
+			{
+				assert(0 <= histinfo.strm_index);
+				assert((0 == histinfo.strm_index) || IS_REPL_INST_UUID_NON_NULL(histinfo.lms_group));
+				assert((0 != histinfo.strm_index) || IS_REPL_INST_UUID_NULL(histinfo.lms_group));
+				/* Check if this is an -UPDATERESYNC type of history record that starts a new stream of updates
+				 * (or a -NORESYNC which creates a discontinuity from the previous stream).
+				 * If so, reset all stream-related information (corresponding to the prior stream) in the db file
+				 * hdr and journal pool. Otherwise if we crash after having processed one logical record after the
+				 * history record, it is possible the regions unaffected by the logical update might have some
+				 * garbage "strm_seqno" value which might affect the max_strm_seqno determination in case we do a
+				 * rollback (this uses the strm_seqno values from the db file header) right after the crash.
+				 */
+				if ((HISTINFO_TYPE_NORESYNC == histinfo.history_type)
+					|| (HISTINFO_TYPE_UPDRESYNC == histinfo.history_type))
+				{	/* Also write an EPOCH with the new strm_seqno. This will help journal recovery know a fresh
+					 * stream of updates begins and that the sequence of strm_seqnos might see a discontinuity.
+					 */
+					assert((0 < histinfo.strm_index) && (MAX_SUPPL_STRMS > histinfo.strm_index));
+					/* Assert strm_seqno is non-zero as this is going to be filled in cs_data and jnlpool_ctl.
+					 * Note that in case of a root primary supplementary instance, the history record is
+					 * received from a non-supplementary instance whose history record has a zero strm_seqno
+					 * so use the start_seqno instead as the strm_seqno. On the other hand, in case of a
+					 * propagating primary supplementary, the history record is received from a supplementary
+					 * instance in which case the strm_seqno field would have been properly populated so use it.
+					 */
+					strm_seqno = (suppl_propagate_primary ? histinfo.strm_seqno : histinfo.start_seqno);
+					assert(strm_seqno);
+					save_reg = gv_cur_region;
+					for (curr = gld_db_files; NULL != curr; curr = curr->next)
+					{
+						TP_CHANGE_REG(curr->gd);
+						assert(!gv_cur_region->read_only);
+						grab_crit(gv_cur_region);
+						if (cs_addrs->onln_rlbk_cycle != cs_addrs->nl->onln_rlbk_cycle)
+							UPDPROC_ONLN_RLBK_CLNUP(gv_cur_region); /* No return */
+						cs_data->strm_reg_seqno[histinfo.strm_index] = strm_seqno;
+						/* Before doing "wcs_flu", do a "jnl_ensure_open" to ensure the journal file
+						 * is open in shared memory as otherwise we might skip writing the EPOCH
+						 * record in case this is the first history record that is being received on
+						 * this instance and no other process on this instance has opened the
+						 * journal file yet. But before doing jnl_ensure_open, do some time adjustments
+						 * like is done in t_end.c (see comments there for details).
+						 */
+						jpc = cs_addrs->jnl;
+						DO_JNL_ENSURE_OPEN(cs_addrs, jpc); /* does "jnl_ensure_open" and pre-requisites */
+						wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH);
+						rel_crit(gv_cur_region);
+					}
+					TP_CHANGE_REG(save_reg);
+					GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY)
+					if (repl_csa->onln_rlbk_cycle != jnlpool_ctl->onln_rlbk_cycle)
+						UPDPROC_ONLN_RLBK_CLNUP(jnlpool.jnlpool_dummy_reg); /* No return */
+					jnlpool_ctl->strm_seqno[histinfo.strm_index] = strm_seqno;
+					rel_lock(jnlpool.jnlpool_dummy_reg);
+					/* Ideally we also want to do a "repl_inst_flush_filehdr" to make the strm_seqno in the
+					 * instance file header also uptodate but that is anyways going to be done as part of
+					 * the "repl_inst_histinfo_add" call below so we skip doing it separately here.
+					 */
+				}
+ 				assert(jnlpool.jnlpool_ctl->upd_disabled || (strm_index == histinfo.strm_index));
+			}
+			/* Now that we have constructed the history, add it to the instance file. */
+			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY)
+			if (repl_csa->onln_rlbk_cycle != jnlpool_ctl->onln_rlbk_cycle)
+				UPDPROC_ONLN_RLBK_CLNUP(jnlpool.jnlpool_dummy_reg); /* No return */
+			repl_inst_histinfo_add(&histinfo);
+			rel_lock(jnlpool.jnlpool_dummy_reg);
+			/* Dump the history contents AFTER the "repl_inst_histinfo_add" and "wcs_flu" above.
+			 * This way, in case of a -updateresync or -noresync history record addition,
+			 * (particularly for the first A->P connection), the user is guaranteed that
+			 * seeing the history dump message indicates the receiver on P can be cleanly shutdown
+			 * and a restart of the receiver does not need to use the -updateresync.
+			 */
+			repl_dump_histinfo(updproc_log_fp, TRUE, TRUE, "New History Content", &histinfo);
+			/* Update pointers to indicate this record is now processed and move on to the next. */
+			readaddrs += rec_len;
+			temp_read += rec_len;
+			upd_proc_local->read = temp_read;
+			continue;
+		}
+#		endif
 		/* NOTE: All journal sequence number fields are at same offset */
 		if (ROUND_DOWN2(rec_len, JNL_REC_START_BNDRY) != rec_len)
 		{	/* We need that so REC_LEN_FROM_SUFFIX does not access unaligned int */
@@ -736,107 +1025,30 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		}
 		if (upd_good_record == bad_trans_type)
 		{
+			UNIX_ONLY(
+				if (suppl_propagate_primary)
+				{
+					rec_strm_seqno = GET_STRM_SEQNO(rec);
+					strm_index = GET_STRM_INDEX(rec_strm_seqno);
+					rec_strm_seqno = GET_STRM_SEQ60(rec_strm_seqno);
+					strm_seqno = jnlpool_ctl->strm_seqno[strm_index];
+					if (rec_strm_seqno != strm_seqno)
+					{
+						assert(FALSE);
+						rts_error(VARLSTCNT(5) ERR_STRMSEQMISMTCH, 3,
+								strm_index, &rec_strm_seqno, &strm_seqno);
+					}
+				}
+			)
 			if (JRT_NULL == rectype)
-			{
+			{	/* Play the NULL transaction into the database and journal files */
 				save_reg = gv_cur_region;
 				gv_cur_region = gld_db_files->gd;
 				tp_change_reg();
-				csa = cs_addrs;
+				DEBUG_ONLY(csa = cs_addrs;)
 				assert(!csa->hold_onto_crit);
 				assert(!csa->now_crit);
-				grab_crit(gv_cur_region);
-				grab_lock(jnlpool.jnlpool_dummy_reg);
-				temp_jnlpool_ctl->write_addr = jnlpool_ctl->write_addr;
-				temp_jnlpool_ctl->write = jnlpool_ctl->write;
-				temp_jnlpool_ctl->jnl_seqno = jnlpool_ctl->jnl_seqno;
-				assert((temp_jnlpool_ctl->write_addr % temp_jnlpool_ctl->jnlpool_size) == temp_jnlpool_ctl->write);
-				jgbl.cumul_jnl_rec_len = SIZEOF(jnldata_hdr_struct) + NULL_RECLEN;
-				temp_jnlpool_ctl->write += SIZEOF(jnldata_hdr_struct);
-				if (temp_jnlpool_ctl->write >= temp_jnlpool_ctl->jnlpool_size)
-				{
-					assert(temp_jnlpool_ctl->write == temp_jnlpool_ctl->jnlpool_size);
-					temp_jnlpool_ctl->write = 0;
-				}
-				jnlpool_ctl->early_write_addr = jnlpool_ctl->write_addr +  jgbl.cumul_jnl_rec_len;
-				/* Source server does not read in crit. It relies on early_write_addr, the transaction
-				 * data, lastwrite_len, write_addr being updated in that order. To ensure this order,
-				 * we have to force out early_write_addr to its coherency point now. If not, the source
-				 * server may read data that is overwritten (or stale). This is true only on
-				 * architectures and OSes that allow unordered memory access
-				 */
-				SHM_WRITE_MEMORY_BARRIER;
-				csa->ti->early_tn = csa->ti->curr_tn + 1;
-				if (JNL_WRITE_LOGICAL_RECS(csa))
-				{
-					SET_GBL_JREC_TIME;	/* needed for jnl_put_jrt_pini() */
-					jpc = csa->jnl;
-					jbp = jpc->jnl_buff;
-					/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order
-					 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write
-					 * journal records (if it decides to switch to a new journal file).
-					 */
-					ADJUST_GBL_JREC_TIME(jgbl, jbp);
-					if (JNL_ENABLED(csa))
-					{
-						jnl_status = jnl_ensure_open();
-						if (0 == jnl_status)
-						{
-							if (0 == jpc->pini_addr)
-								jnl_put_jrt_pini(csa);
-						} else
-						{
-							if (SS_NORMAL != jpc->status)
-								rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csa->hdr),
-									DB_LEN_STR(gv_cur_region), jpc->status);
-							else
-								rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csa->hdr),
-									DB_LEN_STR(gv_cur_region));
-						}
-					}
-					null_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
-					null_record.prefix.jrec_type = JRT_NULL;
-					null_record.prefix.forwptr = null_record.suffix.backptr = NULL_RECLEN;
-					null_record.prefix.time = jgbl.gbl_jrec_time;
-					null_record.prefix.tn = csa->ti->curr_tn;
-					null_record.prefix.checksum = INIT_CHECKSUM_SEED;
-					null_record.jnl_seqno = jnl_seqno;
-					null_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-					JNL_WRITE_APPROPRIATE(csa, jpc, JRT_NULL, (jnl_record *)&null_record, NULL, NULL);
-				}
-				temp_jnlpool_ctl->jnl_seqno++;
-				csa->hdr->reg_seqno = temp_jnlpool_ctl->jnl_seqno;
-				VMS_ONLY(
-					csa->hdr->resync_seqno = temp_jnlpool_ctl->jnl_seqno;
-					csa->hdr->resync_tn = csa->ti->curr_tn;
-					csa->hdr->old_resync_seqno = temp_jnlpool_ctl->jnl_seqno;
-				)
-				UNIX_ONLY(
-					assert(REPL_PROTO_VER_UNINITIALIZED != gtmrecv_local->last_valid_remote_proto_ver);
-					if (REPL_PROTO_VER_DUALSITE == gtmrecv_local->last_valid_remote_proto_ver)
-						csa->hdr->dualsite_resync_seqno = temp_jnlpool_ctl->jnl_seqno;
-				)
-				/* the following statements should be atomic */
-				jnl_header = (jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jnlpool_ctl->write);
-				jnl_header->jnldata_len = temp_jnlpool_ctl->write - jnlpool_ctl->write +
-					(temp_jnlpool_ctl->write > jnlpool_ctl->write ? 0 : jnlpool_ctl->jnlpool_size);
-				jnl_header->prev_jnldata_len = jnlpool_ctl->lastwrite_len;
-				jnlpool_ctl->lastwrite_len = jnl_header->jnldata_len;
-				/* For systems with UNORDERED memory access (example, ALPHA, POWER4, PA-RISC 2.0), on a multi
-				 * processor system, it is possible that the source server notices the change in write_addr
-				 * before seeing the change to jnlheader->jnldata_len, leading it to read an invalid
-				 * transaction length. To avoid such conditions, we should commit the order of shared
-				 * memory updates before we update write_addr. This ensures that the source server sees all
-				 * shared memory updates related to a transaction before the change in write_addr
-				 */
-				SHM_WRITE_MEMORY_BARRIER;
-				jnlpool_ctl->write_addr += jnl_header->jnldata_len;
-				jnlpool_ctl->write = temp_jnlpool_ctl->write;
-				jnlpool_ctl->jnl_seqno = temp_jnlpool_ctl->jnl_seqno;
-				INCREMENT_CURR_TN(csa->hdr);
-				assert(!csa->hold_onto_crit);
-				rel_lock(jnlpool.jnlpool_dummy_reg);
-				rel_crit(gv_cur_region);
-				jgbl.cumul_jnl_rec_len = 0;
+				gvcst_jrt_null();
 				incr_seqno = TRUE;
 				/* Restore gv_cur_region to what it was before the NULL record processing started. op_tstart
 				 * relies on the fact that gv_target->gd_csa and cs_addrs be in sync. If prior to NULL record
@@ -951,11 +1163,14 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 							{
 								if (STR_SUB_PREFIX == scan_char)
 								{
-									assert(!secondary_side_std_null_coll);
+									VMS_ONLY(assert(!secondary_side_std_null_coll);)
+									UNIX_ONLY(
+										assert(!recvpool_ctl->this_side.is_std_null_coll);)
 									last_nullsubs = cntr;
 								} else if (SUBSCRIPT_STDCOL_NULL == scan_char)
 								{
-									assert(secondary_side_std_null_coll);
+									VMS_ONLY(assert(secondary_side_std_null_coll);)
+									UNIX_ONLY(assert(recvpool_ctl->this_side.is_std_null_coll);)
 									last_nullsubs = cntr;
 								}
 							}
@@ -1103,10 +1318,43 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			if (jnl_seqno - lastlog_seqno >= log_interval)
 			{
 				repl_log(updproc_log_fp, TRUE, TRUE, "Rectype = %d Committed Jnl seq no is : "
-					INT8_FMT" "INT8_FMTX" \n", rectype, INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
+					INT8_FMT" "INT8_FMTX"\n", rectype, INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
 				lastlog_seqno = jnl_seqno;
 			}
 			upd_proc_local->read_jnl_seqno = ++jnl_seqno;
+			/* Determine if all updates that we play from the receive pool do end up incrementing the jnl_seqno of the
+			 * journal pool. In case of a root primary supplementary instance, we need to do this check only for the
+			 * non-supplementary stream of interest (strm_index) that this update process is processing.
+			 */
+			UNIX_ONLY(
+				assert(!suppl_root_primary || ((0 < strm_index) && (MAX_SUPPL_STRMS > strm_index)));
+				jnlpool_ctl_seqno = (!suppl_root_primary ? jnlpool_ctl->jnl_seqno
+										: jnlpool_ctl->strm_seqno[strm_index]);
+			)
+			VMS_ONLY(jnlpool_ctl_seqno = jnlpool_ctl->jnl_seqno;)
+			if (jnlpool_ctl_seqno)
+			{	/* Now that the update process has played an incoming seqno, we expect it to have incremented
+				 * the corresponding jnl_seqno and strm_seqno fields in the current instance's journal pool
+				 * as well. Not doing so will cause the source and receiver instances to go out of sync.
+				 * We know of 3 ways in which this can occur and all of them have already been handled.
+				 *	1) UPDREPLSTATEOFF error.
+				 *	2) error_on_jnl_file_lost = JNL_FILE_LOST_ERRORS;
+				 *	3) Duplicate KILL is journaled and increments seqno even though it does not touch db.
+				 * Therefore if we find any out-of-sync situation at this point, we should stop right away
+				 * and get a core dump for further analysis. So GTMASSERT.
+				 */
+				if (upd_proc_local->read_jnl_seqno != jnlpool_ctl_seqno)
+				{
+					repl_log(updproc_log_fp, TRUE, TRUE,
+						"JNLSEQNO last updated by  update process = "INT8_FMT" "INT8_FMTX"\n",
+						INT8_PRINT(upd_proc_local->read_jnl_seqno),
+						INT8_PRINTX(upd_proc_local->read_jnl_seqno));
+					repl_log(updproc_log_fp, TRUE, TRUE,
+						"JNLSEQNO of last transaction written to journal pool = "INT8_FMT" "INT8_FMTX"\n",
+						INT8_PRINT(jnlpool_ctl_seqno), INT8_PRINTX(jnlpool_ctl_seqno));
+					GTMASSERT;
+				}
+			}
 		}
 		readaddrs += rec_len;
 		temp_read += rec_len;

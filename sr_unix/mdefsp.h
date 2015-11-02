@@ -19,17 +19,12 @@
 #endif /* __ia64 */
 
 #ifdef GTM64
-typedef	int	int4;		/* 4-byte signed integer */
-typedef unsigned int	uint4;	  /* 4-byte unsigned integer */
-typedef	long	int8;		/* 8-byte signed integer */
-typedef unsigned long	uint8;	  /* 8-byte unsigned integer */
+typedef	long		int8;		/* 8-byte signed integer */
+typedef unsigned long	uint8;	  	/* 8-byte unsigned integer */
 typedef unsigned long 	gtm_uint8;	/*these two datatypes are defined because */
 typedef		 long	gtm_int8;	/*int8 and uint8 are system defined in AIX_64*/
 #define INT8_NATIVE
-#else
-typedef	long	int4;
-typedef unsigned long	uint4;
-#endif /* GTM64 */
+#endif
 
 #ifdef __s390__
 typedef		 short int2;		/* 2-byte signed integer */

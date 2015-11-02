@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 #include "mdef.h"
 
 #include <signal.h>
-
+#include <stddef.h>
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
@@ -30,6 +30,7 @@
 #define KDIM	64		/* max number of subscripts */
 
 GBLREF VSIG_ATOMIC_T	util_interrupt;
+error_def(ERR_CTRLC);
 
 void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
 {
@@ -51,14 +52,17 @@ void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
 	}
 }
 
-
+/* Note:*shr_sub_size keeps track of total subscript area in lock space. Initialize *shr_sub_size to 0 before calling this.
+ * lke_showtree() will keep adding on previous value of shr_sub_size. If such info is not needed simply pass NULL to shr_sub_size
+ */
 bool	lke_showtree(struct CLB 	*lnk,
 		     mlk_shrblk_ptr_t	tree,
 		     bool 		all,
 		     bool 		wait,
 		     pid_t 		pid,
 		     mstr 		one_lock,
-		     bool 		memory)
+		     bool 		memory,
+	             int		*shr_sub_size)
 {
 	mlk_shrblk_ptr_t	node, start[KDIM];
 	unsigned char	subscript_offset[KDIM];
@@ -66,15 +70,15 @@ bool	lke_showtree(struct CLB 	*lnk,
 	static MSTR_DEF(name, 0, name_buffer);
 	int		depth = 0;
 	bool		locks = FALSE;
-
-	error_def(ERR_CTRLC);
+	int		string_size = 0;
 
 	if (memory)
 	{
 		lke_show_memory(tree, "	");
+		if (shr_sub_size)
+			(*shr_sub_size) = string_size;
 		return TRUE;
 	}
-
 	node = start[0]
 	     = tree;
 	subscript_offset[0] = 0;
@@ -82,7 +86,7 @@ bool	lke_showtree(struct CLB 	*lnk,
 	for (;;)
 	{
 		name.len = subscript_offset[depth];
-
+		string_size += MLK_SHRSUB_SIZE((mlk_shrsub_ptr_t)R2A(node->value));
 		/* Display the lock node */
 		locks = lke_showlock(lnk, node, &name, all, wait, TRUE, pid, one_lock, FALSE)
 			|| locks;
@@ -100,6 +104,8 @@ bool	lke_showtree(struct CLB 	*lnk,
 				{
 					/* We're already at the top, so we're done */
 					assert(depth == 0);
+					if (shr_sub_size)
+						(*shr_sub_size) = string_size;
 					return locks;
 				}
 				--depth;

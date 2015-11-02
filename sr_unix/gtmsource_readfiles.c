@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,12 +58,16 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+
 #define LOG_WAIT_FOR_JNL_RECS_PERIOD	(10 * 1000) /* ms */
 #define LOG_WAIT_FOR_JNLOPEN_PERIOD	(10 * 1000) /* ms */
 
 #define LSEEK_ERR_STR		"Error in lseek"
 #define READ_ERR_STR		"Error in read"
 #define UNKNOWN_ERR_STR		"Error unknown"
+
+/* Get journal end of data, adjusted if file not virtually truncated by recover/rollback */
+#define REAL_END_OF_DATA(FC)	(FC->jfh->prev_recov_end_of_data ? FC->jfh->end_of_data : FC->jfh->end_of_data + EOF_RECLEN)
 
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -76,6 +80,16 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	FILE			*gtmsource_statslog_fp;
 GBLREF	gtmsource_state_t	gtmsource_state;
+GBLREF	uint4			process_id;
+
+error_def(ERR_JNLBADRECFMT);
+error_def(ERR_JNLEMPTY);
+error_def(ERR_JNLRECINCMPL);
+error_def(ERR_NOPREVLINK);
+error_def(ERR_REPLBRKNTRANS);
+error_def(ERR_REPLCOMM);
+error_def(ERR_REPLFILIOERR);
+error_def(ERR_TEXT);
 
 static	int4			num_tcom = -1;
 static	boolean_t		trans_read = FALSE;
@@ -111,8 +125,6 @@ static	int repl_read_file(repl_buff_t *rb)
 	uint4			start_addr;
 	uint4			end_addr;
 
-	error_def(ERR_TEXT);
-
 	fc = rb->fc;
 	b = &rb->buff[rb->buffindex];
 	csa = &FILE_INFO(rb->backctl->reg)->s_addrs;
@@ -125,9 +137,7 @@ static	int repl_read_file(repl_buff_t *rb)
 		if (!rb->backctl->eof_addr_final)
 			update_eof_addr(rb->backctl, &eof_change); /* update possible change in end_of_data, re-read file header */
 		assert(!fc->jfh->crash);
-		dskaddr = fc->jfh->end_of_data;
-		if (0 == fc->jfh->prev_recov_end_of_data) /* file not virtually truncated by recover/rollback */
-			dskaddr += EOF_RECLEN;
+		dskaddr = REAL_END_OF_DATA(fc);
 	}
 	/* Make sure we do not read beyond end of data in the journal file */
 	/* Note : This logic is always needed when journal file is pre-allocated.
@@ -195,8 +205,6 @@ static	int repl_next(repl_buff_t *rb)
 		jnl_record			*rec;
 		jnl_string			*keystr;
 	)
-	error_def(ERR_REPLFILIOERR);
-	error_def(ERR_TEXT);
 
 	b = &rb->buff[rb->buffindex];
 	b->recbuff += b->reclen; /* The next record */
@@ -208,13 +216,18 @@ static	int repl_next(repl_buff_t *rb)
 		b->reclen = 0;
 		b->buffremaining = REPL_BLKSIZE(rb);
 	}
-	if (b->recaddr == b->readaddr || b->reclen == 0)
+	if (b->recaddr == b->readaddr || b->reclen == 0 ||
+		(rb->backctl->eof_addr_final && (b->readaddr != REAL_END_OF_DATA(rb->fc)) && b->buffremaining))
 	{
 		sav_buffremaining = b->buffremaining;
 		if ((status = repl_read_file(rb)) == SS_NORMAL)
 		{
 			if (sav_buffremaining == b->buffremaining)
 			{
+				/* Even though we are returning with EREPL_JNLRECINCMPL, this is not a case of an incomplete record
+				 * if the journal file is a previous generation journal file.  It actually indicates that the end
+				 * of file of the previous generation journal file is now reached.
+				 */
 				b->reclen = 0;
 				repl_errno = EREPL_JNLRECINCMPL;
 				return (repl_errno);
@@ -314,10 +327,6 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 	boolean_t		do_jnl_ensure_open;
 	gd_id_ptr_t		reg_ctl_end_id;
 
-	error_def(ERR_REPLFILIOERR);
-	error_def(ERR_TEXT);
-	error_def(ERR_NOPREVLINK);
-
 	/* Attempt to open newer generation journal files. Return the number of new files opened. Create new
 	 * ctl element(s) for each newer generation and attach at reg_ctl_end. Work backwards from the current journal file.
 	 */
@@ -410,9 +419,6 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 	sgmnt_addrs		*csa;
 	repl_buff_t		*rb;
 
-	error_def(ERR_REPLFILIOERR);
-	error_def(ERR_TEXT);
-
 	assert(!ctl->eof_addr_final); /* The caller should invoke us ONLY if ctl->eof_addr_final is FALSE */
 	csa = &FILE_INFO(ctl->reg)->s_addrs;
 	rb = ctl->repl_buff;
@@ -438,7 +444,7 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 			REPL_DPRINT2("Update EOF : Jnl file hdr refreshed from file for %s\n", ctl->jnl_fn);
 			ctl->eof_addr_final = TRUE; /* No more updates to fc->eof_addr for this journal file */
 		}
-		new_eof_addr = fc->jfh->end_of_data + EOF_RECLEN;
+		new_eof_addr = REAL_END_OF_DATA(fc);
 		REPL_DPRINT3("Update EOF : New EOF addr from jfh for %s is %u\n", ctl->jnl_fn, new_eof_addr);
 	}
 	/* ensure that new_eof_addr is not less than prev_eof_addr.
@@ -508,9 +514,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	enum jnl_record_type	rectype;
 	gd_region		*reg;
 	sgmnt_addrs		*csa;
-
-	error_def(ERR_JNLBADRECFMT);
-	error_def(ERR_TEXT);
+	int			wait_for_jnl = 0;
 
 	assert(ctl->file_state == JNL_FILE_OPEN);
 
@@ -528,8 +532,11 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 		return (SS_NORMAL);
 	}
 #	endif
-	if (fc->eof_addr == JNL_FILE_FIRST_RECORD)
-	{
+	if (JNL_FILE_FIRST_RECORD == fc->eof_addr)
+	{	/* Journal file only has the journal header, no journal records.  That case should have been cought earlier
+		* when the journal file was first open.
+		*/
+		assert(FALSE);
 		repl_errno = EREPL_JNLEARLYEOF;
 		return (repl_errno);
 	}
@@ -557,7 +564,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 		b->recbuff = b->base;
 		b->reclen = 0;
 		b->readaddr = b->recaddr = JNL_BLK_DSKADDR(dskread, REPL_BLKSIZE(rb));
-		if (b->readaddr == JNL_FILE_FIRST_RECORD && adjust_buff_leaving_hdr(rb) != SS_NORMAL)
+		if (JNL_FILE_FIRST_RECORD == b->readaddr && SS_NORMAL != adjust_buff_leaving_hdr(rb))
 		{
 			assert(repl_errno == EREPL_BUFFNOTFRESH);
 			GTMASSERT; /* Program bug */
@@ -569,21 +576,52 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 		assert(stop_at > dskread);
 		while (b->reclen < stop_at - b->recaddr)
 		{
-			if ((status = repl_next(rb)) == SS_NORMAL)
+			if (SS_NORMAL == (status = repl_next(rb)))
 			{
 				rectype = (enum jnl_record_type)((jrec_prefix *)b->recbuff)->jrec_type;
 				if (IS_REPLICATED(rectype))
 				{
 					QWASSIGN(max_seqno, GET_JNL_SEQNO(b->recbuff));
 					max_seqno_addr = b->recaddr;
-				} else if (rectype == JRT_EOF)
+				} else if (JRT_EOF == rectype)
 					break;
-			} else if (status == EREPL_JNLRECINCMPL)
-			{ /* it is possible to get this return value if jb->dskaddr is in the middle of a journal record */
-				break;
+			} else if (EREPL_JNLRECINCMPL == status)
+			{	/* It is possible to get this return value if jb->dskaddr is in the middle of a journal record. Log
+				 * warning message for every certain number of attempts. There might have been a crash and the file
+				 * might have been corrupted. The file possibly might never grow. Such cases have to be detected
+				 * and attempt to read such files aborted. If the journal file is a previous generation, waste no
+				 * time waiting for journal records to be written, but error out right away. That should never
+				 * happen, hence the assert and gtm_fork_n_core.
+				 */
+				if (ctl->eof_addr_final)
+				{ 	/* EREPL_JNLRECINCMPL is also possible if there is no more records left in the journal
+					 * file.  If this happens with a previous generation journal file, there is no point in
+					 * retrying the read from this block as the file will never grow.  Add asserts to ensure
+					 * to ensure this (that we have reached the end of previous generation journal file) and
+					 * create a core otherwise (for diagnostic purposes).
+					 */
+					if ((b->readaddr != b->recaddr) || (b->recaddr != REAL_END_OF_DATA(fc)))
+					{
+						assert(FALSE);
+						gtm_fork_n_core();
+						rts_error(VARLSTCNT(6) ERR_JNLRECINCMPL, 4, b->recaddr, ctl->jnl_fn_len,
+							ctl->jnl_fn, &ctl->seqno);
+					}
+					break;
+				}
+				gtmsource_poll_actions(TRUE);
+				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
+				if (0 == (wait_for_jnl += GTMSOURCE_WAIT_FOR_JNL_RECS) % LOG_WAIT_FOR_JNL_RECS_PERIOD)
+				{
+					repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal "
+						"record(s) to be written to journal file %s while attempting to read seqno %llu "
+						"[0x%llx]. [dskaddr 0x%llx freeaddr 0x%llx]. Check for problems with journaling\n",
+						wait_for_jnl, ctl->jnl_fn, ctl->seqno, ctl->seqno, csa->jnl->jnl_buff->dskaddr,
+						csa->jnl->jnl_buff->freeaddr);
+				}
 			} else
 			{
-				if (status == EREPL_JNLRECFMT)
+				if (EREPL_JNLRECFMT == status)
 					rts_error(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 				else
 					GTMASSERT;
@@ -591,6 +629,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 		}
 		if ((max_seqno_found = (0 != max_seqno)) || (0 == dskread))
 			break;
+		assert(REPL_BLKSIZE(rb) <= dskread);
 		dskread -= REPL_BLKSIZE(rb);
 	} while (TRUE);
 	rb->buffindex = REPL_MAINBUFF;	/* reset back to the main buffer */
@@ -602,7 +641,11 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 			ctl->max_seqno_final = TRUE; /* No more max_seqno updates as this journal file has switched */
 		return (SS_NORMAL);
 	}
-	/* dskread == 0 */
+	/* Two possibilities to get here :
+	 * 1- No replicatable journal record found.  Shouldn't happen since it should have already looked for min seq. number.
+	 * 2- Max seq. number found is 0.  This is possible only if the journal file has been created with replication turned OFF.
+	 *    That should have been detected earlier when opening the journal file. */
+	assert(FALSE);
 	repl_errno = EREPL_JNLEARLYEOF;
 	return (repl_errno);
 }
@@ -641,8 +684,6 @@ static	int first_read(repl_ctl_element *ctl)
 	repl_file_control_t	*fc;
 	boolean_t		min_seqno_found;
 	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
-
-	error_def(ERR_JNLBADRECFMT);
 
 	rb = ctl->repl_buff;
 	assert(rb->buffindex == REPL_MAINBUFF);
@@ -710,9 +751,6 @@ static void increase_buffer(unsigned char **buff, int *buflen, int buffer_needed
 	int 		newbuffsize, alloc_status;
 	unsigned char	*old_msgp;
 
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
-
 	/* The tr size is not known apriori. Hence, a good guess of 1.5 times the current buffer space is used */
 	newbuffsize = gtmsource_msgbufsiz + (gtmsource_msgbufsiz >> 1);
 	if (buffer_needed > newbuffsize)
@@ -744,17 +782,14 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	int			status;
 	seq_num			read_seqno;
 	unsigned char		*seq_num_ptr, seq_num_str[32]; /* INT8_PRINT */
-
-	error_def(ERR_JNLBADRECFMT);
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_REPLBRKNTRANS);
-	error_def(ERR_TEXT);
+	sgmnt_addrs		*csa;
 
 	rb = ctl->repl_buff;
 	assert(rb->buffindex == REPL_MAINBUFF);
 	b = &rb->buff[rb->buffindex];
 	fc = rb->fc;
 	ctl->read_complete = FALSE;
+	csa = &FILE_INFO(ctl->reg)->s_addrs;
 	readlen = 0;
 	assert(0 != b->reclen);
 	if (b->reclen > *bufsiz)
@@ -832,18 +867,27 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 						ERR_TEXT, 2, RTS_ERROR_LITERAL("Early EOF found"));
 			}
 		} else if (status == EREPL_JNLRECINCMPL)
-		{	/* Log warning message for every certain number of attempts. There might have been a crash
-			 * and the file might have been corrupted. The file possibly might never grow.
-			 * Such cases have to be detected and attempt to read such files aborted.
+		{	/* Log warning message for every certain number of attempts. There might have been a crash and the file
+			 * might have been corrupted. The file possibly might never grow. Such cases have to be detected and
+			 * attempt to read such files aborted.  If the journal file is a previous generation, waste no time waiting
+			 * for journal records to be written, but error out right away. That should never happen, hence the assert
+			 * and gtm_fork_n_core.
 			 */
+			if (ctl->eof_addr_final)
+			{
+				assert(FALSE);
+				gtm_fork_n_core();
+				rts_error(VARLSTCNT(6) ERR_JNLRECINCMPL, 4, b->recaddr, ctl->jnl_fn_len, ctl->jnl_fn, &ctl->seqno);
+			}
 			gtmsource_poll_actions(TRUE);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
-			if ((total_wait_for_jnl_recs += GTMSOURCE_WAIT_FOR_JNL_RECS) % LOG_WAIT_FOR_JNL_RECS_PERIOD == 0)
+			if (0 == (total_wait_for_jnl_recs += GTMSOURCE_WAIT_FOR_JNL_RECS) % LOG_WAIT_FOR_JNL_RECS_PERIOD)
 			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal record(s)"
-					 " to be written to journal file %s while attempting to read seqno %llu [0x%llx]. "
-					 "Check for problems with journaling\n", total_wait_for_jnl_recs, ctl->jnl_fn,
-					 ctl->seqno, ctl->seqno);
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal "
+					"record(s) to be written to journal file %s while attempting to read seqno %llu [0x%llx]. "
+					"[dskaddr 0x%llx freeaddr 0x%llx]. Check for problems with journaling\n",
+					total_wait_for_jnl_recs, ctl->jnl_fn, ctl->seqno, ctl->seqno, csa->jnl->jnl_buff->dskaddr,
+					csa->jnl->jnl_buff->freeaddr);
 			}
 		} else
 		{
@@ -868,8 +912,6 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 	enum jnl_record_type	rectype;
 	tr_search_state_t	found;
 	int			status;
-
-	error_def(ERR_JNLBADRECFMT);
 
 	REPL_DPRINT5("do_linear_search: file : %s lo_addr : %u max_readaddr : %u read_seqno : %llu\n",
 			ctl->jnl_fn, lo_addr, max_readaddr, read_seqno);
@@ -1248,8 +1290,6 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 	unsigned char		*seq_num_ptr, seq_num_str[32]; /* INT8_PRINT */
 	repl_ctl_element	*ctl;
 
-	error_def(ERR_REPLBRKNTRANS);
-
 	trans_read = FALSE;
 	num_tcom = -1;
 	tot_tcom_len = 0;
@@ -1589,14 +1629,14 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	{
 		DEBUG_ONLY(loopcnt++);
 		file2pool = FALSE;
-		if (max_read_seqno > gtmsource_local->next_triple_seqno)
-			max_read_seqno = gtmsource_local->next_triple_seqno; /* Do not read more than next triple's boundary */
+		if (max_read_seqno > gtmsource_local->next_histinfo_seqno)
+			max_read_seqno = gtmsource_local->next_histinfo_seqno; /* Do not read more than next histinfo boundary */
 		assert(MAX_SEQNO != max_read_seqno);
 		read_jnl_seqno = gtmsource_local->read_jnl_seqno;
 		assert(read_jnl_seqno <= max_read_seqno);
-		if (read_jnl_seqno == gtmsource_local->next_triple_seqno)
-		{	/* Should signal a REPL_NEW_TRIPLE message to be sent first before sending any more seqnos across */
-			gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SEND_NEW_TRIPLE;
+		if (read_jnl_seqno == gtmsource_local->next_histinfo_seqno)
+		{	/* Request a REPL_HISTREC message be sent first before sending any more seqnos across */
+			gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SEND_NEW_HISTINFO;
 			return 0;
 		}
 		read_addr = gtmsource_local->read_addr;
@@ -1655,20 +1695,22 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 			break;
 		} while (TRUE);
 		assert(read_jnl_seqno <= max_read_seqno);
-		if ((gtmsource_local->next_triple_num < gtmsource_local->num_triples)
-			|| (gtmsource_local->num_triples == jnlpool.repl_inst_filehdr->num_triples))
-		{	/* We are either sending seqnos of a triple that is not the last one in the instance file OR
-			 * we are sending seqnos of the last triple (that is open-ended) but there has been no more triples
-			 * concurrently added to this instance file compared to what is in our private memory. In either case,
-			 * it is safe to send these seqnos without worrying about whether a new triple needs to be sent first.
+		if ((gtmsource_local->next_histinfo_num < gtmsource_local->num_histinfo)
+			|| (gtmsource_local->num_histinfo == jnlpool.repl_inst_filehdr->num_histinfo))
+		{	/* We are either sending seqnos of a histinfo that is not the last one in the instance file OR
+			 * we are sending seqnos of the last histinfo (that is open-ended) but there has been no more histinfo
+			 * records concurrently added to this instance file compared to what is in our private memory. In either
+			 * case, it is safe to send these seqnos without worrying about whether a new histinfo record needs to
+			 * be sent first.
 			 */
 			break;
 		} else
-		{	/* Set the next triple's start_seqno and redo the read with the new "gtmsource_local->next_triple_seqno" */
-			assert(MAX_SEQNO == gtmsource_local->next_triple_seqno);
-			gtmsource_set_next_triple_seqno(TRUE);
+		{	/* Set the next histinfo record's start_seqno and redo the read with the new
+			 * "gtmsource_local->next_histinfo_seqno" */
+			assert(MAX_SEQNO == gtmsource_local->next_histinfo_seqno);
+			gtmsource_set_next_histinfo_seqno(TRUE);
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
-				return 0; /* Connection got reset in "gtmsource_set_next_triple_seqno" */
+				return 0; /* Connection got reset in "gtmsource_set_next_histinfo_seqno" */
 		}
 	} while (TRUE);
 	if (file2pool)
@@ -1678,7 +1720,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	} else
 		read_state = gtmsource_local->read_state;
 	gtmsource_local->read_addr = read_addr;
-	assert(read_jnl_seqno <= gtmsource_local->next_triple_seqno);
+	assert(read_jnl_seqno <= gtmsource_local->next_histinfo_seqno);
 	gtmsource_local->read_jnl_seqno = read_jnl_seqno;
 #ifdef GTMSOURCE_ALWAYS_READ_FILES
 	gtmsource_local->read_state = read_state = READ_FILE;
@@ -1772,10 +1814,14 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 	seq_num			start_seqno, max_zqgblmod_seqno;
 	trans_num		bov_tn;
 
-	error_def(ERR_NOPREVLINK);
-
 	gtmsource_ctl_close();
 	gtmsource_ctl_init();
+	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+	{	/* Possible if grab_crit done from gtmsource_ctl_init -> repl_ctl_create detected an Online Rollback as part
+		 * of grab_crit
+		 */
+		return -1; /* gtmsource_ctl_close will be done by gtmsource_process */
+	}
 	max_zqgblmod_seqno = 0;
 	for (ctl = repl_ctl_list->next; ctl != NULL; ctl = next_ctl)
 	{
@@ -1787,7 +1833,7 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 		{
 			assert(ctl->first_read_done);
 			start_seqno = ctl->repl_buff->fc->jfh->start_seqno;
-			repl_log(gtmsource_log_fp, TRUE, FALSE, "Region [%s] : Journal file [%s] : Start Seqno : [%llx]\n",
+			repl_log(gtmsource_log_fp, TRUE, FALSE, "Region [%s] : Journal file [%s] : Start Seqno : [0x%llx]\n",
 				ctl->reg->rname, ctl->jnl_fn, start_seqno);
 			if (start_seqno <= resync_seqno)
 				break;
@@ -1803,19 +1849,29 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 		csa = &FILE_INFO(ctl->reg)->s_addrs;
 		assert(REPL_ALLOWED(csa->hdr));
 		bov_tn = ctl->repl_buff->fc->jfh->bov_tn;
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Assigning Region [%s] : Resync Seqno [%llx] : ZQGBLMOD SEQNO [%llx] "
-			": ZQGBLMOD TN : [%llx]\n", ctl->reg->rname, resync_seqno, start_seqno, bov_tn);
-		/* Although csa->hdr->zqgblmod_seqno is only modified by the source server (while holding the ftok semaphore
-		 * on the replication instance file), it is read by fileheader_sync() which does it while holding region crit.
-		 * To avoid the latter from reading an inconsistent value (i.e. neither the pre-update nor the post-update value,
-		 * which is possible if the 8-byte operation is not atomic but a sequence of two 4-byte operations AND if the
-		 * pre-update and post-update value differ in their most significant 4-bytes) we grab crit. We could have used
-		 * the QWCHANGE_IS_READER_CONSISTENT macro (which checks for most significant 4-byte differences) instead to
-		 * determine if it is really necessary to grab crit. But since the update to zqgblmod_seqno is a rare operation,
-		 * we decide to play it safe.
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Assigning Region [%s] : Resync Seqno [0x%llx] : ZQGBLMOD SEQNO [0x%llx] "
+			": ZQGBLMOD TN : [0x%llx]\n", ctl->reg->rname, resync_seqno, start_seqno, bov_tn);
+		/* csa->hdr->zqgblmod_seqno is modified ONLY by the source server OR online rollback (both of these hold the
+		 * database crit while doing so). It is also read by fileheader_sync() which does so while holding crit.
+		 * To avoid the latter from reading an inconsistent value (i.e neither the pre-update nor the post-update
+		 * value, which is possible if the 8-byte operation is not atomic but a sequence of two 4-byte operations
+		 * AND if the pre-update and post-update value differ in their most significant 4-bytes) we grab_crit. We
+		 * could have used QWCHANGE_IS_READER_CONSISTENT macro (which checks for most significant 4-byte difference)
+		 * instead to determine if it is really necessary to grab crit. But, since the update to zqgblmod_seqno is a
+		 * rare operation, we decided to play it safe.
 		 */
+		assert(!csa->hold_onto_crit);
 		if (FALSE == (was_crit = csa->now_crit))
 			grab_crit(ctl->reg);
+		if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
+		{
+			assert(process_id != jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
+			SYNC_ONLN_RLBK_CYCLES;
+			gtmsource_onln_rlbk_clnup(); /* would have set gtmsource_state accordingly */
+			if (!was_crit)
+				rel_crit(ctl->reg);
+			return -1; /* gtmsource_ctl_close will be done by gtmsource_process */
+		}
 		csa->hdr->zqgblmod_seqno = start_seqno;
 		csa->hdr->zqgblmod_tn = bov_tn;
 		if (FALSE == was_crit)
@@ -1826,7 +1882,15 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 	assert(!jnlpool.jnlpool_ctl->max_zqgblmod_seqno || jnlpool.jnlpool_ctl->max_zqgblmod_seqno > resync_seqno);
 	assert(0 < max_zqgblmod_seqno);
 	assert(resync_seqno >= max_zqgblmod_seqno);
+	assert(!(FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs.now_crit));
+	GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+	{
+		assert(process_id != jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
+		return -1; /* gtmsource_ctl_close will be done by gtmsource_process */
+	}
 	jnlpool.jnlpool_ctl->max_zqgblmod_seqno = max_zqgblmod_seqno;
+	rel_lock(jnlpool.jnlpool_dummy_reg);
 	gtmsource_ctl_close(); /* close all structures now that we are done; if we have to read from journal files; we'll open
 				* the structures again */
 	return (SS_NORMAL);

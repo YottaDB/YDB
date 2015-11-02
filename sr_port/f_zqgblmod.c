@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,18 +15,18 @@
 #include "indir_enum.h"
 #include "toktyp.h"
 #include "mdq.h"
+#include "fullbool.h"
 
-GBLREF char window_token;
+error_def(ERR_VAREXPECTED);
 
 int f_zqgblmod(oprtype *a, opctype op)
 {
-	triple *oldchain, tmpchain, *r, *triptr;
-	error_def(ERR_VAREXPECTED);
+	triple *oldchain, *r, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
-	switch (window_token)
+	switch (TREF(window_token))
 	{
 	case TK_CIRCUMFLEX:
 		if (!gvn())
@@ -36,7 +36,8 @@ int f_zqgblmod(oprtype *a, opctype op)
 		break;
 	case TK_ATSIGN:
 		r->opcode = OC_INDFUN;
-		if (TREF(shift_side_effects))
+		TREF(saw_side_effect) = TREF(shift_side_effects);
+		if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);

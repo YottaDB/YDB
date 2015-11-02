@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,11 @@ GBLREF uint4			process_id;
 GBLREF uint4			crit_deadlock_check_cycle;
 GBLREF uint4			dollar_tlevel;
 GBLREF unsigned int		t_tries;
-GBLREF	boolean_t		hold_onto_locks;
+#if defined(UNIX) && defined(DEBUG)
+GBLREF jnl_gbls_t		jgbl;
+#endif
+
+error_def(ERR_MUTEXRELEASED);
 
 /* Return number of regions (including jnlpool dummy region) if have or are aquiring crit or in_wtstart
  * ** NOTE **  This routine is called from signal handlers and is thus called asynchronously.
@@ -54,12 +58,10 @@ uint4 have_crit(uint4 crit_state)
 	sgmnt_addrs	*csa;
 	uint4		crit_reg_cnt = 0;
 
-	error_def(ERR_MUTEXRELEASED);
-
 	/* in order to proper release the necessary regions, CRIT_RELEASE implies going through all the regions */
 	if (crit_state & CRIT_RELEASE)
 	{
-		assert(!hold_onto_locks);	/* should not request crit to be released with this variable set to TRUE */
+		UNIX_ONLY(assert(!jgbl.onlnrlbk)); /* should not request crit to be released if online rollback */
 		crit_state |= CRIT_ALL_REGIONS;
 	}
 	if (0 != crit_count)
@@ -81,22 +83,23 @@ uint4 have_crit(uint4 crit_state)
 					{
 						crit_reg_cnt++;
 						/* It is possible that if DSE has done a CRIT REMOVE and stolen our crit, it
-						   could be given to someone else which would cause this test to fail. The
-						   current thinking is that the state DSE put this process is no longer viable
-						   and it should die at the earliest opportunity, there being no way to know if
-						   that is what happened anyway.
-						*/
+						 * could be given to someone else which would cause this test to fail. The
+						 * current thinking is that the state DSE put this process is no longer viable
+						 * and it should die at the earliest opportunity, there being no way to know if
+						 * that is what happened anyway.
+						 */
 						if (csa->nl->in_crit != process_id)
 							GTMASSERT;
 						/* If we are releasing (all) regions with critical section or if special
-						   TP case, release if the cycle number doesn't match meaning this is a
-						   region we should not hold crit in (even if it is part of tp_reg_list).
-						*/
+						 * TP case, release if the cycle number doesn't match meaning this is a
+						 * region we should not hold crit in (even if it is part of tp_reg_list).
+						 */
 						if ((0 != (crit_state & CRIT_RELEASE)) &&
 						    (0 == (crit_state & CRIT_NOT_TRANS_REG) ||
 						     crit_deadlock_check_cycle != csa->crit_check_cycle))
 						{
 							assert(FALSE);
+							assert(!csa->hold_onto_crit);
 							rel_crit(r_local);
 							send_msg(VARLSTCNT(8) ERR_MUTEXRELEASED, 6,
 								 process_id, process_id,  DB_LEN_STR(r_local),
@@ -133,7 +136,10 @@ uint4 have_crit(uint4 crit_state)
 		{
 			crit_reg_cnt++;
 			if (0 != (crit_state & CRIT_RELEASE))
+			{
+				assert(!csa->hold_onto_crit);
 				rel_lock(jnlpool.jnlpool_dummy_reg);
+			}
 		}
 	}
 	return crit_reg_cnt;

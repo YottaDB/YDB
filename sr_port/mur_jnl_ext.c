@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,10 @@ GBLREF  mval            curr_gbl_root;
 GBLREF	char		muext_code[][2];
 LITREF	char		*jrt_label[JRT_RECTYPES];
 
+error_def(ERR_JNLBADRECFMT);
+error_def(ERR_MUINFOUINT4);
+error_def(ERR_TEXT);
+
 #define LAB_LEN 	7
 #define LAB_TERM	"\\"
 #define LAB_TERM_SZ	(SIZEOF(LAB_TERM) - 1)
@@ -59,11 +63,7 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 	int			max_blen, actual, extract_len, val_extr_len, val_len;
 	char			*val_ptr, *ptr, *buff;
 	jnl_string		*keystr;
-	boolean_t		do_format2zwr;
-
-	error_def		(ERR_MUINFOUINT4);
-	error_def		(ERR_JNLBADRECFMT);
-	error_def		(ERR_TEXT);
+	boolean_t		do_format2zwr, is_ztstart;
 
 	if (!mur_options.detail)
 		extract_len = 0;
@@ -77,16 +77,23 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 			if (IS_TUPD(rectype))
 			{
 				EXT2BYTES(&muext_code[MUEXT_TSTART][0]); /* TSTART */
+				is_ztstart = FALSE;
 			} else /* if (IS_FUPD(rectype)) */
 			{
 				EXT2BYTES(&muext_code[MUEXT_ZTSTART][0]); /* ZTSTART */
+				is_ztstart = TRUE;
 			}
 		} else
 		{
 			if (IS_TUPD(rectype))
+			{
 				strcpy(murgbl.extr_buff + extract_len, "TSTART \\");
-			else /* if (IS_FUPD(rectype)) */
+				is_ztstart = FALSE;
+			} else /* if (IS_FUPD(rectype)) */
+			{
 				strcpy(murgbl.extr_buff + extract_len, "ZTSTART\\");
+				is_ztstart = TRUE;
+			}
 			extract_len = STRLEN(murgbl.extr_buff);
 		}
 		EXTTIME(rec->prefix.time);
@@ -95,6 +102,8 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 			EXTINT(rec->prefix.checksum);
 		EXTPID(plst);
 		EXTQW(rec->jrec_set_kill.token_seq.jnl_seqno);
+		if (!is_ztstart)
+			EXT_STRM_SEQNO(rec->jrec_set_kill.strm_seqno);
 		jnlext_write(fi, murgbl.extr_buff, extract_len);
 	}
 	/* Output the SET or KILL or ZKILL or ZTWORMHOLE record */
@@ -143,6 +152,8 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 	} else
 		EXTQW(rec->jrec_set_kill.token_seq.jnl_seqno);
 	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
+	assert(&rec->jrec_set_kill.strm_seqno == &rec->jrec_ztworm.strm_seqno);
+	EXT_STRM_SEQNO(rec->jrec_set_kill.strm_seqno);
 	assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
 	EXTINT(rec->jrec_set_kill.update_num);
 	do_format2zwr = FALSE;
@@ -196,7 +207,8 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 			assert(FALSE);
 		}
 	}
-	jnlext_write(fi, murgbl.extr_buff, extract_len + 1);
+	murgbl.extr_buff[extract_len++] = '\\';
+	jnlext_write(fi, murgbl.extr_buff, extract_len);
 }
 
 void	mur_extract_null(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
@@ -218,6 +230,7 @@ void	mur_extract_null(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_lis
 		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	EXTQW(rec->jrec_null.jnl_seqno);
+	EXT_STRM_SEQNO(rec->jrec_null.strm_seqno);
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
 }
 
@@ -261,7 +274,8 @@ void	mur_extract_blk(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 
 void	mur_extract_epoch(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 {
-	int	extract_len;
+	int	extract_len, idx;
+	seq_num	strm_seqno;
 	char	*ptr;
 
 	if (!mur_options.detail)
@@ -272,10 +286,24 @@ void	mur_extract_epoch(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_li
 	if (mur_options.detail)
 		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
+	assert((0 == rec->jrec_epoch.fully_upgraded) || (1 == rec->jrec_epoch.fully_upgraded));
 	EXTQW(rec->jrec_epoch.jnl_seqno);
 	EXTINT(rec->jrec_epoch.blks_to_upgrd);
 	EXTINT(rec->jrec_epoch.free_blocks);
 	EXTINT(rec->jrec_epoch.total_blks);
+	EXTINT(rec->jrec_epoch.fully_upgraded); /* actually boolean_t */
+#	ifdef UNIX
+	/* Extract upto 16 strm_seqno only if they are non-zero */
+	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+	{
+		strm_seqno = rec->jrec_epoch.strm_seqno[idx];
+		if (strm_seqno)
+		{
+			strm_seqno = SET_STRM_INDEX(strm_seqno, idx);
+			EXT_STRM_SEQNO(strm_seqno);
+		}
+	}
+#	endif
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
 }
 
@@ -338,6 +366,25 @@ void	mur_extract_eof(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	EXTQW(rec->jrec_eof.jnl_seqno);
+	jnlext_write(fi, murgbl.extr_buff, extract_len);
+}
+
+void    mur_extract_trunc(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
+{
+	int		extract_len = 0;
+	char		*ptr;
+
+	if (!mur_options.detail)
+		return;
+	EXT_DET_PREFIX(jctl);
+	EXTTIME(rec->prefix.time);
+	EXTQW(rec->prefix.tn);
+	if (mur_options.detail)
+		EXTINT(rec->prefix.checksum);
+	EXTPID(plst);
+	EXTINT(rec->jrec_trunc.orig_total_blks);
+	EXTINT(rec->jrec_trunc.orig_free_blocks);
+	EXTINT(rec->jrec_trunc.total_blks_after_trunc);
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
 }
 
@@ -411,6 +458,7 @@ void	mur_extract_tcom(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_lis
 	EXTQW(rec->jrec_tcom.token_seq.jnl_seqno);
 	if (JRT_TCOM == rec->prefix.jrec_type)
 	{
+		EXT_STRM_SEQNO(rec->jrec_tcom.strm_seqno);
 		EXTINT(rec->jrec_tcom.num_participants);
 		EXTTXT((unsigned char *)&rec->jrec_tcom.jnl_tid[0], SIZEOF(rec->jrec_tcom.jnl_tid));
 	} else

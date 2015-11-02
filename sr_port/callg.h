@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,12 +10,11 @@
  ****************************************************************/
 #ifndef CALLG_H
 #define CALLG_H
-#include "fgncalsp.h"
 
 typedef struct gparam_list_struct
 {
 	intszofptr_t	n;
-	void    	*arg[MAXIMUM_PARAMETERS];
+	void    	*arg[MAX_ACTUALS];
 } gparam_list;
 
 typedef	INTPTR_T (*callgfnptr)(intszofptr_t cnt, ...);

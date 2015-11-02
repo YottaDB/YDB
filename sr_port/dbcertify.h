@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -247,7 +247,7 @@ typedef struct
 
 /* Debug macro. This macro is compiled into even the pro-build. It emits the enclosed message if a debug
    option has been specified.*/
-#define DBC_DEBUG(x) if (psa->dbc_debug) {PRINTF x; fflush(stdout);}
+#define DBC_DEBUG(x) if (psa->dbc_debug) {PRINTF x; FFLUSH(stdout);}
 
 /* We need to redefine 2 macros from gdsblkops.h (BLK_INIT and BLK_FINI) because they contain references
    to the type blk_hdr which for V5 is a different size than the v15_blk_hdr type we are using for V4 databases.

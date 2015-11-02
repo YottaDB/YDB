@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +20,16 @@
 #include "gtmsiginfo.h"
 #include "gtmimagename.h"
 #include "send_msg.h"
+#include "gtmio.h"
 #include "have_crit.h"
 #include "deferred_signal_handler.h"
 #include "gtmmsg.h"
+#ifdef DEBUG
+#include "wcs_sleep.h"
+#include "wbox_test_init.h"
+#include "gt_timer.h"
+#include "io.h"
+#endif
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	int4			exi_condition;
@@ -35,6 +42,7 @@ GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
+GBLREF  intrpt_state_t          intrpt_ok_state;
 
 error_def(ERR_FORCEDHALT);
 error_def(ERR_KILLBYSIG);
@@ -46,7 +54,9 @@ error_def(ERR_KILLBYSIGUINFO);
 void deferred_signal_handler(void)
 {
 	void (*signal_routine)();
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* To avoid nested calls to this routine, we set forced_exit to FALSE at the very beginning */
 	forced_exit = FALSE;
 
@@ -101,6 +111,17 @@ void deferred_signal_handler(void)
 	 * that would drive us to exit. Setting the "process_exiting" variable causes those csa checks to pass.
 	 */
 	SET_PROCESS_EXITING_TRUE;
+#	ifdef DEBUG
+	if (gtm_white_box_test_case_enabled && (WBTEST_DEFERRED_TIMERS == gtm_white_box_test_case_number)
+		&& (2 == gtm_white_box_test_case_count))
+	{
+		DEFER_INTERRUPTS(INTRPT_NO_TIMER_EVENTS);
+		DBGFPF((stderr, "DEFERRED_SIGNAL_HANDLER: will sleep for 20 seconds\n"));
+		LONG_SLEEP(20);
+		DBGFPF((stderr, "DEFERRED_SIGNAL_HANDLER: done sleeping\n"));
+		ENABLE_INTERRUPTS(INTRPT_NO_TIMER_EVENTS);
+	}
+#	endif
 	/* If any special routines are registered to be driven on a signal, drive them now */
 	if ((0 != exi_condition) && (NULL != call_on_signal))
 	{

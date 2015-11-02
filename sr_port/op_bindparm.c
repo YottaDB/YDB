@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,42 +26,73 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include "compiler.h"
+#include "parm_pool.h"
 
 GBLREF mv_stent			*mv_chain;
 GBLREF unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF symval			*curr_symval;
 GBLREF stack_frame		*frame_pointer;
 
+error_def(ERR_ACTLSTTOOLONG);
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
+
 void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 {
 	va_list		var;
 	uint4		mask;
 	register lv_val *a;
-	mv_stent	*mv_ent;
 	var_tabent	*parm_name;
 	int		i;
 	int		frmp;	/* formal argument pointer */
 	VMS_ONLY(int	frmc;)	/* formal argument count */
 	int		actc;
+	unsigned int	*prev_count_ptr;
+	unsigned int	prev_count;
+	boolean_t	error = FALSE;
 	lv_val		**actp;		/* actual pointer */
 	lv_val		*new_var;
 	mvs_ntab_struct	*ntab;
 	ht_ent_mname	*tabent, **htepp;
+	parm_slot	*curr_slot;
 	DBGRFCT_ONLY(mident_fixed vname;)
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
-	error_def(ERR_ACTLSTTOOLONG);
-
-	for (mv_ent = mv_chain; MVST_PARM != mv_ent->mv_st_type; mv_ent = (mv_stent *)((char *)mv_ent + mv_ent->mv_st_next))
-		assert(mv_ent < (mv_stent *)frame_pointer);
+	SETUP_THREADGBL_ACCESS;
 	frmp = frmp_arg;
-	actc = mv_ent->mv_st_cont.mvs_parm.mvs_parmlist->actualcnt;
-	actp = mv_ent->mv_st_cont.mvs_parm.mvs_parmlist->actuallist;
-	mask = mv_ent->mv_st_cont.mvs_parm.mvs_parmlist->mask;
 	VMS_ONLY(va_count(frmc);)
+	if (TREF(parm_pool_ptr))
+	{
+		curr_slot = PARM_CURR_SLOT;
+		prev_count_ptr = &((*(curr_slot - 1)).mask_and_cnt.actualcnt);
+		prev_count = *prev_count_ptr;
+		/* If we were dealing with a new job, then push_parm would not have been called if the number of
+		 * actuals was 0; so, by checking for proper frame value stored in the parameter pool we ensure
+		 * that we are not looking at some uninitialized value here.
+		 */
+		if (PARM_ACT_FRAME(curr_slot, prev_count) != frame_pointer)
+			actc = 0;
+		else
+		{	/* Acquire mask, actual count, and pointer to actual list from the parameter pool. */
+			mask = (*(curr_slot - 1)).mask_and_cnt.mask;
+			actc = prev_count;
+			if (0 == (TREF(parm_pool_ptr))->start_idx)
+				actp = &((*(TREF(parm_pool_ptr))->parms).actuallist);
+			else
+				actp = &((*(curr_slot - SLOTS_NEEDED_FOR_SET(actc))).actuallist);
+		}
+	} else
+		/* If the parameter pool is uninitialized, there are no parameters we can bind. */
+		return;
+	assert(0 <= frmc);
+	/* This would also guarantee that actc > 0. */
 	if (actc > frmc)
+	{
+		error = TRUE;
+		*prev_count_ptr += SAFE_TO_OVWRT;
 		rts_error(VARLSTCNT(1) ERR_ACTLSTTOOLONG);
+	}
 	VAR_START(var, frmp_arg);
 	for (i = 0; i < frmc; i++, frmp = va_arg(var, int4), actp++)
 	{
@@ -104,6 +135,10 @@ void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 		*htepp = tabent;
 	}
 	va_end(var);
-	free(mv_ent->mv_st_cont.mvs_parm.mvs_parmlist);
-	mv_ent->mv_st_cont.mvs_parm.mvs_parmlist = NULL;
+	/* Incrementing the actual count in parameter pool by a special value, so that we know that it is safe to
+	 * overwrite the current params and there is no need to save them; if an error occurred earlier or actc
+	 * is 0, then this addition has already been taken care of above.
+	 */
+	if (actc && !error)
+		*prev_count_ptr += SAFE_TO_OVWRT;
 }

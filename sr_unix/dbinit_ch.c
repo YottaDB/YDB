@@ -37,15 +37,13 @@
 
 GBLREF gd_region		*db_init_region;
 GBLREF boolean_t		sem_incremented;
-GBLREF boolean_t		new_dbinit_ipc;
 
 CONDITION_HANDLER(dbinit_ch)
 {
-	unix_db_info	*udi;
-	gd_segment	*seg;
-	struct shmid_ds	shm_buf;
-	sgmnt_addrs	*csa;
-	int		rc;
+	unix_db_info		*udi;
+	gd_segment		*seg;
+	sgmnt_addrs		*csa;
+	int			rc, lcl_new_dbinit_ipc;
 
 	START_CH;
 	if (SUCCESS == SEVERITY || INFO == SEVERITY)
@@ -63,6 +61,13 @@ CONDITION_HANDLER(dbinit_ch)
 			CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 		assert(FD_INVALID == udi->fd);
 		csa = &udi->s_addrs;
+#		ifdef GTM_CRYPT
+		if (NULL != csa->encrypted_blk_contents)
+		{
+			free(csa->encrypted_blk_contents);
+			csa->encrypted_blk_contents = NULL;
+		}
+#		endif
 		if (NULL != csa->hdr)
 		{
 			if (dba_mm == db_init_region->dyn.addr->acc_meth)
@@ -79,19 +84,21 @@ CONDITION_HANDLER(dbinit_ch)
 			shmdt((caddr_t)csa->nl);
 			csa->nl = (node_local_ptr_t)NULL;
 		}
-		if (new_dbinit_ipc)
+		lcl_new_dbinit_ipc = TREF(new_dbinit_ipc);
+		if (lcl_new_dbinit_ipc)
 		{
-			if (INVALID_SHMID != udi->shmid)
+			if ((lcl_new_dbinit_ipc & NEW_DBINIT_SHM_IPC_MASK) && (INVALID_SHMID != udi->shmid))
 			{
 				shm_rmid(udi->shmid);
 				udi->shmid = INVALID_SHMID;
 			}
-			assert(INVALID_SEMID != udi->semid);	/* we better have created a semaphore if new_dbinit_ipc is TRUE */
-			if (INVALID_SEMID != udi->semid)
+			if ((lcl_new_dbinit_ipc & NEW_DBINIT_SEM_IPC_MASK) && (INVALID_SEMID != udi->semid))
 			{
 				sem_rmid(udi->semid);
 				udi->semid = INVALID_SEMID;
+				udi->grabbed_access_sem = FALSE;
 			}
+			TREF(new_dbinit_ipc) = 0;
 		}
 		if (sem_incremented)
 		{

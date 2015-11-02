@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@
 #include "mv_stent.h"
 #include "tp_frame.h"
 #include "t_retry.h"
+#include "gtmimagename.h"
 
 #define TRIG_ERROR_RETURN						\
 {									\
@@ -68,9 +69,16 @@ GBLREF	int			tprestart_state;
 GBLREF	io_pair			io_curr_device;
 GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	uint4			dollar_tlevel;
+GBLREF	unsigned int		t_tries;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+#ifdef DEBUG
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#endif
 
 LITREF	mval			literal_hasht;
+
+error_def(ERR_DBROLLEDBACK);
+error_def(ERR_ZFILNMBAD);
 
 STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint4 trigger_filename_len, boolean_t noprompt,
 						    boolean_t lcl_implicit_tpwrap)
@@ -87,8 +95,6 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 	char			*trigger_rec;
 	char			*values[NUM_SUBS];
 	unsigned short		value_len[NUM_SUBS];
-
-	error_def(ERR_ZFILNMBAD);
 
 	all_triggers_error = FALSE;
 	if (lcl_implicit_tpwrap)
@@ -165,15 +171,25 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 	mval			ts_mv;
 	int			loopcnt;
 	struct stat		statbuf;
+	DEBUG_ONLY(unsigned int	lcl_t_tries;)
+	enum cdb_sc		failure;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 
 	ts_mv.mvtype = MV_STR;
 	ts_mv.str.len = 0;
 	ts_mv.str.addr = NULL;
 	/* Do sanity checks on the filename and the file's accessibility. */
 	assert('\0' == trigger_filename[trigger_filename_len]); /* should have been made sure by caller */
-	if ((-1 == Stat(trigger_filename, &statbuf)) || !S_ISREG(statbuf.st_mode))
+	if (-1 == Stat(trigger_filename, &statbuf))
 	{
-		util_out_print_gtmio("Invalid file name: !AD", FLUSH, trigger_filename_len, trigger_filename);
+		util_out_print_gtmio("Invalid file name: !AD: !AZ", FLUSH, trigger_filename_len, trigger_filename, STRERROR(errno));
+		return TRUE;	/* Failure */
+	} else if (!S_ISREG(statbuf.st_mode))
+	{
+		util_out_print_gtmio("Invalid file name: !AD: Not a proper input file", FLUSH, trigger_filename_len,
+				     trigger_filename);
 		return TRUE;	/* Failure */
 	}
 	if (0 == dollar_tlevel)
@@ -191,9 +207,24 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 		for (loopcnt = 0; ; loopcnt++)
 		{
 			assert(donot_INVOKE_MUMTSTART);	/* Make sure still set */
+			DEBUG_ONLY(lcl_t_tries = t_tries);
 			trigger_status = trigger_trgfile_tpwrap_helper(trigger_filename, trigger_filename_len, noprompt, TRUE);
 			if (0 == dollar_tlevel)
 				break;
+			assert(0 < t_tries);
+			assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
+			failure = t_fail_hist[t_tries - 1];
+			assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
+				|| !gv_target || !gv_target->root);
+			assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
+				|| !IS_MCODE_RUNNING || TREF(dollar_zonlnrlbk));
+			if (cdb_sc_onln_rlbk2 == failure)
+				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than trying again. Since this
+			 * is ^#t global, we don't need to GVCST_ROOT_SEARCH before continuing with the next restart because the
+			 * trigger load logic already takes care of doing INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED before doing the
+			 * actual trigger load
+			 */
 			util_out_print_gtmio("RESTART has invalidated this transaction's previous output.  New output follows.",
 					     FLUSH);
 			/* We expect the above function to return with either op_tcommit or a tp_restart invoked.

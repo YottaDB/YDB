@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 /* When the sem_info structure below is allocated, it must be allocated in an array of
    at least the dimension of FTOK_ID_CNT.
 */
-#define FTOK_ID_CNT 2
+#define FTOK_ID_CNT 3
 
 /* Structure that holds information for semaphores we create for standalone processing */
 typedef struct

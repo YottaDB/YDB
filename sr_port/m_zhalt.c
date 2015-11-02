@@ -17,8 +17,6 @@
 #include "opcode.h"
 #include "toktyp.h"
 
-GBLREF char	window_token;
-
 LITREF mval	literal_zero;
 
 /* Halt the process similar to op_halt but allow a return code to be specified. If no return code
@@ -29,23 +27,25 @@ int m_zhalt(void)
 	triple	*triptr;
 	oprtype ot;
 	int	status;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Let m_halt() handle the case of the missing return code */
-	if (window_token == TK_SPACE || window_token == TK_EOL)
+	if ((TK_SPACE == TREF(window_token)) || (TK_EOL == TREF(window_token)))
 		return m_halt();
-	switch (status = numexpr(&ot))		/* note assignment */
+	switch (status = expr(&ot, MUMPS_NUM))		/* NOTE assignment */
 	{
-		case EXPR_FAIL:
-			return FALSE;
-		case EXPR_GOOD:
-			triptr = newtriple(OC_ZHALT);
-			triptr->operand[0] = ot;
-			return TRUE;
-		case EXPR_INDR:
-			make_commarg(&ot, indir_zhalt);
-			return TRUE;
-		default:
-			GTMASSERT;		/* At least in debug builds we will see the status */
+	case EXPR_FAIL:
+		return FALSE;
+	case EXPR_GOOD:
+		triptr = newtriple(OC_ZHALT);
+		triptr->operand[0] = ot;
+		return TRUE;
+	case EXPR_INDR:
+		make_commarg(&ot, indir_zhalt);
+		return TRUE;
+	default:
+		GTMASSERT;
 	}
 	return FALSE; /* This should never get executed, added to make compiler happy */
 }

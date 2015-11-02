@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2011 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -25,7 +25,7 @@ REGION
 	. s lquals("NULL_SUBSCRIPTS")=$s((nullsub="ALWAYS")!(nullsub="TRUE"):1,nullsub="EXISTING":2,1:0)
 	i '$$RQUALS^GDEVERIF(.lquals) zm gdeerr("OBJNOTCHG"):"region":REGION
 	s update=1,s=""
-	f  s s=$o(lquals(s)) q:'$l(s)  s regs(REGION,s)=lquals(s) i s="ALLOCATION" s regs(REGION,"EXTENSION")=lquals(s)
+	f  s s=$o(lquals(s)) q:'$l(s)  s regs(REGION,s)=lquals(s)
 	q
 SEGMENT
 	i '$d(segs(SEGMENT)) zm gdeerr("OBJNOTFND"):"Segment":SEGMENT

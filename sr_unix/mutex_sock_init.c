@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,7 @@
 #include "filestruct.h"
 #include "mutex.h"
 #include "io.h"
+#include "secshr_client.h"
 #include "gtmsecshr.h"
 #include "iosp.h"
 #include "gtm_logicals.h"
@@ -49,6 +50,10 @@ GBLREF fd_set			mutex_wait_on_descs;
 
 static char hex_table[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 
+error_def(ERR_MUTEXERR);
+error_def(ERR_MUTEXRSRCCLNUP);
+error_def(ERR_TEXT);
+
 void mutex_sock_init(void)
 {
 	mstr		mutex_sock_dir_lognam, mutex_sock_dir_transnam;
@@ -59,10 +64,6 @@ void mutex_sock_init(void)
 	struct stat	mutex_sock_stat_buf;
 	int		status;
 	unsigned char   pid_str[2 * SIZEOF(pid_t) + 1];
-
-	error_def(ERR_MUTEXERR);
-	error_def(ERR_TEXT);
-	error_def(ERR_MUTEXRSRCCLNUP);
 
 	if (FD_INVALID != mutex_sock_fd) /* Initialization done already */
 		return;
@@ -130,8 +131,7 @@ void mutex_sock_init(void)
 			  RTS_ERROR_TEXT("Error with mutex socket bind"),
 			  errno);
 
-	/*
-	 * Set the socket permissions to override any umask settings.
+	/* Set the socket permissions to override any umask settings.
 	 * Allow owner and group read and write access.
 	 */
 	STAT_FILE(mutex_sock_address.sun_path, &mutex_sock_stat_buf, status);
@@ -149,8 +149,7 @@ void mutex_sock_init(void)
 	/* Clear the descriptor set used to sense wake up message */
 	FD_ZERO(&mutex_wait_on_descs);
 
-	/*
-	 * To make mutex_wake_proc faster, pre-initialize portions of
+	/* To make mutex_wake_proc faster, pre-initialize portions of
 	 * mutex_wake_this_proc which are invariant of the pid to be woken up.
 	 */
 	memset((char *)&mutex_wake_this_proc, 0, SIZEOF(mutex_wake_this_proc));

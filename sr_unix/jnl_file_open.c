@@ -65,7 +65,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 	sm_uc_ptr_t		nameptr;
 	int			fstat_res;
 	int			close_res;
-	boolean_t		retry;
+	boolean_t		switch_and_retry;
 	ZOS_ONLY(int		realfiletag;)
 
 	csa = &FILE_INFO(reg)->s_addrs;
@@ -88,7 +88,9 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 		csa->nl->jnl_file.u.inode = 0;
 		csa->nl->jnl_file.u.device = 0;
 		jb->cycle++;
-		for (retry = TRUE;  ;)
+		/* Source Server only reads journal files so must never try to create and switch to a new journal file. */
+		switch_and_retry = (!is_src_server) ? TRUE : FALSE;
+		for (;;)
 		{
 			/* D9E04-002445 MUPIP RECOVER always open journal file without O_SYNC, ignoring jnl_sync_io */
 			if (csd->jnl_sync_io && !mupip_jnl_recover)
@@ -124,15 +126,19 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 				} else
 					sts = jnl_file_open_common(reg, (off_jnl_t) stat_buf.st_size);
 			}
-			if (0 != sts && (retry))
-			{
-				assert(!is_src_server);	/* source server should only read journal files so must never reach
-							 * a situation where it has to switch journal files.
-							 */
+			DEBUG_ONLY(
+				/* Will fail if Source Server would need to switch journal files. */
+				assert((gtm_white_box_test_case_enabled && (WBTEST_JNL_SWITCH_EXPECTED ==
+					gtm_white_box_test_case_number)) || (0 == sts) || switch_and_retry);
+			)
+			if ((0 != sts) && switch_and_retry)
+			{	/* Switch to a new journal file and retry, but only once */
 				sts = jnl_file_open_switch(reg, sts);
-				retry = FALSE;	/* Do not switch more than once, even if error occurs */
 				if (0 == sts)
+				{
+					switch_and_retry = FALSE;
 					continue;
+				}
 			}
 			break;
 		}

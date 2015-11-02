@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,36 @@
 #include "gtm_malloc.h"
 #include "stringpool.h"
 #include "mmemory.h"
+#include "gtmio.h"
+#include "have_crit.h"
+
+GBLREF stack_frame	*frame_pointer;
+GBLREF symval		*curr_symval;
+GBLREF unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
+GBLREF mv_stent		*mv_chain;
+GBLREF tp_frame		*tp_pointer;
+GBLREF zwr_hash_table	*zwrhtab;
+GBLREF trans_num	local_tn;					/* transaction number for THIS PROCESS */
+GBLREF uint4		tstartcycle;
+GBLREF uint4		lvtaskcycle;					/* lv_val cycle for misc lv_val related tasks */
+GBLREF mstr		**stp_array;
+GBLREF int		stp_array_size;
+GBLREF lv_val		*zsrch_var, *zsrch_dir1, *zsrch_dir2;
+GBLREF tp_frame		*tp_pointer;
+GBLREF int4		SPGC_since_LVGC;				/* stringpool GCs since the last dead-data GC */
+GBLREF boolean_t	suspend_lvgcol;
+GBLREF lv_xnew_var	*xnewvar_anchor;
+GBLREF lv_xnew_ref	*xnewref_anchor;
+GBLREF mval		*alias_retarg;
+
+LITREF mname_entry	null_mname_entry;
+
+/* Local routines -- not made static so they show up in pro core stack traces */
+STATICFNDCL void als_xnew_killaliasarray(lvTree *lvt);
+STATICFNDCL void als_prcs_xnew_alias_cntnr(lvTree *lvt, symval *popdsymval, symval *cursymval);
+STATICFNDCL void als_prcs_markreached_cntnr(lvTree *lvt);
+
+CONDITION_HANDLER(als_check_xnew_var_aliases_ch);
 
 /* Define macros locally used by this routine only. General use macros are defined in alias.h */
 
@@ -167,37 +197,6 @@
 	}												\
 }
 
-GBLREF stack_frame	*frame_pointer;
-GBLREF symval		*curr_symval;
-GBLREF unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
-GBLREF mv_stent		*mv_chain;
-GBLREF tp_frame		*tp_pointer;
-GBLREF zwr_hash_table	*zwrhtab;
-GBLREF trans_num	local_tn;					/* transaction number for THIS PROCESS */
-GBLREF uint4		tstartcycle;
-GBLREF uint4		lvtaskcycle;					/* lv_val cycle for misc lv_val related tasks */
-GBLREF mstr		**stp_array;
-GBLREF int		stp_array_size;
-GBLREF lv_val		*zsrch_var, *zsrch_dir1, *zsrch_dir2;
-GBLREF tp_frame		*tp_pointer;
-GBLREF int4		SPGC_since_LVGC;				/* stringpool GCs since the last dead-data GC */
-GBLREF boolean_t	suspend_lvgcol;
-GBLREF lv_xnew_var	*xnewvar_anchor;
-GBLREF lv_xnew_ref	*xnewref_anchor;
-GBLREF mval		*alias_retarg;
-
-LITREF mname_entry	null_mname_entry;
-
-/* Local routines -- not made static so they show up in pro core stack traces */
-STATICFNDCL void als_xnew_killaliasarray(lvTree *lvt);
-STATICFNDCL void als_prcs_xnew_alias_cntnr(lvTree *lvt, symval *popdsymval, symval *cursymval);
-STATICFNDCL void als_prcs_markreached_cntnr(lvTree *lvt);
-
-CONDITION_HANDLER(als_check_xnew_var_aliases_ch);
-
-
-/***************************************************************************************/
-
 /* Routine to repair the l_symtab entries in the stack due to hash table expansion such that the
  * l_symtab entries no longer point to valid hash table entries.
  *
@@ -280,7 +279,7 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 			 * different symbol table - previous symbol tables and stack levels are not affected.
 			 */
 			fp = *(stack_frame **)(fp + 1);	/* Backups up to "prev pointer" created by base_frame() */
-			if (NULL == fp || fp >= (stack_frame *)stackbase || fp < (stack_frame *)stacktop)
+			if ((NULL == fp) || (fp >= (stack_frame *)stackbase) || (fp < (stack_frame *)stacktop))
 				break;	/* Pointer not within the stack -- must be earliest occurence */
 		}
 	} while(fp);
@@ -307,11 +306,11 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 		}
 		if (NULL == *htep)
 			continue;
-		if (*htep < table_base_orig || *htep >= table_top_orig)
+		if ((*htep < table_base_orig) || (*htep >= table_top_orig))
 			/* Entry doesn't point to the current symbol table so ignore it since it didn't change */
 			continue;
 		htenew = (ht_ent_mname *)((*htep)->value);	/* Pick up entry we should now use */
-		assert(htenew >= table->base && htenew < (table->base + table->size));
+		assert((htenew >= table->base) && (htenew < (table->base + table->size)));
 		*htep = htenew;
 	}
 	/* For debug at least make unusable in case any stragglers point to it -- even though we are somewhat duplicating
@@ -516,9 +515,9 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 	}
 	/* Step 6: Check if a pending alias return value exists and if so if it needs to be processed.
 	 *         This type of value is created by unw_retarg() as the result of a "QUIT *" statement. It is an alias container
-	 *	   mval that lives in the compiler temps of the caller with a pointer in an mv_stent of the callee in the mvs_parm
-	 *	   block allocated by push_parm. Since this mval-container is just an mval and not an lv_val, we have to largely
-	 *         do similar processing to the "als_prcs_xnew_alias_cntnr" with this block type difference in mind.
+	 *	   mval that lives in the compiler temps of the caller with a pointer in the stack frame of the callee. Since this
+	 *	   mval-container is just an mval and not an lv_val, we have to largely do similar processing to the
+	 *	   "als_prcs_xnew_alias_cntnr" with this block type difference in mind.
 	 */
 	if (NULL != alias_retarg)
 	{
@@ -642,7 +641,8 @@ STATICFNDEF void als_prcs_xnew_alias_cntnr(lvTree *lvt, symval *popdsymval, symv
 						 newlv, oldlv));
 				} else
 				{	/* lv_val is owned by current or older symval .. just use it in the subsequent scan in case
-					 * it leads us to other lv_vals owned by the popped symtab. */
+					 * it leads us to other lv_vals owned by the popped symtab.
+					 */
 					DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr: aliascont var found - aliascont lv 0x"lvaddr
 						 " just being (potentially) scanned for container vars\n", node));
 					newlv = oldlv;
@@ -939,9 +939,8 @@ void als_zwrhtab_init(void)
 		if (zavb)
 		{
 			for (zavb_next = zavb->next; zavb_next; zavb = zavb_next, zavb_next = zavb->next)
-			{	/* Leave one block on queue if it exists .. get rid of others */
+				/* Leave one block on queue if it exists .. get rid of others */
 				free(zavb);
-			}
 			assert(zavb);
 			zwrhtab->first_zwrzavb = zavb;
 		}
@@ -961,7 +960,6 @@ zwr_alias_var *als_getzavslot(void)
 
 	assert(zwrhtab);
 	assert(zwrhtab->first_zwrzavb);
-
 	zwrhtab->cleaned = FALSE;	/* No longer in a clean/initialized state */
 	/* Check if a block can be allocated out of a zavb super block */
 	zavb = zwrhtab->first_zwrzavb;
@@ -993,10 +991,10 @@ ht_ent_mname *als_lookup_base_lvval(lv_val *lvp)
 	htep_loweq = NULL;
 	htep = curr_symval->h_symtab.base;
 	htep_top = curr_symval->h_symtab.base + curr_symval->h_symtab.size;
-	assert(htep_top ==  curr_symval->h_symtab.top);
+	assert(htep_top == curr_symval->h_symtab.top);
 	for (; htep < htep_top; htep++)
 	{
-		if (HTENT_VALID_MNAME(htep, lv_val, lvhtval) && '$' != *htep->key.var_name.addr && lvp == lvhtval)
+		if (HTENT_VALID_MNAME(htep, lv_val, lvhtval) && ('$' != *htep->key.var_name.addr) && (lvp == lvhtval))
 		{	/* HT entry is valid and has a key that is not a $ZWRTAC type key and the lval matches
 			 * so we have a candidate to check for "lowest" alias name for given lv_val addr.
 			 */
@@ -1026,8 +1024,8 @@ ht_ent_mname *als_lookup_base_lvval(lv_val *lvp)
  * 1)  Run lv_blks which contain all lv_val structures in use for this symbol table.
  * 2)  Record each base lv_val in our version of the array used by stp_gcol. Base lv_vals can be identified
  *     by having a non-zero parent.sym field pointing to a block with type MV_SYM. There are 3 exceptions to
-       this: In UNIX, the zsearch_var, zsearch_dir1, and zsearch_dir2 fields contain lv_vals that should not be
-       released. Check for and avoid them.
+ *     this: In UNIX, the zsearch_var, zsearch_dir1, and zsearch_dir2 fields contain lv_vals that should not be
+ *     released. Check for and avoid them.
  * 3)  Increment lvtaskcycle with which we will mark lv_vals as having been marked accessible as we discover them.
  * 4)  Go through the hashtable. Set the lvtaskcycle field to mark the lv_val "reachable".
  * 5)  If the lv_val has descendants, run the decendant chain to look for container vars.
@@ -1064,20 +1062,18 @@ int als_lvval_gc(void)
 	if (NULL == stp_array)
 		/* Same initialization as is in stp_gcol_src.h */
 		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
-
 	lvarraycur = lvarray = (lv_val **)stp_array;
 	lvarraytop = lvarraycur + stp_array_size;
-
 	/* Steps 1,2 - find all the base lv_vals and put in list */
 	for (lv_blk_ptr = curr_symval->lv_first_block; lv_blk_ptr; lv_blk_ptr = lv_blk_ptr->next)
 	{
 		for (lvp = (lv_val *)LV_BLK_GET_BASE(lv_blk_ptr), lvlimit = LV_BLK_GET_FREE(lv_blk_ptr, lvp);
-		     lvp < lvlimit;  lvp++)
+		     lvp < lvlimit; lvp++)
 		{
 			sym = LV_SYMVAL(lvp);
 			assert((NULL == sym) || SYM_IS_SYMVAL(sym));
 			if ((NULL != sym) UNIX_ONLY(&& (TREF(zsearch_var) != lvp))
-					UNIX_ONLY(&& (TREF(zsearch_dir1) != lvp) && (TREF(zsearch_dir2) != lvp)))
+			    UNIX_ONLY(&& (TREF(zsearch_dir1) != lvp) && (TREF(zsearch_dir2) != lvp)))
 			{	/* Put it in the list */
 				assert(0 < lvp->stats.trefcnt);
 				if (lvarraycur >= lvarraytop)
@@ -1099,13 +1095,12 @@ int als_lvval_gc(void)
 	htep_top = curr_symval->h_symtab.base + curr_symval->h_symtab.size;
 	assert(htep_top == curr_symval->h_symtab.top);
 	for (; htep < htep_top; htep++)
-	{
 		if (HTENT_VALID_MNAME(htep, lv_val, lvp))
 		{	/* HT entry is valid. Note for purposes of this loop, we do NOT bypass $ZWRTAC type keys since
-			 * they are valid reachable variables even if hidden */
+			 * they are valid reachable variables even if hidden
+			 */
 			MARK_REACHABLE(lvp);
 		}
-	}
 	/* Step 7 - Run the mv_stent chain marking those vars as reachable. */
 	DBGRFCT((stderr, "als_lvval_gc: Starting mv_stent scan\n"));
 	for (mv_st_ent = mv_chain; mv_st_ent; mv_st_ent = (mv_stent *)(mv_st_ent->mv_st_next + (char *)mv_st_ent))
@@ -1165,9 +1160,9 @@ int als_lvval_gc(void)
 	}
 	/* Step 8 - Run the TP stack to see if there is anything we can mark reachable */
 	DBGRFCT((stderr, "als_lvval_gc: Starting TP stack scan\n"));
-	for (tf = tp_pointer; NULL != tf && tf->sym == curr_symval; tf = tf->old_tp_frame)
+	for (tf = tp_pointer; (NULL != tf) && (tf->sym == curr_symval); tf = tf->old_tp_frame)
 	{
-		for (restore_ent = tf->vars;  NULL != restore_ent;  restore_ent = restore_ent->next)
+		for (restore_ent = tf->vars; NULL != restore_ent; restore_ent = restore_ent->next)
 		{	/* Since TP keeps its own use count on these sorts of variables, we will mark both the
 			 * current and saved values in these blocks. This is because the "current value" could
 			 * be detached from the hash table at this point but is still viable while we hold a use
@@ -1237,9 +1232,8 @@ int als_lvval_gc(void)
 	{
 		lvp = *lvptr;
 		if (lvp->stats.lvtaskcycle != lvtaskcycle && LV_SYMVAL(lvp))
-		{	/* Var is still intact, kill it */
+			/* Var is still intact, kill it */
 			assert(FALSE);
-		}
 	}
 #	endif
 	assert(lvtaskcycle == savelvtaskcycle);
@@ -1263,18 +1257,12 @@ void als_lvmon_output(void)
 
 	flush_pio();
 	for (lvlsymtab = curr_symval; lvlsymtab; lvlsymtab = lvlsymtab->last_tab)
-	{
 		for (lvbp = curr_symval->lv_first_block; lvbp; lvbp = lvbp->next)
-		{
 			for (lvp = (lv_val *)LV_BLK_GET_BASE(lvbp), lvp_top = LV_BLK_GET_FREE(lvbp, lvp); lvp < lvp_top; lvp++)
-			{
 				if (lvp->lvmon_mark)
 				{	/* lv_val slot not used as an sbs and is marked. Report it */
 					FPRINTF(stderr, "als_lvmon_output: lv_val at 0x"lvaddr" is still marked\n", lvp);
 				}
-			}
-		}
-	}
-	fflush(stderr);
+	FFLUSH(stderr);
 }
 # endif

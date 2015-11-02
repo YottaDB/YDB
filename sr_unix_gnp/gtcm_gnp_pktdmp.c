@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,8 @@
 #include "gtm_stat.h"
 #include "gtm_stdlib.h"
 #include "gtm_time.h"
+#include "gtmio.h"
+#include "have_crit.h"
 #include "gtcm_gnp_pktdmp.h"
 
 /* dump packet with connection information...*/
@@ -114,5 +116,5 @@ void gtcm_gnp_pktdmp(FILE *fp, struct CLB *lnk, int sta, unsigned char *buf, siz
 		linebuf[32 + 1 + 16] = '\0';
 		FPRINTF(fp, "%.8X %s\n", offset, linebuf);
 	}
-	fflush(fp);
+	FFLUSH(fp);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,18 +16,18 @@
 #include "indir_enum.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
+error_def(ERR_VAREXPECTED);
 
 int nref(void)
 {
+	boolean_t	gbl;
+	oprtype		tmparg;
+	triple		*ref;
+	DCL_THREADGBL_ACCESS;
 
-	triple *ref;
-	bool	gbl;
-	oprtype tmparg;
-	error_def(ERR_VAREXPECTED);
-
+	SETUP_THREADGBL_ACCESS;
 	gbl = FALSE;
-	switch(window_token)
+	switch (TREF(window_token))
 	{
 	case TK_CIRCUMFLEX:
 		gbl = TRUE;

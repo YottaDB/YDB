@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,24 +47,25 @@ GBLREF 	mur_gbls_t	murgbl;
 GBLREF 	jnl_gbls_t	jgbl;
 GBLREF	boolean_t	mupip_jnl_recover;
 
-error_def(ERR_MUPCLIERR);
-error_def(ERR_INVQUALTIME);
-error_def(ERR_NOTPOSITIVE);
-error_def(ERR_INVREDIRQUAL);
 error_def(ERR_INVERRORLIM);
-error_def(ERR_INVTRNSQUAL);
-error_def(ERR_INVIDQUAL);
 error_def(ERR_INVGLOBALQUAL);
+error_def(ERR_INVIDQUAL);
+error_def(ERR_INVQUALTIME);
+error_def(ERR_INVREDIRQUAL);
+error_def(ERR_INVTRNSQUAL);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_NOTPOSITIVE);
+error_def(ERR_RSYNCSTRMVAL);
 
 #ifdef VMS
 static	const	$DESCRIPTOR(output_qualifier,		"OUTPUT");
 static	const	$DESCRIPTOR(process_qualifier,		"PROCESS");
-#define EXCLUDE_CHAR '-'
-#define STR2PID asc_hex2i
+#define EXCLUDE_CHAR	'-'
+#define STR2PID		asc_hex2i
 #define	MAX_PID_LEN	8	/* maximum number of hexadecimal digits in the process-id */
 #define REDIRECT_STR		"specify as (old-file-name=new-file-name,...)"
 #else
-#define EXCLUDE_CHAR '~'
+#define EXCLUDE_CHAR	'~'
 #define STR2PID asc2i
 #define	MAX_PID_LEN	10	/* maximum number of decimal digits in the process-id */
 #define REDIRECT_STR		"specify as \"old-file-name=new-file-name,...\""
@@ -91,7 +92,7 @@ void	mur_get_options(void)
 	char		*qual_buffer_ptr, *entry, *entry_ptr;
 	char		*file_name_specified, *file_name_expanded;
 	unsigned int 	file_name_specified_len, file_name_expanded_len;
-	int		extr_type, top;
+	int		extr_type, top, onln_rlbk_val;
 	boolean_t	global_exclude;
 	long_list	*ll_ptr, *ll_ptr1;
 	redirect_list	*rl_ptr, *rl_ptr1, *tmp_rl_ptr;
@@ -99,7 +100,7 @@ void	mur_get_options(void)
 	boolean_t	interactive, parse_error;
 #ifdef VMS
 	int4		item_code, mode;
-	jnl_proc_time		max_time;
+	jnl_proc_time	max_time;
 	DEBUG_ONLY(
 		JNL_WHOLE_TIME(max_time);
 		/* The following assert is to make sure we get some fix for the toggling of max_time's bit 55 (bit 0 lsb, 63 msb).
@@ -123,21 +124,42 @@ void	mur_get_options(void)
 	mur_options.update = cli_present("RECOVER") == CLI_PRESENT;
 	/*----- 	-ROLLBACK	-----*/
 	mur_options.rollback = cli_present("ROLLBACK") == CLI_PRESENT;
+	UNIX_ONLY(assert(FALSE == jgbl.onlnrlbk);)
 	if (mur_options.rollback)
+	{
 		mur_options.update = TRUE;
+		UNIX_ONLY(
+			onln_rlbk_val = cli_present("ONLINE");
+			jgbl.onlnrlbk = onln_rlbk_val ? (onln_rlbk_val != CLI_NEGATED) : FALSE; /* Default is -NOONLINE */
+		)
+	}
 	mupip_jnl_recover = mur_options.update;
 	jgbl.mur_rollback = mur_options.rollback;	/* needed to set jfh->repl_state properly for newly created jnl files */
+	UNIX_ONLY(murgbl.resync_strm_index = INVALID_SUPPL_STRM;)
 	if (CLI_PRESENT == cli_present("RESYNC"))
 	{
 		status = cli_get_uint64("RESYNC", (gtm_uint64_t *)&murgbl.resync_seqno);
-		if (!status || 0 == murgbl.resync_seqno)
+		if (!status || (0 == murgbl.resync_seqno))
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_NOTPOSITIVE, 2, LEN_AND_LIT("RESYNC"));
 			mupip_exit(ERR_MUPCLIERR);
 		}
 		mur_options.resync_specified = TRUE;
+		UNIX_ONLY(
+			if (CLI_PRESENT == cli_present("RSYNC_STRM"))
+			{
+				status = cli_get_int("RSYNC_STRM", &murgbl.resync_strm_index);
+				if (!status)
+					mupip_exit(ERR_MUPCLIERR);
+				if ((0 > murgbl.resync_strm_index) || (MAX_SUPPL_STRMS <= murgbl.resync_strm_index))
+				{
+					gtm_putmsg(VARLSTCNT(1) ERR_RSYNCSTRMVAL);
+					mupip_exit(ERR_MUPCLIERR);
+				}
+			}
+		)
 	}
-	if ((status  = cli_present("FETCHRESYNC")) == CLI_PRESENT)
+	if ((status = cli_present("FETCHRESYNC")) == CLI_PRESENT)
 	{
 		if (!cli_get_int("FETCHRESYNC", &mur_options.fetchresync_port))
 			mupip_exit(ERR_MUPCLIERR);
@@ -181,7 +203,8 @@ void	mur_get_options(void)
 			{
 				mur_options.extr_fn_len[extr_type] = length;
 				mur_options.extr_fn[extr_type] = (char *)malloc(mur_options.extr_fn_len[extr_type] + 1);
-				strncpy(mur_options.extr_fn[extr_type], qual_buffer, mur_options.extr_fn_len[extr_type]);
+				strncpy(mur_options.extr_fn[extr_type], qual_buffer, length);
+				mur_options.extr_fn[extr_type][length]='\0';
 			}
 		}
 	}
@@ -190,6 +213,7 @@ void	mur_get_options(void)
 	mur_options.forward = cli_present("FORWARD") == CLI_PRESENT;
 	/*-----		-BACKWARD		-----*/
 	assert(mur_options.forward != (cli_present("BACKWARD") == CLI_PRESENT));
+	DEBUG_ONLY(jgbl.mur_options_forward = mur_options.forward;)
 	/*----- JOURNAL TIME QUALIFIERS -----*/
 	/*-----		-AFTER=delta_or_absolute_time	-----*/
 	if (cli_present("AFTER") == CLI_PRESENT)
@@ -274,7 +298,7 @@ void	mur_get_options(void)
 			if (!cli_get_str_ele(qual_buffer_ptr, entry, &length, FALSE))
 				mupip_exit(ERR_MUPCLIERR);
 			qual_buffer_ptr += length;
-			assert(',' == *qual_buffer_ptr || !(*qual_buffer_ptr));	/* either comma separator or end of option list */
+			assert((',' == *qual_buffer_ptr) || !(*qual_buffer_ptr)); /* either comma separator or end of option list */
 			if (',' == *qual_buffer_ptr)
 				qual_buffer_ptr++;  /* skip separator */
 #ifdef UNIX
@@ -309,12 +333,12 @@ void	mur_get_options(void)
 				gtm_putmsg(VARLSTCNT(4) ERR_INVREDIRQUAL, 2, LEN_AND_LIT("Unable to find full pathname"));
 				mupip_exit(ERR_MUPCLIERR);
 			}
-			for (tmp_rl_ptr = mur_options.redirect;  tmp_rl_ptr != NULL;  tmp_rl_ptr = tmp_rl_ptr->next)
+			for (tmp_rl_ptr = mur_options.redirect; tmp_rl_ptr != NULL; tmp_rl_ptr = tmp_rl_ptr->next)
 			{
-				if ((tmp_rl_ptr->org_name_len == file_name_expanded_len &&
-				    0 == memcmp(tmp_rl_ptr->org_name, file_name_expanded, tmp_rl_ptr->org_name_len)) ||
-				    (tmp_rl_ptr->new_name_len == file_name_expanded_len &&
-				    0 == memcmp(tmp_rl_ptr->new_name, file_name_expanded, tmp_rl_ptr->new_name_len)))
+				if (((tmp_rl_ptr->org_name_len == file_name_expanded_len) &&
+				     (0 == memcmp(tmp_rl_ptr->org_name, file_name_expanded, tmp_rl_ptr->org_name_len))) ||
+				    ((tmp_rl_ptr->new_name_len == file_name_expanded_len) &&
+				     (0 == memcmp(tmp_rl_ptr->new_name, file_name_expanded, tmp_rl_ptr->new_name_len))))
 				{
 					gtm_putmsg(VARLSTCNT(4) ERR_INVREDIRQUAL, 2,
 						LEN_AND_LIT("Duplicate or invalid specification of files"));
@@ -335,7 +359,7 @@ void	mur_get_options(void)
 				gtm_putmsg(VARLSTCNT(4) ERR_INVREDIRQUAL, 2, LEN_AND_LIT("Unable to find full pathname"));
 				mupip_exit(ERR_MUPCLIERR);
 			}
-			for (tmp_rl_ptr = mur_options.redirect;  tmp_rl_ptr != NULL;  tmp_rl_ptr = tmp_rl_ptr->next)
+			for (tmp_rl_ptr = mur_options.redirect; tmp_rl_ptr != NULL; tmp_rl_ptr = tmp_rl_ptr->next)
 			{
 				if ((tmp_rl_ptr->org_name_len == file_name_expanded_len &&
 				    0 == memcmp(tmp_rl_ptr->org_name, file_name_expanded, tmp_rl_ptr->org_name_len)) ||
@@ -385,7 +409,6 @@ void	mur_get_options(void)
 	{
 		if (!cli_get_int("ERROR_LIMIT", &mur_options.error_limit))
 			mupip_exit(ERR_MUPCLIERR);
-
 		if (mur_options.error_limit < 0)
 		{
 			gtm_putmsg(VARLSTCNT(2) ERR_INVERRORLIM, 0);
@@ -398,7 +421,6 @@ void	mur_get_options(void)
 	if ( CLI_PRESENT == cli_present("OUTPUT"))
 		util_out_open(&output_qualifier);
 #endif
-
 	/*-----		-[NO]CHECKTN 		-----*/
 	mur_options.notncheck = (cli_present("CHECKTN") == CLI_NEGATED);
 	/*----- JOURNAL SELECTION QUALIFIERS -----*/
@@ -435,7 +457,7 @@ void	mur_get_options(void)
 			++length;
 			global_exclude = FALSE;
 		}
-		for (ctop = qual_buffer_ptr + length;  qual_buffer_ptr < ctop;)
+		for (ctop = qual_buffer_ptr + length; qual_buffer_ptr < ctop;)
 		{
 			entry_ptr = entry;
 			/* this is a simplistic state machine that does not allow for more than 30 nestings of '(' and '"'*/
@@ -482,7 +504,7 @@ void	mur_get_options(void)
 				}
 			}
 			*entry_ptr = '\0';
-			assert(',' == *qual_buffer_ptr || !(*qual_buffer_ptr));	/* either comma separator or end of option list */
+			assert((',' == *qual_buffer_ptr) || !(*qual_buffer_ptr)); /* either comma separator or end of option list */
 			if (',' == *qual_buffer_ptr)
 				qual_buffer_ptr++;  /* skip separator */
 			entry_ptr = entry;
@@ -530,7 +552,7 @@ void	mur_get_options(void)
 		{
 			++qual_buffer_ptr;
 			--length;
-			if ('"' == qual_buffer_ptr[length-1])
+			if ('"' == qual_buffer_ptr[length - 1])
 				qual_buffer_ptr[--length] = '\0';
 		}
 		if (EXCLUDE_CHAR == *qual_buffer_ptr)
@@ -551,7 +573,7 @@ void	mur_get_options(void)
 		}
 		if (')' == qual_buffer_ptr[length-1])
 			qual_buffer_ptr[--length] = '\0';
-		for (ctop = qual_buffer_ptr + length;  qual_buffer_ptr < ctop;)
+		for (ctop = qual_buffer_ptr + length; qual_buffer_ptr < ctop;)
 		{
 			if (!cli_get_str_ele(qual_buffer_ptr, entry, &length, UNIX_ONLY(FALSE) VMS_ONLY(TRUE)))
 				mupip_exit(ERR_MUPCLIERR);
@@ -625,7 +647,7 @@ void	mur_get_options(void)
 		}
 		if (')' == qual_buffer_ptr[length-1])
 			qual_buffer_ptr[--length] = '\0';
-		for (ctop = qual_buffer_ptr + length;  qual_buffer_ptr < ctop;)
+		for (ctop = qual_buffer_ptr + length; qual_buffer_ptr < ctop;)
 		{
 			if (!cli_get_str_ele(qual_buffer_ptr, entry, &length, UNIX_ONLY(FALSE) VMS_ONLY(TRUE)))
 				mupip_exit(ERR_MUPCLIERR);
@@ -657,7 +679,8 @@ void	mur_get_options(void)
 				ll_ptr->exclude = FALSE;
 			if (global_exclude)
 				ll_ptr->exclude = !ll_ptr->exclude;
-			if ((MAX_PID_LEN < length) || (ll_ptr->num = STR2PID((uchar_ptr_t)entry_ptr, length)) == (unsigned int)-1)
+			if ((MAX_PID_LEN < length) ||
+			    ((ll_ptr->num = STR2PID((uchar_ptr_t)entry_ptr, length)) == (unsigned int) - 1))
 			{
 				gtm_putmsg(VARLSTCNT(4) ERR_INVIDQUAL, 2, length, entry_ptr);
 				mupip_exit(ERR_MUPCLIERR);
@@ -719,12 +742,12 @@ void	mur_get_options(void)
 		}
 		if (')' == qual_buffer_ptr[length-1])
 			qual_buffer_ptr[--length] = '\0';
-		for (ctop = qual_buffer_ptr + length;  qual_buffer_ptr < ctop;)
+		for (ctop = qual_buffer_ptr + length; qual_buffer_ptr < ctop;)
 		{
 			if (!cli_get_str_ele(qual_buffer_ptr, entry, &length, FALSE))
 				mupip_exit(ERR_MUPCLIERR);
 			qual_buffer_ptr += length;
-			assert(',' == *qual_buffer_ptr || !(*qual_buffer_ptr));	/* either comma separator or end of option list */
+			assert((',' == *qual_buffer_ptr) || !(*qual_buffer_ptr)); /* either comma separator or end of option list */
 			if (',' == *qual_buffer_ptr)
 				qual_buffer_ptr++;  /* skip separator */
 			entry_ptr = entry;
@@ -769,7 +792,7 @@ void	mur_get_options(void)
 		mur_options.apply_after_image = FALSE;
 	/* if the only request is -SHOW=HEAD, set show_head_only */
 	if ((SHOW_HEADER == mur_options.show) && !mur_options.update && !mur_options.verify &&
-			(CLI_PRESENT != cli_present("EXTRACT")))
+	    (CLI_PRESENT != cli_present("EXTRACT")))
 		mur_options.show_head_only = TRUE;
 	free(entry);
 	free(qual_buffer);

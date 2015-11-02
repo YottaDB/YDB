@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,8 @@
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*original_header;
 
+error_def(ERR_SIZENOTVALID4);
+
 #define	DB_ABS2REL(X)	((sm_uc_ptr_t)(X) - (sm_uc_ptr_t)csa->nl)
 #define MAX_UTIL_LEN 			40
 #define	CLEAN_VERIFY			"verification is clean"
@@ -54,9 +56,7 @@ void dse_cache(void)
 	sm_uc_ptr_t	chng_ptr;
 	cache_rec_ptr_t	cr_que_lo;
 	mmblk_rec_ptr_t	mr_que_lo;
-	boolean_t	is_mm;
-
-	error_def(ERR_SIZENOTVALID4);
+	boolean_t	is_mm, was_hold_onto_crit;
 
 	all_present = (CLI_PRESENT == cli_present("ALL"));
 
@@ -93,8 +93,7 @@ void dse_cache(void)
 		csa = &FILE_INFO(reg)->s_addrs;
 		assert(is_mm || (csa->db_addrs[0] == (sm_uc_ptr_t)csa->nl));
 		was_crit = csa->now_crit;
-		if (!was_crit && !nocrit_present)
-			grab_crit(reg);
+		DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, csa, reg);
 		if (verify_present || recover_present)
 		{
 			GET_CURR_TIME_IN_DOLLARH_AND_ZDATE(dollarh_mval, dollarh_buffer, zdate_mval, zdate_buffer);
@@ -226,8 +225,7 @@ void dse_cache(void)
 				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE, REG_LEN_STR(reg), csa->hdr);
 			}
 		}
-		if (!was_crit && !nocrit_present)
-			rel_crit(reg);
+		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, csa, reg);
 	}
 	return;
 }

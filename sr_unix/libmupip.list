@@ -52,7 +52,6 @@ gtmsource_statslog
 gtmsource_stopfilter
 gv_select
 jnl2ext
-jnl_setver
 jnlext_write
 jnlpool_hasnt_overflowed
 mu_all_version_standalone
@@ -64,7 +63,6 @@ mu_extr_gblout
 mu_extr_getblk
 mu_extr_ident
 mu_extract
-mu_file_size
 mu_freeze_ch
 mu_getlst
 mu_gv_stack_init
@@ -97,6 +95,7 @@ mu_split
 mu_swap_blk
 mu_term_setup
 mu_trig_trgfile
+mu_truncate
 mu_upgrd_dngrd_confirmed
 mu_upgrd_header
 mubclnup
