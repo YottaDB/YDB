@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2011 Fidelity Information Services, Inc       #
+#	Copyright 2011, 2013 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -31,16 +31,10 @@ GTM>
 
 Additional information available:
 
-About_GTM   BREAK       CLOSE       DO          ELSE        FOR
-Functions   GOTO        HALT        HANG        IF          Intr_Spe_Vars
-In_Out_Processing       JOB         KILL        Lang_Features_M
-LOCK        MERGE       M_Utility_Rtns          NEW         OPEN
-Opr_Dbg_Dir_Mode        Prog_Dev_Cycle          QUIT        READ
-SET         TCOMMIT     TRESTART    TROLLBACK   TSTART      USE
-VIEW        WRITE       XECUTE      ZALLOCATE   ZBREAK      ZCOMPILE
-ZCONTINUE   ZDEALLOCATE ZEDIT       ZGOTO       ZHELP       ZKILL
-ZLINK       ZMESSAGE    ZPRINT      ZSHOW       ZSTEP       ZSYSTEM
-ZTCOMMIT    ZTSTART     ZWITHDRAW   ZWRITE
+About_GT.M  Commands    Err_Processing          Functions   Integrate_External
+Internationalization    IO_Processing           ISV         Language_Extensions
+M_Lang_Features         Opr_Dbg_Dir_Mode        Program_Cycle
+Triggers    Utility_Routines
 
 Topic?
 
@@ -54,19 +48,7 @@ ZCHSET= M
 Global changes in the gtm.mjl file:
 ^a="1"
 ^b="2"
-
-
-Integ of region DEFAULT
-
-No errors detected by integ.
-
-Type           Blocks         Records          % Used      Adjacent
-
-Directory           2               3           0.756            NA
-Index               2               2           0.585             2
-Data                2               2           0.585             2
-Free             4994              NA              NA            NA
-Total            5000               7              NA             4
+mupip integ returned a 0 status - as expected
 
 GTM>
 M
@@ -81,16 +63,4 @@ ZCHSET= UTF-8
 Global changes in the gtm.mjl file:
 ^a="1"
 ^b="2"
-
-
-Integ of region DEFAULT
-
-No errors detected by integ.
-
-Type           Blocks         Records          % Used      Adjacent
-
-Directory           2               3           0.756            NA
-Index               2               2           0.585             2
-Data                2               2           0.585             2
-Free             4994              NA              NA            NA
-Total            5000               7              NA             4
+mupip integ returned a 0 status - as expected

@@ -16,8 +16,9 @@
 #include "gtm_string.h"
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
+#include "gtm_select.h"
 
-#include <sys/un.h>
+#include "gtm_un.h"
 #include "gtm_time.h" /* needed for difftime() definition; if this file is not included, difftime returns bad values on AIX */
 #include <sys/time.h>
 #include <errno.h>
@@ -56,7 +57,6 @@
 #include "util.h"
 #include "gtmsource.h"
 #include "repl_instance.h"
-#include "iotcpdef.h"
 #include "gtmio.h"
 #include "replgbl.h"
 
@@ -70,10 +70,10 @@
 	{															\
 		if (EREPL_RECV == repl_errno)											\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,					\
-					LEN_AND_LIT("Error in recv() for " MESSAGE), STATUS);					\
+					LEN_AND_LIT("Error in recv() for " MESSAGE), STATUS);	/* BYPASSOK(recv) */		\
 		else if (EREPL_SEND == repl_errno)										\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,					\
-					LEN_AND_LIT("Error in send() for " MESSAGE), STATUS);					\
+					LEN_AND_LIT("Error in send() for " MESSAGE), STATUS);	/* BYPASSOK(send) */		\
 		else if (EREPL_SELECT == repl_errno)										\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,					\
 					LEN_AND_LIT("Error in select() for " MESSAGE), STATUS);					\
@@ -107,7 +107,7 @@ CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 {
 	int	rc;
 
-	START_CH;
+	START_CH(TRUE);
 	if (FD_INVALID != gtmrecv_listen_sock_fd)
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 	if (FD_INVALID != gtmrecv_sock_fd)
@@ -124,7 +124,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 	unsigned char			*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
-	int				status;					/* needed for REPL_{SEND,RECV}_LOOP */
+	int				status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	fd_set				input_fds;
 	int				wait_count, save_errno;
 	char				seq_num_str[32], *seq_num_ptr;
@@ -158,6 +158,9 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 	primary_ai.ai_addrlen = SIZEOF(primary_sas);
 	remote_side->proto_ver = REPL_PROTO_VER_UNINITIALIZED;
 	repl_log(stdout, TRUE, TRUE, "Waiting for a connection...\n");
+	assertpro(FD_SETSIZE > gtmrecv_listen_sock_fd);
+	FD_ZERO(&input_fds);
+	FD_SET(gtmrecv_listen_sock_fd, &input_fds);
 	while (TRUE)
 	{
 		t1 = time(NULL);

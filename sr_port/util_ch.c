@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,8 @@ error_def(ERR_VMSMEMORY);
 
 CONDITION_HANDLER(util_ch)
 {
-	START_CH;
+	START_CH(SIGNAL != ERR_CTRLC);
+
 	if (DUMPABLE)
        		NEXTCH;
 	PRN_ERROR;
@@ -40,10 +41,12 @@ CONDITION_HANDLER(util_ch)
 		assert(util_interrupt);
 		util_interrupt = 0;
 		UNWIND(NULL, NULL);
-	} else  if (SUCCESS == SEVERITY || INFO == SEVERITY)
+	} VMS_ONLY (
+	else  if (SUCCESS == SEVERITY || INFO == SEVERITY)
 	{
 		CONTINUE;
-	} else
+	}
+	) else
 	{
 		preemptive_db_clnup(SEVERITY);
 		UNWIND(NULL, NULL);

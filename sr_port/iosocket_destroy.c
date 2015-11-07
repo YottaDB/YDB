@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,6 @@
 #include "gtm_socket.h"
 
 #include "io.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "iosocketdef.h"
 #include "gtmio.h"
 

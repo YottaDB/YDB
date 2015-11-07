@@ -97,6 +97,7 @@ GBLREF	sgmnt_data		*cs_data;
 GBLREF	symval			*curr_symval;
 GBLREF	trans_num		tstart_local_tn;	/* copy of global variable "local_tn" at op_tstart time */
 GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	mstr			extnam_str;
 #ifdef VMS
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
 GBLREF	boolean_t		tp_restart_fail_sig_used;
@@ -130,7 +131,7 @@ static readonly int4		gvname_unknown_len = STR_LIT_LEN(GVNAME_UNKNOWN);
 
 CONDITION_HANDLER(tp_restart_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	/* On Unix, there is only one set of the signal info and this error will handily replace it. For VMS,
 	 * far more subterfuge is required. We will save the signal information and paramters and overlay the
 	 * TPRETRY signal information with it so that the signal will be handled properly. Note also that since
@@ -167,7 +168,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	boolean_t		reset_clues_done = FALSE;
 	mstr			gvname_mstr, reg_mstr;
 	gd_region		*restart_reg, *reg;
-	int			tprestart_rc;
+	int			tprestart_rc, len;
 	enum cdb_sc		status;
 	DCL_THREADGBL_ACCESS;
 
@@ -199,7 +200,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	assert(1 == newlevel);
 	if (!dollar_tlevel)
 	{
-		rts_error(VARLSTCNT(1) ERR_TLVLZERO);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TLVLZERO);
 		return 0; /* for the compiler only -- never executed */
 	}
 #	ifdef GTM_TRIGGER
@@ -272,14 +273,14 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			}
 			if (cdb_sc_blkmod != status)
 			{
-				send_msg(VARLSTCNT(16) ERR_TPRESTART, 14, reg_mstr.len, reg_mstr.addr,
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(16) ERR_TPRESTART, 14, reg_mstr.len, reg_mstr.addr,
 					 t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
 					 0, 0, 0, tp_blkmod_nomod,
 					 (NULL != sgm_info_ptr) ? sgm_info_ptr->num_of_blks : 0,
 					 (NULL != sgm_info_ptr) ? sgm_info_ptr->cw_set_depth : 0, &local_tn);
 			} else
 			{
-				send_msg(VARLSTCNT(16) ERR_TPRESTART, 14, reg_mstr.len, reg_mstr.addr,
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(16) ERR_TPRESTART, 14, reg_mstr.len, reg_mstr.addr,
 					 t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
 					 n_pvtmods, n_blkmods, tp_fail_level, tp_fail_n,
 					 sgm_info_ptr->num_of_blks,
@@ -423,7 +424,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 					assert(gtm_white_box_test_case_enabled
 					    && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
 #					ifdef UNIX
-					send_msg(VARLSTCNT(5) ERR_TPFAIL, 2, hist_index, t_fail_hist, ERR_GVFAILCORE);
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TPFAIL, 2, hist_index, t_fail_hist,
+							ERR_GVFAILCORE);
 					/* Generate core only if not triggering this codepath using white-box tests */
 					DEBUG_ONLY(
 						if (!gtm_white_box_test_case_enabled
@@ -431,8 +433,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 					)
 							gtm_fork_n_core();
 #					endif
-					VMS_ONLY(send_msg(VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist));
-					rts_error(VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist);
+					VMS_ONLY(send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist));
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist);
 					return 0; /* for the compiler only -- never executed */
 				} else
 				{
@@ -510,7 +512,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 			{
 				reg = tr->reg;
-				if (dba_mm == reg->dyn.addr->acc_meth)
+				if (dba_mm == REG_ACC_METH(reg))
 				{
 					TP_CHANGE_REG_IF_NEEDED(reg);
 					MM_DBFILEXT_REMAP_IF_NEEDED(cs_addrs, gv_cur_region);
@@ -534,7 +536,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	 * stack. If ever other sized blocks are pushed on, a different method will need to be found.
 	 */
 	assert(0 == ((tpstackbase - (unsigned char *)tp_pointer) % SIZEOF(tp_frame))); /* Simple check for above condition */
-	tf = (tp_frame *)(tpstackbase - (newlevel * SIZEOF(tp_frame)));
+	tf = (tp_frame *)(tpstackbase - SIZEOF(tp_frame));
 	assert(NULL != tf);
 	assert(tpstacktop < (unsigned char *)tf);
 #	ifdef GTM_TRIGGER
@@ -584,12 +586,22 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		tp_unwind(newlevel, RESTART_INVOCATION, &tprestart_rc);
 		assert(dollar_tlevel == newlevel);	/* tp_unwind would have set this */
 		assert(tf == tp_pointer);	/* Needs to be true for now. Revisit when can restart to other than newlevel == 1 */
-		gd_header = tp_pointer->gd_header;
-		gv_target = tp_pointer->orig_gv_target;
-		gv_cur_region = tp_pointer->gd_reg;
+		assert(NULL == tf->old_tp_frame);	/* this is indeed the outermost TSTART */
+		gd_header = tf->gd_header;
+		gv_target = tf->orig_gv_target;
+		gv_cur_region = tf->gd_reg;
 		TP_CHANGE_REG(gv_cur_region);
-		COPY_KEY(gv_currkey, tp_pointer->orig_key);
+		assert(NULL != tf->orig_key);
+		COPY_KEY(gv_currkey, tf->orig_key);
 		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+		assert(-1 != tf->extnam_str.len);
+		len = tf->extnam_str.len;
+		if (len)
+		{
+			assert(TREF(gv_extname_size) >= len);
+			memcpy(extnam_str.addr, (TREF(gv_tporig_extnam_str)).addr, len);
+		}
+		extnam_str.len = len;
 #		ifdef GTM_TRIGGER
 		/* Maintenance of SFF_IMPLTSTART_CALLD stack frame flag:
 		 * - Set by gtm_trigger when trigger base frame is created. Purpose to prevent MUM_TSTART from restarting
@@ -601,20 +613,20 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		 * - For TSTARTs done implcitly by triggers, MUM_TSTART would break things so we do not turn off the flag
 		 *   for that type.
 		 */
-		if (!tp_pointer->implicit_tstart)
+		if (!tf->implicit_tstart)
 		{	/* SFF_IMPLTSTART_CALLD validation:
 			 * - This is not a trigger-initiated implicit TSTART.
 			 * - If the flag is is not on, no further checks. Turning off flag is unconditional for best performance.
 			 * - If flag is on, verify the address in the stack frame is in fact being modified so it points to
 			 *   a TSTART instead of the (currently) trigger call point.
 			 */
-			assert(!(tp_pointer->fp->flags & SFF_IMPLTSTART_CALLD) || (tp_pointer->fp->mpc != tp_pointer->restart_pc));
-			tp_pointer->fp->flags &= SFF_IMPLTSTART_CALLD_OFF;
-			DBGTRIGR((stderr, "tp_restart: Removing SFF_IMPLTSTART_CALLD in frame 0x"lvaddr"\n", tp_pointer->fp));
+			assert(!(tf->fp->flags & SFF_IMPLTSTART_CALLD) || (tf->fp->mpc != tf->restart_pc));
+			tf->fp->flags &= SFF_IMPLTSTART_CALLD_OFF;
+			DBGTRIGR((stderr, "tp_restart: Removing SFF_IMPLTSTART_CALLD in frame 0x"lvaddr"\n", tf->fp));
 		}
 #		endif
-		tp_pointer->fp->mpc = tp_pointer->restart_pc;
-		tp_pointer->fp->ctxt = tp_pointer->restart_ctxt;
+		tf->fp->mpc = tf->restart_pc;
+		tf->fp->ctxt = tf->restart_ctxt;
 #		ifdef GTM_TRIGGER
 	} else
 		assert(TPRESTART_STATE_MSTKUNW == tprestart_state);
@@ -681,8 +693,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			 * this frame, op_xnew creates a NEW symtab just for this frame. But when this code
 			 * unwound back to the TSTART, we also unwound the l_symtab this frame was using. So here
 			 * we verify this frame is a simple call frame from the previous and restore the use of its
-			 * l_symtab if so. If not, assertpro/GTMASSERT2. Note the outer SFF_UWN_SYMVAL check keeps
-			 * us from having non-existant l_symtab issues which is possible when we are MUPIP.
+			 * l_symtab if so. If not, assertpro. Note the outer SFF_UWN_SYMVAL check keeps  us from
+			 * having non-existant l_symtab issues which is possible when we are MUPIP.
 			 */
 			if ((frame_pointer->rvector == frame_pointer->old_frame_pointer->rvector)
 			    && (frame_pointer->vartab_ptr == frame_pointer->old_frame_pointer->vartab_ptr))
@@ -697,8 +709,11 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			frame_pointer->flags &= SFF_UNW_SYMVAL_OFF;
 		}
 	}
-	dollar_truth = tp_pointer->dlr_t;
-	dollar_zgbldir = tp_pointer->zgbldir;
+	assert(tf == tp_pointer);
+	assert(NULL == tf->old_tp_frame);
+	dollar_truth = tf->dlr_t;
+	dollar_zgbldir = tf->zgbldir;
+	assert(0 != dollar_zgbldir.mvtype);
 	GTMTRIG_ONLY(tprestart_state = TPRESTART_STATE_NORMAL);
 	if (FALSE == tf->restartable)
 	{	/* Transation is not restartable. Be sure to leave things in a state that the transaction could
@@ -708,13 +723,14 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		if (IS_MCODE_RUNNING)
 		{
 			getzposition(&beganHere);
-			send_msg(VARLSTCNT(1) ERR_TRESTNOT);		/* Separate msgs so we get both */
-			send_msg(VARLSTCNT(6) ERR_TRESTLOC, 4, beganHere.str.len, beganHere.str.addr,
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRESTNOT);		/* Separate msgs so we get both */
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRESTLOC, 4, beganHere.str.len, beganHere.str.addr,
 				(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
-			rts_error(VARLSTCNT(8) ERR_TRESTNOT, 0, ERR_TRESTLOC, 4, beganHere.str.len, beganHere.str.addr,
-				(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TRESTNOT, 0, ERR_TRESTLOC, 4,
+					beganHere.str.len, beganHere.str.addr,
+					(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
 		} else
-			rts_error(VARLSTCNT(1) ERR_TRESTNOT);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRESTNOT);
 		return 0; /* for the compiler only -- never executed */
 	}
 	++dollar_trestart;
@@ -736,7 +752,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		 */
 		assert(cdb_sc_normal != status);
 		if (is_updproc && ((cdb_sc_onln_rlbk1 == status) || (cdb_sc_onln_rlbk2 == status)))
-			rts_error(VARLSTCNT(1) ERR_REPLONLNRLBK);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLONLNRLBK);
 	)
 	if (handle_errors_internally)
 		REVERT;

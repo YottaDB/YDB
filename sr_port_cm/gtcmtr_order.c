@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,9 @@ GBLREF gv_key			*gv_altkey;
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF gd_region		*gv_cur_region;
 
+error_def(ERR_TEXT);
+error_def(ERR_UNIMPLOP);
+
 bool gtcmtr_order(void)
 {
 	boolean_t		found;
@@ -48,9 +51,6 @@ bool gtcmtr_order(void)
 	cm_region_list		*reg_ref;
 	boolean_t		last_subsc_is_null;
 	cm_region_head		*cm_reg_head;
-
-	error_def(ERR_UNIMPLOP);
-	error_def(ERR_TEXT);
 
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_ORDER == *ptr);
@@ -106,9 +106,7 @@ bool gtcmtr_order(void)
 					&& (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->end - 2])));
 			if (!last_subsc_is_null)
 			{	/* last subscript is not null */
-				gv_currkey->base[gv_currkey->end - 1] = 1;
-				gv_currkey->base[gv_currkey->end + 1] = KEY_DELIMITER;
-				gv_currkey->end++;
+				GVKEY_INCREMENT_ORDER(gv_currkey);
 			} else
 				gv_currkey->base[gv_currkey->prev] = 1;
 		}
@@ -133,8 +131,8 @@ bool gtcmtr_order(void)
 									 * and two <NUL> delimiters */
 			if ((PRE_V5_MAX_MIDENT_LEN < strlen((char *)gv_altkey->base)) && !curr_entry->client_supports_long_names)
 			{
-				rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0,
-					ERR_TEXT, 2,
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("GT.CM client does not support global names longer than 8 characters"));
 			}
 			save_key = gv_currkey;
@@ -149,10 +147,7 @@ bool gtcmtr_order(void)
 				gv_altkey = save_key;
 				break;
 			}
-			gv_currkey->base[gv_currkey->end - 1] = 1;
-			gv_currkey->base[gv_currkey->end + 1] = 0;
-			gv_currkey->end += 1;
-
+			GVKEY_INCREMENT_ORDER(gv_currkey);
 		}
 	}
 	if (!found)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 #include <signal.h>
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
-#include "iotcp_select.h"
+#include "gtm_select.h"
 #include "io.h"
 #include "trmdef.h"
 #include "iottdef.h"
@@ -205,17 +205,15 @@ void	dm_read (mval *v)
 	if (tt_ptr->mupintr)
 	{	/* restore state to before job interrupt */
 		tt_state = &tt_ptr->tt_state_save;
-		if (ttwhichinvalid == tt_state->who_saved)
-			GTMASSERT;
+		assertpro(ttwhichinvalid != tt_state->who_saved);
 		if (dollar_zininterrupt)
 		{
 			tt_ptr->mupintr = FALSE;
 			tt_state->who_saved = ttwhichinvalid;
-			rts_error(VARLSTCNT(1) ERR_ZINTDIRECT);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTDIRECT);
 		}
 		assert(length == tt_state->length);
-		if (dmread != tt_state->who_saved)
-			GTMASSERT;	/* ZINTRECURSEIO should have caught */
+		assertpro(dmread == tt_state->who_saved);	/* ZINTRECURSEIO should have caught */
 		mv_zintdev = io_find_mvstent(io_ptr, FALSE);
 		if (mv_zintdev && mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid)
 		{
@@ -313,7 +311,7 @@ void	dm_read (mval *v)
 					tt_state->more_ptr = more_ptr;
 					memcpy(tt_state->more_buf, more_buf, SIZEOF(more_buf));
 				}
-				if (buffer_start == stringpool.free)	/* BYPASSOK */
+				if (IS_AT_END_OF_STRINGPOOL(buffer_start, 0))
 					stringpool.free += exp_length;	/* reserve space */
 				tt_state->instr = instr;
 				tt_state->outlen = outlen;
@@ -332,6 +330,7 @@ void	dm_read (mval *v)
 			outofband_action(FALSE);
 			break;
 		}
+		assertpro(FD_SETSIZE > tt_ptr->fildes);
 		FD_ZERO(&input_fd);
 		FD_SET(tt_ptr->fildes, &input_fd);
 		assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
@@ -346,7 +345,7 @@ void	dm_read (mval *v)
 		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL, &input_timeval);
 		if (0 > selstat)
 			if (EINTR != errno)
-				rts_error(VARLSTCNT(1) errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			else
 				continue;
 		else if (0 == selstat)
@@ -358,7 +357,7 @@ void	dm_read (mval *v)
 			{	/* If error was EINTR, go to the top of the loop to check for outofband. */
 				tt_ptr->discard_lf = FALSE;
 				io_ptr->dollar.za = 9;
-				rts_error(VARLSTCNT(1) errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			} else
 				continue;
 		} else if (0 == status)
@@ -371,7 +370,7 @@ void	dm_read (mval *v)
 					exit(errno);
 			}
 			tt_ptr->discard_lf = FALSE;
-			rts_error(VARLSTCNT(1) ERR_IOEOF);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 		}
 		else if (0 < status)
 		{	/* select() says it's ready to read and read() found some data */
@@ -919,7 +918,7 @@ void	dm_read (mval *v)
 			if (MAX_RECALL != recall_num)
 				recall_num ++;
 		}
-		if (buffer_start == stringpool.free)	/* BYPASSOK */
+		if (IS_AT_END_OF_STRINGPOOL(buffer_start, 0))
 			stringpool.free += v->str.len;	/* otherwise using space from before interrupt */
 	}
 	if (!(mask & TRM_NOECHO))

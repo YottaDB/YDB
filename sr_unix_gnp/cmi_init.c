@@ -124,6 +124,7 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 		return status;
 	}
+	assertpro(FD_SETSIZE > ntd_root->listen_fd);
 	FD_SET(ntd_root->listen_fd, &ntd_root->rs);
 	FD_SET(ntd_root->listen_fd, &ntd_root->es);
 	ntd_root->err = err;

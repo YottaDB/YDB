@@ -140,14 +140,14 @@ void gv_rundown(void)
 						assert((si->tp_csa == cs_addrs) || (NULL == si->tp_csa));
 						if (si->jnl_tail)
 						{
-							CAREFUL_FREEUP_BUDDY_LIST(si->format_buff_list);
-							CAREFUL_FREEUP_BUDDY_LIST(si->jnl_list);
+							PROBE_FREEUP_BUDDY_LIST(si->format_buff_list);
+							PROBE_FREEUP_BUDDY_LIST(si->jnl_list);
 						}
-						CAREFUL_FREEUP_BUDDY_LIST(si->recompute_list);
-						CAREFUL_FREEUP_BUDDY_LIST(si->new_buff_list);
-						CAREFUL_FREEUP_BUDDY_LIST(si->tlvl_info_list);
-						CAREFUL_FREEUP_BUDDY_LIST(si->tlvl_cw_set_list);
-						CAREFUL_FREEUP_BUDDY_LIST(si->cw_set_list);
+						PROBE_FREEUP_BUDDY_LIST(si->recompute_list);
+						PROBE_FREEUP_BUDDY_LIST(si->new_buff_list);
+						PROBE_FREEUP_BUDDY_LIST(si->tlvl_info_list);
+						PROBE_FREEUP_BUDDY_LIST(si->tlvl_cw_set_list);
+						PROBE_FREEUP_BUDDY_LIST(si->cw_set_list);
 						if (NULL != si->blks_in_use)
 						{
 							free_hashtab_int4(si->blks_in_use);
@@ -174,26 +174,22 @@ void gv_rundown(void)
 						}
 						free(cs_addrs->jnl);
 					}
-					GTMCRYPT_ONLY(
-						if (cs_addrs->encrypted_blk_contents)
-							free(cs_addrs->encrypted_blk_contents);
-					)
 				}
 				assert(gv_cur_region->dyn.addr->file_cntl->file_info);
-				VMS_ONLY(
-					gds_info = (vms_gds_info *)gv_cur_region->dyn.addr->file_cntl->file_info;
-					if (gds_info->xabpro)
-						free(gds_info->xabpro);
-					if (gds_info->xabfhc)
-						free(gds_info->xabfhc);
-					if (gds_info->nam)
-					{
-						free(gds_info->nam->nam$l_esa);
-						free(gds_info->nam);
-					}
-					if (gds_info->fab)
-						free(gds_info->fab);
-				)
+#				ifdef VMS
+				gds_info = (vms_gds_info *)gv_cur_region->dyn.addr->file_cntl->file_info;
+				if (gds_info->xabpro)
+					free(gds_info->xabpro);
+				if (gds_info->xabfhc)
+					free(gds_info->xabfhc);
+				if (gds_info->nam)
+				{
+					free(gds_info->nam->nam$l_esa);
+					free(gds_info->nam);
+				}
+				if (gds_info->fab)
+					free(gds_info->fab);
+#				endif
 				free(gv_cur_region->dyn.addr->file_cntl->file_info);
 				free(gv_cur_region->dyn.addr->file_cntl);
 			}

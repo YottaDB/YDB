@@ -173,21 +173,6 @@ error_def(ERR_VERMISMATCH);
 	}															\
 }
 
-#define REMOVE_SEMID_IF_ORPHANED(REG, UDI, TSD, SEM_CREATED, SEM_INCREMENTED)							\
-{																\
-	if (is_orphaned_gtm_semaphore(UDI->semid))										\
-	{															\
-		if (0 != sem_rmid(UDI->semid))											\
-		{														\
-			RNDWN_ERR("!AD -> Error removing semaphore.", reg);							\
-			CLNUP_AND_RETURN(REG, UDI, TSD, SEM_CREATED, SEM_INCREMENTED);						\
-		}														\
-		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_SEMREMOVED, 1, UDI->semid);					\
-		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_SEMREMOVED, 1, UDI->semid);					\
-		UDI->semid = INVALID_SEMID;											\
-	}															\
-}
-
 /* Print an error message that, based on whether replication was enabled at the time of the crash, would instruct
  * the user to a more appropriate operation than RUNDOWN, such as RECOVER or REQROLLBACK.
  */
@@ -322,7 +307,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 #	endif
 	CSD2UDI(tsd, udi);
 	semarg.buf = &semstat;
-	REMOVE_SEMID_IF_ORPHANED(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 	if (INVALID_SEMID == udi->semid || (-1 == semctl(udi->semid, DB_CONTROL_SEM, IPC_STAT, semarg)) ||
 #		ifdef GTM64
 		(((tsd->gt_sem_ctime.ctime & 0xffffffff) == 0) && ((tsd->gt_sem_ctime.ctime >> 32) != semarg.buf->sem_ctime)) ||
@@ -529,11 +513,16 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 					CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 				}
 				udi->counter_acc_incremented = FALSE;
-				if (sem_created && (0 != sem_rmid(udi->semid)))
+				if (0 != sem_rmid(udi->semid))
 				{
 					assert(FALSE); /* We've created the semaphore, so we should be able to remove it */
 					RNDWN_ERR("!AD -> Error removing semaphore.", reg);
 					CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
+				}
+				if (!sem_created)
+				{
+					send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_SEMREMOVED, 1, udi->semid);
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_SEMREMOVED, 1, udi->semid);
 				}
 				sem_created = FALSE;
 				udi->grabbed_access_sem = FALSE;
@@ -955,6 +944,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				free(tsd);
 				tsd = NULL;
 			}
+#			if !defined(_AIX)
 			if (dba_mm == acc_meth)
 			{
 				assert(0 != mmap_sz);
@@ -969,6 +959,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 					CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 				}
 			}
+#			endif
 		} else
 			glob_sec_init = FALSE;
 	} else
@@ -1039,10 +1030,15 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			RNDWN_ERR("!AD -> Error removing semaphore.", reg);
 			CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 		}
-		sem_created = FALSE;
+		if (!sem_created)
+		{
+			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_SEMREMOVED, 1, udi->semid);
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_SEMREMOVED, 1, udi->semid);
+		}
 		udi->grabbed_access_sem = FALSE;
 		udi->counter_acc_incremented = FALSE;
 		udi->semid = INVALID_SEMID;
+		sem_created = FALSE;
 	}
 	REVERT;
 	RESET_GV_CUR_REGION;
@@ -1065,7 +1061,7 @@ CONDITION_HANDLER(mu_rndwn_file_ch)
 	unix_db_info	*udi;
 	sgmnt_addrs	*csa;
 
-	START_CH;
+	START_CH(TRUE);
 	PRN_ERROR;
 	assert(NULL != rundown_reg);
 	if (NULL != rundown_reg)

@@ -14,6 +14,10 @@
 
 #include "gtm_string.h"
 #include "gtm_stdio.h"
+#ifndef VMS
+#include "gtm_stdlib.h"
+#include "gtm_stat.h"
+#endif
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 #include "gtm_time.h"
@@ -21,9 +25,6 @@
 #include "gt_timer.h"
 #include "io.h"
 #include "iotimer.h"
-#include "iotcp_select.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "io_params.h"
 #include "iosocketdef.h"
 #include "gtm_caseconv.h"
@@ -31,8 +32,8 @@
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #include "gtm_netdb.h"
+#include "gtm_unistd.h"
 
-GBLREF 	tcp_library_struct	tcp_routines;
 GBLREF	d_socket_struct		*socket_pool, *newdsocket;
 GBLREF	io_pair			io_std_device;	/* standard device */
 GBLREF	boolean_t		gtm_utf8_mode;
@@ -62,7 +63,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 {
 	char			addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
 		                temp_addr[SA_MAXLITLEN], dev_type[MAX_DEV_TYPE_LEN];
-	unsigned char		ch, *c, *next, *top;
+	unsigned char		ch, *c, *start, *next, *top;
 	int			handle_len, moreread_timeout, len;
 	unsigned short		port;
 	int4			errlen, msec_timeout, real_errno, p_offset = 0, zff_len, delimiter_len;
@@ -72,7 +73,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	fd_set			tcp_fd;
 	uint4			bfsize = DEFAULT_SOCKET_BUFFER_SIZE, ibfsize;
         d_socket_struct         *dsocketptr;
-	socket_struct		*socketptr;
+	socket_struct		*socketptr = NULL;
 	mv_stent		*mv_zintdev;
 	boolean_t		zint_conn_restart = FALSE;
 	socket_interrupt	*sockintr;
@@ -86,6 +87,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		                ibfsize_specified = FALSE,
 		                moreread_specified = FALSE,
 		                is_principal = FALSE,	/* called from inetd */
+				newversion = FALSE,	/* for local sockets */
 		                ichset_specified,
 		                ochset_specified;
 	unsigned char 		delimiter_buffer[MAX_N_DELIMITER * (MAX_DELIM_LEN + 1)], zff_buffer[MAX_ZFF_LEN];
@@ -95,6 +97,12 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	char			ipaddr[SA_MAXLEN];
 	int			errcode;
 	struct addrinfo		*ai_ptr, *remote_ai_ptr;
+#ifndef VMS
+	uic_struct_int		uic;
+	uint			filemode;
+	uint			filemode_mask;
+	unsigned long		uicvalue;
+#endif
 
 	ioptr = dev->iod;
 	assert((params) *(pp->str.addr + p_offset) < (unsigned char)n_iops);
@@ -127,25 +135,22 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		ioptr->width	= TCPDEF_WIDTH;
 		ioptr->length	= TCPDEF_LENGTH;
 		ioptr->wrap	= TRUE;
-		if (-1 == iotcp_fillroutine())
-			assert(FALSE);
-		if (!io_std_device.in)
+		dsocketptr->current_socket = -1;	/* 1st socket is 0 */
+		if ((2 > file_des) && (0 <= file_des) && (!io_std_device.in || !io_std_device.out))
 			/* called from io_init */
 			is_principal = TRUE;
 	}
         if (dsocketptr->mupintr)
 	{	/* check if connect was interrupted */
 		sockintr = &dsocketptr->sock_save_state;
-		if (sockwhich_invalid == sockintr->who_saved)
-			GTMASSERT;	/* Interrupt should never have an invalid save state */
+		assertpro(sockwhich_invalid != sockintr->who_saved);	/* Interrupt should never have an invalid save state */
 		if (dollar_zininterrupt)
 		{
 			dsocketptr->mupintr = FALSE;
 			sockintr->who_saved = sockwhich_invalid;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		}
-		if (sockwhich_connect != sockintr->who_saved)
-			GTMASSERT;	/* ZINTRECURSEIO should have caught */
+		assertpro(sockwhich_connect == sockintr->who_saved);	/* ZINTRECURSEIO should have caught */
 		mv_zintdev = io_find_mvstent(dsocketptr->iod, FALSE);
 		if (mv_zintdev && mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid)
 		{	/* mupintr will be reset and mvstent popped in iosocket_connect */
@@ -168,6 +173,11 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		memcpy(ioptr->dollar.device, "0", SIZEOF("0"));
 		zff_len = -1; /* indicates neither ZFF nor ZNOFF specified */
 		delimiter_len = -1; /* indicates neither DELIM nor NODELIM specified */
+#		ifndef VMS
+		filemode = filemode_mask = 0;
+		uic.mem = (uid_t)-1;		/* flag as not specified */
+		uic.grp = (gid_t)-1;
+#		endif
 		ichset_specified = ochset_specified = FALSE;
 		while (iop_eol != (ch = *(pp->str.addr + p_offset++)))
 		{
@@ -339,6 +349,43 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 								 MAX_MOREREAD_TIMEOUT);
 					moreread_specified = TRUE;
 					break;
+#				ifndef VMS
+				case iop_newversion:
+					newversion = TRUE;
+					break;
+				case iop_uic:
+					start = (unsigned char *)pp->str.addr + p_offset;
+					top = (unsigned char *)pp->str.addr + p_offset + 1 + *start;
+					next = ++start;		/* past length */
+					uicvalue = 0;
+					while ((',' != *next) && (('0' <= *next) && ('9' >= *next)) && (next < top))
+						uicvalue = (10 * uicvalue) + (*next++ - '0');
+					if (start < next)
+						uic.mem = uicvalue;
+					if (',' == *next)
+					{
+						start = ++next;
+						uicvalue = 0;
+						while ((',' != *next) && (('0' <= *next) && ('9' >= *next)) && (next < top))
+							uicvalue = (10 * uicvalue) + (*next++ - '0');
+						if (start < next)
+							uic.grp = uicvalue;
+					}
+					break;
+				case iop_w_protection:
+					filemode_mask |= S_IRWXO;
+					filemode |= *(pp->str.addr + p_offset);
+					break;
+				case iop_g_protection:
+					filemode_mask |= S_IRWXG;
+					filemode |= *(pp->str.addr + p_offset) << 3;
+					break;
+				case iop_s_protection:
+				case iop_o_protection:
+					filemode_mask |= S_IRWXU;
+					filemode |= *(pp->str.addr + p_offset) << 6;
+					break;
+#				endif
 				default:
 					break;
 			}
@@ -367,7 +414,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		}
 		if (listen_specified || connect_specified || is_principal)
 		{
-			if (NULL == (socketptr = iosocket_create(sockaddr, bfsize, is_principal ? file_des : -1)))
+			if (NULL == (socketptr = iosocket_create(sockaddr, bfsize, is_principal ? file_des : -1, listen_specified)))
 				return FALSE;
 			assert(listen_specified == socketptr->passive);
 			if (ioerror_specified)
@@ -380,13 +427,24 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 				socketptr->moreread_timeout = moreread_timeout;
 				socketptr->def_moreread_timeout = TRUE; /* iosocket_readfl.c needs to know user specified */
 			}
+#			ifndef VMS
+			if (listen_specified)
+			{	/* for LOCAL sockets */
+				if (filemode_mask)
+				{
+					socketptr->filemode_mask = filemode_mask;
+					socketptr->filemode = filemode;
+				}
+				socketptr->uic = uic;	/* -1 is no change */
+			}
+#			endif
                	 /* socket handle -- also check for duplication */
 			if (attach_specified)
 			{
 				if (iosocket_handle(sock_handle, &handle_len, FALSE, newdsocket) >= 0)
 				{
 					if (FD_INVALID != socketptr->temp_sd)
-						tcp_routines.aa_close(socketptr->temp_sd);
+						close(socketptr->temp_sd);
 					SOCKET_FREE(socketptr);
 					assert(ioptr->newly_created == FALSE);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKETEXIST, 2, handle_len, sock_handle);
@@ -411,7 +469,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			{
 				assert(ioptr->newly_created == FALSE);
 				if (FD_INVALID != socketptr->temp_sd)
-					tcp_routines.aa_close(socketptr->temp_sd);
+					close(socketptr->temp_sd);
 				SOCKET_FREE(socketptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
 				return FALSE;
@@ -420,8 +478,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			newdsocket->socket[newdsocket->n_socket++] = socketptr;
 			newdsocket->current_socket = newdsocket->n_socket - 1;
 		}
-		if (0 <= zff_len && /* ZFF or ZNOFF specified */
-		    0 < (socketptr->zff.len = zff_len)) /* assign the new ZFF len, might be 0 from ZNOFF, or ZFF="" */
+		if (socketptr && (0 <= zff_len) && /* ZFF or ZNOFF specified */
+		    (0 < (socketptr->zff.len = zff_len))) /* assign the new ZFF len, might be 0 from ZNOFF, or ZFF="" */
 		{ /* ZFF="non-zero-len-string" specified */
 			if (gtm_utf8_mode) /* Check if ZFF has any invalid UTF-8 character */
 			{ /* Note: the ZFF string originates from the source program, so is in UTF-8 mode or M mode regardless
@@ -434,11 +492,12 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		}
 	}
 	/* action */
-	if ((listen_specified && (!iosocket_bind(socketptr, timepar, ibfsize_specified))) ||
-	    (connect_specified && (!iosocket_connect(socketptr, timepar, ibfsize_specified))))
-       	{
+	if ((listen_specified && ((!iosocket_bind(socketptr, timepar, ibfsize_specified, newversion))
+			|| (!iosocket_listen_sock(socketptr, DEFAULT_LISTEN_DEPTH))))
+		|| (connect_specified && (!iosocket_connect(socketptr, timepar, ibfsize_specified))))
+	{
 		if (socketptr->sd > 0)
-			(void)tcp_routines.aa_close(socketptr->sd);
+			(void)close(socketptr->sd);
 		SOCKET_FREE(socketptr);
 		return FALSE;
 	} else if (is_principal)

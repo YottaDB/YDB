@@ -580,10 +580,15 @@ int4 gds_rundown(void)
 			} else
 			{	/* Now do final MM file sync before exit */
 				assert(csa->ti->total_blks == csa->total_blks);
+				#ifdef _AIX
+				GTM_DB_FSYNC(csa, udi->fd, rc);
+				if (-1 == rc)
+				#else
 				if (-1 == MSYNC((caddr_t)csa->db_addrs[0], (caddr_t)csa->db_addrs[1]))
+				#endif
 				{
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-						  ERR_TEXT, 2, RTS_ERROR_TEXT("Error during file msync at close"), errno);
+						  ERR_TEXT, 2, RTS_ERROR_TEXT("Error during file sync at close"), errno);
 				}
 			}
                 }
@@ -615,6 +620,7 @@ int4 gds_rundown(void)
 			  ERR_TEXT, 2, LEN_AND_LIT("Error during file close"), errno);
 	}
 	/* Unmap storage if mm mode but only the part that is not the fileheader (so shows up in dumps) */
+#	if !defined(_AIX)
 	if (is_mm && (NULL != csa->db_addrs[0]))
 	{
 		assert(csa->db_addrs[1] > csa->db_addrs[0]);
@@ -622,6 +628,7 @@ int4 gds_rundown(void)
 		if (0 < munmap_len)
 			munmap((caddr_t)(csa->db_addrs[0]), (size_t)(munmap_len));
 	}
+#	endif
 	/* Detach our shared memory while still under lock so reference counts will be correct for the next process to run down
 	 * this region. In the process also get the remove_shm status from node_local before detaching.
 	 * If csa->nl->donotflush_dbjnl is TRUE, it means we can safely remove shared memory without compromising data
@@ -664,23 +671,23 @@ int4 gds_rundown(void)
 			if (0 != shm_rmid(udi->shmid))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 					ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove shared memory"));
+			/* mupip recover/rollback don't release the semaphore here, but do it later in db_ipcs_reset (invoked from
+			 * mur_close_files())
+			 */
+			if (!have_standalone_access)
+			{
+				if (0 != sem_rmid(udi->semid))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+						      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"));
+				udi->grabbed_access_sem = FALSE;
+				udi->counter_acc_incremented = FALSE;
+			}
 		} else if (is_src_server || is_updproc)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBRNDWNWRN, 4, DB_LEN_STR(reg), process_id, process_id);
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBRNDWNWRN, 4, DB_LEN_STR(reg), process_id, process_id);
 		} else
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBRNDWNWRN, 4, DB_LEN_STR(reg), process_id, process_id);
-		/* mupip recover/rollback don't release the semaphore here, but do it later in db_ipcs_reset (invoked from
-		 * mur_close_files())
-		 */
-		if (!have_standalone_access)
-		{
-			if (0 != sem_rmid(udi->semid))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"));
-			udi->grabbed_access_sem = FALSE;
-			udi->counter_acc_incremented = FALSE;
-		}
 	} else
 	{
 		assert(!have_standalone_access || jgbl.onlnrlbk || safe_mode);

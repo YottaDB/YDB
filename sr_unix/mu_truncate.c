@@ -127,6 +127,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 	int4			blks_in_lmap, blk;
 	gtm_uint64_t		before_trunc_file_size;
 	off_t			trunc_file_size;
+	off_t			padding;
 	uchar_ptr_t		lmap_addr;
 	boolean_t		was_crit;
 	uint4			found_busy_blk;
@@ -387,10 +388,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 	CHECK_TN(csa, csd, curr_tn);
 	udi = FILE_INFO(gv_cur_region);
 	/* Information used by recover_truncate to check if the file size and csa->ti->total_blks are INCONSISTENT */
-	before_trunc_file_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl); /* in DISK_BLOCKs */
-	assert((off_t)before_trunc_file_size * DISK_BLOCK_SIZE > (off_t)(old_total - new_total) * csd->blk_size);
-	trunc_file_size = (off_t)before_trunc_file_size * DISK_BLOCK_SIZE
-		- (off_t)(old_total - new_total) * csd->blk_size; /* in bytes */
+	trunc_file_size = BLK_ZERO_OFF(csd) + ((off_t)csd->blk_size * new_total) + DISK_BLOCK_SIZE;
 	csd->after_trunc_total_blks = new_total;
 	csd->before_trunc_free_blocks = csa->ti->free_blocks;
 	csd->before_trunc_total_blks = old_total; /* Flags interrupted truncate for recover_truncate */

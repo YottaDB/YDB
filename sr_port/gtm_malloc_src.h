@@ -500,11 +500,17 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	/* If this routine is entered and environment vars have not yet been processed with a call to gtm_env_init(),
 	 * then do this now. Since this will likely trigger a call to this routine *again*, verify if we still need
 	 * to do this and if not, just return.
+	 *
+	 * Note that in a pro build, this routine (like several others in this module) has two flavors (pro and dbg)
+	 * with the debug flavor being named gtmSmInitdbg(). If driving gtm_env_init() tells us that we want to use
+	 * the debug storage manager (i.e. gtmDebugLevel is non-zero), then we need to not finish this initialization
+	 * and return to gtm_malloc() which also notes this change and drives gtm_malloc_dbg() which then drives the
+	 * correct initialization routine.
 	 */
 	if (!TREF(gtm_env_init_started))
 	{
 		gtm_env_init();
-		if (gtmSmInitialized)
+		if (gtmSmInitialized PRO_ONLY(|| (0 != gtmDebugLevel)))
 			return;		/* A nested call took care of this already so we're done! */
 	}
 	/* WARNING!! Since this is early initialization, the following asserts are not well behaved if they do
@@ -876,7 +882,12 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 			 * call to malloc), we will not record the proper caller id in the storage header or in
 			 * the traceback table. The caller will show up as gtm_malloc(). However, all subsequent
 			 * calls will be correct.
+			 *
+			 * Note, in a pro build, if the call to gtmSmInit() drives gtm_init_env() which discovers
+			 * we should be be doing debug builds, drive the debug flavor of gtm_malloc instead which
+			 * will do its own initialization if it still needs to (see top of gtmSmInit() above).
 			 */
+			PRO_ONLY(if (0 != gtmDebugLevel) return (void *)gtm_malloc_dbg(size));
 			return (void *)gtm_malloc(size);
 		}
 #	ifndef DEBUG

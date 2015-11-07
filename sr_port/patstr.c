@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,12 @@ GBLREF	boolean_t	gtm_utf8_mode;
 
 LITREF	char		ctypetab[NUM_CHARS];
 LITREF	uint4		typemask[PATENTS];
+
+error_def(ERR_PATCLASS);
+error_def(ERR_PATCODE);
+error_def(ERR_PATLIT);
+error_def(ERR_PATMAXLEN);
+error_def(ERR_PATUPPERLIM);
 
 typedef struct
 {
@@ -80,7 +86,7 @@ typedef struct
 int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 {
 	pat_strlit		strlit;
-	boolean_t		infinite, split_atom, done, dfa, fixed_len, prev_fixed_len;
+	boolean_t		dfa, dfa_attempt_failed, done, fixed_len, infinite, prev_fixed_len, split_atom;
 	int4			lower_bound, upper_bound, alloclen;
 	gtm_uint64_t		bound;
 	unsigned char		curchar, symbol, *inchar, *in_top, *buffptr;
@@ -111,7 +117,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	boolean_t		last_infinite;
 	boolean_t		done_free;
 	unsigned char		*let_go;
-	uint4			*fstchar, *outchar, *lastpatptr;
+	uint4			*fstchar, *lastpatptr, *outchar, *topchar;
 	int			any_alt = FALSE;
 	int			altcount, altsimplify;
 	int			low_in, high_in, size_in, jump;
@@ -119,11 +125,6 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						 * byte in inchar (to be stored in curchar). Therefore from this point onwards,
 						 * "curchar" should never be used in this function. This is also asserted below.
 						 */
-	error_def(ERR_PATCODE);
-	error_def(ERR_PATUPPERLIM);
-	error_def(ERR_PATCLASS);
-	error_def(ERR_PATLIT);
-	error_def(ERR_PATMAXLEN);
 
 	if (0 == instr->len)		/* empty pattern string. Cant do much */
 	{
@@ -140,6 +141,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	for (allmask = 0, chidx = 'A'; chidx <= 'X'; chidx++)
 		allmask |= mapbit[chidx - 'A'];
 	outchar = &obj->buff[PAT_MASK_BEGIN_OFFSET]; /* Note: offset is actually PAT_MASK_BEGIN_OFFSET * SIZEOF (uint4) bytes */
+	topchar = &obj->buff[MAX_PATOBJ_LENGTH];
 	last_leaf_mask = *outchar = 0;
 	patmaskptr = lastpatptr = outchar;
 	infinite = last_infinite = FALSE;
@@ -197,10 +199,12 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			{
 				if (dfa)
 				{
+					assert(outchar <= topchar);
 					patmaskptr = outchar;
 					cursize = dfa_calc(lv_ptr, leaf_num, exp_ptr, &fstchar, &outchar);
 					if (cursize >= 0)
 					{
+						assert(outchar <= topchar);
 						min[count] = min_dfa;
 						max[count] = PAT_MAX_REPEAT;
 						size[count] = cursize;
@@ -217,9 +221,9 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							&last_infinite, &fstchar, &outchar, &lastpatptr))
 						{
 							instr->addr = (char *)inchar;
-							assert(FALSE);
 							return ERR_PATMAXLEN;
 						}
+						assert(outchar <= topchar);
 					}
 				}
 				if (outchar == &obj->buff[PAT_MASK_BEGIN_OFFSET])
@@ -229,6 +233,12 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				}
 				patmaskptr = &obj->buff[0];
 				*patmaskptr++ = fixed_len;
+				assert(outchar <= topchar);
+				if ((outchar + 3 + ((fixed_len ? 2 : 3) * count)) > topchar)
+				{
+					instr->addr = (char *)inchar;
+					return ERR_PATMAXLEN;
+				}
 				*patmaskptr = (uint4)(outchar - patmaskptr); /* unit is SIZEOF(uint4) */
 				*outchar++ = count;
 				*outchar++ = total_min;
@@ -240,6 +250,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						*outchar++ = max[seqcnt];
 				for (seqcnt = 0; seqcnt < count; seqcnt++)
 					*outchar++ = size[seqcnt];
+				assert(outchar <= topchar);
 				obj->len = (int4)(outchar - &obj->buff[0]);
 				assert(!topseen || (inchar == in_top));
 				assert(inchar <= in_top);
@@ -301,10 +312,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			}
 			instr->addr = (char *)inchar;
 			if (count >= MAX_PATTERN_ATOMS)
-			{
-				assert(FALSE);
 				return ERR_PATMAXLEN;
-			}
 		}
 		if (!altend)
 		{
@@ -358,7 +366,6 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					if (strlit.bytelen >= alloclen)
 					{
 						instr->addr = (char *)inchar;
-						assert(FALSE);
 						return ERR_PATMAXLEN;
 					}
 					do
@@ -381,14 +388,16 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			{	/* start of 'alternation' */
 				if (dfa)
 				{
+					assert(outchar <= topchar);
 					if (!pat_unwind(&count, lv_ptr, leaf_num, &total_min, &total_max,
 						&min[0], &max[0], &size[0], altmin, altmax,
 						&last_infinite, &fstchar, &outchar, &lastpatptr))
 					{
 						instr->addr = (char *)inchar;
-						assert(FALSE);
 						return ERR_PATMAXLEN;
 					}
+					assert(outchar <= topchar);
+					dfa_attempt_failed = TRUE;
 					dfa = FALSE;
 				}
 				if (inchar >= in_top)
@@ -514,6 +523,10 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			upper_bound = lower_bound;
 		}
 		done = FALSE;
+		/* If dfa_attempt_failed is set to TRUE, it means we tried DFA for the current pattern match string
+		 * and decided that was not possible. In this case, we should not retry the DFA for this pattern.
+		 */
+		dfa_attempt_failed = FALSE;
 		while (!done)
 		{
 			done = TRUE;
@@ -522,7 +535,8 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			 * are no character cells to hold the mask and flag bits that the DFA code needs. Also strings with
 			 * non-ASCII UTF-8 byte sequences are currently not processed through the DFA logic.
 			 */
-			if (infinite && !any_alt && !dfa
+			assert(outchar <= topchar);
+			if (infinite && !any_alt && !dfa && !dfa_attempt_failed
 				&& (!(pattern_mask & PATM_STRLIT) || (strlit.charlen && !(strlit.flags & PATM_STRLIT_NONASCII)))
 				&& ((outchar - &obj->buff[0]) <= (MAX_PATTERN_LENGTH / 2)))
 			{
@@ -534,18 +548,20 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				atom_map = count;
 				memset(expand.num_e, 0, SIZEOF(expand.num_e));
 			}
+			dfa_attempt_failed = FALSE;
 			if (!dfa)
 			{
-				if (count >= MAX_PATTERN_ATOMS ||
-					!add_atom(&count, pattern_mask, &strlit, infinite,
+				assert(outchar <= topchar);
+				if ((MAX_PATTERN_ATOMS <= count)
+					|| !add_atom(&count, pattern_mask, &strlit, infinite,
 						&min[count], &max[count], &size[count],
 						&total_min, &total_max, lower_bound, upper_bound, altmin, altmax,
 						&last_infinite, &fstchar, &outchar, &lastpatptr))
 				{
 					instr->addr = (char *)inchar;
-					assert(FALSE);
 					return ERR_PATMAXLEN;
 				}
+				assert(outchar <= topchar);
 				if (pattern_mask & PATM_ALT)
 				{	/* If the alternation contains only one alternative (altcount == 1) AND
 					 * that alternative contains only one pattern atom, AND that atom is not an
@@ -617,8 +633,14 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							upper_bound = max[count - 1];
 						}
 						outchar--;
+						if ((outchar + (jump - PAT_MASK_BEGIN_OFFSET + 1)) > topchar)
+						{
+							instr->addr = (char *)inchar;
+							return ERR_PATMAXLEN;
+						}
 						for (seq = PAT_MASK_BEGIN_OFFSET; seq <= jump; seq++)
 							*outchar++ = cur_alt->altpat.buff[seq];
+						assert(outchar <= topchar);
 						pattern_mask = cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET];
 						if (pattern_mask & PATM_STRLIT)
 						{
@@ -632,16 +654,28 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					} else
 					{
 						fixed_len = FALSE;
+						if ((outchar + 3) > topchar)
+						{
+							instr->addr = (char *)inchar;
+							return ERR_PATMAXLEN;
+						}
 						*outchar++ = lower_bound;
 						*outchar++ = upper_bound;
 						for (cur_alt = &init_alt; cur_alt; )
 						{
+							assert(outchar < topchar);
+							if ((outchar + 2 + cur_alt->altpat.len) > topchar)
+							{
+								instr->addr = (char *)inchar;
+								return ERR_PATMAXLEN;
+							}
 							*outchar++ = cur_alt->altpat.len;
 							for (seq = 0; seq < cur_alt->altpat.len; seq++)
 								*outchar++ = cur_alt->altpat.buff[seq];
 							cur_alt = (alternation *)cur_alt->next;
 						}
 						*outchar++ = 0;
+						assert(outchar <= topchar);
 						done_free = TRUE;
 					}
 				}
@@ -661,9 +695,11 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					|| (charpos > MAX_DFA_STRLEN))
 				{
 					patmaskptr = outchar;
+					assert(outchar <= topchar);
 					cursize = dfa_calc(lv_ptr, leaf_num, exp_ptr, &fstchar, &outchar);
 					if (cursize >= 0)
 					{
+						assert(outchar <= topchar);
 						min[count] = min_dfa;
 						max[count] = PAT_MAX_REPEAT;
 						size[count] = cursize;
@@ -684,9 +720,10 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							&last_infinite, &fstchar, &outchar, &lastpatptr))
 						{
 							instr->addr = (char *)inchar;
-							assert(FALSE);
 							return ERR_PATMAXLEN;
 						}
+						assert(outchar <= topchar);
+						dfa_attempt_failed = TRUE;
 					}
 					dfa = FALSE;
 					done = FALSE;
@@ -813,9 +850,11 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				if (sym_num >= MAX_SYM - 1)
 				{
 					patmaskptr = outchar;
+					assert(outchar <= topchar);
 					cursize = dfa_calc(lv_ptr, curr_leaf_num, exp_ptr, &fstchar, &outchar);
 					if (cursize >= 0)
 					{
+						assert(outchar <= topchar);
 						min[count] = curr_min_dfa;
 						max[count] = PAT_MAX_REPEAT;
 						size[count] = cursize;
@@ -836,9 +875,10 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							&last_infinite, &fstchar, &outchar, &lastpatptr))
 						{
 							instr->addr = (char *)inchar;
-							assert(FALSE);
 							return ERR_PATMAXLEN;
 						}
+						assert(outchar <= topchar);
+						dfa_attempt_failed = TRUE;
 					}
 					dfa = FALSE;
 					done = FALSE;

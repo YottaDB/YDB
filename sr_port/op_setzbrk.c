@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 #include "iosp.h"
 #include "gtm_text_alloc.h"
 #include "srcline.h"
+#include "compiler.h"
 #ifdef GTM_TRIGGER
 # include "trigger_source_read_andor_verify.h"
 # include "gtm_trigger_trc.h"
@@ -36,7 +37,7 @@
 
 GBLREF z_records		zbrk_recs;
 GBLREF mident_fixed		zlink_mname;
-GBLREF stack_frame		frame_pointer;
+GBLREF stack_frame		*frame_pointer;
 GBLREF unsigned short		proc_act_type;
 
 error_def(ERR_COMMENT);
@@ -84,21 +85,23 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 		GTMTRIG_ONLY(IS_TRIGGER_RTN(&rtn->str, is_trigger));
 		GTMTRIG_ONLY(if (is_trigger) DBGTRIGR((stderr, "op_setzbrk: Setting/clearing a zbreak in a trigger\n")));
 		flush_pio();
-		if (NULL == (routine = find_rtn_hdr(&rtn->str)))	/* Note assignment */
+		if (WANT_CURRENT_RTN(rtn))
+			routine = CURRENT_RHEAD_ADR(frame_pointer->rvector);
+		else if (NULL == (routine = find_rtn_hdr(&rtn->str)))	/* Note assignment */
 		{
 #			ifdef GTM_TRIGGER
 			if (is_trigger)
 			{
 				sstatus = trigger_source_read_andor_verify(&rtn->str, TRIGGER_COMPILE);
 				if ((0 != sstatus) || (NULL == (routine = find_rtn_hdr(&rtn->str))))	/* Note assignment */
-					rts_error(VARLSTCNT(4) ERR_TRIGNAMENF, 2, rtn->str.len, rtn->str.addr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGNAMENF, 2, rtn->str.len, rtn->str.addr);
 			} else
 #			endif
 			{
 				op_zlink(rtn, NULL);
 				routine = find_rtn_hdr(&rtn->str);
 				if (NULL == routine)
-					rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->str.len, rtn->str.addr,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->str.len, rtn->str.addr,
 						  ERR_ZLMODULE, 2, mid_len(&zlink_mname), &zlink_mname.c[0]);
 			}
 		}
@@ -156,7 +159,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 						lname.len = lab->str.len;
 						lname.addr = lab->str.addr;
 						zbloc_end = rtnlaboff2entryref(zbloc_buff, &rname, &lname, offset);
-						rts_error(VARLSTCNT(4) ERR_ZBREAKFAIL, 2, zbloc_end - zbloc_buff,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZBREAKFAIL, 2, zbloc_end - zbloc_buff,
 								zbloc_buff);
 					}
 				}
@@ -187,9 +190,9 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 					*addr = (*addr & (zb_code)(~ZB_CODE_MASK)) |
 						((xf_zbstart * SIZEOF(UINTPTR_T)) << ZB_CODE_SHIFT);
 #					endif
-				} else if (((xf_zbstart * SIZEOF(UINTPTR_T)) != tmp_xf_code)
-					&& ((xf_zbfetch * SIZEOF(UINTPTR_T)) != tmp_xf_code))
-					GTMASSERT;
+				} else
+					assertpro( ((xf_zbstart * SIZEOF(UINTPTR_T)) == tmp_xf_code)
+						|| ((xf_zbfetch * SIZEOF(UINTPTR_T)) == tmp_xf_code));
 				z_ptr->rtn = &(CURRENT_RHEAD_ADR(routine))->routine_name;
 				assert(lab_name != NULL);
 				z_ptr->lab = lab_name;
@@ -207,6 +210,6 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			z_ptr->action = csp;
 			z_ptr->count = cnt;
 		} else
-			GTMASSERT;
+			assertpro(FALSE && line_offset_addr && cnt);
 	}
 }

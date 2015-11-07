@@ -51,6 +51,11 @@ enum
 	REPL_NEED_STRMINFO,		/* 32 */  /* sent by a supplementary source server to a supplementary receiver server */
 	REPL_STRMINFO,			/* 33 */  /* sent in response to a REPL_NEED_STRMINFO message */
 	REPL_LOGFILE_INFO,		/* 34 */  /* sent (at time of handshake) to communicate to one another the $CWD/logfile */
+	REPL_NEED_TLS_INFO,		/* 35 */  /* sent to get the SSL/TLS information from the receiver. */
+	REPL_TLS_INFO,			/* 36 */  /* Receiver's response to REPL_NEED_TLS_INFO message. */
+	REPL_RENEG_ACK_ME,		/* 37 */  /* Start a renegotiation request with the receiver server. */
+	REPL_RENEG_ACK,			/* 38 */  /* Receiver's acknowledgement of REPL_RENEG_ACK_ME message. */
+	REPL_RENEG_COMPLETE,		/* 39 */  /* Completion of SSL/TLS renegotiation between the Source and Receiver server. */
 	REPL_MSGTYPE_LAST=256		/* 256 */
 	/* any new message need to be added before REPL_MSGTYPE_LAST */
 };
@@ -63,7 +68,8 @@ enum
 							 */
 #define	REPL_PROTO_VER_SUPPLEMENTARY	(char)0x3	/* Versions V5.5-000 and above that support supplementary instances */
 #define	REPL_PROTO_VER_REMOTE_LOGPATH	(char)0x4	/* Versions V6.0-003 and above that send remote $CWD as part of handshake */
-#define	REPL_PROTO_VER_THIS		REPL_PROTO_VER_REMOTE_LOGPATH
+#define REPL_PROTO_VER_TLS_SUPPORT	(char)0x5	/* Versions V6.1-000 and above that supports SSL/TLS communication. */
+#define	REPL_PROTO_VER_THIS		REPL_PROTO_VER_TLS_SUPPORT
 							/* The current/latest version of the communication protocol between the
 							 * primary (source server) and secondary (receiver server or rollback)
 							 */
@@ -88,6 +94,7 @@ enum
 #define	START_FLAG_TRIGGER_SUPPORT		0x00000020
 #define	START_FLAG_SRCSRV_IS_VMS		0x00000040	/* Obsolete but preserve slot */
 #define	START_FLAG_NORESYNC			0x00000080
+#define START_FLAG_ENABLE_TLS			0x00000100
 
 #define	MIN_REPL_MSGLEN		32 /* To keep compiler happy with
 				    * the definition of repl_msg_t as well
@@ -379,6 +386,15 @@ typedef struct		/* Used to send a message of type REPL_BADTRANS or REPL_CMP2UNCM
 	seq_num		start_seqno;	/* The seqno that source server should restart sending from */
 	char		filler_32[16];
 } repl_badtrans_msg_t;
+
+typedef struct
+{
+	int4		type;
+	int4		len;
+	uint4		API_version;		/* The GT.M TLS version understood by this side. */
+	uint4		library_version;	/* The SSL/TLS implementation library that this side is linked with at runtime. */
+	char		filler_32[16];
+} repl_tlsinfo_msg_t;
 
 typedef struct
 {

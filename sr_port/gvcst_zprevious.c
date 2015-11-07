@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,19 +59,16 @@ GBLREF int4		gv_keysize;
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 
-error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVORDERFAIL);
-error_def(ERR_TPRETRY);
 
 DEFINE_NSB_CONDITION_HANDLER(gvcst_zprevious_ch)
 
-bool gvcst_zprevious(void)
+boolean_t	gvcst_zprevious(void)
 {	/* See gvcst_query.c */
-	bool		found, is_hidden, sn_tpwrapped;
+	boolean_t	found, is_hidden, sn_tpwrapped;
 	boolean_t	est_first_pass;
-	char		save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key		*save_gv_currkey;
-	int		end, prev, oldend;
+	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	int		prev, oldend;
 	int		save_dollar_tlevel;
 
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
@@ -81,7 +78,7 @@ bool gvcst_zprevious(void)
 	CHECK_HIDDEN_SUBSCRIPT_AND_RETURN(found, gv_altkey, is_hidden);
 	assert(found && is_hidden);
 	IF_SN_DISALLOWED_AND_NO_SPAN_IN_DB(return found);
-	SAVE_GV_CURRKEY_LAST_SUBSCRIPT(gv_currkey, prev, oldend);
+	SAVE_GV_CURRKEY_LAST_SUBSCRIPT(save_currkey, prev, oldend);
 	if (!dollar_tlevel)
 	{
 		sn_tpwrapped = TRUE;
@@ -99,13 +96,7 @@ bool gvcst_zprevious(void)
 		{	/* Replace last subscript to be the lowest possible hidden subscript so another
 			 * gvcst_zprevious2 will give us the previous non-hidden subscript.
 			 */
-			end = gv_altkey->end;
-			gv_currkey->base[end - 4] = 2;
-			gv_currkey->base[end - 3] = 1;
-			gv_currkey->base[end - 2] = 1;
-			gv_currkey->base[end - 1] = 0;
-			gv_currkey->base[end + 0] = 0;
-			gv_currkey->end = end;
+			REPLACE_HIDDEN_SUB_TO_LOWEST(gv_altkey, gv_currkey);	/* uses gv_altkey to modify gv_currkey */
 			/* fix up since it should only be externally counted as one $zprevious */
 			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_zprev, (gtm_uint64_t) -1);
 			found = gvcst_zprevious2();
@@ -116,18 +107,18 @@ bool gvcst_zprevious(void)
 		op_tcommit();
 		REVERT; /* remove our condition handler */
 	}
-	RESTORE_GV_CURRKEY_LAST_SUBSCRIPT(gv_currkey, prev, oldend);
+	RESTORE_GV_CURRKEY_LAST_SUBSCRIPT(save_currkey, prev, oldend);
 	assert(save_dollar_tlevel == dollar_tlevel);
 #	endif
 	return found;
 }
 
-bool gvcst_zprevious2(void)
+boolean_t	gvcst_zprevious2(void)
 {
 	static gv_key	*zprev_temp_key;
 	static int4	zprev_temp_keysize = 0;
 	blk_hdr_ptr_t	bp;
-	bool		found, two_histories;
+	boolean_t	found, two_histories;
 	enum cdb_sc	status;
 	rec_hdr_ptr_t	rp;
 	unsigned char	*c1, *c2, *ctop;
@@ -179,6 +170,7 @@ bool gvcst_zprevious2(void)
 				assert(zprev_temp_keysize <= gv_keysize);
 				if (zprev_temp_keysize < gv_keysize)
 				{
+					assert(DBKEYSIZE(MAX_KEY_SZ) == gv_keysize);
 					zprev_temp_keysize = gv_keysize;
 					GVKEY_INIT(zprev_temp_key, zprev_temp_keysize);
 				}

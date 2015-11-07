@@ -221,7 +221,7 @@ CONDITION_HANDLER(jobexam_dump_ch)
 {
 	boolean_t	save_created_core;
 
-	START_CH;
+	START_CH(TRUE);
 
 	/* Operation:
 	 * 1) Flush out message we came here because of to operator console

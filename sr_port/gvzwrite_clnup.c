@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,8 +32,6 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gvzwrite_datablk	*gvzwrite_block;
-GBLREF gd_binding	*gd_map;
-GBLREF gd_binding	*gd_map_top;
 
 void	gvzwrite_clnup(void)
 {
@@ -50,8 +48,6 @@ void	gvzwrite_clnup(void)
 		memcpy(&gv_currkey->base[0], &old->base[0], old->end + 1);
 		gv_currkey->end = old->end;
 		gv_currkey->prev = old->prev;
-		gd_map = gvzwrite_block->old_map;
-		gd_map_top = gvzwrite_block->old_map_top;
 		free(gvzwrite_block->old_key);
 		gvzwrite_block->old_key = gvzwrite_block->old_targ = (unsigned char *)NULL;
 		gvzwrite_block->subsc_count = 0;

@@ -137,13 +137,16 @@ typedef struct
 #define NOVERIFY	FALSE
 
 int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_t verifytrig);
+void free_src_tbl(rhdtyp *rtn_vector);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
 int4 *find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_name);
 rhdtyp *find_rtn_hdr(mstr *name);
+boolean_t find_rtn_tabent(rtn_tabent **res, mstr *name);
 bool zlput_rname(rhdtyp *hdr);
 rhdtyp *make_dmode(void);
 void comp_lits(rhdtyp *rhead);
 rhdtyp  *op_rhdaddr(mval *name, rhdtyp *rhd);
+rhdtyp	*op_rhdaddr1(mval *name);
 lnr_tabent *op_labaddr(rhdtyp *routine, mval *label, int4 offset);
 void urx_resolve(rhdtyp *rtn, lab_tabent *lbl_tab, lab_tabent *lbl_top);
 char *rtnlaboff2entryref(char *entryref_buff, mident *rtn, mident *lab, int offset);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@ cmi_status_t cmj_clb_set_async(struct CLB *lnk)
 	cmi_status_t status = SS_NORMAL;
 
 	CMI_DPRINT(("in cmj_clb_set_async sta = %d\n", lnk->sta));
+	assertpro(FD_SETSIZE > lnk->mun);
 	switch (lnk->sta)
 	{
 	case CM_CLB_READ:

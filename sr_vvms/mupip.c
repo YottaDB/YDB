@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +31,6 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
-#include "min_max.h"		/* needed for init_root_gv.h */
-#include "init_root_gv.h"
 #include "desblk.h"		/* for desblk structure */
 #include "repl_msg.h"
 #include "gtmsource.h"
@@ -57,7 +55,6 @@ GBLREF desblk		exi_blk;
 GBLREF bool		licensed;
 GBLREF int4		lkid, lid;
 GBLREF bool		in_backup;
-GBLREF mval		curr_gbl_root;
 GBLREF int4		exi_condition;
 GBLREF spdesc		rts_stringpool, stringpool;
 
@@ -132,12 +129,11 @@ mupip()
 	{
 		licensed = FALSE;
 		if (LP_INVCSM != status)
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	}
 #	endif
 	ast_init();
 	initialize_pattern_table();
-	INIT_GBL_ROOT();
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
 	mupip_getcmd();

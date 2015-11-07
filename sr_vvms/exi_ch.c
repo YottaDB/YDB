@@ -25,7 +25,7 @@ static int      		depth = UNWIND_LEVELS;
 
 CONDITION_HANDLER(exi_ch)
 {
-        START_CH;
+        START_CH(FALSE);
 	SET_FORCED_EXIT_STATE;
         UNWIND(&depth, NULL);
 }

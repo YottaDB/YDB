@@ -86,7 +86,6 @@ GBLREF	int			gtmsource_log_fd;
 GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_filter;
-GBLREF	gd_addr			*gd_header;
 GBLREF	seq_num			seq_num_zero, seq_num_minus_one, seq_num_one;
 GBLREF	unsigned char		jnl_ver, remote_jnl_ver;
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
@@ -831,10 +830,9 @@ int gtmsource_process(void)
 				}
 			} else /* else tot_tr_len < 0, error */
 			{
-				if (0 < data_len) /* Insufficient buffer space, increase the buffer space */
-					gtmsource_alloc_msgbuff(data_len + REPL_MSG_HDRLEN);
-				else
-					GTMASSERT; /* Major problems */
+				assertpro(0 < data_len); /* Else major problems */
+				/* Insufficient buffer space, increase the buffer space */
+				gtmsource_alloc_msgbuff(data_len + REPL_MSG_HDRLEN);
 			}
 		}
 	}

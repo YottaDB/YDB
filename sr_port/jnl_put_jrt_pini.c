@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +62,7 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 	if (!jgbl.forw_phase_recovery)
 	{
 		assert(NULL == jgbl.mur_pini_addr_reset_fnptr);
-		assert(NULL == csa->rctl);
+		assert((NULL == csa->miscptr) || IS_DSE_IMAGE);
 		mur_plst = NULL;
 		if (IS_GTCM_GNP_SERVER_IMAGE && (NULL != originator_prc_vec))
 		{
@@ -72,8 +72,8 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 			memset((unsigned char*)&pini_record.process_vector[ORIG_JPV], 0, SIZEOF(jnl_process_vector));
 	} else
 	{
-		assert(NULL != csa->rctl);
-		mur_plst = csa->rctl->mur_plst;
+		assert(NULL != csa->miscptr);
+		mur_plst = ((reg_ctl_list *)csa->miscptr)->mur_plst;
 		if (NULL != jgbl.mur_pini_addr_reset_fnptr)
 		{
 			memcpy((unsigned char*)&pini_record.process_vector[ORIG_JPV],

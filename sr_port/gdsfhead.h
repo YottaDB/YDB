@@ -35,13 +35,17 @@
 
 #define CACHE_STATE_OFF SIZEOF(que_ent)
 
+error_def(ERR_ACTCOLLMISMTCH);
 error_def(ERR_DBCRERR);
 error_def(ERR_DBENDIAN);
 error_def(ERR_DBFLCORRP);
+error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVIS);
 error_def(ERR_GVSUBOFLOW);
 error_def(ERR_MMFILETOOLARGE);
+error_def(ERR_NCTCOLLSPGBL);
 error_def(ERR_REPLINSTMISMTCH);
+error_def(ERR_REPLINSTNOSHM);
 error_def(ERR_REPLREQROLLBACK);
 error_def(ERR_SCNDDBNOUPD);
 error_def(ERR_SRVLCKWT2LNG);
@@ -49,8 +53,11 @@ error_def(ERR_SSATTACHSHM);
 error_def(ERR_SSFILOPERR);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
+error_def(ERR_TEXT);
 error_def(ERR_TNTOOLARGE);
 error_def(ERR_TNWARN);
+error_def(ERR_TPRETRY);
+error_def(ERR_UNIMPLOP);
 
 /* Cache record */
 typedef struct cache_rec_struct
@@ -251,6 +258,13 @@ void verify_queue(que_head_ptr_t qhdr);
 # define MM_PROT_FLAGS(READ_ONLY)		(READ_ONLY ? PROT_READ : (PROT_READ | PROT_WRITE))
 # define MM_BASE_ADDR(CSA) 			(sm_uc_ptr_t)CSA->db_addrs[0]
 # define SET_MM_BASE_ADDR(CSA, CSD)
+# ifdef _AIX
+#  define MEM_MAP_SYSCALL "shmat()"
+#  define MEM_UNMAP_SYSCALL "shmdt()"
+# else
+#  define MEM_MAP_SYSCALL "mmap()"
+#  define MEM_UNMAP_SYSCALL "munmap()"
+# endif
 #else
 # define MM_BASE_ADDR(CSA)			(sm_uc_ptr_t)CSA->acc_meth.mm.base_addr
 # define SET_MM_BASE_ADDR(CSA, CSD)											\
@@ -258,42 +272,6 @@ void verify_queue(que_head_ptr_t qhdr);
 	CSA->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_long_t)CSD + (off_t)(CSD->start_vbn - 1) * DISK_BLOCK_SIZE);	\
 }
 #endif
-
-/* The following 3 macros were introduced while solving a problem with $view where a call to $view in */
-/* mumps right after a change to $zgbldir gave the old global directory - not the new one.  On VMS it */
-/* caused a core dump.  If one were to access a global variable via $data right after the change, however, */
-/* the $view worked correctly.  The solution was to make sure the gd_map information matched the current */
-/* gd_header in op_fnview.c.  The code used as a template for this change was in gvinit.c.  The first */
-/* macro gets the gd_header using an mval.  The second macro establishes the gd_map from the gd_header. */
-/* The third macro is an assert (when DEBUG_ONLY is defined) for those cases where the gd_header is already */
-/* set to make sure the mapping is correct. The first 2 macros are executed when the gd_header is null, */
-/* and the 3rd macro is associated with an else clause if it is not.  Therefore, they should be maintained */
-/* as a group. */
-
-#define SET_GD_HEADER(inmval)				\
-{							\
-	inmval.mvtype = MV_STR;				\
-	inmval.str.len = 0;				\
-	gd_header = zgbldir(&inmval);			\
-}
-
-#define SET_GD_MAP					\
-{							\
-	GBLREF	gd_binding	*gd_map, *gd_map_top;	\
-							\
-	gd_map = gd_header->maps;			\
-	gd_map_top = gd_map + gd_header->n_maps;	\
-	TREF(gd_targ_addr) = gd_header;			\
-}
-
-#define GD_HEADER_ASSERT					\
-{								\
-	GBLREF	gd_binding	*gd_map, *gd_map_top;		\
-								\
-	assert(gd_map == gd_header->maps);			\
-	assert(gd_map_top == gd_map + gd_header->n_maps);	\
-	assert(TREF(gd_targ_addr) == gd_header);		\
-}
 
 /* If reallocating gv_currkey/gv_altkey, preserve pre-existing values */
 #define	GVKEY_INIT(GVKEY, KEYSIZE)						\
@@ -308,8 +286,10 @@ void verify_queue(que_head_ptr_t qhdr);
 	 */									\
 	assert(ROUND_UP2(keySZ, 4) == keySZ);					\
 	new_KEY = (gv_key *)malloc(SIZEOF(gv_key) - 1 + keySZ);			\
+	assert(DBKEYSIZE(MAX_KEY_SZ) == KEYSIZE);				\
 	if (NULL != old_KEY)							\
 	{									\
+		assert(FALSE);	/* dont call GVKEY_INIT twice for same key */	\
 		assert(KEYSIZE >= old_KEY->top);				\
 		assert(old_KEY->top > old_KEY->end);				\
 		memcpy(new_KEY, old_KEY, SIZEOF(gv_key) + old_KEY->end);	\
@@ -333,30 +313,204 @@ void verify_queue(que_head_ptr_t qhdr);
 	}				\
 }
 
-#define	GVKEYSIZE_INCREASE_IF_NEEDED(KEYSIZE)							\
+#define	GVKEYSIZE_INIT_IF_NEEDED									\
+{													\
+	int		keySIZE;									\
+													\
+	GBLREF int4	gv_keysize;									\
+	GBLREF gv_key	*gv_altkey;									\
+	GBLREF gv_key	*gv_currkey;									\
+													\
+	if (!gv_keysize)										\
+	{												\
+		keySIZE = DBKEYSIZE(MAX_KEY_SZ);							\
+		/* Have space to store at least MAX_MIDENT_LEN bytes as otherwise name-level $order	\
+		 * (see op_gvorder/op_zprevious) could have buffer overflow issues in gv_currkey->base.	\
+		 * Do ROUND_UP2(x,4) to keep an assert in GVKEY_INIT macro happy.			\
+		 */											\
+		assert((MAX_MIDENT_LEN + 3) < keySIZE);							\
+		assert(keySIZE);									\
+		gv_keysize = keySIZE;									\
+		GVKEY_INIT(gv_currkey, keySIZE);							\
+		GVKEY_INIT(gv_altkey, keySIZE);								\
+	} else												\
+	{												\
+		assert((NULL != gv_currkey) && (NULL != gv_altkey) && gv_keysize			\
+			&& (DBKEYSIZE(MAX_KEY_SZ) == gv_keysize)					\
+			&& (gv_keysize == gv_currkey->top) && (gv_keysize == gv_altkey->top));		\
+	}												\
+}
+
+/* Transform KEY to look at the immediately next key at the same subscript level as input KEY (like $order(KEY)).
+ * For example if input KEY is ^x(1,2), come up with a key ^x(1,2++).
+ */
+#define	GVKEY_INCREMENT_ORDER(KEY)			\
+{							\
+	int	end;					\
+							\
+	end = KEY->end;					\
+	assert(KEY_DELIMITER == KEY->base[end - 1]);	\
+	assert(KEY_DELIMITER == KEY->base[end]);	\
+	assert(end + 1 < KEY->top);			\
+	KEY->base[end - 1] = 1;				\
+	KEY->base[end + 1] = KEY_DELIMITER;		\
+	KEY->end = end + 1;				\
+}
+
+/* Undo work done by GVKEY_INCREMENT_ORDER */
+#define	GVKEY_UNDO_INCREMENT_ORDER(KEY)			\
+{							\
+	int	end;					\
+							\
+	assert(1 < KEY->end);				\
+	end = KEY->end - 1;				\
+	assert(1 == KEY->base[end - 1]);		\
+	assert(KEY_DELIMITER == KEY->base[end]);	\
+	assert(KEY_DELIMITER == KEY->base[end + 1]);	\
+	assert(end + 1 < KEY->top);			\
+	KEY->base[end - 1] = KEY_DELIMITER;		\
+	KEY->base[end + 0] = KEY_DELIMITER;		\
+	KEY->end = end;					\
+}
+
+/* Transform KEY to look at the immediately previous key at the same subscript level as input KEY (like $order(KEY)).
+ * For example if input KEY is ^x(1,2), come up with a key ^x(1,2--).
+ */
+#define	GVKEY_DECREMENT_ORDER(KEY)			\
+{							\
+	int	end;					\
+							\
+	end = KEY->end;					\
+	assert(1 < end);				\
+	assert(KEY_DELIMITER == KEY->base[end - 1]);	\
+	assert(KEY_DELIMITER == KEY->base[end]);	\
+	assert(0xFF != KEY->base[end - 2]);		\
+	assert((end + 1) < KEY->top);			\
+	KEY->base[end - 2] -= 1;			\
+	KEY->base[end - 1] = 0xFF;			\
+	KEY->base[end + 1] = KEY_DELIMITER;		\
+	KEY->end = end + 1;				\
+}
+
+/* Undo work done by GVKEY_DECREMENT_ORDER */
+#define	GVKEY_UNDO_DECREMENT_ORDER(KEY)			\
+{							\
+	int	end;					\
+							\
+	assert(2 < KEY->end);				\
+	end = KEY->end - 1;				\
+	assert(0xFF == KEY->base[end - 1]);		\
+	assert(KEY_DELIMITER != KEY->base[end - 2]);	\
+	assert(KEY_DELIMITER == KEY->base[end]);	\
+	assert(KEY_DELIMITER == KEY->base[end + 1]);	\
+	assert((end + 1) < KEY->top);			\
+	KEY->base[end - 2] += 1;			\
+	KEY->base[end - 1] = KEY_DELIMITER;		\
+	KEY->end = end;					\
+}
+/* Transform KEY to look at the immediately next KEY at any subscript level (like $query(KEY)).
+ * For example if input KEY is ^x(1,2), come up with a key ^x(1,2,1) assuming that is the next node.
+ */
+#define	GVKEY_INCREMENT_QUERY(KEY)			\
+{							\
+	int	end;					\
+							\
+	end = KEY->end;					\
+	assert(KEY_DELIMITER == KEY->base[end - 1]);	\
+	assert(KEY_DELIMITER == KEY->base[end]);	\
+	assert(end + 2 < KEY->top);			\
+	KEY->base[end] = 1;				\
+	KEY->base[end + 1] = KEY_DELIMITER;		\
+	KEY->base[end + 2] = KEY_DELIMITER;		\
+	KEY->end += 2;					\
+}
+
+/* Transform KEY to look at the immediately previous key at the PREVIOUS subscript level as input KEY.
+ * For example if input KEY is ^x(1,2), come up with a key ^x(1++).
+ */
+#define	GVKEY_INCREMENT_PREVSUBS_ORDER(KEY)			\
+{								\
+	assert(KEY->prev);					\
+	assert(KEY->end > KEY->prev);				\
+	assert(KEY_DELIMITER == KEY->base[KEY->prev - 1]);	\
+	assert(KEY_DELIMITER != KEY->base[KEY->prev]);		\
+	assert(KEY_DELIMITER == KEY->base[KEY->end - 1]);	\
+	assert(KEY_DELIMITER == KEY->base[KEY->end]);		\
+	assert(KEY->end + 1 <= KEY->top);			\
+	KEY->base[KEY->prev - 1] = 1;				\
+}
+
+/* Undo work done by GVKEY_INCREMENT_PREVSUBS_ORDER */
+#define	GVKEY_UNDO_INCREMENT_PREVSUBS_ORDER(KEY)		\
+{								\
+	assert(KEY->prev);					\
+	assert(KEY->end > KEY->prev);				\
+	assert(1 == KEY->base[KEY->prev - 1]);			\
+	assert(KEY_DELIMITER != KEY->base[KEY->prev]);		\
+	assert(KEY_DELIMITER == KEY->base[KEY->end - 1]);	\
+	assert(KEY_DELIMITER == KEY->base[KEY->end]);		\
+	assert(KEY->end + 1 <= KEY->top);			\
+	KEY->base[KEY->prev - 1] = KEY_DELIMITER;		\
+}
+
+/* Transform KEY to look at the "" subscript at same subscript level as input KEY.
+ * For example if input KEY is ^x(1,2), come up with a key ^x(1,"").
+ */
+#define	GVKEY_SET_SUBS_ZPREVIOUS(KEY, SAVECH)			\
+{								\
+	assert(KEY->prev);					\
+	assert(KEY->end > KEY->prev);				\
+	assert(KEY_DELIMITER == KEY->base[KEY->prev - 1]);	\
+	assert(KEY_DELIMITER != KEY->base[KEY->prev]);		\
+	assert(KEY_DELIMITER == KEY->base[KEY->end - 1]);	\
+	assert(KEY_DELIMITER == KEY->base[KEY->end]);		\
+	assert(KEY->end + 1 <= KEY->top);			\
+	SAVECH = KEY->base[KEY->prev];				\
+	KEY->base[KEY->prev] = 1;				\
+}
+
+/* Undo work done by GVKEY_SET_SUBS_ZPREVIOUS */
+#define	GVKEY_UNDO_SET_SUBS_ZPREVIOUS(KEY, SAVECH)		\
+{								\
+	assert(KEY->prev);					\
+	assert(KEY->end > KEY->prev);				\
+	assert(1 == KEY->base[KEY->prev]);			\
+	assert(KEY_DELIMITER == KEY->base[KEY->prev - 1]);	\
+	assert(KEY_DELIMITER == KEY->base[KEY->end - 1]);	\
+	assert(KEY_DELIMITER == KEY->base[KEY->end]);		\
+	assert(KEY->end + 1 <= KEY->top);			\
+	KEY->base[KEY->prev] = SAVECH;				\
+}
+
+/* This macro is used whenever we have found a MAP where a key KEYBASE maps to (using "gv_srch_map*" functions).
+ * If the MAP entry one before EXACTLY matches the KEY, then some callers might want to see MAP-1 instead of MAP.
+ * It is upto the caller to decide which one they want. By default they get MAP from gv_srch_map and can invoke
+ * this macro to get MAP-1 in that special case.
+ */
+#define	BACK_OFF_ONE_MAP_ENTRY_IF_EDGECASE(KEYBASE, KEYLEN, MAP)				\
 {												\
-	int		keySIZE;								\
+	if (!memcmp(KEYBASE, ((MAP) - 1)->gvkey.addr, KEYLEN))					\
+	{	/* KEYBASE starts at "MAP" which means, all keys of interest (just one before	\
+		 * the incremented key) can never map to "MAP" so back off one map entry.	\
+		 */										\
+		(MAP)--;									\
+	}											\
+}
+
+/* Calculate the # of subscripts in "KEY" and stores that in "NSUBS" */
+#define	GET_NSUBS_IN_GVKEY(PTR, LEN, NSUBS)							\
+{												\
+	unsigned char	*ptr, *ptrtop;								\
+	int		nSubs;									\
 												\
-	GBLREF int4	gv_keysize;								\
-	GBLREF gv_key	*gv_altkey;								\
-	GBLREF gv_key	*gv_currkey;								\
-												\
-	keySIZE = KEYSIZE;									\
-	/* Have space to store at least MAX_MIDENT_LEN bytes as otherwise name-level $order	\
-	 * (see op_gvorder/op_zprevious) could have buffer overflow issues in gv_currkey->base.	\
-	 * Do ROUND_UP2(x,4) to keep an assert in GVKEY_INIT macro happy.			\
-	 */											\
-	if ((MAX_MIDENT_LEN + 3) > keySIZE)							\
-		keySIZE = ROUND_UP2(MAX_MIDENT_LEN + 3, 4);					\
-	assert(keySIZE);									\
-	if (keySIZE > gv_keysize)								\
-	{											\
-		gv_keysize = keySIZE;								\
-		GVKEY_INIT(gv_currkey, keySIZE);						\
-		GVKEY_INIT(gv_altkey, keySIZE);							\
-	} else											\
-		assert((NULL != gv_currkey) && (NULL != gv_altkey) && gv_keysize		\
-			&& (gv_keysize == gv_currkey->top) && (gv_keysize == gv_altkey->top));	\
+	ptr = (unsigned char *)PTR;								\
+	ptrtop  = ptr + LEN;									\
+	assert(ptr < ptrtop);									\
+	nSubs = 0;										\
+	for ( ; ptr < ptrtop; ptr++)								\
+		if (KEY_DELIMITER == *ptr)							\
+			nSubs++;								\
+	NSUBS = nSubs;										\
 }
 
 #define WAS_OPEN_TRUE		TRUE
@@ -364,30 +518,31 @@ void verify_queue(que_head_ptr_t qhdr);
 
 /* Below macro sets open, opening and was_open fields of a given region after the corresponding
  * database for that region is opened. Also, if the region was not already open, the macro
- * invokes GVKEYSIZE_INCREASE_IF_NEEDED to allocate gv_currkey/gv_altkey based on the region's
- * max_key_size.
+ * invokes GVKEYSIZE_INIT_IF_NEEDED to allocate gv_currkey/gv_altkey if not already done.
  */
-#define SET_REGION_OPEN_TRUE(REG, WAS_OPEN)							\
-{												\
-	DEBUG_ONLY(GBLREF int4	gv_keysize;)							\
-												\
-	assert(!REG->was_open);									\
-	assert(!REG->open);									\
-	REG->open = TRUE;									\
-	REG->opening = FALSE;									\
-	if (WAS_OPEN)										\
-	{											\
-		REG->was_open = TRUE;								\
-		assert(DBKEYSIZE(REG->max_key_size) <= gv_keysize);				\
-	}											\
-	else											\
-		GVKEYSIZE_INCREASE_IF_NEEDED(DBKEYSIZE(REG->max_key_size));			\
+#define SET_REGION_OPEN_TRUE(REG, WAS_OPEN)									\
+{														\
+	DEBUG_ONLY(GBLREF int4	gv_keysize;)									\
+														\
+	assert(!REG->was_open);											\
+	assert(!REG->open);											\
+	REG->open = TRUE;											\
+	REG->opening = FALSE;											\
+	if (WAS_OPEN)												\
+	{													\
+		REG->was_open = TRUE;										\
+		assert(DBKEYSIZE(REG->max_key_size) <= gv_keysize);						\
+	} else													\
+		GVKEYSIZE_INIT_IF_NEEDED; /* sets up "gv_keysize", "gv_currkey" and "gv_altkey" in sync */	\
 }
+
+#define	REG_ACC_METH(REG)	(REG->dyn.addr->acc_meth)
 
 #define	SET_CSA_DIR_TREE(csa, keysize, reg)							\
 {												\
 	if (NULL == csa->dir_tree)								\
 	{											\
+		assert((dba_bg == REG_ACC_METH(reg)) || (dba_mm == REG_ACC_METH(reg)));		\
 		csa->dir_tree = targ_alloc(keysize, NULL, reg);					\
 		GTMTRIG_ONLY(assert(NULL == csa->hasht_tree));					\
 	} else											\
@@ -405,26 +560,68 @@ void verify_queue(que_head_ptr_t qhdr);
 		if (NULL != hasht_tree)						\
 		{								\
 			assert(hasht_tree->gd_csa == csa);			\
-			hasht_tree->regcnt--;	/* targ_free relies on this */	\
-			targ_free(hasht_tree);					\
+			/* assert that TARG_FREE_IF_NEEDED will happen below */	\
+			assert(1 == hasht_tree->regcnt);			\
+			TARG_FREE_IF_NEEDED(hasht_tree);			\
 			lcl_csa->hasht_tree = NULL;				\
 		}								\
 	)									\
 	dir_tree = lcl_csa->dir_tree;						\
 	assert(NULL != dir_tree);						\
-	dir_tree->regcnt--;	/* targ_free relies on this */			\
-	targ_free(dir_tree);							\
+	/* assert that TARG_FREE_IF_NEEDED will happen below */			\
+	assert(1 == dir_tree->regcnt);						\
+	TARG_FREE_IF_NEEDED(dir_tree);						\
 	lcl_csa->dir_tree = NULL;						\
 }
 
-#define	PROCESS_GVT_PENDING_LIST(GREG, CSA, GVT_PENDING_LIST)						\
+#define	ADD_TO_GVT_PENDING_LIST_IF_REG_NOT_OPEN(REG, GVT_PTR, GVT_PTR2)					\
 {													\
-	if (NULL != GVT_PENDING_LIST)									\
+	gvt_container		*gvtc;									\
+	DEBUG_ONLY(gv_namehead	*gvt;)									\
+													\
+	GBLREF	buddy_list	*gvt_pending_buddy_list;						\
+	GBLREF	gvt_container	*gvt_pending_list;							\
+													\
+	/* For dba_cm or dba_user, dont add to pending list because those regions			\
+	 * will never be opened by the client process (this process).					\
+	 */												\
+	if (!REG->open && ((dba_bg == REG_ACC_METH(REG)) || (dba_mm == REG_ACC_METH(REG))))		\
+	{	/* Record list of all gv_targets that have been allocated BEFORE the			\
+		 * region has been opened. Once the region gets opened, we will re-examine		\
+		 * this list and reallocate them (if needed) since they have now been			\
+		 * allocated using the region's max_key_size value which could potentially		\
+		 * be different from the max_key_size value in the corresponding database		\
+		 * file header.										\
+		 */											\
+		assert(NULL != gvt_pending_buddy_list);	/* should have been allocated by caller */	\
+		DEBUG_ONLY(gvt = *GVT_PTR;)								\
+		assert(NULL == is_gvt_in_pending_list(gvt));	/* do not add duplicates */		\
+		gvtc = (gvt_container *)get_new_free_element(gvt_pending_buddy_list);			\
+		gvtc->gvt_ptr = GVT_PTR;								\
+		gvtc->gvt_ptr2 = GVT_PTR2;								\
+		gvtc->gd_reg = REG;									\
+		gvtc->next_gvtc = (struct gvt_container_struct *)gvt_pending_list;			\
+		gvt_pending_list = gvtc;								\
+	}												\
+}
+
+#define	PROCESS_GVT_PENDING_LIST(GREG, CSA)								\
+{													\
+	GBLREF	gvt_container	*gvt_pending_list;							\
+													\
+	if (NULL != gvt_pending_list)									\
 	{	/* Now that the region has been opened, check if there are any gv_targets that were	\
 		 * allocated for this region BEFORE the open. If so, re-allocate them if necessary.	\
 		 */											\
 		process_gvt_pending_list(GREG, CSA);							\
 	}												\
+}
+
+#define	TARG_FREE_IF_NEEDED(GVT)		\
+{						\
+	GVT->regcnt--;				\
+	if (!GVT->regcnt)			\
+		targ_free(GVT);			\
 }
 
 #define		T_COMMIT_CRIT_PHASE1	1	/* csa->t_commit_crit gets set to this in during bg_update_phase1 */
@@ -480,11 +677,11 @@ void verify_queue(que_head_ptr_t qhdr);
 	cache_start = &(CSA)->acc_meth.bg.cache_state->cache_array[0];			\
 	cache_start += CSD->bt_buckets;							\
 	bufstart = (sm_uc_ptr_t)GDS_ANY_REL2ABS((CSA), cache_start->buffaddr);		\
-	bufstart += (gtm_uint64_t)CSD->blk_size * CSD->n_bts;					\
+	bufstart += (gtm_uint64_t)CSD->blk_size * CSD->n_bts;				\
 	assert((PTR) >= bufstart);							\
 	bufindx = (PTR - bufstart) / CSD->blk_size;					\
 	assert(bufindx < CSD->n_bts);							\
-	assert((bufstart + (bufindx * (gtm_uint64_t)CSD->blk_size)) == (PTR));			\
+	assert((bufstart + (bufindx * (gtm_uint64_t)CSD->blk_size)) == (PTR));		\
 }
 
 #define	DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd)								\
@@ -529,7 +726,7 @@ void verify_queue(que_head_ptr_t qhdr);
 		cache_start = &csa->acc_meth.bg.cache_state->cache_array[0];					\
 		cache_start += csa->hdr->bt_buckets;								\
 		bufstart = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cache_start->buffaddr);				\
-		bufend = bufstart + ((gtm_uint64_t)csa->hdr->n_bts * csa->hdr->blk_size);					\
+		bufend = bufstart + ((gtm_uint64_t)csa->hdr->n_bts * csa->hdr->blk_size);			\
 		bufaddr = (sm_uc_ptr_t)(seg)->addr;								\
 		/* Check if given address is within database shared memory range */				\
 		if ((bufaddr >= bufstart) && (bufaddr < bufend))						\
@@ -605,7 +802,7 @@ void verify_queue(que_head_ptr_t qhdr);
 		cs_data = (sgmnt_data_ptr_t)0;							\
 	} else											\
 	{											\
-		switch (reg->dyn.addr->acc_meth)						\
+		switch (REG_ACC_METH(reg))							\
 		{										\
 			case dba_mm:								\
 			case dba_bg:								\
@@ -618,7 +815,7 @@ void verify_queue(que_head_ptr_t qhdr);
 				cs_data = (sgmnt_data_ptr_t)0;					\
 				break;								\
 			default:								\
-				GTMASSERT;							\
+				assertpro(FALSE);						\
 				break;								\
 		}										\
 	}											\
@@ -630,7 +827,7 @@ void verify_queue(que_head_ptr_t qhdr);
 	if (reg != gv_cur_region)								\
 	{											\
 		gv_cur_region = reg;								\
-		switch (reg->dyn.addr->acc_meth)						\
+		switch (REG_ACC_METH(reg))							\
 		{										\
 			case dba_mm:								\
 			case dba_bg:								\
@@ -644,7 +841,7 @@ void verify_queue(que_head_ptr_t qhdr);
 				cs_data = (sgmnt_data_ptr_t)0;					\
 				break;								\
 			default:								\
-				GTMASSERT;							\
+				assertpro(FALSE);						\
 				break;								\
 		}										\
 	}											\
@@ -688,12 +885,9 @@ void verify_queue(que_head_ptr_t qhdr);
 														\
 	curr_cm_reg_head = (reghead);										\
 	gv_cur_region = curr_cm_reg_head->reg;									\
-	if ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth))	\
-	{													\
-		cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;							\
-		cs_data = cs_addrs->hdr;									\
-	} else													\
-		GTMASSERT;											\
+	assert((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)));		\
+	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;								\
+	cs_data = cs_addrs->hdr;										\
 }
 
 /* Macro to be used whenever cr->data_invalid needs to be set */
@@ -769,7 +963,7 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 		pin_fail_ref_cnt		= cs_addrs->nl->ref_cnt;				\
 		pin_fail_in_wtstart		= cs_addrs->nl->in_wtstart;				\
 		pin_fail_phase2_commit_pidcnt	= cs_addrs->nl->wcs_phase2_commit_pidcnt;		\
-		GTMASSERT;										\
+		assertpro(0 == in_cw_set);								\
 	}												\
 	/* In VMS we should never set in_cw_set on an OLDER twin. */					\
 	VMS_ONLY(assert(!cr->twin || cr->bt_index));							\
@@ -956,7 +1150,10 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 				jnlpool_detach();										\
 				assert(NULL == jnlpool.jnlpool_ctl);								\
 				assert(FALSE == pool_init);									\
-				rts_error_csa(CSA_ARG(CSA) VARLSTCNT(10) ERR_REPLINSTMISMTCH, 8,				\
+				if (INVALID_SHMID == CNL->jnlpool_shmid)							\
+					rts_error_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_REPLINSTNOSHM, 2, DB_LEN_STR(REG));		\
+				else												\
+					rts_error_csa(CSA_ARG(CSA) VARLSTCNT(10) ERR_REPLINSTMISMTCH, 8,			\
 						LEN_AND_STR(instfilename_copy), jnlpool_shmid, DB_LEN_STR(REG),			\
 						LEN_AND_STR(CNL->replinstfilename), CNL->jnlpool_shmid);			\
 			}													\
@@ -1345,6 +1542,7 @@ enum tp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] */
 #define	DONOTCOMMIT_T_QREAD_BAD_PVT_BUILD		(1 << 5) /* Restartable situation due to bad private build in t_qread */
 #define	DONOTCOMMIT_GVCST_SEARCH_LEAF_BUFFADR_NOTSYNC	(1 << 6) /* Restartable situation encountered in gvcst_search */
 #define	DONOTCOMMIT_GVCST_SEARCH_BLKTARGET_MISMATCH	(1 << 7) /* Restartable situation encountered in gvcst_search */
+#define DONOTCOMMIT_REALLOCATE_BITMAP_BMLMOD		(1 << 8) /* Restartable situation encountered in reallocate_bitmap */
 
 #define TAB_BG_TRC_REC(A,B)	B,
 enum bg_trc_rec_type
@@ -1804,17 +2002,21 @@ typedef struct	gd_addr_struct
 {
 	struct gd_region_struct		*local_locks;
 	int4				max_rec_size;
-	short				n_maps;
-	short				n_regions;
-	short				n_segments;
-	short				filler;
+	uint4				n_maps;
+	uint4				n_regions;
+	uint4				n_segments;
+	uint4				n_gblnames;	/* could be 0 if no global has any collation characteristics defined */
+	uint4				var_maps_len;	/* length (in bytes) of variable MAPS sections in .gld file */
 	struct gd_binding_struct	*maps;
 	struct gd_region_struct		*regions;
 	struct gd_segment_struct	*segments;
+	struct gd_gblname_struct	*gblnames;
 	struct gd_addr_struct		*link;
 	struct hash_table_mname_struct  *tab_ptr;
 	gd_id				*id;
 	UINTPTR_T			end;
+	uint4				has_span_gbls;	/* has at least one global which spans multiple regions */
+	char				filler[12];	/* filler to store runtime structures without changing gdeget/gdeput.m */
 } gd_addr;
 typedef gd_addr *(*gd_addr_fn_ptr)();
 
@@ -1836,10 +2038,12 @@ typedef struct	gd_segment_struct
 	uint4			lock_space;
 	uint4			global_buffers;	/* Was passed in FAB */
 	uint4			reserved_bytes;	/* number of bytes to be left in every database block */
+	uint4			mutex_slots;	/* copied over to NUM_CRIT_ENTRY(CSD) */
 	enum db_acc_method	acc_meth;
 	file_control		*file_cntl;
 	struct gd_region_struct	*repl_list;
-	UNIX_ONLY(boolean_t		is_encrypted;)
+	UNIX_ONLY(boolean_t	is_encrypted;)
+	char			filler[16];	/* filler to store runtime structures without changing gdeget/gdeput.m */
 } gd_segment;
 
 typedef union
@@ -1899,6 +2103,8 @@ typedef struct	gd_region_struct
 
 	int4			node;
 	int4			sec_size;
+	uint4			is_spanned;	/* this is one of the regions that some spanning global maps to */
+	char			filler[12];	/* filler to store runtime structures without changing gdeget/gdeput.m */
 } gd_region;
 
 typedef struct	sgmnt_addrs_struct
@@ -1934,10 +2140,11 @@ typedef struct	sgmnt_addrs_struct
 	gd_region				*region;		/* the region corresponding to this csa */
 	struct hash_table_mname_struct		*gvt_hashtab;		/* NON-NULL only if regcnt > 1;
 								 	 * Maintains all gv_targets mapped to this db file */
-	struct reg_ctl_list_struct	*rctl;	/* pointer to rctl for this region (used only if jgbl.forw_phase_recovery) */
+	void					*miscptr;	/* pointer to rctl for this region (if jgbl.forw_phase_recovery
+								 * or pointer to gvt_hashtab for this region if DSE_IMAGE.
+								 * NULL in all other cases. */
 	struct sgmnt_addrs_struct	*next_csa; /* points to csa of NEXT database that has been opened by this process */
 #	ifdef GTM_CRYPT
-	char					*encrypted_blk_contents;
 	gtmcrypt_key_t				encr_key_handle;
 #	endif
 #	ifdef GTM_SNAPSHOT
@@ -2034,15 +2241,158 @@ typedef struct	sgmnt_addrs_struct
 #	endif
 } sgmnt_addrs;
 
-typedef struct	gd_binding_struct
+typedef struct gd_binding_struct
 {
-	unsigned char	name[MAX_NM_LEN + 1];
+	union
+	{
+		char		*addr;
+		uint4		offset;
+	} gvkey;			/* Any input key GREATER THAN OR EQUAL TO "gvkey" lies OUTSIDE this map */
 	union
 	{
 		gd_region	*addr;
-		int4		offset;
+		uint4		offset;
 	} reg;
+	uint4		gvname_len;	/* the unsubscripted global name length */
+	uint4		gvkey_len;	/* the subscripted global name length excluding the second terminating null byte.
+					 *	Is equal to "gvname_len" + 1 if there are no subscripts.
+					 */
 } gd_binding;
+
+typedef struct gd_gblname_struct
+{
+        unsigned char   gblname[MAX_NM_LEN + 1];
+        uint4           act;    /* alternative collation sequence # */
+        uint4           ver;	/* version of collation library used at gld creation time */
+} gd_gblname;
+
+/* Define constants for a dummy gld file. This is used by dtgbldir.c and create_dummy_gbldir.c */
+#define	IMPOS_GBLNAME_7			"\xFF\xFF\xFF\xFF\xFF\xFF\xFF"	/* 7-bytes of 0xFF */
+#define	IMPOS_GBLNAME_8			IMPOS_GBLNAME_7 "\xFF"		/* 8-bytes of 0xFF */
+#define	IMPOSSIBLE_GBLNAME_31		IMPOS_GBLNAME_8 IMPOS_GBLNAME_8 IMPOS_GBLNAME_8 IMPOS_GBLNAME_7
+#define	DUMMY_GBLDIR_N_MAPS		3		/* one for local locks "#)", one for "%" and one for 0xFFFFFF... */
+#define DUMMY_GBLDIR_FIRST_MAP		"#)"		/* local locks */
+#define DUMMY_GBLDIR_SECOND_MAP		"%"		/* start of valid global name */
+#define DUMMY_GBLDIR_THIRD_MAP		IMPOSSIBLE_GBLNAME_31 /* last map always corresponds to impossible global name */
+#define	DUMMY_GBLDIR_MAP_GVN_SIZE(KEY)	(SIZEOF(KEY)-1)	/* SIZEOF already counts the null byte in the literal so remove it */
+#define	DUMMY_GBLDIR_MAP_KEY_SIZE(KEY)	(SIZEOF(KEY)+1)	/* +1 for second null byte (SIZEOF already counts the 1st null byte) */
+#define	DUMMY_GBLDIR_VAR_MAP_SIZE	ROUND_UP2(DUMMY_GBLDIR_MAP_KEY_SIZE(DUMMY_GBLDIR_FIRST_MAP)		\
+							+ DUMMY_GBLDIR_MAP_KEY_SIZE(DUMMY_GBLDIR_SECOND_MAP)	\
+							+ DUMMY_GBLDIR_MAP_KEY_SIZE(DUMMY_GBLDIR_THIRD_MAP), 8)
+#define	DUMMY_GBLDIR_FIX_MAP_SIZE	(DUMMY_GBLDIR_N_MAPS * SIZEOF(gd_binding))
+#define	DUMMY_GBLDIR_TOT_MAP_SIZE	(DUMMY_GBLDIR_FIX_MAP_SIZE + DUMMY_GBLDIR_VAR_MAP_SIZE)
+#define	DUMMY_GBLDIR_SIZE		(SIZEOF(header_struct) + SIZEOF(gd_addr)			\
+						+ DUMMY_GBLDIR_TOT_MAP_SIZE				\
+						+ 1 * SIZEOF(gd_region) + 1 * SIZEOF(gd_segment))
+
+#define	RELATIVE_OFFSET_FALSE		FALSE
+#define	RELATIVE_OFFSET_TRUE		TRUE
+
+#define	DUMMY_GLD_MAP_INIT(ADDR, RELATIVE, REG)							\
+{												\
+	char		*mapkey_ptr;								\
+	uint4		reg_offset;								\
+												\
+	if (RELATIVE)										\
+		ADDR->maps = (gd_binding *)(SIZEOF(gd_addr));					\
+	else											\
+		ADDR->maps = (gd_binding *)((UINTPTR_T)ADDR + SIZEOF(gd_addr));			\
+	ADDR->var_maps_len = DUMMY_GBLDIR_VAR_MAP_SIZE;						\
+	ADDR->n_maps = DUMMY_GBLDIR_N_MAPS;							\
+	ADDR->n_regions = 1;									\
+	ADDR->n_segments = 1;									\
+	ADDR->n_gblnames = 0;									\
+	ADDR->link = 0;										\
+	ADDR->tab_ptr = 0;									\
+	ADDR->id = 0;										\
+	ADDR->local_locks = 0;									\
+	mapkey_ptr = (char *)((UINTPTR_T)ADDR + SIZEOF(gd_addr) + DUMMY_GBLDIR_FIX_MAP_SIZE);	\
+	reg_offset = (INTPTR_T)(SIZEOF(gd_addr)) + DUMMY_GBLDIR_TOT_MAP_SIZE;			\
+	/* Start MAPS section initialization */							\
+	map = (gd_binding *)((UINTPTR_T)ADDR + SIZEOF(gd_addr));				\
+	/* This is the map for local locks which stores the name "#)" */			\
+	map->gvkey.addr = mapkey_ptr;								\
+	MEMCPY_LIT(mapkey_ptr, DUMMY_GBLDIR_FIRST_MAP);						\
+	if (NULL == REG)									\
+		map->reg.offset = reg_offset;							\
+	else											\
+		map->reg.addr = REG;								\
+	map->gvname_len = DUMMY_GBLDIR_MAP_GVN_SIZE(DUMMY_GBLDIR_FIRST_MAP);			\
+	map->gvkey_len =  DUMMY_GBLDIR_MAP_KEY_SIZE(DUMMY_GBLDIR_FIRST_MAP) - 1;		\
+	mapkey_ptr += map->gvkey_len;								\
+	map++;											\
+	/* This is the map for "%" */								\
+	map->gvkey.addr = mapkey_ptr;								\
+	MEMCPY_LIT(mapkey_ptr, DUMMY_GBLDIR_SECOND_MAP);					\
+	if (NULL == REG)									\
+		map->reg.offset = reg_offset;							\
+	else											\
+		map->reg.addr = REG;								\
+	map->gvname_len = DUMMY_GBLDIR_MAP_GVN_SIZE(DUMMY_GBLDIR_SECOND_MAP);			\
+	map->gvkey_len =  DUMMY_GBLDIR_MAP_KEY_SIZE(DUMMY_GBLDIR_SECOND_MAP) - 1;		\
+	mapkey_ptr += map->gvkey_len;								\
+	map++;											\
+	/* This is the map for the 31-byte '0xFF' byte global name (impossible) */		\
+	map->gvkey.addr = mapkey_ptr;								\
+	MEMCPY_LIT(mapkey_ptr, DUMMY_GBLDIR_THIRD_MAP);						\
+	if (NULL == REG)									\
+		map->reg.offset = reg_offset;							\
+	else											\
+		map->reg.addr = REG;								\
+	map->gvname_len = DUMMY_GBLDIR_MAP_GVN_SIZE(DUMMY_GBLDIR_THIRD_MAP);			\
+	map->gvkey_len =  DUMMY_GBLDIR_MAP_KEY_SIZE(DUMMY_GBLDIR_THIRD_MAP) - 1;		\
+	mapkey_ptr += map->gvkey_len;								\
+	/* MAPS sections (Fixed and Variable) initialization complete */			\
+}
+
+#define	DUMMY_GLD_INIT(header, addr, region, segment, size, relative)				\
+{												\
+	gd_binding	*map, *map_top;								\
+	gd_region	*region_top;								\
+	uint4		t_offset;								\
+												\
+	size = DUMMY_GBLDIR_SIZE;								\
+	header = (header_struct *)malloc(ROUND_UP(size, DISK_BLOCK_SIZE));			\
+	memset(header, 0, ROUND_UP(size, DISK_BLOCK_SIZE));					\
+	header->filesize = size;								\
+	size = ROUND_UP(size, DISK_BLOCK_SIZE);							\
+	MEMCPY_LIT(header->label, GDE_LABEL_LITERAL);						\
+	addr = (gd_addr *)((char *)header + SIZEOF(header_struct));				\
+	addr->max_rec_size = 256;								\
+	DUMMY_GLD_MAP_INIT(addr, relative, NULL);						\
+	addr->regions = (gd_region *)((INTPTR_T)(addr->maps) + DUMMY_GBLDIR_TOT_MAP_SIZE);	\
+	addr->segments = (gd_segment *)((INTPTR_T)(addr->regions) + SIZEOF(gd_region));		\
+	addr->end = (UINTPTR_T)(addr->segments) + SIZEOF(gd_segment);				\
+	region = (gd_region *)(addr->regions);							\
+	segment = (gd_segment *)(addr->segments);						\
+	region->rname_len = STR_LIT_LEN("DEFAULT");						\
+	MEMCPY_LIT(region->rname,"DEFAULT");							\
+	if (!relative)										\
+	{											\
+		for (map = addr->maps, map_top = map + addr->n_maps; map < map_top ; map++)	\
+		{										\
+			t_offset = map->reg.offset;						\
+			map->reg.addr = (gd_region *)((char *)addr + t_offset);			\
+		}										\
+		for (region = addr->regions, region_top = region + addr->n_regions;		\
+			region < region_top ; region++)						\
+		{										\
+			t_offset = region->dyn.offset;						\
+			region->dyn.addr = (gd_segment *)((char *)addr + t_offset);		\
+		}										\
+	} else											\
+	{											\
+		region = (gd_region *)((char *)addr + (INTPTR_T)(addr->regions));		\
+		for (region_top = region + addr->n_regions; region < region_top ; region++)	\
+		{										\
+			t_offset = region->dyn.offset;						\
+			region->dyn.addr = (gd_segment *)(INTPTR_T)t_offset;			\
+		}										\
+		region = region_top - addr->n_regions;	/* Restore "region" to point to		\
+							 * start of region array. */		\
+		segment = (gd_segment*)((char *)addr + (INTPTR_T)(addr->segments));		\
+	}											\
+}
 
 typedef struct
 {
@@ -2131,6 +2481,12 @@ typedef struct	gv_key_struct
 	unsigned char	base[1];	/* Base of the key */
 } gv_key;
 
+/* Define macro that will return the size of an array of "gv_key" structures. This is used to allocate temporary key structures
+ * to save/restore gv_currkey (for example). Defining the array as a "gv_key" array instead of a "char" array ensures we
+ * get the alignment we want (e.g. gv_key->end can be dereferenced without concerns for alignment issues).
+ */
+#define	DBKEYALLOC(KSIZE)	(1 + DIVIDE_ROUND_UP(DBKEYSIZE(KSIZE), SIZEOF(gv_key)))	/* 1 is for "gv_key" structure at start */
+
 /* The direction that the newly added record went after a block split at a given level */
 enum split_dir
 {
@@ -2159,19 +2515,25 @@ typedef struct	gv_namehead_struct
 	boolean_t	noisolation;     		/* whether isolation is turned on or off for this global */
 	block_id	root;				/* Root of global variable tree */
 	mname_entry	gvname;				/* the name of the global */
-	NON_GTM64_ONLY(uint4	filler_8byte_align0;)	/* for 8-byte alignment of "hist" member */
+	NON_GTM64_ONLY(uint4	filler_8byte_align1;)	/* for 8-byte alignment of "hist" member */
 	srch_hist	hist;				/* block history array */
 	int4		regcnt;				/* number of global directories whose hash-tables point to this gv_target.
 							 * 1 by default. > 1 if the same name in TWO DIFFERENT global directories
 							 * maps to the same physical file (i.e. two regions in different global
 							 * directories have the same physical file).
 							 */
-	unsigned char	nct;				/* numerical collation type for internalization */
-	unsigned char	act;				/* alternative collation type for internalization */
-	unsigned char	ver;
-	bool		split_cleanup_needed;
+	uint4		nct;				/* numerical collation type for internalization */
+	uint4		act;				/* alternative collation type for internalization */
+	uint4		ver;
+	boolean_t	act_specified_in_gld;		/* this gvt's global name had its "act" specified in the .gld in its
+							 * -GBLNAME section.
+							 */
+	boolean_t	nct_must_be_zero;		/* this gvt is part of a multi-region spanning global and hence
+							 * its "nct" cannot be anything but zero.
+							 */
+	boolean_t	split_cleanup_needed;
 	char		last_split_direction[MAX_BT_DEPTH - 1];	/* maintain last split direction for each level in the GVT */
-	char		filler_8byte_align1[2];
+	char		filler_8byte_align2[6];
 	block_id	last_split_blk_num[MAX_BT_DEPTH - 1];
 #	ifdef GTM_TRIGGER
 	struct gvt_trigger_struct *gvt_trigger;		/* pointer to trigger info for this global
@@ -2182,30 +2544,146 @@ typedef struct	gv_namehead_struct
 							 * last read/initialized from ^#t global (in gvtr_init) */
 	boolean_t	trig_mismatch_test_done;	/* whether update process has checked once if there is a mismatch
 							 * in trigger definitions between originating and replicating instance */
-	GTM64_ONLY(uint4 filler_8byte_align2;)		/* for 8-byte alignment of "clue" member. (targ_alloc relies on this) */
+	GTM64_ONLY(uint4 filler_8byte_align3;)		/* for 8-byte alignment of "clue" member. (targ_alloc relies on this) */
 #	endif
 	gv_key		clue;				/* Clue key, must be last in namehead struct because of hung buffer. */
 } gv_namehead;
 
+/* Below structure is allocated for every global name that spans across multiple regions in each global directory. */
+typedef struct gvnh_spanreg_struct
+{
+	int		start_map_index;	/* index into the global directory "maps" array corresponding to the
+						 *	FIRST map entry with "gvkey" member containing subscripted
+						 *	keys of the parent (unsubscripted) global name.
+						 */
+	int		end_map_index;		/* index into the global directory "maps" array corresponding to the
+						 *	LAST map entry with "gvkey" member containing subscripted
+						 *	keys of the parent (unsubscripted) global name.
+						 *	"start_map_index" and "end_map_index" serve as two bounds of
+						 *	the array within which a binary search is done to find which
+						 *	map entry contains a given input key.
+						 */
+	int		min_reg_index;		/* index into the global directory "regions" array such that ALL
+						 *	regions that the parent global name spans across lie AFTER
+						 *	this index in the "regions" array.
+						 */
+	int		max_reg_index;		/* index into the global directory "regions" array such that ALL
+						 *	regions that the parent global name spans across lie BEFORE
+						 *	this index in the "regions" array.
+						 *	"max_reg_index" - "min_reg_index" effectively determines the
+						 *	size of the array allocated to store the corresponding
+						 *	gv_targets for each unique region the parent global name spans.
+						 */
+	gv_namehead	*gvt_array[1];		/* array of gv_targets corresponding to each region the global name spans.
+						 *	Although the array is defined to be size 1, the actual size allocated
+						 *	depends on "max_reg_index"-"min_reg_index" and having this defined as
+						 *	an array lets us access the entire allocated size with an array index.
+						 *	Set to INVALID_GV_TARGET for array indices that correspond to regions
+						 *	which the parent global does NOT span across.
+						 */
+} gvnh_spanreg_t;
+
+/* Below structure is allocated for every global name in each global directory
+ * (irrespective of whether it spans across multiple regions or not).
+ */
 typedef struct	gvnh_reg_struct
 {
-	gv_namehead	*gvt;
-	gd_region	*gd_reg;			/* Region of key */
+	gv_namehead	*gvt;			/* Pointer to gv_target for the unsubscripted global name */
+	gd_region	*gd_reg;		/* Region corresponding to the global directory map entry where
+						 *	the unsubscripted global name was found.
+						 */
+	gvnh_spanreg_t	*gvspan;		/* Pointer to a structure containing details of what regions are spanned
+						 *	by this global name. Set to NULL for globals that dont span regions.
+						 */
+	uint4		act;			/* Copy of alternative collation SEQUENCE defined in GBLNAMES section of gbldir */
+	uint4		ver;			/* Copy of collation library VERSION defined in GBLNAMES section of gbldir */
 } gvnh_reg_t;
 
+#define	GVNH_REG_INIT(ADDR, HASHTAB, GD_MAP, GVT, REG, GVNH_REG, TABENT)					\
+{														\
+	boolean_t	added, gbl_spans_regions;								\
+	char		*gvent_name;										\
+	gd_binding	*spanmap;										\
+	int		res, gvent_len;										\
+														\
+	GBLREF	jnl_gbls_t	jgbl;										\
+														\
+	GVNH_REG = (gvnh_reg_t *)malloc(SIZEOF(gvnh_reg_t));							\
+	GVNH_REG->gvt = GVT;											\
+	GVNH_REG->gd_reg = REG;											\
+	/* If GD_MAP is NULL, it implies callers like MUPIP JOURNAL -RECOVER or GT.CM GNP server		\
+	 * which dont have a .gld context to map input global names to regions, but instead know		\
+	 * which regions to play input updates. If GD_MAP is non-NULL, it implies the caller has		\
+	 * a .gld with map entries and wants to do more initialization inside this macro if the			\
+	 * input global spans multiple regions. Note that it is possible that even though GD_MAP is NULL,	\
+	 * ADDR could be non-NULL. This is necessary in case we need the gld file for GBLNAME section like	\
+	 * for MUPIP JOURNAL -RECOVER even though it operates on a per-region basis only. The GBLNAME section	\
+	 * is necessary to set correct collation properties in the directory tree if journal recover creates	\
+	 * the directory tree.											\
+	 */													\
+	assert((NULL != ADDR) || (NULL == GD_MAP));								\
+	if (NULL != GD_MAP)											\
+	{	/* check if global spans multiple regions and if so initialize "gvnh_reg->gvspan" */		\
+		gvnh_spanreg_init(GVNH_REG, ADDR, GD_MAP);							\
+		gbl_spans_regions = (NULL != GVNH_REG->gvspan);							\
+	} else													\
+	{	/* GT.CM GNP or MUPIP JOURNAL -RECOVER/ROLLBACK */						\
+		GVNH_REG->gvspan = NULL;									\
+		/* If GT.CM GNP, value of ADDR will be NULL so no need to search the global directory.		\
+		 * Otherwise (i.e. if MUPIP JOURNAL RECOVER/ROLLBACK), find from the gld whether the global	\
+		 * name spans regions. This is necessary to do unconditional collation initialization (as if	\
+		 * the gld specified it) for globals that span multiple regions inside the			\
+		 * COPY_ACT_FROM_GLD_TO_GVNH_REG_AND_GVT macro.	An exception is ^#t (actually all globals that	\
+		 * begin with ^# but ^#t is the only one currently). This does not map to a single region in	\
+		 * the gld map and so gv_srch_map should never be invoked for such globals. This global can	\
+		 * never span regions so treat it accordingly.							\
+		 */												\
+		if ((NULL == ADDR) || IS_MNAME_HASHT_GBLNAME(GVT->gvname.var_name))				\
+			gbl_spans_regions = FALSE;								\
+		else												\
+		{												\
+			assert(jgbl.forw_phase_recovery);							\
+			gvent_name = GVT->gvname.var_name.addr;							\
+			gvent_len = GVT->gvname.var_name.len;							\
+			spanmap = gv_srch_map(ADDR, gvent_name, gvent_len);					\
+			res = memcmp(gvent_name, &(spanmap->gvkey.addr[0]), gvent_len);				\
+			assert((0 != res) || (gvent_len <= spanmap->gvname_len));				\
+			gbl_spans_regions = !((0 > res) || ((0 == res) && (gvent_len < spanmap->gvname_len)));	\
+		}												\
+	}													\
+	COPY_ACT_FROM_GLD_TO_GVNH_REG_AND_GVT(ADDR, GVT, gbl_spans_regions, GVNH_REG, REG);			\
+	/* Add to hash table after all potential error conditions have been checked. If it was the other way	\
+	 * around, we could end up in a situation where an error is issued but pointers are set up incorrectly	\
+	 * so a future global reference will no longer error out and will accept out-of-design updates.		\
+	 * The only drawback of this approach is it might have a memory leak since allocated structures will	\
+	 * no longer have a pointer but that is considered acceptable since these errors are very unlikely	\
+	 * and the alternative (to set up condition handlers etc.) is not considered worth the effort now.	\
+	 */													\
+	added = add_hashtab_mname((hash_table_mname *)HASHTAB, &GVT->gvname, GVNH_REG, &TABENT);		\
+	assert(added);												\
+}
+
 #define INVALID_GV_TARGET (gv_namehead *)-1L
+/* Below macro is used to get the "gvnh_reg->gvspan->gvt_array[]" contents taking into account some
+ * might be set to INVALID_GV_TARGET (done only in DEBUG mode). In that case, we actually want to return NULL
+ * as there is NO gvt defined in that slot.
+ */
+#ifdef DEBUG
+#define	GET_REAL_GVT(gvt)	((INVALID_GV_TARGET == gvt) ? NULL : gvt)
+#else
+#define	GET_REAL_GVT(gvt)	gvt
+#endif
 
 typedef struct gvsavtarg_struct
 {
-	gd_addr			*gd_targ_addr;
-	gd_binding		*gd_map;
 	gd_region		*gv_cur_region;
 	gv_namehead		*gv_target;
-	bool			gv_last_subsc_null;
-	bool			gv_some_subsc_null;
-	short			prev;
-	short			end;
-	short			filler_8byte_align;
+	gvnh_reg_t		*gd_targ_gvnh_reg;
+	gd_binding		*gd_targ_map;
+	boolean_t		gv_last_subsc_null;
+	boolean_t		gv_some_subsc_null;
+	uint4			prev;
+	uint4			end;
 } gvsavtarg_t;
 
 #define	GVSAVTARG_ALIGN_BNDRY	8
@@ -2345,9 +2823,9 @@ GBLREF	gv_namehead	*gvt_tp_list;
 	 * The only exception is if the region was dba_cm but later closed due to an error on		\
 	 * the server side (in which case access method gets reset back to BG. (e.g. gvcmz_error.c)	\
 	 */												\
-	assert((NULL != gvtarg) || (dba_cm == gv_cur_region->dyn.addr->acc_meth)			\
-		|| (dba_usr == gv_cur_region->dyn.addr->acc_meth)					\
-		|| ((FALSE == gv_cur_region->open) && (dba_bg == gv_cur_region->dyn.addr->acc_meth)));	\
+	assert((NULL != gvtarg) || (dba_cm == REG_ACC_METH(gv_cur_region))				\
+		|| (dba_usr == REG_ACC_METH(gv_cur_region))						\
+		|| ((FALSE == gv_cur_region->open) && (dba_bg == REG_ACC_METH(gv_cur_region))));	\
 }
 
 /* If CHECK_CSADDRS input parameter is CHECK_CSA_TRUE, then check that GV_CURRKEY, GV_TARGET and CS_ADDRS are all in sync.
@@ -2464,19 +2942,23 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 	}								\
 }
 
-#define	ISSUE_GVSUBOFLOW_ERROR(GVKEY)								\
-{												\
-	unsigned char *endBuff, fmtBuff[MAX_ZWR_KEY_SZ];					\
-												\
-	/* Assert that input key to format_targ_key is double null terminated */		\
-	assert(KEY_DELIMITER == GVKEY->base[GVKEY->end]);					\
-	endBuff = format_targ_key(fmtBuff, ARRAYSIZE(fmtBuff), GVKEY, TRUE);			\
-	GV_SET_LAST_SUBSCRIPT_INCOMPLETE(fmtBuff, endBuff); /* Note: might update "endBuff" */	\
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2,		\
-			endBuff - fmtBuff, fmtBuff);						\
+#define	KEY_COMPLETE_FALSE	FALSE
+#define	KEY_COMPLETE_TRUE	TRUE
+
+#define	ISSUE_GVSUBOFLOW_ERROR(GVKEY, IS_KEY_COMPLETE)							\
+{													\
+	unsigned char *endBuff, fmtBuff[MAX_ZWR_KEY_SZ];						\
+													\
+	/* Assert that input key to format_targ_key is double null terminated */			\
+	assert(KEY_DELIMITER == GVKEY->base[GVKEY->end]);						\
+	endBuff = format_targ_key(fmtBuff, ARRAYSIZE(fmtBuff), GVKEY, TRUE);				\
+	if (!IS_KEY_COMPLETE)										\
+		GV_SET_LAST_SUBSCRIPT_INCOMPLETE(fmtBuff, endBuff); /* Note: might update "endBuff" */	\
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2,			\
+			endBuff - fmtBuff, fmtBuff);							\
 }
 
-#define COPY_SUBS_TO_GVCURRKEY(mvarg, max_key, gv_currkey, was_null, is_null)					\
+#define COPY_SUBS_TO_GVCURRKEY(mvarg, reg, gv_currkey, was_null, is_null)					\
 {														\
 	GBLREF mv_stent		*mv_chain;									\
 	GBLREF unsigned char	*msp, *stackwarn, *stacktop;							\
@@ -2492,21 +2974,21 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 		if (gv_target->collseq || gv_target->nct)							\
 		{												\
 			/* collation transformation should be done at the server's end for CM regions */	\
-			assert(dba_cm != gv_cur_region->dyn.addr->acc_meth);					\
+			assert(dba_cm != REG_ACC_METH(reg));							\
 			TREF(transform) = FALSE;								\
 			end = gvsub2str((uchar_ptr_t)mvarg->str.addr, buff, FALSE);				\
 			TREF(transform) = TRUE;									\
 			temp.mvtype = MV_STR;									\
 			temp.str.addr = (char *)buff;								\
 			temp.str.len = (mstr_len_t)(end - buff);						\
-			mval2subsc(&temp, gv_currkey);								\
+			mval2subsc(&temp, gv_currkey, reg->std_null_coll);					\
 		} else												\
 		{												\
 			len = mvarg->str.len;									\
-			if (gv_currkey->end + len - 1 >= max_key)						\
-				ISSUE_GVSUBOFLOW_ERROR(gv_currkey);						\
+			if (gv_currkey->end + len - 1 >= gv_currkey->top)					\
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_FALSE);				\
 			memcpy((gv_currkey->base + gv_currkey->end), mvarg->str.addr, len);			\
-			if (is_null && 0 != gv_cur_region->std_null_coll)					\
+			if (is_null && 0 != reg->std_null_coll)							\
 				gv_currkey->base[gv_currkey->end] = SUBSCRIPT_STDCOL_NULL;			\
 			gv_currkey->prev = gv_currkey->end;							\
 			gv_currkey->end += len - 1;								\
@@ -2514,9 +2996,7 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 	} else													\
 	{													\
 		MV_FORCE_DEFINED(mvarg);									\
-		mval2subsc(mvarg, gv_currkey);									\
-		if (gv_currkey->end >= max_key)									\
-			ISSUE_GVSUBOFLOW_ERROR(gv_currkey);							\
+		mval2subsc(mvarg, gv_currkey, reg->std_null_coll);						\
 		is_null = (MV_IS_STRING(mvarg) && (0 == mvarg->str.len));					\
 	}													\
 }
@@ -2524,27 +3004,43 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 /* Copy GVKEY to GVT->CLUE. Take care NOT to copy cluekey->top to GVKEY->top as they correspond
  * to the allocation sizes of two different memory locations and should stay untouched.
  */
-#define	COPY_CURRKEY_TO_GVTARGET_CLUE(GVT, GVKEY)				\
-{										\
-	gv_key	*cluekey;							\
-										\
-	if (GVT->clue.top <= GVKEY->end)					\
-		GTMASSERT;							\
-	assert(KEY_DELIMITER == GVKEY->base[GVKEY->end]);			\
-	assert(KEY_DELIMITER == GVKEY->base[GVKEY->end - 1]);			\
-	cluekey = &GVT->clue;							\
-	memcpy(cluekey->base, GVKEY->base, GVKEY->end + 1);			\
-	cluekey->end = GVKEY->end;						\
-	cluekey->prev = GVKEY->prev;						\
-	DBG_CHECK_GVTARGET_INTEGRITY(GVT);					\
+#define	COPY_CURRKEY_TO_GVTARGET_CLUE(GVT, GVKEY)					\
+{											\
+	int	keyend;									\
+	DCL_THREADGBL_ACCESS;								\
+											\
+	SETUP_THREADGBL_ACCESS;								\
+	keyend = GVKEY->end;								\
+	if (GVT->clue.top <= keyend)							\
+	{	/* Possible only if GVT corresponds to a global that spans multiple	\
+		 * regions. For example, a gvcst_spr_* function could construct a	\
+		 * gv_currkey starting at one spanned region and might have to do a	\
+		 * gvcst_* operation on another spanned region with a max-key-size	\
+		 * that is smaller than gv_currkey->end. In that case, copy only the	\
+		 * portion of gv_currkey that will fit in the gvt of the target region.	\
+		 */									\
+		assert(TREF(spangbl_seen));						\
+		keyend = GVT->clue.top - 1;						\
+		memcpy(GVT->clue.base, GVKEY->base, keyend - 1);			\
+		GVT->clue.base[keyend - 1] = KEY_DELIMITER;				\
+		GVT->clue.base[keyend] = KEY_DELIMITER;					\
+	} else										\
+	{										\
+		assert(KEY_DELIMITER == GVKEY->base[keyend]);				\
+		assert(KEY_DELIMITER == GVKEY->base[keyend - 1]);			\
+		memcpy(GVT->clue.base, GVKEY->base, keyend + 1);			\
+	}										\
+	GVT->clue.end = keyend;								\
+	/* No need to maintain unused GVT->clue.prev */					\
+	DBG_CHECK_GVTARGET_INTEGRITY(GVT);						\
 }
 
 /* If SRC_KEY->end == 0, make sure to copy the first byte of SRC_KEY->base */
-#define MEMCPY_KEY(TARG_KEY, SRC_KEY)												\
-{																\
-	memcpy((TARG_KEY), (SRC_KEY), OFFSETOF(gv_key, base[0]) + (SRC_KEY)->end + 1);						\
+#define MEMCPY_KEY(TARG_KEY, SRC_KEY)								\
+{												\
+	memcpy((TARG_KEY), (SRC_KEY), OFFSETOF(gv_key, base[0]) + (SRC_KEY)->end + 1);		\
 }
-#define COPY_KEY(TARG_KEY, SRC_KEY)										\
+#define COPY_KEY(TARG_KEY, SRC_KEY)												\
 {																\
 	assert(TARG_KEY->top >= SRC_KEY->end);											\
 	/* ensure proper alignment before dereferencing SRC_KEY->end */								\
@@ -2614,35 +3110,32 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 /* Macro used by $ZPREVIOUS to replace a NULL subscript at the end with the maximum possible subscript
  * that could exist in the database for this global name.
  */
-#define GVZPREVIOUS_APPEND_MAX_SUBS_KEY(GVKEY, GVT)					\
-{											\
-	int		lastsubslen, keysize;						\
-	unsigned char	*ptr;								\
-											\
-	assert(GVT->clue.top || (NULL == GVT->gd_csa));					\
-	assert(!GVT->clue.top || (NULL != GVT->gd_csa) && (GVT->gd_csa == cs_addrs));	\
-	/* keysize can be obtained from GVT->clue.top in case of GT.M.			\
-	 * But for GT.CM client, clue will be uninitialized. So we would need to	\
-	 * compute keysize from gv_cur_region->max_key_size. Since this is true for	\
-	 * GT.M as well, we use the same approach for both to avoid an if check and a	\
-	 * break in the pipeline.							\
-	 */										\
-	keysize = DBKEYSIZE(gv_cur_region->max_key_size);				\
-	assert(!GVT->clue.top || (keysize == GVT->clue.top));				\
-	lastsubslen = keysize - GVKEY->prev - 2;					\
-	if ((0 < lastsubslen) && (GVKEY->top >= keysize) && (GVKEY->end > GVKEY->prev))	\
-	{										\
-		ptr = &GVKEY->base[GVKEY->prev];					\
-		memset(ptr, STR_SUB_MAXVAL, lastsubslen);				\
-		ptr += lastsubslen;							\
-		*ptr++ = KEY_DELIMITER;	 /* terminator for last subscript */		\
-		*ptr = KEY_DELIMITER;    /* terminator for entire key */		\
-		GVKEY->end = GVKEY->prev + lastsubslen + 1;				\
-		assert(GVKEY->end == (ptr - &GVKEY->base[0]));				\
-	} else										\
-		GTMASSERT;								\
-	if (NULL != gv_target->gd_csa)							\
-		DBG_CHECK_GVTARGET_INTEGRITY(GVT);					\
+#define GVZPREVIOUS_APPEND_MAX_SUBS_KEY(GVKEY, GVT)						\
+{												\
+	int		lastsubslen, keysize;							\
+	unsigned char	*ptr;									\
+												\
+	assert(GVT->clue.top || (NULL == GVT->gd_csa));						\
+	assert(!GVT->clue.top || (NULL != GVT->gd_csa) && (GVT->gd_csa == cs_addrs));		\
+	/* keysize can be obtained from GVT->clue.top in case of GT.M.				\
+	 * But for GT.CM client, clue will be uninitialized. So we would need to		\
+	 * compute keysize from gv_cur_region->max_key_size. Since this is true for		\
+	 * GT.M as well, we use the same approach for both to avoid an if check and a		\
+	 * break in the pipeline.								\
+	 */											\
+	keysize = DBKEYSIZE(gv_cur_region->max_key_size);					\
+	assert(!GVT->clue.top || (keysize == GVT->clue.top));					\
+	lastsubslen = keysize - GVKEY->prev - 2;						\
+	assertpro((0 < lastsubslen) && (GVKEY->top >= keysize) && (GVKEY->end > GVKEY->prev));	\
+	ptr = &GVKEY->base[GVKEY->prev];							\
+	memset(ptr, STR_SUB_MAXVAL, lastsubslen);						\
+	ptr += lastsubslen;									\
+	*ptr++ = KEY_DELIMITER;	 /* terminator for last subscript */				\
+	*ptr = KEY_DELIMITER;    /* terminator for entire key */				\
+	GVKEY->end = GVKEY->prev + lastsubslen + 1;						\
+	assert(GVKEY->end == (ptr - &GVKEY->base[0]));						\
+	if (NULL != gv_target->gd_csa)								\
+		DBG_CHECK_GVTARGET_INTEGRITY(GVT);						\
 }
 
 /* Bit masks for the update_trans & si->update_trans variables */
@@ -2832,15 +3325,15 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	DECR_CNT(&cnl->wcs_phase2_commit_pidcnt, &cnl->wc_var_lock);	\
 }
 
-/* The CAREFUL_DECR_WCS_PHASE2_COMMIT_PIDCNT macro is the same as the DECR_WCS_PHASE2_COMMIT_PIDCNT macro
- * except that it uses CAREFUL_DECR_CNT instead of DECR_CNT. This does alignment checks and is needed by
+/* The PROBE_DECR_WCS_PHASE2_COMMIT_PIDCNT macro is the same as the DECR_WCS_PHASE2_COMMIT_PIDCNT macro
+ * except that it uses PROBE_DECR_CNT instead of DECR_CNT. This does alignment checks and is needed by
  * secshr_db_clnup as it runs in kernel mode in VMS. The two macros should be maintained in parallel.
  */
-#define	CAREFUL_DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl)				\
+#define	PROBE_DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl)				\
 {										\
 	assert(csa->wcs_pidcnt_incremented);					\
 	csa->wcs_pidcnt_incremented = FALSE;					\
-	CAREFUL_DECR_CNT(&cnl->wcs_phase2_commit_pidcnt, &cnl->wc_var_lock);	\
+	PROBE_DECR_CNT(&cnl->wcs_phase2_commit_pidcnt, &cnl->wc_var_lock);	\
 }
 
 #ifdef UNIX
@@ -2904,7 +3397,7 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	DECR_CNT(&local_csd->kill_in_prog, &local_csa->nl->wc_var_lock);	\
 	REMOVE_KIP_PID(local_csa);						\
 }
-/* Note that the INCR_KIP and CAREFUL_INCR_KIP macros should be maintained in parallel */
+/* Note that the INCR_KIP and PROBE_INCR_KIP macros should be maintained in parallel */
 #define INCR_KIP(CSD, CSA, KIP_CSA)						\
 {										\
 	sgmnt_data_ptr_t	local_csd;					\
@@ -2917,11 +3410,11 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	INSERT_KIP_PID(local_csa);						\
 	KIP_CSA = CSA;								\
 }
-/* The CAREFUL_INCR_KIP macro is the same as the INCR_KIP macro except that it uses CAREFUL_INCR_CNT instead of INCR_CNT.
+/* The PROBE_INCR_KIP macro is the same as the INCR_KIP macro except that it uses PROBE_INCR_CNT instead of INCR_CNT.
  * This does alignment checks and is needed by secshr_db_clnup as it runs in kernel mode in VMS.
- * The INCR_KIP and CAREFUL_INCR_KIP macros should be maintained in parallel.
+ * The INCR_KIP and PROBE_INCR_KIP macros should be maintained in parallel.
  */
-#define CAREFUL_INCR_KIP(CSD, CSA, KIP_CSA)						\
+#define PROBE_INCR_KIP(CSD, CSA, KIP_CSA)						\
 {											\
 	sgmnt_data_ptr_t	local_csd;						\
 	sgmnt_addrs		*local_csa;						\
@@ -2929,11 +3422,11 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	local_csd = CSD;								\
 	local_csa = CSA;								\
 	assert(NULL == KIP_CSA);							\
-	CAREFUL_INCR_CNT(&local_csd->kill_in_prog, &local_csa->nl->wc_var_lock);	\
+	PROBE_INCR_CNT(&local_csd->kill_in_prog, &local_csa->nl->wc_var_lock);	\
 	INSERT_KIP_PID(local_csa);							\
 	KIP_CSA = CSA;									\
 }
-#define CAREFUL_DECR_KIP(CSD, CSA, KIP_CSA)						\
+#define PROBE_DECR_KIP(CSD, CSA, KIP_CSA)						\
 {											\
 	sgmnt_data_ptr_t	local_csd;						\
 	sgmnt_addrs		*local_csa;						\
@@ -2942,13 +3435,13 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	local_csa = CSA;								\
 	assert(NULL != KIP_CSA);							\
 	KIP_CSA = NULL;									\
-	CAREFUL_DECR_CNT(&local_csd->kill_in_prog, &local_csa->nl->wc_var_lock);	\
+	PROBE_DECR_CNT(&local_csd->kill_in_prog, &local_csa->nl->wc_var_lock);	\
 	REMOVE_KIP_PID(local_csa);							\
 }
 /* Since abandoned_kills counter is only incremented in secshr_db_clnup it does not have its equivalent DECR_ABANDONED_KILLS */
-#define CAREFUL_INCR_ABANDONED_KILLS(CSD, CSA)				\
+#define PROBE_INCR_ABANDONED_KILLS(CSD, CSA)				\
 {									\
-        CAREFUL_INCR_CNT(&CSD->abandoned_kills, &CSA->nl->wc_var_lock);	\
+        PROBE_INCR_CNT(&CSD->abandoned_kills, &CSA->nl->wc_var_lock);	\
 }
 
 #define INCR_INHIBIT_KILLS(CNL)					\
@@ -2960,6 +3453,15 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 {									\
 	if (0 < CNL->inhibit_kills)					\
 		DECR_CNT(&CNL->inhibit_kills, &CNL->wc_var_lock);	\
+}
+
+/* Unless the pipeline architecture of the machine precludes it, there is a chance for another process to slip in between the IF and
+ * the decrement, but this macro would only be used in relatively unlikely circumstances.
+ */
+#define CAREFUL_DECR_CNT(CNT,LATCH)			\
+{							\
+	if (0 < CNT)					\
+		DECR_CNT(&CNT, &LATCH);			\
 }
 
 /* Commands like MUPIP BACKUP, MUPIP INTEG -REG or MUPIP FREEZE wait for kills-in-prog flag to become zero.
@@ -3443,7 +3945,7 @@ typedef struct redo_root_search_context_struct
 	uint4		update_trans;
 	uint4		t_err;
 	boolean_t	hold_onto_crit;
-	char		currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	gv_key		currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gv_key		*gv_currkey;
 #	ifdef DEBUG
 	unsigned char	t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
@@ -3452,22 +3954,22 @@ typedef struct redo_root_search_context_struct
 } redo_root_search_context;
 #endif
 
-#define SET_GV_CURRKEY_FROM_REORG_GV_TARGET						\
-{	/* see mupip reorg.c for comment */						\
-	GBLREF	gv_key		*gv_currkey;						\
-	GBLREF	gv_namehead	*reorg_gv_target;	/* for global name */		\
-	GBLREF	boolean_t	mu_reorg_process;					\
-											\
-	mname_entry		*gvent;							\
-	int			end;							\
-											\
-	assert(mu_reorg_process);							\
-	gvent = &reorg_gv_target->gvname;						\
-	memcpy(gv_currkey->base, gvent->var_name.addr, gvent->var_name.len);		\
-	end = gvent->var_name.len + 1;							\
-	gv_currkey->end = end;								\
-	gv_currkey->base[end - 1] = 0;							\
-	gv_currkey->base[end] = 0;							\
+#define SET_GV_CURRKEY_FROM_GVT(GVT)						\
+{										\
+	mname_entry		*gvent;						\
+	int			end;						\
+										\
+	GBLREF	gv_key		*gv_currkey;					\
+	GBLREF	boolean_t	mu_reorg_process;				\
+	GBLREF	gv_namehead	*reorg_gv_target;				\
+										\
+	assert((GVT != reorg_gv_target) || mu_reorg_process);			\
+	gvent = &GVT->gvname;							\
+	memcpy(gv_currkey->base, gvent->var_name.addr, gvent->var_name.len);	\
+	end = gvent->var_name.len + 1;						\
+	gv_currkey->end = end;							\
+	gv_currkey->base[end - 1] = 0;						\
+	gv_currkey->base[end] = 0;						\
 }
 
 #define SET_WANT_ROOT_SEARCH(CDB_STATUS, WANT_ROOT_SEARCH)								\
@@ -3538,56 +4040,262 @@ typedef struct redo_root_search_context_struct
 	assert((NULL == first_sgm_info) || (0 == sgm_info_ptr->num_of_blks));							\
 }
 
-#define GVCST_ROOT_SEARCH													\
-{	/* gvcst_root_search is invoked to establish the root block of a given global (pointed to by gv_target). We always	\
-	 * expect the root block of the directory tree to be 1 and so must never come here with gv_target pointing to directory	\
-	 * tree. Assert that.													\
-	 */															\
-	assert((NULL != gv_target) && (DIR_ROOT != gv_target->root));								\
-	if (!gv_target->root)													\
-		gvcst_root_search(FALSE);											\
+#define GVCST_ROOT_SEARCH							\
+{	/* gvcst_root_search is invoked to establish the root block of a 	\
+	 * given global (pointed to by gv_target). We always expect the root	\
+	 * block of the directory tree to be 1 and so must never come here	\
+	 * with gv_target pointing to directory tree. Assert that.		\
+	 */									\
+	GBLREF gv_namehead	*gv_target;					\
+										\
+	assert((NULL != gv_target) && (DIR_ROOT != gv_target->root));		\
+	if (!gv_target->root)							\
+		gvcst_root_search(FALSE);					\
 }
 
 /* Same as GVCST_ROOT_SEARCH, but tells gvcst_root_search NOT to restart but to return the status code back to the caller */
-#define GVCST_ROOT_SEARCH_DONOT_RESTART(STATUS)											\
-{																\
-	assert((NULL != gv_target) && (DIR_ROOT != gv_target->root));								\
-	STATUS = cdb_sc_normal;													\
-	if (!gv_target->root)													\
-		STATUS = gvcst_root_search(TRUE);										\
+#define GVCST_ROOT_SEARCH_DONOT_RESTART(STATUS)					\
+{										\
+	GBLREF gv_namehead	*gv_target;					\
+										\
+	assert((NULL != gv_target) && (DIR_ROOT != gv_target->root));		\
+	STATUS = cdb_sc_normal;							\
+	if (!gv_target->root)							\
+		STATUS = gvcst_root_search(TRUE);				\
 }
 
-#define GVCST_ROOT_SEARCH_AND_PREP(est_first_pass)										\
-{	/* Before beginning a spanning node try in a gvcst routine, make sure the root is established. If we've restarted	\
-	 * issue DBROLLEDBACK appropriately.											\
-	 */															\
-	GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES]; /* for LAST_RESTART_CODE */					\
-	GBLREF	stack_frame		*frame_pointer;										\
-																\
-	DCL_THREADGBL_ACCESS;													\
-																\
-	SETUP_THREADGBL_ACCESS;													\
-	assert(dollar_tlevel);													\
-	ASSERT_BEGIN_OF_FRESH_TP_TRANS;												\
-	frame_pointer->flags |= SFF_IMPLTSTART_CALLD;										\
-	if (est_first_pass && (cdb_sc_onln_rlbk2 == LAST_RESTART_CODE))								\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBROLLEDBACK);							\
-	tp_set_sgm();														\
-	GVCST_ROOT_SEARCH;													\
+#define GVCST_ROOT_SEARCH_AND_PREP(est_first_pass)								\
+{	/* Before beginning a spanning node (gvcst_xxx) or spanning region (gvcst_spr_xxx) try in a gvcst	\
+	 * routine, make sure the root is established. If we've restarted issue DBROLLEDBACK appropriately.	\
+	 */													\
+	GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES]; /* for LAST_RESTART_CODE */			\
+	GBLREF	stack_frame		*frame_pointer;								\
+	GBLREF	uint4			dollar_tlevel;								\
+														\
+	DCL_THREADGBL_ACCESS;											\
+														\
+	SETUP_THREADGBL_ACCESS;											\
+	assert(dollar_tlevel);											\
+	ASSERT_BEGIN_OF_FRESH_TP_TRANS;										\
+	frame_pointer->flags |= SFF_IMPLTSTART_CALLD;								\
+	if (est_first_pass && (cdb_sc_onln_rlbk2 == LAST_RESTART_CODE))						\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBROLLEDBACK);					\
+	tp_set_sgm();												\
+	GVCST_ROOT_SEARCH;											\
 }
 
-#define GV_BIND_NAME_ONLY(ADDR, TARG)	gv_bind_name(ADDR, TARG)
+#define GV_BIND_NAME_ONLY(ADDR, TARG, GVNH_REG)		GVNH_REG = gv_bind_name(ADDR, TARG)
 
-#define GV_BIND_NAME_AND_ROOT_SEARCH(ADDR, TARG)										\
-{																\
-	enum db_acc_method	acc_meth;											\
-	GBLREF gd_region	*gv_cur_region;											\
-	GBLREF gv_namehead	*gv_target;											\
-																\
-	GV_BIND_NAME_ONLY(ADDR, TARG);												\
-	acc_meth = gv_cur_region->dyn.addr->acc_meth;										\
-	if ((dba_bg == acc_meth) || (dba_mm == acc_meth))									\
-		GVCST_ROOT_SEARCH;												\
+#define GV_BIND_NAME_AND_ROOT_SEARCH(ADDR, TARG, GVNH_REG)					\
+{												\
+	enum db_acc_method	acc_meth;							\
+												\
+	GBLREF gd_region	*gv_cur_region;							\
+	GBLREF gv_namehead	*gv_target;							\
+												\
+	GV_BIND_NAME_ONLY(ADDR, TARG, GVNH_REG);						\
+	/* Skip GVCST_ROOT_SEARCH in case of spanning global.					\
+	 * See comment at end of gv_bind_name.c for details.					\
+	 */											\
+	if (NULL == GVNH_REG->gvspan)								\
+	{											\
+		acc_meth = REG_ACC_METH(gv_cur_region);						\
+		if ((dba_bg == acc_meth) || (dba_mm == acc_meth))				\
+			GVCST_ROOT_SEARCH;							\
+	} else if (!gv_target->root && gv_target->act_specified_in_gld && gv_target->act)	\
+	{	/* gv_target->root is ZERO which means we have still not done a			\
+		 * gvcst_root_search which implies "act_in_gvt" function has not yet been	\
+		 * invoked. But this global has a non-zero act specified in gld. Invoke		\
+		 * "act_in_gvt" now as this might be needed for transforming string subscripts	\
+		 * as part of op_gvname etc.							\
+		 */										\
+		act_in_gvt(gv_target); /* note: this could issue COLLTYPVERSION error */	\
+	}											\
+}
+
+#define	GET_REG_INDEX(ADDR, REG_START, REG, REG_INDEX)				\
+{										\
+	assert((REG >= REG_START) && (REG < &ADDR->regions[ADDR->n_regions]));	\
+	REG_INDEX = REG - REG_START;						\
+}
+
+#define	ACT_NOT_SPECIFIED	(MAXUINT4)
+
+#define	DO_NCT_CHECK_FOR_SPANGBLS(GVT, GVNH_REG, REG)								\
+{														\
+	if ((NULL != GVNH_REG->gvspan) && !GVT->nct_must_be_zero)						\
+	{													\
+		if (GVT->nct)											\
+			rts_error_csa(CSA_ARG(GVT->gd_csa) VARLSTCNT(6) ERR_NCTCOLLSPGBL, 4, DB_LEN_STR(REG),	\
+					GVT->gvname.var_name.len, GVT->gvname.var_name.addr);			\
+		GVT->nct_must_be_zero = TRUE;									\
+	}													\
+}
+
+/* Copy "act" from the .gld file (GBLNAME section) to the GVNH_REG structure and in turn the GVT structure */
+#define	COPY_ACT_FROM_GLD_TO_GVNH_REG_AND_GVT(ADDR, GVT, GBL_SPANS_REG, GVNH_REG, REG)			\
+{													\
+	gd_gblname	*gname;										\
+													\
+	if ((NULL != ADDR) && (((gd_addr *)ADDR)->n_gblnames))						\
+	{	/* have some global names with collation characteristics. check if current global	\
+		 * name is part of that list. If so initialize its collation properties.		\
+		 */											\
+		gname = gv_srch_gblname(ADDR, GVT->gvname.var_name.addr, GVT->gvname.var_name.len);	\
+	} else												\
+		gname = NULL;										\
+	if (NULL != gname)										\
+	{	/* Transfer global's collation characteristics into gvnh_reg.				\
+		 * But before that check for error scenarios.						\
+		 */											\
+		GVNH_REG->act = gname->act;								\
+		GVNH_REG->ver = gname->ver;								\
+	} else if (GBL_SPANS_REG)									\
+	{	/* This global spans multiple regions. And the user did not specify a collation for	\
+		 * this global in the GBLNAME section of the gld. In this case force collation to 0	\
+		 * for this global. Not doing so could cause any non-zero default collation properties	\
+		 * in the spanned global db file header to result in different parts of this global	\
+		 * exist with different collation representations in different .dat files creating	\
+		 * an out-of-design situation since the collation property of a spanning global is used	\
+		 * in op_gvname/op_gvextnam/op_gvnaked to come with the subscript representation even	\
+		 * before determining which region a given subscripted key maps to.			\
+		 */											\
+		GVNH_REG->act = 0;									\
+		GVNH_REG->ver = 0;									\
+	} else												\
+		GVNH_REG->act = ACT_NOT_SPECIFIED;							\
+	COPY_ACT_FROM_GVNH_REG_TO_GVT(GVNH_REG, GVT, REG);						\
+}
+
+/* Copy "act" from the GVNH_REG structure to the GVT structure.
+ * Currently the GLD (and in turn GVNH_REG) dont have a way to set "nct" for a gblname.
+ * Therefore only "act" gets copied over currently. This macro needs to change if/when
+ * "nct" support for gblname gets added to the gld.
+ */
+#define	COPY_ACT_FROM_GVNH_REG_TO_GVT(GVNH_REG, GVT, REG)						\
+{													\
+	uint4	gldact;											\
+													\
+	DO_NCT_CHECK_FOR_SPANGBLS(GVT, GVNH_REG, REG);							\
+	gldact = GVNH_REG->act;										\
+	/* Exclude DSE from ERR_ACTCOLLMISMTCH errors (see gvcst_root_search.c comment for details) */	\
+	if (((ACT_NOT_SPECIFIED != gldact) && (gldact != GVT->act) && !IS_DSE_IMAGE)			\
+		&& ((GVT->root) || GVT->act_specified_in_gld))						\
+	{	/* GVT->root case : Global already exists and GVT/GLD act do not match.			\
+		 * GVT->act_specified_in_gld case :							\
+		 *	Global directory defines one alternate collation sequence for global name	\
+		 *	but gv_target already has a different (and non-zero) alternate collation	\
+		 *	sequence defined (from another global directory's GBLNAME characteristics	\
+		 *	or from the "Default Collation" field of the database file header.		\
+		 * In either case, error out.								\
+		 */											\
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_ACTCOLLMISMTCH, 6,			\
+				GVT->gvname.var_name.len, GVT->gvname.var_name.addr,			\
+				gldact, DB_LEN_STR(REG), GVT->act);					\
+	}												\
+	if (!GVT->act_specified_in_gld && (ACT_NOT_SPECIFIED != gldact))				\
+	{												\
+		GVT->act_specified_in_gld = TRUE;							\
+		GVT->act = gldact;									\
+		GVT->ver = GVNH_REG->ver;								\
+	}												\
+	GVT->nct_must_be_zero = (NULL != GVNH_REG->gvspan);						\
+}
+
+/* This macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH (in terms of setting gv_cur_region)
+ * in case the global spans multiple regions.
+ */
+#define	GV_BIND_SUBSNAME_IF_GVSPAN(GVNH_REG, GD_HEADER, GVKEY, REG)			\
+{											\
+	GBLREF gd_region	*gv_cur_region;						\
+											\
+	assert(NULL != GVNH_REG);							\
+	if (NULL != GVNH_REG->gvspan)							\
+	{										\
+		GV_BIND_SUBSNAME(GVNH_REG, GD_HEADER, GVKEY, REG);			\
+	} else										\
+		TREF(gd_targ_gvnh_reg) = NULL;						\
+}
+
+#define	GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(GVNH_REG, GD_HEADER, GVKEY)						\
+{															\
+	gvnh_reg_t			*gvnhReg; /* use unique name to avoid name collisions with macro caller */	\
+	DEBUG_ONLY(													\
+		ht_ent_mname		*tabent;									\
+		GBLREF gv_namehead	*gv_target;									\
+		gvnh_reg_t		*tmp_gvnhReg;									\
+	)														\
+															\
+	gvnhReg = GVNH_REG;	/* set by op_gvname in previous call */							\
+	DEBUG_ONLY(													\
+		tabent = lookup_hashtab_mname((hash_table_mname *)((GD_HEADER)->tab_ptr), &gv_target->gvname);		\
+		assert(NULL != tabent);											\
+		tmp_gvnhReg = (gvnh_reg_t *)tabent->value;								\
+		assert(NULL != tmp_gvnhReg);										\
+		if (NULL != tmp_gvnhReg->gvspan)									\
+			assert(tmp_gvnhReg == gvnhReg);									\
+		else													\
+			assert(NULL == gvnhReg);									\
+	)														\
+	/* A non-NULL value of gvnh_reg indicates a spanning global as confirmed by the assert below */			\
+	assert((NULL == gvnhReg) || (TREF(spangbl_seen) && (NULL != gvnhReg->gvspan)));					\
+	if (NULL != gvnhReg)												\
+		gv_bind_subsname(GD_HEADER, GVKEY, GVNH_REG);								\
+}
+
+/* This macro is similar to GV_BIND_SUBSNAME_IF_GVSPAN except we know for sure this is a spanning global */
+#define	GV_BIND_SUBSNAME(GVNH_REG, GD_HEADER, GVKEY, REG)					\
+{	/* This is a global that spans multiple regions. Re-bind the subscripted reference			\
+	 * just in case this maps to a different region than the unsubscripted global name.			\
+	 */													\
+	TREF(gd_targ_gvnh_reg) = GVNH_REG;									\
+	gv_bind_subsname(GD_HEADER, GVKEY, GVNH_REG);						\
+	/* gv_target/gv_cur_region/cs_addrs/cs_data are now initialized even for non-NULL gvnh_reg->gvspan */	\
+	/* In addition TREF(gd_targ_map) is set as well */							\
+	REG = gv_cur_region;	/* adjust "REG" in case gv_cur_region was modified in the above call */		\
+}
+
+/* sets gv_target to correspond to REG region of spanning global. also sets gv_target->root if not already non-zero.
+ * also sets global variables gv_cur_region/cs_addrs/cs_data to correspond to input region.
+ */
+#define	GV_BIND_SUBSREG(ADDR, REG, GVNH_REG)						\
+{											\
+	gv_namehead			*gvt;						\
+	gvnh_spanreg_t			*gvspan;					\
+	int				min_reg_index, reg_index;			\
+	DEBUG_ONLY(enum db_acc_method	acc_meth;)					\
+											\
+	GBLREF gv_namehead	*gv_target;						\
+											\
+	if (!REG->open)									\
+		gv_init_reg(REG);							\
+	gvspan = GVNH_REG->gvspan;							\
+	assert(NULL != gvspan);								\
+	min_reg_index = gvspan->min_reg_index;						\
+	GET_REG_INDEX(ADDR, &ADDR->regions[0], REG, reg_index);	/* sets "reg_index" */	\
+	assert(reg_index >= min_reg_index);						\
+	assert(reg_index <= gvspan->max_reg_index);					\
+	gvt = gvspan->gvt_array[reg_index - min_reg_index];				\
+	/* Assert that this region is indeed mapped to by the spanning global */	\
+	assert(INVALID_GV_TARGET != gvt);						\
+	if (NULL == gvt)								\
+	{										\
+		gvt = targ_alloc(REG->max_key_size, &GVNH_REG->gvt->gvname, REG);	\
+		COPY_ACT_FROM_GVNH_REG_TO_GVT(GVNH_REG, gvt, REG);			\
+		/* See comment in GVNH_REG_INIT macro for why the below assignment is	\
+		 * placed AFTER all error conditions (in above macro) have passed.	\
+		 */									\
+		gvspan->gvt_array[reg_index - min_reg_index] = gvt;			\
+	}										\
+	gv_target = gvt;								\
+	/* Even though gv_cur_region might already be equal to "REG", need to invoke	\
+	 * "change_reg" in order to do the "tp_set_sgm" in case of TP.			\
+	 */										\
+	gv_cur_region = REG;								\
+	change_reg();									\
+	DEBUG_ONLY(acc_meth = REG_ACC_METH(gv_cur_region);)				\
+	assert((dba_bg == acc_meth) || (dba_mm == acc_meth));				\
+	GVCST_ROOT_SEARCH;								\
 }
 
 /* When invoking grab_lock or grab_gtmsource_srv_latch, use one of the following parameters.
@@ -3761,7 +4469,7 @@ typedef struct
 	{												\
 		int rc;											\
 													\
-		START_CH;										\
+		START_CH(TRUE);										\
 		if ((int)ERR_TPRETRY == SIGNAL)								\
 		{											\
 			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);					\
@@ -3775,9 +4483,6 @@ typedef struct
 # define RTS_ERROR_IF_SN_DISALLOWED											\
 {															\
 	GBLREF	boolean_t 		span_nodes_disallowed;								\
-															\
-	error_def(ERR_TEXT); /* BYPASSOK */										\
-	error_def(ERR_UNIMPLOP); /* BYPASSOK */										\
 															\
 	if (span_nodes_disallowed)											\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UNIMPLOP, 0,	ERR_TEXT, 2,				\
@@ -3867,78 +4572,106 @@ typedef struct
 	} else									\
 		break;								\
 }
-#define CHECK_HIDDEN_SUBSCRIPT(KEY, IS_HIDDEN)										\
-{															\
-	sm_uc_ptr_t	keyloc;												\
-															\
-	keyloc = (KEY)->base + (KEY)->end - 5;										\
-	if ((KEY)->end >= 5 && 0 == *keyloc && 2 == *(keyloc+1))							\
-		IS_HIDDEN = TRUE;											\
-	else														\
-		IS_HIDDEN = FALSE;											\
+#define CHECK_HIDDEN_SUBSCRIPT(KEY, IS_HIDDEN)					\
+{										\
+	sm_uc_ptr_t	keyloc;							\
+										\
+	keyloc = (KEY)->base + (KEY)->end - 5;					\
+	if ((KEY)->end >= 5 && 0 == *keyloc && 2 == *(keyloc+1))		\
+		IS_HIDDEN = TRUE;						\
+	else									\
+		IS_HIDDEN = FALSE;						\
 }
-#define SAVE_GV_CURRKEY									\
-{											\
-	assert(NULL != gv_currkey);							\
-	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(save_currkey));		\
-	save_gv_currkey = (gv_key *)&save_currkey[0];					\
-	memcpy(save_gv_currkey, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);		\
+#define SAVE_GV_CURRKEY(SAVE_KEY)						\
+{										\
+	assert(NULL != gv_currkey);						\
+	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(SAVE_KEY));		\
+	memcpy(&SAVE_KEY[0], gv_currkey, SIZEOF(gv_key) + gv_currkey->end);	\
 }
-#define RESTORE_GV_CURRKEY								\
-{											\
-	assert(gv_currkey->top == save_gv_currkey->top);				\
-	memcpy(gv_currkey, save_gv_currkey, SIZEOF(gv_key) + save_gv_currkey->end);	\
+#define RESTORE_GV_CURRKEY(SAVE_KEY)						\
+{										\
+	assert(gv_currkey->top == SAVE_KEY[0].top);				\
+	memcpy(gv_currkey, &SAVE_KEY[0], SIZEOF(gv_key) + SAVE_KEY[0].end);	\
 }
-#define SAVE_GV_CURRKEY_LAST_SUBSCRIPT(gv_currkey, prev, oldend)			\
+#define SAVE_GV_CURRKEY_LAST_SUBSCRIPT(SAVE_KEY, PREV, OLDEND)				\
 {											\
-	prev = gv_currkey->prev;							\
-	oldend = gv_currkey->end;							\
+	PREV = gv_currkey->prev;							\
+	OLDEND = gv_currkey->end;							\
 	assert('\0' == gv_currkey->base[oldend]);					\
-	if (prev <= oldend)								\
-		memcpy(save_currkey, &gv_currkey->base[prev], oldend - prev + 1);	\
+	if (PREV <= OLDEND)								\
+		memcpy(&SAVE_KEY[0], &gv_currkey->base[PREV], OLDEND - PREV + 1);	\
 }
-#define RESTORE_GV_CURRKEY_LAST_SUBSCRIPT(gv_currkey, prev, oldend)			\
+#define RESTORE_GV_CURRKEY_LAST_SUBSCRIPT(SAVE_KEY, PREV, OLDEND)			\
 {											\
-	gv_currkey->prev = prev;							\
-	gv_currkey->end = oldend;							\
-	if (prev <= oldend)								\
-		memcpy(&gv_currkey->base[prev], save_currkey, oldend - prev + 1);	\
-	assert('\0' == gv_currkey->base[oldend]);					\
+	gv_currkey->prev = PREV;							\
+	gv_currkey->end = OLDEND;							\
+	if (PREV <= OLDEND)								\
+		memcpy(&gv_currkey->base[PREV], &SAVE_KEY[0], OLDEND - PREV + 1);	\
+	assert('\0' == gv_currkey->base[OLDEND]);					\
 }
 
 #define CAN_APPEND_HIDDEN_SUBS(KEY)	(((KEY)->end + 5 <= MAX_KEY_SZ) && ((KEY)->end + 5 <= (KEY)->top))
-#define APPEND_HIDDEN_SUB(KEY)										\
-{													\
-	int	end;											\
-													\
-	assert(CAN_APPEND_HIDDEN_SUBS(KEY));								\
-	end = gv_currkey->end;										\
-	gv_currkey->end += 4;										\
-	(KEY)->base[end++] = 2;										\
-	(KEY)->base[end++] = 1;										\
-	(KEY)->base[end++] = 1;										\
-	(KEY)->base[end++] = 0;										\
-	(KEY)->base[end] = 0;										\
+#define APPEND_HIDDEN_SUB(KEY)			\
+{						\
+	assert(CAN_APPEND_HIDDEN_SUBS(KEY));	\
+	(KEY)->end += 4;			\
+	REPLACE_HIDDEN_SUB_TO_LOWEST(KEY, KEY);	\
 }
-#define NEXT_HIDDEN_SUB(KEY, I)										\
-{													\
-	int	end;											\
-													\
-	end = gv_currkey->end - 4;									\
-	(KEY)->base[end++] = 2;										\
-	(KEY)->base[end++] = 1 + ((I + 1) / 0xFF);							\
-	(KEY)->base[end++] = 1 + ((I + 1) % 0xFF);							\
-	(KEY)->base[end++] = 0;										\
-	(KEY)->base[end] = 0;										\
+#define	REPLACE_HIDDEN_SUB_TO_LOWEST(KEY1, KEY2)	\
+{							\
+	int	end;					\
+							\
+	end = (KEY1)->end;				\
+	(KEY2)->base[end - 4] = 2;			\
+	(KEY2)->base[end - 3] = 1;			\
+	(KEY2)->base[end - 2] = 1;			\
+	(KEY2)->base[end - 1] = 0;			\
+	(KEY2)->base[end - 0] = 0;			\
+	assert(end < (KEY2)->top);			\
+	(KEY2)->end = end;				\
 }
-#define RESTORE_CURRKEY(KEY, OLDEND)									\
-{													\
-	(KEY)->end = OLDEND;										\
-	(KEY)->base[OLDEND - 1] = 0; 									\
-	(KEY)->base[OLDEND] = 0;									\
+#define	REPLACE_HIDDEN_SUB_TO_HIGHEST(KEY1, KEY2)	\
+{							\
+	int	end;					\
+	end = (KEY1)->end;				\
+	(KEY2)->base[end - 4] = 2;			\
+	(KEY2)->base[end - 3] = 0xFF;			\
+	(KEY2)->base[end - 2] = 0xFF;			\
+	(KEY2)->base[end - 1] = 1;			\
+	(KEY2)->base[end + 0] = 0;			\
+	(KEY2)->base[end + 1] = 0;			\
+	assert((end + 1) < (KEY2)->top);		\
+	(KEY2)->end = end + 1;				\
 }
-#define COMPUTE_CHUNK_SIZE(KEY, BLKSZ, RESERVED)							\
+
+#define NEXT_HIDDEN_SUB(KEY, I)				\
+{							\
+	int	end;					\
+							\
+	end = gv_currkey->end - 4;			\
+	(KEY)->base[end++] = 2;				\
+	(KEY)->base[end++] = 1 + ((I + 1) / 0xFF);	\
+	(KEY)->base[end++] = 1 + ((I + 1) % 0xFF);	\
+	(KEY)->base[end++] = 0;				\
+	(KEY)->base[end] = 0;				\
+}
+#define RESTORE_CURRKEY(KEY, OLDEND)			\
+{							\
+	(KEY)->end = OLDEND;				\
+	(KEY)->base[OLDEND - 1] = 0; 			\
+	(KEY)->base[OLDEND] = 0;			\
+}
+#define COMPUTE_CHUNK_SIZE(KEY, BLKSZ, RESERVED)					\
 	(BLKSZ - RESERVED - ((KEY)->end + 1) - SIZEOF(blk_hdr) - SIZEOF(rec_hdr))
+
+/* in MM mode, AIX increases native DB file size to adjust to the next nearest multiple of OS_PAGE_SIZE if the file is mapped
+ * using shmat() and last portion of the file is accessed. To take into account this adjustment, following macro adjust the
+ * value of DB file size determined using block count, constant DB HEADER SIZE and constant MASTER MAP size and EOF block.
+ * Since We can change the DB access method using MUPIP SET and we can move the dabtabase from AIX to non-AIX platfrom,
+ * following macro is not just AIX specific.
+ */
+#define ALIGN_DBFILE_SIZE_IF_NEEDED(SZ, NATIVE_SZ)						\
+		SZ = (SZ == NATIVE_SZ) ? SZ : ROUND_UP(SZ, (OS_PAGE_SIZE / DISK_BLOCK_SIZE));
 
 void		assert_jrec_member_offsets(void);
 bt_rec_ptr_t	bt_put(gd_region *r, int4 block);
@@ -3975,7 +4708,12 @@ int4 bmm_find_free(uint4 hint, uchar_ptr_t base_addr, uint4 total_bits);
 
 bool reg_cmcheck(gd_region *reg);
 
-void gv_bind_name(gd_addr *addr, mstr *targ);
+gd_binding	*gv_srch_map(gd_addr *addr, char *key, int key_len);
+gd_binding	*gv_srch_map_linear(gd_binding *start_map, char *key, int key_len);
+gd_binding	*gv_srch_map_linear_backward(gd_binding *start_map, char *key, int key_len);
+gd_gblname	*gv_srch_gblname(gd_addr *addr, char *key, int key_len);
+gvnh_reg_t	*gv_bind_name(gd_addr *addr, mname_entry *targ);
+void 		gv_bind_subsname(gd_addr *addr, gv_key *key, gvnh_reg_t *gvnh_reg);
 
 void db_csh_ini(sgmnt_addrs *cs);
 void db_csh_ref(sgmnt_addrs *cs_addrs, boolean_t init);
@@ -3989,7 +4727,7 @@ sm_uc_ptr_t get_lmap(block_id blk, unsigned char *bits, sm_int_ptr_t cycle, cach
 bool ccp_userwait(struct gd_region_struct *reg, uint4 state, int4 *timadr, unsigned short cycle);
 void ccp_closejnl_ast(struct gd_region_struct *reg);
 bt_rec *ccp_bt_get(sgmnt_addrs *cs_addrs, int4 block);
-unsigned char *mval2subsc(mval *in_val, gv_key *out_key);
+unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll);
 
 int4	dsk_read(block_id blk, sm_uc_ptr_t buff, enum db_ver *ondisk_blkver, boolean_t blk_free);
 
@@ -4015,6 +4753,8 @@ gd_addr	*create_dummy_gbldir(void);
 void	gvstats_rec_csd2cnl(sgmnt_addrs *csa);
 void	gvstats_rec_cnl2csd(sgmnt_addrs *csa);
 void	gvstats_rec_upgrade(sgmnt_addrs *csa);
+
+void act_in_gvt(gv_namehead *gvt);
 
 #include "gdsfheadsp.h"
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,8 @@ long	sorts_after (mval *lhs, mval *rhs)
 	SETUP_THREADGBL_ACCESS;
 	if (!TREF(local_coll_nums_as_strings))
 	{	/* If numbers collate normally (ahead of strings), check if either of the operands is a number */
+		MV_FORCE_DEFINED(lhs);
+		MV_FORCE_DEFINED(rhs);
 		if (MV_IS_CANONICAL(lhs))
 		{	/* lhs is a number */
 			if (MV_IS_CANONICAL(rhs))

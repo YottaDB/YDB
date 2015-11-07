@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,8 +95,6 @@ typedef struct gvzwrite_datablk_struct
 	unsigned char			*old_key;
 	unsigned char			*old_targ;
 	zwr_sub_lst			*sub;
-	gd_binding			*old_map;
-	gd_binding			*old_map_top;
 	gd_region			*gd_reg;
 	boolean_t			gv_last_subsc_null;
 	boolean_t			gv_some_subsc_null;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "filestruct.h"
+#include "filestruct.h"		/* needed for "jnl.h" and others */
 #include "cmidef.h"
 #include "hashtab_mname.h"
 #include "cmmdef.h"
@@ -25,6 +25,10 @@
 #include "gv_xform_key.h"
 #include "targ_alloc.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype */
+#include "gvnh_spanreg.h"
+#include "gtmimagename.h"
+#include "gv_trigger_common.h"	/* for *HASHT* macros used inside GVNH_REG_INIT macro */
+#include "jnl.h"		/* needed for "jgbl" */
 
 #define DIR_ROOT 1
 
@@ -36,31 +40,23 @@ void gtcm_bind_name(cm_region_head *rh, boolean_t xform)
 {
 	ht_ent_mname	*tabent;
 	mname_entry	 gvent;
-	boolean_t	added;
 	gvnh_reg_t	*gvnh_reg;
 
 	GTCM_CHANGE_REG(rh);	/* sets the global variables gv_cur_region/cs_addrs/cs_data appropriately */
 	gvent.var_name.addr = (char *)gv_currkey->base;
 	gvent.var_name.len = STRLEN((char *)gv_currkey->base);
 	COMPUTE_HASH_MNAME(&gvent);
-	if (NULL == (tabent = lookup_hashtab_mname(rh->reg_hash, &gvent)) || NULL == (gvnh_reg = (gvnh_reg_t *)tabent->value))
+	if (NULL != (tabent = lookup_hashtab_mname(rh->reg_hash, &gvent)))	/* WARNING ASSIGNMENT */
 	{
-		gv_target = targ_alloc(cs_data->max_key_size, &gvent, rh->reg);
-		gvnh_reg = (gvnh_reg_t *)malloc(SIZEOF(gvnh_reg_t));
-		gvnh_reg->gvt = gv_target;
-		gvnh_reg->gd_reg = rh->reg;
-		if (NULL != tabent)
-		{ 	/* Since the global name was found but gv_target was null and now we created a new gv_target,
-			 * the hash table key must point to the newly created gv_target->gvname. */
-			tabent->key = gv_target->gvname;
-			tabent->value = (char *)gvnh_reg;
-		} else
-		{
-			added = add_hashtab_mname((hash_table_mname *)rh->reg_hash, &gv_target->gvname, gvnh_reg, &tabent);
-			assert(added);
-		}
-	} else
+		gvnh_reg = (gvnh_reg_t *)tabent->value;
+		assert(NULL != gvnh_reg);
 		gv_target = gvnh_reg->gvt;
+	} else
+	{
+		assert((dba_bg == REG_ACC_METH(rh->reg)) || (dba_mm == REG_ACC_METH(rh->reg)));
+		gv_target = targ_alloc(cs_data->max_key_size, &gvent, rh->reg);
+		GVNH_REG_INIT(NULL, rh->reg_hash, NULL, gv_target, rh->reg, gvnh_reg, tabent);
+	}
 	GVCST_ROOT_SEARCH;
 	if ((gv_target->collseq || gv_target->nct) && xform)
 		gv_xform_key(gv_currkey, FALSE);

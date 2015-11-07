@@ -405,7 +405,7 @@ fi
 # copy debug files if necessary
 if [ $arch = "zos" ] ; then
 	for i in `ls *.mdbg 2> /dev/null` ; do
-		cp $i $gtmdist
+		cp -p $i $gtmdist
 		rm -f $i
 	done
 fi
@@ -413,7 +413,7 @@ fi
 # Install COPYING if it is applicable
 file=COPYING
 if [ -f $file ]; then
-	cp $file $gtmdist
+	cp -p $file $gtmdist
 	if [ "$doutf8" -ne 0 ]; then
 		ln -s ../$file $gtmdist/utf8/$file
 	fi
@@ -422,7 +422,7 @@ fi
 # Install README.txt if it is applicable
 file=README.txt
 if [ -f $file ]; then
-	cp $file $gtmdist
+	cp -p $file $gtmdist
 	if [ "$doutf8" -ne 0 ]; then
 		ln -s ../$file $gtmdist/utf8/$file
 	fi
@@ -431,13 +431,13 @@ fi
 # Install custom_errors_sample.txt if it is applicable
 file=custom_errors_sample.txt
 if [ -f $file ]; then
-	cp $file $gtmdist
+	cp -p $file $gtmdist
 	if [ "$doutf8" -ne 0 ]; then
 		ln -s ../$file $gtmdist/utf8/$file
 	fi
 fi
 # Install the .cshrc and .profile files
-cp gdedefaults gtmprofile gtmprofile_preV54000 gtm gtmcshrc $gtmdist
+cp -p gdedefaults gtmprofile gtmprofile_preV54000 gtm gtmcshrc $gtmdist
 chmod 0444 $gtmdist/gdedefaults
 chown $owner $gtmdist/gdedefaults
 chmod 0755 $gtmdist/gtmprofile
@@ -452,7 +452,7 @@ chown $owner $gtmdist/gtmcshrc
 # Install the normal scripts
 for i in $nscripts
 do
-	cp $i $gtmdist
+	cp -p $i $gtmdist
 	chmod 0755 $gtmdist/$i
 	chown $owner $gtmdist/$i
 done
@@ -460,7 +460,7 @@ done
 # Install the root scripts
 for i in $rscripts
 do
-	cp $i $gtmdist
+	cp -p $i $gtmdist
 	chmod 0744 $gtmdist/$i
 	chown $rootuser $gtmdist/$i
 done
@@ -475,7 +475,7 @@ do
 	elif [ -x /usr/sbin/install ]; then
 		/usr/sbin/install -f $gtmdist -m 644 -u $owner -g $bingroup $i $gtmdist
 	elif [ $arch = "zos" ]; then
-		cp $i $gtmdist/
+		cp -p $i $gtmdist/
 		chmod 644 $gtmdist/$i
 		chown $user:$bingroup $gtmdist/$i
 	else
@@ -487,7 +487,7 @@ done
 # Install other individual files
 for i in  $ofiles
 do
-	cp $i $gtmdist
+	cp -p $i $gtmdist
 	chown $owner $gtmdist/$i
 done
 if [ $arch = "sun" ]; then
@@ -508,7 +508,7 @@ plugin="plugin"
 plugin_gtmcrypt="$plugin/gtmcrypt"
 
 # Gtmcrypt files used to build (and install)
-gtmcryptbldfiles="install.sh build.sh"
+gtmcryptbldfiles="Makefile"
 
 # Gtmcrypt Binaries
 gtmcryptbinaries="maskpass"
@@ -516,6 +516,7 @@ gtmcryptbinaries="maskpass"
 # Gtmcrypt shared library
 gtmcryptsharedlibs="libgtmcrypt_openssl_BLOWFISHCFB$ext libgtmcrypt_openssl_AES256CFB$ext"
 gtmcryptsharedlibs="$gtmcryptsharedlibs libgtmcrypt_gcrypt_AES256CFB$ext libgtmcrypt$ext"
+gtmcryptsharedlibs="$gtmcryptsharedlibs libgtmtls$ext libgtmcryptutil$ext"
 
 # Gtmcrypt scripts
 gtmcryptscripts="add_db_key.sh gen_sym_key.sh encrypt_sign_db_key.sh gen_keypair.sh pinentry-gtm.sh"
@@ -527,10 +528,8 @@ gtmcryptmfile="pinentry.m"
 # Gtmcrypt source files
 gtmcryptsrcfiles="gtmcrypt_ref.c gtmcrypt_ref.h gtmcrypt_interface.h maskpass.c"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_dbk_ref.c gtmcrypt_dbk_ref.h gtmcrypt_pk_ref.c gtmcrypt_pk_ref.h"
-gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_sym_ref.h $gtmcryptbldfiles $gtmcryptmfile"
-
-# Other Gtmcrypt related files
-gtmcryptofiles="gtmcrypt.tab"
+gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_sym_ref.h gtmcrypt_sym_ref.c gtm_tls_interface.h gtm_tls_impl.h"
+gtmcryptsrcfiles="$gtmcryptsrcfiles gtm_tls_impl.c gtmcrypt_util.c gtmcrypt_util.h $gtmcryptbldfiles $gtmcryptmfile"
 
 dogtmcrypt=0
 if [ -d "$plugin_gtmcrypt" ]; then
@@ -548,7 +547,7 @@ if [ -d "$plugin_gtmcrypt" ]; then
 	#Install the plugin related scripts
 	for i in $gtmcryptscripts
 	do
-		cp $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt/$i
+		cp -p $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt/$i
 		chmod 0755 $gtmdist/$plugin_gtmcrypt/$i
 		chown $owner $gtmdist/$plugin_gtmcrypt/$i
 		chgrp $bingroup $gtmdist/$plugin_gtmcrypt/$i
@@ -562,7 +561,7 @@ if [ -d "$plugin_gtmcrypt" ]; then
 		elif [ $arch = "ibm" ]; then
 			/usr/bin/install -f $gtmdist/$plugin_gtmcrypt -M 755 -O $owner -G $bingroup $plugin_gtmcrypt/$i
 		elif [ $arch = "zos" ]; then
-			cp $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
+			cp -p $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
 			chmod 755 $gtmdist/$plugin_gtmcrypt/$i
 			chown $user:$bingroup $gtmdist/$plugin_gtmcrypt/$i
 		elif [ -x /usr/sbin/install ]; then
@@ -586,7 +585,7 @@ if [ -d "$plugin_gtmcrypt" ]; then
 		elif [ $arch = "ibm" ]; then
 			/usr/bin/install -f $gtmdist/$plugin -M 755 -O $owner -G $bingroup $plugin/$i
 		elif [ $arch = "zos" ]; then
-			cp $plugin/$i $gtmdist/$plugin
+			cp -p $plugin/$i $gtmdist/$plugin
 			chmod 755 $gtmdist/$plugin/$i
 			chown $user:$bingroup $gtmdist/$plugin/$i
 		elif [ -x /usr/sbin/install ]; then
@@ -603,23 +602,14 @@ if [ -d "$plugin_gtmcrypt" ]; then
 	fi
 
 	# Install the plugin related M file
-	cp $plugin_gtmcrypt/$gtmcryptmfile $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+	cp -p $plugin_gtmcrypt/$gtmcryptmfile $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
 	chmod 0644 $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
 	chown $owner $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
 	chgrp $bingroup $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
 
-	# Install other plugin files
-	for i in $gtmcryptofiles
-	do
-		cp $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
-		chmod 0644 $gtmdist/$plugin_gtmcrypt/$i
-		chown $owner $gtmdist/$plugin_gtmcrypt/$i
-		chgrp $bingroup $gtmdist/$plugin_gtmcrypt/$i
-	done
-
 	# Install gpgagent.tab
 	# This is an external call table so the path to the shared library has to be adjusted
-	echo "$gtmdist/plugin/libgtmcrypt.so" > $gtmdist/$plugin/gpgagent.tab
+	echo "$gtmdist/plugin/libgtmcryptutil$ext" > $gtmdist/$plugin/gpgagent.tab
 	cat $plugin/gpgagent.tab | sed 1d >> $gtmdist/$plugin/gpgagent.tab
 
 	# Tar the source files
@@ -630,7 +620,7 @@ if [ -d "$plugin_gtmcrypt" ]; then
 fi
 
 # Install GDE, GTMHELP, and all the percent routines
-cp *.o *.m $gtmdist
+cp -p *.o *.m $gtmdist
 
 # Install a mirror image (using soft links) of $gtmdist under $gtmdist/utf8 if this platform can support "UTF-8" mode.
 if [ "$doutf8" -ne 0 ]; then
@@ -648,7 +638,7 @@ if [ "$doutf8" -ne 0 ]; then
 		# Install .o files
 		base="`basename $file .o`"
 		if [ "$base" != "$file" ]; then
-			cp $file $gtmdist/utf8
+			cp -p $file $gtmdist/utf8
 		else
 			# Soft link everything else
 			if [ -f $gtmdist/utf8/$file ]; then
@@ -851,8 +841,8 @@ elif [ -x /usr/sbin/install ]; then
 	/usr/sbin/install -f $gtmdist -m 4555 -u root -g $bingroup gtmsecshr $gtmdist
 	/usr/sbin/install -f $tgtmsecshrdir -m 4500 -u root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir
 elif [ $arch = "zos" ]; then
-	cp gtmsecshr $gtmdist/gtmsecshr
-	cp gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
+	cp -p gtmsecshr $gtmdist/gtmsecshr
+	cp -p gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
 	chown $rootuser:$bingroup $gtmdist/gtmsecshr $tgtmsecshrdir/gtmsecshr
 	chmod 4555 $gtmdist/gtmsecshr
 	chmod 4500 $tgtmsecshrdir/gtmsecshr

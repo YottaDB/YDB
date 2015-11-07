@@ -41,7 +41,6 @@
 
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF uint4		update_array_size;
-GBLREF gd_addr		*gd_header;
 GBLREF gd_region        *gv_cur_region;
 GBLREF srch_hist	dummy_hist;
 GBLREF sgmnt_addrs	*cs_addrs;
@@ -69,7 +68,7 @@ void dse_rmrec(void)
 	srch_blk_status	blkhist;
 
         if (gv_cur_region->read_only)
-                rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+                rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
@@ -92,7 +91,7 @@ void dse_rmrec(void)
 	blk_size = cs_addrs->hdr->blk_size;
 	blkhist.blk_num = patch_curr_blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	lbp = (uchar_ptr_t)malloc(blk_size);
 	memcpy(lbp, blkhist.buffaddr, blk_size);
 

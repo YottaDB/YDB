@@ -20,6 +20,7 @@ dse_f_free
 dse_f_key
 dse_f_reg
 dse_fdmp
+dse_find_gvt
 dse_find_roots
 dse_flush
 dse_getki

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -323,7 +323,7 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 /* Local routine! condition handler whose sole function is to turn off the flag that says we are in "als_check_xnew_var_alias" */
 CONDITION_HANDLER(als_check_xnew_var_aliases_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	suspend_lvgcol = FALSE;
 	NEXTCH;
 }

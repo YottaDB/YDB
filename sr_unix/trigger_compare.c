@@ -29,7 +29,7 @@
 #include "mvalconv.h"			/* Needed for MV_FORCE_MVAL and MV_FORCE_UMVAL */
 #include "op.h"
 #include "nametabtyp.h"
-#include "targ_alloc.h"			/* for SETUP_TRIGGER_GLOBAL & SWITCH_TO_DEFAULT_REGION */
+#include "targ_alloc.h"			/* for SET_GVTARGET_TO_HASHT_GBL & SWITCH_TO_DEFAULT_REGION */
 #include "gdscc.h"			/* needed for tp.h */
 #include "gdskill.h"			/* needed for tp.h */
 #include "buddy_list.h"			/* needed for tp.h */
@@ -37,6 +37,7 @@
 #include "filestruct.h"			/* needed for jnl.h */
 #include "jnl.h"			/* needed for tp.h */
 #include "tp.h"
+#include "hashtab_mname.h"
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gd_addr			*gd_header;
@@ -183,11 +184,8 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 {
 	mval			collision_indx;
 	mval			*collision_indx_ptr;
-	sgmnt_addrs		*csa;
 	mval			data_val;
-	mstr			gbl_name;
-	mname_entry		gvent;
-	gv_namehead		*hasht_tree;
+	mname_entry		gvname;
 	boolean_t		have_value;
 	mval			key_val;
 	int4			len;
@@ -205,6 +203,7 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 	int			trig_index;
 	char			*xecute_buff;
 	int4			xecute_len;
+	gvnh_reg_t		*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -242,11 +241,12 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 		ptr++;
 		A2I(ptr, key_val.str.addr + key_val.str.len, trig_index);
 		assert(-1 != trig_index);
-		gbl_name.addr = trigvn;
-		gbl_name.len = trigvn_len;
-		GV_BIND_NAME_ONLY(gd_header, &gbl_name);
-		csa = gv_target->gd_csa;
-		SETUP_TRIGGER_GLOBAL;
+		gvname.var_name.addr = trigvn;
+		gvname.var_name.len = trigvn_len;
+		COMPUTE_HASH_MNAME(&gvname);
+		GV_BIND_NAME_ONLY(gd_header, &gvname, gvnh_reg);
+		assert(cs_addrs == gv_target->gd_csa);
+		SET_GVTARGET_TO_HASHT_GBL(cs_addrs);
 		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 		MV_FORCE_MVAL(&mv_trig_indx, trig_index);
 		for (sub_indx = 0; sub_indx < NUM_TOTAL_SUBS; sub_indx++)

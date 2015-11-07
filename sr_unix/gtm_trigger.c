@@ -233,7 +233,7 @@ CONDITION_HANDLER(gtm_trigger_complink_ch)
 	 * have their own handler but other errors are still possible. The primary use of this handler is (1) to remove
 	 * the mv_stent we created and (2) most importantly to turn off the trigger_compile flag.
 	 */
-	START_CH;
+	START_CH(TRUE);
 	TREF(trigger_compile) = FALSE;
 	run_time = gtm_trigger_comp_prev_run_time;
 	if (((unsigned char *)mv_chain == msp) && (MVST_MSAV == mv_chain->mv_st_type)
@@ -263,7 +263,7 @@ CONDITION_HANDLER(gtm_trigger_ch)
 	   always an mdb_condition_handler behind us for an earlier trigger level and we let it handle severe
 	   errors for us as it gives better diagnostics (e.g. GTM_FATAL_ERROR dumps) in addition to the file core dump.
 	*/
-	START_CH;
+	START_CH(TRUE);
 	DBGTRIGR((stderr, "gtm_trigger_ch: Failsafe condition cond handler entered with SIGNAL = %d\n", SIGNAL));
 	if (DUMPABLE)
 		/* Treat fatal errors thusly */
@@ -313,7 +313,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	char		objname[GTM_PATH_MAX + 1];
 	char		zcomp_parms[(GTM_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)];
 	mstr		save_zsource;
-	int		rtnfd, rc, lenrtnname, lenobjname, len, alphnum_len, retry, save_errno;
+	int		rtnfd, rc, lenrtnname, lenobjname, len, retry, save_errno;
 	char		*mident_suffix_p1, *mident_suffix_p2, *mident_suffix_top, *namesub1, *namesub2, *zcomp_parms_ptr;
 	mval		zlfile, zcompprm;
 	DCL_THREADGBL_ACCESS;
@@ -331,15 +331,8 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	/* Verify the routine name set by MUPIP TRIGGER and read by gvtr_db_read_hasht() is not in use */
 	if (NULL != find_rtn_hdr(&trigdsc->rtn_desc.rt_name))
 	{	/* Ooops .. need name to be more unique.. */
-		alphnum_len = alphanumeric_table_len;	/* Local copy so can override it for whitebox test */
 		namesub1 = trigdsc->rtn_desc.rt_name.addr + trigdsc->rtn_desc.rt_name.len++;
-		/* If WBTEST_HELPOUT_TRIGNAMEUNIQ is defined, set alphnum_len to 1. This way, we make the maximum
-		 * possible combinations for the uniqe trigger names to be 3 which is significantly lesser than
-		 * the actual number of combinations (62x62 = 3844). For eg., if ^a is a global having triggers defined
-		 * in 4 global directories, then the possible unique trigger names are a#1# ; a#1#A ; a#1#AA.
-		 */
-		GTM_WHITE_BOX_TEST(WBTEST_HELPOUT_TRIGNAMEUNIQ, alphnum_len, 1);
-		mident_suffix_top = (char *)alphanumeric_table + alphnum_len;
+		mident_suffix_top = (char *)alphanumeric_table + alphanumeric_table_len;
 		/* Phase 1. See if any single character can add uniqueness */
 		for (mident_suffix_p1 = (char *)alphanumeric_table; mident_suffix_p1 < mident_suffix_top; mident_suffix_p1++)
 		{
@@ -368,8 +361,9 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 			if (mident_suffix_p1 == mident_suffix_top)
 			{	/* Phase 3: Punt */
 				assert(WBTEST_HELPOUT_TRIGNAMEUNIQ == gtm_white_box_test_case_number);
-				rts_error(VARLSTCNT(5) ERR_TRIGNAMEUNIQ, 3, trigdsc->rtn_desc.rt_name.len - 2,
-					  trigdsc->rtn_desc.rt_name.addr, alphnum_len * alphnum_len);
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TRIGNAMEUNIQ, 3,
+						trigdsc->rtn_desc.rt_name.len - 2, trigdsc->rtn_desc.rt_name.addr,
+						((alphanumeric_table_len + 1) * alphanumeric_table_len) + 1);
 			}
 		}
 	}
@@ -391,7 +385,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	{
 		save_errno = errno;
 		assert(FALSE);
-		rts_error(VARLSTCNT(12) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("mkstemp()"), CALLFROM,
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("mkstemp()"), CALLFROM,
 			  ERR_TEXT, 2, RTS_ERROR_TEXT(rtnname), save_errno);
 	}
 	assert(0 < rtnfd);	/* Verify file descriptor */
@@ -402,7 +396,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		if (0 != rc)
 		{
 			UNLINK(rtnname);
-			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 		}
 	}
 #	endif
@@ -410,7 +404,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	if (0 != rc)
 	{
 		UNLINK(rtnname);
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 	}
 	if (NULL == memchr(trigdsc->xecute_str.str.addr, '\n', trigdsc->xecute_str.str.len))
 	{
@@ -418,14 +412,14 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		if (0 != rc)
 		{
 			UNLINK(rtnname);
-			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 		}
 	}
 	CLOSEFILE(rtnfd, rc);
 	if (0 != rc)
 	{
 		UNLINK(rtnname);
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
 	}
 	assert(MAX_MIDENT_LEN > trigdsc->rtn_desc.rt_name.len);
 	zcomp_parms_ptr = zcomp_parms;
@@ -533,7 +527,8 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		if (0 != gtm_trigger_complink(trigdsc, TRUE))
 		{
 			PRN_ERROR;	/* Leave record of what error caused the compilation failure if any */
-			rts_error(VARLSTCNT(4) ERR_TRIGCOMPFAIL, 2, trigdsc->rtn_desc.rt_name.len, trigdsc->rtn_desc.rt_name.addr);
+			rts_error_csa(CSA_ARG(cs_addrs)
+				VARLSTCNT(4) ERR_TRIGCOMPFAIL, 2, trigdsc->rtn_desc.rt_name.len, trigdsc->rtn_desc.rt_name.addr);
 		}
 	}
 	assert(trigdsc->rtn_desc.rt_adr);
@@ -542,7 +537,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	if (!(frame_pointer->type & SFT_TRIGR))
 	{	/* Create new trigger base frame first that back-stops stack unrolling and return to us */
 		if (GTM_TRIGGER_DEPTH_MAX < (gtm_trigger_depth + 1))	/* Verify we won't nest too deep */
-			rts_error(VARLSTCNT(3) ERR_MAXTRIGNEST, 1, GTM_TRIGGER_DEPTH_MAX);
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_MAXTRIGNEST, 1, GTM_TRIGGER_DEPTH_MAX);
 		DBGTRIGR((stderr, "gtm_trigger: Invoking new trigger at frame_pointer 0x%016lx  ctxt value: 0x%016lx\n",
 			  frame_pointer, ctxt));
 		/* Protect against interrupts while we have only a trigger base frame on the stack */
@@ -733,7 +728,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		{	/* Our TP level was unwound during the trigger so throw an error */
 			DBGTRIGR((stderr, "gtm_trigger: $TLEVEL less than at start - throwing TRIGTLVLCHNG\n"));
 			gtm_trigger_fini(TRUE, FALSE);	/* dump this trigger level */
-			rts_error(VARLSTCNT(4) ERR_TRIGTLVLCHNG, 2, trigdsc->rtn_desc.rt_name.len,
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TRIGTLVLCHNG, 2, trigdsc->rtn_desc.rt_name.len,
 				  trigdsc->rtn_desc.rt_name.addr);
 		}
 		rc = 0;			/* Be polite and return 0 for the (hopefully common) success case */
@@ -780,15 +775,14 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 			}
 		}
 		/* Fall out and return ERR_TPRETRY to caller */
-	} else if (0 == rc)
-		/* We should never get a return code of 0. This would be out-of-design and a signal that something
+	} else
+	{	/* We should never get a return code of 0. This would be out-of-design and a signal that something
 		 * is quite broken. We cannot "rethrow" outside the trigger because it was not initially an error so
 		 * mdb_condition_handler would have no record of it (rethrown errors must have originally occurred in
 		 * or to be RE-thrown) and assert fail at best.
 		 */
-		GTMASSERT;
-	else
-	{	/* We have an unexpected return code due to some error during execution of the trigger that tripped
+		assertpro(0 != rc);
+		/* We have an unexpected return code due to some error during execution of the trigger that tripped
 		 * gtm_trigger's safety handler (i.e. an error occurred in mdb_condition_handler() established by
 		 * dm_start(). Since we are going to unwind the trigger frame and rethrow the error, we also have
 		 * to unwind all the stack frames on top of the trigger frame. Figure out how many frames that is,
@@ -801,7 +795,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		assert((NULL != frame_pointer) && !(SFT_TRIGR & frame_pointer->type));
 		DBGTRIGR((stderr, "gtm_trigger: Unsupported return code (%d) - unwound %d frames and now rethrowing error\n",
 			  rc, unwinds));
-		rts_error(VARLSTCNT(1) ERR_REPEATERROR);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_REPEATERROR);
 	}
 	return rc;
 }
@@ -946,26 +940,7 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	/* Remove break points in this routine before rmv from rtntbl */
 	zr_remove(rtnhdr, BREAKMSG);
 	/* Release any $TEXT() info this trigger has loaded */
-	if (NULL != (TREF(rt_name_tbl)).base)
-	{
-		key.var_name = mid->rt_name;
-		COMPUTE_HASH_MNAME(&key);
-		if (NULL != (tabent = lookup_hashtab_mname(TADR(rt_name_tbl), &key)))	/* note assignment */
-		{	/* We have a hash entry. Whether it has a value or not, it has a key name (if this is
-			 * the first time this trigger is being deleted) that may be pointing into the routine we
-			 * are about to remove. Migrate this key name to the stringpool.
-			 */
-			s2pool(&tabent->key.var_name);
-			if (NULL != tabent->value)
-			{	/* Has value, release the source. Entries and source are malloc'd in two blocks on UNIX */
-				src_tbl = (routine_source *)tabent->value;
-				if (NULL != src_tbl->srcbuff)
-					free(src_tbl->srcbuff);
-				free(src_tbl);
-				tabent->value = NULL;
-			}
-		}
-	}
+	free_src_tbl(rtnhdr);
 	/* Remove the routine from the rtn_table */
 	size = INTCAST((char *)rtn_names_end - (char *)mid);
 	if (0 < size)

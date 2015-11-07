@@ -24,16 +24,13 @@
 
 #include "io_params.h"
 #include "io.h"
-#include "iotcproutine.h"
-#include "iotcpdef.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
-
-GBLREF tcp_library_struct	tcp_routines;
 
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_LISTENPASSBND);
 error_def(ERR_LQLENGTHNA);
+error_def(ERR_NOSOCKETINDEV);
 error_def(ERR_SOCKLISTEN);
 error_def(ERR_TEXT);
 
@@ -42,32 +39,47 @@ error_def(ERR_TEXT);
 
 boolean_t iosocket_listen(io_desc *iod, unsigned short len)
 {
+	d_socket_struct	*dsocketptr;
+	socket_struct	*socketptr;
+
+	assert(gtmsocket == iod->type);
+	dsocketptr = (d_socket_struct *)iod->dev_sp;
+	if (0 >= dsocketptr->n_socket)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		return FALSE;
+	}
+	if (dsocketptr->current_socket >= dsocketptr->n_socket)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
+		return FALSE;
+	}
+	socketptr = dsocketptr->socket[dsocketptr->current_socket];
+	assert(socketptr && (socketptr->dev == dsocketptr));
+
+	return iosocket_listen_sock(socketptr, len);
+}
+
+boolean_t iosocket_listen_sock(socket_struct *socketptr, unsigned short len)
+{
 	char		*errptr;
 	int4		errlen;
 	d_socket_struct	*dsocketptr;
-	socket_struct	*socketptr;
 
 	if (MAX_LISTEN_QUEUE_LENGTH < len)
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LQLENGTHNA, 1, len);
 		return FALSE;
 	}
-	assert(gtmsocket == iod->type);
-	dsocketptr = (d_socket_struct *)iod->dev_sp;
-	socketptr = dsocketptr->socket[dsocketptr->current_socket];
-	if (dsocketptr->current_socket >= dsocketptr->n_socket)
-	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
-		return FALSE;
-	}
-	if ((socketptr->state != socket_bound) || (TRUE != socketptr->passive))
+	if (((socketptr->state != socket_bound) && (socketptr->state != socket_listening)) || (TRUE != socketptr->passive))
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LISTENPASSBND);
 		return FALSE;
 	}
+	dsocketptr = socketptr->dev;
 	dsocketptr->iod->dollar.key[0] = '\0';
 	/* establish a queue of length len for incoming connections */
-	if (-1 == tcp_routines.aa_listen(socketptr->sd, len))
+	if (-1 == listen(socketptr->sd, len))
 	{
 		errptr = (char *)STRERROR(errno);
 		errlen = STRLEN(errptr);
@@ -81,6 +93,14 @@ boolean_t iosocket_listen(io_desc *iod, unsigned short len)
 	memcpy(&dsocketptr->iod->dollar.key[len], socketptr->handle, socketptr->handle_len);
 	len += socketptr->handle_len;
 	dsocketptr->iod->dollar.key[len++] = '|';
-	SPRINTF(&dsocketptr->iod->dollar.key[len], "%d", socketptr->local.port);
+	if (socket_local != socketptr->protocol)
+		SPRINTF(&dsocketptr->iod->dollar.key[len], "%d", socketptr->local.port);
+#	ifndef VMS
+	else
+	{
+		STRNCPY_STR(&dsocketptr->iod->dollar.key[len],
+			((struct sockaddr_un *)(socketptr->local.sa))->sun_path, DD_BUFLEN - len - 1);
+	}
+#	endif
 	return TRUE;
 }

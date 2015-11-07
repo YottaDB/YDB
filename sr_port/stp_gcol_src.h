@@ -538,9 +538,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 		low_reclaim_passes = &indr_stp_low_reclaim_passes;
 		incr_factor = &indr_stp_incr_factor;
 	} else
-	{
-		GTMASSERT; /* neither rts_stringpool, nor indr_stringpool */
-	}
+		assertpro(FALSE && stringpool.base);	/* neither rts_stringpool, nor indr_stringpool */
 	if (NULL == stp_array)
 		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
 	topstr = array = stp_array;
@@ -626,6 +624,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 			for (xnewvar = symtab->xnew_var_list; xnewvar; xnewvar = xnewvar->next)
 				MSTR_STPG_ADD(&xnewvar->key.var_name);
 		}
+#		ifdef VMS
 		if (NULL != (TREF(rt_name_tbl)).base)
 		{	/* Keys for $TEXT source hash table can live in stringpool */
 			for (tabent_mname = (TREF(rt_name_tbl)).base, topent_mname = (TREF(rt_name_tbl)).top;
@@ -633,6 +632,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 				if (HTENT_VALID_MNAME(tabent_mname, routine_source, rsptr))
 					MSTR_STPG_ADD(&tabent_mname->key.var_name);
 		}
+#		endif
 		if (x = comline_base)
 			for (index = MAX_RECALL; index > 0 && x->len; index--, x++)
 			{	/* These strings are guaranteed to be in the stringpool so use MSTR_STPG_PUT macro directly
@@ -776,7 +776,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 					ZWRHTAB_GC(mvs->mv_st_cont.mvs_mrgzwrsv.save_zwrhtab);
 					continue;
 				default:
-					GTMASSERT;
+					assertpro(FALSE && mvs->mv_st_type);
 			}
 			MVAL_STPG_ADD(m);
 		}

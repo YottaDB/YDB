@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -797,6 +797,9 @@ int	trim_U16_line_term(UChar *buffer, int len);
 #define	UTF8_BADCHAR(len, str, strtop, chset_len, chset)								\
 	utf8_badchar((len), (unsigned char *)(str), (unsigned char *)(strtop), (chset_len), (unsigned char *)(chset))
 
+#define	UTF8_BADCHAR_DEC(len, str, strtop, chset_len, chset)								\
+	utf8_badchar_dec((len), (unsigned char *)(str), (unsigned char *)(strtop), (chset_len), (unsigned char *)(chset))
+
 #define	UTF8_BADCHAR_STX(len, str, strtop, chset_len, chset)								\
 	utf8_badchar_stx((len), (unsigned char *)(str), (unsigned char *)(strtop), (chset_len), (unsigned char *)(chset))
 
@@ -815,14 +818,27 @@ int	trim_U16_line_term(UChar *buffer, int len);
 		? FALSE													\
 		: u_isprint(code))
 
+/* The utf8_len[_{stx,dec)] routines do slightly different error reporting. This enum defines which type is desired */
+typedef enum
+{
+	err_rts,		/* Use rts_error() */
+	err_stx,		/* Use stx_error() */
+	err_dec			/* Use dec_error() */
+} utf8_err_type;
+
 GBLREF		boolean_t       utf8_patnumeric;
 int		utf8_len(mstr* str);
+int		utf8_len_dec(mstr* str);
 int		utf8_len_stx(mstr* str);
 int		utf8_len_strict(unsigned char* ptr, int len);
+STATICFNDCL int utf8_len_real(utf8_err_type err_type, mstr* str);
 int		gtm_wcwidth(wint_t code);
 int		gtm_wcswidth(unsigned char* ptr, int len, boolean_t strict, int nonprintwidth);
 void		utf8_badchar(int len, unsigned char* str, unsigned char *strtop, int chset_len, unsigned char* chset);
+void		utf8_badchar_dec(int len, unsigned char* str, unsigned char *strtop, int chset_len, unsigned char* chset);
 void		utf8_badchar_stx(int len, unsigned char* str, unsigned char *strtop, int chset_len, unsigned char* chset);
+STATICFNDCL void utf8_badchar_real(utf8_err_type err_type, int len, unsigned char* str, unsigned char *strtop, int chset_len,
+				   unsigned char* chset);
 unsigned char	*gtm_utf8_trim_invalid_tail(unsigned char *str, int len);
 
 /* To prevent GTMSECSHR from pulling in the function "gtmwcswidth" (used in util_output.c) and in turn the entire Unicode

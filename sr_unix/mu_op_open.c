@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,10 +95,10 @@ int mu_op_open(mval *v, mval *p, int t, mval *mspace)
 			tl = naml;
 			break;
 		case SS_LOG2LONG:
-			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf1) - 1);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf1) - 1);
 			break;
 		default:
-			rts_error(VARLSTCNT(1) stat);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) stat);
 		}
 	}
 	stat = mu_open_try(naml, tl, p, mspace);
@@ -161,7 +161,7 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 				if (-1 == fstat_res)
 				{
 					save_errno = errno;
-					rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 						  RTS_ERROR_LITERAL("fstat()"),
 						  CALLFROM, save_errno);
 				}
@@ -174,7 +174,7 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 					if (-1 == fstat_res)
 					{
 						save_errno = errno;
-						rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 							  RTS_ERROR_LITERAL("fstat()"),
 							  CALLFROM, save_errno);
 					}
@@ -191,7 +191,7 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 					else
 					{
 						save_errno = errno;
-						rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 							  RTS_ERROR_LITERAL("fstat()"),
 							  CALLFROM, save_errno);
 					}
@@ -225,7 +225,7 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 	} else
 		iod = naml->iod;
 	active_device = iod;
-	if ((-2 == file_des) && (dev_open != iod->state) && (us != iod->type) && (tcp != iod->type))
+	if ((-2 == file_des) && (dev_open != iod->state) && (us != iod->type))
 	{
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
 		p_offset = 0;
@@ -345,7 +345,6 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 		if (-1 == file_des)
 			return FALSE;
 	}
-	assert (tcp != iod->type);
 #ifdef KEEP_zOS_EBCDIC
 	SET_CODE_SET(iod->in_code_set, OUTSIDE_CH_SET);
 	if (DEFAULT_CODE_SET != iod->in_code_set)
@@ -357,7 +356,7 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 	/* smw 99/12/18 not possible to be -1 here */
 	if (-1 == file_des)
 	{
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 			  RTS_ERROR_LITERAL("open()"),
 			  CALLFROM, save_errno);
 	}

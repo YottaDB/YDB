@@ -273,7 +273,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	mv_stent		*mvst;
 #	endif
 
-	START_CH;
+	START_CH(FALSE);
 	DBGEHND((stderr, "mdb_condition_handler: Entered with SIGNAL=%d frame_pointer=0x"lvaddr"\n", SIGNAL, frame_pointer));
 	if (NULL != gtm_err_dev)
 	{
@@ -457,8 +457,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				 */
 				gv_cur_region = csa->region;
 				assert(gv_cur_region->open);
-				assert((dba_mm == gv_cur_region->dyn.addr->acc_meth)
-					|| (dba_bg == gv_cur_region->dyn.addr->acc_meth));
+				assert((dba_mm == REG_ACC_METH(gv_cur_region)) || (dba_bg == REG_ACC_METH(gv_cur_region)));
 				/* The above assert is needed to ensure that change_reg/tp_change_reg (invoked below)
 				 * will set cs_addrs, cs_data etc. to non-zero values.
 				 */
@@ -499,7 +498,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 */
 		SET_PROCESS_EXITING_TRUE;	/* So zshow doesn't push stuff on stack to "protect" it when
 						 * we potentially already have a stack overflow */
-		cancel_timer(0);		/* No interruptions now that we are dying */
+		CANCEL_TIMERS;			/* No unsafe interruptions now that we are dying */
 		if (!repeat_error UNIX_ONLY(&& (0 == gtmMallocDepth)))
 		{
 			src_line_d.addr = src_line;	/* Setup entry point buffer for set_zstatus() */
@@ -911,7 +910,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 	}
 	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
 	{
-		PRN_ERROR;
+		/* skip printing error messages for INFO messages if this variable is set.
+		 * this is currently relied upon by GDE for the VIEW "YCHKCOLL" command.
+		 */
+		if (!TREF(skip_gtm_putmsg))
+			PRN_ERROR;
 		CONTINUE;
 	}
 	/* Error from direct mode actions or "transcendental" code does not invoke MUMPS error handling routines */

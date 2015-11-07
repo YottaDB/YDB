@@ -86,13 +86,13 @@ ZOS_ONLY(error_def(ERR_TEXT);)
 
 
 #define SNAPSHOT_TMP_PREFIX	"gtm_snapshot_"
-#define ISSUE_WRITE_ERROR_AND_EXIT(reg, RC, csa, tempfilename)								\
-{															\
-	gtm_putmsg(VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("write"), LEN_AND_STR(tempfilename), RC);		\
-	if (csa->now_crit)												\
-		rel_crit(csa->region);											\
+#define ISSUE_WRITE_ERROR_AND_EXIT(reg, RC, csa, tempfilename)									\
+{																\
+	gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("write"), LEN_AND_STR(tempfilename), RC);	\
+	if (csa->now_crit)													\
+		rel_crit(csa->region);												\
 	UNFREEZE_REGION_IF_NEEDED(csa->hdr, reg);										\
-	return FALSE;													\
+	return FALSE;														\
 }
 
 #define TOT_BYTES_REQUIRED(BLKS)	DIVIDE_ROUND_UP(BLKS, 8) /* One byte can represent 8 blocks' before image state */
@@ -137,15 +137,15 @@ ZOS_ONLY(error_def(ERR_TEXT);)
 		{											\
 			RC = errno;									\
 			assert(FALSE);									\
-			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmdt"), 	\
-					CALLFROM, RC);							\
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5,			\
+					LEN_AND_LIT("Error with shmdt"), CALLFROM, RC);			\
 		}											\
 		if (0 != shmctl(SS_SHMID, IPC_RMID, 0))							\
 		{											\
 			RC = errno;									\
 			assert(FALSE);									\
-			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmctl"),	\
-					CALLFROM, RC);							\
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5,			\
+					LEN_AND_LIT("Error with shmctl"), CALLFROM, RC);		\
 		}											\
 	}												\
 	SS_SHMID = shmget(IPC_PRIVATE, SS_SHMSIZE, RWDALL | IPC_CREAT);					\
@@ -153,15 +153,15 @@ ZOS_ONLY(error_def(ERR_TEXT);)
 	{												\
 		RC = errno;										\
 		assert(FALSE);										\
-		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmget"), CALLFROM,	\
-				RC);									\
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5,				\
+				LEN_AND_LIT("Error with shmget"), CALLFROM, RC);			\
 	}												\
 	if (-1 == (sm_long_t)(SS_SHMADDR = do_shmat(SS_SHMID, 0, 0)))					\
 	{												\
 		RC = errno;										\
 		assert(FALSE);										\
-		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmat"), CALLFROM,	\
-			RC);										\
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5,				\
+				LEN_AND_LIT("Error with shmat"), CALLFROM, RC);				\
 	}												\
 }
 
@@ -205,7 +205,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	shm_snapshot_ptr_t	ss_shm_ptr;
 	snapshot_context_ptr_t	lcl_ss_ctx, ss_orphan_ctx;
 	snapshot_filhdr_ptr_t	ss_filhdr_ptr;
-	int			shdw_fd, tmpfd, fclose_res, fstat_res, status, perm, group_id, pwrite_res, dsk_addr = 0;
+	int			shdw_fd, tmpfd, fclose_res, fstat_res, status, perm, user_id, group_id, pwrite_res, dsk_addr = 0;
 	int			retries, idx, this_snapshot_idx, save_errno, ss_shmsize, ss_shm_vbn;
 	ZOS_ONLY(int		realfiletag;)
 	long			ss_shmid = INVALID_SHMID;
@@ -216,6 +216,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	enum db_acc_method	acc_meth;
 	void			*ss_shmaddr;
 	gtm_uint64_t		db_file_size, native_size;
+	DEBUG_ONLY(gtm_uint64_t db_size;)
 	uint4			tempnamprefix_len, crit_counter, tot_blks, prev_ss_shmsize, fstat_status;
 	pid_t			*kip_pids_arr_ptr;
 	mstr			tempdir_log, tempdir_full, tempdir_trans;
@@ -255,7 +256,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 			ss_release(NULL);
 		else
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_MAXSSREACHED, 3, MAX_SNAPSHOTS, REG_LEN_STR(reg));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MAXSSREACHED, 3, MAX_SNAPSHOTS, REG_LEN_STR(reg));
 			ss_release_lock(reg);
 			UNFREEZE_REGION_IF_NEEDED(csd, reg);
 			return FALSE;
@@ -328,7 +329,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	/* Verify if we can stat the temporary directory */
 	if (FILE_STAT_ERROR == (fstat_res = gtm_file_stat(&tempdir_trans, NULL, &tempdir_full, FALSE, &fstat_status)))
 	{
-		gtm_putmsg(VARLSTCNT(5) ERR_SSTMPDIRSTAT, 2, tempdir_trans.len, tempdir_trans.addr, fstat_status);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_SSTMPDIRSTAT, 2, tempdir_trans.len, tempdir_trans.addr, fstat_status);
 		UNFREEZE_REGION_IF_NEEDED(csd, reg);
 		return FALSE;
 	}
@@ -346,7 +347,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	if (FD_INVALID == tmpfd)
 	{
 		status = errno;
-		gtm_putmsg(VARLSTCNT(5) ERR_SSTMPCREATE, 2, tempdir_trans.len, tempdir_trans.addr, status);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_SSTMPCREATE, 2, tempdir_trans.len, tempdir_trans.addr, status);
 		UNFREEZE_REGION_IF_NEEDED(csd, reg);
 		return FALSE;
 	}
@@ -364,7 +365,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	if (FD_INVALID == shdw_fd)
 	{
 		status = errno;
-		gtm_putmsg(VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"),
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"),
 				tempdir_full.len, tempdir_full.addr, status);
 		UNFREEZE_REGION_IF_NEEDED(csd, reg);
 		return FALSE;
@@ -389,13 +390,13 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		 * INTEG started by read-only processes to create snapshot files that are writable by processes having write
 		 * permissions on the database file.
 		 */
-		if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_IPC, &pdd) < 0)
+		if (gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_IPC, &pdd) < 0)
 		{
-			send_msg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("snapshot file"),
 				RTS_ERROR_STRING(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fn),
 				PERMGENDIAG_ARGS(pdd));
-			gtm_putmsg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("snapshot file"),
 				RTS_ERROR_STRING(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fn),
 				PERMGENDIAG_ARGS(pdd));
@@ -404,10 +405,10 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		}
 	}
 	if ((-1 == fstat_res) || (-1 == FCHMOD(shdw_fd, perm))
-		|| ((-1 != group_id) && (-1 == fchown(shdw_fd, -1, group_id))))
+		|| (((-1 != user_id) || (-1 != group_id)) && (-1 == fchown(shdw_fd, user_id, group_id))))
 	{
 		status = errno;
-		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fchmod/fchown"), CALLFROM, status);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fchmod/fchown"), CALLFROM, status);
 		UNFREEZE_REGION_IF_NEEDED(csd, reg);
 		return FALSE;
 	}
@@ -579,7 +580,8 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		{	/* We have a consistent copy of the total blocks and csd->kill_in_prog is FALSE inside crit. No need for
 			 * retry.
 			 */
-			assert(native_size == (((gtm_uint64_t)tot_blks * (csd->blk_size / DISK_BLOCK_SIZE)) + (csd->start_vbn)));
+			DEBUG_ONLY(db_size = ((gtm_uint64_t)tot_blks * (csd->blk_size / DISK_BLOCK_SIZE)) + (csd->start_vbn);)
+			assert((native_size == db_size) || (native_size == ROUND_UP(db_size, (OS_PAGE_SIZE / DISK_BLOCK_SIZE))));
 			break;
 		}
 	}
@@ -589,7 +591,8 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	 * proceed gracefully
 	 */
 	assert(csa->now_crit);
-	assert(native_size == (((gtm_uint64_t)tot_blks * (csd->blk_size / DISK_BLOCK_SIZE)) + (csd->start_vbn)));
+	DEBUG_ONLY(db_size = ((gtm_uint64_t)tot_blks * (csd->blk_size / DISK_BLOCK_SIZE)) + (csd->start_vbn);)
+	assert((native_size == db_size) || (native_size == ROUND_UP(db_size, (OS_PAGE_SIZE / DISK_BLOCK_SIZE))));
 	assert(NULL != ss_shmaddr);
 	assert(0 == ((long)ss_shmaddr % OS_PAGE_SIZE));
 	assert(0 == ss_shmsize % OS_PAGE_SIZE);
@@ -612,7 +615,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		/* If -ONLINE was specified explicitly, then it is an ERROR. Issue the error and return FALSE. */
 		if (online_specified)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_SSV4NOALLOW, 2, DB_LEN_STR(reg));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_SSV4NOALLOW, 2, DB_LEN_STR(reg));
 			util_out_print(NO_ONLINE_ERR_MSG, TRUE);
 			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
 			UNFREEZE_REGION_IF_NEEDED(csd, reg);
@@ -642,7 +645,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 								   * phase 2 commits are done with before returning */
 	{
 		assert(process_id != csd->freeze); /* We would not have frozen the region if the database is read-write */
-		gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_STR(calling_utility), DB_LEN_STR(reg));
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_STR(calling_utility), DB_LEN_STR(reg));
 		GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
 		return FALSE;
 	}
@@ -701,7 +704,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	{	/* A concurrent online rollback happened since we did the gvcst_init. The INTEG is not reliable.
 		 * Cleanup and exit
 		 */
-		gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
 		UNFREEZE_REGION_IF_NEEDED(csa, reg);
 		return FALSE;
 	}

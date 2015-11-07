@@ -47,7 +47,6 @@ GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_log_fd;
 GBLREF 	FILE			*gtmsource_log_fp;
 GBLREF  gtmsource_state_t       gtmsource_state;
-GBLREF	gd_addr          	*gd_header;
 
 GBLDEF	boolean_t			heartbeat_stalled = TRUE;
 GBLDEF	repl_heartbeat_que_entry_t	*repl_heartbeat_que_head = NULL;
@@ -83,7 +82,7 @@ int gtmsource_init_heartbeat(void)
 	REPL_DPRINT4("Initialized heartbeat, heartbeat_period = %d s, heartbeat_max_wait = %d s, num_q_entries = %d\n",
 			heartbeat_period, heartbeat_max_wait, num_q_entries);
 	if (!(repl_heartbeat_que_head = (repl_heartbeat_que_entry_t *)malloc(num_q_entries * SIZEOF(repl_heartbeat_que_entry_t))))
-		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Error in allocating heartbeat queue"), errno);
 
 	memset(repl_heartbeat_que_head, 0, num_q_entries * SIZEOF(repl_heartbeat_que_entry_t));
@@ -183,7 +182,6 @@ int gtmsource_send_heartbeat(time_t *now)
 		    GTMSOURCE_CHANGING_MODE == gtmsource_state)
 			return (SS_NORMAL);
 	}
-
 	if (SS_NORMAL == status)
 	{
 		insqt((que_ent_ptr_t)heartbeat_element, (que_ent_ptr_t)repl_heartbeat_que_head);
@@ -197,7 +195,6 @@ int gtmsource_send_heartbeat(time_t *now)
 
 		return (SS_NORMAL);
 	}
-
 	if (EREPL_SEND == repl_errno && REPL_CONN_RESET(status))
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to send heartbeat. Status = %d ; %s\n",
@@ -207,14 +204,12 @@ int gtmsource_send_heartbeat(time_t *now)
 		return (SS_NORMAL);
 	}
 	if (EREPL_SEND == repl_errno)
-		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Error sending HEARTBEAT message. Error in send"), status);
-
 	if (EREPL_SELECT == repl_errno)
-		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Error sending HEARTBEAT message. Error in select"), status);
-
-	GTMASSERT;
+	assertpro((SS_NORMAL == status));
 }
 
 int gtmsource_process_heartbeat(repl_heartbeat_msg_t *heartbeat_msg)

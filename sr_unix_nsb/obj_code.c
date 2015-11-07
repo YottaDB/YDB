@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@
 #include "cg_var.h"
 #include "gtm_string.h"
 #include "stringpool.h"
+#include "rtn_src_chksum.h"
 
 GBLREF boolean_t		run_time;
 GBLREF command_qualifier	cmd_qlf;
@@ -81,7 +82,7 @@ void	cg_lab (mlabel *l, int4 base);
  *
  */
 
-void	obj_code (uint4 src_lines, uint4 checksum)
+void	obj_code (uint4 src_lines, void *checksum_ctx)
 {
 	rhdtyp		rhead;
 	mline		*mlx, *mly;
@@ -111,7 +112,7 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	if (!(cmd_qlf.qlf & CQ_OBJECT))
 		return;
 	rhead.ptext_ptr = SIZEOF(rhead);
-	rhead.checksum = checksum;
+	set_rtnhdr_checksum(&rhead, (gtm_rtn_src_chksum_ctx *)checksum_ctx);
 	rhead.vartab_ptr = code_size;
 	rhead.vartab_len = mvmax;
 	code_size += mvmax * SIZEOF(var_tabent);

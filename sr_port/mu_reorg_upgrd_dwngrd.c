@@ -174,9 +174,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		util_out_print("!/MUPIP REORG !AD cannot proceed with above errors!/", TRUE, LEN_AND_STR(command));
 		mupip_exit(ERR_MUNOACTION);
 	}
-	GVKEYSIZE_INCREASE_IF_NEEDED(DBKEYSIZE(MAX_KEY_SZ)); /* Keep gv_currkey/gv_altkey in sync with respect to gv_keysize
-							      * (now MAX_KEY_SZ) */
-	assert(DBKEYSIZE(MAX_KEY_SZ) == gv_keysize);
+	assert(DBKEYSIZE(MAX_KEY_SZ) == gv_keysize);	/* no need to invoke GVKEYSIZE_INIT_IF_NEEDED macro */
 	gv_target = targ_alloc(gv_keysize, NULL, NULL);	/* t_begin needs this initialized */
 	gv_target_list = NULL;
 	memset(&alt_hist, 0, SIZEOF(alt_hist));	/* null-initialize history */
@@ -200,7 +198,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		 * the database setting prevails. therefore, the access method check can be done only after opening
 		 * the database (i.e. after the gvcst_init)
 		 */
-		if (dba_bg != reg->dyn.addr->acc_meth)
+		if (dba_bg != REG_ACC_METH(reg))
 		{
 			util_out_print("Region !AD : MUPIP REORG !AD cannot continue as access method is not BG",
 				TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
@@ -218,7 +216,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		blk_size = csd->blk_size;	/* "blk_size" is used by the BLK_FINI macro */
 		if (reg->read_only)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(reg));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(reg));
 			status = ERR_MUNOFINISH;
 			continue;
 		}
@@ -291,7 +289,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 		if (!wcs_flu(WCSFLU_FLUSH_HDR))	/* wcs_flu assumes gv_cur_region is set (which it is in this routine) */
 		{
 			rel_crit(reg);
-			gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("MUPIP REORG UPGRADE/DOWNGRADE"), DB_LEN_STR(reg));
+			gtm_putmsg_csa(CSA_ARG(csa)
+				VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("MUPIP REORG UPGRADE/DOWNGRADE"), DB_LEN_STR(reg));
 			status = ERR_MUNOFINISH;
 			continue;
 		}
@@ -351,7 +350,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			}
 			bml_sm_buff = t_qread(curbmp, (sm_int_ptr_t)&cycle, &cr); /* now that in crit, note down stable buffer */
 			if (NULL == bml_sm_buff)
-				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 			ondsk_blkver = cr->ondsk_blkver;	/* note down db fmt on disk for bitmap block */
 			/* Take a copy of the shared memory bitmap buffer into process-private memory before releasing crit.
 			 * We are interested in those blocks that are currently marked as USED in the bitmap.
@@ -418,7 +417,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 								ondsk_blkver = new_db_format;
 							} else
 							{
-								gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status1);
+								gtm_putmsg_csa(CSA_ARG(csa)
+									VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status1);
 								util_out_print("Region !AD : Error occurred while reading block "
 									"[0x!XL]", TRUE, REG_LEN_STR(reg), curblk);
 								status1 = ERR_MUNOFINISH;
@@ -671,7 +671,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			/* flush all changes noted down in the file-header */
 			if (!wcs_flu(WCSFLU_FLUSH_HDR))	/* wcs_flu assumes gv_cur_region is set (which it is in this routine) */
 			{
-				gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4,
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4,
 					LEN_AND_LIT("MUPIP REORG UPGRADE/DOWNGRADE"), DB_LEN_STR(reg));
 				status = ERR_MUNOFINISH;
 				rel_crit(reg);
@@ -698,7 +698,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_converted_nonbmp);
 		if (reorg_entiredb && (SS_NORMAL == status1) && (0 != blocks_left))
 		{	/* file-header counter does not match what reorg on the entire database expected to see */
-			gtm_putmsg(VARLSTCNT(4) ERR_DBBTUWRNG, 2, expected_blks2upgrd, actual_blks2upgrd);
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBBTUWRNG, 2, expected_blks2upgrd, actual_blks2upgrd);
 			util_out_print("Region !AD : Run MUPIP INTEG (without FAST qualifier) to fix the counter",
 				TRUE, REG_LEN_STR(reg));
 			status1 = ERR_MUNOFINISH;
@@ -712,7 +712,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 			if (set_fully_upgraded)
 				util_out_print("Region !AD : Database is now FULLY UPGRADED", TRUE, REG_LEN_STR(reg));
 			util_out_print("Region !AD : MUPIP REORG !AD finished!/", TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
-			send_msg(VARLSTCNT(7) ERR_MUREUPDWNGRDEND, 5, REG_LEN_STR(reg), process_id, process_id, &curr_tn);
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_MUREUPDWNGRDEND, 5, REG_LEN_STR(reg),
+										process_id, process_id, &curr_tn);
 		} else
 		{
 			assert(ERR_MUNOFINISH == status1);
@@ -728,7 +729,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		free(bml_lcl_buff);
 	if (mu_ctrly_occurred || mu_ctrlc_occurred)
 	{
-		gtm_putmsg(VARLSTCNT(1) ERR_REORGCTRLY);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REORGCTRLY);
 		status = ERR_MUNOFINISH;
 	}
 	mupip_exit(status);

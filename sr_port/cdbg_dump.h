@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #define OP_1 1		/* operand[1] is passed */
 #define OP_DEST 2	/* destination is passed */
 
+void cdbg_dump_triple_all(void);
 void cdbg_dump_triple(triple *dtrip, int indent);
 void cdbg_dump_shrunk_triple(triple *dtrip, int old_size, int new_size);
 void cdbg_dump_operand(int indent, oprtype *opr, int opnum);

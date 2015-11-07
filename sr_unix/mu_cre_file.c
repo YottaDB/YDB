@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -105,7 +105,7 @@ unsigned char mu_cre_file(void)
 	char		*fgets_res;
 	gd_segment	*seg;
 #	ifdef GTM_CRYPT
-	char		datfile_hash[GTMCRYPT_HASH_LEN];
+	char		hash[GTMCRYPT_HASH_LEN];
 	int		gtmcrypt_errno;
 #	endif
 	ZOS_ONLY(int	realfiletag;)
@@ -241,26 +241,26 @@ unsigned char mu_cre_file(void)
 			 * Also, if the anticipatory freeze scheme is in effect at this point, we would have issued
 			 * a NOSPACECRE warning (see NOSPACEEXT message which goes through a similar transformation).
 			 * But at this point, we are guaranteed to not have access to the journal pool or csa both
-			 * of which are necessary for the ANTICIPATORY_FREEZE_ENABLED(csa) macro so we dont bother
+			 * of which are necessary for the INST_FREEZE_ON_ERROR_ENABLED(csa) macro so we dont bother
 			 * to do the warning transformation in this case.
 			 */
 			assert(NULL == jnlpool.jnlpool_ctl);
 			if (avail_blocks < blocks_for_create)
 			{
-				gtm_putmsg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), &blocks_for_create,
-					   &avail_blocks);
-				send_msg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), &blocks_for_create,
-					 &avail_blocks);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path),
+						&blocks_for_create, &avail_blocks);
+				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path),
+						&blocks_for_create, &avail_blocks);
 				CLEANUP(EXIT_ERR);
 				return EXIT_ERR;
 			}
 			delta_blocks = avail_blocks - blocks_for_create;
 			if (delta_blocks < blocks_for_extension)
 			{
-				gtm_putmsg(VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path), EXTEND_WARNING_FACTOR,
-					   &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
-				send_msg(VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path), EXTEND_WARNING_FACTOR,
-					 &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path),
+						EXTEND_WARNING_FACTOR, &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
+				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path),
+						EXTEND_WARNING_FACTOR, &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
 			}
 		}
 	}
@@ -317,16 +317,16 @@ unsigned char mu_cre_file(void)
 	/* Check if this file is an encrypted database. If yes, do init */
 	if (gv_cur_region->dyn.addr->is_encrypted)
 	{
-		GTMCRYPT_HASH_GEN(cs_addrs, path, STRLEN(path), datfile_hash, gtmcrypt_errno);
+		GTMCRYPT_HASH_GEN(cs_addrs, path, STRLEN(path), hash, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
 			CLEANUP(EXIT_ERR);
 			return EXIT_ERR;
 		}
-		memcpy(cs_data->encryption_hash, datfile_hash, GTMCRYPT_HASH_LEN);
+		memcpy(cs_data->encryption_hash, hash, GTMCRYPT_HASH_LEN);
 		cs_data->is_encrypted = TRUE; /* Mark this file as encrypted */
-		ALLOC_BUFF_GET_ENCR_KEY(cs_addrs, cs_data->encryption_hash, BLK_SIZE, gtmcrypt_errno);
+		INIT_DB_ENCRYPTION(cs_addrs, cs_data, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
@@ -367,7 +367,8 @@ unsigned char mu_cre_file(void)
 		return EXIT_WRN;
 	}
 	if ((32 * 1024 - SIZEOF(shmpool_blk_hdr)) < cs_data->blk_size)
-		gtm_putmsg(VARLSTCNT(5) ERR_MUNOSTRMBKUP, 3, RTS_ERROR_STRING(path), 32 * 1024 - DISK_BLOCK_SIZE);
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_MUNOSTRMBKUP, 3, RTS_ERROR_STRING(path),
+				32 * 1024 - DISK_BLOCK_SIZE);
 	util_out_print("Created file !AD", TRUE, RTS_ERROR_STRING(path));
 	CLEANUP(EXIT_NRM);
 	return EXIT_NRM;

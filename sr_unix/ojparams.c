@@ -15,6 +15,8 @@
 
 #include "job.h"
 #include "min_max.h"
+#include "io.h"
+#include "iosocketdef.h"
 
 /*
  * ---------------------------------------------------------
@@ -23,7 +25,6 @@
  */
 
 static readonly char definput[] = "/dev/null";
-static readonly char deflogfile[] = "/dev/null";
 
 static char *defoutbuf;
 static char *deferrbuf;
@@ -32,6 +33,8 @@ MSTR_CONST(defoutext, ".mjo");
 MSTR_CONST(deferrext, ".mje");
 
 LITREF jp_datatype	job_param_datatypes[];
+
+GBLREF	d_socket_struct		*socket_pool;
 
 error_def		(ERR_PARFILSPC);
 
@@ -47,7 +50,7 @@ void ojparams (char *p, job_params_type *job_params)
 {
 	unsigned char		ch;
 	int4			status;
-
+	mstr_len_t		handle_len;
 
 		/* Initializations */
 	job_params->baspri = 0;
@@ -56,8 +59,6 @@ void ojparams (char *p, job_params_type *job_params)
 	job_params->error.len = 0;
 	job_params->gbldir.len = 0;
 	job_params->startup.len = 0;
-	job_params->logfile.addr = 0;
-	job_params->logfile.len = 0;
 	job_params->directory.len = 0;
 	job_params->directory.addr = 0;
 	job_params->cmdline.len = 0;
@@ -100,14 +101,6 @@ void ojparams (char *p, job_params_type *job_params)
 			}
 			break;
 
-		case jp_logfile:
-			if (*p != 0)
-			{
-				job_params->logfile.len = (int)((unsigned char) *p);
-				job_params->logfile.addr = p + 1;
-			}
-			break;
-
 		case jp_output:
 			if (*p != 0)
 			{
@@ -139,6 +132,7 @@ void ojparams (char *p, job_params_type *job_params)
 		case jp_account:
 		case jp_detached:
 		case jp_image:
+		case jp_logfile:
 		case jp_noaccount:
 		case jp_nodetached:
 		case jp_noswapping:
@@ -147,7 +141,7 @@ void ojparams (char *p, job_params_type *job_params)
 		case jp_swapping:
 			break;
 		default:
-		        GTMASSERT;
+		        assertpro(ch != ch);
 		}
 
 		switch (job_param_datatypes[ch])
@@ -163,7 +157,9 @@ void ojparams (char *p, job_params_type *job_params)
 			p += ((int)((unsigned char)*p)) + 1;
 			break;
 		default:
-			GTMASSERT;
+			assertpro((jpdt_nul == job_param_datatypes[ch])
+				|| (jpdt_num == job_param_datatypes[ch])
+				|| (jpdt_str == job_param_datatypes[ch]));
 		}
 	}
 
@@ -176,6 +172,14 @@ void ojparams (char *p, job_params_type *job_params)
 	{
 		job_params->input.len = STRLEN(definput);
 		job_params->input.addr = definput;
+	}
+	else if (IS_JOB_SOCKET(job_params->input.addr, job_params->input.len))
+	{
+		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->input.len);
+		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->input.addr),
+									&handle_len, FALSE, socket_pool)))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "INPUT",
+				job_params->input.len, job_params->input.addr);
 	}
 	else
 		if (!(status = ojchkfs (job_params->input.addr,
@@ -200,6 +204,14 @@ void ojparams (char *p, job_params_type *job_params)
 		  + defoutext.len;
 		job_params->output.addr = &defoutbuf[0];
 	}
+	else if (IS_JOB_SOCKET(job_params->output.addr, job_params->output.len))
+	{
+		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->output.len);
+		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->output.addr),
+									&handle_len, FALSE, socket_pool)))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "OUTPUT",
+				job_params->output.len, job_params->output.addr);
+	}
 	else
 		if (!(status = ojchkfs (job_params->output.addr,
 		  job_params->output.len, FALSE)))
@@ -222,6 +234,14 @@ void ojparams (char *p, job_params_type *job_params)
 		job_params->error.len = job_params->routine.len
 		  + deferrext.len;
 		job_params->error.addr = &deferrbuf[0];
+	}
+	else if (IS_JOB_SOCKET(job_params->error.addr, job_params->error.len))
+	{
+		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->error.len);
+		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->error.addr),
+									&handle_len, FALSE, socket_pool)))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "ERROR",
+				job_params->error.len, job_params->error.addr);
 	}
 	else
 		if (!(status = ojchkfs (job_params->error.addr,
@@ -253,18 +273,5 @@ void ojparams (char *p, job_params_type *job_params)
 		  job_params->directory.len, FALSE)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 7, "DEFAULT",
 			  job_params->directory.len, job_params->directory.addr);
-/*
- * Logfile
- */
-	if (job_params->logfile.len == 0)
-	{
-		job_params->logfile.len = STRLEN(deflogfile);
-		job_params->logfile.addr = deflogfile;
-	}
-	else
-		if (!(status = ojchkfs (job_params->logfile.addr,
-		  job_params->logfile.len, FALSE)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 7, "LOGFILE",
-			  job_params->logfile.len, job_params->logfile.addr);
 }
 

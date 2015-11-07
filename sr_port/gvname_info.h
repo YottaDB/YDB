@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,17 +18,23 @@
  * Also note that it is not easy to call op_gvname with variable arguments again and again.
  */
 #ifndef MERGE_GLOBAL_DEFINED
+
 typedef struct gvname_info_struct {
-        gv_key           *s_gv_currkey;
-        gv_namehead      *s_gv_target;
-        gd_region        *s_gv_cur_region;
-        sgmnt_addrs      *s_cs_addrs;
-	sgm_info         *s_sgm_info_ptr;
+	gv_key		*s_gv_currkey;
+	gv_namehead	*s_gv_target;
+	gd_region	*s_gv_cur_region;
+	sgmnt_addrs	*s_cs_addrs;
+	sgm_info	*s_sgm_info_ptr;
+	gvnh_reg_t	*s_gd_targ_gvnh_reg;
+	gd_binding	*s_gd_targ_map;
+	gd_addr		*s_gd_targ_addr;
+	int		gvkey_nsubs;	/* # of subscripts in s_gv_currkey. Maintained only in case of MERGE LCL=^GBL */
 } gvname_info;
-typedef gvname_info     *gvname_info_ptr;
+
+typedef gvname_info	*gvname_info_ptr;
 
 /* Function Prototypes for M global variable functions of MERGE */
-void 		gvname_env_restore(gvname_info *curr_gvname_info);
-void	 	gvname_env_save(gvname_info *  curr_gvname_info);
+void		gvname_env_restore(gvname_info *curr_gvname_info);
+void		gvname_env_save(gvname_info *  curr_gvname_info);
 #define MERGE_GLOBAL_DEFINED
 #endif

@@ -55,13 +55,13 @@ typedef enum
 	INTRPT_IN_WAIT_FOR_DISK_SPACE,	/* Deferring interrupts during wait_for_disk_space.c */
 	INTRPT_IN_WCS_WTSTART,		/* Deferring interrupts until cnl->intent_wtstart is decremented and dbsync timer is
 					 * started */
-	INTRPT_IN_REFORMAT_BUFFER_USE,	/* Deferring interrupts until buffer is reformatted */
 	INTRPT_IN_X_TIME_FUNCTION,	/* Deferring interrupts in non-nesting functions, such as localtime, ctime, and mktime. */
 	INTRPT_IN_FUNC_WITH_MALLOC,	/* Deferring interrupts while in libc- or system functions that do a malloc internally. */
 	INTRPT_IN_FDOPEN,		/* Deferring interrupts in fdopen. */
 	INTRPT_IN_LOG_FUNCTION,		/* Deferring interrupts in openlog, syslog, or closelog. */
 	INTRPT_IN_FORK_OR_SYSTEM,	/* Deferring interrupts in fork or system. */
 	INTRPT_IN_FSTAT,		/* Deferring interrupts in fstat. */
+	INTRPT_IN_TLS_FUNCTION,		/* Deferring interrupts in TLS functions. */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum */
 } intrpt_state_t;
 
@@ -70,12 +70,10 @@ GBLREF	boolean_t	deferred_timers_check_needed;
 
 /* Macro to check if we are in a state that is ok to interrupt (or to do deferred signal handling). We do not want to interrupt if
  * the global variable intrpt_ok_state indicates it is not ok to interrupt, if we are in the midst of a malloc, if we are holding
- * crit, if we are in the midst of commit, or in wcs_wtstart. In the last case, we could be causing another process HOLDING CRIT on
- * the region to wait in bg_update_phase1 if we hold the write interlock. Hence it is important for us to finish that as soon as
- * possible and not interrupt it.
+ * crit, or if we are in the midst of a commit.
  */
 #define	OK_TO_INTERRUPT	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (0 == gtmMallocDepth)			\
-				&& (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT | CRIT_IN_WTSTART)))
+				&& (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)))
 
 /* Set the value of forced_exit to 1. This should indicate that we want a deferred signal handler to be invoked first upon leaving
  * the current deferred window. Since we do not want forced_exit state to ever regress, and there might be several signals delivered

@@ -13,11 +13,13 @@
 
 #include "gtm_socket.h"
 #include "gtm_inet.h"
+#include "gtm_netdb.h"
 #include "gtm_time.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
+#include "gtm_select.h"
 
 #include <sys/time.h>
 #include <errno.h>
@@ -45,7 +47,6 @@
 #include "repl_filter.h"
 #include "repl_log.h"
 #include "gtmsource.h"
-#include "gtm_netdb.h"
 #include "sgtm_putmsg.h"
 #include "gt_timer.h"
 #include "min_max.h"
@@ -272,6 +273,7 @@ static int gtmrecv_est_conn(void)
 	gtmrecv_comm_init((in_port_t)gtmrecv_local->listen_port);
 	primary_ai.ai_addrlen = SIZEOF(primary_sas);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Waiting for a connection...\n");
+	assertpro(FD_SETSIZE > gtmrecv_listen_sock_fd);
 	FD_ZERO(&input_fds);
 	FD_SET(gtmrecv_listen_sock_fd, &input_fds);
 	/*
@@ -674,7 +676,7 @@ static void process_tr_buff(void)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1,
 									&recvpool_ctl->jnl_seqno);
 						else /* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */
-							GTMASSERT;
+							assertpro(repl_errno != repl_errno);
 					}
 				} else
 				{
@@ -1108,6 +1110,6 @@ void gtmrecv_process(boolean_t crash_restart)
 	{
 		gtmrecv_main_loop(crash_restart);
 	} while (repl_connection_reset);
-	GTMASSERT; /* shouldn't reach here */
+	assertpro(FALSE); /* shouldn't reach here */
 	return;
 }

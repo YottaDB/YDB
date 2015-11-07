@@ -449,11 +449,23 @@ echo ""
 echo "Start of C Compilation"	# Do not change this string. $gtm_tools/buildwarn.awk relies on this to detect warnings.
 echo ""
 
-#Do not compile gtmcrypt_ref.c, maskpass.c, gtm_threadgbl_deftypes.c
-#$gtm_tools/buildplugin.csh will take care of compilation and building of the reference plugin and the supporting files.
-find $gs[1] \( -name 'gtmcrypt*_ref.c' -o -name 'maskpass.c' -o -name 'omi_sx_play.c' -o \
-	-name 'gtm_threadgbl_deftypes.c' \) -prune -o -name '*.c' -print | \
-	sort | xargs -n25 $shell $gtm_tools/gt_cc.csh
+# List of files that should be excluded from the compilation as they are dealt with separately
+set TMP_DIR_PREFIX = "/tmp/__${user}__comlist"
+set TMP_DIR = "${TMP_DIR_PREFIX}__`date +"%y%m%d_%H_%M_%S"`_$$"
+\mkdir -p ${TMP_DIR}
+cat << EOF >&! ${TMP_DIR}/exclude.lst
+omi_sx_play.c
+gtm_threadgbl_deftypes.c
+gtmcrypt_pk_ref.c
+gtmcrypt_dbk_ref.c
+gtmcrypt_sym_ref.c
+gtmcrypt_ref.c
+gtmcrypt_util.c
+maskpass.c
+gtm_tls_impl.c
+EOF
+find $gs[1] -name '*.c' | grep -v -f ${TMP_DIR}/exclude.lst | sort | xargs -n25 $shell $gtm_tools/gt_cc.csh
+\rm -rf ${TMP_DIR}
 
 # Special compilation for omi_sx_play.c
 set comlist_gt_cc_bak = "$comlist_gt_cc"

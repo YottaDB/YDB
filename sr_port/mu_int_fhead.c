@@ -157,12 +157,12 @@ boolean_t mu_int_fhead(void)
 		mu_int_err(ERR_DBTNNEQ, 0, 0, 0, 0, 0, 0, 0);
         if (0 != mu_data->kill_in_prog)
         {
-                gtm_putmsg(VARLSTCNT(6) ERR_MUKILLIP, 4, DB_LEN_STR(gv_cur_region), LEN_AND_LIT("MUPIP INTEG"));
+                gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUKILLIP, 4, DB_LEN_STR(gv_cur_region), LEN_AND_LIT("MUPIP INTEG"));
                 mu_int_errknt++;
         }
         if (0 != mu_data->abandoned_kills)
         {
-                gtm_putmsg(VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(gv_cur_region),
+                gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(gv_cur_region),
 			LEN_AND_LIT("database could have incorrectly marked busy integrity errors"));
                 mu_int_errknt++;
         }
@@ -190,7 +190,8 @@ boolean_t mu_int_fhead(void)
 		if (max_tn_warn == mu_data->trans_hist.curr_tn)
 		{	/* implies there is not enough transactions to go before reaching MAX_TN (see SET_TN_WARN macro) */
 			temp_tn = mu_data->max_tn - mu_data->trans_hist.curr_tn;
-			gtm_putmsg(VARLSTCNT(6) ERR_MUTNWARN, 4, DB_LEN_STR(gv_cur_region), &temp_tn, &mu_data->max_tn);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUTNWARN, 4,
+						DB_LEN_STR(gv_cur_region), &temp_tn, &mu_data->max_tn);
 			mu_int_errknt++;
 		}
 	}
@@ -243,6 +244,7 @@ boolean_t mu_int_fhead(void)
 	size = mu_int_ovrhd + (off_t)block_factor * mu_data->trans_hist.total_blks;
 	/* If ONLINE INTEG for this region is in progress, then native_size would have been calculated in ss_initiate. */
 	SET_NATIVE_SIZE(native_size);
+	ALIGN_DBFILE_SIZE_IF_NEEDED(size, native_size);
 	/* In the following tests, the EOF block should always be 1 greater
 	 * than the actual size of the file.  This is due to the GDS being
 	 * allocated in even DISK_BLOCK_SIZE-byte blocks. */
@@ -253,13 +255,14 @@ boolean_t mu_int_fhead(void)
 		else
 			mu_int_err(ERR_DBFSTBC, 0, 0, 0, 0, 0, 0, 0);
 		if (native_size % 2) /* Native size should be (64K + n*1K + 512) / DISK_BLOCK_SIZE , so always an odd number. */
-			gtm_putmsg(VARLSTCNT(4) ERR_DBTOTBLK, 2, (uint4)((native_size - mu_data->start_vbn) / block_factor),
-				mu_data->trans_hist.total_blks);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBTOTBLK, 2,
+						(uint4)((native_size - mu_data->start_vbn) / block_factor),
+						mu_data->trans_hist.total_blks);
 		else
 			/* Since native_size is even and the result will be rounded down, we need to add 1 before the division so we
 			 * extend by enough blocks (ie. if current nb. of blocks is 100, and the file size gives 102.5 blocks, we
 			 * need to extend by 3 blocks, not 2). */
-			gtm_putmsg(VARLSTCNT(6) ERR_DBMISALIGN, 4, DB_LEN_STR(gv_cur_region),
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBMISALIGN, 4, DB_LEN_STR(gv_cur_region),
 				(uint4)((native_size - mu_data->start_vbn) / block_factor),
 				(uint4)(((native_size + 1 - mu_data->start_vbn) / block_factor) - mu_data->trans_hist.total_blks));
 	}

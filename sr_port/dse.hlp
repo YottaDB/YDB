@@ -125,9 +125,9 @@
 1 Commands
    Commands
 
-   The format for DSE commands is:
+   The general format of DSE commands is:
 
-   DSE> command [-qualifier[...]] [object[,...]]
+   command [-qualifier[...]] [object[,...]]
 
    DSE interprets all numeric input as hexadecimal, except for time values,
    the values for the following qualifiers when used with CHANGE -FILEHEADER:
@@ -568,7 +568,7 @@
    -TIM[ERS_PENDING]=integer
    -TO[TAL_BLKS]=total-blocks
    -TR[IGGER_FLUSH]=trigger-flus
-   -UPD_RESERVED_AREA=reserved- area
+   -UPD_RESERVED_AREA=reserved-area
    -UPD_WRITER_TRIGGER_FACTOR=trigger-factor
    -W[RITES_PER_FLUSH]=writes-per-flush
    -WAIT_DISK=wait-disk
@@ -2496,9 +2496,9 @@
    |             |                                   | -LEVEL, -OFFSET,     |
    |             |                                   | -RECORD, -RSIZ       |
    |-------------+-----------------------------------+----------------------|
-   | -           | AVG_BLKS_READ=Average blocks read |                      |
+   | -           | AVG_BLKS_READ=Average blocks read | -                    |
    |-------------+-----------------------------------+----------------------|
-   | -           | B_B[YTESTREAM]=transaction number |                      |
+   | -           | B_B[YTESTREAM]=transaction number | -                    |
    |-------------+-----------------------------------+----------------------|
    | -           | -B_C[OMPREHENSIVE]=transaction    | Use only with        |
    |             | number                            | -FILEHEADER; decimal |
@@ -2613,14 +2613,13 @@
    | -           | -W[RITES_PER_FLUSH]=writes per    | Use only with        |
    |             | flush                             | -FILEHEADER; decimal |
    |-------------+-----------------------------------+----------------------|
-   | -           | -WAIT_DISK=wait disk              |                      |
+   | -           | -WAIT_DISK=wait disk              | -                    |
    |-------------+-----------------------------------+----------------------|
    | -           | -Zqgblmod_S[EQNO] = sequence      | Use only with        |
    |             | number                            | -FILEHEADER;hexa     |
    |-------------+-----------------------------------+----------------------|
    | -           | -Zqgblmod_T[rans]=sequence_number | Use only with        |
    |             |                                   | -FILEHEADER;hexa     |
-   |-------------+-----------------------------------+----------------------|
    |-------------+-----------------------------------+----------------------|
    | CL[OSE]     | -                                 | -                    |
    |-------------+-----------------------------------+----------------------|
@@ -2693,7 +2692,7 @@
    |-------------+-----------------------------------+----------------------|
    | H[ELP]      | [help topic]                      | -                    |
    |-------------+-----------------------------------+----------------------|
-   | I[NTEGRIT]  | -B[LOCK]=block&_number            | -                    |
+   | I[NTEGRIT]  | -B[LOCK]=block_number             | -                    |
    |-------------+-----------------------------------+----------------------|
    | M[APS]      | -BL[OCK]=block_number             | Incompatible with    |
    |             |                                   | -RESTORE_ALL         |
@@ -2777,4 +2776,33 @@
    +------------------------------------------------------------------------+
 
    * Use these qualifiers only with instructions from FIS.
+
+1 Copyright
+   Copyright
+
+   Copyright 2013
+
+   Fidelity Information Services, Inc. All rights reserved.
+
+   Permission is granted to copy, distribute and/or modify this document
+   under the terms of the GNU Free Documentation License, Version 1.3 or any
+   later version published by the Free Software Foundation; with no Invariant
+   Sections, no Front-Cover Texts and no Back-Cover Texts.
+
+   GT.M(TM) is a trademark of Fidelity Information Services, Inc. Other
+   trademarks are the property of their respective owners.
+
+   This document contains a description of GT.M and the operating
+   instructions pertaining to the various functions that comprise the system.
+   This document does not contain any commitment of FIS. FIS believes the
+   information in this publication is accurate as of its publication date;
+   such information is subject to change without notice. FIS is not
+   responsible for any errors or defects.
+
+   **Note**
+
+   This help file is a concise representation of revision V6.1-000 of the
+   UNIX Administration and Operations Guide. To obtain a copy of the current
+   revision, go to www.fis-gtm.com and then click on the User Documentation
+   tab.
 

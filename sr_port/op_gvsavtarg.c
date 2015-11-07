@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,9 +27,9 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
+#include "dpgbldir.h"
 #include "process_gvt_pending_list.h"
 
-GBLREF	gd_binding	*gd_map;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;
 GBLREF	gv_namehead	*gv_target;
@@ -52,13 +52,12 @@ void op_gvsavtarg(mval *v)
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	v->mvtype = 0;	/* BYPASSOK */ /* so stp_gcol (if invoked below) can free up space currently
 					* occupied by this to-be-overwritten mval */
-	if (NULL == gv_currkey)
+	if ((NULL == gv_currkey) || (0 == gv_currkey->end))
 	{	/* Simplest case, finish it off */
 		v->str.len = 0;
 		v->mvtype = MV_STR;
 		return;
 	}
-	assert(NULL != TREF(gd_targ_addr));
 	assert((NULL != gv_target) || (0 == gv_currkey->end));
 	/* The way savtarg/rectarg works is by saving and restoring a copy of "gv_target". This assumes that once gv_target
 	 * has been allocated and used in a savtarg, the memory is never freed at least until the rectarg is completed.
@@ -66,7 +65,7 @@ void op_gvsavtarg(mval *v)
 	 * "gv_target" global in case we are in savtarg (or else at rectarg time the saved gv_target could have been freed).
 	 * Assert accordingly.
 	 */
-	assert((NULL == gv_target) || !is_gvt_in_pending_list(gv_target));
+	assert((NULL == gv_target) || (NULL == is_gvt_in_pending_list(gv_target)));
 	end = gv_currkey->end;
 	len = (int)(end + GVSAVTARG_FIXED_SIZE);
 	align_len = len + (GVSAVTARG_ALIGN_BNDRY - 1); /* is for 8-byte alignment of v->str.addr */
@@ -86,10 +85,14 @@ void op_gvsavtarg(mval *v)
 		if (dollar_tlevel && (NULL != sgm_info_ptr))
 			DBG_CHECK_IN_FIRST_SGM_INFO_LIST(sgm_info_ptr);
 	)
-	gvsavtarg->gd_targ_addr = TREF(gd_targ_addr);
-	gvsavtarg->gd_map = gd_map;
 	gvsavtarg->gv_cur_region = gv_cur_region;
 	gvsavtarg->gv_target = gv_target;
+	/* op_gv* functions use TREF(gd_targ_gvnh_reg) to determine whether the global name corresponding to current
+	 * global reference spans multiple regions or not. If it is, then TREF(gd_targ_map) is also additionally used.
+	 * So save/restore these as well.
+	 */
+	gvsavtarg->gd_targ_gvnh_reg   = TREF(gd_targ_gvnh_reg);	/* non-zero only for spanning globals */
+	gvsavtarg->gd_targ_map        = TREF(gd_targ_map);	/* initialized only if gd_targ_gvnh_reg is non-NULL */
 	gvsavtarg->gv_last_subsc_null = TREF(gv_last_subsc_null);
 	gvsavtarg->gv_some_subsc_null = TREF(gv_some_subsc_null);
 	gvsavtarg->prev = gv_currkey->prev;

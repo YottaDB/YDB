@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,7 +110,7 @@ GBLDEF int			trans_errors = 0;
 GBLDEF boolean_t		block = FALSE;
 GBLDEF boolean_t		muint_fast = FALSE;
 GBLDEF boolean_t		master_dir;
-GBLDEF boolean_t		muint_key = FALSE;
+GBLDEF boolean_t		muint_key = MUINTKEY_FALSE;
 GBLDEF boolean_t		muint_subsc = FALSE;
 GBLDEF boolean_t		mu_int_err_ranges;
 GBLDEF boolean_t		tn_reset_specified;	/* use this to avoid recomputing cli_present("TN_RESET") in the loop */
@@ -129,6 +129,13 @@ GBLDEF span_node_integ		*sndata;
 GTMCRYPT_ONLY(
 	GBLDEF	gtmcrypt_key_t	mu_int_encrypt_key_handle;
 )
+GBLDEF boolean_t		ointeg_this_reg;
+GTM_SNAPSHOT_ONLY(
+	GBLDEF util_snapshot_ptr_t	util_ss_ptr;
+	GBLDEF boolean_t		preserve_snapshot;
+	GBLDEF boolean_t		online_specified;
+)
+
 GBLREF bool			mu_ctrly_occurred;
 GBLREF bool			mu_ctrlc_occurred;
 GBLREF bool			error_mupip;
@@ -141,12 +148,8 @@ GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF tp_region		*grlist;
 GBLREF bool			region;
 GBLREF boolean_t		debug_mupip;
-GBLDEF boolean_t		ointeg_this_reg;
-GTM_SNAPSHOT_ONLY(
-	GBLDEF util_snapshot_ptr_t	util_ss_ptr;
-	GBLDEF boolean_t		preserve_snapshot;
-	GBLDEF boolean_t		online_specified;
-)
+GBLREF gv_key			*muint_end_key;
+GBLREF gv_key			*muint_start_key;
 
 error_def(ERR_CTRLC);
 error_def(ERR_CTRLY);
@@ -190,6 +193,7 @@ void mupip_integ(void)
 		char		ss_filename[GTM_PATH_MAX];
 		unsigned short	ss_file_len = GTM_PATH_MAX;
 	)
+	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	span_node_integ		span_node_data;
 
@@ -274,7 +278,7 @@ void mupip_integ(void)
                 if (!grlist)
                 {
 			error_mupip = TRUE;
-			gtm_putmsg(VARLSTCNT(1) ERR_DBNOREGION);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBNOREGION);
 			mupip_exit(ERR_MUNOACTION);
                 }
 		rptr = grlist;
@@ -283,6 +287,7 @@ void mupip_integ(void)
 	GTM_SNAPSHOT_ONLY(online_integ = ((TRUE != cli_negated("ONLINE")) && region)); /* Default option for INTEG is -ONLINE */
 	GTM_SNAPSHOT_ONLY(preserve_snapshot = (CLI_PRESENT == cli_present("PRESERVE"))); /* Should snapshot file be preserved ? */
 	GTM_SNAPSHOT_ONLY(assert(!online_integ || (region && !tn_reset_specified)));
+	assert(MUINTKEY_FALSE == muint_key);
 	if (CLI_PRESENT == cli_present("SUBSCRIPT"))
 	{
 		keylen = SIZEOF(key_buff);
@@ -319,8 +324,7 @@ void mupip_integ(void)
 			util_ss_ptr->master_map = mu_int_master;
 			util_ss_ptr->native_size = 0;
 #			endif
-		}
-		else /* Establish the condition handler ONLY if ONLINE INTEG was not requested */
+		} else /* Establish the condition handler ONLY if ONLINE INTEG was not requested */
 			ESTABLISH(mu_freeze_ch);
 	}
 	for (total_errors = mu_int_errknt = 0;  ;  total_errors += mu_int_errknt, mu_int_errknt = 0)
@@ -363,7 +367,7 @@ void mupip_integ(void)
 		{
 			util_out_print("!/!/Integ of region !AD", TRUE, REG_LEN_STR(rptr->reg));
 			ointeg_this_reg = online_integ;
-			mu_int_reg(rptr->reg, &retvalue_mu_int_reg);
+			mu_int_reg(rptr->reg, &retvalue_mu_int_reg);	/* sets "gv_cur_region" */
 			region_was_frozen = !ointeg_this_reg;
 			if (TRUE != retvalue_mu_int_reg)
 			{
@@ -372,19 +376,21 @@ void mupip_integ(void)
 					break;
 				continue;
 			}
+			csa = cs_addrs;
 			/* If the region was frozen (INTEG -REG -NOONLINE) then use cs_addrs->hdr for verification of
 			 * blks_to_upgrd, free blocks calculation. Otherwise (ONLINE INTEG) then use mu_int_data for
 			 * the verification.
 			 */
 			if (region_was_frozen)
-				csd = cs_addrs->hdr;
+				csd = csa->hdr;
 			else
 				csd = &mu_int_data;
 		} else
 		{
 			region_was_frozen = FALSE; /* For INTEG -FILE, region is not frozen as we would have standalone access */
-			if (FALSE == mu_int_init())
+			if (FALSE == mu_int_init())	/* sets "gv_cur_region" */
 				mupip_exit(ERR_INTEGERRS);
+			csa = NULL;
 			/* Since we have standalone access, there is no need for cs_addrs->hdr. So, use mu_int_data for
 			 * verifications
 			 */
@@ -402,7 +408,7 @@ void mupip_integ(void)
 		{
 			if (gv_cur_region->read_only)
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, gv_cur_region->dyn.addr->fname_len,
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBRDONLY, 2, gv_cur_region->dyn.addr->fname_len,
 					gv_cur_region->dyn.addr->fname);
 				mu_int_errknt++;
 				mu_int_err(ERR_DBTNRESET, 0, 0, 0, 0, 0, 0, 0);
@@ -416,6 +422,14 @@ void mupip_integ(void)
 		{
 			master_dir = FALSE;
 			trees->root = muint_block;
+		}
+		if ((MUINTKEY_NULLSUBS == muint_key) && gv_cur_region->std_null_coll)
+		{	/* -SUBSCRIPT was specified AND at least one null-subscript was specified in it.
+			 * muint_start_key and muint_end_key have been constructed assuming gv_cur_region->std_null_coll is FALSE.
+			 * Update muint_start_key and muint_end_key to reflect the current gv_cur_region->std_null_coll value.
+			 */
+			GTM2STDNULLCOLL(muint_start_key->base, muint_start_key->end);
+			GTM2STDNULLCOLL(muint_end_key->base, muint_end_key->end);
 		}
 		for (trees->link = 0;  ;  master_dir = FALSE, temp = (char*)trees,  trees = trees->link,  free(temp))
 		{
@@ -434,7 +448,7 @@ void mupip_integ(void)
 						dbfilop(fc);
 					}
 				}
-				gtm_putmsg(VARLSTCNT(1) mu_ctrly_occurred ? ERR_CTRLY : ERR_CTRLC);
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) mu_ctrly_occurred ? ERR_CTRLY : ERR_CTRLC);
 				mupip_exit(ERR_MUNOFINISH);
 			}
 			if (!trees)
@@ -469,7 +483,7 @@ void mupip_integ(void)
  			gv_altkey->base[gv_altkey->end++] = '\0';
  			gv_altkey->base[gv_altkey->end] = '\0';
  			if (gv_target->act)
- 				act_in_gvt();
+				act_in_gvt(gv_target);
 			if (mu_int_blk(trees->root, MAX_BT_DEPTH, TRUE, gv_altkey->base, gv_altkey->end, &dummy, 0, 0))
 			{
 				/* We are done with the INTEG CHECK for the current GVT, but if the spanning node INTEG
@@ -570,6 +584,11 @@ void mupip_integ(void)
 				mu_int_errknt--; /* if this error is not supposed to increment the error count */
 			}
 		}
+		if ((MUINTKEY_NULLSUBS == muint_key) && gv_cur_region->std_null_coll)
+		{	/* muint_start_key and muint_end_key have been modified for this region. Undo that change. */
+			STD2GTMNULLCOLL(muint_start_key->base, muint_start_key->end);
+			STD2GTMNULLCOLL(muint_end_key->base, muint_end_key->end);
+		}
 		if (muint_all_index_blocks)
 		{
 			mu_int_maps();
@@ -600,11 +619,12 @@ void mupip_integ(void)
 			}
 			if (!muint_fast && (mu_int_blks_to_upgrd != csd->blks_to_upgrd))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_DBBTUWRNG, 2, mu_int_blks_to_upgrd, csd->blks_to_upgrd);
+				gtm_putmsg_csa(CSA_ARG(csa)
+					VARLSTCNT(4) ERR_DBBTUWRNG, 2, mu_int_blks_to_upgrd, csd->blks_to_upgrd);
 				if (gv_cur_region->read_only || mu_int_errknt)
 					mu_int_errknt++;
 				else
-					gtm_putmsg(VARLSTCNT(1) ERR_DBBTUFIXED);
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBBTUFIXED);
 			}
 			if (((0 != mu_int_data.kill_in_prog) || (0 != mu_int_data.abandoned_kills)) && (!mu_map_errs) && !region
 				&& !gv_cur_region->read_only)
@@ -641,7 +661,7 @@ void mupip_integ(void)
 			util_out_print("Data     !12UL    !12UL    !8UL.!3ZL  !12UL", TRUE, mu_data_blks, mu_data_recs,
 					leftpt, rightpt, mu_data_adj);
 		}
-		if ((FALSE == block) && (FALSE == muint_key))
+		if ((FALSE == block) && (MUINTKEY_FALSE == muint_key))
 			util_out_print("Free     !12UL              NA              NA            NA", TRUE,
 				mu_int_data.trans_hist.total_blks -
 				(mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap -
@@ -726,10 +746,10 @@ void mupip_integ(void)
 #			ifdef GTM_SNAPSHOT
 			else
 			{
-				assert(SNAPSHOTS_IN_PROG(cs_addrs));
-				assert(NULL != cs_addrs->ss_ctx);
-				ss_release(&cs_addrs->ss_ctx);
-				CLEAR_SNAPSHOTS_IN_PROG(cs_addrs);
+				assert(SNAPSHOTS_IN_PROG(csa));
+				assert(NULL != csa->ss_ctx);
+				ss_release(&csa->ss_ctx);
+				CLEAR_SNAPSHOTS_IN_PROG(csa);
 			}
 #			endif
 			rptr = rptr->fPtr;
@@ -810,7 +830,7 @@ void mupip_integ(void)
 		total_errors++;
 	if (mu_ctrly_occurred || mu_ctrlc_occurred)
 	{
-		gtm_putmsg(VARLSTCNT(1) mu_ctrly_occurred ? ERR_CTRLY : ERR_CTRLC);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) mu_ctrly_occurred ? ERR_CTRLY : ERR_CTRLC);
 		mupip_exit(ERR_MUNOFINISH);
 	}
 	if (0 != total_errors)

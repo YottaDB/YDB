@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 #include "t_retry.h"
 #include "t_begin.h"
 #include "gvcst_protos.h"	/* for gvcst_search,gvcst_rtsib,gvcst_lftsib prototype */
+#include "hashtab_mname.h"
 
 GBLREF int		rc_size_return;
 GBLREF gd_addr		*gd_header;
@@ -48,7 +49,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	int		key_size, data_len, i;
 	bool		dollar_order, two_histories;
 	char		*cp2, *cp1;
-	mval		v;
+	mname_entry	gvname;
 	short		rsiz, bsiz, fmode, size_return;
 	rec_hdr		*rp;
 	blk_hdr		*bp;
@@ -57,6 +58,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	rc_req_getr	*req;
 	rc_rsp_page	*rsp;
 	srch_blk_status	*bh;
+	gvnh_reg_t	*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -81,15 +83,14 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 		REVERT;
 		return 0;
 	}
-	v.mvtype = MV_STR;
 	cp2 = req->key.key + req->key.len.value;
 	for (cp1 = req->key.key; *cp1 && cp1 < cp2; cp1++)
 		;
-	v.str.len = INTCAST(cp1 - req->key.key);
-	v.str.addr = req->key.key;
-	if (v.str.len > MAX_MIDENT_LEN)	/* GT.M does not support global variables > MAX_MIDENT_LEN chars */
+	gvname.var_name.len = INTCAST(cp1 - req->key.key);
+	gvname.var_name.addr = req->key.key;
+	if (gvname.var_name.len > MAX_MIDENT_LEN)	/* GT.M does not support global variables > MAX_MIDENT_LEN chars */
 	{
-		if (!(v.str.len == (MAX_MIDENT_LEN + 1) && v.str.addr[MAX_MIDENT_LEN] == 0x01))
+		if (!(gvname.var_name.len == (MAX_MIDENT_LEN + 1) && gvname.var_name.addr[MAX_MIDENT_LEN] == 0x01))
 		{
 		    qhdr->a.erc.value = RC_KEYTOOLONG;
 		    rsp->size_return.value = 0;
@@ -100,7 +101,9 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 		    return -1;
 		}
 	}
-	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &v.str);
+	COMPUTE_HASH_MNAME(&gvname);
+	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gvname, gvnh_reg);
+	assert(NULL == gvnh_reg->gvspan); /* so GV_BIND_SUBSNAME_IF_GVSPAN is not needed */
 	memcpy(gv_currkey->base, req->key.key, req->key.len.value);
 	gv_currkey->end = req->key.len.value;
 	dollar_order = FALSE;
@@ -135,16 +138,15 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	{
 		if (TREF(gv_last_subsc_null))
 			gv_currkey->base[gv_currkey->prev] = 01;
-		else {
+		else
+		{
 			if (dollar_order)
-			{	gv_currkey->end++;
-				gv_currkey->base[gv_currkey->end] = 0;
-			}else
 			{
-				gv_currkey->base[gv_currkey->end] = 1;
-				gv_currkey->base[gv_currkey->end + 1] = 0;
-				gv_currkey->base[gv_currkey->end + 2] = 0;
-				gv_currkey->end += 2;
+				gv_currkey->end++;
+				gv_currkey->base[gv_currkey->end] = 0;
+			} else
+			{
+				GVKEY_INCREMENT_QUERY(gv_currkey);
 			}
 		}
 	}

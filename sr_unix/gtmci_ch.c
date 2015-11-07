@@ -38,7 +38,8 @@ CONDITION_HANDLER(gtmci_ch)
 {
 	char	src_buf[MAX_ENTRYREF_LEN];
 	mstr	src_line;
-	START_CH;
+
+	START_CH(TRUE);
 	if (DUMPABLE)
 	{
 		gtm_dump();
@@ -47,9 +48,9 @@ CONDITION_HANDLER(gtmci_ch)
 	src_line.len = 0;
 	src_line.addr = &src_buf[0];
 	set_zstatus(&src_line, SIGNAL, NULL, FALSE);
-	TREF(in_gtmci) = FALSE;
-	if (msp < fgncal_stack) /* restore stack to the last marked position */
+	if (msp < FGNCAL_STACK) /* restore stack to the last marked position */
 		fgncal_unwind();
+	else TREF(temp_fgncal_stack) = NULL;	/* If fgncal_unwind() didn't run to clear this, we have to */
 	mumps_status = SIGNAL;
 	UNWIND(NULL, NULL);
 }

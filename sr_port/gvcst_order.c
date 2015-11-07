@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,18 +60,15 @@ GBLREF int4		gv_keysize;
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 
-error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVORDERFAIL);
-error_def(ERR_TPRETRY);
 
 DEFINE_NSB_CONDITION_HANDLER(gvcst_order_ch)
 
-bool	gvcst_order(void)
+boolean_t	gvcst_order(void)
 {	/* See gvcst_query.c */
-	bool		found, is_hidden, sn_tpwrapped;
+	boolean_t	found, is_hidden, sn_tpwrapped;
 	boolean_t	est_first_pass;
-	char		save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key		*save_gv_currkey;
+	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	int		end, prev, oldend;
 	int		save_dollar_tlevel;
 
@@ -82,17 +79,17 @@ bool	gvcst_order(void)
 	CHECK_HIDDEN_SUBSCRIPT_AND_RETURN(found, gv_altkey, is_hidden);
 	assert(found && is_hidden);
 	IF_SN_DISALLOWED_AND_NO_SPAN_IN_DB(return found);
-	SAVE_GV_CURRKEY_LAST_SUBSCRIPT(gv_currkey, prev, oldend);
+	SAVE_GV_CURRKEY_LAST_SUBSCRIPT(save_currkey, prev, oldend);
 	if (!dollar_tlevel)
 	{
 		sn_tpwrapped = TRUE;
 		op_tstart((IMPLICIT_TSTART), TRUE, &literal_batch, 0);
 		ESTABLISH_NORET(gvcst_order_ch, est_first_pass);
 		GVCST_ROOT_SEARCH_AND_PREP(est_first_pass);
+		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_order, (gtm_uint64_t) -1);
+		found = gvcst_order2();
 	} else
 		sn_tpwrapped = FALSE;
-	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_order, (gtm_uint64_t) -1);
-	found = gvcst_order2();
 	if (found)
 	{
 		CHECK_HIDDEN_SUBSCRIPT(gv_altkey, is_hidden);
@@ -100,14 +97,7 @@ bool	gvcst_order(void)
 		{	/* Replace last subscript to be the highest possible hidden subscript so another
 			 * gvcst_order2 will give us the next non-hidden subscript.
 			 */
-			end = gv_altkey->end;
-			gv_currkey->base[end - 4] = 2;
-			gv_currkey->base[end - 3] = 0xFF;
-			gv_currkey->base[end - 2] = 0xFF;
-			gv_currkey->base[end - 1] = 1;
-			gv_currkey->base[end + 0] = 0;
-			gv_currkey->base[end + 1] = 0;
-			gv_currkey->end = end + 1;
+			REPLACE_HIDDEN_SUB_TO_HIGHEST(gv_altkey, gv_currkey);	/* uses gv_altkey to modify gv_currkey */
 			/* fix up since it should only be externally counted as one $order */
 			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_order, (gtm_uint64_t) -1);
 			found = gvcst_order2();
@@ -118,13 +108,13 @@ bool	gvcst_order(void)
 		op_tcommit();
 		REVERT; /* remove our condition handler */
 	}
-	RESTORE_GV_CURRKEY_LAST_SUBSCRIPT(gv_currkey, prev, oldend);
+	RESTORE_GV_CURRKEY_LAST_SUBSCRIPT(save_currkey, prev, oldend);
 	assert(save_dollar_tlevel == dollar_tlevel);
 #	endif
 	return found;
 }
 
-bool	gvcst_order2(void)
+boolean_t	gvcst_order2(void)
 {
 	blk_hdr_ptr_t	bp;
 	boolean_t	found, two_histories;

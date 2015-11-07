@@ -53,6 +53,7 @@
 #include "gtmimagename.h"
 #include "gtmio.h"
 #include "have_crit.h"
+#include "hashtab_mname.h"
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -200,7 +201,6 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 	char			out_rec[MAX_BUFF_SIZE];
 	char			*out_rec_ptr;
 	char			*ptr1, *ptr2;
-	mname_entry		gvent;
 	mval			mi, trigger_count, trigger_value;
 	mval			*mv_trig_cnt_ptr;
 	boolean_t		multi_line;
@@ -397,14 +397,11 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, uint4 f
 {
 	char			save_name[MAX_MIDENT_LEN], curr_name[MAX_MIDENT_LEN];
 	boolean_t		wildcard;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gd_region		*save_gv_cur_region;
-	gv_key			*save_gv_currkey;
-	gv_namehead		*hasht_tree, *save_gv_target;
+	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
-	sgmnt_addrs		*csa;
-	mname_entry		gvent;
-	mstr			ms_gbl_nam;
+	mname_entry		ms_gvname;
 	mval			mv_curr_nam;
         mval                    mi, trigger_count, trig_gbl;
         mval                    *mv_trig_cnt_ptr, mv_trigger_val;
@@ -412,6 +409,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, uint4 f
 	char			*ptr;
 	uint4			curr_name_len;
 	int			trigvn_len;
+	gvnh_reg_t		*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -452,12 +450,12 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, uint4 f
 			ptr += trigvn_len + 1;
 			A2I(ptr, mv_trigger_val.str.addr + mv_trigger_val.str.len, indx);
 			STR2MVAL(trig_gbl, mv_trigger_val.str.addr, trigvn_len);
-			SAVE_TRIGGER_REGION_INFO;
-			ms_gbl_nam.addr = mv_trigger_val.str.addr;
-			ms_gbl_nam.len = trigvn_len;
-			GV_BIND_NAME_ONLY(gd_header, &ms_gbl_nam);
-			csa = gv_target->gd_csa;
-			SETUP_TRIGGER_GLOBAL;
+			SAVE_TRIGGER_REGION_INFO(save_currkey);
+			ms_gvname.var_name.addr = mv_trigger_val.str.addr;
+			ms_gvname.var_name.len = trigvn_len;
+			COMPUTE_HASH_MNAME(&ms_gvname);
+			GV_BIND_NAME_ONLY(gd_header, &ms_gvname, gvnh_reg);
+			SET_GVTARGET_TO_HASHT_GBL(gv_target->gd_csa);
 			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 		} else
 		{
@@ -467,7 +465,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, uint4 f
 		write_out_trigger(trig_gbl.str.addr, trig_gbl.str.len, file_name_len, op_val, indx);
 		if (trig_name)
 		{
-			RESTORE_TRIGGER_REGION_INFO;
+			RESTORE_TRIGGER_REGION_INFO(save_currkey);
 		}
 		if (wildcard)
 		{
@@ -493,13 +491,7 @@ STATICFNDEF void dump_all_triggers(uint4 file_name_len, mval *op_val)
 {
 	mval			curr_gbl_name, val;
 	gd_region		*reg;
-	sgmnt_addrs		*csa;
-	mname_entry		gvent;
-	gv_namehead		*hasht_tree, *save_gvtarget;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	char			save_altkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key			*save_gv_currkey;
-	gv_key			*save_gv_altkey;
+	gv_namehead		*save_gvtarget;
 	unsigned char		*key;
 	mval			trigger_value;
 	int			reg_index;
@@ -517,8 +509,7 @@ STATICFNDEF void dump_all_triggers(uint4 file_name_len, mval *op_val)
 			gv_init_reg(reg);
 		gv_cur_region = reg;
 		change_reg();
-		csa = cs_addrs;
-		SETUP_TRIGGER_GLOBAL;
+		SET_GVTARGET_TO_HASHT_GBL(cs_addrs);
 		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 		if (0 != gv_target->root)
 		{
@@ -546,16 +537,11 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 {
 	char			*sel_ptr, *strtok_ptr, *prev_ptr, *ptr1, *ptr2;
 	int			gbl_len, prev_len;
-	mstr			gbl_name;
-	sgmnt_addrs		*csa;
-	gv_namehead		*hasht_tree, *save_gvtarget;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	char			save_altkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key			*save_gv_currkey;
-	gv_key			*save_gv_altkey;
+	mname_entry		gvname;
+	gv_namehead		*save_gvtarget;
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gd_region		*save_gv_cur_region;
 	char			save_select_list[MAX_BUFF_SIZE];
-	mname_entry		gvent;
 	mval			trigger_value;
 	int			len, len1, badpos;
 	int			local_errno;
@@ -566,6 +552,7 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 	mval			op_val, op_pars;
 	boolean_t		select_status;
 	io_pair			save_io_curr_device;
+	gvnh_reg_t		*gvnh_reg;
 
 	static readonly unsigned char	open_params_list[] =
 	{
@@ -661,21 +648,21 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 						select_status, badpos);
 					continue;
 				}
-				SAVE_TRIGGER_REGION_INFO;
+				SAVE_TRIGGER_REGION_INFO(save_currkey);
 				gbl_len = NAM_LEN(sel_ptr + 1, (int)(ptr1 - sel_ptr) - 1);
 				ptr1 = sel_ptr + 1;
 				if ((prev_len != gbl_len) || (0 != memcmp(prev_ptr, ptr1, gbl_len)))
 				{
-					gbl_name.addr = ptr1;
-					gbl_name.len = gbl_len;
 					prev_ptr = ptr1;
 					prev_len = gbl_len;
-					GV_BIND_NAME_ONLY(gd_header, &gbl_name);
+					gvname.var_name.addr = ptr1;
+					gvname.var_name.len = gbl_len;
+					COMPUTE_HASH_MNAME(&gvname);
+					GV_BIND_NAME_ONLY(gd_header, &gvname, gvnh_reg);
 					if ('*' == *(ptr1 + gbl_len))
-						gbl_name.len++;
+						gvname.var_name.len++;
 				}
-				csa = gv_target->gd_csa;
-				SETUP_TRIGGER_GLOBAL;
+				SET_GVTARGET_TO_HASHT_GBL(gv_target->gd_csa);
 			} else
 			{
 				if (len1 != (badpos = validate_input_trigger_name(ptr1, len1, NULL))) /* assignment is intended */
@@ -687,15 +674,15 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 				if (TRIGNAME_SEQ_DELIM == *(sel_ptr + (len1 - 1)))
 					/* drop the trailing # sign */
 					len1--;
-				gbl_name.addr = sel_ptr;
-				gbl_name.len = len1;
-				SAVE_TRIGGER_REGION_INFO;
+				gvname.var_name.addr = sel_ptr;
+				gvname.var_name.len = len1;
+				SAVE_TRIGGER_REGION_INFO(save_currkey);
 				SWITCH_TO_DEFAULT_REGION;
 			}
 			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 			if (0 != gv_target->root)
-				write_gbls_or_names(gbl_name.addr, gbl_name.len, file_name_len, &op_val, trig_name);
-			RESTORE_TRIGGER_REGION_INFO;
+				write_gbls_or_names(gvname.var_name.addr, gvname.var_name.len, file_name_len, &op_val, trig_name);
+			RESTORE_TRIGGER_REGION_INFO(save_currkey);
 		} while (NULL != (sel_ptr = strtok_r(NULL, ",", &strtok_ptr)));	/* Embedded assignment is intended */
 	}
 	if (0 != file_name_len)

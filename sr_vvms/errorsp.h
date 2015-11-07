@@ -82,7 +82,7 @@ GBLREF int4		 error_condition;
 					return SS$_NORMAL; \
 				}
 
-#define START_CH		error_def(ERR_TPRETRY);								\
+#define START_CH(flag_assert)	error_def(ERR_TPRETRY);								\
 				DCL_THREADGBL_ACCESS;								\
 														\
 				SETUP_THREADGBL_ACCESS;								\

@@ -422,12 +422,12 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 	bp = (blk_hdr_ptr_t) pblkcontents;
 	in_len = MIN(csd->blk_size, bp->bsiz) - SIZEOF(*bp);
 	jctl = rctl->jctl;
-	if (!jctl->is_same_hash_as_db && BLOCK_REQUIRE_ENCRYPTION(csd->is_encrypted, bp->levl, in_len))
+	if (!jctl->is_same_hash_as_db && BLK_NEEDS_ENCRYPTION3(csd->is_encrypted, bp->levl, in_len))
 	{	/* Database and Journals are setup with different encryption keys. So, decrypt the PBLK records with the journal's
 		 * encryption key and encrypt it with the database's encryption key before writing it to the database file.
 		 */
 		ASSERT_ENCRYPTION_INITIALIZED;
-		/* The below assert cannot be moved before BLOCK_REQUIRE_ENCRYPTION check done above as tmp_ptr could
+		/* The below assert cannot be moved before BLK_NEEDS_ENCRYPTION3 check done above as tmp_ptr could
 		 * potentially point to a V4 block in which case the assert might fail when a V4 block is casted to
 		 * a V5 block header.
 		 */

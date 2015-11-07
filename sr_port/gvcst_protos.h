@@ -28,7 +28,7 @@ mint		gvcst_data(void);
 mint		gvcst_data2(void);
 enum cdb_sc	gvcst_dataget(mint *dollar_data, mval *val);
 enum cdb_sc	gvcst_dataget2(mint *dollar_data, mval *val, unsigned char *sn_ptr);
-bool		gvcst_gblmod(mval *v);
+boolean_t	gvcst_gblmod(mval *v);
 boolean_t	gvcst_get(mval *v);
 boolean_t	gvcst_get2(mval *v, unsigned char *sn_ptr);
 void		gvcst_incr(mval *increment, mval *result);
@@ -36,12 +36,12 @@ void		gvcst_init(gd_region *greg);
 void		gvcst_kill(boolean_t do_subtree);
 void		gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing_chunks);
 enum cdb_sc	gvcst_lftsib(srch_hist *full_hist);
-bool		gvcst_order(void);
-bool		gvcst_order2(void);
+boolean_t	gvcst_order(void);
+boolean_t	gvcst_order2(void);
 void		gvcst_put(mval *v);
 void		gvcst_put2(mval *val, span_parms *parms);
-bool		gvcst_query(void);
-bool		gvcst_query2(void);
+boolean_t	gvcst_query(void);
+boolean_t	gvcst_query2(void);
 boolean_t	gvcst_queryget(mval *val);
 boolean_t	gvcst_queryget2(mval *val, unsigned char *sn_ptr);
 enum cdb_sc	gvcst_root_search(boolean_t donot_restart);
@@ -49,15 +49,47 @@ enum cdb_sc	gvcst_rtsib(srch_hist *full_hist, int level);
 enum cdb_sc	gvcst_search(gv_key *pKey, srch_hist *pHist);
 enum cdb_sc	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat);
 enum cdb_sc	gvcst_search_tail(gv_key *pKey, srch_blk_status *pStat, gv_key *pOldKey);
+
+#ifdef UNIX
+mint		gvcst_spr_data(void);
+void		gvcst_spr_kill(void);
+boolean_t	gvcst_spr_order(void);
+boolean_t	gvcst_spr_zprevious(void);
+boolean_t	gvcst_spr_query(void);
+boolean_t	gvcst_spr_queryget(mval *cumul_val);
+
+# define INVOKE_GVCST_SPR_XXX(GVNH_REG, STATEMENT)	\
+{							\
+	assert(NULL != GVNH_REG->gvspan);		\
+	STATEMENT;					\
+}
+#else
+# define INVOKE_GVCST_SPR_XXX(GVNH_REG, STMT)	assert(FALSE)
+#endif
+
 void		gvcst_tp_init(gd_region *);
-bool		gvcst_zprevious(void);
-bool		gvcst_zprevious2(void);
+boolean_t	gvcst_zprevious(void);
+boolean_t	gvcst_zprevious2(void);
 
 /* gvcst_dataget and gvcst_dataget2 take the following values as input */
 #define DG_GETONLY	2
 #define DG_DATAONLY	3
 #define DG_DATAGET	4
 #define DG_GETSNDATA	5
+
+#define	INCREMENT_GD_TARG_TN(LCL_TN)								\
+{												\
+	(TREF(gd_targ_tn))++;									\
+	LCL_TN = TREF(gd_targ_tn);								\
+	if (0 == LCL_TN)									\
+	{	/* We have wrapped around after 2**64 increments. Reset gd_targ_reg_array to	\
+		 * avoid incorrect matches of tn (the pre-wrapped tn with the post-wrapped tn).	\
+		 */										\
+		memset(TREF(gd_targ_reg_array), 0, TREF(gd_targ_reg_array_size));		\
+		LCL_TN++;									\
+		TREF(gd_targ_tn) = LCL_TN;							\
+	}											\
+}
 
 GBLREF	boolean_t	gv_play_duplicate_kills;
 

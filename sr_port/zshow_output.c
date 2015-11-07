@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@
 #ifdef UNICODE_SUPPORTED
 #include "gtm_utf8.h"
 #endif
+#include "gtmimagename.h"
 
 #define F_SUBSC_LEN		 3
 #define N_SUBSC_LEN		 5
@@ -65,10 +66,14 @@ void zshow_output(zshow_out *out, const mstr *str)
 	int		buff_len;
 	int		device_width, inchar_width, cumul_width;
 	boolean_t	is_base_var, lvundef, utf8_active;
+	gd_addr		*gbl_gd_addr;
+	gvnh_reg_t	*gvnh_reg;
 #ifdef UNICODE_SUPPORTED
 	wint_t		codepoint;
 #endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (NULL != str)
 	{
 		buff_len = (int)(out->ptr - out->buff);
@@ -200,7 +205,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				is_base_var = LV_IS_BASE_VAR(lv);
 				LV_SBS_DEPTH(lv, is_base_var, sbs_depth);
 				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 2))
-					rts_error(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 				out->out_var.lv.child = op_putindx(VARLSTCNT(2) lv, mv);
 				DEBUG_ONLY(LV_SBS_DEPTH(out->out_var.lv.child, FALSE, dbg_sbs_depth);)
 				assert(MAX_LVSUBSCRIPTS > (dbg_sbs_depth + 1));
@@ -286,8 +291,10 @@ void zshow_output(zshow_out *out, const mstr *str)
 			key_ovrhd = gv_currkey->end + 1 + F_SUBSC_LEN + N_SUBSC_LEN;
 			out->len = (int)(gv_cur_region->max_rec_size - key_ovrhd - SIZEOF(rec_hdr));
 			if (out->len < MIN_DATASIZE)
-				rts_error(VARLSTCNT(1) ERR_ZSHOWGLOSMALL);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSHOWGLOSMALL);
 		}
+		gbl_gd_addr = TREF(gd_targ_addr);	/* set by op_gvname/op_gvextnam/op_gvnaked at start of ZSHOW cmd */
+		gvnh_reg = TREF(gd_targ_gvnh_reg);	/* set by op_gvname/op_gvextnam/op_gvnaked at start of ZSHOW cmd */
 		if (out->code && out->code != out->curr_code)
 		{
 			gv_currkey->end = out->out_var.gv.end;
@@ -297,9 +304,13 @@ void zshow_output(zshow_out *out, const mstr *str)
 			mv->str.len = 1;
 			mv->str.addr = &buff;
 			*mv->str.addr = out->code;
-			mval2subsc(mv, gv_currkey);
+			mval2subsc(mv, gv_currkey, gv_cur_region->std_null_coll);
+			/* If gvnh_reg corresponds to a spanning global, then determine
+			 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+			 */
+			GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
 			if (gv_currkey->end >= gv_cur_region->max_key_size)
-				ISSUE_GVSUBOFLOW_ERROR(gv_currkey);
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
 			op_gvkill();
 		}
 		if (str)
@@ -334,9 +345,13 @@ void zshow_output(zshow_out *out, const mstr *str)
 					op_gvnaked(VARLSTCNT(1) mv);
 				else
 				{
-					mval2subsc(mv, gv_currkey);
+					mval2subsc(mv, gv_currkey, gv_cur_region->std_null_coll);
+					/* If gvnh_reg corresponds to a spanning global, then determine
+					 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+					 */
+					GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
 					if (gv_currkey->end >= gv_cur_region->max_key_size)
-						ISSUE_GVSUBOFLOW_ERROR(gv_currkey);
+						ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
 				}
 				ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
 				mv->str.addr = (char *)stringpool.free;
@@ -362,9 +377,13 @@ void zshow_output(zshow_out *out, const mstr *str)
 				op_gvnaked(VARLSTCNT(1) mv);
 			else
 			{
-				mval2subsc(mv, gv_currkey);
+				mval2subsc(mv, gv_currkey, gv_cur_region->std_null_coll);
+				/* If gvnh_reg corresponds to a spanning global, then determine
+				 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+				 */
+				GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
 				if (gv_currkey->end >= gv_cur_region->max_key_size)
-					ISSUE_GVSUBOFLOW_ERROR(gv_currkey);
+					ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
 			}
 			ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
 			mv->str.addr = (char *)stringpool.free;
@@ -390,13 +409,11 @@ void zshow_output(zshow_out *out, const mstr *str)
 		}
 		break;
 	default:
-		GTMASSERT;
+		assertpro(FALSE && out->type);
 		break;
 	}
 	if (!process_exiting)
-	{
 		POP_MV_STENT();
-	}
 	out->curr_code = out->code;
 	out->flush = 0;
 }

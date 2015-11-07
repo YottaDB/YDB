@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,6 +92,7 @@ GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	uint4			tstartcycle;
 GBLREF	char			*update_array_ptr;
 GBLREF	ua_list			*curr_ua, *first_ua;
+GBLREF	mstr			extnam_str;
 #ifdef GTM_TRIGGER
 GBLREF	mval			dollar_ztwormhole;
 GBLREF	int4			gtm_trigger_depth;
@@ -111,7 +112,8 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 {
 	boolean_t		serial;			/* whether SERIAL keyword was present */
 	int			prescnt,		/* number of names to save, -1 = no restart, -2 = preserve all */
-				pres;
+				pres, len;
+	char			*ptr;
 	lv_val			*lv;
 	mlk_pvtblk		*pre_lock;
 	mlk_tp			*lck_tp;
@@ -165,7 +167,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
 			{
 				if (r_local->open && !r_local->was_open &&
-				    (dba_bg == r_local->dyn.addr->acc_meth || dba_mm == r_local->dyn.addr->acc_meth))
+				    (dba_bg == REG_ACC_METH(r_local) || dba_mm == REG_ACC_METH(r_local)))
 				{	/* Let's initialize those regions but only if it came through gvcst_init_sysops
 					   (being a bg or mm region)
 					*/
@@ -175,9 +177,9 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		}
 	}
 	if (0 != jnl_fence_ctl.level)
-		rts_error(VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
 	if (dollar_tlevel + 1 >= TP_MAX_NEST)
-		rts_error(VARLSTCNT(1) ERR_TPTOODEEP);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPTOODEEP);
 	va_start(varlst, implicit_flag);	/* no argument count first */
 	serial = va_arg(varlst, int);
 	tid = va_arg(varlst, mval *);
@@ -320,9 +322,9 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			if (msp <= stacktop)
 			{
 				msp = old_sp;
-				rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
 			} else
-				rts_error(VARLSTCNT(1) ERR_STACKCRIT);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
 		}
 		memmove(msp, old_sp, top - (unsigned char *)old_sp);	/* Shift stack w/possible overlapping ranges */
 		mv_st_ent = (mv_stent *)(top - shift_size);
@@ -386,7 +388,6 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	DBGRFCT((stderr, "\n*** op_tstart: *** Entering $TLEVEL = %d\n", dollar_tlevel + 1));
 	tf = (tp_frame *)(tp_sp -= SIZEOF(tp_frame));
 	assert((unsigned char *)tf > tpstacktop);	/* Block should lie entirely within tp stack area */
-	tf->dlr_t = dollar_truth;
 	tf->restart_pc = fp->mpc;
 	tf->restart_ctxt = fp->ctxt;
 	tf->fp = fp;
@@ -394,8 +395,6 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	tf->trans_id = *tid;
 	tf->restartable = (NORESTART != prescnt);
 	tf->old_locks = (NULL != mlk_pvt_root);
-	tf->orig_gv_target = gv_target;
-	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
 #	ifdef DEBUG
 	if (!jgbl.forw_phase_recovery)
 	{	/* In case of forward phase of journal recovery, gv_currkey is set by caller (mur_forward) only
@@ -404,18 +403,54 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	}
 #	endif
-	/* If the TP structures have not yet been initialized, do that now. */
-	if (NULL == TREF(gv_tporigkey_ptr))
-	{	/* This need only be set once */
-		TREF(gv_tporigkey_ptr) = (gv_orig_key_array *)malloc(SIZEOF(gv_orig_key_array));
-		memset(TREF(gv_tporigkey_ptr), 0, SIZEOF(gv_orig_key_array));
+	if (!dollar_tlevel)
+	{	/* If the TP structures have not yet been initialized, do that now. */
+		if (NULL == TREF(gv_tporigkey_ptr))
+		{	/* This need only be set once */
+			TREF(gv_tporigkey_ptr) = (gv_orig_key_array *)malloc(SIZEOF(gv_orig_key_array));
+			memset(TREF(gv_tporigkey_ptr), 0, SIZEOF(gv_orig_key_array));
+		}
+		tf->orig_key = (gv_key *)&((TREF(gv_tporigkey_ptr))->gv_orig_key[0]);
+		assert(NULL != gv_currkey);
+		MEMCPY_KEY(tf->orig_key, gv_currkey);
+		tf->gd_header = gd_header;
+		tf->gd_reg = gv_cur_region;
+		tf->orig_gv_target = gv_target;
+		tf->zgbldir = dollar_zgbldir;
+		tf->dlr_t = dollar_truth;
+		len = extnam_str.len;
+		tf->extnam_str.len = len;
+		if (len)
+		{	/* Take a copy of extnam_str */
+			if ((TREF(gv_tporig_extnam_str)).len < len)
+			{
+				if (NULL != (TREF(gv_tporig_extnam_str)).addr)
+					free((TREF(gv_tporig_extnam_str)).addr);
+				(TREF(gv_tporig_extnam_str)).addr = malloc(len);
+				(TREF(gv_tporig_extnam_str)).len = len;	/* this is the allocated buffer size */
+			}
+			ptr = (TREF(gv_tporig_extnam_str)).addr;
+			memcpy(ptr, extnam_str.addr, len);
+			tf->extnam_str.addr = ptr;
+		}
 	}
-	tf->orig_key = (gv_key *)&((TREF(gv_tporigkey_ptr))->gv_orig_key[dollar_tlevel][0]);
-	assert(NULL != gv_currkey);
-	MEMCPY_KEY(tf->orig_key, gv_currkey);
-	tf->gd_header = gd_header;
-	tf->gd_reg = gv_cur_region;
-	tf->zgbldir = dollar_zgbldir;
+#	ifdef DEBUG
+	else
+	{	/* Set up fields in "tf" to impossible values for nested TP frames. These should never be used.
+		 * This will help us get an assert failure or SIG-11 right should any of these get referenced.
+		 */
+		tf->orig_key = NULL;
+		tf->gd_header = NULL;
+		tf->gd_reg = NULL;
+		tf->orig_gv_target = NULL;
+		/* Unfortunately tf->dlr_t has just one bit to store 0 or 1 (valid values) so an impossible value of say -1
+		 * cannot be stored here. We therefore skip initializing this one.
+		 */
+		tf->zgbldir.mvtype = 0;	/* impossible value */
+		tf->extnam_str.len = -1; /* impossible value */
+	}
+#	endif
+	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
 	tf->mvc = mv_st_ent;
 	tf->sym = curr_symval;
 	tf->tp_save_all_flg = FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,6 @@
 #include "ftok_sems.h"
 #endif
 
-GBLREF	gd_addr		*gd_header;
 GBLREF	jnlpool_addrs	jnlpool;
 
 error_def(ERR_ASSERT);
@@ -63,7 +62,7 @@ CONDITION_HANDLER(gtmsource_ch)
 	gd_region	*reg_local, *reg_top;
 	sgmnt_addrs	*csa;
 
-	START_CH;
+	START_CH(TRUE);
 	if (!(IS_GTM_ERROR(SIGNAL)) || DUMPABLE || SEVERITY == ERROR)
 	{
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
@@ -87,6 +86,9 @@ CONDITION_HANDLER(gtmsource_ch)
 		}
        		NEXTCH;
 	}
-	/* warning, info, or success */
-	CONTINUE;
+	VMS_ONLY (
+		/* warning, info, or success */
+		CONTINUE;
+	)
+	assertpro(FALSE);
 }

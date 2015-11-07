@@ -20,7 +20,7 @@
 
 #	gtm_curpro is the current production version
 if (`uname -s` != "OS/390") then
-	setenv	gtm_curpro	"V60001"
+	setenv	gtm_curpro	"V60003"
 else
 	setenv	gtm_curpro	"V53004A"	# until newer version built on z/OS
 endif

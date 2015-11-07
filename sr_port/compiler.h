@@ -11,6 +11,34 @@
 #ifndef COMPILER_H_INCLUDED
 #define COMPILER_H_INCLUDED
 
+/* Values for oprclass */
+typedef enum
+{
+	NO_REF,		/* 0 */
+	TVAR_REF,	/* 1 */
+	TVAL_REF,	/* 2 */
+	TINT_REF,	/* 3 */
+	TVAD_REF,	/* 4 */
+	TCAD_REF,	/* 5  - This and all _REFs before are VALUED_REF_TYPES (see alloc_reg.c) */
+	MLIT_REF,	/* 6 */
+	MVAR_REF,	/* 7 */
+	TRIP_REF,	/* 8 */
+	TNXT_REF,	/* 9  */
+	TJMP_REF,	/* 10 */
+	INDR_REF,	/* 11 */
+	MLAB_REF,	/* 12 */
+	ILIT_REF,	/* 13 */
+	CDLT_REF,	/* 14 */
+	TEMP_REF,	/* 15 */
+	MFUN_REF,	/* 16 */
+	MNXL_REF,	/* 17 refer to internalentry of child line */
+	TSIZ_REF,	/* 18 ilit refering to size of given triple codegen */
+	OCNT_REF	/* 19 Offset from Call to Next Triple */
+} operclass;
+#define VALUED_REF_TYPES 6	/* Types 0-6 are specific types used by alloc_reg() in array references
+				 * **** WARNING **** Do NOT reorder
+				 */
+
 typedef unsigned int	opctype;
 
 typedef struct	mvarstruct
@@ -69,7 +97,7 @@ typedef struct	triplesize
 
 typedef struct	oprtypestruct
 {
-	char			oprclass;
+	operclass		oprclass;
 	union
 	{
 		struct	oprtypestruct	*indr;
@@ -86,31 +114,6 @@ typedef struct	oprtypestruct
 		unsigned char		vreg;
 	} oprval;
 } oprtype;
-
-/* Values for oprclass */
-#define NO_REF		0
-#define TVAR_REF	1
-#define TVAL_REF	2
-#define TINT_REF	3
-#define TVAD_REF	4
-#define TCAD_REF	5
-#define VALUED_REF_TYPES 6
-#define VREG_REF	6
-#define MLIT_REF	7
-#define MVAR_REF	8
-#define TRIP_REF	9
-#define TNXT_REF	10
-#define TJMP_REF	11
-#define INDR_REF	12
-#define MLAB_REF	13
-#define ILIT_REF	14
-#define CDLT_REF	15
-#define TEMP_REF	16
-#define MFUN_REF	17
-#define MNXL_REF	18	/* refer to internalentry of child line */
-#define TSIZ_REF	19	/* ilit refering to size of given triple codegen */
-#define OCNT_REF	20	/* Offset from Call to Next Triple */
-
 
 typedef struct	tbptype
 {
@@ -309,28 +312,6 @@ error_def(ERR_SVNOSET);
 	COMPLITS_HASHTAB_CLEANUP;	\
 	COMPSYMS_HASHTAB_CLEANUP;
 
-/* Macro to compute running checksum of a routine one line at a time. */
-#define RTN_SRC_CHKSUM(srcptr, srclen, chksum)								\
-{													\
-	char	*chkcalc, *cptr;									\
-	uint4	srcint;											\
-	for (chkcalc = srcptr, cptr = srcptr + srclen; chkcalc < cptr; )				\
-	{												\
-		srcint = 0;										\
-		if (INTCAST(cptr - chkcalc) < SIZEOF(uint4))						\
-		{											\
-			memcpy(&srcint, chkcalc, cptr - chkcalc);					\
-			chkcalc = cptr;		/* Stops loop after this iteration is complete */	\
-		} else											\
-		{											\
-			GET_ULONG(srcint, chkcalc);							\
-			chkcalc += SIZEOF(uint4);							\
-		}											\
-		chksum ^= srcint;									\
-		chksum >>= 1;										\
-	}												\
-}
-
 typedef struct
 {
 	triple		*expr_start;
@@ -504,6 +485,19 @@ typedef struct
 		--(TREF(for_stack_ptr));									\
 }
 
+/* $TEXT(+n^rtn) fetches from the most recently ZLINK'd version of rtn. $TEXT(+n) fetches from the currently executing version.
+ * The compiler converts $TEXT(+n) to $TEXT(+n^!), indicating at runtime $TEXT should fetch from the current executing routine.
+ * '!' is not a legal routine name character.
+ */
+#define CURRENT_RTN_STRING		"!"
+#define PUT_CURRENT_RTN			put_str(LIT_AND_LEN(CURRENT_RTN_STRING))
+/* Do we want the current routine? Return TRUE.
+ * Otherwise, return FALSE; we want the latest version of whichever routine name is specified.
+ */
+#define WANT_CURRENT_RTN_MSTR(S)	((STR_LIT_LEN(CURRENT_RTN_STRING) == (S)->len)	\
+						&& (0 == MEMCMP_LIT((S)->addr, CURRENT_RTN_STRING)))
+#define WANT_CURRENT_RTN(R)		WANT_CURRENT_RTN_MSTR(&(R)->str)
+
 int		actuallist(oprtype *opr);
 int		bool_expr(boolean_t op, oprtype *addr);
 void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);
@@ -602,7 +596,7 @@ triple		*maketriple(opctype op);
 int		name_glvn(boolean_t gblvn, oprtype *a);
 triple		*newtriple(opctype op);
 int		nref(void);
-void		obj_code(uint4 src_lines, uint4 checksum);
+void		obj_code(uint4 src_lines, void *checksum_ctx);
 int		one_job_param(char **parptr);
 int		parse_until_rparen_or_space(void);
 oprtype		put_ocnt(void);

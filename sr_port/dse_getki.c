@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +21,6 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "min_max.h"		/* needed for init_root_gv.h */
-#include "init_root_gv.h"
 #include "util.h"
 #include "cli.h"
 #include "stringpool.h"
@@ -30,21 +28,20 @@
 #include "mvalconv.h"
 #include "op.h"
 #include "format_targ_key.h"
+#include "gvcst_protos.h"
 
 #ifdef GTM_TRIGGER
 #include "hashtab_mname.h"
 #include <rtnhdr.h>
-#include "gv_trigger.h"		/* needed for INIT_ROOT_GVT */
 #include "targ_alloc.h"
 #endif
 #ifdef UNICODE_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 
-GBLREF gv_key		*gv_currkey;
-GBLREF sgmnt_addrs      *cs_addrs;
-GBLREF gd_region    	*gv_cur_region;
-GBLREF mval		curr_gbl_root;
+GBLREF	gv_key		*gv_currkey;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_namehead	*gv_target;
 
 LITREF	mval		literal_hasht;
@@ -54,11 +51,10 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 	char 		buf[MAX_ZWR_KEY_SZ], *src, *temp_dst, *bot, *top, *tmp, slit[MAX_KEY_SZ + 1], key_buf[MAX_KEY_SZ + 1];
 	short int	max_key;
 	unsigned short 	buf_len;
-	int  		key_len, dlr_num, dlr_len;
+	int  		dlr_num, dlr_len;
 	int		num;
 	unsigned char	*ptr;
 	mval 		key_subsc;
-	sgmnt_addrs	*csa;
 	span_subs	subs;
 
 	buf_len = SIZEOF(buf);
@@ -67,14 +63,14 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 	bot = temp_dst = (char *)&key_buf[0];
 	top = &buf[buf_len];
 	src = &buf[0];
-	if (*src++ != '^')
+	if ('^' != *src++)
 	{
 		util_out_print("Error:  invalid key.", TRUE);
 		return FALSE;
 	}
-	if ((*src >= 'A' && *src <= 'Z') ||
-	    (*src >= 'a' && *src <= 'z') ||
-	    (*src == '%') || (*src == '#'))			/* first letter must be an alphabet or % or # */
+	if ((('A' <= *src) && ('Z' >= *src))
+		|| (('a' <= *src) && ('z' >= *src))
+		|| ('%' == *src) || ('#' == *src))			/* first letter must be an alphabet or % or # */
 	{
 		*temp_dst++ = *src++;
 	} else
@@ -82,13 +78,14 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 		util_out_print("Error:  invalid key.", TRUE);
 		return FALSE;
 	}
-	for ( ; *src != '(' && src < top ;src++)
+	for ( ; ('(' != *src) && (src < top); src++)
 	{
-		if ((*src >= 'A' && *src <= 'Z') ||
-		    (*src >= 'a' && *src <= 'z') ||
-		    (*src >= '0' && *src <= '9'))
+		if ((('A' <= *src) && ('Z' >= *src))
+			|| (('a' <= *src) && ('z' >= *src))
+			|| (('0' <= *src) && ('9' >= *src)))
+		{
 			*temp_dst = *src;
-		else
+		} else
 		{
 			util_out_print("Error:  invalid key.", TRUE);
 			return FALSE;
@@ -96,10 +93,9 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 		temp_dst++;
 	}
 	*temp_dst = '\0';
-
-	csa = cs_addrs;
-	key_len = (int )(temp_dst - bot);
-	INIT_ROOT_GVT(bot, key_len, curr_gbl_root);
+	gv_target = dse_find_gvt(gv_cur_region, bot, (int)(temp_dst - bot));
+	SET_GV_CURRKEY_FROM_GVT(gv_target);	/* gv_currkey is needed by GVCST_ROOT_SEARCH AND code after it */
+	GVCST_ROOT_SEARCH; /* sets up gv_target->collseq (needed by mval2subsc below ) */
 	bot = (char *)&gv_currkey->base[0];
 	temp_dst = (char *)&gv_currkey->base[0] + gv_currkey->end;
 	max_key = gv_cur_region->max_key_size;
@@ -131,7 +127,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 					return FALSE;
 				}
 				src = src + SPAN_SUBS_LEN + 1;
-				for (num = 0, src++; *src != ')'; num = (num * DECIMAL_BASE + (int)(*src++ - ASCII_0)))
+				for (num = 0, src++; ')' != *src; num = (num * DECIMAL_BASE + (int)(*src++ - ASCII_0)))
 					;
 				ptr = gv_currkey->base + gv_currkey->end;
 				num = num - 1;
@@ -142,11 +138,11 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 				*ptr = KEY_DELIMITER;
 				gv_currkey->end = ptr - gv_currkey->base;
 				break;
-			} else if (*src != '\"')		/* numerical subscript */
+			} else if ('\"' != *src)		/* numerical subscript */
 			{
-				for (key_subsc.str.addr = src ; *src != ')' && *src != ','; src++)
+				for (key_subsc.str.addr = src ; (')' != *src) && (',' != *src); src++)
 				{
-					if (src == top || (*src < '0' || *src > '9') && *src != '-' && *src != '.')
+					if (src == top || (('0' > *src) || ('9' < *src)) && ('-' != *src) && ('.' != *src))
 					{
 						util_out_print("Error:  invalid key.", TRUE);
 						return FALSE;
@@ -166,8 +162,8 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 						util_out_print("Error:  invalid key.", TRUE);
 						return FALSE;
 					}
-					if (*src == '\"')
-						if (*++src != '\"')
+					if ('\"' == *src)
+						if ('\"' != *++src)
 							break;
 					*tmp++ = *src++;
 				}
@@ -179,14 +175,14 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 				util_out_print("Error:  Null subscripts not allowed", TRUE);
 				return FALSE;
 		        }
-			mval2subsc(&key_subsc, gv_currkey);
+			mval2subsc(&key_subsc, gv_currkey, gv_cur_region->std_null_coll);
 			if (gv_currkey->end >= max_key)
-				ISSUE_GVSUBOFLOW_ERROR(gv_currkey);
-			if (*src != ',')
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+			if (',' != *src)
 				break;
 			src++;
 		}
-		if (*src++ != ')')
+		if (')' != *src++)
 		{
 			util_out_print("Error:  invalid key.", TRUE);
 			return FALSE;
@@ -199,6 +195,10 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 		return FALSE;
 	}
 	*len = (int)(temp_dst - bot + 1);
+	assert(3 <= *len);
+	assert(KEY_DELIMITER != gv_currkey->base[*len - 3]);
+	assert(KEY_DELIMITER == gv_currkey->base[*len - 2]);
+	assert(KEY_DELIMITER == gv_currkey->base[*len - 1]);
 	memcpy(dst, &gv_currkey->base[0], *len);
 	return TRUE;
 }

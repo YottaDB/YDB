@@ -135,6 +135,10 @@ typedef struct
 	int		outbufsize;	/* Size of outbuf */
 	int4		recordsize;	/* Size of record in bytes */
 	int4		padchar;	/* Character to use for padding */
+	int4		fol_bytes_read;	/* Number of bytes read from current record in utf fix mode with follow */
+	int4		last_was_timeout;	/* last read in utf fix mode with follow was a timeout */
+	int4		orig_bytes_already_read;	/* bytes_already_read from a previous read
+							   in utf fix mode with follow */
 	int		out_bytes;	/* Number of bytes output for this fixed record */
 	uint4		bom_buf_cnt;	/* Count of bytes in BOM buffer */
 	uint4		bom_buf_off;	/* Next available byte in BOM buffer */
@@ -161,9 +165,10 @@ typedef struct
 int gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, int len);
 int iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4 *tot_bytes_read,
 		 TID timer_id, int4 *msec_timeout, boolean_t colon_zero);
-int iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, boolean_t timed, boolean_t *bom_timeout);
+int iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, boolean_t timed,
+		     boolean_t *bom_timeout, ABS_TIME end_time);
 int iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, boolean_t timed, boolean_t zint_restart,
-		 boolean_t *follow_timeout);
+		 boolean_t *follow_timeout, ABS_TIME end_time);
 int iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4 *tot_bytes_read,
 	     TID timer_id, int4 *msec_timeout, boolean_t colon_zero, boolean_t zint_restart);
 int iorm_write_utf_ascii(io_desc *iod, char *string, int len);

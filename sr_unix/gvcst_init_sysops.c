@@ -460,7 +460,7 @@ int db_init(gd_region *reg)
 	boolean_t		shm_setup_ok = FALSE, vermismatch = FALSE, vermismatch_already_printed = FALSE;
 	boolean_t		new_shm_ipc, do_crypt_init = FALSE, replinst_mismatch;
 	char            	machine_name[MAX_MCNAMELEN];
-	int			gethostname_res, stat_res, group_id, perm, save_udi_semid;
+	int			gethostname_res, stat_res, user_id, group_id, perm, save_udi_semid;
 	int4            	status, semval, dblksize, fbwsize, save_errno, wait_time, loopcnt, sem_pid;
 	sm_long_t       	status_l;
 	sgmnt_addrs     	*csa;
@@ -482,6 +482,8 @@ int db_init(gd_region *reg)
 	boolean_t		bypassed_ftok = FALSE, bypassed_access = FALSE;
 	int			jnl_buffer_size;
 	char			s[JNLBUFFUPDAPNDX_SIZE];	/* JNLBUFFUPDAPNDX_SIZE is defined in jnl.h */
+	char			*syscall;
+	void			*mmapaddr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -510,7 +512,7 @@ int db_init(gd_region *reg)
 	if (-1 == stat_res)
 		RTS_ERROR(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 	/* Setup new group and permissions if indicated by the security rules. */
-	if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_IPC, &pdd) < 0)
+	if (gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_IPC, &pdd) < 0)
 	{
 		SEND_MSG(VARLSTCNT(6 + PERMGENDIAG_ARG_COUNT)
 			ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("ipc resources"), RTS_ERROR_STRING(udi->fn),
@@ -598,6 +600,8 @@ int db_init(gd_region *reg)
 				if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, IPC_STAT, semarg))
 					RTS_ERROR(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 						  ERR_TEXT, 2, LEN_AND_LIT("Error with database control semctl IPC_STAT1"), errno);
+				if ((-1 != user_id) && (user_id != semstat.sem_perm.uid))
+					semstat.sem_perm.uid = user_id;
 				if ((-1 != group_id) && (group_id != semstat.sem_perm.gid))
 					semstat.sem_perm.gid = group_id;
 				semstat.sem_perm.mode = perm;
@@ -770,8 +774,7 @@ int db_init(gd_region *reg)
 		INIT_DB_ENCRYPTION_IF_NEEDED(do_crypt_init, init_status, reg, csa, tsd);
 		CSD2UDI(tsd, udi);
 		/* Make sure "mu_rndwn_file" has created semaphore for standalone access */
-		if (INVALID_SEMID == udi->semid || 0 == udi->gt_sem_ctime)
-			GTMASSERT;
+		assertpro((INVALID_SEMID != udi->semid) && (0 != udi->gt_sem_ctime));
 		/* Make sure "mu_rndwn_file" has reset shared memory. In pro, just clear it and proceed. */
 		assert((INVALID_SHMID == udi->shmid) && (0 == udi->gt_shm_ctime));
 		/* In pro, just clear it and proceed */
@@ -806,7 +809,7 @@ int db_init(gd_region *reg)
 	{	/* Bypassers are not allowed to create shared memory so we don't end up with conflicting shared memories */
 		if (bypassed_ftok || bypassed_access)
 		{
-			gtm_putmsg_csa(CSA_ARG(csa) ERR_REGOPENRETRY, 2, REG_LEN_STR(reg), DB_LEN_STR(reg));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_REGOPENRETRY, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
 			REVERT;
 			return -1; /* Retry calling db_init. Cleanup in gvcst_init() */
 		}
@@ -839,6 +842,8 @@ int db_init(gd_region *reg)
 			RTS_ERROR(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl IPC_STAT1"), errno);
 		/* change group and permissions */
+		if ((-1 != user_id) && (user_id != shmstat.shm_perm.uid))
+			shmstat.shm_perm.uid = user_id;
 		if ((-1 != group_id) && (group_id != shmstat.shm_perm.gid))
 			shmstat.shm_perm.gid = group_id;
 		shmstat.shm_perm.mode = perm;
@@ -905,12 +910,22 @@ int db_init(gd_region *reg)
 		mmap_sz = stat_buf.st_size - BLK_ZERO_OFF(tsd);
 		assert(0 < mmap_sz);
 		CHECK_LARGEFILE_MMAP(reg, mmap_sz); /* can issue rts_error MMFILETOOLARGE */
-		if (-1 == (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)MMAP_FD(udi->fd, mmap_sz, BLK_ZERO_OFF(tsd), read_only)))
+#		ifdef _AIX
+		mmapaddr = shmat(udi->fd, 0, (read_only ? (SHM_MAP|SHM_RDONLY) : SHM_MAP));
+#		else
+		mmapaddr = MMAP_FD(udi->fd, mmap_sz, BLK_ZERO_OFF(tsd), read_only);
+#		endif
+		if (-1 == (INTPTR_T)mmapaddr)
 		{
 			RTS_ERROR(VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					ERR_SYSCALL, 5, LEN_AND_LIT("mmap()"), CALLFROM, errno);
+					ERR_SYSCALL, 5, LEN_AND_STR(MEM_MAP_SYSCALL), CALLFROM, errno);
 		}
-		csa->db_addrs[1] = csa->db_addrs[0] + mmap_sz - 1;	/* '- 1' due to 0-based indexing */
+#		ifdef _AIX
+		csa->db_addrs[0] = (sm_uc_ptr_t)((sm_uc_ptr_t)mmapaddr + BLK_ZERO_OFF(tsd));
+#		else
+		csa->db_addrs[0] = mmapaddr;
+#		endif
+		csa->db_addrs[1] = (sm_uc_ptr_t)((sm_uc_ptr_t)csa->db_addrs[0] + mmap_sz - 1);	/* '- 1' due to 0-based indexing */
 		assert(csa->db_addrs[1] > csa->db_addrs[0]);
 		csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->lock_addrs[1] + 1);
 	}
@@ -1145,9 +1160,15 @@ int db_init(gd_region *reg)
 		}
 		/* Replication instance file or jnlpool id mismatch. Issue error. */
 		if (replinst_mismatch)
-			RTS_ERROR(VARLSTCNT(10) ERR_REPLINSTMISMTCH, 8,
-				LEN_AND_STR(jnlpool.jnlpool_ctl->jnlpool_id.instfilename), jnlpool.repl_inst_filehdr->jnlpool_shmid,
-				DB_LEN_STR(reg), LEN_AND_STR(csa->nl->replinstfilename), csa->nl->jnlpool_shmid);
+		{
+			if (INVALID_SHMID == csa->nl->jnlpool_shmid)
+				RTS_ERROR(VARLSTCNT(4) ERR_REPLINSTNOSHM, 2, DB_LEN_STR(reg));
+			else
+				RTS_ERROR(VARLSTCNT(10) ERR_REPLINSTMISMTCH, 8,
+					  LEN_AND_STR(jnlpool.jnlpool_ctl->jnlpool_id.instfilename),
+					  jnlpool.repl_inst_filehdr->jnlpool_shmid, DB_LEN_STR(reg),
+					  LEN_AND_STR(csa->nl->replinstfilename), csa->nl->jnlpool_shmid);
+		}
 	}
 	csa->root_search_cycle = csa->nl->root_search_cycle;
 	csa->onln_rlbk_cycle = csa->nl->onln_rlbk_cycle;	/* take local copy of the current Online Rollback cycle */

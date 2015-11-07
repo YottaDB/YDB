@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,9 +33,11 @@
 #include "gtm_stdio.h"
 #include "util.h"
 #include "repl_log.h"
-
 #ifdef UNIX
 #include "gtm_zlib.h"
+#endif
+#ifdef GTM_TLS
+#include "gtm_repl.h"
 #endif
 
 GBLREF	gtmrecv_options_t	gtmrecv_options;
@@ -43,8 +45,8 @@ GBLREF	gtmrecv_options_t	gtmrecv_options;
 int gtmrecv_get_opt(void)
 {
 
-	boolean_t	log, log_interval_specified;
-	unsigned short 	log_file_len, filter_cmd_len, instfilename_len, instname_len;
+	boolean_t	log, log_interval_specified, plaintext_fallback;
+	unsigned short 	log_file_len, filter_cmd_len, instfilename_len, instname_len, tlsid_len;
 	boolean_t	buffsize_status;
 	boolean_t	filter;
 	int		status;
@@ -151,8 +153,6 @@ int gtmrecv_get_opt(void)
 		} else
 			gtmrecv_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
 #		endif
-		/* Round up or down buffsize */
-
 		if (filter = (CLI_PRESENT == cli_present("FILTER")))
 		{
 			filter_cmd_len = MAX_FILTER_CMD_LEN;
@@ -165,6 +165,24 @@ int gtmrecv_get_opt(void)
 			gtmrecv_options.filter_cmd[0] = '\0';
 
 		gtmrecv_options.stopsourcefilter = (CLI_PRESENT == cli_present("STOPSOURCEFILTER"));
+		/* Check if SSL/TLS secure communication is requested. */
+#		ifdef GTM_TLS
+		if (CLI_PRESENT == cli_present("TLSID"))
+		{
+			tlsid_len = MAX_TLSID_LEN;
+			if (!cli_get_str("TLSID", repl_tls.id, &tlsid_len))
+			{
+				util_out_print("Error parsing TLSID qualifier", TRUE);
+				return -1;
+			}
+			assert(0 < tlsid_len);
+			/* Check if plaintext-fallback mode is specified. Default option is NOPLAINTEXTFALLBACK. */
+			if (CLI_PRESENT == (plaintext_fallback = cli_present("PLAINTEXTFALLBACK")))
+				repl_tls.plaintext_fallback = (plaintext_fallback != CLI_NEGATED);
+			else
+				repl_tls.plaintext_fallback = FALSE;
+		}
+#		endif
 	}
 
 	if ((gtmrecv_options.start && 0 != gtmrecv_options.listen_port) || gtmrecv_options.statslog || gtmrecv_options.changelog)

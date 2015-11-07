@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 	int		first_item, len, word_cnt;
 	unsigned char	*cp;
 
-	result->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
+	result->mvtype = 0; /* so stp_gcol, if invoked below, can free up space currently occupied by this to-be-overwritten mval */
 	len = -1;							/* to compensate for no space at the end */
 	if (cmd_cnt > 1)
 	{
@@ -74,6 +74,6 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 			break;
 		cp += len;
 	}
-	assert(cp + len == stringpool.free);
+	assert(IS_AT_END_OF_STRINGPOOL(cp, len));
 	return;
 }

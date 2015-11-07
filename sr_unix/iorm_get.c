@@ -96,14 +96,15 @@ int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, in
 				bom_bytes = 0;		/* no BOM found */
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE);
 	}
 	return bom_bytes;
 }
 
 /* When we get to this routine it is guaranteed that rm_ptr->done_1st_read is FALSE. */
 
-int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, boolean_t timed, boolean_t *bom_timeout)
+int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, boolean_t timed,
+			 boolean_t *bom_timeout, ABS_TIME end_time)
 {
 	int4		bytes2read, bytes_read, reclen, bom_bytes2read, bom_bytes_read;
 	int		status = 0;
@@ -112,6 +113,7 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 	int		fildes;
 	int4 sleep_left;
 	int4 sleep_time;
+	ABS_TIME	current_time, time_left;
 
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	fildes = rm_ptr->fildes;
@@ -125,8 +127,21 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 	if (timed)
 	{
 		/* check iorm_get_bom_fol.... for msc_timeout */
+		/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
 		if (0 < *msec_timeout)
 		{
+			/* get the current time */
+			sys_get_curr_time(&current_time);
+			time_left = sub_abs_time(&end_time, &current_time);
+			if (0 > time_left.at_sec)
+			{
+				*msec_timeout = -1;
+				*bom_timeout = TRUE;
+			} else
+				*msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+			/* make sure it terminates with bom_timeout */
+			if (!*bom_timeout && !*msec_timeout)
+				*msec_timeout = 1;
 			sleep_left = *msec_timeout;
 		} else
 			sleep_left = 0;
@@ -136,6 +151,7 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 		io_ptr->dollar.zeof = FALSE;
 	do
 	{
+		/* in follow mode a read will return an EOF if no more bytes are available*/
 		status = read(fildes, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt], bom_bytes2read - rm_ptr->bom_buf_cnt);
 		if (0 < status) /* we read some chars */
 		{
@@ -151,12 +167,27 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 			/* if a timed read, sleep the minimum of 100 ms and sleep_left.
 			   If not a timed read then just sleep 100 ms */
 			if (TRUE == timed)
+			{
+				/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
+				/* get the current time */
+				sys_get_curr_time(&current_time);
+				time_left = sub_abs_time(&end_time, &current_time);
+				if (0 > time_left.at_sec)
+				{
+					*msec_timeout = -1;
+					*bom_timeout = TRUE;
+				} else
+					*msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+
+				/* make sure it terminates with bom_timeout */
+				if (!*bom_timeout && !*msec_timeout)
+					*msec_timeout = 1;
+				sleep_left = *msec_timeout;
 				sleep_time = MIN(100,sleep_left);
-			else
+			} else
 				sleep_time = 100;
-			SHORT_SLEEP(sleep_time);
-			if (TRUE == timed)
-				sleep_left -= sleep_time;
+			if (0 < sleep_time)
+				SHORT_SLEEP(sleep_time);
 			if (outofband)
 			{
 				return 0;
@@ -184,7 +215,7 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 		get_chset_desc(&chset_names[chset]);
 	}
 	/* if outofband is not set then we are done getting the bom */
-	if (!outofband)
+	if (!outofband && !*bom_timeout)
 		rm_ptr->done_1st_read = TRUE;
 	return 0;
 }
@@ -192,7 +223,7 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 /* If we are in this routine then it is a fixed utf disk read with rm_ptr->follow = TRUE */
 
 int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, boolean_t timed,
-		     boolean_t zint_restart, boolean_t *follow_timeout)
+		     boolean_t zint_restart, boolean_t *follow_timeout, ABS_TIME end_time)
 {
 	boolean_t	ret;
 	char		inchar, *temp;
@@ -208,6 +239,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 	int4		sleep_left;
 	int4		sleep_time;
 	boolean_t	bom_timeout = FALSE;
+	ABS_TIME	current_time, time_left;
 
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
@@ -216,9 +248,23 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 	assert(rm_ptr->fixed);
 	if (!zint_restart)
 	{
-		bytes2read = rm_ptr->recordsize;
-		bytes_already_read = 0;
-		rm_ptr->inbuf_pos = rm_ptr->inbuf_top = rm_ptr->inbuf_off = rm_ptr->inbuf;
+		/* if last operation timed out with some chars then only read up to recordsize bytes */
+		bytes_already_read = rm_ptr->inbuf_top - rm_ptr->inbuf;
+		if (bytes_already_read)
+			rm_ptr->last_was_timeout = 1;
+		else
+			rm_ptr->last_was_timeout = 0;
+		if ((bytes_already_read == rm_ptr->recordsize) || (rm_ptr->fol_bytes_read == rm_ptr->recordsize))
+		{
+			bytes2read = rm_ptr->recordsize;
+			rm_ptr->inbuf_pos = rm_ptr->inbuf_top = rm_ptr->inbuf_off = rm_ptr->inbuf;
+			bytes_already_read = 0;
+			rm_ptr->fol_bytes_read = 0;
+			rm_ptr->last_was_timeout = 0;
+		} else
+			bytes2read = rm_ptr->recordsize - bytes_already_read;
+		/* since it is not a restart bytes_already_read happened in a previous read so save it */
+		rm_ptr->orig_bytes_already_read = bytes_already_read;
 	}
 	else
 	{
@@ -230,18 +276,19 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 		else
 			rm_ptr->inbuf_pos = rm_ptr->inbuf_off = rm_ptr->inbuf;
 	}
-	PIPE_DEBUG(PRINTF("iorm_get_fol: bytes2read: %d, zint_restart: %d\n", bytes2read,zint_restart); DEBUGPIPEFLUSH;);
+	PIPE_DEBUG(PRINTF("iorm_get_fol: bytes2read: %d, bytes_already_read: %d, last_was_timeout: %d, zint_restart: %d\n",
+			  bytes2read,bytes_already_read,rm_ptr->last_was_timeout,zint_restart); DEBUGPIPEFLUSH;);
+	PIPE_DEBUG(PRINTF("iorm_get_fol: inbuf: 0x%08lx, top: 0x%08lx, off: 0x%08lx\n", rm_ptr->inbuf, rm_ptr->inbuf_top,
+			  rm_ptr->inbuf_off); DEBUGPIPEFLUSH;);
 	bytes_read = 0;
 	assert(rm_ptr->bufsize >= rm_ptr->recordsize);
 	errno = status = 0;
-	/* don't reset this if continuing from an interrupt unless we haven't read the bom yet */
-/*	if (!rm_ptr->done_1st_read || FALSE == zint_restart)
-	rm_ptr->inbuf_pos = rm_ptr->inbuf_off = rm_ptr->inbuf;*/
 	chset = io_ptr->ichset;
 	if (!rm_ptr->done_1st_read)
 	{
 		PIPE_DEBUG(PRINTF("do iorm_get_bom_fol: bytes2read: %d\n", bytes2read); DEBUGPIPEFLUSH;)
-			status = iorm_get_bom_fol(io_ptr, tot_bytes_read, msec_timeout, timed, &bom_timeout);
+			status = iorm_get_bom_fol(io_ptr, tot_bytes_read, msec_timeout, timed,
+						  &bom_timeout, end_time);
 		if (!rm_ptr->done_1st_read && outofband)
 		{
 			PIPE_DEBUG(PRINTF("return since iorm_get_bom_fol went outofband\n"); DEBUGPIPEFLUSH;);
@@ -278,8 +325,20 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 		PIPE_DEBUG(PRINTF("iorm_get_fol: bytes2read after bom: %d\n", bytes2read); DEBUGPIPEFLUSH;);
 		if (timed)
 		{
+			/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
 			if (0 < *msec_timeout)
 			{
+				/* get the current time */
+				sys_get_curr_time(&current_time);
+				time_left = sub_abs_time(&end_time, &current_time);
+				if (0 > time_left.at_sec)
+				{
+					*msec_timeout = -1;
+					*follow_timeout = TRUE;
+				} else
+					*msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+				/* make sure it terminates with follow_timeout */
+				if (!*follow_timeout && !*msec_timeout) *msec_timeout = 1;
 				sleep_left = *msec_timeout;
 			} else
 				sleep_left = 0;
@@ -290,10 +349,11 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 		temp = (char *)rm_ptr->inbuf_pos;
 		do
 		{
+			/* in follow mode a read will return an EOF if no more bytes are available*/
 			status = read(fildes, temp, (int)bytes2read - bytes_count);
 			if (0 < status) /* we read some chars */
 			{
-				tot_bytes_read += status;
+				*tot_bytes_read += status;
 				bytes_count += status;
 				temp = temp + status;
 			} else if (0 == status) /* end of file */
@@ -307,12 +367,26 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 				/* if a timed read, sleep the minimum of 100 ms and sleep_left.
 				   If not a timed read then just sleep 100 ms */
 				if (TRUE == timed)
+				{
+					/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
+					/* get the current time */
+					sys_get_curr_time(&current_time);
+					time_left = sub_abs_time(&end_time, &current_time);
+					if (0 > time_left.at_sec)
+					{
+						*msec_timeout = -1;
+						*follow_timeout = TRUE;
+					} else
+						*msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+
+					/* make sure it terminates with follow_timeout */
+					if (!*follow_timeout && !*msec_timeout) *msec_timeout = 1;
+					sleep_left = *msec_timeout;
 					sleep_time = MIN(100,sleep_left);
-				else
+				} else
 					sleep_time = 100;
-				SHORT_SLEEP(sleep_time);
-				if (TRUE == timed)
-					sleep_left -= sleep_time;
+				if (0 < sleep_time)
+					SHORT_SLEEP(sleep_time);
 				if (outofband)
 					break;
 				continue; /* for now try and read again if eof or no input ready */
@@ -348,7 +422,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 		bytes_read = 0;
 		if (TRUE == *follow_timeout)
 			status = -2;
-	} else if (bytes_read || status)
+	} else if (bytes_read || status || (bytes_already_read && (TRUE == timed)))
 	{
 		bytes_read += status;
 		rm_ptr->file_pos += status;
@@ -358,15 +432,16 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 			/* It's possible that only one byte is read if this is an interrupt restart one byte from the width
 			 * In that case it's not an error if already_read is non-zero, but we have to adjust bytes_read differently.
 			 */
-			PIPE_DEBUG(PRINTF("pipeget: bytes_read: %d bytes_already_read: %d, zint_restart: %d\n",
+			PIPE_DEBUG(PRINTF("iorm_get_fol: bytes_read: %d bytes_already_read: %d, zint_restart: %d\n",
 					  bytes_read,bytes_already_read,zint_restart); DEBUGPIPEFLUSH;);
-			if (zint_restart && bytes_already_read)
+			if (bytes_already_read)
 			{
 				tmp_bytes_read = bytes_read + bytes_already_read;
 			} else
 			{
 				tmp_bytes_read = bytes_read;
 			}
+			rm_ptr->fol_bytes_read = tmp_bytes_read;
 			assert(tmp_bytes_read >= 2);
 			if (CHSET_UTF16LE == chset)
 			{
@@ -380,7 +455,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 			for (pad_ptr = rm_ptr->inbuf + tmp_bytes_read - 2;
 			     0 < tmp_bytes_read && rm_ptr->inbuf <= pad_ptr; pad_ptr-=2)
 			{
-				PIPE_DEBUG(PRINTF("pad 16 loop: bytes_read: %d pad_ptr: %sx\n",
+				PIPE_DEBUG(PRINTF("pad 16 loop: bytes_read: %d pad_ptr: 0x%08lx\n",
 						  bytes_read,pad_ptr); DEBUGPIPEFLUSH;);
 				if ((padcharray[0] == pad_ptr[0]) && (padcharray[1] == pad_ptr[1]))
 					tmp_bytes_read -= 2;
@@ -390,12 +465,16 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 			bytes_read = tmp_bytes_read;
 		} else
 		{	/* strip 1-byte PADCHAR in UTF-8 from tail of line */
-			if (zint_restart && bytes_already_read)
+			if (bytes_already_read)
 				bytes_read = bytes_read + bytes_already_read;
+
+			/* store total of bytes read */
+			rm_ptr->fol_bytes_read = bytes_read;
+
 			assert(CHSET_UTF8 == chset);
 			for (pad_ptr = rm_ptr->inbuf + bytes_read - 1; 0 < bytes_read && rm_ptr->inbuf <= pad_ptr; pad_ptr--)
 			{
-				PIPE_DEBUG(PRINTF("pad 8 loop: bytes_read: %d pad_ptr: %sx\n",
+				PIPE_DEBUG(PRINTF("pad 8 loop: bytes_read: %d pad_ptr: 0x%08lx\n",
 						  bytes_read,pad_ptr); DEBUGPIPEFLUSH;);
 				if (*pad_ptr == padchar)
 					bytes_read--;
@@ -405,7 +484,16 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 		}
 	}
 	rm_ptr->inbuf_top = rm_ptr->inbuf_pos = rm_ptr->inbuf + bytes_read;
-	rm_ptr->inbuf_off = rm_ptr->inbuf;
+	PIPE_DEBUG(PRINTF("last_was_timeout: %d \n",rm_ptr->last_was_timeout); DEBUGPIPEFLUSH;);
+	if (!zint_restart || (TRUE == rm_ptr->last_was_timeout))
+	{
+		rm_ptr->inbuf_off = rm_ptr->inbuf + rm_ptr->orig_bytes_already_read;
+		/* back out bytes_already_read mod */
+		bytes_read = bytes_read - bytes_already_read + rm_ptr->orig_bytes_already_read;
+		rm_ptr->orig_bytes_already_read = 0;
+		rm_ptr->last_was_timeout = 0;
+	} else
+		rm_ptr->inbuf_off = rm_ptr->inbuf;
 	return (0 <= status ? bytes_read : status);
 }
 

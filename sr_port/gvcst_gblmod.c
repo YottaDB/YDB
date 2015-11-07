@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,18 +42,18 @@ LITREF mstr			nsb_dummy;
 
 error_def(ERR_GBLMODFAIL);
 
-bool	gvcst_gblmod(mval *v)
+boolean_t	gvcst_gblmod(mval *v)
 {
-	boolean_t		gblmod, is_dummy;
-	enum cdb_sc		status;
-	int				key_size,  key_size2, data_len;
-	srch_hist		*alt_history;
+	boolean_t	gblmod, is_dummy;
+	enum cdb_sc	status;
+	int		key_size,  key_size2, data_len;
+	srch_hist	*alt_history;
 	blk_hdr_ptr_t	bp;
 	rec_hdr_ptr_t	rp;
 	unsigned short	match, match2, rsiz, offset_to_value, oldend;
 	srch_blk_status	*bh;
-	sm_uc_ptr_t		b_top;
-	trans_num		tn_to_compare;
+	sm_uc_ptr_t	b_top;
+	trans_num	tn_to_compare;
 
 	T_BEGIN_READ_NONTP_OR_TP(ERR_GBLMODFAIL);
 	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */

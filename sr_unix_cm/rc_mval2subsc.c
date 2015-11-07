@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ static readonly unsigned char neg_code[100] =
 	0x6e, 0x6d, 0x6c, 0x6b, 0x6a, 0x69, 0x68, 0x67, 0x66, 0x65
 };
 
-unsigned char *mval2subsc(mval *v, gv_key *g)
+unsigned char *mval2subsc(mval *v, gv_key *g, boolean_t std_null_coll)
 {
         char            buf1[MAX_KEY_SZ + 1];
 	mstr		mstr_buf1;
@@ -90,7 +90,7 @@ unsigned char *mval2subsc(mval *v, gv_key *g)
 			s2n(v);
 			mvt = v->mvtype;
 			if (!(mvt & MV_NM))
-				rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
 		}
 		else
 		{
@@ -116,7 +116,7 @@ unsigned char *mval2subsc(mval *v, gv_key *g)
 		{
 			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, g, TRUE)))
 				end = &buff[MAX_ZWR_KEY_SZ - 1];
-			rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 		}
 		if (n > 0)
 		{
@@ -133,17 +133,15 @@ unsigned char *mval2subsc(mval *v, gv_key *g)
 						{
 							end = &buff[MAX_ZWR_KEY_SZ - 1];
 						}
-						rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+						rts_error_csa(CSA_ARG(NULL)
+							VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 					}
 					ch++;	/* promote character */
 				}
 				*out_ptr++ = ch;
 			} while (--n > 0);
 		} else
-		{
-			*out_ptr++ = (!TREF(transform) || 0 == gv_cur_region->std_null_coll)
-				? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL;
-		}
+			*out_ptr++ = (0 == std_null_coll) ? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL;
 		goto ALLDONE;
 	}
 	/* Its a number, is it an integer? */
@@ -293,7 +291,7 @@ ALLDONE:
 	{	/* take of extra space and one for last zero */
 		if ((end = format_targ_key(buff, MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
 			end = &buff[MAX_ZWR_KEY_SZ - 1];
-		rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 	}
 	return out_ptr;
 }

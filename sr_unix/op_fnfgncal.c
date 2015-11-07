@@ -111,6 +111,8 @@ GBLREF pthread_t	gtm_main_thread_id;
 GBLREF boolean_t	gtm_main_thread_id_set;
 #endif
 
+LITREF mval		skiparg;
+
 error_def(ERR_JNI);
 error_def(ERR_MAXSTRLEN);
 error_def(ERR_TEXT);
@@ -150,7 +152,7 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 
 	if (java)
 	{
-		switch(typ)
+		switch (typ)
 		{
 			case gtm_notfound:
 				break;
@@ -215,7 +217,7 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 		return;
 	}
 	/* The following switch is for non-Java call-outs. */
-	switch(typ)
+	switch (typ)
 	{
 		case gtm_notfound:
 			break;
@@ -376,7 +378,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	gparam_list	*param_list;
 	gtm_long_t	*free_space_pointer;
 	int		i, j, save_mumps_status;
-	int4 		m1, m2, n;
+	int4 		m1, m2, n, space_n;
 	INTPTR_T	status;
 	mval		*v;
 	va_list		var_copy;
@@ -428,60 +430,96 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		*types_descr_dptr = 'v';
 	types_descr_dptr++;
 	assert(2 * gtm_jtype_count == SIZEOF(gtm_jtype_chars));
-	for (i = argcnt + 2, j = -2, m1 = entry_ptr->input_mask, m2 = mask & entry_ptr->output_mask; 0 < i; i--, j++)
+	for (i = argcnt + 2, j = -2, m1 = entry_ptr->input_mask, m2 = entry_ptr->output_mask, space_n = 0; 0 < i; i--, j++)
 	{	/* Enforce mval values and record expected argument types. */
 		v = va_arg(var, mval *);
 		if (0 > j)
 		{
 			MV_FORCE_STR(v);
-			n += v->str.len + SIZEOF(gtm_long_t) + 1;
+			n += SIZEOF(void *) + v->str.len + 1;
 			continue;
 		}
-		if (m1 & 1)
+		if (MASK_BIT_ON(m1))
 		{
-			if ((gtm_jstring == entry_ptr->parms[j]) || (gtm_jbyte_array == entry_ptr->parms[j]))
+			MV_FORCE_DEFINED_UNLESS_SKIPARG(v);
+		}
+		/* Estimate how much allocation we are going to need for arguments which require more than pointer-size space. */
+		if (MASK_BIT_ON(m1) && ((gtm_jstring == entry_ptr->parms[j]) || (gtm_jbyte_array == entry_ptr->parms[j])))
+		{
+			if (MV_DEFINED(v))
 			{
 				MV_FORCE_STR(v);
-				n += v->str.len + SIZEOF(gtm_long_t) + 1;
+				n += SIZEOF(gtm_long_t) + SIZEOF(void *) + v->str.len + 1;  /* length + pointer + string + '\0' */
 			} else
-			{
-				MV_FORCE_DEFINED(v);
-			}
+				n += SIZEOF(gtm_long_t) + SIZEOF(void *) + 1;		    /* length + pointer + '\0' */
+			space_n += SIZEOF(gtm_long_t) + SIZEOF(void *);
 		}
+#		ifdef GTM64
+		else if (MASK_BIT_ON(m2) || (gtm_jfloat == entry_ptr->parms[j]) || (gtm_jdouble == entry_ptr->parms[j]))
+		{	/* Account for a pointer space, since floats and doubles cannot be passed by value. */
+			n += SIZEOF(void *);
+			space_n += SIZEOF(void *);
+		}
+#		else
+		else if ((gtm_jdouble == entry_ptr->parms[j]) || (gtm_jlong == entry_ptr->parms[j]))
+		{	/* Account for a pointer space, since longs and doubles cannot be passed by value on 32-bit boxes, and also
+			 * make room for a potential 8-byte alignment.
+			 */
+			n += SIZEOF(void *) + SIZEOF(gtm_int64_t);
+			space_n += SIZEOF(void *) + SIZEOF(gtm_int64_t);
+		} else if (MASK_BIT_ON(m2) || (gtm_jfloat == entry_ptr->parms[j]))
+		{	/* Account for a pointer space, since floats cannot be passed by value. */
+			n += SIZEOF(void *);
+			space_n += SIZEOF(void *);
+		}
+#		endif
 		jtype_char = entry_ptr->parms[j] - gtm_jtype_start_idx;
 		if ((0 > jtype_char) || (gtm_jtype_count <= jtype_char))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 		else
-			*types_descr_dptr = gtm_jtype_chars[(m2 & 1) ? (gtm_jtype_count + jtype_char) : jtype_char];
+			*types_descr_dptr = gtm_jtype_chars[MASK_BIT_ON(m2) ? (gtm_jtype_count + jtype_char) : jtype_char];
 		types_descr_dptr++;
 		m1 >>= 1;
 		m2 >>= 1;
 	}
 	va_end(var);
-        /* Double the size, to take care of any alignments in the middle. */
-	param_list = (gparam_list *)malloc(n * 2);
+        /* Allocate space for argument handling. Overall, the allocated space has the following structure:
+	 *   ___________________________________________
+	 *  |            |              |               |
+	 *  | param_list | space buffer | string buffer |
+	 *  |____________|______________|_______________|
+	 *
+	 * All input-output and output-only parameters have to be passed by reference, which means that param_list contains a
+	 * pointer to the space buffer where the actual value is stored. Furthermore, in case of gtm_jstring_t and gtm_jbyte_array_t
+	 * another pointer from within the space buffer is referencing an area inside the string buffer. Note, however, that certain
+	 * arguments, such as gtm_jfloat_t and gtm_jdouble_t, and gtm_jlong_t on 32-bit boxes, are always passed by reference.
+	 */
+	param_list = (gparam_list *)malloc(n);
 	param_list->arg[0] = (void *)types_descr_ptr;
 	/* Adding 3 to account for type descriptions, class name, and method name arguments. */
 	free_space_pointer = (gtm_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * (argcnt + 3)));
 	/* Adding 3 for the same reason as above and another 3 to account for the fact that each of type description, class name,
 	 * and method name arguments require room in the free_space buffer, which comes ahead of free_string buffer in memory.
 	 */
-	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size + (SIZEOF(void *) * (3 + 3));
+	free_string_pointer_start = free_string_pointer
+		= (char *)param_list + entry_ptr->parmblk_size + (SIZEOF(void *) * 3) + space_n;
 	/* Load-up the parameter list */
 	VAR_COPY(var, var_copy);
 	/* We need to enter this loop even if argcnt == 0, so that the class and method arguments get set. */
-	for (i = (0 == argcnt ? -1 : 0), j = 1, m1 = entry_ptr->input_mask, m2 = mask & entry_ptr->output_mask; i < argcnt; j++)
+	for (i = (0 == argcnt ? -1 : 0), j = 1, m1 = entry_ptr->input_mask, m2 = entry_ptr->output_mask; i < argcnt; j++)
 	{
 		v = va_arg(var_copy, mval *);
 		if (j < 3)
 		{
 			param_list->arg[j] = free_string_pointer;
 			if (v->str.len)
+			{
 				memcpy(free_string_pointer, v->str.addr, v->str.len);
-			free_string_pointer += v->str.len;
-			*free_string_pointer++ = 0;
+				free_string_pointer += v->str.len;
+			}
+			*free_string_pointer++ = '\0';
 			/* In case there are 0 arguments. */
-			if (2 == j && 0 > i)
+			if ((2 == j) && (0 > i))
 				i = 0;
 			continue;
 		}
@@ -489,52 +527,45 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		switch (entry_ptr->parms[i])
 		{
 			case gtm_jboolean:
-				if (m2 & 1)
+				if (MASK_BIT_ON(m2))
 				{	/* Output expected. */
 					param_list->arg[j] = free_space_pointer;
-					*((gtm_int_t *)free_space_pointer) = (m1 & 1) ? ((gtm_int_t)(mval2i(v) ? 1 : 0)) : 0;
+					*((gtm_int_t *)free_space_pointer) = (gtm_int_t)(MV_ON(m1, v) ? (mval2i(v) ? 1 : 0) : 0);
 					free_space_pointer++;
-				} else if (m1 & 1)
-					param_list->arg[j] = (void *)((gtm_long_t)(mval2i(v) ? 1 : 0));
+				} else	/* Input expected. */
+					param_list->arg[j] = (void *)(gtm_long_t)(MV_ON(m1, v) ? (mval2i(v) ? 1 : 0) : 0);
 				break;
 			case gtm_jint:
-				if (m2 & 1)
+				if (MASK_BIT_ON(m2))
 				{	/* Output expected. */
 					param_list->arg[j] = free_space_pointer;
-					*((gtm_int_t *)free_space_pointer) = (m1 & 1) ? (gtm_int_t)mval2i(v) : 0;
+					*((gtm_int_t *)free_space_pointer) = (gtm_int_t)(MV_ON(m1, v) ? mval2i(v) : 0);
 					free_space_pointer++;
-				} else if (m1 & 1)
-					param_list->arg[j] = (void *)(gtm_long_t)mval2i(v);
+				} else	/* Input expected. */
+					param_list->arg[j] = (void *)(gtm_long_t)(MV_ON(m1, v) ? mval2i(v) : 0);
 				break;
 			case gtm_jlong:
-				if (m2 & 1)
+#				ifndef GTM64
+				/* Only need to do this rounding on non-64 it platforms because this one type has a 64-bit
+				 * alignment requirement on those platforms.
+				 */
+				free_space_pointer = (gtm_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(gtm_int64_t)));
+#				else
+				if (MASK_BIT_ON(m2))
 				{	/* Output expected. */
-#					ifndef GTM64
-					free_space_pointer = (gtm_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer),
-						SIZEOF(gtm_int64_t)));
-#					endif
+#				endif
 					param_list->arg[j] = free_space_pointer;
-					*((gtm_int64_t *)free_space_pointer) = (m1 & 1) ? (gtm_int64_t)mval2i8(v) : 0;
+					*((gtm_int64_t *)free_space_pointer) = (gtm_int64_t)(MV_ON(m1, v) ? mval2i8(v) : 0);
 					free_space_pointer = (gtm_long_t *)((char *)free_space_pointer + SIZEOF(gtm_int64_t));
-				} else if (m1 & 1)
-				{
-#					ifdef GTM64
-					param_list->arg[j] = (void *)(gtm_int64_t)mval2i8(v);
-#					else
-					/* Only need to do this rounding on non-64 it platforms because this one type has a 64 bit
-					 * alignment requirement on those platforms.
-					 */
-					free_space_pointer = (gtm_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer),
-						SIZEOF(gtm_int64_t)));
-					param_list->arg[j] = free_space_pointer;
-					*((gtm_int64_t *)free_space_pointer) = (gtm_int64_t)mval2i8(v);
-					free_space_pointer = (gtm_long_t *)((char *)free_space_pointer + SIZEOF(gtm_int64_t));
-#					endif
-				}
+#				ifdef GTM64
+				} else	/* Input expected. */
+					param_list->arg[j] = (void *)(gtm_int64_t)(MV_ON(m1, v) ? mval2i8(v) : 0);
+#				endif
 				break;
 			case gtm_jfloat:
+				/* Have to go with additional storage either way due to the limitations of callg. */
 				param_list->arg[j] = free_space_pointer;
-				*((float *)free_space_pointer) = (m1 & 1) ? (float)mval2double(v) : (float)0.0;
+				*((float *)free_space_pointer) = (float)(MV_ON(m1, v) ? mval2double(v) : 0.0);
 				free_space_pointer++;
 				break;
 			case gtm_jdouble:
@@ -544,23 +575,31 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 				 */
 				free_space_pointer = (gtm_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(double)));
 #				endif
+				/* Have to go with additional storage either way due to the limitations of callg. */
 				param_list->arg[j] = free_space_pointer;
-				*((double *)free_space_pointer) = (m1 & 1) ? (double)mval2double(v) : (double)0.0;
+				*((double *)free_space_pointer) = (double)(MV_ON(m1, v) ? mval2double(v) : 0.0);
 				free_space_pointer = (gtm_long_t *)((char *)free_space_pointer + SIZEOF(double));
 				break;
 			case gtm_jstring:
 			case gtm_jbyte_array:
 				param_list->arg[j] = free_space_pointer;
-				*free_space_pointer++ = (gtm_long_t)v->str.len;
-				*(char **)free_space_pointer = (char *)free_string_pointer;
-				free_space_pointer++;
-				if (m1 & 1)
+				/* If this is input-enabled and defined, it should have been forced to string in an earlier loop. */
+				assert(!MV_ON(m1, v) || MV_IS_STRING(v));
+				if (MV_ON(m1, v) && v->str.len)
 				{
-					if (v->str.len)
-						memcpy(free_string_pointer, v->str.addr, v->str.len);
+					*free_space_pointer++ = (gtm_long_t)v->str.len;
+					memcpy(free_string_pointer, v->str.addr, v->str.len);
+					*(char **)free_space_pointer = (char *)free_string_pointer;
 					free_string_pointer += v->str.len;
-					*free_string_pointer++ = 0;
+				} else
+				{	/* If an argument is for output only, an empty string, or skipped altogether, we still want
+					 * a valid length and a pointer to an empty null-terminated character array.
+					 */
+					*free_space_pointer++ = 0;
+					*(char **)free_space_pointer = (char *)free_string_pointer;
 				}
+				free_space_pointer++;
+				*free_string_pointer++ = '\0';
 				break;
 			default:
 				va_end(var_copy);
@@ -598,7 +637,8 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	if (frame_pointer->flags & SFF_CI)
 		ci_ret_code_quit();
 	/* Only process the input-output and output-only arguments if the external call succeeded; otherwise, return -1
-	 * if non-void return is expected. */
+	 * if non-void return is expected.
+	 */
 	if (!error_in_xc)
 	{	/* Compute space requirement for return values. */
 		n = 0;
@@ -608,7 +648,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 			v = va_arg(var, mval *);
 			if (j < 3)
 				continue;
-			if (m1 & 1)
+			if (MASK_BIT_ON(m1))
 				n += extarg_getsize(param_list->arg[j], entry_ptr->parms[i], v);
 			i++;
 			m1 = m1 >> 1;
@@ -624,7 +664,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 			v = va_arg(var_copy, mval *);
 			if (j < 3)
 				continue;
-			if (m1 & 1)
+			if (MASK_BIT_ON(m1))
 				extarg2mval((void *)param_list->arg[j], entry_ptr->parms[i], v, TRUE, TRUE);
 			i++;
 			m1 = m1 >> 1;
@@ -645,7 +685,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 					memcpy(tmp_buff_ptr, package->str.addr, package->str.len);
 					tmp_buff_ptr += package->str.len;
 				}
-				*tmp_buff_ptr = 0;
+				*tmp_buff_ptr = '\0';
 				xtrnl_table_name = GETENV(str_buffer);
 				if (NULL == xtrnl_table_name)
 				{ 	/* Environment variable for the package not found. This part of code is for more safety.
@@ -664,7 +704,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	return;
 }
 
-void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
+void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
 {
 	boolean_t	java = FALSE;
 	char		*free_string_pointer, *free_string_pointer_start;
@@ -742,40 +782,51 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	for (i = 0, m1 = entry_ptr->input_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
-		/* If it is an input value of char* or char **, add the length. Also a good time to force it into string form */
-		switch(entry_ptr->parms[i])
+		/* For char*, char **, and gtm_string_t * types, add the length. Also a good time to force it into string form. */
+		switch (entry_ptr->parms[i])
 		{
+			case gtm_string_star:	/* CAUTION: Fall-through. */
 			case gtm_char_star:
 				n += (-1 != entry_ptr->param_pre_alloc_size[i]) ? entry_ptr->param_pre_alloc_size[i] : 0;
-				/* Caution fall through */
+				/* CAUTION: Fall-through. */
 			case gtm_char_starstar:
-				if (m1 & 1)
+				if (MASK_BIT_ON(m1))
 				{
-					MV_FORCE_STR(v);
-					n += v->str.len + 1;
+					if (MV_DEFINED(v))
+					{
+						MV_FORCE_STR(v);
+						n += v->str.len + 1;	/* gtm_string_star does not really need the extra byte */
+					} else
+					{
+						MV_FORCE_DEFINED_UNLESS_SKIPARG(v);
+						n += 1;
+					}
 				}
 				break;
-			case gtm_string_star:
-				if (m1 & 1)
-				{
-					MV_FORCE_STR(v);
-					n += v->str.len + 1;
-				} else
-					n += (-1 != entry_ptr->param_pre_alloc_size[i]) ? entry_ptr->param_pre_alloc_size[i] : 0;
-				break;
+#			ifndef GTM64
 			case gtm_double_star:
 				n += SIZEOF(double);
-				if (m1 & 1)
-					MV_FORCE_DEFINED(v);
-				break;
+				/* CAUTION: Fall-through. */
+#			endif
 			default:
-				if (m1 & 1)
-					MV_FORCE_DEFINED(v);
-				break;
+				if (MASK_BIT_ON(m1))
+				{
+					MV_FORCE_DEFINED_UNLESS_SKIPARG(v);
+				}
 		}
 	}
 	va_end(var);
-        /* Double the size, to take care of any alignments in the middle  */
+        /* Double the size, to take care of any alignments in the middle. Overall, the allocated space has the following structure:
+	 *   ___________________________________________
+	 *  |            |              |               |
+	 *  | param_list | space buffer | string buffer |
+	 *  |____________|______________|_______________|
+	 *
+	 * For pointer-type arguments (gtm_long_t *, gtm_float_t *, etc.) the value in param_list is a pointer to a slot inside the
+	 * space buffer, unless it is gtm_char_t *, in which case the string buffer is used. For double-pointer types (char ** or
+	 * gtm_string_t *) the value in param_list is always a pointer inside the space buffer, where a pointer to an area inside
+	 * the string buffer is stored.
+	 */
 	param_list = (gparam_list *)malloc(n * 2);
 	free_space_pointer = (gtm_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
@@ -784,54 +835,42 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	for (i = 0, m1 = entry_ptr->input_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
-		/* Note that even in this second pass at these mvals, we need to do the MV_FORCE processing because
-		 * in a NOUNDEF environment, undefiend mvals were NOT modified in the first pass and thus reamin undefined
-		 * in this pass.
-		 */
-		if (gtm_char_star != entry_ptr->parms[i] && (m1 & 1))
-			MV_FORCE_DEFINED(v);	/* Redefine undef'd mvals */
 		/* Verify that all input values are defined */
 		pre_alloc_size = entry_ptr->param_pre_alloc_size[i];
-		switch(entry_ptr->parms[i])
-		{	/* Note the int/long types are handled separately here in anticipation of correct handling
-			 * of "long" types on 64 bit hardware in the future. For the time being however, they are
-			 * using the same mval2i interface routine so are both restricted to 32 bits.
-			 */
+		switch (entry_ptr->parms[i])
+		{
 			case gtm_uint:
-				if (m1 & 1)
-					param_list->arg[i] = (void *)(gtm_long_t)mval2ui(v);
-				/* Note: output gtm_int and gtm_uint is an error (only "star" flavor can be modified) */
+				param_list->arg[i] = (void *)(gtm_ulong_t)(MV_ON(m1, v) ? mval2ui(v) : 0);
+				/* Note: output gtm_int and gtm_uint is an error (only "star" flavor can be modified). */
 				break;
 			case gtm_int:
-				if (m1 & 1)
-					param_list->arg[i] = (void *)(gtm_long_t)mval2i(v);
+				param_list->arg[i] = (void *)(gtm_long_t)(MV_ON(m1, v) ? mval2i(v) : 0);
 				break;
 			case gtm_ulong:
-				if (m1 & 1)
-				{
-					GTM64_ONLY(param_list->arg[i] = (void *)(gtm_uint64_t)mval2ui8(v));
-					NON_GTM64_ONLY(param_list->arg[i] = (void *)(gtm_ulong_t)mval2ui(v));
-				}
-				/* Note: output xc_long and xc_ulong is an error as described above */
+				param_list->arg[i] = (void *)GTM64_ONLY((gtm_uint64_t)) NON_GTM64_ONLY((gtm_ulong_t))
+					(MV_ON(m1, v) ? GTM64_ONLY(mval2ui8(v)) NON_GTM64_ONLY(mval2ui(v)) : 0);
+				/* Note: output xc_long and xc_ulong is an error as described above. */
 				break;
 			case gtm_long:
-				if (m1 & 1)
-				{
-					GTM64_ONLY(param_list->arg[i] = (void *)(gtm_int64_t)mval2i8(v));
-					NON_GTM64_ONLY(param_list->arg[i] = (void *)(gtm_long_t)mval2i(v));
-				}
+				param_list->arg[i] = (void *)GTM64_ONLY((gtm_int64_t)) NON_GTM64_ONLY((gtm_long_t))
+					(MV_ON(m1, v) ? GTM64_ONLY(mval2i8(v)) NON_GTM64_ONLY(mval2i(v)) : 0);
 				break;
 			case gtm_char_star:
 				param_list->arg[i] = free_string_pointer;
-				if (m1 & 1)
-				{
-					if (v->str.len)
+				if (MASK_BIT_ON(m1))
+				{	/* If this is defined and input-enabled, it should have already been forced to string. */
+					assert(!MV_DEFINED(v) || MV_IS_STRING(v));
+					if (MV_DEFINED(v) && v->str.len)
+					{
 						memcpy(free_string_pointer, v->str.addr, v->str.len);
-					free_string_pointer += v->str.len;
-					*free_string_pointer++ = 0;
-				} else if (-1 != pre_alloc_size)
+						free_string_pointer += v->str.len;
+					}
+					*free_string_pointer++ = '\0';
+				} else if (0 < pre_alloc_size)
+				{
+					*free_string_pointer = '\0';
 					free_string_pointer += pre_alloc_size;
-				else /* Output and no pre-allocation specified */
+				} else /* Output and no pre-allocation specified */
 				{
 					if (0 == package->str.len)
 						/* Default package - do not display package name */
@@ -844,52 +883,64 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				break;
 			case gtm_char_starstar:
 				param_list->arg[i] = free_space_pointer;
-				if (m1 & 1)
+				/* If this is defined and input-enabled, it should have been forced to string in an earlier loop. */
+				assert(!MV_ON(m1, v) || MV_IS_STRING(v));
+				*(char **)free_space_pointer = free_string_pointer;
+				if (MV_ON(m1, v) && v->str.len)
 				{
-					*(char **)free_space_pointer = free_string_pointer;
-					if (v->str.len)
-						memcpy(free_string_pointer, v->str.addr, v->str.len);
+					memcpy(free_string_pointer, v->str.addr, v->str.len);
 					free_string_pointer += v->str.len;
-					*free_string_pointer++ = 0;
-				} else
-					*(char **)free_space_pointer = free_string_pointer++;
+				}
+				*free_string_pointer++ = '\0';
 				free_space_pointer++;
 				break;
 			case gtm_int_star:
 				param_list->arg[i] = free_space_pointer;
-				*((gtm_int_t *)free_space_pointer) = (m1 & 1) ? (gtm_int_t)mval2i(v) : 0;
+				*((gtm_int_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_int_t)mval2i(v) : 0;
 				free_space_pointer++;
 				break;
 			case gtm_uint_star:
 				param_list->arg[i] = free_space_pointer;
-				*((gtm_uint_t *)free_space_pointer) = (m1 & 1) ? (gtm_uint_t)mval2ui(v) : 0;
+				*((gtm_uint_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_uint_t)mval2ui(v) : 0;
 				free_space_pointer++;
 				break;
 			case gtm_long_star:
 				param_list->arg[i] = free_space_pointer;
-				GTM64_ONLY(*((gtm_int64_t *)free_space_pointer) = (m1 & 1) ? (gtm_int64_t)mval2i8(v) : 0);
-				NON_GTM64_ONLY(*((gtm_long_t *)free_space_pointer) = (m1 & 1) ? (gtm_long_t)mval2i(v) : 0);
+				GTM64_ONLY(*((gtm_int64_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_int64_t)mval2i8(v) : 0);
+				NON_GTM64_ONLY(*((gtm_long_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_long_t)mval2i(v) : 0);
 				free_space_pointer++;
 				break;
 			case gtm_ulong_star:
 				param_list->arg[i] = free_space_pointer;
-				GTM64_ONLY(*((gtm_uint64_t *)free_space_pointer) = (m1 & 1) ? (gtm_uint64_t)mval2ui8(v) : 0);
-				NON_GTM64_ONLY(*((gtm_ulong_t *)free_space_pointer) = (m1 & 1) ? (gtm_ulong_t)mval2ui(v) : 0);
+				GTM64_ONLY(*((gtm_uint64_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_uint64_t)mval2ui8(v) : 0);
+				NON_GTM64_ONLY(*((gtm_ulong_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_ulong_t)mval2ui(v) : 0);
 				free_space_pointer++;
 				break;
 			case gtm_string_star:
 				param_list->arg[i] = free_space_pointer;
-				*free_space_pointer++ = (gtm_long_t)v->str.len;
-				*(char **)free_space_pointer = (char *)free_string_pointer;
-				free_space_pointer++;
-				if (m1 & 1)
-				{
-					if (v->str.len)
+				if (MASK_BIT_ON(m1))
+				{	/* If this is defined and input-enabled, it should have already been forced to string. */
+					assert(!MV_DEFINED(v) || MV_IS_STRING(v));
+					if (MV_DEFINED(v) && v->str.len)
+					{
+						*free_space_pointer++ = (gtm_long_t)v->str.len;
+						*(char **)free_space_pointer = (char *)free_string_pointer;
 						memcpy(free_string_pointer, v->str.addr, v->str.len);
-					free_string_pointer += v->str.len;
-				} else if (-1 != pre_alloc_size)
+						free_string_pointer += v->str.len;
+						free_space_pointer++;
+					} else
+					{
+						*free_space_pointer++ = 0;
+						*free_space_pointer++ = 0;	/* Effectively a NULL pointer. */
+					}
+				} else if (0 < pre_alloc_size)
+				{
+					*free_space_pointer++ = (gtm_long_t)pre_alloc_size;
+					*(char **)free_space_pointer = (char *)free_string_pointer;
+					*free_string_pointer = '\0';
+					free_space_pointer++;
 					free_string_pointer += pre_alloc_size;
-				else /* Output and no pre-allocation specified */
+				} else /* Output and no pre-allocation specified */
 				{
 					if (0 == package->str.len)
 						/* Default package - do not display package name */
@@ -904,7 +955,7 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				break;
 			case gtm_float_star:
 				param_list->arg[i] = free_space_pointer;
-				*((float *)free_space_pointer) = (m1 & 1) ? (float)mval2double(v) : (float)0.0;
+				*((float *)free_space_pointer) = MV_ON(m1, v) ? (float)mval2double(v) : (float)0.0;
 				free_space_pointer++;
 				break;
 			case gtm_double_star:
@@ -914,12 +965,12 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				NON_GTM64_ONLY(free_space_pointer = (gtm_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer),
 											    SIZEOF(double))));
 				param_list->arg[i] = free_space_pointer;
-				*((double *)free_space_pointer) = (m1 & 1) ? (double)mval2double(v) : (double)0.0;
-				free_space_pointer = (gtm_long_t *)((char *)free_space_pointer + SIZEOF(double));
+				*((double *)free_space_pointer) = MV_ON(m1, v) ? (double)mval2double(v) : 0.0;
+				free_space_pointer += (SIZEOF(double) / SIZEOF(gtm_long_t));
 				break;
 			case gtm_pointertofunc:
-				if (((callintogtm_vectorindex = (int4)mval2i(v)) >= gtmfunc_unknown_function)
-				    || (callintogtm_vectorindex < 0))
+				callintogtm_vectorindex = MV_DEFINED(v) ? (int4)mval2i(v) : 0;
+				if ((callintogtm_vectorindex >= gtmfunc_unknown_function) || (callintogtm_vectorindex < 0))
 				{
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZCVECTORINDX, 1, callintogtm_vectorindex,
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Passing Null vector"));
@@ -960,7 +1011,7 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	for (i = 0, m1 = mask & entry_ptr->output_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
-		if (m1 & 1)
+		if (MASK_BIT_ON(m1))
 			n += extarg_getsize(param_list->arg[i], entry_ptr->parms[i], v);
 	}
 	va_end(var);
@@ -972,7 +1023,7 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	for (i = 0, m1 = mask & entry_ptr->output_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
-		if (m1 & 1)
+		if (MASK_BIT_ON(m1))
 			extarg2mval((void *)param_list->arg[i], entry_ptr->parms[i], v, FALSE, TRUE);
 	}
 	va_end(var);
@@ -991,13 +1042,11 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				memcpy(tmp_buff_ptr, package->str.addr, package->str.len);
 				tmp_buff_ptr += package->str.len;
 			}
-			*tmp_buff_ptr = 0;
+			*tmp_buff_ptr = '\0';
 			xtrnl_table_name = GETENV(str_buffer);
 			if (NULL == xtrnl_table_name)
-			{
-				/* Environment variable for the package not found.
-				 * This part of code is for more safety. We should
-				 * not come into this path at all.
+			{	/* Environment variable for the package not found. This part of code is for more safety.
+				 * We should not come into this path at all.
 				 */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
 			}

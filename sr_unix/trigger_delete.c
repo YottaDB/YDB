@@ -30,7 +30,7 @@
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
 #include "format_targ_key.h"		/* for COPY_SUBS_TO_GVCURRKEY */
-#include "targ_alloc.h"			/* for SETUP_TRIGGER_GLOBAL & SWITCH_TO_DEFAULT_REGION */
+#include "targ_alloc.h"			/* for SET_GVTARGET_TO_HASHT_GBL & SWITCH_TO_DEFAULT_REGION */
 #include "hashtab_str.h"
 #include "wbox_test_init.h"
 #include "trigger_delete_protos.h"
@@ -45,6 +45,7 @@
 #include "op.h"
 #include "util.h"
 #include "zshow.h"			/* for format2zwr() prototype */
+#include "hashtab_mname.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgm_info		*sgm_info_ptr;
@@ -104,8 +105,7 @@ STATICFNDEF void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **value
 {
 	sgmnt_addrs		*csa;
 	uint4			len;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key			*save_gv_currkey;
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
@@ -113,8 +113,9 @@ STATICFNDEF void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **value
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	SAVE_TRIGGER_REGION_INFO;
+	SAVE_TRIGGER_REGION_INFO(save_currkey);
 	SWITCH_TO_DEFAULT_REGION;
+	csa = cs_addrs;
 	assert(0 != gv_target->root);
 	if (gv_cur_region->read_only)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
@@ -126,19 +127,13 @@ STATICFNDEF void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **value
 	{
 		SEARCH_AND_KILL_BY_HASH(trigvn, trigvn_len, kill_hash, match_index, csa);
 	}
-	RESTORE_TRIGGER_REGION_INFO;
+	RESTORE_TRIGGER_REGION_INFO(save_currkey);
 }
 
 STATICFNDEF void cleanup_trigger_name(char *trigvn, int trigvn_len, char *trigger_name, int trigger_name_len)
 {
-	sgmnt_addrs		*csa;
-	mname_entry		gvent;
-	gv_namehead		*hasht_tree;
 	int4			result;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	char			save_altkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key			*save_gv_altkey;
-	gv_key			*save_gv_currkey;
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	gv_namehead		*save_gvtarget;
@@ -161,12 +156,12 @@ STATICFNDEF void cleanup_trigger_name(char *trigvn, int trigvn_len, char *trigge
 		used_trigvn_len = MIN(trigvn_len, MAX_AUTO_TRIGNAME_LEN);
 		memcpy(trunc_name, trigvn, used_trigvn_len);
 	}
-	SAVE_TRIGGER_REGION_INFO;
+	SAVE_TRIGGER_REGION_INFO(save_currkey);
 	SWITCH_TO_DEFAULT_REGION;
 	if (0 != gv_target->root)
 	{
 		if (gv_cur_region->read_only)
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 		if (is_auto_name)
 		{
 			/* $get(^#t("#TNAME",<trunc_name>,"#TNCOUNT")) */
@@ -199,22 +194,18 @@ STATICFNDEF void cleanup_trigger_name(char *trigvn, int trigvn_len, char *trigge
 					    trigger_name_len - 1);
 		gvcst_kill(is_auto_name);
 	}
-	RESTORE_TRIGGER_REGION_INFO;
+	RESTORE_TRIGGER_REGION_INFO(save_currkey);
 }
 
 STATICFNDEF int4 update_trigger_name_value(int trigvn_len, char *trig_name, int trig_name_len, int new_trig_index)
 {
-	sgmnt_addrs		*csa;
-	mname_entry		gvent;
-	gv_namehead		*hasht_tree;
 	int			len;
 	char			name_and_index[MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT];
 	char			new_trig_name[MAX_TRIGNAME_LEN + 1];
 	int			num_len;
 	char			*ptr;
 	int4			result;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key			*save_gv_currkey;
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
@@ -224,10 +215,10 @@ STATICFNDEF int4 update_trigger_name_value(int trigvn_len, char *trig_name, int 
 	SETUP_THREADGBL_ACCESS;
 	if (MAX_AUTO_TRIGNAME_LEN < trigvn_len)
 		return PUT_SUCCESS;
-	SAVE_TRIGGER_REGION_INFO;
+	SAVE_TRIGGER_REGION_INFO(save_currkey);
 	SWITCH_TO_DEFAULT_REGION;
 	if (gv_cur_region->read_only)
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	assert(0 != gv_target->root);
 	/* $get(^#t("#TNAME",^#t(GVN,index,"#TRIGNAME")) */
 	BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name, trig_name_len - 1);
@@ -252,7 +243,7 @@ STATICFNDEF int4 update_trigger_name_value(int trigvn_len, char *trig_name, int 
 	/* set ^#t(GVN,index,"#TRIGNAME")=trig_name $C(0) new_trig_index */
 	SET_TRIGGER_GLOBAL_SUB_SUB_STR(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name, trig_name_len - 1,
 		name_and_index, len, result);
-	RESTORE_TRIGGER_REGION_INFO;
+	RESTORE_TRIGGER_REGION_INFO(save_currkey);
 	return result;
 }
 
@@ -268,8 +259,7 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 	int			num_len;
 	char			*ptr;
 	int4			result;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key			*save_gv_currkey;
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
@@ -277,8 +267,9 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	SAVE_TRIGGER_REGION_INFO;
+	SAVE_TRIGGER_REGION_INFO(save_currkey);
 	SWITCH_TO_DEFAULT_REGION;
+	csa = cs_addrs;
 	if (gv_cur_region->read_only)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	assert(0 != gv_target->root);
@@ -307,7 +298,7 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 			tmp_str, len, result);
 		if (PUT_SUCCESS != result)
 		{
-			RESTORE_TRIGGER_REGION_INFO;
+			RESTORE_TRIGGER_REGION_INFO(save_currkey);
 			return result;
 		}
 	}
@@ -334,10 +325,10 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 		tmp_str, len, result);
 	if (PUT_SUCCESS != result)
 	{
-		RESTORE_TRIGGER_REGION_INFO;
+		RESTORE_TRIGGER_REGION_INFO(save_currkey);
 		return result;
 	}
-	RESTORE_TRIGGER_REGION_INFO;
+	RESTORE_TRIGGER_REGION_INFO(save_currkey);
 	return PUT_SUCCESS;
 }
 
@@ -346,16 +337,13 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	sgmnt_addrs		*csa;
 	char			curr_name[MAX_MIDENT_LEN + 1];
 	uint4			curr_name_len, orig_name_len;
-	mstr			gbl_name;
-	mname_entry		gvent;
-	gv_namehead		*hasht_tree;
+	mname_entry		gvname;
 	int			len;
 	mval			mv_curr_nam;
 	boolean_t		name_found;
 	char			*ptr;
 	char			*name_tail_ptr;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key			*save_gv_currkey;
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	char			save_name[MAX_MIDENT_LEN + 1];
@@ -368,6 +356,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	int			trig_indx;
 	int			badpos;
 	boolean_t		wildcard;
+	gvnh_reg_t		*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -387,7 +376,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	/* $data(^#t) */
 	SWITCH_TO_DEFAULT_REGION;
 	if (gv_cur_region->read_only)
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 == gv_target->root)
 	{
@@ -406,7 +395,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 		BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), curr_name, curr_name_len);
 		if (gvcst_get(&trig_gbl))
 		{
-			SAVE_TRIGGER_REGION_INFO;
+			SAVE_TRIGGER_REGION_INFO(save_currkey);
 			ptr = trig_gbl.str.addr;
 			trigvn_len = STRLEN(trig_gbl.str.addr);
 			assert(MAX_MIDENT_LEN >= trigvn_len);
@@ -414,13 +403,15 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 			ptr += trigvn_len + 1;
 			/* the index is just beyon the length of the GVN string */
 			A2I(ptr, trig_gbl.str.addr + trig_gbl.str.len, trig_indx);
-			gbl_name.addr = trigvn;
-			gbl_name.len = trigvn_len;
-			GV_BIND_NAME_ONLY(gd_header, &gbl_name);
+			gvname.var_name.addr = trigvn;
+			gvname.var_name.len = trigvn_len;
+			COMPUTE_HASH_MNAME(&gvname);
+			GV_BIND_NAME_ONLY(gd_header, &gvname, gvnh_reg);
+			assert(cs_addrs == gv_target->gd_csa);
+			csa = cs_addrs;
 			if (gv_cur_region->read_only)
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
-			csa = gv_target->gd_csa;
-			SETUP_TRIGGER_GLOBAL;
+			SET_GVTARGET_TO_HASHT_GBL(csa);
 			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 			/* $get(^#t(GVN,"COUNT") */
 			BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
@@ -453,7 +444,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 					util_out_print_gtmio("Deleted trigger named '!AD' for global ^!AD",
 							FLUSH, curr_name_len, curr_name, trigvn_len, trigvn);
 			}
-			RESTORE_TRIGGER_REGION_INFO;
+			RESTORE_TRIGGER_REGION_INFO(save_currkey);
 			name_found = TRUE;
 		} else
 		{ /* no names match, if !wildcard report an error */
@@ -493,8 +484,6 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	char			*ptr1;
 	int4			result;
 	int4			retval;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key			*save_gv_currkey;
 	stringkey		kill_hash, set_hash;
 	int			sub_indx;
 	char			tmp_trig_str[MAX_BUFF_SIZE];
@@ -702,17 +691,13 @@ void trigger_delete_all(void)
 	sgmnt_addrs		*csa;
 	mval			curr_gbl_name;
 	int			cycle;
-	mstr			gbl_name;
-	mname_entry		gvent;
-	gv_namehead		*hasht_tree, *gvt;
+	gv_namehead		*gvt;
 	mval			*mv_count_ptr;
 	mval			*mv_cycle_ptr;
 	mval			mv_indx;
 	gd_region		*reg;
 	int			reg_indx;
 	int4			result;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key			*save_gv_currkey;
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
@@ -735,7 +720,7 @@ void trigger_delete_all(void)
 	}
 	SWITCH_TO_DEFAULT_REGION;
 	if (gv_cur_region->read_only)
-		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 != gv_target->root)
 	{
@@ -753,7 +738,7 @@ void trigger_delete_all(void)
 		gv_cur_region = reg;
 		change_reg();
 		csa = cs_addrs;
-		SETUP_TRIGGER_GLOBAL;
+		SET_GVTARGET_TO_HASHT_GBL(csa);
 		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 		/* There might not be any ^#t in this region, so check */
 		if (0 != gv_target->root)

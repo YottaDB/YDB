@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,16 +34,21 @@ boolean_t op_gvqueryget(mval *key, mval *val)
 {
 	boolean_t 	gotit;
 	gv_key		*save_key;
+	gvnh_reg_t	*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
-	switch (gv_cur_region->dyn.addr->acc_meth)
+	switch (REG_ACC_METH(gv_cur_region))
 	{
 	case dba_bg:
 	case dba_mm:
-		gotit = (0 != gv_target->root) ? gvcst_queryget(val) : FALSE;
+		gvnh_reg = TREF(gd_targ_gvnh_reg);
+		if (NULL == gvnh_reg)
+			gotit = ((0 != gv_target->root) ? gvcst_queryget(val) : FALSE); /* global does not exist if root is 0 */
+		else
+			INVOKE_GVCST_SPR_XXX(gvnh_reg, gotit = gvcst_spr_queryget(val));
 		break;
 	case dba_cm:
 		gotit = gvcmx_query(val);
@@ -60,7 +65,7 @@ boolean_t op_gvqueryget(mval *key, mval *val)
 		gv_currkey = save_key;
 		break;
 	default:
-		GTMASSERT;
+		assertpro(FALSE && REG_ACC_METH(gv_cur_region));
 	}
 	if (gotit)
 	{

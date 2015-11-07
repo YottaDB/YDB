@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,100 +18,63 @@
 #include "gtm_caseconv.h"
 #include "stringpool.h"
 #include "view.h"
-#include "min_max.h"	/* MIDENT_CMP needs MIN */
-
-#define S_CUTOFF 7
+#include "rtn_src_chksum.h"
 
 GBLREF rtn_tabent	*rtn_names, *rtn_names_end;
-GBLREF stack_frame 	*frame_pointer;
+
+/*
+ * Returns name of next (alphabetical) routine currently ZLINK'd.
+ * If no such routine, returns null string.
+ */
 
 void view_routines(mval *dst, mident_fixed *name)
 {
-	mident		temp;
-	char		temp_buff[SIZEOF(mident_fixed)];
-	rtn_tabent	*bot, *top, *mid;
-	int4		comp;
+	mident		rname;
+	rtn_tabent	*mid;
+	boolean_t	found;
 
-	temp.len = INTCAST(mid_len(name));
-#ifdef UNIX
-	temp.addr = &name->c[0];
-#else
-	lower_to_upper(&temp_buff[0], &name->c[0], temp.len);
-	temp.addr = &temp_buff[0];
-#endif
-
-	bot = rtn_names;
-	top = rtn_names_end;
+	rname.len = INTCAST(mid_len(name));	/* convert from mident_fixed to mident */
+	rname.addr = &name->c[0];
+	found = find_rtn_tabent(&mid, &rname);
+	if (found)
+		mid++;	/* want the *next* routine */
 	/* Skip over all routines that are not created by the user. These routines include
 	 * the dummy null routine, $FGNXEC (created for DALs) and $FGNFNC (created for Call-ins)
 	 * which are guaranteed to sort before any valid M routine */
-	while (bot < top && (0 == bot->rt_name.len || '%' > bot->rt_name.addr[0]))
-		bot++;
-	assert(bot <= top);
-	if (!temp.len)
-	{	dst->str.addr = bot->rt_name.addr;
-		dst->str.len = bot->rt_name.len;
-		s2pool(&dst->str);
-		return;
-	}
-
-	for (;;)
+	while ((mid <= rtn_names_end) && ((0 == mid->rt_name.len) || ('%' > mid->rt_name.addr[0])))
+		mid++;
+	if (mid > rtn_names_end)
+		dst->str.len = 0;
+	else
 	{
-		if ((top - bot) < S_CUTOFF)
-		{
-			comp = -1;
-			for (mid = bot; comp < 0 && mid <= top ;mid++)
-			{
-				MIDENT_CMP(&mid->rt_name, &temp, comp);
-				if (!comp)
-				{
-					if (mid != rtn_names_end)
-					{
-						mid++;
-						dst->str.addr = mid->rt_name.addr;
-						dst->str.len = mid->rt_name.len;
-						s2pool(&dst->str);
-					}
-					else
-						dst->str.len = 0;
-					return;
-				}
-				else if (comp < 0)
-					continue;
-				else
-				{	dst->str.addr = mid->rt_name.addr;
-					dst->str.len = mid->rt_name.len;
-					s2pool(&dst->str);
-					return;
-				}
-			}
-			dst->str.len = 0;
-			return;
-		}
-		else
-		{
-			mid = bot + (top - bot)/2;
-			MIDENT_CMP(&mid->rt_name, &temp, comp);
-			if (!comp)
-			{	if (mid != rtn_names_end)
-				{
-					mid++;
-					dst->str.addr = mid->rt_name.addr;
-					dst->str.len = mid->rt_name.len;
-					s2pool(&dst->str);
-				}
-				else
-					dst->str.len = 0;
-				return;
-			}
-			else if (comp < 0)
-			{	bot = mid + 1;
-				continue;
-			}
-			else
-			{	top = mid;
-				continue;
-			}
-		}
+		dst->str.addr = mid->rt_name.addr;
+		dst->str.len = mid->rt_name.len;
+		s2pool(&dst->str);
+	}
+}
+
+/*
+ * Returns checksum of routine <name>.
+ * If name is not ZLINK'd, returns null string.
+ */
+
+void view_routines_checksum(mval *dst, mident_fixed *name)
+{
+	mident		rname;
+	rtn_tabent	*mid;
+	boolean_t	found;
+	char		buf[MAX_ROUTINE_CHECKSUM_DIGITS];
+
+	rname.len = INTCAST(mid_len(name));	/* convert from mident_fixed to mident */
+	rname.addr = &name->c[0];
+	found = find_rtn_tabent(&mid, &rname);
+	/* Ignore the dummy null routine, $FGNXEC (created for DALs) and $FGNFNC (created for Call-ins) */
+	if (!found || ((0 == mid->rt_name.len) || ('%' > mid->rt_name.addr[0])))
+		dst->str.len = 0;
+	else
+	{
+		dst->str.addr = &buf[0];
+		dst->str.len = append_checksum((unsigned char *)&buf[0], mid->rt_adr);
+		s2pool(&dst->str);
 	}
 }

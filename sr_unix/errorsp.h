@@ -260,6 +260,7 @@ void ch_trace_point() {return;}
 						 */							\
 						stop_image_ch();					\
 					}								\
+					assert((SUCCESS == SEVERITY) || (INFO == SEVERITY));		\
                                 }
 
 #define NEXTCH			{									\
@@ -300,7 +301,7 @@ void ch_trace_point() {return;}
 					longjmp(active_ch->jmp, -1);								\
 				}
 
-#define START_CH		int current_ch;										\
+#define START_CH(flag_assert)	int current_ch;										\
 				DCL_THREADGBL_ACCESS;									\
 															\
 				SETUP_THREADGBL_ACCESS;									\
@@ -310,7 +311,12 @@ void ch_trace_point() {return;}
 				active_ch--;										\
 				CHECKLOWBOUND(active_ch);								\
 				DBGEHND((stderr, "%s: Condition handler entered at line %d - arg: %d  SIGNAL: %d\n",	\
-				         __FILE__, __LINE__, arg, SIGNAL));
+				         __FILE__, __LINE__, arg, SIGNAL));						\
+				if ((flag_assert) && ((SUCCESS == SEVERITY) || (INFO == SEVERITY)))			\
+				{											\
+					PRN_ERROR;									\
+					CONTINUE;									\
+				}
 
 #define MDB_START
 
@@ -416,6 +422,14 @@ CONDITION_HANDLER(gvcst_put_ch);
 CONDITION_HANDLER(gvcst_query_ch);
 CONDITION_HANDLER(gvcst_queryget_ch);
 CONDITION_HANDLER(gvcst_zprevious_ch);
+
+CONDITION_HANDLER(gvcst_spr_data_ch);
+CONDITION_HANDLER(gvcst_spr_kill_ch);
+CONDITION_HANDLER(gvcst_spr_order_ch);
+CONDITION_HANDLER(gvcst_spr_zprevious_ch);
+CONDITION_HANDLER(gvcst_spr_query_ch);
+CONDITION_HANDLER(gvcst_spr_queryget_ch);
+
 CONDITION_HANDLER(op_fnzpeek_ch);
 CONDITION_HANDLER(op_fnzpeek_getpool_ch);
 

@@ -191,15 +191,15 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 };
 
 static readonly CLI_ENTRY dse_change_qual[] = {
-{ "BLOCK",      0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "BSIZ",       0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "CMPC",       dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "FILEHEADER", dse_chng_fhead, dse_cfhead_qual, 0, 0, cli_disallow_dse_chng_fhead, 0, VAL_DISALLOWED, 0, 0,       0,       0       },
-{ "LEVEL",      0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "OFFSET",     dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "RECORD",     dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "RSIZ",       dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "TN",         0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "BLOCK",      0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
+{ "BSIZ",       0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
+{ "CMPC",       dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
+{ "FILEHEADER", dse_chng_fhead, dse_cfhead_qual, 0, 0, cli_disallow_dse_chng_fhead, 0, VAL_DISALLOWED, 0, 0,       0,       0       },	/* BYPASSOK */
+{ "LEVEL",      0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
+{ "OFFSET",     dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
+{ "RECORD",     dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
+{ "RSIZ",       dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
+{ "TN",         0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
 { 0 }
 };
 
@@ -274,6 +274,7 @@ static readonly CLI_ENTRY dse_find_qual[] = {
 { "CRIT",       0,          0, 0,                    0, 0, 0, VAL_N_A,     0, NEG,     0,       0       },
 { "EXHAUSTIVE", 0,          0, 0,                    0, 0, 0, VAL_N_A,     0, NON_NEG, 0,       0       },
 { "FREEBLOCK",  dse_f_free, 0, 0,                    0, 0, 0, VAL_N_A,     0, NON_NEG, 0,       0       },
+{ "GBLDIR",     0,          0, 0,                    0, 0, 0, VAL_N_A,     0, NEG,     0,       0       },
 { "HINT",       0,          0, 0,                    0, 0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM, VAL_HEX },
 { "KEY",        dse_f_key,  0, 0,                    0, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR, 0       },
 { "REGION",     dse_f_reg,  0, dse_freg_parm_values, 0, 0, 0, VAL_NOT_REQ, 0, NON_NEG, VAL_STR, 0       },

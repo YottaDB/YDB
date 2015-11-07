@@ -592,9 +592,9 @@ typedef struct node_local_struct
 #define BT_NOT_ALIGNED(bt, bt_base)		(!IS_PTR_ALIGNED((bt), (bt_base), SIZEOF(bt_rec)))
 #define BT_NOT_IN_RANGE(bt, bt_lo, bt_hi)	(!IS_PTR_IN_RANGE((bt), (bt_lo), (bt_hi)))
 
-#define MIN_CRIT_ENTRY				1024
-#define MAX_CRIT_ENTRY				32768
-#define DEFAULT_NUM_CRIT_ENTRY			1024
+#define MIN_CRIT_ENTRY				64		/* keep this in sync with gdeinit.m minseg("MUTEX_SLOTS") */
+#define MAX_CRIT_ENTRY				32768		/* keep this in sync with gdeinit.m maxseg("MUTEX_SLOTS") */
+#define DEFAULT_NUM_CRIT_ENTRY			1024		/* keep this in sync with gdeget.m tmpseg("MUTEX_SLOTS") */
 #define NUM_CRIT_ENTRY(CSD)			(CSD)->mutex_spin_parms.mutex_que_entry_space_size
 #define CRIT_SPACE(ENTRIES)			((ENTRIES) * SIZEOF(mutex_que_entry) + SIZEOF(mutex_struct))
 #define JNLPOOL_CRIT_SPACE			CRIT_SPACE(DEFAULT_NUM_CRIT_ENTRY)

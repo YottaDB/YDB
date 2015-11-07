@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Serivces, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Serivces, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,12 +25,15 @@
 
 #define JNLPOOL_SHMDT(RC, SAVE_ERRNO)				\
 {								\
+	jnlpool_ctl_ptr_t save_jnlpool_ctl;			\
+								\
 	SAVE_ERRNO = 0; /* clear any left-over value */		\
 	assert(NULL != jnlpool_ctl);				\
 	DEFER_INTERRUPTS(INTRPT_IN_SHMDT);			\
-	RC = SHMDT(jnlpool.jnlpool_ctl);			\
-	SAVE_ERRNO = errno;					\
+	save_jnlpool_ctl = jnlpool.jnlpool_ctl;			\
 	jnlpool_ctl = jnlpool.jnlpool_ctl = NULL;		\
+	RC = SHMDT(save_jnlpool_ctl);				\
+	SAVE_ERRNO = errno;					\
 	ENABLE_INTERRUPTS(INTRPT_IN_SHMDT);			\
 }
 

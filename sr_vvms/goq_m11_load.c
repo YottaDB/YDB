@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@
 #include "mvalconv.h"
 #include "mu_gvis.h"
 #include "quad2asc.h"
+#include "hashtab_mname.h"
 
 #define ODD 1
 #define NEGORZRO 1
@@ -80,6 +81,8 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 	gv_key		*goq_currkey;
 	int		goq_key_sub, goq_subsc_map[2][129];
 	mval		v, exist;
+	mname_entry	gvname;
+	gvnh_reg_t	*gvnh_reg;
 
 	if (end > 0)
 		is_end = TRUE;
@@ -124,14 +127,14 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 					   (rec_count * goq_blk_size / 512) + 1,0,0,0);
 
 			if (status != SS$_NORMAL)
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 
 			sys$synch(efn_bg_qio_read, &iosb[0]);
 			if (iosb[0] == SS$_ENDOFFILE)
 				break;
 
 			if (iosb[0] != SS$_NORMAL)
-				rts_error(VARLSTCNT(1) iosb[0]);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) iosb[0]);
 			rec_count++;
 			len = *goq_blk_used;
 		}
@@ -139,7 +142,7 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 		if ((is_end && rec_count >= end) || iosb[0] == SS$_ENDOFFILE)
 			break;
 		if (len >= goq_blk_size)
-		{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,0);
+		{	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,0);
 			continue;
 		}
 		goq_rp = in_buff;
@@ -164,13 +167,16 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 
 		if (goq_rp->cmpc != 0 || v.str.len > goq_currkey->top)
 		{
-			rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 			continue;
 		}
-		GV_BIND_NAME_AND_ROOT_SEARCH (gd_header, &v.str);
+		gvname.var_name = v.str;
+		COMPUTE_HASH_MNAME(&gvname);
+		GV_BIND_NAME_AND_ROOT_SEARCH (gd_header, &gvname, gvnh_reg);
+		assert(NULL == gvnh_reg->gvspan); /* so GV_BIND_SUBSNAME_IF_GVSPAN is not needed */
 		if (mupip_error_occurred)
 		{
-			rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 			mu_gvis();
 			util_out_print(0,TRUE);
 			continue;
@@ -194,7 +200,7 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 			n += goq_rp->subsc_len + 2 * SIZEOF(char); /* size of key */
 			if ((unsigned char *) goq_rp + n > btop)
 			{
-				rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 				mu_gvis();
 				util_out_print(0,TRUE);
 				break;
@@ -242,8 +248,8 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 								case '9': *b++ = '0';
 									break;
 								default:
-									rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,
-										global_key_count);
+									rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4)
+										ERR_CORRUPT,2,rec_count, global_key_count);
 									 mu_gvis();
 									 util_out_print(0,TRUE);
 							}
@@ -251,7 +257,9 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 						if (!mupip_error_occurred)
 						{
 							if (*cp1++ != M11_NEG)
-							{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+							{
+								rts_error_csa(CSA_ARG(NULL)
+									VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 								mu_gvis();
 								util_out_print(0,TRUE);
 								break;
@@ -267,7 +275,9 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 							v.str.len = b - (unsigned char *) v.str.addr;
 							s2n(&v);
 							if (mupip_error_occurred)
-							{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+							{
+								rts_error_csa(CSA_ARG(NULL)
+									VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 								mu_gvis();
 								util_out_print(0,TRUE);
 								break;
@@ -275,14 +285,13 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 							else
 								v.mvtype = MV_NM;
 						}
-					}
-					else if (exp == M11_ZRO)
+					} else if (M11_ZRO == exp)
 					{
 						v.mvtype = MV_NM;
 						v.m[1] = 0;
-					}
-					else
-					{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+					} else
+					{
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 						mu_gvis();
 						util_out_print(0,TRUE);
 						break;
@@ -305,7 +314,7 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 					v.str.len = b - (unsigned char *) v.str.addr;
 					if (cp1 > cp2)
 					{
-						rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 						mu_gvis();
 						util_out_print(0,TRUE);
 						break;
@@ -316,7 +325,8 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 					}
 					s2n(&v);
 					if (mupip_error_occurred)
-					{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+					{
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 						mu_gvis();
 						util_out_print(0,TRUE);
 						break;
@@ -336,17 +346,17 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 					v.str.len = b - (unsigned char *) v.str.addr;
 					if (cp1 > cp2)
 					{
-						rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 						mu_gvis();
 						util_out_print(0,TRUE);
 						break;
 					}
 				}
-				mval2subsc(&v,gv_currkey);
+				mval2subsc(&v, gv_currkey, gvnh_reg->gd_reg->std_null_coll);
 				gv_currkey->prev = 0;
 				if (mupip_error_occurred)
 				{
-					rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 					mu_gvis();
 					util_out_print(0,TRUE);
 					break;
@@ -388,7 +398,7 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 			{
 				if (!mupip_DB_full)
 				{
-					rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 					util_out_print(0,TRUE);
 				}
 				break;
@@ -404,7 +414,7 @@ void  goq_m11_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 			{
 				if (goq_rp->cmpc > goq_currkey->end)
 				{
-					rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 					break;
 				}
 				cp1 = &goq_rp->subsc[0];

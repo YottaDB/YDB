@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,18 +106,27 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 			rtn_str.addr = rtnname.addr;
 			advancewindow();
 			if (!IS_MCODE_RUNNING)
-			{	/* Triples for indirect code */
-				same_rout = (MIDENT_EQ(&rtnname, &routine_name) && can_commarg);
+			{	/* Triples for normal compiled code. */
+				NON_USHBIN_ONLY(same_rout = (MIDENT_EQ(&rtnname, &routine_name) && can_commarg));
+				/* On shared binary platforms, we support recursive relink, and it's possible for an old version
+				 * of a routine to invoke a different new version. Therefore, even if a label corresponds to the
+				 * current routine name, we need to treat this as an external reference.
+				 */
 				if (!textname)
 				{	/* Resolve routine and label names to addresses for most calls */
 					if (!label.oprclass && !offset.oprclass)
-					{	/* Routine only (no label or offset) */
+					{	/* Do LABEL^RTN comes here (LABEL is *not* indirect) */
+#						ifndef USHBIN_SUPPORTED
 						if (same_rout)
-						{
+						{	/* Do LABEL^SAMERTN comes here.
+							 * On platforms where we don't support recursive relink, we can treat
+							 * Do LABEL^SAMERTN the same as Do LABEL, and morph this into a local call.
+							 */
 							rettrip = newtriple(op1);
 							rettrip->operand[0] =  put_mlab(&labname);
 						} else
-						{
+#						endif
+						{	/* Create an external reference to LABEL^RTN */
 							rettrip = maketriple(op2);
 							if (rtnname.addr[0] == '%')
 								rtnname.addr[0] = '_';
@@ -127,8 +136,11 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 							ins_triple(rettrip);
 						}
 						return rettrip;
-					} else if (!same_rout)
-					{
+					} else NON_USHBIN_ONLY(if (!same_rout))
+					{	/* Do @"LABEL"^RTN comes here (LABEL is indirect).
+						 * Exception: on non-USHBIN platforms, we morph Do @"LABEL"^SAMERTN into a local
+						 * call in the next else-block.
+						 */
 						rte1 = put_str(rtn_str.addr, rtn_str.len);
 						if (rtnname.addr[0] == '%')
 							rtnname.addr[0] = '_';
@@ -137,8 +149,11 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 						ref->operand[0] = rte1;
 						ref->operand[1] = routine;
 						routine = put_tref(ref);
-					} else
+					}
+#					ifndef USHBIN_SUPPORTED
+					else	/* Do @"LABEL"^SAMERTN comes here. Again, morph into local call Do @"LABEL" */
 						routine = put_tref(newtriple(OC_CURRHD));
+#					endif
 				} else
 				{	/* Return the actual names used */
 					if (!label.oprclass && !offset.oprclass)
@@ -155,7 +170,7 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 						routine = put_str(rtn_str.addr, rtn_str.len);
 				}
 			} else
-			{	/* Triples for normal compiled code */
+			{	/* Triples for indirect code */
 				routine = put_str(rtn_str.addr, rtn_str.len);
 				if (!textname)
 				{	/* If not returning text name, convert text name to routine header address */
@@ -190,15 +205,9 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 			routine = put_tref(newtriple(OC_CURRHD));
 		else
 		{	/* If we need a name, the mechanism to retrieve it differs between normal and indirect compilation */
-			if (!IS_MCODE_RUNNING)
 				/* For normal compile, use routine name set when started compile */
-				routine = put_str(routine_name.addr, routine_name.len);
-			else
-				/* For an indirect compile, obtain the currently running routine header and pull the routine
-				 * name out of that.
-				 */
-				routine = put_str(frame_pointer->rvector->routine_name.addr,
-						  frame_pointer->rvector->routine_name.len);
+				/* Routine name can vary. textname=TRUE callers (zgoto) fetch name from frame_pointer at runtime */
+			routine = put_str("",0);
 		}
 	}
 	if (!offset.oprclass)

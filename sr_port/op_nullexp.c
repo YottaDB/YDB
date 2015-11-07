@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,13 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
-
-#include "gtm_string.h"
-
 #include "op.h"
 
-void op_nullexp(mval *v)
+LITREF mval skiparg;
+
+mval *op_nullexp(void)
 {
-	memset(v, 0, SIZEOF(mval));
-	v->str.addr = (char *)v;
+	return (mval *)&skiparg;
 }

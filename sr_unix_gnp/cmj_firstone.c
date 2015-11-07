@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,7 @@ int cmj_firstone(fd_set *s, int n)
 {
 	int i;
 
+	assertpro(FD_SETSIZE >= n);
 	for (i = 0; i < n; i++) {
 		if (FD_ISSET(i, s)) {
 			FD_CLR(i, s);

@@ -56,7 +56,7 @@ error_def(ERR_DEVICEWRITEONLY);
 #define SETZACANCELTIMER					\
 		io_ptr->dollar.za = 9;				\
 		v->str.len = 0;					\
-		if (timed && !out_of_time)			\
+		if (!rm_ptr->follow && timed && !out_of_time)	\
 			cancel_timer(timer_id);
 
 #ifdef UNICODE_SUPPORTED
@@ -132,7 +132,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	int		do_clearerr = FALSE;
 	int		saved_lastop;
 	int             min_bytes_to_copy;
-	ABS_TIME	cur_time, end_time, time_for_read;
+	ABS_TIME	cur_time, end_time, current_time, time_left;
 	pipe_interrupt	*pipeintr;
 	mv_stent	*mv_zintdev;
 	unsigned int	*dollarx_ptr;
@@ -222,20 +222,24 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	if (rm_ptr->mupintr)
 	{	/* We have a pending read restart of some sort */
 		if (pipewhich_invalid == pipeintr->who_saved)
-			GTMASSERT;      /* Interrupt should never have an invalid save state */
+			assertpro(FALSE);      /* Interrupt should never have an invalid save state */
 		/* check we aren't recursing on this device */
 		if (dollar_zininterrupt)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
                 if (pipewhich_readfl != pipeintr->who_saved)
-                        GTMASSERT;      /* ZINTRECURSEIO should have caught */
+                        assertpro(FALSE);      /* ZINTRECURSEIO should have caught */
 		PIPE_DEBUG(PRINTF("piperfl: *#*#*#*#*#*#*#  Restarted interrupted read\n"); DEBUGPIPEFLUSH);
 		mv_zintdev = io_find_mvstent(io_ptr, FALSE);
 		if (mv_zintdev)
 		{
 			if (mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid)
 			{
-				assert(mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.len == pipeintr->bytes_read);
-				buffer_start = (unsigned char *)mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr;
+				bytes_read = pipeintr->bytes_read;
+				assert(mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.len == bytes_read);
+				if (bytes_read)
+					buffer_start = (unsigned char *)mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr;
+				else
+					buffer_start = stringpool.free;
 				zint_restart = TRUE;
 			} else
 			{
@@ -311,7 +315,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		   don't use temp, so skip the following stringpool checks */
 		if (!utf_active || !rm_ptr->fixed)
 		{
-			if (stringpool.free != (buffer_start + bytes_read)) /* BYPASSOK */
+			if (!IS_AT_END_OF_STRINGPOOL(buffer_start, bytes_read))
 			{	/* Not @ stringpool.free - must move what we have, so we need room for
 				   the whole anticipated message */
 				PIPE_DEBUG(PRINTF("socrfl: .. Stuff put on string pool after our buffer\n"); DEBUGPIPEFLUSH);
@@ -330,32 +334,28 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 				v->str.len = bytes_read;
 				INVOKE_STP_GCOL(exp_width);
 				/* if v->str.len is 0 then v->str.add is ignored by garbage collection so reset it to
-				   stringpool.free */
+					stringpool.free */
 				if (v->str.len == 0)
-					v->str.addr =  (char *)stringpool.free;
+			 		v->str.addr =  (char *)stringpool.free;
 				buffer_start = (unsigned char *)v->str.addr;
 			}
-			if ((buffer_start + bytes_read) < stringpool.free)	/* BYPASSOK */
+			assert((buffer_start + bytes_read) <= stringpool.free);	/* BYPASSOK */
+			if (!IS_AT_END_OF_STRINGPOOL(buffer_start, bytes_read))
+
 			{	/* now need to move it to the top */
 				assert(stp_need == exp_width);
 				memcpy(stringpool.free, buffer_start, bytes_read);
 			} else
-			{	/* it should still be just under the used space */
-				assert(!bytes_read || ((buffer_start + bytes_read) == stringpool.free));	/* BYPASSOK */
-				stringpool.free = buffer_start;
-			}
+				stringpool.free = buffer_start;	/* it should still be just under the used space */
 			v->str.len = 0;		/* Clear in case interrupt or error -- don't want to hold this buffer */
-
 			temp = (char *)(stringpool.free + bytes_read);
 			tot_bytes_read = bytes_count = bytes_read;
 			if (!(rm_ptr->fixed && rm_ptr->follow))
 				width -= bytes_read;
 		}
 	}
-
         if (utf_active)
 		bytes_read = 0;
-
 	out_of_time = FALSE;
 	if (timeout == NO_M_TIMEOUT)
 	{
@@ -377,9 +377,9 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		timed = TRUE;
 		msec_timeout = timeout2msec(timeout);
 		if (msec_timeout > 0)
-		{
-			/* for the read x:n case a timer started here.  It is checked in the (timed) clause
-			 at the end of this routine and canceled if it has not expired. */
+		{	/* for the read x:n case a timer started here.  It is checked in the (timed) clause
+			 * at the end of this routine and canceled if it has not expired.
+			 */
 			sys_get_curr_time(&cur_time);
 			if (!zint_restart || !pipeintr->end_time_valid)
 				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
@@ -395,6 +395,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
                                         out_of_time = TRUE;
                                 } else
 					msec_timeout = (int4)(cur_time.at_sec * 1000 + cur_time.at_usec / 1000);
+				if (rm_ptr->follow && !out_of_time && !msec_timeout)
+					msec_timeout = 1;
 				PIPE_DEBUG(PRINTF("piperfl: Taking timeout end time from read restart data - "
 						  "computed msec_timeout: %d\n", msec_timeout); DEBUGPIPEFLUSH);
 			}
@@ -402,8 +404,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			/* if it is a disk read with follow don't start timer, as we use a sleep loop instead */
 			if ((0 < msec_timeout) && !rm_ptr->follow)
 				start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
-		}
-		else
+		} else
 		{
 			/* out_of_time is set to TRUE because no timer is set for read x:0 for any device type at
 			 this point.  It will be set to FALSE for a pipe device if it has read one character as
@@ -435,8 +436,21 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 				PIPE_DEBUG(PRINTF(" %d fixed\n", pid); DEBUGPIPEFLUSH);
 				if (timed)
 				{
+					/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
 					if (0 < msec_timeout)
 					{
+						/* get the current time */
+						sys_get_curr_time(&current_time);
+						time_left = sub_abs_time(&end_time, &current_time);
+						if (0 > time_left.at_sec)
+						{
+							msec_timeout = -1;
+							out_of_time = TRUE;
+						} else
+							msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+						/* make sure it terminates with out_of_time */
+						if (!out_of_time && !msec_timeout)
+							msec_timeout = 1;
 						sleep_left = msec_timeout;
 					} else
 						sleep_left = 0;
@@ -446,6 +460,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					io_ptr->dollar.zeof = FALSE;
 				do
 				{
+					/* in follow mode a read will return an EOF if no more bytes are available*/
 					status = read(fildes, temp, width - bytes_count);
 					if (0 < status) /* we read some chars */
 					{
@@ -463,12 +478,28 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 						/* if a timed read, sleep the minimum of 100 ms and sleep_left.
 						   If not a timed read then just sleep 100 ms */
 						if (TRUE == timed)
+						{
+							/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
+							/* get the current time */
+							sys_get_curr_time(&current_time);
+							time_left = sub_abs_time(&end_time, &current_time);
+							if (0 > time_left.at_sec)
+							{
+								msec_timeout = -1;
+								out_of_time = TRUE;
+							} else
+								msec_timeout = (int4)(time_left.at_sec * 1000 +
+										      time_left.at_usec / 1000);
+
+							/* make sure it terminates with out_of_time */
+							if (!out_of_time && !msec_timeout)
+								msec_timeout = 1;
+							sleep_left = msec_timeout;
 							sleep_time = MIN(100,sleep_left);
-						else
+						} else
 							sleep_time = 100;
-						SHORT_SLEEP(sleep_time);
-						if (TRUE == timed)
-							sleep_left -= sleep_time;
+						if (0 < sleep_time)
+							SHORT_SLEEP(sleep_time);
 						if (outofband)
 						{
 							PIPE_DEBUG(PRINTF(" %d fixed outofband\n", pid); DEBUGPIPEFLUSH);
@@ -491,7 +522,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 											      the interrupt */
 							(TREF(pipefifo_interrupt))++;
 							outofband_action(FALSE);
-							GTMASSERT;	/* Should *never* return from outofband_action */
+							assertpro(FALSE);	/* Should *never* return from outofband_action */
 							return FALSE;	/* For the compiler.. */
 						}
 						continue; /* for now try and read again if eof or no input ready */
@@ -535,7 +566,6 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					PIPE_DEBUG(PRINTF(" %d temp= %s tot_bytes_read = %d\n", pid, temp, tot_bytes_read);
 						   DEBUGPIPEFLUSH);
 				}
-
 				if (pipe_or_fifo && outofband)
 				{
 					PIPE_DEBUG(PRINTF(" %d fixed outofband\n", pid); DEBUGPIPEFLUSH);
@@ -557,27 +587,39 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					stringpool.free += tot_bytes_read;	/* Don't step on our parade in the interrupt */
 					(TREF(pipefifo_interrupt))++;
 					outofband_action(FALSE);
-					GTMASSERT;	/* Should *never* return from outofband_action */
+					assertpro(FALSE);	/* Should *never* return from outofband_action */
 					return FALSE;	/* For the compiler.. */
 				}
 			}
-
-		} else if (!rm_ptr->pipe && !rm_ptr->fifo)
+		} else if (!rm_ptr->pipe && !rm_ptr->fifo) /* not fixed mode */
 		{	/* rms-file device */
 			if ((rm_ptr->follow) && timed)
 			{
+				/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
 				if (0 < msec_timeout)
 				{
+					/* get the current time */
+					sys_get_curr_time(&current_time);
+					time_left = sub_abs_time(&end_time, &current_time);
+					if (0 > time_left.at_sec)
+					{
+						msec_timeout = -1;
+						out_of_time = TRUE;
+					} else
+						msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+					/* make sure it terminates with out_of_time */
+					if (!out_of_time && !msec_timeout)
+						msec_timeout = 1;
 					sleep_left = msec_timeout;
 				} else
 					sleep_left = 0;
 			}
-
 			/* if zeof is set and follow is TRUE then ignore any previous zeof */
 			if (rm_ptr->follow && (TRUE == io_ptr->dollar.zeof))
 				io_ptr->dollar.zeof = FALSE;
 			do
 			{
+				/* in follow mode a read will return an EOF if no more bytes are available*/
 				if (EOF != (status = getc(filstr)))
 				{
 					inchar = (unsigned char)status;
@@ -609,12 +651,29 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							/* if a timed read, sleep the minimum of 100 ms and sleep_left.
 							   If not a timed read then just sleep 100 ms */
 							if (TRUE == timed)
+							{
+								/* recalculate msec_timeout and sleep_left as
+								   &end_time - &current_time */
+								/* get the current time */
+								sys_get_curr_time(&current_time);
+								time_left = sub_abs_time(&end_time, &current_time);
+								if (0 > time_left.at_sec)
+								{
+									msec_timeout = -1;
+									out_of_time = TRUE;
+								} else
+									msec_timeout = (int4)(time_left.at_sec * 1000 +
+											      time_left.at_usec / 1000);
+
+								/* make sure it terminates with out_of_time */
+								if (!out_of_time && !msec_timeout)
+									msec_timeout = 1;
+								sleep_left = msec_timeout;
 								sleep_time = MIN(100,sleep_left);
-							else
+							} else
 								sleep_time = 100;
-							SHORT_SLEEP(sleep_time);
-							if (TRUE == timed)
-								sleep_left -= sleep_time;
+							if (0 < sleep_time)
+								SHORT_SLEEP(sleep_time);
 							if (outofband)
 							{
 								PIPE_DEBUG(PRINTF(" %d outofband\n", pid); DEBUGPIPEFLUSH);
@@ -634,11 +693,12 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 								pipeintr->max_bufflen = exp_width;
 								pipeintr->bytes_read = tot_bytes_read;
 								rm_ptr->mupintr = TRUE;
-								stringpool.free += tot_bytes_read;	/* Don't step on our parade
-													   in the interrupt */
+								stringpool.free += tot_bytes_read; /* Don't step on our parade
+												      in the interrupt */
 								(TREF(pipefifo_interrupt))++;
 								outofband_action(FALSE);
-								GTMASSERT;	/* Should *never* return from outofband_action */
+								/* Should *never* return from outofband_action */
+								assertpro(FALSE);
 								return FALSE;	/* For the compiler.. */
 							}
 							continue; /* for now try and read again if eof or no input ready */
@@ -742,7 +802,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					stringpool.free += tot_bytes_read;	/* Don't step on our parade in the interrupt */
 					(TREF(pipefifo_interrupt))++;
 					outofband_action(FALSE);
-					GTMASSERT;	/* Should *never* return from outofband_action */
+					assertpro(FALSE);	/* Should *never* return from outofband_action */
 					return FALSE;	/* For the compiler.. */
 				}
 			} while (bytes_count < width);
@@ -760,7 +820,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			{	/* need to refill the buffer */
 				if (rm_ptr->follow)
 					buff_len = iorm_get_fol(io_ptr, &tot_bytes_read, &msec_timeout, timed, zint_restart,
-								&follow_timeout);
+								&follow_timeout, end_time);
 				else
 					buff_len = iorm_get(io_ptr, &blocked_in, rm_ptr->pipe, flags, &tot_bytes_read,
 						    timer_id, &msec_timeout, pipe_zero_timeout, zint_restart);
@@ -783,7 +843,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					{
 						pipeintr->end_time = end_time;
 						pipeintr->end_time_valid = TRUE;
-						cancel_timer(timer_id);		/* Worry about timer if/when we come back */
+						if (!rm_ptr->follow)
+							cancel_timer(timer_id);	/* Worry about timer if/when we come back */
 					}
 					pipeintr->max_bufflen = exp_width;
 					/* since nothing read into stringpool.free set pipeintr->bytes_read to zero
@@ -792,7 +853,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					rm_ptr->mupintr = TRUE;
 					(TREF(pipefifo_interrupt))++;
 					outofband_action(FALSE);
-					GTMASSERT;	/* Should *never* return from outofband_action */
+					assertpro(FALSE);	/* Should *never* return from outofband_action */
 					return FALSE;	/* For the compiler.. */
 				}
 				chset = io_ptr->ichset;		/* in case UTF-16 was changed */
@@ -800,6 +861,9 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			status = tot_bytes_read = buff_len;		/* for EOF checking at the end */
 			char_ptr = rm_ptr->inbuf_off;
 
+			PIPE_DEBUG(PRINTF("iorm_readfl: inbuf: 0x%08lx, top: 0x%08lx, off: 0x%08lx\n", rm_ptr->inbuf,
+					  rm_ptr->inbuf_top,rm_ptr->inbuf_off); DEBUGPIPEFLUSH;);
+			PIPE_DEBUG(PRINTF("iorm_readfl: status: %d, width: %d", status, width); DEBUGPIPEFLUSH;);
 			if (0 < buff_len)
 			{
 				for (char_count = 0; char_count < width && char_ptr < rm_ptr->inbuf_top; char_count++)
@@ -822,7 +886,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 						}
 						break;
 					case CHSET_UTF16BE:
-						if (UTF16BE_VALID(char_ptr, rm_ptr->inbuf_top, mblen))
+						if ((2 <= (mblen = (rm_ptr->inbuf_top - char_ptr))) &&
+						    UTF16BE_VALID(char_ptr, rm_ptr->inbuf_top, mblen))
 						{
 							bytes_count += mblen;
 							char_ptr += mblen;
@@ -837,7 +902,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 						}
 						break;
 					case CHSET_UTF16LE:
-						if (UTF16LE_VALID(char_ptr, rm_ptr->inbuf_top, mblen))
+						if ((2 <= (mblen = (rm_ptr->inbuf_top - char_ptr))) &&
+						    UTF16LE_VALID(char_ptr, rm_ptr->inbuf_top, mblen))
 						{
 							bytes_count += mblen;
 							char_ptr += mblen;
@@ -852,7 +918,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 						}
 						break;
 					default:
-						GTMASSERT;
+						assertpro(FALSE);
 					}
 				}
 				if (rm_ptr->follow && (char_count == width) && (TRUE == follow_timeout))
@@ -864,9 +930,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 				{
 					if (CHSET_UTF8 == chset)
 					{
-						if (temp != (char *)stringpool.free) /* BYPASSOK */
-						{
-							/* make sure enough space to store buffer */
+						if (!IS_AT_END_OF_STRINGPOOL(temp, 0))
+						{	/* make sure enough space to store buffer */
 							ENSURE_STP_FREE_SPACE(GTM_MB_LEN_MAX * width);
 						}
 						memcpy(stringpool.free, rm_ptr->inbuf_off, v->str.len);
@@ -917,8 +982,22 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 				/* rms-file device in follow mode */
 				if (timed)
 				{
+					/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
 					if (0 < msec_timeout)
 					{
+						/* get the current time */
+						sys_get_curr_time(&current_time);
+						time_left = sub_abs_time(&end_time, &current_time);
+						if (0 > time_left.at_sec)
+						{
+							msec_timeout = -1;
+							out_of_time = TRUE;
+						} else
+							msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+
+						/* make sure it terminates with out_of_time */
+						if (!out_of_time && !msec_timeout)
+							msec_timeout = 1;
 						sleep_left = msec_timeout;
 					} else
 						sleep_left = 0;
@@ -937,7 +1016,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					if (rm_ptr->follow)
 					{
 						status = iorm_get_bom_fol(io_ptr, &tot_bytes_read, &msec_timeout, timed,
-									  &bom_timeout);
+									  &bom_timeout, end_time);
 					} else
 						status = iorm_get_bom(io_ptr, &blocked_in, rm_ptr->pipe, flags, &tot_bytes_read,
 							      timer_id, &msec_timeout, pipe_zero_timeout);
@@ -958,7 +1037,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 						{
 							pipeintr->end_time = end_time;
 							pipeintr->end_time_valid = TRUE;
-							cancel_timer(timer_id);	/* Worry about timer if/when we come back */
+							if (!rm_ptr->follow)
+								cancel_timer(timer_id);	/* Worry about timer if/when we come back */
 						}
 						pipeintr->max_bufflen = exp_width;
 						/* nothing copied to stringpool.free yet */
@@ -970,7 +1050,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 						(TREF(pipefifo_interrupt))++;
 						PIPE_DEBUG(PRINTF(" %d utf1.1 stream outofband\n", pid); DEBUGPIPEFLUSH);
 						outofband_action(FALSE);
-						GTMASSERT;	/* Should *never* return from outofband_action */
+						assertpro(FALSE);	/* Should *never* return from outofband_action */
 						return FALSE;	/* For the compiler.. */
 					}
 					chset = io_ptr->ichset;	/* UTF16 will have changed to UTF16BE or UTF16LE */
@@ -1011,80 +1091,95 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 						 *
 						 */
 
-						if (rm_ptr->follow)
+						if (rm_ptr->follow && (FALSE == bom_timeout))
 						{
-							if (FALSE == bom_timeout)
+							/* in follow mode a read will return an EOF if no more bytes are available*/
+							status = read(fildes, rm_ptr->utf_tmp_buffer, CHUNK_SIZE);
+
+							if (0 == status) /* end of file */
 							{
-								status = read(fildes, rm_ptr->utf_tmp_buffer, CHUNK_SIZE);
-
-								if (0 == status) /* end of file */
+								if ((TRUE == timed) && (0 >= sleep_left))
 								{
-									if ((TRUE == timed) && (0 >= sleep_left))
-									{
-										follow_timeout = TRUE;
-										break;
-									}
-
-									/* if a timed read, sleep the minimum of 100 ms and
-									   sleep_left. If not a timed read then just sleep 100 ms */
-									if (TRUE == timed)
-										sleep_time = MIN(100,sleep_left);
-									else
-										sleep_time = 100;
-									SHORT_SLEEP(sleep_time);
-									if (TRUE == timed)
-										sleep_left -= sleep_time;
-
-									if (outofband)
-									{
-										PIPE_DEBUG(PRINTF(" %d utf2 stream outofband\n",
-												  pid); DEBUGPIPEFLUSH);
-										PUSH_MV_STENT(MVST_ZINTDEV);
-										mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
-										mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr
-											= (char *)stringpool.free;
-										mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len
-											= bytes_count;
-										mv_chain->mv_st_cont.mvs_zintdev.buffer_valid =
-											TRUE;
-										pipeintr->who_saved = pipewhich_readfl;
-										if (0 < msec_timeout && NO_M_TIMEOUT !=
-										    msec_timeout)
-										{
-											pipeintr->end_time = end_time;
-											pipeintr->end_time_valid = TRUE;
-										}
-										pipeintr->max_bufflen = exp_width;
-										/* streaming mode uses bytes_count to show how many
-										   bytes are in *temp, but the interrupt re-entrant
-										   code uses bytes_read */
-										pipeintr->bytes_read = bytes_count;
-										pipeintr->bytes2read = bytes2read;
-										pipeintr->char_count = char_count;
-										pipeintr->add_bytes = add_bytes;
-										pipeintr->bytes_count = bytes_count;
-										PIPE_DEBUG(PRINTF("utf2 stream outofband "
-												  "char_bytes_read %d add_bytes "
-												  "%d bytes_count %d\n",
-												  char_bytes_read,
-												  add_bytes, bytes_count);
-											   DEBUGPIPEFLUSH);
-										rm_ptr->mupintr = TRUE;
-										/* Don't step on our parade in the interrupt */
-										stringpool.free += bytes_count;
-										(TREF(pipefifo_interrupt))++;
-										outofband_action(FALSE);
-										GTMASSERT;	/* Should *never* return from
-												   outofband_action */
-										return FALSE;	/* For the compiler.. */
-									}
-									continue; /* for now try and read again if eof or no input
-										     ready */
-								} else if (-1 == status && errno != EINTR)  /* error returned */
-								{
-									bytes_count = 0;
+									follow_timeout = TRUE;
 									break;
 								}
+
+								/* if a timed read, sleep the minimum of 100 ms and
+								   sleep_left. If not a timed read then just sleep
+								   100 ms */
+								if (TRUE == timed)
+								{
+									/* recalculate msec_timeout and sleep_left as
+									   &end_time - &current_time */
+									/* get the current time */
+									sys_get_curr_time(&current_time);
+									time_left = sub_abs_time(&end_time, &current_time);
+									if (0 > time_left.at_sec)
+									{
+										msec_timeout = -1;
+										out_of_time = TRUE;
+									} else
+										msec_timeout = (int4)(time_left.at_sec * 1000 +
+												      time_left.at_usec / 1000);
+
+									/* make sure it terminates with out_of_time */
+									if (!out_of_time && !msec_timeout)
+										msec_timeout = 1;
+									sleep_left = msec_timeout;
+									sleep_time = MIN(100,sleep_left);
+								} else
+									sleep_time = 100;
+								if (0 < sleep_time)
+									SHORT_SLEEP(sleep_time);
+								if (outofband)
+								{
+									PIPE_DEBUG(PRINTF(" %d utf2 stream outofband\n",
+											  pid); DEBUGPIPEFLUSH);
+									PUSH_MV_STENT(MVST_ZINTDEV);
+									mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
+									mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr
+										= (char *)stringpool.free;
+									mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len
+										= bytes_count;
+									mv_chain->mv_st_cont.mvs_zintdev.buffer_valid =
+										TRUE;
+									pipeintr->who_saved = pipewhich_readfl;
+									if (0 < msec_timeout && NO_M_TIMEOUT !=
+									    msec_timeout)
+									{
+										pipeintr->end_time = end_time;
+										pipeintr->end_time_valid = TRUE;
+									}
+									pipeintr->max_bufflen = exp_width;
+									/* streaming mode uses bytes_count to show how many
+									   bytes are in *temp, but the interrupt re-entrant
+									   code uses bytes_read */
+									pipeintr->bytes_read = bytes_count;
+									pipeintr->bytes2read = bytes2read;
+									pipeintr->char_count = char_count;
+									pipeintr->add_bytes = add_bytes;
+									pipeintr->bytes_count = bytes_count;
+									PIPE_DEBUG(PRINTF("utf2 stream outofband "
+											  "char_bytes_read %d add_bytes "
+											  "%d bytes_count %d\n",
+											  char_bytes_read,
+											  add_bytes, bytes_count);
+										   DEBUGPIPEFLUSH);
+									rm_ptr->mupintr = TRUE;
+									/* Don't step on our parade in the interrupt */
+									stringpool.free += bytes_count;
+									(TREF(pipefifo_interrupt))++;
+									outofband_action(FALSE);
+									assertpro(FALSE);	/* Should *never* return from
+											   outofband_action */
+									return FALSE;	/* For the compiler.. */
+								}
+								continue; /* for now try and read again if eof or no input
+									     ready */
+							} else if (-1 == status && errno != EINTR)  /* error returned */
+							{
+								bytes_count = 0;
+								break;
 							}
 						} else
 						{
@@ -1100,7 +1195,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 						 * in utf_tot_bytes_read. */
 						/* if chunk read returned some bytes then ignore outofband.  We won't try a
 						 read again until bytes are processed*/
-						if (pipe_or_fifo && outofband && (0 >= status))
+						if ((pipe_or_fifo || rm_ptr->follow) && outofband && (0 >= status))
 						{
 							PIPE_DEBUG(PRINTF(" %d utf2 stream outofband\n", pid); DEBUGPIPEFLUSH);
 							PUSH_MV_STENT(MVST_ZINTDEV);
@@ -1115,7 +1210,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 								pipeintr->end_time = end_time;
 								pipeintr->end_time_valid = TRUE;
 								/* Worry about timer if/when we come back */
-								cancel_timer(timer_id);
+								if (!rm_ptr->follow)
+									cancel_timer(timer_id);
 							}
 							pipeintr->max_bufflen = exp_width;
 							/* streaming mode uses bytes_count to show how many bytes are in *temp,
@@ -1133,7 +1229,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							stringpool.free += bytes_count;
 							(TREF(pipefifo_interrupt))++;
 							outofband_action(FALSE);
-							GTMASSERT;	/* Should *never* return from outofband_action */
+							assertpro(FALSE);	/* Should *never* return from outofband_action */
 							return FALSE;	/* For the compiler.. */
 						}
 
@@ -1334,7 +1430,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							nextmb = UTF16BE_MBTOWC(char_start, rm_ptr->inbuf_pos, utf_code);
 						else
 							nextmb = UTF16LE_MBTOWC(char_start, rm_ptr->inbuf_pos, utf_code);
-						if (WEOF == utf_code)
+						if ( (WEOF == utf_code) || (nextmb != rm_ptr->inbuf_pos) )
 						{	/* invalid mb char */
 							SETZACANCELTIMER;
 							iorm_readfl_badchar(v, (int)((unsigned char *)temp - stringpool.free),
@@ -1380,7 +1476,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							break;
 						}
 					} else
-						GTMASSERT;
+						assertpro(FALSE);
 					char_count++;
 					char_start = rm_ptr->inbuf_pos = rm_ptr->inbuf_off = rm_ptr->inbuf;
 					bytes_read = char_bytes_read = 0;

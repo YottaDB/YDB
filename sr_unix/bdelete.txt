@@ -43,22 +43,16 @@ obj
 pro/gtmsecshrdir:
 
 pro/plugin/gtmcrypt:
-build.sh
+Makefile
 gpgagent.tab
+gtm_tls_impl.h
+gtm_tls_interface.h
 gtmcrypt_dbk_ref.h
 gtmcrypt_interface.h
 gtmcrypt_pk_ref.h
 gtmcrypt_ref.h
 gtmcrypt_sym_ref.h
-install.sh
-ld_verbose.out
-libgtmcrypt.dll
-libgtmcrypt.dll.map
-libgtmcrypt.so
-libgtmcrypt.so.map
-libgtmcrypt.x
-maskpass.map
-maskpass.x
+gtmcrypt_util.h
 
 pro/utf8:
 CHK2LEV.o

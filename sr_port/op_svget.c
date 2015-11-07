@@ -293,7 +293,7 @@ void op_svget(int varnum, mval *v)
 		case SV_ZDIR:
 			setzdir(NULL, v);
 			if (v->str.len != dollar_zdir.str.len || 0 != memcmp(v->str.addr, dollar_zdir.str.addr, v->str.len))
-				gtm_putmsg(VARLSTCNT(6) ERR_ZDIROUTOFSYNC, 4, v->str.len, v->str.addr,
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ZDIROUTOFSYNC, 4, v->str.len, v->str.addr,
 					   dollar_zdir.str.len, dollar_zdir.str.addr);
 			SKIP_DEVICE_IF_NOT_NEEDED(v);
 			s2pool(&(v->str));
@@ -440,7 +440,7 @@ void op_svget(int varnum, mval *v)
 			}
 			break;
 #			else
-			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTDATA:
 #			ifdef GTM_TRIGGER
@@ -451,7 +451,7 @@ void op_svget(int varnum, mval *v)
 			memcpy(v, (NULL != dollar_ztdata) ? dollar_ztdata : &literal_null, SIZEOF(mval));
 			break;
 #			else
-			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTOLDVAL:
 #			ifdef GTM_TRIGGER
@@ -462,7 +462,7 @@ void op_svget(int varnum, mval *v)
 			memcpy(v, (NULL != dollar_ztoldval) ? dollar_ztoldval : &literal_null, SIZEOF(mval));
 			break;
 #			else
-			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTRIGGEROP:
 #			ifdef GTM_TRIGGER
@@ -471,7 +471,7 @@ void op_svget(int varnum, mval *v)
 			memcpy(v, (NULL != dollar_ztriggerop) ? dollar_ztriggerop : &literal_null, SIZEOF(mval));
 			break;
 #			else
-			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTUPDATE:
 #			ifdef GTM_TRIGGER
@@ -482,7 +482,7 @@ void op_svget(int varnum, mval *v)
 				   : &literal_null), SIZEOF(mval));
 			break;
 #			else
-			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTVALUE:
 #			ifdef GTM_TRIGGER
@@ -493,7 +493,7 @@ void op_svget(int varnum, mval *v)
 			memcpy(v, (NULL != dollar_ztvalue) ? dollar_ztvalue : &literal_null, SIZEOF(mval));
 			break;
 #			else
-			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTWORMHOLE:
 #			ifdef GTM_TRIGGER
@@ -508,7 +508,7 @@ void op_svget(int varnum, mval *v)
 			ztwormhole_used = TRUE;
 			break;
 #			else
-			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTSLATE:
 #			ifdef GTM_TRIGGER
@@ -519,14 +519,14 @@ void op_svget(int varnum, mval *v)
 			memcpy(v, mvp, SIZEOF(mval));
 			break;
 #			else
-			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTLEVEL:
 #			ifdef GTM_TRIGGER
 			MV_FORCE_MVAL(v, gtm_trigger_depth);
 			break;
 #			else
-			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZONLNRLBK:
 #			ifdef UNIX
@@ -534,9 +534,20 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_MVAL(v, count);
 			break;
 #			else
-			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
+		case SV_ZCLOSE:
+#			ifdef UNIX
+			count = TREF(dollar_zclose);
+			MV_FORCE_MVAL(v, count);
+			break;
+#			else
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZKEY:
+			get_dlr_zkey(v);
+			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE);
 	}
 }

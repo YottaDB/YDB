@@ -140,7 +140,7 @@ void trip_gen (triple *ct)
 	int		off;
 
 #	if !defined(TRUTH_IN_REG) && (!(defined(__osf__) || defined(__x86_64__) || defined(Linux390)))
-	GTMASSERT;
+	assertpro(FALSE);
 #	endif
 	DEBUG_ONLY(opcode_emitted = FALSE);
 	current_triple = ct;	/* save for possible use by internal rtns */
@@ -242,7 +242,7 @@ void trip_gen (triple *ct)
 				tsp = &ttt[ttt[tp]];
 				break;
 			default:
-				GTMASSERT;
+				assertpro(FALSE && ct->opcode);
 		}
 	} else if (oct & OCT_COERCE)
 	{
@@ -258,7 +258,7 @@ void trip_gen (triple *ct)
 				tp = ttt[tp + 4];
 				break;
 			default:
-				GTMASSERT;
+				assertpro(FALSE && (oc_tab[ct->operand[0].oprval.tref->opcode].octype & (OCT_VALUE | OCT_BOOL)));
 				break;
 		}
 		tsp = &ttt[tp];
@@ -604,7 +604,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						inst++;
 						emit_trip(*(fst_opr + save_inst), addr, GENERIC_OPCODE_LDA, gtm_reg(*inst++));
 					} else
-						GTMASSERT;
+						assertpro(FALSE && *inst);
 					break;
 				case VXI_MOVC3:
 					/* The MOVC3 instruction is only used to copy an mval from one place to another
@@ -712,7 +712,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 #								endif
 								inst++;
 							} else
-								GTMASSERT;
+								assertpro(FALSE && *inst);
 						}
 					} else if (*inst == VXT_VAL)
 					{
@@ -724,7 +724,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						inst++;
 						emit_trip(*(fst_opr + save_inst), TRUE, GENERIC_OPCODE_LOAD, MOVL_REG_R1);
 					} else
-						GTMASSERT;
+						assertpro(FALSE && *inst);
 					break;
 				case VXT_IREPAB:
 					assert(*inst == VXT_VAL);
@@ -746,7 +746,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						inst++;
 						emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LDA, reg);
 					} else
-						GTMASSERT;
+						assertpro(FALSE && *inst);
 					emit_push(reg);
 					break;
 				case VXT_IREPL:
@@ -772,7 +772,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						inst++;
 						emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LOAD, reg);
 					} else
-						GTMASSERT;
+						assertpro(FALSE && *inst);
 					emit_push(reg);
 					break;
 				case VXI_TSTL:
@@ -795,12 +795,12 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					}
 					break;
 				default:
-					GTMASSERT;
+					assertpro(FALSE && sav_in);
 					break;
 			}
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && cg_phase);
 			break;
 	}
 	assert(code_idx < NUM_BUFFERRED_INSTRUCTIONS);
@@ -923,7 +923,7 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 							break;
 #						endif
 						default:
-							GTMASSERT;
+							assertpro(FALSE && branchop);
 							break;
 					}
 					RISC_ONLY(
@@ -985,7 +985,7 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 			}
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && cg_phase);
 			break;
 	}
 }
@@ -1022,7 +1022,7 @@ void	emit_pcrel(void)
 			emit_base_offset(GTM_REG_CODEGEN_TEMP, INST_SIZE * branch_offset);
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && cg_phase);
 			break;
 	}
 }
@@ -1129,7 +1129,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							inst_emitted = TRUE;
 							break;
 						default:
-							GTMASSERT;
+							assertpro(FALSE && ct->opcode);
 							break;
 					}
 					break;
@@ -1145,10 +1145,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							REVERT_GENERICINST_TO_WORD(generic_inst);
 						}
 					)
-					NON_GTM64_ONLY(
-						if (offset < 0  ||  offset > MAX_OFFSET)
-							GTMASSERT;
-					)
+					NON_GTM64_ONLY(assertpro((0 <= offset) &&  (MAX_OFFSET >= offset));)
 					emit_base_offset(GTM_REG_FRAME_TMP_PTR, offset);
 					break;
 
@@ -1164,10 +1161,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							REVERT_GENERICINST_TO_WORD(generic_inst);
 						}
 					)
-					NON_GTM64_ONLY(
-						if (offset < 0  ||  offset > MAX_OFFSET)
-							GTMASSERT;
-					)
+					NON_GTM64_ONLY(assertpro((0 <= offset) &&  (MAX_OFFSET >= offset));)
 					if (opr->oprclass == TVAR_REF)
 						reg = GTM_REG_FRAME_VAR_PTR;
 					else
@@ -1281,7 +1275,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							}
 							break;
 						case OC_ILIT:
-							assert(generic_inst == GENERIC_OPCODE_LOAD);
+							assert(GENERIC_OPCODE_LOAD == generic_inst);
 							immediate = ct->operand[0].oprval.ilit;
 							memcpy(obpt, &vdat_immed[0], VDAT_IMMED_SIZE);
 							obpt += VDAT_IMMED_SIZE;
@@ -1297,7 +1291,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							inst_emitted = TRUE;
 							break;
 						default:
-							GTMASSERT;
+							assertpro(FALSE && ct->opcode);
 							break;
 					}
 					break;
@@ -1306,10 +1300,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					assert(val_output);
 					offset = sa_temps_offset[opr->oprclass];
 					offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-					NON_GTM64_ONLY(
-						if (offset < 0  ||  offset > MAX_OFFSET)
-							GTMASSERT;
-					)
+					NON_GTM64_ONLY(assertpro((0 <= offset) &&  (MAX_OFFSET >= offset));)
 					if (offset < 127)
 					{
 						memcpy(obpt, &vdat_bdisp[0], VDAT_BDISP_SIZE);
@@ -1366,10 +1357,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						memcpy(obpt, &vdat_r9[0], VDAT_R9_SIZE);
 						obpt += VDAT_R9_SIZE;
 					}
-					NON_GTM64_ONLY(
-						if (offset < 0  ||  offset > MAX_OFFSET)
-							GTMASSERT;
-					)
+					NON_GTM64_ONLY(assertpro((0 <= offset) &&  (MAX_OFFSET >= offset));)
 					if (opr->oprclass == TVAR_REF)
 						reg = GTM_REG_FRAME_VAR_PTR;
 					else
@@ -1416,7 +1404,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					break;
 
 				default:
-					GTMASSERT;
+					assertpro(FALSE && opr->oprclass);
 					break;
 			}
 			if (!inst_emitted) {
@@ -1484,7 +1472,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							inst_emitted = TRUE;
 							break;
 						default:
-							GTMASSERT;
+							assertpro(FALSE && ct->opcode);
 							break;
 					}
 					break;
@@ -1500,11 +1488,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							REVERT_GENERICINST_TO_WORD(generic_inst);
 						}
 					)
-
-					NON_GTM64_ONLY(
-						if (offset < 0  ||  offset > MAX_OFFSET)
-							GTMASSERT;
-					)
+					NON_GTM64_ONLY(assertpro((0 <= offset) &&  (MAX_OFFSET >= offset));)
 					emit_base_offset(GTM_REG_FRAME_TMP_PTR, offset);
 					break;
 				case TCAD_REF:
@@ -1519,10 +1503,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							REVERT_GENERICINST_TO_WORD(generic_inst);
 						}
 					)
-					NON_GTM64_ONLY(
-						if (offset < 0 || offset > MAX_OFFSET)
-							GTMASSERT;
-					)
+					NON_GTM64_ONLY(assertpro((0 <= offset) &&  (MAX_OFFSET >= offset));)
 					if (opr->oprclass == TVAR_REF)
 						reg = GTM_REG_FRAME_VAR_PTR;
 					else
@@ -1560,7 +1541,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					ocnt_ref_opr = opr;
 					break;
 				default:
-					GTMASSERT;
+					assertpro(FALSE && opr->oprclass);
 					break;
 			}
 			/* If we haven't emitted a finished instruction already, finish it now */
@@ -1570,7 +1551,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 			}
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && cg_phase);
 			break;
 	}
 }
@@ -1632,7 +1613,7 @@ int	get_arg_reg(void)
 				arg_reg_i = GTM_REG_ACCUM;
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && cg_phase);
 			break;
 	}
 	return arg_reg_i;
@@ -1676,7 +1657,7 @@ int	gtm_reg(int vax_reg)
 			reg = GTM_REG_FRAME_POINTER;
 			break;	/* VMS ap */
 		default:
-			GTMASSERT;
+			assertpro(FALSE && (vax_reg & 0x0f));
 			break;
 	}
 	return reg;
@@ -1714,7 +1695,7 @@ void	emit_push(int reg)
 			}
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && cg_phase);
 			break;
 	}
 	if (cg_phase == CGP_MACHINE || cg_phase == CGP_ASSEMBLY)
@@ -1766,8 +1747,7 @@ int	next_vax_push_list(void)
 	if (push_list_index >= PUSH_LIST_SIZE)
 	{
 		push_list_index=0;
-		if (current_push_list_ptr->next == 0 )
-			GTMASSERT;
+		assertpro(current_push_list_ptr->next);
 		current_push_list_ptr = current_push_list_ptr->next;
 	}
 	return (current_push_list_ptr->value[push_list_index]);

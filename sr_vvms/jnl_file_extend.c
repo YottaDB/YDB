@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -141,16 +141,16 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				{
 					if (new_blocks > avail_blocks)
 					{	/* if we cannot satisfy the requst, it is an error */
-						send_msg(VARLSTCNT(6) ERR_NOSPACEEXT, 4, JNL_LEN_STR(csd),
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOSPACEEXT, 4, JNL_LEN_STR(csd),
 							new_blocks, avail_blocks);
 						new_blocks = 0;
 						jpc->status = SS_NORMAL;
 					} else
-						send_msg(VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, JNL_LEN_STR(csd),
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, JNL_LEN_STR(csd),
 							(avail_blocks - new_blocks));
 				}
 			} else
-				send_msg(VARLSTCNT(5) ERR_JNLFILEXTERR, 2, JNL_LEN_STR(csd), status);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_JNLFILEXTERR, 2, JNL_LEN_STR(csd), status);
 			fab.fab$w_deq = new_blocks;
 			rab = cc$rms_rab;
 			rab.rab$l_fab = &fab;
@@ -162,7 +162,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			{
 				new_alq = jb->filesize + new_blocks;
 				if (csd->autoswitchlimit < ((new_blocks * EXTEND_WARNING_FACTOR) + jb->filesize))
-					send_msg(VARLSTCNT(5) ERR_JNLSPACELOW, 3, JNL_LEN_STR(csd),
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_JNLSPACELOW, 3, JNL_LEN_STR(csd),
 						csd->autoswitchlimit - jb->filesize);
 				/* switch journal file if the request cannot be satisfied */
 				if (csd->autoswitchlimit < new_alq)
@@ -233,7 +233,8 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 							fc->op_buff = (sm_uc_ptr_t)csd;
 							fc->op_len = SGMNT_HDR_LEN;
 							fc->op_pos = 1;
-							send_msg(VARLSTCNT(4) ERR_NEWJNLFILECREAT, 2, JNL_LEN_STR(csd));
+							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4)
+									ERR_NEWJNLFILECREAT, 2, JNL_LEN_STR(csd));
 							/* Dequeue the journal lock on the current jnl generation */
 							jpc->status = gtm_deq(jpc->jnllsb->lockid, NULL, PSL$C_USER, 0);
 							assert(SS$_NORMAL == jpc->status);
@@ -241,8 +242,9 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 							if ((SS_NORMAL != (status = set_jnl_file_close(SET_JNL_FILE_CLOSE_EXTEND)))
 								|| (SS_NORMAL != (status = dbfilop(fc))))
 							{
-								send_msg(VARLSTCNT(7) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
-											status, 0, gds_info->fab->fab$l_stv);
+								send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_DBFILERR, 2,
+										DB_LEN_STR(gv_cur_region),
+										status, 0, gds_info->fab->fab$l_stv);
 								jpc->status = ERR_JNLNOCREATE;
 							} else
 							{
@@ -259,18 +261,19 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 									{
 										if (!(IS_RMS_ERROR(jpc->status2) ||
 												IS_SYSTEM_ERROR(jpc->status2)))
-											rts_error(VARLSTCNT(9) jnl_status, 4,
-												JNL_LEN_STR(csd),
+											rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9)
+												jnl_status, 4, JNL_LEN_STR(csd),
 												DB_LEN_STR(gv_cur_region),
 												jpc->status, 0, jpc->status2);
 										else
-											rts_error(VARLSTCNT(8) jnl_status, 4,
-												JNL_LEN_STR(csd),
+											rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
+												jnl_status, 4, JNL_LEN_STR(csd),
 												DB_LEN_STR(gv_cur_region),
 												jpc->status, jpc->status2);
 									}
 									else
-										rts_error(VARLSTCNT(7) jnl_status, 4,
+										rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7)
+											jnl_status, 4,
 											JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region),
 											jpc->status);
 								}
@@ -291,13 +294,15 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 							}
 						} else
 						{
-							send_msg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, JNL_LEN_STR(csd));
+							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLNOCREATE, 2,
+									JNL_LEN_STR(csd));
 							jpc->status = ERR_JNLNOCREATE;
 						}
 					} else
 					{
 						assert(FALSE);
-						rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
+									DB_LEN_STR(gv_cur_region));
 					}
 				} else
 				{	/* nullify extension jnl blocks */
@@ -315,8 +320,8 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 						if (SYSCALL_ERROR(jpc->status))
 						{
 							assert(FALSE);
-							rts_error(VARLSTCNT(6) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status,
-								rab.rab$l_stv);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLWRERR, 2,
+									JNL_LEN_STR(csd), jpc->status, rab.rab$l_stv);
 						}
 					}
 					jb->filesize = new_alq;	/* Actually this is virtual file size blocks */
@@ -324,7 +329,8 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					if (SYSCALL_ERROR(jpc->status))
 					{
 						assert(FALSE);
-						rts_error(VARLSTCNT(5) ERR_JNLRDERR, 2, JNL_LEN_STR(csd), jpc->status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_JNLRDERR, 2,
+								JNL_LEN_STR(csd), jpc->status);
 					}
 					assert((header.virtual_size + new_blocks) == new_alq);
 					header.virtual_size = new_alq;
@@ -333,7 +339,8 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					if (SYSCALL_ERROR(jpc->status))
 					{
 						assert(FALSE);
-						rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_JNLWRERR, 2,
+								JNL_LEN_STR(csd), jpc->status);
 					}
 					assert(!need_extend);	/* ensure we won't go through the for loop again */
 					free(buff);
@@ -377,7 +384,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 
 CONDITION_HANDLER(jnl_file_autoswitch_ch)
 {
-	START_CH;
+	START_CH(FALSE);
 	assert(in_jnl_file_autoswitch);
 	in_jnl_file_autoswitch = FALSE;
 	jgbl.dont_reset_gbl_jrec_time = jgbl.save_dont_reset_gbl_jrec_time;

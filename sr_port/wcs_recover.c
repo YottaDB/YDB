@@ -17,6 +17,9 @@
 
 #ifdef UNIX
 #  include <sys/mman.h>
+# ifdef _AIX
+# include <sys/shm.h>
+# endif
 #  include "gtm_stat.h"
 #  include <errno.h>
 #  include <signal.h>
@@ -385,8 +388,7 @@ void wcs_recover(gd_region *reg)
 					 * this as corruption and fixup up this cr and proceed to the next cr.
 					 */
 					assert(FALSE || (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number));
-					if ((0 != r_epid) && (epid != r_epid))
-						GTMASSERT;
+					assertpro((0 == r_epid) || (epid == r_epid));
 					/* process still active but not playing fair or cache is corrupted */
 					GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, r_epid, TWICE);
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id, cr->blk, cr, r_epid,
@@ -424,8 +426,7 @@ void wcs_recover(gd_region *reg)
 						epid = cr->epid;
 					else  if (BUF_OWNER_STUCK < lcnt)
 					{
-						if ((0 != cr->epid) && (epid != cr->epid))
-							GTMASSERT;
+						assertpro((0 == cr->epid) || (epid == cr->epid));
 						if (0 != epid)
 						{	/* process still active, but not playing fair */
 							send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_STOPTIMEOUT, 3, epid,
@@ -493,10 +494,12 @@ void wcs_recover(gd_region *reg)
 				}
 			}	/* end of bitmap processing */
 			if (certify_all_blocks)
-				cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, TRUE); /* GTMASSERT on error */
+				cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, TRUE);/* assertpro() on error */
 			bt = bt_put(reg, cr->blk);
-			if (NULL == bt)		/* NULL value is only possible if wcs_get_space in bt_put fails */
-				GTMASSERT;	/* That is impossible here since we have called bt_refresh above */
+			/* NULL value for 'bt' is only possible if wcs_get_space in bt_put fails which is impossible here since we
+			 * have called bt_refresh above. Confrim this in the below assertpro().
+			 */
+			assertpro(NULL != bt);
 			bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID != bt->cache_index)
 			{	/* the bt already identifies another cache entry with this block */
@@ -630,8 +633,7 @@ void wcs_recover(gd_region *reg)
 				hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
 				WRITE_LATCH_VAL(cr) = LATCH_SET;
 				bt = bt_put(reg, cr->blk);
-				if (NULL == bt)		/* NULL value is only possible if wcs_get_space in bt_put fails */
-					GTMASSERT;	/* That is impossible here since we have called bt_refresh above */
+				assertpro(NULL != bt);		/* NULL value is only possible if wcs_get_space in bt_put fails */
 				bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 				if (CR_NOTVALID == bt->cache_index)
 				{	/* no previous entry for this block; more recent cache record will twin when processed */
@@ -674,8 +676,7 @@ void wcs_recover(gd_region *reg)
 		if ((LATCH_SET > WRITE_LATCH_VAL(cr)) VMS_ONLY(|| (WRT_STRT_PNDNG == cr->iosb.cond)))
 		{	/* no process has an interest */
 			bt = bt_put(reg, cr->blk);
-			if (NULL == bt)		/* NULL value is only possible if wcs_get_space in bt_put fails */
-				GTMASSERT;	/* That is impossible here since we have called bt_refresh above */
+			assertpro(NULL != bt);		/* NULL value is only possible if wcs_get_space in bt_put fails */
 			bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID == bt->cache_index)
 			{	/* no previous entry for this block */
@@ -736,8 +737,7 @@ void wcs_recover(gd_region *reg)
 		UNIX_ONLY(WRITE_LATCH_VAL(cr) = LATCH_CLEAR;)
 		hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
 		bt = bt_put(reg, cr->blk);
-		if (NULL == bt)		/* NULL value is only possible if wcs_get_space in bt_put fails */
-			GTMASSERT;	/* That is impossible here since we have called bt_refresh above */
+		assertpro(NULL != bt);		/* NULL value is only possible if wcs_get_space in bt_put fails */
 		bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 		if (CR_NOTVALID == bt->cache_index)
 		{	/* no previous entry for this block */
@@ -773,8 +773,7 @@ void wcs_recover(gd_region *reg)
 		if (!reg->read_only)
 			fileheader_sync(reg);
 	}
-	if (FALSE == wcs_verify(reg, FALSE, TRUE))	/* expect_damage is FALSE, in_wcs_recover is TRUE */
-		GTMASSERT;
+	assertpro(wcs_verify(reg, FALSE, TRUE));	/* expect_damage is FALSE, in_wcs_recover is TRUE */
 	/* skip INCTN processing in case called from mu_rndwn_file().
 	 * if called from mu_rndwn_file(), we have standalone access to shared memory so no need to increment db curr_tn
 	 * or write inctn (since no concurrent GT.M process is present in order to restart because of this curr_tn change)
@@ -838,7 +837,7 @@ void	wcs_mm_recover(gd_region *reg)
 	sm_uc_ptr_t		old_db_addrs[2], mmap_retaddr;
 	boolean_t       	was_crit, read_only;
 	unix_db_info		*udi;
-	const char		*syscall = "munmap()";
+	const char		*syscall;
 
 	VMS_ONLY(assert(FALSE));
 	assert(&FILE_INFO(reg)->s_addrs == cs_addrs);
@@ -860,7 +859,12 @@ void	wcs_mm_recover(gd_region *reg)
 	old_db_addrs[0] = cs_addrs->db_addrs[0];
 	old_db_addrs[1] = cs_addrs->db_addrs[1];
 	cs_addrs->db_addrs[0] = NULL;
+	syscall = MEM_UNMAP_SYSCALL;
+#	ifdef _AIX
+	status = shmdt(old_db_addrs[0] - BLK_ZERO_OFF(cs_data));
+#	else
 	status = (INTPTR_T)munmap((caddr_t)old_db_addrs[0], (size_t)(old_db_addrs[1] - old_db_addrs[0]));
+#	endif
 	if (-1 != status)
 	{
 		udi = FILE_INFO(gv_cur_region);
@@ -868,20 +872,28 @@ void	wcs_mm_recover(gd_region *reg)
 		mmap_sz = stat_buf.st_size - BLK_ZERO_OFF(cs_data);
 		CHECK_LARGEFILE_MMAP(gv_cur_region, mmap_sz); /* can issue rts_error MMFILETOOLARGE */
 		read_only = gv_cur_region->read_only;
-		syscall = "mmap()";
+		syscall = MEM_MAP_SYSCALL;
+#		ifdef _AIX
+		status = (sm_long_t)(mmap_retaddr = (sm_uc_ptr_t)shmat(udi->fd, (void *)NULL,
+								(read_only ? (SHM_MAP|SHM_RDONLY) : SHM_MAP)));
+		#else
 		status = (sm_long_t)(mmap_retaddr = (sm_uc_ptr_t)MMAP_FD(udi->fd, mmap_sz, BLK_ZERO_OFF(cs_data), read_only));
-		GTM_WHITE_BOX_TEST(WBTEST_MMAP_SYSCALL_FAIL, status, -1);
+#		endif
+		GTM_WHITE_BOX_TEST(WBTEST_MEM_MAP_SYSCALL_FAIL, status, -1);
 	}
 	if (-1 == status)
 	{
 		save_errno = errno;
-		WBTEST_ASSIGN_ONLY(WBTEST_MMAP_SYSCALL_FAIL, save_errno, ENOMEM);
+		WBTEST_ASSIGN_ONLY(WBTEST_MEM_MAP_SYSCALL_FAIL, save_errno, ENOMEM);
 		if (!was_crit)
 			rel_crit(gv_cur_region);
-		assert(WBTEST_ENABLED(WBTEST_MMAP_SYSCALL_FAIL));
+		assert(WBTEST_ENABLED(WBTEST_MEM_MAP_SYSCALL_FAIL));
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 				LEN_AND_STR(syscall), CALLFROM, save_errno);
 	}
+#	if defined(_AIX)
+	mmap_retaddr = (sm_uc_ptr_t)mmap_retaddr + BLK_ZERO_OFF(cs_data);
+#	endif
 	gds_map_moved(mmap_retaddr, old_db_addrs[0], old_db_addrs[1], mmap_sz); /* updates cs_addrs->db_addrs[1] */
 	cs_addrs->db_addrs[0] = mmap_retaddr;
         cs_addrs->total_blks = cs_addrs->ti->total_blks;

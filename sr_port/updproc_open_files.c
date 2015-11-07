@@ -113,10 +113,9 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 			if (-1 == this_side_std_null_coll)
 				this_side_std_null_coll = csd->std_null_coll;
 			else
-				rts_error(VARLSTCNT(1) ERR_NULLCOLLDIFF);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NULLCOLLDIFF);
 		}
-		if (DBKEYSIZE(csd->max_key_size) > gv_keysize)
-			gv_keysize = DBKEYSIZE(csd->max_key_size);
+		assert(DBKEYSIZE(csd->max_key_size) <= gv_keysize);
 		SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);
 		assert(!csa->now_crit);
 		if (reg->was_open)	/* Should never happen as only open one at a time, but handle for safety */
@@ -131,8 +130,8 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 		{
 			curr = curr->next;
 			continue;
-		} else if (REPL_ENABLED(csd) && !JNL_ENABLED(csd))
-			GTMASSERT;
+		} else
+			assertpro(!REPL_ENABLED(csd) || JNL_ENABLED(csd));
 #		ifdef VMS
 		if (recvpool.upd_proc_local->updateresync)
 		{
@@ -156,7 +155,7 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 		/* Unix and VMS have different field names */
 		UNIX_ONLY(gld_fn = (sm_uc_ptr_t)recvpool.recvpool_ctl->recvpool_id.instfilename;)
 		VMS_ONLY(gld_fn = (sm_uc_ptr_t)recvpool.recvpool_ctl->recvpool_id.gtmgbldir;)
-		rts_error(VARLSTCNT(5) ERR_NOREPLCTDREG, 3,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NOREPLCTDREG, 3,
 			   LEN_AND_LIT(UNIX_ONLY("instance file") VMS_ONLY("global directory")), gld_fn);
 	}
 	/* Now that all the databases are opened, compute the MAX region sequence number across all regions */

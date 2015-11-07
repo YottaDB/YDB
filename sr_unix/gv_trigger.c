@@ -141,10 +141,10 @@ LITREF	mval	literal_zero;
 		gvtr_free(gv_target);							\
 	/* check no keysize expansion occurred inside gvcst_root_search */		\
 	assert(gv_currkey->top == save_gv_currkey->top);				\
-	memcpy(gv_currkey, save_gv_currkey, SIZEOF(gv_key) + save_gv_currkey->end);	\
+	COPY_KEY(gv_currkey, save_gv_currkey);						\
 	/* check no keysize expansion occurred inside gvcst_root_search */		\
 	assert(gv_altkey->top == save_gv_altkey->top);					\
-	memcpy(gv_altkey, save_gv_altkey, SIZEOF(gv_key) + save_gv_altkey->end);	\
+	COPY_KEY(gv_altkey, save_gv_altkey);						\
 	TREF(gv_last_subsc_null) = save_gv_last_subsc_null;				\
 	TREF(gv_some_subsc_null) = save_gv_some_subsc_null;				\
 }
@@ -292,7 +292,7 @@ CONDITION_HANDLER(gvtr_tpwrap_ch)
 {
 	int	rc;
 
-	START_CH;
+	START_CH(TRUE);
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 		assert(TPRESTART_STATE_NORMAL == tprestart_state);
@@ -372,7 +372,6 @@ STATICFNDEF boolean_t	gvtr_get_hasht_gblsubs(mval *subs_mval, mval *ret_mval)
 {
 	uint4		curend;
 	boolean_t	was_null = FALSE, is_null = FALSE, is_defined;
-	short int	max_key;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -380,8 +379,7 @@ STATICFNDEF boolean_t	gvtr_get_hasht_gblsubs(mval *subs_mval, mval *ret_mval)
 	curend = gv_currkey->end; /* note down gv_currkey->end before changing it so we can restore it before function returns */
 	assert(KEY_DELIMITER == gv_currkey->base[curend]);
 	assert(gv_target->gd_csa == cs_addrs);
-	max_key = gv_cur_region->max_key_size;
-	COPY_SUBS_TO_GVCURRKEY(subs_mval, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey */
+	COPY_SUBS_TO_GVCURRKEY(subs_mval, gv_cur_region, gv_currkey, was_null, is_null); /* updates gv_currkey */
 	is_defined = gvcst_get(ret_mval);
 	assert(!is_defined || (MV_STR & ret_mval->mvtype));	/* assert that gvcst_get() sets type of mval to MV_STR */
 	gv_currkey->end = curend;	/* reset gv_currkey->end to what it was at function entry */
@@ -393,7 +391,6 @@ STATICFNDEF boolean_t	gvtr_get_hasht_gblsubs_and_index(mval *subs_mval, mval *in
 {
 	uint4		curend;
 	boolean_t	was_null = FALSE, is_null = FALSE, is_defined;
-	short int	max_key;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -401,9 +398,8 @@ STATICFNDEF boolean_t	gvtr_get_hasht_gblsubs_and_index(mval *subs_mval, mval *in
 	curend = gv_currkey->end; /* note down gv_currkey->end before changing it so we can restore it before function returns */
 	assert(KEY_DELIMITER == gv_currkey->base[curend]);
 	assert(gv_target->gd_csa == cs_addrs);
-	max_key = gv_cur_region->max_key_size;
-	COPY_SUBS_TO_GVCURRKEY(subs_mval, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey */
-	COPY_SUBS_TO_GVCURRKEY(index, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey */
+	COPY_SUBS_TO_GVCURRKEY(subs_mval, gv_cur_region, gv_currkey, was_null, is_null); /* updates gv_currkey */
+	COPY_SUBS_TO_GVCURRKEY(index, gv_cur_region, gv_currkey, was_null, is_null); /* updates gv_currkey */
 	is_defined = gvcst_get(ret_mval);
 	assert(!is_defined || (MV_STR & ret_mval->mvtype));	/* assert that gvcst_get() sets type of mval to MV_STR */
 	gv_currkey->end = curend;	/* reset gv_currkey->end to what it was at function entry */
@@ -474,11 +470,10 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 		out_key = (gv_key *)keybuff;
 		out_key->end = 0;
 		out_key->top = DBKEYSIZE(MAX_KEY_SZ);
-		mval2subsc(&tmpmval, out_key);
+		mval2subsc(&tmpmval, out_key, gv_cur_region->std_null_coll);
 		gv_target = save_gvt;
-		if(len > 0)
-		{
-		/* Now that mval2subsc is done, free up the allocated dststart buffer */
+		if (0 < len)
+		{	/* Now that mval2subsc is done, free up the allocated dststart buffer */
 			ret = free_last_n_elements(gvt_trigger->gv_trig_list, nelems);
 			assert(ret);
 		}
@@ -619,17 +614,15 @@ STATICFNDEF uint4 gvtr_process_gvsubs(char *start, char *end, gvtr_subs_t *subsd
 
 void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 {
-	gv_namehead		*hasht_tree, *save_gvtarget, *gvt;
-	mname_entry		gvent;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	char			save_altkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	gv_namehead		*save_gvtarget, *gvt;
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key			save_altkey[DBKEYALLOC(MAX_KEY_SZ)];
 	unsigned char		util_buff[MAX_TRIG_UTIL_LEN];
 	gv_key			*save_gv_currkey;
 	gv_key			*save_gv_altkey;
 	mval			tmpmval, *ret_mval;
 	boolean_t		is_defined, was_null = FALSE, is_null = FALSE, zdelim_defined, delim_defined;
 	boolean_t		save_gv_last_subsc_null, save_gv_some_subsc_null;
-	short int		max_key;
 	int4			tmpint4, util_len;
 	gvt_trigger_t		*gvt_trigger;
 	uint4			trigidx, num_gv_triggers, num_pieces, len, cmdtype, index, minpiece, maxpiece;
@@ -653,16 +646,16 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	SETUP_THREADGBL_ACCESS;
 	assert(dollar_tlevel);		/* the code below is not designed to work in non-TP */
 	save_gvtarget = gv_target;
-	SETUP_TRIGGER_GLOBAL;
+	SET_GVTARGET_TO_HASHT_GBL(csa);
 	/* Save gv_currkey and gv_altkey */
 	assert(NULL != gv_currkey);
 	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(save_currkey));
-	save_gv_currkey = (gv_key *)save_currkey;
-	memcpy(save_gv_currkey, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
+	save_gv_currkey = &save_currkey[0];
+	MEMCPY_KEY(save_gv_currkey, gv_currkey);
 	assert(NULL != gv_altkey);
 	assert((SIZEOF(gv_key) + gv_altkey->end) <= SIZEOF(save_altkey));
-	save_gv_altkey = (gv_key *)save_altkey;
-	memcpy(save_gv_altkey, gv_altkey, SIZEOF(gv_key) + gv_altkey->end);
+	save_gv_altkey = &save_altkey[0];
+	MEMCPY_KEY(save_gv_altkey, gv_altkey);
 	save_gv_last_subsc_null = TREF(gv_last_subsc_null);
 	save_gv_some_subsc_null = TREF(gv_some_subsc_null);
 	DBGTRIGR((stderr, "gvtr_db_read_hasht: begin\n"));
@@ -713,8 +706,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	tmpmval.mvtype = MV_STR;
 	tmpmval.str = gvt->gvname.var_name;	/* copy gvname from gvt */
 	ret_mval = &tmpmval;
-	max_key = gv_cur_region->max_key_size;
-	COPY_SUBS_TO_GVCURRKEY(ret_mval, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey */
+	COPY_SUBS_TO_GVCURRKEY(ret_mval, gv_cur_region, gv_currkey, was_null, is_null); /* updates gv_currkey */
 	/* At this point, gv_currkey points to ^#t("GBL") */
 	/* Now check for ^#t("CIF","#LABEL") to determine what format ^#t("GBL") is stored in (if at all it exists) */
 	is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashlabel, ret_mval);
@@ -804,7 +796,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	{	/* All records to be read in this loop are of the form ^#t("GBL",1,...) so add "1" as a subscript to gv_currkey */
 		i2mval(&tmpmval, trigidx);
 		assert(ret_mval == &tmpmval);
-		COPY_SUBS_TO_GVCURRKEY(ret_mval, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey */
+		COPY_SUBS_TO_GVCURRKEY(ret_mval, gv_cur_region, gv_currkey, was_null, is_null); /* updates gv_currkey */
 		/* Read in ^#t("GBL",1,"TRIGNAME")="GBL#1" */
 		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_trigname, ret_mval);
 		if (!is_defined)
@@ -1430,10 +1422,9 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 			 * In the case of op_tcommit, we expect dollar_tlevel to be 0 and if so we break out of the loop.
 			 * In the tp_restart case, we expect a maximum of 4 tries/retries and much lesser usually.
 			 * Additionally we also want to avoid an infinite loop so limit the loop to what is considered
-			 * a huge iteration count and GTMASSERT if that is reached as it suggests an out-of-design situation.
+			 * a huge iteration count and assertpro if that is reached as it suggests an out-of-design situation.
 			 */
-			if (TPWRAP_HELPER_MAX_ATTEMPTS < loopcnt)
-				GTMASSERT;
+			assertpro(TPWRAP_HELPER_MAX_ATTEMPTS >= loopcnt);
 		}
 		/* It is possible we have restarted one or more times. If so, it is possible for csa->db_trigger_cycle
 		 * to have also been updated one or more times by t_retry() or tp_set_sgm but "cycle" would not have been
@@ -1474,7 +1465,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	char			*key_ptr, *key_start, *key_end;
 	char			*keysub_start[MAX_KEY_SZ + 1];
 	gv_key			*save_gv_currkey;
-	char			save_currkey[SIZEOF(short) + SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gv_trigger_t		*trigdsc, *trigstop, *trigstart;
 	int			gtm_trig_status, tfxb_status, num_triggers_invoked, trigmax, trig_list_offset;
 	mstr			*ztupd_mstr;
@@ -1534,9 +1525,9 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	 * gets opened) inside any of the "gtm_trigger" invocations. So we should maintain pointers only
 	 * to the local copy (not the global gv_currkey) for use inside all iterations of the for loop.
 	 */
-	save_gv_currkey = (gv_key *)ROUND_UP2((INTPTR_T)save_currkey, SIZEOF(gv_currkey->end));
-	assert(((char *)save_gv_currkey + SIZEOF(gv_key) + gv_currkey->end) < ARRAYTOP(save_currkey));
-	memcpy(save_gv_currkey, gv_currkey, OFFSETOF(gv_key, base[0]) + gv_currkey->end + 1); /* + 1 for second null terminator */
+	save_gv_currkey = &save_currkey[0];
+	assert(((char *)save_gv_currkey + SIZEOF(gv_key) + gv_currkey->end) < (char *)ARRAYTOP(save_currkey));
+	MEMCPY_KEY(save_gv_currkey, gv_currkey);
 	key_ptr = (char *)save_gv_currkey->base;
 	DEBUG_ONLY(key_start = key_ptr;)
 	key_end = key_ptr + save_gv_currkey->end;
@@ -1588,8 +1579,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	{
 		DBGTRIGR((stderr, "gvtr_match_n_invoke: top of trigr scan loop\n"));
 		trigstop = trigstart;		/* Stop when we get back to where we started */
-		if (0 > trigmax)
-			GTMASSERT;		/* Loop ender "just in case" */
+		assertpro(0 <= trigmax);		/* Loop ender "just in case" */
 		assert(trigdsc >= gvt_trigger->gv_trig_array);
 		assert(trigdsc < gvt_trigger->gv_trig_top);
 		assert((trigdsc->cmdmask & gvtr_cmd_mask[gvtr_cmd]) || !is_set_trigger);

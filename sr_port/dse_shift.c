@@ -43,9 +43,12 @@ GBLREF uint4		update_array_size;
 GBLREF srch_hist	dummy_hist;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
-GBLREF gd_addr		*gd_header;
 GBLREF block_id 	patch_curr_blk;
 GBLREF cw_set_element   cw_set[];
+
+error_def(ERR_DBRDONLY);
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEFAIL);
 
 void dse_shift(void)
 {
@@ -58,12 +61,8 @@ void dse_shift(void)
 	int4		blk_seg_cnt, blk_size;
 	srch_blk_status	blkhist;
 
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_DSEBLKRDFAIL);
-	error_def(ERR_DSEFAIL);
-
         if (gv_cur_region->read_only)
-                rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+                rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	if (patch_curr_blk < 0 || patch_curr_blk >= cs_addrs->ti->total_blks || !(patch_curr_blk % cs_addrs->hdr->bplmap))
 	{
@@ -110,7 +109,7 @@ void dse_shift(void)
 	{
 		if (lbp)
 			free(lbp);
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	}
 	bp = blkhist.buffaddr;
 	size = ((blk_hdr *)bp)->bsiz;

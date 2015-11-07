@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2009, 2012 Fidelity Information Services, Inc #
+#	Copyright 2009, 2013 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -109,8 +109,8 @@ mandate_libs="libgpg-error libgpgme"
 mandate_bins="gpg"
 gcrypt_headers="gcrypt.h gcrypt-module.h"
 gcrypt_libs="libgcrypt"
-openssl_headers="openssl/evp.h openssl/sha.h openssl/blowfish.h"
-openssl_libs="libcrypto"
+openssl_headers="openssl/evp.h openssl/sha.h openssl/blowfish.h openssl/ssl.h openssl/err.h"
+openssl_libs="libcrypto libssl"
 lib_ext=".so"
 if [ "AIX" = "$hostos" ]; then
 	lib_ext="$lib_ext .a"

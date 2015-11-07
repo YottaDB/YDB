@@ -42,6 +42,7 @@
 LITREF	unsigned char		io_params_size[];
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
 GBLREF	boolean_t		gtm_pipe_child;
+GBLREF	char			gtm_dist[GTM_PATH_MAX];
 
 error_def(ERR_DEVOPENFAIL);
 error_def(ERR_SYSCALL);
@@ -202,11 +203,10 @@ int parse_pipe(char *cmd_string, char *ret_token)
 		} else
 		{
 			/* look in $gtm_dist in case not explicitly listed or not in the $PATH variable */
-			env_var = GETENV("gtm_dist");
-			if (NULL != env_var)
+			if (!STRLEN(gtm_dist))
 			{
 				/* build a translated path to command */
-				SPRINTF(temp, "%s/%s", env_var, token2);
+				SPRINTF(temp, "%s/%s", gtm_dist, token2);
 				STAT_FILE(temp, &sb, ret_stat);
 				if (0 == ret_stat && (S_ISREG(sb.st_mode)) && (sb.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
 					notfound = FALSE;

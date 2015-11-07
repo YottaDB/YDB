@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -38,10 +39,11 @@ void op_gvnext(mval *v)
 	enum db_acc_method 	acc_meth;
 	int4			n;
 	register char		*c;
+	gvnh_reg_t		*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	acc_meth = gv_cur_region->dyn.addr->acc_meth;
+	acc_meth = REG_ACC_METH(gv_cur_region);
 	/* if the lowest subscript is -1, then make it null */
 	if ((gv_currkey->end == gv_currkey->prev + 4)
 		&& *(gv_currkey->base + gv_currkey->prev) == 0x40
@@ -64,18 +66,17 @@ void op_gvnext(mval *v)
 	{
 		if (!TREF(gv_last_subsc_null) || gv_cur_region->std_null_coll)
 		{
-			*(gv_currkey->base + gv_currkey->end - 1) = 1;
-			*(gv_currkey->base + gv_currkey->end + 1) = KEY_DELIMITER;
-			gv_currkey->end += 1;
+			GVKEY_INCREMENT_ORDER(gv_currkey);
 		} else
 			*(gv_currkey->base + gv_currkey->prev) = 01;
 	}
-	if ((acc_meth == dba_bg) || (acc_meth == dba_mm))
+	if ((dba_bg == acc_meth) || (dba_mm == acc_meth))
 	{
-		if (gv_target->root)
-			found = gvcst_order();
+		gvnh_reg = TREF(gd_targ_gvnh_reg);
+		if (NULL == gvnh_reg)
+			found = (gv_target->root ? gvcst_order() : FALSE);
 		else
-			found = FALSE;		/* global does not exist */
+			INVOKE_GVCST_SPR_XXX(gvnh_reg, found = gvcst_spr_order());
 	} else if (acc_meth == dba_cm)
 		found = gvcmx_order();
 	else

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +76,7 @@ int op_fnzsearch(mval *file, mint indx, mval *ret)
 	TREF(lv_null_subs) = LVNULLSUBS_OK;	/* $ZSearch processing depends on this */
 	MV_FORCE_STR(file);
 	if (file->str.len > MAX_FBUFF)
-		rts_error(VARLSTCNT(4) ERR_INVSTRLEN, 2, file->str.len, MAX_FBUFF);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, file->str.len, MAX_FBUFF);
 	MV_FORCE_MVAL(((mval *)TADR(fnzsearch_sub_mval)), indx);
 	TREF(fnzsearch_lv_vars) = op_srchindx(VARLSTCNT(2) TREF(zsearch_var), (mval *)TADR(fnzsearch_sub_mval));
 	if (TREF(fnzsearch_lv_vars))
@@ -103,7 +103,7 @@ int op_fnzsearch(mval *file, mint indx, mval *ret)
 			{
 				if (errno == ENOENT)
 					continue;
-				rts_error(VARLSTCNT(1) errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			}
 			break;
 		}
@@ -150,7 +150,7 @@ int op_fnzsearch(mval *file, mint indx, mval *ret)
 				{
 					if (errno == ENOENT)
 						continue;
-					rts_error(VARLSTCNT(1) errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				}
 				break;
 			}
@@ -407,7 +407,7 @@ STATICFNDEF CONDITION_HANDLER(fnzsrch_ch)
 {
 	int	dummy1, dummy2;
 
-	START_CH;
+	START_CH(TRUE);
 	TREF(lv_null_subs) = TREF(fnzsearch_nullsubs_sav);
 	NEXTCH;
 }
@@ -416,7 +416,7 @@ STATICFNDEF CONDITION_HANDLER(dir_ch)
 {
 	int	dummy1, dummy2;
 
-	START_CH;
+	START_CH(TRUE);
 	if (DUMP)
 	{
 		NEXTCH;

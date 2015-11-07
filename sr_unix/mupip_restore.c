@@ -17,6 +17,7 @@
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+#include "gtm_select.h"
 
 #include <sys/wait.h>
 #include <stddef.h>
@@ -43,8 +44,6 @@
 #include "error.h"
 #include "gtmio.h"
 #include "iotimer.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "gtm_pipe.h"
 #include "gt_timer.h"
 #include "stp_parms.h"
@@ -72,7 +71,6 @@
 
 GBLDEF	inc_list_struct		in_files;
 GBLREF	uint4			pipe_child;
-GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	uint4			restore_read_errno;
 
@@ -107,7 +105,7 @@ CONDITION_HANDLER(iob_io_error)
 	char 	s[80];
 	char 	*fgets_res;
 
-	START_CH;
+	START_CH(TRUE);
 	if (SIGNAL == ERR_IOEOF)
 	{
 		PRINTF("End of media reached, please mount next volume and press Enter: ");
@@ -304,7 +302,6 @@ void mupip_restore(void)
 				if ((0 == cli_get_int("NETTIMEOUT", (int4 *)&timeout)) || (0 > timeout))
 					timeout = DEFAULT_BKRS_TIMEOUT;
 				in = (BFILE *)malloc(SIZEOF(BFILE));
-				iotcp_fillroutine();
 				if (0 > (in->fd = tcp_open(addr, port, timeout, TRUE)))
 				{
 					util_out_print("Error establishing TCP connection to !AD.",
@@ -539,7 +536,7 @@ void mupip_restore(void)
 			assert((size <= old_blk_size) && (size >= SIZEOF(blk_hdr)));
 			in_len = MIN(old_blk_size, size) - SIZEOF(blk_hdr);
 			if (!is_same_hash
-				&& (BLOCK_REQUIRE_ENCRYPTION(is_bkup_file_encrypted, (((blk_hdr_ptr_t)blk_ptr)->levl), in_len)))
+				&& (BLK_NEEDS_ENCRYPTION3(is_bkup_file_encrypted, (((blk_hdr_ptr_t)blk_ptr)->levl), in_len)))
 			{
 				inptr = blk_ptr + SIZEOF(blk_hdr);
 				GTMCRYPT_DECRYPT(NULL, bkup_key_handle, inptr, in_len, NULL, gtmcrypt_errno);
@@ -554,7 +551,7 @@ void mupip_restore(void)
 			offset = (old_start_vbn - 1) * DISK_BLOCK_SIZE + ((off_t)old_blk_size * blk_num);
 #			ifdef GTM_CRYPT
 			if (!is_same_hash
-				&& (BLOCK_REQUIRE_ENCRYPTION(old_data.is_encrypted, (((blk_hdr_ptr_t)blk_ptr)->levl), in_len)))
+				&& (BLK_NEEDS_ENCRYPTION3(old_data.is_encrypted, (((blk_hdr_ptr_t)blk_ptr)->levl), in_len)))
 			{
 				inptr = blk_ptr + SIZEOF(blk_hdr);
 				GTMCRYPT_ENCRYPT(NULL, target_key_handle, inptr, in_len, NULL, gtmcrypt_errno);
@@ -706,21 +703,22 @@ STATICFNDEF void exec_read(BFILE *bf, char *buf, int nbytes)
 	return;
 }
 
-/* the logic here can be reused in iotcp_readfl.c and iosocket_readfl.c */
+/* the logic here can be reused in iosocket_readfl.c */
 STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 {
 	int     	needed, status;
 	char		*curr;
 	fd_set          fs;
-	ABS_TIME	save_nap, nap;
+	struct timeval	save_nap, nap;
 	int		rc;
 
 	needed = nbytes;
 	curr = buf;
-	nap.at_sec = 1;
-	nap.at_usec = 0;
+	nap.tv_sec = 1;
+	nap.tv_usec = 0;
 	while (1)
 	{
+		assertpro(FD_SETSIZE > bf->fd);
 		FD_ZERO(&fs);
 		FD_SET(bf->fd, &fs);
 		assert(0 != FD_ISSET(bf->fd, &fs));
@@ -728,11 +726,11 @@ STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 		 * function, and not all callers of aa_select behave the same when EINTR is returned.
 		 */
 		save_nap = nap;
-		status = tcp_routines.aa_select(bf->fd + 1, (void *)(&fs), (void *)0, (void *)0, &nap);
+		status = select(bf->fd + 1, (void *)(&fs), (void *)0, (void *)0, &nap);
 		nap = save_nap;
 		if (status > 0)
 		{
-			status = tcp_routines.aa_recv(bf->fd, curr, needed, 0);
+			RECV(bf->fd, curr, needed, 0, status);
 			if ((0 == status) || (needed == status))        /* lost connection or all set */
 			{
 				break;

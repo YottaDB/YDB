@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,36 +24,55 @@
 #include "min_max.h"
 #include "hashtab_mname.h"
 #include "gtmimagename.h"
+#include "dpgbldir.h"
 
 GBLREF	gv_namehead		*gv_target_list;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	int			process_exiting;
+GBLREF	gvt_container		*gvt_pending_list;
 
 gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 {
-	gv_namehead	*gvt, *gvt1;
-	int4		index;
-	int4		partial_size;
-	int4		gvn_size;
-	sgmnt_addrs	*csa;
-	ht_ent_mname	*tabent;
-	boolean_t	gvt_hashtab_present, added;
-#ifdef DEBUG
-	ssize_t		first_rec_size, last_rec_size, clue_size;
-#endif
+	gv_namehead		*gvt, *gvt1;
+	int4			index;
+	int4			partial_size;
+	int4			gvn_size;
+	sgmnt_addrs		*csa;
+	ht_ent_mname		*tabent;
+	boolean_t		gvt_hashtab_present, added;
+	enum db_acc_method	acc_meth;
+#	ifdef DEBUG
+	ssize_t			first_rec_size, last_rec_size, clue_size;
+#	endif
 
+	acc_meth = (NULL != reg) ? REG_ACC_METH(reg) : dba_bg;
+	if ((dba_cm == acc_meth) || (dba_usr == acc_meth))
+	{
+		gvt = malloc(SIZEOF(gv_namehead) + gvent->var_name.len);
+		memset(gvt, 0, SIZEOF(gv_namehead) + gvent->var_name.len);
+		gvt->gvname.var_name.addr = (char *)gvt + SIZEOF(gv_namehead);
+		gvt->nct = 0;
+		gvt->collseq = NULL;
+		gvt->regcnt = 1;
+		memcpy(gvt->gvname.var_name.addr, gvent->var_name.addr, gvent->var_name.len);
+		gvt->gvname.var_name.len = gvent->var_name.len;
+		gvt->gvname.hash_code = gvent->hash_code;
+		return gvt;
+	}
+	assert((NULL == reg) || dba_mm == REG_ACC_METH(reg) || (dba_bg == REG_ACC_METH(reg)));
+	assert((NULL == reg) || (reg->max_key_size <= MAX_KEY_SZ));
 	/* Ensure there are no additional compiler introduced filler bytes. This is a safety since a few elements in the
 	 * gv_namehead structure are defined using MAX_BT_DEPTH macros and we want to guard against changes to this macro
 	 * that cause unintended changes to the layout/size of the gv_namehead structure.
 	 */
-	assert(OFFSETOF(gv_namehead, filler_8byte_align1[0]) + SIZEOF(gvt->filler_8byte_align1)
+	assert(OFFSETOF(gv_namehead, filler_8byte_align2[0]) + SIZEOF(gvt->filler_8byte_align2)
 			== OFFSETOF(gv_namehead, last_split_blk_num[0]));
 #	ifdef GTM_TRIGGER
 	assert(OFFSETOF(gv_namehead, last_split_blk_num[0]) + SIZEOF(gvt->last_split_blk_num)
 			== OFFSETOF(gv_namehead, gvt_trigger));
-	GTM64_ONLY(assert(OFFSETOF(gv_namehead, filler_8byte_align2) + SIZEOF(gvt->filler_8byte_align2)
+	GTM64_ONLY(assert(OFFSETOF(gv_namehead, filler_8byte_align3) + SIZEOF(gvt->filler_8byte_align3)
 			== OFFSETOF(gv_namehead, clue));)
 	NON_GTM64_ONLY(assert(OFFSETOF(gv_namehead, trig_mismatch_test_done) + SIZEOF(gvt->trig_mismatch_test_done)
 			== OFFSETOF(gv_namehead, clue));)
@@ -110,8 +129,11 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	assert(clue_size == first_rec_size);
 	assert(clue_size == last_rec_size);
 	assert(clue_size == (SIZEOF(gv_key) + keysize));
-	gvt->clue.top = gvt->last_rec->top = gvt->first_rec->top = keysize;
-	gvt->clue.prev = gvt->clue.end = 0;
+	gvt->first_rec->top = keysize;
+	gvt->last_rec->top =keysize;
+	gvt->clue.top = keysize;
+	/* No need to initialize gvt->clue.prev as it is not currently used */
+	gvt->clue.end = 0;
 	/* If "reg" is non-NULL, but "gvent" is NULL, then it means the targ_alloc is being done for the directory tree.
 	 * In that case, set gvt->root appropriately to DIR_ROOT. Else set it to 0. Also assert that the region is
 	 * open in this case with the only exception being if called from mur_forward for non-invasive operations (e.g. EXTRACT).
@@ -119,7 +141,9 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	assert((NULL != gvent) || (NULL == reg) || reg->open || (IS_MUPIP_IMAGE && !mupip_jnl_recover));
 	gvt->root = ((NULL != reg) && (NULL == gvent) ? DIR_ROOT : 0);
 	gvt->nct = 0;
+	gvt->nct_must_be_zero = FALSE;
 	gvt->act = 0;
+	gvt->act_specified_in_gld = FALSE;
 	gvt->ver = 0;
 	gvt->regcnt = 1;
 	gvt->collseq = NULL;
@@ -169,7 +193,18 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 void	targ_free(gv_namehead *gvt)
 {
 	gv_namehead	*prev_gvnh, *next_gvnh;
+#	ifdef DEBUG
+	gvt_container	*gvtc;
+#	endif
 
+#	ifdef DEBUG
+	/* Assert that no container points to the gvt we are about to free up */
+	for (gvtc = gvt_pending_list; NULL != gvtc; gvtc = (gvt_container *)gvtc->next_gvtc)
+	{
+		prev_gvnh = *gvtc->gvt_ptr;
+		assert(prev_gvnh != gvt);
+	}
+#	endif
 	assert(0 == gvt->regcnt);
 	if (gvt == gv_target)
 	{	/* Should not be freeing an actively used global variable. Exceptions are

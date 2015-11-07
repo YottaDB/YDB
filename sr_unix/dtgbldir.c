@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,29 +48,14 @@
 #	define  SECOND_ONE	0xFFFFFF25
 #endif
 
-#ifdef GTM64
-#define SAVE_ADDR_REGION                   \
-{ \
-	int4 *tmp = (int *)&(addr->regions); \
-	*int4_ptr++ = *(tmp + lsb_index); \
-	int4_ptr++;       \
-}
-#else /* GTM64 */
-#define SAVE_ADDR_REGION                   \
-	*int4_ptr++ = (int4)addr->regions;
-#endif /* GTM64 */
-
-
 int main(int argc, char **argv)
 {
 	int		fd;
 	header_struct	*header;
 	gd_addr		*addr;
 	gd_region	*region;
-	gd_region	*region_top;
 	gd_segment	*segment;
-	int4		*int4_ptr;
-	uint4		t_offset, size;
+	uint4		size;
 	int		i, alloc, extend, block, global, key, lock, record;
 	ZOS_ONLY(int	realfiletag;)
 
@@ -192,64 +177,9 @@ int main(int argc, char **argv)
 	if (-1 == gtm_zos_set_tag(fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
 		PERROR("Error tagging file with TAG_BINARY");
 #endif
-	size = SIZEOF(header_struct) + SIZEOF(gd_addr) + 3 * SIZEOF(gd_binding) + 1 * SIZEOF(gd_region) + 1 * SIZEOF(gd_segment);
-	header = (header_struct *)malloc(ROUND_UP(size, DISK_BLOCK_SIZE));
-	memset(header, 0, ROUND_UP(size, DISK_BLOCK_SIZE));
-	header->filesize = size;
-	size = ROUND_UP(size, DISK_BLOCK_SIZE);
-	MEMCPY_LIT(header->label, GDE_LABEL_LITERAL);
-	addr = (gd_addr *)((char *)header + SIZEOF(header_struct));
-	addr->max_rec_size = 256;
-	addr->maps = (gd_binding*)(SIZEOF(gd_addr));
-	addr->n_maps = 3;
-	addr->regions = (gd_region *)((INTPTR_T)(addr->maps) + 3 * SIZEOF(gd_binding));
-	addr->n_regions = 1;
-	addr->segments = (gd_segment *)((INTPTR_T)(addr->regions) + SIZEOF(gd_region));
-	addr->n_segments = 1;
-	addr->link = 0;
-	addr->tab_ptr = 0;
-	addr->id = 0;
-	addr->local_locks = 0;
-	addr->end = (INTPTR_T)((char *)addr->segments + 1 * SIZEOF(gd_segment));
-	int4_ptr = (int4*)((char *)addr + (INTPTR_T)(addr->maps));
-	*int4_ptr++ = FIRST_ONE;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-        SAVE_ADDR_REGION
-	*int4_ptr++ = SECOND_ONE;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-        SAVE_ADDR_REGION
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-	*int4_ptr++ = 0xFFFFFFFF;
-        SAVE_ADDR_REGION
-	region = (gd_region*)((char *)addr + (INTPTR_T)(addr->regions));
-	segment = (gd_segment*)((char *)addr + (INTPTR_T)(addr->segments));
-	region->rname_len = 7;
-	memcpy(region->rname,"DEFAULT",7);
 
-	for (region_top = region + addr->n_regions; region < region_top ; region++)
-	{	t_offset = region->dyn.offset;
-		region->dyn.addr = (gd_segment *)(INTPTR_T)t_offset;
-	}
-
-	region = (gd_region*)((char *)addr + (INTPTR_T)(addr->regions));
+	DUMMY_GLD_INIT(header, addr, region, segment, size, RELATIVE_OFFSET_TRUE);
+	/* the above macro invocation initializes "header", "addr", "region", "segment" and "size" */
 	region->dyn.offset = (int4)(INTPTR_T)addr->segments;
 	region->max_rec_size = record;
 	region->max_key_size = key;

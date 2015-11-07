@@ -25,7 +25,6 @@
 #include "gtm_env_init.h"	/* for gtm_env_init() and gtm_env_init_sp() prototype */
 #include "gt_timer.h"
 #include "io.h"
-#include "iotcpdef.h"
 #include "iosocketdef.h"
 #include "gtm_malloc.h"
 #include "cache.h"
@@ -58,6 +57,11 @@
 #  define DEFAULT_FBW_FLAG FALSE
 #endif
 #define SIZEOF_prombuf ggl_prombuf
+
+/* gtm_dirtree_collhdr_always is only used in dbg code and hence doesn't need checking in the D9I10002703 subtest
+ * Hence this env var is not defined in gtm_logicals.h as that is what the D9I10002703 subtest looks at for a list of env vars.
+ */
+#define	GTM_DIRTREE_COLLHDR_ALWAYS	"$gtm_dirtree_collhdr_always"
 
 GBLREF	boolean_t	dollar_zquit_anyway;	/* if TRUE compile QUITs to not care whether or not they're from an extrinsic */
 GBLREF	uint4		gtmDebugLevel; 		/* Debug level (0 = using default sm module so with
@@ -154,6 +158,13 @@ void	gtm_env_init(void)
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
 			TREF(gtm_gvundef_fatal) = ret; /* if logical is not defined, gtm_gvundef_fatal takes the default value */
+		/* GTM_DIRTREE_COLLHDR_ALWAYS environment/logical */
+		val.addr = GTM_DIRTREE_COLLHDR_ALWAYS;
+		val.len = SIZEOF(GTM_DIRTREE_COLLHDR_ALWAYS) - 1;
+		assert(FALSE == TREF(gtm_dirtree_collhdr_always));	/* should have been set to FALSE by gtm_threadgbl_defs */
+		ret = logical_truth_value(&val, FALSE, &is_defined);
+		if (is_defined)
+			TREF(gtm_dirtree_collhdr_always) = ret; /* if logical is not defined, the TREF takes the default value */
 #		endif
 		/* Initialize variable that controls TP allocation clue (for created blocks) */
 		val.addr = GTM_TP_ALLOCATION_CLUE;

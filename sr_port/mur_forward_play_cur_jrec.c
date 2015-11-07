@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,10 +46,14 @@
 #include "tp_set_sgm.h"
 #include "tp_frame.h"
 #include "wbox_test_init.h"
+#include "gvnh_spanreg.h"
+#include "gtmimagename.h"
+#include "gv_trigger_common.h"	/* for *HASHT* macros used inside GVNH_REG_INIT macro */
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
 
+GBLREF	gd_addr			*gd_header;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF  gd_region		*gv_cur_region;
@@ -72,7 +76,7 @@ static	void	(* const extraction_routine[])() =
 uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 {
 	boolean_t		process_losttn;
-	boolean_t		is_set_kill_zkill_ztrig_ztworm, is_set_kill_zkill_ztrig, added;
+	boolean_t		is_set_kill_zkill_ztrig_ztworm, is_set_kill_zkill_ztrig;
 	trans_num		curr_tn;
 	enum jnl_record_type	rectype;
 	enum rec_fence_type	rec_fence;
@@ -262,7 +266,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 		{
 			assert(FALSE);
 			murgbl.wrn_count++;
-			gtm_putmsg(VARLSTCNT(6) ERR_JNLTPNEST, 4, jctl->jnl_fn_len,
+			gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(6) ERR_JNLTPNEST, 4, jctl->jnl_fn_len,
 				jctl->jnl_fn, jctl->rec_offset, &rec->prefix.tn);
 			OP_TROLLBACK(0);
 		}
@@ -293,36 +297,22 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 		gv_currkey->base[keystr->length] = '\0';
 		gv_currkey->end = keystr->length;
 		if (gv_cur_region->open)
-		{/* find out collation of key in the jnl-record from the database corresponding to the jnl file */
+		{	/* find out collation of key in the jnl-record from the database corresponding to the jnl file */
 			gvent.var_name.addr = (char *)gv_currkey->base;
 			gvent.var_name.len = STRLEN((char *)gv_currkey->base);
 			COMPUTE_HASH_MNAME(&gvent);
-			if ((NULL !=  (tabent = lookup_hashtab_mname(&rctl->gvntab, &gvent)))
-				&& (NULL != (gvnh_reg = (gvnh_reg_t *)tabent->value)))
+			if (NULL != (tabent = lookup_hashtab_mname(&rctl->gvntab, &gvent)))	/* WARNING ASSIGNMENT */
 			{
+				gvnh_reg = (gvnh_reg_t *)tabent->value;
+				assert(NULL != gvnh_reg);
 				gv_target = gvnh_reg->gvt;
 				gv_cur_region = gvnh_reg->gd_reg;
 				assert(gv_cur_region->open);
 			} else
 			{
-				assert(gv_cur_region->max_key_size <= MAX_KEY_SZ);
-				gv_target = (gv_namehead *)targ_alloc(gv_cur_region->max_key_size,
-					&gvent, gv_cur_region);
-				gvnh_reg = (gvnh_reg_t *)malloc(SIZEOF(gvnh_reg_t));
-				gvnh_reg->gvt = gv_target;
-				gvnh_reg->gd_reg = gv_cur_region;
-				if (NULL != tabent)
-				{	/* Since the global name was found but gv_target was null and
-					 * now we created a new gv_target, the hash table key must point
-					 * to the newly created gv_target->gvname. */
-					tabent->key = gv_target->gvname;
-					tabent->value = (char *)gvnh_reg;
-				} else
-				{
-					added = add_hashtab_mname(&rctl->gvntab, &gv_target->gvname,
-							gvnh_reg, &tabent);
-					assert(added);
-				}
+				assert((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)));
+				gv_target = (gv_namehead *)targ_alloc(gv_cur_region->max_key_size, &gvent, gv_cur_region);
+				GVNH_REG_INIT(gd_header, &rctl->gvntab, NULL, gv_target, gv_cur_region, gvnh_reg, tabent);
 			}
 			if (!TREF(jnl_extract_nocol))
 				GVCST_ROOT_SEARCH;
@@ -347,7 +337,8 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			{
 				assert(FALSE); /* We want to debug this */
 				murgbl.wrn_count++;
-				gtm_putmsg(VARLSTCNT(6) ERR_DUPTN, 4, &curr_tn, jctl->rec_offset, jctl->jnl_fn_len, jctl->jnl_fn);
+				gtm_putmsg_csa(CSA_ARG(rctl->csa)
+					VARLSTCNT(6) ERR_DUPTN, 4, &curr_tn, jctl->rec_offset, jctl->jnl_fn_len, jctl->jnl_fn);
 				if (dollar_tlevel)
 				{
 					assert(murgbl.ok_to_update_db);

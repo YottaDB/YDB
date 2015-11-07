@@ -69,11 +69,16 @@ setenv gtm_dist $save_gtm_dist
 
 $gtm_dist/mupip journal -extract -forward gtm.mjl 				>& mupip.out
 env gtmgbldir=$gtm_dist/test_gtm/mumps.gld $gtm_dist/mupip integ -reg "*"	>& integ.out
+set mupip_status = $status
 # output the change lines
 echo ""							>>&! $gtm_dist/gtm_test_install.out
 echo "Global changes in the gtm.mjl file:"		>>&! $gtm_dist/gtm_test_install.out
 grep = gtm.mjf | awk -F\\ '{print ($NF)}'		>>&! $gtm_dist/gtm_test_install.out
-cat integ.out						>>&! $gtm_dist/gtm_test_install.out
+if (0 != $mupip_status) then
+	echo "Error: mupip integ returned $status status instead of 0" >>&! $gtm_dist/gtm_test_install.out
+else
+	echo "mupip integ returned a 0 status - as expected" >>&! $gtm_dist/gtm_test_install.out
+endif
 
 cd $gtm_dist
 
@@ -222,7 +227,7 @@ EOF
 	grep ZCHSET gtm.out				>>&! $save_gtm_dist/gtm_test_install.out
 	# test gtmsecshr with an alternate user
 	set XCMD='do ^GTMHELP("",$ztrnlnm("gtm_dist")_"/gtmhelp.gld")'
-	su - gtmtest1 -c "env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL gtm_chset=UTF-8 gtm_dist=$gtm_dist gtmroutines='$gtmroutines' $gtm_dist/mumps -run %XCMD '${XCMD:q}' < /dev/null" > gtmtest.out   #BYPASSOK line length
+	su - gtmtest -c "env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL gtm_chset=UTF-8 gtm_dist=$gtm_dist gtmroutines='$gtmroutines' $gtm_dist/mumps -run %XCMD '${XCMD:q}' < /dev/null" > gtmtest.out   #BYPASSOK line length
 	# if we see the 'Topic? ' prompt, all is well
 	grep -q '^Topic. $' gtmtest.out
 	if ( $status ) cat gtmtest.out			>>&! $save_gtm_dist/gtm_test_install.out
@@ -231,13 +236,18 @@ EOF
 
 	$save_gtm_dist/mupip journal -extract -forward gtm.mjl					>& mupip.out
 	env gtmgbldir=$save_gtm_dist/test_gtm/mumps.gld $save_gtm_dist/mupip integ -reg "*"	>& integ.out
-
+	set mupip_status = $status
 	# output the change lines
 	echo ""						>>&! $save_gtm_dist/gtm_test_install.out
 	echo "Global changes in the gtm.mjl file:"	>>&! $save_gtm_dist/gtm_test_install.out
 	awk -F\\ '/=/{print ($NF)}' gtm.mjf		>>&! $save_gtm_dist/gtm_test_install.out
-	cat integ.out					>>&! $save_gtm_dist/gtm_test_install.out
+	if (0 != $mupip_status) then
+		echo "Error: mupip integ returned $status status instead of 0" >>&! $save_gtm_dist/gtm_test_install.out
+	else
+		echo "mupip integ returned a 0 status - as expected" >>&! $save_gtm_dist/gtm_test_install.out
+	endif
 	$gtm_dist/gtmsecshr				>>&! $save_gtm_dist/gtm_test_install.out
+	$gtm_com/IGS $gtm_dist/gtmsecshr "STOP"
 	cd $save_gtm_dist
 
 else
@@ -253,19 +263,7 @@ ZCHSET= UTF-8
 Global changes in the gtm.mjl file:
 ^a="1"
 ^b="2"
-
-
-Integ of region DEFAULT
-
-No errors detected by integ.
-
-Type           Blocks         Records          % Used      Adjacent
-
-Directory           2               3           0.756            NA
-Index               2               2           0.585             2
-Data                2               2           0.585             2
-Free             4994              NA              NA            NA
-Total            5000               7              NA             4
+mupip integ returned a 0 status - as expected
 EOF
 	#  END  - Fake the UTF-8 mode run for platforms that don't support it
 endif

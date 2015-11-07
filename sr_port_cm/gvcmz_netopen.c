@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,11 @@ GBLREF jnl_process_vector	*prc_vec;
 GBLREF spdesc			stringpool;
 GBLREF struct NTD		*ntd_root;
 
+error_def(CMERR_INVPROT);
+error_def(ERR_BADSRVRNETMSG);
+error_def(ERR_NETDBOPNERR);
+error_def(ERR_TEXT);
+
 static volatile boolean_t	second_attempt = FALSE;
 static protocol_msg		myproto;
 static struct CLB		*clb;
@@ -52,9 +57,9 @@ void		v010_jnl_prc_vector(void *);
 
 CONDITION_HANDLER(gvcmz_netopen_ch)
 {
-	error_def(CMERR_INVPROT);
-
-	START_CH;
+	/* This condition handler is established only for VMS. In VMS, we do not do CONTINUE for INFO/SUCCESS severity.
+	 * FALSE input to START_CH achieves the same thing. */
+	START_CH(FALSE);
 	if (SIGNAL != CMERR_INVPROT || second_attempt)
 	{
 		second_attempt = FALSE;
@@ -74,9 +79,6 @@ void gvcmz_netopen_attempt(struct CLB *c)
 #ifdef BIGENDIAN
 	jnl_process_vector	temp_vect;
 #endif
-
-	error_def(ERR_BADSRVRNETMSG);
-	error_def(ERR_NETDBOPNERR);
 
 	VMS_ONLY(
 		ESTABLISH(gvcmz_netopen_ch); /* our old servers run only on VMS; no need for retry on other OSs */
@@ -128,20 +130,20 @@ void gvcmz_netopen_attempt(struct CLB *c)
 	if (CMI_ERROR(status))
 	{
 		gvcmy_close(c);
-		rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
 	}
 	status = cmi_read(c);	/* return message should be same size */
 	if (CMI_ERROR(status))
 	{
 		gvcmy_close(c);
-		rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
 	}
 	if (CMMS_T_INITPROC != *c->mbf)
 	{
 		if (CMMS_E_ERROR != *c->mbf)
 		{
 			gvcmy_close(c);
-			rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
 		}
 		gvcmz_errmsg(c, FALSE);
 	}
@@ -161,11 +163,6 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	int			len, i;
 	uint4			status;
 	protocol_msg		*server_proto;
-
-	error_def(ERR_BADSRVRNETMSG);
-	error_def(ERR_NETDBOPNERR);
-	error_def(ERR_TEXT);
-	error_def(CMERR_INVPROT);
 
 	c = UNIX_ONLY(cmi_alloc_clb())VMS_ONLY(cmu_makclb());
 	c->usr = malloc(SIZEOF(link_info));
@@ -206,7 +203,7 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 		free(VMS_ONLY(c->tnd.dsc$a_pointer) UNIX_ONLY(c->tnd.addr));
 		VMS_ONLY(lib$free_vm(&SIZEOF(*c), &c, 0);)
 		UNIX_ONLY(cmi_free_clb(c));
-		rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
 	}
 	if (0 == ntd_root)
 		ntd_root = cmu_ntdroot();
@@ -220,13 +217,13 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	if (S_HDRSIZE + S_PROTSIZE + 2 != c->cbl)
 	{
 		gvcmy_close(c);
-		rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
 	}
 	server_proto = (protocol_msg *)(c->mbf + 1);
 	if (!gtcm_protocol_match(server_proto, &myproto))
 	{
 		gvcmy_close(c);
-		rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, CMERR_INVPROT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, CMERR_INVPROT);
 	}
 	li->convert_byteorder = (gtcm_is_big_endian(&myproto) != gtcm_is_big_endian(server_proto));
 	li->query_is_queryget = gtcm_is_query_queryget(server_proto, &myproto);
@@ -236,7 +233,7 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	if (!(li->err_compat = gtcm_err_compat((protocol_msg *)(c->mbf + 1), &myproto)))
 	{
 		gvcmy_close(c);
-		rts_error(VARLSTCNT(6) ERR_NETDBOPNERR, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NETDBOPNERR, 0, ERR_TEXT, 2,
 				LEN_AND_LIT("GTCM functionality not implemented between UNIX and VMS yet"));
 	}
 	gtcm_connection = TRUE;

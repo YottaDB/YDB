@@ -76,24 +76,23 @@ void gtm_fork_n_core(void)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd, tmp_csd;
 	gd_region		*reg, *r_top;
-	gd_addr			*addr_ptr;
-DEBUG_ONLY( struct rlimit rlim;)
+	DEBUG_ONLY(struct rlimit rlim;)
 
 	DEBUG_ONLY(
-	getrlimit(RLIMIT_CORE, &rlim);
-	if ( rlim.rlim_cur != rlim.rlim_max)
-	{
-		if (RLIM_INFINITY == rlim.rlim_max)
-			rlim.rlim_cur = RLIM_INFINITY;
-		else
+		getrlimit(RLIMIT_CORE, &rlim);
+		if ( rlim.rlim_cur != rlim.rlim_max)
 		{
-			if (rlim.rlim_cur < rlim.rlim_max)
+			if (RLIM_INFINITY == rlim.rlim_max)
+				rlim.rlim_cur = RLIM_INFINITY;
+			else
 			{
-				rlim.rlim_cur = rlim.rlim_max;
+				if (rlim.rlim_cur < rlim.rlim_max)
+				{
+					rlim.rlim_cur = rlim.rlim_max;
+				}
 			}
+			setrlimit(RLIMIT_CORE, &rlim);
 		}
-		setrlimit(RLIMIT_CORE, &rlim);
-	}
 	)
 
 #ifdef AIX_SYSTRACE_ENABLE

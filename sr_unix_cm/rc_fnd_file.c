@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,11 +66,14 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	gv_namehead	*g;
 	short		dsid, node;
 	gd_binding	*map;
+	gd_addr		*addr;
 	char		buff[1024], *cp, *cp1;
 	mstr		fpath1, fpath2;
 	mval		v;
+	mname_entry	gvname;
 	int		i, keysize;
 	int             len, node2;
+	gvnh_reg_t	*gvnh_reg;
 
 	GET_SHORT(dsid, &xdsid->dsid.value);
 	GET_SHORT(node, &xdsid->node.value);
@@ -100,7 +103,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		memset(gv_cur_region->dyn.addr, 0, SIZEOF(gd_segment));
 		memcpy(gv_cur_region->dyn.addr->fname, fpath2.addr, fpath2.len);
 		gv_cur_region->dyn.addr->fname_len = fpath2.len;
-		gv_cur_region->dyn.addr->acc_meth = dba_bg;
+		REG_ACC_METH(gv_cur_region) = dba_bg;
 		ESTABLISH_RET(rc_fnd_file_ch1, RC_SUCCESS);
 		gvcst_init(gv_cur_region);
 		REVERT;
@@ -126,30 +129,19 @@ short rc_fnd_file(rc_xdsid *xdsid)
 			gv_cur_region = NULL;
 			return RC_FILEACCESS;
 		}
-		gv_keysize = DBKEYSIZE(gv_cur_region->max_key_size);
-		GVKEY_INIT(gv_currkey, gv_keysize);
-		GVKEY_INIT(gv_altkey, gv_keysize);
+		GVKEYSIZE_INIT_IF_NEEDED;	/* sets up "gv_keysize", "gv_currkey" and "gv_altkey" in sync if not already done */
 		cs_addrs->dir_tree = (gv_namehead *)malloc(SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * (gv_keysize - 1));
 		g = cs_addrs->dir_tree;
 		g->first_rec = (gv_key*)(g->clue.base + gv_keysize);
 		g->last_rec = (gv_key*)(g->first_rec->base + gv_keysize);
 		g->clue.top = g->last_rec->top = g->first_rec->top = gv_keysize;
-		g->clue.prev = g->clue.end = 0;
+		/* No need to initialize g->clue.prev as it is never used */
+		g->clue.end = 0;
 		g->root = DIR_ROOT;
-		dsid_list->gda = (gd_addr*)malloc(SIZEOF(gd_addr) + 3 * SIZEOF(gd_binding));
-		dsid_list->gda->n_maps = 3;
-		dsid_list->gda->n_regions = 1;
-		dsid_list->gda->n_segments = 1;
-		dsid_list->gda->maps = (gd_binding*)((char*)dsid_list->gda + SIZEOF(gd_addr));
+		addr = dsid_list->gda = (gd_addr *)malloc(SIZEOF(gd_addr) + DUMMY_GBLDIR_TOT_MAP_SIZE);
+		memset(addr, 0, SIZEOF(gd_addr) + DUMMY_GBLDIR_TOT_MAP_SIZE);
+		DUMMY_GLD_MAP_INIT(addr, RELATIVE_OFFSET_FALSE, gv_cur_region);
 		dsid_list->gda->max_rec_size = gv_cur_region->max_rec_size;
-		map = dsid_list->gda->maps;
-		map ++;
-		memset(map->name, 0, SIZEOF(map->name));
-		map->name[0] = '%';
-		map->reg.addr = gv_cur_region;
-		map++;
-		map->reg.addr = gv_cur_region;
-		memset(map->name, -1, SIZEOF(map->name));
 		dsid_list->gda->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 		init_hashtab_mname(dsid_list->gda->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 		change_reg();
@@ -169,22 +161,23 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	{	/*	need to open new database, add to list, set fdi_ptr */
 		gd_header = dsid_list->gda;
 		gv_currkey->end = 0;
-		v.mvtype = MV_STR;
-		v.str.len = RC_NSPACE_GLOB_LEN-1;
-		v.str.addr = RC_NSPACE_GLOB;
-		GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &v.str);
+		gvname.var_name.len  = RC_NSPACE_GLOB_LEN - 1;
+		gvname.var_name.addr = RC_NSPACE_GLOB;
+		COMPUTE_HASH_MNAME(&gvname);
+		GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gvname, gvnh_reg);
+		assert(NULL == gvnh_reg->gvspan); /* so GV_BIND_SUBSNAME_IF_GVSPAN is not needed */
 		if (!gv_target->root)	/* No namespace global */
 			return RC_UNDEFNAMSPC;
 		v.mvtype = MV_STR;
 		v.str.len = SIZEOF(RC_NSPACE_DSI_SUB)-1;
 		v.str.addr = RC_NSPACE_DSI_SUB;
-		mval2subsc(&v,gv_currkey);
+		mval2subsc(&v, gv_currkey, gv_cur_region->std_null_coll);
 		node2 = node;
 		MV_FORCE_MVAL(&v,node2);
-		mval2subsc(&v,gv_currkey);
+		mval2subsc(&v, gv_currkey, gv_cur_region->std_null_coll);
 		i = dsid / 256;
 		MV_FORCE_MVAL(&v,i);
-		mval2subsc(&v,gv_currkey);
+		mval2subsc(&v, gv_currkey, gv_cur_region->std_null_coll);
 		if (gvcst_get(&v))
 			return RC_UNDEFNAMSPC;
 		for (cp = v.str.addr, i = 1; i < RC_FILESPEC_PIECE; i++)
@@ -207,7 +200,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		memset(gv_cur_region->dyn.addr, 0, SIZEOF(gd_segment));
 		memcpy(gv_cur_region->dyn.addr->fname, cp, len);
 		gv_cur_region->dyn.addr->fname_len = len;
-		gv_cur_region->dyn.addr->acc_meth = dba_bg;
+		REG_ACC_METH(gv_cur_region) = dba_bg;
 		ESTABLISH_RET(rc_fnd_file_ch2, RC_SUCCESS);
 		gvcst_init(gv_cur_region);
 		REVERT;
@@ -259,29 +252,20 @@ short rc_fnd_file(rc_xdsid *xdsid)
 			return RC_FILEACCESS;
 		}
 		rel_crit(gv_cur_region);
+		GVKEYSIZE_INIT_IF_NEEDED;
 		keysize = DBKEYSIZE(gv_cur_region->max_key_size);
-		GVKEYSIZE_INCREASE_IF_NEEDED(keysize);
 		cs_addrs->dir_tree = (gv_namehead *)malloc(SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * (keysize - 1));
 		g = cs_addrs->dir_tree;
 		g->first_rec = (gv_key*)(g->clue.base + keysize);
 		g->last_rec = (gv_key*)(g->first_rec->base + keysize);
 		g->clue.top = g->last_rec->top = g->first_rec->top = keysize;
-		g->clue.prev = g->clue.end = 0;
+		/* No need to initialize g->clue.prev as it is not currently used */
+		g->clue.end = 0;
 		g->root = DIR_ROOT;
-		fdi_ptr->gda = (gd_addr*)malloc(SIZEOF(gd_addr) + 3 * SIZEOF(gd_binding));
-		fdi_ptr->gda->n_maps = 3;
-		fdi_ptr->gda->n_regions = 1;
-		fdi_ptr->gda->n_segments = 1;
-		fdi_ptr->gda->maps = (gd_binding*)((char*)fdi_ptr->gda + SIZEOF(gd_addr));
+		addr = fdi_ptr->gda = (gd_addr *)malloc(SIZEOF(gd_addr) + DUMMY_GBLDIR_TOT_MAP_SIZE);
+		memset(addr, 0, SIZEOF(gd_addr) + DUMMY_GBLDIR_TOT_MAP_SIZE);
+		DUMMY_GLD_MAP_INIT(addr, RELATIVE_OFFSET_FALSE, gv_cur_region);
 		fdi_ptr->gda->max_rec_size = gv_cur_region->max_rec_size;
-		map = fdi_ptr->gda->maps;
-		map ++;
-		memset(map->name, 0, SIZEOF(map->name));
-		map->name[0] = '%';
-		map->reg.addr = gv_cur_region;
-		map++;
-		map->reg.addr = gv_cur_region;
-		memset(map->name, -1, SIZEOF(map->name));
 		fdi_ptr->gda->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 		init_hashtab_mname(fdi_ptr->gda->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 		fdi_ptr->next = dsid_list->next;
@@ -310,7 +294,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 /* clean up from gvcst_init() failure, when dsid_list was NULL (open first db) */
 static CONDITION_HANDLER(rc_fnd_file_ch1)
 {	/* undo setup */
-	START_CH
+	START_CH(FALSE);
 	free(dsid_list->fname);
 	dsid_list = NULL;
 	free(gv_cur_region->dyn.addr);
@@ -323,7 +307,7 @@ static CONDITION_HANDLER(rc_fnd_file_ch1)
 /* clean up from gvcst_init() failure, when dsid_list was non-NULL (open new db) */
 static CONDITION_HANDLER(rc_fnd_file_ch2)
 {	/* undo setup */
-	START_CH
+	START_CH(FALSE);
 	free(fdi_ptr->fname);
 	fdi_ptr->fname = NULL;
 	free(fdi_ptr);

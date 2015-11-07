@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@ void cmj_err(struct CLB *lnk, cmi_reason_t reason, cmi_status_t status)
 	lnk->deferred_event = TRUE;
 	lnk->deferred_reason = reason;
 	lnk->deferred_status = status;
+	assertpro(FD_SETSIZE > lnk->mun);
 	FD_CLR(lnk->mun, &tsk->rs);
 	FD_CLR(lnk->mun, &tsk->ws);
 	FD_CLR(lnk->mun, &tsk->es);

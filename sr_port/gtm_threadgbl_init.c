@@ -87,7 +87,6 @@
 # include "gtmsiginfo.h"
 #endif
 #include "gtmimagename.h"
-#include "iotcpdef.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"	/* needed for socket_pool and MAX_N_SOCKETS*/
 #include "ctrlc_handler_dummy.h"

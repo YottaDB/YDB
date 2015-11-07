@@ -47,6 +47,8 @@
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 #include "format_targ_key.h"
 #include "zshow.h"
+#include "hashtab_mname.h"
+#include "min_max.h"
 
 GBLREF bool		mupip_DB_full;
 GBLREF bool		mu_ctrly_occurred;
@@ -58,7 +60,6 @@ GBLREF gv_key		*gv_altkey;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF int4		gv_keysize;
-GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 #ifdef GTM_CRYPT
 GBLREF io_pair		io_curr_device;
@@ -108,16 +109,22 @@ error_def(ERR_LDSPANGLOINCMP);
 
 #define	DEFAULT_SN_HOLD_BUFF_SIZE MAX_IO_BLOCK_SIZE
 
-#define KILL_INCMP_SN_IF_NEEDED													\
-{																\
-	if (!sn_incmp_gbl_already_killed)											\
-	{															\
-		COPY_KEY(sn_savekey,  gv_currkey);										\
-		COPY_KEY(gv_currkey, sn_gvkey);											\
-		bin_call_db(BIN_KILL, 0, 0);											\
-		COPY_KEY(gv_currkey, sn_savekey);										\
-		sn_incmp_gbl_already_killed = TRUE;										\
-	}															\
+#define KILL_INCMP_SN_IF_NEEDED(GVNH_REG)									\
+{														\
+	gd_region	*dummy_reg;										\
+														\
+	if (!sn_incmp_gbl_already_killed)									\
+	{													\
+		COPY_KEY(sn_savekey, gv_currkey);								\
+		COPY_KEY(gv_currkey, sn_gvkey);									\
+		/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH				\
+		 * (e.g. setting gv_cur_region for spanning globals).						\
+		 */												\
+		GV_BIND_SUBSNAME_IF_GVSPAN(GVNH_REG, gd_header, gv_currkey, dummy_reg);		\
+		bin_call_db(BIN_KILL, 0, 0);									\
+		COPY_KEY(gv_currkey, sn_savekey);								\
+		sn_incmp_gbl_already_killed = TRUE;								\
+	}													\
 }
 
 #define DISPLAY_INCMP_SN_MSG													\
@@ -175,7 +182,7 @@ error_def(ERR_LDSPANGLOINCMP);
  * that its size is 4 bytes and no valid data record can have length 4.
  */
 
-void		bin_call_db(int, INTPTR_T, INTPTR_T);
+gvnh_reg_t	*bin_call_db(int, INTPTR_T, INTPTR_T);
 void 		zwr_out_print(char * buff, int len);
 
 #define ZWR_BASE_STRIDE 1024
@@ -227,6 +234,7 @@ void bin_load(uint4 begin, uint4 end)
 	boolean_t		is_hidden_subscript, ok_to_put = TRUE, putting_a_sn = FALSE, sn_incmp_gbl_already_killed = FALSE;
 	rec_hdr			*rp, *next_rp;
 	mval			v, tmp_mval;
+	mname_entry		gvname;
 	mstr			mstr_src, mstr_dest;
 	collseq			*extr_collseq, *db_collseq, *save_gv_target_collseq;
 	coll_hdr		extr_collhdr, db_collhdr;
@@ -235,12 +243,13 @@ void bin_load(uint4 begin, uint4 end)
 	gv_key			*sn_savekey = NULL; /* null-initialize at start, will be malloced later */
 	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff = NULL, *sn_hold_buff_temp = NULL;
 #	ifdef GTM_CRYPT
-	gtmcrypt_key_t		*encr_key_handles;
-	char			*inbuf;
+	int			in_len, gtmcrypt_errno, n_index, encrypted_hash_array_len;
+	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr;
 	int4			index;
-	int			in_len, gtmcrypt_errno;
-	muext_hash_hdr_ptr_t	hash_array = NULL;
+	gtmcrypt_key_t		*encr_key_handles;
 #	endif
+	gvnh_reg_t		*gvnh_reg;
+	gd_region		*dummy_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -311,20 +320,19 @@ void bin_load(uint4 begin, uint4 end)
 #	ifdef GTM_CRYPT
 	if ('7' <= hdr_lvl)
 	{
-		int	i, num_indexes;
-		len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base);
-		hash_array = (muext_hash_hdr *)malloc(len);
-		/* store hashes of all the files used during extract into muext_hash_hdr structure */
-		memcpy((char *)hash_array, ptr, len);
-		num_indexes = len / GTMCRYPT_HASH_LEN;
-		encr_key_handles = (gtmcrypt_key_t *)malloc(SIZEOF(gtmcrypt_key_t) * num_indexes);
+		encrypted_hash_array_len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base);
+		encrypted_hash_array_ptr = malloc(encrypted_hash_array_len);
+		memcpy(encrypted_hash_array_ptr, ptr, encrypted_hash_array_len);
+		n_index = encrypted_hash_array_len / GTMCRYPT_HASH_LEN;
+		encr_key_handles = (gtmcrypt_key_t *)malloc(SIZEOF(gtmcrypt_key_t) * n_index);
 		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
 		GC_BIN_LOAD_ERR(gtmcrypt_errno);
-		for (index = 0; index < num_indexes; index++)
+		for (index = 0; index < n_index; index++)
 		{
-			if (0 == memcmp(hash_array[index].gtmcrypt_hash, EMPTY_GTMCRYPT_HASH, GTMCRYPT_HASH_LEN))
+			curr_hash_ptr = encrypted_hash_array_ptr + index * GTMCRYPT_HASH_LEN;
+			if (0 == memcmp(curr_hash_ptr, EMPTY_GTMCRYPT_HASH, GTMCRYPT_HASH_LEN))
 				continue;
-			GTMCRYPT_GETKEY(NULL, hash_array[index].gtmcrypt_hash, encr_key_handles[index], gtmcrypt_errno);
+			GTMCRYPT_GETKEY(NULL, curr_hash_ptr, encr_key_handles[index], gtmcrypt_errno);
 			GC_BIN_LOAD_ERR(gtmcrypt_errno);
 		}
 	}
@@ -373,7 +381,8 @@ void bin_load(uint4 begin, uint4 end)
 	GVKEY_INIT(sn_gvkey, DBKEYSIZE(MAX_KEY_SZ));	/* sn_gvkey will point to malloced memory after this */
 	assert(NULL == sn_savekey);	/* GVKEY_INIT macro relies on this */
 	GVKEY_INIT(sn_savekey, DBKEYSIZE(MAX_KEY_SZ));	/* sn_gvkey will point to malloced memory after this */
-	for (; !mupip_DB_full ;)
+	gvnh_reg = NULL;
+	for ( ; !mupip_DB_full; )
 	{
 		if (++rec_count > end)
 			break;
@@ -417,22 +426,29 @@ void bin_load(uint4 begin, uint4 end)
 #		endif
 		btop = ptr + len;
 		cp1 = (unsigned char*)(rp + 1);
-		v.str.addr = (char*)cp1;
+		gvname.var_name.addr = (char*)cp1;
 		while (*cp1++)
 			;
-		v.str.len =INTCAST((char*)cp1 - v.str.addr - 1);
+		gvname.var_name.len =INTCAST((char*)cp1 - gvname.var_name.addr - 1);
 		if (('2' >= hdr_lvl) || new_gvn)
 		{
-			if ((HASHT_GBLNAME_LEN == v.str.len) &&	(0 == memcmp(v.str.addr, HASHT_GBLNAME, HASHT_GBLNAME_LEN)))
+			if ((HASHT_GBLNAME_LEN == gvname.var_name.len)
+					&& (0 == memcmp(gvname.var_name.addr, HASHT_GBLNAME, HASHT_GBLNAME_LEN)))
 				continue;
-			bin_call_db(BIN_BIND, (INTPTR_T)gd_header, (INTPTR_T)&v.str);
-			max_key = gv_cur_region->max_key_size;
+			gvname.var_name.len = MIN(gvname.var_name.len, MAX_MIDENT_LEN);
+			COMPUTE_HASH_MNAME(&gvname);
+			gvnh_reg = bin_call_db(BIN_BIND, (INTPTR_T)gd_header, (INTPTR_T)&gvname);
+			/* "gv_cur_region" will be set at this point in case the global does NOT span regions.
+			 * For globals that do span regions, "gv_cur_region" will be set just before the call to op_gvput.
+			 * This value of "gvnh_reg" will be in effect until all records of this global are processed.
+			 */
+			max_key = gvnh_reg->gd_reg->max_key_size;
 			db_collhdr.act = gv_target->act;
 			db_collhdr.ver = gv_target->ver;
 			db_collhdr.nct = gv_target->nct;
 		}
 		GET_USHORT(rec_len, &rp->rsiz);
-		if (EVAL_CMPC(rp) != 0 || v.str.len > rec_len || mupip_error_occurred)
+		if ((0 != EVAL_CMPC(rp)) || (gvname.var_name.len > rec_len) || mupip_error_occurred)
 		{
 			bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 			mu_gvis();
@@ -442,9 +458,8 @@ void bin_load(uint4 begin, uint4 end)
 		if (new_gvn)
 		{
 			global_key_count = 1;
-			if ((db_collhdr.act != extr_collhdr.act || db_collhdr.ver != extr_collhdr.ver
-				|| db_collhdr.nct != extr_collhdr.nct
-				|| gv_cur_region->std_null_coll != extr_std_null_coll))
+			if ((db_collhdr.act != extr_collhdr.act) || (db_collhdr.ver != extr_collhdr.ver)
+				|| (db_collhdr.nct != extr_collhdr.nct) || (gvnh_reg->gd_reg->std_null_coll != extr_std_null_coll))
 			{
 				if (extr_collhdr.act)
 				{
@@ -487,7 +502,7 @@ void bin_load(uint4 begin, uint4 end)
 				need_xlation = FALSE;
 		}
 		new_gvn = FALSE;
-		for (; rp < (rec_hdr*)btop; rp = (rec_hdr*)((unsigned char *)rp + rec_len))
+		for ( ; rp < (rec_hdr*)btop; rp = (rec_hdr*)((unsigned char *)rp + rec_len))
 		{
 			GET_USHORT(rec_len, &rp->rsiz);
 			if (rec_len + (unsigned char *)rp > btop)
@@ -500,7 +515,7 @@ void bin_load(uint4 begin, uint4 end)
 			cp1 =  (unsigned char*)(rp + 1);
 			cp2 = gv_currkey->base + EVAL_CMPC(rp);
 			current = 1;
-			for (;;)
+			for ( ; ; )
 			{
 				last = current;
 				current = *cp2++ = *cp1++;
@@ -524,8 +539,8 @@ void bin_load(uint4 begin, uint4 end)
 			if (need_xlation)
 			{
 				assert(hdr_lvl >= '3');
-				assert(extr_collhdr.act || db_collhdr.act || extr_collhdr.nct || db_collhdr.nct ||
-				 	extr_std_null_coll != gv_cur_region->std_null_coll);
+				assert(extr_collhdr.act || db_collhdr.act || extr_collhdr.nct || db_collhdr.nct
+						|| (extr_std_null_coll != gvnh_reg->gd_reg->std_null_coll));
 							/* gv_currkey would have been modified/translated in the earlier put */
 				memcpy(gv_currkey->base, cmpc_str, next_cmpc);
 				next_rp = (rec_hdr *)((unsigned char*)rp + rec_len);
@@ -573,23 +588,13 @@ void bin_load(uint4 begin, uint4 end)
 					tmp_gvkey->end = 0;
 					if (extr_collseq)
 						gv_target->collseq = save_gv_target_collseq;
-					mval2subsc(&tmp_mval, tmp_gvkey);
+					mval2subsc(&tmp_mval, tmp_gvkey, gvnh_reg->gd_reg->std_null_coll);
 						/* we now have the correctly transformed subscript */
 					tmp_key_ptr = gv_currkey->base + gv_currkey->end;
 					memcpy(tmp_key_ptr, tmp_gvkey->base, tmp_gvkey->end + 1);
 					gv_currkey->prev = gv_currkey->end;
 					gv_currkey->end += tmp_gvkey->end;
 					gvkey_char_ptr++;
-				}
-				if ( gv_cur_region->std_null_coll != extr_std_null_coll && gv_currkey->prev)
-				{
-					if (extr_std_null_coll == 0)
-					{
-						GTM2STDNULLCOLL(gv_currkey->base, gv_currkey->end);
-					} else
-					{
-						STD2GTMNULLCOLL(gv_currkey->base, gv_currkey->end);
-					}
 				}
 			}
 			if (gv_currkey->end >= max_key)
@@ -635,7 +640,7 @@ void bin_load(uint4 begin, uint4 end)
 						expected_sn_chunk_number + 1);
 				if (sn_hold_buff_pos)
 					DISPLAY_PARTIAL_SN_HOLD_BUFF;
-				KILL_INCMP_SN_IF_NEEDED;
+				KILL_INCMP_SN_IF_NEEDED(gvnh_reg);
 				sn_hold_buff_pos = 0;
 				expected_sn_chunk_number = 0;
 				ok_to_put = TRUE;
@@ -663,7 +668,7 @@ void bin_load(uint4 begin, uint4 end)
 								expected_sn_chunk_number + 1, sn_chunk_number + 1);
 						if (sn_hold_buff_pos)
 							DISPLAY_PARTIAL_SN_HOLD_BUFF;
-						KILL_INCMP_SN_IF_NEEDED;
+						KILL_INCMP_SN_IF_NEEDED(gvnh_reg);
 					}
 					/* start building a new spanning node */
 					sn_gvkey->end = gv_currkey->end - (SPAN_SUBS_LEN + 1);
@@ -703,27 +708,26 @@ void bin_load(uint4 begin, uint4 end)
 						{
 							if (sn_hold_buff_pos != gblsize)
 							{	/* we don't have the expected size even though 	*/
-								/* we have all the expected chunks.		 		*/
+								/* we have all the expected chunks. 		*/
 								DISPLAY_INCMP_SN_MSG;
 								util_out_print("!_!_Expected size : !UL actual size : !UL", TRUE,
 										gblsize, sn_hold_buff_pos);
 								if (sn_hold_buff_pos)
 									DISPLAY_PARTIAL_SN_HOLD_BUFF;
-								KILL_INCMP_SN_IF_NEEDED;
+								KILL_INCMP_SN_IF_NEEDED(gvnh_reg);
 								expected_sn_chunk_number = 0;
 								ok_to_put = FALSE;
 								sn_hold_buff_pos = 0;
-							}
-							else
+							} else
 							{
 								expected_sn_chunk_number = 0;
 								ok_to_put = TRUE;
 								putting_a_sn = TRUE;
 							}
 
-						}else
+						} else
 							expected_sn_chunk_number++;
-					}else
+					} else
 					{
 						DISPLAY_INCMP_SN_MSG;
 						if ((sn_hold_buff_pos + v.str.len) <= gblsize)
@@ -736,7 +740,7 @@ void bin_load(uint4 begin, uint4 end)
 							DISPLAY_PARTIAL_SN_HOLD_BUFF;
 						if (v.str.len)
 							DISPLAY_VALUE("!_!_Errant Chunk :");
-						KILL_INCMP_SN_IF_NEEDED;
+						KILL_INCMP_SN_IF_NEEDED(gvnh_reg);
 						sn_hold_buff_pos = 0;
 						expected_sn_chunk_number = 0;
 					}
@@ -745,42 +749,49 @@ void bin_load(uint4 begin, uint4 end)
 				ok_to_put = TRUE;
 			if (ok_to_put)
 			{
-					if (putting_a_sn)
+				if (putting_a_sn)
+				{
+					gv_currkey->base[gv_currkey->end - (SPAN_SUBS_LEN + 1)] = 0;
+					gv_currkey->end -= (SPAN_SUBS_LEN + 1);
+					v.str.addr = sn_hold_buff;
+					v.str.len = sn_hold_buff_pos;
+				}
+				if (max_data_len < v.str.len)
+					max_data_len = v.str.len;
+				/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH
+				 * (e.g. setting gv_cur_region for spanning globals).
+				 */
+				GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey, dummy_reg);
+				bin_call_db(BIN_PUT, (INTPTR_T)&v, 0);
+				if (mupip_error_occurred)
+				{
+					if (!mupip_DB_full)
 					{
-						gv_currkey->base[gv_currkey->end - (SPAN_SUBS_LEN + 1)] = 0;
-						gv_currkey->end -= (SPAN_SUBS_LEN + 1);
-						v.str.addr = sn_hold_buff;
-						v.str.len = sn_hold_buff_pos;
+						bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+						file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);
+						util_out_print("!_!_at File offset : [0x!XL]", TRUE, file_offset);
+						DISPLAY_CURRKEY;
+						DISPLAY_VALUE("!_!_Value :");
 					}
-					if (max_data_len < v.str.len)
-						max_data_len = v.str.len;
-					bin_call_db(BIN_PUT, (INTPTR_T)&v, 0);
-					if (mupip_error_occurred)
-					{
-						if (!mupip_DB_full)
-						{
-							bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
-							file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);
-							util_out_print("!_!_at File offset : [0x!XL]", TRUE, file_offset);
-							DISPLAY_CURRKEY;
-							DISPLAY_VALUE("!_!_Value :");
-						}
-						break;
-					}
-					if (putting_a_sn)
-						putting_a_sn = FALSE;
-					else
-					{
-						key_count++;
-						global_key_count++;
-					}
+					break;
+				}
+				if (putting_a_sn)
+					putting_a_sn = FALSE;
+				else
+				{
+					key_count++;
+					global_key_count++;
+				}
 			}
 		}
 	}
-	GTMCRYPT_ONLY(
-		if (NULL != hash_array)
-			free(hash_array);
-	)
+#	ifdef GTM_CRYPT
+	if ('7' <= hdr_lvl)
+	{
+		assert(NULL != encrypted_hash_array_ptr);
+		free(encrypted_hash_array_ptr);
+	}
+#	endif
 	free(tmp_gvkey);
 	free(sn_gvkey);
 	if (NULL != sn_hold_buff)
@@ -796,20 +807,22 @@ void bin_load(uint4 begin, uint4 end)
 	}
 }
 
-void bin_call_db(int routine, INTPTR_T parm1, INTPTR_T parm2)
+gvnh_reg_t *bin_call_db(int routine, INTPTR_T parm1, INTPTR_T parm2)
 {	/* In order to duplicate the VMS functionality, which is to trap all errors in mupip_load_ch and
 	 * continue in bin_load after they occur, it is necessary to call these routines from a
 	 * subroutine due to the limitations of condition handlers and unwinding on UNIX
 	 */
+	gvnh_reg_t	*gvnh_reg;
 
-	ESTABLISH(mupip_load_ch);
+	gvnh_reg = NULL;
+	ESTABLISH_RET(mupip_load_ch, gvnh_reg);
 	switch(routine)
 	{
 		case BIN_PUT:
 			op_gvput((mval *)parm1);
 			break;
 		case BIN_BIND:
-			GV_BIND_NAME_AND_ROOT_SEARCH((gd_addr *)parm1, (mstr *)parm2);
+			GV_BIND_NAME_AND_ROOT_SEARCH((gd_addr *)parm1, (mname_entry *)parm2, gvnh_reg);
 			break;
 		case ERR_COR:
 			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_CORRUPT, 2, parm1, parm2);
@@ -818,4 +831,5 @@ void bin_call_db(int routine, INTPTR_T parm1, INTPTR_T parm2)
 			break;
 	}
 	REVERT;
+	return gvnh_reg;
 }

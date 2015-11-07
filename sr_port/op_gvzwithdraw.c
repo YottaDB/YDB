@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,14 +52,21 @@ void op_gvzwithdraw(void)
 
 	SETUP_THREADGBL_ACCESS;
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
+	{
+		assert(cs_addrs == &FILE_INFO(gv_cur_region)->s_addrs);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
+	}
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
-	if (gv_cur_region->dyn.addr->acc_meth == dba_bg || gv_cur_region->dyn.addr->acc_meth == dba_mm)
+	if (REG_ACC_METH(gv_cur_region) == dba_bg || REG_ACC_METH(gv_cur_region) == dba_mm)
 	{
+		/* No special code needed for spanning globals here since we are in the region we want to be
+		 * and all we want to do is kill one node in this region (not a subtree underneath) even if
+		 * the global spans multiple regions. Hence there is no need to invoke gvcst_spr_kill here.
+		 */
 		if (IS_OK_TO_INVOKE_GVCST_KILL(gv_target))
 			gvcst_kill(FALSE);
-	} else if (gv_cur_region->dyn.addr->acc_meth == dba_cm)
+	} else if (REG_ACC_METH(gv_cur_region) == dba_cm)
 		gvcmx_kill(FALSE);
 	else
 		gvusr_kill(FALSE);
@@ -93,7 +100,7 @@ void with_var(void)
 		REVERT;
 		return;
 	}
-	assert(gv_cur_region->dyn.addr->acc_meth == dba_cm);
+	assert(REG_ACC_METH(gv_cur_region) == dba_cm);
 	gvcmx_kill(FALSE);
 	REVERT;
 }

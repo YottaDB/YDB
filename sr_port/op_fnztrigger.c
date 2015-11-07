@@ -41,7 +41,6 @@
 GBLREF	sgmnt_data_ptr_t cs_data;
 GBLREF  uint4		dollar_tlevel;
 GBLREF	gd_addr		*gd_header;
-GBLREF	gd_binding	*gd_map;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;
 GBLREF	gv_namehead	*gv_target;
@@ -55,9 +54,8 @@ GBLREF	boolean_t	donot_INVOKE_MUMTSTART;
 LITREF	mval	literal_zero;
 LITREF	mval	literal_one;
 
-STATICDEF char		save_currkey[SIZEOF(gv_key) + SIZEOF(short) + DBKEYSIZE(MAX_KEY_SZ)];	/* SIZEOF(short) for alignment */
+STATICDEF gv_key	save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 STATICDEF gd_addr	*save_gd_header;
-STATICDEF gd_binding	*save_gd_map;
 STATICDEF gv_key	*save_gv_currkey;
 STATICDEF gv_namehead	*save_gv_target;
 STATICDEF gd_region	*save_gv_cur_region;
@@ -100,12 +98,10 @@ LITDEF enum ztrprms ztrprm_data[] =
 /* reset global variables from the values noted down at op_fnztrigger entry */
 #define RESTORE_ZTRIGGER_ENTRY_STATE												\
 {																\
-	unsigned short	top;													\
 	DCL_THREADGBL_ACCESS;													\
 																\
 	SETUP_THREADGBL_ACCESS;													\
 	/* Reset global variables noted down at function entry */								\
-	gd_map = save_gd_map;													\
 	gd_header = save_gd_header;												\
 	if (NULL != save_gv_cur_region)												\
 	{															\
@@ -118,9 +114,7 @@ LITDEF enum ztrprms ztrprm_data[] =
 		 * inside the trigger* functions above. Therefore take care not to overwrite that				\
 		 * part of the gv_currkey structure. Restore everything else.							\
 		 */														\
-		top = gv_currkey->top;												\
-		memcpy(gv_currkey, save_gv_currkey, SIZEOF(gv_key) + save_gv_currkey->end);					\
-		gv_currkey->top = top;												\
+		COPY_KEY(gv_currkey, save_gv_currkey);										\
 	} else if (NULL != gv_currkey)												\
 	{															\
 		gv_currkey->end = 0;												\
@@ -136,7 +130,7 @@ LITDEF enum ztrprms ztrprm_data[] =
  */
 CONDITION_HANDLER(op_fnztrigger_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 
 	RESTORE_ZTRIGGER_ENTRY_STATE;
 	DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);
@@ -160,7 +154,7 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	if (0 < gtm_trigger_depth)
 	{
 		DEBUG_ONLY(in_op_fnztrigger = FALSE);
-		rts_error(VARLSTCNT(4) ERR_DZTRIGINTRIG, 2, dollar_ztname->len, dollar_ztname->addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DZTRIGINTRIG, 2, dollar_ztname->len, dollar_ztname->addr);
 	}
 	MV_FORCE_STR(func);
 	MV_FORCE_STR(arg1);
@@ -170,29 +164,27 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	{
 		DEBUG_ONLY(in_op_fnztrigger = FALSE;)
 		/* We have a wrong-sized keyword */
-		rts_error(VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 1);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 1);
 	}
 	if (0 > (index = namelook(ztrprm_index, ztrprm_names, func->str.addr, inparm_len)))	/* Note assignment */
 	{
 		DEBUG_ONLY(in_op_fnztrigger = FALSE);
 		/* Specified parm was not found */
-		rts_error(VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 1);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 1);
 	}
 	if ((0 < arg1->str.len) && (0 == arg1->str.addr[0]))
 	{
 		DEBUG_ONLY(in_op_fnztrigger = FALSE);
 		/* 2nd parameter is invalid */
-		rts_error(VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 2);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 2);
 	}
 	save_gd_header = gd_header;
 	save_gv_target = gv_target;
-	save_gd_map = gd_map;
 	save_gv_cur_region = gv_cur_region;
 	if (NULL != gv_currkey)
-	{	/* Align save_gv_currkey on a "short" boundary, but first we check that field "gv_currkey->end" is truly short */
-		assert(SIZEOF(short) == SIZEOF(save_gv_currkey->end));
-		save_gv_currkey = (gv_key *)ROUND_UP2((INTPTR_T)&save_currkey[0], SIZEOF(gv_currkey->end));
-		memcpy(save_gv_currkey, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
+	{
+		save_gv_currkey = (gv_key *)&save_currkey[0];
+		MEMCPY_KEY(save_gv_currkey, gv_currkey);
 		save_gv_last_subsc_null = TREF(gv_last_subsc_null);
 		save_gv_some_subsc_null = TREF(gv_some_subsc_null);
 	} else
@@ -221,9 +213,9 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 		case ZTRP_FILE:
 			if (0 == arg1->str.len)
 				/* 2nd parameter is missing */
-				rts_error(VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 2);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 2);
 			if (MAX_FN_LEN < arg1->str.len)
-				rts_error(VARLSTCNT(1) ERR_FILENAMETOOLONG);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_FILENAMETOOLONG);
 			/* The file name is in string pool so make a local copy in case GC happens */
 			strncpy(filename, arg1->str.addr, arg1->str.len);
 			filename_len = arg1->str.len;
@@ -233,14 +225,15 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 		case ZTRP_ITEM:
 			if (0 == arg1->str.len)
 				/* 2nd parameter is missing */
-				rts_error(VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 2);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 2);
 			failed = trigger_update(arg1->str.addr, arg1->str.len);
 			break;
 		case ZTRP_SELECT:
 			failed = (TRIG_FAILURE == trigger_select(arg1->str.addr, arg1->str.len, NULL, 0));
 			break;
 		default:
-			GTMASSERT;	/* Should never happen with checks above */
+			assertpro(FALSE && ztrprm_data[index]);	/* Should never happen with checks above */
+			break;
 	}
 	REVERT;
 	RESTORE_ZTRIGGER_ENTRY_STATE;
@@ -253,6 +246,6 @@ error_def(ERR_UNIMPLOP);
 
 void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 {
-	rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 }
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2012 Fidelity Information Services, Inc.*
+ *	Copyright 2002, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -349,12 +349,19 @@ boolean_t cli_disallow_mupip_replic_source(void)
 	disallow_return_value = cli_check_any2(VARLSTCNT(11) p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);
 	CLI_DIS_CHECK_N_RESET;
 
-	/* BUFFSIZE, CMPLVL, FILTER, PASSIVE are supported only with START qualifier */
+	/* It's an error to specify TLSID and PLAINTEXTFALLBACK qualifiers on platforms that don't support SSL/TLS communication. */
+#	ifndef GTM_TLS
+	disallow_return_value = (d_c_cli_present("PLAINTEXTFALLBACK") || d_c_cli_present("TLSID"));
+	CLI_DIS_CHECK_N_RESET;
+#	endif
+	/* BUFFSIZE, CMPLVL, FILTER, PASSIVE, PLAINTEXTFALLBACK and TLSID  are supported only with START qualifier */
 	disallow_return_value = (!d_c_cli_present("START")
 					&& (d_c_cli_present("BUFFSIZE")
 						|| d_c_cli_present("CMPLVL")
 						|| d_c_cli_present("FILTER")
-						|| d_c_cli_present("PASSIVE")));
+						|| d_c_cli_present("PASSIVE")
+						|| d_c_cli_present("PLAINTEXTFALLBACK")
+						|| d_c_cli_present("TLSID")));
 	CLI_DIS_CHECK_N_RESET;
 	/* CONNECTPARAMS, SECONDARY are supported only with START or ACTIVATE qualifiers */
 	disallow_return_value = (!d_c_cli_present("START") && !d_c_cli_present("ACTIVATE")
@@ -411,6 +418,11 @@ boolean_t cli_disallow_mupip_replic_source(void)
 	/* DETAIL is compatible only with JNLPOOL */
 	disallow_return_value = (!d_c_cli_present("JNLPOOL") && d_c_cli_present("DETAIL"));
 	CLI_DIS_CHECK_N_RESET;
+#	ifdef GTM_TLS
+	/* PLAINTEXTFALLBACK is supported only with TLSID qualifier */
+	disallow_return_value = (!d_c_cli_present("TLSID") && d_c_cli_present("PLAINTEXTFALLBACK"));
+	CLI_DIS_CHECK_N_RESET;
+#	endif
 	return FALSE;
 }
 

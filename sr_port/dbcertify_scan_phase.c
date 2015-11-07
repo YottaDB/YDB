@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -203,7 +203,8 @@ void dbcertify_scan_phase(void)
 			memcpy(badfn, dbfn, len);
 			badfn[len] = 0;
 			strcat((char_ptr_t)badfn, DEFAULT_OUTFILE_SUFFIX);
-			rts_error(VARLSTCNT(6) ERR_FILENAMETOOLONG, 0, ERR_TEXT, 2, RTS_ERROR_STRING((char_ptr_t)badfn));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILENAMETOOLONG, 0,
+						ERR_TEXT, 2, RTS_ERROR_STRING((char_ptr_t)badfn));
 		}
 		strcpy((char_ptr_t)psa->outfn, (char_ptr_t)dbfn);
 		strcat((char_ptr_t)psa->outfn, DEFAULT_OUTFILE_SUFFIX);
@@ -211,7 +212,7 @@ void dbcertify_scan_phase(void)
 	/* Build data structures and open database */
 	MALLOC_INIT(psa->dbc_gv_cur_region, SIZEOF(gd_region));
 	MALLOC_INIT(psa->dbc_gv_cur_region->dyn.addr, SIZEOF(gd_segment));
-	psa->dbc_gv_cur_region->dyn.addr->acc_meth = dba_bg;
+	REG_ACC_METH(psa->dbc_gv_cur_region) = dba_bg;
 	len = strlen((char_ptr_t)dbfn);
 	strcpy((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn);
 	psa->dbc_gv_cur_region->dyn.addr->fname_len = (unsigned short)len;
@@ -228,14 +229,15 @@ void dbcertify_scan_phase(void)
 	max_max_rec_size = psa->dbc_cs_data->blk_size - SIZEOF(blk_hdr);
 	if (VMS_ONLY(9) UNIX_ONLY(8) > psa->dbc_cs_data->reserved_bytes)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_DBMINRESBYTES, 2, VMS_ONLY(9) UNIX_ONLY(8), psa->dbc_cs_data->reserved_bytes);
+		gtm_putmsg_csa(CSA_ARG(NULL)
+			VARLSTCNT(4) ERR_DBMINRESBYTES, 2, VMS_ONLY(9) UNIX_ONLY(8), psa->dbc_cs_data->reserved_bytes);
 		if (!psa->report_only)
 			exit(SS_NORMAL - 1);	/* Gives -1 on UNIX (failure) and 0 on VMS (failure) */
 	}
 	if (psa->dbc_cs_data->max_rec_size > max_max_rec_size)
 	{
-		gtm_putmsg(VARLSTCNT(5) ERR_DBMAXREC2BIG, 3, psa->dbc_cs_data->max_rec_size, psa->dbc_cs_data->blk_size,
-			  max_max_rec_size);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBMAXREC2BIG, 3,
+			psa->dbc_cs_data->max_rec_size, psa->dbc_cs_data->blk_size, max_max_rec_size);
 		if (!psa->report_only)
 			exit(SS_NORMAL - 1);
 	}
@@ -249,7 +251,7 @@ void dbcertify_scan_phase(void)
 		{	/* The following STRERROR() extraction necessary for VMS portability */
 			save_errno = errno;
 			errmsg = STRERROR(save_errno);
-			rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn),
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn),
 				  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 		}
 #	ifdef __MVS__
@@ -348,7 +350,7 @@ void dbcertify_scan_phase(void)
 		{
 			save_errno = errno;
 			errmsg = STRERROR(save_errno);
-			rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("lseek()"), CALLFROM,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("lseek()"), CALLFROM,
 				  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 		}
 		psa->ofhdr.tn = psa->dbc_cs_data->trans_hist.curr_tn;
@@ -371,7 +373,7 @@ void dbcertify_scan_phase(void)
 		{
 			save_errno = errno;
 			errmsg = STRERROR(save_errno);
-			rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM,
 				  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 		}
 	}
@@ -435,7 +437,7 @@ void dbc_write_p1out(phase_static_area *psa, void *obuf, int olen)
 	{
 		save_errno = errno;
 		errmsg = STRERROR(save_errno);
-		rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM,
 			  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 	}
 }
@@ -513,7 +515,7 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 				assert(0 == ((v15_blk_hdr_ptr_t)psa->block_buff)->levl);
 				psa->gvtlvl0++;
 				key_ptr = dbc_format_key(psa, rec_ptr);	/* Text representation of the key */
-				gtm_putmsg(VARLSTCNT(9) ERR_DBCREC2BIG, 7,
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DBCREC2BIG, 7,
 					   RTS_ERROR_STRING((char_ptr_t)key_ptr), rec_len,
 					   blk_num, psa->dbc_cs_data->max_rec_size,
 					   psa->dbc_gv_cur_region->dyn.addr->fname_len,
@@ -525,15 +527,17 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 					{
 						save_errno = errno;
 						errmsg = STRERROR(save_errno);
-						rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM,
-							  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
+						rts_error_csa(CSA_ARG(NULL)
+							VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM,
+							ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 					}
 					if (-1 == remove((char_ptr_t)psa->outfn))
 					{	/* Delete bogus output file */
 						save_errno = errno;
 						errmsg = STRERROR(save_errno);
-						rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("remove()"), CALLFROM,
-							  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
+						rts_error_csa(CSA_ARG(NULL)
+							VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("remove()"), CALLFROM,
+							ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 					}
 					psa->report_only = TRUE; /* No more writing to output file */
 				}
@@ -715,14 +719,14 @@ void dbc_integ_error(phase_static_area *psa, block_id blk_num, char_ptr_t emsg)
 			{
 				save_errno = errno;
 				errmsg = STRERROR(save_errno);
-				rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM,
 					  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 			}
 			if (-1 == remove((char_ptr_t)psa->outfn))
 			{	/* Delete bogus output file */
 				save_errno = errno;
 				errmsg = STRERROR(save_errno);
-				rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("remove()"), CALLFROM,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("remove()"), CALLFROM,
 					  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 			}
 			psa->report_only = TRUE; /* No more writing to output file */
@@ -733,7 +737,7 @@ void dbc_integ_error(phase_static_area *psa, block_id blk_num, char_ptr_t emsg)
 		len = strlen((char_ptr_t)intgerrmsg);
 		i2hex(blk_num, &intgerrmsg[len], 8);
 		intgerrmsg[len + 8] = 0;
-		rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 			  ERR_TEXT, 2, RTS_ERROR_STRING((char_ptr_t)intgerrmsg));
 	}
 }
@@ -796,7 +800,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	if (NULL == gv_target)
 	{
 		gv_target = malloc(SIZEOF(gv_namehead) + psa->dbc_cs_data->max_key_size);
-		gv_target->clue.prev = 0;
+		/* No need to initialize gv_target->clue.prev as it is not currently used */
 		gv_target->clue.top = psa->first_rec_key->top;
 	}
 	/* Copy our key to gv_target->clue since dbc_gv_key is somewhat different */
@@ -837,7 +841,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 		}
 		gv_altkey->end = psa->first_rec_key->gvn_len + 1;
 		memcpy(gv_altkey->base, psa->first_rec_key->base, psa->first_rec_key->gvn_len + 1);
-		act_in_gvt();
+		act_in_gvt(gv_target);
 	}
 	assert(gv_target->act || NULL == gv_target->collseq);
 	/* Format the resulting key into the result buffer which is sized appropriately for this task */

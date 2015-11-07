@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,8 +59,8 @@ int f_piece(oprtype *a, opctype op)
 	}
 	assert(TRIP_REF == x.oprclass);
 	if ((TK_COMMA != TREF(window_token)) && (OC_LIT == x.oprval.tref->opcode)
-		 && (1 == ((gtm_utf8_mode && (OC_FNZPIECE != op))  ?   MV_FORCE_LEN(&x.oprval.tref->operand[0].oprval.mlit->v)
-								   : x.oprval.tref->operand[0].oprval.mlit->v.str.len)))
+	    && (1 == ((gtm_utf8_mode && (OC_FNZPIECE != op)) ? MV_FORCE_LEN_DEC(&x.oprval.tref->operand[0].oprval.mlit->v)
+		      : x.oprval.tref->operand[0].oprval.mlit->v.str.len)))
 	{	/* Potential shortcut to op_fnzp1 or op_fnp1. Make some further checks */
 		delim_mval = &x.oprval.tref->operand[0].oprval.mlit->v;
 		/* Both valid chars of char_len 1 and invalid chars of byte length 1 get the fast path */

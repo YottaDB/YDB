@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,9 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
         static MSTR_CONST(xback_sym, "gtm_ac_xback");
         static MSTR_CONST(verify_sym, "gtm_ac_verify");
         static MSTR_CONST(version_sym, "gtm_ac_version");
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(map_sym_ch);
 	fspec_desc.dsc$w_length = fspec->len;
 	fspec_desc.dsc$b_dtype = DSC$K_DTYPE_T;
@@ -73,7 +75,9 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 			ret_collseq->argtype = 1;
 		} else
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_COLLFNMISSING, 3, LEN_AND_LIT("gtm_ac_xback_1()"), ret_collseq->act );
+			if (!TREF(skip_gtm_putmsg))
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_COLLFNMISSING, 3,
+						LEN_AND_LIT("gtm_ac_xback_1()"), ret_collseq->act);
 			CHECK_ERR_STAT;
 		}
 	}
@@ -97,7 +101,9 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 				ret_collseq->argtype = 0;
 			} else
 			{
-				gtm_putmsg(VARLSTCNT(5) ERR_COLLFNMISSING, 3, LEN_AND_LIT("gtm_ac_xback()"), ret_collseq->act );
+				if (!TREF(skip_gtm_putmsg))
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_COLLFNMISSING, 3,
+							LEN_AND_LIT("gtm_ac_xback()"), ret_collseq->act);
 				CHECK_ERR_STAT;
 			}
 		} else /* Neither xform_1 or xform is found */
@@ -127,7 +133,7 @@ STATICFNDEF CONDITION_HANDLER(map_sym_ch)
 {
 	int4 	status;
 
-	START_CH;
+	START_CH(FALSE);
 
 	if (DUMP)
 		NEXTCH;

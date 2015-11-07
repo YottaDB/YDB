@@ -102,7 +102,7 @@ enum dse_fmt
 #else
 # define GET_CONFIRM(X, Y)								\
 {											\
-	if(!cli_get_str("CONFIRMATION",(X),&(Y)))					\
+	if (!cli_get_str("CONFIRMATION", (X), &(Y)))					\
 	{										\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEWCINITCON);		\
 		return;									\
@@ -127,7 +127,7 @@ enum dse_fmt
 #define DSE_WCREINIT(CS_ADDRS)										\
 {													\
 	assert(CS_ADDRS->now_crit);									\
-	if (CS_ADDRS->hdr->acc_meth == dba_bg)								\
+	if (dba_bg == CS_ADDRS->hdr->acc_meth)								\
 		bt_refresh(CS_ADDRS, TRUE);								\
 	db_csh_ref(CS_ADDRS, TRUE);									\
 	send_msg_csa(CSA_ARG(CS_ADDRS) VARLSTCNT(4) ERR_DSEWCREINIT, 2, DB_LEN_STR(gv_cur_region));	\
@@ -139,13 +139,11 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len);
 int dse_is_blk_in(sm_uc_ptr_t rp, sm_uc_ptr_t r_top, short size);
 int dse_ksrch(block_id srch, block_id_ptr_t pp, int4 *off, char *targ_key, int targ_len);
 int dse_key_srch(block_id srch, block_id_ptr_t pp, int4 *off, char *targ_key, int targ_len);
-int dse_order(block_id srch, block_id_ptr_t pp, int4 *op, char *targ_key, short int targ_len,
-	bool dir_data_blk);
+int dse_order(block_id srch, block_id_ptr_t pp, int4 *op, char *targ_key, short int targ_len, bool dir_data_blk);
 void  dse_rmsb(void);
 void dse_ctrlc_handler(int sig);
 void dse_exhaus(int4 pp, int4 op);
-void dse_m_rest(block_id blk, unsigned char *bml_list, int4 bml_size, sm_vuint_ptr_t blks_ptr,
-	bool in_dir_tree);
+void dse_m_rest(block_id blk, unsigned char *bml_list, int4 bml_size, sm_vuint_ptr_t blks_ptr, bool in_dir_tree);
 void dse_rmrec(void);
 void dse_find_roots(block_id index);
 boolean_t dse_fdmp(sm_uc_ptr_t data, int len);
@@ -187,5 +185,6 @@ sm_uc_ptr_t dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_
 void dse_dmp_fhead (void);
 void dse_ctrlc_handler(int sig);
 void dse_remove(void);
+gv_namehead *dse_find_gvt(gd_region *reg, char *name, int name_len);
 
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@ GBLREF	uint4		dollar_tlevel;
 GBLREF io_pair		io_curr_device;
 
 error_def(ERR_LOADFILERR);
+error_def(ERR_FILEOPENFAIL);
 error_def(ERR_PREMATEOF);
 
 static char		buff1[BUFF_SIZE];
@@ -74,6 +75,8 @@ void file_input_init(char *fn, short fn_len)
 	val.str.addr = (char *)fn;
 	/* The mode will be set to M for reads */
 	status = (*op_open_ptr)(&val, &pars, 0, 0);
+	if (!status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILEOPENFAIL, 2, fn_len, fn);
 	pars.str.len = SIZEOF(iop_eol);
 	pars.str.addr = (char *)&no_param;
 	op_use(&val, &pars);
@@ -111,9 +114,9 @@ int	file_input_bin_get(char **in_ptr, ssize_t *file_offset, char **buff_base)
 		if (0 >= (rd_len = file_input_bin_read()))	/* NOTE assignment */
 		{
 			if (buff1_end != buff1_ptr)
-				rts_error(VARLSTCNT(1) ERR_PREMATEOF);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
 			else  if (-1 == rd_len)
-				rts_error(VARLSTCNT(4) ERR_LOADFILERR, 2, load_fn_len, load_fn_ptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADFILERR, 2, load_fn_len, load_fn_ptr);
 			else
 			{
 				REVERT;
@@ -134,8 +137,8 @@ int	file_input_bin_get(char **in_ptr, ssize_t *file_offset, char **buff_base)
 		if ((rd_len + buff1_end - buff1_ptr) < s1)
 		{
 			if (-1 == rd_len)
-				rts_error(VARLSTCNT(4) ERR_LOADFILERR, 2, load_fn_len, load_fn_ptr);
-			rts_error(VARLSTCNT(1) ERR_PREMATEOF);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADFILERR, 2, load_fn_len, load_fn_ptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
 		}
 		buff1_end += rd_len;
 	}
@@ -166,7 +169,7 @@ int file_input_bin_read(void)
 #	ifdef DEBUG_FO_BIN
 	PRINTF("int file_input_bin_read:\t\tread(%d, %x, %d) = %d\n", d_rm->fildes, buff1,  BUFF_SIZE, s1);
 	if (BUFF_SIZE - s1 > rdlen)
-		rts_error(VARLSTCNT(1) errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 #	endif
 	return rdlen;
 }
@@ -190,7 +193,7 @@ int file_input_get(char **in_ptr)
 		{
 			REVERT;
 			if (io_curr_device.in->dollar.x)
-				rts_error(VARLSTCNT(1) ERR_PREMATEOF);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
 			return -1;
 		}
 		if (mbuff_len < ret_len + rd_len)

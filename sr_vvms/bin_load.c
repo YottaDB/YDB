@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,8 @@
 #include "mvalconv.h"
 #include "mu_gvis.h"
 #include "gtmmsg.h"
+#include "hashtab_mname.h"
+#include "min_max.h"
 
 #define 	CR 13
 #define 	LF 10
@@ -52,7 +54,6 @@ GBLREF bool		mupip_error_occurred;
 GBLREF spdesc 		stringpool;
 GBLREF gv_key		*gv_altkey;
 GBLREF gv_key		*gv_currkey;
-GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*gd_header;
 GBLREF int4		gv_keysize;
 GBLREF gv_namehead	*gv_target;
@@ -86,7 +87,6 @@ error_def(ERR_TEXT);
 
 void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 {
-
 	boolean_t	need_xlation, new_gvn;
 	char 		*buff, std_null_coll[BIN_HEADER_NUMSZ + 1];
 	coll_hdr	db_collhdr, extr_collhdr;
@@ -100,6 +100,9 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 	unsigned char	*btop, *cp1, *cp2, *end_buff, *gvkey_char_ptr, hdr_lvl ,*tmp_ptr, *tmp_key_ptr,
 			cmpc_str[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ], dup_key_str[MAX_KEY_SZ + 1], src_buff[MAX_KEY_SZ + 1];
 	unsigned short	next_cmpc, rec_len;
+	mname_entry	gvname;
+	gvnh_reg_t	*gvnh_reg;
+	gd_region	*dummy_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -110,9 +113,9 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 	rec_count = 1;
 	status = sys$get(inrab);
 	if (RMS$_EOF == status)
-		rts_error(VARLSTCNT(1) ERR_PREMATEOF);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	len = inrab->rab$w_rsz;
 	buff = inrab->rab$l_rbf;
 	while ((0 < len) && ((LF == buff[len - 1]) || (CR == buff[len - 1])))
@@ -123,7 +126,7 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
         if (0 != memcmp(buff, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || '2' > hdr_lvl
 	    || *(BIN_HEADER_VERSION) < hdr_lvl)
 	{				/* ignore the level check */
-		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
 		return;
 	}
 	if ('3' < hdr_lvl)
@@ -133,8 +136,8 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 		extr_std_null_coll = STRTOUL(std_null_coll, NULL, 10);
 		if (0 != extr_std_null_coll && 1!= extr_std_null_coll)
 		{
-                	rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupted null collation field in header"),
-				ERR_LDBINFMT);
+                	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
+				ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupted null collation field in header"), ERR_LDBINFMT);
 			return;
 		}
 	} else
@@ -195,18 +198,19 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 	{
 		status = sys$get(inrab);
 		if (RMS$_EOF == status)
-			rts_error(VARLSTCNT(1) ERR_PREMATEOF);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
 		if (!(status & 1))
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		if (SIZEOF(coll_hdr) != inrab->rab$w_rsz)
                 {
-                        rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupt collation header"), ERR_LDBINFMT);
+                        rts_error_csa(CSA_ARG(NULL)
+				VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupt collation header"), ERR_LDBINFMT);
 			return;
                 }
 		extr_collhdr = *((coll_hdr *)(inrab->rab$l_rbf));
 		new_gvn = TRUE;
 	} else
-		gtm_putmsg(VARLSTCNT(3) ERR_OLDBINEXTRACT, 1, hdr_lvl - '0');
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_OLDBINEXTRACT, 1, hdr_lvl - '0');
 	if (begin < 2)
 		begin = 2;
 	for ( ; rec_count < begin; )
@@ -215,11 +219,11 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 		if (RMS$_EOF == status)
 		{
 			sys$close(infab);
-			gtm_putmsg(VARLSTCNT(3) ERR_LOADEOF, 1, begin);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, begin);
 			mupip_exit(ERR_MUNOACTION);
 		}
 		if (RMS$_NORMAL != status)
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		if (SIZEOF(coll_hdr) == inrab->rab$w_rsz)
 		{
 			assert(hdr_lvl > '2');
@@ -239,6 +243,7 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 	other_rsz = 0;
 	assert(NULL == tmp_gvkey);	/* GVKEY_INIT macro relies on this */
 	GVKEY_INIT(tmp_gvkey, DBKEYSIZE(MAX_KEY_SZ));	/* tmp_gvkey will point to malloced memory after this */
+	gvnh_reg = NULL;
 	for ( ; !mupip_DB_full; )
 	{
 		if (++rec_count > end)
@@ -303,15 +308,21 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 		v.str.len = cp1 - (unsigned char *)v.str.addr - 1;
 		if (hdr_lvl <= '2' || new_gvn)
 		{
-			GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &v.str);
-			max_key = gv_cur_region->max_key_size;
+			gvname.var_name = v.str;
+			gvname.var_name.len = MIN(gvname.var_name.len, MAX_MIDENT_LEN);
+			COMPUTE_HASH_MNAME(&gvname);
+			GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gvname, gvnh_reg);
+			/* "gv_cur_region" will be set at this point in case the global does NOT span regions.
+			 * For globals that do span regions, "gv_cur_region" will be set just before the call to op_gvput
+			 */
+			max_key = gvnh_reg->gd_reg->max_key_size;
 			db_collhdr.act = gv_target->act;
 			db_collhdr.ver = gv_target->ver;
 			db_collhdr.nct = gv_target->nct;
 		}
 		if ((0 != rp->cmpc) || (v.str.len > rp->rsiz) || mupip_error_occurred)
 		{
-			rts_error(VARLSTCNT(4) ERR_CORRUPT, 2, rec_count, global_key_count);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT, 2, rec_count, global_key_count);
 			mu_gvis();
 			util_out_print(0, TRUE);
 			continue;
@@ -319,9 +330,8 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 		if (new_gvn)
 		{
 			global_key_count = 1;
-			if ((db_collhdr.act != extr_collhdr.act || db_collhdr.ver != extr_collhdr.ver ||
-				db_collhdr.nct != extr_collhdr.nct || extr_std_null_coll != gv_cur_region->std_null_coll))
-				/* do we need to bother about 'ver' change ??? */
+			if ((db_collhdr.act != extr_collhdr.act) || (db_collhdr.ver != extr_collhdr.ver)
+				|| (db_collhdr.nct != extr_collhdr.nct) || (gvnh_reg->gd_reg->std_null_coll != extr_std_null_coll))
 			{
 				if (extr_collhdr.act)
 				{
@@ -329,13 +339,13 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 					{
 						if (!do_verify(extr_collseq, extr_collhdr.act, extr_collhdr.ver))
 						{
-							rts_error(VARLSTCNT(8) ERR_COLLTYPVERSION, 2,
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_COLLTYPVERSION, 2,
 								extr_collhdr.act, extr_collhdr.ver,
 								ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
 						}
 					} else
 					{
-						rts_error(VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, extr_collhdr.act,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, extr_collhdr.act,
 							ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
 					}
 				}
@@ -345,13 +355,13 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 					{
 						if (!do_verify(db_collseq, db_collhdr.act, db_collhdr.ver))
 						{
-							rts_error(VARLSTCNT(8) ERR_COLLTYPVERSION, 2, db_collhdr.act,
-								db_collhdr.ver,
+							rts_error_csa(CSA_ARG(NULL)
+								VARLSTCNT(8) ERR_COLLTYPVERSION, 2, db_collhdr.act, db_collhdr.ver,
 								ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
 						}
 					} else
 					{
-						rts_error(VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, db_collhdr.act,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, db_collhdr.act,
 							ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
 					}
 				}
@@ -371,7 +381,7 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 			}
 			if (rec_len + (unsigned char *)rp > btop)
 			{
-				rts_error(VARLSTCNT(4) ERR_CORRUPT, 2, rec_count, global_key_count);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT, 2, rec_count, global_key_count);
 				mu_gvis();
 				util_out_print(0, TRUE);
 				break;
@@ -388,7 +398,7 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 				if ((cp1 > ((unsigned char *)rp + rec_len)) ||
 				    (cp2 > ((unsigned char *)gv_currkey + gv_currkey->top)))
 				{
-					rts_error(VARLSTCNT(4) ERR_CORRUPT, 2, rec_count, global_key_count);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT, 2, rec_count, global_key_count);
 					mu_gvis();
 					util_out_print(0, TRUE);
 					break;
@@ -411,8 +421,8 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 				} else
 					next_cmpc = 0;
 				assert(hdr_lvl >= '3');
-				assert(extr_collhdr.act || db_collhdr.act || extr_collhdr.nct || db_collhdr.nct ||
-				 	extr_std_null_coll != gv_cur_region->std_null_coll);
+				assert(extr_collhdr.act || db_collhdr.act || extr_collhdr.nct || db_collhdr.nct
+						|| (extr_std_null_coll != gvnh_reg->gd_reg->std_null_coll));
 							/* the length of the key might change (due to nct variation),
 							 * so get a copy of the original key from the extract */
 				memcpy(dup_key_str, gv_currkey->base, gv_currkey->end + 1);
@@ -449,7 +459,7 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 					tmp_gvkey->end = 0;
 					if (extr_collseq)
 						gv_target->collseq = save_gv_target_collseq;
-					mval2subsc(&tmp_mval, tmp_gvkey);
+					mval2subsc(&tmp_mval, tmp_gvkey, gvnh_reg->gd_reg->std_null_coll);
 					/* we now have the correctly transformed subscript */
 					tmp_key_ptr = gv_currkey->base + gv_currkey->end;
 					memcpy(tmp_key_ptr, tmp_gvkey->base, tmp_gvkey->end + 1);
@@ -457,20 +467,10 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 					gv_currkey->end += tmp_gvkey->end;
 					gvkey_char_ptr++;
 				}
-				if ((gv_cur_region->std_null_coll != extr_std_null_coll) && gv_currkey->prev)
-				{
-					if (extr_std_null_coll == 0)
-					{
-						GTM2STDNULLCOLL(gv_currkey->base, gv_currkey->end);
-					} else
-					{
-						STD2GTMNULLCOLL(gv_currkey->base, gv_currkey->end);
-					}
-				}
 			}
 			if (gv_currkey->end >= max_key)
 			{
-				rts_error(VARLSTCNT(4) ERR_CORRUPT, 2, rec_count, global_key_count);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT, 2, rec_count, global_key_count);
 				mu_gvis();
 				util_out_print(0, TRUE);
 				continue;
@@ -479,12 +479,16 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 			v.str.len = rec_len - (cp1 - (unsigned char *)rp);
 			if (max_data_len < v.str.len)
 				max_data_len = v.str.len;
+			/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH
+			 * (e.g. setting gv_cur_region for spanning globals).
+			 */
+			GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey, dummy_reg);
 			op_gvput(&v);
 			if (mupip_error_occurred)
 			{
 				if (!mupip_DB_full)
 				{
-					rts_error(VARLSTCNT(4) ERR_CORRUPT, 2, rec_count, global_key_count);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT, 2, rec_count, global_key_count);
 					util_out_print(0, TRUE);
 				}
 				break;

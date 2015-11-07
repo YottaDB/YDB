@@ -18,6 +18,8 @@
 #include "mlkdef.h"
 #include "zshow.h"
 #include "io.h"
+#include "copy.h"
+#include "rtn_src_chksum.h"
 
 #define ZTRAP_FRAME		"    ($ZTRAP)"
 #define ZBRK_FRAME		"    (ZBREAK)"
@@ -35,14 +37,14 @@
 
 GBLREF stack_frame *frame_pointer;
 
-void zshow_stack(zshow_out *output)
+void zshow_stack(zshow_out *output, boolean_t show_checksum)
 {
 	boolean_t	line_reset;
 	unsigned char	*addr;
 	unsigned short	nocount_frames[MAX_INDR_PER_COUNTED], *nfp;
 	stack_frame	*fp;
 	mstr 		v;
-	unsigned char	buff[MAX_ENTRYREF_LEN + SIZEOF(INDR_OVERFLOW)];
+	unsigned char	buff[MAX_ENTRYREF_LEN + MAX_ROUTINE_CHECKSUM_DIGITS + SIZEOF(INDR_OVERFLOW)];
 
 	v.addr = (char *)&buff[0];
 	flush_pio();
@@ -50,16 +52,9 @@ void zshow_stack(zshow_out *output)
 	line_reset = FALSE;
 	for (fp = frame_pointer; ; fp = fp->old_frame_pointer)
 	{
+		fp = SKIP_BASE_FRAME(fp);
 		if (NULL == fp->old_frame_pointer)
-		{	/* This frame is a base frame - endpoint or jump it? */
-#		ifdef GTM_TRIGGER
-			if (fp->type & SFT_TRIGR)
-				/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by base_frame() */
-				fp = *(stack_frame **)(fp + 1);
-			else
-#		endif
-				break;	/* Endpoint.. */
-		}
+			break; /* Endpoint.. */
 		if (!(fp->type & SFT_COUNT) || ((fp->type & SFT_ZINTR) && (fp->flags & SFF_INDCE)))
 		{	/* SFT_ZINTR is normally indirect but if the frame has been replaced by non-indirect frame via ZGOTO or GOTO
 			 * then do not include it in the indirect list here.
@@ -89,7 +84,11 @@ void zshow_stack(zshow_out *output)
 			{
 				MEMCPY_LIT(&buff[0], UNK_LOC_MESS);
 				v.len = SIZEOF(UNK_LOC_MESS) - 1;
-			}
+			} /*else if (show_checksum && !(fp->type & SFT_DM)) Don't print noisy 000...000 checksum for GTM$DMOD */
+			/* {
+				v.len += SPRINTF(&buff[v.len], ":");
+				v.len += append_checksum(&buff[v.len], fp->rvector);
+			}*/
 			if (nfp != &nocount_frames[0])
 			{
 				for (--nfp; nfp >= &nocount_frames[0]; nfp--)
@@ -130,6 +129,14 @@ void zshow_stack(zshow_out *output)
 				nfp = &nocount_frames[0];
 			} else
 			{
+				if ((0 < v.len) && show_checksum)
+				{	/* Note: we don't print a noisy 000...000 checksum for GTM$DMOD, because that logic
+					 * goes through the if-block above. Instead we only print checksums for "real" routines,
+					 * where it is meaningful.
+					 */
+					buff[v.len++] = ':';
+					v.len += append_checksum(&buff[v.len], fp->rvector);
+				}
 				output->flush = TRUE;
 				zshow_output(output, &v);
 			}

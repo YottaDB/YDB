@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2011 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -9,9 +9,29 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 gde:	;base module - d DEBUG^GDE to debug
-	i $$set^%LCLCOL(0)
+	n  ; clear calling process M variable state (if any) so it does not interfere with GDE variable names
 	s (debug,runtime)=0
 DBG:	;transfer point for DEBUG and "runtime" %gde
+	; Save parent process context before GDE tampers with it for its own necessities.
+	; Most of it is stored in the "gdeEntryState" local variable in subscripted nodes.
+	; Exceptions are local collation related act,ncol,nct values which have to be stored in in unsubscripted variables
+	;	to prevent COLLDATAEXISTS error as part of the $$set^%LCLCOL below.
+	n gdeEntryState,gdeEntryStateAct,gdeEntryStateNcol,gdeEntryStateNct
+	s gdeEntryStateAct=$$get^%LCLCOL
+	s gdeEntryStateNcol=$$getncol^%LCLCOL
+	s gdeEntryStateNct=$$getnct^%LCLCOL
+	; Set local collation to what GDE wants to operate. Errors while doing so will have to exit GDE right away.
+	; Prepare special $etrap to issue error in case VIEW "YLCT" call to set local collation fails below
+	; Need to use this instead of the gde $etrap (set a few lines later below) as that expects some initialization
+	; to have happened whereas we are not yet there since setting local collation is a prerequisite for that init.
+	i $zver'["VMS" s $et="w !,$p($zs,"","",3,999) s $ecode="""" zm 150503603:$zparse(""$gtmgbldir"","""",""*.gld"") quit"
+	else           s $et="w !,$p($zs,"","",3,999) s $ecode="""" zm 150503603:$zparse(""GTM$GBLDIR"","""",""*.GLD"") quit"
+	v "YLCT":0:1:0		; sets local variable alternate collation = 0, null collation = 1, numeric collation = 0
+	; since GDE creates null subscripts, we dont want user level setting of gtm_lvnullsubs to affect us in any way
+	s gdeEntryState("nullsubs")=$v("LVNULLSUBS")
+	v "LVNULLSUBS"
+	s gdeEntryState("zlevel")=$zlevel-1
+	s gdeEntryState("io")=$io
 	s $et=$s(debug:"b:$zs'[""%GDE""!allerrs  ",1:"")_"g:(""%GDE%NONAME""[$p($p($zs,"","",3),""-"")) SHOERR^GDE d ABORT^GDE"
 	s io=$io,useio="io",comlevel=0,combase=$zl,resume(0)=$zl_":INTERACT"
 	i $$set^%PATCODE("M")
@@ -25,27 +45,41 @@ DBG:	;transfer point for DEBUG and "runtime" %gde
 INTERACT
 	f  u io:ctrap=$c(25,26) w !,prompt," " r comline u @useio d comline:$l(comline)
 	q
-comline: s cp=1,ntoken="",ntoktype="TKEOL" s:runtime comline="/"_comline d GETTOK^GDESCAN
+comline:
+	f cp=1:1 s c=$e(comline,cp) q:(c'=" ")&(c'=TAB)	 ; remove extraneous whitespace at beginning of line
+	s ntoken="",ntoktype="TKEOL" s:runtime comline="/"_comline
+	d GETTOK^GDESCAN
+	i ntoktype="TKEOL" q	 ; if comline begins with a ! dont even bother parsing this line anymore
 	i log u @uself w comline,! u @useio
 	i runtime n NAME,REGION,SEGMENT,gqual,lquals zg:"/QUIT"[$tr(comline,lower,upper) combase-1 d SHOW^GDEPARSE q
-	i ntoktype="TKAMPER" s resume(comlevel+1)=$zl d comfile q
+	i ntoktype="TKAT" s resume(comlevel+1)=$zl d comfile q
 	d GDEPARSE^GDEPARSE
 	q
 CTRL
 	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(3) encountered" do  zg @resume(comlevel)
-	. i comlevel>0 d comeof; if we take a ctrl-c in a command file then get out of that command file
-	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(25) encountered" h
+	. i comlevel>0 d comeof ; if we take a ctrl-c in a command file then get out of that command file
+	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(25) encountered" d GETOUT^GDEEXIT h
 	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(26) encountered" d EXIT^GDEEXIT
 	i $p($zs,",",3,999)="%GTM-E-IOEOF, Attempt to read past an end-of-file" d comexit
 	i $zeof d EXIT^GDEEXIT
 	d ABORT
 	;
 comexit: i 'update d QUIT^GDEQUIT
-	i $$ALL^GDEVERIF,$$GDEPUT^GDEPUT  h
-DBGCOMX u $i:exception="" s $et="" zm (gdeerr("VERIFY")\2*2):"FAILED"
+	i $$ALL^GDEVERIF,$$GDEPUT^GDEPUT
+	e  w $p($zm(gdeerr("VERIFY")\2*2),"!AD")_"FAILED" w !
+	d GETOUT^GDEEXIT
+	h
+DBGCOMX u $i:exception="" s $et="" zm gdeerr("VERIFY"):"FAILED" w !
+	d GETOUT^GDEEXIT
 	h
 comfile:
-	d GETTOK^GDESCAN,TFSPEC^GDEPARSE
+	d GETTOK^GDESCAN
+	i ntoktype="TKEOL" zm gdeerr("QUALREQD"):"file specification"
+	d TFSPEC^GDEPARSE
+	; remove trailing whitespaces in filename
+	n i
+	f i=$zl(value):-1  s c=$ze(value,i)  q:(c'=" ")&(c'=TAB)  ; remove trailing 0s
+	s value=$ze(value,1,i)
 	s (comfile,comfile(comlevel+1))=$zparse(value,"","",".COM")
 	i '$l($zsearch(comfile)),'$l($zsearch(comfile)) zm gdeerr("FILENOTFND"):comfile
 	e  o comfile:(read:exc="zg "_$zl_":comeof") zm gdeerr("EXECOM"):comfile d SCRIPT
@@ -56,7 +90,7 @@ comeof	c comfile s comlevel=$select(comlevel>1:comlevel-1,1:0)
 	q
 SCRIPT:
 	s comlevel=comlevel+1
-	f  u comfile r comline i $e(comline,1)'="!" u @useio d comline:$l(comline)
+	f  u comfile r comline u @useio d comline:$l(comline)
 	;this loop is terminated by the comfile exception at eof
 SHOERR
 	w !,$p($zs,",",3,999),!
@@ -71,8 +105,9 @@ ABORT
 	; make GDECHECK error fatal except native UNIX
         i $d(gdeerr) zm gdeerr("GDECHECK") Write $ZMessage($Select($ZVersion'["VMS"&(256>abortzs):+abortzs,1:+abortzs\8*8+4)),!
         e  w $zs
-        h
+        d GETOUT^GDEEXIT
+	h
 DEBUG	;entry point to debug gde
-	i $$set^%LCLCOL(0)
+	n  ; clear calling process M variable state (if any) so it does not interfere with GDE variable names
 	s allerrs=0,debug=1,runtime=0 u 0:(ctrap="":exception="") zb DBGCOMX,ABORT
 	g DBG

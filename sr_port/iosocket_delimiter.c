@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,6 @@
 
 #include "io.h"
 #include "iottdef.h"
-#include "iotcpdef.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "gtm_conv.h"
@@ -114,7 +113,7 @@ boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len
 		}
 		if (counter > MAX_DELIM_LEN)
 		{
-			rts_error(VARLSTCNT(1) ERR_DELIMSIZNA);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
 			return FALSE;
 		}
 	}
@@ -140,7 +139,7 @@ void iosocket_delim_conv(socket_struct *socketptr, gtm_chset_t to_chset)
 		assert(MAX_DELIM_LEN > new_delim_len);
 		if (MAX_DELIM_LEN < new_delim_len)
 		{
-			rts_error(VARLSTCNT(1) ERR_DELIMSIZNA);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
 			return;
 		}
 		socketptr->idelimiter[delim_index].len = new_delim_len;

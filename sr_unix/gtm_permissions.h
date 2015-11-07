@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ error_def(ERR_PERMGENDIAG);
 
 int gtm_get_group_id(struct stat *stat_buff);
 int gtm_member_group_id(int uid, int gid);
-int gtm_set_group_and_perm(struct stat *stat_buff, int *group_id, int *perm, enum perm_target_types target_type,
-			   struct perm_diag_data *pdd);
+int gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *perm, enum perm_target_types target_type,
+			struct perm_diag_data *pdd);
 
 #endif /* GTM_PERMISSIONS */

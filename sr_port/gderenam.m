@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -14,9 +14,13 @@ NAME(old,new)
 	i old="*" zm gdeerr("LVSTARALON")
 	i '$d(nams(old)) d error1
 	i $d(nams(new)) d error2
-	s update=1,nams(new)=nams(old),s=""
-	f  s s=$o(nams(old,s)) q:'$l(s)  s nams(new,s)=nams(old,s)
+	; check if changing a name (with ranges) poses issues with overlap amongst other existing name ranges
+	d namerangeoverlapcheck^GDEPARSE(.new,nams(old),old)
+	s update=1
+	m nams(new)=new
+	s nams(new)=nams(old)
 	k nams(old)
+	i $d(namrangeoverlap) d namcoalesce^GDEMAP
 	q
 REGION(old,new)
 	i old=new q
@@ -36,6 +40,21 @@ SEGMENT(old,new)
 	i '$$SQUALS^GDEVERIF(am,.lquals) k segs(new) zm gdeerr("OBJNOTCHG"):"segment":old
 	s segs(new,"ACCESS_METHOD")=am k segs(old)
 	f  s s=$o(regs(s)) q:'$l(s)  i regs(s,"DYNAMIC_SEGMENT")=old s regs(s,"DYNAMIC_SEGMENT")=new
+	q
+GBLNAME(old,new)
+	i old=new q
+	i '$d(gnams(old)) d error1
+	; check if changing (i.e. deleting) collation for "old" GBLNAME poses issues with existing names & ranges
+	i $d(gnams(old,"COLLATION")) d
+	. d gblnameeditchecks^GDEPARSE(old,0)
+	. i $d(namrangeoverlap) d namcoalesce^GDEMAP
+	i $d(gnams(new)) d error2
+	; check if changing (i.e. adding) collation for "new" GBLNAME poses issues with existing names & ranges
+	d gblnameeditchecks^GDEPARSE(new,+$get(gnams(old,"COLLATION")))
+	i $d(namrangeoverlap) d namcoalesce^GDEMAP
+	s update=1
+	m gnams(new)=gnams(old)
+	k gnams(old)
 	q
 error1:
 	zm gdeerr("OBJNOTFND"):"Old "_$tr(gqual,upper,lower):old

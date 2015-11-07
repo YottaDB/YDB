@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,8 +47,8 @@ error_def(ERR_BADSRVRNETMSG);
 error_def(ERR_INVNETFILNM);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_NETDBOPNERR);
+error_def(ERR_REMOTEDBNOSPGBL);
 error_def(ERR_SYSCALL);
-
 
 #define GTCM_ENVVAR_PFX "GTCM_"
 #define GTCM_ENVVAR_PFXLEN (SIZEOF(GTCM_ENVVAR_PFX) - 1)
@@ -74,9 +74,11 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	UNIX_ONLY(MSTR_DEF(task, 0, NULL);)
 
 	ESTABLISH(gvcmy_open_ch);
+	if (reg->is_spanned)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REMOTEDBNOSPGBL, 2, REG_LEN_STR(reg));
 #ifdef VMS
 	if (!nb->nam$b_node)
-		rts_error(VARLSTCNT(1) ERR_INVNETFILNM);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVNETFILNM);
 	top = nb->nam$l_esa + nb->nam$b_esl;
 	fn = nb->nam$l_node + nb->nam$b_node;
 	node.dsc$b_dtype = task.dsc$b_dtype = 14;
@@ -88,7 +90,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	status = TRANS_LOG_NAME(&task1, &task2, (char *)buff, SIZEOF(buff), dont_sendmsg_on_log2long);
 #elif defined(UNIX)
 	if (!pb->b_node)
-		rts_error(VARLSTCNT(1) ERR_INVNETFILNM);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVNETFILNM);
 	fn = (unsigned char *)pb->l_dir;
 	top = fn + pb->b_esl - pb->b_node; 	/* total length except node gives end of string */
 	/*
@@ -122,10 +124,11 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		{
 #			ifdef UNIX
 			if (SS_LOG2LONG == status)
-				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, task1.len, task1.addr, SIZEOF(buff) - 1);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(5) ERR_LOGTOOLONG, 3, task1.len, task1.addr, SIZEOF(buff) - 1);
 			else
 #			endif
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 		VMS_ONLY(
 			task.dsc$a_pointer = buff;
@@ -164,14 +167,14 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	{
 		if (new)
 			gvcmy_close(clb_ptr);
-		rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
 	}
 	status = cmi_read(clb_ptr);
 	if (CMI_ERROR(status))
 	{
 		if (new)
 			gvcmy_close(clb_ptr);
-		rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
 	}
 	if (CMMS_T_REGNUM != *clb_ptr->mbf)
 	{
@@ -179,7 +182,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		{
 			if (new)
 				gvcmy_close(clb_ptr);
-			rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
 		}
 		gvcmz_errmsg(clb_ptr, new);
 	}
@@ -209,7 +212,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	reg->std_null_coll = (li->server_supports_std_null_coll) ? *ptr++ : 0;
 		/* From level 210 (GT.M V5), server will send null subscript collation info into CMMS_S_INITREG message */
 	reg->dyn.addr->cm_blk = clb_ptr;
-	reg->dyn.addr->acc_meth = dba_cm;
+	REG_ACC_METH(reg) = dba_cm;
 	SET_REGION_OPEN_TRUE(reg, WAS_OPEN_FALSE);
 	clb_ptr->mbl = li->buffer_size;
 	if (clb_ptr->mbl < CM_MINBUFSIZE)

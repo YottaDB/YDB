@@ -118,15 +118,17 @@ boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsiz
 		if (issue_rts_error == error_action)
 		{
 			if (SS_LOG2LONG == status)
-				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(temp_inst_fn) - 1);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr,
+					      SIZEOF(temp_inst_fn) - 1);
 			else
-				rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLINSTUNDEF);
 		} else if (issue_gtm_putmsg == error_action)
 		{
 			if (SS_LOG2LONG == status)
-				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(temp_inst_fn) - 1);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr,
+					       SIZEOF(temp_inst_fn) - 1);
 			else
-				gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLINSTUNDEF);
 		}
 	}
 	return ret;
@@ -175,7 +177,7 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	}
 	OPENFILE(fn, O_RDONLY, fd);
 	if (FD_INVALID == fd)
-		rts_error(VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
 	assert(0 < buflen);
 	if (0 != offset)
 	{
@@ -194,8 +196,8 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 		{	/* Have read the entire label in the instance file header. Check if it is the right version */
 			if (memcmp(buff, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1))
 			{
-				rts_error(VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
-					GDS_REPL_INST_LABEL_SZ - 1, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1, buff);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
+					      GDS_REPL_INST_LABEL_SZ - 1, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1, buff);
 			}
 		}
 		if (0 == status)
@@ -205,14 +207,14 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 			/* Check endianness match */
 			if (GTM_IS_LITTLE_ENDIAN != replhdr->is_little_endian)
 			{
-				rts_error(VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
-					LEN_AND_LIT(ENDIANTHIS), LEN_AND_LIT(ENDIANOTHER));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
+					      LEN_AND_LIT(ENDIANTHIS), LEN_AND_LIT(ENDIANOTHER));
 			}
 			/* Check 64bitness match */
 			if (GTM_IS_64BIT != replhdr->is_64bit)
 			{
-				rts_error(VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
-					LEN_AND_LIT(GTM_BITNESS_THIS), LEN_AND_LIT(GTM_BITNESS_OTHER));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
+					      LEN_AND_LIT(GTM_BITNESS_THIS), LEN_AND_LIT(GTM_BITNESS_OTHER));
 			}
 			/* At the time of this writing, the only minor version supported is 1.
 			 * Whenever this gets updated, we need to add code to do the online upgrade.
@@ -228,14 +230,15 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	if (0 != status)
 	{
 		if (-1 == status)
-			rts_error(VARLSTCNT(6) ERR_REPLINSTREAD, 4, buflen, (qw_off_t *)&offset, LEN_AND_STR(fn));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTREAD, 4, buflen, (qw_off_t *)&offset, LEN_AND_STR(fn));
 		else
-			rts_error(VARLSTCNT(7) ERR_REPLINSTREAD, 4, buflen, (qw_off_t *)&offset, LEN_AND_STR(fn), status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLINSTREAD, 4, buflen, (qw_off_t *)&offset, LEN_AND_STR(fn),
+				      status);
 	}
 	CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
 	assert(0 == status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
 }
 
 /* Description:
@@ -290,9 +293,9 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	if (FD_INVALID == fd)
 	{
 		if (!in_repl_inst_create)
-			rts_error(VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
 		else
-			rts_error(VARLSTCNT(5) ERR_REPLINSTCREATE, 2, LEN_AND_STR(fn), errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTCREATE, 2, LEN_AND_STR(fn), errno);
 	}
 #ifdef __MVS__
 	if (-1 == (in_repl_inst_create ? gtm_zos_set_tag(fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag) :
@@ -303,11 +306,12 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	REPL_INST_LSEEKWRITE(fd, offset, buff, buflen, status);
 	assert(0 == status);
 	if (0 != status)
-		rts_error(VARLSTCNT(7) ERR_REPLINSTWRITE, 4, buflen, (qw_off_t *)&offset, LEN_AND_STR(fn), status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLINSTWRITE, 4, buflen, (qw_off_t *)&offset, LEN_AND_STR(fn),
+			      status);
 	CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
 	assert(0 == status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
 }
 
 /* Description:
@@ -344,15 +348,15 @@ void	repl_inst_sync(char *fn)
 	oflag = O_RDWR;
 	OPENFILE3(fn, oflag, 0666, fd);
 	if (FD_INVALID == fd)
-		rts_error(VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
 	GTM_REPL_INST_FSYNC(fd, status);
 	assert(0 == status);
 	if (0 != status)
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fsync()"), CALLFROM, errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fsync()"), CALLFROM, errno);
 	CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
 	assert(0 == status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
 }
 
 /* Description:
@@ -441,7 +445,7 @@ void	repl_inst_ftok_sem_lock(void)
 		if (!ftok_sem_lock(reg, FALSE, FALSE))
 		{
 			assert(FALSE);
-			rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, LEN_AND_STR(udi->fn));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLFTOKSEM, 2, LEN_AND_STR(udi->fn));
 		}
 	}
 	assert(udi->grabbed_ftok_sem);
@@ -469,7 +473,7 @@ void	repl_inst_ftok_sem_release(void)
 		if (!ftok_sem_release(reg, FALSE, FALSE))
 		{
 			assert(FALSE);
-			rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, LEN_AND_STR(udi->fn));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLFTOKSEM, 2, LEN_AND_STR(udi->fn));
 		}
 	}
 	assert(!udi->grabbed_ftok_sem);
@@ -605,7 +609,7 @@ int4	repl_inst_wrapper_histinfo_find_seqno(seq_num seqno, int4 strm_idx, repl_hi
 	{
 		status = ERR_REPLINSTNOHIST;
 		SPRINTF(histdetail, "seqno "INT8_FMT" "INT8_FMTX, seqno - 1, seqno - 1);
-		gtm_putmsg(VARLSTCNT(6) ERR_REPLINSTNOHIST, 4, LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTNOHIST, 4, LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
 	} else
 		assert(0 <= local_histinfo->histinfo_num);
 	return status;
@@ -659,8 +663,8 @@ void	repl_inst_histinfo_add(repl_histinfo *histinfo)
 		assert(jnlpool.jnlpool_ctl->last_histinfo_seqno == last_histinfo->start_seqno);
 		if (histinfo->start_seqno < last_histinfo->start_seqno)
 		{	/* cannot create histinfo with out-of-order start_seqno */
-			rts_error(VARLSTCNT(8) ERR_REPLINSTSEQORD, 6, LEN_AND_LIT("New history record"),
-				&histinfo->start_seqno, &last_histinfo->start_seqno, LEN_AND_STR(udi->fn));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTSEQORD, 6, LEN_AND_LIT("New history record"),
+				      &histinfo->start_seqno, &last_histinfo->start_seqno, LEN_AND_STR(udi->fn));
 		}
 	}
 	strm_histinfo_num = jnlpool.repl_inst_filehdr->last_histinfo_num[strm_idx];
@@ -864,8 +868,8 @@ seq_num	repl_inst_histinfo_truncate(seq_num rollback_seqno)
 				assert(FALSE);
 				NON_GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%llx]", rollback_seqno - 1));
 				GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%lx]", rollback_seqno - 1));
-				gtm_putmsg(VARLSTCNT(6) MAKE_MSG_WARNING(ERR_REPLINSTNOHIST), 4,
-							LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_REPLINSTNOHIST), 4,
+					       LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
 			}
 			index = -1;
 			/* Since we are rolling back all history records in the instance file,
@@ -1223,7 +1227,7 @@ int4	repl_inst_reset_zqgblmod_seqno_and_tn(void)
 	/* We use the same code dse uses to open all regions but we must make sure they are all open before proceeding. */
 	all_files_open = region_init(FALSE);
 	if (!all_files_open)
-		rts_error(VARLSTCNT(1) ERR_NOTALLDBOPN);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBOPN);
 	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 	for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions;  reg < reg_top;  reg++)
 	{

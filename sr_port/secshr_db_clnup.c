@@ -471,7 +471,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					if (csa->timer)
 					{
 						if (-1 < cnl->wcs_timers) /* private flag is optimistic: dont overdo */
-							CAREFUL_DECR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
+							PROBE_DECR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
 						csa->timer = FALSE;
 					}
 					if (csa->read_write && csa->ref_cnt)
@@ -479,15 +479,15 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						assert(0 < cnl->ref_cnt);
 						csa->ref_cnt--;
 						assert(!csa->ref_cnt);
-						CAREFUL_DECR_CNT(&cnl->ref_cnt, &cnl->wc_var_lock);
+						PROBE_DECR_CNT(&cnl->ref_cnt, &cnl->wc_var_lock);
 					}
 				}
 				if ((csa->in_wtstart) && (0 < cnl->in_wtstart))
 				{
-					CAREFUL_DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
+					PROBE_DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
 					assert(0 < cnl->intent_wtstart);
 					if (0 < cnl->intent_wtstart)
-						CAREFUL_DECR_CNT(&cnl->intent_wtstart, &cnl->wc_var_lock);
+						PROBE_DECR_CNT(&cnl->intent_wtstart, &cnl->wc_var_lock);
 				}
 				csa->in_wtstart = FALSE;	/* Let wcs_wtstart run for exit processing */
 				if (cnl->wcsflu_pid == rundown_process_id)
@@ -669,8 +669,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				assert((T_COMMIT_CRIT_PHASE2 == csa->t_commit_crit) || csa->now_crit);
 				if (T_COMMIT_CRIT_PHASE1 == csa->t_commit_crit)
 				{	/* in PHASE1 so hold crit AND have noted down valid value in csa->prev_free_blks */
-					assert(NORMAL_TERMINATION != secshr_state); /* for normal termination we should not
-										     * have been in the midst of commit */
+					/* for normal termination we should not have been in the midst of commit */
+					assert((NORMAL_TERMINATION != secshr_state) || WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART));
 					assert(csa->now_crit);
 					csd->trans_hist.free_blocks = csa->prev_free_blks;
 				}
@@ -911,8 +911,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					 * holding crit at this point.
 					 */
 					set_wc_blocked = TRUE;
-					assert(NORMAL_TERMINATION != secshr_state); /* for normal termination we should not
-										     * have been in the midst of commit */
+					/* for normal termination we should not have been in the midst of commit */
+					assert((NORMAL_TERMINATION != secshr_state) || WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART));
 					if (tp_update_underway)
 					{	/* Since the current cse has not been committed, this is a partial
 						 * GT.M commit in this region even if we have already seen committed cses.
@@ -1543,7 +1543,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						|| (REG_COMMIT_PARTIAL == this_reg_commit_type)
 						|| (REG_COMMIT_UNSTARTED == this_reg_commit_type));
 					/* We have already checked that "si" is READABLE. Check that it is WRITABLE since
-					 * we might need to set "si->kip_csa" in the CAREFUL_INCR_KIP macro.
+					 * we might need to set "si->kip_csa" in the PROBE_INCR_KIP macro.
 					 */
 					if (GTM_PROBE(SIZEOF(sgm_info), si, WRITE))
 					{
@@ -1558,7 +1558,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					if (REG_COMMIT_COMPLETE != this_reg_commit_type)
 					{
 						if (kip_csa_usable && (NULL != si->kill_set_head) && (NULL == si->kip_csa))
-							CAREFUL_INCR_KIP(csd, csa, si->kip_csa);
+							PROBE_INCR_KIP(csd, csa, si->kip_csa);
 					} else
 						assert((NULL == si->kill_set_head) || (NULL != si->kip_csa));
 					assert((NULL == si->kill_set_head) || (NULL != si->kip_csa));
@@ -1582,7 +1582,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					}
 					if (needkipincr && kip_csa_usable && (NULL == *kip_csa_addrs))
 					{
-						CAREFUL_INCR_KIP(csd, csa, *kip_csa_addrs);
+						PROBE_INCR_KIP(csd, csa, *kip_csa_addrs);
 						*need_kip_incr_addrs = FALSE;
 					}
 #					ifdef UNIX
@@ -1625,8 +1625,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					if (kip_csa_usable && (NULL != si->kill_set_head) && (NULL != si->kip_csa))
 					{
 						assert(csa == si->kip_csa);
-						CAREFUL_DECR_KIP(csd, csa, si->kip_csa);
-						CAREFUL_INCR_ABANDONED_KILLS(csd, csa);
+						PROBE_DECR_KIP(csd, csa, si->kip_csa);
+						PROBE_INCR_ABANDONED_KILLS(csd, csa);
 					} else
 						assert((NULL == si->kill_set_head) || (NULL == si->kip_csa));
 				} else if (!dlr_tlevel)
@@ -1638,8 +1638,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					if (kip_csa_usable && (NULL != *kip_csa_addrs) && (csa == *kip_csa_addrs))
 					{
 						assert(0 < (*kip_csa_addrs)->hdr->kill_in_prog);
-						CAREFUL_DECR_KIP(csd, csa, *kip_csa_addrs);
-						CAREFUL_INCR_ABANDONED_KILLS(csd, csa);
+						PROBE_DECR_KIP(csd, csa, *kip_csa_addrs);
+						PROBE_INCR_ABANDONED_KILLS(csd, csa);
 					}
 				}
 			}
@@ -1724,20 +1724,20 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				}
 				UNIX_ONLY(
 					/* cannot send oplog message in VMS as privileged routines cannot do I/O */
-					send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_STR(wcblocked_ptr),
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_STR(wcblocked_ptr),
 						rundown_process_id, &csd->trans_hist.curr_tn, DB_LEN_STR(reg));
 				)
 			}
 			csa->wbuf_dqd = 0;		/* We can clear the flag now */
 			if (csa->wcs_pidcnt_incremented)
-				CAREFUL_DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl);
+				PROBE_DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl);
 			if (csa->now_crit)
 			{
 				if (csd->trans_hist.curr_tn == csd->trans_hist.early_tn - 1)
 				{	/* there can be at most one region in non-TP with different curr_tn and early_tn */
 					assert(!non_tp_update_underway || first_time);
-					assert(NORMAL_TERMINATION != secshr_state); /* for normal termination we should not
-										     * have been in the midst of commit */
+					/* for normal termination we should not have been in the midst of commit */
+					assert((NORMAL_TERMINATION != secshr_state) || WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART));
 					DEBUG_ONLY(first_time = FALSE;)
 					if (update_underway)
 					{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,11 +31,7 @@ CONDITION_HANDLER(omi_dbms_ch)
     GBLREF int4	 omi_errno;
     int		dummy1, dummy2;
 
-    START_CH;
-
-    if (SEVERITY == SUCCESS || SEVERITY == INFO) {
-	CONTINUE;
-    }
+    START_CH(TRUE);
 
     PRN_ERROR;
     gtcm_rep_err("",SIGNAL);
@@ -46,5 +42,4 @@ CONDITION_HANDLER(omi_dbms_ch)
     }
 
     NEXTCH;
-
 }

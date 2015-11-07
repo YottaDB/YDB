@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,10 @@
 #define MUPINT_H
 
 /*  requires gdsroot.h */
+
+#define	MUINTKEY_FALSE		0 /* -subscript was NOT specified as part of mupip integ */
+#define	MUINTKEY_TRUE		1 /* -subscript was specified as part of mupip integ */
+#define	MUINTKEY_NULLSUBS	2 /* -subscript was specified as part of mupip integ AND there was at least one null subscript */
 
 #define	NO_ONLINE_ERR_MSG	"ONLINE qualifier for this region will be ignored"
 

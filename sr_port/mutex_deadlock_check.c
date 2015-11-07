@@ -126,8 +126,12 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr, sgmnt_addrs *csa)
 			{	/* grab_lock going for crit on the jnlpool region. gv_cur_region points to the current region of
 				 * interest, which better have REPL_ENABLED or REPL_WAS_ENABLED, and be now crit
 				 */
-				assert(cs_addrs == &FILE_INFO(gv_cur_region)->s_addrs);
-				cs_addrs->crit_check_cycle = crit_deadlock_check_cycle; /* allow for crit in gv_cur_region */
+				if ((NULL != cs_addrs) && cs_addrs->now_crit)
+				{	/* cs_addrs can be NULL if it is open, but there is no update on that region */
+					assert(cs_addrs == &FILE_INFO(gv_cur_region)->s_addrs);
+					/* allow for crit in gv_cur_region */
+					cs_addrs->crit_check_cycle = crit_deadlock_check_cycle;
+				}
 			}
 		} else
                 {       /* Need to mark the regions allowed to have crit as follows: Place the current cycle into the csa's of

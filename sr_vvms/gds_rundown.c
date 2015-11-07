@@ -99,7 +99,7 @@ CONDITION_HANDLER(gds_rundown_ch)
 	uint4			outaddrs[2], retadr[2], status;
 	boolean_t		nonclst_bg;
 
-        START_CH;
+        START_CH(FALSE);
 
 	if (PRO_ONLY(mu_rndwn_process &&) DUMPABLE && !SUPPRESS_DUMP)
 		TERMINATE;
@@ -166,7 +166,7 @@ CONDITION_HANDLER(gds_rundown_ch)
 		cs_addrs->lock_addrs[0] = NULL;
 	}
         PRN_ERROR;
-	gtm_putmsg(VARLSTCNT(4) ERR_DBRNDWN, 2, REG_LEN_STR(gv_cur_region));
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRNDWN, 2, REG_LEN_STR(gv_cur_region));
         UNWIND(NULL, NULL);
 }
 
@@ -260,9 +260,9 @@ void	gds_rundown(void)
 						jnl_put_jrt_pfin(cs_addrs);
 						if (SS_NORMAL != (jnl_status = jnl_flush(gv_cur_region)))
 						{
-							send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(cs_data),
-								ERR_TEXT, 2,
-									RTS_ERROR_TEXT("Error with journal flush in gds_rundown1"),
+							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_JNLFLUSH, 2,
+								JNL_LEN_STR(cs_data), ERR_TEXT, 2,
+								RTS_ERROR_TEXT("Error with journal flush in gds_rundown1"),
 								jnl_status);
 							assert(NOJNL == jpc->channel);/* jnl file lost has been triggered */
 							/* In this routine, all code that follows from here on does not
@@ -439,8 +439,8 @@ void	gds_rundown(void)
 							{
 								if (SS_NORMAL != (jnl_status = jnl_flush(gv_cur_region)))
 								{
-									send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(cs_data),
-										ERR_TEXT, 2,
+									send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_JNLFLUSH, 2,
+										JNL_LEN_STR(cs_data), ERR_TEXT, 2,
 										RTS_ERROR_TEXT( \
 										"Error with journal flush in gds_rundown2"),
 										jnl_status);
@@ -521,10 +521,13 @@ void	gds_rundown(void)
 			ipc_deleted = TRUE;
 		} else if (is_src_server || is_updproc)
 		{
-			gtm_putmsg(VARLSTCNT(6) ERR_DBRNDWNWRN, 4, DB_LEN_STR(gv_cur_region), process_id, process_id);
-			send_msg(VARLSTCNT(6) ERR_DBRNDWNWRN, 4, DB_LEN_STR(gv_cur_region), process_id, process_id);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBRNDWNWRN, 4, DB_LEN_STR(gv_cur_region),
+					process_id, process_id);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBRNDWNWRN, 4, DB_LEN_STR(gv_cur_region),
+					process_id, process_id);
 		} else
-			send_msg(VARLSTCNT(6) ERR_DBRNDWNWRN, 4, DB_LEN_STR(gv_cur_region), process_id, process_id);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBRNDWNWRN, 4, DB_LEN_STR(gv_cur_region),
+					process_id, process_id);
 	}
 	/* ------------------------- take care of locks ------------------------------------ */
 	if (TRUE == clustered)
@@ -558,16 +561,16 @@ void	gds_rundown(void)
 	{
 		GET_CUR_TIME;
 		if (is_src_server)
-			gtm_putmsg(VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
 				LEN_AND_LIT("Source server"), REG_LEN_STR(gv_cur_region));
 		if (is_updproc)
-			gtm_putmsg(VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
 				LEN_AND_LIT("Update process"), REG_LEN_STR(gv_cur_region));
 		if (mupip_jnl_recover)
 		{
-			gtm_putmsg(VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
 				LEN_AND_LIT("Mupip journal process"), REG_LEN_STR(gv_cur_region));
-			send_msg(VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
 				LEN_AND_LIT("Mupip journal process"), REG_LEN_STR(gv_cur_region));
 		}
 	}

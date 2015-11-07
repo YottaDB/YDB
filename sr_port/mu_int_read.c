@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 #	ifdef UNIX
 	if (region && csa->nl->onln_rlbk_pid)
 	{
-		gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
 		mupip_exit(ERR_INTEGERRS);
 	}
 #	endif
@@ -91,7 +91,8 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 			 * crit as GT.M is the only one that sets it and INTEG (while doing snapshot cleanup) is the only one
 			 * that resets it
 			 */
-			gtm_putmsg(VARLSTCNT(5) ERR_REGSSFAIL, 3, ss_shm_ptr->failed_pid, DB_LEN_STR(gv_cur_region));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_REGSSFAIL, 3, ss_shm_ptr->failed_pid,
+						DB_LEN_STR(gv_cur_region));
 			mupip_exit(ERR_INTEGERRS);
 		}
 	}
@@ -116,7 +117,8 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 				ss_get_block(csa, blk, tmp_ptr);
 			else
 			{
-				gtm_putmsg(VARLSTCNT(5) ERR_REGSSFAIL, 3, ss_shm_ptr->failed_pid, DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_REGSSFAIL, 3, ss_shm_ptr->failed_pid,
+							DB_LEN_STR(gv_cur_region));
 				mupip_exit(ERR_INTEGERRS);
 			}
 		}
@@ -124,9 +126,9 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 	}
 #	ifdef GTM_CRYPT
 	in_len = MIN(mu_int_data.blk_size, ((blk_hdr_ptr_t)tmp_ptr)->bsiz) - SIZEOF(blk_hdr);
-	if (BLOCK_REQUIRE_ENCRYPTION(mu_int_data.is_encrypted, (((blk_hdr_ptr_t)tmp_ptr)->levl), in_len))
+	if (BLK_NEEDS_ENCRYPTION3(mu_int_data.is_encrypted, (((blk_hdr_ptr_t)tmp_ptr)->levl), in_len))
 	{
-		/* The below assert cannot be moved before BLOCK_REQUIRE_ENCRYPTION check done above as tmp_ptr could
+		/* The below assert cannot be moved before BLK_NEEDS_ENCRYPTION3 check done above as tmp_ptr could
 		 * potentially point to a V4 block in which case the assert might fail when a V4 block is casted to
 		 * a V5 block header.
 		 */
@@ -144,8 +146,8 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 	GDS_BLK_UPGRADE_IF_NEEDED(blk, tmp_ptr, tmp_ptr, &mu_int_data, ondsk_blkver, status, mu_int_data.fully_upgraded);
 	if (SS_NORMAL != status)
 		if (ERR_DYNUPGRDFAIL == status)
-			rts_error(VARLSTCNT(5) status, 3, blk, DB_LEN_STR(gv_cur_region));
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) status, 3, blk, DB_LEN_STR(gv_cur_region));
 		else
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) status);
 	return tmp_ptr;
 }

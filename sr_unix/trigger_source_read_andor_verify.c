@@ -28,7 +28,7 @@
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
 #include "format_targ_key.h"		/* for COPY_SUBS_TO_GVCURRKEY */
 #include "hashtab.h"			/* for STR_HASH (in COMPUTE_HASH_MNAME) */
-#include "targ_alloc.h"			/* for SETUP_TRIGGER_GLOBAL & SWITCH_TO_DEFAULT_REGION */
+#include "targ_alloc.h"			/* for SET_GVTARGET_TO_HASHT_GBL & SWITCH_TO_DEFAULT_REGION */
 #include "filestruct.h"			/* for INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED (FILE_INFO) */
 #include "mvalconv.h"
 #include "gdscc.h"			/* needed for tp.h */
@@ -48,6 +48,7 @@
 #include "cdb_sc.h"
 #include "mv_stent.h"
 #include "gv_trigger_protos.h"
+#include "hashtab_mname.h"
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -104,7 +105,7 @@ CONDITION_HANDLER(trigger_source_raov_ch)
 {
 	int	rc;
 
-	START_CH;
+	START_CH(TRUE);
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 		/* This only happens at the outer-most TP layer so state should be normal now */
@@ -150,13 +151,11 @@ CONDITION_HANDLER(trigger_source_raov_ch)
  */
 int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op)
 {
-	gv_key			*save_gv_currkey;
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
 	int			src_fetch_status;
-	sgmnt_addrs		*csa;	/* Used in SWITCH_TO_DEFAULT_REGION macro */
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	uint4			cycle;
 	DEBUG_ONLY(unsigned int	lcl_t_tries;)
 	enum cdb_sc		failure;
@@ -171,7 +170,7 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op)
 		gvinit();
 		SWITCH_TO_DEFAULT_REGION;
 	}
-	SAVE_TRIGGER_REGION_INFO;
+	SAVE_TRIGGER_REGION_INFO(save_currkey);
 	DBGTRIGR((stderr, "trigger_source_raov: Entered with trigger action %d\n", trigger_op));
 	/* First determination is if a TP fence is already in operation or not */
 	if (0 == dollar_tlevel)
@@ -204,7 +203,7 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op)
 				|| !gv_target || !gv_target->root);
 			assert((cdb_sc_onln_rlbk2 != failure) || TREF(dollar_zonlnrlbk));
 			if (cdb_sc_onln_rlbk2 == failure)
-				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBROLLEDBACK);
 			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than proceeding with the next
 			 * retry. Even though online rollback restart resets root block to zero for all gv_targets, ^#t root is
 			 * always established in gvtr_db_read_hasht (called below). We don't care about the root block being reset
@@ -216,7 +215,7 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op)
 		/* no return if TP restart */
 		src_fetch_status = trigger_source_raov(trigname, trigger_op);
 	assert((0 == src_fetch_status) || (TRIG_FAILURE_RC == src_fetch_status));
-	RESTORE_TRIGGER_REGION_INFO;
+	RESTORE_TRIGGER_REGION_INFO(save_currkey);
 	return src_fetch_status;
 }
 
@@ -248,11 +247,10 @@ STATICFNDEF int trigger_source_raov_tpwrap_helper(mstr *trigname, trigger_action
  */
 STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op)
 {
-	mname_entry		gvent;
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa=NULL;
 	sgmnt_data_ptr_t	csd;
 	rhdtyp			*rtn_vector;
-	gv_namehead		*gvt, *hasht_tree;
+	gv_namehead		*gvt;
 	gvt_trigger_t		*gvt_trigger;
 	mstr			gbl, xecute_buff;
 	int			index;
@@ -326,7 +324,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op)
 			if (NULL == gvt_trigger)
 			{	/* No triggers were loaded for this region (all gone now) */
 				CLEAR_IMPLICIT_TP_BEFORE_ERROR;
-				rts_error(VARLSTCNT(4) ERR_TRIGNAMENF, 2, trigname->len, trigname->addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGNAMENF, 2, trigname->len, trigname->addr);
 			}
 			gvt->db_trigger_cycle = cycle_start;
 			gvt->db_dztrigger_cycle = csa->db_dztrigger_cycle;
@@ -351,7 +349,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op)
 			/* Else we need the trigger source loaded */
 			if (0 == ((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len)
 			{
-				SETUP_TRIGGER_GLOBAL;
+				SET_GVTARGET_TO_HASHT_GBL(csa);
 				INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 				assert(0 == trigdsc->xecute_str.str.len);	/* Make sure not replacing/losing a buffer */
 				i2mval(&trig_index, index);
@@ -373,7 +371,8 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op)
 		if (0 != gtm_trigger_complink(trigdsc, TRUE))
 		{
 			PRN_ERROR;	/* Flush out any compiler messages for compile record */
-			rts_error(VARLSTCNT(4) ERR_TRIGCOMPFAIL, 2, trigdsc->rtn_desc.rt_name.len, trigdsc->rtn_desc.rt_name.addr);
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGCOMPFAIL, 2,
+					trigdsc->rtn_desc.rt_name.len, trigdsc->rtn_desc.rt_name.addr);
 		}
 		assert(trigdsc->rtn_desc.rt_adr);
 		assert(trigdsc->rtn_desc.rt_adr == CURRENT_RHEAD_ADR(trigdsc->rtn_desc.rt_adr));
@@ -396,19 +395,20 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op)
 /* Routine called when need triggers loaded for a given global */
 STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t **ret_trigdsc)
 {
-	mname_entry		gvent;
 	mval			val;
 	char			*ptr;
 	int			len;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	gv_namehead		*gvt, *hasht_tree;
+	gv_namehead		*gvt;
 	gvt_trigger_t		*gvt_trigger;
-	mstr			gbl, xecute_buff;
+	mstr			xecute_buff;
+	mname_entry		gvname;
 	int			index;
 	mval			trig_index;
 	gv_trigger_t		*trigdsc;
 	uint4			cycle_start;
+	gvnh_reg_t		*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -418,7 +418,7 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 		if (!TREF(in_op_fntext))
 		{
 			CLEAR_IMPLICIT_TP_BEFORE_ERROR;
-			rts_error(VARLSTCNT(4) ERR_TRIGNAMENF, 2, trigname->len, trigname->addr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGNAMENF, 2, trigname->len, trigname->addr);
 		}
 		return TRIG_FAILURE;
 	}
@@ -429,9 +429,10 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	assert(('\0' == *ptr) && (val.str.len > len));
 	ptr++;
 	A2I(ptr, val.str.addr + val.str.len, index);
-	gbl.addr = val.str.addr;
-	gbl.len = len;
-	GV_BIND_NAME_ONLY(gd_header, &gbl);	/* does tp_set_sgm() */
+	gvname.var_name.addr = val.str.addr;
+	gvname.var_name.len = len;
+	COMPUTE_HASH_MNAME(&gvname);
+	GV_BIND_NAME_ONLY(gd_header, &gvname, gvnh_reg);	/* does tp_set_sgm() */
 	gvt = gv_target;
 	assert(cs_addrs == gvt->gd_csa);
 	csa = gvt->gd_csa;
@@ -444,19 +445,20 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	if (NULL == gvt_trigger)
 	{	/* No trigger were loaded for this region (all gone now) */
 		CLEAR_IMPLICIT_TP_BEFORE_ERROR;
-		rts_error(VARLSTCNT(4) ERR_TRIGNAMENF, 2, trigname->len, trigname->addr);
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGNAMENF, 2, trigname->len, trigname->addr);
 	}
 	gvt->db_trigger_cycle = cycle_start;
 	gvt->db_dztrigger_cycle = csa->db_dztrigger_cycle;
 	gvt->trig_local_tn = local_tn;		/* Mark this trigger as being referenced in this transaction */
 	DBGTRIGR((stderr, "trigger_source_raov_trigload: gvt->db_trigger_cycle updated to %d\n",
 		  gvt->db_trigger_cycle));
-	SETUP_TRIGGER_GLOBAL;
+	SET_GVTARGET_TO_HASHT_GBL(csa);
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	trigdsc = &gvt_trigger->gv_trig_array[index - 1];
 	assert(0 == trigdsc->xecute_str.str.len);	/* Make sure not replacing/losing a buffer */
 	i2mval(&trig_index, index);
-	xecute_buff.addr = trigger_gbl_fill_xecute_buffer(gbl.addr, gbl.len, &trig_index, NULL, (int4 *)&xecute_buff.len);
+	xecute_buff.addr = trigger_gbl_fill_xecute_buffer(gvname.var_name.addr, gvname.var_name.len,
+								&trig_index, NULL, (int4 *)&xecute_buff.len);
 	trigdsc->xecute_str.str = xecute_buff;
 	*ret_trigdsc = trigdsc;
 	return TRIG_SUCCESS;

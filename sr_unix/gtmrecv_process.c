@@ -17,6 +17,7 @@
 
 #include "gtm_socket.h"
 #include "gtm_inet.h"
+#include "gtm_netdb.h"
 #include "gtm_time.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
@@ -38,6 +39,7 @@
 #include "repl_msg.h"
 #include "repl_dbg.h"
 #include "repl_errno.h"
+#include "io.h"
 #include "iosp.h"
 #include "gtm_event_log.h"
 #include "eintr_wrappers.h"
@@ -61,7 +63,6 @@
 #include "gtmmsg.h"
 #include "is_proc_alive.h"
 #include "jnl_typedef.h"
-#include "iotcpdef.h"
 #include "memcoherency.h"
 #include "have_crit.h"			/* needed for ZLIB_UNCOMPRESS */
 #include "deferred_signal_handler.h"	/* needed for ZLIB_UNCOMPRESS */
@@ -75,6 +76,9 @@
 #include "repl_inst_dump.h"		/* for "repl_dump_histinfo" prototype */
 #include "gv_trigger_common.h"
 #include "anticipatory_freeze.h"
+#ifdef GTM_TLS
+#include "gtm_repl.h"
+#endif
 
 #define	GTM_ZLIB_UNCMP_ERR_STR		"error from zlib uncompress function "
 #define	GTM_ZLIB_Z_MEM_ERROR_STR	"Out-of-memory " GTM_ZLIB_UNCMP_ERR_STR
@@ -162,6 +166,9 @@ STATICFNDCL	void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 STATICFNDCL	void	do_main_loop(boolean_t crash_restart);
 STATICFNDCL	void	gtmrecv_heartbeat_timer(TID tid, int4 interval_len, int *interval_ptr);
 STATICFNDCL	void	gtmrecv_main_loop(boolean_t crash_restart);
+#ifdef GTM_TLS
+STATICFNDCL	boolean_t gtmrecv_exchange_tls_info(void);
+#endif
 
 GBLREF	gtmrecv_options_t	gtmrecv_options;
 GBLREF	int			gtmrecv_listen_sock_fd;
@@ -201,6 +208,7 @@ error_def(ERR_REPLCOMM);
 error_def(ERR_REPLGBL2LONG);
 error_def(ERR_REPLINSTNOHIST);
 error_def(ERR_REPLINSTREAD);
+error_def(ERR_REPLNOTLS);
 error_def(ERR_REPLTRANS2BIG);
 error_def(ERR_REPLXENDIANFAIL);
 error_def(ERR_RESUMESTRMNUM);
@@ -210,6 +218,8 @@ error_def(ERR_SECONDAHEAD);
 error_def(ERR_STRMNUMIS);
 error_def(ERR_SUPRCVRNEEDSSUPSRC);
 error_def(ERR_TEXT);
+error_def(ERR_TLSCONVSOCK);
+error_def(ERR_TLSHANDSHAKE);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_UPDSYNCINSTFILE);
 
@@ -311,6 +321,11 @@ static	boolean_t	repl_cmp_solve_timer_set;
 		return;								\
 }
 
+/* Wrapper for gtmrecv_poll_actions to handle connection reset. The arguments passed in are typically either the static variables
+ * `data_len', `buff_unprocessed' and `buffp'. But, these values are relevant only when this is being called from do_main_loop as
+ * they indicate how much of the received buffer is still to be processed and the pointer to the beginning of the unprocessed
+ * buffer. Outside do_main_loop (for instance, in gtmrecv_est_conn), gtmrecv_poll_actions is invoked with 0,0, NULL respectively.
+ */
 #define	GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp)			\
 {										\
 	gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);		\
@@ -579,7 +594,7 @@ STATICFNDEF void do_flow_control(uint4 write_pos)
 	unsigned char		*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int			torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
-	int			status;					/* needed for REPL_{SEND,RECV}_LOOP */
+	int			status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	int			read_pos;
 	seq_num			temp_seq_num;
 	DCL_THREADGBL_ACCESS;
@@ -688,7 +703,7 @@ STATICFNDEF int gtmrecv_est_conn(void)
 	{
 		while (TRUE)
 		{
-			if (0 < (status = fd_ioready(gtmrecv_listen_sock_fd, TRUE, REPL_POLL_WAIT)))
+			if (0 < (status = fd_ioready(gtmrecv_listen_sock_fd, REPL_POLLIN, REPL_POLL_WAIT)))
 				break;
 			if (-1 == status)
 			{
@@ -817,6 +832,13 @@ STATICFNDEF int gtmrecv_est_conn(void)
 	/* Reset prior connection related state variables (see <C9J02_003091_receiver_server_assert_due_to_lingering_XOFF>) */
 	xoff_sent = FALSE;
 	xoff_msg_log_cnt = 0;
+#	ifdef GTM_TLS
+	assert(!repl_tls.enabled);
+	/* We either did not create a TLS/SSL aware socket or the SSL object off of the TLS/SSL aware socket should be NULL since
+	 * we haven't yet connected to the source server. Assert that.
+	 */
+	assert((NULL == repl_tls.sock) || (NULL == repl_tls.sock->ssl));
+#	endif
 	/* Note that even though we are reopening a fresh connection, we should NOT reset the cached information
 	 * last_rcvd_histinfo, last_valid_histinfo etc. in this case as we might just resume processing from where
 	 * the previous connection left off in which case all the cached information is still valid. If we dont
@@ -896,7 +918,7 @@ void	gtmrecv_repl_send(repl_msg_ptr_t msgp, int4 type, int4 len, char *msgtypest
 {
 	unsigned char		*msg_ptr;				/* needed for REPL_SEND_LOOP */
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
-	int			status;					/* needed for REPL_SEND_LOOP */
+	int			status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	FILE			*log_fp;
 	DCL_THREADGBL_ACCESS;
 
@@ -1770,7 +1792,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1,
 									&recvpool_ctl->jnl_seqno);
 						else /* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */
-							GTMASSERT;
+							assertpro(repl_errno != repl_errno);
 					}
 				} else
 				{
@@ -2580,20 +2602,86 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 	return;
 }
 
+#ifdef GTM_TLS
+/* The below logic is very similar to `gtmsource_exchange_tls_info' but is kept separate because of the following reasons:
+ * (a) `gtmrecv_poll_actions' needs to be invoked as opposed to `gtmsource_poll_actions'.
+ * (b) The arguments passed to `gtmrecv_poll_actions' are defined as static.
+ * (c) The action taken after `gtmsource_poll_actions' and `gtmrecv_poll_actions' are different.
+ */
+STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
+{
+	int			poll_dir, status;
+	char			*errp;
+	repl_tlsinfo_msg_t	reply;
+
+	reply.type = REPL_TLS_INFO;
+	reply.len = MIN_REPL_MSGLEN;
+	reply.API_version = GTM_TLS_API_VERSION;
+	reply.library_version = (uint4)tls_ctx->runtime_version;
+	if (remote_side->cross_endian)
+	{
+		reply.API_version = GTM_BYTESWAP_32(reply.API_version);
+		reply.library_version = GTM_BYTESWAP_32(reply.library_version);
+	}
+	gtmrecv_repl_send((repl_msg_ptr_t)&reply, REPL_TLS_INFO, SIZEOF(repl_tlsinfo_msg_t), "REPL_TLS_INFO", MAX_SEQNO);
+	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
+		return FALSE;
+	/* At this point, the both sides are ready for a TLS/SSL handshake. Create a TLS/SSL aware socket. */
+	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id, GTMTLS_OP_VERIFY_PEER)))
+	{
+		if (!PLAINTEXT_FALLBACK)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
+				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+	} else
+	{
+		/* Do the actual handshake. */
+		poll_dir = REPL_INVALID_POLL_DIRECTION;
+		do
+		{
+			status = repl_do_tls_handshake(gtmrecv_log_fp, gtmrecv_sock_fd, TRUE, &poll_dir);
+			assert(0 == data_len);
+			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
+			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
+				return FALSE;
+		} while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status));
+		if (SS_NORMAL == status)
+			return TRUE;
+		else if (REPL_CONN_RESET(status))
+		{
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Attempt to connect() with TLS/SSL protocol failed. "
+					"Status = %d; %s\n", status, STRERROR(status));
+			repl_close(&gtmrecv_sock_fd);
+			repl_connection_reset = TRUE;
+			return FALSE;
+		}
+		errp = (-1 == status) ? (char *)gtm_tls_get_error() : STRERROR(status);
+		if (!PLAINTEXT_FALLBACK)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSHANDSHAKE), 0, ERR_TEXT, 2, LEN_AND_STR(errp));
+	}
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Plaintext fallback enabled. Closing and reconnecting without TLS/SSL.\n");
+	repl_close(&gtmrecv_sock_fd);
+	repl_connection_reset = TRUE;
+	CLEAR_REPL_TLS_REQUESTED; /* As if -tlsid qualifier was never specified. */
+	return FALSE;
+}
+#endif
+
 STATICFNDEF void do_main_loop(boolean_t crash_restart)
 {
 	/* The work-horse of the Receiver Server */
 	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc;
-	boolean_t			uncmpfail, send_cross_endian, preserve_buffp, recvpool_prepared;
+	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared, copied_to_recvpool;
 	gtmrecv_local_ptr_t		gtmrecv_local;
 	gtm_time4_t			ack_time;
 	int4				msghdrlen, strm_num;
 	int4				need_histinfo_num;
 	int				cmpret;
 	int				msg_type, msg_len;
-	int				status;					/* needed for REPL_{SEND,RECV}_LOOP */
 	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
+	int				status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	recvpool_ctl_ptr_t		recvpool_ctl;
 	repl_cmpinfo_msg_ptr_t		cmptest_msg;
 	repl_cmpinfo_msg_t		cmpsolve_msg;
@@ -2610,7 +2698,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 	seq_num				ack_seqno, temp_ack_seqno;
 	seq_num				request_from, recvd_jnl_seqno;
 	sgmnt_addrs			*repl_csa;
-	uchar_ptr_t			old_buffp;
+	uchar_ptr_t			old_buffp, buffp_start;
 	uint4				recvd_start_flags, len;
 	uLong				cmplen;
 	uLongf				destlen;
@@ -2618,6 +2706,12 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 	unsigned char			remote_jnl_ver;
 	upd_proc_local_ptr_t		upd_proc_local;
 	repl_logfile_info_msg_t		*logfile_msgp, logfile_msg;
+#	ifdef GTM_TLS
+	repl_msg_t			renegotiate_msg;
+	boolean_t			reneg_ack_sent;
+	repl_tlsinfo_msg_t		*need_tlsinfo_msgp;
+	uint4				remote_lib_ver, remote_API_ver;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -2641,9 +2735,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 		while (QWEQ(recvpool_ctl->jnl_seqno, seq_num_zero))
 		{
 			SHORT_SLEEP(GTMRECV_WAIT_FOR_STARTJNLSEQNO);
-			gtmrecv_poll_actions(0, 0, NULL);
-			if (repl_connection_reset)
-				return;
+			GTMRECV_POLL_ACTIONS(0, 0, NULL);
 		}
 		/* The call to "gtmrecv_poll_actions" above might have set the variable "gtmrecv_wait_for_jnl_seqno" to TRUE.
 		 * In that case, we need to reset it to FALSE here as we are now going to wait for the jnl_seqno below.
@@ -2710,6 +2802,13 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 			msgp->start_flags |= START_FLAG_COLL_M;
 		msgp->start_flags |= START_FLAG_VERSION_INFO;
 		GTMTRIG_ONLY(msgp->start_flags |= START_FLAG_TRIGGER_SUPPORT;)
+#		ifdef GTM_TLS
+		if (REPL_TLS_REQUESTED)
+		{
+			assert(NULL != tls_ctx);		/* gtm_tls_init() must have already happened. */
+			msgp->start_flags |= START_FLAG_ENABLE_TLS;
+		}
+#		endif
 		if (send_cross_endian)
 			msgp->start_flags = GTM_BYTESWAP_32(msgp->start_flags);
 		msgp->jnl_ver = this_side->jnl_ver;
@@ -2743,11 +2842,14 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 	repl_recv_lastlog_data_recvd = 0;
 	repl_recv_lastlog_data_procd = 0;
 	msghdrlen = REPL_MSG_HDRLEN;
+	GTMTLS_ONLY(DEBUG_ONLY(reneg_ack_sent = FALSE));
+	GTMTLS_ONLY(repl_tls.renegotiate_state = REPLTLS_RENEG_STATE_NONE);
 	while (TRUE)
 	{
 		recvd_len = gtmrecv_max_repl_msglen - buff_unprocessed;
+		GTMTLS_ONLY(poll_dir = REPL_INVALID_POLL_DIRECTION);
 		while ((SS_NORMAL == (status = repl_recv(gtmrecv_sock_fd,
-							(buffp + buff_unprocessed), &recvd_len, REPL_POLL_WAIT)))
+							(buffp + buff_unprocessed), &recvd_len, REPL_POLL_WAIT, &poll_dir)))
 			       && (0 == recvd_len))
 		{
 			recvd_len = gtmrecv_max_repl_msglen - buff_unprocessed;
@@ -2802,6 +2904,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 			repl_log(gtmrecv_log_fp, FALSE, FALSE, "Recvd : %d  Total : %d\n", recvd_len, repl_recv_data_recvd);
 		while (msghdrlen <= buff_unprocessed)
 		{
+			buffp_start = buffp;
 			if (0 == data_len)
 			{
 				assert(0 == ((unsigned long)buffp % REPL_MSG_ALIGN));
@@ -2901,7 +3004,11 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 			buffp += buffered_data_len;
 			buff_unprocessed -= buffered_data_len;
 			data_len -= buffered_data_len;
-			preserve_buffp = (0 != data_len);
+			/* Once we have sent a REPL_RENEG_ACK, the only message we should get is the REPL_RENEG_COMPLETE. */
+			assert(buffp > buff_start);
+			assert(buffp <= (buff_start + gtmrecv_max_repl_msglen));
+			assert(!reneg_ack_sent || (REPL_RENEG_COMPLETE == msg_type));
+			copied_to_recvpool = FALSE;
 			switch(msg_type)
 			{
 				case REPL_TR_JNL_RECS:
@@ -2920,6 +3027,11 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						gtmrecv_cur_cmpmsglen += buffered_data_len;
 						assert(gtmrecv_cur_cmpmsglen <= gtmrecv_max_repl_cmpmsglen);
 					}
+					/* The partial/complete message is copied either to the receive pool or the private
+					 * compression buffer space. Set copied_to_recvpool to TRUE so that we can safely
+					 * set buffp = buff_start if this is the last message in the current received buffer.
+					 */
+					copied_to_recvpool = TRUE;
 					repl_recv_data_processed += (qw_num)buffered_data_len;
 					if (0 == data_len)
 					{
@@ -2927,7 +3039,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 							return;
 					}
-					preserve_buffp = FALSE;
 					break;
 
 				case REPL_LOSTTNCOMPLETE:
@@ -3339,8 +3450,20 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						remote_side->null_subs_xform = FALSE;
 						/* this sets null_subs_xform regardless of remote_jnl_ver */
 					remote_side->is_supplementary = start_msg->is_supplementary;
-					remote_side->trigger_supported = (recvd_start_flags & START_FLAG_TRIGGER_SUPPORT)
-														? TRUE : FALSE;
+					remote_side->trigger_supported = (recvd_start_flags & START_FLAG_TRIGGER_SUPPORT) ? TRUE
+															  : FALSE;
+#					ifdef GTM_TLS
+					remote_side->tls_requested = (recvd_start_flags & START_FLAG_ENABLE_TLS) ? TRUE : FALSE;
+					if (REPL_TLS_REQUESTED && !remote_side->tls_requested)
+					{
+						ISSUE_REPLNOTLS(ERR_REPLNOTLS, "Receiver side", "Source side");
+						CLEAR_REPL_TLS_REQUESTED; /* As if -tlsid qualifier was never specified. */
+					}
+					/* If we have not requested TLS/SSL and the originating side requested TLS/SSL, the latter
+					 * reports the REPLNOTLS error and so we need not do anything. Hence, the below assert.
+					 */
+					assert(REPL_TLS_REQUESTED || !remote_side->tls_requested);
+#					endif
 					if (this_side->jnl_ver > remote_jnl_ver)
 					{
 						assert(JNL_VER_EARLIEST_REPL <= remote_jnl_ver);
@@ -3459,6 +3582,60 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						CHECK_REPL_SEND_LOOP_ERROR(status, "REPL_LOGFILE_INFO");
 					}
 					break;
+
+#				ifdef GTM_TLS
+				case REPL_NEED_TLS_INFO:
+					if (0 != data_len)
+						break;
+					assert(REPL_PROTO_VER_TLS_SUPPORT <= REPL_PROTO_VER_THIS);
+					assert(REPL_PROTO_VER_TLS_SUPPORT <= remote_side->proto_ver);
+					assert(REPL_TLS_REQUESTED);
+					assert(NULL != tls_ctx);
+					assert(!repl_tls.enabled);
+					need_tlsinfo_msgp = (repl_tlsinfo_msg_t *)(buffp - msg_len - REPL_MSG_HDRLEN);
+					remote_API_ver = need_tlsinfo_msgp->API_version;
+					remote_lib_ver = need_tlsinfo_msgp->library_version;
+					if (remote_side->cross_endian)
+					{
+						remote_API_ver = GTM_BYTESWAP_32(remote_API_ver);
+						remote_lib_ver = (uint4)GTM_BYTESWAP_32(remote_lib_ver);
+					}
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_NEED_TLS_INFO message\n");
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "  Remote side API version: 0x%08x\n", remote_API_ver);
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "  Remote side Library version: 0x%08x\n",
+														remote_lib_ver);
+					if (!gtmrecv_exchange_tls_info())
+					{
+						if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
+							return;
+						assert(PLAINTEXT_FALLBACK);
+						assert(!repl_tls.enabled);
+					} else
+						repl_tls.enabled = TRUE; /* From here on, all communications are secured with SSL */
+					break;
+
+				case REPL_RENEG_ACK_ME:
+					if (0 != data_len)
+						break;
+					assert(!reneg_ack_sent);
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_RENEG_ACK_ME message\n");
+					gtmrecv_repl_send(&renegotiate_msg, REPL_RENEG_ACK, MIN_REPL_MSGLEN, "REPL_RENEG_ACK",
+								MAX_SEQNO);
+					DEBUG_ONLY(reneg_ack_sent = TRUE);
+					repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_COMPLETE;
+					break;
+
+				case REPL_RENEG_COMPLETE:
+					if (0 != data_len)
+						break;
+					assert(reneg_ack_sent);
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_RENEG_COMPLETE message."
+								" TLS/SSL connection successfully renegotiated.\n");
+					DEBUG_ONLY(reneg_ack_sent = FALSE);
+					repl_log_tls_info(gtmrecv_log_fp, repl_tls.sock);
+					repl_tls.renegotiate_state = REPLTLS_RENEG_STATE_NONE;
+					break;
+#				endif
 				default:
 					/* Discard the message */
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received UNKNOWN message (type = %d). "
@@ -3473,15 +3650,24 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				return;
 		}
 		assert(0 == ((unsigned long)(buffp) % REPL_MSG_ALIGN));
-		if (!preserve_buffp)
-		{
-			if ((0 != buff_unprocessed) && (buff_start != buffp))
-			{
-				REPL_DPRINT4("Incmpl msg hdr, moving %d bytes from %lx to %lx\n", buff_unprocessed, (caddr_t)buffp,
-					     (caddr_t)buff_start);
+		if (buff_start != buffp)
+		{	/* We are at the tail of the current received buffer. */
+			if ((0 != data_len) && !copied_to_recvpool)
+			{	/* We have a complete header for a control message, but not the complete message. Move the message
+				 * (including the header) to the beginning of the allocated buffer space and update data_len and
+				 * buff_unprocessed.
+				 */
+				buff_unprocessed += buffered_data_len;
+				data_len += buffered_data_len;
+				if (buffp_start != buff_start)
+					memmove(buff_start, buffp_start, buff_unprocessed + REPL_MSG_HDRLEN);
+				buffp = buff_start + REPL_MSG_HDRLEN; /* + REPL_MSG_HDRLEN since we already processed the header. */
+			} else if (0 != buff_unprocessed)
+			{	/* We have an incomplete header. Move it to the beginning of the allocated buffer space. */
 				memmove(buff_start, buffp, buff_unprocessed);
-			}
-			buffp = buff_start;
+				buffp = buff_start;
+			} else
+				buffp = buff_start;
 		}
 		GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
 	}
@@ -3489,7 +3675,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 
 void repl_cmp_solve_rcv_timeout(void)
 {
-	GTMASSERT;
+	assertpro(FALSE);
 }
 
 STATICFNDEF void gtmrecv_heartbeat_timer(TID tid, int4 interval_len, int *interval_ptr)
@@ -3529,6 +3715,13 @@ void gtmrecv_process(boolean_t crash_restart)
 
 	if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
 		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */
+#	ifdef GTM_TLS
+	if (REPL_TLS_REQUESTED)
+	{
+		repl_do_tls_init(gtmrecv_log_fp);
+		assert(REPL_TLS_REQUESTED || PLAINTEXT_FALLBACK);
+	}
+#	endif
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;
@@ -3574,6 +3767,6 @@ void gtmrecv_process(boolean_t crash_restart)
 	{
 		gtmrecv_main_loop(crash_restart);
 	} while (repl_connection_reset);
-	GTMASSERT; /* shouldn't reach here */
+	assertpro(FALSE); /* shouldn't reach here */
 	return;
 }

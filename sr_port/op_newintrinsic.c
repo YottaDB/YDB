@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,8 +29,6 @@
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_addr		*gd_header;
-GBLREF gd_binding	*gd_map;
-GBLREF gd_binding	*gd_map_top;
 GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_estack_delta;
@@ -54,15 +52,13 @@ void op_newintrinsic(int intrtype)
 {
 	mval		*intrinsic;
 	boolean_t	stored_explicit_null;
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
-	switch(intrtype)
+	switch (intrtype)
 	{
 		case SV_ZTRAP:
 #			ifdef GTM_TRIGGER
 			if (0 < gtm_trigger_depth)
-				rts_error(VARLSTCNT(1) ERR_NOZTRAPINTRIG);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOZTRAPINTRIG);
 #			endif
 			/* Due to the potential intermix of $ETRAP and $ZTRAP, we put a condition on the
 			   explicit NEWing of these two special variables. If "the other" trap handler
@@ -111,7 +107,7 @@ void op_newintrinsic(int intrtype)
 			break;
 #		endif
 		default:	/* Only above types defined by compiler */
-			GTMASSERT;
+			assertpro(FALSE && intrtype);
 	}
 	gtm_newintrinsic(intrinsic);
 	if (SV_ESTACK == intrtype)
@@ -125,17 +121,14 @@ void op_newintrinsic(int intrtype)
 	} else if (SV_ZGBLDIR == intrtype)
 	{
 		if (dollar_zgbldir.str.len != 0)
-		{
 			gd_header = zgbldir(&dollar_zgbldir);
-			/* update the gd_map */
-			SET_GD_MAP;
-		} else
-		{
-			dpzgbini();
-        		gd_header = NULL;
-		}
+		else
+			dpzgbini();	/* sets gd_header to NULL */
 		if (gv_currkey)
+		{
 			gv_currkey->base[0] = 0;
+			gv_currkey->prev = gv_currkey->end = 0;
+		}
 		if (gv_target)
 			gv_target->clue.end = 0;
 	}

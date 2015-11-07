@@ -57,7 +57,7 @@ STATICFNDCL CONDITION_HANDLER(trigger_gbl_fill_xecute_buffer_ch);
  */
 STATICFNDEF CONDITION_HANDLER(trigger_gbl_fill_xecute_buffer_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	if (!DUMPABLE && (NULL != xecute_buff))
 		free(xecute_buff);
 	NEXTCH;

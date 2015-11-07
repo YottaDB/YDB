@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,30 +25,38 @@
 #include "gvsub2str.h"
 #include "gvcmx.h"
 #include "gvusr.h"
+#include "hashtab_mname.h"
+#include "targ_alloc.h"		/* for GV_BIND_SUBSREG macro which needs "targ_alloc" prototype */
+#include "gtmimagename.h"
+#include "mvalconv.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF gd_region	*gv_cur_region;
-GBLREF gd_addr		*gd_header;
-GBLREF gd_binding	*gd_map;
-GBLREF gd_binding	*gd_map_top;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF spdesc		stringpool;
 
 /* op_zprevious should generally be maintained in parallel */
 
-void op_gvorder (mval *v)
+void op_gvorder(mval *v)
 {
 	int4			n;
-	gd_binding		*map;
-	mstr			name;
+	int			min_reg_index, reg_index, res;
+	int			i, mini, maxi;
+	mname_entry		gvname;
+	mval			tmpmval, *datamval;
 	enum db_acc_method	acc_meth;
 	boolean_t		found, ok_to_change_currkey;
+	gd_binding		*gd_map_start, *map, *map_top;
+	gd_addr			*gd_targ;
+	gv_namehead		*gvt;
+	gvnh_reg_t		*gvnh_reg;
+	gvnh_spanreg_t		*gvspan;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	acc_meth = gv_cur_region->dyn.addr->acc_meth;
+	acc_meth = REG_ACC_METH(gv_cur_region);
 	/* Modify gv_currkey such that a gvcst_search of the resulting gv_currkey will find the next available subscript.
 	 * But in case of dba_usr (the custom implementation of $ORDER which is overloaded for DDP but could be more in the
 	 * future) it is better to hand over gv_currkey as it is so the custom implementation can decide what to do with it.
@@ -58,9 +66,7 @@ void op_gvorder (mval *v)
 	{	/* Modify gv_currkey to reflect the next possible key value in collating order */
 		if (!TREF(gv_last_subsc_null) || gv_cur_region->std_null_coll)
 		{
-			*(&gv_currkey->base[0] + gv_currkey->end - 1) = 1;
-			*(&gv_currkey->base[0] + gv_currkey->end + 1) = 0;
-			gv_currkey->end += 1;
+			GVKEY_INCREMENT_ORDER(gv_currkey);
 		} else
 		{
 			assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]);
@@ -72,38 +78,38 @@ void op_gvorder (mval *v)
 	}
 	if (gv_currkey->prev)
 	{
-		if (acc_meth == dba_bg || acc_meth == dba_mm)
+		if ((dba_bg == acc_meth) || (dba_mm == acc_meth))
 		{
-			if (gv_target->root == 0)	/* global does not exist */
-				found = FALSE;
+			gvnh_reg = TREF(gd_targ_gvnh_reg);
+			if (NULL == gvnh_reg)
+				found = (gv_target->root ? gvcst_order() : FALSE);
 			else
-				found = gvcst_order();
-		} else if (acc_meth == dba_cm)
+				INVOKE_GVCST_SPR_XXX(gvnh_reg, found = gvcst_spr_order());
+		} else if (dba_cm == acc_meth)
 			found = gvcmx_order();
 		else
-		 	found = gvusr_order();
+			found = gvusr_order();
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by (BYPASSOK)
 				* this to-be-overwritten mval */
 		if (found)
 		{
 			gv_altkey->prev = gv_currkey->prev;
-
 			if (!(IS_STP_SPACE_AVAILABLE(MAX_KEY_SZ)))
- 			{
+			{
 				if (*(&gv_altkey->base[0] + gv_altkey->prev) != 0xFF)
-		 			n = MAX_FORM_NUM_SUBLEN;
+					n = MAX_FORM_NUM_SUBLEN;
 				else
 				{
 					n = gv_altkey->end - gv_altkey->prev;
-					assert (n > 0);
+					assert(n > 0);
 				}
 				ENSURE_STP_FREE_SPACE(n);
 			}
-	 		v->str.addr = (char *)stringpool.free;
-	 		stringpool.free = gvsub2str (&gv_altkey->base[0] + gv_altkey->prev, stringpool.free, FALSE);
-	 		v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
-			assert (v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
-			assert (v->str.addr + v->str.len <= (char *)stringpool.top &&
+			v->str.addr = (char *)stringpool.free;
+			stringpool.free = gvsub2str (&gv_altkey->base[0] + gv_altkey->prev, stringpool.free, FALSE);
+			v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
+			assert(v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
+			assert(v->str.addr + v->str.len <= (char *)stringpool.top &&
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
@@ -125,74 +131,109 @@ void op_gvorder (mval *v)
 		}
 	} else	/* the following section is for $O(^gname) */
 	{
-		assert (2 < gv_currkey->end);
-		assert (gv_currkey->end < (MAX_MIDENT_LEN + 3));	/* until names are not in midents */
-		map = gd_map + 1;
-		while (map < gd_map_top &&
-			(memcmp(gv_currkey->base, map->name,
-				gv_currkey->end == (MAX_MIDENT_LEN + 2) ? MAX_MIDENT_LEN : gv_currkey->end - 1) >= 0))
-		{
-			map++;
-		}
-
-		for (; map < gd_map_top; ++map)
+		assert(2 < gv_currkey->end);
+		assert(gv_currkey->end < (MAX_MIDENT_LEN + 3));	/* until names are not in midents */
+		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
+		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 1]);
+		gd_targ = TREF(gd_targ_addr);
+		gd_map_start = gd_targ->maps;
+		map_top = gd_map_start + gd_targ->n_maps;
+		map = gv_srch_map(gd_targ, (char *)&gv_currkey->base[0], gv_currkey->end - 1);
+		for ( ; map < map_top; ++map)
 		{
 			gv_cur_region = map->reg.addr;
 			if (!gv_cur_region->open)
 				gv_init_reg(gv_cur_region);
 			change_reg();
-			acc_meth = gv_cur_region->dyn.addr->acc_meth;
-
-			for (; ;)		/* search region, entries in directory tree could be empty */
+			acc_meth = REG_ACC_METH(gv_cur_region);
+			/* search region, entries in directory tree could have empty GVT in which case move on to next entry */
+			for ( ; ; )
 			{
-				if (acc_meth == dba_bg || acc_meth == dba_mm)
+				if ((dba_bg == acc_meth) || (dba_mm == acc_meth))
 				{
 					gv_target = cs_addrs->dir_tree;
-					found = gvcst_order ();
+					found = gvcst_order();
 				} else if (acc_meth == dba_cm)
-					found = gvcmx_order ();
+					found = gvcmx_order();
 				else
-				 	found = gvusr_order();
+					found = gvusr_order();
 				if (!found)
 					break;
-				assert (1 < gv_altkey->end);
-				assert (gv_altkey->end < (MAX_MIDENT_LEN + 2));	/* until names are not in midents */
-				if (memcmp(gv_altkey->base, map->name, gv_altkey->end - 1) > 0)
-				{
+				/* At this point, gv_altkey contains the result of the gvcst_order */
+				assert(1 < gv_altkey->end);
+				assert((MAX_MIDENT_LEN + 2) > gv_altkey->end);	/* until names are not in midents */
+				res = memcmp(gv_altkey->base, map->gvkey.addr, gv_altkey->end);
+				assert((0 != res) || (gv_altkey->end <= map->gvkey_len));
+				if ((0 < res) || ((0 == res) && (map->gvkey_len == (map->gvname_len + 1))))
+				{	/* The global name we found is greater than the maximum value in this map OR
+					 * it is exactly equal to the upper bound of this map so this name cannot be
+					 * found in current map for sure. Move on to next map.
+					 */
 					found = FALSE;
 					break;
 				}
-				name.addr = (char *)&gv_altkey->base[0];
-				name.len = gv_altkey->end - 1;
-				if (acc_meth == dba_cm)
+				gvname.var_name.addr = (char *)&gv_altkey->base[0];
+				gvname.var_name.len = gv_altkey->end - 1;
+				if (dba_cm == acc_meth)
 					break;
-				GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &name);
-				if (gv_cur_region != map->reg.addr)
-				{
-					found = FALSE;
-					break;
+				COMPUTE_HASH_MNAME(&gvname);
+				GV_BIND_NAME_AND_ROOT_SEARCH(gd_targ, &gvname, gvnh_reg);	/* updates "gv_currkey" */
+				gvspan = gvnh_reg->gvspan;
+				assert((NULL != gvspan) || (gv_cur_region == map->reg.addr));
+				if (NULL != gvspan)
+				{	/* gv_target would NOT have been initialized by GV_BIND_NAME in this case.
+					 * So finish that initialization.
+					 */
+					datamval = &tmpmval;
+					/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH
+					 * 	(e.g. setting gv_cur_region for spanning globals)
+					 */
+					GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_targ, gv_currkey, gvnh_reg->gd_reg);
+					op_gvdata(datamval);
+					if (MV_FORCE_INT(datamval))
+						break;
+					if (TREF(want_empty_gvts))
+ 					{	/* For effective reorg truncates, we need to move empty data blocks in reorg,
+						 * so it sets want_empty_gvts before calling gv_select which then calls op_gvorder
+						 * Check if any of the spanned regions have a non-zero gv_target->root.
+						 * If so, treat it as if op_gvdata is non-zero. That is the only way truncate
+						 * can work on this empty GVT.
+						 */
+						maxi = gvspan->max_reg_index;
+						mini = gvspan->min_reg_index;
+						for (i = mini; i <= maxi; i++)
+						{
+							assert(i >= 0);
+							assert(i < gd_targ->n_regions);
+							gvt = GET_REAL_GVT(gvspan->gvt_array[i - mini]);
+							if ((NULL != gvt) && (0 != gvt->root))
+								break;
+						}
+						if (i <= maxi)
+							break;	/* found at least one spanned region with non-zero gvt->root */
+					}
+				} else
+				{	/* else gv_target->root would have been initialized by GV_BIND_NAME_AND_ROOT_SEARCH */
+					/* For effective truncates , we want to be able to move empty data blocks in reorg.
+					 * Reorg truncate calls gv_select which in turn calls op_gvorder.
+					 */
+					if ((0 != gv_target->root) && (TREF(want_empty_gvts) || (0 != gvcst_data())))
+						break;
 				}
-				/* For effective truncates, we want to be able to move empty data blocks in reorg */
-				if ((gv_target->root != 0) && (TREF(want_empty_gvts) || gvcst_data() != 0))
-					break;
-				*(&gv_currkey->base[0] + gv_currkey->end - 1) = 1;
-				*(&gv_currkey->base[0] + gv_currkey->end + 1) = 0;
-				gv_currkey->end += 1;
+				GVKEY_INCREMENT_ORDER(gv_currkey);
 			}
 			if (found)
 				break;
-			else
+			/* do not invoke GVKEY_DECREMENT_ORDER on last map since it contains 0xFFs and will fail an assert */
+			if ((map + 1) != map_top)
 			{
-				assert(SIZEOF(map->name) == SIZEOF(mident_fixed));
-				gv_currkey->end = mid_len((mident_fixed *)map->name);
-				assert(gv_currkey->end <= MAX_MIDENT_LEN);
-				memcpy(&gv_currkey->base[0], map->name, gv_currkey->end);
-				gv_currkey->base[ gv_currkey->end - 1 ] -= 1;
-				gv_currkey->base[ gv_currkey->end ] = 0xFF;	/* back off 1 spot from map */
-				gv_currkey->base[ gv_currkey->end + 1] = 0;
-				gv_currkey->base[ gv_currkey->end + 2] = 0;
-				gv_currkey->end += 2;
-				assert(gv_currkey->top > gv_currkey->end);	/* ensure we are within allocated bounds */
+				assert(strlen(map->gvkey.addr) == map->gvname_len);
+				gv_currkey->end = map->gvname_len + 1;
+				assert(gv_currkey->end <= (1 + MAX_MIDENT_LEN));
+				memcpy(&gv_currkey->base[0], map->gvkey.addr, gv_currkey->end);
+				assert(gv_currkey->end < gv_currkey->top);
+				gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+				GVKEY_DECREMENT_ORDER(gv_currkey); /* back off 1 spot from map */
 			}
 		}
 		/* Reset gv_currkey as we have potentially skipped one or more regions so we no
@@ -204,22 +245,18 @@ void op_gvorder (mval *v)
 				* this to-be-overwritten mval */
 		if (found)
 		{
-			if (!IS_STP_SPACE_AVAILABLE(name.len + 1))
+			if (!IS_STP_SPACE_AVAILABLE(gvname.var_name.len + 1))
 			{
 				v->str.len = 0;	/* so stp_gcol ignores otherwise incompletely setup mval (BYPASSOK) */
-				INVOKE_STP_GCOL(name.len + 1);
+				INVOKE_STP_GCOL(gvname.var_name.len + 1);
 			}
-#ifdef mips
-			/* the following line works around a tandem compiler bug. */
-			v->str.addr = (char *)0;
-#endif
 			v->str.addr = (char *)stringpool.free;
 			*stringpool.free++ = '^';
-			memcpy (stringpool.free, name.addr, name.len);
-			stringpool.free += name.len;
-			v->str.len = name.len + 1;
-			assert (v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
-			assert (v->str.addr + v->str.len <= (char *)stringpool.top &&
+			memcpy (stringpool.free, gvname.var_name.addr, gvname.var_name.len);
+			stringpool.free += gvname.var_name.len;
+			v->str.len = gvname.var_name.len + 1;
+			assert(v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
+			assert(v->str.addr + v->str.len <= (char *)stringpool.top &&
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;

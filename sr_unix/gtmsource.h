@@ -14,7 +14,6 @@
 
 /* for in_addr_t typedef on Linux */
 #include "gtm_inet.h"
-GBLREF gd_addr	*gd_header;
 #include "min_max.h"
 #include "mdef.h"
 #include "gt_timer.h"
@@ -22,6 +21,7 @@ GBLREF gd_addr	*gd_header;
 
 /* Needs mdef.h, gdsfhead.h and its dependencies */
 #define JNLPOOL_DUMMY_REG_NAME		"JNLPOOL_REG"
+#define MAX_TLSKEY_LEN			32
 #define MAX_FILTER_CMD_LEN		512
 #define MIN_JNLPOOL_SIZE		(1 * 1024 * 1024)
 #define MAX_FREEZE_COMMENT_LEN		1024
@@ -65,7 +65,7 @@ typedef enum
 {
 	GTMSOURCE_DUMMY_STATE = 0,		/* Default state when no source server is up */
 	GTMSOURCE_START,			/* Set at source server startup (in gtmsource.c) */
-	GTMSOURCE_WAITING_FOR_CONNECTION,	/* Set when waiting for receiver to connect (connection got reset etc.) */
+	GTMSOURCE_WAITING_FOR_CONNECTION,	/* Set when waiting for receiver to connect e.g. connection got reset etc. */
 	GTMSOURCE_WAITING_FOR_RESTART,		/* Set when previous state is GTMSOURCE_WAITING_FOR_CONNECTION and
 						 * connection gets established with the receiver server. */
 	GTMSOURCE_SEARCHING_FOR_RESTART,	/* Set when source server scans the jnl files and determines the resend point */
@@ -97,7 +97,7 @@ typedef enum
  * databases, this value needs to be bumped as well.
  */
 
-#define	GTMSOURCE_MAX_SHUTDOWN_WAITLOOP	(MAX(120, (gd_header->n_regions) * 90))
+#define	GTMSOURCE_MAX_SHUTDOWN_WAITLOOP(gdheader)	(MAX(120, (gdheader->n_regions) * 90))
 
 #define GTMSOURCE_SHUTDOWN_PAD_TIME		5 /* seconds */
 
@@ -350,9 +350,10 @@ typedef struct
 	int4			shutdown_time;		/* Time allowed for shutdown in seconds */
 	char			filter_cmd[MAX_FILTER_CMD_LEN];	/* command to run to invoke the external filter (if needed) */
 	global_latch_t		gtmsource_srv_latch;
-#if 0
-	int4			padding;		/* Pad structure out to multiple of 8 bytes - un-"#if 0" if needed */
-#endif
+#	ifdef GTM_TLS
+	uint4			next_renegotiate_time;	/* Time (in future) at which the next SSL/TLS renegotiation happens. */
+	int4			num_renegotiations;	/* Number of SSL/TLS renegotiations that happened so far. */
+#	endif
 } gtmsource_local_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -470,6 +471,10 @@ typedef struct
 	char            log_file[MAX_FN_LEN + 1];
 	char		secondary_instname[MAX_INSTNAME_LEN];	/* instance name specified in -INSTSECONDARY qualifier */
 	char		freeze_comment[MAX_FREEZE_COMMENT_LEN];
+#	ifdef GTM_TLS
+	char		tlsid[MAX_TLSKEY_LEN];
+	int4		renegotiate_interval;
+#	endif
 } gtmsource_options_t;
 
 /********** Source server function prototypes **********/
@@ -528,5 +533,8 @@ int		gtmsource_stop_jnl_release_timer(void);
 void		gtmsource_onln_rlbk_clnup(void);
 int		gtmsource_showfreeze(void);
 int		gtmsource_setfreeze(void);
+#ifdef GTM_TLS
+boolean_t	gtmsource_exchange_tls_info(void);
+#endif
 
 #endif /* GTMSOURCE_H */

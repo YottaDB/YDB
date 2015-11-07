@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,8 +44,6 @@
 #include "error.h"
 #include "gtmio.h"
 #include "iotimer.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "gt_timer.h"
 #include "stp_parms.h"
 #include "gtm_stat.h"
@@ -101,6 +99,9 @@ error_def(ERR_TEXT);
 boolean_t		is_encrypted = FALSE;
 gtmcrypt_key_t		encr_key_handle;
 #endif
+
+/* No journal pool for endiancvt, so ignore csa everywhere. Saves a bunch of CSA_ARG(NULL)s. */
+#define GTM_PUTMSG_CSA(...)	gtm_putmsg_csa(CSA_ARG(NULL) __VA_ARGS__)
 
 typedef struct
 {	/* adapted from dbcertify.h */
@@ -251,57 +252,57 @@ void mupip_endiancvt(void)
 			if (GDSMVCURR != swap_mdbver)
 			{
 				check_error = NOTCURRMDBFORMAT;
-				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
 			swap_uint4 = GTM_BYTESWAP_32(old_data->kill_in_prog);
 			if (0 != swap_uint4)
 			{
 				check_error = KILLINPROG;
-				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
 			swap_uint4 = GTM_BYTESWAP_32(old_data->abandoned_kills);
 			if (0 != swap_uint4)
 			{
 				check_error = ABANDONED_KILLS;
-				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
 			swap_uint4 = GTM_BYTESWAP_32(old_data->rc_srv_cnt);
 			if (0 != swap_uint4)
 			{
 				check_error = GTCMSERVERACTIVE;
-				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
 		}
 		swap_dbver = (enum db_ver)GTM_BYTESWAP_32(old_data->desired_db_format);
 		if (GDSVCURR != swap_dbver)
 		{
 			check_error = NOTCURRDBFORMAT;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		assert(SIZEOF(int4) == SIZEOF(old_data->fully_upgraded));
 		swap_boolean = GTM_BYTESWAP_32(old_data->fully_upgraded);
 		if (!swap_boolean)
 		{
 			check_error = NOTFULLYUPGRADED;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		swap_uint4 = GTM_BYTESWAP_32(old_data->recov_interrupted);
 		if (0 != swap_uint4)
 		{
 			check_error = RECOVINTRPT;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		swap_uint4 = GTM_BYTESWAP_32(old_data->createinprogress);
 		if (0 != swap_uint4)
 		{
 			check_error = DBCREATE;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		swap_uint4 = GTM_BYTESWAP_32(old_data->file_corrupt);
 		if (0 != swap_uint4)
 		{
 			check_error = DBCORRUPT;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 	} else
 	{
@@ -315,7 +316,7 @@ void mupip_endiancvt(void)
 			mu_gv_cur_reg_free();
 			free(old_data);
 			CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
-			gtm_putmsg(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, n_len, db_name);
+			GTM_PUTMSG_CSA(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, n_len, db_name);
 			mupip_exit(ERR_MUNOACTION);
 		}
 		if (gv_cur_region->read_only && !outdb_specified)
@@ -323,7 +324,7 @@ void mupip_endiancvt(void)
 			DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 			free(old_data);
 			CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
-			gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, n_len, db_name);
+			GTM_PUTMSG_CSA(VARLSTCNT(4) ERR_DBRDONLY, 2, n_len, db_name);
 			mupip_exit(ERR_MUNOACTION);
 		}
 		if (!override_specified)
@@ -331,48 +332,48 @@ void mupip_endiancvt(void)
 			if (GDSMVCURR != old_data->minor_dbver)
 			{
 				check_error = NOTCURRMDBFORMAT;
-				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
 			if (0 != old_data->kill_in_prog)
 			{
 				check_error = KILLINPROG;
-				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
 			if (0 != old_data->abandoned_kills)
 			{
 				check_error = ABANDONED_KILLS;
-				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
 			if (0 != old_data->rc_srv_cnt)
 			{
 				check_error = GTCMSERVERACTIVE;
-				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
 		}
 		if (GDSVCURR != old_data->desired_db_format)
 		{
 			check_error = NOTCURRDBFORMAT;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		if (!old_data->fully_upgraded)
 		{
 			check_error = NOTFULLYUPGRADED;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		if (0 != old_data->recov_interrupted)
 		{
 			check_error = RECOVINTRPT;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		if (0 != old_data->createinprogress)
 		{
 			check_error = DBCREATE;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		if (0 != old_data->file_corrupt)
 		{
 			check_error = DBCORRUPT;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		if (!check_error && !outdb_specified)
 		{
@@ -598,7 +599,7 @@ void mupip_endiancvt(void)
 	if (outdb_specified)
 		CLOSEFILE_RESET(outdb_fd, rc);	/* resets "outdb_fd" to FD_INVALID */
 	/* Display success message only after all data has been synced to disk and the file descriptors closed */
-	gtm_putmsg(VARLSTCNT(7) ERR_ENDIANCVT, 5, n_len, db_name, from_endian, to_endian, ENDIANTHIS);
+	GTM_PUTMSG_CSA(VARLSTCNT(7) ERR_ENDIANCVT, 5, n_len, db_name, from_endian, to_endian, ENDIANTHIS);
  	mupip_exit(SS_NORMAL);
 }
 
@@ -863,8 +864,8 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 				recycled_done++;
 			} else if (BLK_FREE == lbm_status)
 				free_done++;		/* count before changing recycled to free */
-			else if (BLK_MAPINVALID == lbm_status)
-				GTMASSERT;
+			else
+				assertpro(BLK_MAPINVALID != lbm_status);
 		}
 		if (info->inplace)
 		{
@@ -1105,7 +1106,7 @@ char *endian_read_dbblk(endian_info *info, block_id blk_to_get)
 		bp = (blk_hdr_ptr_t)buff;
 		assert((bp->bsiz <= info->bsize) && (bp->bsiz >= SIZEOF(*bp)));
 		req_dec_blk_size = MIN(info->bsize, bp->bsiz) - (SIZEOF(*bp));
-		if (BLOCK_REQUIRE_ENCRYPTION(is_encrypted, bp->levl, req_dec_blk_size))
+		if (BLK_NEEDS_ENCRYPTION3(is_encrypted, bp->levl, req_dec_blk_size))
 		{
 			ASSERT_ENCRYPTION_INITIALIZED;
 			inbuf = (char *)(bp + 1);

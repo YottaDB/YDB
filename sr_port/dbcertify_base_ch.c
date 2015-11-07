@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,43 +59,41 @@ CONDITION_HANDLER(dbcertify_base_ch)
 		$DESCRIPTOR(msgbuf, msg_buff);
 	)
 
-	START_CH;
+	START_CH(TRUE);
 	PRN_ERROR;
-	if (SUCCESS == SEVERITY || INFO == SEVERITY)
-	{
-		CONTINUE;
-	} else
-	{
-		UNIX_ONLY(
-			if ((DUMPABLE) && !SUPPRESS_DUMP)
-			{
-				need_core = TRUE;
-				gtm_fork_n_core();
-			}
-			/* rts_error sets error_condition, and dbcertify_base_ch is called only if
-			 * exiting thru rts_error. Setup exi_condition to reflect error
-			 * exit status. Note, if the last eight bits (the only relevant bits
-			 * for Unix exit status) of error_condition is non-zero in case of
-			 * errors, we make sure that an error exit status (non-zero value -1)
-			 * is setup. This is a hack.
-			 */
-			if (0 == exi_condition)
-				exi_condition = (((error_condition & UNIX_EXIT_STATUS_MASK) != 0) ? error_condition : -1);
-		)
-		VMS_ONLY(
-			if ((DUMPABLE) && !SUPPRESS_DUMP)
-			{
-				gtm_dump();
-				TERMINATE;
-			}
-			exi_condition = SIGNAL;
-			/* following is a hack to avoid FAO directives getting printed without expanding
-			 * in the error message during EXIT()
-			 */
-			if (IS_GTM_ERROR(SIGNAL))
-			        exi_condition = ERR_DBCNOFINISH;
-		)
-		UNSUPPORTED_PLATFORM_CHECK;
-		EXIT(exi_condition);
-	}
+	UNIX_ONLY(
+		if ((DUMPABLE) && !SUPPRESS_DUMP)
+		{
+			need_core = TRUE;
+			gtm_fork_n_core();
+		}
+		/* rts_error sets error_condition, and dbcertify_base_ch is called only if
+		 * exiting thru rts_error. Setup exi_condition to reflect error
+		 * exit status. Note, if the last eight bits (the only relevant bits
+		 * for Unix exit status) of error_condition is non-zero in case of
+		 * errors, we make sure that an error exit status (non-zero value -1)
+		 * is setup. This is a hack.
+		 */
+		if (0 == exi_condition)
+			exi_condition = (((error_condition & UNIX_EXIT_STATUS_MASK) != 0) ? error_condition : -1);
+	)
+	VMS_ONLY(
+		if (SUCCESS == SEVERITY || INFO == SEVERITY)
+		{
+			CONTINUE;
+		}
+		if ((DUMPABLE) && !SUPPRESS_DUMP)
+		{
+			gtm_dump();
+			TERMINATE;
+		}
+		exi_condition = SIGNAL;
+		/* following is a hack to avoid FAO directives getting printed without expanding
+		 * in the error message during EXIT()
+		 */
+		if (IS_GTM_ERROR(SIGNAL))
+		        exi_condition = ERR_DBCNOFINISH;
+	)
+	UNSUPPORTED_PLATFORM_CHECK;
+	EXIT(exi_condition);
 }

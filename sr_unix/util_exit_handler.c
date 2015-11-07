@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@ void util_exit_handler()
 	if (exit_handler_active)	/* Don't recurse if exit handler exited */
 		return;
 	exit_handler_active = TRUE;
-	SET_PROCESS_EXITING_TRUE;	/* set this BEFORE cancelling timers as wcs_phase2_commit_wait relies on this */
+	SET_PROCESS_EXITING_TRUE;	/* set this BEFORE canceling timers as wcs_phase2_commit_wait relies on this */
 	if (IS_DSE_IMAGE)
 	{	/* Need to clear csa->hold_onto_crit in case it was set */
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
@@ -60,7 +60,7 @@ void util_exit_handler()
 			}
 		}
 	}
-	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
+	CANCEL_TIMERS;		/* Cancel all unsafe timers - No unpleasant surprises */
 	secshr_db_clnup(NORMAL_TERMINATION);
 	assert(!dollar_tlevel);	/* MUPIP and GT.M are the only ones which can run TP and they have their own exit handlers.
 				 * So no need to run op_trollback here like mupip_exit_handler and gtm_exit_handler. */

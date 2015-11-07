@@ -26,12 +26,10 @@
 #include "gtm_socket.h"
 #include "gtm_unistd.h"
 #include "gtm_limits.h"
+#include "gtm_un.h"
 
 #include <signal.h>
 #include <sys/time.h>
-#ifdef UNIX
-# include <sys/un.h>
-#endif
 #ifdef VMS
 # include <descrip.h>		/* Required for gtmsource.h */
 # include <ssdef.h>
@@ -86,7 +84,6 @@
 # include "gtmsiginfo.h"
 #endif
 #include "gtmimagename.h"
-#include "iotcpdef.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"	/* needed for socket_pool and MAX_N_SOCKETS */
 #include "ctrlc_handler_dummy.h"
@@ -116,6 +113,7 @@
 #include "repl_sem.h"
 #include "gtm_zlib.h"
 #include "anticipatory_freeze.h"
+#include "mu_rndwn_all.h"
 #endif
 #include "jnl_typedef.h"
 #include "repl_ctl.h"
@@ -134,6 +132,9 @@
 # include "gdsblk.h"
 # include "muextr.h"
 # endif
+#ifdef GTM_TLS
+#include "gtm_tls_interface.h"
+#endif
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -257,6 +258,7 @@ GBLDEF	gv_namehead	*gv_target_list;	/* List of ALL gvts that were allocated (in 
 GBLDEF	gv_namehead	*gvt_tp_list;		/* List of gvts that were referenced in the current TP transaction */
 GBLDEF	gvt_container	*gvt_pending_list;	/* list of gvts that need to be re-examined/re-allocated when region is opened */
 GBLDEF	buddy_list	*gvt_pending_buddy_list;/* buddy_list for maintaining memory for gv_targets to be re-examined/allocated */
+GBLDEF	buddy_list	*noisolation_buddy_list;	/* a buddy_list for maintaining the globals that are noisolated */
 GBLDEF	int4		exi_condition;
 GBLDEF	uint4		gtmDebugLevel;
 GBLDEF	caddr_t		smCallerId;			/* Caller of top level malloc/free */
@@ -270,7 +272,6 @@ GBLDEF	boolean_t	certify_all_blocks;		/* If flag is set all blocks are checked a
 							 * written to the database.  Upon error we stay critical
 							 * and report.  This flag can be set via the MUMPS command
 							 * VIEW "GDSCERT":1. */
-GBLDEF	mval		curr_gbl_root;
 GBLDEF	gd_addr		*original_header;
 GBLDEF	hash_table_str	*complits_hashtab;
 GBLDEF	hash_table_str	*compsyms_hashtab;
@@ -480,7 +481,9 @@ GBLDEF	gd_region	*ftok_sem_reg;		/* Last region for which ftok semaphore is grab
 GBLDEF	int		gtm_non_blocked_write_retries; /* number of retries for non-blocked write to pipe */
 #endif
 #ifdef VMS
-/* Following global variables store the state of an erroring sys$qio just before a GTMASSERT in the CHECK_CHANNEL_STATUS macro */
+/* Following global variables store the state of an erroring sys$qio just before a GTMASSERT			BYPASSOK(GTMASSERT)
+ * in the CHECK_CHANNEL_STATUS macro.
+ */
 GBLDEF	uint4	check_channel_status;		/* stores the qio return status */
 GBLDEF	uint4	check_channel_id;		/* stores the qio channel id */
 #endif
@@ -926,14 +929,7 @@ GBLDEF	boolean_t	gtm_tag_utf8_as_ascii = TRUE;
 LITDEF	char			gtmcrypt_repeat_msg[] = "Please look at prior messages related to encryption for more details";
 GBLDEF	boolean_t		gtmcrypt_initialized;	/* Set to TRUE if gtmcrypt_init() completes successfully */
 GBLDEF	char			dl_err[MAX_ERRSTR_LEN];
-GBLDEF	gtmcrypt_init_t			gtmcrypt_init_fnptr;
-GBLDEF  gtmcrypt_close_t        	gtmcrypt_close_fnptr;
-GBLDEF  gtmcrypt_hash_gen_t		gtmcrypt_hash_gen_fnptr;
-GBLDEF  gtmcrypt_encrypt_t		gtmcrypt_encrypt_fnptr;
-GBLDEF  gtmcrypt_decrypt_t		gtmcrypt_decrypt_fnptr;
-GBLDEF	gtmcrypt_getkey_by_hash_t	gtmcrypt_getkey_by_hash_fnptr;
-GBLDEF	gtmcrypt_getkey_by_name_t	gtmcrypt_getkey_by_name_fnptr;
-GBLDEF	gtmcrypt_strerror_t		gtmcrypt_strerror_fnptr;
+GBLDEF	mstr			pvt_crypt_buf;	/* Temporary buffer needed where in-place encryption/decryption is not an option */
 #endif /* GTM_CRYPT */
 #ifdef DEBUG
 /* Following definitions are related to white_box testing */
@@ -961,8 +957,6 @@ GBLDEF	boolean_t	block_is_free;			/* Set to TRUE if the caller wants to let t_qr
 							 */
 GBLDEF	int4		gv_keysize;
 GBLDEF	gd_addr		*gd_header;
-GBLDEF	gd_binding	*gd_map;
-GBLDEF	gd_binding	*gd_map_top;
 #ifdef GTM_TRIGGER
 GBLDEF	int4		gtm_trigger_depth;		/* 0 if no trigger, 1 if inside trigger; 2 if inside nested trigger etc. */
 GBLDEF	int4		tstart_trigger_depth;		/* gtm_trigger_depth at the time of the outermost "op_tstart"
@@ -1078,23 +1072,38 @@ GBLDEF	boolean_t	span_nodes_disallowed; 		/* Indicates whether spanning nodes ar
 GBLDEF	boolean_t	argumentless_rundown;
 GBLDEF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLDEF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
-GBLDEF	boolean_t				is_jnlpool_creator;
+GBLDEF	boolean_t	is_jnlpool_creator;
 GBLDEF	char		gtm_dist[GTM_PATH_MAX];		/* Value of $gtm_dist env variable */
+GBLDEF	semid_queue_elem	*keep_semids;		/* Access semaphores that should be kept because shared memory is up */
 #endif
-GBLDEF	boolean_t	in_jnl_file_autoswitch;	/* Set to TRUE for a short window inside jnl_file_extend when we are about to
-						 * autoswitch; used by jnl_write. */
+GBLDEF	boolean_t	in_jnl_file_autoswitch;		/* Set to TRUE for a short window inside jnl_file_extend when we are about
+							 * to autoswitch; used by jnl_write. */
 #ifdef GTM_PTHREAD
 GBLDEF	pthread_t	gtm_main_thread_id;		/* ID of the main GT.M thread. */
 GBLDEF	boolean_t	gtm_main_thread_id_set;		/* Indicates whether the thread ID is set. */
 GBLDEF	boolean_t	gtm_jvm_process;		/* Indicates whether we are running with JVM or stand-alone. */
 #endif
-GBLDEF	size_t		gtm_max_storalloc;	/* Maximum that GTM allows to be allocated - used for testing */
+GBLDEF	size_t		gtm_max_storalloc;		/* Maximum that GTM allows to be allocated - used for testing */
 #ifdef VMS
-GBLDEF		sgmnt_addrs	*vms_mutex_check_csa;	/* On VMS, mutex_deadlock_check() is directly called from mutex.mar. In
+GBLDEF	sgmnt_addrs	*vms_mutex_check_csa;		/* On VMS, mutex_deadlock_check() is directly called from mutex.mar. In
 							 * order to avoid passing csa parameter from the VMS assembly, we set this
 							 * global from mutex_lock* callers.
 							 */
 #endif
-GBLDEF	boolean_t	ipv4_only;		/* If TRUE, only use AF_INET.
-						 * Reflects the value of the gtm_ipv4_only environment variable, so is process wide.
-						 */
+GBLDEF	boolean_t	ipv4_only;			/* If TRUE, only use AF_INET. Reflects the value of the gtm_ipv4_only
+							 * environment variable, so is process wide.
+							 */
+#ifdef UNIX
+GBLDEF void (*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_error() so gtm_utf8.c can avoid pulling
+							 * stx_error() into gtmsecshr, and thus just about everything else as well.
+							 */
+GBLDEF void (*show_source_line_fptr)(boolean_t warn);	/* Func pointer for show_source_line() - same purpose as stx_error_fptr */
+#endif
+#ifdef GTM_TLS
+GBLDEF	gtm_tls_ctx_t	*tls_ctx;			/* Process private pointer to SSL/TLS context. Any SSL/TLS connections that
+							 * the process needs to create will be created from this context.
+							 * Currently, SSL/TLS is implemented only for replication, but keep it here
+							 * so that it can be used when SSL/TLS support is implemented for GT.M
+							 * Socket devices.
+							 */
+#endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #include "mu_int_maps.h"
 #include "util.h"
 #include "mupint.h"
+#include "gtmmsg.h"
 
 /* Include prototypes */
 #include "bit_set.h"
@@ -40,6 +41,8 @@ GBLREF	int			mu_map_errs;
 GBLREF	int			disp_trans_errors;
 GBLREF	int			trans_errors;
 
+GBLREF trans_num        largest_tn;
+
 error_def(ERR_DBREADBM);
 error_def(ERR_DBLVLINC);
 error_def(ERR_DBMBSIZMN);
@@ -56,6 +59,7 @@ error_def(ERR_DBMBPINCFL);
 error_def(ERR_DBMRKFREE);
 error_def(ERR_DBMRKBUSY);
 error_def(ERR_DBMBMINCFRE);
+error_def(ERR_DBTN);
 
 void mu_int_maps(void)
 {
@@ -68,6 +72,7 @@ void mu_int_maps(void)
 	uint4		dskmap, lfree, *lmap, map_blk_size;
 	block_id	blkno, last_bmp;
 	enum db_ver	ondsk_blkver;
+	trans_num map_tn;
 
 	mu_int_offset[0] = 0;
 	maps = (mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap;
@@ -116,20 +121,21 @@ void mu_int_maps(void)
 				mu_int_blks_to_upgrd++;
 		} else if (GDSVCURR != ondsk_blkver)
 			mu_int_blks_to_upgrd++;
-		if (((blk_hdr_ptr_t)disk)->tn >= mu_int_data.trans_hist.curr_tn)
-		{
+		map_tn = ((blk_hdr_ptr_t)disk)->tn;
+ 		if (map_tn >= mu_int_data.trans_hist.curr_tn)
+ 		{
 			if (trans_errors < disp_trans_errors)
 			{
 				mu_int_path[0] = blkno;
 				mu_int_plen = 1;
 				mu_int_err(ERR_DBMBTNSIZMX, 0, 0, 0, 0, 0, 0, level);
-				trans_errors++;
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DBTN, 1, &map_tn);
 			} else
-			{
-				mu_int_errknt++;
-				trans_errors++;
-			}
-		}
+			   mu_int_errknt++;
+			trans_errors++;
+			if (map_tn > largest_tn)
+				largest_tn = map_tn;
+ 		}
 		master_full = !bit_set(mcnt, mu_int_master);
 		if (last_bmp == blkno)
 			mapsize = (mu_int_data.trans_hist.total_blks - blkno);

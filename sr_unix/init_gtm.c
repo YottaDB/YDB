@@ -14,6 +14,7 @@
 #ifdef GTM_PTHREAD
 #  include <pthread.h>
 #endif
+#include <stdarg.h>
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 
@@ -42,7 +43,9 @@
 #include "stp_parms.h"
 #include "create_fatal_error_zshow_dmp.h"
 #include "mtables.h"
+#include "show_source_line.h"
 
+GBLREF mstr		default_sysid;
 GBLREF void		(*ctrlc_handler_ptr)();
 GBLREF void		(*tp_timeout_action_ptr)(void);
 GBLREF void		(*tp_timeout_clear_ptr)(void);
@@ -51,8 +54,11 @@ GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF void		(*op_write_ptr)(mval *v);
 GBLREF void		(*op_wteol_ptr)(int4 n);
 GBLREF void		(*unw_prof_frame_ptr)(void);
-
-GBLREF mstr		default_sysid;
+GBLREF void		(*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_error() so gtm_utf8.c can avoid pulling
+								 * stx_error() into gtmsecshr, and thus just about everything else
+								 * as well.
+								 */
+GBLREF	void		(*show_source_line_fptr)(boolean_t warn); /* Func ptr for show_source_line() for same reason as above */
 #ifdef GTM_PTHREAD
 GBLREF pthread_t	gtm_main_thread_id;
 GBLREF boolean_t	gtm_main_thread_id_set;
@@ -60,6 +66,7 @@ GBLREF boolean_t	gtm_jvm_process;
 #endif
 GBLDEF boolean_t	gtm_startup_active = FALSE;
 
+/* Note the function pointer initializations below happen in both the GT.M runtime and in mupip */
 void init_gtm(void)
 {
 	struct startup_vector   svec;
@@ -72,17 +79,17 @@ void init_gtm(void)
 	assert(SIZEOF(int) == 4);
 	assert(SIZEOF(int4) == 4);
 	assert(SIZEOF(short) == 2);
-#ifdef OFF_T_LONG
+#	ifdef OFF_T_LONG
 	assert(SIZEOF(off_t) == 8);
-#else
+#	else
 	assert(SIZEOF(off_t) == 4);
-#endif
+#	endif
 	assert(SIZEOF(sgmnt_data) == ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
-#ifdef KEY_T_LONG
+#	ifdef KEY_T_LONG
 	assert(8 == SIZEOF(key_t));
-#else
+#	else
 	assert(SIZEOF(key_t) == SIZEOF(int4));
-#endif
+#	endif
 	assert(SIZEOF(boolean_t) == 4); /* generated code passes 4 byte arguments, run time rtn might be expecting boolean_t arg */
 	assert(BITS_PER_UCHAR == 8);
 	assert(SIZEOF(enum db_ver) == SIZEOF(int4));
@@ -91,7 +98,6 @@ void init_gtm(void)
 	assert(SIZEOF(chkmval.fnpc_indx) == SIZEOF(chkmval_b.fnpc_indx));
 	assert(OFFSETOF(mval, fnpc_indx) == OFFSETOF(mval_b, fnpc_indx));
 	DEBUG_ONLY(mtables_chk());	/* Validate mtables.c assumptions */
-
 	SFPTR(create_fatal_error_zshow_dmp_fptr, create_fatal_error_zshow_dmp);
 #	ifdef GTM_PTHREAD
 	assert(!gtm_main_thread_id_set);
@@ -110,11 +116,11 @@ void init_gtm(void)
 	op_write_ptr = op_write;
 	op_wteol_ptr = op_wteol;
 	unw_prof_frame_ptr = unw_prof_frame;
-
+	stx_error_fptr = stx_error;
+	show_source_line_fptr = show_source_line;
 	if (MUMPS_COMPILE == invocation_mode)
 		exit(gtm_compile());
-
-	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
+	/* This should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	memset(&svec, 0, SIZEOF(svec));
 	svec.argcnt = SIZEOF(svec);
 	svec.rtn_start = svec.rtn_end = malloc(SIZEOF(rtn_tabent));

@@ -29,6 +29,9 @@
 #define	GTM_TPRESTART_LOG_DELTA		"GTM_TPRESTART_LOG_DELTA"
 #define	GTM_TPRESTART_LOG_LIMIT		"GTM_TPRESTART_LOG_FIRST"
 #define	GTM_ZMAXTPTIME			"GTM_ZMAXTPTIME"
+/* 	GTM_DIRTREE_COLLHDR_ALWAYS	"GTM_DIRTREE_COLLHDR_ALWAYS"	dbg-only use in gvcst_put hence no #define for it or
+									else the D9I10002703 subtest will need changes for this.
+									*/
 
 /* White-box testing */
 #define	GTM_WHITE_BOX_TEST_CASE_COUNT	"GTM_WHITE_BOX_TEST_CASE_COUNT"

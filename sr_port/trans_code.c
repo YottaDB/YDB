@@ -84,7 +84,7 @@ void trans_code(void);
 
 CONDITION_HANDLER(zyerr_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	if (indr_stringpool.base == stringpool.base)
 	{ /* switch to run time stringpool */
 		indr_stringpool = stringpool;
@@ -129,7 +129,7 @@ CONDITION_HANDLER(trans_code_ch)
 	mval		dummy;
 	int		level2go;
 
-	START_CH;
+	START_CH(TRUE);
 	/* Treat $ZTRAP (and DEVICE exception action) as the target entryref for an implicit GOTO */
 	if (DUMPABLE 				/* fatal error; we test for STACKOFLOW as part of DUMPABLE test */
 	    || (int)ERR_STACKCRIT == SIGNAL 	/* Successfully compiled ${Z,E}TRAP code but encountered STACK error while

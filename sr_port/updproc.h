@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,19 +33,19 @@ enum upd_bad_trans_type
 	upd_bad_key
 };
 
-#define	UPD_GV_BIND_NAME(GD_HEADER, MNAME)	GV_BIND_NAME_AND_ROOT_SEARCH(GD_HEADER, &MNAME)
+#define	UPD_GV_BIND_NAME(GD_HEADER, GVNAME, GVNH_REG)	GV_BIND_NAME_AND_ROOT_SEARCH(GD_HEADER, &GVNAME, GVNH_REG)
 
 #ifdef GTM_TRIGGER
-#define UPD_GV_BIND_NAME_APPROPRIATE(GD_HEADER, MNAME, KEY, KEYLEN)					\
+#define UPD_GV_BIND_NAME_APPROPRIATE(GD_HEADER, GVNAME, KEY, KEYLEN, GVNH_REG)				\
 {													\
 	char			*tr_ptr;								\
-	gv_namehead		*hasht_tree;								\
-	mstr			gbl_name;								\
+	mname_entry		gvname1;								\
 	int			tr_len;									\
-	mname_entry		gvent;									\
+	sgmnt_addrs		*csa;									\
+													\
 	GBLREF boolean_t	dollar_ztrigger_invoked;						\
 													\
-	if (IS_MNAME_HASHT_GBLNAME(MNAME))								\
+	if (IS_MNAME_HASHT_GBLNAME(GVNAME.var_name))							\
 	{	/* gbl is ^#t. In this case, do special processing. Look at the first subscript and	\
 		 * bind to the region mapped to by that global name (not ^#t).				\
 		 */											\
@@ -58,12 +58,12 @@ enum upd_bad_trans_type
 		assert((HASHT_GBL_CHAR1 == *tr_ptr) || ('%' == *tr_ptr) || (ISALPHA_ASCII(*tr_ptr)));	\
 		if (HASHT_GBL_CHAR1 != *tr_ptr)								\
 		{											\
-			gbl_name.addr = tr_ptr;								\
-			gbl_name.len = STRLEN(tr_ptr);							\
-			GV_BIND_NAME_ONLY(GD_HEADER, &gbl_name);					\
+			gvname1.var_name.addr = tr_ptr;							\
+			gvname1.var_name.len = STRLEN(tr_ptr);						\
+			COMPUTE_HASH_MNAME(&gvname1);							\
+			GV_BIND_NAME_ONLY(GD_HEADER, &gvname1, GVNH_REG);				\
 			csa = cs_addrs;									\
-			SETUP_TRIGGER_GLOBAL;								\
-			gv_target = hasht_tree;								\
+			SET_GVTARGET_TO_HASHT_GBL(csa);							\
 			if (!dollar_ztrigger_invoked)							\
 				dollar_ztrigger_invoked = TRUE;						\
 			csa->incr_db_trigger_cycle = TRUE;						\
@@ -71,13 +71,15 @@ enum upd_bad_trans_type
 		} else											\
 		{											\
 			SWITCH_TO_DEFAULT_REGION;							\
+			/* Special case for ^#t. Set GVNH_REG to NULL. Caller needs to check this */	\
+			GVNH_REG = NULL;								\
 		}											\
 		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;							\
 	} else												\
-		UPD_GV_BIND_NAME(GD_HEADER, MNAME);							\
+		UPD_GV_BIND_NAME(GD_HEADER, GVNAME, GVNH_REG);						\
 }
 #else
-#define UPD_GV_BIND_NAME_APPROPRIATE(GD_HEADER, MNAME, KEY, KEYLEN)	UPD_GV_BIND_NAME(GD_HEADER, MNAME)
+#define UPD_GV_BIND_NAME_APPROPRIATE(GD_HEADER, GVNAME, KEY, KEYLEN, GVNH_REG)	UPD_GV_BIND_NAME(GD_HEADER, GVNAME, GVNH_REG)
 #endif
 
 int		updproc(void);

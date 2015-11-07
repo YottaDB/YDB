@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,13 +24,14 @@
 
 GBLREF int4		gv_keysize;
 GBLREF gv_namehead	*gv_target;
+GBLREF gd_region	*gv_cur_region;
 
 /* transform gv_currkey or gv_altkey based on collation sequence
  * if XBACK is true then convert from internal to external format.
  * if XBACK is false, convert from external to internal format
  */
 
-void	gv_xform_key(gv_key *keyp,  boolean_t xback)
+void gv_xform_key(gv_key *keyp,  boolean_t xback)
 {
 	unsigned char		*c0, *c1, *ctop;
 	DCL_THREADGBL_ACCESS;
@@ -68,7 +69,7 @@ void	gv_xform_key(gv_key *keyp,  boolean_t xback)
 	{
 		if (STR_SUB_PREFIX != *c0)
 		{
-			assert(!gv_target->nct);
+			assert(!(gv_target->nct));
 			while (*c1++ = *c0++)
 				;
 			keyp->prev = keyp->end;
@@ -80,7 +81,7 @@ void	gv_xform_key(gv_key *keyp,  boolean_t xback)
 				= gvsub2str(c0, (unsigned char *)((TREF(gv_sparekey_mval)).str.addr), FALSE)
 				- (unsigned char *)(TREF(gv_sparekey_mval)).str.addr;
 			TREF(transform) = !xback;
-			mval2subsc(TADR(gv_sparekey_mval), keyp);
+			mval2subsc(TADR(gv_sparekey_mval), keyp, gv_cur_region->std_null_coll);
 			c1 = &keyp->base[keyp->end];
 			while (*c0++)
 				;

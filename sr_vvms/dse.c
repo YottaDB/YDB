@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,8 +32,6 @@
 #include "filestruct.h"
 #include "cli.h"
 #include "error.h"
-#include "min_max.h"		/* needed for init_root_gv.h */
-#include "init_root_gv.h"
 #include "io.h"
 #include "iottdef.h"
 #include "jnl.h"
@@ -69,10 +67,7 @@ GBLREF int4		exi_condition;
 GBLREF int4 		lkid;
 GBLREF boolean_t        dse_running;
 GBLREF gv_namehead	*gv_target;
-GBLREF mval		curr_gbl_root;
 GBLREF gd_region	*gv_cur_region;
-GBLREF gd_binding       *gd_map;
-GBLREF gd_binding       *gd_map_top;
 GBLREF gd_addr          *gd_header;
 GBLREF gd_addr          *original_header;
 GBLREF sgmnt_addrs	*cs_addrs;
@@ -109,12 +104,13 @@ void dse(void)
 	gtm_imagetype_init(DSE_IMAGE);
 	gtm_env_init();	/* read in all environment variables */
 	TREF(transform) = TRUE;
+	TREF(no_spangbls) = TRUE;	/* dse operates on a per-region basis irrespective of global mapping in gld */
 	util_out_open(0);
 	SET_EXIT_HANDLER(exi_blk, generic_exit_handler, exi_condition);	/* Establish exit handler */
 	ESTABLISH(util_base_ch);
 	status =lp_id(&lkid);
 	if (SS$_NORMAL != status)
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	get_page_size();
 	getjobnum();
 	INVOKE_INIT_SECSHR_ADDRS;
@@ -125,7 +121,6 @@ void dse(void)
 	initialize_pattern_table();
 	gvinit();
 	region_init(FALSE);
-	INIT_GBL_ROOT();
 	sys$assign(&desc, &sysout_channel, 0, 0);
 	if (sysout_channel)
 	{
@@ -143,7 +138,9 @@ void dse(void)
 	util_out_print("!/File  !_!AD", TRUE, DB_LEN_STR(gv_cur_region));
 	util_out_print("Region!_!AD!/", TRUE, REG_LEN_STR(gv_cur_region));
 	dse_ctrlc_setup();
-	CREATE_DUMMY_GBLDIR(gd_header, original_header, gv_cur_region, gd_map, gd_map_top);
+	/* Since DSE operates on a region-by-region basis (for the most part), do not use a global directory at all from now on */
+	original_header = gd_header;
+	gd_header = NULL;
 	status = lib$get_foreign(&command, 0, &outlen, 0);
 	if ((status & 1) && outlen > 0)
 	{
@@ -153,7 +150,7 @@ void dse(void)
 			dse_exit();
 		else if (CLI$_NORMAL == status)
 		{
-    			ESTABLISH(util_ch);
+			ESTABLISH(util_ch);
 			CLI$DISPATCH();
 			REVERT;
 		}
@@ -164,14 +161,14 @@ void dse(void)
 
 static void dse_process(void)
 {
-    uint4	status;
+	uint4	status;
 
-    ESTABLISH(util_ch);
-    status = CLI$DCL_PARSE(0, &DSE_CMD, &lib$get_input, &lib$get_input, &prompt);
-    if (RMS$_EOF == status)
-	dse_exit();
-    else if (CLI$_NORMAL == status)
-	CLI$DISPATCH();
-    if (util_interrupt)
-	rts_error(VARLSTCNT(1) ERR_CTRLC);
+	ESTABLISH(util_ch);
+	status = CLI$DCL_PARSE(0, &DSE_CMD, &lib$get_input, &lib$get_input, &prompt);
+	if (RMS$_EOF == status)
+		dse_exit();
+	else if (CLI$_NORMAL == status)
+		CLI$DISPATCH();
+	if (util_interrupt)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 }

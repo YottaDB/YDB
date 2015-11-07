@@ -1,6 +1,6 @@
 $!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 $!								!
-$!	Copyright 2001, 2005 Fidelity Information Services, Inc	!
+$!	Copyright 2001, 2013 Fidelity Information Services, Inc	!
 $!								!
 $!	This source code contains the intellectual property	!
 $!	of its copyright holder(s), and is made available	!
@@ -153,17 +153,12 @@ $	xtra = "," + f$parse(f$search("gtm$src:gde*.msg"),,,"NAME")
 $	set noon
 $	search/nooutput gtm$src:gde.m patcode
 $	if $severity .eq. 1 then $ xtra = xtra + ",_patcode"
-$	define/user gdeobj 'objdir'mumps.olb
-$	define/user sys$error nl:
-$	define/user sys$output nl:
-$	gtm_library/extract=gdeoget/output=nl: 'objdir'mumps.olb
-$	if $severity .eq. 1 then $ xtra = xtra + ",gdeoget"
 $	set on
 $	gdedsf = ""
 $	if dsffiles then gdedsf = "/dsf=gde.dsf"
 $	define/user gdeobj 'objdir'mumps.olb
 $	define/user target 'targdir'
-$	link/map='mapfile'gde.map/full/exe='targdir'gde.exe'lnkopt' 'gdedsf' gdeobj/incl=(gde'xtra'),sys$input/opt,target:cluster.opt/opt,target:release_name.opt/opt
+$	link/map='mapfile'gde.map/full/exe='targdir'gde.exe'lnkopt' 'gdedsf' gdeobj/incl=(gde'xtra'),sys$input/opt,target:cluster.opt/opt,target:release_name.opt/opt  ! BYPASSOK
 gdeobj/incl=(_lclcol,gdeadd,gdechang,gdetempl,gdedelet,gdeexit,gdeget,gdemsgin)
 gdeobj/incl=(gdehelp,gdesetgd,gdeinit,gdelocks,gdelog,gdemap,gdeparse,gdeput,gdequit)
 gdeobj/incl=(gderenam,gdescan,gdeshow,gdespawn,gdeverif)
@@ -180,7 +175,7 @@ $	dsedsf = ""
 $	if dsffiles then dsedsf = "/dsf=dse.dsf"
 $	define/user dseobj 'objdir'mumps.olb
 $	define/user target 'targdir'
-$	link/map='mapfile'dse.map/full/cross/exe='targdir'dse.exe'lnkopt' 'dsedsf' dseobj/libr/incl=dse,target:secshrlink.opt/opt,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt
+$	link/map='mapfile'dse.map/full/cross/exe='targdir'dse.exe'lnkopt' 'dsedsf' dseobj/libr/incl=dse,target:secshrlink.opt/opt,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt  ! BYPASSOK
 name = DSE.EXE
 $ endif
 $!
@@ -193,7 +188,7 @@ $	mupipdsf = ""
 $	if dsffiles then mupipdsf = "/dsf=mupip.dsf"
 $	define/user mupipobj 'objdir'mumps.olb
 $	define/user target 'targdir'
-$	link/map='mapfile'mupip.map/full/cross/exe='targdir'mupip.exe'lnkopt' 'mupipdsf' mupipobj/libr/incl=mupip,target:secshrlink.opt/opt,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt
+$	link/map='mapfile'mupip.map/full/cross/exe='targdir'mupip.exe'lnkopt' 'mupipdsf' mupipobj/libr/incl=mupip,target:secshrlink.opt/opt,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt  ! BYPASSOK
 name = MUPIP.EXE
 $ endif
 $!
@@ -206,7 +201,7 @@ $	dbcertifydsf = ""
 $	if dsffiles then dbcertifydsf = "/dsf=dbcertify.dsf"
 $	define/user dbcertifyobj 'objdir'mumps.olb
 $	define/user target 'targdir'
-$	link/map='mapfile'dbcertify.map/full/cross/exe='targdir'dbcertify.exe'lnkopt' 'dbcertifydsf' dbcertifyobj/libr/incl=dbcertify,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt
+$	link/map='mapfile'dbcertify.map/full/cross/exe='targdir'dbcertify.exe'lnkopt' 'dbcertifydsf' dbcertifyobj/libr/incl=dbcertify,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt  ! BYPASSOK
 name = DBCERTIFY.EXE
 $ endif
 $!
@@ -219,7 +214,7 @@ $	lkedsf = ""
 $	if dsffiles then lkedsf = "/dsf=lke.dsf"
 $	define/user lkeobj 'objdir'mumps.olb
 $	define/user target 'targdir'
-$	link/map='mapfile'lke.map/full/exe='targdir'lke.exe'lnkopt' 'lkedsf' lkeobj/libr/incl=lke,target:secshrlink.opt/opt,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt
+$	link/map='mapfile'lke.map/full/exe='targdir'lke.exe'lnkopt' 'lkedsf' lkeobj/libr/incl=lke,target:secshrlink.opt/opt,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt  ! BYPASSOK
 name = LKE.EXE
 $ endif
 $!
@@ -233,7 +228,7 @@ $	then
 $		@gtm$tools:build_print_stage "Building LMU" "middle"
 $		define/user lmuobj 'objdir'mumps.olb
 $		define/user target 'targdir'
-$		link/map='mapfile'lmu.map/full/exe='targdir'lmu.exe'lnkopt' lmuobj/libr/incl=lmu,target:secshrlink.opt/opt,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt
+$		link/map='mapfile'lmu.map/full/exe='targdir'lmu.exe'lnkopt' lmuobj/libr/incl=lmu,target:secshrlink.opt/opt,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt  ! BYPASSOK
 name = LMU.EXE
 $	endif
 $ endif
@@ -266,7 +261,7 @@ $	gtmstopdsf = ""
 $	if dsffiles then gtmstopdsf = "/dsf=gtm$stop.dsf"
 $	define/user gtmstopobj 'objdir'mumps.olb
 $	define/user target 'targdir'
-$	link/exe=gtm$stop.exe/map='mapfile'gtm$stop.map/full 'gtmstopdsf' gtmstopobj/incl=(gtmstop,gtmstopzc,merrors),sys$input/opt,target:cluster.opt/opt,target:release_name.opt/opt
+$	link/exe=gtm$stop.exe/map='mapfile'gtm$stop.map/full 'gtmstopdsf' gtmstopobj/incl=(gtmstop,gtmstopzc,merrors),sys$input/opt,target:cluster.opt/opt,target:release_name.opt/opt  ! BYPASSOK
 gtm$vrt:[pct]_dh.obj,_do.obj,_exp.obj,_st.obj
 name = GTM$STOP.EXE
 $ endif
@@ -283,7 +278,7 @@ $	cmidsf = ""
 $	if dsffiles then cmidsf = "/dsf=cmishr.dsf"
 $	define/user cmiobj 'objdir'cmi.olb
 $	define/user target 'targdir'
-$	link/map='mapfile'cmishr.map/full/share='targdir'cmishr.exe'lnkopt' 'cmidsf' cmiobj/libr'xtra',gtm$tools:'cmilink'/opt,sys$input/opt,target:release_name.opt/opt
+$	link/map='mapfile'cmishr.map/full/share='targdir'cmishr.exe'lnkopt' 'cmidsf' cmiobj/libr'xtra',gtm$tools:'cmilink'/opt,sys$input/opt,target:release_name.opt/opt  ! BYPASSOK
 name = CMISHR.EXE
 $	set security/protect=(o:rwed,s:rwed,g:re,w:re) 'targdir'cmishr.exe
 $	if p2 .eqs. "P"
@@ -305,7 +300,7 @@ $	gtcmsrvdsf = ""
 $	if dsffiles then gtcmsrvdsf = "/dsf=gtcm_server.dsf"
 $	define/user gtcmobj 'objdir'mumps.olb
 $	define/user target 'targdir'
-$	link/map='mapfile'gtcm_server.map/full/exe='targdir'gtcm_server.exe'lnkopt' 'gtcmsrvdsf' gtcmobj/libr/incl=gtcm_server,target:secshrlink.opt/opt,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt
+$	link/map='mapfile'gtcm_server.map/full/exe='targdir'gtcm_server.exe'lnkopt' 'gtcmsrvdsf' gtcmobj/libr/incl=gtcm_server,target:secshrlink.opt/opt,target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt  ! BYPASSOK
 name = GTCM_SERVER.EXE
 $ endif
 $!
@@ -329,7 +324,7 @@ $	gtcmstpdsf = ""
 $	if dsffiles then gtcmstpdsf = "/dsf=gtcm_stop.dsf"
 $	define/user gtcmstopobj 'objdir'mumps.olb
 $	define/user target 'targdir'
-$	link/map='mapfile'gtcm_stop.map/full/exe='targdir'gtcm_stop.exe gtcmstopobj/incl=(gtcmstop,gtmstopzc,merrors),target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt
+$	link/map='mapfile'gtcm_stop.map/full/exe='targdir'gtcm_stop.exe gtcmstopobj/incl=(gtcmstop,gtmstopzc,merrors),target:cluster.opt/opt,sys$input/opt,target:release_name.opt/opt  ! BYPASSOK
 gtm$vrt:[pct]_dh.obj,_exp.obj
 name = GTCM_STOP.EXE
 $ endif
@@ -349,7 +344,7 @@ $	then
 $		@gtm$tools:build_print_stage "Building IBI_XFM" "middle"
 $		define/user ibiobj 'objdir'mumps.olb
 $		define/user target 'targdir'
-$		link/share='targdir'ibi_xfm.exe/map='mapfile'ibi_xfm.map/full ibiobj/libr/incl=dsm_api_vector,sys$input/opt,target:cluster.opt/opt,target:release_name.opt/opt
+$		link/share='targdir'ibi_xfm.exe/map='mapfile'ibi_xfm.map/full ibiobj/libr/incl=dsm_api_vector,sys$input/opt,target:cluster.opt/opt,target:release_name.opt/opt  ! BYPASSOK
 GTMSHR/SHARE
 GSMATCH=LEQ,4,0
 name=DSM$SHARE
@@ -371,7 +366,7 @@ $	then
 $		@gtm$tools:build_print_stage "Building DDPSERVER" "middle"
 $		define/user ddpobj 'objdir'mumps.olb
 $		define/user target 'targdir'
-$		link/map='mapfile'ddpserver.map/full/exe='targdir'ddpserver.exe'lnkopt' ddpobj/libr/incl=ddpserver,sys$input/opt,target:cluster.opt/opt,target:release_name.opt/opt
+$		link/map='mapfile'ddpserver.map/full/exe='targdir'ddpserver.exe'lnkopt' ddpobj/libr/incl=ddpserver,sys$input/opt,target:cluster.opt/opt,target:release_name.opt/opt  ! BYPASSOK
 gtmshr/share
 gtmsecshr/share
 name = DDPSERVER.EXE
@@ -379,7 +374,7 @@ $		@gtm$tools:build_print_stage "Building DDPGVUSR" "middle"
 $		ddplink ="ddplink." + f$element(alpha,",","vax,axp")
 $		define/user ddpobj 'objdir'mumps.olb
 $		define/user target 'targdir'
-$		link/share='targdir'ddpgvusr.exe'lnkopt'/map='mapfile'DDPGVUSR.MAP/full ddpobj/incl=(DDPGVUSR),gtm$tools:'ddplink'/opt,sys$input/opt,target:release_name.opt/opt
+$		link/share='targdir'ddpgvusr.exe'lnkopt'/map='mapfile'DDPGVUSR.MAP/full ddpobj/incl=(DDPGVUSR),gtm$tools:'ddplink'/opt,sys$input/opt,target:release_name.opt/opt  ! BYPASSOK
 name = DDPGVUSR.EXE
 $		if p2 .eqs. "P"
 $		then
@@ -400,7 +395,7 @@ $			set def [-]
 $!
 $			define/user ddpobj 'objdir'mumps.olb
 $			define/user target 'targdir'
-$			link/exe='targdir'gtcmddpstop.exe/map='mapfile'gtcmddpstop.map/full ddpobj/incl=(stpimg),sys$input/opt,target:cluster.opt/opt,target:release_name.opt/opt
+$			link/exe='targdir'gtcmddpstop.exe/map='mapfile'gtcmddpstop.map/full ddpobj/incl=(stpimg),sys$input/opt,target:cluster.opt/opt,target:release_name.opt/opt  ! BYPASSOK
 ddpobj/incl=(pid,gtmstopzc,merrors)
 gtm$vrt:[pct]_dh.obj,_exp.obj
 SYMBOL=GTM$CTRLC_ENABLE,0

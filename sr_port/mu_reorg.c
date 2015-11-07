@@ -65,19 +65,12 @@
 #include "sleep_cnt.h"
 #include "wcs_sleep.h"
 #include "memcoherency.h"
+#include "change_reg.h"
 
 #ifdef UNIX
 #include "repl_msg.h"
 #include "gtmsource.h"
 #endif
-#ifdef GTM_TRIGGER
-#include "hashtab_mname.h"
-#include "gv_trigger.h"
-#include "gv_trigger_common.h"
-#include "targ_alloc.h"
-#endif
-
-GTMTRIG_ONLY(LITREF	mval	literal_hasht;)
 
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
@@ -121,20 +114,21 @@ error_def(ERR_MUREORGFAIL);
 }
 
 #ifdef UNIX
-# define ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(LCL_T_TRIES)								\
+# define ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(LCL_T_TRIES, GN)								\
 {																\
 	boolean_t		tn_aborted;											\
 																\
 	ABORT_TRANS_IF_GBL_EXIST_NOMORE(LCL_T_TRIES, tn_aborted);								\
 	if (tn_aborted)														\
 	{															\
-		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);			\
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GN->len, GN->addr);				\
 		reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused, file_extended, lvls_reduced, blks_coalesced,\
 				blks_split, blks_swapped);									\
 		return TRUE; /* It is not an error if the global (that once existed) doesn't exist anymore (due to ROLLBACK) */	\
 	}															\
 }
 #endif
+
 void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *kill_set_list, trans_num tn);
 void reorg_finish(block_id dest_blk_id, int blks_processed, int blks_killed,
 	int blks_reused, int file_extended, int lvls_reduced,
@@ -196,7 +190,7 @@ void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *
 
 /****************************************************************
 Input Parameter:
-	gn = Global name
+	gl_ptr = pointer to glist structure corresponding to global name
 	exclude_glist_ptr = list of globals in EXCLUDE option
 	index_fill_factor = index blocks' fill factor
 	data_fill_factor = data blocks' fill factor
@@ -205,7 +199,8 @@ Input/Output Parameter:
 	reorg_op = What operations to do (coalesce or, swap or, split) [Default is all]
 			[Only for debugging]
  ****************************************************************/
-boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int index_fill_factor, int data_fill_factor, int reorg_op)
+boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
+				int index_fill_factor, int data_fill_factor, int reorg_op)
 {
 	boolean_t		end_of_tree = FALSE, complete_merge, detailed_log;
 	int			rec_size;
@@ -233,35 +228,18 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 	super_srch_hist		super_dest_hist; /* dir_hist combined with reorg_gv_target->hist */
 	jnl_buffer_ptr_t	jbp;
 	trans_num		ret_tn;
-	sgmnt_addrs		*csa;
+	mstr			*gn;
 #	ifdef UNIX
 	DEBUG_ONLY(unsigned int	lcl_t_tries;)
-#	endif
-#	ifdef GTM_TRIGGER
-	gv_namehead		*hasht_tree;
-	mname_entry		gvent;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = cs_addrs;
 	t_err = ERR_MUREORGFAIL;
 	kill_set_tail = &kill_set_list;
 	inctn_opcode = inctn_invalid_op; /* temporary reset; satisfy an assert in t_end() */
-#	ifdef GTM_TRIGGER
-	if (IS_MNAME_HASHT_GBLNAME(gn->str))
-	{	/* Initialize ^#t global for this region. Maintain reorg_restart_key as usual since this exists per region. */
-		SETUP_TRIGGER_GLOBAL;
-		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
-		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
-		if (0 != gv_target->root)
-		{
-			util_out_print("   ", FLUSH);
-			util_out_print("Global: !AD (region !AD)", FLUSH, gn->str.len, gn->str.addr, REG_LEN_STR(gv_cur_region));
-		}
-	} else
-#	endif	/* Initialization for current global */
-		op_gvname(VARLSTCNT(1) gn);
+	DO_OP_GVNAME(gl_ptr);
+		/* sets gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr */
 	/* Cannot proceed for read-only data files */
 	if (gv_cur_region->read_only)
 	{
@@ -272,36 +250,34 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 		return TRUE; /* It is not an error that global was killed */
 	dest_blk_id = cs_addrs->reorg_last_dest;
 	inctn_opcode = inctn_mu_reorg;
-
+	gn = &GNAME(gl_ptr);
 	/* If resume option is present, then reorg_restart_key should be not null.
 	 * Skip all globals until we are in the region for that global.
 	 * Get the reorg_restart_key and reorg_restart_block from database header and restart from there.
 	 */
 	if (*resume && 0 != cs_data->reorg_restart_key[0])
-	{
-		/* resume from last key reorged in GVT */
+	{	/* resume from last key reorged in GVT */
 		tkeysize = get_key_len(NULL, &cs_data->reorg_restart_key[0]);
 		memcpy(gv_currkey->base, cs_data->reorg_restart_key, tkeysize);
 		gv_currkey->end = tkeysize - 1;
 		dest_blk_id = cs_data->reorg_restart_block;
 		SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;
 		altkeylen = gv_altkey->end - 1;
- 		if (altkeylen && (altkeylen == gn->str.len) && (0 == memcmp(gv_altkey->base, gn->str.addr, gn->str.len)))
+ 		if (altkeylen && (altkeylen == gn->len) && (0 == memcmp(gv_altkey->base, gn->addr, gn->len)))
 			/* Going to resume from current global, so it resumed and make it false */
 			*resume = FALSE;
 	} else
-	{
-		/* start from the left most leaf */
-		memcpy(&gv_currkey->base[0], gn->str.addr, gn->str.len);
-		gv_currkey->base[gn->str.len] = gv_currkey->base[gn->str.len + 1] = 0;
-		gv_currkey->end = gn->str.len + 1;
+	{	/* start from the left most leaf */
+		memcpy(&gv_currkey->base[0], gn->addr, gn->len);
+		gv_currkey->base[gn->len] = gv_currkey->base[gn->len + 1] = 0;
+		gv_currkey->end = gn->len + 1;
 	}
 	if (*resume)
 	{
 		util_out_print("REORG cannot be resumed from this point, Skipping this global...", FLUSH);
-		memcpy(&gv_currkey->base[0], gn->str.addr, gn->str.len);
-		gv_currkey->base[gn->str.len] = gv_currkey->base[gn->str.len + 1] = 0;
-		gv_currkey->end = gn->str.len + 1;
+		memcpy(&gv_currkey->base[0], gn->addr, gn->len);
+		gv_currkey->base[gn->len] = gv_currkey->base[gn->len + 1] = 0;
+		gv_currkey->end = gn->len + 1;
 		return TRUE;
 	}
  	memcpy(&gv_currkey_next_reorg->base[0], &gv_currkey->base[0], gv_currkey->end + 1);
@@ -320,7 +296,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 	/* --- more detailed debugging information --- */
 	if (detailed_log = reorg_op & DETAIL)
 		util_out_print("STARTING to work on global ^!AD from region !AD", TRUE,
-			gn->str.len, gn->str.addr, REG_LEN_STR(gv_cur_region));
+			gn->len, gn->addr, REG_LEN_STR(gv_cur_region));
 
 	/* In each iteration of MAIN loop, a working block is processed for a GVT */
 	for (; ;)	/* ================ START MAIN LOOP ================ */
@@ -375,8 +351,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					status = mu_split(level, i_max_fill, d_max_fill, &cnt1, &cnt2);
 					if (cdb_sc_maxlvl == status)
 					{
-						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_MAXBTLEVEL, 2, gn->str.len,
-								gn->str.addr);
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_MAXBTLEVEL, 2, gn->len, gn->addr);
 						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
 							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
 						return FALSE;
@@ -387,7 +362,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
-							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
+							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
 							continue;
 						}
 						if (detailed_log)
@@ -450,7 +425,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
-							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
+							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
 							if (level)
 							{	/* reinitialize level member in rtsib_hist srch_blk_status' */
 								for (count = 0; count < MAX_BT_DEPTH; count++)
@@ -520,7 +495,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
-							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
+							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
 							inctn_opcode = inctn_mu_reorg;	/* reset inctn_opcode to its default */
 							update_trans = UPDTRNS_DB_UPDATED_MASK;/* reset update_trans to old value */
 							continue;
@@ -543,7 +518,6 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 			}/* === SPLIT-COALESCE LOOP END === */
 			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}/* === START WHILE COMPLETE_MERGE === */
-
 		if (mu_ctrlc_occurred || mu_ctrly_occurred)
 		{
 			SAVE_REORG_RESTART;
@@ -567,8 +541,9 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
                                 }
 				if (gv_target->hist.depth <= level)
 					break;
-				/* swap working block with appropriate dest_blk_id block.
-				   Historys are sent as gv_target->hist and reorg_gv_target->hist */
+				/* Swap working block with appropriate dest_blk_id block.
+				 * Histories are sent as gv_target->hist and reorg_gv_target->hist.
+				 */
 				mu_reorg_in_swap_blk = TRUE;
 				status = mu_swap_blk(level, &dest_blk_id, &kill_set_list, exclude_glist_ptr);
 				mu_reorg_in_swap_blk = FALSE;
@@ -596,7 +571,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
-							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
+							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
 							DECR_BLK_NUM(dest_blk_id);
 							continue;
 						}
@@ -620,7 +595,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					{
 						need_kip_incr = FALSE;
 						assert(NULL == kip_csa);
-						UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
+						UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
 						DECR_BLK_NUM(dest_blk_id);
 						continue;
 					}
@@ -660,9 +635,9 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 	}		/* ================ END MAIN LOOP ================ */
 
 	/* =========== START REDUCE LEVEL ============== */
-	memcpy(&gv_currkey->base[0], gn->str.addr, gn->str.len);
-	gv_currkey->base[gn->str.len] = gv_currkey->base[gn->str.len + 1] = 0;
-	gv_currkey->end = gn->str.len + 1;
+	memcpy(&gv_currkey->base[0], gn->addr, gn->len);
+	gv_currkey->base[gn->len] = gv_currkey->base[gn->len + 1] = 0;
+	gv_currkey->end = gn->len + 1;
 	for (;;)	/* Reduce level continues until it fails to reduce */
 	{
 		t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
@@ -698,7 +673,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				{
 					need_kip_incr = FALSE;
 					assert(NULL == kip_csa);
-					UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries));
+					UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
 					continue;
 				}
 				if (detailed_log)
@@ -721,11 +696,9 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 			break;
 	}
 	/* =========== END REDUCE LEVEL ===========*/
-
 	reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
-		file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
+			file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
 	return TRUE;
-
 } /* end mu_reorg() */
 
 /**********************************************
@@ -750,11 +723,8 @@ void reorg_finish(block_id dest_blk_id, int blks_processed, int blks_killed,
 		util_out_print("Levels Eliminated   : !SL ", FLUSH, lvls_reduced);
 	util_out_print("Blocks extended     : !SL ", FLUSH, file_extended);
 	cs_addrs->reorg_last_dest = dest_blk_id;
-
 	/* next attempt for this global will start from the beginning, if RESUME option is present */
 	cs_data->reorg_restart_block = 0;
 	cs_data->reorg_restart_key[0] = 0;
 	cs_data->reorg_restart_key[1] = 0;
 }
-
-/* end of program */

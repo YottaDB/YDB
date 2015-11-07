@@ -60,17 +60,15 @@ int gtm_chk_dist(char *image)
 	int		status;
 	char 		mbuff[MAX_FBUFF + 1];
 	parse_blk	pblk;
-	char		*dist;
 
-	if (NULL != (dist = (char *)GETENV(GTM_DIST)))
+	if (STRLEN(gtm_dist))
 	{
 		assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
-		if ((GTM_PATH_MAX - 2) <= (STRLEN(dist) + gtmImageNames[image_type].imageNameLen))
+		if ((GTM_PATH_MAX - 2) <= (STRLEN(gtm_dist) + gtmImageNames[image_type].imageNameLen))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1,
 					GTM_PATH_MAX - gtmImageNames[image_type].imageNameLen - 2);
 	} else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
-	memcpy(gtm_dist, dist, STRLEN(dist));
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = mbuff;
 	pblk.buff_size = MAX_FBUFF;

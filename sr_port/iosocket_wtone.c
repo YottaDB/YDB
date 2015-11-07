@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,6 @@
 #include "gtm_inet.h"
 #include "io.h"
 #include "gt_timer.h"
-#include "iotcpdef.h"
 #include "iosocketdef.h"
 #include "gtm_utf8.h"
 
@@ -48,7 +47,7 @@ void iosocket_wtone(int ch)
 				endptr = UTF16LE_WCTOMB(ch, uni_c);
 				break;
 			default:
-				GTMASSERT;
+				assertpro(io_curr_device.out->ochset != io_curr_device.out->ochset);
 		}
 		temp.addr = uni_c;
 		temp.len = INTCAST(endptr - uni_c);

@@ -36,8 +36,6 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
-#include "min_max.h"		/* needed for init_root_gv.h */
-#include "init_root_gv.h"
 #include "dse.h"
 #ifdef UNIX
 # include "mutex.h"
@@ -47,7 +45,6 @@
 
 GBLREF	VSIG_ATOMIC_T	util_interrupt;
 GBLREF	block_id	patch_curr_blk;
-GBLREF	gd_addr		*gd_header;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	short		crash_count;
@@ -62,9 +59,9 @@ error_def(ERR_FREEZECTRL);
 
 void dse_all(void)
 {
-	gd_region	*ptr;
+	gd_region	*reg;
 	tp_region	*region_list, *rg, *rg_last, *rg_new;	/* A handy structure for maintaining a list of regions */
-	int		i, j;
+	int		i;
 	sgmnt_addrs	*old_addrs, *csa;
 	gd_region	*old_region;
 	block_id	old_block;
@@ -80,15 +77,11 @@ void dse_all(void)
 	boolean_t	dump = FALSE;
 	boolean_t	override = FALSE;
 	boolean_t	was_crit;
-	gd_addr         *temp_gdaddr;
-	gd_binding      *map;
 	UNIX_ONLY(char	*fgets_res;)
 
 	old_addrs = cs_addrs;
 	old_region = gv_cur_region;
 	old_block = patch_curr_blk;
-	temp_gdaddr = gd_header;
-	gd_header = original_header;
 	if (cli_present("RENEW") == CLI_PRESENT)
 	{
 		crit = ref = wc = nofreeze = TRUE;
@@ -124,33 +117,31 @@ void dse_all(void)
 			dump = TRUE;
 	}
         if (!dump && gv_cur_region->read_only)
-                rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+                rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	region_list = NULL;
-	for (i = 0, ptr = gd_header->regions; i < gd_header->n_regions; i++, ptr++)
+	for (i = 0, reg = original_header->regions; i < original_header->n_regions; i++, reg++)
 	{
-		if (ptr->dyn.addr->acc_meth != dba_bg && ptr->dyn.addr->acc_meth != dba_mm)
+		if ((dba_bg != REG_ACC_METH(reg)) && (dba_mm != REG_ACC_METH(reg)))
 		{
-			util_out_print("Skipping region !AD: not BG or MM access",TRUE,ptr->rname_len,&ptr->rname[0]);
+			util_out_print("Skipping region !AD: not BG or MM access", TRUE, REG_LEN_STR(reg));
 			continue;
 		}
-		if (!ptr->open)
+		if (!reg->open)
 		{
-			util_out_print("Skipping region !AD as it is not bound to any namespace.", TRUE,
-				ptr->rname_len, &ptr->rname[0]);
+			util_out_print("Skipping region !AD as it is not bound to any namespace.", TRUE, REG_LEN_STR(reg));
 			continue;
 		}
 		if (dump)
 		{
-			gv_cur_region = ptr;
+			gv_cur_region = reg;
 			cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 			dse_all_dump = TRUE;
 			dse_dmp_fhead();
 			assert(!dse_all_dump);	/* should have been reset by "dse_dmp_fhead" */
 		} else
-		{
-			/* put on region list in order of ftok value so processed in same order that crits are obtained */
-			csa = &FILE_INFO(ptr)->s_addrs;
-			insert_region(ptr, &(region_list), NULL, SIZEOF(tp_region));
+		{	/* put on region list in order of ftok value so processed in same order that crits are obtained */
+			csa = &FILE_INFO(reg)->s_addrs;
+			insert_region(reg, &(region_list), NULL, SIZEOF(tp_region));
 		}
 	}
 	if (!dump)
@@ -158,15 +149,8 @@ void dse_all(void)
 		for (rg = region_list; NULL != rg; rg = rg->fPtr)
 		{
 			gv_cur_region = rg->reg;
-			switch(gv_cur_region->dyn.addr->acc_meth)
-			{
-			case dba_mm:
-			case dba_bg:
-				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
-				break;
-			default:
-				GTMASSERT;
-			}
+			assert((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)));
+			cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 			patch_curr_blk = get_dir_root();
 			if (crit)
 			{
@@ -185,7 +169,7 @@ void dse_all(void)
 					hiber_start(1000);
 					if (util_interrupt)
 					{
-						gtm_putmsg(VARLSTCNT(1) ERR_FREEZECTRL);
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FREEZECTRL);
                         	                break;
 					}
 				}
@@ -227,8 +211,8 @@ void dse_all(void)
 			}
 			if (nofreeze)
 			{
-				if (REG_ALREADY_FROZEN == region_freeze(gv_cur_region,FALSE, override, FALSE))
-					util_out_print("Region: !AD is frozen by another user, not releasing freeze",TRUE,
+				if (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, FALSE, override, FALSE))
+					util_out_print("Region: !AD is frozen by another user, not releasing freeze", TRUE,
 						REG_LEN_STR(gv_cur_region));
 				else
 					util_out_print("Region !AD is now UNFROZEN", TRUE, REG_LEN_STR(gv_cur_region));
@@ -240,6 +224,5 @@ void dse_all(void)
 	cs_addrs = old_addrs;
 	gv_cur_region = old_region;
 	patch_curr_blk = old_block;
-	GET_SAVED_GDADDR(gd_header, temp_gdaddr, map, gv_cur_region);
 	return;
 }

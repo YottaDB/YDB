@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +76,7 @@ void gtm_exit_handler(void)
 		turn_tracing_off(NULL);
 	exit_handler_active = TRUE;
 	SET_PROCESS_EXITING_TRUE;
-	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
+	CANCEL_TIMERS;			/* Cancel all unsafe timers - No unpleasant surprises */
 	ESTABLISH(lastchance1);
 	secshr_db_clnup(NORMAL_TERMINATION);
 	if (dollar_tlevel)

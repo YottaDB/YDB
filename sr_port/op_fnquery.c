@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,7 +97,7 @@ void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 			if ((0 == arg1->str.len) && (i + 1 != sbscnt) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
 			{	/* This is not the last subscript, we don't allow nulls subs and it was null */
 				va_end(var);
-				rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVNULLSUBS);
 			}
 			if (is_num = MV_IS_CANONICAL(arg1))
 				MV_FORCE_NUM(arg1);
@@ -297,7 +297,7 @@ void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 			{
 				v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 				INVOKE_STP_GCOL(MAX_NUM_SIZE);
-				assert((char *)stringpool.free - v1->str.addr == v1->str.len);
+				assert(IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len));
 			}
 			*v2 = *mv;
 			/* Now that we have ensured enough space in the stringpool, we dont expect any more
@@ -371,7 +371,7 @@ void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 		{
 			v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 			INVOKE_STP_GCOL(1);
-			assert((char *)stringpool.free - v1->str.addr == v1->str.len);
+			assert(IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len));
 		}
 		*stringpool.free++ = (h2 < h1 ? ',' : ')');
 	}

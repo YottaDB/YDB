@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -131,7 +131,7 @@ void	op_indsavglvn(mval *target, uint4 slot, uint4 do_ref);			/* Used by [SET an
 void	op_indsavlvn(mval *target, uint4 slot);					/* Used by [FOR] */
 void	op_rfrshgvn(uint4 indx, opctype oc);					/* Used by [SET and $ORDER()] */
 lv_val	*op_rfrshlvn(uint4 indx, opctype oc);					/* Used by [FOR, SET and $ORDER()] */
-void	op_savgvn(UNIX_ONLY_COMMA(int argcnt) mval *val_arg, ...);		/* Used by [SET and $ORDER()] */
+void	op_savgvn(UNIX_ONLY_COMMA(int argcnt) int hash_code_dummy, mval *val_arg, ...);	/* Used by [SET and $ORDER()] */
 void	op_savlvn(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);		/* Used by [FOR, SET and $ORDER()] */
 void	op_shareslot(uint4 indx, opctype opcode);				/* Used by [FOR, SET and $ORDER()] */
 void	op_stoglvn(uint4 indx, mval *value);					/* Used by [SET] */

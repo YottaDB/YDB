@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@ void	get_dollar_stack_info(int level, stack_mode_t mode,  mval *result)
 {
 	assert(0 <= level);
 	assert(level < dollar_stack.index);
-	switch(mode)
+	switch (mode)
 	{
 		case DOLLAR_STACK_MODE:
 			result->str = dollar_stack.array[level].mode_str;
@@ -42,9 +42,9 @@ void	get_dollar_stack_info(int level, stack_mode_t mode,  mval *result)
 			}
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && mode);
 	}
 	s2pool(&result->str);
-	assert(!result->str.len || ((unsigned char *)result->str.addr + result->str.len) == stringpool.free);
+	assert(!result->str.len || IS_AT_END_OF_STRINGPOOL(result->str.addr, result->str.len));
 	return;
 }

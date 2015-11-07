@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	sm_uc_ptr_t		save_buff;
 #	ifdef GTM_CRYPT
 	int			in_len, this_blk_size, gtmcrypt_errno;
-	char			*in, *out;
+	char			*in;
 	gd_segment		*seg;
 #	endif
 
@@ -93,7 +93,10 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 		assert(SIZEOF(blk_hdr) <= size);
 		/* no adjustment to blks_to_upgrd counter is needed since the format we are going to write is GDSVCURR */
 	}
-	DEBUG_ONLY(else GTMASSERT);
+#	ifdef DEBUG
+	else
+		assert(GDSV6 == ondsk_blkver);
+#	endif
 	if (csa->do_fullblockwrites)
 		size =(int)ROUND_UP(size, csa->fullblockwrite_len); /* round size up to next full logical filesys block. */
 	assert(size <= csd->blk_size);
@@ -102,7 +105,6 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	assert(size <= csd->blk_size);
 	if (udi->raw)
 		size = ROUND_UP(size, DISK_BLOCK_SIZE);	/* raw I/O must be a multiple of DISK_BLOCK_SIZE */
-
 #	ifdef GTM_CRYPT
 	/* Make sure we don't end up encrypting a zero length'ed record */
 	if (csd->is_encrypted)
@@ -113,17 +115,13 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 		if (BLK_NEEDS_ENCRYPTION(((blk_hdr_ptr_t)buff)->levl, in_len))
 		{
 			ASSERT_ENCRYPTION_INITIALIZED;
-			assert(csa->encrypted_blk_contents);
-			memcpy(csa->encrypted_blk_contents, buff, SIZEOF(blk_hdr));
-			out = csa->encrypted_blk_contents + SIZEOF(blk_hdr);
 			in = (char *)(buff + SIZEOF(blk_hdr));
-			GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, in, in_len, out, gtmcrypt_errno);
+			GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, in, in_len, NULL, gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
 			{
 				seg = reg->dyn.addr;
-				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
+				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
 			}
-			buff = (unsigned char *)csa->encrypted_blk_contents;
 		}
 	}
 #	endif

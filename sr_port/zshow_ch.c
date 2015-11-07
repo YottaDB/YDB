@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@
 
 CONDITION_HANDLER(zshow_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	CLEANUP_ZSHOW_BUFF;
 	NEXTCH;
 }

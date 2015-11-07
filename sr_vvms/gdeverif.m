@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2012 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2013 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -12,6 +12,7 @@ verify:	;implement the verb: VERIFY, also invoked from show and GDEGET
 ALL()	;external
 	n verified,gqual s verified=1
 	s gqual="NAME" d ALLNAM
+	s gqual="GBLNAME" d ALLGBL
 	s gqual="REGION" d ALLREG,usereg
 	s gqual="SEGMENT" d ALLSEG,useseg
 	d ALLTEM
@@ -22,8 +23,34 @@ ALL()	;external
 ; called from GDEPARSE.M
 
 ALLNAM
-	n NAME s NAME=""
-	f  s NAME=$o(nams(NAME)) q:'$l(NAME)  d name1
+	n NAME,hassubs s NAME="",hassubs=0
+	f  s NAME=$o(nams(NAME)) q:'$zl(NAME)  d name1  i +$g(nams(NAME,"NSUBS")) s hassubs=1
+	; if using subscripted names, check that all regions where a globals spans has STDNULLCOLL set to TRUE
+	i hassubs d
+	. n map,currMap,nextMap,nextMapHasSubs,reg,gblname,mapreg
+	. d NAM2MAP^GDEMAP
+	. s currMap="",nextMap="",nextMapHasSubs=0
+	. f  s currMap=$o(map(currMap),-1) q:currMap="#)"  d
+	. . s hassubs=$zf(currMap,ZERO,0)
+	. . ; Check if current map entry has subscripts. If so this map entry should have STDNULLCOLL set.
+	. . ; Also check if next map entry had subscripts. If so this map entry should have STDNULLCOLL set
+	. . ; 	That is because a portion of the global in the next map entry lies in the current map entry region.
+	. . i (hassubs!nextMapHasSubs) d
+	. . . ; check if region has STDNULLCOLL defined to true
+	. . . s reg=map(currMap)
+	. . . i '+$g(regs(reg,"STDNULLCOLL")) d
+	. . . . s verified=0
+	. . . . i nextMapHasSubs d
+	. . . . . s gblname=$ze(nextMap,1,nextMapHasSubs-2)
+	. . . . . i '$d(mapreg(reg,gblname)) zm gdeerr("STDNULLCOLLREQ"):reg:"^"_gblname s mapreg(reg,gblname)=""
+	. . . . i hassubs d
+	. . . . . s gblname=$ze(currMap,1,hassubs-2)
+	. . . . . i '$d(mapreg(reg,gblname)) zm gdeerr("STDNULLCOLLREQ"):reg:"^"_gblname s mapreg(reg,gblname)=""
+	. . s nextMapHasSubs=hassubs,nextMap=currMap
+	q
+ALLGBL
+	n GBLNAME s GBLNAME=""
+	f  s GBLNAME=$o(gnams(GBLNAME)) q:""=GBLNAME  d gblname1
 	q
 ALLREG
 	n REGION s REGION=""
@@ -40,8 +67,29 @@ ALLSEG
 	f  s s=$o(segs(s)) q:'$l(s)  d:$d(reffils(segs(s,"FILE_NAME"))) dupfile s reffils(segs(s,"FILE_NAME"),s)=""
 	q
 NAME
-	i '$d(nams(NAME)) k verified zm $$info(gdeerr("OBJNOTFND")):"Name":$s(NAME'="#":NAME,1:"Local Locks") q
-name1:	i '$d(regs(nams(NAME))) s verified=0 zm gdeerr("MAPBAD"):"Region":nams(NAME):"Name":$s(NAME'="#":NAME,1:"Local Locks")
+	i '$d(nams(NAME)) k verified d  q
+	. zm $$info(gdeerr("OBJNOTFND")):"Name":$s(NAME'="#":$$namedisp^GDESHOW(NAME,0),1:"Local Locks")
+name1:	i '$d(regs(nams(NAME))) d
+	. s verified=0
+	. zm gdeerr("MAPBAD"):"Region":nams(NAME):"Name":$s(NAME'="#":$$namedisp^GDESHOW(NAME,0),1:"Local Locks")
+	q
+GBLNAME
+	i '$d(gnams(GBLNAME)) k verified zm $$info(gdeerr("OBJNOTFND")):"Global Name":GBLNAME q
+gblname1:
+	n s,sval,errissued s s=""
+	f  s s=$o(gnams(GBLNAME,s)) q:""=s  s sval=gnams(GBLNAME,s) d
+	. s errissued=0
+	. i $d(mingnam(s)),mingnam(s)>sval s errissued=1 zm gdeerr("VALTOOSMALL"):sval:mingnam(s):s
+	. i $d(maxgnam(s)),maxgnam(s)<sval s errissued=1 zm gdeerr("VALTOOBIG"):sval:maxgnam(s):s
+	. i errissued s verified=0 zm gdeerr("GBLNAMEIS"):GBLNAME
+	. i (s="COLLATION") d
+	. . i $d(gnams(GBLNAME,"COLLVER")) d
+	. . . d chkcoll^GDEPARSE(sval,GBLNAME,gnams(GBLNAME,"COLLVER"))
+	. . e  d chkcoll^GDEPARSE(sval,GBLNAME)
+	; now that all gblnames and names have been read, do some checks between them
+	; ASSERT : i $d(namrangeoverlap)  zsh "*"  h
+	d gblnameeditchecks^GDEPARSE("*",0)	; check all name specifications are good given the gblname collation settings
+	; ASSERT : i $d(namrangeoverlap)  zsh "*"  h
 	q
 REGION
 	i '$d(regs(REGION)) k verified zm $$info(gdeerr("OBJNOTFND")):"Region":REGION q
@@ -112,7 +160,7 @@ segelm:	i s'="FILE_NAME",'$l(tmpseg(am,s)) zm $$info(gdeerr("QUALBAD")):s
 rec2blk:	s y=s-f-SIZEOF("blk_hdr")
 	i x>y s verified=0 zm gdeerr("RECSIZIS"):x,gdeerr("REGIS"):REGION,gdeerr("RECTOOBIG"):s:f:y,gdeerr("SEGIS"):am:SEGMENT
 	q
-buf2blk:	i REGION="TEMPLATE","USER"[am,am'=tmpacc q
+buf2blk:	i REGION="TEMPLATE" q
 	i "USER"[am s verified=0 zm gdeerr("NOJNL"):am,gdeerr("REGIS"):REGION,gdeerr("SEGIS"):am:SEGMENT
 	s y=s/256
 	i y>x s verified=0 zm gdeerr("BUFSIZIS"):x,gdeerr("REGIS"):REGION,gdeerr("BUFTOOSMALL"):s:y,gdeerr("SEGIS"):am:SEGMENT
@@ -120,12 +168,6 @@ buf2blk:	i REGION="TEMPLATE","USER"[am,am'=tmpacc q
 mmbichk:	i REGION="TEMPLATE",am="MM",tmpacc'="MM" q
 	i am="MM" s verified=0 zm gdeerr("MMNOBEFORIMG"),gdeerr("REGIS"):REGION,gdeerr("SEGIS"):am:SEGMENT
 	q
-prefix(str1,str2)  ;check whether str1 is a prefix of str2
-	n len1,len2
-	s len1=$l(str1),len2=$l(str2)
-	q:(len1>len2)!'len1 0
-	i ($e(str2,1,len1)=str1) q 1
-	q 0
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
 ; called from GDEADD.M and GDECHANG.M
@@ -140,6 +182,8 @@ RQUALS(rquals)
 	s x="RECORD_SIZE",x=$s($d(rquals(x)):rquals(x),$d(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
 	i s+4>x s verified=0 zm gdeerr("KEYSIZIS"):s,gdeerr("KEYTOOBIG"):x:x-4,gdeerr("REGIS"):REGION
 	i REGION="TEMPLATE" s s=tmpseg(tmpacc,"BLOCK_SIZE"),f=tmpseg(tmpacc,"RESERVED_BYTES")
+	; note "else" used in two consecutive lines intentionally (instead of using a do block inside one else).
+	; this is because we want the QUIT to quit out of RQUALS and the NEW of SEGMENT,am to happen at the RQUALS level.
 	e  s s="DYNAMIC_SEGMENT",s=$s($d(rquals(s)):rquals(s),$d(regs(REGION,s)):regs(REGION,s),1:0)
 	e  q:'$d(segs(s)) verified n SEGMENT,am d
 	. s SEGMENT=s,am=segs(s,"ACCESS_METHOD"),s=$g(segs(s,"BLOCK_SIZE")),f=$g(segs(s,"RESERVED_BYTES"))
@@ -160,7 +204,8 @@ SQUALS(am,squals)
 	s s="WINDOW_SIZE"
 	i SEGMENT="TEMPLATE" s x=tmpreg("RECORD_SIZE") d segreg q verified
 	n REGION s REGION=""
-	f  s REGION=$o(regs(REGION)) q:'$l(REGION)  i regs(REGION,"DYNAMIC_SEGMENT")=SEGMENT s s=regs(REGION,"RECORD_SIZE") d segreg
+	f  s REGION=$o(regs(REGION)) q:'$l(REGION)  d
+	. i regs(REGION,"DYNAMIC_SEGMENT")=SEGMENT s s=regs(REGION,"RECORD_SIZE") d segreg
 	q verified
 segreg:
 	i am'="USER" d
@@ -168,9 +213,9 @@ segreg:
 	. s f="RESERVED_BYTES",f=$s($d(squals(f)):squals(f),$d(segs(SEGMENT,s)):seg(SEGMENT,f),1:tmpseg(am,f))
 	. s x="RECORD_SIZE",x=$s($d(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
 	. d rec2blk
-	i '$s(SEGMENT="TEMPLATE":tmpreg("JOURNAL"),1:regs(REGION,"JOURNAL")) q
+	i '$s(SEGMENT="TEMPLATE":0,1:regs(REGION,"JOURNAL")) q
 	s x=$s(SEGMENT="TEMPLATE":tmpreg("BUFFER_SIZE"),1:regs(REGION,"BUFFER_SIZE")) d buf2blk
-	i nommbi,$s(SEGMENT="TEMPLATE":tmpreg("BEFORE_IMAGE"),1:regs(REGION,"BEFORE_IMAGE")) d mmbichk
+	i nommbi,$s(SEGMENT="TEMPLATE":0,1:regs(REGION,"BEFORE_IMAGE")) d mmbichk
 	q
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
@@ -184,13 +229,3 @@ TSQUALS(am,squals)
 	n REGION,SEGMENT s (REGION,SEGMENT)="TEMPLATE"
 	q $$SQUALS(am,.squals)
 
-;-----------------------------------------------------------------------------------------------------------------------------------
-; called from GDEADD.M, GDECHANG.M and GDETEMPL.M, [GTM-7184]
-NQUALS(rquals)
-	n nullsub s nullsub=rquals("NULL_SUBSCRIPTS")
-	i ($$prefix(nullsub,"NEVER")!$$prefix(nullsub,"FALSE")) s rquals("NULL_SUBSCRIPTS")=0
-	e  d
-	. i ($$prefix(nullsub,"ALWAYS")!$$prefix(nullsub,"TRUE")) s rquals("NULL_SUBSCRIPTS")=1
-	. e  d
-	. . i ($$prefix(nullsub,"EXISTING")) s rquals("NULL_SUBSCRIPTS")=2
-	q

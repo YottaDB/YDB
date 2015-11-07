@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@
 #include "sgnl.h"
 #include "gvzwrite_clnup.h"
 #include "mvalconv.h"
+#include "gtmimagename.h"
 
 GBLDEF zshow_out	*zwr_output;
 
@@ -37,8 +38,7 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gvzwrite_datablk	*gvzwrite_block;
-GBLREF gd_binding	*gd_map;
-GBLREF gd_binding	*gd_map_top;
+GBLREF gd_addr		*gd_header;
 
 error_def(ERR_GVNAKED);
 
@@ -47,14 +47,13 @@ void gvzwr_fini(zshow_out *out, int pat)
 	char 		m[SIZEOF(mident_fixed)];
 	mval 		local, data;
 	gv_key		*old;
+	gvnh_reg_t	*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (!gv_currkey)
 		gvinit();
-
 	ESTABLISH(gvzwrite_ch);
-
 	zwr_output = out;
 	assert(INVALID_GV_TARGET == reset_gv_target);
 	reset_gv_target = gv_target;
@@ -64,8 +63,6 @@ void gvzwr_fini(zshow_out *out, int pat)
 	old = (gv_key *)malloc(SIZEOF(gv_key) + gv_currkey->end);
 	gvzwrite_block->old_key = (unsigned char *)old;
 	memcpy(gvzwrite_block->old_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
-	gvzwrite_block->old_map = gd_map;
-	gvzwrite_block->old_map_top = gd_map_top;
 	gvzwrite_block->gv_last_subsc_null = TREF(gv_last_subsc_null);
 	gvzwrite_block->gv_some_subsc_null = TREF(gv_some_subsc_null);
 	if (!pat)
@@ -84,14 +81,18 @@ void gvzwr_fini(zshow_out *out, int pat)
 				gvzwrite_block->fixed = (gvzwrite_block->fixed ? TRUE : FALSE);
 				gvzwr_var(MV_FORCE_INTD(&data), 0);
 			}
-		} else               /* Old (naked) reference. Keep previous gv_target reference */
+		} else	/* Old (naked) reference. Keep previous gv_target reference */
 		{
 			if (gv_currkey->prev == 0)
-				rts_error(VARLSTCNT(1) ERR_GVNAKED);
-
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GVNAKED);
 			gv_currkey->end = gv_currkey->prev;
-			gv_currkey->base[ gv_currkey->end ] = 0;
+			gv_currkey->base[gv_currkey->end] = 0;
 			gv_currkey->prev = 0;
+			/* If gvnh_reg corresponds to a spanning global, then determine
+			 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+			 */
+			gvnh_reg = TREF(gd_targ_gvnh_reg);	/* set by op_gvname in previous call */
+			GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey);
 			op_gvdata(&data);
 			if (!(MV_FORCE_INTD(&data)))
 				sgnl_gvundef();

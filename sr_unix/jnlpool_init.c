@@ -105,10 +105,13 @@ error_def(ERR_TEXT);
 
 #define REMOVE_OR_RELEASE_SEM(NEW_IPC)										\
 {														\
-	if (NEW_IPC)												\
-		remove_sem_set(SOURCE);										\
-	else													\
-		rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);							\
+	if (!skip_locks)											\
+	{													\
+		if (NEW_IPC)											\
+			remove_sem_set(SOURCE);									\
+		else												\
+			rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);						\
+	}													\
 }
 
 #define	DETACH_AND_REMOVE_SHM_AND_SEM										\
@@ -290,7 +293,6 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		udi->gt_sem_ctime = semarg.buf->sem_ctime;
 	} else
 	{	/* find create time of semaphore from the file header and check if the id is reused by others */
-		assert(repl_instance.crash || jgbl.mur_rollback);
 		semarg.buf = &semstat;
 		if (-1 == semctl(repl_instance.jnlpool_semid, DB_CONTROL_SEM, IPC_STAT, semarg))
 		{
@@ -946,6 +948,12 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			 * control semaphore. So, go ahead and initialize the gtmsource_srv_latch for this source server.
 			 */
 			SET_LATCH_GLOBAL(&gtmsourcelocal_ptr->gtmsource_srv_latch, LOCK_AVAILABLE);
+#			ifdef GTM_TLS
+			/* Since the slot is reused for (possibly) a different secondary instance, reset the # of renegotiations
+			 * counter.
+			 */
+			gtmsourcelocal_ptr->num_renegotiations = 0;
+#			endif
 		}
 		if (reset_gtmsrclcl_info)
 		{	/* Initialize all fields of "gtmsource_local" that are also present in the corresponding "gtmsrc_lcl" */

@@ -25,7 +25,7 @@
 #include "gdsblk.h"
 #include "gdskill.h"
 #include "gdscc.h"
-#include "min_max.h"		/* needed for gdsblkops.h */
+#include "min_max.h"		/* needed for gdsblkops.h and MAX macro used below */
 #include "gdsblkops.h"
 #include "filestruct.h"
 #include "iosp.h"
@@ -52,8 +52,9 @@
 #include "compswap.h"
 #include "send_msg.h"
 #include "targ_alloc.h"		/* for "targ_free" prototype */
-#include "hashtab_mname.h"
+#include "hashtab_mname.h"	/* for CWS_INIT macro */
 #include "process_gvt_pending_list.h"
+#include "gvt_hashtab.h"
 #include "gtmmsg.h"
 #ifdef UNIX
 #include "heartbeat_timer.h"
@@ -92,7 +93,6 @@ GBLREF	sm_uc_ptr_t		reformat_buffer;
 GBLREF	int			reformat_buffer_len;
 GBLREF	volatile int		reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLREF	volatile int4		fast_lock_count;
-GBLREF	gvt_container		*gvt_pending_list;
 GBLREF	boolean_t		dse_running;
 GBLREF	jnl_gbls_t		jgbl;
 #ifdef UNIX
@@ -219,21 +219,17 @@ void gvcst_init(gd_region *greg)
 	bt_rec_ptr_t		bt;
 	blk_ident		tmp_blk;
 #	endif
+	int			max_fid_index;
 	mstr			log_nam, trans_log_nam;
 	char			trans_buff[MAX_FN_LEN + 1];
 	unique_file_id		*greg_fid, *reg_fid;
-	gd_addr			*addr_ptr;
 	tp_region		*tr;
 	ua_list			*tmp_ua;
 	time_t			curr_time;
 	uint4			curr_time_uint4, next_warn_uint4;
 	unsigned int            minus1 = (unsigned)-1;
 	enum db_acc_method	greg_acc_meth;
-	ht_ent_mname		*tabent, *topent, *stayent;
-	gv_namehead		*gvt, *gvt_stay;
-	gvnh_reg_t		*gvnh_reg;
-	hash_table_mname	*table;
-	boolean_t		added, first_wasopen, onln_rlbk_cycle_mismatch = FALSE;
+	boolean_t		onln_rlbk_cycle_mismatch = FALSE;
 	intrpt_state_t		save_intrpt_ok_state;
 #	ifdef UNIX
 	replpool_identifier	replpool_id;
@@ -271,64 +267,15 @@ void gvcst_init(gd_region *greg)
 	{
 		if (NULL == prev_reg || (gd_region *)-1L == prev_reg) /* (gd_region *)-1 == prev_reg => cm region open attempted */
 			return;
-		/* Found same database already open - prev_reg contains addr of originally openned region */
+		/* Found same database already open - prev_reg contains addr of originally opened region */
 		greg->dyn.addr->file_cntl = prev_reg->dyn.addr->file_cntl;
 		memcpy(greg->dyn.addr->fname, prev_reg->dyn.addr->fname, prev_reg->dyn.addr->fname_len);
 		greg->dyn.addr->fname_len = prev_reg->dyn.addr->fname_len;
 		csa = (sgmnt_addrs *)&FILE_INFO(greg)->s_addrs;
-		PROCESS_GVT_PENDING_LIST(greg, csa, gvt_pending_list);
-		csd = csa->hdr;
 		if (NULL == csa->gvt_hashtab)
-		{	/* Already have another region that points to the same physical database file as this one.
-			 * Since two regions point to the same physical file, start maintaining a list of all global variable
-			 * names whose gv_targets have already been allocated on behalf of the current database file.
-			 * Future targ_allocs will check this list before they allocate (to avoid duplicate allocations).
-			 */
-			csa->gvt_hashtab = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
-			init_hashtab_mname(csa->gvt_hashtab, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
-			assert(1 == csa->regcnt);
-			first_wasopen = TRUE;
-		} else
-			first_wasopen = FALSE;
-		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
-		{
-			table = addr_ptr->tab_ptr;
-			for (tabent = table->base, topent = tabent + table->size; tabent < topent; tabent++)
-			{
-				if (HTENT_VALID_MNAME(tabent, gvnh_reg_t, gvnh_reg))
-				{	/* Check if the gvt's region is the current region.
-					 * If so add gvt's variable name into the csa hashtable.
-					 */
-					gvt = gvnh_reg->gvt;
-					assert((gvnh_reg->gd_reg != greg) || (csa == gvt->gd_csa));
-					/* If this is the first time a was_open region is happening for this csa, then
-					 * we want to merge gv_targets from both the regions into csa->gvt_hashtab. For
-					 * all future was_open cases, we want only to add gv_targets from the was_open region.
-					 */
-					if (first_wasopen && (csa == gvt->gd_csa) || !first_wasopen && (gvnh_reg->gd_reg == greg))
-					{	/* Add gv_target into csa->gvt_hashtab */
-						added = add_hashtab_mname(csa->gvt_hashtab, &gvt->gvname, gvt, &stayent);
-						assert(!added || (1 <= gvt->regcnt));
-						if (!added)
-						{	/* Entry already present. Increment gvt->regcnt.
-							 * If NOISOLATION status differs between the two,
-							 * choose the more pessimistic one.
-							 */
-							gvt_stay = (gv_namehead *)stayent->value;
-							assert(gvt_stay != gvt);
-							if (FALSE == gvt->noisolation)
-								gvt_stay->noisolation = FALSE;
-							assert(1 <= gvt_stay->regcnt);
-							/* Now make gvnh_reg->gvt point to gvt_stay (instead of gvt) */
-							gvt_stay->regcnt++;
-							gvt->regcnt--;
-							gvnh_reg->gvt = gvt_stay;
-							targ_free(gvt);
-						}
-					}
-				}
-			}
-		}
+			gvt_hashtab_init(csa);	/* populate csa->gvt_hashtab; need to do this BEFORE PROCESS_GVT_PENDING_LIST */
+		PROCESS_GVT_PENDING_LIST(greg, csa);
+		csd = csa->hdr;
 		greg->max_rec_size = csd->max_rec_size;
 		greg->max_key_size = csd->max_key_size;
 	 	greg->null_subs = csd->null_subs;
@@ -381,7 +328,7 @@ void gvcst_init(gd_region *greg)
 	csa->db_addrs[0] = csa->db_addrs[1] = NULL;
 	csa->lock_addrs[0] = csa->lock_addrs[1] = NULL;
 #	ifdef VMS
-	greg_acc_meth = greg->dyn.addr->acc_meth;
+	greg_acc_meth = REG_ACC_METH(greg);
 	assert(dba_cm != greg_acc_meth);
 	temp_cs_data = (sgmnt_data_ptr_t)cs_data_buff;
 	fc = greg->dyn.addr->file_cntl;
@@ -396,7 +343,7 @@ void gvcst_init(gd_region *greg)
 	if (greg_acc_meth != temp_cs_data->acc_meth)
 	{
 		greg_acc_meth = temp_cs_data->acc_meth;
-		greg->dyn.addr->acc_meth = greg_acc_meth;
+		REG_ACC_METH(greg) = greg_acc_meth;
 	}
 #	endif
 	/* Here's the shared memory layout:
@@ -513,14 +460,14 @@ void gvcst_init(gd_region *greg)
 	csa->db_trigger_cycle = csd->db_trigger_cycle;
 #	endif
 	/* set csd and fill in selected fields */
-	assert(greg->dyn.addr->acc_meth == csd->acc_meth); /* db_init should have made sure this assert holds good */
+	assert(REG_ACC_METH(greg) == csd->acc_meth); /* db_init should have made sure this assert holds good */
 	greg_acc_meth = csd->acc_meth;
 	/* It is necessary that we do the pending gv_target list reallocation BEFORE db_common_init as the latter resets
 	 * greg->max_key_size to be equal to the csd->max_key_size and hence process_gvt_pending_list might wrongly conclude
 	 * that NO reallocation (since it checks greg->max_key_size with csd->max_key_size) is needed when in fact a
 	 * reallocation might be necessary (if the user changed max_key_size AFTER database creation)
 	 */
-	PROCESS_GVT_PENDING_LIST(greg, csa, gvt_pending_list);
+	PROCESS_GVT_PENDING_LIST(greg, csa);
 	db_common_init(greg, csa, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
 
 	/* If we are not fully upgraded, see if we need to send a warning to the operator console about
@@ -644,7 +591,6 @@ void gvcst_init(gd_region *greg)
 	}
 	assert(!greg->was_open);
 	SET_REGION_OPEN_TRUE(greg, WAS_OPEN_FALSE);
-	csa = (sgmnt_addrs*)&FILE_INFO(greg)->s_addrs;
 	if (NULL != csa->dir_tree)
 	{	/* It is possible that dir_tree has already been targ_alloc'ed. This is because GT.CM or VMS DAL
 		 * calls can run down regions without the process halting out. We don't want to double malloc.
@@ -701,6 +647,7 @@ void gvcst_init(gd_region *greg)
 		 */
 		prevcsa = NULL;
 		greg_fid = &(csa->nl->unique_id);
+		max_fid_index = 1;
 		for (regcsa = cs_addrs_list; NULL != regcsa; regcsa = regcsa->next_csa)
 		{
 			UNIX_ONLY(onln_rlbk_cycle_mismatch |= (regcsa->db_onln_rlbkd_cycle != regcsa->nl->db_onln_rlbkd_cycle));
@@ -713,12 +660,18 @@ void gvcst_init(gd_region *greg)
 				if ((NULL == prevcsa) || (regcsa->fid_index > prevcsa->fid_index))
 					prevcsa = regcsa;
 			} else
+			{
 				regcsa->fid_index++;
+				max_fid_index = MAX(max_fid_index, regcsa->fid_index);
+			}
 		}
 		if (NULL == prevcsa)
 			csa->fid_index = 1;
 		else
+		{
 			csa->fid_index = prevcsa->fid_index + 1;
+			max_fid_index = MAX(max_fid_index, csa->fid_index);
+		}
 		UNIX_ONLY(
 			if (onln_rlbk_cycle_mismatch)
 			{
@@ -734,6 +687,7 @@ void gvcst_init(gd_region *greg)
 		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 			tr->file.fid_index = (&FILE_INFO(tr->reg)->s_addrs)->fid_index;
 		DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
+		TREF(max_fid_index) = max_fid_index;
 	}
 #	ifdef UNIX
 	if (pool_init && REPL_ALLOWED(csd) && jnlpool_init_needed)

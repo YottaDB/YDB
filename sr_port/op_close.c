@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ void op_close(mval *v, mval *p)
 			return;
 		ciod = tl->iod;
 		if (0 == ciod || TRUE == ciod->perm ||
-		    (ciod->state != dev_open && tcp != ciod->type))
+		    (ciod->state != dev_open))
 			return;
 
 		for (prev = io_root_log_name, l = prev->next;  l != 0;  prev = l, l = l->next)
@@ -67,15 +67,15 @@ void op_close(mval *v, mval *p)
 	        if (0 == (l = get_log_name(&v->str, NO_INSERT)))
 			return;
 		else if (0 == (ciod = l->iod) || TRUE == ciod->perm
-			 || (dev_open != ciod->state && tcp != ciod->type))
+			 || (dev_open != ciod->state))
 			return;
 	}
 #	ifdef UNIX
 	else if (SS_LOG2LONG == stat)
-		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf) - 1);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf) - 1);
 #	endif
 	else
-		rts_error(VARLSTCNT(1) stat);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) stat);
 
 	active_device = ciod;
 	if (io_curr_device.in == ciod)

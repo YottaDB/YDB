@@ -254,7 +254,7 @@ CONDITION_HANDLER(mu_rndwn_replpool_ch)
 	int			status, save_errno;
 	repl_inst_hdr_ptr_t	inst_hdr;
 
-	START_CH;
+	START_CH(TRUE);
 	PRN_ERROR; /* flush the error string */
 	if (SEVERITY == SEVERE)
 		NEXTCH;

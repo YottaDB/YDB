@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,12 @@ void nil_dlr_device(mstr *d)
 }
 
 void nil_dlr_key(mstr *d)
+{
+	d->len = 0;
+	return;
+}
+
+void nil_dlr_zkey(mstr *d)
 {
 	d->len = 0;
 	return;

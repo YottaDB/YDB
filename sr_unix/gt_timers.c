@@ -76,6 +76,7 @@
 #include "have_crit.h"
 #include "util.h"
 #include "sleep.h"
+#include "error.h"
 #if defined(__osf__)
 # define HZ	CLK_TCK
 #elif defined(__MVS__)
@@ -98,17 +99,39 @@ int4	time();
 #define GT_TIMER_INIT_DATA_LEN	8
 #define MAX_TIMER_POP_TRACE_SZ	32
 
-#define ADD_SAFE_HNDLR(HNDLR)						\
-{									\
-	assert((ARRAYSIZE(safe_handlers) - 1) > safe_handlers_cnt);	\
-	safe_handlers[safe_handlers_cnt++] = HNDLR;			\
+#define ADD_SAFE_HNDLR(HNDLR)									\
+{												\
+	assert((ARRAYSIZE(safe_handlers) - 1) > safe_handlers_cnt);				\
+	safe_handlers[safe_handlers_cnt++] = HNDLR;						\
 }
 
 #ifdef BSD_TIMER
-STATICDEF struct itimerval sys_timer, old_sys_timer;
+#  define REPORT_SETITIMER_ERROR(TIMER_TYPE, SYS_TIMER, FATAL, ERRNO)				\
+{												\
+	char s[512];										\
+												\
+	SNPRINTF(s, 512, "Timer: %s; timer_active: %d; "					\
+		"sys_timer.it_value: [tv_sec: %ld; tv_usec: %ld]; "				\
+		"sys_timer.it_interval: [tv_sec: %ld; tv_usec: %ld]",				\
+		TIMER_TYPE, timer_active,							\
+		SYS_TIMER.it_value.tv_sec, SYS_TIMER.it_value.tv_usec,				\
+		SYS_TIMER.it_interval.tv_sec, SYS_TIMER.it_interval.tv_usec);			\
+	if (FATAL)										\
+	{											\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)						\
+			ERR_SETITIMERFAILED, 1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));		\
+		in_setitimer_error = TRUE;							\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SETITIMERFAILED, 1, ERRNO);	\
+	} else											\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)	MAKE_MSG_WARNING(ERR_SETITIMERFAILED),	\
+			1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));					\
+}
+
+STATICDEF struct itimerval	sys_timer, old_sys_timer;
+STATICDEF boolean_t		in_setitimer_error;
 #endif
 
-#define DUMMY_SIG_NUM 0			/* following can be used to see why timer_handler was called */
+#define DUMMY_SIG_NUM		0	/* following can be used to see why timer_handler was called */
 
 STATICDEF volatile GT_TIMER *timeroot = NULL;	/* chain of pending timer requests in time order */
 STATICDEF boolean_t first_timeset = TRUE;
@@ -162,6 +185,8 @@ GBLREF	int4		error_condition;
 GBLREF	int4		outofband;
 GBLREF	int		process_exiting;
 
+error_def(ERR_SETITIMERFAILED);
+error_def(ERR_TEXT);
 error_def(ERR_TIMERHANDLER);
 
 /* Called when a hiber_start timer pops. Set flag so a given timer will wake up (not go back to sleep). */
@@ -264,7 +289,7 @@ void prealloc_gt_timers(void)
 	 */
 	ADD_SAFE_HNDLR(&hiber_wake);		/* Resident in this module */
 	ADD_SAFE_HNDLR(&hiber_start_wait_any);	/* Resident in this module */
-	ADD_SAFE_HNDLR(&wake_alarm);		/* Standalone module containing on one global reference */
+	ADD_SAFE_HNDLR(&wake_alarm);		/* Standalone module containing only one global reference */
 }
 
 /* Get current clock time. Fill-in the structure with the absolute time of system clock.
@@ -294,7 +319,6 @@ void hiber_start(uint4 hiber)
 	TID		tid;
 	sigset_t	savemask;
 
-	assertpro(1 > timer_stack_count);		/* timer services are unavailable from within a timer handler */
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
 	/* sigsuspend() sets the signal mask to 'savemask' and waits for an ALARM signal. If the SIGALRM is a member of savemask,
 	 * this process will never receive SIGALRM, and it will hang indefinitely. One such scenario would be if we interrupted a
@@ -303,10 +327,13 @@ void hiber_start(uint4 hiber)
 	 * than GT.M timers.
 	 */
 	if (sigismember(&savemask, SIGALRM))
-	{
+	{	/* normally, if SIGALRMs are blocked, we must already be inside a timer handler, but someone can actually disable
+		 * SIGALRMs, in which case we do not want this assert to trip in pro */
+		assert(1 <= timer_stack_count);
 		NANOSLEEP(hiber);
 	} else
 	{
+		assertpro(1 > timer_stack_count);	/* if SIGALRMs are not blocked, we cannot be inside a timer handler */
 		waitover = FALSE;			/* when OUR timer pops, it will set this flag */
 		waitover_addr = &waitover;
 		tid = (TID)waitover_addr;		/* unique id of this timer */
@@ -321,7 +348,7 @@ void hiber_start(uint4 hiber)
 				cancel_timer(tid);
 				break;
 			}
-		} while(FALSE == waitover);
+		} while (FALSE == waitover);
 	}
 	sigprocmask(SIG_SETMASK, &savemask, NULL);	/* reset signal handlers */
 }
@@ -395,21 +422,30 @@ void start_timer(TID tid,
 	{
 		safe_to_add = TRUE;
 		safe_timer = TRUE;
-	} else if ((wcs_clean_dbsync_fptr == handler) || (wcs_stale_fptr == handler))
+	} else if (wcs_clean_dbsync_fptr == handler)
+	{	/* Account for known instances of the above function being called from within a deferred zone. */
+		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_WCS_WTSTART == intrpt_ok_state)
+			|| (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state));
 		safe_to_add = TRUE;
-	else
+	} else if (wcs_stale_fptr == handler)
+	{	/* Account for known instances of the above function being called from within a deferred zone. */
+		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state));
+		safe_to_add = TRUE;
+	} else
 	{
                 for (i = 0; NULL != safe_handlers[i]; i++)
+		{
                         if (safe_handlers[i] == handler)
                         {
 				safe_to_add = TRUE;
 				safe_timer = TRUE;
                                 break;
                         }
+		}
 	}
 	if (!safe_to_add && (process_exiting || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state)))
 	{
-		assert(WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC));
+		assert(FALSE);
 		return;
 	}
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
@@ -436,8 +472,6 @@ STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(),
 	 * If a few years pass without the assert failing, it might be safe then to remove the PRO_ONLY code below.
 	 */
 #	ifndef DEBUG
-	if (timeroot && (timeroot->tid == tid))
-		sys_canc_timer();
 	remove_timer(tid); /* Remove timer from chain */
 #	endif
 	/* Check if # of free timer slots is less than minimum threshold. If so, allocate more of those while it is safe to do so */
@@ -448,55 +482,26 @@ STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(),
 		start_first_timer(&at);
 }
 
-/* Uninitialize all timers, since we will not be needing them anymore. */
-STATICFNDEF void uninit_all_timers(void)
-{
-	st_timer_alloc	*next_timeblk;
-
-	sys_canc_timer();
-	first_timeset = TRUE;
-	for (; timer_allocs;  timer_allocs = next_timeblk)	/* loop over timer_allocs entries and deallocate them */
-	{
-		next_timeblk = timer_allocs->next;
-		free(timer_allocs->addr);			/* free the timeblk */
-		free((st_timer_alloc *)timer_allocs); 		/* free the container */
-	}
-	/* after all timers are removed, we need to set the below pointers to NULL */
-	timeroot = NULL;
-	timefree = NULL;
-	num_timers_free = 0;
-	/* empty the blockalrm and sigsent entries */
-	sigemptyset(&blockalrm);
-	sigemptyset(&block_sigsent);
-	sigaction(SIGALRM, &prev_alrm_handler, NULL);
-	timer_active = FALSE;
-}
-
 /* Cancel timer.
  * Arguments:	tid - timer id
  */
 void cancel_timer(TID tid)
 {
-        ABS_TIME at;
-	sigset_t savemask;
+        ABS_TIME	at;
+	sigset_t	savemask;
+	boolean_t	first_timer;
 
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
 	sys_get_curr_time(&at);
-	if (tid == 0)
-	{
-		assert(process_exiting || IS_GTMSECSHR_IMAGE); /* wcs_phase2_commit_wait relies on this flag being set BEFORE
-								* cancelling all timers. But secshr doesn't have it.
-								*/
-		cancel_all_timers();
-		uninit_all_timers();
-		timer_stack_count = 0;
-		sigprocmask(SIG_SETMASK, &savemask, NULL);
-		return;
-	}
-	if (timeroot && (timeroot->tid == tid))		/* if this is the first timer in the chain, stop it */
-		sys_canc_timer();
+	first_timer = (timeroot && (timeroot->tid == tid));
 	remove_timer(tid);		/* remove it from the chain */
-	start_first_timer(&at);		/* start the first timer in the chain */
+	if (first_timer)
+	{
+		if (timeroot)
+			start_first_timer(&at);		/* start the first timer in the chain */
+		else if (timer_active)
+			sys_canc_timer();
+	}
 	sigprocmask(SIG_SETMASK, &savemask, NULL);
 }
 
@@ -520,9 +525,11 @@ void clear_timers(void)
  *		time_to_expir	- time to expiration
  *		handler		- address of handler routine
  */
-STATICFNDEF void sys_settimer (TID tid, ABS_TIME *time_to_expir, void (*handler)())
+STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir, void (*handler)())
 {
 #	ifdef BSD_TIMER
+	if (in_setitimer_error)
+		return;
 	if ((time_to_expir->at_sec == 0) && (time_to_expir->at_usec < (1000000 / HZ)))
 	{
 		sys_timer.it_value.tv_sec = 0;
@@ -533,7 +540,11 @@ STATICFNDEF void sys_settimer (TID tid, ABS_TIME *time_to_expir, void (*handler)
 		sys_timer.it_value.tv_usec = (gtm_tv_usec_t)time_to_expir->at_usec;
 	}
 	sys_timer.it_interval.tv_sec = sys_timer.it_interval.tv_usec = 0;
-	setitimer(ITIMER_REAL, &sys_timer, &old_sys_timer);
+	assert(1000000 > sys_timer.it_value.tv_usec);
+	if ((-1 == setitimer(ITIMER_REAL, &sys_timer, &old_sys_timer)) || WBTEST_ENABLED(WBTEST_SETITIMER_ERROR))
+	{
+		REPORT_SETITIMER_ERROR("ITIMER_REAL", sys_timer, TRUE, errno);
+	}
 #	else
 	if (time_to_expir->at_sec == 0)
 		alarm((unsigned)1);
@@ -736,9 +747,9 @@ STATICFNDEF void timer_handler(int why)
 		start_first_timer(&at);
 	else if ((NULL != timeroot) || (0 < timer_defer_cnt))
 		deferred_timers_check_needed = TRUE;
-	/* Restore mainline error_condition global variable. This way any gtm_putmsg or rts_errors that occurred inside
-	 * interrupt code do not affect the error_condition global variable that mainline code was relying on.
-	 * For example, not doing this restore caused the update process (in updproc_ch) to issue a GTMASSERT (GTM-7526).
+	/* Restore mainline error_condition global variable. This way any gtm_putmsg or rts_errors that occurred inside interrupt
+	 * code do not affect the error_condition global variable that mainline code was relying on. For example, not doing this
+	 * restore caused the update process (in updproc_ch) to issue a GTMASSERT (GTM-7526). BYPASSOK.
 	 */
 	error_condition = save_error_condition;
 	errno = save_errno;		/* restore mainline errno by similar reasoning as mainline error_condition */
@@ -887,43 +898,70 @@ void sys_canc_timer()
 	struct itimerval zero;
 
 	memset(&zero, 0, SIZEOF(struct itimerval));
-	setitimer(ITIMER_REAL, &zero, &old_sys_timer);
+	assert(timer_active);
+	/* In case of canceling the system timer, we do not care if we succeed. Consider the two scenarios:
+	 *   1) The process is exiting, so all timers must have been removed anyway, and regardless of whether the system
+	 *      timer got unset or not, no handlers would be processed (even in the event of a pop).
+	 *   2) Some timer is being canceled as part of the runtime logic. If the system is experiencing problems, then the
+	 *      following attempt to schedule a new timer (remember that we at the very least have the heartbeat timer once
+	 *      database access has been established) would fail; if no other timer is scheduled, then the canceled entry
+	 *      must have been removed off the queue anyway, so no processing would occur on a pop.
+	 */
+	if (-1 == setitimer(ITIMER_REAL, &zero, &old_sys_timer))
+	{
+		REPORT_SETITIMER_ERROR("ITIMER_REAL", zero, FALSE, errno);
+	}
 #	else
 	alarm(0);
 #	endif
 	timer_active = FALSE;		/* no timer is active now */
 }
 
-/* Cancel all timers.
- * Note: The timer signal must be blocked prior to entry
+/* Cancel all unsafe timers.
  */
-STATICFNDEF void cancel_all_timers(void)
+void cancel_unsafe_timers(void)
 {
+        ABS_TIME	at;
+	sigset_t	savemask;
+	GT_TIMER	*active, *curr, *next;
 	DEBUG_ONLY(int4 cnt = 0;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (timeroot)
-		sys_canc_timer();
-	while (timeroot)
-	{	/* remove timer from the chain */
-		remove_timer(timeroot->tid);
+	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
+	active = curr = (GT_TIMER *)timeroot;
+	while (curr)
+	{	/* If the timer is unsafe, remove it from the chain. */
+		next = curr->next;
+		if (!curr->safe)
+			remove_timer(curr->tid);
+		curr = next;
 		DEBUG_ONLY(cnt++;)
 	}
-	safe_timer_cnt = 0;
-	if (!timeroot)
+	assert((NULL == timeroot) || (0 < safe_timer_cnt));
+	if (timeroot)
+	{	/* If the head of the queue has changed, start the current first timer. */
+		if (timeroot != active)
+		{
+			sys_get_curr_time(&at);
+			start_first_timer(&at);
+		}
+	} else
 	{
 		deferred_timers_check_needed = FALSE;
+		/* There are no timers left, but the system timer was active, so cancel it. */
+		if (timer_active)
+			sys_canc_timer();
 	}
 #	ifdef DEBUG
-	if (gtm_white_box_test_case_enabled
-		&& WBTEST_DEFERRED_TIMERS == gtm_white_box_test_case_number)
+	if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS))
 	{
 		DBGFPF((stderr, "CANCEL_ALL_TIMERS:\n"));
 		DBGFPF((stderr, " Timer pops handled: %d\n", timer_pop_cnt));
 		DBGFPF((stderr, " Timers canceled: %d\n", cnt));
 	}
 #	endif
+	sigprocmask(SIG_SETMASK, &savemask, NULL);
 }
 
 /* Initialize timers. */

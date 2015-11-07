@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,6 @@ typedef struct {
 	enum {arsample, scan, impsample}	heuristic;
 	int4 					samples;
 	int4 					level;
-	mval					*global_name;
 	int4					seed;
 } mupip_size_cfg_t;
 
@@ -74,7 +73,7 @@ void mupip_size(void)
 	uint4			status = EXIT_NRM;
 	glist			gl_head, exclude_gl_head, *gl_ptr;
 	/* configuration default values */
-	mupip_size_cfg_t	mupip_size_cfg = { impsample, 1000, 1, 0, 0 };
+	mupip_size_cfg_t	mupip_size_cfg = { impsample, 1000, 1, 0 };
 	char			cli_buff[MAX_LINE];
 	int4			reg_max_rec, reg_max_key, reg_max_blk;
 	unsigned short		n_len;
@@ -114,9 +113,10 @@ void mupip_size(void)
 	}
 	/* gv_select will select globals for this clause*/
 	gv_select(cli_buff, n_len, FALSE, "SELECT", &gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk, restrict_reg);
-	if (!gl_head.next){
+	if (!gl_head.next)
+	{
 		error_mupip = TRUE;
-		gtm_putmsg(VARLSTCNT(1) ERR_NOSELECT);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSELECT);
 	}
 	mupip_size_check_error();
 
@@ -137,12 +137,11 @@ void mupip_size(void)
 			if (!valid || mupip_size_cfg.level <= -MAX_BT_DEPTH || MAX_BT_DEPTH <= mupip_size_cfg.level)
 			{
 				error_mupip = TRUE;
-				gtm_putmsg(VARLSTCNT(4) ERR_MUSIZEINVARG, 2, LEN_AND_LIT("HEURISTIC.LEVEL"));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSIZEINVARG, 2, LEN_AND_LIT("HEURISTIC.LEVEL"));
 			}
 		}
 		/* else level is already initialized with default value */
-	}
-	else if (cli_present("HEURISTIC.ARSAMPLE") == CLI_PRESENT || cli_present("HEURISTIC.IMPSAMPLE") == CLI_PRESENT)
+	} else if (cli_present("HEURISTIC.ARSAMPLE") == CLI_PRESENT || cli_present("HEURISTIC.IMPSAMPLE") == CLI_PRESENT)
 	{
 		if (cli_present("HEURISTIC.ARSAMPLE") == CLI_PRESENT)
 			mupip_size_cfg.heuristic = arsample;
@@ -153,18 +152,17 @@ void mupip_size(void)
 			boolean_t valid = cli_get_int("HEURISTIC.SAMPLES", &(mupip_size_cfg.samples));
 			if (!valid || mupip_size_cfg.samples <= 0){
 				error_mupip = TRUE;
-				gtm_putmsg(VARLSTCNT(4) ERR_MUSIZEINVARG, 2, LEN_AND_LIT("HEURISTIC.SAMPLES"));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSIZEINVARG, 2, LEN_AND_LIT("HEURISTIC.SAMPLES"));
 			}
 		}
 		/* else samples is already initialized with default value */
-
 		/* undocumented SEED parameter used for testing sampling method */
 		if (cli_present("HEURISTIC.SEED"))
 		{
 			boolean_t valid = cli_get_int("HEURISTIC.SEED", &(mupip_size_cfg.seed));
 			if (!valid){
 				error_mupip = TRUE;
-				gtm_putmsg(VARLSTCNT(4) ERR_MUSIZEINVARG, 2, LEN_AND_LIT("HEURISTIC.SEED"));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSIZEINVARG, 2, LEN_AND_LIT("HEURISTIC.SEED"));
 			}
 		}
 		/* else seed will be based on the time */
@@ -174,22 +172,21 @@ void mupip_size(void)
 	/* run mupip size on each global */
 	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
 	{
-		util_out_print("!/Global: !AD ", FLUSH, gl_ptr->name.str.len, gl_ptr->name.str.addr);
-
-		mupip_size_cfg.global_name = &(gl_ptr->name);
+		util_out_print("!/Global: !AD (region !AD)", FLUSH,
+			GNAME(gl_ptr).len, GNAME(gl_ptr).addr, REG_LEN_STR(gl_ptr->reg));
 		switch (mupip_size_cfg.heuristic)
 		{
 		case scan:
-			status |= mu_size_scan(mupip_size_cfg.global_name, mupip_size_cfg.level);
+			status |= mu_size_scan(gl_ptr, mupip_size_cfg.level);
 			break;
 		case arsample:
-			status |= mu_size_arsample(mupip_size_cfg.global_name, mupip_size_cfg.samples, TRUE, mupip_size_cfg.seed);
+			status |= mu_size_arsample(gl_ptr, mupip_size_cfg.samples, TRUE, mupip_size_cfg.seed);
 			break;
 		case impsample:
-			status |= mu_size_impsample(mupip_size_cfg.global_name, mupip_size_cfg.samples, mupip_size_cfg.seed);
+			status |= mu_size_impsample(gl_ptr, mupip_size_cfg.samples, mupip_size_cfg.seed);
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && mupip_size_cfg.heuristic);
 			break;
 		}
 		if (mu_ctrlc_occurred || mu_ctrly_occurred)

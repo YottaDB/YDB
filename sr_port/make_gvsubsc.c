@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "compiler.h"
 #include "stringpool.h"
 #include "gdsroot.h"
@@ -19,6 +20,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "mvalconv.h"
+#include "collseq.h"
 
 GBLREF spdesc stringpool;
 
@@ -28,12 +30,12 @@ oprtype make_gvsubsc(mval *v)
 	gv_key	*gp;
 
 	ENSURE_STP_FREE_SPACE(MAX_SRCLINE + SIZEOF(gv_key));
-	if ((INTPTR_T)stringpool.free & 1)
+	if ((INTPTR_T)stringpool.free & 1)	/* BYPASSOK */
 		stringpool.free++;	/* word align key for structure refs */
 	gp = (gv_key *) stringpool.free;
 	gp->top = MAX_SRCLINE;
 	gp->end = gp->prev = 0;
-	mval2subsc(v,gp);
+	mval2subsc(v, gp, STD_NULL_COLL_FALSE);
 	w.mvtype = MV_STR | MV_SUBLIT;
 	w.str.addr = (char *) gp->base;
 	w.str.len = gp->end + 1;

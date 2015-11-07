@@ -73,6 +73,7 @@ GBLREF	boolean_t		exit_handler_active;
 GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
+GBLREF	volatile boolean_t	timer_active;
 
 LITREF	gtmImageName		gtmImageNames[];
 
@@ -303,7 +304,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	/* Stop the timers but do not cancel them. This allows the timer structures to appear in the core where gtmpcat can
 	 * extract them allowing us to see what was going on.
 	 */
-	sys_canc_timer();
+	if (timer_active)
+		sys_canc_timer();
 	FFLUSH(stdout);
 	if (!dont_want_core)
 	{

@@ -44,6 +44,9 @@
 #include "memcoherency.h"
 #include "replgbl.h"
 #include "gtmsource.h"
+#ifdef GTM_TLS
+#include "gtm_repl.h"
+#endif
 
 GBLREF	repl_msg_ptr_t		gtmrecv_msgp;
 GBLREF	int			gtmrecv_max_repl_msglen;
@@ -102,7 +105,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	unsigned char		*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int			torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
-	int			status;					/* needed for REPL_{SEND,RECV}_LOOP */
+	int			status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	int			temp_len, pending_msg_size;
 	int			upd_start_status, upd_start_attempts;
 	int			buffered_data_len;
@@ -129,6 +132,14 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Shutdown signalled\n");
 		gtmrecv_end(); /* Won't return */
 	}
+#	ifdef GTM_TLS
+	/* If we sent a REPL_RENEG_ACK, then we cannot afford to send anymore asynchronous messages (like XOFF_ACK_ME) until we
+	 * receive a REPL_RENEG_COMPLETE from the source server. This ensures that while the source server attempts to do a SSL/TLS
+	 * renegotiation, it doesn't have any application data (like XOFF_ACK_ME) sitting in the pipe.
+	 */
+	if (REPLTLS_WAITING_FOR_RENEG_COMPLETE == repl_tls.renegotiate_state)
+		return STOP_POLL;
+#	endif
 	/* Reset report_cnt and next_report_at to 1 when a new upd proc is forked */
 	if ((1 == report_cnt) || (report_cnt == next_report_at))
 	{
@@ -152,8 +163,8 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			if (1 == report_cnt)
 			{
 				send_xoff = TRUE;
-				QWASSIGN(recvpool_ctl->old_jnl_seqno, recvpool_ctl->jnl_seqno);
-				QWASSIGNDW(recvpool_ctl->jnl_seqno, 0);
+				recvpool_ctl->old_jnl_seqno = recvpool_ctl->jnl_seqno;
+				recvpool_ctl->jnl_seqno = 0;
 				/* Even though we have identified that the update process is NOT alive, a waitpid on the update
 				 * process PID is necessary so that the system doesn't leave any zombie process lying around.
 				 * This is possible since any child process that dies without the parent doing a waitpid on it
@@ -193,8 +204,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		 */
 		onln_rlbk_flg_set = TRUE;
 		send_xoff = TRUE;
-	}
-	else if (!send_cmp2uncmp && gtmrecv_send_cmp2uncmp)
+	} else if (!send_cmp2uncmp && gtmrecv_send_cmp2uncmp)
 	{
 		send_xoff = TRUE;
 		send_seqno = recvpool_ctl->jnl_seqno;

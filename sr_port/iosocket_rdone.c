@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,6 @@
 #include "gtm_inet.h"
 #include "io.h"
 #include "gt_timer.h"
-#include "iotcpdef.h"
 #include "iosocketdef.h"
 #include "gtm_utf8.h"
 
@@ -51,7 +50,7 @@ int	iosocket_rdone(mint *v, int4 timeout)
 					UTF16LE_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
 					break;
 				default:
-					GTMASSERT;
+					assertpro(ichset != ichset);
 			}
 			UNICODE_ONLY(assert(WEOF != codepoint));
 		} else

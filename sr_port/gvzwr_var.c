@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@
 #include "mvalconv.h"
 #include "follow.h"
 #include "gtm_string.h"
+#include "gtmimagename.h"
 
 #define eb_less(u, v)	(numcmp(u, v) < 0)
 
@@ -31,6 +32,8 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gvzwrite_datablk *gvzwrite_block;
 GBLREF int4		outofband;
 GBLREF gd_region	*gv_cur_region;
+GBLREF gd_addr		*gd_header;
+
 LITREF mval		literal_null;
 
 void gvzwr_var(uint4 data, int4 n)
@@ -42,6 +45,7 @@ void gvzwr_var(uint4 data, int4 n)
 	char		seen_null;
 	zwr_sub_lst	*zwr_sub;
 	int		loop_condition = 1;
+	gvnh_reg_t	*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -60,9 +64,14 @@ void gvzwr_var(uint4 data, int4 n)
 	assert(1 < data);
 	end = gv_currkey->end;
 	prev = gv_currkey->prev;
+	gvnh_reg = TREF(gd_targ_gvnh_reg);	/* set by op_gvname call done in gvzwr_fini before call to gvzwr_var */
 	if ((n < gvzwrite_block->subsc_count) && (ZWRITE_VAL == zwr_sub->subsc_list[n].subsc_type))
 	{
-		mval2subsc(zwr_sub->subsc_list[n].first, gv_currkey);
+		mval2subsc(zwr_sub->subsc_list[n].first, gv_currkey, gv_cur_region->std_null_coll);
+		/* If gvnh_reg corresponds to a spanning global, then determine
+		 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+		 */
+		GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey);
 		op_gvdata(&subdata);
 		if (MV_FORCE_INTD(&subdata) && ((10 != (int4)MV_FORCE_INTD(&subdata)) || n < gvzwrite_block->subsc_count - 1))
 		{
@@ -79,13 +88,17 @@ void gvzwr_var(uint4 data, int4 n)
 		    && ZWRITE_PATTERN != zwr_sub->subsc_list[n].subsc_type)
 		{
 			mv = *zwr_sub->subsc_list[n].first;
-			mval2subsc(&mv, gv_currkey);
+			mval2subsc(&mv, gv_currkey, gv_cur_region->std_null_coll);
 			if ((mv.mvtype & MV_STR) && !mv.str.len)
 				seen_null = 1;
+			/* If gvnh_reg corresponds to a spanning global, then determine
+			 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+			 */
+			GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey);
 			op_gvdata(&subdata);
 		} else
 		{
-			mval2subsc((mval *)&literal_null, gv_currkey);
+			mval2subsc((mval *)&literal_null, gv_currkey, gv_cur_region->std_null_coll);
 			TREF(gv_last_subsc_null) = TRUE;
 			if (0 == gv_cur_region->std_null_coll)
 			{
@@ -108,10 +121,7 @@ void gvzwr_var(uint4 data, int4 n)
 					op_gvdata(&subdata);
 				}
 			} else /* for standard null collation */
-			{
-				/* determine whether $data(^gbl("") == 1 or 11,
-				   if yes, first process that
-				*/
+			{	/* determine whether $data(^gbl("") == 1 or 11, if yes, first process that */
 				if (NEVER == gv_cur_region->null_subs)
 				{
 					op_gvorder(&mv);
@@ -121,6 +131,10 @@ void gvzwr_var(uint4 data, int4 n)
 					op_gvdata(&subdata);
 				} else
 				{
+					/* If gvnh_reg corresponds to a spanning global, then determine
+					 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+					 */
+					GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey);
 					op_gvdata(&subdata);
 					if (MV_FORCE_INTD(&subdata))
 						seen_null = 1;

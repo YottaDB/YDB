@@ -67,6 +67,9 @@
 #include "replgbl.h"
 #include "repl_inst_dump.h"		/* for "repl_dump_histinfo" prototype */
 #include "gtmdbgflags.h"
+#ifdef GTM_TLS
+#include "gtm_repl.h"
+#endif
 
 #define SEND_REPL_LOGFILE_INFO(LOGFILE, LOGFILE_MSG)							\
 {													\
@@ -107,7 +110,9 @@ GBLREF	uchar_ptr_t		repl_filter_buff;
 GBLREF	uint4			process_id;
 GBLREF	unsigned char		*gtmsource_tcombuffp;
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
+#ifdef GTM_TLS
 GBLREF	gtmsource_options_t	gtmsource_options;
+#endif
 
 error_def(ERR_REPL2OLD);
 error_def(ERR_REPLCOMM);
@@ -120,54 +125,70 @@ error_def(ERR_SECNOTSUPPLEMENTARY);
 error_def(ERR_STRMNUMMISMTCH1);
 error_def(ERR_STRMNUMMISMTCH2);
 error_def(ERR_TEXT);
+error_def(ERR_TLSCONVSOCK);
+error_def(ERR_TLSHANDSHAKE);
 
 static	unsigned char		*tcombuff, *msgbuff, *cmpmsgbuff, *filterbuff;
 
 int gtmsource_est_conn()
 {
-	int			connection_attempts, alert_attempts, save_errno, status;
 	char			print_msg[1024], msg_str[1024], *errmsg;
-	gtmsource_local_ptr_t	gtmsource_local;
+	int			connection_attempts, alert_attempts, save_errno, status;
 	int			send_buffsize, recv_buffsize, tcp_s_bufsize;
 	int 			logging_period, logging_interval; /* logging period = soft_tries_period*logging_interval */
+	int			hardtries_period, hardtries_count;
 	int 			logging_attempts;
-	sockaddr_ptr		secondary_sa;
 	int			secondary_addrlen;
+	sockaddr_ptr		secondary_sa;
+	gtmsource_local_ptr_t	gtmsource_local;
 
 	gtmsource_local = jnlpool.gtmsource_local;
+#	ifdef GTM_TLS
+	assert(!repl_tls.enabled); /* Set after REPL_NEED_TLS_INFO/REPL_TLS_INFO messages are exchanged. */
+	assert(REPLTLS_RENEG_STATE_NONE == repl_tls.renegotiate_state);
+	/* We either did not create a TLS/SSL aware socket or the SSL object off of the TLS/SSL aware socket should be NULL since
+	 * we haven't yet connected to the receiver server. Assert that.
+	 */
+	assert((NULL == repl_tls.sock) || (NULL == repl_tls.sock->ssl));
+	/* Since this is a new connection, reset next renegotiation time. */
+	gtmsource_local->next_renegotiate_time = 0;	/* Set to correct value after TLS/SSL handshake is established. */
+#	endif
 	assert(remote_side == &gtmsource_local->remote_side);
 	remote_side->proto_ver = REPL_PROTO_VER_UNINITIALIZED;
 	remote_side->endianness_known = FALSE;
 	/* Connect to the secondary - use hard tries, soft tries ... */
 	connection_attempts = 0;
 	gtmsource_comm_init(); /* set up gtmsource_local.secondary_ai */
+	hardtries_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD];
+	hardtries_count = gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT];
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "Connect hard tries count = %d, Connect hard tries period = %d\n",
-		 gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT],
-		 gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD]);
+				hardtries_count, hardtries_period);
 	do
 	{
 		secondary_sa = (sockaddr_ptr)(&gtmsource_local->secondary_inet_addr);
 		secondary_addrlen = gtmsource_local->secondary_addrlen;
-		status = gtm_connect(gtmsource_sock_fd, secondary_sa, secondary_addrlen);
+		CONNECT_SOCKET(gtmsource_sock_fd, secondary_sa, secondary_addrlen, status);
 		if (0 == status)
 			break;
-		repl_log(gtmsource_log_fp, FALSE, FALSE, "%d hard connection attempt failed : %s\n", connection_attempts + 1,
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "%d hard connection attempt failed : %s\n", connection_attempts + 1,
 			 STRERROR(errno));
 		repl_close(&gtmsource_sock_fd);
-		if (REPL_MAX_CONN_HARD_TRIES_PERIOD > jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD])
-			SHORT_SLEEP(gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD])
+		if (REPL_MAX_CONN_HARD_TRIES_PERIOD > hardtries_period)
+		{
+			SHORT_SLEEP(hardtries_period);
+		}
 		else
-			LONG_SLEEP(gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD] % MILLISECS_IN_SEC);
+			LONG_SLEEP_MSEC(hardtries_period);
 		gtmsource_poll_actions(FALSE);
 		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 			return (SS_NORMAL);
 		gtmsource_comm_init();
-	} while (++connection_attempts < gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT]);
+	} while (++connection_attempts < hardtries_count);
 	gtmsource_poll_actions(FALSE);
 	if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 		return (SS_NORMAL);
 
-	if (gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT] <= connection_attempts)
+	if (hardtries_count <= connection_attempts)
 	{	/*Initialize logging period related variables*/
 		logging_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD];
 		logging_interval = 1;
@@ -183,7 +204,7 @@ int gtmsource_est_conn()
 		{
 			secondary_sa = (sockaddr_ptr)(&gtmsource_local->secondary_inet_addr);
 			secondary_addrlen = gtmsource_local->secondary_addrlen;
-			status = gtm_connect(gtmsource_sock_fd, secondary_sa, secondary_addrlen);
+			CONNECT_SOCKET(gtmsource_sock_fd, secondary_sa, secondary_addrlen, status);
 			if (0 == status)
 				break;
 			repl_close(&gtmsource_sock_fd);
@@ -405,7 +426,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 	unsigned char			*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
-	int				status;					/* needed for REPL_{SEND,RECV}_LOOP */
+	int				status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	uint4				remaining_len, len;
 	unsigned char			seq_num_str[32], *seq_num_ptr, *buffp;
 	repl_msg_t			xoff_ack;
@@ -444,8 +465,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			buffp = (unsigned char *)&logfile_msg;
 			/* First copy what we already received */
 			memcpy(buffp, &msg, MIN_REPL_MSGLEN);
-			assert((logfile_msg.fullpath_len > MIN_REPL_MSGLEN)
-					&& logfile_msg.fullpath_len < REPL_LOGFILE_PATH_MAX);
+			assert((logfile_msg.fullpath_len > 0) && (logfile_msg.fullpath_len < REPL_LOGFILE_PATH_MAX));
 			/* Now receive the rest of the message */
 			buffp += MIN_REPL_MSGLEN;
 			remaining_len = msg.len - MIN_REPL_MSGLEN;
@@ -581,13 +601,14 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			if (remote_side->jnl_ver < V19_JNL_VER)
 				*start_flags &= ~START_FLAG_TRIGGER_SUPPORT; /* zap it for pro, just in case */
 			remote_side->trigger_supported = (*start_flags & START_FLAG_TRIGGER_SUPPORT) ? TRUE : FALSE;
-#				ifdef GTM_TRIGGER
+#			ifdef GTM_TRIGGER
 			if (!remote_side->trigger_supported)
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Warning : Secondary does not support GT.M "
 					"database triggers. #t updates on primary will not be replicated\n");
-#				endif
+#			endif
 			/* remote_side->null_subs_xform is initialized later in function "gtmsource_process" */
 			(TREF(replgbl)).trig_replic_warning_issued = FALSE;
+			remote_side->tls_requested = (*start_flags & START_FLAG_ENABLE_TLS) ? TRUE : FALSE;
 			if (REPL_PROTO_VER_REMOTE_LOGPATH > remote_side->proto_ver)
 				return SS_NORMAL; /* Remote side doesn't support REPL_LOGFILE_INFO message */
 			SEND_REPL_LOGFILE_INFO(jnlpool.gtmsource_local->log_file, logfile_msg);
@@ -929,9 +950,8 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 				return (0);	/* Connection got reset in call to "gtmsource_readfiles" */
 			if (0 < total_tr_len)
 				return (total_tr_len);
-			if (0 < *data_len)
-				return (-1);
-			GTMASSERT;
+			assertpro(0 < *data_len);
+			return (-1);
 	}
 	return (-1); /* This should never get executed, added to make compiler happy */
 }
@@ -947,7 +967,7 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 {
 	unsigned char		*msg_ptr;				/* needed for REPL_SEND_LOOP */
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
-	int			status;					/* needed for REPL_SEND_LOOP */
+	int			status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	char			err_string[1024];
 
 	assert((REPL_MULTISITE_MSG_START > msg->type) || (REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver));
@@ -1010,7 +1030,7 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 {
 	unsigned char		*msg_ptr;				/* needed for REPL_RECV_LOOP */
 	int			torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
-	int			status;					/* needed for REPL_RECV_LOOP */
+	int			status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	repl_msg_t		xoff_ack;
 	char			err_string[1024];
 	unsigned char		*buff;
@@ -1243,10 +1263,78 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 	return TRUE;
 }
 
-void 		repl_cmp_solve_src_timeout(void)
+void 	repl_cmp_solve_src_timeout(void)
 {
-	GTMASSERT;
+	assertpro(FALSE);
 }
+
+#ifdef GTM_TLS
+boolean_t gtmsource_exchange_tls_info(void)
+{
+	int			poll_dir, status, flags;
+	char			*errp;
+	repl_tlsinfo_msg_t	reply, response;
+
+	assert(NULL != tls_ctx);
+	assert(REPL_TLS_REQUESTED);
+	assert(!repl_tls.enabled);
+	/* Send REPL_NEED_TLS_INFO message. We pass our GT.M TLS API version as part of this message. */
+	reply.type = REPL_NEED_TLS_INFO;
+	reply.len = MIN_REPL_MSGLEN;
+	reply.API_version = GTM_TLS_API_VERSION;
+	reply.library_version = (uint4)tls_ctx->runtime_version;
+	gtmsource_repl_send((repl_msg_ptr_t)&reply, "REPL_NEED_TLS_INFO", MAX_SEQNO, INVALID_SUPPL_STRM);
+	if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
+		return FALSE; /* send did not succeed */
+
+	/* Receive REPL_TLS_INFO message. The GT.M TLS API version of the receiver is sent as part of the message. */
+	if (!gtmsource_repl_recv((repl_msg_ptr_t)&response, MIN_REPL_MSGLEN, REPL_TLS_INFO, "REPL_TLS_INFO"))
+		return FALSE; /* recv did not succeed */
+	repl_log(gtmsource_log_fp, TRUE, TRUE, "  Remote side API version: 0x%08x\n", response.API_version);
+	repl_log(gtmsource_log_fp, TRUE, TRUE, "  Remote side Library version: 0x%08x\n", response.library_version);
+	flags = GTMTLS_OP_VERIFY_PEER | GTMTLS_OP_CLIENT_MODE;
+	/* At this point, both sides are ready for a TLS/SSL handshake. Create a TLS/SSL aware socket. */
+	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmsource_sock_fd, repl_tls.id, flags)))
+	{
+		if (!PLAINTEXT_FALLBACK)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
+				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+	} else
+	{
+		/* Do the actual handshake. */
+		poll_dir = REPL_INVALID_POLL_DIRECTION;
+		do
+		{
+			status = repl_do_tls_handshake(gtmsource_log_fp, gtmsource_sock_fd, FALSE, &poll_dir);
+			gtmsource_poll_actions(FALSE);
+			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+				return FALSE;
+		} while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status));
+		if (SS_NORMAL == status)
+			return TRUE;
+		else if (REPL_CONN_RESET(status))
+		{
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Attempt to connect() with TLS/SSL protocol failed. "
+					"Status = %d; %s\n", status, STRERROR(status));
+			repl_close(&gtmsource_sock_fd);
+			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
+			gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+			return FALSE;
+		}
+		errp = (-1 == status) ? (char *)gtm_tls_get_error() : STRERROR(status);
+		if (!PLAINTEXT_FALLBACK)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSHANDSHAKE), 0, ERR_TEXT, 2, LEN_AND_STR(errp));
+	}
+	repl_log(gtmsource_log_fp, TRUE, TRUE, "Plaintext fallback enabled. Closing and reconnecting without TLS/SSL.\n");
+	repl_close(&gtmsource_sock_fd);
+	SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
+	gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+	CLEAR_REPL_TLS_REQUESTED; /* As if -tlsid qualifier was never specified. */
+	return FALSE;
+}
+#endif
 
 /* Note: Do NOT reset input parameter "strm_jnl_seqno" unless receiver instance is supplementary and root primary */
 boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_num *strm_jnl_seqno)

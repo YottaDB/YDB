@@ -40,7 +40,6 @@ typedef struct
 	gtm_long_t	length;
 	gtm_char_t	*address;
 }	gtm_string_t;
-typedef	int	gtmcrypt_key_t;
 #ifdef __osf__
 #pragma pointer_size (restore)
 #endif
@@ -59,27 +58,27 @@ typedef struct
 } ci_name_descriptor;
 
 /* Define deprecated types for backward compatibility. */
-typedef gtm_status_t	xc_status_t;
-typedef gtm_int_t	xc_int_t;
-typedef gtm_uint_t	xc_uint_t;
-typedef gtm_long_t	xc_long_t;
-typedef gtm_ulong_t	xc_ulong_t;
-typedef gtm_float_t	xc_float_t;
-typedef gtm_double_t	xc_double_t;
-typedef gtm_char_t	xc_char_t;
-typedef gtm_string_t	xc_string_t;
+typedef gtm_status_t		xc_status_t;
+typedef gtm_int_t		xc_int_t;
+typedef gtm_uint_t		xc_uint_t;
+typedef gtm_long_t		xc_long_t;
+typedef gtm_ulong_t		xc_ulong_t;
+typedef gtm_float_t		xc_float_t;
+typedef gtm_double_t		xc_double_t;
+typedef gtm_char_t		xc_char_t;
+typedef gtm_string_t		xc_string_t;
 typedef gtm_pointertofunc_t	xc_pointertofunc_t;
 typedef gtm_fileid_ptr_t	xc_fileid_ptr_t;
 
 /* Java types with special names for clarity. */
-typedef gtm_int_t	gtm_jboolean_t;
-typedef gtm_int_t	gtm_jint_t;
-typedef gtm_long_t	gtm_jlong_t;
-typedef gtm_float_t	gtm_jfloat_t;
-typedef gtm_double_t	gtm_jdouble_t;
-typedef gtm_char_t	gtm_jstring_t;
-typedef gtm_char_t	gtm_jbyte_array_t;
-typedef gtm_char_t	gtm_jbig_decimal_t;
+typedef gtm_int_t		gtm_jboolean_t;
+typedef gtm_int_t		gtm_jint_t;
+typedef gtm_long_t		gtm_jlong_t;
+typedef gtm_float_t		gtm_jfloat_t;
+typedef gtm_double_t		gtm_jdouble_t;
+typedef gtm_char_t		gtm_jstring_t;
+typedef gtm_char_t		gtm_jbyte_array_t;
+typedef gtm_char_t		gtm_jbig_decimal_t;
 
 /* Call-in interface. */
 gtm_status_t 	gtm_ci(const char *c_rtn_name, ...);

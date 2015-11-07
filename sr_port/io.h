@@ -60,6 +60,11 @@ error_def(ERR_BADCHSET);
 #define DEFAULT_IOD_WIDTH	80
 #define DEFAULT_IOD_WRAP	TRUE
 
+#define TCPDEF_WIDTH	255
+#define TCPDEF_LENGTH	66
+
+#define DLRZKEYLEN	1024
+
 #define BADCHAR_DEVICE_MSG "BADCHAR error raised on input"
 #define UNAVAILABLE_DEVICE_MSG "Resource temporarily unavailable"
 
@@ -78,7 +83,6 @@ enum io_dev_type
 	mb,		/* mail box	*/
 	nl,		/* null device	*/
 	ff,		/* fifo device  */
-	tcp,		/* TCP socket  */
 	gtmsocket,	/* socket device, socket is already used by sys/socket.h */
 #ifdef UNIX
 	pi,		/* pipe */
@@ -202,6 +206,7 @@ typedef struct dev_dispatch_struct
 	void	(*iocontrol)(mstr *);
 	void	(*dlr_device)(mstr *);
 	void	(*dlr_key)(mstr *);
+	void	(*dlr_zkey)(mstr *);
 } dev_dispatch_struct;
 
 /* io_ prototypes */
@@ -233,16 +238,19 @@ void io_init_name(void);
 #define xx_iocontrol(X)		void X##_iocontrol(mstr *d)
 #define xx_dlr_device(X)	void X##_dlr_device(mstr *d)
 #define xx_dlr_key(X)		void X##_dlr_key(mstr *d)
+#define xx_dlr_zkey(X)		void X##_dlr_zkey(mstr *d)
 
 /* Following definitions have a pattern that most of the routines follow. Only exceptions are:
  *      1. ioff_open() is an extra routine
  *      2. iopi_open() is an extra routine on unix
  *	3. iopi_iocontrol() is an extra routine on unix to handle write /writeof
+ *	4. iosocket_dlr_zkey() is only for sockets
  */
 
 #define ioxx(X) ioxx_##X(tt); ioxx_##X(mt); ioxx_##X(rm); VMS_ONLY(ioxx_##X(mb);) ioxx_##X(nl); \
 	ioxx_##X(us); ioxx_##X(tcp); ioxx_##X(socket)
 #define xxdlr(X) xx_iocontrol(X); xx_dlr_device(X); xx_dlr_key(X)
+#define xxdlrzk(X) xx_iocontrol(X); xx_dlr_device(X); xx_dlr_key(X); xx_dlr_zkey(X)
 
 /* prototypes for dispatch functions */
 
@@ -258,10 +266,9 @@ ioxx(wteol);
 ioxx(wtff);
 ioxx(dummy);
 ioxx(flush);
-xxdlr(nil);
+xxdlrzk(nil);
 xxdlr(ious);
-xxdlr(iotcp);
-xxdlr(iosocket);
+xxdlrzk(iosocket);
 ioxx_open(ff);
 #ifdef UNIX
 ioxx_open(pi);
@@ -300,11 +307,6 @@ boolean_t iosocket_listen(io_desc *iod, unsigned short len);
 boolean_t iosocket_wait(io_desc *iod, int4 timepar);
 void iosocket_poolinit(void);
 
-/* iotcp_ prototypes */
-int iotcp_fillroutine(void);
-int iotcp_getlsock(io_log_name *dev);
-void iotcp_rmlsock(io_desc *iod);
-
 /* tcp_ prototypes */
 int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive);
 
@@ -315,15 +317,15 @@ int iomb_dataread (int timeout);
 
 bool same_device_check(mstr tname, char *buf);
 
-#define	iotype(O,X,Y) 								\
+#define	iotype(O,X,Y,Z) 								\
 { 										\
 	O##_open, X##_close, X##_use, X##_read, X##_rdone, X##_write, 		\
 	X##_wtone, X##_wteol, X##_wtff, NULL, X##_flush, X##_readfl,		\
-	Y##_iocontrol, Y##_dlr_device, Y##_dlr_key 				\
+	Y##_iocontrol, Y##_dlr_device, Y##_dlr_key, Z##_dlr_zkey 				\
 }
 #define ionil_dev 												\
 {														\
-		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL	\
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL	\
 }
 
 #ifdef __sparc
@@ -334,6 +336,7 @@ int outc(int ch);
 
 void get_dlr_device(mval *v);
 void get_dlr_key(mval *v);
+void get_dlr_zkey(mval *v);
 
 
 void flush_pio(void);

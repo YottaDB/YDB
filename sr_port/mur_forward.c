@@ -116,7 +116,6 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = TRUE;
 	assert(NULL == jgbl.mur_pini_addr_reset_fnptr);
 	jgbl.mur_pini_addr_reset_fnptr = (pini_addr_reset_fnptr)mur_pini_addr_reset;
-	gv_keysize = DBKEYSIZE(MAX_KEY_SZ);
 	mu_gv_stack_init();
 	murgbl.consist_jnl_seqno = 0;
 	/* Note down passed in values in murgbl global so "mur_forward_play_cur_jrec" function can see it as well */
@@ -166,7 +165,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			tp_change_reg();	/* note : sets cs_addrs to non-NULL value even if gv_cur_region->open is FALSE
 						 * (cs_data could still be NULL). */
 			rctl->csa = cs_addrs;
-			cs_addrs->rctl = rctl;
+			cs_addrs->miscptr = (void *)rctl;
 			rctl->csd = cs_data;
 			rctl->sgm_info_ptr = cs_addrs->sgm_info_ptr;
 			assert(!reg->open || (NULL != cs_addrs->dir_tree));
@@ -253,8 +252,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 		if (NULL != rctl->forw_multi)
 		{	/* This region's current journal record is part of a TP transaction waiting for other regions */
 			regcnt_stuck++;
-			if (regcnt_stuck >= murgbl.regcnt_remaining)
-				GTMASSERT;	/* Out-of-design situation. Stuck in ALL regions. */
+			assertpro(regcnt_stuck < murgbl.regcnt_remaining); /* Out-of-design situation. Stuck in ALL regions. */
 			rctl = rctl->next_rctl;	/* Move on to the next available region */
 			assert(NULL != rctl);
 			continue;
@@ -423,9 +421,9 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 		assert(murgbl.ok_to_update_db || !rctl->db_updated);
 		rctl->mur_plst = NULL;	/* reset now that simulation of GT.M updates is done */
 		/* Ensure mur_block_count_correct is called if updates allowed*/
-		if ((murgbl.ok_to_update_db) && (SS_NORMAL != mur_block_count_correct(rctl)))
+		if (murgbl.ok_to_update_db && (SS_NORMAL != mur_block_count_correct(rctl)))
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_BLKCNTEDITFAIL, 2, DB_LEN_STR(rctl->gd));
+			gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(4) ERR_BLKCNTEDITFAIL, 2, DB_LEN_STR(rctl->gd));
 			murgbl.wrn_count++;
 		}
 	}

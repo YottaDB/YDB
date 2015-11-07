@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include "advancewindow.h"
 #include "fullbool.h"
 #include "show_source_line.h"
+#include "hashtab_mname.h"
 
 GBLREF	boolean_t	run_time;
 
@@ -32,8 +33,9 @@ int gvn(void)
 {
 	boolean_t	parse_status, shifting, vbar;
 	char		x;
+	int		hash_code;
 	opctype		ox;
-	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS];
+	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 1];
 	triple		*oldchain, *ref, *s, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
@@ -50,6 +52,9 @@ int gvn(void)
 	}
 	if ((TK_LBRACKET == TREF(window_token)) || (TK_VBAR == TREF(window_token)))
 	{
+		assert(sb2 == sb1);
+		/* set "hash_code" as the first operand so OC_GVEXTNAM has it passed in at same spot as op_gvname */
+		sb1++;
 		vbar = (TK_VBAR == TREF(window_token));
 		advancewindow();
 		if (vbar)
@@ -90,8 +95,13 @@ int gvn(void)
 	}
 	if (TK_IDENT == TREF(window_token))
 	{
+		COMPUTE_HASH_MSTR((TREF(window_ident)), hash_code);
 		if (!ox)
+		{
 			ox = OC_GVNAME;
+			*sb1++ = put_ilit((mint)hash_code);
+		} else
+			*sb2 = put_ilit((mint)hash_code);	/* fill in hash_code in the space previously set aside */
 		*sb1++ = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
 		advancewindow();
 	} else
@@ -110,6 +120,11 @@ int gvn(void)
 			return FALSE;
 		}
 		ox = OC_GVNAKED;
+		/* pass in a dummy hash_code in case of OC_GVNAKED. We need this so op_gvname_fast, op_gvextnam_fast and
+		 * op_gvnaked_fast have the same call interface. op_savgvn.c relies on this to replace OC_GVNAME, OC_GVEXTNAM
+		 * or OC_GVNAKED opcodes with a OC_SAVGVN opcode.
+		 */
+		*sb1++ = put_ilit((mint)0);
 	}
 	if (TK_LPAREN == TREF(window_token))
 	{

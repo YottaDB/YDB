@@ -29,7 +29,9 @@
 #define	GTM_TPRESTART_LOG_DELTA		"$gtm_tprestart_log_delta"
 #define	GTM_TPRESTART_LOG_LIMIT		"$gtm_tprestart_log_first"
 #define	GTM_ZMAXTPTIME			"$gtm_zmaxtptime"
-
+/* 	GTM_DIRTREE_COLLHDR_ALWAYS	"$gtm_dirtree_collhdr_always"	dbg-only use in gvcst_put hence no #define for it or
+									else the D9I10002703 subtest will need changes for this.
+									*/
 /* White-box testing */
 #define	GTM_WHITE_BOX_TEST_CASE_COUNT	"$gtm_white_box_test_case_count"
 #define	GTM_WHITE_BOX_TEST_CASE_ENABLE	"$gtm_white_box_test_case_enable"
@@ -111,6 +113,7 @@
 /* Miscellaneous */
 #define GTM_ERROR_ON_JNL_FILE_LOST	"$gtm_error_on_jnl_file_lost"
 #define GTM_ETRAP			"$gtm_etrap"
+#define	GTM_LINK			"$gtm_link"
 #define	GTM_LOG_ENV			"$gtm_log"
 #define	GTM_LVNULLSUBS			"$gtm_lvnullsubs"
 #define	GTM_NOCENABLE			"$gtm_nocenable"

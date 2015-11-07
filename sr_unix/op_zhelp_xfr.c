@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,25 +41,20 @@ void op_zhelp_xfr(mval *subject, mval *lib)
 	action->mvtype = MV_STR;
 
 	mval_lex(subject, &x);
-	if (x.addr == (char *)stringpool.free)
-	{	action->str.len += x.len;
+	if (IS_AT_END_OF_STRINGPOOL(x.addr, 0))
+	{
+		action->str.len += x.len;
 		stringpool.free += x.len;
-	}
-	else
+	} else
 		op_cat(VARLSTCNT(3) action, action, subject);
-
 	op_cat(VARLSTCNT(3) action, action, &com);	/* add "," */
-
 	mval_lex(lib, &x);
-	if (x.addr == (char *)stringpool.free)
-	{	action->str.len += x.len;
+	if (IS_AT_END_OF_STRINGPOOL(x.addr, 0))
+	{
+		action->str.len += x.len;
 		stringpool.free += x.len;
-	}
-	else
+	} else
 		op_cat(VARLSTCNT(3) action, action, lib);
-
 	op_cat(VARLSTCNT(3) action, action, &rpar);	/* add ")" */
-
 	op_commarg(action,indir_linetail);
 }
-

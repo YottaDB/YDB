@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -177,20 +177,20 @@ typedef struct gtmsrc_lcl_struct
 #define	OK_TO_LOG_FALSE		FALSE
 #define	OK_TO_LOG_TRUE		TRUE
 
-#define GET_INSTFILE_NAME(sendmsg, err_act)									\
-{														\
-	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, temp_inst_fn, SIZEOF(temp_inst_fn),	\
-							sendmsg)))						\
-		&& (0 != trans_name.len))									\
-	{													\
-		temp_inst_fn[trans_name.len] = '\0';								\
-		if (!get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus) && err_act)	\
-		{												\
-			gtm_putmsg(VARLSTCNT(9) ERR_REPLINSTACC, 2, trans_name.len, trans_name.addr,		\
-				ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"), ustatus);	\
-		} else												\
-			ret = TRUE;										\
-	}													\
+#define GET_INSTFILE_NAME(sendmsg, err_act)										\
+{															\
+	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, temp_inst_fn, SIZEOF(temp_inst_fn),		\
+							sendmsg)))							\
+		&& (0 != trans_name.len))										\
+	{														\
+		temp_inst_fn[trans_name.len] = '\0';									\
+		if (!get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus) && err_act)		\
+		{													\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLINSTACC, 2, trans_name.len, trans_name.addr,	\
+				ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"), ustatus);		\
+		} else													\
+			ret = TRUE;											\
+	}														\
 }
 
 typedef enum {

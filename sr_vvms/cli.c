@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@ error_def(ERR_STRNOTVALID);
 
 CONDITION_HANDLER(clich)
 {
-	START_CH;
+	START_CH(FALSE);
 	CONTINUE;
 }
 
@@ -54,12 +54,12 @@ boolean_t cli_get_hex(char *e, uint4 *dst)
 			buf[retlength] = 0;	/* for cli_str_to_hex */
 			if (!cli_str_to_hex(ptr, dst))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
 				return (FALSE);
 			}
 			return (TRUE);
 		} else
-			gtm_putmsg(VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
 	}
 	return (FALSE);
 }
@@ -84,12 +84,12 @@ boolean_t cli_get_hex64(char *e, gtm_uint64_t *dst)
 			buf[retlength] = 0;	/* for cli_str_to_hex64 */
 			if (!cli_str_to_hex64(ptr, dst))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
 				return (FALSE);
 			}
 			return (TRUE);
 		} else
-			gtm_putmsg(VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
 	}
 	return (FALSE);
 }
@@ -114,12 +114,12 @@ boolean_t cli_get_uint64(char *e, gtm_uint64_t *dst)
 			buf[retlength] = 0;	/* for cli_str_to_uint64 */
 			if (!cli_str_to_uint64(ptr, dst))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
 				return (FALSE);
 			}
 			return (TRUE);
 		} else
-			gtm_putmsg(VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
 	}
 	return (FALSE);
 }
@@ -145,12 +145,12 @@ boolean_t cli_get_int(char *e, int *dst)		/* entity, destination */
 			buf[retlength] = 0;	/* for cli_str_to_int */
 			if (!cli_str_to_int(bufpt, dst))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
 				return FALSE;
 			} else
 				return TRUE;
 		} else
-			gtm_putmsg(VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
 	}
 	return FALSE;
 }
@@ -176,12 +176,12 @@ boolean_t cli_get_int64(char *e, gtm_int64_t *dst)		/* entity, destination */
 			buf[retlength] = 0;	/* for cli_str_to_int64 */
 			if (!cli_str_to_int64(bufpt, dst))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
 				return FALSE;
 			} else
 				return TRUE;
 		} else
-			gtm_putmsg(VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
 	}
 	return FALSE;
 }
@@ -207,12 +207,12 @@ boolean_t cli_get_num(char *e, int *dst)		/* entity, destination */
 			buf[retlength] = 0;	/* for cli_str_to_num */
 			if (!cli_str_to_num(bufpt, dst))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
 				return FALSE;
 			} else
 				return TRUE;
 		} else
-			gtm_putmsg(VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
 	}
 	return FALSE;
 }
@@ -238,12 +238,12 @@ boolean_t cli_get_num64(char *e, gtm_int64_t *dst)		/* entity, destination */
 			buf[retlength] = 0;	/* for cli_str_to_num64 */
 			if (!cli_str_to_num64(bufpt, dst))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STRNOTVALID, 2, retlength, buf);
 				return FALSE;
 			} else
 				return TRUE;
 		} else
-			gtm_putmsg(VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
 	}
 	return FALSE;
 }
@@ -333,7 +333,7 @@ int4 cli_t_f_n(char *e)	/* entity */
 			return (-1);
 	} else
 	{
-		gtm_putmsg(VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
 		return (-1);
 	}
 }
@@ -364,7 +364,7 @@ int4 cli_n_a_e(char *e)	/* entity */
 			return (-1);
 	} else
 	{
-		gtm_putmsg(VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_STRNOTVALID, 2, retlength, buf, status);
 		return (-1);
 	}
 }

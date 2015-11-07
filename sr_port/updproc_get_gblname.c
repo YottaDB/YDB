@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,13 +31,12 @@
 #include "updproc.h"
 #include "updproc_get_gblname.h"
 #include "min_max.h"
+#include "hashtab_mname.h"
 
-/*
- * This rourine validates the key from journal record copying to memory pointed updproc_get_gblname
- * The mname is an mstr for the global name (to be used for gv_bind_name) is set here.
+/* This routine validates the key from journal record copying to memory pointed updproc_get_gblname
+ * "gvname" is an mname_entry pointing to the global name (to be used for gv_bind_name) is set here.
  */
-
-enum upd_bad_trans_type updproc_get_gblname(char *src_ptr, int key_len, char *gv_mname, mstr *mname)
+enum upd_bad_trans_type updproc_get_gblname(char *src_ptr, int key_len, char *gv_mname, mname_entry *gvname)
 {
 	char			*dest_ptr;
 	int			cplen;
@@ -52,7 +51,8 @@ enum upd_bad_trans_type updproc_get_gblname(char *src_ptr, int key_len, char *gv
 	} while (cplen);
 	if (0 != (*(dest_ptr - 1)) || (0 >= dest_ptr - 1 - gv_mname))
 		return upd_bad_mname_size;
-	mname->addr = (char *)gv_mname;
-	mname->len = INTCAST(dest_ptr - 1 - (char *)gv_mname);
+	gvname->var_name.addr = (char *)gv_mname;
+	gvname->var_name.len = INTCAST(dest_ptr - 1 - (char *)gv_mname);
+	COMPUTE_HASH_MNAME(gvname);
 	return upd_good_record;
 }

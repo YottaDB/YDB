@@ -20,7 +20,6 @@
 #include "gtm_netdb.h"
 #include "gtm_socket.h"
 #include "gtm_stdio.h"
-#include "iotcpdef.h"
 #include "gtm_string.h"	/* for rts_error */
 
 /* return in a the char * the ASCII representation of a network address.

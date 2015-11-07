@@ -53,6 +53,9 @@
 #include "alias.h"
 #include "fullbool.h"
 #include "anticipatory_freeze.h"
+#include "gvnh_spanreg.h"
+#include "targ_alloc.h"
+#include "gvcst_protos.h"
 #ifdef GTM_TRIGGER
 # include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
 # include "gv_trigger.h"
@@ -61,10 +64,12 @@
 #ifdef UNIX
 # include "wbox_test_init.h"
 # include "mutex.h"
+# include "gtmlink.h"
 # ifdef DEBUG
 #  include "gtmsecshr.h"
 # endif
 #endif
+#include "gtmimagename.h"
 
 STATICFNDCL void view_dbflushop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
 
@@ -99,6 +104,7 @@ error_def(ERR_ACTRANGE);
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_COLLDATAEXISTS);
 error_def(ERR_DBFSYNCERR);
+error_def(ERR_GBLNOMAPTOREG);
 error_def(ERR_INVZDIRFORM);
 error_def(ERR_ISOLATIONSTSCHN);
 error_def(ERR_JNLFLUSH);
@@ -140,9 +146,11 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	mval			*arg, *nextarg, outval;
 	mstr			tmpstr;
 	va_list			var;
-	viewparm		parmblk;
+	viewparm		parmblk, parmblk2;
 	viewtab_entry		*vtp;
 	gd_addr			*addr_ptr;
+	gvnh_reg_t		*gvnh_reg;
+	gvnh_spanreg_t		*gvspan;
 	noisolation_element	*gvnh_entry;
 	int			lct, ncol, nct;
 	collseq			*new_lcl_collseq;
@@ -155,7 +163,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	int			table_size_orig;
 	ht_ent_mname		*table_base_orig;
 	hash_table_mname	*table;
-	boolean_t		dbgdmpenabled, was_crit;
+	boolean_t		dbgdmpenabled, was_crit, was_skip_gtm_putmsg;
 	symval			*lvlsymtab;
 	lv_blk			*lvbp;
 	lv_val			*lvp, *lvp_top;
@@ -174,8 +182,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	VAR_START(var, keyword);
 	VMS_ONLY(va_count(numarg));
 		jnl_status = 0;
-	if (numarg < 1)
-		GTMASSERT;
+	assertpro(1 <= numarg);
 	MV_FORCE_STR(keyword);
 	numarg--;	/* remove keyword from count */
 	if (0 < numarg)
@@ -185,7 +192,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	} else
 		arg = (mval *)NULL;
 	vtp = viewkeys(&keyword->str);
-	view_arg_convert(vtp, arg, &parmblk);
+	view_arg_convert(vtp, (int)vtp->parm, arg, &parmblk, IS_DOLLAR_VIEW_FALSE);
 	switch(vtp->keycode)
 	{
 #		ifdef UNICODE_SUPPORTED
@@ -378,7 +385,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				{
 					if (!reg->open)
 						continue;
-					switch(reg->dyn.addr->acc_meth)
+					switch(REG_ACC_METH(reg))
 					{
 						case dba_mm:
 						case dba_bg:
@@ -389,10 +396,36 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 						case dba_usr:
 							break;
 						default:
-							GTMASSERT;
+							assert(FALSE && REG_ACC_METH(reg));
 							break;
 					}
 				}
+			}
+			break;
+		case VTK_YCHKCOLL:
+			if (arg)
+				lct = MV_FORCE_INT(parmblk.value);
+			else
+			{
+				va_end(var);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REQDVIEWPARM);
+			}
+			if (0 == lct)
+				break;	/* 0 value of collation is always good */
+			if ((lct < MIN_COLLTYPE) || (lct > MAX_COLLTYPE))
+			{
+				va_end(var);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
+			}
+			was_skip_gtm_putmsg = TREF(skip_gtm_putmsg);
+			TREF(skip_gtm_putmsg) = TRUE;	/* to avoid ready_collseq from doing gtm_putmsg in case of errors.
+							 * not doing so will cause GDECHECK errors in caller (GDE). */
+			new_lcl_collseq = ready_collseq(lct);
+			TREF(skip_gtm_putmsg) = was_skip_gtm_putmsg;
+			if (0 == new_lcl_collseq)
+			{
+				va_end(var);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
 			}
 			break;
 		case VTK_YDIRTVAL:
@@ -424,6 +457,23 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			 * a YDIRTREE update is performed
 			 */
 			op_gvname(VARLSTCNT(1) parmblk.value);
+			arg = (numarg > 1) ? va_arg(var, mval *) : NULL;
+			if (NULL != arg)
+			{
+				view_arg_convert(vtp, VTP_DBREGION, arg, &parmblk2, IS_DOLLAR_VIEW_FALSE);
+				reg = parmblk2.gv_ptr;
+				/* Determine if "reg" is mapped to by global name. If not issue error */
+				gvnh_reg = TREF(gd_targ_gvnh_reg);	/* set up by op_gvname */
+				gvspan = (NULL == gvnh_reg) ? NULL : gvnh_reg->gvspan;
+				if (((NULL != gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg))
+					|| ((NULL == gvspan) && (reg != gv_cur_region)))
+				{
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GBLNOMAPTOREG, 4,
+						parmblk.value->str.len, parmblk.value->str.addr, REG_LEN_STR(reg));
+				}
+				if (NULL != gvspan)
+					GV_BIND_SUBSREG(gd_header, reg, gvnh_reg);
+			}
 			assert(INVALID_GV_TARGET == reset_gv_target);
 			reset_gv_target = gv_target;
 			gv_target = cs_addrs->dir_tree;		/* Trick the put program into using the directory tree */
@@ -686,6 +736,11 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 		case VTK_NOLOGTPRESTART:
 			TREF(tprestart_syslog_delta) = 0;
 			break;
+#		ifdef UNIX
+		case VTK_LINK:
+			init_relink_allowed(&parmblk.value->str);
+			break;
+#		endif
 #		ifdef DEBUG_ALIAS
 		case VTK_LVMONOUT:
 			als_lvmon_output();

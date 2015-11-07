@@ -96,6 +96,7 @@ void gtcm_loop(omi_conn_ll *cll)
 /*	Pay attention to the network visible end point */
 	if (INV_FD_P((nfds = cll->nve)))
 	    break;
+	assertpro(FD_SETSIZE > cll->nve);
 	FD_SET(cll->nve, &r_fds);
 	FD_SET(cll->nve, &e_fds);
 	if (psock >= 0)
@@ -103,6 +104,7 @@ void gtcm_loop(omi_conn_ll *cll)
 
 /*	We will service transactions from any existing connection */
 	for (cptr = cll->head; cptr; cptr = cptr->next) {
+	    assertpro(FD_SETSIZE > cptr->fd);
 	    FD_SET(cptr->fd, &r_fds);
 	    FD_SET(cptr->fd, &e_fds);
 	    if (cptr->fd > nfds)

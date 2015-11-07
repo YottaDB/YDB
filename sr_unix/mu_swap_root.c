@@ -50,14 +50,7 @@
 #include "t_create.h"
 #include "t_write_map.h"
 #include "t_write.h"
-#ifdef GTM_TRIGGER
-#include "hashtab_mname.h"
-#include "gv_trigger.h"
-#include "gv_trigger_common.h"
-#include "targ_alloc.h"
-#endif
-
-GTMTRIG_ONLY(LITREF	mval	literal_hasht;)
+#include "change_reg.h"
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -92,7 +85,7 @@ error_def(ERR_MUTRUNCNOTBG);
 #define RETRY_SWAP		(0)
 #define ABORT_SWAP		(1)
 
-boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
+boolean_t mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 {
 	sgmnt_data_ptr_t	csd;
 	sgmnt_addrs		*csa;
@@ -108,10 +101,6 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 	boolean_t		tn_aborted;
 	unsigned int		lcl_t_tries;
 	enum cdb_sc		status;
-#	ifdef GTM_TRIGGER
-	gv_namehead		*hasht_tree;
-	mname_entry		gvent;
-#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -121,18 +110,8 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 	dir_hist_ptr = gv_target->alt_hist;
 	gvt_hist_ptr = &(gv_target->hist);
 	inctn_opcode = inctn_invalid_op;
-#	ifdef GTM_TRIGGER
-	if (IS_MNAME_HASHT_GBLNAME(gn->str))
-	{	/* Initialize ^#t global for this region. */
-		csa = cs_addrs;	/* needed for SETUP_TRIGGER_GLOBAL and INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED macros */
-		SETUP_TRIGGER_GLOBAL;
-		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
-		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
-		if (0 == gv_target->root)
-			return TRUE;
-	} else
-#	endif	/* Initialization for current global */
-		op_gvname(VARLSTCNT(1) (gn));
+	DO_OP_GVNAME(gl_ptr);
+		/* sets gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr */
 	csa = cs_addrs;
 	cnl = csa->nl;
 	csd = cs_data;	/* Be careful to keep csd up to date. With MM, cs_data can change, and
@@ -140,7 +119,7 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 			 */
 	if (0 == gv_target->root)
 	{	/* Global does not exist (online rollback). No problem. */
-		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
 		return TRUE;
 	}
 	if (dba_mm == csd->acc_meth)
@@ -205,7 +184,7 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 			ABORT_TRANS_IF_GBL_EXIST_NOMORE(lcl_t_tries, tn_aborted);
 			if (tn_aborted)
 			{	/* It is not an error if the global (that once existed) doesn't exist anymore (due to ROLLBACK) */
-				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
 				return TRUE;
 			}
 			continue;

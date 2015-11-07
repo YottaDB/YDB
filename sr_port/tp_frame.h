@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,7 @@ typedef struct tp_frame_struct
 	unsigned int			serial : 1;
 	unsigned int			restartable : 1;
 	unsigned int			old_locks : 1;
-	unsigned int			dlr_t : 1;
+	unsigned int			dlr_t : 1;		/* saved/restored only for OUTERMOST tstart */
 	unsigned int			tp_save_all_flg : 1;
 	unsigned int			implicit_tstart : 1;	/* TRUE if op_tstart was invoked by gvcst_put/gvcst_kill as part of
 								 * trigger processing. Field is inherited across nested op_tstarts
@@ -80,14 +80,15 @@ typedef struct tp_frame_struct
 	unsigned char 			*restart_pc;
 	struct stack_frame_struct	*fp;
 	struct mv_stent_struct		*mvc;
-	struct gv_namehead_struct	*orig_gv_target;
-	struct gv_key_struct		*orig_key;
-	struct gd_addr_struct		*gd_header;
-	struct gd_region_struct		*gd_reg;
+	struct gv_namehead_struct	*orig_gv_target; /* saved/restored only for OUTERMOST tstart */
+	struct gv_key_struct		*orig_key;	/* saved/restored only for OUTERMOST tstart */
+	struct gd_addr_struct		*gd_header;	/* saved/restored only for OUTERMOST tstart */
+	struct gd_region_struct		*gd_reg;	/* saved/restored only for OUTERMOST tstart */
 	struct symval_struct		*sym;
 	struct tp_var_struct		*vars;
-	mval				zgbldir;
+	mval				zgbldir;	/* saved/restored only for OUTERMOST tstart */
 	mval				trans_id;
+	mstr				extnam_str;	/* saved/restored only for OUTERMOST tstart */
 	struct tp_frame_struct 		*old_tp_frame;
 	unsigned char			*restart_ctxt;
 } tp_frame;

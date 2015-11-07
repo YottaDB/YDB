@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,9 +29,8 @@
 #include "muprec.h"
 #include "jnl_typedef.h"
 #include "copy.h"
-#include "init_root_gv.h"
-#include "min_max.h"          	/* needed for init_root_gv.h */
-#include "format_targ_key.h"   	/* needed for init_root_gv.h */
+#include "min_max.h"
+#include "format_targ_key.h"
 #include "mlkdef.h"
 #include "zshow.h"
 #include "mur_jnl_ext.h"
@@ -43,7 +42,6 @@ GBLREF	gv_key		*gv_currkey;
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	boolean_t	is_updproc;
-GBLREF  mval            curr_gbl_root;
 GBLREF	char		muext_code[][2];
 LITREF	char		*jrt_label[JRT_RECTYPES];
 
@@ -192,15 +190,15 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 			extract_len += val_extr_len;
 		} else
 		{
-			gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_JNLBADRECFMT,
 				3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset,
 				ERR_TEXT, 2, LEN_AND_LIT("Length of the record is too high for zwr format"));
 			if (mur_options.verbose || mur_options.detail)
 			{
-				gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4,
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4,
 					LEN_AND_LIT("After max expansion record length"),
 					ZWR_EXP_RATIO(val_len), ZWR_EXP_RATIO(val_len));
-				gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Buffer size"),
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Buffer size"),
 					murgbl.max_extr_record_length - extract_len,
 					murgbl.max_extr_record_length - extract_len);
 			}

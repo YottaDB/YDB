@@ -80,6 +80,10 @@
 #  define DIR_SEPARATOR		'/'
 #endif
 
+/* Use the below macros for function declarations and definitions that are part of an API */
+#define _GTM_APIDECL
+#define _GTM_APIDEF
+
 /* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */
 #define	STR_LIT_LEN(LITERAL)			(SIZEOF(LITERAL) - 1)
 #define	LITERAL_AND_LENGTH(LITERAL)		(LITERAL), (SIZEOF(LITERAL) - 1)

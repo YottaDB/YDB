@@ -65,6 +65,7 @@ void cmj_incoming_call(struct NTD *tsk)
 		lnk->peer_ai.ai_addrlen = sz;
 		insqh(&lnk->cqe, &tsk->cqh);
 		lnk->ntd = tsk;
+		assertpro(FD_SETSIZE > rval);
 		FD_SET(rval, &tsk->es);
 		/* setup for callback processing */
 		lnk->deferred_event = TRUE;

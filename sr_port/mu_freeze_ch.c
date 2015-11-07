@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ CONDITION_HANDLER(mu_freeze_ch)
 {
 	tp_region	*rptr1;
 
-	START_CH;
+	START_CH(TRUE);
 	for (rptr1 = grlist ; rptr1 != NULL; rptr1 = rptr1->fPtr)
 	{
 		gv_cur_region = rptr1->reg;

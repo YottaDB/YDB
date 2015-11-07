@@ -149,13 +149,13 @@ void trip_gen(triple *ct)
 		case OC_CALL:
 		case OC_FORLCLDO:
 		case OC_CALLSP:
-/*  Changes to emit_xfer, emit_base_offset, or emit_jmp may require changes
-	here since we try to predict how big the call into the xfer_table
-	and the following jump will be.
-	There is also an assumption that both the word and long variants
-	of the opcode will be followed by a jmp with 32 bit offset while
-	the -BYTE variants will be followed by a BRB with an 8 bit offset.
-*/
+			/* Changes to emit_xfer, emit_base_offset, or emit_jmp may require changes
+			 * here since we try to predict how big the call into the xfer_table
+			 * and the following jump will be.
+			 * There is also an assumption that both the word and long variants
+			 * of the opcode will be followed by a jmp with 32 bit offset while
+			 * the -BYTE variants will be followed by a BRB with an 8 bit offset.
+			*/
 			tsp = (short *)&ttt[ttt[tp]];
 			if (-128 <= tsp[CALL_4LCLDO_XFER] && 127 >= tsp[CALL_4LCLDO_XFER])
 				off = jmp_offset - XFER_BYTE_INST_SIZE;
@@ -190,7 +190,7 @@ void trip_gen(triple *ct)
 			tsp = (short *)&ttt[ttt[tp]];
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && ct->opcode);
 			break;
 		}
 	}
@@ -208,7 +208,7 @@ void trip_gen(triple *ct)
 			tp = ttt[tp + 4];
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && (oc_tab[ct->operand[0].oprval.tref->opcode].octype & (OCT_VALUE | OCT_BOOL)));
 			break;
 		}
 		tsp = (short *)&ttt[tp];
@@ -226,7 +226,7 @@ void trip_gen(triple *ct)
 			assert(repcnt != 1);
 			for (irep_index = repcnt, irep_opr = &ct->operand[1]; irep_index > 2; --irep_index)
 			{
-				assert (irep_opr->oprclass == TRIP_REF);
+				assert(irep_opr->oprclass == TRIP_REF);
 				irep_opr = &irep_opr->oprval.tref->operand[1];
 			}
 
@@ -285,7 +285,7 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				break;
 			case VXI_BLBC:
 			case VXI_BLBS:
-				assert (*inst == VXT_REG);
+				assert(VXT_REG == *inst);
 				inst++;
 				inst++;
 				emit_xfer(4*xf_dt_get);
@@ -296,40 +296,39 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					emit_jmp(VXI_BEQL, &inst);
 				else
 				{
-					assert (sav_in == VXI_BLBS);
+					assert(sav_in == VXI_BLBS);
 					emit_jmp(VXI_BNEQ, &inst);
 				}
 				break;
 			case VXI_BICB2:
 			case VXI_BISB2:
-				assert (*inst == VXT_LIT);
+				assert(VXT_LIT == *inst);
 				inst++;
-				assert (*inst == 1);
+				assert(1 == *inst);
 				inst++;
-				assert (*inst == VXT_REG);
+				assert(VXT_REG == *inst);
 				inst++;
 				inst++;
 				if (sav_in == VXI_BICB2)
 					emit_xfer(4*xf_dt_false);
 				else
 				{
-					assert (sav_in == VXI_BISB2);
+					assert(sav_in == VXI_BISB2);
 					emit_xfer(4*xf_dt_true);
 				}
 				break;
 			case VXI_CALLS:
 				oc_int = TRUE;
-				if (*inst == VXT_LIT)
+				if (VXT_LIT == *inst)
 				{
 					inst++;
 					cnt = (int4) *inst++;
-				}
-				else
+				} else
 				{
-					assert(*inst == VXT_VAL);
+					assert(VXT_VAL == *inst);
 					inst++;
 					opr = *(fst_opr + *inst);
-					assert (opr->oprclass == TRIP_REF);
+					assert(opr->oprclass == TRIP_REF);
 					ct = opr->oprval.tref;
 					if (ct->destination.oprclass)
 					{
@@ -361,7 +360,7 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						emit_trip(PUSH, opr, TRUE, 0);
 					}
 				}
-				assert (*inst == VXT_XFER);
+				assert(VXT_XFER == *inst);
 				inst++;
 				emit_xfer(*inst++);
 				if (oc_int)
@@ -381,25 +380,25 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				}
 				break;
 			case VXI_CLRL:
-				assert (*inst == VXT_VAL);
+				assert(VXT_VAL == *inst);
 				inst++;
 				emit_trip(CLEAR, *(fst_opr + *inst++), TRUE, 0);
 				break;
 			case VXI_CMPL:
-				assert (*inst == VXT_VAL);
+				assert(VXT_VAL == *inst);
 				inst++;
 				emit_trip(LOAD, *(fst_opr + *inst++), TRUE, I386_REG_EDX);
-				assert (*inst == VXT_VAL);
+				assert(VXT_VAL == *inst);
 				inst++;
 				emit_trip(COMPARE, *(fst_opr + *inst++), TRUE, I386_REG_EDX);
 				break;
 			case VXI_INCL:
-				assert (*inst == VXT_VAL);
+				assert(VXT_VAL == *inst);
 				inst++;
 				emit_trip(INCREMENT, *(fst_opr + *inst++), TRUE, 0);
 				break;
 			case VXI_JMP:
-				if (*inst == VXT_VAL)
+				if (VXT_VAL == *inst)
 				{
 					inst++;
 					emit_trip(JUMP, *(fst_opr + *inst++), FALSE, 0);
@@ -410,47 +409,45 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				}
 				break;
 			case VXI_JSB:
-				assert (*inst == VXT_XFER);
+				assert(VXT_XFER == *inst);
 				inst++;
 				emit_xfer(*inst++);
 				break;
 			case VXI_MOVAB:
-				if (*inst == VXT_JMP)
+				if (VXT_JMP == *inst)
 				{
 					inst += 2;
 					emit_pcrel(LOAD_ADDRESS, I386_REG_EAX);
-					assert (*inst == VXT_ADDR);
+					assert(VXT_ADDR == *inst);
 					inst++;
 					emit_trip(STORE, *(fst_opr + *inst++), FALSE, I386_REG_EAX);
-				}
-				else if (*inst == VXT_ADDR || *inst == VXT_VAL)
+				} else if ((VXT_ADDR == *inst) || (VXT_VAL == *inst))
 				{
 					bool	addr;
 					unsigned char reg;
 					short	save_inst;
 
-					addr = (*inst == VXT_VAL);
+					addr = (VXT_VAL == *inst);
 					inst++;
 					save_inst = *inst++;
-					assert (*inst == VXT_REG);
+					assert(VXT_REG == *inst);
 					inst++;
 					reg = ((*inst++ & 0x01) ? I386_REG_EDX : I386_REG_EAX); /* r0 and r1 are only ones used */
 					emit_trip(LOAD_ADDRESS, *(fst_opr + save_inst), addr, reg);
-				}
-				else
-					GTMASSERT;
+				} else
+					assertpro(FALSE && *inst);
 				break;
 			case VXI_MOVC3:
-				assert (*inst == VXT_LIT);
+				assert(VXT_LIT == *inst);
 				inst += 2;
-				assert(*inst == VXT_VAL);
+				assert(VXT_VAL == *inst);
 				inst++;
 				code_buf[code_idx++] = I386_INS_PUSH_eSI;
 				code_buf[code_idx++] = I386_INS_PUSH_eDI;
 
 				emit_trip(LOAD_ADDRESS, *(fst_opr + *inst++), TRUE, I386_REG_ECX);
 
-				assert(*inst == VXT_VAL);
+				assert(VXT_VAL == *inst);
 				inst++;
 				emit_trip(LOAD_ADDRESS, *(fst_opr + *inst++), TRUE, I386_REG_EDI);
 
@@ -471,32 +468,31 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				code_buf[code_idx++] = I386_INS_POP_eSI;
 				break;
 			case VXI_MOVL:
-				if (*inst == VXT_REG)
+				if (VXT_REG == *inst)
 				{
 					inst++;
 					if (*inst > 0x5f)	/* OC_CURRHD */  /* any mode >= 6 (deferred), any register */
 					{
 						inst++;
-						assert (*inst == VXT_ADDR);
+						assert(VXT_ADDR == *inst);
 						inst++;
 
 						emit_xfer(4*xf_get_msf);
 						emit_op_base_offset(LOAD, I386_REG_EAX, 0, I386_REG_EAX);
 						emit_trip(STORE, *(fst_opr + *inst++), FALSE, I386_REG_EAX);
-					}
-					else
+					} else
 					{
 						bool addr;
 
-						assert (*inst == 0x50);  /* register mode: R0 */
+						assert(0x50 == *inst);  /* register mode: R0 */
 						inst++;
-						if (*inst == VXT_VAL || *inst == VXT_ADDR)
+						if ((VXT_VAL == *inst) || (VXT_ADDR == *inst))
 						{
-							addr = (*inst == VXT_VAL);
+							addr = (VXT_VAL == *inst);
 							inst++;
 							emit_trip(STORE, *(fst_opr + *inst++), addr, I386_REG_EAX);
 						}
-						else if (*inst == VXT_REG)
+						else if (VXT_REG == *inst)
 						{
 							unsigned char	reg;
 
@@ -516,49 +512,44 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 								code_buf[code_idx++] = modrm_byte.byte;
 							}
 							inst++;
-						}
-						else
-							GTMASSERT;
+						} else
+							assertpro(FALSE && *inst);
 					}
-				}
-				else if (*inst == VXT_VAL)
+				} else if (VXT_VAL == *inst)
 				{
 					inst++;
 					emit_trip(LOAD, *(fst_opr + *inst++), TRUE, I386_REG_EDX);
-					assert (*inst == VXT_REG);
+					assert(VXT_REG == *inst);
 					inst++;
-					assert (*inst == 0x51);  /* register mode: R1 */
+					assert(0x51 == *inst);  /* register mode: R1 */
 					inst++;
-				}
-				else
-					GTMASSERT;
+				} else
+					assertpro(FALSE && *inst);
 				break;
 			case VXT_IREPAB:
-				assert (*inst == VXT_VAL);
+				assert(VXT_VAL == *inst);
 				inst += 2;
 				emit_trip(PUSH_ADDRESS, *lst_opr, TRUE, 0);
 				break;
 			case VXI_PUSHAB:
-				if (*inst == VXT_JMP)
+				if (VXT_JMP == *inst)
 				{
 					inst += 2;
 					emit_pcrel(PUSH_ADDRESS, 0);
-				}
-				else if (*inst == VXT_VAL)
+				} else if (VXT_VAL == *inst)
 				{
 					inst++;
 					emit_trip(PUSH_ADDRESS, *(fst_opr + *inst++), TRUE, 0);
-				}
-				else
-					GTMASSERT;
+				} else
+					assertpro(FALSE && *inst);
 				break;
 			case VXT_IREPL:
-				assert (*inst == VXT_VAL);
+				assert(VXT_VAL == *inst);
 				inst += 2;
 				emit_trip(PUSH, *lst_opr, TRUE, 0);
 				break;
 			case VXI_PUSHL:
-				if (*inst == VXT_LIT)
+				if (VXT_LIT == *inst)
 				{
 					int4	lit;
 
@@ -575,22 +566,19 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						*((int4 *)&code_buf[code_idx]) = lit;
 						code_idx += SIZEOF(int4);
 					}
-				}
-				else if (*inst == VXT_ADDR)
+				} else if (VXT_ADDR == *inst)
 				{
 					inst++;
 					emit_trip(PUSH, *(fst_opr + *inst++), FALSE, 0);
-				}
-				else if (*inst == VXT_VAL)
+				} else if (VXT_VAL == *inst)
 				{
 					inst++;
 					emit_trip(PUSH, *(fst_opr + *inst++), TRUE, 0);
-				}
-				else
-					GTMASSERT;
+				} else
+					assertpro(FALSE && *inst);
 				break;
 			case VXI_TSTL:
-				if (*inst == VXT_VAL)
+				if (VXT_VAL == *inst)
 				{
 				  inst++;
 				  emit_trip(TEST, *(fst_opr + *inst++), TRUE, 0);
@@ -603,19 +591,18 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				    inst++;
 				    *((int4 *)&code_buf[code_idx]) = 0;	/* 32 bit immediate 0 */
 				    code_idx += SIZEOF(int4);
-				}
-				else
-				  GTMASSERT;
+				} else
+					assertpro(FALSE && *inst);
 				break;
 			default:
-				GTMASSERT;
+				assertpro(FALSE && sav_in);
 		}
 		break;
 	default:
-		GTMASSERT;
+		assertpro(FALSE && cg_phase);
 		break;
 	}
-	assert (code_idx < BUFFERED_CODE_SIZE);
+	assert(code_idx < BUFFERED_CODE_SIZE);
 	if (cg_phase == CGP_MACHINE)
 	{
          	generated_code_size += code_idx;
@@ -639,18 +626,18 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 void emit_jmp(short vax_in, short **instp)
 {
 
-	assert (jmp_offset != 0);
+	assert(jmp_offset != 0);
 	jmp_offset -= code_idx * SIZEOF(code_buf[0]);	/* size of this particular instruction */
 
-	assert (**instp == VXT_JMP);
+	assert(**instp == VXT_JMP);
 	*instp += 1;
-	assert (**instp == 1);
+	assert(**instp == 1);
 	*instp += 1;
 	if (jmp_offset == 0)
 	{
 		code_buf[code_idx++] = I386_INS_NOP__;
 	}
-	else if ((jmp_offset - 2) >= -128  &&  (jmp_offset - 2) <= 127 &&
+	else if ((jmp_offset - 2) >= -128  && (jmp_offset - 2) <= 127 &&
 			JMP_LONG_INST_SIZE != call_4lcldo_variant)
 	{
 		jmp_offset -= 2;
@@ -681,7 +668,7 @@ void emit_jmp(short vax_in, short **instp)
 			code_buf[code_idx++] = I386_INS_JMP_Jb;
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && vax_in);
 			break;
 		}
 		code_buf[code_idx++] = jmp_offset & 0xff;
@@ -719,7 +706,7 @@ void emit_jmp(short vax_in, short **instp)
 				code_buf[code_idx++] = I386_INS_JNZ_Jv;
 				break;
 			default:
-				GTMASSERT;
+				assertpro(FALSE && vax_in);
 				break;
 			}
 		}
@@ -836,7 +823,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 				}
 				break;
 			default:
-				GTMASSERT;
+				assertpro(FALSE && ct->opcode);
 				break;
 			}
 			break;
@@ -845,8 +832,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 			assert(val_output);
 			offset = sa_temps_offset[opr->oprclass];
 			offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-			if (offset < 0  &&  offset > 65535)
-				GTMASSERT;
+			assertpro((0 <= offset) && (65535 >= offset));
 			emit_op_base_offset(op, I386_REG_EDI, offset, use_reg);
 			break;
 		case TCAD_REF:
@@ -854,9 +840,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 		case TVAR_REF:
 			offset = sa_temps_offset[opr->oprclass];
 			offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-			if (offset < 0  &&  offset > 65535)
-				GTMASSERT;
-
+			assertpro((0 <= offset) && (65535 >= offset));
 			if (opr->oprclass == TVAR_REF)
 				base_reg = I386_REG_ESI;
 			else
@@ -1036,7 +1020,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 				}
 				break;
 			default:
-				GTMASSERT;
+				assertpro(FALSE && ct->opcode);
 				break;
 			}
 			break;
@@ -1045,8 +1029,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 			assert(val_output);
 			offset = sa_temps_offset[opr->oprclass];
 			offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-			if (offset < 0  &&  offset > 65535)
-				GTMASSERT;
+			assertpro((0 <= offset) && (65535 >= offset));
 			emit_op_base_offset(op, I386_REG_EDI, offset, use_reg);
 			break;
 		case TCAD_REF:
@@ -1054,8 +1037,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 		case TVAR_REF:
 			offset = sa_temps_offset[opr->oprclass];
 			offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-			if (offset < 0  &&  offset > 65535)
-				GTMASSERT;
+			assertpro((0 <= offset) && (65535 >= offset));
 			if (opr->oprclass == TVAR_REF)
 				base_reg = I386_REG_ESI;
 			else
@@ -1064,7 +1046,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 			switch (op)
 			{
 			case JUMP:
-				assert (use_reg == 0);
+				assert(use_reg == 0);
 				if (val_output)
 				{
 					code_buf[code_idx++] = I386_INS_MOV_Gv_Ev;
@@ -1150,12 +1132,12 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 			}
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && opr->oprclass);
 			break;
 		}
 		break;
 	default:
-		GTMASSERT;
+		assertpro(FALSE && cg_phase);
 		break;
 	}
 }
@@ -1295,13 +1277,23 @@ unsigned char i386_reg(unsigned char vax_reg)
 
 	switch (vax_reg & 0xf)	/* mask out VAX register mode field */
 	{
-	case 0:		reg = I386_REG_EAX;	break;
-	case 1:		reg = I386_REG_EDX;	break;
-	case 8:		reg = I386_REG_ESI;	break;
-	case 9:		reg = I386_REG_EDI;	break;
-	case 11:	reg = I386_REG_EBX;	break;
+	case 0:
+		reg = I386_REG_EAX;
+		break;
+	case 1:
+		reg = I386_REG_EDX;
+		break;
+	case 8:
+		reg = I386_REG_ESI;
+		break;
+	case 9:
+		reg = I386_REG_EDI;
+		break;
+	case 11:
+		reg = I386_REG_EBX;
+		break;
 	default:
-		GTMASSERT;
+		assertpro(FALSE && (vax_reg & 0xf));
 		break;
 	}
 

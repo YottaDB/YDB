@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,6 @@
 #include "gtm_inet.h"
 #include "io.h"
 #include "gt_timer.h"
-#include "iotcpdef.h"
 #include "iosocketdef.h"
 
 int	iosocket_read(mval *v, int4 timeout)

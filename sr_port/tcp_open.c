@@ -38,14 +38,13 @@
 #include "gtm_string.h"
 #include "gtm_ctype.h"
 #include "gtm_stdio.h"
+#include "gtm_select.h"
+#include "eintr_wrappers.h"
 
 #include "copy.h"
 #include "gt_timer.h"
 #include "io.h"
 #include "iotimer.h"
-#include "iotcp_select.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "io_params.h"
 #include "util.h"
 #include "gtmmsg.h"
@@ -61,12 +60,9 @@
 const char *hstrerror(int err);
 #endif
 
-GBLREF tcp_library_struct       tcp_routines;
-
 error_def(ERR_GETADDRINFO);
 error_def(ERR_GETNAMEINFO);
 error_def(ERR_INVADDRSPEC);
-error_def(ERR_IPADDRREQ);
 error_def(ERR_SETSOCKOPTERR);
 error_def(ERR_SOCKACPT);
 error_def(ERR_SOCKINIT);
@@ -148,11 +144,11 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		int 		lsock;
 
 		af = ((GTM_IPV6_SUPPORTED && !ipv4_only) ? AF_INET6 : AF_INET);
-		lsock = tcp_routines.aa_socket(af, SOCK_STREAM, IPPROTO_TCP);
+		lsock = socket(af, SOCK_STREAM, IPPROTO_TCP);
 		if (-1 == lsock)
 		{
 			af = AF_INET;
-			if (-1 == (lsock = tcp_routines.aa_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)))
+			if (-1 == (lsock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)))
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);
@@ -174,10 +170,10 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 
 		}
 		/* allow multiple connections to the same IP address */
-		if (-1 == tcp_routines.aa_setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
+		if (-1 == setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
 		{
 			save_errno = errno;
-			(void)tcp_routines.aa_close(lsock);
+			(void)close(lsock);
 			errptr = (char *)STRERROR(save_errno);
          		errlen = STRLEN(errptr);
                 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
@@ -185,20 +181,20 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			assert(FALSE);
 			return -1;
 		}
-		if (-1 == tcp_routines.aa_bind(lsock, ai_ptr->ai_addr, ai_ptr->ai_addrlen))
+		if (-1 == bind(lsock, ai_ptr->ai_addr, ai_ptr->ai_addrlen))
 		{
 			save_errno = errno;
-			(void)tcp_routines.aa_close(lsock);
+			(void)close(lsock);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				   LEN_AND_LIT("bind()"), CALLFROM, save_errno);
 			return -1;
 		}
 		freeaddrinfo(ai_ptr);
 		/* establish a queue of length MAX_CONN_PENDING for incoming connections */
-		if (-1 == tcp_routines.aa_listen(lsock, MAX_CONN_PENDING))
+		if (-1 == listen(lsock, MAX_CONN_PENDING))
 		{
 			save_errno = errno;
-			(void)tcp_routines.aa_close(lsock);
+			(void)close(lsock);
 			errptr = (char *)STRERROR(save_errno);
 			errlen = STRLEN(errptr);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKLISTEN, 0, ERR_TEXT, 2, errlen, errptr);
@@ -213,6 +209,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			utimeout.tv_sec = timeout;
 			utimeout.tv_usec = 0;
 		}
+		assertpro(FD_SETSIZE > lsock);
 		FD_ZERO(&tcp_fd);
 		while (TRUE)
 		{
@@ -223,7 +220,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				 */
 				FD_SET(lsock, &tcp_fd);
                                 save_utimeout = utimeout;
-				rv = tcp_routines.aa_select(lsock + 1, (void *)&tcp_fd, (void *)0, (void *)0,
+				rv = select(lsock + 1, (void *)&tcp_fd, (void *)0, (void *)0,
 					(NO_M_TIMEOUT == timeout) ? (struct timeval *)0 : &utimeout);
 				save_errno = errno;
                                 utimeout = save_utimeout;
@@ -242,20 +239,20 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			}
 			if (0 == rv)
 			{
-				(void)tcp_routines.aa_close(lsock);
+				(void)close(lsock);
 				util_out_print("Listening timed out.\n", TRUE);
 				assert(FALSE);
 				return -1;
 			} else  if (0 > rv)
 			{
-				(void)tcp_routines.aa_close(lsock);
+				(void)close(lsock);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					   LEN_AND_LIT("select()"), CALLFROM, save_errno);
 				assert(FALSE);
 				return -1;
 			}
 			size = SIZEOF(struct sockaddr_storage);
-			sock = tcp_routines.aa_accept(lsock, (struct sockaddr*)(&peer), &size);
+			ACCEPT_SOCKET(lsock, (struct sockaddr*)(&peer), &size, sock);
 			if (FD_INVALID == sock)
 			{
 				save_errno = errno;
@@ -263,7 +260,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				if (ENOBUFS == save_errno)
 					continue;
 #				endif
-				(void)tcp_routines.aa_close(lsock);
+				(void)close(lsock);
 				errptr = (char *)STRERROR(save_errno);
 				errlen = STRLEN(errptr);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKACPT, 0, ERR_TEXT, 2, errlen, errptr);
@@ -286,7 +283,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			 * temp_addr(remote address), so the entire check should be removed
 			 */
 		}
-		(void)tcp_routines.aa_close(lsock);
+		(void)close(lsock);
 	} else
 	{	/* client side (connection side) */
 		if (NO_M_TIMEOUT != timeout)
@@ -300,11 +297,11 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		do
 		{
 			if (1 != temp_1)
-				tcp_routines.aa_close(sock);
+				close(sock);
 			assert(NULL != remote_ai_head);
 			for (remote_ai_ptr = remote_ai_head; NULL != remote_ai_ptr; remote_ai_ptr = remote_ai_ptr->ai_next)
 			{
-				sock = tcp_routines.aa_socket(remote_ai_ptr->ai_family, remote_ai_ptr->ai_socktype,
+				sock = socket(remote_ai_ptr->ai_family, remote_ai_ptr->ai_socktype,
 							      remote_ai_ptr->ai_protocol);
 				if (FD_INVALID != sock)
 					break;
@@ -319,10 +316,10 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				return -1;
 			}
 			/* Allow multiple connections to the same IP address */
-			if (-1 == tcp_routines.aa_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
+			if (-1 == setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
 			{
 				save_errno = errno;
-				(void)tcp_routines.aa_close(sock);
+				(void)close(sock);
 				errptr = (char *)STRERROR(save_errno);
 				errlen = STRLEN(errptr);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
@@ -330,13 +327,13 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				assert(FALSE);
 				return -1;
 			}
-			temp_1 = tcp_routines.aa_connect(sock, remote_ai_ptr->ai_addr, remote_ai_ptr->ai_addrlen);
+			CONNECT_SOCKET(sock, remote_ai_ptr->ai_addr, remote_ai_ptr->ai_addrlen, temp_1);
 			save_errno = errno;
-			/* tcp_routines.aa_connect == gtm_connect should have handled EINTR. Assert that */
+			/* CONNECT_SOCKET should have handled EINTR. Assert that */
 			assert((0 <= temp_1) || (EINTR != save_errno));
 			if ((0 > temp_1) && (ECONNREFUSED != save_errno))
 			{
-				(void)tcp_routines.aa_close(sock);
+				(void)close(sock);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					   LEN_AND_LIT("connect()"), CALLFROM, save_errno);
 				assert(FALSE);
@@ -355,7 +352,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		freeaddrinfo(remote_ai_head);
 		if (0 > temp_1) /* out of time */
 		{
-			tcp_routines.aa_close(sock);
+			close(sock);
 			util_out_print("Connection timed out.", TRUE);
 			assert(FALSE);
 			return -1;

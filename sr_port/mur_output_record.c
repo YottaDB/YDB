@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,7 +99,9 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 	blk_hdr_ptr_t		aimg_blk_ptr;
 	int			in_len, gtmcrypt_errno ;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(mur_options.update);
 	rec = rctl->mur_desc->jnlrec;
 	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
@@ -155,6 +157,16 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 			)
 		}
 	}
+	/* Assert that TREF(gd_targ_gvnh_reg) is NULL for every update that journal recovery/rollback plays forward;
+	 * This is necessary to ensure every update is played in only the database file where the journal record is seen
+	 * instead of across all regions that span the particular global reference. For example if ^a(1) spans db files
+	 * a.dat and b.dat, and a KILL ^a(1) is done at the user level, we would see KILL ^a(1) journal records in a.mjl
+	 * and b.mjl. When journal recovery processes the journal record in a.mjl, it should do the kill only in a.dat
+	 * When it gets to the same journal record in b.mjl, it would do the same kill in b.dat and effectively complete
+	 * the user level KILL ^a(1). If instead recovery does the KILL across all spanned regions, we would be basically
+	 * doing duplicate work let alone do it out-of-order since recovery goes region by region for the most part.
+	 */
+	assert(NULL == TREF(gd_targ_gvnh_reg));
 	if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 	{	/* TP and non-TP has same format */
 		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
@@ -360,9 +372,10 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 			} else
 			{
 				if (SS_NORMAL != csa->jnl->status)
-					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), csa->jnl->status);
+					rts_error_csa(CSA_ARG(csa)
+						VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), csa->jnl->status);
 				else
-					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
 			}
 			if (!was_crit)
 				rel_crit(reg);

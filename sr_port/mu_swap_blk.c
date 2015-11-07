@@ -594,7 +594,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 }
 
 /***************************************************************
-Checks if a key is present in exclude global lists.
+Checks if an input global name is present in exclude global lists.
 	curr_key_ptr = Key pointer
 	key_len = curr_key_ptr length excludeing nulls
 	exclude_glist_ptr = list of globals in -EXCLUDE option
@@ -608,7 +608,8 @@ boolean_t in_exclude_list(unsigned char *curr_key_ptr, int key_len, glist *exclu
 
 	for (gl_ptr = exclude_glist_ptr->next; gl_ptr; gl_ptr = gl_ptr->next)
 	{
-		if (gl_ptr->name.str.len == key_len && 0 == memcmp(gl_ptr->name.str.addr, curr_key_ptr, gl_ptr->name.str.len))
+		if ((GNAME(gl_ptr).len == key_len)
+				&& (0 == memcmp(GNAME(gl_ptr).addr, curr_key_ptr, key_len)))
 			return TRUE;
 	}
 	return FALSE;

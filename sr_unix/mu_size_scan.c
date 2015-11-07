@@ -45,6 +45,7 @@
 #include "sleep_cnt.h"
 #include "wcs_sleep.h"
 #include "memcoherency.h"
+#include "change_reg.h"
 
 #include "gtm_time.h"
 #include "mvalconv.h"
@@ -109,7 +110,7 @@ GBLDEF	INTPTR_T		saveoff[MAX_BT_DEPTH + 1];
 enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skiprecs);
 enum cdb_sc read_block(block_id nBlkId, sm_uc_ptr_t *pBlkBase_ptr, int *nLevl_ptr, int desired_levl);
 
-int4 mu_size_scan(mval *gn, int4 level)
+int4 mu_size_scan(glist *gl_ptr, int4 level)
 {
 	enum cdb_sc		status;
 	trans_num		ret_tn;
@@ -126,10 +127,11 @@ int4 mu_size_scan(mval *gn, int4 level)
 
 	SETUP_THREADGBL_ACCESS;
 	inctn_opcode = inctn_invalid_op;
-	op_gvname(VARLSTCNT(1) gn);
+	DO_OP_GVNAME(gl_ptr);
+		/* sets gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr */
 	if (0 == gv_target->root)
 	{	/* Global does not exist (online rollback). Not an error. */
-		gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
 		return EXIT_NRM;
 	}
 	gv_target->alt_hist->depth = MAX_BT_DEPTH;	/* initialize: don't copy to saveoff if restart before a single success */
@@ -159,7 +161,7 @@ int4 mu_size_scan(mval *gn, int4 level)
 			ABORT_TRANS_IF_GBL_EXIST_NOMORE(lcl_t_tries, tn_aborted);
 			if (tn_aborted)
 			{	/* Global does not exist (online rollback). Not an error. */
-				gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
 				return EXIT_NRM;
 			}
 			continue;
@@ -170,7 +172,7 @@ int4 mu_size_scan(mval *gn, int4 level)
 		level += nLevl;
 	if (level < 0 || nLevl < level)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_MUSIZEINVARG, 2, LEN_AND_LIT("HEURISTIC.LEVEL"));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSIZEINVARG, 2, LEN_AND_LIT("HEURISTIC.LEVEL"));
 		return EXIT_ERR;
 	}
 	targ_levl = level;
@@ -192,7 +194,7 @@ int4 mu_size_scan(mval *gn, int4 level)
 			ABORT_TRANS_IF_GBL_EXIST_NOMORE(lcl_t_tries, tn_aborted);
 			if (tn_aborted)
 			{	/* Global does not exist (online rollback). Not an error. */
-				gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
 				return EXIT_NRM;
 			}
 			/* update saveoff */

@@ -16,7 +16,6 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/time.h>
-#include <sys/un.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <sys/param.h>
@@ -40,6 +39,7 @@
 #include "eintr_wrappers.h"
 #include "util.h"
 #include "send_msg.h"
+#include "gtm_un.h"
 #include "gtmmsg.h"
 #include "wcs_backoff.h"
 #include "trans_log_name.h"
@@ -64,13 +64,13 @@ GBLREF int			server_start_tries;
 GBLREF boolean_t		gtmsecshr_sock_init_done;
 GBLREF uint4			process_id;
 GBLREF ipcs_mesg		db_ipcs;
+GBLREF char			gtm_dist[GTM_PATH_MAX];
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
 
 static int			secshr_sem;
 static boolean_t		gtmsecshr_file_check_done;
-static mstr			gtmsecshr_logname;
 static char			gtmsecshr_path[GTM_PATH_MAX];
 static volatile boolean_t	client_timer_popped;
 static unsigned long		cur_seqno;
@@ -179,6 +179,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	char			*gtm_tmp_ptr;
 	struct stat		stat_buf;
 	struct shmid_ds		shm_info;
+	int			len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -191,15 +192,9 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	timer_id = (TID)send_mesg2gtmsecshr;
 	if (!gtmsecshr_file_check_done)
 	{
-		gtmsecshr_logname.addr = GTMSECSHR_PATH;
-                gtmsecshr_logname.len = SIZEOF(GTMSECSHR_PATH);
-		status = TRANS_LOG_NAME(&gtmsecshr_logname, &gtmsecshr_pathname, gtmsecshr_path, SIZEOF(gtmsecshr_path),
-					dont_sendmsg_on_log2long);
-                if (SS_NORMAL != status)
+		len = STRLEN(gtm_dist);
+		if (!len)
 		{
-			if (SS_LOG2LONG == status)
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3,
-					gtmsecshr_logname.len, gtmsecshr_logname.addr, SIZEOF(gtmsecshr_path) - 1);
                         send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3,
 					RTS_ERROR_TEXT("Client"), process_id, ERR_TEXT, 2,
 					RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
@@ -207,6 +202,14 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 					RTS_ERROR_TEXT("Client"), process_id, ERR_TEXT, 2,
 					RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
 		}
+		memcpy(gtmsecshr_path, gtm_dist, len);
+		gtmsecshr_path[len] =  '/';
+		memcpy(gtmsecshr_path + len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
+		gtmsecshr_pathname.addr = gtmsecshr_path;
+		gtmsecshr_pathname.len = len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
+		if (GTM_PATH_MAX <= gtmsecshr_pathname.len)
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("gtmsecshr path too long"));
 		gtmsecshr_pathname.addr[gtmsecshr_pathname.len] = '\0';
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,

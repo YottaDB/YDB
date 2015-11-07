@@ -82,7 +82,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 		csa = &FILE_INFO(jpc->region)->s_addrs;
 		break;
 	default:
-		GTMASSERT;
+		assertpro((dba_mm == jpc->region->dyn.addr->acc_meth) || (dba_bg == jpc->region->dyn.addr->acc_meth));
 	}
 	csd = csa->hdr;
 	assert(csa == cs_addrs && csd == cs_data);
@@ -129,7 +129,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					 * retrying the writes. Therefore, we make the NOSPACEEXT a warning in this case.
 					 */
 					SETUP_THREADGBL_ACCESS;
-					if (!ANTICIPATORY_FREEZE_ENABLED(csa))
+					if (!INST_FREEZE_ON_NOSPC_ENABLED(csa))
 					{
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_NOSPACEEXT, 4,
 								JNL_LEN_STR(csd), new_blocks, avail_blocks);
@@ -305,7 +305,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 
 CONDITION_HANDLER(jnl_file_autoswitch_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	assert(in_jnl_file_autoswitch);
 	in_jnl_file_autoswitch = FALSE;
 	jgbl.dont_reset_gbl_jrec_time = jgbl.save_dont_reset_gbl_jrec_time;

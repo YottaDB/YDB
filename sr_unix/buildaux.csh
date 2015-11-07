@@ -153,7 +153,7 @@ if ( $buildaux_gde == 1 ) then
 		chmod 664 *.m *.o
 
 		\rm -f *.m *.o	# use \rm to avoid rm from asking for confirmation (in case it has been aliased so)
-		cp $gtm_pct/*.m .
+		cp -p $gtm_pct/*.m .
 		switch ($gt_image)  # potentially all 3 versions could be in $gtm_pct .. we only need one, delete the others
 		    case "pro":
 			rm -f GTMDefinedTypesInitBta.m >& /dev/null
@@ -189,7 +189,7 @@ if ( $buildaux_gde == 1 ) then
 		if (0 != $status) @ buildaux_status = $status
 		if ($buildaux_status != 0) then
 			echo "buildaux-E-compile_M, Failed to compile .m programs in M mode" \
-				>> $gtm_log/error.`basename $gtm_exe`.log
+				>> $gtm_log/error.${gtm_exe:t}.log
 		endif
 
 		source $gtm_tools/set_library_path.csh
@@ -213,7 +213,7 @@ if ( $buildaux_gde == 1 ) then
 			if (0 != $status) @ buildaux_status = $status
 			if ($buildaux_status != 0) then
 				echo "buildaux-E-compile_UTF8, Failed to compile .m programs in UTF-8 mode" \
-					>> $gtm_log/error.`basename $gtm_exe`.log
+					>> $gtm_log/error.${gtm_exe:t}.log
 			endif
 			cd ..
 			setenv LC_CTYPE C
@@ -241,7 +241,7 @@ if ( $buildaux_dse == 1 ) then
 	if ( $status != 0  ||  ! -x $3/dse ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkdse, Failed to link dse (see ${dollar_sign}gtm_map/dse.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable +as mpas $3/dse
@@ -263,7 +263,7 @@ if ( $buildaux_geteuid == 1 ) then
 	if ( $status != 0  ||  ! -x $3/geteuid ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgeteuid, Failed to link geteuid (see ${dollar_sign}gtm_map/geteuid.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable $3/geteuid
@@ -286,7 +286,7 @@ if ( $buildaux_gtmsecshr == 1 ) then
 		if ( $status != 0  ||  ! -x $3/${file} ) then
 			set buildaux_status = `expr $buildaux_status + 1`
 			echo "buildaux-E-link${file}, Failed to link ${file} (see ${dollar_sign}gtm_map/${file}.map)" \
-				>> $gtm_log/error.`basename $gtm_exe`.log
+				>> $gtm_log/error.${gtm_exe:t}.log
 		else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 			if ( "dbg" == $gt_image ) then
 				chatr +dbg enable +as mpas $3/${file}
@@ -318,7 +318,7 @@ if ( $buildaux_lke == 1 ) then
 	if ( $status != 0  ||  ! -x $3/lke ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linklke, Failed to link lke (see ${dollar_sign}gtm_map/lke.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable +as mpas $3/lke
@@ -339,7 +339,7 @@ if ( $buildaux_mupip == 1 ) then
 	if ( $status != 0  ||  ! -x $3/mupip ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkmupip, Failed to link mupip (see ${dollar_sign}gtm_map/mupip.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable +as mpas $3/mupip
@@ -362,7 +362,7 @@ if ( $buildaux_gtcm_server == 1 ) then
 	if ( $status != 0  ||  ! -x $3/gtcm_server) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgtcm_server, Failed to link gtcm_server (see ${dollar_sign}gtm_map/gtcm_server.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable +as mpas $3/gtcm_server
@@ -386,7 +386,7 @@ if ( $buildaux_gtcm_gnp_server == 1 ) then
 	if ( $status != 0  ||  ! -x $3/gtcm_gnp_server) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgtcm_gnp_server, Failed to link gtcm_gnp_server" \
-			"(see ${dollar_sign}gtm_map/gtcm_gnp_server.map)" >> $gtm_log/error.`basename $gtm_exe`.log
+			"(see ${dollar_sign}gtm_map/gtcm_gnp_server.map)" >> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable +as mpas $3/gtcm_gnp_server
@@ -410,7 +410,7 @@ if ( $buildaux_gtcm_play == 1 ) then
 	if ( $status != 0  ||  ! -x $3/gtcm_play) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgtcm_play, Failed to link gtcm_play (see ${dollar_sign}gtm_map/gtcm_play.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable +as mpas $3/gtcm_play
@@ -433,7 +433,7 @@ if ( $buildaux_gtcm_pkdisp == 1 ) then
 	if ( $status != 0  ||  ! -x $3/gtcm_pkdisp) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgtcm_pkdisp, Failed to link gtcm_pkdisp (see ${dollar_sign}gtm_map/gtcm_pkdisp.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable $3/gtcm_pkdisp
@@ -454,7 +454,7 @@ if ( $buildaux_gtcm_shmclean == 1 ) then
 	if ( $status != 0  ||  ! -x $3/gtcm_shmclean) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgtcm_shmclean, Failed to link gtcm_shmclean (see ${dollar_sign}gtm_map/gtcm_shmclean.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable $3/gtcm_shmclean
@@ -474,7 +474,7 @@ if ( $buildaux_semstat2 == 1 ) then
 	if ( $status != 0  ||  ! -x $3/semstat2 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linksemstat2, Failed to link semstat2 (see ${dollar_sign}gtm_map/semstat2.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable $3/semstat2
@@ -492,7 +492,7 @@ if ( $buildaux_ftok == 1 ) then
 	if ( $status != 0  ||  ! -x $3/ftok ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkftok, Failed to link ftok (see ${dollar_sign}gtm_map/ftok.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable $3/ftok
@@ -513,7 +513,7 @@ if ( $buildaux_dbcertify == 1 ) then
 	if ( $status != 0  ||  ! -x $3/dbcertify ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkdbcertify, Failed to link dbcertify (see ${dollar_sign}gtm_map/dbcertify.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 		if ( "dbg" == $gt_image ) then
 			chatr +dbg enable +as mpas $3/dbcertify
@@ -530,51 +530,84 @@ if ($buildaux_gtmcrypt == 1) then
 		set plugin_build_type=""
 		switch ($2)
 			case "[bB]*":
-				set plugin_build_type="p"
+				set plugin_build_type="PRO"
 				breaksw
 			case "[pP]*":
-				set plugin_build_type="p"
+				set plugin_build_type="PRO"
 				breaksw
 			default:
-				set plugin_build_type="d"
+				set plugin_build_type="DEBUG"
 				breaksw
 		endsw
-		rm -rf $gtm_dist/plugin/gtmcrypt
-		rm -rf $gtm_dist/plugin/
-		mkdir -p $gtm_dist/plugin/gtmcrypt >&! /dev/null
-		setenv gtm_dist_plugin $gtm_dist/plugin/gtmcrypt
-		cp -pf $gtm_src/gtmcrypt_*ref.c $gtm_src/maskpass.c $gtm_dist_plugin >&! /dev/null
-		cp -pf $gtm_inc/gtmcrypt_*ref.h $gtm_inc/gtmcrypt_interface.h $gtm_dist_plugin >&! /dev/null
-		cp -pf $gtm_tools/build.sh $gtm_tools/install.sh $gtm_tools/add_db_key.sh $gtm_dist_plugin >&! /dev/null
-		cp -pf $gtm_tools/encrypt_sign_db_key.sh $gtm_tools/gen_keypair.sh $gtm_dist_plugin >&! /dev/null
-		cp -pf $gtm_tools/gen_sym_hash.sh $gtm_tools/gen_sym_key.sh $gtm_dist_plugin >&! /dev/null
-		cp -pf $gtm_tools/import_and_sign_key.sh $gtm_tools/pinentry-gtm.sh $gtm_dist_plugin >&! /dev/null
-		cp -pf $gtm_tools/show_install_config.sh $gtm_dist_plugin >&! /dev/null
-		cp -pf $gtm_pct/pinentry.m $gtm_dist_plugin >&! /dev/null
-		chmod +x $gtm_dist_plugin/*.sh
-		pushd $gtm_dist_plugin >&! /dev/null
-		# For, non-AIX platforms, move the libgcrypt entry to the end of $supported_list. This way, build.sh will always
-		# build maskpass with libgcrypt dependency rather than libcrypto dependency on non-AIX platforms.
-		if ($HOSTOS != "AIX") then
-			set supported_list_reorder = `echo $supported_list | sed 's/gcrypt//;s/$/ gcrypt/'`
-			set supported_list = `echo $supported_list_reorder`
+		# First copy all the necessary source and script files to $gtm_dist/plugin/gtmcrypt
+		set helpers = "add_db_key,encrypt_sign_db_key,gen_keypair,gen_sym_hash,gen_sym_key,import_and_sign_key"
+		set helpers = "$helpers,pinentry-gtm,show_install_config"
+
+		set srcfiles = "gtmcrypt_dbk_ref.c gtmcrypt_pk_ref.c gtmcrypt_sym_ref.c gtmcrypt_ref.c gtm_tls_impl.c maskpass.c"
+		set srcfiles = "$srcfiles gtmcrypt_util.c"
+
+		set incfiles = "gtmcrypt_interface.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_pk_ref.h gtmcrypt_ref.h"
+		set incfiles = "$incfiles gtmcrypt_util.h gtm_tls_impl.h gtm_tls_interface.h"
+
+		set gtm_dist_plugin = $gtm_dist/plugin
+		rm -rf $gtm_dist_plugin
+		mkdir -p $gtm_dist_plugin/gtmcrypt
+		set srcfile_list = ($srcfiles)
+		eval cp -pf '${srcfile_list:gs||'$gtm_src'/|} $gtm_dist_plugin/gtmcrypt'
+
+		set incfile_list = ($incfiles)
+		eval cp -pf '${incfile_list:gs||'$gtm_inc'/|} $gtm_dist_plugin/gtmcrypt'
+
+		cp -pf $gtm_tools/{$helpers}.sh $gtm_dist_plugin/gtmcrypt
+		cp -pf $gtm_pct/pinentry.m $gtm_dist_plugin/gtmcrypt
+		cp -pf $gtm_tools/Makefile.mk $gtm_dist_plugin/gtmcrypt/Makefile
+		chmod +x $gtm_dist_plugin/gtmcrypt/*.sh
+		#
+		pushd $gtm_dist_plugin/gtmcrypt
+		if ("HP-UX" == "$HOSTOS") then
+			set make = "gmake"
+		else
+			set make = "make"
+		endif
+		# libssl.so isn't available on pfloyd. Skip building SSL/TLS reference implementation library on pfloyd. This is
+		# okay since pfloyd is AIX 5.3 which isn't a supported AIX version anyways.
+		set host=$HOST:r:r:r
+		if ($host !~ pfloyd) then
+			$make gtmtls
+			if (0 != $status) then
+				set buildaux_status = `expr $buildaux_status + 1`
+				echo "buildaux-E-tls, failed to build libgtmtls.so." >> $gtm_log/error.${gtm_exe:t}.log
+			endif
+		endif
+		# On tuatara, atlhxit1 and atlhxit2 Libgcrypt version is too low to support FIPS mode. Add necessary flags to
+		# Makefile to tell the plugin to build without FIPS support.
+		if ($host =~ {tuatara,atlhxit1,atlhxit2}) then
+			set fips_flag = "gcrypt_nofips=1"
+		else
+			set fips_flag = ""
 		endif
 		# Build all possible encryption libraries based on what encryption libraries are supported in this platform.
 		foreach supported_lib ($supported_list)
 			foreach algorithm ("AES256CFB" "BLOWFISHCFB")
 				if ("gcrypt" == "$supported_lib" && "BLOWFISHCFB" == "$algorithm") continue
 				echo "####### Building encryption plugin using $supported_lib with $algorithm algorithm #########"
-				sh -x $gtm_dist_plugin/build.sh $supported_lib $plugin_build_type $algorithm
+				$make gtmcrypt image=$plugin_build_type thirdparty=$supported_lib algo=$algorithm $fips_flag
 				set bstat = $status
 				echo ""
 				if (0 != $bstat) then
 					set buildaux_status = `expr $buildaux_status + 1`
-					echo "buildaux-E-libgtmcrypt, failed to build gtmcrypt and/or helper scripts. See 'map'	\
-						files in ${dollar_sign}gtm_dist/plugin/gtmcrypt for more details" 		\
-									>> $gtm_log/error.`basename $gtm_exe`.log
+					echo "buildaux-E-libgtmcrypt, failed to build gtmcrypt and/or helper scripts."	\
+									>> $gtm_log/error.${gtm_exe:t}.log
 				endif
 			end
 		end
+		# Now that the individual libraries are built, go ahead and build the maskpass
+		$make maskpass
+		if (0 != $status) then
+			set buildaux_status = `expr $buildaux_status + 1`
+			echo "buildaux-E-maskpass, failed to build maskpass." >> $gtm_log/error.${gtm_exe:t}.log
+		endif
+		#
 		if ($gtm_verno =~ V[4-8]*) then
 			# For production builds don't do any randomizations.
 			set algorithm = "AES256CFB"
@@ -599,12 +632,17 @@ if ($buildaux_gtmcrypt == 1) then
 				set algorithm = $algorithms[$rand]
 			endif
 		endif
-		$gtm_dist_plugin/install.sh $encryption_lib $algorithm
+		$make install thirdparty=$encryption_lib algo=$algorithm
 		if (0 != $status) then
 			set buildaux_status = `expr $buildaux_status + 1`
 			echo "buildaux-E-libgtmcrypt, failed to install libgtmcrypt and/or helper scripts"		\
-						>> $gtm_log/error.`basename $gtm_exe`.log
+						>> $gtm_log/error.${gtm_exe:t}.log
 		endif
+		# Create the one time gpgagent.tab file.
+		echo "$gtm_dist_plugin/libgtmcryptutil.so" >&! $gtm_dist_plugin/gpgagent.tab
+		echo "unmaskpwd: gtm_status_t gc_mask_unmask_passwd(I:gtm_string_t*,O:gtm_string_t*[512])"	\
+							>>&! $gtm_dist_plugin/gpgagent.tab
+		#
 		popd >&! /dev/null
 	endif
 endif

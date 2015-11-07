@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,9 +61,7 @@ GBLREF	gd_region	*gv_cur_region;
 GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 
-error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVGETFAIL);
-error_def(ERR_TPRETRY);
 
 DEFINE_NSB_CONDITION_HANDLER(gvcst_get_ch)
 
@@ -72,7 +70,7 @@ boolean_t gvcst_get(mval *v)
 	boolean_t	gotit, gotspan, gotpiece, gotdummy, sn_tpwrapped;
 	boolean_t	est_first_pass;
 	mval		val_ctrl, val_piece;
-	int		gblsize, chunk_size, i, total_len, oldend, tmp_numsubs;
+	int		gblsize, i, total_len, oldend, tmp_numsubs;
 	unsigned short	numsubs;
 	sm_uc_ptr_t	sn_ptr;
 	int		debug_len;
@@ -91,12 +89,15 @@ boolean_t gvcst_get(mval *v)
 			op_tstart((IMPLICIT_TSTART), TRUE, &literal_batch, 0);
 			ESTABLISH_NORET(gvcst_get_ch, est_first_pass);
 			GVCST_ROOT_SEARCH_AND_PREP(est_first_pass);
+			/* fix up since it should only be externally counted as one get */
+			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) -1);
+			gotdummy = gvcst_get2(v, NULL);        /* Will be returned if not currently a spanning node */
 		} else
+		{
 			sn_tpwrapped = FALSE;
+			gotdummy = gotit;
+		}
 		oldend = gv_currkey->end;
-		/* fix up since it should only be externally counted as one get */
-		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) -1);
-		gotdummy = gvcst_get2(v, NULL);        /* Will be returned if not currently a spanning node */
 		APPEND_HIDDEN_SUB(gv_currkey);
 		/* fix up since it should only be externally counted as one get */
 		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) -1);
@@ -181,14 +182,14 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	for (;;)
 	{
-#if defined(DEBUG) && defined(UNIX)
+#		if defined(DEBUG) && defined(UNIX)
 		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVGETFAIL == gtm_white_box_test_case_number))
 		{
 			status = cdb_sc_blknumerr;
 			t_retry(status);
 			continue;
 		}
-#endif
+#		endif
 		if (cdb_sc_normal == (status = gvcst_search(gv_currkey, NULL)))
 		{
 			bh = gv_target->hist.h;

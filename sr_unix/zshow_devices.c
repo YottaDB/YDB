@@ -24,7 +24,6 @@
 #include "iottdef.h"
 #include "trmdef.h"
 #include "iormdef.h"
-#include "iotcpdef.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "zshow_params.h"
@@ -51,7 +50,7 @@ static readonly char	space_text[] = {' '};
 
 LITREF mstr		chset_names[];
 LITREF nametabent	dev_param_names[];
-LITREF unsigned char	dev_param_index[];
+LITREF uint4		dev_param_index[];
 LITREF zshow_index	zshow_param_index[];
 GBLREF bool		ctrlc_on;
 GBLREF io_log_name	*io_root_log_name;
@@ -133,6 +132,7 @@ void zshow_devices(zshow_out *output)
 			,"CREATED"
 		};
 	static readonly char morereadtime_text[] = "MOREREADTIME=";
+	char	*charptr;
 
 	v.mvtype = MV_STR;
 	for (l = io_root_log_name;  l != 0;  l = l->next)
@@ -287,7 +287,7 @@ void zshow_devices(zshow_out *output)
 								assert(gtm_utf8_mode);
 								break;
 							default:
-								GTMASSERT;
+								assertpro(l->iod->ichset != l->iod->ichset);
 						}
 						switch(l->iod->ochset)
 						{
@@ -303,7 +303,7 @@ void zshow_devices(zshow_out *output)
 								assert(gtm_utf8_mode);
 								break;
 							default:
-								GTMASSERT;
+								assertpro(l->iod->ochset != l->iod->ochset);
 						}
 						if (tt_ptr->mupintr)
 							ZS_STR_OUT(&v, interrupt_text);
@@ -415,7 +415,7 @@ void zshow_devices(zshow_out *output)
 								ZS_ONE_OUT(&v, space_text);
 								break;
 							default:
-								GTMASSERT;
+								assertpro(l->iod->ichset != l->iod->ichset);
 						}
 						switch(l->iod->ochset)
 						{
@@ -439,7 +439,7 @@ void zshow_devices(zshow_out *output)
 								ZS_ONE_OUT(&v, space_text);
 								break;
 							default:
-								GTMASSERT;
+								assertpro(l->iod->ochset != l->iod->ochset);
 						}
 #ifdef __MVS__
 						if (TAG_ASCII != l->iod->file_tag)
@@ -543,7 +543,7 @@ void zshow_devices(zshow_out *output)
 									ZS_ONE_OUT(&v, space_text);
 									break;
 								default:
-									GTMASSERT;
+									assertpro(l->iod->ichset != l->iod->ichset);
 							}
 							switch(l->iod->ochset)
 							{
@@ -567,7 +567,7 @@ void zshow_devices(zshow_out *output)
 									ZS_ONE_OUT(&v, space_text);
 									break;
 								default:
-									GTMASSERT;
+									assertpro(l->iod->ochset != l->iod->ochset);
 							}
 							/* socket type */
 							if (socketptr->passive)
@@ -588,7 +588,7 @@ void zshow_devices(zshow_out *output)
 							}
 							ZS_ONE_OUT(&v, space_text);
 							/* address + port */
-							if (socketptr->passive)
+							if ((socket_local != socketptr->protocol) && socketptr->passive)
 							{
 								ZS_STR_OUT(&v, port_text);
 								tmpport = (int)socketptr->local.port;
@@ -607,10 +607,13 @@ void zshow_devices(zshow_out *output)
 									v.str.len = 0;
 								}
 								zshow_output(output, &v.str);
-								ZS_ONE_OUT(&v, at_text);
-								tmpport = (int)socketptr->remote.port;
-								MV_FORCE_MVAL(&m, tmpport);
-								mval_write(output, &m, FALSE);
+								if (socket_local != socketptr->protocol)
+								{
+									ZS_ONE_OUT(&v, at_text);
+									tmpport = (int)socketptr->remote.port;
+									MV_FORCE_MVAL(&m, tmpport);
+									mval_write(output, &m, FALSE);
+								}
 								ZS_ONE_OUT(&v, space_text);
 								if (NULL != socketptr->local.saddr_ip)
 								{
@@ -622,6 +625,20 @@ void zshow_devices(zshow_out *output)
 									tmpport = (int)socketptr->local.port;
 									MV_FORCE_MVAL(&m, tmpport);
 									mval_write(output, &m, FALSE);
+								} else if (socket_local == socketptr->protocol)
+								{
+									ZS_STR_OUT(&v, local_text);
+									if (NULL != socketptr->local.sa)
+									{
+										charptr = ((struct sockaddr_un *)
+											(socketptr->local.sa))->sun_path;
+										ZS_VAR_STR_OUT(&v, charptr);
+									} else if (NULL != socketptr->remote.sa)
+									{ /* CONNECT shows remote path as LOCAL */
+										charptr = ((struct sockaddr_un *)
+											(socketptr->remote.sa))->sun_path;
+										ZS_VAR_STR_OUT(&v, charptr);
+									}
 								}
 							}
 							ZS_ONE_OUT(&v, space_text);

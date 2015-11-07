@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2013 Fidelity Information Services, Inc 	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,31 +9,47 @@
  *								*
  ****************************************************************/
 
-#define _FILE_OFFSET_BITS	64	/* Needed to compile gpgme client progs also with large file support */
-
-#include <stdio.h>			/* BYPASSOK -- Plugin doesn't have access to gtm_* header files */
-#include <string.h>			/* BYPASSOK -- see above */
-#include <unistd.h>			/* BYPASSOK -- see above */
-#include <stdlib.h>			/* BYPASSOK -- see above */
-#include <sys/stat.h>			/* BYPASSOK -- see above */
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <sys/stat.h>
 #include <ctype.h>
 #include <assert.h>
 #include <errno.h>
 #include <gpgme.h>			/* gpgme functions */
 #include <gpg-error.h>			/* gcry*_err_t */
-#include "gtmxc_types.h"		/* xc_string, xc_status_t and other callin interfaces xc_fileid */
+#include <libconfig.h>
+
+#include "gtmxc_types.h"
+
+#include "gtmcrypt_util.h"
 #include "gtmcrypt_interface.h"		/* Function prototypes for gtmcrypt*.* functions */
+
 #include "gtmcrypt_ref.h"
-#include "gtmcrypt_sym_ref.h"
 #include "gtmcrypt_dbk_ref.h"
+#include "gtmcrypt_sym_ref.h"
 #include "gtmcrypt_pk_ref.h"
 
-#define NEWLINE		0x0A
+#define NEWLINE			0x0A
 
-GBLDEF int		num_entries;
-GBLREF int		can_prompt_passwd;
-GBLDEF gtm_dbkeys_tbl	*tbl_head;
-GBLDEF gtm_dbkeys_tbl	**fast_lookup_entry;
+#define PARSE_ERROR_PREFIX	"Error parsing database key file"
+#define LOOKING_FOR_DB		0x1
+#define LOOKING_FOR_KEY		0x2
+
+#define PARSE_COMPLETED		0x1
+#define KEEP_GOING		0x2
+
+STATICDEF int			n_dbkeys;
+STATICDEF char			gc_dbk_filename[GTM_PATH_MAX];
+STATICDEF gtm_dbkeys_tbl	*tbl_head;
+STATICDEF config_t		gtmcrypt_cfg;
+GBLDEF gtm_dbkeys_tbl		**fast_lookup_entry;
+GBLDEF int			gc_dbk_file_format;
+
+GBLREF	passwd_entry_t		*gtmcrypt_pwent;
+GBLREF	int			gtmcrypt_init_flags;
 
 /* Free up the linked list of database-symmetric key association AFTER scrubbing off the contents of the raw symmetric key and
  * its corresponding hash
@@ -55,24 +71,27 @@ void gc_dbk_scrub_entries()
 		}
 #		endif
 		temp = cur->next;
-		GC_FREE_TBL_ENTRY(cur); /* Note, this will memset the symmetric_key to 0 before free'ing */
+		GTM_XCFILEID_FREE(cur->fileid);
+		memset(cur->symmetric_key, 0, SYMMETRIC_KEY_MAX);
+		memset(cur->symmetric_key_hash, 0, GTMCRYPT_HASH_LEN);
+		FREE(cur);
 		cur = temp;
 	}
 	if (NULL != fast_lookup_entry)
-		GC_FREE(fast_lookup_entry);
-	num_entries = 0;
+		FREE(fast_lookup_entry);
+	n_dbkeys = 0;
 }
 
-/* Given a xc_fileid, containing a unique description of the dat file, the function searches for it's
+/* Given a fileid, containing a unique description of the dat file, the function searches for it's
  * entry in the linked list. On unsuccessful search, returns NULL.
  */
-gtm_dbkeys_tbl* gc_dbk_get_entry_by_fileid(xc_fileid_ptr_t fileid)
+gtm_dbkeys_tbl* gc_dbk_get_entry_by_fileid(gtm_fileid_ptr_t fileid)
 {
 	gtm_dbkeys_tbl *cur = tbl_head;
 
 	while (NULL != cur)
 	{
-		if (!cur->fileid_dirty && (!cur->symmetric_key_dirty) && (gtm_is_file_identical_fptr(fileid, cur->fileid)))
+		if (!cur->fileid_dirty && (!cur->symmetric_key_dirty) && (gtm_is_file_identical(fileid, cur->fileid)))
 			break;
 		cur = (gtm_dbkeys_tbl *)cur->next;
 	}
@@ -80,7 +99,7 @@ gtm_dbkeys_tbl* gc_dbk_get_entry_by_fileid(xc_fileid_ptr_t fileid)
 }
 
 /* Given a hash, the function returns the entry in the linked list that matches with the given hash. Otherwise, NULL is returned */
-gtm_dbkeys_tbl* gc_dbk_get_entry_by_hash(xc_string_t *hash)
+gtm_dbkeys_tbl* gc_dbk_get_entry_by_hash(gtm_string_t *hash)
 {
 	gtm_dbkeys_tbl *cur = tbl_head;
 
@@ -94,13 +113,12 @@ gtm_dbkeys_tbl* gc_dbk_get_entry_by_hash(xc_string_t *hash)
 	return cur;
 }
 
-xc_status_t	gc_dbk_fill_gtm_dbkeys_fname(char *fname)
+STATICFNDEF int	gc_dbk_get_dbkeys_fname(char *fname, int *stat_success)
 {
 	char			*ptr;
-	int			status;
 	struct stat		stat_buf;
 
-	if (ptr = getenv(GTM_DBKEYS))
+	if (NULL != (ptr = getenv(GTM_DBKEYS)))
 	{
 		if (0 == STRLEN(ptr))
 		{
@@ -116,6 +134,7 @@ xc_status_t	gc_dbk_fill_gtm_dbkeys_fname(char *fname)
 				SNPRINTF(fname, GTM_PATH_MAX, "%s", ptr);
 			} else
 			{
+				assert(FALSE);
 				UPDATE_ERROR_STRING("%s is neither a directory nor a regular file", ptr);
 				return GC_FAILURE;
 			}
@@ -128,7 +147,7 @@ xc_status_t	gc_dbk_fill_gtm_dbkeys_fname(char *fname)
 			UPDATE_ERROR_STRING("Cannot find DB keys file - %s. %s", ptr, strerror(errno));
 			return GC_FAILURE;
 		}
-	} else if (ptr = getenv(HOME))
+	} else if (NULL != (ptr = getenv(HOME)))
 	{
 		SNPRINTF(fname, GTM_PATH_MAX, "%s/%s", ptr, DOT_GTM_DBKEYS);
 	} else
@@ -136,173 +155,256 @@ xc_status_t	gc_dbk_fill_gtm_dbkeys_fname(char *fname)
 		UPDATE_ERROR_STRING("Neither $"GTM_DBKEYS "nor $"HOME " is defined");
 		return GC_FAILURE;
 	}
+	if (0 != stat(fname, &stat_buf))
+	{
+		*stat_success = FALSE;
+		if (ENOENT == errno)
+		{
+			UPDATE_ERROR_STRING("Cannot find DB keys file - %s", fname);
+		} else
+		{
+			UPDATE_ERROR_STRING("Cannot find DB keys file - %s. %s", fname, strerror(errno));
+		}
+		return GC_FAILURE;
+	}
+	*stat_success = TRUE;
 	return GC_SUCCESS;
 }
-/* Initialize the linked list with minimal things. For each pair of entries in the db key file, load the
- * file names into the linked list and validate the format of the entries. Returns error if the format is
- * not the one that's expected. This is a fatal error and program will not continue on encountering this
- * error. Another fatal error is the 'gtm_dbkeys' env variable not set
- */
-xc_status_t gc_dbk_load_entries_from_file()
-{
-	FILE			*gtm_dbkeys_fp;
-	int			current_state, count, status, space_cnt, line_no = 0, line_type, filename_len;
-	int			looking_for_dat_entry = 1, looking_for_key_entry = 2, buflen, save_errno;
-	const char		*prefix = "Error parsing database key file";
-	char			buf[LINE_MAX], gtm_dbkeys_fname[GTM_PATH_MAX];
-	struct stat		stat_info;
-	static time_t		last_modified = 0;
-	gtm_dbkeys_tbl		*node = NULL;
 
-	if (GC_SUCCESS != gc_dbk_fill_gtm_dbkeys_fname(&gtm_dbkeys_fname[0]))
-		return GC_FAILURE;
-	if (0 != stat(gtm_dbkeys_fname, &stat_info))
-	{
-		save_errno = errno;
-		if (ENOENT == save_errno)
-		{
-			UPDATE_ERROR_STRING("Cannot find DB keys file - %s", gtm_dbkeys_fname);
-		} else
-			UPDATE_ERROR_STRING("Cannot find DB keys file - %s. %s", gtm_dbkeys_fname, strerror(save_errno));
-		return GC_FAILURE;
-	}
-	if (last_modified == stat_info.st_mtime)
-		return GC_SUCCESS;/* Nothing changed since we last read it. So, return success */
-	last_modified = stat_info.st_mtime;
-	if (NULL == (gtm_dbkeys_fp = fopen(gtm_dbkeys_fname, "r")))
-	{
-		save_errno = errno;
-		UPDATE_ERROR_STRING("Cannot open DB keys file - %s. %s", gtm_dbkeys_fname, strerror(save_errno));
-		return GC_FAILURE;
-	}
-	/* Read the file and parse the contents and fill a mapping table */
-	/* Note the format of this dbkeys will be like this -
-	 * 	dat <db file1 path>
-	 *	key <key file1 name>
-	 *	dat <db file2 path>
-	 *	key <key file2 name>
+STATICFNDEF int gc_dbk_get_single_entry(void *handle, char **db, char **key, int n)
+{
+	FILE			*fp;
+	int			current_state, space_cnt, line_type, filename_len, buflen;
+	char			buf[LINE_MAX];
+	static int		line_no;
+	config_setting_t	*db_setting, *elem;
+
+	/* The caller makes sure that the file format at this point is either the old $gtm_dbkeys flat file format or the new
+	 * libconfig file format. Assert accordingly. In PRO, if the file format is neither, we fall-through anyways and attempt
+	 * to parse the flat-file provides an appropriate error message to the user.
 	 */
-	current_state = looking_for_dat_entry;	/* To start with we are looking for a database entry */
-	if (tbl_head)
+	assert((LIBCONFIG_FILE_FORMAT == gc_dbk_file_format) || (DBKEYS_FILE_FORMAT == gc_dbk_file_format));
+	if (LIBCONFIG_FILE_FORMAT == gc_dbk_file_format)
 	{
-		gc_dbk_scrub_entries();	/* free up the existing linked list as we are about to create a fresh one */
-		tbl_head = NULL;
+		db_setting = (config_setting_t *)handle;
+		if (n + 1 == config_setting_length(db_setting))
+			return PARSE_COMPLETED;
+		if (NULL != (elem = config_setting_get_elem(db_setting, n)))
+		{
+			if (!config_setting_lookup_string(elem, "dat", (const char **)db))
+			{
+				UPDATE_ERROR_STRING("In config file %s, entry# %d corresponding to database.keys "
+							"does not have a `dat' item", gc_dbk_filename, n + 1);
+				return -1;
+			}
+
+			if (!config_setting_lookup_string(elem, "key", (const char **)key))
+			{
+				UPDATE_ERROR_STRING("In config file %s, entry# %d corresponding to database.keys "
+							"does not have a `key' item", gc_dbk_filename, n + 1);
+				return -1;
+			}
+			return KEEP_GOING;
+		}
+		assert(FALSE);	/* We should never reach here as that would mean we couldn't find the nth entry in database.keys. */
 	}
-	while (!feof(gtm_dbkeys_fp))
+	/* Fall-through: Old $gtm_dbkeys flat file format. Read a single pair of database-key entry. */
+	fp = (FILE *)handle;
+	current_state = LOOKING_FOR_DB;
+	while (!feof(fp))
 	{
-		if (NULL == fgets(buf, LINE_MAX, gtm_dbkeys_fp))
+		if (NULL == fgets(buf, LINE_MAX, fp))
 			break;
 		line_no++;
 		buflen = STRLEN(buf);
 		if (NEWLINE != buf[buflen - 1])
-		{	/* last character in the read buffer is not a newline implying that the line contains more than
-			 * LINE_MAX characters.
+		{	/* Last character in the buffer is not a newline implying that the line contains more than LINE_MAX
+			 * characters.
 			 */
-			 fclose(gtm_dbkeys_fp);
-			 UPDATE_ERROR_STRING("%s. Entry at line: %d longer than %ld characters", prefix, line_no, LINE_MAX);
-			 return GC_FAILURE;
+			UPDATE_ERROR_STRING("%s. Entry at line: %d longer than %ld characters", PARSE_ERROR_PREFIX, line_no,
+							LINE_MAX);
+			return -1;
 		}
-		buf[buflen - 1] = '\0'; /* strip off the newline at the end */
-		space_cnt = 0;
-		while (isspace(buf[space_cnt]))		/* BYPASSOK -- don't have access to gtm_ctype.h */
-			space_cnt++;	/* go past any whitespace characters */
-		assert(space_cnt <= (buflen - 1));
+		buf[--buflen] = '\0'; /* strip off the newline at the end */
+		for (space_cnt = 0; isspace(buf[space_cnt]); space_cnt++)	/* BYPASSOK -- cannot use ISSPACE */
+			;
+		assert(space_cnt <= buflen);
 		if ((0 == space_cnt) && ('\0' != buf[0]))
 		{
 			if (0 == memcmp(buf, DATABASE_LINE_INDICATOR, DATABASE_LINE_INDICATOR_SIZE))
 			{
 				filename_len = buflen - DATABASE_LINE_INDICATOR_SIZE;
 				line_type = DATABASE_LINE_INFO;
-			}
-			else if (0 == memcmp(buf, SYMMETRIC_KEY_LINE_INDICATOR, SYMMETRIC_KEY_LINE_INDICATOR_SIZE))
+			} else if (0 == memcmp(buf, SYMMETRIC_KEY_LINE_INDICATOR, SYMMETRIC_KEY_LINE_INDICATOR_SIZE))
 			{
 				filename_len = buflen - SYMMETRIC_KEY_LINE_INDICATOR_SIZE;
 				line_type = SYMMETRIC_KEY_LINE_INFO;
-			}
-			else
+			} else
 				line_type = -1;
-		} else if (space_cnt < (buflen - 1))
+		} else if (space_cnt < buflen)
 			line_type = -1;		/* line doesn't consist entirely of spaces (but only has leading spaces) */
 		else
 			continue;	/* skip this line as it consists entirely of spaces -- blank line */
-		switch(line_type)
+		switch (line_type)
 		{
 			case DATABASE_LINE_INFO:
-				if (current_state == looking_for_key_entry)
+				if (LOOKING_FOR_KEY == current_state)
 				{
-					fclose(gtm_dbkeys_fp);
-					UPDATE_ERROR_STRING("%s. At line %d: Found DAT entry, expecting KEY entry", prefix,
-								line_no);
-
-					return GC_FAILURE;
+					UPDATE_ERROR_STRING("%s. At line %d: Found DAT entry, expecting KEY entry",
+								PARSE_ERROR_PREFIX, line_no);
+					return -1;
 				}
-				GC_ALLOCATE_TBL_ENTRY(node);
-				memcpy(node->database_fn, &buf[DATABASE_LINE_INDICATOR_SIZE], filename_len + 1);
-				assert('\0' == node->database_fn[filename_len]);
-				node->database_fn_len = filename_len;
-				node->next = tbl_head;
-				tbl_head = node;
-				current_state = looking_for_key_entry;
+				memcpy(*db, &buf[DATABASE_LINE_INDICATOR_SIZE], filename_len + 1);
+				assert('\0' == *(*db + filename_len));
+				current_state = LOOKING_FOR_KEY;
 				break;
 
 			case SYMMETRIC_KEY_LINE_INFO:
-				if (current_state == looking_for_dat_entry)
+				if (LOOKING_FOR_DB == current_state)
 				{
-					fclose(gtm_dbkeys_fp);
-					UPDATE_ERROR_STRING("%s. At line %d: Found KEY entry, expecting DAT entry", prefix,
-								line_no);
-					return GC_FAILURE;
+					UPDATE_ERROR_STRING("%s. At line %d: Found KEY entry, expecting DAT entry",
+								PARSE_ERROR_PREFIX, line_no);
+					return -1;
 				}
-				assert(NULL != node);
-				memcpy(node->symmetric_key_fn, &buf[SYMMETRIC_KEY_LINE_INDICATOR_SIZE], filename_len + 1);
-				assert('\0' == node->symmetric_key_fn[filename_len]);
-				num_entries++;	/* one set of entries processed */
-				current_state = looking_for_dat_entry;
-				break;
+				memcpy(*key, &buf[SYMMETRIC_KEY_LINE_INDICATOR_SIZE], filename_len + 1);
+				assert('\0' == *(*key + filename_len));
+				current_state = LOOKING_FOR_DB;
+				return KEEP_GOING;	/* Done reading a single entry. */
 
 			default:
-				fclose(gtm_dbkeys_fp);
-				UPDATE_ERROR_STRING("%s. At line %d: %s does not start with 'dat '/'key '", prefix, line_no, buf);
-				return GC_FAILURE;
+				UPDATE_ERROR_STRING("%s. At line %d: %s does not start with 'dat '/'key '", PARSE_ERROR_PREFIX,
+							line_no, buf);
+				return -1;
 		}
 	}
-	if (!feof(gtm_dbkeys_fp))
+	if (!feof(fp))
 	{
-		save_errno = errno;
-		UPDATE_ERROR_STRING("Error while reading from database key file. %s", strerror(save_errno));
-		return GC_FAILURE;
+		UPDATE_ERROR_STRING("Error while reading from database key file. %s", strerror(errno));
+		return -1;
 	} else if (0 == line_no)
-	{	/* EOF reached, but did not go past the first line -- no entries in database key file */
-		fclose(gtm_dbkeys_fp);
-		UPDATE_ERROR_STRING("%s. No entries found in DB keys file.", prefix);
-		return GC_FAILURE;
-	} else if (current_state == looking_for_key_entry)
-	{	/* last database file entry has no matching symmetric key file entry */
-		fclose(gtm_dbkeys_fp);
-		UPDATE_ERROR_STRING("%s. No matching KEY entry found for DAT entry at line: %d", prefix, line_no);
-		return GC_FAILURE;
-	}
-	GC_MALLOC(fast_lookup_entry, (SIZEOF(fast_lookup_entry) * num_entries), gtm_dbkeys_tbl*);
-	node = tbl_head;
-	count = 0;
-	while (NULL != node)
 	{
-		node->index = count;
-		fast_lookup_entry[count] = node;
-		count++;
-		node = node->next;
+		UPDATE_ERROR_STRING("%s. No entries found in DB keys file.", PARSE_ERROR_PREFIX);
+		return -1;
+	} else if (LOOKING_FOR_KEY == current_state)
+	{
+		UPDATE_ERROR_STRING("%s. No matching KEY entry found for DAT entry at line: %d", PARSE_ERROR_PREFIX, line_no);
+		return -1;
 	}
-	assert(count == num_entries);
-	fclose(gtm_dbkeys_fp);
-	return GC_SUCCESS;
+	return PARSE_COMPLETED;
 }
 
-xc_status_t gc_dbk_fill_sym_key_and_hash(xc_fileid_ptr_t req_fileid, char *req_hash)
+int gc_dbk_init_dbkeys_tbl()
 {
-	gtm_dbkeys_tbl	*cur;
-	int		status, concerns_current_file, skip_entry, plain_text_length;
-	xc_fileid_ptr_t	db_fileid;
-	xc_string_t	filename;
+	FILE			*fp;
+	void			*handle;
+	int			count, status, ret, stat_success;
+	char			err[MAX_GTMCRYPT_ERR_STRLEN], *db, *key, db_fname[GTM_PATH_MAX], key_fname[GTM_PATH_MAX];
+	char			*config_env;
+	struct stat		stat_info;
+	static time_t		last_modified;
+	config_setting_t	*setting;
+	gtm_dbkeys_tbl		*node;
+
+	if (INVALID_FILE_FORMAT == gc_dbk_file_format)
+	{	/* Decide which file format to use: Old format ($gtm_dbkeys) or the new format ($gtmcrypt_config). */
+		if ((GC_SUCCESS != gc_dbk_get_dbkeys_fname(gc_dbk_filename, &stat_success)) || !stat_success)
+		{
+			if (NULL != (config_env = getenv("gtmcrypt_config")))
+			{
+				strncpy(err, gtmcrypt_err_string, MAX_GTMCRYPT_ERR_STRLEN);
+				if (0 != stat(config_env, &stat_info))
+				{
+					UPDATE_ERROR_STRING("Failed to open $gtm_dbkeys. Reason: %s; attempt to read alternate "
+								"config file %s failed as well. Reason: %s", err, config_env,
+								strerror(errno));
+					return GC_FAILURE;
+				}
+			} else
+				return GC_FAILURE;	/* Error string is already updated in gc_dbk_get_dbkeys_fname. */
+			strncpy(gc_dbk_filename, config_env, GTM_PATH_MAX);
+			gc_dbk_file_format = LIBCONFIG_FILE_FORMAT;
+		} else
+			gc_dbk_file_format = DBKEYS_FILE_FORMAT;
+	}
+	assert('\0' != gc_dbk_filename[0]);
+	if (0 != stat(gc_dbk_filename, &stat_info))
+	{
+		assert(FALSE);
+		UPDATE_ERROR_STRING("Cannot stat %s file %s. %s", DBKEYS_FILE_FORMAT == gc_dbk_file_format ? "DB keys" : "config",
+					gc_dbk_filename, strerror(errno));
+		return GC_FAILURE;
+	}
+	if (last_modified == stat_info.st_mtime)
+		return GC_SUCCESS;	/* Nothing changed since we last read it. So, return success. */
+	handle = NULL;
+	if (DBKEYS_FILE_FORMAT == gc_dbk_file_format)
+	{
+		if (NULL == (fp = fopen(gc_dbk_filename, "r")))
+		{
+			UPDATE_ERROR_STRING("Cannot open DB keys file - %s. %s", gc_dbk_filename, strerror(errno));
+			return GC_FAILURE;
+		}
+		handle = fp;
+	} else
+	{
+		if (!config_read_file(&gtmcrypt_cfg, gc_dbk_filename))
+		{
+			UPDATE_ERROR_STRING("Cannot read config file %s. At line# %d - %s", gc_dbk_filename,
+						config_error_line(&gtmcrypt_cfg), config_error_text(&gtmcrypt_cfg))
+			return GC_FAILURE;
+		}
+		if (NULL == (setting = config_lookup(&gtmcrypt_cfg, "database.keys")))
+		{
+			UPDATE_ERROR_STRING("Failed to lookup database.keys in config file %s", gc_dbk_filename);
+			return GC_FAILURE;
+		}
+		handle = setting;
+	}
+	assert(NULL != handle);
+	if (tbl_head)
+	{
+		gc_dbk_scrub_entries();	/* free up the existing linked list as we are about to create a fresh one */
+		tbl_head = NULL;
+	}
+	db = &db_fname[0];
+	key = &key_fname[0];
+	while (KEEP_GOING == (status = gc_dbk_get_single_entry(handle, &db, &key, n_dbkeys)))
+	{
+		assert('\0' == db[strlen(db)]);
+		assert('\0' == key[strlen(key)]);
+		GC_ALLOCATE_TBL_ENTRY(node);
+		strncpy(node->database_fn, db, GTM_PATH_MAX);
+		strncpy(node->symmetric_key_fn, key, GTM_PATH_MAX);
+		node->next = tbl_head;
+		tbl_head = node;
+		n_dbkeys++;
+	}
+	if (PARSE_COMPLETED == status)
+	{
+		fast_lookup_entry = (gtm_dbkeys_tbl **)MALLOC((SIZEOF(fast_lookup_entry) * n_dbkeys));
+		node = tbl_head;
+		for (count = 0, node = tbl_head; NULL != node; node = node->next, count++)
+		{
+			node->index = count;
+			fast_lookup_entry[count] = node;
+		}
+		assert(count == n_dbkeys);
+		ret = 0;
+	} else
+		ret = -1;
+	if (DBKEYS_FILE_FORMAT == gc_dbk_file_format)
+		fclose(fp);
+	else
+		config_destroy(&gtmcrypt_cfg);
+	return ret;
+}
+
+int gc_dbk_fill_symkey_hash(gtm_fileid_ptr_t req_fileid, char *req_hash)
+{
+	gtm_dbkeys_tbl		*cur;
+	int			status, concerns_current_file, skip_entry, plain_text_length;
+	gtm_fileid_ptr_t	db_fileid;
+	gtm_string_t		filename;
 
 	cur = tbl_head;
 	while (NULL != cur)
@@ -312,7 +414,7 @@ xc_status_t gc_dbk_fill_sym_key_and_hash(xc_fileid_ptr_t req_fileid, char *req_h
 		{
 			filename.length = cur->database_fn_len;
 			filename.address = cur->database_fn;
-			if (TRUE == gtm_filename_to_id_fptr(&filename, &db_fileid))
+			if (TRUE == GTM_FILENAME_TO_ID(&filename, &db_fileid))
 			{
 				cur->fileid_dirty = FALSE;
 				cur->fileid = db_fileid;
@@ -321,14 +423,17 @@ xc_status_t gc_dbk_fill_sym_key_and_hash(xc_fileid_ptr_t req_fileid, char *req_h
 		if (cur->symmetric_key_dirty) /* Need to fill sym key value */
 		{
 			skip_entry = FALSE;
-			/* Before decrypting the key, let's see if the gtm_passwd in the environment has changed since
-			 * the last time we read from the environment. This way if the user had originally entered a wrong
-			 * password and if he/she is in MUMPS and changes the password through an external call then we should
-			 * be using the new password rather than the old one which might still be hanging in the environment.
+			/* Check & update the value of $gtm_passwd if it changed since we last checked. This way, if the user
+			 * had originally entered a wrong password, but later changed the value (possible in MUMPS using external
+			 * call), we read the up-to-date value instead of issuing an error.
 			 */
-			gc_pk_crypt_prompt_passwd_if_needed(can_prompt_passwd);
+			if (0 != gc_update_passwd(GTM_PASSWD_ENV, &gtmcrypt_pwent, GTMCRYPT_DEFAULT_PASSWD_PROMPT,
+							GTMCRYPT_OP_INTERACTIVE_MODE & gtmcrypt_init_flags))
+			{
+				return GC_FAILURE;
+			}
 			status = gc_pk_get_decrypted_key(cur->symmetric_key_fn, cur->symmetric_key, &plain_text_length);
-			concerns_current_file = (NULL != req_fileid && (gtm_is_file_identical_fptr(cur->fileid, req_fileid)));
+			concerns_current_file = (NULL != req_fileid && (GTM_IS_FILE_IDENTICAL(cur->fileid, req_fileid)));
 			if (0 != status)
 			{
 				/* If we failed because of wrong we password OR we are processing an entry that concerns the file
@@ -349,7 +454,8 @@ xc_status_t gc_dbk_fill_sym_key_and_hash(xc_fileid_ptr_t req_fileid, char *req_h
 			if (!skip_entry)
 			{ 	/* Everything is fine, compute the hash for the key */
 				GC_PK_COMPUTE_HASH(cur->symmetric_key_hash, cur->symmetric_key);
-				GC_SYM_CREATE_HANDLES(cur);
+				if (0 != gc_sym_create_key_handles(cur))
+					return -1;
 				cur->symmetric_key_dirty = FALSE;
 				if (concerns_current_file
 				    || (NULL != req_hash && (0 == memcmp(cur->symmetric_key_hash, req_hash, GTMCRYPT_HASH_LEN))))
@@ -363,7 +469,7 @@ xc_status_t gc_dbk_fill_sym_key_and_hash(xc_fileid_ptr_t req_fileid, char *req_h
 	return GC_SUCCESS;
 }
 
-void	 gc_dbk_get_hash(gtm_dbkeys_tbl *entry,  xc_string_t *hash)
+void	 gc_dbk_get_hash(gtm_dbkeys_tbl *entry,  gtm_string_t *hash)
 {
 	assert(hash->address);
 	assert(NULL != entry);

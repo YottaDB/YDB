@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +31,7 @@ char *s2n (mval *u)
 
 	SETUP_THREADGBL_ACCESS;
 	i = 0;
-	if (!MV_DEFINED(u))
-		GTMASSERT;
+	assertpro(MV_DEFINED(u));
 	c = u->str.addr;
 	if (0 == u->str.len)
 	{	/* Substitute pre-converted NULL/0 value */
@@ -119,10 +118,12 @@ char *s2n (mval *u)
 	exp = ('E' == *c) && digit;
 	if (exp && ((c + 1) < eos))
 	{
+		w = c;	/* save pointer to return in case expression following E is not a valid exponent */
 		c++;
 		exneg = ('-' == *c);
 		if (exneg || ('+' == *c))
 			c++;
+		d = c;	/* save pointer to see if any progress occurs in the below for loop */
 		for (; (c < eos) && ('0' == *c); c++)
 			;	/* Do not count leading 0s towards MAX_DIGITS_IN_EXP */
 		for (expdigits = 0; (c < eos) && DIGIT(*c); c++)
@@ -133,7 +134,11 @@ char *s2n (mval *u)
 				expdigits++;
 			}
 		}
-		if (exneg)
+		if (!expdigits && (d == c))
+		{
+			c = w;	/* if we did not see any digit following the E (and optional + or -) reset parse to E */
+			assert(0 == x);
+		} else if (exneg)
 			x = -x;
 	}
 	TREF(s2n_intlit) = (0 != sign) || dot || exp;
@@ -162,7 +167,7 @@ char *s2n (mval *u)
 			{
 				u->mvtype &= ~NUM_MASK;
 				if (!TREF(compile_time))
-					rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
 			} else
 			{
 				u->e = x;

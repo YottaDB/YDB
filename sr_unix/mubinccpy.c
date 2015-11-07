@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,8 +45,6 @@
 #include "mupipbckup.h"
 #include "gtmio.h"
 #include "gtm_pipe.h"
-#include "iotcproutine.h"
-#include "iotcpdef.h"
 #include "iotimer.h"
 #include "eintr_wrappers.h"
 #include "sleep_cnt.h"
@@ -82,7 +80,6 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uchar_ptr_t		mubbuf;
-GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	uint4			pipe_child;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		debug_mupip;
@@ -164,6 +161,7 @@ bool	mubinccpy (backup_reg_list *list)
 	int			rc;
 	int                     fstat_res;
 	struct stat		stat_buf;
+	int			user_id;
 	int			group_id;
 	int			perm;
 	struct perm_diag_data	pdd;
@@ -212,14 +210,14 @@ bool	mubinccpy (backup_reg_list *list)
 			{
 				FSTAT_FILE(db_fd, &stat_buf, fstat_res);
 				if (-1 != fstat_res)
-					if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_FILE, &pdd) < 0)
+					if (gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE, &pdd) < 0)
 					{
-						send_msg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 							ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
 							RTS_ERROR_STRING(((unix_db_info *)
 								(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
 							PERMGENDIAG_ARGS(pdd));
-						gtm_putmsg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 							ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
 							RTS_ERROR_STRING(((unix_db_info *)
 								(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
@@ -228,7 +226,7 @@ bool	mubinccpy (backup_reg_list *list)
 					}
 				/* setup new group and permissions if indicated by the security rules. */
 				if ((-1 == fstat_res) || (-1 == FCHMOD(backup->fd, perm))
-					|| ((-1 != group_id) && (-1 == fchown(backup->fd, -1, group_id))))
+					|| (((-1 != user_id) || (-1 != group_id)) && (-1 == fchown(backup->fd, user_id, group_id))))
 				{
 					PERROR("fchmod/fchown error: ");
 					util_out_print("ERROR: Cannot access incremental backup file !AD.",
@@ -256,7 +254,6 @@ bool	mubinccpy (backup_reg_list *list)
 			break;
 		case backup_to_tcp:
 			common_write = tcp_write;
-			iotcp_fillroutine();
 			backup = (BFILE *)malloc(SIZEOF(BFILE));
 			backup->blksiz = DISK_BLOCK_SIZE;
 			backup->remaining = 0; /* number of zeros to be added in the end, just use this field */
@@ -351,7 +348,7 @@ bool	mubinccpy (backup_reg_list *list)
 	DEBUG_INCBKUP_ONLY(blks_this_lmap = 0);
 	if (cs_addrs->nl->onln_rlbk_pid)
 	{
-		gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
 		free(outptr);
 		free(bm_blk_buff);
 		CLEANUP_AND_RETURN_FALSE;
@@ -395,7 +392,7 @@ bool	mubinccpy (backup_reg_list *list)
 			}
 			if (cs_addrs->nl->onln_rlbk_pid)
 			{
-				gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
 				free(outptr);
 				free(bm_blk_buff);
 				CLEANUP_AND_RETURN_FALSE;
@@ -523,7 +520,7 @@ bool	mubinccpy (backup_reg_list *list)
 	}
 	if (cs_addrs->nl->onln_rlbk_pid)
 	{
-		gtm_putmsg(VARLSTCNT(1) ERR_DBROLLEDBACK);
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
 		free(outptr);
 		free(bm_blk_buff);
 		CLEANUP_AND_RETURN_FALSE;
@@ -551,7 +548,7 @@ bool	mubinccpy (backup_reg_list *list)
 			if (cs_addrs->nl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(cs_addrs, NULL))
 			{
 				assert(FALSE);
-				gtm_putmsg(VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
 					cs_addrs->nl->wcs_phase2_commit_pidcnt, DB_LEN_STR(gv_cur_region));
 				rel_crit(gv_cur_region);
 				CLEANUP_AND_RETURN_FALSE;
@@ -569,7 +566,7 @@ bool	mubinccpy (backup_reg_list *list)
 			backup_buffer_flush(gv_cur_region);
 			if (++counter > MAX_BACKUP_FLUSH_TRY)
 			{
-				gtm_putmsg(VARLSTCNT(1) ERR_BCKUPBUFLUSH);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_BCKUPBUFLUSH);
 				CLEANUP_AND_RETURN_FALSE;
 			}
 			if (counter & 0xF)
@@ -578,7 +575,7 @@ bool	mubinccpy (backup_reg_list *list)
 			{	/* Force shmpool recovery to see if it can find the lost blocks */
 				if (!shmpool_lock_hdr(gv_cur_region))
 				{
-					gtm_putmsg(VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(gv_cur_region),
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(gv_cur_region),
 						   ERR_ERRCALL, 3, CALLFROM);
 					assert(FALSE);
 					CLEANUP_AND_RETURN_FALSE;
@@ -692,7 +689,7 @@ bool	mubinccpy (backup_reg_list *list)
 		util_out_print("Process !UL encountered the following error.", TRUE,
 			cs_addrs->shmpool_buffer->failed);
 		if (0 != cs_addrs->shmpool_buffer->backup_errno)
-			gtm_putmsg(VARLSTCNT(1) cs_addrs->shmpool_buffer->backup_errno);
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) cs_addrs->shmpool_buffer->backup_errno);
 		util_out_print("!AD, backup for DB file !AD, is not valid.", TRUE,
 			file->len, file->addr, DB_LEN_STR(gv_cur_region));
 	} else
@@ -729,7 +726,7 @@ void exec_write(BFILE *bf, char *buf, int nbytes)
 
 	if ((nwritten < nbytes) && (-1 == nwritten))
 	{
-		gtm_putmsg(VARLSTCNT(1) errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 		CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
 		if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, 0)))
 			WAITPID(pipe_child, (int *)&status, 0, waitpid_res);
@@ -748,7 +745,8 @@ void tcp_write(BFILE *bf, char *buf, int nbytes)
 	send_retry = 5;
 	do
 	{
-		if (-1 != (iostatus = tcp_routines.aa_send(bf->fd, buf + nwritten, nbytes - nwritten, 0)))
+		SEND(bf->fd, buf + nwritten, nbytes - nwritten, 0, iostatus);
+		if (-1 != iostatus)
 		{
 			nwritten += iostatus;
 			if (nwritten == nbytes)
@@ -762,7 +760,7 @@ void tcp_write(BFILE *bf, char *buf, int nbytes)
 
 	if ((nwritten != nbytes) && (-1 == iostatus))
 	{
-		gtm_putmsg(VARLSTCNT(1) errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 		CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
 		backup_write_errno = errno;
 	}
@@ -775,7 +773,7 @@ CONDITION_HANDLER(iob_io_error1)
 	char	s[80];
 	char	*fgets_res;
 
-	START_CH;
+	START_CH(TRUE);
 	if (SIGNAL == ERR_IOEOF)
 	{
 		PRINTF("End of media reached, please mount next volume and press Enter: ");
@@ -797,7 +795,7 @@ CONDITION_HANDLER(iob_io_error2)
 	int	dummy1, dummy2;
 	char	s[80];
 
-	START_CH;
+	START_CH(TRUE);
 	PRN_ERROR;
 	if (!debug_mupip)
 		UNLINK(incbackupfile);

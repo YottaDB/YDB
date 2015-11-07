@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ int dse_ksrch(block_id srch,
 	cache_rec_ptr_t dummy_cr;
 
 	if(!(bp = t_qread(srch, &dummy_int, &dummy_cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
 	else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
@@ -124,8 +124,10 @@ int dse_ksrch(block_id srch,
 
 int dse_key_srch(block_id srch, block_id_ptr_t key_path, int4 *off, char *targ_key, int targ_len)
 {
-	int status = dse_ksrch(srch, key_path, off, targ_key, targ_len);
-	if(status)
+	int	status;
+
+	status = dse_ksrch(srch, key_path, off, targ_key, targ_len);
+	if (status)
 		return status;
 	else if(!patch_find_root_search)
 	{	/* We are not searching for the global name in the directory tree and search for the regular-key
@@ -139,7 +141,11 @@ int dse_key_srch(block_id srch, block_id_ptr_t key_path, int4 *off, char *targ_k
 		targ_key[targ_len++] = KEY_DELIMITER;
 		patch_path_count = 1; 	/*This indicates the length of the path of node in gvtree*/
 		patch_find_root_search = FALSE;
-		return(dse_ksrch(srch,key_path, off, targ_key, targ_len));
+		status = dse_ksrch(srch, key_path, off, targ_key, targ_len);
+		/* Undo updates to "targ_key" */
+		targ_len -= (SPAN_SUBS_LEN + 2);
+		targ_key[targ_len] = KEY_DELIMITER;
+		return status;
 	}
 	return FALSE;
 }

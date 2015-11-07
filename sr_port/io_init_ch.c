@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ CONDITION_HANDLER(io_init_ch)
 {
 	io_log_name	*iol;
 
-	START_CH;
+	START_CH(TRUE);
 	if (INFO == SEVERITY)
 	{
 		PRN_ERROR;

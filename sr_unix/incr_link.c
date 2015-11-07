@@ -285,10 +285,10 @@ bool incr_link (int file_desc, zro_ent *zro_entry)
 		}
 		zl_error_hskpng(file_desc);
 		if ((hdr->compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
-			rts_error(VARLSTCNT(6) ERR_INVOBJ, 0,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVOBJ, 0,
 				ERR_TEXT, 2, LEN_AND_LIT("Object compiled with CHSET=UTF-8 which is different from $ZCHSET"));
 		else
-			rts_error(VARLSTCNT(6) ERR_INVOBJ, 0,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVOBJ, 0,
 				ERR_TEXT, 2, LEN_AND_LIT("Object compiled with CHSET=M which is different from $ZCHSET"));
 	}
 	/* Read in and/or relocate the pointers to the various sections. To understand the size calculations
@@ -634,7 +634,6 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 		rtnid.c[sym_size] = 0;
 		if ('_' == rtnid.c[0])
 			rtnid.c[0] = '%';
-		assert((mid_len(&zlink_mname) != sym_size) || (0 != memcmp(&zlink_mname.c[0], &rtnid.c[0], sym_size)));
 		rtn_str.addr = &rtnid.c[0];
 		rtn_str.len = sym_size;
 		rtn = find_rtn_hdr(&rtn_str);	/* Routine already resolved? */
@@ -750,12 +749,12 @@ void zl_error (int4 file, zro_ent *zroe, int4 err, int4 len, char *addr, int4 le
 	zl_error_hskpng(file);
 	/* 0, 2, or 4 arguments */
 	if (0 == len)
-		rts_error(VARLSTCNT(1) err);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) err);
 	else
 		if (0 == len2)
-			rts_error(VARLSTCNT(4) err, 2, len, addr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) err, 2, len, addr);
 		else
-			rts_error(VARLSTCNT(6) err, 4, len, addr, len2, addr2);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) err, 4, len, addr, len2, addr2);
 }
 
 /* ZL_ERROR-housekeeping */

@@ -9,6 +9,6 @@
  *								*
  ****************************************************************/
 
-#define GTM_RELEASE_NAME	"GT.M V6.0-003 VMS AXP"
+#define GTM_RELEASE_NAME	"GT.M V6.1-000 VMS AXP"
 #define GTM_PRODUCT		"GT.M"
-#define GTM_VERSION		"V6.0"
+#define GTM_VERSION		"V6.1"

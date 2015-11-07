@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,6 +99,9 @@ typedef struct
 	unsigned y;
 }quad_struct;
 
+error_def(ERR_ZFILNMBAD);
+error_def(ERR_ZFILKEYBAD);
+
 void op_fnzfile(mval *name,mval *key,mval *ret)
 {
 	struct NAM	nm;
@@ -110,25 +113,21 @@ void op_fnzfile(mval *name,mval *key,mval *ret)
 	quad_struct 	*cdt;
 	quad_struct 	*edt;
 	quad_struct 	*rdt;
-	int4 days;
-	int4 seconds;
-	error_def(ERR_ZFILNMBAD);
-	error_def(ERR_ZFILKEYBAD);
+	int4		days;
+	int4		seconds;
 	struct FAB	f;
-	int4 	status;
-	char 	index,slot,last_slot;
-	char	buf[MAX_KW_LEN] ;
+	int4		status;
+	char		index,slot,last_slot;
+	char		buf[MAX_KW_LEN] ;
 
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.top >= stringpool.free);
 	MV_FORCE_STR(name);
 	if (name->str.len == 0)
-	{	rts_error(VARLSTCNT(4) ERR_ZFILNMBAD,2,4,"NULL");
-	}
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFILNMBAD,2,4,"NULL");
 	MV_FORCE_STR(key);
 	if (key->str.len == 0 || key->str.len != KEY_LEN)
-	{	rts_error(VARLSTCNT(4) ERR_ZFILKEYBAD,2,key->str.len,key->str.addr);
-	}
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFILKEYBAD,2,key->str.len,key->str.addr);
 	lower_to_upper(buf,key->str.addr,MIN(key->str.len,MAX_KW_LEN)) ;
 	nm = cc$rms_nam;
 	dat = cc$rms_xabdat;
@@ -143,18 +142,17 @@ void op_fnzfile(mval *name,mval *key,mval *ret)
 	sum.xab$l_nxt = &pro;
 	pro.xab$l_nxt = &fhc;
 	if ((index = buf[0] - 'A') < MIN_ZF_INDEX || index > MAX_ZF_INDEX)
-		rts_error(VARLSTCNT(4)  ERR_ZFILKEYBAD,2,key->str.len,key->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4)  ERR_ZFILKEYBAD,2,key->str.len,key->str.addr);
 	if (!(last_slot = zfile_index[ index ].last_index))
-		rts_error(VARLSTCNT(4)  ERR_ZFILKEYBAD,2,key->str.len,key->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4)  ERR_ZFILKEYBAD,2,key->str.len,key->str.addr);
 	slot = zfile_index[ index ].index;
 	for ( ; slot < last_slot ; slot++ )
 	{
 		if (!memcmp(zfile_key[slot].name,buf,3))
-		{	break;
-		}
+			break;
 	}
 	if (slot == last_slot)
-		rts_error(VARLSTCNT(4)  ERR_ZFILKEYBAD,2,key->str.len,key->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4)  ERR_ZFILKEYBAD,2,key->str.len,key->str.addr);
 	f  = cc$rms_fab;
 	f.fab$b_shr = FAB$M_SHRPUT | FAB$M_SHRGET | FAB$M_SHRDEL | FAB$M_SHRUPD;
 	f.fab$l_nam = &nm;
@@ -162,7 +160,7 @@ void op_fnzfile(mval *name,mval *key,mval *ret)
 	f.fab$l_fna = name->str.addr;
 	f.fab$b_fns = name->str.len;
 	if ((status = sys$open(&f)) != RMS$_NORMAL)
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	ENSURE_STP_FREE_SPACE(MAX_ZF_LEN);
 	switch( slot )
 	{
@@ -172,12 +170,12 @@ void op_fnzfile(mval *name,mval *key,mval *ret)
 	case ZF_BDT:
 	{	ret->mvtype = MV_STR;
 		if (!bdt->x && !bdt->y)
-		{	ret->str.len = 0;
+		{
+			ret->str.len = 0;
 			break;
 		}
 		if ((status= lib$day( &days, bdt, &seconds )) != SS$_NORMAL)
-		{	rts_error(VARLSTCNT(1)  status );
-		}
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1)  status );
 		days += DAYS;
 		seconds /= CENTISECONDS;
 		ret->str.addr = stringpool.free;
@@ -202,8 +200,7 @@ void op_fnzfile(mval *name,mval *key,mval *ret)
 	case ZF_CDT:
 	{
 		if ((status= lib$day( &days, cdt, &seconds )) != SS$_NORMAL)
-		{	rts_error(VARLSTCNT(1)  status );
-		}
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1)  status );
 		days += DAYS;
 		seconds /= CENTISECONDS;
 		ret->mvtype = MV_STR;
@@ -256,7 +253,7 @@ void op_fnzfile(mval *name,mval *key,mval *ret)
 		if ((status= lib$day(	 &days
 					,edt
 					,&seconds	)) != SS$_NORMAL)
-		{	rts_error(VARLSTCNT(1)  status );
+		{	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1)  status );
 		}
 		days += DAYS;
 		seconds /= CENTISECONDS;
@@ -409,9 +406,8 @@ void op_fnzfile(mval *name,mval *key,mval *ret)
 			stringpool.free += RAT_LEN;
 			*stringpool.free++ = ',';
 		}
-		if (stringpool.free != ret->str.addr)
-		{	stringpool.free--;
-		}
+		if (!IS_AT_END_OF_STRINGPOOL(ret->str.addr, 0));
+			stringpool.free--;
 		ret->str.len = (char *) stringpool.free - ret->str.addr;
 		break;
 	case ZF_RCK:
@@ -426,7 +422,7 @@ void op_fnzfile(mval *name,mval *key,mval *ret)
 		if ((status= lib$day(	 &days
 					,rdt
 					,&seconds	)) != SS$_NORMAL)
-		{	rts_error(VARLSTCNT(1)  status );
+		{	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1)  status );
 		}
 		days += DAYS;
 		seconds /= CENTISECONDS;
@@ -490,7 +486,6 @@ void op_fnzfile(mval *name,mval *key,mval *ret)
 		assert(0);
 	}
 	if ((status = sys$close(&f)) != RMS$_NORMAL)
-	{	rts_error(VARLSTCNT(1)  status );
-	}
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	return;
 }

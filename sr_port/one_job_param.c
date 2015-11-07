@@ -44,8 +44,8 @@ const static readonly unsigned char job_param_index[27] =
       /* A(2)    B(0)   C(2)   D(4)   E(2)   F(0)  G(2)  H(0)  I(4)   J(0)  K(0)  L(2)  M(0) */
 	 0,	2,    	 2,     4,     8,    10,     10,   12,   12,    16,   16,   16,   18,
       /* N(6)	O(2)	P(4)	Q(0)	R(0)	S(6)	T(0)   U(0)	V(0)	W(0)   X(0)	Y(0)	Z(0) */
-	18,	24,	26,	30,	30,	30,	36,	36,	36,	36,	36,	36,	36,
-	36
+	18,	24,	26,	30,	30,	30,	37,	37,	37,	37,	37,	37,	37,
+	37
 };
 #else
 const static readonly unsigned char job_param_index[27] =
@@ -134,7 +134,7 @@ int one_job_param (char **parptr)
 			*parptr += len;
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && job_param_datatypes[job_param_data[x]]);
 		}
 		advancewindow ();
 	} else if (TK_EQUAL == TREF(window_token))

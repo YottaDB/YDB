@@ -25,7 +25,7 @@ error_def(ERR_VMSMEMORY);
 
 CONDITION_HANDLER(fntext_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	GTMTRIG_ONLY(TREF(in_op_fntext) = FALSE);
 	if (!DUMPABLE && (SIGNAL != ERR_TPRETRY))
 	{

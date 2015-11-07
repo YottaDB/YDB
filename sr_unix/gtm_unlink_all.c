@@ -90,9 +90,9 @@ void gtm_unlink_all(void)
 	/* Step 1: Stop M-Profiling */
 	if (is_tracing_on)
 		turn_tracing_off(NULL);
-	/* Step 2: Unwind M stack back to level 1 */
-	GOLEVEL(1, TRUE);
-	assert(1 == dollar_zlevel());
+	/* Step 2: Unwind M stack back to level 0 */
+	GOLEVEL(0, TRUE);
+	assert(0 == dollar_zlevel());
 	/* Step 3: re-Initialize $ECODE, $REFERENCE, and $TEST */
 	NULLIFY_DOLLAR_ECODE;		/* Clears $ECODE and results returned for $STACK */
 	if (NULL != gv_currkey)
@@ -122,20 +122,7 @@ void gtm_unlink_all(void)
 		 * (in USHBIN builds) we release the literal text section as part of the releasable read-only section.
 		 * Note this code is similar to code in zlput_rname() 'cept this is necessarily UNIX-only.
 		 */
-		tabent_mname = NULL;
-		if (NULL != (TREF(rt_name_tbl)).base)
-		{
-			key.var_name = rtab->rt_name;
-			COMPUTE_HASH_MNAME(&key);
-			if (NULL != (tabent_mname = lookup_hashtab_mname(TADR(rt_name_tbl), &key)) && tabent_mname->value)
-			{	/* Entries and source are malloc'd in two blocks on UNIX */
-				src_tbl = (routine_source *)tabent_mname->value;
-				if (NULL != src_tbl->srcbuff)
-					free(src_tbl->srcbuff);
-				free(src_tbl);
-				tabent_mname->value = NULL;
-			}
-		}
+		free_src_tbl(rtnhdr);
 		if ((0 == strcmp(rtnhdr->routine_name.addr, GTM_DMOD)) || (0 == strcmp(rtnhdr->routine_name.addr, GTM_CIMOD)))
 		{	/* If the routine is GTM$DMOD or GTM$CIMOD, it is allocated in one chunk by make_*mode(). Release it in
 			 * one chunk too.

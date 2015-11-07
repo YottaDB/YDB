@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -23,36 +24,32 @@
 #include "gv_trigger.h"
 #endif
 
-GBLREF gv_namehead	*gv_target;
-GBLREF gv_key		*gv_altkey;
+error_def(ERR_COLLATIONUNDEF);
+error_def(ERR_COLLTYPVERSION);
+error_def(ERR_GVIS);
 
-void act_in_gvt(void)
+void act_in_gvt(gv_namehead *gvt)
 {
 	collseq		*csp;
-	error_def(ERR_COLLATIONUNDEF);
-	error_def(ERR_COLLTYPVERSION);
-	error_def(ERR_GVIS);
 
 #	ifdef GTM_TRIGGER
-	if ((HASHT_GBLNAME_LEN == gv_target->gvname.var_name.len) &&
-			(0 == MEMCMP_LIT(gv_target->gvname.var_name.addr, HASHT_GBLNAME)))
+	if (IS_MNAME_HASHT_GBLNAME(gvt->gvname.var_name))
 		return;		/* No collation for triggers */
 #	endif
-	if (csp = ready_collseq((int)(gv_target->act)))
+	if (csp = ready_collseq((int)(gvt->act)))	/* WARNING: ASSIGNMENT */
 	{
-		if (!do_verify(csp, gv_target->act, gv_target->ver))
+		if (!do_verify(csp, gvt->act, gvt->ver))
 		{
-			gv_target->root = 0;
-			rts_error(VARLSTCNT(8) ERR_COLLTYPVERSION, 2, gv_target->act, gv_target->ver,
-				ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
+			gvt->root = 0;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_COLLTYPVERSION, 2, gvt->act, gvt->ver,
+				ERR_GVIS, 2, gvt->gvname.var_name.len, gvt->gvname.var_name.addr);
 		}
-	}
-	else
+	} else
 	{
-		gv_target->root = 0;
-		rts_error(VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, gv_target->act,
-			ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
+		gvt->root = 0;
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, gvt->act,
+				ERR_GVIS, 2, gvt->gvname.var_name.len, gvt->gvname.var_name.addr);
 	}
-	gv_target->collseq = csp;
+	gvt->collseq = csp;
 	return;
 }

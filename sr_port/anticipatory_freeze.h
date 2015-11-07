@@ -42,15 +42,14 @@ GBLREF	boolean_t				mupip_jnl_recover;
 GBLREF	uint4	  				lseekwrite_target;
 #endif
 
+error_def(ERR_DSKNOSPCAVAIL);
 error_def(ERR_MUINSTFROZEN);
 error_def(ERR_MUINSTUNFROZEN);
-
 error_def(ERR_MUNOACTION);
 error_def(ERR_REPLINSTFREEZECOMMENT);
 error_def(ERR_REPLINSTFROZEN);
 error_def(ERR_REPLINSTUNFROZEN);
 error_def(ERR_TEXT);
-
 
 #define ENABLE_FREEZE_ON_ERROR											\
 {														\
@@ -118,9 +117,12 @@ error_def(ERR_TEXT);
 								&& ((REPL_ALLOWED(((sgmnt_addrs *)CSA)->hdr))			\
 							    		|| mupip_jnl_recover	/* recover or rollback */	\
 									|| ((sgmnt_addrs *)CSA)->nl->onln_rlbk_pid )))
-#define ANTICIPATORY_FREEZE_ENABLED(CSA)	(INSTANCE_FREEZE_HONORED(CSA)				\
+#define INST_FREEZE_ON_ERROR_ENABLED(CSA)	(INSTANCE_FREEZE_HONORED(CSA)				\
 							&& ANTICIPATORY_FREEZE_AVAILABLE		\
 							&& (((sgmnt_addrs *)CSA)->hdr->freeze_on_fail))
+#define INST_FREEZE_ON_NOSPC_ENABLED(CSA)	(INST_FREEZE_ON_ERROR_ENABLED(CSA)						\
+							&& (NULL != is_anticipatory_freeze_needed_fnptr)			\
+							&& (*is_anticipatory_freeze_needed_fnptr)(CSA, ERR_DSKNOSPCAVAIL))
 #define IS_REPL_INST_FROZEN			((NULL != jnlpool.jnlpool_ctl) && jnlpool.jnlpool_ctl->freeze)
 #define IS_REPL_INST_UNFROZEN			((NULL != jnlpool.jnlpool_ctl) && !jnlpool.jnlpool_ctl->freeze)
 
@@ -147,7 +149,7 @@ error_def(ERR_TEXT);
 /* This is a version of the macro which waits for the instance freeze to be lifted off assuming the process has
  * already attached to the journal pool. We need to wait for the freeze only if the input database cares about
  * anticipatory freeze. Examples of those databases that dont care are non-replicated databases, databases with
- * "freeze_on_fail" field set to FALSE in the file header etc. Hence the use of ANTICIPATORY_FREEZE_ENABLED below.
+ * "freeze_on_fail" field set to FALSE in the file header etc. Hence the use of INST_FREEZE_ON_ERROR_ENABLED below.
  * Note: Do not use "hiber_start" as that uses timers and if we are already in a timer handler now, nested timers
  * wont work. Since SHORT_SLEEP allows a max of 1000, we use 500 (half a second) for now.
  */
@@ -195,7 +197,7 @@ error_def(ERR_TEXT);
 #define	WAIT_FOR_REPL_INST_UNFREEZE_NOCSA						\
 {											\
 	GBLREF	jnlpool_addrs	jnlpool;						\
-	GBLREF	volatile int4	exit_state;						\
+	GBLREF	int4		exit_state;						\
 	GBLREF	int4		exi_condition;						\
 	GBLREF	int4		forced_exit_err;					\
 											\
@@ -335,7 +337,7 @@ void clear_fake_enospc_if_master_dead(void);
 
 #else	/* #ifdef UNIX */
 #	define ANTICIPATORY_FREEZE_AVAILABLE			FALSE
-#	define ANTICIPATORY_FREEZE_ENABLED(CSA)			FALSE
+#	define INST_FREEZE_ON_ERROR_ENABLED(CSA)		FALSE
 #	define REPL_INST_AVAILABLE				FALSE
 #	define WAIT_FOR_REPL_INST_UNFREEZE
 #	define WAIT_FOR_REPL_INST_UNFREEZE_SAFE

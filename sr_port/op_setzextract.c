@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,7 @@ void op_setzextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 	/* Calculate total string len. delim_cnt has needed padding delimiters for null fields */
 	strlen = (size_t)pfxlen + padlen + (size_t)expr->str.len + (size_t)sfxlen;
 	if (MAX_STRLEN < strlen)
-		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 	ENSURE_STP_FREE_SPACE((int)strlen);
 
 	pfx = (unsigned char *)src->str.addr;
@@ -103,7 +103,7 @@ void op_setzextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 		memcpy(straddr, pfx + sfxoff, sfxlen);
 		straddr += sfxlen;
 	}
-	assert((straddr - stringpool.free) == strlen);
+	assert(IS_AT_END_OF_STRINGPOOL(straddr, -strlen));
 	dst->mvtype = MV_STR;
 	dst->str.len = INTCAST(straddr - stringpool.free);
 	dst->str.addr = (char *)stringpool.free;

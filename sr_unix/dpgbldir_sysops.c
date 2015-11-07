@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,8 @@ char LITDEF gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE] =
 	GDE_LABEL_LITERAL
 };
 
-GBLREF mval dollar_zgbldir;
+GBLREF mval 	dollar_zgbldir;
+GBLREF gd_addr	*gd_header;
 
 error_def(ERR_ZGBLDIRACC);
 error_def(ERR_IOEOF);
@@ -66,7 +67,8 @@ mstr *get_name(mstr *ms)
 	pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
 	status = parse_file(ms,&pblk);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, ms->len, ms->addr, LEN_AND_LIT(""), LEN_AND_LIT(""), status);
+		rts_error_csa(CSA_ARG(NULL)
+			VARLSTCNT(9) ERR_ZGBLDIRACC, 6, ms->len, ms->addr, LEN_AND_LIT(""), LEN_AND_LIT(""), status);
 	new = (mstr *)malloc(SIZEOF(mstr));
 	new->len = pblk.b_esl;
 	new->addr = (char *)malloc(pblk.b_esl);
@@ -90,11 +92,11 @@ void *open_gd_file(mstr *v)
 		if (!dollar_zgbldir.str.len || ((dollar_zgbldir.str.len == fp->v.len)
 							&& !memcmp(dollar_zgbldir.str.addr, fp->v.addr, fp->v.len)))
 		{
-			rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, fp->v.len, fp->v.addr,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, fp->v.len, fp->v.addr,
 				LEN_AND_LIT(".  Cannot continue"), LEN_AND_LIT(""), errno);
 			assert(FALSE);
 		}
-		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, fp->v.len, fp->v.addr, LEN_AND_LIT(".  Retaining "),
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, fp->v.len, fp->v.addr, LEN_AND_LIT(".  Retaining "),
 			dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
 	}
 #ifdef __MVS__
@@ -111,7 +113,7 @@ bool comp_gd_addr(gd_addr *gd_ptr, file_pointer *file_ptr)
 
 	FSTAT_FILE(file_ptr->fd, &buf, fstat_res);
 	if (-1 == fstat_res)
-		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
 			LEN_AND_LIT(""), LEN_AND_LIT(""), errno);
 	return is_gdid_stat_identical(gd_ptr->id, &buf);
 }
@@ -121,10 +123,10 @@ void fill_gd_addr_id(gd_addr *gd_ptr, file_pointer *file_ptr)
 	int fstat_res;
 	struct stat buf;
 
-	gd_ptr->id = (gd_id *) malloc(SIZEOF(gd_id));	/* Need to convert to gd_id_ptr_t during the 64-bit port */
+	gd_ptr->id = (gd_id *)malloc(SIZEOF(gd_id));
 	FSTAT_FILE(file_ptr->fd, &buf, fstat_res);
 	if (-1 == fstat_res)
-		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
 			LEN_AND_LIT(""), LEN_AND_LIT(""), errno);
 	set_gdid_from_stat(gd_ptr->id, &buf);
 	return;
@@ -146,19 +148,19 @@ void file_read(file_pointer *file_ptr, int4 size, uchar_ptr_t buff, int4 pos)
 	LSEEKREAD(file_ptr->fd, (off_t)(pos - 1 ) * DISK_BLOCK_SIZE, buff, size, save_errno);
 	if (0 != save_errno)
 		if (-1 == save_errno)
-			rts_error(VARLSTCNT(1) ERR_IOEOF);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 		else
-			rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
 				LEN_AND_LIT(""), LEN_AND_LIT(""), save_errno);
 	return;
 }
 
 void dpzgbini(void)
 {
-	mstr	temp_mstr;
-	char	temp_buff[MAX_FBUFF + 1];
-	uint4 status;
-	parse_blk pblk;
+	mstr		temp_mstr;
+	char		temp_buff[MAX_FBUFF + 1];
+	uint4		status;
+	parse_blk	pblk;
 
 	temp_mstr.addr = GTM_GBLDIR;
 	temp_mstr.len = SIZEOF(GTM_GBLDIR) - 1;
@@ -178,4 +180,5 @@ void dpzgbini(void)
 		dollar_zgbldir.str.addr = pblk.buffer;
 	}
 	s2pool(&dollar_zgbldir.str);
+	gd_header = NULL;
 }

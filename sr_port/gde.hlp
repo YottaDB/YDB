@@ -1,11 +1,10 @@
 1 Overview
    Overview
 
-   The GT.M Global Directory Editor (GDE) is a utility that enables you to
-   create, examine, and modify a global directory. GDE is a program written
-   in M and you can invoke it from the shell with $gtm_dist/mumps -run ^GDE,
-   with the gtm alias gtm -run GDE, or from inside the direct mode with Do
-   ^GDE.
+   The GT.M Global Directory Editor (GDE) is a utility for creating,
+   examining, and modifying a global directory. GDE is a program written in M
+   and you can invoke it from the shell with $gtm_dist/mumps -run ^GDE, with
+   the gtm alias gtm -run GDE, or from inside the direct mode with Do ^GDE.
 
    **Note**
 
@@ -455,7 +454,7 @@
 
    Command Syntax:
 
-   The general format for GDE commands is:
+   The general format of GDE commands is:
 
    command [-object-type] [object-name] [-qualifier]
 
@@ -521,7 +520,7 @@
    The ADD command inserts a new name, region, or segment into the Global
    Directory.
 
-   The format of the ADD command is one of the f ollowing:
+   The format of the ADD command is one of the following:
 
    A[DD]-N[AME] name-space -R[EGION]=region-name
    A[DD]-R[EGION] region-name -D[YNAMIC]=segment-name [-REGION-qualifier...]
@@ -1007,7 +1006,7 @@
    The following -REGION qualifiers can be used with the ADD, CHANGE, or
    TEMPLATE commands.
 
-   -C[OLLATION_SEQUENCE]=id number
+   -C[OLLATION_DEFAULT]=number
 
    Specifies the number of the collation sequence definition to be used as
    the default for this database file. The number can be any integer from 0
@@ -1018,12 +1017,12 @@
    refer to the "Internationalization" chapter in the GT.M Programmer's
    Guide.
 
-   The minimum COLLATION_SEQUENCE ID number is zero, which is the standard M
+   The minimum COLLATION_DEFAULT number is zero, which is the standard M
    collation sequence.
 
-   The maximum COLLATION_SEQUENCE ID number is 255.
+   The maximum COLLATION_DEFAULT number is 255.
 
-   By default, GDE uses zero (0) as the COLLATION_SEQUENCE ID.
+   By default, GDE uses zero (0) as the COLLATION_DEFAULT.
 
    -D[YNAMIC_SEGMENT]=segment-name
 
@@ -1048,16 +1047,16 @@
    When determining the maximum key size, applications should consider the
    following:
 
-     o A key must fit within one database block and the maximum KEY_SIZE is
+     * A key must fit within one database block and the maximum KEY_SIZE is
        limited to 40 bytes less than the block size. For example, a 1024 byte
        block can support a maximum KEY_SIZE of 984 bytes and a 1536 byte
        block size is the smallest that supports a maximum KEY_SIZE of 1019
        bytes.
-     o GT.M uses packed decimal representation for numeric subscripts which
+     * GT.M uses packed decimal representation for numeric subscripts which
        may be larger or smaller than the original representation.
-     o GT.M substitutes an element terminator for the caret (^), any comma
+     * GT.M substitutes an element terminator for the caret (^), any comma
        (,), and any right parenthesis ()).
-     o GT.M adds an extra byte for every string element, including the global
+     * GT.M adds an extra byte for every string element, including the global
        name.
 
    For example, the key ^ACN ("Name", "Type") internally occupies 17 bytes.
@@ -1067,9 +1066,7 @@
    -R[ECORD_SIZE]=size in bytes
 
    Specifies the maximum size (in bytes) of a global variable node's value
-   that can be stored in a region. The KEY_SIZE must be less than the
-   RECORD_SIZE. GDE rejects the command if the KEY_SIZE is inappropriate for
-   the RECORD_SIZE.
+   that can be stored in a region.
 
    If the size of a global exceeds one database block, GT.M implicitly spans
    that global across multiple database blocks. In the event a global
@@ -1078,7 +1075,10 @@
    performs the entire operation within an implicit TP transaction (just as
    is the case with triggers).
 
-   The minimum RECORD_SIZE is seven or eight, depending on your platform.
+   The minimum RECORD_SIZE is zero. A RECORD_SIZE of zero only allows a
+   global variable node that does not have a value. A typical use of a global
+   variable node with RECORD_SIZE of zero is for creating indices (where the
+   presence of a node is all that is required).
 
    The maximum RECORD_SIZE is 1,048,576 bytes (1MiB).
 
@@ -1100,17 +1100,17 @@
 
    By default, regions have -NULL_SUBSCRIPTS=NEVER.
 
-   -[NO]STDNULLCOLL[=TRUE|FALSE]
+   -[NO]STDNULLCOLL
 
    Determines whether GT.M null subscripts collate in conformance to the M
    standard.
 
-   If -STDNULLCOLL is set to TRUE or -STDNULLCOLL is specified, subscripts of
-   globals in the database follow the M standard where the null subscript
-   collates before all other subscripts.
+   If STDNULLCOLL is specified, subscripts of globals in the database follow
+   the M standard where the null subscript collates before all other
+   subscripts.
 
-   If -STDNULLCOLL is set to FALSE or -NOSTDNULLCOLL is specified, null
-   subscripts collate between numeric and string subscripts.
+   If NOSTDNULLCOLL is specified, null subscripts collate between numeric and
+   string subscripts.
 
    -[NO]INST[_FREEZE_ON_ERROR]
 
@@ -1159,15 +1159,15 @@
 
    The journal-option-list includes:
 
-     o [NO]BE[FORE_IMAGE]
-     o F[ILE_NAME]=file-specification-name
+     * [NO]BE[FORE_IMAGE]
+     * F[ILE_NAME]=file-specification-name
 
-     o AUTOSWITCHLIMIT=blocks
+     * AUTOSWITCHLIMIT=blocks
 
-     o A[LLOCATION]=blocks
+     * A[LLOCATION]=blocks
 
-     o E[XTENSION]=blocks
-     o BU[FFER_SIZE]=pages
+     * E[XTENSION]=blocks
+     * BU[FFER_SIZE]=pages
 
    The following section describes some -JOURNAL options.
 
@@ -1213,7 +1213,7 @@
  |-----------------------------------------------------------------------------|
  |                 QUALIFIER                  | DEFAULT  | MINIMUM |  MAXIMUM  |
  |--------------------------------------------+----------+---------+-----------|
- |-C[OLLATION_SEQUENCE]=id-number (integer)   |0         |0        |255        |
+ |-C[OLLATION_DEFAULT]=number (integer)       |0         |0        |255        |
  |--------------------------------------------+----------+---------+-----------|
  |-D[YNAMIC_SEGMENT] =segment-name (char)     |-         |1        |16         |
  |--------------------------------------------+----------+---------+-----------|
@@ -1250,9 +1250,9 @@
        system may also provide additional buffering). You get the choice of
        using BEFORE_IMAGE or NOBEFORE_IMAGE journaling for your database.
 
-          o BG supports both forward and backward recovery and rollback to
+          * BG supports both forward and backward recovery and rollback to
             recover a database without a restore.
-          o BG is a likely choice when you need faster recovery times from
+          * BG is a likely choice when you need faster recovery times from
             system failures.
 
      o With MM, GT.M bypasses the global buffer pool and relies entirely on
@@ -1260,14 +1260,14 @@
        GT.M has no control over the timing of disk updates, therefore there
        is a greater reliance on the OS/file system for database performance.
 
-          o MM supports NOBEFORE_IMAGE journaling only. GT.M triggers an
+          * MM supports NOBEFORE_IMAGE journaling only. GT.M triggers an
             error if you use MM with BEFORE_IMAGE Journaling. MM also
             supports MUPIP FORWARD -RECOVER and MUPIP JOURNAL -ROLLBACK with
             the -RESYNC or -FETCHRESYNC qualifiers to generate lost and
             broken transaction files. For more information, see the
             Journaling chapter.
-          o MM does not support backward recovery/rollback.
-          o MM is a possible choice when you need performance advantage in
+          * MM does not support backward recovery/rollback.
+          * MM is a possible choice when you need performance advantage in
             situations where the above restrictions are acceptable.
 
      o GDE maintains a separate set of segment qualifier values for each
@@ -1289,14 +1289,14 @@
    creates the file. For GDS files, the number of bytes allocated is the size
    of the database file header plus the ALLOCATION size times the BLOCK_SIZE.
 
-     o The minimum ALLOCATION is 10 blocks.
-     o The maximum ALLOCATION is 1,040,187,392 blocks.
-     o By default, GDE uses an ALLOCATION of 100 blocks.
-     o The maximum size of a database file is 1,040,187,392(992Mi) blocks.
-     o Out of the requested allocation, GT.M always reserves 32 global
+     * The minimum ALLOCATION is 10 blocks.
+     * The maximum ALLOCATION is 1,040,187,392 blocks.
+     * By default, GDE uses an ALLOCATION of 100 blocks.
+     * The maximum size of a database file is 1,040,187,392(992Mi) blocks.
+     * Out of the requested allocation, GT.M always reserves 32 global
        buffers for BG access method for read-only use to ensure that
        non-dirty global buffers are always available.
-     o The default ALLOCATION was chosen for initial development and
+     * The default ALLOCATION was chosen for initial development and
        experimentation with GT.M. Because file fragmentation impairs
        performance, make the initial allocation for production files and
        large projects large enough to hold the anticipated contents of the
@@ -1645,7 +1645,7 @@
    |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
    |-BL[OCK_SIZE]=size(bytes)                   |1024   |512  |65024              |-    |-    |X    |
    |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
-   |-C[OLLATION_SEQUENCE]=id-number (integer)   |0      |0    |255                |-    |X    |-    |
+   |-C[OLLATION_DEFAULT]=id-number (integer)    |0      |0    |255                |-    |X    |-    |
    |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
    |-D[YNAMIC_SEGMENT]=segment-name (chars)     |*      |1A   |16A/N              |-    |X    |-    |
    |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
@@ -1677,4 +1677,33 @@
    |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
    |-R[ESERVED_BYTES]=size (bytes)              |0      |0    |blocksize          |-    |-    |X    |
    +------------------------------------------------------------------------------------------------+
+
+1 Copyright
+   Copyright
+
+   Copyright 2013
+
+   Fidelity Information Services, Inc. All rights reserved.
+
+   Permission is granted to copy, distribute and/or modify this document
+   under the terms of the GNU Free Documentation License, Version 1.3 or any
+   later version published by the Free Software Foundation; with no Invariant
+   Sections, no Front-Cover Texts and no Back-Cover Texts.
+
+   GT.M(TM) is a trademark of Fidelity Information Services, Inc. Other
+   trademarks are the property of their respective owners.
+
+   This document contains a description of GT.M and the operating
+   instructions pertaining to the various functions that comprise the system.
+   This document does not contain any commitment of FIS. FIS believes the
+   information in this publication is accurate as of its publication date;
+   such information is subject to change without notice. FIS is not
+   responsible for any errors or defects.
+
+   **Note**
+
+   This help file is a concise representation of revision V6.1-000 of the
+   UNIX Administration and Operations Guide. To obtain a copy of the current
+   revision, go to www.fis-gtm.com and then click on the User Documentation
+   tab.
 

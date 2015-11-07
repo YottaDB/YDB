@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,6 @@
 #include "gtm_string.h"
 #ifdef UNIX
 #include "gtm_fcntl.h"
-#include "eintr_wrappers.h"
 static int fcntl_res;
 #ifdef DEBUG
 #include <sys/time.h>		/* for gettimeofday */
@@ -53,11 +52,11 @@ static int fcntl_res;
 #include <sys/poll.h>
 #endif
 #endif
+#include "gtm_select.h"
+#include "eintr_wrappers.h"
 #include "gt_timer.h"
 #include "io.h"
 #include "iotimer.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "stringpool.h"
 #include "iosocketdef.h"
 #include "min_max.h"
@@ -77,7 +76,6 @@ static	struct timeval tvbefore, tvafter;
 GBLREF	io_pair 		io_curr_device;
 GBLREF	bool			out_of_time;
 GBLREF	spdesc 			stringpool;
-GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	int4			outofband;
 
 /* Local routine we aren't making static due to increased debugging difficult static routines make */
@@ -149,7 +147,7 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 {
 	int		status, bytesread, real_errno;
 	fd_set		tcp_fd;
-	ABS_TIME	lcl_time_for_read;
+	struct timeval	lcl_time_for_read;
 #	ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 	long		poll_timeout;
 	unsigned long	poll_nfds;
@@ -161,11 +159,13 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 	DBGSOCK2((stdout, "time_for_read->at_sec: %d  usec: %d\n", time_for_read->at_sec, time_for_read->at_usec));
 	DEBUG_ONLY(gettimeofday(&tvbefore, NULL);)
 #ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-        FD_ZERO(&tcp_fd);
-        FD_SET(socketptr->sd, &tcp_fd);
-        assert(0 != FD_ISSET(socketptr->sd, &tcp_fd));
-        lcl_time_for_read = *time_for_read;
-        status = tcp_routines.aa_select(socketptr->sd + 1, (void *)(&tcp_fd), (void *)0, (void *)0, &lcl_time_for_read);
+	assertpro(FD_SETSIZE > socketptr->sd);
+	FD_ZERO(&tcp_fd);
+	FD_SET(socketptr->sd, &tcp_fd);
+	assert(0 != FD_ISSET(socketptr->sd, &tcp_fd));
+	lcl_time_for_read.tv_sec = time_for_read->at_sec;
+	lcl_time_for_read.tv_usec = (gtm_tv_usec_t) time_for_read->at_usec;
+	status = select(socketptr->sd + 1, (void *)(&tcp_fd), (void *)0, (void *)0, &lcl_time_for_read);
 #else
 	poll_fdlist[0].fd = socketptr->sd;
 	poll_fdlist[0].events = POLLIN;
@@ -178,7 +178,7 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 	DBGSOCK2((stdout, "socsnrio: Select return code: %d :: errno: %d\n", status, real_errno));
         if (0 < status)
 	{
-                bytesread = tcp_routines.aa_recv(socketptr->sd, buffer, maxlength, flags);
+                RECV(socketptr->sd, buffer, maxlength, flags, bytesread);
 		real_errno = errno;
 		socketptr->last_recv_errno = (-1 != status) ? 0 : real_errno;	/* Save status of last recv for dbging purposes */
 		DBGSOCK2((stdout, "socsnrio: aa_recv return code: %d :: errno: %d\n", bytesread, errno));
@@ -285,7 +285,7 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			}
 			break;
 		default:
-			GTMASSERT;
+			assertpro(iod->ichset != iod->ichset);
 	}
 	mblen++;	/* Include first char we were looking at in the required byte length */
 	DBGSOCK2((stdout, "socsnrupb: Length of char: %d\n", mblen));

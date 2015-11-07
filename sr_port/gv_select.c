@@ -42,6 +42,9 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
+#include "hashtab_mname.h"
+#include "gvnh_spanreg.h"
+#include "change_reg.h"
 
 #define	MAX_GMAP_ENTRIES_PER_ITER	2 /* maximum increase (could even be negative) in gmap array size per call to global_map */
 
@@ -58,27 +61,34 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF tp_region	*grlist;
+GBLREF gd_addr		*gd_header;
 
 static readonly unsigned char	percent_lit = '%';
 static readonly unsigned char	tilde_lit = '~';
 
+STATICFNDCL void gv_select_reg(void *ext_hash, boolean_t freeze, int *reg_max_rec, int *reg_max_key,
+				int *reg_max_blk, boolean_t restrict_reg, gvnh_reg_t *gvnh_reg, glist **gl_tail);
+
 void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist *gl_head,
 	       int *reg_max_rec, int *reg_max_key, int *reg_max_blk, boolean_t restrict_reg)
 {
-	boolean_t			stashed = FALSE, append_gbl;
-	int				num_quote, len, gmap_size, new_gmap_size, estimated_entries, count, rslt;
-	char				*ptr, *ptr1, *c;
-	mstr				gmap[512], *gmap_ptr, *gmap_ptr_base, gmap_beg, gmap_end;
-	mval				val, curr_gbl_name;
-	glist				*gl_tail, *gl_ptr;
-	tp_region			*rptr;
-#ifdef GTM64
-	hash_table_int8	        	ext_hash;
-	ht_ent_int8                   	*tabent;
-#else
-	hash_table_int4	        	ext_hash;
-	ht_ent_int4                   	*tabent;
-#endif /* GTM64 */
+	int			num_quote, len, gmap_size, new_gmap_size, estimated_entries, count, rslt, hash_code;
+	int			i, mini, maxi;
+	char			*ptr, *ptr1, *c;
+	mname_entry		gvname;
+	mstr			gmap[512], *gmap_ptr, *gmap_ptr_base, gmap_beg, gmap_end;
+	mval			curr_gbl_name;
+	gd_region		*reg;
+	gv_namehead		*gvt;
+	gvnh_reg_t		*gvnh_reg;
+	gvnh_spanreg_t		*gvspan;
+	ht_ent_mname		*tabent_mname;
+	glist			*gl_tail;
+#	ifdef GTM64
+	hash_table_int8		ext_hash;
+#	else
+	hash_table_int4		ext_hash;
+#	endif
 
 	memset(gmap, 0, SIZEOF(gmap));
 	gmap_size = SIZEOF(gmap) / SIZEOF(gmap[0]);
@@ -212,106 +222,52 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	{
 		curr_gbl_name.mvtype = MV_STR;
 		curr_gbl_name.str = *gmap_ptr++;
-		op_gvname(VARLSTCNT(1) &curr_gbl_name);
-		append_gbl = TRUE;
-		if (dba_cm == gv_cur_region->dyn.addr->acc_meth)
-		{	util_out_print("Can not select globals from region !AD across network",TRUE,gv_cur_region->rname_len,
-					gv_cur_region->rname);
-			mupip_exit(ERR_MUNOFINISH);
-
-		}
-		if (dba_bg != gv_cur_region->dyn.addr->acc_meth && dba_mm != gv_cur_region->dyn.addr->acc_meth)
+		DEBUG_ONLY(MSTRP_CMP(&curr_gbl_name.str, gmap_ptr, rslt);)
+		assert(0 >= rslt);
+		do
 		{
-			assert(gv_cur_region->dyn.addr->acc_meth == dba_usr);
-			util_out_print("Can not select globals from non-GDS format region !AD",TRUE,gv_cur_region->rname_len,
-					gv_cur_region->rname);
-			mupip_exit(ERR_MUNOFINISH);
-		}
-		op_gvdata(&val);
-		if (0 == val.m[1])
-		{
-			op_gvname(VARLSTCNT(1) &curr_gbl_name);
-			op_gvorder(&curr_gbl_name);
-			if (!curr_gbl_name.str.len)
-				break;
-			assert('^' == *curr_gbl_name.str.addr);
-			curr_gbl_name.str.addr++;
-			curr_gbl_name.str.len--;
-		}
-		for (;;)
-		{
-			MSTRP_CMP(&curr_gbl_name.str, gmap_ptr, rslt);
-			if (0 < rslt)
-				break;
-			if (freeze)
-                        {
-				/* Note: We cannot use int4 hash when we will have 64-bit address.
-				 * In that case we may choose to hash the region name or use int8 hash */
-
-			        GTM64_ONLY(if(add_hashtab_int8(&ext_hash,(gtm_uint64_t *)&gv_cur_region, HT_VALUE_DUMMY, &tabent)))
-			        NON_GTM64_ONLY(if (add_hashtab_int4(&ext_hash, (uint4 *)&gv_cur_region, HT_VALUE_DUMMY, &tabent)))
-                                {
-                                        if (cs_addrs->hdr->freeze)
-                                        {
-                                                gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FREEZE, 2, gv_cur_region->rname_len,
-							gv_cur_region->rname);
-                                                mupip_exit(ERR_MUNOFINISH);
-                                        }
-					/* Cannot proceed for read-only data files */
-					if (gv_cur_region->read_only)
-					{
-						util_out_print("Cannot freeze the database",TRUE);
-						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRDONLY, 2,
-							DB_LEN_STR(gv_cur_region));
-						mupip_exit(ERR_MUNOFINISH);
-					}
-					while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, FALSE, FALSE))
-					{
-						hiber_start(1000);
-						if (mu_ctrly_occurred || mu_ctrlc_occurred)
-						{
-							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_FREEZECTRL);
-                                                	mupip_exit(ERR_MUNOFINISH);
-						}
-					}
-					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-                                }
-                        }
-			assert(0 < curr_gbl_name.str.len);
-			gl_ptr = (glist*)malloc(SIZEOF(glist) - 1 + curr_gbl_name.str.len);
-			gl_ptr->name.mvtype = MV_STR;
-			gl_ptr->name.str.addr = (char*)gl_ptr->nbuf;
-			gl_ptr->name.str.len = MIN(curr_gbl_name.str.len, MAX_MIDENT_LEN);
-			memcpy(gl_ptr->nbuf, curr_gbl_name.str.addr, curr_gbl_name.str.len);
-			gl_ptr->next = 0;
-			if (append_gbl)
-			{
-				if (*reg_max_rec < cs_data->max_rec_size)
-					*reg_max_rec = cs_data->max_rec_size;
-				if (*reg_max_key < cs_data->max_key_size)
-					*reg_max_key = cs_data->max_key_size;
-				if (*reg_max_blk < cs_data->blk_size)
-					*reg_max_blk = cs_data->blk_size;
-			}
-			op_gvname(VARLSTCNT(1) &gl_ptr->name);
-			if (restrict_reg)
-			{ /* Only select globals in specified regions */
-				append_gbl = FALSE;
-				for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
+			/* User input global names could be arbitrarily large.
+			 * Truncate to max supported length before computing hash.
+			 */
+			if (MAX_MIDENT_LEN < curr_gbl_name.str.len)
+				curr_gbl_name.str.len = MAX_MIDENT_LEN;
+			COMPUTE_HASH_MSTR(curr_gbl_name.str, hash_code);
+			op_gvname_fast(VARLSTCNT(2) hash_code, &curr_gbl_name);
+			assert((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)));
+				/* for dba_cm or dba_usr, op_gvname_fast/gv_bind_name/gv_init_reg would have errored out */
+			gvname.hash_code = hash_code;
+			gvname.var_name = curr_gbl_name.str;
+			tabent_mname = lookup_hashtab_mname((hash_table_mname *)gd_header->tab_ptr, &gvname);
+			assert(NULL != tabent_mname);
+			gvnh_reg = (gvnh_reg_t *)tabent_mname->value;
+			assert(gv_cur_region == gvnh_reg->gd_reg);
+			gvspan = gvnh_reg->gvspan;
+			if (NULL == gvspan)
+				gv_select_reg((void *)&ext_hash, freeze, reg_max_rec, reg_max_key, reg_max_blk,
+										restrict_reg, gvnh_reg, &gl_tail);
+			else
+			{	/* If global spans multiple regions, make sure gv_targets corresponding to ALL spanned regions
+				 * are allocated and gv_target->root is also initialized accordingly for all the spanned regions.
+				 */
+				gvnh_spanreg_subs_gvt_init(gvnh_reg, gd_header, NULL);
+				maxi = gvspan->max_reg_index;
+				mini = gvspan->min_reg_index;
+				for (i = mini; i <= maxi; i++)
 				{
-					if (gv_cur_region == rptr->reg)
+					assert(i >= 0);
+					assert(i < gd_header->n_regions);
+					reg = gd_header->regions + i;
+					gvt = GET_REAL_GVT(gvspan->gvt_array[i - mini]);
+					if (NULL != gvt)
 					{
-						append_gbl = TRUE;
-						break;
+						gv_target = gvt;
+						gv_cur_region = reg;
+						change_reg();
+						gv_select_reg((void *)&ext_hash, freeze, reg_max_rec, reg_max_key,
+										reg_max_blk, restrict_reg, gvnh_reg, &gl_tail);
 					}
 				}
 			}
-			if (append_gbl)
-			{
-				gl_tail->next = gl_ptr;
-				gl_tail = gl_ptr;
-			} else
-				free(gl_ptr);
 			op_gvorder(&curr_gbl_name);
 			if (0 == curr_gbl_name.str.len)
 			{
@@ -321,8 +277,91 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 			assert('^' == *curr_gbl_name.str.addr);
 			curr_gbl_name.str.addr++;
 			curr_gbl_name.str.len--;
-		}
+			MSTRP_CMP(&curr_gbl_name.str, gmap_ptr, rslt);
+		} while (0 >= rslt);
 	}
 	if (gmap_ptr_base != &gmap[0])
 		free(gmap_ptr_base);
+}
+
+/* Assumes "gv_target" and "gv_cur_region" are properly setup at function entry */
+STATICFNDEF void gv_select_reg(void *ext_hash, boolean_t freeze, int *reg_max_rec, int *reg_max_key,
+				int *reg_max_blk, boolean_t restrict_reg, gvnh_reg_t *gvnh_reg, glist **gl_tail)
+{
+	tp_region	*rptr;
+	mval		val;
+	glist		*gl_ptr;
+#	ifdef GTM64
+	ht_ent_int8	*tabent;
+#	else
+	ht_ent_int4	*tabent;
+#	endif
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	assert(gv_target->gd_csa == cs_addrs);
+	if (restrict_reg)
+	{	/* Only select globals in specified regions */
+		for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
+		{
+			if (gv_cur_region == rptr->reg)
+				break;
+		}
+		if (NULL == rptr)
+			return;	/* this region is not part of specified regions. return right away */
+	}
+	TREF(gd_targ_gvnh_reg) = NULL;	/* needed so op_gvdata goes through gvcst_data (i.e. focuses only on the current region)
+					 * and NOT through gvcst_spr_data (which would focus on all spanned regions if any).
+					 */
+	op_gvdata(&val);
+	/* It is okay not to restore TREF(gd_targ_gvnh_reg) since it will be initialized again once gv_select is done
+	 * and the next op_gvname/op_gvextnam/op_gvnaked call is made. It is not needed until then anyways.
+	 */
+	if ((0 == val.m[1]) && ((0 == gv_target->root) || !TREF(want_empty_gvts)))
+		return;	/* global has an empty GVT in this region. return right away */
+	if (freeze)
+        {	/* Note: gv_cur_region pointer is 64-bits on 64-bit platforms. So use hashtable accordingly. */
+	        GTM64_ONLY(if(add_hashtab_int8((hash_table_int8 *)ext_hash,(gtm_uint64_t *)&gv_cur_region,
+											HT_VALUE_DUMMY, &tabent)))
+	        NON_GTM64_ONLY(if (add_hashtab_int4((hash_table_int4 *)ext_hash, (uint4 *)&gv_cur_region,
+											HT_VALUE_DUMMY, &tabent)))
+                {
+                        if (cs_addrs->hdr->freeze)
+                        {
+                                gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FREEZE, 2, REG_LEN_STR(gv_cur_region));
+                                mupip_exit(ERR_MUNOFINISH);
+                        }
+			/* Cannot proceed for read-only data files */
+			if (gv_cur_region->read_only)
+			{
+				util_out_print("Cannot freeze the database",TRUE);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2,
+					DB_LEN_STR(gv_cur_region));
+				mupip_exit(ERR_MUNOFINISH);
+			}
+			while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, FALSE, FALSE))
+			{
+				hiber_start(1000);
+				if (mu_ctrly_occurred || mu_ctrlc_occurred)
+				{
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FREEZECTRL);
+                                	mupip_exit(ERR_MUNOFINISH);
+				}
+			}
+			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
+                }
+        }
+	if (*reg_max_rec < cs_data->max_rec_size)
+		*reg_max_rec = cs_data->max_rec_size;
+	if (*reg_max_key < cs_data->max_key_size)
+		*reg_max_key = cs_data->max_key_size;
+	if (*reg_max_blk < cs_data->blk_size)
+		*reg_max_blk = cs_data->blk_size;
+	gl_ptr = (glist *)malloc(SIZEOF(glist));
+	gl_ptr->next = NULL;
+	gl_ptr->reg = gv_cur_region;
+	gl_ptr->gvt = gv_target;
+	gl_ptr->gvnh_reg = gvnh_reg;
+	(*gl_tail)->next = gl_ptr;
+	*gl_tail = gl_ptr;
 }

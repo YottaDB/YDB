@@ -510,8 +510,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOPRINCIO */
 	   0,	/* INVPORTSPEC */
 	   0,	/* INVADDRSPEC */
-	  78,	/* SOCKPARMREQ */
-	   0,	/* IPADDRREQ */
+	  78,	/* UNUSEDMSG677 */
+	   0,	/* UNUSEDMSG678 */
 	  80,	/* SOCKWAIT */
 	  81,	/* SOCKACPT */
 	  80,	/* SOCKINIT */
@@ -614,7 +614,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOFORKCORE */
 	   0,	/* JNLREAD */
 	   0,	/* JNLMINALIGN */
-	   0,	/* UNUSEDMSG781 */
+	   0,	/* JOBSTARTCMDFAIL */
 	   0,	/* JNLPOOLSETUP */
 	   0,	/* JNLSTATEOFF */
 	   0,	/* RECVPOOLSETUP */
@@ -677,7 +677,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* BUFFLUFAILED */
 	   0,	/* MUQUALINCOMP */
 	   0,	/* DISTPATHMAX */
-	   0,	/* UNUSEDMSG844 */
+	   0,	/* FILEOPENFAIL */
 	   0,	/* IMAGENAME */
 	   0,	/* GTMSECSHRPERM */
 	   0,	/* GTMDISTUNDEF */
@@ -805,7 +805,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* SEMWT2LONG */
 	   0,	/* REPLINSTOPEN */
 	   0,	/* REPLINSTCLOSE */
-	   0,	/* UNUSEDMSG972 */
+	   0,	/* JOBSETUP */
 	   0,	/* DBCRERR8 */
 	   0,	/* NUMPROCESSORS */
 	   0,	/* DBADDRANGE8 */
@@ -940,7 +940,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* ZDIROUTOFSYNC */
 	   0,	/* GBLNOEXIST */
 	   0,	/* MAXBTLEVEL */
-	   0,	/* UNUSEDMSG1107 */
+	  35,	/* INVMNEMCSPC */
 	   0,	/* JNLALIGNSZCHG */
 	   0,	/* UNUSEDMSG1109 */
 	   0,	/* GVFAILCORE */
@@ -1152,7 +1152,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CRYPTKEYFETCHFAILED */
 	   0,	/* CRYPTKEYFETCHFAILEDNF */
 	   0,	/* CRYPTHASHGENFAILED */
-	   0,	/* CRYPTNOPSWDINTP */
+	   0,	/* UNUSEDMSG1319 */
 	   0,	/* BADTAG */
 	   0,	/* ICUVERLT36 */
 	   0,	/* ICUSYMNOTFOUND */
@@ -1251,7 +1251,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* SECNOTSUPPLEMENTARY */
 	   0,	/* SUPRCVRNEEDSSUPSRC */
 	   0,	/* UNUSEDMSG1417 */
-	   0,	/* UNUSEDMSG1418 */
+	   0,	/* SETITIMERFAILED */
 	   0,	/* UPDSYNC2MTINS */
 	   0,	/* UPDSYNCINSTFILE */
 	   0,	/* REUSEINSTNAME */
@@ -1361,4 +1361,23 @@ const static readonly int error_ansi[] = {
 	   0,	/* INSTFRZDEFER */
 	   0,	/* REGOPENRETRY */
 	   0,	/* REGOPENFAIL */
+	   0,	/* REPLINSTNOSHM */
+	   0,	/* DEVPARMTOOSMALL */
+	   0,	/* REMOTEDBNOSPGBL */
+	   0,	/* NCTCOLLSPGBL */
+	   0,	/* ACTCOLLMISMTCH */
+	   0,	/* GBLNOMAPTOREG */
+	   0,	/* ISSPANGBL */
+	   0,	/* TPNOSUPPORT */
+	   0,	/* GVSUBSERR */
+	   0,	/* TRIGNOSPANGBL */
+	   0,	/* FILTERTIMEDOUT */
+	   0,	/* TLSDLLNOOPEN */
+	   0,	/* TLSINIT */
+	   0,	/* TLSCONVSOCK */
+	   0,	/* TLSHANDSHAKE */
+	   0,	/* TLSCONNINFO */
+	   0,	/* TLSIOERROR */
+	   0,	/* TLSRENEGOTIATE */
+	   0,	/* REPLNOTLS */
 	};

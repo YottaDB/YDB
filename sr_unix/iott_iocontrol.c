@@ -16,7 +16,6 @@
 
 #include "gtm_string.h"
 #include "io.h"
-#include "iotcpdef.h"
 
 GBLREF io_pair		io_curr_device;
 

@@ -21,11 +21,27 @@
 #include <sys/types.h>
 #include "gtm_inet.h"
 #include "gtm_netdb.h"
+#ifndef VMS
+#include "gtm_un.h"
+#endif
 #include "gtm_socket.h" /* for using sockaddr_storage */
-#include "iotcpdef.h"
 
 #ifndef GTM_MB_LEN_MAX
 #include "gtm_utf8.h"
+#endif
+
+/* values for lastop in socket_struct */
+
+#define TCP_NOOP		0
+#define TCP_WRITE		1
+#define TCP_READ		2
+
+#ifndef VMS
+typedef struct
+{
+        uid_t   mem;
+        gid_t   grp;
+} uic_struct_int;
 #endif
 
 /* Debugging notes: Some debuging calls as as below. Note that DBGSOCK2 is *always* disabled.
@@ -196,6 +212,7 @@ enum socket_protocol
 {
 	socket_tcpip,
 	socket_spx,
+	socket_local,
 	n_socket_protocol
 };
 
@@ -213,6 +230,7 @@ typedef struct socket_address_type
 	struct addrinfo			ai;
 	struct addrinfo			*ai_head; /* store the head of addrinfo linked list */
 	unsigned short                  port;
+	pid_t				process;	/* for LOCAL passfd */
 	char            		*saddr_ip;
 } socket_address;
 
@@ -247,7 +265,16 @@ typedef struct socket_struct_type
 	boolean_t			first_read;
 	boolean_t			first_write;
 	boolean_t			def_moreread_timeout;	/* true if deviceparameter morereadtime defined in open or use */
+#ifndef VMS
+	boolean_t			passedfd;		/* true if WRITE /ACCEPT or /PASS */
+	uint				filemode;		/* for LOCAL */
+	uint				filemode_mask;		/* to tell which modes specified */
+	uic_struct_int			uic;
+#endif
 	mstr				zff;
+	uint4				lastaction;		/* waitcycle  count */
+	uint4				readycycle;		/* when was ready */
+	boolean_t			pendingevent;		/* if listening, needs accept */
 } socket_struct;
 
 typedef struct socket_interrupt_type
@@ -268,22 +295,26 @@ typedef struct d_socket_struct_type
 	boolean_t                     	mupintr;			/* We were mupip interrupted */
 	int4				current_socket;			/* current socket index */
 	int4				n_socket;			/* number of sockets	*/
+	uint4				waitcycle;			/* count waits */
 	struct io_desc_struct		*iod;				/* Point back to main IO descriptor block */
 	struct socket_struct_type 	*socket[1];			/* Array size determined by gtm_max_sockets */
 } d_socket_struct;
 
-boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz);
+boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz, boolean_t newversion);
 boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz);
 boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len, socket_struct *socketptr, boolean_t rm);
 void iosocket_delim_conv(socket_struct *socketptr, gtm_chset_t to_chset);
 void iosocket_delimiter_copy(socket_struct *from, socket_struct *to);
 boolean_t iosocket_switch(char *handle, int handle_len, d_socket_struct *from, d_socket_struct *to);
 int4 iosocket_handle(char *handle, int *len, boolean_t newhandle, d_socket_struct *dsocketptr);
-socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des);
+socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boolean_t listen_specified);
 ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, int flags, ABS_TIME *time_for_read);
 void iosocket_unsnr(socket_struct *socketptr, unsigned char *buffer, size_t len);
 ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int flags, ABS_TIME *time_for_read,
 				   boolean_t wait_for_input);
 void iosocket_write_real(mstr *v, boolean_t convert_output);
 void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr, unsigned char *strend);
+boolean_t iosocket_listen_sock(socket_struct *socketptr, unsigned short len);
+void iosocket_close_one(d_socket_struct *dsocketptr, int index);
+int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boolean_t selectfirst);
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,8 @@
 
 GBLREF io_pair  io_curr_device;
 
+error_def (ERR_MTIOERR);
+
 /* iomt_ch.c error handler for an ioctl() failure in iomt_qio() */
 CONDITION_HANDLER(iomt_ch)
 {
@@ -35,9 +37,8 @@ CONDITION_HANDLER(iomt_ch)
 	d_mt_struct	*mt_ptr;
 	char		closep;
 	mval		close_params;
-	error_def (ERR_MTIOERR);
 
-	START_CH
+	START_CH(TRUE);
 	if (arg == ERR_MTIOERR)
 	{
 		dv = io_curr_device.in;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,8 @@
 #include "copy.h"
 #include "collseq.h"
 #include "do_xform.h"
-#include "gvstrsub.h"
 #include "gvsub2str.h"
+#include "zshow.h"
 
 #define LARGE_EXP	10000
 
@@ -44,7 +44,7 @@ LITREF	unsigned short	dpos[], dneg[];
  *	sub	- input string in subscript format
  *	targ	- output string buffer
  *	xlat_flg- translate flag.
- *		  If true convert string to MUMPS format
+ *		  If true convert string to MUMPS format (aka ZWRITE format)
  * Return:
  *	(pointer to the last char.
  *	converted in the targ string) + 1.
@@ -52,11 +52,11 @@ LITREF	unsigned short	dpos[], dneg[];
  */
 unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat_flg)
 {
-	unsigned char	buf1[MAX_KEY_SZ + 1], ch, *ptr, trail_ch;
+	unsigned char	buf[MAX_KEY_SZ + 1], buf1[MAX_KEY_SZ + 1], ch, *ptr, trail_ch, *str;
 	unsigned short	*tbl_ptr;
 	int		num, rev_num, trail_zero;
 	span_subs	*subs_ptr;
-	int		expon, in_length, length, tmp;
+	int		expon, in_length, targ_len;
 	mstr		mstr_ch, mstr_targ;
 	DCL_THREADGBL_ACCESS;
 
@@ -64,32 +64,43 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat
 	ch = *sub++;
 	if (STR_SUB_PREFIX == ch || (SUBSCRIPT_STDCOL_NULL == ch && KEY_DELIMITER == *sub))
 	{	/* If this is a string */
-		if (xlat_flg)
-			return gvstrsub(sub, targ);
-		else
+		in_length = 0;
+		ptr = (xlat_flg ? buf : targ);
+		while ((ch = *sub++))
+		{	/* Copy string to ptr, xlating each char */
+			in_length++;
+			if (STR_SUB_ESCAPE == ch)	/* if this is an escape, demote next char */
+				ch = (*sub++ - 1);
+			*ptr++ = ch;
+		}
+		if (TREF(transform) && gv_target && gv_target->collseq)
 		{
-			in_length = 0;
-			ptr = targ;
-			while ((ch = *sub++))
-			{	/* Copy string to targ, xlating each char */
-				in_length++;
-				if (STR_SUB_ESCAPE == ch)
-				/* if this is an escape, demote next char */
-					ch = (*sub++ - 1);
-				*targ++ = ch;
-			}
-			if (TREF(transform) && gv_target && gv_target->collseq)
+			mstr_ch.len = in_length;
+			mstr_ch.addr = (char *)(xlat_flg ? buf : targ);
+			mstr_targ.len = SIZEOF(buf1);
+			mstr_targ.addr = (char *)buf1;
+			do_xform(gv_target->collseq, XBACK, &mstr_ch, &mstr_targ, &targ_len);
+			if (!xlat_flg)
 			{
-				mstr_ch.len = in_length;
-				mstr_ch.addr = (char *)ptr;
-				mstr_targ.len = SIZEOF(buf1);
-				mstr_targ.addr = (char *)buf1;
-				do_xform(gv_target->collseq, XBACK, &mstr_ch, &mstr_targ, &length);
-				memcpy(ptr, mstr_targ.addr, length); /* mstr_targ.addr is used just in case it is
-								      * reallocated by the XBACK routine
-								      */
-				targ = ptr + length;
+				memcpy(targ, mstr_targ.addr, targ_len);	/* mstr_targ.addr is used just in case it is
+									 * reallocated by the XBACK routine.
+									 */
+				targ = targ + targ_len;
+			} else
+			{
+				in_length = targ_len;
+				ptr = (unsigned char *)mstr_targ.addr;	/* mstr_targ.addr is used just in case it is
+									 * reallocated in the XBACK routine.
+									 */
 			}
+		} else if (xlat_flg)
+			ptr = &buf[0];
+		else
+			targ = ptr;
+		if (xlat_flg)
+		{
+			format2zwr((sm_uc_ptr_t)ptr, in_length, targ, &targ_len);
+			targ = targ + targ_len;
 		}
 	} else
 	{	/* Number */
@@ -179,5 +190,5 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat
 					*targ++ = '0';
 		}
 	}
-	return (targ);
+	return targ;
 }

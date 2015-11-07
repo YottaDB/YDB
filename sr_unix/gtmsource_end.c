@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,9 @@
 #include "repl_comm.h"
 #include "have_crit.h"
 #include "anticipatory_freeze.h"
+#ifdef GTM_TLS
+#include "gtm_repl.h"
+#endif
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
@@ -101,6 +104,16 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	gtmsource_free_filter_buff();
 	gtmsource_stop_heartbeat();
 	repl_close(&gtmsource_sock_fd);
+#	ifdef GTM_TLS
+	/* Free up the SSL/TLS socket structures. */
+	if (NULL != repl_tls.sock)
+		gtm_tls_session_close(&repl_tls.sock);
+	assert(NULL == repl_tls.sock);
+	/* Free up the SSL/TLS context now that we are shutting down. */
+	if (NULL != tls_ctx)
+		gtm_tls_fini(&tls_ctx);
+	assert(NULL == tls_ctx);
+#	endif
 	if (jnlpool_seqno)
 	{
 		repl_log(gtmsource_log_fp, TRUE, FALSE, "REPL INFO - Current Jnlpool Seqno : %llu\n", jnlpool_seqno);

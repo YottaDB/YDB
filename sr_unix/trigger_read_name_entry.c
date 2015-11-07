@@ -24,7 +24,7 @@
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
 #include "format_targ_key.h"		/* for COPY_SUBS_TO_GVCURRKEY */
-#include "targ_alloc.h"			/* for SETUP_TRIGGER_GLOBAL & SWITCH_TO_DEFAULT_REGION */
+#include "targ_alloc.h"			/* for SET_GVTARGET_TO_HASHT_GBL & SWITCH_TO_DEFAULT_REGION */
 #include "gdscc.h"			/* needed for tp.h */
 #include "gdskill.h"			/* needed for tp.h */
 #include "buddy_list.h"			/* needed for tp.h */
@@ -34,7 +34,6 @@
 #include "tp.h"				/* for sgm_info */
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	gd_addr			*gd_header;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	sgm_info		*sgm_info_ptr;
@@ -43,9 +42,7 @@ LITREF	mval			literal_hasht;
 
 boolean_t trigger_read_name_entry(mident *trig_name, mval *val)
 {
-	sgmnt_addrs		*csa;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key			*save_gv_currkey;
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
@@ -53,19 +50,17 @@ boolean_t trigger_read_name_entry(mident *trig_name, mval *val)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Trigger name should end with # -- so assert it */
-	assert(TRIGNAME_SEQ_DELIM == trig_name->addr[trig_name->len - 1]);
-	SAVE_TRIGGER_REGION_INFO;
+	SAVE_TRIGGER_REGION_INFO(save_currkey);
 	SWITCH_TO_DEFAULT_REGION;
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 == gv_target->root)
 	{
-		RESTORE_TRIGGER_REGION_INFO;
+		RESTORE_TRIGGER_REGION_INFO(save_currkey);
 		return FALSE;
 	}
 	BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name->addr, trig_name->len - 1);
 	status = gvcst_get(val);
-	RESTORE_TRIGGER_REGION_INFO;
+	RESTORE_TRIGGER_REGION_INFO(save_currkey);
 	return status;
 }
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@ void	mur_pini_addr_reset(sgmnt_addrs *csa)
 	pini_list_struct	*plst;
 	ht_ent_int4 		*tabent, *topent;
 
-	rctl = csa->rctl;
+	rctl = (reg_ctl_list *)csa->miscptr;
 	assert(NULL != rctl);
 	jctl = rctl->jctl;
 	assert(NULL != jctl);

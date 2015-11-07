@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,6 +67,8 @@ void	drop_object_file(void)
         }
 }
 
+error_def(ERR_OBJFILERR);
+error_def(ERR_STRINGOFLOW);
 
 /*
  *	emit_link_reference
@@ -108,12 +110,11 @@ void	emit_link_reference(int4 refoffset, mstr *name)
 void	emit_immed(char *source, uint4 size)
 {
 	short int 	write;
-	error_def(ERR_STRINGOFLOW);
 
 	if (run_time)
 	{
-		if (stringpool.free + size > stringpool.top)
-			rts_error(VARLSTCNT(1) ERR_STRINGOFLOW);
+		if (!IS_STP_SPACE_AVAILABLE_PRO(size))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STRINGOFLOW);
 		memcpy(stringpool.free, source, size);
 		stringpool.free += size;
 	} else
@@ -142,11 +143,10 @@ void	emit_immed(char *source, uint4 size)
 void	buff_emit(void)
 {
 	int	stat;
-	error_def(ERR_OBJFILERR);
 
 	DOWRITERC(object_file_des, emit_buff, emit_buff_used, stat);
 	if (0 != stat)
-		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, stat);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, stat);
 	emit_buff_used = 0;
 }
 
@@ -185,8 +185,12 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 		sym = symbols;
 		sym1 = NULL;
 		while (sym)
-		{
-			if ((cmp = memvcmp(name->addr, (int)name->len, &sym->name[0], sym->name_len - 1)) <= 0)
+		{	/* Consider this a match only if type is N_EXT. If we are inserting an external reference symbol
+			 * for the current routine name, we may find a N_TEXT entry. But in this case, we want to add another
+			 * (N_EXT) entry so that the symbol table is correctly formed.
+			 */
+			if ((0 >= (cmp = memvcmp(name->addr, (int)name->len, &sym->name[0], sym->name_len - 1)))
+				&& (N_EXT == sym->n.n_type))
 				break;
 			sym1 = sym;
 			sym = sym->next;
@@ -210,6 +214,8 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 			assert(compsyms_hashtab->base);
 			for (sym = symbols; sym; sym = sym->next)
 			{
+				if (N_EXT != sym->n.n_type)	/* Consider this a match only if type is N_EXT. See comment above */
+					continue;
 				symkey.str.addr = (char *)&sym->name[0];
 				symkey.str.len = sym->name_len - 1;
 				COMPUTE_HASH_STR(&symkey);

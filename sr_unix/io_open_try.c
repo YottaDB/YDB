@@ -195,9 +195,6 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 			else if (((SIZEOF("PIPE") - 1) == mspace->str.len)
 			    && (0 == MEMCMP_LIT(dev_type, "PIPE")))
 				tl->iod->type = pi;
-			else if (((SIZEOF("TCP") - 1) == mspace->str.len)
-			    && (0 == MEMCMP_LIT(dev_type, "TCP")))
-				tl->iod->type = tcp;
 			else
 				tl->iod->type = us;
 		}
@@ -311,7 +308,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	active_device = naml->iod;
 
 	if ((-2 == file_des) && (dev_open != naml->iod->state) && (us != naml->iod->type)
-	    && (tcp != naml->iod->type) && (gtmsocket != naml->iod->type) && (pi != naml->iod->type))
+	    && (gtmsocket != naml->iod->type) && (pi != naml->iod->type))
 	{
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
 		p_offset = 0;
@@ -490,7 +487,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		cancel_timer(timer_id);
 
 #ifdef KEEP_zOS_EBCDIC
-	if ((tcp != naml->iod->type) && (gtmsocket != naml->iod->type))
+	if (gtmsocket != naml->iod->type)
 	{
 		SET_CODE_SET(naml->iod->in_code_set, OUTSIDE_CH_SET);
 		if (DEFAULT_CODE_SET != naml->iod->in_code_set)

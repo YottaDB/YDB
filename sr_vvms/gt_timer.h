@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,8 +58,9 @@ typedef struct tag_ts {
 	struct tag_ts	*next;		/* Pointer to next */
 } GT_TIMER;
 
-#define GT_WAKE sys$wake(0,0)
-#define hiber_start_wait_any hiber_start
+#define GT_WAKE			sys$wake(0,0)
+#define hiber_start_wait_any	hiber_start
+#define CANCEL_TIMERS		cancel_timer(0)
 
 int4 abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2);
 void add_int_to_abs_time(ABS_TIME *atps, int4 ival, ABS_TIME *atpd);

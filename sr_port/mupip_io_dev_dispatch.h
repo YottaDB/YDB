@@ -20,23 +20,23 @@
 UNIX_ONLY(GBLDEF) VMS_ONLY(LITDEF) dev_dispatch_struct io_dev_dispatch_mupip[] =
 {
 #	ifdef UNIX
-	iotype(iott, iott, iott),
+	iotype(iott, iott, iott, nil),
 #	else
 	ionil_dev,
 #	endif
 	ionil_dev,
 #	ifdef UNIX
-	iotype(iorm, iorm, iopi),
+	iotype(iorm, iorm, iopi, nil),
 #	else
-	iotype(iorm, iorm, nil),
+	iotype(iorm, iorm, nil, nil),
 #	endif
 	ionil_dev,
 	ionil_dev,
 	ionil_dev,
 #	ifdef UNIX
-	iotype(ioff, iorm, iopi),
+	iotype(ioff, iorm, iopi, nil),
 #	else
-	iotype(ioff, iorm, nil),
+	iotype(ioff, iorm, nil, nil),
 #	endif
 	ionil_dev,
 	ionil_dev

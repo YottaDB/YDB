@@ -79,9 +79,46 @@ THREADGBLDEF(dbinit_max_hrtbt_delta,		uint4)				/* max heartbeats before we bail
 THREADGBLDEF(dollar_zmaxtptime, 		int4)				/* tp timeout in seconds */
 THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */
 THREADGBLDEF(donot_write_inctn_in_wcs_recover,	boolean_t)			/* TRUE if wcs_recover should NOT write INCTN */
-THREADGBLDEF(gd_targ_addr,			gd_addr *)			/* current global directory reference */
+THREADGBLDEF(gd_targ_tn,			trans_num)			/* number that is incremented for every gvcst_spr*
+										 * action. helps easily determine whether a region
+										 * has already been seen in this gvcst_spr* action.
+										 */
+THREADGBLDEF(gd_targ_reg_array,			trans_num *)			/* Indicates which regions are already part of
+										 * current spanning-region database action.
+										 * Array is NULL if no spanning globals were
+										 * detected as part of opening global directory.
+										 */
+THREADGBLDEF(gd_targ_reg_array_size,		uint4)				/* Size of current gd_targ_reg_array allocation.
+										 * Non-zero only if at least one spanning global
+										 * has been seen at time of gld open.
+										 */
+THREADGBLDEF(gd_targ_addr,			gd_addr *)			/* current global directory reference. Needed by
+										 * name level $order or $zprevious to know inside
+										 * op_gvorder.c/op_zprevious.c whether the global
+										 * reference went through op_gvname/op_gvextnam.
+										 * Also needed by gvcst_spr_*.c etc.
+										 */
+THREADGBLDEF(gd_targ_gvnh_reg,			gvnh_reg_t *)			/* Pointer to the gvnh_reg corresponding to the
+										 * unsubscripted gvn reference that last went
+										 * through op_gvname/op_gvnaked/op_gvextnam.
+										 * Set to a non-NULL value for spanning globals
+										 * and to NULL for non-spanning globals (because
+										 * it offers an easy way to check for spanning
+										 * globals in op_gv* functions before invoking
+										 * the corresponding gvcst_spr_* functions).
+										 * Needed by op_gvorder etc. to avoid having to
+										 * recompute this based on gd_header & gv_currkey.
+										 */
+THREADGBLDEF(gd_targ_map,			gd_binding *)			/* map entry to which "gv_bind_subsname" bound
+										 * the subscripted gvn. Maintained ONLY for spanning
+										 * globals. Cannot be relied upon in case the
+										 * current reference is for a non-spanning global.
+										 * (i.e. is usable only if gd_targ_gvnh_reg->gvspan
+										 * is non-NULL). This is needed by gvcst_spr_*
+										 * functions to avoid recomputing the map (using
+										 * gv_srch_map) based on gd_header/gv_currkey.
+										 */
 THREADGBLDEF(gtm_custom_errors,			mstr)
-THREADGBLDEF(gtm_gvundef_fatal,			boolean_t)			/* core and die intended for testing */
 THREADGBLDEF(gv_extname_size,			int4)				/* part op_gvextname working memory mechanism */
 THREADGBLDEF(gv_last_subsc_null,		boolean_t)			/* indicates whether the last subscript of
 										 * gv_currkey (aka $reference) is a NULL string */
@@ -95,7 +132,8 @@ THREADGBLDEF(gv_some_subsc_null,		boolean_t)			/* TRUE if SOME subscript other t
 THREADGBLDEF(gv_sparekey,			gv_key *)			/* gv_xform_key working memory */
 THREADGBLDEF(gv_sparekey_mval,			mval)				/* gv_xform_key working memory */
 THREADGBLDEF(gv_sparekey_size,			int4)				/* part gv_xform_key working memory mechanism */
-THREADGBLDEF(gv_tporigkey_ptr,			gv_orig_key_array *)		/* op_tstart tp nesting anchor */
+THREADGBLDEF(gv_tporigkey_ptr,			gv_orig_key_array *)		/* copy of gv_currkey at outermost TSTART */
+THREADGBLDEF(gv_tporig_extnam_str,		mstr)				/* copy of extnam_str at outermost TSTART */
 THREADGBLDEF(in_gvcst_redo_root_search,		boolean_t)			/* TRUE if gvcst_redo_root_search is in C-stack */
 THREADGBLDEF(in_op_gvget,			boolean_t)			/* TRUE if op_gvget() is a C-stack call ancestor */
 THREADGBLDEF(issue_DBROLLEDBACK_anyways,	boolean_t)			/* currently set by MUPIP LOAD */
@@ -161,6 +199,7 @@ THREADGBLDEF(disable_sigcont,			boolean_t)			/* indicates whether the SIGCONT si
 THREADGBLDEF(dollar_zcompile,			mstr)				/* compiler qualifiers */
 THREADGBLDEF(dollar_zmode,			mval)				/* run mode indicator */
 THREADGBLDEF(dollar_zonlnrlbk,			int)				/* ISV (incremented for every online rollback) */
+THREADGBLDEF(dollar_zclose,			int)				/* ISV (set to close status for PIPE device) */
 THREADGBLDEF(dollar_zroutines,			mstr)				/* routine search list */
 THREADGBLDEF(error_on_jnl_file_lost,		unsigned int)			/* controls error handling done by jnl_file_lost.
 										 * 0 (default) : Turn off journaling and continue.
@@ -229,6 +268,7 @@ THREADGBLDEF(pipefifo_interrupt,		int)				/* count of number of times a pipe or 
 										 * interrupted */
 #endif
 THREADGBLDEF(prof_fp,				mprof_stack_frame *)		/* Stack frame that mprof currently operates on */
+THREADGBLDEF(relink_allowed,			int)				/* Non-zero if recursive relink permitted */
 THREADGBLDEF(trans_code_pop,			mval *)				/* trans_code holder for $ZTRAP popping */
 THREADGBLDEF(view_ydirt_str,			char *)				/* op_view working storage for ydir* ops */
 THREADGBLDEF(view_ydirt_str_len,		int4)				/* Part of op_view working storage for ydir* ops */
@@ -240,6 +280,8 @@ THREADGBLDEF(zsearch_var,			lv_val *)			/* UNIX $zsearch() lookup variable */
 THREADGBLDEF(zsearch_dir1,			lv_val *)			/* UNIX $zsearch() directory 1 */
 THREADGBLDEF(zsearch_dir2,			lv_val *)			/* UNIX $zsearch() directory 2 */
 #endif
+THREADGBLDEF(poll_fds_buffer,			char *)				/* Buffer for poll() argument */
+THREADGBLDEF(poll_fds_buffer_size,		size_t)				/* Current allocated size of poll_fds_buffer */
 
 /* Larger structures and char strings */
 THREADGBLAR1DEF(director_string,		char,	SIZEOF(mident_fixed))	/* Buffer for director_ident */
@@ -262,7 +304,9 @@ THREADGBLAR1DEF(prombuf,			char,	(MAX_MIDENT_LEN + 1))	/* The prompt buffer size
 										 * commonly used Unicode characters only occupy up
 										 * to 3 bytes, the buffer would at least
 										 * accommodate 10 Unicode characters in a prompt */
+#ifdef VMS
 THREADGBLDEF(rt_name_tbl,			hash_table_mname)		/* Routine hash table for finding $TEXT() info */
+#endif
 THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
 #ifdef UNIX
 THREADGBLDEF(user_id,				uint4)				/* USERID number */
@@ -285,10 +329,8 @@ THREADGBLDEF(ci_table, 				callin_entry_list *)		/* Callin table in the form of 
 THREADGBLDEF(extcall_package_root,		struct extcall_package_list *)	/* External call table package list */
 #ifdef UNIX
 THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* Current nested depth of callin environments */
-THREADGBLDEF(in_gtmci,				boolean_t)			/* Indicates if we are in one of the gtm_ci...
-										 * functions. */
+THREADGBLDEF(temp_fgncal_stack,			unsigned char *)		/* Override for fgncal_stack when non-NULL */
 #endif
-
 THREADGBLDEF(want_empty_gvts,			boolean_t)			/* set to TRUE by MUPIP REORG when it is selecting
 										 * globals to be reorged. Need to be able to select
 										 * killed globals for effective truncate. */
@@ -317,6 +359,21 @@ THREADGBLDEF(jnl_extract_nocol,			uint4)				/* If non-zero, MUPIP JOURNAL EXTRAC
 										 * in the extract if globals do use alternative
 										 * collation.
 										 */
+THREADGBLDEF(skip_gtm_putmsg,			boolean_t)			/* currently needed by GDE to avoid gtm_putmsg
+										 * from happening inside map_sym.c/fgn_getinfo.c
+										 * when a VIEW "YCHKCOLL" is done as otherwise this
+										 * pollutes the current device GDE is writing to
+										 * and causes a GDECHECK error. This variable might
+										 * also be useful for others as the need arises.
+										 */
+THREADGBLDEF(spangbl_seen,			boolean_t)	/* The process has referenced at least one global which spans
+								 * multiple regions. Used by op_gvnaked currently.
+								 */
+THREADGBLDEF(no_spangbls,			boolean_t)	/* This process does not need to worry about spanning regions.
+								 * Examples are DSE which operates on a specific region
+								 * irrespective of whether the global spans regions or not.
+								 */
+THREADGBLDEF(max_fid_index,			int)		/* maximum value of csa->fid_index across all open csa's */
 #ifdef GTM_TRIGGER
 THREADGBLDEF(gvt_triggers_read_this_tn,		boolean_t)			/* if non-zero, indicates triggers were read for
 										 * at least one gv_target in this transaction.
@@ -345,4 +402,9 @@ THREADGBLDEF(rts_error_unusable,		boolean_t)			/* Denotes the window in which an
 THREADGBLDEF(rts_error_unusable_seen,		boolean_t)
 THREADGBLAR1DEF(trans_restart_hist_array,	trans_restart_hist_t, TRANS_RESTART_HIST_ARRAY_SZ) /* See tp.h for usage */
 THREADGBLDEF(trans_restart_hist_index,		uint4)
+THREADGBLDEF(skip_mv_num_approx_assert,		boolean_t)		/* TRUE if mval2subsc is invoked from op_fnview */
+THREADGBLDEF(gtm_gvundef_fatal,			boolean_t)			/* core and die intended for testing */
+THREADGBLDEF(gtm_dirtree_collhdr_always,	boolean_t)	/* Initialize 4-byte collation header in directory tree always.
+								 * Used by tests that are sensitive to DT leaf block layout.
+								 */
 #endif

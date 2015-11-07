@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,6 @@
 #include "gdsfhead.h"
 #include "mupint.h"
 #include "min_max.h"
-#include "init_root_gv.h"
 #include "util.h"
 #include "print_target.h"
 #include "gtmmsg.h"
@@ -82,11 +81,11 @@ void	mu_int_err(
 	MEMCPY_LIT(&util_buff[util_len], TEXT2);
 	util_len += SIZEOF(TEXT2) - 1;
 	util_buff[util_len] = 0;
-	if(sndata->sn_type)
-		gtm_putmsg(VARLSTCNT(5) err, 3, LEN_AND_STR((char*)util_buff),
+	if (sndata->sn_type)
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) err, 3, LEN_AND_STR((char*)util_buff),
 				(SPAN_NODE == sndata->sn_type) ? (sndata->span_prev_blk + 2) : (sndata->span_blk_cnt));
 	else
-		gtm_putmsg(VARLSTCNT(4) err, 2, LEN_AND_STR((char*)util_buff));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) err, 2, LEN_AND_STR((char*)util_buff));
 	if (do_path)
 	{
 		if (!master_dir)

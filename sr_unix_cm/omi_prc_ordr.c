@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,7 @@ static char rcsid[] = "$Header:$";
 #include "stringpool.h"
 #include "op.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
+#include "hashtab_mname.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
@@ -43,9 +44,11 @@ GBLREF bool		undef_inhibit;
 int omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
 {
 	char		*bptr;
-	int			 rv;
-	omi_li		 len;
-	mval		 vo, vd, vg;
+	int		rv;
+	mname_entry	gvname;
+	omi_li		len;
+	mval		vo, vd, vg;
+	gvnh_reg_t	*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -95,9 +98,10 @@ int omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
 					REVERT;
 					return -OMI_ER_PR_INVGLOBREF;
 				}
-				vo.str.addr++;	vo.str.len--;
-				GV_BIND_NAME_AND_ROOT_SEARCH(cptr->ga, &vo.str);
-				vo.str.addr--;	vo.str.len++;
+				gvname.var_name.addr = vo.str.addr + 1;
+				gvname.var_name.len = vo.str.len - 1;
+				COMPUTE_HASH_MNAME(&gvname);
+				GV_BIND_NAME_AND_ROOT_SEARCH(cptr->ga, &gvname, gvnh_reg);
 				TREF(gv_last_subsc_null) = FALSE;
 			} else
 			{

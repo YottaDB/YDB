@@ -20,7 +20,7 @@
 #include "io_params.h"
 #include "zshow_params.h"
 #include "advancewindow.h"
-#include "namelook.h"
+#include "int_namelook.h"
 #include "cvtparm.h"
 #include "deviceparameters.h"
 
@@ -214,6 +214,7 @@ LITDEF nametabent dev_param_names[] =
 	,{2,"SY*"}
 
 	,{2,"TE*"}	,{4,"TERM"}
+	,{3,"TIM*"}
 	,{2,"TM*"}
 	,{3,"TRA*"}
 	,{3,"TRU*"}
@@ -262,16 +263,13 @@ LITDEF nametabent dev_param_names[] =
 	,{4,"ZWRA*"}
 };
 /* Offset of letter in dev_param_names */
-/* Following array has reached the maximum value limit(255) for its entry. Hence adddition of the next deviceparameter needs
- * to change this array to short or int. This will lead to change the interface to namelook() and the type of the first argument
- * passed to it. Once that is implemented, remove this comment.
- */
-LITDEF	unsigned char dev_param_index[27] =
+
+LITDEF	uint4 dev_param_index[27] =
 {
 /*	A    B    C    D    E    F    G    H    I    J    K    L    M    N   */
 	0,   5,   9,   26,  34,  49,  64,  66,  70,  76,  76,  76,  84,  87,
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	153, 158, 177, 178, 191, 209, 218, 224, 225, 240, 241, 242, 255
+	153, 158, 177, 178, 191, 209, 219, 225, 226, 241, 242, 243, 257
 };
 /* Offset of string within letter in dev_param_names */
 /* maintained in conjunction with zshow_params.h   = offset in letter, letter  */
@@ -288,7 +286,7 @@ LITDEF zshow_index zshow_param_index[] =
 /*	NOPAST   NOREADS  NOTTSY   NOTYPE   NOWRAP   OCHSET   PAD     PARSE   PAST     PRMMBX   RCHK    */
 	{39,13}, {44,13}, {55,13}, {57,13}, {63,13}, {1,14},  {8,15}, {11,15}, {13,15}, {17,15}, {1,17},
 /*      READ     READS	  REC      SHAR     SHELL    STDERR   TERM     TTSY     TYPE    UIC      WAIT     WCHK   */
-	{2,17},  {4,17},  {5,17},  {5,18},  {7,18},  {15,18},  {1,19},  {6,19},  {8,19}, {1,20},  {2,22},  {4,22},
+	{2,17},  {4,17},  {5,17},  {5,18},  {7,18},  {15,18},  {1,19},  {7,19},  {9,19}, {1,20},  {2,22},  {4,22},
 /*      WIDTH   WRITE  */
 	{6,22}, {10,22}
 };
@@ -375,7 +373,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_label
 		,iop_lastpage
 		,iop_length ,iop_length
-		,iop_listen
+		,iop_zlisten			/* Replaces iop_listen. LISTEN is now aliased to ZLISTEN. */
 		,iop_logfile
 		,iop_logqueue
 		,iop_lowercase
@@ -490,6 +488,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_s_protection
 
 		,iop_terminator, iop_terminator
+		,iop_timeout
 		,iop_tmpmbx
 		,iop_trailer
 		,iop_truncate
@@ -539,14 +538,9 @@ int deviceparameters(oprtype *c, char who_calls)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* The value of dev_param_index[26] should be 256 but is 255 since that is all that can fit in a unsigned char. That is why
-	 * following asserts has (dev_param_index[26] + 1). Once the type of dev_param_index is changed, the "+ 1" in following
-	 * assert should be removed.
-	 */
-	assert((SIZEOF(dev_param_names) / SIZEOF(nametabent) == dev_param_index[26] + 1));
-	assert((SIZEOF(dev_param_data) / SIZEOF(unsigned char)) == dev_param_index[26] + 1);
-	assert(dev_param_index[26] == 255);
-	assert(SIZEOF(dev_param_index[26] == SIZEOF(char)));
+
+	assert((SIZEOF(dev_param_names) / SIZEOF(nametabent) == dev_param_index[26]));
+	assert((SIZEOF(dev_param_data) / SIZEOF(unsigned char)) == dev_param_index[26]);
 	is_parm_list = (TK_LPAREN == TREF(window_token));
 	if (is_parm_list)
 		advancewindow();
@@ -556,8 +550,8 @@ int deviceparameters(oprtype *c, char who_calls)
 	for (;;)
 	{
 		if ((TK_IDENT != TREF(window_token))
-			|| (0
-			 > (n = namelook(dev_param_index, dev_param_names, (TREF(window_ident)).addr, (TREF(window_ident)).len))))
+			|| (0 > (n = int_namelook(dev_param_index, dev_param_names,
+						  (TREF(window_ident)).addr, (TREF(window_ident)).len))))
 		{	/* NOTE assignment above */
 			STX_ERROR_WARN(ERR_DEVPARUNK);	/* sets "parse_warn" to TRUE */
 			break;

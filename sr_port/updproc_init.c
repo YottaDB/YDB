@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,9 @@
 #include "read_db_files_from_gld.h"
 #include "updproc.h"
 #include "repl_dbg.h"
+#ifdef VMS
+#include "dpgbldir_sysops.h"	/* for dpzgbini prototype */
+#endif
 
 GBLREF	boolean_t	pool_init;
 GBLREF	gd_addr		*gd_header;
@@ -80,7 +83,7 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 		if (REPL_SEM_NOT_GRABBED)
 			return UPDPROC_EXISTS;
 		else
-			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Receive pool semop error"), UNIX_ONLY(save_errno) VMS_ONLY(REPL_SEM_ERRNO));
 	}
 	jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
@@ -90,7 +93,12 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 	repl_log(updproc_log_fp, TRUE, TRUE, "Attached to existing recvpool with shmid = [%d] and semid = [%d]\n",
 			jnlpool.repl_inst_filehdr->recvpool_shmid, jnlpool.repl_inst_filehdr->recvpool_semid);
 #	endif
-	gvinit();	/* get the desired global directory and update the gd_map */
+	/* In case of Unix dpzgbini() is called as part of gtm_startup which in turn is invoked by init_gtm.
+	 * In VMS though, this is not the case. But the update process needs to initialize dollar_zgbldir as
+	 * tp_restart relies on this (fails an assert otherwise). So do this initialization now for VMS.
+	 */
+	VMS_ONLY(dpzgbini();)
+	gvinit();	/* get the desired global directory */
 	*gld_db_files = read_db_files_from_gld(gd_header);/* read all the database files to be opened in this global directory */
 	if (!updproc_open_files(gld_db_files, start_jnl_seqno)) /* open and initialize all regions */
 		mupip_exit(ERR_UPDATEFILEOPEN);

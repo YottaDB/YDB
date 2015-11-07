@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,7 @@
 #include "gvcst_protos.h"	/* for gvcst_search,gvcst_root_search prototype */
 #include "get_spec.h"
 #include "collseq.h"
+#include "gtmimagename.h"
 #ifdef UNIX
 #include "error.h"
 #endif
@@ -70,7 +71,9 @@ GBLREF	uint4		t_err;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 #endif
 
+error_def(ERR_ACTCOLLMISMTCH);
 error_def(ERR_GVGETFAIL);
+error_def(ERR_NCTCOLLSPGBL);
 
 static	mstr	global_collation_mstr;
 
@@ -106,6 +109,8 @@ static	mstr	global_collation_mstr;
 	int				idx;							\
 	redo_root_search_context	*rootsrch_ctxt_ptr;					\
 												\
+	GBLREF	gv_namehead		*reorg_gv_target;					\
+												\
 	rootsrch_ctxt_ptr = &(TREF(redo_rootsrch_ctxt));					\
 	rootsrch_ctxt_ptr->t_tries = t_tries;							\
 	for (idx = 0; CDB_MAX_TRIES > idx; idx++)						\
@@ -129,9 +134,9 @@ static	mstr	global_collation_mstr;
 	}											\
 	if (mu_reorg_process)									\
 	{	/* In case gv_currkey/gv_target are out of sync. */				\
-		rootsrch_ctxt_ptr->gv_currkey = (gv_key *)&rootsrch_ctxt_ptr->currkey[0];	\
+		rootsrch_ctxt_ptr->gv_currkey = &rootsrch_ctxt_ptr->currkey[0];			\
 		MEMCPY_KEY(rootsrch_ctxt_ptr->gv_currkey, gv_currkey);				\
-		SET_GV_CURRKEY_FROM_REORG_GV_TARGET;						\
+		SET_GV_CURRKEY_FROM_GVT(reorg_gv_target);					\
 	}											\
 }
 
@@ -163,7 +168,7 @@ static	mstr	global_collation_mstr;
 
 CONDITION_HANDLER(gvcst_redo_root_search_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 
 	RESTORE_ROOTSRCH_ENTRY_STATE;
 
@@ -216,10 +221,11 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 	int		altkeylen;
 	int		tmp_cmpc;
 	block_id	lcl_root;
+	uint4		oldact, newact, oldnct, oldver;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth));
+	assert((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)));
 	SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;	/* set up gv_altkey to be just the gblname */
 	save_targ = gv_target;
 	/* Check if "gv_target->gvname" matches "gv_altkey->base". If not, there is a name mismatch (out-of-design situation).
@@ -311,32 +317,73 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 			continue;
 		}
 	}
-	save_targ->root = lcl_root;	/* now that we know the transaction validated fine, set root block in gv_target */
 	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
-	if (rlen > hdr_len + SIZEOF(block_id))
+	if (lcl_root)
 	{
-		assert(NULL != global_collation_mstr.addr);
-		subrec_ptr = get_spec((uchar_ptr_t)global_collation_mstr.addr,
-				      (int)(rlen - (hdr_len + SIZEOF(block_id))), COLL_SPEC);
-		if (subrec_ptr)
+		oldact = gv_target->act;
+		oldnct = gv_target->nct;
+		if (rlen > hdr_len + SIZEOF(block_id))
 		{
-			gv_target->nct = *(subrec_ptr + COLL_NCT_OFFSET);
-			gv_target->act = *(subrec_ptr + COLL_ACT_OFFSET);
-			gv_target->ver = *(subrec_ptr + COLL_VER_OFFSET);
-		} else
-		{
+			assert(NULL != global_collation_mstr.addr);
+			subrec_ptr = get_spec((uchar_ptr_t)global_collation_mstr.addr,
+					      (int)(rlen - (hdr_len + SIZEOF(block_id))), COLL_SPEC);
+			if (subrec_ptr)
+			{
+				gv_target->nct = *(subrec_ptr + COLL_NCT_OFFSET);
+				gv_target->act = *(subrec_ptr + COLL_ACT_OFFSET);
+				gv_target->ver = *(subrec_ptr + COLL_VER_OFFSET);
+			} else
+			{
+				gv_target->nct = 0;
+				gv_target->act = 0;
+				gv_target->ver = 0;
+			}
+		} else if (gv_target->act_specified_in_gld)
+		{	/* Global directory specified a collation. Directory tree did not specify any non-zero collation.
+			 * So global directory prevails.
+			 */
 			gv_target->nct = 0;
-			gv_target->act = 0;
-			gv_target->ver = 0;
+			/* gv_target->act and gv_target->ver would already have been set in COPY_ACT_FROM_GVNH_REG_TO_GVT macro */
+		} else
+		{	/* Global directory did not specify a collation. In that case, db file header defaults prevail. */
+			gv_target->nct = 0;
+			gv_target->act = cs_addrs->hdr->def_coll;
+			gv_target->ver = cs_addrs->hdr->def_coll_ver;
 		}
-	} else
-	{
+		/* If DSE, a runtime global directory is created and hence $gtmgbldir is not as effective as it is for GT.M.
+		 * Hence exclude DSE from the below errors which are related to $gtmgbldir.
+		 */
+		if (!IS_DSE_IMAGE)
+		{
+			if (gv_target->nct && gv_target->nct_must_be_zero)
+			{	/* restore gv_target->act and gv_target->nct */
+				gv_target->act = oldact;
+				gv_target->nct = oldnct;
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_NCTCOLLSPGBL, 4, DB_LEN_STR(gv_cur_region),
+						gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
+			}
+			if (gv_target->act_specified_in_gld && (oldact != gv_target->act))
+			{
+				newact = gv_target->act;
+				gv_target->act = oldact;
+				gv_target->nct = oldnct;
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_ACTCOLLMISMTCH, 6,
+						gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr,
+						oldact, DB_LEN_STR(gv_cur_region), newact);
+			}
+		}
+	} else if (!gv_target->act_specified_in_gld)
+	{	/* If GLD did NOT specify an alternative collation sequence for this global name
+		 * but the db file header has a default collation defined, use it.
+		 */
 		gv_target->nct = 0;
+		assert(ACT_NOT_SPECIFIED != cs_addrs->hdr->def_coll);
 		gv_target->act = cs_addrs->hdr->def_coll;
 		gv_target->ver = cs_addrs->hdr->def_coll_ver;
 	}
 	if (gv_target->act)
-		act_in_gvt();
+		act_in_gvt(gv_target); /* note: this could issue COLLTYPVERSION error */
+	gv_target->root = lcl_root;	/* now that we know the transaction validated fine, set root block in gv_target */
 	assert(gv_target->act || NULL == gv_target->collseq);
 	return cdb_sc_normal;
 }

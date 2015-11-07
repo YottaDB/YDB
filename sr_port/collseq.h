@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,11 +42,13 @@
 		TREF(lcl_coll_xform_buff) = (char *)malloc(TREF(max_lcl_coll_xform_bufsiz));		\
 	}												\
 }
-/*
-   Following two macros are currently used in replication filters, merge command  and binary load to transform
-   GTM null subscripts collation to standard null subscript collation and vice versa
-*/
 
+#define	STD_NULL_COLL_FALSE	FALSE
+#define	STD_NULL_COLL_TRUE	TRUE
+
+/* Following two macros are currently used in replication filters, merge command  and binary load to transform
+ * GTM null subscripts collation to standard null subscript collation and vice versa
+ */
 #define GTM2STDNULLCOLL(key, len)							\
 {											\
 	unsigned char *currptr, *ptrtop;						\
@@ -96,6 +98,5 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq);
 collseq *ready_collseq(int act);
 int4 do_verify(collseq *csp, unsigned char type, unsigned char ver);
 int find_local_colltype(void);
-void act_in_gvt(void);
 
 #endif /* COLLSEQ_H_INCLUDED */

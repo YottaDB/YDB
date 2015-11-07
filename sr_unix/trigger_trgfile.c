@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,6 @@ GBLREF	sgm_info		*first_sgm_info;
 GBLREF	bool			mupip_error_occurred;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	sgm_info		*sgm_info_ptr;
-GBLREF	gd_addr			*gd_header;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	int			tprestart_state;
 GBLREF	io_pair			io_curr_device;
@@ -218,7 +217,7 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 				|| !gv_target || !gv_target->root);
 			assert((cdb_sc_onln_rlbk2 != failure) || !IS_GTM_IMAGE || TREF(dollar_zonlnrlbk));
 			if (cdb_sc_onln_rlbk2 == failure)
-				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBROLLEDBACK);
 			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than trying again. Since this
 			 * is ^#t global, we don't need to GVCST_ROOT_SEARCH before continuing with the next restart because the
 			 * trigger load logic already takes care of doing INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED before doing the
@@ -230,10 +229,9 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 			 * In the case of op_tcommit, we expect dollar_tlevel to be 0 and if so we break out of the loop.
 			 * In the tp_restart case, we expect a maximum of 4 tries/retries and much lesser usually.
 			 * Additionally we also want to avoid an infinite loop so limit the loop to what is considered
-			 * a huge iteration count and GTMASSERT if that is reached as it suggests an out-of-design situation.
+			 * a huge iteration count and assertpro if that is reached as it suggests an out-of-design situation.
 			 */
-			if (TPWRAP_HELPER_MAX_ATTEMPTS < loopcnt)
-				GTMASSERT;
+			assertpro(TPWRAP_HELPER_MAX_ATTEMPTS >= loopcnt);
 		}
 	} else
 	{

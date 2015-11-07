@@ -67,7 +67,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 {
 	boolean_t		all_dead, first_time, sem_incremented, regrab_lock;
 	uint4			savepid[NUM_GTMSRC_LCL];
-	int			status, shutdown_status, save_errno;
+	int			status, shutdown_status, save_errno, max_loopcnt;
 	int4			index, maxindex, lcnt, num_src_servers_running;
 	unix_db_info		*udi;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
@@ -151,9 +151,9 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 		regrab_lock = sem_incremented = TRUE;
 		gvinit();	/* Get the gd header*/
 		/* Wait for ONE particular or ALL source servers to die */
-		repl_log(stdout, TRUE, TRUE, "Waiting for upto [%d] seconds for the source server to shutdown\n",
-			GTMSOURCE_MAX_SHUTDOWN_WAITLOOP);
-		for (lcnt = 1; GTMSOURCE_MAX_SHUTDOWN_WAITLOOP >= lcnt; lcnt++)
+		max_loopcnt = GTMSOURCE_MAX_SHUTDOWN_WAITLOOP(gd_header);
+		repl_log(stdout, TRUE, TRUE, "Waiting for upto [%d] seconds for the source server to shutdown\n", max_loopcnt);
+		for (lcnt = 1; max_loopcnt >= lcnt; lcnt++)
 		{
 			all_dead = TRUE;
 			for (index = 0; index < maxindex; index++)
@@ -172,7 +172,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			else
 				break;
 		}
-		if (GTMSOURCE_MAX_SHUTDOWN_WAITLOOP < lcnt)
+		if (max_loopcnt < lcnt)
 		{	/* Max timeout over, take stack trace of all the source server(s) which are still running.
 			 * Display the list of pids that wont die along with the secondary instances they correspond to.
 			 * Users need to kill these pids and reissue the shutdown command for the journal pool to be cleaned up.
@@ -305,11 +305,10 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 		rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
 	else
 	{	/* Journal Pool and Access Control Semaphores removed. Invalidate corresponding fields in file header */
-		assert(NORMAL_SHUTDOWN == exit_status);
 		repl_inst_jnlpool_reset();
 	}
 	if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, FALSE))
-		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	assert(!num_src_servers_running || (ABNORMAL_SHUTDOWN == exit_status));
 	return (((1 == maxindex) && num_src_servers_running) ? shutdown_status : exit_status);
 }

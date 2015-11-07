@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 /* return a pointer that points after the last char added */
 unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_key *key, boolean_t dollarc)
 {
-	unsigned char			*gvkey_char_ptr, *out_top, *work_char_ptr, work_buff[MAX_ZWR_KEY_SZ], *work_top;
+	unsigned char			ch, *gvkey_char_ptr, *out_top, *work_char_ptr, work_buff[MAX_ZWR_KEY_SZ], *work_top;
 	boolean_t			is_string;
 	DEBUG_ONLY(unsigned char	*gvkey_top_ptr;)
 
@@ -63,17 +63,44 @@ unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_ke
 				*out_char_ptr++ = '"';
 			}
 			work_top = gvsub2str(gvkey_char_ptr, work_buff, dollarc);
-			for (work_char_ptr = work_buff;  work_char_ptr < work_top;)
+			if (!is_string)
 			{
+				for (work_char_ptr = work_buff;  work_char_ptr < work_top;)
+				{
+					if (out_char_ptr >= out_top)
+					{
+						assert(FALSE);
+						return (NULL);
+					}
+					*out_char_ptr++ = *work_char_ptr++;
+				}
+			} else
+			{	/* replace double-quote with TWO double-quotes since this subs is already double-quote-enclosed */
+				for (work_char_ptr = work_buff;  work_char_ptr < work_top;)
+				{
+					if (out_char_ptr >= out_top)
+					{
+						assert(FALSE);
+						return (NULL);
+					}
+					*out_char_ptr++ = (ch = *work_char_ptr++);
+					if ('"' == ch)
+					{
+						if (out_char_ptr >= out_top)
+						{
+							assert(FALSE);
+							return (NULL);
+						}
+						*out_char_ptr++ = ch;
+					}
+				}
 				if (out_char_ptr >= out_top)
 				{
 					assert(FALSE);
 					return (NULL);
 				}
-				*out_char_ptr++ = *work_char_ptr++;
-			}
-			if (is_string)
 				*out_char_ptr++ = '"';
+			}
 		}
 		if (out_char_ptr >= out_top)
 		{

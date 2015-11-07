@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,10 +42,7 @@ int m_zprint(void)
 		return TRUE;
 	if (TK_CIRCUMFLEX != TREF(window_token))
 	{	/* Routine not specified, use current routine */
-		if (!run_time)
-			rtn = put_str(routine_name.addr, routine_name.len);
-		else
-			rtn = put_tref(newtriple(OC_CURRTN));
+		rtn = PUT_CURRENT_RTN;
 	} else
 	{
 		got_some = TRUE;

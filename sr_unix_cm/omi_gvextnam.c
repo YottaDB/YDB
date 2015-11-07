@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@ static char rcsid[] = "$Header:$";
 #include "gbldirnam.h"
 #include "dpgbldir.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
+#include "hashtab_mname.h"
 
 GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
@@ -44,12 +45,15 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 {
 	bool		was_null, is_null;
 	mval		v;
+	mname_entry	gvname;
 	char		*ptr, *end, c[MAX_FBUFF + 1];
 	omi_li		li;
 	omi_si		si;
 	parse_blk	pblk;
 	int4		status;
 	gd_segment	*cur_seg, *last_seg;
+	gvnh_reg_t	*gvnh_reg;
+	gd_region	*reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -95,10 +99,13 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 	si.value--;
 	if (ptr + si.value > end)
 		return -OMI_ER_PR_INVGLOBREF;
-	v.str.len   = si.value;
-	v.str.addr  = ptr;
 	gd_header   = cptr->ga;
-	GV_BIND_NAME_AND_ROOT_SEARCH(cptr->ga, &v.str);
+	gvname.var_name.len   = si.value;
+	gvname.var_name.addr  = ptr;
+	COMPUTE_HASH_MNAME(&gvname);
+	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gvname, gvnh_reg);
+	/* gv_cur_region will not be set in case gvnh_reg->gvspan is non-NULL. So use region from gvnh_reg */
+	reg = gvnh_reg->gd_reg;
 	ptr        += si.value;
 	/* Refine the gd_addr given these subscripts */
 	was_null = is_null  = FALSE;
@@ -112,13 +119,15 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 		v.str.len  = si.value;
 		v.str.addr = ptr;
 		is_null    = (si.value == 0);
-		mval2subsc(&v, gv_currkey);
+		mval2subsc(&v, gv_currkey, reg->std_null_coll);
 		ptr       += si.value;
 	}
 	TREF(gv_some_subsc_null) = was_null; /* if true, it indicates there is a null subscript (except the last subscript)
 						in current key */
 	TREF(gv_last_subsc_null) = is_null; /* if true, it indicates that last subscript in current key is null */
-	if (was_null  &&  NEVER == gv_cur_region->null_subs)
+	if (was_null && (NEVER == reg->null_subs))
 		return -OMI_ER_DB_INVGLOBREF;
+	/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH (e.g. setting gv_cur_region for spanning globals). */
+	GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey, reg);
 	return 0;
 }

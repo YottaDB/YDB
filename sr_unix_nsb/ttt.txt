@@ -474,7 +474,8 @@ OC_GETTRUTH:	movab	val.0,r1
 		jsb	xfer.xf_gettruth
 OC_GVDATA:	pushab	val.0
 		calls	#1,xfer.xf_gvdata
-OC_GVEXTNAM:	irepab	val.2
+OC_GVEXTNAM:	irepab	val.3
+		pushl	val.2	; hash_code
 		calls	val.1,xfer.xf_gvextnam
 OC_GVGET:	pushab	val.0
 		calls	#1,xfer.xf_gvget
@@ -482,9 +483,11 @@ OC_GVINCR:	pushab	val.0		; result of $INCR
 		pushab	val.2		; r->operand[1] = increment (global-variable to increment is gv_currkey so no operand[0])
 		calls	#2,xfer.xf_gvincr
 OC_GVKILL:	calls	#0,xfer.xf_gvkill
-OC_GVNAKED:	irepab	val.2
+OC_GVNAKED:	irepab	val.3
+		pushl	val.2	; hash_code
 		calls	val.1,xfer.xf_gvnaked
-OC_GVNAME:	irepab	val.2
+OC_GVNAME:	irepab	val.3
+		pushl	val.2	; hash_code
 		calls	val.1,xfer.xf_gvname
 OC_GVNEXT:	pushab	val.0
 		calls	#1,xfer.xf_gvnext
@@ -685,8 +688,8 @@ OC_NEWINTRINSIC:  pushl	val.1
 		jsb	xfer.xf_newintrinsic
 OC_NEWVAR:	pushl	val.1
 		jsb	xfer.xf_newvar
-OC_NULLEXP:	pushab	val.0
-		calls	#1,xfer.xf_nullexp
+OC_NULLEXP:	calls	#0,xfer.xf_nullexp
+		movl    r0,addr.0
 OC_NUMCMP:	movab	val.1,r0
 		movab	val.2,r1
 		jsb	xfer.xf_numcmp
@@ -986,7 +989,8 @@ OC_RFRSHLVN:	pushl	val.2
 		pushab	val.1
 		calls	#2,xfer.xf_rfrshlvn
 		movl	r0,addr.0
-OC_SAVGVN:	irepab	val.2
+OC_SAVGVN:	irepab	val.3
+		pushl	val.2	; hash_code
 		calls	val.1,xfer.xf_savgvn
 OC_SAVLVN:	irepab	val.2
 		calls	val.1,xfer.xf_savlvn

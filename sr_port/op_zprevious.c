@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include <stddef.h>		/* for offsetof macro in VMS */
 
 #include "gtm_string.h"
 
@@ -28,14 +30,16 @@
 #include "filestruct.h"
 #include "gdscc.h"
 #include "jnl.h"
+#include "hashtab_mname.h"
+#include "targ_alloc.h"		/* for GV_BIND_SUBSREG macro which needs "targ_alloc" prototype */
+#include "gtmimagename.h"
+#include "collseq.h"		/* for STD_NULL_COLL_FALSE */
+#include "mvalconv.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF gd_region	*gv_cur_region;
-GBLREF gd_addr		*gd_header;
-GBLREF gd_binding	*gd_map;
-GBLREF gd_binding	*gd_map_top;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF spdesc		stringpool;
 
@@ -44,10 +48,14 @@ GBLREF spdesc		stringpool;
 void op_zprevious(mval *v)
 {
 	int4			n;
-	gd_binding		*map;
-	mstr			name;
+	int			min_reg_index, reg_index, res;
+	mname_entry		gvname;
+	mval			tmpmval, *datamval;
 	enum db_acc_method	acc_meth;
 	boolean_t		found, ok_to_change_currkey;
+	gd_binding		*gd_map_start, *map, *prev_map;
+	gd_addr			*gd_targ;
+	gvnh_reg_t		*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -58,7 +66,7 @@ void op_zprevious(mval *v)
 		 * is overloaded for DDP now but could be more in the future) it is better to hand over gv_currkey as it is so
 		 * the custom implementation can decide what to do with it.
 		 */
-		acc_meth = gv_cur_region->dyn.addr->acc_meth;
+		acc_meth = REG_ACC_METH(gv_cur_region);
 		ok_to_change_currkey = (dba_usr != acc_meth);
 		if (TREF(gv_last_subsc_null) && ok_to_change_currkey)
 		{	/* Replace the last subscript with the highest possible subscript value i.e. the byte sequence
@@ -81,11 +89,12 @@ void op_zprevious(mval *v)
 		}
 		if ((dba_bg == acc_meth) || (dba_mm == acc_meth))
 		{
-			if (!gv_target->root)	/* global does not exist */
-				found = FALSE;
+			gvnh_reg = TREF(gd_targ_gvnh_reg);
+			if (NULL == gvnh_reg)
+				found = (gv_target->root ? gvcst_zprevious() : FALSE);
 			else
-				found = gvcst_zprevious();
-		} else  if (dba_cm == acc_meth)
+				INVOKE_GVCST_SPR_XXX(gvnh_reg, found = gvcst_spr_zprevious());
+		} else if (dba_cm == acc_meth)
 			found = gvcmx_zprevious();
 		else
 			found = gvusr_zprevious();
@@ -130,20 +139,31 @@ void op_zprevious(mval *v)
 	} else
 	{	/* the following section is for $ZPREVIOUS(^gname) */
 		assert(2 <= gv_currkey->end);
-		assert(gv_currkey->end < (MAX_MIDENT_LEN + 3));	/* until names are not in midents */
-		for (map = gd_map_top - 1; (map > (gd_map + 1)) &&
-			(0 >= memcmp(gv_currkey->base, map->name,
-				((MAX_MIDENT_LEN + 2) == gv_currkey->end) ? MAX_MIDENT_LEN : gv_currkey->end - 1)); map--)
-			;
-		for (map++;  map > gd_map;  map--)
+		assert(gv_currkey->end < (MAX_MIDENT_LEN + 2));	/* until names are not in midents */
+		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
+		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 1]);
+		gd_targ = TREF(gd_targ_addr);
+		gd_map_start = gd_targ->maps;
+		map = gv_srch_map(gd_targ, (char *)&gv_currkey->base[0], gv_currkey->end - 1);
+		assert(map > (gd_map_start + 1));
+		/* If ^gname starts at "map" start search from map-1 since $ZPREVIOUS(^gname) is sought */
+		BACK_OFF_ONE_MAP_ENTRY_IF_EDGECASE(gv_currkey->base, gv_currkey->end - 1, map);
+		found = FALSE;
+		/* The first map entry corresponds to local locks. The second map entry does not contain any globals.
+		 * Therefore, any search for globals needs to only look after these maps. Hence the "gd_map_start + 1" below.
+		 */
+		for ( ; map > gd_map_start + 1; map = prev_map)
 		{
+			prev_map = map - 1;
 			gv_cur_region = map->reg.addr;
 			if (!gv_cur_region->open)
 				gv_init_reg(gv_cur_region);
 			change_reg();
-			acc_meth = gv_cur_region->dyn.addr->acc_meth;
-			for (;  ;)		/* search region, entries in directory tree could be empty */
+			acc_meth = REG_ACC_METH(gv_cur_region);
+			/* search region, entries in directory tree could have empty GVT in which case move on to previous entry */
+			for ( ; ; )
 			{
+				assert(0 == gv_currkey->prev);	/* or else gvcst_zprevious could get confused */
 				if ((dba_bg == acc_meth) || (dba_mm == acc_meth))
 				{
 					gv_target = cs_addrs->dir_tree;
@@ -158,52 +178,77 @@ void op_zprevious(mval *v)
 					break;
 				assert(1 < gv_altkey->end);
 				assert(gv_altkey->end < (MAX_MIDENT_LEN + 2));	/* until names are not in midents */
-				if (memcmp(gv_altkey->base, (map - 1)->name, gv_altkey->end) < 0)
-				{
+				res = memcmp(gv_altkey->base, prev_map->gvkey.addr, gv_altkey->end);
+				assert((0 != res) || (gv_altkey->end <= prev_map->gvkey_len));
+				if (0 > res)
+				{	/* The global name we found is less than the maximum value in the previous map
+					 * so this name is not part of the current map for sure. Move on to previous map.
+					 */
 					found = FALSE;
 					break;
 				}
-				name.addr = (char *)gv_altkey->base;
-				name.len = gv_altkey->end - 1;
+				gvname.var_name.addr = (char *)gv_altkey->base;
+				gvname.var_name.len = gv_altkey->end - 1;
 				if (dba_cm == acc_meth)
 					break;
-				GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &name);
-				if (gv_cur_region != map->reg.addr)
-				{
-					found = FALSE;
-					break;
+				COMPUTE_HASH_MNAME(&gvname);
+				GV_BIND_NAME_AND_ROOT_SEARCH(gd_targ, &gvname, gvnh_reg);	/* updates "gv_currkey" */
+				assert((NULL != gvnh_reg->gvspan) || (gv_cur_region == map->reg.addr));
+				if (NULL != gvnh_reg->gvspan)
+				{	/* gv_target would NOT have been initialized by GV_BIND_NAME in this case.
+					 * So finish that initialization.
+					 */
+					datamval = &tmpmval;
+					/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH
+					 * 	(e.g. setting gv_cur_region for spanning globals)
+					 */
+					GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_targ, gv_currkey, gvnh_reg->gd_reg);
+					op_gvdata(datamval);
+					if (MV_FORCE_INT(datamval))
+						break;
+				} else
+				{	/* else gv_target->root would have been initialized by GV_BIND_NAME_AND_ROOT_SEARCH */
+					if ((0 != gv_target->root) && (0 != gvcst_data()))
+						break;
 				}
-				if ((gv_target->root) && gvcst_data())
-					break;
 			}
 			if (found)
 				break;
-			else  if ((map - 1) > gd_map)
+			/* If previous map corresponding to a spanning global, then do not update gv_currkey as that would
+			 * effectively cause the spanning global to be skipped. If gvkey_len == gvname_len + 1 it is NOT
+			 * a spanning global map entry.
+			 */
+			assert(prev_map->gvkey_len >= (prev_map->gvname_len + 1));
+			if ((prev_map > (gd_map_start + 1)) && (prev_map->gvkey_len == (prev_map->gvname_len + 1)))
 			{
-				assert(SIZEOF((map - 1)->name) == SIZEOF(mident_fixed));
-				assert(0 == (map - 1)->name[SIZEOF((map - 1)->name) - 1]);
-				gv_currkey->end = mid_len((mident_fixed *)((map - 1)->name));
-				assert(gv_currkey->end <= MAX_MIDENT_LEN);
-				memcpy(gv_currkey->base, (map - 1)->name, gv_currkey->end);
-				gv_currkey->base[gv_currkey->end++] = KEY_DELIMITER;
+				assert(strlen(prev_map->gvkey.addr) == prev_map->gvname_len);
+				gv_currkey->end = prev_map->gvname_len + 1;
+				assert(gv_currkey->end <= (MAX_MIDENT_LEN + 1));
+				memcpy(gv_currkey->base, prev_map->gvkey.addr, gv_currkey->end);
+				assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 1]);
 				gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 				assert(gv_currkey->top > gv_currkey->end);	/* ensure we are within allocated bounds */
 			}
 		}
+		/* Reset gv_currkey as we have potentially skipped one or more regions so we no
+		 * longer can expect gv_currkey/gv_cur_region/gv_target to match each other.
+		 */
 		gv_currkey->end = 0;
 		gv_currkey->base[0] = KEY_DELIMITER;
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied (BYPASSOK)
 				* by this to-be-overwritten mval */
 		if (found)
 		{
-			v->str.len = 0; /* so stp_gcol (if invoked) can free up space currently occupied by this (BYPASSOK)
-					 * to-be-overwritten mval */
-			ENSURE_STP_FREE_SPACE(name.len + 1);
+			if (!IS_STP_SPACE_AVAILABLE(gvname.var_name.len + 1))
+			{
+				v->str.len = 0;	/* so stp_gcol ignores otherwise incompletely setup mval (BYPASSOK) */
+				INVOKE_STP_GCOL(gvname.var_name.len + 1);
+			}
 			v->str.addr = (char *)stringpool.free;
 			*stringpool.free++ = '^';
-			memcpy(stringpool.free, name.addr, name.len);
-			stringpool.free += name.len;
-			v->str.len = name.len + 1;
+			memcpy(stringpool.free, gvname.var_name.addr, gvname.var_name.len);
+			stringpool.free += gvname.var_name.len;
+			v->str.len = gvname.var_name.len + 1;
 			assert(v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
 			assert(v->str.addr + v->str.len <= (char *)stringpool.top &&
 				v->str.addr + v->str.len >= (char *)stringpool.base);

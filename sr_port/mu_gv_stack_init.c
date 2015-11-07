@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,11 +25,6 @@
 #include "stack_frame.h"
 #include "mu_gv_stack_init.h"
 
-GBLREF	gv_key			*gv_currkey;
-GBLREF	gv_namehead		*gv_target;
-GBLREF  gd_region               *gv_cur_region;
-GBLREF  int4			gv_keysize;
-GBLREF  gv_key                  *gv_altkey;
 GBLREF  mv_stent                *mv_chain;
 GBLREF  stack_frame             *frame_pointer;
 GBLREF  unsigned char           *msp, *stackbase, *stacktop, *stackwarn;
@@ -41,8 +36,7 @@ void mu_gv_stack_init(void)
 	lnr_tabent	*lnrtbe;
 	unsigned char	*mstack_ptr;
 
-	GVKEY_INIT(gv_currkey, gv_keysize);
-	GVKEY_INIT(gv_altkey, gv_keysize);
+	GVKEYSIZE_INIT_IF_NEEDED;	/* sets "gv_keysize", "gv_currkey" and "gv_altkey" (if not already done) */
 	/* There may be M transactions in the journal files.  If so, op_tstart() and op_tcommit()
 	 * will be called during recovery;  they require a couple of dummy stack frames to be set up.
 	 */

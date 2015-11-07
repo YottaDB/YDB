@@ -82,7 +82,6 @@ GBLREF	sgm_info		*first_sgm_info, *sgm_info_ptr;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	cw_set_element		cw_set[];
-GBLREF	gd_addr			*gd_header;
 GBLREF	boolean_t		tp_kill_bitmaps;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];

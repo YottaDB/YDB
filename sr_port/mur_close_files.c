@@ -45,6 +45,7 @@
 #include "gtmmsg.h"
 #include "file_head_read.h"
 #include "file_head_write.h"
+#include "have_crit.h"
 #if defined(UNIX)
 #include "repl_msg.h"
 #include "gtmsource.h"
@@ -54,7 +55,6 @@
 #include "repl_instance.h"
 #include "repl_sem.h"
 #include "ftok_sems.h"
-#include "have_crit.h"
 #include "gtmsource_srv_latch.h"
 #include <signal.h>
 #include "anticipatory_freeze.h"
@@ -474,7 +474,7 @@ boolean_t mur_close_files(void)
 				assert(jctl->turn_around_offset);
 				jctl->jfh->turn_around_offset = 0;
 				jctl->jfh->turn_around_time = 0;
-				jctl->jfh->crash = 0;
+				jctl->jfh->crash = FALSE;
 				jctl->jfh->end_of_data = jctl->turn_around_offset;
 				jctl->jfh->eov_timestamp = jctl->turn_around_time;
 				jctl->jfh->eov_tn = jctl->turn_around_tn;
@@ -831,7 +831,6 @@ boolean_t mur_close_files(void)
 		mu_replpool_release_sem(&repl_instance, RECVPOOL_SEGMENT, got_ftok);
 		if (got_ftok)
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, TRUE); /* immediate=TRUE */
-		murgbl.repl_standalone = FALSE;
 		ASSERT_DONOT_HOLD_REPLPOOL_SEMS;
 		assert(jgbl.onlnrlbk ||
 			((INVALID_SEMID == repl_instance.jnlpool_semid) && (0 == repl_instance.jnlpool_semid_ctime)));
@@ -851,10 +850,9 @@ boolean_t mur_close_files(void)
 	{	/* Signal completion */
 		assert(((NULL != inst_hdr) && (udi == FILE_INFO(jnlpool.jnlpool_dummy_reg))) || !murgbl.clean_exit);
 		finish_err_code = murgbl.clean_exit ? ERR_ORLBKCMPLT : ERR_ORLBKTERMNTD;
-		if (NULL != inst_hdr)
-		{	/* If inst_hdr is NULL, it means we exited even before getting standalone access on the journal pool.
-			 * No point issuing the ORLBKCMPLT or ORLBKTERMNTD message because ORLBKSTART will not even be issued.
-			 */
+		assert(!murgbl.repl_standalone || ((NULL != inst_hdr) && (NULL != udi)));
+		if (murgbl.repl_standalone)
+		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) finish_err_code, 4,
 					LEN_AND_STR(inst_hdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) finish_err_code, 4,

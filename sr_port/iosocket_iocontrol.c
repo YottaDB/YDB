@@ -20,16 +20,22 @@
 
 #include "io.h"
 #include "iotimer.h"
-#include "iotcpdef.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "gtm_caseconv.h"
 #include "stringpool.h"
+#include "min_max.h"
 
 GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
 
 error_def(ERR_INVCTLMNE);
+
+/* for iosocket_dlr_zkey */
+#define LISTENING	"LISTENING|"
+#define READ		"READ|"
+#define MAXEVENTLITLEN	(SIZEOF(LISTENING)-1)
+#define MAXZKEYITEMLEN	(MAX_HANDLE_LEN + SA_MAXLITLEN + MAXEVENTLITLEN + 2)	/* 1 pipe and a semicolon */
 
 void	iosocket_iocontrol(mstr *d)
 {
@@ -98,4 +104,116 @@ void	iosocket_dlr_key(mstr *d)
 	        memcpy(d->addr, iod->dollar.key, len);
         d->len = len;
         return;
+}
+
+void iosocket_dlr_zkey(mstr *d)
+{
+	int4		ii;
+	int		len, thislen, totlen;
+	char		*zkeyptr, *charptr;
+	io_desc		*iod;
+	d_socket_struct	*dsocketptr;
+	socket_struct	*socketptr;
+
+	iod = io_curr_device.out;
+	if (gtmsocket != iod->type)
+		iod = io_curr_device.in;
+	assertpro(gtmsocket == iod->type);
+	dsocketptr = (d_socket_struct *)iod->dev_sp;
+	zkeyptr = (char *)stringpool.free;
+	totlen = thislen = len = 0;
+	for (ii = 0; ii < dsocketptr->n_socket; ii++)
+	{
+		socketptr = dsocketptr->socket[ii];
+		if ((socket_listening != socketptr->state) && (socket_connected != socketptr->state))
+			continue;
+		if ((socket_connected == socketptr->state) && (0 < socketptr->buffered_length))
+		{	/* data to be read in buffer */
+			if (!socketptr->pendingevent)
+			{	/* may have been cleared by partial READ */
+				socketptr->pendingevent = TRUE;
+				socketptr->readycycle = dsocketptr->waitcycle;
+			}
+		}
+		if (socketptr->pendingevent)
+		{
+			thislen = len = 0;
+			if (!IS_STP_SPACE_AVAILABLE(totlen + MAXZKEYITEMLEN))
+			{	/* d must be mstr part of mval known to stp_gcol */
+				if (totlen)
+				{
+					d->len = totlen;
+					d->addr = (char *)stringpool.free;
+					stringpool.free += totlen;
+				}
+				INVOKE_STP_GCOL(totlen + MAXZKEYITEMLEN);
+				if (totlen)
+				{
+					if (!IS_AT_END_OF_STRINGPOOL(d->addr, totlen))
+					{	/* need to move to top */
+						memcpy(stringpool.free, d->addr, totlen);
+					} else
+						stringpool.free -= totlen;	/* backup over prior items */
+					d->len = 0;	/* so ignored by stp_gcol */
+				}
+				zkeyptr = (char *)stringpool.free + totlen;
+			}
+			if (totlen)
+			{	/* at least one item already */
+				*zkeyptr++ = ';';
+				totlen++;
+			}
+			/* add READ/LISTENING|handle|remoteinfo;... */
+			if (socket_listening == socketptr->state)
+			{
+				thislen = len = SIZEOF(LISTENING) - 1;
+				memcpy(zkeyptr, LISTENING, len);
+			} else
+			{
+				thislen = len = SIZEOF(READ) - 1;
+				memcpy(zkeyptr, READ, len);
+			}
+			zkeyptr += len;
+			thislen += len;
+			totlen += len;
+			memcpy(zkeyptr, socketptr->handle, socketptr->handle_len);
+			zkeyptr += socketptr->handle_len;
+			*zkeyptr++ = '|';
+			thislen += (socketptr->handle_len + 1);
+			totlen += (socketptr->handle_len + 1);
+			if (socket_local != socketptr->protocol)
+			{
+				if (socket_listening == socketptr->state)
+					len = SPRINTF(zkeyptr, "%d", socketptr->local.port);
+				else
+				{
+					if (NULL != socketptr->remote.saddr_ip)
+					{
+						len = STRLEN(socketptr->remote.saddr_ip);
+						memcpy(zkeyptr, socketptr->remote.saddr_ip, len);
+					} else
+						len = 0;
+				}
+#			ifndef VMS
+			} else
+			{
+				if (NULL != socketptr->local.sa)
+					charptr = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
+				else if (NULL != socketptr->remote.sa)
+					charptr = ((struct sockaddr_un *)(socketptr->remote.sa))->sun_path;
+				else
+					charptr = "";
+				len = STRLEN(charptr);
+				len = MIN(len, (MAXZKEYITEMLEN - thislen));
+				memcpy(zkeyptr, charptr, len);
+#			endif
+			}
+			zkeyptr += len;
+			totlen += len;
+		}
+	}
+	d->addr = (char *)stringpool.free;
+	d->len = totlen;
+	stringpool.free += totlen;
+	return;
 }

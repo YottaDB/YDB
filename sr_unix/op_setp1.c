@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -262,7 +262,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 	/* Calculate total string len. delim_cnt has needed padding delimiters for null fields */
 	str_len = (size_t)expr->str.len + (size_t)pfx_str_len + (delim_cnt * (size_t)dlmlen) + (size_t)sfx_str_len;
 	if (MAX_STRLEN < str_len)
-		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 	ENSURE_STP_FREE_SPACE((int)str_len);
 	str_addr = stringpool.free;
 	start_pfx = (unsigned char *)src->str.addr;
@@ -290,7 +290,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 		memcpy(str_addr, start_pfx + sfx_start_offset, sfx_str_len);
 		str_addr += sfx_str_len;
 	}
-	assert((str_addr - stringpool.free) == str_len);
+	assert(IS_AT_END_OF_STRINGPOOL(str_addr, -str_len));
 	dst->mvtype = MV_STR;
 	dst->str.len = INTCAST(str_addr - stringpool.free);
 	dst->str.addr = (char *)stringpool.free;

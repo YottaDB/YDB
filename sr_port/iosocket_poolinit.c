@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,14 +15,13 @@
 
 #include "gtm_string.h"
 
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 
 #include "io.h"
 #include "io_params.h"
 #include "iotimer.h"
-#include "iotcpdef.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "op.h"

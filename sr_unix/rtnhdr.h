@@ -11,6 +11,8 @@
 #ifndef RTNHDR_H_INCLUDED
 #define RTNHDR_H_INCLUDED
 
+#include "srcline.h"
+
 /* rtnhdr.h - routine header for shared binary Unix platforms */
 
 /* There are several references to this structure from assembly language; these include:
@@ -94,7 +96,7 @@ typedef struct	rhead_struct
 	unsigned char		*shared_ptext_adr;	/* If set, ptext_adr points to local copy, this points to old shared copy */
 	unsigned char		*ptext_adr;		/* (#) address of start of instructions (offset in original rtnhdr) */
 	unsigned char		*ptext_end_adr;		/* (#) address of end of instructions + 1 (offset in original rtnhdr) */
-	int4			checksum;		/* verification value */
+	int4			checksum;		/* 4-byte source code checksum (for platforms where MD5 is unavailable) */
 	int4			temp_mvals;		/* (#) temp_mvals value of current module version */
 	int4			temp_size;		/* (#) temp_size value of current module version */
 	struct rhead_struct	*current_rhead_adr;	/* (#) address of routine header of current module version */
@@ -102,6 +104,9 @@ typedef struct	rhead_struct
 #	ifdef GTM_TRIGGER
 	void_ptr_t		trigr_handle;		/* Type is void to avoid needing gv_trigger.h for gv_trigger_t type addr */
 #	endif
+	unsigned char		checksum_md5[16];	/* 16-byte MD5 checksum of routine source code */
+	struct rhead_struct	*active_rhead_adr;	/* chain of active old versions, fully reserved for continued use */
+	routine_source		*source_code;		/* source code used by $TEXT */
 } rhdtyp;
 
 /* Routine table entry */
@@ -207,14 +212,17 @@ struct	sym_table
 
 /* Prototypes */
 int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_t verifytrig);
+void free_src_tbl(rhdtyp *rtn_vector);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
 int4 *find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_name);
 rhdtyp *find_rtn_hdr(mstr *name);
+boolean_t find_rtn_tabent(rtn_tabent **res, mstr *name);
 bool zlput_rname(rhdtyp *hdr);
 void zlmov_lnames(rhdtyp *hdr);
 rhdtyp *make_dmode(void);
 void comp_lits(rhdtyp *rhead);
 rhdtyp  *op_rhdaddr(mval *name, rhdtyp *rhd);
+rhdtyp	*op_rhdaddr1(mval *name);
 lnr_tabent **op_labaddr(rhdtyp *routine, mval *label, int4 offset);
 void urx_resolve(rhdtyp *rtn, lab_tabent *lbl_tab, lab_tabent *lbl_top);
 char *rtnlaboff2entryref(char *entryref_buff, mident *rtn, mident *lab, int offset);

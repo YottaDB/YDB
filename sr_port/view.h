@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,9 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#ifndef VIEW_INCLUDED
+#define VIEW_INCLUDED
 
 typedef struct
 {
@@ -44,6 +47,7 @@ typedef union
 	mval			*value;
 	struct gd_region_struct *gv_ptr;
 	noisolation_list	ni_list;
+	mstr			str;
 } viewparm;
 
 #define VTP_NULL 1
@@ -56,12 +60,18 @@ typedef union
 
 #define VIEWTAB(A,B,C,D) C
 
+#define	IS_DOLLAR_VIEW_FALSE	FALSE
+#define	IS_DOLLAR_VIEW_TRUE	TRUE
+
 enum viewtab_keycode {
 #include "viewtab.h"
 };
 
 viewtab_entry *viewkeys(mstr *v);
-void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk);
+void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *parmblk, boolean_t is_dollar_view);
 void view_routines(mval *dst, mident_fixed *name);
+void view_routines_checksum(mval *dst, mident_fixed *name);
 
 #undef VIEWTAB
+
+#endif /* VIEW_INCLUDED */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,9 +63,7 @@ GBLREF spdesc		stringpool;
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 
-error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVQUERYGETFAIL);
-error_def(ERR_TPRETRY);
 
 DEFINE_NSB_CONDITION_HANDLER(gvcst_queryget_ch)
 
@@ -73,8 +71,7 @@ boolean_t gvcst_queryget(mval *val)
 {
 	bool		found, is_hidden, is_dummy = FALSE, sn_tpwrapped;
 	boolean_t	est_first_pass;
-	char		save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_key		*save_gv_currkey;
+	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	int		save_dollar_tlevel;
 
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
@@ -87,7 +84,7 @@ boolean_t gvcst_queryget(mval *val)
 	if (!found || (!is_dummy && !is_hidden))
 		return found;
 	IF_SN_DISALLOWED_AND_NO_SPAN_IN_DB(return found);
-	SAVE_GV_CURRKEY;
+	SAVE_GV_CURRKEY(save_currkey);
 	if (!dollar_tlevel)
 	{
 		sn_tpwrapped = TRUE;
@@ -106,7 +103,7 @@ boolean_t gvcst_queryget(mval *val)
 		op_tcommit();
 		REVERT; /* remove our condition handler */
 	}
-	RESTORE_GV_CURRKEY;
+	RESTORE_GV_CURRKEY(save_currkey);
 	assert(save_dollar_tlevel == dollar_tlevel);
 #	endif
 	return found;
@@ -191,10 +188,10 @@ boolean_t gvcst_queryget2(mval *val, unsigned char *sn_ptr)
 					continue;
 				}
 				ENSURE_STP_FREE_SPACE(data_len);
-				DEBUG_ONLY (
+#				ifdef DEBUG
 				if (!save_strp)
-					save_strp = stringpool.free);
-				assert(stringpool.top - stringpool.free >= data_len);
+					save_strp = stringpool.free;
+#				endif
 				memcpy(stringpool.free, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
 				/* Assumption: t_end/tp_hist will never cause stp_gcol() call BYPASSOK */
 			}

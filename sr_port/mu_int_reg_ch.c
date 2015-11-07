@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ error_def(ERR_VMSMEMORY);
 
 CONDITION_HANDLER(mu_int_reg_ch)
 {
-	START_CH
+	START_CH(TRUE);
 	mu_int_skipreg_cnt++;
 	if (DUMPABLE)
 		NEXTCH;

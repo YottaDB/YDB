@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,15 @@
 #include "subscript.h"
 #include "str2gvargs.h"
 #include "str2gvkey.h"
+#include "collseq.h"
+
+#ifdef UNIX
+GBLREF  repl_conn_info_t        *this_side;
+#endif
+
+#ifdef VMS
+GBLREF	gd_region	*gv_cur_region;
+#endif
 
 void str2gvkey_nogvfunc(char *cp, int len, gv_key *key)
 { /* We have two functions str2gvkey_gvfunc and str2gvkey_nogvfunc instead of passing a boolean argument to say a common  */
@@ -32,14 +41,18 @@ void str2gvkey_nogvfunc(char *cp, int len, gv_key *key)
 	int		subsc;
 
 	naked = str2gvargs(cp, len, &op_gvargs);
-	if (naked)
-		GTMASSERT; /* 'cos this function does not handle nakeds correctly */
+	assertpro(!naked);	/* because this function does not handle nakeds correctly */
 	key->end = op_gvargs.args[0]->str.len;
 	memcpy(key->base, op_gvargs.args[0]->str.addr, key->end);
 	key->base[key->end] = 0;
 	key->end++;
 	key->prev = 0;
+	/* Since this function is called from the source and/or receiver server for now and since both of them ensure
+	 * all regions have the same std_null_coll value and since "this_side" holds this information (for Unix) we
+	 * use this to determine the std_null_coll setting to use for mval2subsc. In VMS, we use a hardcoded value.
+	 */
 	for (subsc = 1; subsc < op_gvargs.count; subsc++)
-		mval2subsc(op_gvargs.args[subsc], key);
+		mval2subsc(op_gvargs.args[subsc], key, UNIX_ONLY(this_side->is_std_null_coll)
+				VMS_ONLY((NULL != gv_cur_region ? gv_cur_region->std_null_coll : STD_NULL_COLL_FALSE)));
 	return;
 }

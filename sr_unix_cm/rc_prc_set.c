@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,7 @@
 #include "rc_oflow.h"
 #include "gtcm.h"
 #include "gvcst_protos.h"	/* for gvcst_put prototype */
+#include "hashtab_mname.h"	/* for COMPUTE_HASH_MNAME prototype */
 
 GBLREF rc_oflow	*rc_overflow;
 GBLREF gv_key 		*gv_currkey;
@@ -41,45 +42,42 @@ int rc_prc_set(rc_q_hdr *qhdr)
     short	len;
     int		 i;
     mval	 v;
+    mname_entry	gvname;
     char	*cp1;
+    gvnh_reg_t	*gvnh_reg;
 
     ESTABLISH_RET(rc_dbms_ch, RC_SUCCESS);
     if ((qhdr->a.erc.value = rc_fnd_file(&qhdr->r.xdsid)) != RC_SUCCESS)
     {
 	REVERT;
-#ifdef DEBUG
-	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"rc_fnd_file.");
-#endif
+	DEBUG_ONLY(gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"rc_fnd_file.");)
 	return -1;
     }
-assert(rc_overflow->buff != 0);
+	assert(rc_overflow->buff != 0);
 
     rsp = req = (rc_set *)qhdr;
     if (req->key.len.value > cs_data->max_key_size)
     {
 	qhdr->a.erc.value = RC_KEYTOOLONG;
 	REVERT;
-#ifdef DEBUG
-	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
-#endif
+	DEBUG_ONLY(gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");)
 	return -1;
     }
-    v.mvtype = MV_STR;
     for (cp1 = req->key.key; *cp1; cp1++)
 	;
-    v.str.len = INTCAST(cp1 - req->key.key);
-    v.str.addr = req->key.key;
-	if (v.str.len > 8)	/* GT.M does not support global variables > 8 chars */
+    gvname.var_name.len = INTCAST(cp1 - req->key.key);
+    gvname.var_name.addr = req->key.key;
+	if (gvname.var_name.len > 8)	/* GT.M does not support global variables > 8 chars */
 	{	qhdr->a.erc.value = RC_KEYTOOLONG;
 		REVERT;
-#ifdef DEBUG
-	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
-#endif
+		DEBUG_ONLY(gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");)
 		return -1;
 	}
-	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &v.str);
+	COMPUTE_HASH_MNAME(&gvname);
+	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gvname, gvnh_reg);
+	assert(NULL == gvnh_reg->gvspan); /* so GV_BIND_SUBSNAME_IF_GVSPAN is not needed */
     memcpy(gv_currkey->base, req->key.key, req->key.len.value);
-assert(rc_overflow->buff != 0);
+	assert(rc_overflow->buff != 0);
     gv_currkey->end = req->key.len.value;
     gv_currkey->base[gv_currkey->end] = 0;
     for (i = gv_currkey->end - 2; i > 0; i--)
@@ -88,9 +86,9 @@ assert(rc_overflow->buff != 0);
     gv_currkey->prev = i;
     data = (rc_swstr *)(req->key.key + req->key.len.value);
     GET_SHORT (len, &data->len.value);
+    v.mvtype = MV_STR;
     v.str.len = len;
     v.str.addr = data->str;
-    v.mvtype = MV_STR;
     if (gv_currkey->end + 1 + v.str.len + SIZEOF(rec_hdr) > gv_cur_region->max_rec_size)
     {
 	qhdr->a.erc.value = RC_KEYTOOLONG;

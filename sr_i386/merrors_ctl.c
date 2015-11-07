@@ -42,7 +42,7 @@ LITDEF	err_msg merrors[] = {
 	"DBRDERR", "Cannot read database file !AD after opening", 2,
 	"CCEDUMPNOW", "", 0,
 	"DEVPARINAP", "Device parameter inappropriate to this command", 0,
-	"RECORDSTAT", "!AD:!_  Key cnt: !UL  max subsc len: !UL  max data len: !UL  max rec len: !UL", 6,
+	"RECORDSTAT", "!AD:!_  Key cnt: !UL  max subsc len: !UL  max rec len: !UL  max node len: !UL", 6,
 	"NOTGBL", "!_!AD!/!_!_!_\"^\" Expected", 2,
 	"DEVPARPROT", "The protection specification is invalid", 0,
 	"PREMATEOF", "Premature end of file detected", 0,
@@ -512,12 +512,12 @@ LITDEF	err_msg merrors[] = {
 	"NOPRINCIO", "Unable to write to principal device", 0,
 	"INVPORTSPEC", "Invalid port specification", 0,
 	"INVADDRSPEC", "Invalid IP address specification", 0,
-	"SOCKPARMREQ", "Socket device parameter is required for TCP open", 0,
-	"IPADDRREQ", "Active connection requires IP address", 0,
+	"UNUSEDMSG677", "SOCKPARMREQ last used in V6.0-002", 0,
+	"UNUSEDMSG678", "IPADDRREQ last used in V6.0-002", 0,
 	"SOCKWAIT", "Error waiting for socket connection", 0,
 	"SOCKACPT", "Error accepting socket connection", 0,
-	"SOCKINIT", "Error initializing TCP socket: (errno == !UL) !AD", 3,
-	"OPENCONN", "Error opening TCP connection", 0,
+	"SOCKINIT", "Error initializing socket: (errno == !UL) !AD", 3,
+	"OPENCONN", "Error opening socket connection", 0,
 	"DEVNOTIMP", "!AD device not implemented on in this environment", 2,
 	"JNLEXTR", "Error writing journal extract file: !AD", 2,
 	"DBREMOTE", "Database region !AD is remote; perform maintenance on the server node", 2,
@@ -543,7 +543,7 @@ LITDEF	err_msg merrors[] = {
 	"MUNOACTION", "MUPIP unable to perform requested action", 0,
 	"RMBIGSHARE", "File with BIGRECORD specified may only be shared if READONLY", 0,
 	"TPRESTART", "Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: 0x!16@XQ", 14,
-	"SOCKWRITE", "Write to a TCP/IP socket failed", 0,
+	"SOCKWRITE", "Write to a socket failed", 0,
 	"DBCNTRLERR", "Database file !AD: control error suspected but not found", 2,
 	"NOTERMENV", "Environment variable TERM not set.  Assuming \"unknown.\"", 0,
 	"NOTERMENTRY", "TERM = \"!AD\" has no \"terminfo\" entry.  Possible terminal handling problems.", 2,
@@ -616,7 +616,7 @@ LITDEF	err_msg merrors[] = {
 	"NOFORKCORE", "Unable to fork off process to create core.  Core creation postponed.", 0,
 	"JNLREAD", "Error reading from journal file !AD at offset [0x!XL]", 3,
 	"JNLMINALIGN", "Journal Record Alignment !UL is less than the minimum value of !UL", 2,
-	"UNUSEDMSG781", "JNLDSKALIGN : Last used in V4.3-000", 0,
+	"JOBSTARTCMDFAIL", "JOB command STARTUP script invocation failed", 0,
 	"JNLPOOLSETUP", "Journal Pool setup error", 0,
 	"JNLSTATEOFF", "ROLLBACK or RECOVER BACKWARD cannot proceed as database file !AD does not have journaling ENABLED and ON", 2,
 	"RECVPOOLSETUP", "Receive Pool setup error", 0,
@@ -679,7 +679,7 @@ LITDEF	err_msg merrors[] = {
 	"BUFFLUFAILED", "Error flushing buffers from !AD for database file !AD", 4,
 	"MUQUALINCOMP", "Incompatible qualifiers - FILE and REGION", 0,
 	"DISTPATHMAX", "$gtm_dist path is greater than maximum (!UL)", 1,
-	"UNUSEDMSG844", "MAXTRACEHEIGHT last used in V5.4-002", 0,
+	"FILEOPENFAIL", "Failed to open file !AD", 2,
 	"IMAGENAME", "The executing module name should be !AD instead of !AD", 4,
 	"GTMSECSHRPERM", "The gtmsecshr module in $gtm_dist does not have the correct permission and uid", 0,
 	"GTMDISTUNDEF", "Environment variable $gtm_dist is not defined", 0,
@@ -807,7 +807,7 @@ LITDEF	err_msg merrors[] = {
 	"SEMWT2LONG", "Process !UL waited !UL second(s) for the !AD lock for region !AD, lock held by pid !UL", 7,
 	"REPLINSTOPEN", "Error opening replication instance file !AD", 2,
 	"REPLINSTCLOSE", "Error closing replication instance file !AD", 2,
-	"UNUSEDMSG972", "JNLNOTFOUND : Last used in V4.4-000", 0,
+	"JOBSETUP", "Error receiving !AD from parent process", 2,
 	"DBCRERR8", "Database file !AD, cr location 0x!XJ blk = 0x!XL error: !AD was 0x!16@XQ, expecting 0x!16@XQ -- called from module !AD at line !UL", 11,
 	"NUMPROCESSORS", "Could not determine number of processors", 0,
 	"DBADDRANGE8", "Database file !AD, element location 0x!XJ: blk = 0x!XL: control 0x!16@XQ was outside !AD range 0x!16@XQ to 0x!16@XQ", 9,
@@ -942,7 +942,7 @@ LITDEF	err_msg merrors[] = {
 	"ZDIROUTOFSYNC", "$ZDIRECTORY !AD is not the same as its cached value !AD", 4,
 	"GBLNOEXIST", "Global !AD no longer exists", 2,
 	"MAXBTLEVEL", "Global !AD reached maximum level", 2,
-	"UNUSEDMSG1107", "JNLSTRESTFL : found no evidence it ever was used in a production release", 0,
+	"INVMNEMCSPC", "Unsupported mnemonicspace !AD", 2,
 	"JNLALIGNSZCHG", "Journal ALIGNSIZE is rounded up to !UL blocks (closest next higher power of two)", 1,
 	"UNUSEDMSG1109", "MAXTRACELEVEL : last used in V5.4-002B", 0,
 	"GVFAILCORE", "A core file is being created for later analysis if necessary", 0,
@@ -1154,7 +1154,7 @@ LITDEF	err_msg merrors[] = {
 	"CRYPTKEYFETCHFAILED", "Could not retrieve encryption key corresponding to file !AD. !AD", 4,
 	"CRYPTKEYFETCHFAILEDNF", "Could not retrieve encryption key during !AD operation key. !AD", 4,
 	"CRYPTHASHGENFAILED", "Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD", 4,
-	"CRYPTNOPSWDINTP", "Cannot prompt for password inside a TP transaction.", 0,
+	"UNUSEDMSG1319", "CRYPTNOPSWDINTP : Last used in V6.0-003", 0,
 	"BADTAG", "Unable to use file !AD (CCSID !UL) with CCSID !UL", 4,
 	"ICUVERLT36", "!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used", 4,
 	"ICUSYMNOTFOUND", "Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified", 2,
@@ -1253,7 +1253,7 @@ LITDEF	err_msg merrors[] = {
 	"SECNOTSUPPLEMENTARY", "!AD is a Supplementary Instance and so cannot act as a source to non-Supplementary Instance !AD ", 4,
 	"SUPRCVRNEEDSSUPSRC", "Instance !AD is not configured to perform local updates so it cannot act as a receiver for non-Supplementary Instance !AD", 4,
 	"UNUSEDMSG1417", "SYNCTOSAMETYPE: Never used before so slot free for reuse", 0,
-	"UNUSEDMSG1418", "TARGINSRUNNING: Never used before so slot free for reuse", 0,
+	"SETITIMERFAILED", "A setitimer() call returned an error status of !UL", 1,
 	"UPDSYNC2MTINS", "Can only UPDATERESYNC with an empty instance file", 0,
 	"UPDSYNCINSTFILE", "Error with instance file name specified in UPDATERESYNC qualifier", 0,
 	"REUSEINSTNAME", "Error with instance name specified in REUSE qualifier", 0,
@@ -1359,10 +1359,29 @@ LITDEF	err_msg merrors[] = {
 	"HOSTCONFLICT", "Host !AD could not open database file !AD because it is marked as already open on node !AD", 6,
 	"GETADDRINFO", "Error in getting address info", 0,
 	"GETNAMEINFO", "Error in getting name info", 0,
-	"SOCKBIND", "Error in binding TCP socket", 0,
+	"SOCKBIND", "Error in binding socket", 0,
 	"INSTFRZDEFER", "Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict", 4,
 	"REGOPENRETRY", "Attempt to open region !AD (!AD) using startup shortcut failed due to conflicting database shutdown. Retrying...", 4,
 	"REGOPENFAIL", "Failed to open region !AD (!AD) due to conflicting database shutdown activity", 4,
+	"REPLINSTNOSHM", "Database !AD has no active connection to a replication journal pool; please verify that the database is listed in your instance file", 2,
+	"DEVPARMTOOSMALL", "Deviceparameter must be greater than zero (0)", 0,
+	"REMOTEDBNOSPGBL", "Database region !AD contains portion of a spanning global and so cannot point to a remote file", 2,
+	"NCTCOLLSPGBL", "Database region !AD contains portion of spanning global ^!AD and so cannot support non-zero numeric collation type", 4,
+	"ACTCOLLMISMTCH", "Global ^!AD inherits alternative collation sequence #!UL from global directory but database file !AD contains different collation sequence #!UL for this global", 6,
+	"GBLNOMAPTOREG", "Global !AD does not map to region !AD in current global directory", 4,
+	"ISSPANGBL", "Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory", 2,
+	"TPNOSUPPORT", "Operation cannot be performed while inside of a TP transaction", 0,
+	"GVSUBSERR", "Invalid subscripted global name specification in $VIEW() function", 0,
+	"TRIGNOSPANGBL", "Triggers cannot be installed/deleted for global name !AD as it spans multiple regions in current global directory", 2,
+	"FILTERTIMEDOUT", "Replication server timed out attempting to read seqno !16@XQ from external filter", 1,
+	"TLSDLLNOOPEN", "Failed to load GT.M TLS/SSL library for secure communication", 0,
+	"TLSINIT", "Failed to initialize GT.M TLS/SSL library for secure communication", 0,
+	"TLSCONVSOCK", "Failed to convert Unix TCP/IP socket to TLS/SSL aware socket", 0,
+	"TLSHANDSHAKE", "Connection to remote side using TLS/SSL protocol failed", 0,
+	"TLSCONNINFO", "Failed to obtain information on the TLS/SSL connection", 0,
+	"TLSIOERROR", "Error during TLS/SSL !AD operation", 2,
+	"TLSRENEGOTIATE", "Failed to renegotiate TLS/SSL connection", 0,
+	"REPLNOTLS", "!AD requested TLS/SSL communication but the !AD was either not started with TLSID qualifier or does not support TLS/SSL protocol", 4,
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -1864,8 +1883,8 @@ LITDEF	int ERR_CCPSIGDMP = 150376323;
 LITDEF	int ERR_NOPRINCIO = 150376332;
 LITDEF	int ERR_INVPORTSPEC = 150376338;
 LITDEF	int ERR_INVADDRSPEC = 150376346;
-LITDEF	int ERR_SOCKPARMREQ = 150376354;
-LITDEF	int ERR_IPADDRREQ = 150376362;
+LITDEF	int ERR_UNUSEDMSG677 = 150376354;
+LITDEF	int ERR_UNUSEDMSG678 = 150376362;
 LITDEF	int ERR_SOCKWAIT = 150376370;
 LITDEF	int ERR_SOCKACPT = 150376378;
 LITDEF	int ERR_SOCKINIT = 150376386;
@@ -1968,7 +1987,7 @@ LITDEF	int ERR_BCKUPBUFLUSH = 150377154;
 LITDEF	int ERR_NOFORKCORE = 150377160;
 LITDEF	int ERR_JNLREAD = 150377170;
 LITDEF	int ERR_JNLMINALIGN = 150377176;
-LITDEF	int ERR_UNUSEDMSG781 = 150377186;
+LITDEF	int ERR_JOBSTARTCMDFAIL = 150377186;
 LITDEF	int ERR_JNLPOOLSETUP = 150377194;
 LITDEF	int ERR_JNLSTATEOFF = 150377202;
 LITDEF	int ERR_RECVPOOLSETUP = 150377210;
@@ -2031,7 +2050,7 @@ LITDEF	int ERR_RECSIZENOTEVEN = 150377658;
 LITDEF	int ERR_BUFFLUFAILED = 150377666;
 LITDEF	int ERR_MUQUALINCOMP = 150377674;
 LITDEF	int ERR_DISTPATHMAX = 150377682;
-LITDEF	int ERR_UNUSEDMSG844 = 150377690;
+LITDEF	int ERR_FILEOPENFAIL = 150377690;
 LITDEF	int ERR_IMAGENAME = 150377698;
 LITDEF	int ERR_GTMSECSHRPERM = 150377706;
 LITDEF	int ERR_GTMDISTUNDEF = 150377714;
@@ -2159,7 +2178,7 @@ LITDEF	int ERR_MUTEXRSRCCLNUP = 150378683;
 LITDEF	int ERR_SEMWT2LONG = 150378690;
 LITDEF	int ERR_REPLINSTOPEN = 150378698;
 LITDEF	int ERR_REPLINSTCLOSE = 150378706;
-LITDEF	int ERR_UNUSEDMSG972 = 150378714;
+LITDEF	int ERR_JOBSETUP = 150378714;
 LITDEF	int ERR_DBCRERR8 = 150378723;
 LITDEF	int ERR_NUMPROCESSORS = 150378728;
 LITDEF	int ERR_DBADDRANGE8 = 150378739;
@@ -2294,7 +2313,7 @@ LITDEF	int ERR_INVZDIRFORM = 150379762;
 LITDEF	int ERR_ZDIROUTOFSYNC = 150379768;
 LITDEF	int ERR_GBLNOEXIST = 150379779;
 LITDEF	int ERR_MAXBTLEVEL = 150379786;
-LITDEF	int ERR_UNUSEDMSG1107 = 150379794;
+LITDEF	int ERR_INVMNEMCSPC = 150379794;
 LITDEF	int ERR_JNLALIGNSZCHG = 150379803;
 LITDEF	int ERR_UNUSEDMSG1109 = 150379810;
 LITDEF	int ERR_GVFAILCORE = 150379818;
@@ -2506,7 +2525,7 @@ LITDEF	int ERR_CRYPTJNLWRONGHASH = 150381458;
 LITDEF	int ERR_CRYPTKEYFETCHFAILED = 150381466;
 LITDEF	int ERR_CRYPTKEYFETCHFAILEDNF = 150381474;
 LITDEF	int ERR_CRYPTHASHGENFAILED = 150381482;
-LITDEF	int ERR_CRYPTNOPSWDINTP = 150381490;
+LITDEF	int ERR_UNUSEDMSG1319 = 150381490;
 LITDEF	int ERR_BADTAG = 150381498;
 LITDEF	int ERR_ICUVERLT36 = 150381506;
 LITDEF	int ERR_ICUSYMNOTFOUND = 150381514;
@@ -2605,7 +2624,7 @@ LITDEF	int ERR_MUUSERECOV = 150382250;
 LITDEF	int ERR_SECNOTSUPPLEMENTARY = 150382258;
 LITDEF	int ERR_SUPRCVRNEEDSSUPSRC = 150382266;
 LITDEF	int ERR_UNUSEDMSG1417 = 150382275;
-LITDEF	int ERR_UNUSEDMSG1418 = 150382283;
+LITDEF	int ERR_SETITIMERFAILED = 150382284;
 LITDEF	int ERR_UPDSYNC2MTINS = 150382290;
 LITDEF	int ERR_UPDSYNCINSTFILE = 150382298;
 LITDEF	int ERR_REUSEINSTNAME = 150382306;
@@ -2715,9 +2734,28 @@ LITDEF	int ERR_SOCKBIND = 150383130;
 LITDEF	int ERR_INSTFRZDEFER = 150383139;
 LITDEF	int ERR_REGOPENRETRY = 150383147;
 LITDEF	int ERR_REGOPENFAIL = 150383154;
+LITDEF	int ERR_REPLINSTNOSHM = 150383162;
+LITDEF	int ERR_DEVPARMTOOSMALL = 150383170;
+LITDEF	int ERR_REMOTEDBNOSPGBL = 150383178;
+LITDEF	int ERR_NCTCOLLSPGBL = 150383186;
+LITDEF	int ERR_ACTCOLLMISMTCH = 150383194;
+LITDEF	int ERR_GBLNOMAPTOREG = 150383202;
+LITDEF	int ERR_ISSPANGBL = 150383210;
+LITDEF	int ERR_TPNOSUPPORT = 150383218;
+LITDEF	int ERR_GVSUBSERR = 150383226;
+LITDEF	int ERR_TRIGNOSPANGBL = 150383234;
+LITDEF	int ERR_FILTERTIMEDOUT = 150383242;
+LITDEF	int ERR_TLSDLLNOOPEN = 150383250;
+LITDEF	int ERR_TLSINIT = 150383258;
+LITDEF	int ERR_TLSCONVSOCK = 150383266;
+LITDEF	int ERR_TLSHANDSHAKE = 150383274;
+LITDEF	int ERR_TLSCONNINFO = 150383280;
+LITDEF	int ERR_TLSIOERROR = 150383290;
+LITDEF	int ERR_TLSRENEGOTIATE = 150383298;
+LITDEF	int ERR_REPLNOTLS = 150383306;
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1350};
+	1369};

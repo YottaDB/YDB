@@ -75,6 +75,11 @@
 #ifdef UNIX
 #include "preemptive_db_clnup.h"
 #endif
+#include "spec_type.h"
+#include "collseq.h"
+#ifdef DEBUG
+#include "mvalconv.h"
+#endif
 
 #ifdef GTM_TRIGGER
 LITREF	mval	literal_null;
@@ -251,7 +256,7 @@ CONDITION_HANDLER(gvcst_put_ch)
 {
 	int rc;
 
-	START_CH;
+	START_CH(TRUE);
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{	/* delay tp_restart till after the long jump and some other stuff */
 		UNWIND(NULL, NULL);
@@ -262,7 +267,7 @@ CONDITION_HANDLER(gvcst_put_ch)
 void	gvcst_put(mval *val)
 {
 	boolean_t			sn_tpwrapped, fits;
-	boolean_t			est_first_pass;
+	boolean_t			est_first_pass, found;
 	mval				val_ctrl, val_piece, val_dummy;
 	mval				*pre_incr_mval, *save_val;
 	block_id			lcl_root;
@@ -349,8 +354,11 @@ void	gvcst_put(mval *val)
 		in_gvcst_incr = FALSE;		/* allow gvcst_put2 to do a regular set */
 		PUSH_MV_STENT(MVST_MVAL);       /* protect pre_incr_mval from stp_gcol */
 		pre_incr_mval = &mv_chain->mv_st_cont.mvs_mval;
-		gvcst_get(pre_incr_mval);	/* what if it doesn't exist? needs to be treated as 0 */
-		pre_incr_mval->mvtype = MV_STR;
+		found = gvcst_get(pre_incr_mval);	/* what if it doesn't exist? needs to be treated as 0 */
+		if (found)
+			pre_incr_mval->mvtype = MV_STR;
+		else
+			*pre_incr_mval = literal_null;
 		op_add(pre_incr_mval, &increment_delta_mval, post_incr_mval);
 		POP_MV_STENT();			/* pre_incr_mval */
 		assert(MV_IS_NUMERIC(post_incr_mval));
@@ -417,7 +425,8 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	int4			blk_size, blk_fill_size, blk_reserved_bytes;
-	const int4		zeroes = 0;
+	const uint4		zeroes4byte = 0;
+	const gtm_uint64_t	zeroes8byte = 0;
 	boolean_t		jnl_format_done, is_dummy, needfmtjnl, fits, lcl_span_status;
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
 	block_id		allocation_clue, tp_root, gvt_for_root, blk_num, last_split_blk_num[MAX_BT_DEPTH];
@@ -427,7 +436,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	gv_namehead		*save_targ, *split_targ, *dir_tree;
 	enum cdb_sc		status;
 	gv_key			*temp_key;
-	int			tmp_cmpc;
+	uchar_ptr_t		subrec_ptr;
 	mstr			value;
 	off_chain		chain1, curr_chain, prev_chain, chain2;
 	rec_hdr_ptr_t		curr_rec_hdr, extra_rec_hdr, next_rec_hdr, new_star_hdr, rp, tmp_rp;
@@ -436,11 +445,12 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	int			cur_blk_size, blk_seg_cnt, delta, i, j, left_hand_offset, n, ins_chain_offset,
 				new_blk_size_l, new_blk_size_r, new_blk_size_single, new_blk_size, blk_reserved_size,
 				last_possible_left_offset, new_rec_size, next_rec_shrink, next_rec_shrink1, start_len,
-				offset_sum, rec_cmpc, target_key_size, tp_lev, undo_index, cur_val_offset, curr_offset, bh_level;
+				offset_sum, rec_cmpc, tmp_cmpc, target_key_size, tp_lev, undo_index, cur_val_offset,
+				curr_offset, bh_level;
 	uint4			segment_update_array_size, key_top, cp2_len, bs1_2_len, bs1_3_len;
 	char			*va, last_split_direction[MAX_BT_DEPTH];
 	sm_uc_ptr_t		cp1, cp2, curr;
-	unsigned short		extra_record_orig_size, rec_size, temp_short;
+	unsigned short		extra_record_blkid_off, rec_size, tmp_rsiz;
 	unsigned int		prev_rec_offset, prev_rec_match, curr_rec_offset, curr_rec_match;
 	boolean_t		copy_extra_record, level_0, new_rec, no_pointers, succeeded, key_exists;
 	boolean_t		make_it_null, gbl_target_was_set, duplicate_set, new_rec_goes_to_right, need_extra_block_split;
@@ -486,6 +496,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	mval			*pval;				/* copy of "value" (an mstr), protected from stp gcol */
 	DEBUG_ONLY(enum cdb_sc	save_cdb_status;)
 #	endif
+	uint4			no_4byte_collhdr;
 #	ifdef DEBUG
 	char			dbg_valbuff[256];
 	mstr_len_t		dbg_vallen;
@@ -519,6 +530,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	dbg_trace		dbg_trace_array[16];
 	boolean_t		is_fresh_tn_start;
 	boolean_t		is_mm;
+	mval			tmpmval, *random_mval = &tmpmval;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -692,7 +704,7 @@ tn_restart:
 		segment_update_array_size = UA_NON_BM_SIZE(csd);
 		ENSURE_UPDATE_ARRAY_SPACE(segment_update_array_size);
 		curr_chain = *(off_chain *)&lcl_root;
-		if (curr_chain.flag == 1)
+		if (curr_chain.flag)
 		{
 			tp_get_cw(si->first_cw_set, (int)curr_chain.cw_index, &cse);
 			tp_root = cse->blk;
@@ -721,7 +733,7 @@ tn_restart:
 			{
 				gvt_for_root = dir_hist->h[0].blk_num;
 				curr_chain = *(off_chain *)&gvt_for_root;
-				if (curr_chain.flag == 1)
+				if (curr_chain.flag)
 					tp_get_cw(si->first_cw_set, curr_chain.cw_index, &cse);
 				else
 				{
@@ -794,7 +806,7 @@ tn_restart:
 		SET_CMPC(curr_rec_hdr, 0);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
-		BLK_SEG(bs_ptr, (unsigned char *)&zeroes, SIZEOF(block_id));
+		BLK_SEG(bs_ptr, (unsigned char *)&zeroes4byte, SIZEOF(block_id));
 		if (0 == BLK_FINI(bs_ptr, bs1))
 		{
 			assert(CDB_STAGNATE > t_tries);
@@ -803,16 +815,85 @@ tn_restart:
 		}
 		assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
         	allocation_clue = ALLOCATION_CLUE(csd->trans_hist.total_blks);
-		next_blk_index = t_create(allocation_clue, (uchar_ptr_t)new_blk_bs, 0, 0, 0);
+		next_blk_index = t_create(allocation_clue, (uchar_ptr_t)new_blk_bs, 0, 0, 0);	/* create GVT data block */
 		++allocation_clue;
 		ins_chain_index = t_create(allocation_clue, (uchar_ptr_t)bs1, SIZEOF(blk_hdr) + SIZEOF(rec_hdr), next_blk_index, 1);
+					/* create GVT index block */
 		root_blk_cw_index = ins_chain_index;
 		temp_key = gv_altkey;
 		gv_target->hist.h[0].blk_num = HIST_TERMINATOR;
 		gv_target = dir_tree;
 		bh = &gv_target->hist.h[0];
-		value.len = SIZEOF(block_id);
-		value.addr = (char *)&zeroes;
+		assert(ACT_NOT_SPECIFIED != save_targ->act);
+		/* Global directory OR db file header defined an alternative collation sequence for this global (even if it is 0).
+		 * Store it in directory tree as part of the specific global name. This way future updates to this global will
+		 * continue to use this stored collation even if the db file header collation sequence changes (using DSE) during
+		 * the lifetime of this GVT.
+		 */
+		if (save_targ->act)
+		{
+			act_in_gvt(save_targ); /* verify that collation library version is still compatible */
+			/* The above call sets "save_targ->collseq" to a non-NULL value. need to keep it set so it
+			 * stays set after the GVT gets created. If this transaction restarts (i.e. we did not
+			 * create the GVT, it is okay for save_targ->collseq to be set to a non-NULL value since it
+			 * will be reinitialized when save_targ->root gets set to a non-zero value in gvcst_root_search.
+			 */
+			no_4byte_collhdr = 0;
+		} else if (save_targ->act_specified_in_gld)
+		{	/* If collation has been specified in gld, even though it is zero, we need to store it in
+			 * the directory tree. Or else we could get an incorrect ACTCOLLMISMTCH error later in case
+			 * the db file header has an overriding non-zero default collation field set.
+			 */
+			no_4byte_collhdr = 0;
+		} else
+#		if defined(DEBUG) && defined(UNIX)
+		{	/* Starting V6.1, newly created nodes in the directory tree (DT) leaf block have a 4-byte collation header
+			 * unconditionally but in order to test the code below for correctness on pre-existing DT leaf block
+			 * records which might not contain a 4-byte collation header, we randomly enable the 4-byte collation
+			 * header for now in debug mode. Note that this can be safely done only for globals that have collation #0.
+			 * When V7 is released and the directory tree leaf records are all upgraded to contain the 4-byte collation
+			 * header unconditionally, this randomization will need to be removed.
+			 * Note that if the env var "gtm_dirtree_collhdr_always" is true, then disable this behavior (this is
+			 * usually set by tests that rely on a fixed DT leaf block layout and will fail if the layout changes).
+			 */
+			if (TREF(gtm_dirtree_collhdr_always))
+				no_4byte_collhdr = 0;
+			else
+			{
+				op_fnrandom(2, random_mval);
+				no_4byte_collhdr = MV_FORCE_INT(random_mval);
+			}
+		}
+#		elif defined(UNIX)
+			no_4byte_collhdr = 0;	/* for Unix pro, add the 4-byte collation header even for "act" = 0 */
+#		elif defined(VMS)
+			no_4byte_collhdr = 1;	/* for VMS (pro and dbg) unconditionally disable the 4-byte collation header.
+						 * as otherwise it means fixing test reference files to account for new 4-bytes
+						 */
+#		endif
+		if (no_4byte_collhdr)
+		{	/* No 4-byte collation header */
+			value.addr = (char *)&zeroes4byte;
+			value.len = SIZEOF(block_id);
+			assert(SIZEOF(zeroes4byte) == value.len);
+		} else
+		{
+			value.addr = (char *)&zeroes8byte;
+			value.len = SIZEOF(block_id) + COLL_SPEC_LEN;
+			assert(SIZEOF(zeroes8byte) == value.len);
+			/* The 4-byte "block_id" will be filled in later. Fill the 4-byte collation header now */
+			subrec_ptr = (unsigned char *)value.addr + SIZEOF(block_id);
+			assert(COLL_NCT_OFFSET > 0);
+			assert(COLL_ACT_OFFSET > 0);
+			assert(COLL_VER_OFFSET > 0);
+			assert(COLL_NCT_OFFSET < COLL_SPEC_LEN);
+			assert(COLL_ACT_OFFSET < COLL_SPEC_LEN);
+			assert(COLL_VER_OFFSET < COLL_SPEC_LEN);
+			*subrec_ptr = COLL_SPEC;
+			*(subrec_ptr + COLL_NCT_OFFSET) = save_targ->nct;
+			*(subrec_ptr + COLL_ACT_OFFSET) = save_targ->act;
+			*(subrec_ptr + COLL_VER_OFFSET) = save_targ->ver;
+		}
 		no_pointers = FALSE;
 	} else
 	{
@@ -830,13 +911,13 @@ tn_restart:
 				GOTO_RETRY;
 		}
 #		endif
-#if defined(DEBUG) && defined(UNIX)
+#		if defined(DEBUG) && defined(UNIX)
 		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVINCRPUTFAIL == gtm_white_box_test_case_number))
 		{
 			status = cdb_sc_blknumerr;
 			GOTO_RETRY;
 		}
-#endif
+#		endif
 		if (cdb_sc_normal != (status = gvcst_search(gv_currkey, NULL)))
 			GOTO_RETRY;
 		target_key_size = gv_currkey->end + 1;
@@ -1092,7 +1173,14 @@ tn_restart:
 			if (no_pointers)	/* level zero (normal) data block: no deferred pointer chains */
 				ins_chain_offset = 0;
 			else			/* index or directory level block */
-				ins_chain_offset =(int)((sm_uc_ptr_t)rp - buffaddr + new_rec_size - SIZEOF(block_id));
+			{	/* In case a new GVT is being created, it is possible 4-byte collation information is being
+				 * added to the leaf level directory tree record for this global name (after the 4-byte block_id).
+				 * Irrespective of the collation header, make sure ins_chain_offset points to the block_id part.
+				 */
+				assert(((char *)&zeroes4byte == value.addr) || ((char *)&zeroes8byte == value.addr));
+				assert((4 == value.len) || (8 == value.len));
+				ins_chain_offset = (int)(curr_rec_offset + new_rec_size - value.len);
+			}
 			BLK_INIT(bs_ptr, bs1);
 			if (0 == rc_set_fragment)
 			{
@@ -1175,15 +1263,16 @@ tn_restart:
 									&& (buffaddr == cse->low_tlevel->new_buff));
 				assert(0 == cse->next_off);
 				assert(ins_chain_offset > (signed)SIZEOF(blk_hdr));	/* we want signed comparison */
-				assert((curr_rec_offset - SIZEOF(off_chain)) == (ins_chain_offset - new_rec_size));
 				offset_sum = cse->first_off;
 				curr = buffaddr + offset_sum;
+				assert(new_rec);
+				assert(offset_sum != curr_rec_offset);
 				/* The typecast is needed below to enforce a "signed int" (versus "unsigned int") comparison */
 				if (offset_sum >= (signed int)curr_rec_offset)
 				{	/* the new record is prior to the first existing chain record, id the new one as first */
 					/* first_off-------------v--------------------v
 					 * [blk_hdr]...[new rec ( )]...[existing rec ( )]... */
-					cse->next_off = cse->first_off - (ins_chain_offset - new_rec_size) - next_rec_shrink1;
+					cse->next_off = value.len + (offset_sum - curr_rec_offset - next_rec_shrink1);
 					cse->first_off = ins_chain_offset;
 				} else
 				{
@@ -1198,10 +1287,11 @@ tn_restart:
 					for ( ; ; curr += curr_chain.next_off)
 					{	/* try to make offset_sum identify the first chain entry after the new record */
 						GET_LONGP(&curr_chain, curr);
-						assert(curr_chain.flag == 1);
+						assert(1 == curr_chain.flag);
 						if (0 == curr_chain.next_off)
 							break;
 						offset_sum += curr_chain.next_off;
+						assert(offset_sum != curr_rec_offset);
 						/* The typecast is needed below to enforce a "signed int" comparison */
 						if (offset_sum >= (signed int)curr_rec_offset)
 							break;
@@ -1225,7 +1315,7 @@ tn_restart:
 						 * [blk_hdr]...[existing rec ( )]...[new rec ( )]...[existing rec ( )] */
 						curr_chain.next_off = (unsigned int)(ins_chain_offset - (curr - buffaddr));
 						GET_LONGP(curr, &curr_chain);
-						cse->next_off = offset_sum - (ins_chain_offset - new_rec_size) - next_rec_shrink1;
+						cse->next_off = value.len + (offset_sum - curr_rec_offset - next_rec_shrink1);
 					}
 				}
 				assert((ins_chain_offset + (int)cse->next_off) <=
@@ -1303,11 +1393,10 @@ tn_restart:
 			gv_target->clue.end = 0;	/* invalidate clue */
 			/* Potential size of the left and right blocks, including the new record */
 			new_blk_size_l = curr_rec_offset + new_rec_size;
-			new_blk_size_r = SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + target_key_size + value.len + cur_blk_size
+			new_blk_size_r = new_blk_size_single + cur_blk_size
 						- curr_rec_offset - (new_rec ? next_rec_shrink : rec_size);
 			assert(new_blk_size_single <= blk_reserved_size);
 			assert(blk_reserved_size >= blk_fill_size);
-			extra_record_orig_size = 0;
 			prev_rec_offset = bh->prev_rec.offset;
 			/* Decide which side (left or right) the new record goes. Ensure either side has at least one record.
 			 * This means we might not honor the desired FillFactor if the only record in a block exceeds the
@@ -1501,11 +1590,11 @@ tn_restart:
 					left_hand_offset = 0;
 				else
 				{
-					left_hand_offset = curr_rec_offset + SIZEOF(rec_hdr);
+					left_hand_offset = curr_rec_offset + SIZEOF(rec_hdr); /* *-record is usually last record */
 					if (level_0 || copy_extra_record)
-						left_hand_offset += target_key_size - prev_rec_match;
+						left_hand_offset += target_key_size - prev_rec_match; /* exceptions for *-record */
 				}
-				left_hand_index = ins_chain_index;
+				left_hand_index = ins_chain_index;	/* copy over cw_set index from child level block create */
 				ins_chain_index = ins_chain_offset = 0;
 				BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), curr_rec_offset - SIZEOF(blk_hdr));
 				if (level_0)
@@ -1590,7 +1679,7 @@ tn_restart:
 					BLK_SEG(bs_ptr, (sm_uc_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
 					if (!copy_extra_record)
 					{
-						BLK_SEG(bs_ptr, (unsigned char *)&zeroes, SIZEOF(block_id));
+						BLK_SEG(bs_ptr, (unsigned char *)&zeroes4byte, SIZEOF(block_id));
 					} else
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + rec_size - SIZEOF(block_id), SIZEOF(block_id));
 				}
@@ -1614,14 +1703,14 @@ tn_restart:
 				assert(new_rec || !copy_extra_record);
 				if (!new_rec || copy_extra_record)
 				{	/* Should guard for empty block??? */
+					/* Before advancing one record, store rec_size and rec_cmpc for current record */
+					tmp_rp = rp;
 					rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + rec_size);
 					rec_cmpc = EVAL_CMPC(rp);
-					temp_short = rec_size;
 					GET_USHORT(rec_size, &rp->rsiz);
 				}
 				if (copy_extra_record)
 				{
-				        extra_record_orig_size = temp_short;
 					assert(gv_altkey->top == gv_currkey->top);
 					assert(gv_altkey->end < gv_altkey->top);
 					temp_key = gv_altkey;
@@ -1633,10 +1722,9 @@ tn_restart:
 					memcpy(gv_altkey, temp_key, SIZEOF(gv_key) + temp_key->end);
 					temp_key = gv_altkey;
 				}
-				rec_size += rec_cmpc;
 				BLK_INIT(bs_ptr, bs1);
 				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-				next_rec_hdr->rsiz = rec_size;
+				next_rec_hdr->rsiz = rec_size + rec_cmpc;
 				SET_CMPC(next_rec_hdr, 0);
 				BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
 				BLK_ADDR(cp1, rec_cmpc, unsigned char);
@@ -1671,7 +1759,7 @@ tn_restart:
 			{	/* there may be chains */
 				assert(new_rec);
 				curr_chain = *(off_chain *)&blk_num;
-				if (curr_chain.flag == 1)
+				if (curr_chain.flag)
 					tp_get_cw(si->first_cw_set, curr_chain.cw_index, &cse);
 				else
 				{
@@ -1698,9 +1786,62 @@ tn_restart:
 					offset_sum = cse_first_off;
 					curr = buffaddr + offset_sum;
 					GET_LONGP(&curr_chain, curr);
-					assert(curr_chain.flag == 1);
-					last_possible_left_offset = curr_rec_offset + extra_record_orig_size - SIZEOF(off_chain);
-					/* some of the following logic used to be in tp_split_chain which was nixed */
+					assert(1 == curr_chain.flag);
+					/* Determine "last_possible_left_offset" and "extra_record_blkid_off" */
+					copy_extra_record = !new_rec_goes_to_right && copy_extra_record;
+					if (copy_extra_record)
+					{
+						assert(!new_rec_goes_to_right);
+						GET_USHORT(tmp_rsiz, &tmp_rp->rsiz);
+						tmp_cmpc = EVAL_CMPC(tmp_rp);
+						if (level_0)
+						{	/* Directory Tree leaf level block. Determine the offset within the
+							 * extra record where "block_id" is stored. It is guaranteed to be
+							 * the last 4-bytes of the record for all GVT index and DT index blocks
+							 * but not for DT leaf blocks where it is the first 4-bytes (after the key)
+							 * and a 4-byte collation header could optionally follow it.
+							 */
+							extra_record_blkid_off = SIZEOF(rec_hdr) + temp_key->end + 1 - tmp_cmpc;
+							assert(((tmp_rsiz - extra_record_blkid_off) == SIZEOF(off_chain))
+								|| ((tmp_rsiz - extra_record_blkid_off)
+									== SIZEOF(off_chain) + COLL_SPEC_LEN));
+						} else
+				        		extra_record_blkid_off = tmp_rsiz - SIZEOF(off_chain);
+						assert(extra_record_blkid_off);
+						last_possible_left_offset = curr_rec_offset + extra_record_blkid_off;
+					} else
+					{
+				        	extra_record_blkid_off = 0;
+						if (level_0)
+						{	/* Directory Tree leaf level block. Find end of key in prev_rec
+							 * since block_id starts right after that.
+							 */
+							if (!prev_rec_offset)
+								cp1 = buffaddr;
+							else
+							{
+								cp1 = buffaddr + prev_rec_offset + SIZEOF(rec_hdr);
+								assert(((sm_uc_ptr_t)rp - buffaddr) == curr_rec_offset);
+								assert(cp1 < (sm_uc_ptr_t)rp);
+								for ( ; cp1 < (sm_uc_ptr_t)rp; )
+								{
+									if ((KEY_DELIMITER == *cp1++) && (KEY_DELIMITER == *cp1))
+										break;
+								}
+								if (++cp1 > ((sm_uc_ptr_t)rp - SIZEOF(off_chain)))
+								{
+									assert(CDB_STAGNATE > t_tries);
+									status = cdb_sc_mkblk;
+									GOTO_RETRY;
+								}
+								assert(((cp1 + SIZEOF(off_chain)) == (sm_uc_ptr_t)rp)
+									|| ((cp1 + SIZEOF(off_chain) + COLL_SPEC_LEN)
+													== (sm_uc_ptr_t)rp));
+							}
+						}
+						last_possible_left_offset = level_0 ? INTCAST(cp1 - buffaddr)
+											: curr_rec_offset - SIZEOF(off_chain);
+					}
 					if (offset_sum <= last_possible_left_offset)
 					{	/* the split falls within or after the chain; otherwise entire chain stays right */
 						assert((cse_first_off < curr_rec_offset)
@@ -1755,7 +1896,7 @@ tn_restart:
 							if (left_hand_offset)
 							{
 								assert(!ins_chain_offset);
-								if (!extra_record_orig_size && (offset_sum != cse_first_off))
+								if (!extra_record_blkid_off && (offset_sum != cse_first_off))
 								{	/* bring curr up to the match */
 									curr += curr_chain.next_off;
 									GET_LONGP(&curr_chain, curr);
@@ -1768,7 +1909,7 @@ tn_restart:
 									 * before this offset.
 									 */
 									prev_chain = curr_chain;
-									assert(extra_record_orig_size
+									assert(extra_record_blkid_off
 										|| (BSTAR_REC_SIZE
 											== (left_hand_offset - curr_offset)));
 									prev_chain.next_off = left_hand_offset - curr_offset;
@@ -1787,7 +1928,7 @@ tn_restart:
 									}
 									GET_LONGP(curr, &prev_chain);
 								}
-								if (extra_record_orig_size)
+								if (extra_record_blkid_off)
 								{
 									if (offset_sum != cse_first_off)
 									{	/* bring curr up to the match */
@@ -1875,11 +2016,11 @@ tn_restart:
 							if (left_hand_offset)
 							{	/* there's a new chain rec in left */
 								curr_offset = curr - buffaddr;
-								if (extra_record_orig_size
+								if (extra_record_blkid_off
 									&& (curr_offset == last_possible_left_offset))
 								{
 									assert(level_0);	/* else *-key issues */
-									cse_new->next_off = extra_record_orig_size
+									cse_new->next_off = value.len + extra_record_blkid_off
 													- next_rec_shrink1;
 								}
 								assert(!ins_chain_offset);
@@ -1916,7 +2057,7 @@ tn_restart:
 						/* first_off---------v
 						 * [blk_hdr][new rec( )]... */
 						assert(!left_hand_offset);
-						assert(0 == extra_record_orig_size);
+						assert(0 == extra_record_blkid_off);
 						assert(ins_chain_offset >= (SIZEOF(blk_hdr) + SIZEOF(rec_hdr)));
 						cse->first_off = ins_chain_offset;
 						assert(0 == cse->next_off);
@@ -1925,7 +2066,8 @@ tn_restart:
 							/* first_off---------v--------------------v
 							 * [blk_hdr][new rec( )]...[existing rec ( )] */
 							prev_next_off = cse->next_off;
-							cse->next_off = offset_sum - last_possible_left_offset - next_rec_shrink1;
+							assert(offset_sum >  curr_rec_offset);
+							cse->next_off = offset_sum - curr_rec_offset - next_rec_shrink1 + value.len;
 							assert((int)(cse->next_off + ins_chain_offset) < new_blk_size_r);
 						}
 					} else if (offset_sum <= last_possible_left_offset)
@@ -1936,8 +2078,12 @@ tn_restart:
 						/* first_off------------------v
 						 * [blk_hdr]...[existing rec ( )] */
 						assert(offset_sum >= (int)cse_first_off);
-						cse->first_off =  (block_offset)(offset_sum - last_possible_left_offset + rec_cmpc
-								+ SIZEOF(blk_hdr) - SIZEOF(off_chain));
+						assert(offset_sum > curr_rec_offset);
+						assert((curr_rec_offset == ((sm_uc_ptr_t)rp - buffaddr))
+							|| copy_extra_record
+								&& (curr_rec_offset + tmp_rsiz == ((sm_uc_ptr_t)rp - buffaddr)));
+						cse->first_off = (block_offset)(offset_sum - ((sm_uc_ptr_t)rp - buffaddr)
+								+ rec_cmpc + SIZEOF(blk_hdr));
 						assert(cse->first_off >= (SIZEOF(blk_hdr) + SIZEOF(rec_hdr)));
 					}
 					assert((ins_chain_offset + (int)cse->next_off) <=
@@ -2114,7 +2260,7 @@ tn_restart:
 					cse->write_type |= GDS_WRITE_BLOCK_SPLIT;
 				}
 				value.len = SIZEOF(block_id);
-				value.addr = (char *)&zeroes;
+				value.addr = (char *)&zeroes4byte;
 				++bh;
 				ins_chain_index = next_blk_index;
 			} else
@@ -2170,12 +2316,12 @@ tn_restart:
 				BLK_ADDR(cp1, target_key_size, unsigned char);
 				memcpy(cp1, temp_key->base, target_key_size);
 				BLK_SEG(bs_ptr, cp1, target_key_size);
-				BLK_SEG(bs_ptr, (unsigned char *)&zeroes, SIZEOF(block_id));
+				BLK_SEG(bs_ptr, (unsigned char *)&zeroes4byte, SIZEOF(block_id));
 				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				next_rec_hdr->rsiz = BSTAR_REC_SIZE;
 				SET_CMPC(next_rec_hdr, 0);
 				BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
-				BLK_SEG(bs_ptr, (unsigned char *)&zeroes, SIZEOF(block_id));
+				BLK_SEG(bs_ptr, (unsigned char *)&zeroes4byte, SIZEOF(block_id));
 				if (0 == BLK_FINI(bs_ptr, bs1))
 				{
 					assert(CDB_STAGNATE > t_tries);

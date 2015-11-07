@@ -134,7 +134,7 @@ LITDEF zpeek_data_typ zpeek_data[] =
  */
 CONDITION_HANDLER(op_fnzpeek_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	NEXTCH;		/* In the unlikely event it gets driven, just be a pass-thru */
 }
 
@@ -152,7 +152,7 @@ void op_fnzpeek_signal_handler(int sig, siginfo_t *info, void *context)
 	 */
 	{	/* Needs new block since START_CH declares a new var used in UNWIND() */
 		int arg = 0;	/* Needed for START_CH macro if debugging enabled */
-		START_CH;
+		START_CH(TRUE);
 		DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);
 		UNWIND(NULL, NULL);
 	}
@@ -366,7 +366,7 @@ STATICFNDEF int op_fnzpeek_stpcopy(char *zpeekadr, int len, mval *ret, char fmtc
  */
 CONDITION_HANDLER(op_fnzpeek_getpool_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	if (DUMPABLE)
 		NEXTCH;		/* Let next (more robust) handler deal with it */
 	UNWIND(NULL, NULL);

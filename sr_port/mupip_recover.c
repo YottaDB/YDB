@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,9 +62,6 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF  gd_addr         	*gd_header;
-GBLREF	gd_binding      	*gd_map;
-GBLREF	gd_binding      	*gd_map_top;
 #ifdef VMS
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
 GBLREF	boolean_t		tp_restart_fail_sig_used;
@@ -117,7 +114,7 @@ CONDITION_HANDLER(mupip_recover_ch)
 {
 	int	rc;
 
-	START_CH;
+	START_CH(TRUE);
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 		assert(gtm_white_box_test_case_enabled && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
@@ -125,24 +122,19 @@ CONDITION_HANDLER(mupip_recover_ch)
 		rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS);	/* This SHOULD generate an error (TPFAIL or other) */
 		GTMTRIG_ONLY(assert(ERR_TPRETRY != rc));
 #		ifdef UNIX
-		if (ERR_TPRETRY == SIGNAL)		/* (signal value undisturbed) */
+		assertpro(ERR_TPRETRY != SIGNAL);		/* (signal value undisturbed) */
 #		elif defined VMS
-		if (!tp_restart_fail_sig_used)	/* If tp_restart ran clean */
+		assertpro(tp_restart_fail_sig_used);	/* If tp_restart ran clean */
 #		else
 #		error unsupported platform
 #		endif
-		{
-			GTMASSERT;		/* It should *not* run clean */
-		}
 #		ifdef VMS
-		else
-		{	/* Otherwise tp_restart had a signal that we must now deal with -- replace the TPRETRY
-			   information with that saved from tp_restart. */
-			/* Assert we have room for these arguments - the array malloc is in tp_restart */
-			assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
-			memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * SIZEOF(int));
-			tp_restart_fail_sig_used = FALSE;
-		}
+		/* Otherwise tp_restart had a signal that we must now deal with -- replace the TPRETRY
+		   information with that saved from tp_restart. */
+		/* Assert we have room for these arguments - the array malloc is in tp_restart */
+		assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
+		memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * SIZEOF(int));
+		tp_restart_fail_sig_used = FALSE;
 #		endif
 		/* At this point SIGNAL would correspond to TPFAIL (not a TPRETRY) error */
 	}
@@ -273,14 +265,14 @@ void	mupip_recover(void)
 		{
 			TREF(jnl_extract_nocol) = !mur_options.update && jgbl.mur_extract && TREF(jnl_extract_nocol);
 			if (db_absent)
-				gtm_putmsg(VARLSTCNT(6) ERR_DBCOLLREQ, 4, LEN_AND_LIT("Mising Database file"),
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBCOLLREQ, 4, LEN_AND_LIT("Mising Database file"),
 						DB_LEN_STR(db_absent_rctl->gd));
 			else
-				gtm_putmsg(VARLSTCNT(6) ERR_DBCOLLREQ, 4, LEN_AND_LIT("Instance is frozen."),
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBCOLLREQ, 4, LEN_AND_LIT("Instance is frozen."),
 						LEN_AND_LIT(""));
 		} else
 		{
-			gtm_putmsg(VARLSTCNT(1) ERR_SETEXTRENV);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SETEXTRENV);
 			mupip_exit(ERR_MUNOACTION);
 		}
 	} else
@@ -307,7 +299,7 @@ void	mupip_recover(void)
 		if (!jnlpool.repl_inst_filehdr->crash && (0 != replinst_seqno) && (max_reg_seqno != replinst_seqno))
 		{
 			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-			gtm_putmsg(VARLSTCNT(6) ERR_REPLINSTDBMATCH, 4,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTDBMATCH, 4,
 				LEN_AND_STR(udi->fn), &replinst_seqno, &max_reg_seqno);
 			mupip_exit(ERR_MUNOACTION);
 		}
@@ -341,7 +333,7 @@ void	mupip_recover(void)
 	}
 	if (murgbl.intrpt_recovery && mur_options.update && mur_options.forward)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_MUPJNLINTERRUPT, 2, DB_LEN_STR(rctl->gd));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUPJNLINTERRUPT, 2, DB_LEN_STR(rctl->gd));
 		mupip_exit(ERR_MUNOACTION);
 	}
 	if (mur_options.update && intrrupted_recov_processing)
@@ -358,7 +350,7 @@ void	mupip_recover(void)
 	}
 	assert(FALSE == murgbl.ok_to_update_db);
 	if (mur_options.rollback_losttnonly)
-		gtm_putmsg(VARLSTCNT(1) ERR_RLBKLOSTTNONLY);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RLBKLOSTTNONLY);
 	/* The current resync_seqno of this replication instance needs to be calculated before the call to "gtmrecv_fetchresync" */
 	VMS_ONLY(jgbl.max_resync_seqno = 0;)
 	for (regno = 0; regno < reg_total; regno++)
@@ -395,19 +387,20 @@ void	mupip_recover(void)
 		{
 			UNIX_ONLY(
 				if ((INVALID_SUPPL_STRM != murgbl.resync_strm_index) && !remote_side->is_supplementary)
-					gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4,
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4,
 						LEN_AND_LIT("Gtmrecv_fetchresync returned strm_index"),
 							murgbl.resync_strm_index, murgbl.resync_strm_index);
 			)
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("Gtmrecv_fetchresync returned resync_seqno"),
-				&murgbl.resync_seqno, &murgbl.resync_seqno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT8, 4,
+					LEN_AND_LIT("Gtmrecv_fetchresync returned resync_seqno"),
+					&murgbl.resync_seqno, &murgbl.resync_seqno);
 		}
 		VMS_ONLY(
 			if (jgbl.max_resync_seqno < murgbl.resync_seqno)
 			{
 				murgbl.resync_seqno = jgbl.max_resync_seqno;
 				if (mur_options.verbose)
-					gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4,
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT8, 4,
 						LEN_AND_LIT("Resync_seqno is reset to max_resync_seqno"),
 						&murgbl.resync_seqno, &murgbl.resync_seqno);
 			}
@@ -420,7 +413,7 @@ void	mupip_recover(void)
 		 */
 		if (!jnlpool.repl_inst_filehdr->is_supplementary)
 		{
-			gtm_putmsg(VARLSTCNT(1) ERR_RSYNCSTRMSUPPLONLY);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RSYNCSTRMSUPPLONLY);
 			mupip_exit(ERR_MUNOACTION);
 		}
 		if (0 < murgbl.resync_strm_index)
@@ -441,7 +434,8 @@ void	mupip_recover(void)
 				SPRINTF(histdetail, "Stream Seqno "INT8_FMT" "INT8_FMTX" (Stream # %2d) ",
 					murgbl.resync_seqno - 1, murgbl.resync_seqno - 1, murgbl.resync_strm_index);
 				udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-				gtm_putmsg(VARLSTCNT(6) ERR_REPLINSTNOHIST, 4, LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTNOHIST, 4,
+						LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
 				mupip_exit(ERR_MUNOACTION);
 			}
 		}
@@ -482,8 +476,9 @@ void	mupip_recover(void)
 		 * 	ztp_broken = TRUE, if any ztp entry is broken */
 		min_broken_time = mur_process_token_table(&ztp_broken);
 		if (mur_options.verbose)
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("mur_process_token_table returns min_broken_time"),
-				min_broken_time, min_broken_time);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4,
+					LEN_AND_LIT("mur_process_token_table returns min_broken_time"),
+					min_broken_time, min_broken_time);
 		min_broken_seqno = losttn_seqno = MAXUINT8;
 	} else
 		assert(0 != losttn_seqno);
@@ -557,10 +552,12 @@ void	mupip_recover(void)
 		mur_process_seqno_table(&min_broken_seqno, &losttn_seqno);
 		if (mur_options.verbose)
 		{
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("mur_process_seqno_table returns min_broken_seqno"),
-				&min_broken_seqno, &min_broken_seqno);
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("mur_process_seqno_table returns losttn_seqno"),
-				&losttn_seqno, &losttn_seqno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT8, 4,
+					LEN_AND_LIT("mur_process_seqno_table returns min_broken_seqno"),
+					&min_broken_seqno, &min_broken_seqno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT8, 4,
+					LEN_AND_LIT("mur_process_seqno_table returns losttn_seqno"),
+					&losttn_seqno, &losttn_seqno);
 		}
 		min_broken_time = MAXUINT4;
 	}
@@ -585,7 +582,7 @@ void	mupip_recover(void)
 	{
 		assert(murgbl.consist_jnl_seqno <= losttn_seqno);
 		assert(murgbl.consist_jnl_seqno <= min_broken_seqno);
-		gtm_putmsg(VARLSTCNT(4) ERR_RLBKJNSEQ, 2, &murgbl.consist_jnl_seqno, &murgbl.consist_jnl_seqno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RLBKJNSEQ, 2, &murgbl.consist_jnl_seqno, &murgbl.consist_jnl_seqno);
 	}
 	if (murgbl.wrn_count)
 		mupip_exit(ERR_JNLACTINCMPLT);

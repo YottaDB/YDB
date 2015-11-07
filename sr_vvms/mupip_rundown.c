@@ -105,7 +105,7 @@ error_def(ERR_VMSMEMORY);
 
 CONDITION_HANDLER(mupip_rundown_ch)
 {
-	START_CH;
+	START_CH(FALSE);
 	if ((0 != rndwn_pid) && !(SEVERITY & SUCCESS))
 	{
 		if (DUMPABLE)
@@ -204,12 +204,14 @@ void mupip_rundown(void)
 							status = del_sec(SEC$M_SYSGBL, &d_sec, 0);
 					}
 					if (status & 1)
-						rts_error(VARLSTCNT(4) ERR_MUSECDEL, 2, d_sec.dsc$w_length, d_sec.dsc$a_pointer);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSECDEL, 2,
+								d_sec.dsc$w_length, d_sec.dsc$a_pointer);
 					else
 					{
 						if (status)
-							gtm_putmsg(VARLSTCNT(1) status);
-						rts_error(VARLSTCNT(4) ERR_MUSECNOTDEL, 2, d_sec.dsc$w_length, d_sec.dsc$a_pointer);
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSECNOTDEL, 2,
+								d_sec.dsc$w_length, d_sec.dsc$a_pointer);
 						exit_status = ERR_MUNOTALLSEC;
 					}
 				} else if ((0 == memcmp("GT$P", mbuff, SIZEOF("GT$P") - 1)) ||
@@ -225,10 +227,12 @@ void mupip_rundown(void)
 						replpool_id.pool_type = RECVPOOL_SEGMENT;
 					sgmnt_found = FALSE;
 					if (mu_rndwn_replpool(&replpool_id, TRUE, &sgmnt_found) && sgmnt_found)
-						rts_error(VARLSTCNT(4) ERR_MUREPLSECDEL, 2, LEN_AND_STR(mbuff));
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUREPLSECDEL, 2,
+								LEN_AND_STR(mbuff));
 					else if (sgmnt_found)
 					{
-						rts_error(VARLSTCNT(4) ERR_MUREPLSECNOTDEL, 2, LEN_AND_STR(mbuff));
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUREPLSECNOTDEL, 2,
+								LEN_AND_STR(mbuff));
 						exit_status = ERR_MUNOTALLSEC;
 					}
 				}
@@ -300,22 +304,22 @@ void mupip_rundown(void)
 			if (status & 1)
 			{
 #ifdef	IPCRM_FOR_SANCHEZ_ONLY
-				rts_error(VARLSTCNT(6) ERR_MUDESTROYSUC, 4,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUDESTROYSUC, 4,
 					name_dsc.dsc$w_length, name_dsc.dsc$a_pointer, DB_LEN_STR(gv_cur_region));
 #else
-				rts_error(VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));
 #endif
 			}
 			else
 			{
 				if (status)
-					gtm_putmsg(VARLSTCNT(1) status);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 #ifdef	IPCRM_FOR_SANCHEZ_ONLY
-				rts_error(VARLSTCNT(6) ERR_MUDESTROYFAIL, 4,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUDESTROYFAIL, 4,
 					name_dsc.dsc$w_length, name_dsc.dsc$a_pointer, DB_LEN_STR(gv_cur_region));
 				exit_status = ERR_MUNOACTION;
 #else
-				gtm_putmsg(VARLSTCNT(4) ERR_MUFILRNDWNFL, 2, DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUFILRNDWNFL, 2, DB_LEN_STR(gv_cur_region));
 				exit_status = ERR_MUNOTALLSEC;
 #endif
 			}
@@ -334,7 +338,7 @@ void mupip_rundown(void)
 					replpool_id.gtmgbldir, &full_len, SIZEOF(replpool_id.gtmgbldir), &status))
 			{
 				util_out_print("Failed to get full path for gtmgbldir, !AD", TRUE, tran_name->len, tran_name->addr);
-				gtm_putmsg(VARLSTCNT(1) status);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				exit_status = ERR_MUNOTALLSEC;
 			} else
 			{
@@ -346,11 +350,11 @@ void mupip_rundown(void)
 				replpool_id.pool_type = JNLPOOL_SEGMENT;
 				sgmnt_found = FALSE;
 				if (mu_rndwn_replpool(&replpool_id, FALSE, &sgmnt_found) && sgmnt_found)
-					rts_error(VARLSTCNT(6) ERR_MUJPOOLRNDWNSUC, 4, res_name[0], &res_name[1],
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNSUC, 4, res_name[0], &res_name[1],
 							tran_name->len, replpool_id.gtmgbldir);
 				else if (sgmnt_found)
 				{
-					gtm_putmsg(VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, res_name[0], &res_name[1],
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, res_name[0], &res_name[1],
 							tran_name->len, replpool_id.gtmgbldir);
 					exit_status = ERR_MUNOTALLSEC;
 				}
@@ -360,11 +364,11 @@ void mupip_rundown(void)
 				replpool_id.pool_type = RECVPOOL_SEGMENT;
 				sgmnt_found = FALSE;
 				if (mu_rndwn_replpool(&replpool_id, FALSE, &sgmnt_found) && sgmnt_found)
-					rts_error(VARLSTCNT(6) ERR_MURPOOLRNDWNSUC, 4, res_name[0], &res_name[1],
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURPOOLRNDWNSUC, 4, res_name[0], &res_name[1],
 							tran_name->len, replpool_id.gtmgbldir);
 				else if (sgmnt_found)
 				{
-					gtm_putmsg(VARLSTCNT(6) ERR_MURPOOLRNDWNFL, 4, res_name[0], &res_name[1],
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURPOOLRNDWNFL, 4, res_name[0], &res_name[1],
 							tran_name->len, replpool_id.gtmgbldir);
 					exit_status = ERR_MUNOTALLSEC;
 				}

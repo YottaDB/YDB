@@ -24,8 +24,6 @@
 #include "io.h"
 #include "io_params.h"
 #include "iotimer.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "nametabtyp.h"
@@ -36,7 +34,6 @@
 GBLREF 	io_pair          	io_curr_device;
 GBLREF  io_pair			io_std_device;
 GBLREF 	io_desc          	*active_device;
-GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	d_socket_struct		*socket_pool;
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	spdesc			stringpool;
@@ -59,6 +56,7 @@ error_def(ERR_DELIMWIDTH);
 error_def(ERR_DEVPARMNEG);
 error_def(ERR_ILLESOCKBFSIZE);
 error_def(ERR_MRTMAXEXCEEDED);
+error_def(ERR_NOSOCKETINDEV);
 error_def(ERR_SETSOCKOPTERR);
 error_def(ERR_SOCKBFNOTEMPTY);
 error_def(ERR_SOCKNOTFND);
@@ -349,7 +347,10 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			return;
 		}
 		if (NULL == socket_pool)
+		{
 			iosocket_poolinit();
+			memcpy(newdsocket, dsocketptr, d_socket_struct_len);
+		}
 		iosocket_switch(handled, handled_len, newdsocket, socket_pool);
 		memcpy(dsocketptr, newdsocket, d_socket_struct_len);
 		if (0 > dsocketptr->current_socket)
@@ -383,13 +384,18 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	if (create_new_socket = (listen_specified || connect_specified))	/* real "=" */
 	{
 		/* allocate the structure for a new socket */
-                if (NULL == (socketptr = iosocket_create(sockaddr, bfsize, -1)))
+                if (NULL == (socketptr = iosocket_create(sockaddr, bfsize, -1, listen_specified)))
                         return;
 		/* give the new socket a handle */
 		iosocket_handle(handles, &handles_len, TRUE, dsocketptr);
                 socketptr->handle_len = handles_len;
                 memcpy(socketptr->handle, handles, handles_len);
 		socketptr->dev = newdsocket;	/* use newdsocket temporarily for the sake of bind/connect */
+#ifndef		VMS
+		socketptr->filemode_mask = 0;
+		socketptr->uic.mem = (uid_t)-1;
+		socketptr->uic.grp = (gid_t)-1;
+#endif
 	} else
 	{
 		if (socket_specified)
@@ -402,9 +408,20 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			}
 			newdsocket->current_socket = index;
 			socketptr = newdsocket->socket[index];
+			if ((1 == n_specified) && (socket_listening == socketptr->state))
+			{	/* accept a new connection if there is one */
+				socketptr->pendingevent = FALSE;
+				iod->dollar.key[0] = '\0';
+				save_errno = iosocket_accept(dsocketptr, socketptr, TRUE);
+				return;
+			}
 		} else
 		{
-			socketptr = newdsocket->socket[newdsocket->current_socket];
+			if (0 >= newdsocket->n_socket)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+				return;
+			}
      			if (newdsocket->n_socket <= newdsocket->current_socket)
 	     		{
 				assert(FALSE);
@@ -412,6 +429,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 						newdsocket->n_socket);
      				return;
      			}
+			socketptr = newdsocket->socket[newdsocket->current_socket];
 		}
 		socketptr->temp_sd = FD_INVALID;
 	}
@@ -511,7 +529,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 #ifdef TCP_NODELAY
 		nodelay = newsocket.nodelay ? 1 : 0;
 		if ((socketptr->nodelay != newsocket.nodelay) &&
-		    (-1 == tcp_routines.aa_setsockopt(newsocket.sd, IPPROTO_TCP,
+		    (-1 == setsockopt(newsocket.sd, IPPROTO_TCP,
 						      TCP_NODELAY, &nodelay, SIZEOF(nodelay))))
 		{
 			save_errno = errno;
@@ -522,7 +540,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		}
 #endif
 		if ((socketptr->bufsiz != newsocket.bufsiz) &&
-		    (-1 == tcp_routines.aa_setsockopt(newsocket.sd, SOL_SOCKET,
+		    (-1 == setsockopt(newsocket.sd, SOL_SOCKET,
 						      SO_RCVBUF, &newsocket.bufsiz, SIZEOF(newsocket.bufsiz))))
 		{
 			save_errno = errno;
@@ -545,11 +563,12 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		}
 	}
         /* -------------------------------------- action -------------------------------------------- */
-        if ((listen_specified && (!iosocket_bind(&newsocket, NO_M_TIMEOUT, ibfsize_specified))) ||
-	    (connect_specified && (!iosocket_connect(&newsocket, 0, ibfsize_specified))))
+	if ((listen_specified && ((!iosocket_bind(&newsocket, NO_M_TIMEOUT, ibfsize_specified, FALSE))
+			|| (!iosocket_listen_sock(&newsocket, DEFAULT_LISTEN_DEPTH))))
+		|| (connect_specified && (!iosocket_connect(&newsocket, 0, ibfsize_specified))))
         {	/* error message should be printed from bind/connect */
                 if (socketptr->sd > 0)
-                        (void)tcp_routines.aa_close(socketptr->sd);
+                        (void)close(socketptr->sd);
 		SOCKET_FREE(socketptr);
                 return;
         }

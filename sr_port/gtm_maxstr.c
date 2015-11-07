@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ GBLDEF  int	maxstr_stack_level = -1;
  * should do the same so that the storage is not kept dangling. */
 CONDITION_HANDLER(gtm_maxstr_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	if (maxstr_buff[maxstr_stack_level].addr)
 	{
 		free(maxstr_buff[maxstr_stack_level].addr);

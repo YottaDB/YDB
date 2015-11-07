@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,14 +47,22 @@ CONDITION_HANDLER(t_ch)
 {
 	boolean_t	retvalue;
 
-	START_CH;
+	/* We dont know how it is possible to have a success or info type severity message show up while we are in
+	 * the middle of a transaction commit. In any case, return right away instead of invoking t_commit_cleanup.
+	 * The issue with invoking that is that it would complete the transaction and release crit but the NEXTCH
+	 * call at the end of this condition handler would invoke the next level condition handler which could
+	 * decide the message is innocuous and therefore decide to return control to where the error was signalled
+	 * in the first place (in the midst of database commit) which can cause database damage since we no longer
+	 * hold crit.
+	 */
+	START_CH(TRUE);
 	UNIX_ONLY(
 		/* To get as virgin a state as possible in the core, take the core now if we
 		 * would be doing so anyway. This will set created_core so it doesn't happen again.
 		 */
 		if (DUMPABLE)
 		{	/* this is most likely a fatal error, therefore print the error right here as we do not know if
-			 * the send_msg() call in t_commit_cleanup() done below might overlay this primary fatal error.
+			 * the send_msg_csa() call in t_commit_cleanup() done below might overlay this primary fatal error.
 			 */
 			PRN_ERROR;
 			if (!SUPPRESS_DUMP)
@@ -64,18 +72,14 @@ CONDITION_HANDLER(t_ch)
 			}
 		}
 	)
-	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
-	{	/* We dont know how it is possible to have a success or info type severity message show up while we are in
-		 * the middle of a transaction commit. In any case, return right away instead of invoking t_commit_cleanup.
-		 * The issue with invoking that is that it would complete the transaction and release crit but the NEXTCH
-		 * call at the end of this condition handler would invoke the next level condition handler which could
-		 * decide the message is innocuous and therefore decide to return control to where the error was signalled
-		 * in the first place (in the midst of database commit) which can cause database damage since we no longer
-		 * hold crit.
-		 */
-		assert(FALSE);
-		CONTINUE;
-	}
+	VMS_ONLY (
+		if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
+		{
+			assert(FALSE);
+			CONTINUE;
+		}
+	)
+	ENABLE_AST;
 	ENABLE_AST;
 	/* Reset jgbl.dont_reset_gbl_jrec_time to FALSE if already set by tp_tend and we come here due to an rts_error in wcs_flu.
 	 * However, if it was forward recovery that ended up invoking tp_tend, then we should not reset the variable to FALSE as

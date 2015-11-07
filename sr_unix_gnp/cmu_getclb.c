@@ -15,7 +15,6 @@
 #include "eintr_wrappers.h"
 #include "gtm_netdb.h"
 #include "gtm_socket.h"
-#include "iotcpdef.h"
 
 GBLREF struct NTD *ntd_root;
 

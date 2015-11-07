@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
+#include "eintr_wrappers.h"
 
 #include <rms.h>
 #include <ssdef.h>
@@ -19,6 +20,7 @@
 #include <errno.h>
 #include "gtm_socket.h"
 #include "gtm_inet.h"
+#include "gtm_netdb.h"
 #include <efndef.h>
 
 #include "gdsroot.h"
@@ -33,8 +35,6 @@
 #include "muextr.h"
 #include "murest.h"
 #include "mupipbckup.h"
-#include "iotcproutine.h"
-#include "iotcpdef.h"
 #include "sleep_cnt.h"
 #include "util.h"
 #include "cli.h"
@@ -66,7 +66,6 @@ GBLREF  gd_region               *gv_cur_region;
 GBLREF 	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF 	unsigned char 		*mubbuf;
-GBLREF	tcp_library_struct      tcp_routines;
 GBLREF  int4                    backup_write_errno;
 GBLREF	int4			backup_close_errno;
 GBLREF	boolean_t		debug_mupip;
@@ -84,6 +83,9 @@ GBLREF	uint4			process_id;
 						return FALSE;           \
 				}
 
+/* VMS-only code, which never uses CSA_ARG(). Using GTM_PUTMSG avoids cosmetic warnings. */
+#define GTM_PUTMSG		gtm_putmsg
+
 LITREF	mval		mu_bin_datefmt;
 
 /* forward declarations */
@@ -91,6 +93,11 @@ static void file_write(char *temp, char *buf, int nbytes);
 static void file_close(char *temp);
 static void tcp_write(char *temp, char *buf, int nbytes);
 static void tcp_close(char *temp);
+
+error_def(ERR_BCKUPBUFLUSH);
+error_def(ERR_COMMITWAITSTUCK);
+error_def(ERR_DBCCERR);
+error_def(ERR_ERRCALL);
 
 bool mubinccpy(backup_reg_list *list)
 {
@@ -119,11 +126,6 @@ bool mubinccpy(backup_reg_list *list)
 	boolean_t		is_bitmap_blk, backup_this_blk;
 	enum db_ver		dummy_odbv;
 	int4			blk_bsiz;
-
-	error_def(ERR_BCKUPBUFLUSH);
-	error_def(ERR_COMMITWAITSTUCK);
-	error_def(ERR_DBCCERR);
-	error_def(ERR_ERRCALL);
 
 	assert(list->reg == gv_cur_region);
 	assert(incremental);
@@ -172,7 +174,7 @@ bool mubinccpy(backup_reg_list *list)
 				case RMS$_FILEPURGED:
 					break;
 				default:
-					gtm_putmsg(status, 0, mubincfab.fab$l_stv);
+					GTM_PUTMSG(status, 0, mubincfab.fab$l_stv);
 					util_out_print("Error: Cannot create backup file !AD.",
 						       TRUE, mubincfab.fab$b_fns, mubincfab.fab$l_fna);
 					return FALSE;
@@ -183,7 +185,7 @@ bool mubinccpy(backup_reg_list *list)
 			mubincrab.rab$l_rop = RAB$M_WBH;
 			if (RMS$_NORMAL != (status = sys$connect(&mubincrab)))
 			{
-				gtm_putmsg(status, 0, mubincrab.rab$l_stv);
+				GTM_PUTMSG(status, 0, mubincrab.rab$l_stv);
 				util_out_print("Error: Cannot connect to backup file !AD.",
 					       TRUE, mubincfab.fab$b_fns, mubincfab.fab$l_fna);
 				mubincfab.fab$l_fop |= FAB$M_DLT;
@@ -200,7 +202,6 @@ bool mubinccpy(backup_reg_list *list)
 				       fcb->fab$b_fns, fcb->fab$l_fna, file->len, file->addr);
 			return FALSE;
 		case backup_to_tcp:
-			iotcp_fillroutine();
 			/* parse it first */
 			switch (match = SSCANF(file->addr, "%[^:]:%hu", addr, &port))
 			{
@@ -301,7 +302,7 @@ bool mubinccpy(backup_reg_list *list)
 							      0, 0, 0)))
 			    || (SS$_NORMAL != (status = rd_iosb[0])))
 			{
-				gtm_putmsg(VARLSTCNT(1) status);
+				GTM_PUTMSG(VARLSTCNT(1) status);
 				util_out_print("Error reading data from database !AD.", TRUE,
 					       fcb->fab$b_fns, fcb->fab$l_fna);
 				free(outptr);
@@ -455,7 +456,7 @@ bool mubinccpy(backup_reg_list *list)
 			 */
 			if (cs_addrs->nl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(cs_addrs, NULL))
 			{
-				gtm_putmsg(VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
+				GTM_PUTMSG(VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
 					cs_addrs->nl->wcs_phase2_commit_pidcnt, DB_LEN_STR(gv_cur_region));
 				rel_crit(gv_cur_region);
 				free(outptr);
@@ -479,7 +480,7 @@ bool mubinccpy(backup_reg_list *list)
 				util_out_print("Process !UL encountered the following error.", TRUE,
 					       cs_addrs->shmpool_buffer->failed);
 				if (0 != cs_addrs->shmpool_buffer->backup_errno)
-					gtm_putmsg(VARLSTCNT(1) cs_addrs->shmpool_buffer->backup_errno);
+					GTM_PUTMSG(VARLSTCNT(1) cs_addrs->shmpool_buffer->backup_errno);
 				free(outptr);
 				free(bm_blk_buff);
 				error_mupip = TRUE;
@@ -489,7 +490,7 @@ bool mubinccpy(backup_reg_list *list)
 			backup_buffer_flush(gv_cur_region);
 			if (++counter > MAX_BACKUP_FLUSH_TRY)
 			{
-				gtm_putmsg(VARLSTCNT(1) ERR_BCKUPBUFLUSH);
+				GTM_PUTMSG(VARLSTCNT(1) ERR_BCKUPBUFLUSH);
 				free(outptr);
 				free(bm_blk_buff);
 				error_mupip = TRUE;
@@ -502,7 +503,7 @@ bool mubinccpy(backup_reg_list *list)
 			{	/* Force shmpool recovery to see if it can find the lost blocks */
 				if (!shmpool_lock_hdr(gv_cur_region))
 				{
-					gtm_putmsg(VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(gv_cur_region),
+					GTM_PUTMSG(VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(gv_cur_region),
 						   ERR_ERRCALL, 3, CALLFROM);
 					free(outptr);
 					free(bm_blk_buff);
@@ -533,7 +534,7 @@ bool mubinccpy(backup_reg_list *list)
 
 		if (RMS$_NORMAL != status)
 		{
-			gtm_putmsg(status, 0, temp_fab.fab$l_stv);
+			GTM_PUTMSG(status, 0, temp_fab.fab$l_stv);
 			util_out_print("WARNING:  DB file !AD backup aborted.", TRUE, fcb->fab$b_fns, fcb->fab$l_fna);
 			free(outptr);
 			free(bm_blk_buff);
@@ -544,7 +545,7 @@ bool mubinccpy(backup_reg_list *list)
 
 		if (RMS$_NORMAL != (status = sys$connect(&temp_rab)))
 		{
-			gtm_putmsg(status, 0, temp_rab.rab$l_stv);
+			GTM_PUTMSG(status, 0, temp_rab.rab$l_stv);
 			util_out_print("WARNING:  DB file !AD backup aborted.", TRUE, fcb->fab$b_fns, fcb->fab$l_fna);
 			free(outptr);
 			free(bm_blk_buff);
@@ -573,7 +574,7 @@ bool mubinccpy(backup_reg_list *list)
 
 		if (RMS$_NORMAL != status)
 		{
-			gtm_putmsg(status, 0, temp_rab.rab$l_stv);
+			GTM_PUTMSG(status, 0, temp_rab.rab$l_stv);
 			util_out_print("WARNING:  DB file !AD backup aborted.", TRUE, fcb->fab$b_fns, fcb->fab$l_fna);
 			free(outptr);
 			free(bm_blk_buff);
@@ -585,7 +586,7 @@ bool mubinccpy(backup_reg_list *list)
 		/* ---------------- Close the temporary file ----------------------- */
 		if (RMS$_NORMAL != (status = sys$close(&temp_fab)))
 		{
-			gtm_putmsg(status, 0, temp_fab.fab$l_stv);
+			GTM_PUTMSG(status, 0, temp_fab.fab$l_stv);
 			util_out_print("WARNING:  DB file !AD backup aborted.", TRUE, fcb->fab$b_fns, fcb->fab$l_fna);
 			free(outptr);
 			free(bm_blk_buff);
@@ -641,7 +642,7 @@ bool mubinccpy(backup_reg_list *list)
 		util_out_print("Process !UL encountered the following error.", TRUE,
 			       cs_addrs->shmpool_buffer->failed);
 		if (0 != cs_addrs->shmpool_buffer->backup_errno)
-			gtm_putmsg(VARLSTCNT(1) cs_addrs->shmpool_buffer->backup_errno);
+			GTM_PUTMSG(VARLSTCNT(1) cs_addrs->shmpool_buffer->backup_errno);
 		free(outptr);
 		free(bm_blk_buff);
 		error_mupip = TRUE;
@@ -676,7 +677,8 @@ static void tcp_write(char *temp, char *buf, int nbytes)
 
 	do
 	{
-		if (-1 != (iostatus = tcp_routines.aa_send(socket, buf + nwritten, nbytes - nwritten, 0)))
+		SEND(socket, buf + nwritten, nbytes - nwritten, 0, iostatus);
+		if (-1 != iostatus)
 		{
 			nwritten += iostatus;
 			if (nwritten == nbytes)
@@ -687,8 +689,8 @@ static void tcp_write(char *temp, char *buf, int nbytes)
 
 	if ((nwritten != nbytes) && (-1 == iostatus))
 	{
-		gtm_putmsg(VARLSTCNT(1) errno);
-		tcp_routines.aa_close(socket);
+		GTM_PUTMSG(VARLSTCNT(1) errno);
+		close(socket);
 		backup_write_errno = errno;
 	}
 
@@ -700,7 +702,7 @@ static void tcp_close(char *temp)
 	int 	socket;
 
 	socket = *((int *)(temp));
-	tcp_routines.aa_close(socket);
+	close(socket);
 
 	return;
 }
@@ -709,7 +711,6 @@ static void file_write(char *temp, char *buf, int nbytes)
 {
 	uint4		status;
 	struct RAB	*rab;
-	void		gtm_putmsg();
 
 	assert(nbytes > 4);
 	rab = (struct RAB *)(temp);
@@ -718,7 +719,7 @@ static void file_write(char *temp, char *buf, int nbytes)
 	if (RMS$_NORMAL != (status = sys$put(rab)))
 	{
 		backup_write_errno = status;
-		gtm_putmsg(status, 0, rab->rab$l_stv);
+		GTM_PUTMSG(status, 0, rab->rab$l_stv);
 		(rab->rab$l_fab)->fab$l_fop |= FAB$M_DLT;
 		sys$close(rab->rab$l_fab);
 	}
@@ -730,7 +731,6 @@ static void file_close(char *temp)
 {
 	uint4		status;
 	struct RAB	*rab;
-	void 		gtm_putmsg();
 
 	rab = (struct RAB *)(temp);
 	if (error_mupip)
@@ -739,7 +739,7 @@ static void file_close(char *temp)
 	if (status != RMS$_NORMAL)
 	{
 		backup_close_errno = status;
-		gtm_putmsg(status);
+		GTM_PUTMSG(status);
 		util_out_print("FATAL ERROR: System Service failure.",TRUE);
 	}
 

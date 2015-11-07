@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,12 +41,13 @@ void op_gvquery (mval *v)
 	int			maxlen;
 	char			extnamdelim[] = "^|\"\"|";
 	mval			val;
+	gvnh_reg_t		*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	/* We want to turn QUERY into QUERYGET for all types of access methods so that we can cache the value of the key returned
 	 * by $QUERY. The value is very likely to be used shortly after $QUERY - Vinaya, Aug 13, 2001 */
-	acc_meth = gv_cur_region->dyn.addr->acc_meth;
+	acc_meth = REG_ACC_METH(gv_cur_region);
 	/* Modify gv_currkey such that a gvcst_search of the resulting key will find the next available record in collation order.
 	 * But in case of dba_usr (the custom implementation of $ORDER which is overloaded for DDP now but could be more in the
 	 * future) it is better to hand over gv_currkey as it is so the custom implementation can decide what to do with it.
@@ -71,7 +72,11 @@ void op_gvquery (mval *v)
 	{
 		case dba_bg:
 		case dba_mm:
-			found = ((0 != gv_target->root) ? gvcst_query() : FALSE); /* global does not exist if root is 0 */
+			gvnh_reg = TREF(gd_targ_gvnh_reg);
+			if (NULL == gvnh_reg)
+				found = ((0 != gv_target->root) ? gvcst_query() : FALSE); /* global does not exist if root is 0 */
+			else
+				INVOKE_GVCST_SPR_XXX(gvnh_reg, found = gvcst_spr_query());
 			break;
 		case dba_cm:
 			found = gvcmx_query(&val); /* val ignored currently - Vinaya Aug 13, 2001*/
@@ -100,7 +105,7 @@ void op_gvquery (mval *v)
 			gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 		}
 	}
-	v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
+	v->mvtype = 0; /* so STP_GCOL (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
 	if (found)
 	{
 		if (acc_meth != dba_usr)
@@ -133,7 +138,6 @@ void op_gvquery (mval *v)
 			}
 			*extnamdst++ = extnamdelim[3];
 			*extnamdst++ = extnamdelim[4];
-			extnam_str.len = 0;
 		}
 		memcpy(extnamdst, glob_begin, size);
 		v->str.len = INTCAST(extnamdst - stringpool.free + size);

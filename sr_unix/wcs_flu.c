@@ -109,8 +109,9 @@ error_def(ERR_WRITERSTUCK);
 				 * a little over a minute) we wait for twice the time in the debug version.		\
 				 */											\
 				GET_C_STACK_MULTIPLE_PIDS("WRITERSTUCK", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);	\
-				assert((gtm_white_box_test_case_enabled) && 						\
-				(WBTEST_BUFOWNERSTUCK_STACK == gtm_white_box_test_case_number));			\
+				assert((gtm_white_box_test_case_enabled)						\
+					&& ((WBTEST_BUFOWNERSTUCK_STACK == gtm_white_box_test_case_number)		\
+						|| (WBTEST_SLEEP_IN_WCS_WTSTART == gtm_white_box_test_case_number)));	\
 				cnl->wcsflu_pid = 0;									\
 				SIGNAL_WRITERS_TO_RESUME(cnl);								\
 				if (!WAS_CRIT)										\
@@ -173,6 +174,7 @@ boolean_t wcs_flu(uint4 options)
 	cache_que_head_ptr_t	crq;
         struct shmid_ds         shm_buf;
 	uint4			fsync_dskaddr;
+	int4			rc;
 
 	jnl_status = 0;
 	flush_hdr = options & WCSFLU_FLUSH_HDR;
@@ -296,8 +298,12 @@ boolean_t wcs_flu(uint4 options)
 		if (WBTEST_ENABLED(WBTEST_WCS_FLU_FAIL)
 			|| ((csd->freeze || flush_msync) && (csa->ti->last_mm_sync != csa->ti->curr_tn)))
 		{
-			if (!(WBTEST_ENABLED(WBTEST_WCS_FLU_FAIL))
-				&& (0 == MSYNC((caddr_t)(MM_BASE_ADDR(csa)), (caddr_t)csa->db_addrs[1])))
+			#ifdef _AIX
+			GTM_DB_FSYNC(csa, udi->fd, rc);
+			#else
+			rc = MSYNC((caddr_t)(MM_BASE_ADDR(csa)), (caddr_t)csa->db_addrs[1]);
+			#endif
+			if (!(WBTEST_ENABLED(WBTEST_WCS_FLU_FAIL)) && (0 == rc))
 			{	/* Save when did last full sync */
 				csa->ti->last_mm_sync = csa->ti->curr_tn;
 			} else
@@ -472,7 +478,7 @@ boolean_t wcs_flu(uint4 options)
 					if (cnl->wcs_active_lvl || crq->fl)
 					{
 						REL_CRIT_BEFORE_RETURN;
-						GTMASSERT;
+						assertpro(FALSE);
 					}
 				}
 			}
@@ -504,7 +510,7 @@ boolean_t wcs_flu(uint4 options)
 				GET_C_STACK_MULTIPLE_PIDS("MAXJNLQIOLOCKWAIT", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);
 				assert(FALSE);
 				REL_CRIT_BEFORE_RETURN;
-				GTMASSERT;
+				assertpro(FALSE);
 			}
 			wcs_sleep(SLEEP_JNLQIOLOCKWAIT);	/* since it is a short lock, sleep the minimum */
 

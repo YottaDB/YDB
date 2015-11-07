@@ -112,7 +112,6 @@ GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
 UNIX_ONLY(GBLREF	boolean_t 		span_nodes_disallowed;)
 
-error_def(ERR_DBROLLEDBACK);
 error_def(ERR_TPRETRY);
 error_def(ERR_GVKILLFAIL);
 

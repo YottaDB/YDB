@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ CONDITION_HANDLER(trigger_tpwrap_ch)
 {
 	int	rc;
 
-	START_CH;
+	START_CH(TRUE);
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 		assert(TPRESTART_STATE_NORMAL == tprestart_state);

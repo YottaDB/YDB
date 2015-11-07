@@ -61,6 +61,9 @@
 #include "fork_init.h"
 #include "heartbeat_timer.h"
 #include "gtmio.h"
+#ifdef GTM_TLS
+#include "gtm_repl.h"
+#endif
 
 GBLDEF	boolean_t		gtmsource_logstats = FALSE, gtmsource_pool2file_transition = FALSE;
 GBLDEF	int			gtmsource_filter = NO_FILTER;
@@ -176,7 +179,7 @@ int gtmsource()
 		gtmsource_exit(gtmsource_statslog() - NORMAL_SHUTDOWN);
 	}
 	assert(gtmsource_options.start);
-#ifndef REPL_DEBUG_NOBACKGROUND
+#	ifndef REPL_DEBUG_NOBACKGROUND
 	/* Set "child_server_running" to FALSE before forking off child. Wait for it to be set to TRUE by the child. */
 	gtmsource_local = jnlpool.gtmsource_local;
 	gtmsource_local->child_server_running = FALSE;
@@ -262,7 +265,7 @@ int gtmsource()
 	if (-1 == (procgp = setsid()))
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Source server error in setsid"), errno);
-#endif /* REPL_DEBUG_NOBACKGROUND */
+#	endif /* REPL_DEBUG_NOBACKGROUND */
 	if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
 		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */
 	REPL_DPRINT1("Setting up regions\n");
@@ -319,7 +322,7 @@ int gtmsource()
 		}
 	}
 	/* after this point we can no longer have the case where all the regions are unreplicated/non-journaled. */
-#ifndef REPL_DEBUG_NOBACKGROUND
+#	ifndef REPL_DEBUG_NOBACKGROUND
 	/* It is necessary for every process that is using the ftok semaphore to increment the counter by 1. This is used
 	 * by the last process that shuts down to delete the ftok semaphore when it notices the counter to be 0.
 	 * Note that the parent source server startup command would have done an increment of the ftok counter semaphore
@@ -336,11 +339,13 @@ int gtmsource()
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Counter semaphore increment failure in child source server"), save_errno);
 	}
-#else
+#	else
 	if (0 != (save_errno = rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM)))
+	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error in rel_sem_immediate"), save_errno);
-#endif /* REPL_DEBUG_NOBACKGROUND */
+	}
+#	endif /* REPL_DEBUG_NOBACKGROUND */
 
 	gtmsource_srv_count++;
 	gtmsource_local->child_server_running = TRUE;	/* At this point, the parent startup command will stop waiting for child */
@@ -361,6 +366,13 @@ int gtmsource()
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Attached to existing jnlpool with shmid = [%d] and semid = [%d]\n",
 			jnlpool.repl_inst_filehdr->jnlpool_shmid, jnlpool.repl_inst_filehdr->jnlpool_semid);
 	gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
+#	ifdef GTM_TLS
+	if (REPL_TLS_REQUESTED)
+	{
+		repl_do_tls_init(gtmsource_log_fp);
+		assert(REPL_TLS_REQUESTED || PLAINTEXT_FALLBACK);
+	}
+#	endif
 	if (jnlpool.jnlpool_ctl->freeze)
 	{
 		last_seen_freeze_flag = jnlpool.jnlpool_ctl->freeze;

@@ -120,8 +120,7 @@ int updhelper_reader(void)
 	call_on_signal = updhelper_reader_sigstop;
 	updhelper_init(UPD_HELPER_READER);
 	repl_log(updhelper_log_fp, TRUE, TRUE, "Helper reader started. PID %d [0x%X]\n", process_id, process_id);
-	GVKEY_INIT(gv_currkey, gv_keysize);
-	GVKEY_INIT(gv_altkey, gv_keysize);
+	GVKEYSIZE_INIT_IF_NEEDED;       /* sets "gv_keysize", "gv_currkey" and "gv_altkey" (if not already done) */
 	last_pre_read_offset = 0;
 	continue_reading = TRUE;
 	do
@@ -148,7 +147,7 @@ boolean_t updproc_preread(void)
 	int			rec_len, cnt, retries, spins, maxspins, key_len;
 	enum jnl_record_type	rectype;
 	mstr_len_t		val_len;
-	mstr			mname;
+	mname_entry		gvname;
 	sm_uc_ptr_t		readaddrs;	/* start of current rec in pool */
 	sm_uc_ptr_t		limit_readaddrs;
 	jnl_record		*rec;
@@ -167,6 +166,7 @@ boolean_t updproc_preread(void)
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
+	gvnh_reg_t		*gvnh_reg;
 #ifdef REPL_DEBUG
 	unsigned char 		buff[MAX_ZWR_KEY_SZ], *end;
 	uint4			write, write_wrap;
@@ -335,32 +335,47 @@ boolean_t updproc_preread(void)
 					 */
 					memcpy(lcl_key, keystr->text, key_len);
 					if ((0 < key_len) && (0 == lcl_key[key_len - 1])
-						&& (upd_good_record == updproc_get_gblname(lcl_key, key_len, gv_mname, &mname))
+						&& (upd_good_record == updproc_get_gblname(lcl_key, key_len, gv_mname, &gvname))
 						&& (key_len == keystr->length))	/* If the shared copy changed underneath us, what
 										   we copied over is potentially a bad record */
 					{
 						TREF(tqread_nowait) = FALSE;	/* don't screw up gvcst_root_search */
-						UPD_GV_BIND_NAME_APPROPRIATE(gd_header, mname, lcl_key, key_len); /* if ^#t do
-													       special processing */
+						UPD_GV_BIND_NAME_APPROPRIATE(gd_header, gvname, lcl_key, key_len, gvnh_reg);
+							/* if ^#t do special processing */
+						memcpy(gv_currkey->base, lcl_key, key_len);
+						gv_currkey->end = key_len;
+						gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+						/* If gvname is "^#t", then gvnh_reg is NULL. This global for sure does NOT
+						 * span multiple regions. So treat it accordingly.
+						 */
+						if (NULL != gvnh_reg)
+						{	/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH
+							 * (e.g. setting gv_cur_region for spanning globals).
+							 */
+							GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_header,
+													gv_currkey, reg);
+									/* "reg" is a dummy argument above */
+						}
 						/* the above would have set gv_target and gv_cur_region appropriately */
+						DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 						if (!gv_target->root)
 							continue;
-						csa = &FILE_INFO(gv_cur_region)->s_addrs;/* we modify n_pre_read for the region we
-											    read on our last try. This is done for
-											    performance reasons so that n_pre_read
-											    doesn't have to be an atomic counter */
-						memcpy(gv_currkey->base, lcl_key, key_len);
 						if ((readaddrs + rec_len > recvpool.recvdata_base + upd_proc_local->read
 						     && !(was_wrapped && !recvpool_ctl->wrapped))
 						    && (0 != gv_currkey->base[0]
 							&&  0 == gv_currkey->base[key_len - 1]
-							&&  0 == gv_currkey->base[mname.len]))
+							&&  0 == gv_currkey->base[gvname.var_name.len]))
 						{
 							gv_currkey->base[key_len] = 0; 	/* second null of a key terminator */
 							gv_currkey->end = key_len;
 							disk_blk_read = FALSE;
 							DEBUG_ONLY(num_helped++);
 							TREF(tqread_nowait) = TRUE;
+							/* we modify n_pre_read for the region we read on our last try.
+							 * This is done for performance reasons so that n_pre_read
+							 * doesn't have to be an atomic counter.
+							 */
+							csa = &FILE_INFO(gv_cur_region)->s_addrs;
 							assert(!csa->now_crit);
 							status = gvcst_search(gv_currkey, NULL);
 							assert(!csa->now_crit);

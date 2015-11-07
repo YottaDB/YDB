@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,9 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+
 GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	mstr			pvt_crypt_buf;
 
 void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 {
@@ -82,19 +84,21 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 	save_buffer = buffer;
 #	ifdef GTM_CRYPT
 	in_len = aimg_record.bsiz - SIZEOF(*buffer);
-	if (BLOCK_REQUIRE_ENCRYPTION(csd->is_encrypted, buffer->levl, in_len))
+	if (BLK_NEEDS_ENCRYPTION3(csd->is_encrypted, buffer->levl, in_len))
 	{
 		ASSERT_ENCRYPTION_INITIALIZED;
-		memcpy(csa->encrypted_blk_contents, buffer, SIZEOF(*buffer));
-		in = (char *)(buffer + 1);
-		out = csa->encrypted_blk_contents + SIZEOF(blk_hdr);
+		assert(aimg_record.bsiz <= csa->hdr->blk_size);
+		REALLOC_CRYPTBUF_IF_NEEDED(csa->hdr->blk_size);
+		memcpy(pvt_crypt_buf.addr, buffer, SIZEOF(blk_hdr));	/* copy the block header */
+		in = (char *)(buffer + 1);	/* + 1 because `buffer' is of type blk_hdr_ptr_t */
+		out = pvt_crypt_buf.addr + SIZEOF(blk_hdr);
 		GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, in, in_len, out, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			seg = csa->region->dyn.addr;
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
 		}
-		buffer = (blk_hdr_ptr_t)csa->encrypted_blk_contents;
+		buffer = (blk_hdr_ptr_t)pvt_crypt_buf.addr;
 	}
 #	endif
 	cursum = jnl_get_checksum((uint4 *)buffer, NULL, aimg_record.bsiz);

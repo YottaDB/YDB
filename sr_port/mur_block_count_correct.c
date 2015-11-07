@@ -51,30 +51,20 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 	int4			mu_int_ovrhd;
 	uint4			total_blks;
 	uint4			status;
-	uint4                   new_bit_maps, bplmap, new_blocks;
+	uint4                   new_bit_maps, bplmap, new_blocks, tmpcnt;
+	enum db_acc_method      acc_meth;
 
 	MUR_CHANGE_REG(rctl);
 	mu_data = cs_data;
-	switch (mu_data->acc_meth)
+	acc_meth = mu_data->acc_meth;
+	switch (acc_meth)
 	{
-		default:
-			GTMASSERT;
-			break;
-#if defined(VMS) && defined(GT_CX_DEF)
-		case dba_bg:	/* necessary to do calculation in this manner to prevent double rounding causing an error */
-			if (mu_data->unbacked_cache)
-				mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space +
-					mu_data->lock_space_size, DISK_BLOCK_SIZE);
-			else
-				mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + BT_SIZE(mu_data)
-					+ mu_data->free_space + mu_data->lock_space_size, DISK_BLOCK_SIZE);
-			break;
-#else
 		case dba_bg:
-#endif
 		case dba_mm:
 			mu_int_ovrhd = (int4)DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
-		break;
+			break;
+		default:
+			assertpro(FALSE && acc_meth);
 	}
 	mu_int_ovrhd += 1;
 	assert(mu_int_ovrhd == mu_data->start_vbn);
@@ -85,7 +75,7 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 	 */
 	if (native_size && (size < native_size))
 	{
-		total_blks = (dba_mm == mu_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
+		total_blks = (dba_mm == acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
 		if (JNL_ENABLED(cs_addrs))
 			cs_addrs->jnl->pini_addr = 0; /* Stop simulation of GTM process journal record writing (if any active)*/
 		/* If journaling, gdsfilext will need to write an inctn record. The timestamp of that journal record will
@@ -102,18 +92,24 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 		bplmap = cs_data->bplmap;
 		new_blocks = (native_size - size)/(mu_data->blk_size / DISK_BLOCK_SIZE);
 		new_bit_maps = DIVIDE_ROUND_UP(total_blks + new_blocks, bplmap) - DIVIDE_ROUND_UP(total_blks, bplmap);
-		if (SS_NORMAL != (status = GDSFILEXT(new_blocks - new_bit_maps, total_blks, TRANS_IN_PROG_FALSE)))
+		tmpcnt = new_blocks - new_bit_maps;
+		/* Call GDSFILEXT only if the no of blocks by which DB needs to be extended is not '0' since GDSFILEXT() treats
+		 * extension by count 0 as unavailability of space(NO_FREE_SPACE error). And in the following case, tmpcnt could
+		 * be '0' on AIX because in MM mode AIX increases the native_size to the nearest multiple of OS_PAGE_SIZE.
+		 * And this increase could be less than GT.M block size.*/
+		if (tmpcnt && SS_NORMAL != (status = GDSFILEXT(new_blocks - new_bit_maps, total_blks, TRANS_IN_PROG_FALSE)))
 		{
 			jgbl.dont_reset_gbl_jrec_time = TRUE;
 			return (status);
 		}
 		jgbl.dont_reset_gbl_jrec_time = TRUE;
-		DEBUG_ONLY(
-			/* Check that the filesize and blockcount in the fileheader match now after the extend */
-			size = mu_int_ovrhd + (off_t)(mu_data->blk_size / DISK_BLOCK_SIZE) * mu_data->trans_hist.total_blks;
-			native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);
-			assert(size == native_size);
-		)
+#		ifdef DEBUG
+		/* Check that the filesize and blockcount in the fileheader match now after the extend */
+		size = mu_int_ovrhd + (off_t)(mu_data->blk_size / DISK_BLOCK_SIZE) * mu_data->trans_hist.total_blks;
+		native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);
+		ALIGN_DBFILE_SIZE_IF_NEEDED(size, native_size);
+		assert(size == native_size);
+#		endif
 	}
 	return SS_NORMAL;
 }

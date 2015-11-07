@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@ GBLREF	bool gv_replication_error;
 
 CONDITION_HANDLER(replication_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	gv_replication_error = TRUE;
 	if (SEVERITY == SEVERE)
 	{

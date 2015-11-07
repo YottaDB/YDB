@@ -48,11 +48,12 @@ GBLREF uint4		process_id;
 error_def(ERR_RUNPARAMERR);
 error_def(ERR_TEXT);
 error_def(ERR_SYSCALL);
+error_def(ERR_JOBSTARTCMDFAIL);
 error_def(ERR_JOBLABOFF);
 
 CONDITION_HANDLER(job_init_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	PRN_ERROR;
 	NEXTCH;
 }
@@ -79,23 +80,23 @@ void jobchild_init(void)
 	 * gtm process; else, we are a child process of a job command.
 	 */
 	if ((c = GETENV(CHILD_FLAG_ENV)) && strlen(c))
-	{	/* We are a Jobbed process Get Job parameters and set up environment to run the Job command.
-		 * Clear the environment variable so that subsequent child mumps processes can start normal initialization.
-		 */
+	{	/* We are a Jobbed process Get Job parameters and set up environment to run the Job command. */
+		/* read parameters into parameter structure  - references CHILD_FLAG_ENV */
+		ojchildparms(&jparms, &job_arglist, job_args);
+		/* Clear the environment variable so that subsequent child mumps processes can start normal initialization. */
 		if (PUTENV(CLEAR_CHILD_FLAG_ENV))
 		{
 			util_out_print("Unable to clear gtmj0 process !UL exiting.", TRUE, process_id);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 		}
-		/* read parameters into parameter structure */
-		ojchildparms(&jparms, &job_arglist, job_args);
 		/* Execute the command to be run before executing the actual M routine */
 		if (jparms.startup.len)
 		{
 			rc = SYSTEM(jparms.startup.addr);
-			if ((0 != rc))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,
-						LEN_AND_LIT("STARTUP command failed"));
+			if (-1 == rc)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBSTARTCMDFAIL, 0, errno);
+			else if (0 != rc)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_JOBSTARTCMDFAIL, 0);
 		}
 		if(!job_addr(&jparms.routine, &jparms.label, jparms.offset,
 				(char **)&base_addr, (char **)&transfer_addr))
@@ -127,8 +128,6 @@ void jobchild_init(void)
 			free(jparms.routine.addr);
 		if (jparms.label.len)
 			free(jparms.label.addr);
-		if (jparms.logfile.len)
-			free(jparms.logfile.addr);
 	} else
 	{	/* If we are not a child, setup a dummy mumps routine */
 		if (MUMPS_RUN == invocation_mode)

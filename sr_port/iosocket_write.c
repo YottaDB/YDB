@@ -18,10 +18,9 @@
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+#include "eintr_wrappers.h"
 
 #include "io.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "dollarx.h"
@@ -37,18 +36,49 @@ GBLREF io_pair			io_std_device;
 GBLREF bool			prin_out_dev_failure;
 #endif
 
-GBLREF tcp_library_struct	tcp_routines;
 GBLREF mstr			chset_names[];
 GBLREF UConverter		*chset_desc[];
 GBLREF spdesc			stringpool;
 
+error_def(ERR_CURRSOCKOFR);
+error_def(ERR_DELIMSIZNA);
+UNIX_ONLY(error_def(ERR_NOPRINCIO);)
+error_def(ERR_NOSOCKETINDEV);
 error_def(ERR_SOCKWRITE);
 error_def(ERR_TEXT);
-error_def(ERR_CURRSOCKOFR);
 error_def(ERR_ZFF2MANY);
-error_def(ERR_DELIMSIZNA);
 error_def(ERR_ZINTRECURSEIO);
-UNIX_ONLY(error_def(ERR_NOPRINCIO);)
+
+#define DOTCPSEND(SDESC, SBUFF, SBUFF_LEN, SFLAGS, RC)									\
+{															\
+	ssize_t		gtmioStatus;											\
+	size_t		gtmioBuffLen;											\
+	size_t		gtmioChunk;											\
+	sm_uc_ptr_t	gtmioBuff;											\
+															\
+	gtmioBuffLen = SBUFF_LEN;											\
+	gtmioBuff = (sm_uc_ptr_t)(SBUFF);										\
+	for (;;)													\
+        {														\
+		gtmioChunk = gtmioBuffLen VMS_ONLY(> VMS_MAX_TCP_IO_SIZE ? VMS_MAX_TCP_IO_SIZE : gtmioBuffLen);		\
+		SEND(SDESC, gtmioBuff, gtmioChunk, SFLAGS, gtmioStatus);						\
+		if ((ssize_t)-1 != gtmioStatus)										\
+	        {													\
+			gtmioBuffLen -= gtmioStatus;									\
+			if (0 == gtmioBuffLen)										\
+				break;											\
+			gtmioBuff += gtmioStatus;									\
+	        }													\
+		else													\
+			break;												\
+        }														\
+	if ((ssize_t)-1 == gtmioStatus)    	/* Had legitimate error - return it */					\
+		RC = errno;												\
+	else if (0 == gtmioBuffLen)											\
+	        RC = 0;													\
+	else														\
+		RC = -1;		/* Something kept us from sending what we wanted */				\
+}
 
 void	iosocket_write(mstr *v)
 {
@@ -69,7 +99,11 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	iod = io_curr_device.out;
 	assert(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
-	socketptr = dsocketptr->socket[dsocketptr->current_socket];
+	if (0 >= dsocketptr->n_socket)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		return;
+	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
@@ -77,6 +111,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	}
 	if (dsocketptr->mupintr)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 #ifdef MSG_NOSIGNAL
 	flags = MSG_NOSIGNAL;		/* return EPIPE instead of SIGPIPE */
 #else

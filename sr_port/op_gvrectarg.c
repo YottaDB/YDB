@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,6 @@
 
 #define DIR_ROOT 1
 
-GBLREF	gd_binding	*gd_map;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;
 GBLREF	gv_namehead	*gv_target;
@@ -90,8 +89,6 @@ void op_gvrectarg(mval *v)
 		gvsavtarg = &gvst_tmp;
 		memcpy(gvsavtarg, c, GVSAVTARG_FIXED_SIZE);
 	}
-	TREF(gd_targ_addr) = gvsavtarg->gd_targ_addr;
-	gd_map = gvsavtarg->gd_map;
 	reg = gvsavtarg->gv_cur_region;
 	TP_CHANGE_REG(reg);	/* sets gv_cur_region, cs_addrs, cs_data */
 	gv_target = gvsavtarg->gv_target;
@@ -127,6 +124,8 @@ void op_gvrectarg(mval *v)
 		}
 		assert((NULL != first_sgm_info) || (NULL == sgm_info_ptr));
 	}
+	TREF(gd_targ_gvnh_reg)   = gvsavtarg->gd_targ_gvnh_reg;	/* non-zero only for spanning globals */
+	TREF(gd_targ_map)        = gvsavtarg->gd_targ_map;	/* initialized only if gd_targ_gvnh_reg is non-NULL */
 	TREF(gv_last_subsc_null) = gvsavtarg->gv_last_subsc_null;
 	TREF(gv_some_subsc_null) = gvsavtarg->gv_some_subsc_null;
 	gv_currkey->prev = gvsavtarg->prev;

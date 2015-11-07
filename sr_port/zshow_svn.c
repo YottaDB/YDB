@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,6 +127,8 @@ static readonly char zusedstor_text[] = "$ZUSEDSTOR";
 static readonly char zversion_text[] = "$ZVERSION";
 static readonly char zyerror_text[] = "$ZYERROR";
 static readonly char zonlnrlbk_text[] = "$ZONLNRLBK";
+static readonly char zclose_text[] = "$ZCLOSE";
+static readonly char zkey_text[] = "$ZKEY";
 static readonly char arrow_text[] = "->";
 
 GBLREF mval		dollar_zdir;
@@ -400,6 +402,16 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
+#		ifdef UNIX
+		case SV_ZCLOSE:
+			count = (int)(TREF(dollar_zclose));
+			MV_FORCE_MVAL(&var, count);
+			ZS_VAR_EQU(&x, zclose_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+#		endif
+		/* CAUTION: fall through */
 		case SV_ZCMDLINE:
 			get_command_line(&var, TRUE);	/* TRUE indicates $ZCMDLINE (i.e. processed not actual command line) */
 			ZS_VAR_EQU(&x, zcmdline_text);
@@ -513,6 +525,13 @@ void zshow_svn(zshow_out *output, int one_sv)
 		case SV_ZJOB:
 			MV_FORCE_UMVAL(&var, dollar_zjob);
 			ZS_VAR_EQU(&x, zjob_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZKEY:
+			get_dlr_zkey(&var);
+			ZS_VAR_EQU(&x, zkey_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
@@ -771,7 +790,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 			mval_write(output, &var, TRUE);
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE);
 
 	}
 }

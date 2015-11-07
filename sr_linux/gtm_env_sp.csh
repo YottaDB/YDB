@@ -142,8 +142,7 @@ if ( $?gtm_version_change == "1" ) then
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_XOPEN_SOURCE=600 -fsigned-char "
 
         if ( "ia64" != $mach_type ) then
-		set tmpgtmval = `echo $gt_cc_compiler | grep icc`
-		if ($status) then
+		if ("$gt_cc_compiler" =~ *icc*) then
         		setenv gt_cc_options_common "$gt_cc_options_common $gt_cc_shl_fpic"
 		else
 			setenv gt_cc_options_common "$gt_cc_options_common $gt_cc_shl_fpic -Wimplicit"

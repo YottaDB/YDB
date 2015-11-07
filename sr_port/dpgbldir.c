@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -131,16 +131,23 @@ Notes:          A) While checking may be done earlier for duplicate names,
 -*/
 gd_addr *gd_load(mstr *v)
 {
-	void		*file_ptr;	/* This is a temporary structure as the file open and manipulations are currently stubs */
-	header_struct	*header, temp_head;
-	gd_addr		*table, *gd_addr_ptr;
-	gd_binding	*map, *map_top;
-	gd_region	*reg, *reg_top;
-	uint4		t_offset, size;
-	short		i;
+	void			*file_ptr; /* is a temporary structure as the file open and manipulations are currently stubs */
+	header_struct		*header, temp_head;
+	gd_addr			*table, *gd_addr_ptr;
+	gd_binding		*map, *map_top;
+	gd_region		*reg, *reg_top;
+	uint4			t_offset, size;
+	gd_gblname		*gnam, *gnam_top;
+	int			i, n_regions, arraysize;
+	trans_num		*array;
+#	ifdef DEBUG
+	boolean_t		prevMapIsSpanning, currMapIsSpanning, gdHasSpanGbls;
+	boolean_t		isSpannedReg[256];	/* currently we allow for a max of 256 regions in this dbg code */
+#	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	file_ptr = open_gd_file(v);
-
 	for (gd_addr_ptr = gd_addr_head;  gd_addr_ptr;  gd_addr_ptr = gd_addr_ptr->link)
 	{	/* if already open then return old structure */
 		if (comp_gd_addr(gd_addr_ptr, file_ptr))
@@ -158,7 +165,7 @@ gd_addr *gd_load(mstr *v)
 	if (GDE_LABEL_NUM == i)
 	{
 		close_gd_file(file_ptr);
-		rts_error(VARLSTCNT(8) ERR_GDINVALID, 6, v->len, v->addr, LEN_AND_LIT(GDE_LABEL_LITERAL),
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GDINVALID, 6, v->len, v->addr, LEN_AND_LIT(GDE_LABEL_LITERAL),
 				SIZEOF(temp_head.label), temp_head.label);
 	}
 	size = LEGAL_IO_SIZE(temp_head.filesize);
@@ -166,31 +173,73 @@ gd_addr *gd_load(mstr *v)
 	file_read(file_ptr, size, (uchar_ptr_t)header, 1);			/* Read in body of file */
 	table = (gd_addr *)((char *)header + SIZEOF(header_struct));
         table->local_locks = (struct gd_region_struct *)((UINTPTR_T)table->local_locks + (UINTPTR_T)table);
+	assert(table->var_maps_len == ((UINTPTR_T)table->regions - (UINTPTR_T)table->maps) - (table->n_maps * SIZEOF(gd_binding)));
 	table->maps = (struct gd_binding_struct *)((UINTPTR_T)table->maps + (UINTPTR_T)table);
 	table->regions = (struct gd_region_struct *)((UINTPTR_T)table->regions + (UINTPTR_T)table);
 	table->segments = (struct gd_segment_struct *)((UINTPTR_T)table->segments + (UINTPTR_T)table);
+	table->gblnames = (struct gd_gblname_struct *)((UINTPTR_T)table->gblnames + (UINTPTR_T)table);
 	table->end = (table->end + (UINTPTR_T)table);
+	n_regions = table->n_regions;
+	for (reg = table->regions, reg_top = reg + n_regions; reg < reg_top; reg++)
+	{
+		t_offset = reg->dyn.offset;
+		reg->dyn.addr = (gd_segment *)((char *)table + t_offset);
+#		ifdef DEBUG
+		assert((reg - table->regions) < ARRAYSIZE(isSpannedReg));
+		isSpannedReg[reg - table->regions] = FALSE;
+#		endif
+	}
+#	ifdef DEBUG
+	prevMapIsSpanning = FALSE;
+	currMapIsSpanning = FALSE;
+	gdHasSpanGbls = FALSE;
+#	endif
 	for (map = table->maps, map_top = map + table->n_maps;  map < map_top;  map++)
 	{
 		t_offset = map->reg.offset;
 		map->reg.addr = (gd_region *)((char *)table + t_offset);
-		assert(SIZEOF(map->name) == (MAX_MIDENT_LEN + 1));
-		map->name[MAX_MIDENT_LEN] = '\0';	/* reset 32nd byte to 0 since only 31 bytes are used in map.
-							 * this is necessary so "mid_len" can be invoked on this
-							 * as it expects a null-terminated string.
-							 */
+#		ifdef DEBUG
+		currMapIsSpanning = ((map->gvname_len + 1) != map->gvkey_len);
+		if (currMapIsSpanning)
+			gdHasSpanGbls = TRUE;
+		if (currMapIsSpanning || prevMapIsSpanning)
+			isSpannedReg[map->reg.addr - table->regions] = TRUE;
+		prevMapIsSpanning = currMapIsSpanning;
+#		endif
+		t_offset = map->gvkey.offset;
+		map->gvkey.addr = (char *)table + t_offset;
+		assert('\0' == map->gvkey.addr[map->gvname_len]);
+		assert('\0' == map->gvkey.addr[map->gvkey_len]);
+		assert('\0' == map->gvkey.addr[map->gvkey_len - 1]);
+		assert((map->gvname_len + 1) <= map->gvkey_len);
 	}
-	for (reg = table->regions, reg_top = reg + table->n_regions;  reg < reg_top;  reg++)
+#	ifdef DEBUG
+	assert(table->has_span_gbls == gdHasSpanGbls);
+	for (reg = table->regions, reg_top = reg + n_regions; reg < reg_top; reg++)
+		assert(reg->is_spanned == isSpannedReg[reg - table->regions]);
+	for (gnam = table->gblnames, gnam_top = gnam + table->n_gblnames; gnam < gnam_top; gnam++)
 	{
-		t_offset = reg->dyn.offset;
-		reg->dyn.addr = (gd_segment *)((char *)table + t_offset);
+		assert(SIZEOF(gnam->gblname) == (MAX_MIDENT_LEN + 1));
+		assert('\0' == gnam->gblname[MAX_MIDENT_LEN]);
 	}
+#	endif
 	table->link = gd_addr_head;
 	gd_addr_head = table;
 	fill_gd_addr_id(gd_addr_head, file_ptr);
 	close_gd_file(file_ptr);
 	table->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 	init_hashtab_mname(table->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+	if (table->has_span_gbls && (TREF(gd_targ_reg_array_size) < n_regions))
+	{
+		array = TREF(gd_targ_reg_array);
+		if (NULL != array)
+			free(array);
+		arraysize = n_regions * SIZEOF(*array);
+		array = malloc(arraysize);
+		memset(array, 0, arraysize);
+		TREF(gd_targ_reg_array) = array;
+		TREF(gd_targ_reg_array_size) = arraysize;
+	}
 	return table;
 }
 
@@ -313,6 +362,8 @@ void gd_ht_kill(hash_table_mname *table, boolean_t contents)	/* wipe out the has
 	ht_ent_mname	*tabent, *topent;
 	gvnh_reg_t	*gvnh_reg;
 	gv_namehead	*gvt;
+	gvnh_spanreg_t	*gvspan;
+	int		i;
 
 	if (contents)
 	{
@@ -320,10 +371,30 @@ void gd_ht_kill(hash_table_mname *table, boolean_t contents)	/* wipe out the has
 		{
 			if (HTENT_VALID_MNAME(tabent, gvnh_reg_t, gvnh_reg))
 			{
-				gvt = gvnh_reg->gvt;
-				gvt->regcnt--;
-				if (!gvt->regcnt)
-					targ_free(gvt);
+				gvspan = gvnh_reg->gvspan;
+				if (NULL == gvspan)
+				{
+					gvt = gvnh_reg->gvt;
+					DEBUG_ONLY(gvnh_reg->gvt = NULL;)	/* or else targ_free() might assert fail */
+					TARG_FREE_IF_NEEDED(gvt);
+				} else
+				{	/* this global spans more than one region. free up gvts corresponding to those regions */
+					for (i = 0; i < (gvspan->max_reg_index - gvspan->min_reg_index + 1); i++)
+					{
+						gvt = GET_REAL_GVT(gvspan->gvt_array[i]);
+						if (NULL != gvt)
+						{
+#							ifdef DEBUG
+							/* below is needed to ensure "targ_free" does not assert fail */
+							gvspan->gvt_array[i] = NULL;
+							if (gvt == gvnh_reg->gvt)
+								gvnh_reg->gvt = NULL;
+#							endif
+							TARG_FREE_IF_NEEDED(gvt);
+						}
+					}
+					free(gvspan);
+				}
 				free(gvnh_reg);
 			}
 		}

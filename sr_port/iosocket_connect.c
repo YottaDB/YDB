@@ -21,19 +21,18 @@
 #include "gt_timer.h"
 #include "io.h"
 #include "iotimer.h"
-#include "iotcpdef.h"
 #include "iosocketdef.h"
-#include "iotcproutine.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "outofband.h"
 #include "gtm_netdb.h"
 #include "gtm_ipv6.h"
+#include "gtm_unistd.h"
+#include "gtm_select.h"
 
 #define	ESTABLISHED	"ESTABLISHED"
 
-GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	volatile int4           outofband;
 GBLREF	boolean_t               dollar_zininterrupt;
 GBLREF	stack_frame             *frame_pointer;
@@ -90,12 +89,10 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
         /* Check for restart */
         if (dsocketptr->mupintr)
         {       /* We have a pending read restart of some sort - check we aren't recursing on this device */
-                if (sockwhich_invalid == sockintr->who_saved)
-                        GTMASSERT;      /* Interrupt should never have an invalid save state */
+                assertpro(sockwhich_invalid != sockintr->who_saved);	/* Interrupt should never have an invalid save state */
                 if (dollar_zininterrupt)
                         rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
-                if (sockwhich_connect != sockintr->who_saved)
-                        GTMASSERT;      /* ZINTRECURSEIO should have caught */
+                assertpro(sockwhich_connect == sockintr->who_saved);	/* ZINTRECURSEIO should have caught */
                 DBGSOCK((stdout, "socconn: *#*#*#*#*#*#*#  Restarted interrupted connect\n"));
                 mv_zintdev = io_find_mvstent(iod, FALSE);
                 if (mv_zintdev)
@@ -137,11 +134,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 		/* If the connect was failed, we may have already changed the remote.
 	 	 * So, the remote ai_addr should be restored.
 	 	 */
-		assertpro(NULL != sockptr->remote.ai_head);
-		memcpy(remote_ai_ptr, sockptr->remote.ai_head, SIZEOF(struct addrinfo));
+		assertpro((socket_tcpip != sockptr->protocol) || (NULL != sockptr->remote.ai_head));
+		if (sockptr->remote.ai_head)
+			memcpy(remote_ai_ptr, sockptr->remote.ai_head, SIZEOF(struct addrinfo));
 		if (need_socket && (FD_INVALID != sockptr->sd))
 		{
-			tcp_routines.aa_close(sockptr->sd);
+			close(sockptr->sd);
 			sockptr->sd = FD_INVALID;
 		}
 		assert(FD_INVALID == -1);
@@ -150,10 +148,13 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 			real_errno = -2;
 			for (raw_ai_ptr = remote_ai_ptr; NULL != raw_ai_ptr; raw_ai_ptr = raw_ai_ptr->ai_next)
 			{
-				if (-1 == (sockptr->sd = tcp_routines.aa_socket(raw_ai_ptr->ai_family, raw_ai_ptr->ai_socktype,
+				if (-1 == (sockptr->sd = socket(raw_ai_ptr->ai_family, raw_ai_ptr->ai_socktype,
 										  raw_ai_ptr->ai_protocol)))
+				{
 					real_errno = errno;
-				else
+					if (socket_local == sockptr->protocol)
+						break;		/* just one attempt */
+				} else
 				{
 					real_errno = 0;
 					break;
@@ -172,59 +173,24 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 				return FALSE;
 			}
-			assertpro(NULL != raw_ai_ptr);/* either there is an IPv6 or an IPv4 address */
-			memcpy(remote_ai_ptr, raw_ai_ptr, SIZEOF(struct addrinfo));
-			SOCKET_AI_TO_REMOTE_ADDR(sockptr, raw_ai_ptr);
-			remote_ai_ptr->ai_addr = SOCKET_REMOTE_ADDR(sockptr);
-			remote_ai_ptr->ai_addrlen = raw_ai_ptr->ai_addrlen;
-			remote_ai_ptr->ai_next = NULL;
+			assertpro(NULL != raw_ai_ptr);	/* there is a local, IPv6, or IPv4 address */
+			if (remote_ai_ptr != raw_ai_ptr)
+				memcpy(remote_ai_ptr, raw_ai_ptr, SIZEOF(struct addrinfo));
 			need_socket = FALSE;
 			temp_1 = 1;
-			if (-1 == tcp_routines.aa_setsockopt(sockptr->sd, SOL_SOCKET, SO_REUSEADDR, &temp_1, SIZEOF(temp_1)))
-        		{
-				save_errno = errno;
-                		errptr = (char *)STRERROR(save_errno);
-                		errlen = STRLEN(errptr);
-				tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
-				sockptr->sd = FD_INVALID;
-				if (NULL != sockptr->remote.ai_head)
-				{
-					freeaddrinfo(sockptr->remote.ai_head);
-					sockptr->remote.ai_head = NULL;
-				}
-                		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-					  RTS_ERROR_LITERAL("SO_REUSEADDR"), save_errno, errlen, errptr);
-                		return FALSE;
-        		}
-#ifdef			TCP_NODELAY
-			temp_1 = sockptr->nodelay ? 1 : 0;
-			if (-1 == tcp_routines.aa_setsockopt(sockptr->sd,
-						     IPPROTO_TCP, TCP_NODELAY, &temp_1, SIZEOF(temp_1)))
-        		{
-				save_errno = errno;
-                		errptr = (char *)STRERROR(save_errno);
-                		errlen = STRLEN(errptr);
-				tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
-				sockptr->sd = FD_INVALID;
-				if (NULL != sockptr->remote.ai_head)
-				{
-					freeaddrinfo(sockptr->remote.ai_head);
-					sockptr->remote.ai_head = NULL;
-				}
-                		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-					  RTS_ERROR_LITERAL("TCP_NODELAY"), save_errno, errlen, errptr);
-                		return FALSE;
-        		}
-#endif
-			if (update_bufsiz)
+			if (socket_local != sockptr->protocol)
 			{
-				if (-1 == tcp_routines.aa_setsockopt(sockptr->sd,
-							     SOL_SOCKET, SO_RCVBUF, &sockptr->bufsiz, SIZEOF(sockptr->bufsiz)))
-				{
+				SOCKET_AI_TO_REMOTE_ADDR(sockptr, raw_ai_ptr);
+				remote_ai_ptr->ai_addr = SOCKET_REMOTE_ADDR(sockptr);
+				remote_ai_ptr->ai_addrlen = raw_ai_ptr->ai_addrlen;
+				remote_ai_ptr->ai_next = NULL;
+				if (-1 == setsockopt(sockptr->sd, SOL_SOCKET, SO_REUSEADDR,
+					&temp_1, SIZEOF(temp_1)))
+        			{
 					save_errno = errno;
-					errptr = (char *)STRERROR(save_errno);
-         				errlen = STRLEN(errptr);
-					tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
+                			errptr = (char *)STRERROR(save_errno);
+                			errlen = STRLEN(errptr);
+					close(sockptr->sd);	/* Don't leave a dangling socket around */
 					sockptr->sd = FD_INVALID;
 					if (NULL != sockptr->remote.ai_head)
 					{
@@ -232,28 +198,68 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 						sockptr->remote.ai_head = NULL;
 					}
                 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-						  RTS_ERROR_LITERAL("SO_RCVBUF"), save_errno, errlen, errptr);
-					return FALSE;
-				}
-			} else
-			{
-				sockbuflen = SIZEOF(sockptr->bufsiz);
-				if (-1 == tcp_routines.aa_getsockopt(sockptr->sd,
-							     SOL_SOCKET, SO_RCVBUF, &sockptr->bufsiz, &sockbuflen))
+						  RTS_ERROR_LITERAL("SO_REUSEADDR"), save_errno, errlen, errptr);
+                			return FALSE;
+        			}
+#				ifdef TCP_NODELAY
+				temp_1 = sockptr->nodelay ? 1 : 0;
+				if (-1 == setsockopt(sockptr->sd,
+					IPPROTO_TCP, TCP_NODELAY, &temp_1, SIZEOF(temp_1)))
 				{
 					save_errno = errno;
 					errptr = (char *)STRERROR(save_errno);
-         				errlen = STRLEN(errptr);
-					tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
+					errlen = STRLEN(errptr);
+					close(sockptr->sd);	/* Don't leave a dangling socket around */
 					sockptr->sd = FD_INVALID;
 					if (NULL != sockptr->remote.ai_head)
 					{
 						freeaddrinfo(sockptr->remote.ai_head);
 						sockptr->remote.ai_head = NULL;
 					}
-                			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
-						  RTS_ERROR_LITERAL("SO_RCVBUF"), save_errno, errlen, errptr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+						RTS_ERROR_LITERAL("TCP_NODELAY"), save_errno, errlen, errptr);
 					return FALSE;
+				}
+#				endif
+				if (update_bufsiz)
+				{
+					if (-1 == setsockopt(sockptr->sd,
+						     SOL_SOCKET, SO_RCVBUF, &sockptr->bufsiz, SIZEOF(sockptr->bufsiz)))
+					{
+						save_errno = errno;
+						errptr = (char *)STRERROR(save_errno);
+						errlen = STRLEN(errptr);
+						close(sockptr->sd);	/* Don't leave a dangling socket around */
+						sockptr->sd = FD_INVALID;
+						if (NULL != sockptr->remote.ai_head)
+						{
+							freeaddrinfo(sockptr->remote.ai_head);
+							sockptr->remote.ai_head = NULL;
+						}
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+							RTS_ERROR_LITERAL("SO_RCVBUF"), save_errno, errlen, errptr);
+						return FALSE;
+					}
+				} else
+				{
+					sockbuflen = SIZEOF(sockptr->bufsiz);
+					if (-1 == getsockopt(sockptr->sd,
+						     SOL_SOCKET, SO_RCVBUF, &sockptr->bufsiz, &sockbuflen))
+					{
+						save_errno = errno;
+						errptr = (char *)STRERROR(save_errno);
+						errlen = STRLEN(errptr);
+						close(sockptr->sd);	/* Don't leave a dangling socket around */
+						sockptr->sd = FD_INVALID;
+						if (NULL != sockptr->remote.ai_head)
+						{
+							freeaddrinfo(sockptr->remote.ai_head);
+							sockptr->remote.ai_head = NULL;
+						}
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
+							RTS_ERROR_LITERAL("SO_RCVBUF"), save_errno, errlen, errptr);
+						return FALSE;
+					}
 				}
 			}
 		}
@@ -262,7 +268,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 		{
 			/* Use plain connect to allow jobinterrupt */
 			assert(FD_INVALID != sockptr->sd);
-			res = connect(sockptr->sd, SOCKET_REMOTE_ADDR(sockptr), remote_ai_ptr->ai_addrlen);
+			res = connect(sockptr->sd, SOCKET_REMOTE_ADDR(sockptr), remote_ai_ptr->ai_addrlen);	 /* BYPASSOK */
 			if (res < 0)
 			{
 				save_errno = errno;
@@ -293,6 +299,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 					/* fall through */
 					case ETIMEDOUT:	/* the other side bound but not listening */
 					case ECONNREFUSED:
+#					ifndef VMS
+					case ENOENT:	/* LOCAL socket not there */
+#					endif
 						if (!no_time_left && 0 != timepar && NO_M_TIMEOUT != timepar)
 						{
 							sys_get_curr_time(&cur_time);
@@ -304,7 +313,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 							no_time_left = TRUE;
 						else if (!no_time_left)
 						{
-							if (ETIMEDOUT == save_errno || ECONNREFUSED == save_errno)
+							if (ETIMEDOUT == save_errno || ECONNREFUSED == save_errno
+								UNIX_ONLY(|| ENOENT == save_errno))
 								need_connect = need_socket = TRUE;
 							save_errno = 0;
 							res = -1;	/* do the outer loop again */
@@ -337,6 +347,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 						break;
 					}
 				}
+				assert(FD_INVALID != sockptr->sd);
+				assertpro(FD_SETSIZE > sockptr->sd);
 				FD_ZERO(&writefds);
 				FD_SET(sockptr->sd, &writefds);
 				res = select(sockptr->sd + 1, NULL, &writefds, NULL, sel_time);
@@ -357,7 +369,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 							continue;
 						} else
 						{	/* return socket error */
-							if (ECONNREFUSED == sockerror || ETIMEDOUT == sockerror)
+							if (ECONNREFUSED == sockerror || ETIMEDOUT == sockerror
+								UNIX_ONLY(|| ENOENT == sockerror))
 							{	/* try until timeout */
 								last_errno = sockerror;
 								save_errno = 0;
@@ -393,7 +406,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 		{
 			if (FD_INVALID != sockptr->sd)
 			{
-				tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
+				close(sockptr->sd);	/* Don't leave a dangling socket around */
 				sockptr->sd = FD_INVALID;
 			}
 			if (NULL != sockptr->remote.ai_head)
@@ -428,18 +441,23 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 		{
 			DBGSOCK((stdout, "socconn: outofband interrupt received (%d) -- "
 				 "queueing mv_stent for wait intr\n", outofband));
+			if (!OUTOFBAND_RESTARTABLE(outofband))
+			{	/* the operation would not be resumed, no need to save socket device states */
+				if (!need_socket)
+				{
+					close(sockptr->sd);
+					sockptr->sd = FD_INVALID;
+				}
+				outofband_action(FALSE);
+				assertpro(FALSE);
+			}
 			if (need_connect)
 			{	/* no connect in progress */
-				tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
+				close(sockptr->sd);	/* Don't leave a dangling socket around */
 				sockptr->sd = FD_INVALID;
 				sockptr->state = socket_created;
 			} else
 				sockptr->state = socket_connect_inprogress;
-			if (NULL != sockptr->remote.ai_head)
-			{
-				freeaddrinfo(sockptr->remote.ai_head);
-				sockptr->remote.ai_head = NULL;
-			}
 			real_sockintr->who_saved = sockintr->who_saved = sockwhich_connect;
 			if (NO_M_TIMEOUT != timepar)
 			{
@@ -466,7 +484,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 			DBGSOCK((stdout, "socconn: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
 				 end_time.at_sec, end_time.at_usec, socketus_interruptus));
 			outofband_action(FALSE);
-			GTMASSERT;      /* Should *never* return from outofband_action */
+			assertpro(FALSE);      /* Should *never* return from outofband_action */
 			return FALSE;   /* For the compiler.. */
 		}
 		hiber_start(100);
@@ -488,20 +506,29 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 		freeaddrinfo(sockptr->remote.ai_head);
 		sockptr->remote.ai_head = NULL;
 	}
-	GETNAMEINFO(SOCKET_REMOTE_ADDR(sockptr), remote_ai_ptr->ai_addrlen, ipaddr, SA_MAXLEN, NULL, 0, NI_NUMERICHOST, errcode);
-	if (0 != errcode)
+	if (socket_local != sockptr->protocol)
 	{
-		if (FD_INVALID != sockptr->sd)
+		GETNAMEINFO(SOCKET_REMOTE_ADDR(sockptr), remote_ai_ptr->ai_addrlen, ipaddr, SA_MAXLEN, NULL, 0
+			, NI_NUMERICHOST, errcode);
+		if (0 != errcode)
 		{
-			tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
-			sockptr->sd = FD_INVALID;
+			if (FD_INVALID != sockptr->sd)
+			{
+				close(sockptr->sd);	/* Don't leave a dangling socket around */
+				sockptr->sd = FD_INVALID;
+			}
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+			return FALSE;
 		}
-		RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
-		return FALSE;
+		STRNDUP(ipaddr, SA_MAXLEN, sockptr->remote.saddr_ip);
+		strncpy(&iod->dollar.key[len], sockptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
+#	ifndef VMS
+	} else
+	{
+		STRNCPY_STR(&iod->dollar.key[len], ((struct sockaddr_un *)(sockptr->remote.sa))->sun_path, DD_BUFLEN - len - 1);
+#	endif
 	}
-	STRNDUP(ipaddr, SA_MAXLEN, sockptr->remote.saddr_ip);
-	strncpy(&iod->dollar.key[len], sockptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
-	iod->dollar.key[DD_BUFLEN-1] = '\0';			/* In case we fill the buffer */
+	iod->dollar.key[DD_BUFLEN - 1] = '\0';			/* In case we fill the buffer */
 
 	return TRUE;
 }

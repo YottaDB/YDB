@@ -26,12 +26,19 @@
 #include "iosp.h"
 #include "string.h"
 #include "stringpool.h"
+#include "iotimer.h"
+#include "gt_timer.h"
+#include "wake_alarm.h"
+#include "copy.h"
 
 GBLREF io_pair		io_curr_device;
 GBLREF io_pair		io_std_device;
 GBLREF	boolean_t	gtm_pipe_child;
+GBLREF	volatile bool	out_of_time;
 
 error_def(ERR_CLOSEFAIL);
+error_def(ERR_SYSCALL);
+error_def(ERR_DEVPARMTOOSMALL);
 
 LITREF unsigned char	io_params_size[];
 
@@ -48,13 +55,25 @@ void iorm_close(io_desc *iod, mval *pp)
 	struct stat	statbuf, fstatbuf;
 	int		p_offset;
 	pid_t  		done_pid;
-	int  		wait_status, rc;
+#ifdef _BSD
+        union wait      wait_status;
+#else
+        int4            wait_status;
+#endif
+
+	int  		status,rc;
 	unsigned int	*dollarx_ptr;
 	unsigned int	*dollary_ptr;
 	char 		*savepath2 = 0;
 	int		path2len;
 	boolean_t	rm_destroy = TRUE;
 	boolean_t	rm_rundown = FALSE;
+	TID		timer_id;
+	int4		pipe_timeout = 2;	/* default timeout in sec waiting for waitpid */
+
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 
 	assert (iod->type == rm);
 	if (iod->state != dev_open)
@@ -135,6 +154,11 @@ void iorm_close(io_desc *iod, mval *pp)
 			case iop_rundown:
 				rm_rundown = TRUE;
 				break;
+			case iop_timeout:
+				GET_LONG(pipe_timeout, (pp->str.addr + p_offset));
+				if (1 > pipe_timeout)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMTOOSMALL);
+				break;
 			default:
 				break;
 		}
@@ -211,8 +235,46 @@ void iorm_close(io_desc *iod, mval *pp)
 		{
 			if (!rm_ptr->independent)
 			{
-				WAITPID(rm_ptr->pipe_pid, &wait_status, 0, done_pid);
-				assert(done_pid == rm_ptr->pipe_pid);
+				/* start timer for pipe_timeout sec to wait for reap of close via waitpid.  If this
+				   times out, set dollar_zclose = -99 */
+				out_of_time = FALSE;
+				timer_id = (TID)iorm_close;
+				start_timer(timer_id, pipe_timeout * 1000, wake_alarm, 0, NULL);
+				do
+				{
+					done_pid = waitpid(rm_ptr->pipe_pid, &status, 0); /* BYPASSOK */
+				} while((pid_t)-1 == done_pid && EINTR == errno && !out_of_time);
+
+				if ((pid_t)-1 == done_pid && !out_of_time)
+				{
+					cancel_timer(timer_id);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+						      RTS_ERROR_LITERAL("waitpid"), CALLFROM, errno);
+				}
+				if (out_of_time)
+				{
+					TREF(dollar_zclose) = -99;
+				} else
+				{
+					/* not an error and didn't timeout */
+					assert(done_pid == rm_ptr->pipe_pid);
+					/* cancel timer since it didn't timeout */
+					cancel_timer(timer_id);
+#ifdef _BSD
+					assert(SIZEOF(wait_status) == SIZEOF(int4));
+					wait_status.w_status = status;
+					/* the WIF* macros expect a union wait_stat as an argument on BSD */
+#else
+					wait_status = status;
+#endif
+					if (WIFEXITED(wait_status))
+						TREF(dollar_zclose) = WEXITSTATUS(wait_status); /* normal exit */
+					else if (WIFSIGNALED(wait_status))
+						/* change the signal to a negative for distinguishing from normal exit codes */
+						TREF(dollar_zclose) = -WTERMSIG(wait_status);
+					else /* set any other non-normal status to -98 */
+						TREF(dollar_zclose) = -98;
+				}
 			}
 		}
 

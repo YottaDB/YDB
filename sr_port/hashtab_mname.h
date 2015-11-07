@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,15 @@ typedef struct hash_table_mname_struct
 {											\
 	assert((0 < (hkey)->var_name.len) && (MAX_MIDENT_LEN >= (hkey)->var_name.len));	\
 	STR_HASH((hkey)->var_name.addr, (hkey)->var_name.len, ((hkey)->hash_code), 0);	\
+}
+
+/* This is the same as the COMPUTE_HASH_MNAME macro except "hkey" is of type mstr (not mname_entry)
+ * and target of the computed hash_code is an input parameter "hash_code" of type "int".
+ */
+#define COMPUTE_HASH_MSTR(hkey, hash_code)				\
+{									\
+	assert((0 < (hkey).len) && (MAX_MIDENT_LEN >= (hkey).len));	\
+	STR_HASH((hkey).addr, (hkey).len, hash_code, 0);		\
 }
 
 /* Prototypes for mname hash routines. See hashtab_implementation.h for detail interface and implementation */

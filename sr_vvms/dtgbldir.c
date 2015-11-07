@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,12 +68,12 @@ main()
 	ilist.ret_addr = &ret_addr;
 	status = sys$crelnm(0, &proc_tab, &gbldir, &acmo, &ilist);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	ilist.buf_len = SIZEOF(file_name2) - 1;
 	ilist.buf_addr = file_name2;
 	status = sys$crelnm(0, &proc_tab, &dtlog, &acmo, &ilist);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 
 /************************* Create global directory files for tests *************************************************/
 	fab = cc$rms_fab;
@@ -86,31 +86,8 @@ main()
 	status = sys$create(&fab);
 	if (status != RMS$_CREATED && status != RMS$_FILEPURGED && status != RMS$_NORMAL)
 		sys$exit(status);
-	size = SIZEOF(header_struct) + SIZEOF(gd_addr) + 3 * SIZEOF(gd_binding) + SIZEOF(gd_region) + SIZEOF(gd_segment);
-	header = malloc(((size  + 511) / 512) * 512);
-	header->filesize = size;
-	size = ((size + 511) / 512) * 512;
-	memcpy(header->label, label, SIZEOF(label)-1);
-	addr = (char*)header + SIZEOF(header_struct);
-	addr->maps = SIZEOF(gd_addr);
-	addr->n_maps = 3;
-	addr->regions = (int4)(addr->maps) + 3 * SIZEOF(gd_binding);
-	addr->n_regions = 1;
-	addr->segments = (int4)(addr->regions) + SIZEOF(gd_region);
-	addr->n_segments = 1;
-	addr->link = addr->tab_ptr = addr->id = addr->local_locks = 0;
-	addr->max_rec_size = 100;
-	addr->end = addr->segments + SIZEOF(gd_segment);
-	long_ptr = (char*)addr + (int4)(addr->maps);
-	*long_ptr++ = 0xFFFF2F23;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = addr->regions;
-	*long_ptr++ = 0xFFFFFF24;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = addr->regions;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = addr->regions;
+	DUMMY_GLD_INIT(header, addr, region, segment, size, RELATIVE_OFFSET_TRUE);
+	/* the above macro invocation initializes "header", "addr", "region", "segment" and "size" */
 	region = (char*)addr + (int4)(addr->regions);
 	segment = (char*)addr + (int4)(addr->segments);
 	memset(region, 0, SIZEOF(gd_region));
@@ -137,9 +114,9 @@ main()
 	segment->file_cntl = 0;
 	status = sys$qiow(EFN$C_ENF, fab.fab$l_stv, IO$_WRITEVBLK, &iosb[0], 0, 0, header, size, 1, 0, 0, 0);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	if (!(iosb[0] & 1))
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	sys$dassgn(fab.fab$l_stv);
 	region->rname_len = 5;
 	memcpy(region->rname,"TEMP2",5);
@@ -154,9 +131,9 @@ main()
 		sys$exit(status);
 	status = sys$qiow(EFN$C_ENF, fab.fab$l_stv, IO$_WRITEVBLK, &iosb[0], 0, 0, header, size, 1, 0, 0, 0);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	if (!(iosb[0] & 1))
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	sys$dassgn(fab.fab$l_stv);
 	region->rname_len = 5;
 	memcpy(region->rname, "TEMP3", 5);
@@ -171,9 +148,9 @@ main()
 		sys$exit(status);
 	status = sys$qiow(EFN$C_ENF, fab.fab$l_stv, IO$_WRITEVBLK, &iosb[0], 0, 0, header, size, 1, 0, 0, 0);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	if (!(iosb[0] & 1))
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	sys$dassgn(fab.fab$l_stv);
 
 /*************************** Run tests********************************************/

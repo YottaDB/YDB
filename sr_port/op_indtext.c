@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,12 +26,14 @@
 #include "toktyp.h"
 #include <rtnhdr.h>
 #include "mv_stent.h"
+#include "stack_frame.h"
 
 GBLREF unsigned char 		*source_buffer;
 GBLREF short int 		source_column;
 GBLREF spdesc 			stringpool;
 GBLREF mv_stent			*mv_chain;
 GBLREF unsigned char		*msp, *stackwarn, *stacktop;
+GBLREF stack_frame		*frame_pointer;
 
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
@@ -44,10 +46,17 @@ void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 	mval		mv_off;
 	oprtype		opt, getdst;
 	triple		*ref;
+	mval 		m;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(lab);
+	if (WANT_CURRENT_RTN(rtn))
+	{
+		m = *rtn;
+		rtn = &m;
+		rtn->str = frame_pointer->rvector->routine_name;
+	}
 	indir_src.str.len = lab->str.len;
 	indir_src.str.len += SIZEOF("+^") - 1;
 	indir_src.str.len += MAX_NUM_SIZE;

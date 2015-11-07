@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,10 +41,10 @@ int op_readfl(mval *v, int4 length, int4 timeout)
 	 */
 	b_length = (!IS_UTF_CHSET(io_curr_device.in->ichset)) ? length : (length * 4);
 	if (0 >= length)
-		rts_error(VARLSTCNT(1) ERR_RDFLTOOSHORT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RDFLTOOSHORT);
 	/* This check is more useful in "M" mode. For UTF-8 mode, checks have to be done while reading */
 	if (MAX_STRLEN < length)
-		rts_error(VARLSTCNT(1) ERR_RDFLTOOLONG);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RDFLTOOLONG);
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	v->mvtype = MV_STR;
@@ -53,7 +53,7 @@ int op_readfl(mval *v, int4 length, int4 timeout)
 	v->str.addr = (char *)stringpool.free;
 	active_device = io_curr_device.in;
 	stat = (io_curr_device.in->disp_ptr->readfl)(v, length, timeout);
-	if (stringpool.free == (unsigned char *)v->str.addr)	/* BYPASSOK */
+	if (IS_AT_END_OF_STRINGPOOL(v->str.addr, 0))
 		stringpool.free += v->str.len;	/* see UNIX iott_readfl */
 	assert((int4)v->str.len <= b_length);
 	assert(stringpool.free <= stringpool.top);

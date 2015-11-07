@@ -20,7 +20,7 @@ GBLREF	boolean_t	ok_to_UNWIND_in_exit_handling;
 
 CONDITION_HANDLER(gds_rundown_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	/* To get as virgin a state as possible in the core, take the core now if we
 	 * would be doing so anyway. This will set created_core so it doesn't happen again.
 	 */

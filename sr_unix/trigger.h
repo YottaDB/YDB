@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -157,149 +157,135 @@ typedef enum
 	TREF(gv_some_subsc_null) = FALSE;					\
 }
 
-#define BUILD_HASHT_SUB_CURRKEY_T(TRIG_VAL, SUB, LEN)							\
-{													\
-	short int		max_key;								\
-	boolean_t		was_null = FALSE, is_null = FALSE;					\
-	mval			*subsc_ptr;								\
-	DCL_THREADGBL_ACCESS;										\
-													\
-	SETUP_THREADGBL_ACCESS;										\
-	max_key = gv_cur_region->max_key_size;								\
-	BUILD_HASHT_CURRKEY_NAME;									\
-	subsc_ptr = &TRIG_VAL;										\
-	STR2MVAL(TRIG_VAL, SUB, LEN);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	TREF(gv_last_subsc_null) = is_null;								\
-	TREF(gv_some_subsc_null) = was_null;								\
+#define BUILD_HASHT_SUB_CURRKEY_T(TRIG_VAL, SUB, LEN)						\
+{												\
+	boolean_t		was_null = FALSE, is_null = FALSE;				\
+	mval			*subsc_ptr;							\
+	DCL_THREADGBL_ACCESS;									\
+												\
+	SETUP_THREADGBL_ACCESS;									\
+	BUILD_HASHT_CURRKEY_NAME;								\
+	subsc_ptr = &TRIG_VAL;									\
+	STR2MVAL(TRIG_VAL, SUB, LEN);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	TREF(gv_last_subsc_null) = is_null;							\
+	TREF(gv_some_subsc_null) = was_null;							\
 }
 
-#define	BUILD_HASHT_SUB_MSUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2)					\
-{													\
-	short int		max_key;								\
-	boolean_t		was_null = FALSE, is_null = FALSE;					\
-	mval			*subsc_ptr;								\
-	DCL_THREADGBL_ACCESS;										\
-													\
-	SETUP_THREADGBL_ACCESS;										\
-	max_key = gv_cur_region->max_key_size;								\
-	BUILD_HASHT_CURRKEY_NAME;									\
-	subsc_ptr = &TRIG_VAL;										\
-	STR2MVAL(TRIG_VAL, SUB1, LEN1);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	subsc_ptr = &SUB2;										\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	TREF(gv_last_subsc_null) = is_null;								\
-	TREF(gv_some_subsc_null) = was_null;								\
+#define	BUILD_HASHT_SUB_MSUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2)				\
+{												\
+	boolean_t		was_null = FALSE, is_null = FALSE;				\
+	mval			*subsc_ptr;							\
+	DCL_THREADGBL_ACCESS;									\
+												\
+	SETUP_THREADGBL_ACCESS;									\
+	BUILD_HASHT_CURRKEY_NAME;								\
+	subsc_ptr = &TRIG_VAL;									\
+	STR2MVAL(TRIG_VAL, SUB1, LEN1);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	subsc_ptr = &SUB2;									\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	TREF(gv_last_subsc_null) = is_null;							\
+	TREF(gv_some_subsc_null) = was_null;							\
 }
 
-#define BUILD_HASHT_SUB_SUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2, LEN2)					\
-{													\
-	short int		max_key;								\
-	boolean_t		was_null = FALSE, is_null = FALSE;					\
-	mval			*subsc_ptr;								\
-	DCL_THREADGBL_ACCESS;										\
-													\
-	SETUP_THREADGBL_ACCESS;										\
-	max_key = gv_cur_region->max_key_size;								\
-	BUILD_HASHT_CURRKEY_NAME;									\
-	subsc_ptr = &TRIG_VAL;										\
-	STR2MVAL(TRIG_VAL, SUB1, LEN1);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	subsc_ptr = &TRIG_VAL;										\
-	STR2MVAL(TRIG_VAL, SUB2, LEN2);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	TREF(gv_last_subsc_null) = is_null;								\
-	TREF(gv_some_subsc_null) = was_null;								\
+#define BUILD_HASHT_SUB_SUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2, LEN2)				\
+{												\
+	boolean_t		was_null = FALSE, is_null = FALSE;				\
+	mval			*subsc_ptr;							\
+	DCL_THREADGBL_ACCESS;									\
+												\
+	SETUP_THREADGBL_ACCESS;									\
+	BUILD_HASHT_CURRKEY_NAME;								\
+	subsc_ptr = &TRIG_VAL;									\
+	STR2MVAL(TRIG_VAL, SUB1, LEN1);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	subsc_ptr = &TRIG_VAL;									\
+	STR2MVAL(TRIG_VAL, SUB2, LEN2);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	TREF(gv_last_subsc_null) = is_null;							\
+	TREF(gv_some_subsc_null) = was_null;							\
 }
 
-#define	BUILD_HASHT_SUB_MSUB_MSUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2, SUB3) 				\
-{													\
-	short int		max_key;								\
-	boolean_t		was_null = FALSE, is_null = FALSE;					\
-	mval			*subsc_ptr;								\
-	DCL_THREADGBL_ACCESS;										\
-													\
-	SETUP_THREADGBL_ACCESS;										\
-	max_key = gv_cur_region->max_key_size;								\
-	BUILD_HASHT_CURRKEY_NAME;									\
-	subsc_ptr = &TRIG_VAL;										\
-	STR2MVAL(TRIG_VAL, SUB1, LEN1);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	subsc_ptr = &SUB2;										\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	subsc_ptr = &SUB3;										\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	TREF(gv_last_subsc_null) = is_null;								\
-	TREF(gv_some_subsc_null) = was_null;								\
+#define	BUILD_HASHT_SUB_MSUB_MSUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2, SUB3) 			\
+{												\
+	boolean_t		was_null = FALSE, is_null = FALSE;				\
+	mval			*subsc_ptr;							\
+	DCL_THREADGBL_ACCESS;									\
+												\
+	SETUP_THREADGBL_ACCESS;									\
+	BUILD_HASHT_CURRKEY_NAME;								\
+	subsc_ptr = &TRIG_VAL;									\
+	STR2MVAL(TRIG_VAL, SUB1, LEN1);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	subsc_ptr = &SUB2;									\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	subsc_ptr = &SUB3;									\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	TREF(gv_last_subsc_null) = is_null;							\
+	TREF(gv_some_subsc_null) = was_null;							\
 }
 
-#define BUILD_HASHT_SUB_MSUB_SUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2, SUB3, LEN3)			\
-{													\
-	short int		max_key;								\
-	boolean_t		was_null = FALSE, is_null = FALSE;					\
-	mval			*subsc_ptr;								\
-	DCL_THREADGBL_ACCESS;										\
-													\
-	SETUP_THREADGBL_ACCESS;										\
-	max_key = gv_cur_region->max_key_size;								\
-	BUILD_HASHT_CURRKEY_NAME;									\
-	subsc_ptr = &TRIG_VAL;										\
-	STR2MVAL(TRIG_VAL, SUB1, LEN1);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	subsc_ptr = &SUB2;										\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	subsc_ptr = &TRIG_VAL;										\
-	STR2MVAL(TRIG_VAL, SUB3, LEN3);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	TREF(gv_last_subsc_null) = is_null;								\
-	TREF(gv_some_subsc_null) = was_null;								\
+#define BUILD_HASHT_SUB_MSUB_SUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2, SUB3, LEN3)		\
+{												\
+	boolean_t		was_null = FALSE, is_null = FALSE;				\
+	mval			*subsc_ptr;							\
+	DCL_THREADGBL_ACCESS;									\
+												\
+	SETUP_THREADGBL_ACCESS;									\
+	BUILD_HASHT_CURRKEY_NAME;								\
+	subsc_ptr = &TRIG_VAL;									\
+	STR2MVAL(TRIG_VAL, SUB1, LEN1);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	subsc_ptr = &SUB2;									\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	subsc_ptr = &TRIG_VAL;									\
+	STR2MVAL(TRIG_VAL, SUB3, LEN3);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	TREF(gv_last_subsc_null) = is_null;							\
+	TREF(gv_some_subsc_null) = was_null;							\
 }
 
-#define	BUILD_HASHT_SUB_SUB_SUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2, LEN2, SUB3, LEN3) 		\
-{													\
-	short int		max_key;								\
-	boolean_t		was_null = FALSE, is_null = FALSE;					\
-	mval			*subsc_ptr;								\
-	DCL_THREADGBL_ACCESS;										\
-													\
-	SETUP_THREADGBL_ACCESS;										\
-	max_key = gv_cur_region->max_key_size;								\
-	BUILD_HASHT_CURRKEY_NAME;									\
-	subsc_ptr = &TRIG_VAL;										\
-	STR2MVAL(TRIG_VAL, SUB1, LEN1);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	subsc_ptr = &TRIG_VAL;										\
-	STR2MVAL(TRIG_VAL, SUB2, LEN2);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	STR2MVAL(TRIG_VAL, SUB3, LEN3);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	TREF(gv_last_subsc_null) = is_null;								\
-	TREF(gv_some_subsc_null) = was_null;								\
+#define	BUILD_HASHT_SUB_SUB_SUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2, LEN2, SUB3, LEN3) 	\
+{												\
+	boolean_t		was_null = FALSE, is_null = FALSE;				\
+	mval			*subsc_ptr;							\
+	DCL_THREADGBL_ACCESS;									\
+												\
+	SETUP_THREADGBL_ACCESS;									\
+	BUILD_HASHT_CURRKEY_NAME;								\
+	subsc_ptr = &TRIG_VAL;									\
+	STR2MVAL(TRIG_VAL, SUB1, LEN1);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	subsc_ptr = &TRIG_VAL;									\
+	STR2MVAL(TRIG_VAL, SUB2, LEN2);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	STR2MVAL(TRIG_VAL, SUB3, LEN3);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	TREF(gv_last_subsc_null) = is_null;							\
+	TREF(gv_some_subsc_null) = was_null;							\
 }
 
-#define BUILD_HASHT_SUB_MSUB_SUB_MSUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2, SUB3, LEN3, SUB4)		\
-{													\
-	short int		max_key;								\
-	boolean_t		was_null = FALSE, is_null = FALSE;					\
-	mval			*subsc_ptr;								\
-	DCL_THREADGBL_ACCESS;										\
-													\
-	SETUP_THREADGBL_ACCESS;										\
-	max_key = gv_cur_region->max_key_size;								\
-	BUILD_HASHT_CURRKEY_NAME;									\
-	subsc_ptr = &TRIG_VAL;										\
-	STR2MVAL(TRIG_VAL, SUB1, LEN1);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	subsc_ptr = &SUB2;										\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	subsc_ptr = &TRIG_VAL;										\
-	STR2MVAL(TRIG_VAL, SUB3, LEN3);									\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	subsc_ptr = &SUB4;										\
-	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, max_key, gv_currkey, was_null, is_null);			\
-	TREF(gv_last_subsc_null) = is_null;								\
-	TREF(gv_some_subsc_null) = was_null;								\
+#define BUILD_HASHT_SUB_MSUB_SUB_MSUB_CURRKEY_T(TRIG_VAL, SUB1, LEN1, SUB2, SUB3, LEN3, SUB4)	\
+{												\
+	boolean_t		was_null = FALSE, is_null = FALSE;				\
+	mval			*subsc_ptr;							\
+	DCL_THREADGBL_ACCESS;									\
+												\
+	SETUP_THREADGBL_ACCESS;									\
+	BUILD_HASHT_CURRKEY_NAME;								\
+	subsc_ptr = &TRIG_VAL;									\
+	STR2MVAL(TRIG_VAL, SUB1, LEN1);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	subsc_ptr = &SUB2;									\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	subsc_ptr = &TRIG_VAL;									\
+	STR2MVAL(TRIG_VAL, SUB3, LEN3);								\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	subsc_ptr = &SUB4;									\
+	COPY_SUBS_TO_GVCURRKEY(subsc_ptr, gv_cur_region, gv_currkey, was_null, is_null);	\
+	TREF(gv_last_subsc_null) = is_null;							\
+	TREF(gv_some_subsc_null) = was_null;							\
 }
 
 #define	TRIGGER_GLOBAL_ASSIGNMENT_STR(TRIG_VAL, VALUE, LEN, RES)					\
@@ -462,44 +448,43 @@ typedef enum
 	TRIGGER_GLOBAL_ASSIGNMENT_STR(trig_val, VALUE, LEN, RES);					\
 }
 
-#define	INT2STR(INT, STR)									\
-{												\
-	char		*lcl_ptr;								\
-	int		num_len;								\
-												\
-	lcl_ptr = STR;										\
-	num_len = 0;										\
-	I2A(lcl_ptr, num_len, INT);								\
-	assert(MAX_DIGITS_IN_INT >= num_len);							\
-	*(lcl_ptr + num_len) = '\0';								\
+#define	INT2STR(INT, STR)			\
+{						\
+	char		*lcl_ptr;		\
+	int		num_len;		\
+						\
+	lcl_ptr = STR;				\
+	num_len = 0;				\
+	I2A(lcl_ptr, num_len, INT);		\
+	assert(MAX_DIGITS_IN_INT >= num_len);	\
+	*(lcl_ptr + num_len) = '\0';		\
 }
 
-#define SAVE_TRIGGER_REGION_INFO							\
-{											\
-	save_gv_target = gv_target;							\
-	save_gv_cur_region = gv_cur_region;						\
-	save_sgm_info_ptr = sgm_info_ptr;						\
-	assert(NULL != gv_currkey);							\
-	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(save_currkey));		\
-	save_gv_currkey = (gv_key *)&save_currkey[0];					\
-	memcpy(save_gv_currkey, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);		\
+#define SAVE_TRIGGER_REGION_INFO(SAVE_KEY)					\
+{										\
+	save_gv_target = gv_target;						\
+	save_gv_cur_region = gv_cur_region;					\
+	save_sgm_info_ptr = sgm_info_ptr;					\
+	assert(NULL != gv_currkey);						\
+	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(SAVE_KEY));		\
+	memcpy(&SAVE_KEY[0], gv_currkey, SIZEOF(gv_key) + gv_currkey->end);	\
 }
-#define RESTORE_TRIGGER_REGION_INFO							\
-{											\
-	gv_target = save_gv_target;							\
-	sgm_info_ptr = save_sgm_info_ptr;						\
-	/* check no keysize expansion occurred inside gvcst_root_search */		\
-	assert(gv_currkey->top == save_gv_currkey->top);				\
-	memcpy(gv_currkey, save_gv_currkey, SIZEOF(gv_key) + save_gv_currkey->end);	\
-	if (NULL != save_gv_cur_region)							\
-	{										\
-		TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);				\
-	} else										\
-	{										\
-		gv_cur_region = NULL;							\
-		cs_data = NULL;								\
-		cs_addrs = NULL;							\
-	}										\
+#define RESTORE_TRIGGER_REGION_INFO(SAVE_KEY)					\
+{										\
+	gv_target = save_gv_target;						\
+	sgm_info_ptr = save_sgm_info_ptr;					\
+	/* check no keysize expansion occurred inside gvcst_root_search */	\
+	assert(gv_currkey->top == SAVE_KEY[0].top);				\
+	memcpy(gv_currkey, &SAVE_KEY[0], SIZEOF(gv_key) + SAVE_KEY[0].end);	\
+	if (NULL != save_gv_cur_region)						\
+	{									\
+		TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);			\
+	} else									\
+	{									\
+		gv_cur_region = NULL;						\
+		cs_data = NULL;							\
+		cs_addrs = NULL;						\
+	}									\
 }
 
 #endif /* MUPIP_TRIGGER_INCLUDED */

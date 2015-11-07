@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 #include "copy.h"
 #include "jnl.h"
 #include "buddy_list.h"
+#include "hashtab_mname.h"
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "merge_def.h"
@@ -40,6 +41,8 @@
 #include "stringpool.h"
 #include "alias.h"
 #include "callg.h"
+#include "gtmimagename.h"
+#include "format_targ_key.h"	/* for ISSUE_GVSUBOFLOW_ERROR macro */
 
 GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF zshow_out	*zwr_output;
@@ -104,7 +107,10 @@ void lvzwr_out(lv_val *lvp)
 	mident_fixed		zwrt_varname;
 	lvzwrite_datablk	*newzwrb;
 	gparam_list		param_list;	/* for op_putindx call through callg */
+	gvnh_reg_t		*gvnh_reg;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	val = &lvp->v;
 	assert(lvzwrite_block);
 	if (!merge_args)
@@ -269,28 +275,43 @@ void lvzwr_out(lv_val *lvp)
 	{	/* MERGE assignment from local variable */
 		nsubs = lvzwrite_block->curr_subsc;
 		if (MARG1_IS_GBL(merge_args))
-		{	/* Target global var */
+		{	/* Target is a global var : i.e. MERGE ^gvn1=lcl1.
+			 * In this case, mglvnp->gblp[IND1]->gvkey_nsubs would have been initialized in op_merge.c already.
+			 * Use that to check if the target node in ^gvn1 exceeds max # of subscripts.
+			 */
+			if (MAX_GVSUBSCRIPTS <= (mglvnp->gblp[IND1]->gvkey_nsubs + nsubs))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
 			memcpy(gv_currkey->base, mglvnp->gblp[IND1]->s_gv_currkey->base, mglvnp->gblp[IND1]->s_gv_currkey->end + 1);
 			gv_currkey->end = mglvnp->gblp[IND1]->s_gv_currkey->end;
-			for (n = 0 ; n < nsubs; n++)
+			for (n = 0; n < nsubs; n++)
 			{
 				subscp = ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual;
 				MV_FORCE_STR(subscp);
-				mval2subsc(subscp, gv_currkey);
+				mval2subsc(subscp, gv_currkey, gv_cur_region->std_null_coll);
 				if (!subscp->str.len &&	(ALWAYS != gv_cur_region->null_subs))
 					sgnl_gvnulsubsc();
 			}
 			MV_FORCE_STR(val);
+			gvnh_reg = TREF(gd_targ_gvnh_reg);	/* set by op_gvname/op_gvextnam/op_gvnaked done before op_merge */
+			/* If gvnh_reg corresponds to a spanning global, then determine
+			 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+			 */
+			GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, (TREF(gd_targ_addr)), gv_currkey);
+			/* For spanning globals, "gv_cur_region" points to the target region for ^gvn1 only now.
+			 * So do the GVSUBOFLOW check (both for spanning and non-spanning globals) now.
+			 */
+			if (gv_currkey->end >= gv_cur_region->max_key_size)
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
 			op_gvput(val);
 		} else
-		{	/* Target local var - pre-process target in case is a container */
+		{	/* Target is a local var : pre-process target in case it is a container */
 			assert(MARG1_IS_LCL(merge_args));
 			dst_lv = mglvnp->lclp[IND1];
 			if (!LV_IS_BASE_VAR(dst_lv))
 			{
 				LV_SBS_DEPTH(dst_lv, FALSE, sbs_depth);
 				if (MAX_LVSUBSCRIPTS < (sbs_depth + nsubs))
-					rts_error(VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
 			}
 			param_list.arg[0] = dst_lv;	/* this is already protected from stp_gcol by op_merge so no need to
 							 * push this into the stack for stp_gcol protection. */

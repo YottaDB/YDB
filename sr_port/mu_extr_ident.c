@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,10 +10,18 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #ifdef VMS
 #include <rms.h>		/* needed for muextr.h */
 #endif
-#include "muextr.h"
+
+#include "gdsroot.h"
+#include "gdsblk.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"	/* above includes needed for muextr.h */
+#include "muextr.h"	/* needed for "mu_extr_ident" prototype */
 
 #define IDENT_FCHAR(x) (((x) >= 'A' && (x) <= 'Z') || ((x) >= 'a' && (x) <= 'z') || (x) == '%')
 #define IDENT_TAIL(x) (((x) >= 'A' && (x) <= 'Z') || ((x) >= 'a' && (x) <= 'z') || ((x) >= '0' && (x) <= '9'))

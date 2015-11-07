@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,19 +29,23 @@ LITREF mval		*fndata_table[2][2];
 
 void op_gvdata(mval *v)
 {
-	mint x;
+	mint			x;
+	gvnh_reg_t		*gvnh_reg;
+	enum db_acc_method	acc_meth;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
-
-	x = 0;
-	if (gv_cur_region->dyn.addr->acc_meth == dba_bg || gv_cur_region->dyn.addr->acc_meth == dba_mm)
+	acc_meth = REG_ACC_METH(gv_cur_region);
+	if ((dba_bg == acc_meth) || (dba_mm == acc_meth))
 	{
-		if (gv_target->root)
-			x = gvcst_data();
-	} else if (gv_cur_region->dyn.addr->acc_meth == dba_cm)
+		gvnh_reg = TREF(gd_targ_gvnh_reg);
+		if (NULL == gvnh_reg)
+			x = (gv_target->root ? gvcst_data() : 0);
+		else
+			INVOKE_GVCST_SPR_XXX(gvnh_reg, x = gvcst_spr_data());
+	} else if (REG_ACC_METH(gv_cur_region) == dba_cm)
 		x = gvcmx_data();
 	else
 		x = gvusr_data();

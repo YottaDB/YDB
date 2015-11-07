@@ -260,7 +260,7 @@ CONDITION_HANDLER(updproc_ch)
 	unsigned char	seq_num_str[32], *seq_num_ptr;
 	unsigned char	seq_num_strx[32], *seq_num_ptrx;
 
-	START_CH;
+	START_CH(TRUE);
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 #		if defined(DEBUG) && defined(DEBUG_UPDPROC_TPRETRY)
@@ -270,7 +270,7 @@ CONDITION_HANDLER(updproc_ch)
 			INT8_PRINT(recvpool.upd_proc_local->read_jnl_seqno),
 			INT8_PRINTX(recvpool.upd_proc_local->read_jnl_seqno));
 		/* This is a kludge. We can come here from 2 places.
-		 *	( i) From a call to t_retry which does a rts_error(ERR_TPRETRY)
+		 *	( i) From a call to t_retry which does a rts_error_csa(ERR_TPRETRY)
 		 *	(ii) From updproc_actions() where immediately after op_tcommit we detect that dollar_tlevel is non-zero.
 		 * In the first case, we need to do a tp_restart. In the second, op_tcommit would have already done it for us.
 		 * The way we detect the second case is from the value of first_sgm_info since it is NULLified in tp_restart.
@@ -284,7 +284,7 @@ CONDITION_HANDLER(updproc_ch)
 			NON_GTMTRIG_ONLY(assert(INVALID_GV_TARGET == reset_gv_target);)
 			reset_gv_target = INVALID_GV_TARGET; /* see "trigger_item_tpwrap_ch" similar code for why this is needed */
 #			ifdef UNIX
-			if (ERR_REPLONLNRLBK == SIGNAL) /* tp_restart did rts_error(ERR_REPLONLNRLBK) */
+			if (ERR_REPLONLNRLBK == SIGNAL) /* tp_restart did rts_error_csa(ERR_REPLONLNRLBK) */
 				set_onln_rlbk_flg = TRUE;
 			if ((ERR_TPRETRY == SIGNAL) || (ERR_REPLONLNRLBK == SIGNAL))
 #			elif defined VMS
@@ -532,7 +532,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	seq_num			jnlpool_ctl_seqno, rec_strm_seqno, strm_seqno;
 	char			*val_ptr;
 	jnl_string		*keystr;
-	mstr			mname;
+	mname_entry		gvname;
 	char			*key, *keytop;
 	gv_key			*gv_failed_key = NULL, *gv_failed_key_ptr;
 	unsigned char		*endBuff, fmtBuff[MAX_ZWR_KEY_SZ];
@@ -555,13 +555,14 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 #	endif
 	jnl_private_control	*jpc;
 	gld_dbname_list		*curr;
-	gd_region		*save_reg;
+	gd_region		*save_reg, *dummy_reg;
 	uint4			write_wrap, cntr, last_nullsubs, last_subs, keyend;
 #	ifdef GTM_TRIGGER
 	uint4			nodeflags;
 	boolean_t		primary_has_trigdef, secondary_has_trigdef;
 	const char		*trigdef_inst = NULL, *no_trigdef_inst = NULL;
 #	endif
+	gvnh_reg_t		*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -603,6 +604,10 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		suppl_propagate_primary = FALSE;
 	}
 #	endif
+	/* Since update process does not invoke op_gvname but directly invokes op_gvput/kill etc. we set TREF(gd_targ_addr)
+	 * here (this is normally set by op_gvname in mumps).
+	 */
+	TREF(gd_targ_addr) = gd_header;
 	while (TRUE)
 	{
 		incr_seqno = FALSE;
@@ -696,8 +701,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		if (temp_read >= write_wrap)
 		{
 			assert(temp_read == write_wrap);
-			if (0 < tupd_num)	/* receive pool cannot wrap in the middle of TP */
-				GTMASSERT;	/* see process_tr_buff in gtmrecv_process for why */
+			/* receive pool cannot wrap in the middle of TP; See process_tr_buff in gtmrecv_process for why */
+			assertpro(0 == tupd_num);
 			if (FALSE == recvpool.recvpool_ctl->wrapped)
 			{ 	/* Update process in keeping up with receiver server, notices that there was a wrap
 				 * (thru write and write_wrap). It has to wait till receiver sets wrapped.
@@ -929,7 +934,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				)
 				key_len = keystr->length;	/* local copy of shared recvpool key */
 				if ((MAX_KEY_SZ >= key_len && 0 < key_len && 0 == keystr->text[key_len - 1]) &&
-					(upd_good_record == updproc_get_gblname(keystr->text, key_len, gv_mname, &mname)))
+					(upd_good_record == updproc_get_gblname(keystr->text, key_len, gv_mname, &gvname)))
 				{
 					if (IS_SET(rectype))
 					{
@@ -1081,8 +1086,22 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			} else if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 			{
 				key = keystr->text;
-				UPD_GV_BIND_NAME_APPROPRIATE(gd_header, mname, key, key_len);	/* if ^#t do special processing */
+				UPD_GV_BIND_NAME_APPROPRIATE(gd_header, gvname, key, key_len, gvnh_reg);
+					/* if ^#t do special processing */
+				memcpy(gv_currkey->base, keystr->text, keystr->length);
+				gv_currkey->end = keystr->length;
+				gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+				/* If gvname is "^#t", then gvnh_reg is NULL. This global for sure does NOT
+				 * span multiple regions. So treat it accordingly.
+				 */
+				if (NULL != gvnh_reg)
+				{	/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH
+					 * (e.g. setting gv_cur_region for spanning globals).
+					 */
+					GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey, dummy_reg);
+				}
 				/* the above would have set gv_target and gv_cur_region appropriately */
+				DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 				csa = &FILE_INFO(gv_cur_region)->s_addrs;
 				if (!REPL_ALLOWED(csa))
 				{	/* Replication/Journaling is NOT enabled on the database file that the current
@@ -1092,12 +1111,11 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					 * the primary database.
 					 */
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_UPDREPLSTATEOFF, 4,
-						mname.len, mname.addr, DB_LEN_STR(gv_cur_region));
+						gvname.var_name.len, gvname.var_name.addr, DB_LEN_STR(gv_cur_region));
 					/* Shut down the update process normally */
 					upd_proc_local->upd_proc_shutdown = SHUTDOWN;
 					break;
 				}
-				memcpy(gv_currkey->base, keystr->text, keystr->length);
 				gv_currkey->base[keystr->length] = 0; 	/* second null of a key terminator */
 				gv_currkey->end = keystr->length;
 				if (gv_currkey->end + 1 > gv_cur_region->max_key_size)
@@ -1214,8 +1232,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 								no_trigdef_inst = "originating";
 							}
 							send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_TRIGDEFNOSYNC, 7,
-									mname.len, mname.addr, LEN_AND_STR(trigdef_inst),
-									LEN_AND_STR(no_trigdef_inst), &jnl_seqno);
+								gvname.var_name.len, gvname.var_name.addr,
+								LEN_AND_STR(trigdef_inst), LEN_AND_STR(no_trigdef_inst),
+								&jnl_seqno);
 						}
 					}
 #					endif
@@ -1279,8 +1298,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			temp_write = 0;
 			upd_rec_seqno = tupd_num = tcom_num = 0;
 			/* KEY2BIG and REC2BIG are cases for which we need to make sure it is not a transmission hiccup before we
-			 * go ahead and do the rts_error(GVSUBOFLOW) or rts_error(REC2BIG). That is the reason we give those two
-			 * errors a second chance. Other errors are handled by either throwing an rts_error or asking for an
+			 * go ahead and do the rts_error_csa(GVSUBOFLOW) or rts_error_csa(REC2BIG). That is the reason we give those
+			 * two errors a second chance. Other errors are handled by either throwing an rts_error or asking for an
 			 * unconditional re-transmission (as opposed to only two attempts for GVSUBOFLOW and REC2BIG). By asking for
 			 * a re-transmission we increase our confidence level that this is a configuration issue (with smaller
 			 * keysize on the secondary) and proceed with an rts_error if we see the same symptom. It is possible we
@@ -1371,7 +1390,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					repl_log(updproc_log_fp, TRUE, TRUE,
 						"JNLSEQNO of last transaction written to journal pool = "INT8_FMT" "INT8_FMTX"\n",
 						INT8_PRINT(jnlpool_ctl_seqno), INT8_PRINTX(jnlpool_ctl_seqno));
-					GTMASSERT;
+					assertpro(FALSE && (upd_proc_local->read_jnl_seqno == jnlpool_ctl_seqno));
 				}
 			}
 		}

@@ -57,7 +57,8 @@ set(gtm_osarch_libs "")
 set(gt_src_list)
 set(sources_used "")
 set(extralibs "")
-set(is_encryption_supported 1)
+# Disable encryption for the time being. Need to change this to invoke the gtmcrypt Makefile AS 2013.12.18
+set(is_encryption_supported 0)
 set(libmumpsrestoreregex "")
 message("--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 # Establish platform
@@ -220,10 +221,12 @@ set_source_list(gtcm_server      gtcm_main omi_srvc_xct)
 set_source_list(gtcm_shmclean    gtcm_shmclean)
 set_source_list(gtmsecshr        gtmsecshr_wrapper)
 set_source_list(gtmsecshr_real   gtmsecshr)
-set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref)
+set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref)
+set_source_list(libgtmtls        gtm_tls_impl)
+set_source_list(libgtmcryptutil  gtmcrypt_util)
 set_source_list(libgtmshr        gtm_main)
 set_source_list(lke              lke lke_cmd)
-set_source_list(maskpass         maskpass)
+set_source_list(maskpass         maskpass gtmcrypt_util)
 set_source_list(mumps            gtm)
 set_source_list(mupip            mupip mupip_cmd)
 set_source_list(semstat2         semstat2)
@@ -472,6 +475,14 @@ if(is_encryption_supported)
     set(GPG_LIBRARIES ${GPG_LIBRARIES} ${GPGLIB_${gpglib}})
   endforeach()
 
+  # Iterate over the list of SSL related libraries
+  foreach(ssl)
+    # For each library, we need a new CMake variable, hence TLSLIB_${tlslib}
+    find_library(TLSLIB_${tlslib} NAME ${tlslib} PATHS ${CMAKE_LIBRARY_PATH})
+    # Append the found library to the list
+    set(TLS_LIBRARIES ${TLS_LIBRARIES} ${TLSLIB_${tlslib}})
+  endforeach()
+
   add_library(libgtmcrypt MODULE ${libgtmcrypt_SOURCES})
   set_target_properties(libgtmcrypt PROPERTIES
     OUTPUT_NAME gtmcrypt
@@ -481,57 +492,76 @@ if(is_encryption_supported)
   target_link_libraries(libgtmcrypt ${GPG_LIBRARIES})
   install(TARGETS libgtmcrypt DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
+  add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
+  set_target_properties(libgtmtls PROPERTIES
+    OUTPUT_NAME gtmtls
+    LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+    )
+  target_link_libraries(libgtmtls ${TLS_LIBRARIES})
+  install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
+
+  add_library(libgtmcryptutil MODULE ${libgtmcryptutil_SOURCES})
+  set_target_properties(libgtmcryptutil PROPERTIES
+    OUTPUT_NAME gtmcryptutil
+    COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
+    LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+    )
+  target_link_libraries(libgtmcryptutil ${GPG_LIBRARIES})
+  install(TARGETS libgtmcryptutil DESTINATION ${GTM_INSTALL_DIR}/plugin)
+
   add_executable(maskpass ${maskpass_SOURCES})
   target_link_libraries(maskpass ${GPG_LIBRARIES})
   set_target_properties(maskpass PROPERTIES
-    COMPILE_DEFINITIONS USE_GCRYPT
+    COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_SYSLIB_FUNCS"
     RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
     )
   install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)
+endif()
 
-  foreach(f
+# Always copy files into the plugin directory
+foreach(f
+      Makefile.mk
       add_db_key.sh
-      build.sh
       encrypt_sign_db_key.sh
       gen_keypair.sh
       gen_sym_hash.sh
       gen_sym_key.sh
-      gtmcrypt.tab
+      gtm_tls_impl.c
+      gtm_tls_impl.h
+      gtm_tls_interface.h
       gtmcrypt_dbk_ref.c
       gtmcrypt_dbk_ref.h
       gtmcrypt_interface.h
       gtmcrypt_pk_ref.c
       gtmcrypt_pk_ref.h
-      gtmcrypt_dbk_ref.c
-      gtmcrypt_dbk_ref.h
       gtmcrypt_ref.c
       gtmcrypt_ref.h
+      gtmcrypt_sym_ref.c
       gtmcrypt_sym_ref.h
-      gtmxc_types.h
+      gtmcrypt_util.c
+      gtmcrypt_util.h
       import_and_sign_key.sh
-      install.sh
       maskpass.c
       pinentry-gtm.sh
       pinentry.m
-      pinentry.m
       show_install_config.sh
-      )
-    set(f_in "${GTM_SOURCE_DIR}/sr_unix/${f}")
-    set(f_out "${GTM_BINARY_DIR}/plugin/gtmcrypt/${f}")
-    add_custom_command(
-      OUTPUT "${f_out}"
-      DEPENDS "${f_in}"
-      COMMAND ${CMAKE_COMMAND} -E copy "${f_in}" "${f_out}"
-      )
-    if("${f}" MATCHES "\\.sh$")
-      set(permissions PERMISSIONS ${install_permissions_script})
-    else()
-      set(permissions "")
-    endif()
-    install(FILES "${f_out}" DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt ${permissions})
-    list(APPEND files_to_place "${f_out}")
-  endforeach()
-endif()
+    )
+  set(f_in "${GTM_SOURCE_DIR}/sr_unix/${f}")
+  string(REGEX REPLACE ".mk$" "" f_mod "${f}")
+  set(f_out "${GTM_BINARY_DIR}/plugin/gtmcrypt/${f_mod}")
+  add_custom_command(
+    OUTPUT "${f_out}"
+    DEPENDS "${f_in}"
+    COMMAND ${CMAKE_COMMAND} -E copy "${f_in}" "${f_out}"
+    )
+  if("${f}" MATCHES "\\.sh$")
+    set(permissions PERMISSIONS ${install_permissions_script})
+  else()
+    set(permissions "")
+  endif()
+  install(FILES "${f_out}" DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt ${permissions})
+  list(APPEND files_to_place "${f_out}")
+endforeach()
 
 install(TARGETS
   mumps
@@ -623,6 +653,7 @@ endforeach()
 
 set(files)
 foreach(f
+  gtm_common_defs.h
   gtm_descript.h
   gtm_limits.h
   gtm_sizeof.h
@@ -759,6 +790,7 @@ Halt")
     )
   list(APPEND files_to_place ${help}help.dat)
   install(FILES ${GTM_BINARY_DIR}/${help}help.dat DESTINATION ${GTM_INSTALL_DIR})
+  install(FILES ${GTM_BINARY_DIR}/${help}help.gld DESTINATION ${GTM_INSTALL_DIR})
 endforeach()
 #-----------------------------------------------------------------------------
 

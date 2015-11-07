@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,10 +58,10 @@ error_def(ERR_GVPUTFAIL);
 
 enum cdb_sc gvcst_dataget(mint *dollar_data, mval *val)
 {
-	boolean_t	gotit, gotspan, gotpiece, gotdummy, sn_tpwrapped, check_rtsib;
+	boolean_t	gotit, gotspan, gotpiece, check_rtsib;
 	mint		dollar_data_ctrl, dollar_data_piece, dollar_data_null, dg_info;
 	mval		val_ctrl, val_piece;
-	int		gblsize, chunk_size, i, total_len, oldend, tmp_numsubs;
+	int		gblsize, i, total_len, oldend, tmp_numsubs;
 	unsigned short	numsubs;
 	sm_uc_ptr_t	sn_ptr;
 	enum cdb_sc	status;
@@ -147,10 +147,7 @@ enum cdb_sc gvcst_dataget(mint *dollar_data, mval *val)
 				if ((11 != dollar_data_piece) && cs_data->std_null_coll)
 				{	/* Check for a null-subscripted descendant. Append null sub to gv_currkey and check $data */
 					RESTORE_CURRKEY(gv_currkey, oldend);
-					gv_currkey->end = oldend + 2;
-					gv_currkey->base[oldend + 0] = 1;
-					gv_currkey->base[oldend + 1] = 0;
-					gv_currkey->base[oldend + 2] = 0;
+					GVKEY_INCREMENT_QUERY(gv_currkey);
 					dollar_data_null = DG_DATAONLY;
 					gvcst_dataget2(&dollar_data_null, &val_piece, NULL);
 					if (dollar_data_null)

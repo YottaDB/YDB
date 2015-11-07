@@ -63,8 +63,10 @@
 
 #define PRINT_AND_SEND_SHMREMOVED_MSG(MSGBUFF, FNAME_LEN, FNAME, SHMID)							\
 {															\
-	gtm_putmsg(VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), ERR_SHMREMOVED, 3, SHMID, FNAME_LEN, FNAME);		\
-	send_msg(VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), ERR_SHMREMOVED, 3, SHMID, FNAME_LEN, FNAME);		\
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), 					\
+			ERR_SHMREMOVED, 3, SHMID, FNAME_LEN, FNAME);							\
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), 					\
+			ERR_SHMREMOVED, 3, SHMID, FNAME_LEN, FNAME);							\
 }
 
 #define PRINT_AND_SEND_REPLPOOL_FAILURE_MSG(MSGBUFF, REPLPOOL_ID, SHMID)						\
@@ -75,19 +77,22 @@
 	ipcs_ptr = i2asc(ipcs_buff, SHMID);										\
 	*ipcs_ptr = '\0';												\
 	msgid = (JNLPOOL_SEGMENT == REPLPOOL_ID->pool_type) ? ERR_MUJPOOLRNDWNFL : ERR_MURPOOLRNDWNFL;			\
-	gtm_putmsg(VARLSTCNT(10) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), msgid, 4, LEN_AND_STR(ipcs_buff),			\
-			LEN_AND_STR(REPLPOOL_ID->instfilename));							\
-	send_msg(VARLSTCNT(10) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), msgid, 4, LEN_AND_STR(ipcs_buff),			\
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), 					\
+				msgid, 4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(REPLPOOL_ID->instfilename));		\
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), msgid, 4, LEN_AND_STR(ipcs_buff),	\
 			LEN_AND_STR(REPLPOOL_ID->instfilename));							\
 }
 
 #define PRINT_AND_SEND_DBRNDWN_FAILURE_MSG(MSGBUFF, FNAME, SHMID)							\
 {															\
-	gtm_putmsg(VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), ERR_MUFILRNDWNFL2, 3, SHMID, LEN_AND_STR(FNAME));	\
-	send_msg(VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), ERR_MUFILRNDWNFL2, 3, SHMID, LEN_AND_STR(FNAME));	\
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), ERR_MUFILRNDWNFL2, 3, 		\
+			SHMID, LEN_AND_STR(FNAME));									\
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_TEXT, 2, LEN_AND_STR(MSGBUFF), ERR_MUFILRNDWNFL2, 3, 		\
+			SHMID, LEN_AND_STR(FNAME));									\
 }
 
 GBLREF gd_region        *gv_cur_region;
+GBLREF semid_queue_elem	*keep_semids;
 
 LITREF char             gtm_release_name[];
 LITREF int4             gtm_release_name_len;
@@ -119,7 +124,7 @@ STATICDEF	boolean_t	mu_rndwn_all_helper_error = FALSE;
  */
 CONDITION_HANDLER(mu_rndwn_all_helper_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	mu_rndwn_all_helper_error = TRUE;
 	PRN_ERROR;
 	if (SEVERITY == SEVERE)
@@ -144,9 +149,12 @@ STATICFNDEF void mu_rndwn_all_helper(shm_parms *parm_buff, char *fname, int *exi
 			gv_cur_region->dyn.addr->fname_len = strlen(fname);
 			STRNCPY_STR(gv_cur_region->dyn.addr->fname, fname, gv_cur_region->dyn.addr->fname_len);
 			if (mu_rndwn_file(gv_cur_region, FALSE))
-				gtm_putmsg(VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));
 			else
+			{	/* Save semid so that it will not be removed by mu_rndwn_sem_all() */
+				add_to_semids_list(FILE_INFO(gv_cur_region)->semid);
 				*exit_status = ERR_MUNOTALLSEC;
+			}
 			mu_gv_cur_reg_free();
 		} else
 		{	/* shm has been cleaned up by "validate_db_shm_entry" so no need of any more cleanup here */
@@ -162,7 +170,7 @@ STATICFNDEF void mu_rndwn_all_helper(shm_parms *parm_buff, char *fname, int *exi
 			ret_status = mu_rndwn_repl_instance(&replpool_id, TRUE, FALSE, &jnlpool_sem_created);
 			ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, parm_buff->shmid);
 			*ipcs_ptr = '\0';
-			gtm_putmsg(VARLSTCNT(6) (JNLPOOL_SEGMENT == replpool_id.pool_type) ?
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) (JNLPOOL_SEGMENT == replpool_id.pool_type) ?
 				(ret_status ? ERR_MUJPOOLRNDWNSUC : ERR_MUJPOOLRNDWNFL) :
 				(ret_status ? ERR_MURPOOLRNDWNSUC : ERR_MURPOOLRNDWNFL),
 				4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(replpool_id.instfilename));
@@ -188,7 +196,7 @@ int mu_rndwn_all(void)
 	if (NULL == (pf = POPEN(IPCS_CMD_STR ,"r")))
         {
 		save_errno = errno;
-		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("POPEN()"), CALLFROM, save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("POPEN()"), CALLFROM, save_errno);
                 return ERR_MUNOTALLSEC;
         }
 	fname = (char *)malloc(MAX_FN_LEN + 1);
@@ -286,7 +294,7 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 		assert(FALSE);/* we were able to attach to this shmid before so should be able to get stats on it */
 		util_out_print("!AD -> Error with shmctl for shmid = !UL",
 			TRUE, fname_len, fname, shmid);
-		gtm_putmsg(VARLSTCNT(1) save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 		*exit_stat = ERR_MUNOTALLSEC;
 		shmdt((void *)start_addr);
 		return FALSE;
@@ -314,7 +322,7 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 			save_errno = errno;
 			util_out_print("Cannot rundown shmid !UL for database file !AD as stat() on the file"
 				" returned the following error", TRUE, shmid, fname_len, fname);
-			gtm_putmsg(VARLSTCNT(1) save_errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 			*exit_stat = ERR_MUNOTALLSEC;
 			shmdt((void *)start_addr);
 			return FALSE;
@@ -330,7 +338,7 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 		if (SS_NORMAL != status)
 		{
 			util_out_print("!AD -> Error with dbfilop for shmid = !UL", TRUE, fname_len, fname, shmid);
-			gtm_putmsg(VARLSTCNT(5) status, 2, DB_LEN_STR(gv_cur_region), errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) status, 2, DB_LEN_STR(gv_cur_region), errno);
 			*exit_stat = ERR_MUNOTALLSEC;
 			shmdt((void *)start_addr);
 			return FALSE;
@@ -341,7 +349,7 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 		{
 			save_errno = errno;
 			util_out_print("!AD -> Error with LSEEKREAD for shmid = !UL", TRUE, fname_len, fname, shmid);
-			gtm_putmsg(VARLSTCNT(1) save_errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 			*exit_stat = ERR_MUNOTALLSEC;
 			shmdt((void *)start_addr);
 			return FALSE;
@@ -380,10 +388,10 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 		if (0 != shm_rmid(shmid))
 		{
 			save_errno = errno;
-			gtm_putmsg(VARLSTCNT(8) ERR_DBFILERR, 2, fname_len, fname,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2, fname_len, fname,
 				   ERR_TEXT, 2, RTS_ERROR_TEXT("Error removing shared memory"));
 			util_out_print("!AD -> Error removing shared memory for shmid = !UL", TRUE, fname_len, fname, shmid);
-			gtm_putmsg(VARLSTCNT(1) save_errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 			*exit_stat = ERR_MUNOTALLSEC;
 			return FALSE;
 		}
@@ -461,7 +469,7 @@ boolean_t validate_replpool_shm_entry(shm_parms *parm_buff, replpool_id_ptr_t re
 		assert(FALSE);/* we were able to attach to this shmid before so should be able to get stats on it */
 		util_out_print("!AD -> Error with shmctl for shmid = !UL",
 				TRUE, LEN_AND_STR(instfilename), shmid);
-		gtm_putmsg(VARLSTCNT(1) save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 		*exit_stat = ERR_MUNOTALLSEC;
 		shmdt((void *)start_addr);
 		return FALSE;
@@ -493,7 +501,7 @@ boolean_t validate_replpool_shm_entry(shm_parms *parm_buff, replpool_id_ptr_t re
 			util_out_print("Cannot rundown replpool shmid !UL for instance file"
 				" !AD as open() on the file returned the following error",
 				TRUE, shmid, LEN_AND_STR(instfilename));
-			gtm_putmsg(VARLSTCNT(1) save_errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 			*exit_stat = ERR_MUNOTALLSEC;
 			shmdt((void *)start_addr);
 			return FALSE;
@@ -506,7 +514,7 @@ boolean_t validate_replpool_shm_entry(shm_parms *parm_buff, replpool_id_ptr_t re
 			save_errno = errno;
 			util_out_print("!AD -> Error with LSEEKREAD for shmid = !UL", TRUE,
 				LEN_AND_STR(instfilename), shmid);
-			gtm_putmsg(VARLSTCNT(1) save_errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 			*exit_stat = ERR_MUNOTALLSEC;
 			shmdt((void *)start_addr);
 			return FALSE;
@@ -537,7 +545,7 @@ boolean_t validate_replpool_shm_entry(shm_parms *parm_buff, replpool_id_ptr_t re
 			save_errno = errno;
 			util_out_print("!AD -> Error removing shared memory for shmid = !UL",
 				TRUE, LEN_AND_STR(instfilename), shmid);
-			gtm_putmsg(VARLSTCNT(1) save_errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 			*exit_stat = ERR_MUNOTALLSEC;
 			return FALSE;
 		}
@@ -664,7 +672,7 @@ int mu_rndwn_sem_all(void)
 	if (NULL == (pf = POPEN(IPCS_SEM_CMD_STR ,"r")))
         {
 		save_errno = errno;
-		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("POPEN()"), CALLFROM, save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("POPEN()"), CALLFROM, save_errno);
                 return ERR_MUNOTALLSEC;
         }
 	while (NULL != (FGETS(entry, SIZEOF(entry), pf, fgets_res)) && entry[0] != '\n')
@@ -672,11 +680,11 @@ int mu_rndwn_sem_all(void)
 		if (-1 != (semid = parse_sem_id(entry)))
 		{
 			if (is_orphaned_gtm_semaphore(semid))
-			{
+			{	/* semval == 0 and corresponding shared memory has been removed */
 				if (-1 != semctl(semid, 0, IPC_RMID))
 				{
-					gtm_putmsg(VARLSTCNT(3) ERR_SEMREMOVED, 1, semid);
-					send_msg(VARLSTCNT(3) ERR_SEMREMOVED, 1, semid);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SEMREMOVED, 1, semid);
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SEMREMOVED, 1, semid);
 				}
 			}
 		}
@@ -684,6 +692,7 @@ int mu_rndwn_sem_all(void)
 	pclose(pf);
 	return exit_status;
 }
+
 boolean_t is_orphaned_gtm_semaphore(int semid)
 {
 	int			semno, semval;
@@ -702,7 +711,34 @@ boolean_t is_orphaned_gtm_semaphore(int semid)
 				if (-1 == (semval = semctl(semid, semno, GETVAL)) || semval)
 					return FALSE;
 		}
-		return TRUE;
+		/* We know that the semvals are 0, and this is a GTM semaphore. Now, we can remove it if it is not specifically
+		 * meant to be kept.
+		 */
+		return  !in_keep_sems_list(semid);
 	}
 	return FALSE;
+}
+
+boolean_t in_keep_sems_list(int semid)
+{
+	semid_queue_elem	*iter;
+
+	iter = keep_semids;
+	while (iter)
+	{
+		if (iter->semid == semid)
+			return TRUE;
+		iter = iter->prev;
+	}
+	return FALSE;
+}
+
+void add_to_semids_list(int semid)
+{
+	semid_queue_elem	*new_semid_elem;
+
+	new_semid_elem = (semid_queue_elem*) malloc(SIZEOF(semid_queue_elem));
+	new_semid_elem->semid = semid;
+	new_semid_elem->prev = keep_semids;
+	keep_semids = new_semid_elem;
 }

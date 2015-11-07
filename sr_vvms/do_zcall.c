@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,6 +76,8 @@ static readonly short	dsizes[N_DSIZES] = {
 GBLREF spdesc	stringpool;
 GBLREF io_pair	io_std_device;
 
+LITREF mval	skiparg;
+
 error_def(ERR_MAXSTRLEN);
 error_def(ERR_VMSMEMORY2);
 error_def(ERR_ZCALLTABLE);
@@ -144,7 +146,7 @@ void do_zcall(mval		*dst,
 			case ZC$DTYPE_H_FLOATING:
 				break;
 			default:
-				rts_error(VARLSTCNT(1) ERR_ZCUNKTYPE);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCUNKTYPE);
 		}
 		switch (inp->mechanism)	/* guard mechanism */
 		{
@@ -154,12 +156,12 @@ void do_zcall(mval		*dst,
 			case ZC$MECH_DESCRIPTOR64:
 				break;
 			default:
-				rts_error(VARLSTCNT(1) ERR_ZCUNKMECH);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCUNKMECH);
 		}
 		assertpro(mvpp <= mvallistend);
 		lclp = lcllist + inp->position - 1;
 		if (lclp->initted)
-			rts_error(VARLSTCNT(5) ERR_ZCALLTABLE, 0, ERR_ZCPOSOVR, 1, inp->position);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZCALLTABLE, 0, ERR_ZCPOSOVR, 1, inp->position);
 		lclp->skip = FALSE;
 		lclp->zctab = inp;
 		if (ZC$MECH_DESCRIPTOR64 == inp->mechanism)
@@ -178,7 +180,7 @@ void do_zcall(mval		*dst,
 			case ZC$IQUAL_OPTIONAL:
 				if (mvpp == mvallistend)
 					lclp->skip = TRUE;
-				else if (!MV_DEFINED(*mvpp) && (*mvpp)->str.addr == (*mvpp))
+				else if (!MV_DEFINED(*mvpp) && M_ARG_SKIPPED(*mvpp))
 				{
 					lclp->skip = TRUE;
 					mvpp++;
@@ -186,11 +188,11 @@ void do_zcall(mval		*dst,
 					use_value = VAL_INPUTMVAL;
 				break;
 			case ZC$IQUAL_OPTIONAL_0:
-				if (mvpp == mvallistend || (!MV_DEFINED(*mvpp) && (*mvpp)->str.addr == (*mvpp)))
+				if ((mvpp == mvallistend) || (!MV_DEFINED(*mvpp) && M_ARG_SKIPPED(*mvpp)))
 				{
 					if (!(ZC$MECH_REFERENCE == inp->mechanism ||
 					      ZC$MECH_DESCRIPTOR == inp->mechanism || ZC$MECH_DESCRIPTOR64 == inp->mechanism))
-						rts_error(VARLSTCNT(3) ERR_ZCALLTABLE, 0, ERR_ZCOPT0);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZCALLTABLE, 0, ERR_ZCOPT0);
 					lclp->skip = TRUE;
 					if (is_a_desc64)
 						dsc64->dsc64$pq_pointer = 0;
@@ -213,11 +215,11 @@ void do_zcall(mval		*dst,
 				break;
 			case ZC$IQUAL_REQUIRED:
 				if (mvpp == mvallistend || (!MV_DEFINED(*mvpp) && (*mvpp)->str.addr == (*mvpp)))
-					rts_error(VARLSTCNT(1) ERR_ZCINPUTREQ);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCINPUTREQ);
 				use_value = VAL_INPUTMVAL;
 				break;
 			default:
-				rts_error(VARLSTCNT(3) ERR_ZCALLTABLE, 0, ERR_ZCUNKQUAL);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZCALLTABLE, 0, ERR_ZCUNKQUAL);
 		}
 		switch (use_value)
 		{
@@ -234,7 +236,7 @@ void do_zcall(mval		*dst,
 					if (!is_a_desc64)
 					{
 						if (65535 < (*mvpp)->str.len)
-							rts_error(VARLSTCNT(1) ERR_ZCWRONGDESC);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCWRONGDESC);
 						dsc->dsc$w_length =(*mvpp)->str.len ;
 						dsc->dsc$a_pointer = (*mvpp)->str.addr;
 					} else
@@ -299,13 +301,13 @@ void do_zcall(mval		*dst,
 			case VAL_NONE:
 				break;
 			default:
-				GTMASSERT;
+				assertpro(FALSE && use_value);
 				break;		/* though not necessary, keep compiler on some platforms happy */
 		}
 		lclp->initted = TRUE;
 	}
 	assert(inp == (zctabinput *)firstout);
-	if (mvpp < mvallistend) rts_error(VARLSTCNT(1) ERR_ZCCONMSMTCH);
+	if (mvpp < mvallistend) rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCCONMSMTCH);
 	assert(mvpp == mvallistend);
 	is_a_desc64 = FALSE;
 	for (outp = firstout; outp < lastout; outp++)
@@ -325,7 +327,7 @@ void do_zcall(mval		*dst,
 			case ZC$DTYPE_H_FLOATING:
 				break;
 			default:
-				rts_error(VARLSTCNT(1) ERR_ZCUNKTYPE);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCUNKTYPE);
 		}
 		switch (outp->mechanism)	/* guard mechanism */
 		{
@@ -335,7 +337,7 @@ void do_zcall(mval		*dst,
 			case ZC$MECH_DESCRIPTOR64:
 				break;
 			default:
-				rts_error(VARLSTCNT(1) ERR_ZCUNKMECH);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCUNKMECH);
 		}
 		switch (outp->qualifier)	/* guard qualifier */
 		{
@@ -344,7 +346,7 @@ void do_zcall(mval		*dst,
 			case ZC$OQUAL_PREALLOCATE:
 				break;
 			default:
-				rts_error(VARLSTCNT(3) ERR_ZCALLTABLE, 0, ERR_ZCUNKQUAL);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZCALLTABLE, 0, ERR_ZCUNKQUAL);
 		}
 		lclp = lcllist + outp->position - 1;
 		if (lclp->initted)
@@ -352,7 +354,7 @@ void do_zcall(mval		*dst,
 			inp = lclp->zctab;
 			if (lclp->skip || outp->type != inp->type || outp->mechanism != inp->mechanism ||
 			    inp->type == ZC$DTYPE_STRING || outp->qualifier == ZC$OQUAL_PREALLOCATE)
-				rts_error(VARLSTCNT(5) ERR_ZCALLTABLE, 0, ERR_ZCPOSOVR, 1, outp->position);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZCALLTABLE, 0, ERR_ZCPOSOVR, 1, outp->position);
 		} else
 		{
 			lclp->skip = FALSE;
@@ -394,11 +396,11 @@ void do_zcall(mval		*dst,
 					if (!(status & 1))
 					{
 						if (LIB$_INSVIRMEM == status)
-							rts_error(VARLSTCNT(3) ERR_VMSMEMORY2, 1, alloclen);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VMSMEMORY2, 1, alloclen);
 						else
-						{
+						{	/* Only other return code is fatal internal error */
 							assert(LIB$_FATERRLIB == status);
-							GTMASSERT;	/* Only other return code is fatal internal error */
+							assertpro(LIB$_INSVIRMEM == status);	/* to force dump file creation */
 						}
 					}
 				} else
@@ -480,14 +482,14 @@ void do_zcall(mval		*dst,
 						dstlen += dsc->dsc$w_length;
 					else {
 						if (MAX_STRLEN < dsc64->dsc64$q_length)
-							rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 						dstlen += dsc64->dsc64$q_length;
 					}
 				}
 			}
 		}
 		if (MAX_STRLEN < dstlen)
-			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 		ENSURE_STP_FREE_SPACE(dstlen);
 		/* Construct destination mval */
 		dst->str.addr = stringpool.free;
@@ -535,11 +537,11 @@ void do_zcall(mval		*dst,
 						else
 							dsc64->dsc64$q_length = outp->value;
 						if ((status = lib$sfree1_dd(&lclp->dsc)) != SS$_NORMAL)
-							rts_error(VARLSTCNT(3) ERR_ZCCONVERT, 0, status);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZCCONVERT, 0, status);
 					} else if (DSC64$K_CLASS_D == *class && (dsc->dsc$a_pointer || dsc64->dsc64$pq_pointer))
 					{
 						if ((status = lib$sfree1_dd(&lclp->dsc)) != SS$_NORMAL)
-							rts_error(VARLSTCNT(3) ERR_ZCCONVERT, 0, status);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZCCONVERT, 0, status);
 					}
 				} else
 				{
@@ -554,7 +556,7 @@ void do_zcall(mval		*dst,
 		dst->mvtype = MV_STR;
 		if (dstlen == 0)
 		{
-			assert(stringpool.free == dst->str.addr);
+			assert(IS_AT_END_OF_STRINGPOOL(dst->str.addr, 0));
 			dst->str.len = 0;
 		} else
 		{

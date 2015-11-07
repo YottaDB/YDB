@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ error_def		(ERR_NOLBRSRC);
 
 CONDITION_HANDLER(zro_load_ch)
 {
-	START_CH;
+	START_CH(FALSE);
 	if (zro_str)
 		free(zro_str);
 	zro_str = NULL;
@@ -99,23 +99,25 @@ void  zro_load (mstr *str)
 		{
 			file = FALSE;
 			if (toktyp != TK_IDENT)
-				rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FSEXP);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FSEXP);
 			if (oi + 1 >= ZRO_MAX_ENTS)
-				rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
+					ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
 			fab.fab$b_fns = tok.len;
 			fab.fab$l_fna = tok.addr;
 			status = sys$parse (&fab);
 			if (!(status & 1))
-				rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FILEPARSE, 2, tok.len, tok.addr,
-					  status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+					ERR_FILEPARSE, 2, tok.len, tok.addr, status);
 			if (nam.nam$l_fnb & (NAM$M_WILDCARD))
-				rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_WILDCARD, 2, tok.len, tok.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
+					ERR_WILDCARD, 2, tok.len, tok.addr);
 			if (nam.nam$l_fnb & (NAM$M_EXP_NAME | NAM$M_EXP_TYPE | NAM$M_EXP_VER))
 			{
 				file = TRUE;
 				status = sys$search(&fab);
 				if (!(status & 1))
-					rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
 						  ERR_FILEPARSE, 2, tok.len, tok.addr, status);
 			}
 			array[0].count++;
@@ -133,19 +135,21 @@ void  zro_load (mstr *str)
 			{
 				GETTOK;
 				if (toktyp != TK_IDENT)
-					rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_QUALEXP);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZROSYNTAX, 2,
+							str->len, str->addr, ERR_QUALEXP);
 				if (tok.len == 3)
 				{
 					lower_to_upper (qual, tok.addr, 3);
 					if (!memcmp (qual, "SRC", 3))
 					{
 						if (file)
-							rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_NOLBRSRC);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZROSYNTAX, 2,
+									str->len, str->addr, ERR_NOLBRSRC);
 
 						GETTOK;
 						if (si >= ZRO_MAX_ENTS)
-							rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
-								  ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ZROSYNTAX, 2,
+									str->len, str->addr, ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
 						if (toktyp == TK_COMMA || toktyp == TK_EOL)
 						{
 							array[oi + 1].count = 1;
@@ -158,24 +162,25 @@ void  zro_load (mstr *str)
 							if (toktyp != TK_LPAREN)
 							{
 								if (toktyp != TK_IDENT)
-									rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len,
-										  str->addr, ERR_FSEXP);
+									rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
+											ERR_ZROSYNTAX, 2, str->len,
+										  	str->addr, ERR_FSEXP);
 								fab.fab$b_fns = tok.len;
 								fab.fab$l_fna = tok.addr;
 								status = sys$parse (&fab);
 								if (!(status & 1))
-									rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len,
-										  str->addr, ERR_FILEPARSE, 2, tok.len, tok.addr,
-										  status);
+									rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9)
+										ERR_ZROSYNTAX, 2, str->len, str->addr,
+										ERR_FILEPARSE, 2, tok.len, tok.addr, status);
 								if (nam.nam$l_fnb & (NAM$M_EXP_NAME | NAM$M_EXP_TYPE
 										     | NAM$M_EXP_VER))
-									rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len,
-										  str->addr, ERR_DIRONLY, 2, tok.len,
-										  tok.addr);
+									rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
+										ERR_ZROSYNTAX, 2, str->len, str->addr,
+										ERR_DIRONLY, 2, tok.len, tok.addr);
 								if (nam.nam$l_fnb & (NAM$M_WILDCARD))
-									rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len,
-										  str->addr, ERR_WILDCARD, 2, tok.len,
-										  tok.addr);
+									rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
+										ERR_ZROSYNTAX, 2, str->len, str->addr,
+										ERR_WILDCARD, 2, tok.len, tok.addr);
 								array[oi + 1].count = 1;
 								array[si].type = ZRO_TYPE_SOURCE;
 								array[si].node_present = (nam.nam$l_fnb & (NAM$M_NODE));
@@ -190,27 +195,30 @@ void  zro_load (mstr *str)
 								{
 									GETTOK;
 									if (toktyp != TK_IDENT)
-										rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len,
-											  str->addr, ERR_FSEXP);
+										rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
+											ERR_ZROSYNTAX, 2, str->len,
+											str->addr, ERR_FSEXP);
 									if (si >= ZRO_MAX_ENTS)
-										rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len,
-											  str->addr,ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
+										rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7)
+											ERR_ZROSYNTAX, 2, str->len,
+											str->addr,ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
 									fab.fab$b_fns = tok.len;
 									fab.fab$l_fna = tok.addr;
 									status = sys$parse (&fab);
 									if (!(status & 1))
-										rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len,
-											  str->addr,ERR_FILEPARSE, 2, tok.len,
-											  tok.addr, status);
+										rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9)
+											ERR_ZROSYNTAX, 2, str->len,
+											str->addr,ERR_FILEPARSE, 2, tok.len,
+											tok.addr, status);
 									if (nam.nam$l_fnb & (NAM$M_EXP_NAME | NAM$M_EXP_TYPE
 											     | NAM$M_EXP_VER))
-										rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len,
-											  str->addr, ERR_DIRONLY, 2, tok.len,
-											  tok.addr);
+										rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
+											ERR_ZROSYNTAX, 2, str->len, str->addr,
+											ERR_DIRONLY, 2, tok.len, tok.addr);
 									if (nam.nam$l_fnb & (NAM$M_WILDCARD))
-										rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len,
-											  str->addr, ERR_WILDCARD, 2, tok.len,
-											  tok.addr);
+										rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
+											ERR_ZROSYNTAX, 2, str->len, str->addr,
+											ERR_WILDCARD, 2, tok.len, tok.addr);
 									array[oi + 1].count++;
 									array[si].type = ZRO_TYPE_SOURCE;
 									array[si].node_present = (nam.nam$l_fnb & (NAM$M_NODE));
@@ -221,15 +229,17 @@ void  zro_load (mstr *str)
 									if (toktyp == TK_RPAREN)
 										break;
 									if (toktyp != TK_COMMA)
-										rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len,
-											  str->addr, ERR_COMMAORRPAREXP);
+										rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
+											ERR_ZROSYNTAX, 2, str->len, str->addr,
+											ERR_COMMAORRPAREXP);
 								}
 								GETTOK;
 							}
 						} else
-							rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_QUALVAL);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
+								ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_QUALVAL);
 					} else
-						rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
 							  ERR_BADQUAL, 2, tok.len, tok.addr);
 				} else if (tok.len == 5)
 				{
@@ -239,10 +249,10 @@ void  zro_load (mstr *str)
 						array[oi + 1].count = 0;
 						GETTOK;
 					} else
-						rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
 							  ERR_BADQUAL, 2, tok.len, tok.addr);
 				} else
-					rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
 						  ERR_BADQUAL, 2, tok.len, tok.addr);
 			} else if (toktyp == TK_COMMA || toktyp == TK_EOL)
 			{
@@ -260,7 +270,7 @@ void  zro_load (mstr *str)
 			else if (toktyp == TK_EOL)
 				break;
 			else
-				rts_error(VARLSTCNT(4) ERR_ZROSYNTAX, 2, str->len, str->addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZROSYNTAX, 2, str->len, str->addr);
 			oi = si;
 		}
 	}

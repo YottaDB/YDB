@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2010 Fidelity Information Services, Inc	;
+;	Copyright 2010, 2013 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -20,8 +20,11 @@ pinentry	; Substitute pinentry that returns an unobfuscated password
 	For  Quit:done  Read in Quit:'$Length(in)  Do
 	. If "GETPIN"=$Translate($Piece(in," ",1),"abcdefghijklmnopqrstuvwxyz","ABCDEFGHIJKLMNOPQRSTUVWXYZ") Do
 	. . Set obfpwds=""
-	. . For i=1:2:$Length(obfpwd) Set obfpwds=obfpwds_$ZCHar(16*($Find("0123456789ABCDEF",$Extract(obfpwd,i))-2)+$Find("0123456789ABCDEF",$Extract(obfpwd,i+1))-2)
-	. . Write:'$&gpgagent.unmaskpwd(obfpwds,.clrpwds,$Length(obfpwds)) "D ",clrpwds,!
+	. . For i=1:2:$Length(obfpwd) Do
+	. . . Set msb=$Find("0123456789ABCDEF",$Extract(obfpwd,i))-2
+	. . . Set lsb=$Find("0123456789ABCDEF",$Extract(obfpwd,i+1))-2
+	. . . Set obfpwds=obfpwds_$ZCHar(16*msb+lsb)
+	. . Write:'$&gpgagent.unmaskpwd(obfpwds,.clrpwds) "D ",clrpwds,!
 	. . Set done=1
 	. Write "OK",!
 	Quit

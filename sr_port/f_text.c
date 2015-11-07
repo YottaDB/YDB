@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,12 +94,7 @@ int f_text(oprtype *a, opctype op)
 	if (TK_CIRCUMFLEX != TREF(window_token))
 	{	/* No routine specified - default to current routine */
 		if (OC_INDFUN != r->opcode)
-		{
-			if (!run_time)
-				label->operand[1] = put_str(routine_name.addr, routine_name.len);
-			else
-				label->operand[1] = put_tref(newtriple(OC_CURRTN));
-		}
+			label->operand[1] = PUT_CURRENT_RTN; /* tell op_fntext to pick up current routine version */
 	} else
 	{	/* Routine has been specified - pull it */
 		advancewindow();

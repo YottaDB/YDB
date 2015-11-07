@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,10 @@
 #include "gtmsource.h"
 #include "gtmio.h"
 #include "have_crit.h"
+#include "repl_comm.h"
+#ifdef GTM_TLS
+#include "gtm_repl.h"
+#endif
 
 GBLREF	uint4			process_id;
 GBLREF	recvpool_addrs		recvpool;
@@ -163,8 +167,17 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	/* Close the connection with the Receiver */
 	if (FD_INVALID != gtmrecv_listen_sock_fd)
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
-	if (FD_INVALID != gtmrecv_sock_fd)
-		CLOSEFILE_RESET(gtmrecv_sock_fd, rc);	/* resets "gtmrecv_sock_fd" to FD_INVALID */
+	repl_close(&gtmrecv_sock_fd);
+#	ifdef GTM_TLS
+	/* Free up the SSL/TLS socket structures. */
+	if (NULL != repl_tls.sock)
+		gtm_tls_session_close(&repl_tls.sock);
+	assert(NULL == repl_tls.sock);
+	/* Free up the SSL/TLS context now that we are shutting down. */
+	if (NULL != tls_ctx)
+		gtm_tls_fini(&tls_ctx);
+	assert(NULL == tls_ctx);
+#	endif
 	repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Current Jnlpool Seqno : %llu\n", jnlpool_seqno);
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 	{

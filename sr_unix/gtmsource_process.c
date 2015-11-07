@@ -66,6 +66,11 @@
 #include "replgbl.h"
 #include "gtmsource_srv_latch.h"
 #include "gv_trigger_common.h"
+#include "wbox_test_init.h"
+#ifdef GTM_TLS
+#include "heartbeat_timer.h"
+#include "gtm_repl.h"
+#endif
 
 #define MAX_HEXDUMP_CHARS_PER_LINE	26		/* 2 characters per byte + space, 80 column assumed */
 
@@ -139,6 +144,34 @@
 }
 #endif
 
+#ifdef GTM_TLS
+#define REPLTLS_RENEGOTIATE(SOCK, STATUS)											\
+{																\
+	char	*errp;														\
+	int	save_errno;													\
+																\
+	if (0 != (STATUS = gtm_tls_renegotiate(SOCK)))										\
+	{															\
+		assert(-1 == STATUS);												\
+		save_errno = gtm_tls_errno();											\
+		if (REPL_CONN_RESET(save_errno))										\
+		{														\
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to renegotiate"		\
+					" TLS/SSL connection.\n");								\
+			gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;			\
+			repl_close(&gtmsource_sock_fd);										\
+		} else														\
+		{														\
+			errp = (-1 == save_errno) ? (char *)gtm_tls_get_error() : STRERROR(save_errno);				\
+			assert(FALSE);												\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));	\
+		}														\
+	} else															\
+		gtmsource_local->num_renegotiations++;										\
+}
+#else
+#endif
+
 
 GBLDEF	repl_msg_ptr_t		gtmsource_msgp = NULL;
 GBLDEF	int			gtmsource_msgbufsiz = 0;
@@ -160,7 +193,6 @@ GBLREF	int			repl_filter_bufsiz;
 GBLREF	volatile time_t		gtmsource_now;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	gd_addr			*gd_header;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gd_region		*gv_cur_region;
@@ -182,6 +214,7 @@ GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	int4			strm_index;
 GBLREF	uint4			process_id;
 GBLREF	seq_num			gtmsource_save_read_jnl_seqno;
+GBLREF	uint4			heartbeat_counter;
 
 error_def(ERR_JNLNEWREC);
 error_def(ERR_JNLSETDATA2LONG);
@@ -190,10 +223,12 @@ error_def(ERR_REPLFTOKSEM);
 error_def(ERR_REPLGBL2LONG);
 error_def(ERR_REPLINSTNOHIST);
 error_def(ERR_REPLNOMULTILINETRG);
+error_def(ERR_REPLNOTLS);
 error_def(ERR_REPLRECFMT);
 error_def(ERR_REPLXENDIANFAIL);
 error_def(ERR_SECNODZTRIGINTP);
 error_def(ERR_TRIG2NOTRIG);
+error_def(ERR_TLSRENEGOTIATE);
 error_def(ERR_TEXT);
 
 /* Endian converts the given set of journal records (possibly multiple sequence numbers) so that the secondary can consume them
@@ -318,7 +353,7 @@ int gtmsource_process(void)
 	unsigned char			*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
-	int				status;					/* needed for REPL_{SEND,RECV}_LOOP */
+	int				status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	int				tot_tr_len, send_tr_len, remaining_len, pre_cmpmsglen;
 	int				recvd_msg_type, recvd_start_flags;
 	uchar_ptr_t			in_buff, out_buff, out_buffmsg;
@@ -352,6 +387,11 @@ int gtmsource_process(void)
 	gtm_time4_t			tmp_time4;
 	repl_heartbeat_msg_ptr_t	heartbeat_msg;
 	sm_global_latch_ptr_t		gtmsource_srv_latch;
+#	ifdef GTM_TLS
+	repl_msg_t			renegotiate_msg;
+	uint4				next_renegotiate_hrtbt;
+	DEBUG_ONLY(boolean_t		renegotiation_pending;)
+#	endif
 	DEBUG_ONLY(uchar_ptr_t		save_inbuff;)
 	DEBUG_ONLY(uchar_ptr_t		save_outbuff;)
 	DCL_THREADGBL_ACCESS;
@@ -816,6 +856,11 @@ int gtmsource_process(void)
 					assert(0 < gd_header->n_regions);
 					grab_gtmsource_srv_latch(gtmsource_srv_latch, 2 * gd_header->n_regions * max_epoch_interval,
 									HANDLE_CONCUR_ONLINE_ROLLBACK);
+#					ifdef DEBUG
+					if (WBTEST_ENABLED(WBTEST_HOLD_GTMSOURCE_SRV_LATCH))
+						while (0 == TREF(continue_proc_cnt))
+							LONG_SLEEP(1);
+#					endif
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 						continue;
 					srch_status = gtmsource_srch_restart(resync_seqno, recvd_start_flags);
@@ -829,6 +874,17 @@ int gtmsource_process(void)
 						assert(this_side->trigger_supported);
 						temp_ulong |= START_FLAG_TRIGGER_SUPPORT;
 					)
+#					ifdef GTM_TLS
+					if (REPL_TLS_REQUESTED)
+					{
+						if (!remote_side->tls_requested)
+						{
+							ISSUE_REPLNOTLS(ERR_REPLNOTLS, "Source side", "Receiver side");
+							CLEAR_REPL_TLS_REQUESTED; /* As if -tlsid qualifier was never specified. */
+						} else
+							temp_ulong |= START_FLAG_ENABLE_TLS;
+					}
+#					endif
 					PUT_ULONG(reply_msgp->start_flags, temp_ulong);
 					recvd_start_flags = START_FLAG_NONE;
 					gtmsource_repl_send((repl_msg_ptr_t)reply_msgp, "REPL_WILL_RESTART_WITH_INFO",
@@ -971,6 +1027,33 @@ int gtmsource_process(void)
 				repl_log(gtmsource_log_fp, TRUE, FALSE, "Defaulting to NO compression\n");
 			}
 		}
+#		ifdef GTM_TLS
+		if (!repl_tls.enabled && REPL_TLS_REQUESTED && remote_side->tls_requested)
+		{	/* Now that START_FLAGS have been exchanged and both sides request TLS/SSL, do the handshake and establish
+			 * an TLS/SSL connection. Even though the TCP connection is established much earlier, we want to do the
+			 * TLS/SSL handshake at a point that is close to its purpose which is to send the journal records.
+			 */
+			assert(REPL_PROTO_VER_TLS_SUPPORT <= REPL_PROTO_VER_THIS);
+			assert(REPL_PROTO_VER_TLS_SUPPORT <= remote_side->proto_ver);
+			if (!gtmsource_exchange_tls_info())
+			{
+				switch (gtmsource_state)
+				{
+					case GTMSOURCE_CHANGING_MODE:		/* ACTIVE->PASSIVE mode change in poll actions. */
+						return SS_NORMAL;
+					case GTMSOURCE_WAITING_FOR_CONNECTION:	/* Disconnect during gtmsource_repl_{send,recv} */
+					case GTMSOURCE_WAITING_FOR_RESTART:	/* Got a REPL_XOFF_ACK_ME from receiver. Restart. */
+						continue;
+					default:
+						assert(FALSE);
+				}
+			} else
+			{
+				repl_tls.enabled = TRUE; /* From here on, all communications are secured with TLS/SSL. */
+				REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(next_renegotiate_hrtbt);
+			}
+		}
+#		endif
 		if (QWLT(gtmsource_local->read_jnl_seqno, sav_read_jnl_seqno) && (NULL != repl_ctl_list))
 		{	/* The journal files may have been positioned ahead of the read_jnl_seqno for the next read.
 			 * Indicate that they have to be repositioned into the past.
@@ -1016,7 +1099,14 @@ int gtmsource_process(void)
 			if (NO_FILTER == gtmsource_filter)
 				gtmsource_free_filter_buff();
 		}
+		/* Reset some variables to their initial value before entering the while loop (to safeguard against stale values) */
 		xon_wait_logged = FALSE;
+		heartbeat_stalled = FALSE;
+#		ifdef GTM_TLS
+		DEBUG_ONLY(renegotiation_pending = FALSE);
+		if (repl_tls.enabled && (0 < gtmsource_options.renegotiate_interval))
+			repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_TIMEOUT;
+#		endif
 		/* Flush "gtmsource_local->read_jnl_seqno" to disk right now. This will serve as a reference point for next timed
 		 * flush to occur.
 		 */
@@ -1084,7 +1174,35 @@ int gtmsource_process(void)
 			 */
 			/* Make sure we don't sleep for an extended period of time if there is something to be sent across */
 			assert((GTMSOURCE_SENDING_JNLRECS != gtmsource_state)
-					|| ((0 == poll_time) || (GTMSOURCE_IDLE_POLL_WAIT == poll_time)));
+					|| ((0 == poll_time) || (GTMSOURCE_IDLE_POLL_WAIT == poll_time))
+					GTMTLS_ONLY(DEBUG_ONLY(|| renegotiation_pending)));
+#			ifdef GTM_TLS
+			assert(repl_tls.enabled || (REPLTLS_RENEG_STATE_NONE == repl_tls.renegotiate_state));
+			if (repl_tls.enabled && (REPLTLS_WAITING_FOR_RENEG_TIMEOUT == repl_tls.renegotiate_state)
+				&& (heartbeat_counter >= next_renegotiate_hrtbt))
+			{	/* Time to renegotiate the TLS/SSL parameters. */
+				heartbeat_stalled = TRUE;	/* Defer heartbeats until renegotiation is done. */
+				DEBUG_ONLY(renegotiation_pending = TRUE);
+				/* Send REPL_RENEG_ACK_ME message to the receiver. */
+				renegotiate_msg.type = REPL_RENEG_ACK_ME;
+				renegotiate_msg.len = MIN_REPL_MSGLEN;
+				gtmsource_repl_send((repl_msg_ptr_t)&renegotiate_msg, "REPL_RENEG_ACK_ME",
+								MAX_SEQNO, INVALID_SUPPL_STRM);
+				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+					return SS_NORMAL;
+				if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+					break;
+				/* We now have to wait for REPL_RENEG_ACK from the receiver. Until then we defer sending journal
+				 * records to the other side. This way, we don't end up having outbound data in the TCP/IP pipe
+				 * during the time of renegotiation. TLS/SSL protocol doesn't handle application data when it is
+				 * in the middle of renegotiation. Similarly, the receiver on receipt of the REPL_RENEG_ACK_ME
+				 * message will defer sending any more messages to us until the renegotiation is completed.
+				 */
+				repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_ACK;
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Waiting for REPL_RENEG_ACK\n");
+				poll_time = REPL_POLL_WAIT; /* because we are waiting for a REPL_RENEG_ACK */
+			}
+#			endif
 			REPL_RECV_LOOP(gtmsource_sock_fd, gtmsource_msgp, MIN_REPL_MSGLEN, poll_time)
 			{
 				if (0 == recvd_len) /* nothing received in the first attempt, let's try again later */
@@ -1136,18 +1254,34 @@ int gtmsource_process(void)
 								return (SS_NORMAL);	/* "gtmsource_repl_send" did not complete */
 							if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 								break;	/* "gtmsource_repl_send" did not complete */
+							/* REPL_XOFF_ACK_ME is always followed by either a REPL_START_JNL_SEQNO,
+							 * REPL_CMP2UNCMP or REPL_BADTRANS. We don't want to be doing TLS/SSL
+							 * renegotiation in the middle of these messages as the logic on the
+							 * receiver side is complicated enough to include TLS/SSL renegotiation.
+							 * In all three cases, we go break out of this loop and redo the replication
+							 * handshake. So, set the state to skip renegotiation in the mean time.
+							 */
+#							ifdef GTM_TLS
+							if (repl_tls.enabled)
+								repl_tls.renegotiate_state = REPLTLS_SKIP_RENEGOTIATION;
+#							endif
 						}
 						break;
 					case REPL_XON:
 						gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SENDING_JNLRECS;
 						poll_time = REPL_POLL_NOWAIT; /* because we received XON and data ready for send */
 						repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_XON received\n");
-						heartbeat_stalled = FALSE;
+						GTMTLS_ONLY(if (REPLTLS_WAITING_FOR_RENEG_ACK != repl_tls.renegotiate_state))
+							heartbeat_stalled = FALSE;
 						REPL_DPRINT1("Restarting HEARTBEAT\n");
 						break;
 					case REPL_BADTRANS:
 					case REPL_CMP2UNCMP:
 					case REPL_START_JNL_SEQNO:
+						/* A REPL_XOFF_ACK_ME must have been sent before. Ensure by asserting that we are
+						 * waiting for an XON.
+						 */
+						assert(GTMSOURCE_WAITING_FOR_XON == gtmsource_state);
 						QWASSIGN(recvd_seqno, *(seq_num *)&gtmsource_msgp->msg[0]);
 						if (msg_is_cross_endian)
 							recvd_seqno = GTM_BYTESWAP_64(recvd_seqno);
@@ -1196,6 +1330,36 @@ int gtmsource_process(void)
 						}
 						gtmsource_process_heartbeat((repl_heartbeat_msg_ptr_t)gtmsource_msgp);
 						break;
+#					ifdef GTM_TLS
+					case REPL_RENEG_ACK:
+						repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_RENEG_ACK received\n");
+						REPLTLS_RENEGOTIATE(repl_tls.sock, status);
+						poll_time = REPL_POLL_NOWAIT; /* because we are back to sending data */
+						if (0 != status)
+						{
+							assert(GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state);
+							break;
+						}
+						/* Send the REPL_RENEG_COMPLETE message. */
+						renegotiate_msg.type = REPL_RENEG_COMPLETE;
+						renegotiate_msg.len = MIN_REPL_MSGLEN;
+						gtmsource_repl_send((repl_msg_ptr_t)&renegotiate_msg, "REPL_RENEG_COMPLETE",
+										MAX_SEQNO, INVALID_SUPPL_STRM);
+						if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+							return SS_NORMAL;
+						if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+							break;
+						repl_log(gtmsource_log_fp, TRUE, TRUE, "Sent REPL_RENEG_COMPLETE message."
+								" TLS/SSL connection successfully renegotiated.\n");
+						assert(heartbeat_stalled);
+						if (GTMSOURCE_WAITING_FOR_XON != gtmsource_state)
+							heartbeat_stalled = FALSE;
+						/* else, heartbeat_stalled will be set back to FALSE when REPL_XON is received. */
+						DEBUG_ONLY(renegotiation_pending = FALSE);
+						REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(next_renegotiate_hrtbt);
+						repl_log_tls_info(gtmsource_log_fp, repl_tls.sock);
+						break;
+#					endif
 					default:
 						repl_log(gtmsource_log_fp, TRUE, TRUE, "Message of unknown type %d of length %d "
 							"bytes received; hex dump follows\n", gtmsource_msgp->type, recvd_len);
@@ -1210,6 +1374,13 @@ int gtmsource_process(void)
 						assert(FALSE);
 						break;
 				}
+#				ifdef GTM_TLS
+				/* On receipt of a REPL_XOFF_ACK_ME, we should no longer wait-for/attempt TLS/SSL
+				 * renegotiation.
+				 */
+				assert((REPL_XOFF_ACK_ME != gtmsource_msgp->type)
+						|| !repl_tls.enabled || (REPLTLS_SKIP_RENEGOTIATION == repl_tls.renegotiate_state));
+#				endif
 			} else if (SS_NORMAL != status)
 			{
 				if (EREPL_RECV == repl_errno)
@@ -1242,6 +1413,13 @@ int gtmsource_process(void)
 							 LEN_AND_STR(err_string));
 				}
 			}
+#			ifdef GTM_TLS
+			/* If we are waiting for a REPL_RENEG_ACK from the receiver, don't send any more messages (even journal
+			 * records) before completing the renegotiation.
+			 */
+			if (REPLTLS_WAITING_FOR_RENEG_ACK == repl_tls.renegotiate_state)
+				continue;
+#			endif
 			if (GTMSOURCE_WAITING_FOR_XON == gtmsource_state)
 			{
 				if (!xon_wait_logged)
@@ -1264,6 +1442,7 @@ int gtmsource_process(void)
 				break;
 			assert(gtmsource_state == GTMSOURCE_SENDING_JNLRECS);
 			pre_read_seqno = gtmsource_local->read_jnl_seqno;
+			GTMTLS_ONLY(assert(!renegotiation_pending));
 			grab_gtmsource_srv_latch(gtmsource_srv_latch, 2 * gd_header->n_regions * max_epoch_interval,
 							HANDLE_CONCUR_ONLINE_ROLLBACK);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
@@ -1590,10 +1769,9 @@ int gtmsource_process(void)
 				}
 			} else /* else tot_tr_len < 0, error */
 			{
-				if (0 < data_len) /* Insufficient buffer space, increase the buffer space */
-					gtmsource_alloc_msgbuff(data_len + REPL_MSG_HDRLEN, TRUE);
-				else
-					GTMASSERT; /* Major problems */
+				assertpro(0 < data_len); /* Else major problems */
+				/* Insufficient buffer space, increase the buffer space */
+				gtmsource_alloc_msgbuff(data_len + REPL_MSG_HDRLEN, TRUE);
 			}
 		}
 	}

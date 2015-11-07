@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ CONDITION_HANDLER(lke_ctrlc_handler)
 {
 	int	dummy1, dummy2;
 
-	START_CH;				/* Drive top level condition handler if we can */
+	START_CH(TRUE);				/* Drive top level condition handler if we can */
 	util_interrupt = 1;
 	if (0 == fast_lock_count && 0 == have_crit(CRIT_HAVE_ANY_REG))
 	{

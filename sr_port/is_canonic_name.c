@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,8 @@ error_def(ERR_BADCHAR);
 /*
  * -----------------------------------------------
  * is_canonic_name()
- * validate a variable name
+ * validate a variable name (unsubscripted or subscripted).
+ * Note: This code is very similar to "gvn2gds()" in op_fnview.c. With some effort, they might even be merged into one.
  *
  * Arguments:
  *	src	   - Pointer to Source Name string mval
@@ -333,7 +334,8 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 		{	/* multi-byte increment */
 			assert(4 > utf8_len);
 			if (0 > utf8_len)
-				rts_error(VARLSTCNT(6) ERR_BADCHAR, 4, 1, &src->str.addr[isrc - 1], LEN_AND_LIT(UTF8_NAME));
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(6) ERR_BADCHAR, 4, 1, &src->str.addr[isrc - 1], LEN_AND_LIT(UTF8_NAME));
 			isrc += utf8_len;
 		}
 #		endif

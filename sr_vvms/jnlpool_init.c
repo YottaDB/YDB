@@ -89,7 +89,7 @@ error_def(ERR_VMSMEMORY);
 
 CONDITION_HANDLER(jnlpool_init_ch)
 {
-	START_CH;
+	START_CH(FALSE);
 	if (!(IS_GTM_ERROR(SIGNAL)) || DUMPABLE || SEVERITY == ERROR)
 	{	/* Release resources we have aquired */
 		if (gsec_is_registered)

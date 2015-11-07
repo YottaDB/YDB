@@ -20,7 +20,11 @@
 
 #include "gtm_string.h"
 #include "gtm_iconv.h"
+#ifndef  VMS
+#include "gtm_stat.h"
+#endif
 #include "gtm_stdio.h"
+#include "gtm_unistd.h"
 
 #include "gtm_socket.h"
 #include "gtm_inet.h"
@@ -28,16 +32,19 @@
 #include "copy.h"
 #include "io_params.h"
 #include "io.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "stringpool.h"
+#include "eintr_wrappers.h"
 
-GBLREF tcp_library_struct	tcp_routines;
 GBLREF io_desc		*active_device;
 LITREF unsigned char		io_params_size[];
+
+error_def(ERR_CLOSEFAIL);
 error_def(ERR_SOCKNOTFND);
+error_def(ERR_SYSCALL);
+
+void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boolean_t socket_delete, boolean_t socket_specified);
 
 void iosocket_close(io_desc *iod, mval *pp)
 {
@@ -45,11 +52,11 @@ void iosocket_close(io_desc *iod, mval *pp)
 	unsigned char	ch;
 	int		handle_len;
 	d_socket_struct	*dsocketptr;
-	socket_struct	*socketptr;
 	char		sock_handle[MAX_HANDLE_LEN];
-	int4		ii, jj, start, end, index;
+	int4		start, end, index;
 	int		p_offset = 0;
-	boolean_t socket_destroy = FALSE;
+	boolean_t	socket_destroy = FALSE;
+	boolean_t	socket_delete = FALSE;
 
 	assert(iod->type == gtmsocket);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
@@ -70,7 +77,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 			socket_specified = TRUE;
 			break;
 		case iop_ipchset:
-#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
+#			if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 			if ( (iconv_t)0 != iod->input_conv_cd )
 			{
 				ICONV_CLOSE_CD(iod->input_conv_cd);
@@ -78,10 +85,10 @@ void iosocket_close(io_desc *iod, mval *pp)
 			SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
 			if (DEFAULT_CODE_SET != iod->in_code_set)
 				ICONV_OPEN_CD(iod->input_conv_cd, INSIDE_CH_SET, (char *)(pp->str.addr + p_offset + 1));
-#endif
+#			endif
 			break;
                 case iop_opchset:
-#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
+#			if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 			if ( (iconv_t)0 != iod->output_conv_cd )
 			{
 				ICONV_CLOSE_CD(iod->output_conv_cd);
@@ -89,7 +96,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 			SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
 			if (DEFAULT_CODE_SET != iod->out_code_set)
 				ICONV_OPEN_CD(iod->output_conv_cd, (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
-#endif
+#			endif
 			break;
 		case iop_destroy:
 			socket_destroy = TRUE;
@@ -97,6 +104,11 @@ void iosocket_close(io_desc *iod, mval *pp)
 		case iop_nodestroy:
 			socket_destroy = FALSE;
 			break;
+#		ifndef VMS
+		case iop_delete:
+			socket_delete = TRUE;
+			break;
+#		endif
 		default:
 			break;
 		}
@@ -117,17 +129,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 		start = dsocketptr->n_socket - 1;
 		end = 0;
 	}
-	for (ii = start; ii >= end; ii--)
-	{
-		socketptr = dsocketptr->socket[ii];
-		tcp_routines.aa_close(socketptr->sd);
-		SOCKET_FREE(socketptr);
-		if (dsocketptr->current_socket >= ii)
-			dsocketptr->current_socket--;
-		for (jj = ii + 1; jj <= dsocketptr->n_socket - 1; jj++)
-			dsocketptr->socket[jj - 1] = dsocketptr->socket[jj];
-		dsocketptr->n_socket--;
-	}
+	iosocket_close_range(dsocketptr, start, end, socket_delete, socket_specified);
 	if (!socket_specified)
 	{
 		iod->state = dev_closed;
@@ -137,4 +139,61 @@ void iosocket_close(io_desc *iod, mval *pp)
 			iosocket_destroy(iod);
 		}
 	}
+}
+
+void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boolean_t socket_delete, boolean_t socket_specified)
+{
+	int4		ii,jj;
+	int		rc, save_fd, save_rc = 0, save_errno;
+	socket_struct	*socketptr;
+#	ifndef VMS
+	struct stat	statbuf, fstatbuf;
+	char		*path;
+	int		res;
+#	endif
+
+	for (ii = start; ii >= end; ii--)
+	{
+		socketptr = dsocketptr->socket[ii];
+#		ifndef VMS
+		if (socket_specified && socket_delete && (socket_local == socketptr->protocol) && socketptr->passive)
+		{	/* only delete if SOCKET= specified  and passive/listening */
+			assertpro(socketptr->local.sa);
+			path = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
+			FSTAT_FILE(socketptr->sd, &fstatbuf, res);
+			if (-1 == res)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("fstat during socket delete"), CALLFROM, errno);
+			STAT_FILE(path, &statbuf, res);
+			if (-1 == res)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("stat during socket delete"), CALLFROM, errno);
+			if (UNLINK(path) == -1)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("unlink during socket delete"), CALLFROM, errno);
+		}
+#		endif
+		CLOSE(socketptr->sd, rc);
+		if (-1 == rc)
+		{
+			save_rc = rc;
+			save_fd = socketptr->sd;
+			save_errno = errno;
+		}
+		SOCKET_FREE(socketptr);
+		if (dsocketptr->current_socket >= ii)
+			dsocketptr->current_socket--;
+		for (jj = ii + 1; jj <= dsocketptr->n_socket - 1; jj++)
+			dsocketptr->socket[jj - 1] = dsocketptr->socket[jj];
+		dsocketptr->n_socket--;
+	}
+	if (0 != save_rc)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, save_errno);
+	}
+}
+
+void iosocket_close_one(d_socket_struct *dsocketptr, int index)
+{
+	iosocket_close_range(dsocketptr, index, index, FALSE, TRUE);
 }

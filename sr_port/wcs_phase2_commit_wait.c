@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,16 +34,17 @@
 error_def(ERR_COMMITWAITPID);
 error_def(ERR_COMMITWAITSTUCK);
 
-#define	SEND_COMMITWAITPID_GET_STACK_IF_NEEDED(BLOCKING_PID, STUCK_CNT, CR, CSA)						\
-{																\
-	GBLREF	uint4	process_id;												\
-																\
-	if (BLOCKING_PID)													\
-	{															\
-		STUCK_CNT++;													\
-		GET_C_STACK_FROM_SCRIPT("COMMITWAITPID", process_id, BLOCKING_PID, STUCK_CNT);					\
-		send_msg(VARLSTCNT(8) ERR_COMMITWAITPID, 6, process_id, 1, BLOCKING_PID, CR->blk, DB_LEN_STR(CSA->region));	\
-	}															\
+#define	SEND_COMMITWAITPID_GET_STACK_IF_NEEDED(BLOCKING_PID, STUCK_CNT, CR, CSA)				\
+{														\
+	GBLREF	uint4	process_id;										\
+														\
+	if (BLOCKING_PID)											\
+	{													\
+		STUCK_CNT++;											\
+		GET_C_STACK_FROM_SCRIPT("COMMITWAITPID", process_id, BLOCKING_PID, STUCK_CNT);			\
+		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_COMMITWAITPID, 6,					\
+			process_id, 1, BLOCKING_PID, CR->blk, DB_LEN_STR(CSA->region));				\
+	}													\
 }
 
 /* take C-stack trace of the process doing the phase2 commits at half the entire wait. We do this only while waiting
@@ -110,15 +111,12 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	assert(!in_mu_rndwn_file);
 	csd = csa->hdr;
 	/* To avoid unnecessary time spent waiting, we would like to do rel_quants instead of wcs_sleep. But this means
-	 * we need to have some other scheme for limiting the total time slept. We use the heartbeat scheme which currently
-	 * is available only in Unix. Every 8 seconds or so, the heartbeat timer increments a counter. But there are two
-	 * cases where heartbeat_timer will not pop:
-	 * (a) if we are in the process of exiting (through a call to cancel_timer(0) which cancels all active timers)
-	 * (b) if we are are already in timer_handler. This is possible if the flush timer pops and we end up invoking
-	 *     wcs_clean_dbsync->wcs_flu->wcs_phase2_commit_wait. But since the heartbeat timer cannot pop as long as
-	 *     timer_in_handler is TRUE (which it will be until at least we exit this function), we cannot use the heartbeat
-	 *     scheme in this case as well.
-	 * Therefore, if heartbeat timer is available and currently active, then use rel_quants. If not, use wcs_sleep.
+	 * we need to have some other scheme for limiting the total time slept. We use the heartbeat scheme which currently is
+	 * available only in Unix. Every 8 seconds or so, the heartbeat timer increments a counter. But the heartbeat_timer
+	 * will not pop if we are are already in timer_handler. This is possible if the flush timer pops and we end up invoking
+	 * wcs_clean_dbsync->wcs_flu->wcs_phase2_commit_wait. But since the heartbeat timer cannot pop as long as
+	 * timer_in_handler is TRUE (which it will be until at least we exit this function), we cannot use the heartbeat scheme
+	 * and so fall back on rel_quants. If not, use wcs_sleep.
 	 * We have found that doing rel_quants (instead of sleeps) causes huge CPU usage in Tru64 even if the default spincnt is
 	 * set to 0 and ALL processes are only waiting for one process to finish its phase2 commit. Therefore we choose
 	 * the sleep approach for Tru64. Choosing a spincnt of 0 would choose the sleep approach (versus rel_quant).
@@ -163,8 +161,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 			assert(gtm_white_box_test_case_enabled);
 			return TRUE;
 		}
-		if (process_id == start_in_tend)
-			GTMASSERT;	/* should not deadlock on our self */
+		assertpro(process_id != start_in_tend);	/* should not deadlock on our self */
 		if (!start_in_tend)
 			return TRUE;
 	} else
@@ -194,10 +191,10 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 			 * an update to the 8-byte transaction number is not necessarily atomic AND because the block's tn
 			 * that we read could be a mish-mash of low-order and high-order bytes taken from BEFORE and AFTER
 			 * an update. Doing less than checks with these bad values is considered risky as a false return
-			 * means a GTMASSERT in "t_end" or "tp_tend" in the PIN_CACHE_RECORD macro. Since this situation is
-			 * almost an impossibility in practice, we handle this by returning FALSE after timing out and
-			 * requiring the caller (t_qread) to restart. Eventually we will get crit (in the final retry) where
-			 * we are guaranteed not to end up in this situation.
+			 * means a GTMASSERT (BYPASSOK) in "t_end" or "tp_tend" in the PIN_CACHE_RECORD macro. Since this
+			 * situation is almost an impossibility in practice, we handle this by returning FALSE after timing
+			 * out and requiring the caller (t_qread) to restart. Eventually we will get crit (in the final retry)
+			 * where we are guaranteed not to end up in this situation.
 			 */
 			value = cr->in_tend;
 			if (value != start_in_tend)
@@ -320,7 +317,8 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 		SEND_COMMITWAITPID_GET_STACK_IF_NEEDED(blocking_pid, stuck_cnt, cr, csa);
 	}
 	DEBUG_ONLY(incrit_pid = cnl->in_crit;)
-	send_msg(VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1, cnl->wcs_phase2_commit_pidcnt, DB_LEN_STR(csa->region));
+	send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id,
+		1, cnl->wcs_phase2_commit_pidcnt, DB_LEN_STR(csa->region));
 	BG_TRACE_PRO_ANY(csa, wcb_phase2_commit_wait);
 	/* If called from wcs_recover(), we dont want to assert(FALSE) as it is possible (in case of STOP/IDs) that
 	 * cnl->wcs_phase2_commit_pidcnt is non-zero even though there is no process in phase2 of commit. In this case

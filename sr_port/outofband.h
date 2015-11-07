@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,8 @@ enum outofbands
 	tptimeout,
 	jobinterrupt
 };
+
+#define OUTOFBAND_RESTARTABLE(event)	(jobinterrupt == (event))
 
 /* ------------------------------------------------------------------
  *  Old-style declarations (and uses) of this function abound.

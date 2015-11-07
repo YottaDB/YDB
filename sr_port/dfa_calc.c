@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,12 +17,12 @@
 #include "gtm_string.h"
 
 /* the following macro checks that a 1 dimensional array reference is valid i.e. array[index] is within defined limits */
-#define check_1dim_array_bound(array, index)    assert((index) < (SIZEOF(array) / SIZEOF(array[0])))
+#define check_1dim_array_bound(array, index)    assert((index) < ARRAYSIZE(array))
 
 /* the following macro checks that a 2 dimensional array reference is valid i.e. array[row][col] is within defined limits */
 #define check_2dim_array_bound(array, row, col)                         \
 {                                                                       \
-        assert((row) < (SIZEOF(array) / SIZEOF(array[0])));             \
+        assert((row) < ARRAYSIZE(array));             			\
         assert((col) < (SIZEOF(array[0]) / SIZEOF(array[0][0])));       \
 }
 
@@ -79,6 +79,8 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 	 * uses may  differ from the ones that are in operation at run-time.
 	 */
 	locoutchar = *outchar_ptr;
+	if (0 == leaf_num)
+		return -1;
 	if (leaf_num > 1)
 	{
 		pattern_mask = PATM_DFA;
@@ -392,8 +394,11 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 								offset[seq + 1] += 3;
 							}
 							if (count == state_num)
+							{
 								state_num++;
-							else
+								if (state_num >= ARRAYSIZE(states))
+									return -1;
+							} else
 								memset(states[state_num], 0, (sym_num + 1) * SIZEOF(states[0][0]));
 						}
 					}
@@ -402,8 +407,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 			}
 		}
 		*outchar_ptr += offset[state_num] + 2;
-		if ((*outchar_ptr - *fstchar_ptr > MAX_DFA_SPACE) ||
-		    ((offset[state_num] + 1) > (MAX_PATTERN_LENGTH / 2)))
+		if ((*outchar_ptr - *fstchar_ptr > MAX_DFA_SPACE) || ((offset[state_num] + 1) > (MAX_PATTERN_LENGTH / 2)))
 			return -1;
 		*locoutchar++ = PATM_DFA;
 		*locoutchar++ = offset[state_num];

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,7 +83,7 @@ void dse_f_blk(void)
 	/* ESTABLISH is done here because dse_f_blk_ch() assumes we already have crit. */
 	ESTABLISH(dse_f_blk_ch);
 	if (!(bp = t_qread(patch_find_blk, &dummy_int, &dummy_cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
 	else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t) bp)->bsiz)
@@ -254,7 +254,7 @@ void dse_f_blk(void)
 			{
 				if (!(sp = t_qread(patch_find_root_search ? patch_path[lvl] : patch_path1[lvl], &dummy_int,
 					&dummy_cr)))
-						rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 				if (((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size)
 					s_top = sp + cs_addrs->hdr->blk_size;
 				else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz)
@@ -300,7 +300,7 @@ void dse_f_blk(void)
 				for (lvl++; lvl < (patch_find_root_search ? patch_dir_path_count : patch_path_count); lvl++)
 				{
 					if (!(sp = t_qread(last, &dummy_int, &dummy_cr)))
-						rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 					if (((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size)
 						s_top = sp + cs_addrs->hdr->blk_size;
 					else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz)
@@ -338,7 +338,7 @@ void dse_f_blk(void)
 			{
 				if (!(sp = t_qread(patch_find_root_search ? patch_path[lvl] : patch_path1[lvl], &dummy_int,
 					&dummy_cr)))
-					rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 				if (((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size)
 					s_top = sp + cs_addrs->hdr->blk_size;
 				else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz)
@@ -389,7 +389,7 @@ void dse_f_blk(void)
 				for (lvl++; lvl < (patch_find_root_search ? patch_dir_path_count : patch_path_count); lvl++)
 				{
 					if (!(sp = t_qread(look, &dummy_int, &dummy_cr)))	/* NOTE assignment */
-						rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 					if (((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size)
 						s_top = sp + cs_addrs->hdr->blk_size;
 					else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz)
@@ -483,10 +483,10 @@ void dse_f_blk(void)
 /* Control-C condition handler */
 CONDITION_HANDLER(dse_f_blk_ch)
 {
-	START_CH;
+	START_CH(SIGNAL != ERR_CTRLC);
 
 	if (ERR_CTRLC == SIGNAL)
-	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
+		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	NEXTCH;
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,17 +24,15 @@
 #include "gdsblk.h"
 #include "cli.h"
 #include "copy.h"
-#include "min_max.h"		/* needed for init_root_gv.h */
-#include "init_root_gv.h"
 #include "util.h"
 #include "dse.h"
 #include "print_target.h"
 #include "op.h"
+#include "gvcst_protos.h"
 
 #ifdef GTM_TRIGGER
 #include "hashtab_mname.h"
 #include <rtnhdr.h>		/* needed for gv_trigger.h */
-#include "gv_trigger.h"		/* needed for INIT_ROOT_GVT */
 #include "targ_alloc.h"
 #endif
 #ifdef UNICODE_SUPPORTED
@@ -42,18 +40,17 @@
 #include "gtm_utf8.h"
 #endif
 
-
 GBLDEF bool             wide_out;
 GBLDEF char             patch_comp_key[MAX_KEY_SZ + 1];
 GBLDEF unsigned short   patch_comp_count;
 GBLDEF int              patch_rec_counter;
+
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF VSIG_ATOMIC_T	util_interrupt;
-GBLREF mval             curr_gbl_root;
 GBLREF int              patch_is_fdmp;
 GBLREF int              patch_fdmp_recs;
-GBLREF	gv_key		*gv_currkey;
-GBLREF	gv_namehead	*gv_target;
+GBLREF gd_region    	*gv_cur_region;
+GBLREF gv_namehead	*gv_target;
 
 LITREF	mval		literal_hasht;
 
@@ -74,7 +71,6 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
         ssize_t   	chlen;
 	block_id	blk_id;
 	boolean_t	rechdr_displayed = FALSE;
-	sgmnt_addrs	*csa;
 
 	if (rp >= b_top)
 		return NULL;
@@ -106,7 +102,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 	r_top = rp + size;
 	if (r_top > b_top)
 		r_top = b_top;
-	else  if (r_top < rp + SIZEOF(rec_hdr))
+	else if (r_top < rp + SIZEOF(rec_hdr))
 		r_top = rp + SIZEOF(rec_hdr);
 	if (cc > patch_comp_count)
 		cc = patch_comp_count;
@@ -123,7 +119,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 		size = SIZEOF(patch_comp_key) - 2 - cc;
 	memcpy(&patch_comp_key[cc], rp + SIZEOF(rec_hdr), size);
 	patch_comp_count = cc + size;
-	patch_comp_key[patch_comp_count] = patch_comp_key[patch_comp_count + 1] = 0;
+	patch_comp_key[patch_comp_count] = patch_comp_key[patch_comp_count + 1] = '\0';
 	if (patch_is_fdmp)
 	{
 		if (dse_fdmp(key_top, (int)(r_top - key_top)))
@@ -145,16 +141,26 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 			}
 		}
 		util_out_print("Key ", FALSE);
-		if (r_top == b_top
+		if ((r_top == b_top)
 			&& ((blk_hdr_ptr_t)bp)->levl && !EVAL_CMPC((rec_hdr_ptr_t)rp)
-			&& r_top - rp == SIZEOF(rec_hdr) + SIZEOF(block_id))
-				util_out_print("*", FALSE);
-		else  if (patch_comp_key[0])
+			&& ((r_top - rp) == (SIZEOF(rec_hdr) + SIZEOF(block_id))))
+		{	/* *-key */
+			assert('\0' == patch_comp_key[0]);
+			assert('\0' == patch_comp_key[1]);
+			util_out_print("*", FALSE);
+			/* it is ok not to set gv_target in this case as "print_target" does not need it */
+		} else if (patch_comp_key[0])
 		{
 			util_out_print("^", FALSE);
-			csa = cs_addrs;
-			RETRIEVE_ROOT_VAL(patch_comp_key, key_buf, temp_ptr, temp_key, buf_len);
-			INIT_ROOT_GVT(key_buf, buf_len, curr_gbl_root);
+			temp_ptr = patch_comp_key;
+			temp_key = key_buf;
+			/* Copy from temp_ptr to temp_key until the first zero byte (copy that as well) */
+			for (buf_len = 0; (*temp_key++ = *temp_ptr++); buf_len++)
+				;
+			*temp_key = KEY_DELIMITER;	/* Set the second zero byte */
+			gv_target = dse_find_gvt(gv_cur_region, key_buf, buf_len); /* sets up gv_target */
+			SET_GV_CURRKEY_FROM_GVT(gv_target);	/* gv_currkey is needed by GVCST_ROOT_SEARCH */
+			GVCST_ROOT_SEARCH; /* sets up gv_target->collseq (needed by print_target --> gvsub2str) */
 		}
 		print_target((uchar_ptr_t)patch_comp_key);
 		util_out_print(0, TRUE);

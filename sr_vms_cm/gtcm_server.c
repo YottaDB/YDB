@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,7 +114,6 @@ gtcm_server()
 	uint4		status;
 	int		i, receive(), value;
 	mstr		name1, name2;
-	gd_addr		*get_next_gdr();
 	struct NTD	*cmu_ntdroot();
 	connection_struct *prev_curr_entry;
 	struct	dsc$descriptor_s	dprd;
@@ -141,7 +140,7 @@ gtcm_server()
 		MEMCPY_LIT(nbuff, "GTCMSVR");
 		node_name.dsc$w_length = SIZEOF("GTCMSVR") - 1;
 	} else
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	sys$setprn(&proc_name);
 	status = lib$get_foreign(&timout, 0, &outlen, 0);
 	if ((status & 1) && (6 > outlen))
@@ -185,7 +184,7 @@ gtcm_server()
 	{
 		licensed = TRUE;
 		if (days < 14)
-			rts_error(VARLSTCNT(1) ERR_WILLEXPIRE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_WILLEXPIRE);
 	} else
 	{
 		licensed = FALSE;
@@ -202,7 +201,7 @@ gtcm_server()
 	status = cmi_init(&node_name, 0, 0, gtcm_init_ast, gtcm_link_accept);
 	if (!(status & 1))
 	{
-		rts_error(VARLSTCNT(1) ((status ^ 3) | 4));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ((status ^ 3) | 4));
 		sys$exit(status);
 	}
 	ntd_root = cmu_ntdroot();
@@ -225,9 +224,9 @@ gtcm_server()
 		assert(!lib$ast_in_prog());
 		status = sys$dclast(&gtcm_remove_from_action_queue, 0, 0);
 		if (SS$_NORMAL != status)
-			rts_error(VARLSTCNT(4) CMERR_CMSYSSRV, 0, status, 0);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) CMERR_CMSYSSRV, 0, status, 0);
 		if (INTERLOCK_FAIL == curr_entry)
-			rts_error(VARLSTCNT(1) CMERR_CMINTQUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) CMERR_CMINTQUE);
 		if (EMPTY_QUEUE != curr_entry)
 		{
 			switch (*curr_entry->clb_ptr->mbf)
@@ -322,14 +321,15 @@ gtcm_server()
 				default:
 					reply = FALSE;
 					if (SS$_NORMAL == status)
-                                                rts_error(VARLSTCNT(3) ERR_BADGTMNETMSG, 1, (int)*curr_entry->clb_ptr->mbf);
+                                                rts_error_csa(CSA_ARG(NULL)
+							VARLSTCNT(3) ERR_BADGTMNETMSG, 1, (int)*curr_entry->clb_ptr->mbf);
 					break;
 			}
 			if (curr_entry)		/* curr_entry can be NULL if went through gtcmtr_terminate */
 			{
 				status = sys$gettim(&curr_entry->lastact[0]);
 				if (SS$_NORMAL != status)
-					rts_error(VARLSTCNT(1) status);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				/* curr_entry is used by gtcm_mbxread_ast to determine if it needs to defer the interrupt message */
 				prev_curr_entry = curr_entry;
 				if (CM_WRITE == reply)
@@ -344,7 +344,7 @@ gtcm_server()
 					{  /* valid interrupt cancel msg, handle in gtcm_mbxread_ast */
 						status = sys$dclast(gtcm_int_unpack, prev_curr_entry, 0);
 						if (SS$_NORMAL != status)
-							rts_error(VARLSTCNT(1) status);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 					} else  if (CM_READ == reply)
 					{
 						prev_curr_entry->clb_ptr->ast = gtcm_read_ast;

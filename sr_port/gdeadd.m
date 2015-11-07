@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2012 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -10,22 +10,25 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 add:	;implement the verb: ADD
 NAME
-	i $d(nams(NAME)) zm gdeerr("OBJDUP"):"Name":NAME
+	i $d(nams(NAME)) zm gdeerr("OBJDUP"):"Name":$$namedisp^GDESHOW(NAME,0)
 	i '$d(lquals("REGION")) zm gdeerr("QUALREQD"):"Region"
+	; check if changing (i.e. adding) a name (with ranges) poses issues with overlap amongst other existing name ranges
+	d namerangeoverlapcheck^GDEPARSE(.NAME,lquals("REGION"))
 	s update=1,nams=nams+1
+	m nams(NAME)=NAME
 	s nams(NAME)=lquals("REGION")
+	i $d(namrangeoverlap) d namcoalesce^GDEMAP
 	q
 REGION
 	i $d(regs(REGION)) zm gdeerr("OBJDUP"):"Region":REGION
 	i '$d(lquals("DYNAMIC_SEGMENT")) zm gdeerr("QUALREQD"):"Dynamic_segment"
-	i $d(lquals("JOURNAL")),lquals("JOURNAL"),'$d(lquals("BEFORE_IMAGE")) zm gdeerr("QUALREQD"):"Before_image"
-	i $d(lquals("NULL_SUBSCRIPTS")) d NQUALS^GDEVERIF(.lquals)
 	i '$$RQUALS^GDEVERIF(.lquals) zm gdeerr("OBJNOTADD"):"Region":REGION
 	s update=1,s="",regs=regs+1
 	f  s s=$o(tmpreg(s)) q:'$l(s)  s regs(REGION,s)=tmpreg(s)
 	f  s s=$o(lquals(s)) q:'$l(s)  s regs(REGION,s)=lquals(s)
 	i $d(segs),$d(regs(REGION,"DYNAMIC_SEGMENT")),$d(segs(regs(REGION,"DYNAMIC_SEGMENT"),"ACCESS_METHOD")) d
 	. i "MM"=segs(regs(REGION,"DYNAMIC_SEGMENT"),"ACCESS_METHOD"),'$d(lquals("BEFORE_IMAGE")) s regs(REGION,"BEFORE_IMAGE")=0
+	. i "USER"[segs(regs(REGION,"DYNAMIC_SEGMENT"),"ACCESS_METHOD"),'$d(lquals("JOURNAL")) s regs(REGION,"JOURNAL")=0
 	q
 SEGMENT
 	i $d(segs(SEGMENT)) zm gdeerr("OBJDUP"):"Segment":SEGMENT
@@ -41,4 +44,13 @@ SEGMENT
 	q
 seg:	s segs(SEGMENT,"FILE_NAME")=lquals("FILE_NAME")
 	f  s s=$o(tmpseg(am,s)) q:'$l(s)  s segs(SEGMENT,s)=tmpseg(am,s)
+	q
+GBLNAME
+	i $d(gnams(GBLNAME)) zm gdeerr("OBJDUP"):"Global Name":GBLNAME
+	i '$d(lquals("COLLATION")) zm gdeerr("QUALREQD"):"Collation"
+	; check if changing (i.e. adding) collation for GBLNAME poses issues with existing names & ranges
+	d gblnameeditchecks^GDEPARSE(GBLNAME,lquals("COLLATION"))
+	i $d(namrangeoverlap) d namcoalesce^GDEMAP
+	s update=1,gnams=gnams+1
+	s gnams(GBLNAME,"COLLATION")=lquals("COLLATION")
 	q

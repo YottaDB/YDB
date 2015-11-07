@@ -14,6 +14,9 @@
 #include "gtm_string.h"
 #include "gtm_time.h"
 #include <sys/mman.h>
+#ifdef _AIX
+#include <sys/shm.h>
+#endif
 #include <errno.h>
 #include "gtm_unistd.h"
 #include <signal.h>
@@ -172,7 +175,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 				if (blocks > (uint4)avail_blocks)
 				{
 					SETUP_THREADGBL_ACCESS;
-					if (!ANTICIPATORY_FREEZE_ENABLED(cs_addrs))
+					if (!INST_FREEZE_ON_NOSPC_ENABLED(cs_addrs))
 						return (uint4)(NO_FREE_SPACE);
 					else
 						send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_NOSPACEEXT), 4,
@@ -219,13 +222,19 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 			while (cs_data->freeze || IS_REPL_INST_FROZEN)
 				hiber_start(1000);
 		}
-	} else if ((cs_data->freeze || IS_REPL_INST_FROZEN) && dollar_tlevel)
+	} else if (cs_data->freeze && dollar_tlevel)
 	{	/* We don't want to continue with file extension as explained above. Hence return with an error code which
-		 * op_tcommit will recognize (as a cdb_sc_needcrit type of restart) and restart accordingly.
+		 * op_tcommit will recognize (as a cdb_sc_needcrit/cdb_sc_instancefreeze type of restart) and restart accordingly.
 		 */
 		assert(CDB_STAGNATE <= t_tries);
 		GDSFILEXT_CLNUP;
-		return (uint4)(FINAL_RETRY_FREEZE_PROG);
+		return (uint4)FINAL_RETRY_FREEZE_PROG;
+	}
+	if (IS_REPL_INST_FROZEN && trans_in_prog)
+	{
+		assert(CDB_STAGNATE <= t_tries);
+		GDSFILEXT_CLNUP;
+		return (uint4)FINAL_RETRY_INST_FREEZE;
 	}
 	assert(cs_addrs->ti->total_blks == cs_data->trans_hist.total_blks);
 	old_total = cs_data->trans_hist.total_blks;
@@ -278,13 +287,17 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		old_base[0] = cs_addrs->db_addrs[0];
 		old_base[1] = cs_addrs->db_addrs[1];
 		cs_addrs->db_addrs[0] = NULL; /* don't rely on it until the mmap below */
+#		ifdef _AIX
+		status = shmdt(old_base[0] - BLK_ZERO_OFF(cs_data));
+#		else
 		status = munmap((caddr_t)old_base[0], (size_t)(old_base[1] - old_base[0]));
+#		endif
 		if (0 != status)
 		{
 			save_errno = errno;
 			GDSFILEXT_CLNUP;
 			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
-					ERR_SYSCALL, 5, LEN_AND_LIT("munmap()"), CALLFROM, save_errno);
+					ERR_SYSCALL, 5, LEN_AND_STR(MEM_UNMAP_SYSCALL), CALLFROM, save_errno);
 			return (uint4)(NO_FREE_SPACE);
 		}
 	} else
@@ -453,18 +466,25 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		assert((NULL != old_base[0]) && (NULL != old_base[1]));
 		mmap_sz = new_eof - BLK_ZERO_OFF(cs_data);	/* Don't mmap the file header and master map */
 		CHECK_LARGEFILE_MMAP(gv_cur_region, mmap_sz);   /* can issue rts_error MMFILETOOLARGE */
+#		ifdef _AIX
+		status = (sm_long_t)(mmap_retaddr = (sm_uc_ptr_t)shmat(udi->fd, (void *)NULL,SHM_MAP));
+#		else
 		status = (sm_long_t)(mmap_retaddr = (sm_uc_ptr_t)MMAP_FD(udi->fd, mmap_sz, BLK_ZERO_OFF(cs_data), FALSE));
-		GTM_WHITE_BOX_TEST(WBTEST_MMAP_SYSCALL_FAIL, status, -1);
+#		endif
+		GTM_WHITE_BOX_TEST(WBTEST_MEM_MAP_SYSCALL_FAIL, status, -1);
 		if (-1 == status)
 		{
 			save_errno = errno;
-			WBTEST_ASSIGN_ONLY(WBTEST_MMAP_SYSCALL_FAIL, save_errno, ENOMEM);
+			WBTEST_ASSIGN_ONLY(WBTEST_MEM_MAP_SYSCALL_FAIL, save_errno, ENOMEM);
 			GDSFILEXT_CLNUP;
 			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
-					ERR_SYSCALL, 5, LEN_AND_LIT("mmap()"), CALLFROM, save_errno);
+					ERR_SYSCALL, 5, LEN_AND_STR(MEM_MAP_SYSCALL), CALLFROM, save_errno);
 			return (uint4)(NO_FREE_SPACE);
 		}
 		/* In addition to updating the internal map values, gds_map_moved sets cs_data to point to the remapped file */
+#		if defined(_AIX)
+		mmap_retaddr = (sm_uc_ptr_t)mmap_retaddr + BLK_ZERO_OFF(cs_data);
+#		endif
 		gds_map_moved(mmap_retaddr, old_base[0], old_base[1], mmap_sz); /* updates cs_addrs->db_addrs[1] */
 		cs_addrs->db_addrs[0] = mmap_retaddr;
 		assert(cs_addrs->db_addrs[0] < cs_addrs->db_addrs[1]);

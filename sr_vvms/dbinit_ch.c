@@ -61,7 +61,7 @@ CONDITION_HANDLER(dbinit_ch)
 	uint4 		prvprv1[2], prvprv2[2], prvadr[2];
        	$DESCRIPTOR(desc, name_buff);
 
-	START_CH;
+	START_CH(FALSE);
 	if (SUCCESS == SEVERITY || INFO == SEVERITY)
 	{
 		PRN_ERROR;

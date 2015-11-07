@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +66,7 @@ int op_read(mval *v, int4 timeout)
 	v->mvtype = MV_STR;
 	v->str.len = 0;
 	stat = (io_curr_device.in->disp_ptr->read)(v, timeout);
-	if (stringpool.free == (unsigned char *)v->str.addr)		/* BYPASSOK */
+	if (IS_AT_END_OF_STRINGPOOL(v->str.addr, 0))
 		stringpool.free += v->str.len;	/* see UNIX iott_readfl */
 	assert(stringpool.free <= stringpool.top);
 #	ifdef KEEP_zOS_EBCDIC

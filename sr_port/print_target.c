@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,9 +25,6 @@
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
-
-GBLREF gd_region       *gv_cur_region;
-LITDEF char 		spaces[] = "    ";
 
 void print_target(unsigned char *c)
 {
@@ -93,7 +90,7 @@ void print_target(unsigned char *c)
 				if (!PRINTABLE(*p))
 					*p = '.';
 		}
-#ifdef UNICODE_SUPPORTED
+#		ifdef UNICODE_SUPPORTED
 		else {
 			for (p = buff;  p < top;  p = p_next)
 			{
@@ -105,7 +102,7 @@ void print_target(unsigned char *c)
 				}
 			}
 		}
-#endif
+#		endif
 		util_out_print("!AD", FALSE, p - buff, buff);
 		if (is_string)
 			util_out_print("\"", FALSE);

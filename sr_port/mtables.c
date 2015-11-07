@@ -161,12 +161,14 @@ LITDEF unsigned char mvs_size[] =
 
 /* All mv_stent types that need to be preserved are indicated by the mvs_save[] array.
  * MVST_STCK_SP (which is the same as the MVST_STCK type everywhere else) is handled specially here.
- * The MVST_STCK_SP entry is created by mdb_condition_handler to stack the "stackwarn" global variable.
+ * For example, when the MVST_STCK_SP entry is created by mdb_condition_handler to stack the "stackwarn" global variable.
  * This one needs to be preserved since our encountering this type in flush_jmp.c indicates that we are currently
  * in the error-handler of a STACKCRIT error which in turn has "GOTO ..." in the $ZTRAP/$ETRAP that is
  * causing us to mutate the current frame we are executing in with the contents pointed to by the GOTO.
  * In that case, we do not want to restore "stackwarn" to its previous value since we are still handling
- * the STACKCRIT error. So we set MVST_STCK_SP type as needing to be preserved.
+ * the STACKCRIT error. So we set MVST_STCK_SP type as needing to be preserved. So bottom line is MVST_STCK and
+ * MVST_STCK_SP are identical except the former is not kept when a frame is rewritten by ZGOTO (or other) and the
+ * latter *is* kept.
  */
 LITDEF boolean_t mvs_save[] =
 {
@@ -190,6 +192,9 @@ LITDEF boolean_t mvs_save[] =
 	TRUE,	/* MVST_STORIG */
 	FALSE	/* MVST_MRGZWRSV */
 };
+
+/* The address of this literal is assigned to mval pointers for arguments which are deliberately skipped in label invocations. */
+LITDEF mval skiparg		= DEFINE_MVAL_COMMON(0, 0, 0, 0, 0, 0, 0, 0);
 
 static readonly unsigned char localpool[7] = {'1', '1', '1', '0', '1', '0', '0'};
 LITDEF mval literal_null	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX | MV_UTF_LEN, 0, 0, 0, 0, 0, 0);

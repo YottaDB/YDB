@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,12 +81,11 @@
 
 #define PAT_MAX_REPEAT		MAX_STRLEN
 #define MAX_PATTERN_ATOMS	50
-#define	MAX_PATOBJ_LENGTH	2048
-#define	MAX_PATTERN_OVERHEAD	((3 * MAX_PATTERN_ATOMS) + 3) * 4/* maximum length (in integers) of compiled pattern code
+#define	MAX_PATOBJ_LENGTH	4096
+#define	MAX_PATTERN_OVERHEAD	((3 * MAX_PATTERN_ATOMS) + 3)	/* maximum length (in integers) of compiled pattern code
 								  * excluding count,tot_min,tot_max and min,max,size arrays
 								  * that come at the tail. 3 * MAX_PATTERN_ATOMS is for
 								  * min, max, size arrays and 3 is for count, tot_min, tot_max
-								  * 4 is to convert the size into bytes.
 								  */
 #define MAX_PATTERN_LENGTH	(MAX_PATOBJ_LENGTH - MAX_PATTERN_OVERHEAD)
 #define PATENTS		256	/* Size of the builtin pattern/typemask table in M mode */

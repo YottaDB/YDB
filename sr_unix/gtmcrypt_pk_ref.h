@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2013 Fidelity Information Services, Inc 	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@ int 			gc_pk_mask_unmask_passwd(char *in, char *out, int len);
 int 			gc_pk_mask_unmask_passwd_interlude(int nparm, gtm_string_t *in, gtm_string_t *out, int len);
 void 			gc_pk_scrub_passwd();
 void 			gc_pk_crypt_load_gtmci_env();
-xc_status_t 		gc_pk_crypt_prompt_passwd_if_needed(int prompt_passwd);
+xc_status_t 		gc_pk_update_passwd();
 int 			gc_pk_crypt_passphrase_callback(void *opaque,
 							const char *uid_hint,
 							const char *passphrase_info,
@@ -56,12 +56,6 @@ int			gc_pk_gpghome_has_permissions(void);
 	}														\
 }
 
-#define GC_PK_PROMPT_PASSWD(prompt_passwd)										\
-{															\
-	if (0 != gc_pk_crypt_prompt_passwd_if_needed(prompt_passwd))							\
-		return GC_FAILURE;											\
-}
-
 #define GC_PK_APPEND_UNIQ_STRING(in_buff, symmetric_key)								\
 {															\
 	memcpy(in_buff, symmetric_key, SYMMETRIC_KEY_MAX);								\
@@ -83,7 +77,6 @@ int			gc_pk_gpghome_has_permissions(void);
 	unsigned char	in_buff[HASH_INPUT_BUFF_LEN];									\
 															\
 	GC_PK_APPEND_UNIQ_STRING(in_buff, symmetric_key);								\
-	GC_SYM_INIT;													\
 	gcry_md_hash_buffer(GCRY_MD_SHA512, symmetric_key_hash, in_buff, HASH_INPUT_BUFF_LEN);				\
 	memset(in_buff, 0, HASH_INPUT_BUFF_LEN);									\
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@ error_def(ERR_VMSMEMORY);
 
 CONDITION_HANDLER(region_init_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	if (!(IS_GTM_ERROR(SIGNAL)) || DUMPABLE)
 		NEXTCH;
      	PRN_ERROR;

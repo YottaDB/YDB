@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,51 +46,62 @@
 #include "gtm_conv.h"
 #endif
 #ifdef GTM_CRYPT
-#include "gtmci.h"
 #include "gtmcrypt.h"
-#define GTM_PASSWD "gtm_passwd"
+#endif
+#ifdef GTM_TLS
+#include "gtm_tls.h"
 #endif
 
 GBLREF	IN_PARMS			*cli_lex_in_ptr;
 GBLREF	char				cli_token_buf[];
 GBLREF	char				cli_err_str[];
 GBLREF	CLI_ENTRY			mumps_cmd_ary[];
-GTMTRIG_DBG_ONLY(GBLREF	ch_ret_type	(*ch_at_trigger_init)();)
+GBLREF	boolean_t			skip_dbtriggers;
+#if defined (GTM_TRIGGER) && (DEBUG)
+GBLREF	ch_ret_type			(*ch_at_trigger_init)();
+#endif
 #ifdef UNICODE_SUPPORTED
 GBLREF	u_casemap_t 			gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 
 GBLDEF	CLI_ENTRY			*cmd_ary = &mumps_cmd_ary[0]; /* Define cmd_ary to be the MUMPS specific cmd table */
-GBLREF	boolean_t			skip_dbtriggers;
+
+#define GTMCRYPT_ERRLIT			"during GT.M startup"
 
 #ifdef __osf__
-	/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
-	 * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
-	 * the only exception and, in particular because the operating system does not support such an exception, the argv
-	 * array passed to the main program is an array of 64-bit pointers.  Thus the C program needs to declare argv[]
-	 * as an array of 64-bit pointers and needs to do the same for any pointer it sets to an element of argv[].
-	 */
+ /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
+  * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
+  * the only exception and, in particular because the operating system does not support such an exception, the argv
+  * array passed to the main program is an array of 64-bit pointers.  Thus the C program needs to declare argv[]
+  * as an array of 64-bit pointers and needs to do the same for any pointer it sets to an element of argv[].
+  */
 # pragma pointer_size (save)
 # pragma pointer_size (long)
 #endif
-GBLDEF char 		**gtmenvp;
-#ifdef GTM_CRYPT
+
+GBLDEF	char 				**gtmenvp;
+
 error_def(ERR_CRYPTDLNOOPEN);
 error_def(ERR_CRYPTDLNOOPEN2);
 error_def(ERR_CRYPTINIT);
 error_def(ERR_CRYPTINIT2);
-#endif
+error_def(ERR_TEXT);
+error_def(ERR_TLSDLLNOOPEN);
+error_def(ERR_TLSINIT);
+
 int gtm_main (int argc, char **argv, char **envp)
 #ifdef __osf__
 # pragma pointer_size (restore)
 #endif
 {
-	char			*ptr;
+	char			*ptr, *eq, **p;
 	int             	eof, parse_ret;
 #	ifdef GTM_CRYPT
-	char			*gtm_passwd;
-	const char		*gtmcrypt_errlit = "during GT.M startup";
 	int			gtmcrypt_errno;
+#	endif
+#	ifdef GTM_SOCKET_SSL_SUPPORT
+	int			status;
+	char			tlsid_env_name[MAX_TLSID_LEN * 2];
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -133,7 +144,7 @@ int gtm_main (int argc, char **argv, char **envp)
 	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
 	parse_ret = parse_cmd();
 	if (parse_ret && (EOF != parse_ret))
-		rts_error(VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
 	if (cli_present("DIRECT_MODE"))
 		invocation_mode = MUMPS_DIRECT;
 	else if (cli_present("RUN"))
@@ -141,24 +152,67 @@ int gtm_main (int argc, char **argv, char **envp)
 	gtm_chk_dist(argv[0]);
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	init_gtm();
-#	ifdef GTM_CRYPT
-	if (MUMPS_COMPILE != invocation_mode
-	    && (NULL != (gtm_passwd = (char *)getenv(GTM_PASSWD)))
-	    && (0 == strlen(gtm_passwd)))
+#	if defined(GTM_CRYPT) || defined(GTM_TLS)
+	if (MUMPS_COMPILE != invocation_mode)
 	{
-		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
-		if (0 != gtmcrypt_errno)
+		if ((NULL != (ptr = (char *)getenv(GTM_PASSWD_ENV))) && (0 == strlen(ptr)))
 		{
-			CLEAR_CRYPTERR_MASK(gtmcrypt_errno);
-			assert(!IS_REPEAT_MSG_MASK(gtmcrypt_errno));
-			assert((ERR_CRYPTDLNOOPEN == gtmcrypt_errno) || (ERR_CRYPTINIT == gtmcrypt_errno));
-			if (ERR_CRYPTDLNOOPEN == gtmcrypt_errno)
-				gtmcrypt_errno = ERR_CRYPTDLNOOPEN2;
-			else if (ERR_CRYPTINIT == gtmcrypt_errno)
-				gtmcrypt_errno = ERR_CRYPTINIT2;
-			gtmcrypt_errno = SET_CRYPTERR_MASK(gtmcrypt_errno);
-			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, STRLEN(gtmcrypt_errlit), gtmcrypt_errlit);
+			INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+			if (0 != gtmcrypt_errno)
+			{
+				CLEAR_CRYPTERR_MASK(gtmcrypt_errno);
+				assert(!IS_REPEAT_MSG_MASK(gtmcrypt_errno));
+				assert((ERR_CRYPTDLNOOPEN == gtmcrypt_errno) || (ERR_CRYPTINIT == gtmcrypt_errno));
+				if (ERR_CRYPTDLNOOPEN == gtmcrypt_errno)
+					gtmcrypt_errno = ERR_CRYPTDLNOOPEN2;
+				else if (ERR_CRYPTINIT == gtmcrypt_errno)
+					gtmcrypt_errno = ERR_CRYPTINIT2;
+				gtmcrypt_errno = SET_CRYPTERR_MASK(gtmcrypt_errno);
+				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, SIZEOF(GTMCRYPT_ERRLIT) - 1, GTMCRYPT_ERRLIT);
+			}
 		}
+#		ifdef GTM_SOCKET_SSL_SUPPORT
+		/* The below logic is for prefetching the password for TLS identifiers that may have been set in the environment.
+		 * But, since SSL support for Socket devices is not yet implemented, this logic need not be enabled as of this
+		 * writing. When SSL support for socket devices is implemented, the surrounding #ifdef can be removed.
+		 */
+		if (NULL != getenv("gtmcrypt_config"))
+		{	/* Environment is configured for SSL/TLS (and/or encryption). Check if any environment variable of the form
+			 * `gtmtls_passwd_*' is set to NULL string. If so, nudge the SSL/TLS library to read password(s) from the
+			 * user.
+			 */
+			for (p = envp; *p; p++)
+			{
+				ptr = *p;
+				if (0 == MEMCMP_LIT(ptr, GTMTLS_PASSWD_ENV_PREFIX))
+				{	/* At least one environment variable of $gtmtls_passwd_* is found. */
+					eq = strchr(ptr, '=');
+					if (0 != strlen(eq + 1))
+						break; /* Set to non-empty string. No need to initialize the library now. */
+					/* Set to empty string. */
+					if (NULL == tls_ctx)
+					{
+						if (SS_NORMAL != (status = gtm_tls_loadlibrary()))
+						{
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSDLLNOOPEN, 0,
+									ERR_TEXT, 2, LEN_AND_STR(dl_err));
+						}
+						if (NULL == (tls_ctx = gtm_tls_init(GTM_TLS_API_VERSION,
+											GTMTLS_OP_INTERACTIVE_MODE)))
+						{
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSINIT, 0,
+									ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));
+						}
+					}
+					assert(NULL != tls_ctx);
+					assert((MAX_TLSID_LEN * 2) > (int)(eq - ptr));
+					memcpy(tlsid_env_name, ptr, (int)(eq - ptr));
+					tlsid_env_name[(int)(eq - ptr)] = '\0';
+					gtm_tls_prefetch_passwd(tls_ctx, tlsid_env_name);
+				}
+			}
+		}
+#		endif
 	}
 #	endif
 	dm_start();

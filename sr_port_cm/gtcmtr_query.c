@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,19 +86,13 @@ bool gtcmtr_query(void)
 				 	SUBSCRIPT_STDCOL_NULL))
 		{
 			assert(!was_null); /* null to non null transformation not allowed */
-			gv_currkey->base[gv_currkey->end++] = 1;
-			gv_currkey->base[gv_currkey->end++] = 0;
-			gv_currkey->base[gv_currkey->end] = 0;
+			GVKEY_INCREMENT_QUERY(gv_currkey);
 		} else
 		{
 			if (0 == gv_cur_region->std_null_coll)
 				gv_currkey->base[gv_currkey->prev] = 1;
 			else
-			{
-				gv_currkey->base[gv_currkey->end++]= 1;
-				gv_currkey->base[gv_currkey->end++] = 0;
-				gv_currkey->base[gv_currkey->end] = 0;
-			}
+				GVKEY_INCREMENT_QUERY(gv_currkey);
 		}
 	}
 	found = (0 != gv_target->root) ? (curr_entry->query_is_queryget ? gvcst_queryget(&val) : gvcst_query()) : FALSE;

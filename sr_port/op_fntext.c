@@ -19,11 +19,14 @@
 #include "srcline.h"
 #include "op.h"
 #include "stringpool.h"
+#include "compiler.h"
 #ifdef GTM_TRIGGER
 # include "gtm_trigger_trc.h"
 #endif
+#include "stack_frame.h"
 
-GBLREF spdesc stringpool;
+GBLREF spdesc 		stringpool;
+GBLREF stack_frame	*frame_pointer;
 
 error_def(ERR_TXTSRCMAT);
 error_def(ERR_ZLINKFILE);
@@ -40,7 +43,7 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 	mstr		*sld;
 	uint4		stat;
 	rhdtyp		*rtn_vector;
-	boolean_t	is_trigger;
+	boolean_t	is_trigger, current_rtn = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -48,6 +51,8 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 	MV_FORCE_STR(rtn);
 	temp_rtn = &temp_mval;
 	*temp_rtn = *rtn;	/* make a copy of the routine in case the caller used the same mval for rtn and ret */
+	if (WANT_CURRENT_RTN(temp_rtn)) /* we want $TEXT for the routine currently executing. */
+		current_rtn = TRUE;
 	ret->str.len = 0;	/* make ret an emptystring in case the return is by way of the condition handler */
 	ret->mvtype = MV_STR;
 	sld = (mstr *)NULL;
@@ -72,10 +77,13 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 	{
 		if (stat & ZEROLINE)
 		{
-			if (NULL == (rtn_vector = find_rtn_hdr(&temp_rtn->str)))
-			{	/* not here, so try to bring it in */
-				GTMTRIG_ONLY(if (!is_trigger))	/* Triggers cannot be loaded in this fashion */
-				{
+			if (current_rtn)
+				rtn_vector = frame_pointer->rvector;
+			else
+			{
+				rtn_vector = find_rtn_hdr(&temp_rtn->str);
+				if ((NULL == rtn_vector) GTMTRIG_ONLY(&& !is_trigger))
+				{	/* not here, so try to bring it in... Triggers cannot be loaded in this fashion */
 					op_zlink(temp_rtn, 0);
 					rtn_vector = find_rtn_hdr(&temp_rtn->str);
 				}

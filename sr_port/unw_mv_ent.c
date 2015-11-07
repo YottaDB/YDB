@@ -16,6 +16,7 @@
 #endif
 
 #include "gtm_string.h"
+#include "gtm_unistd.h"
 
 #include "lv_val.h"
 #include <rtnhdr.h>
@@ -42,8 +43,6 @@
 #include "dpgbldir_sysops.h"
 #include "error_trap.h"		/* for STACK_ZTRAP_EXPLICIT_NULL macro */
 #include "op.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #ifdef UNIX
@@ -64,8 +63,6 @@ GBLREF lv_val			*active_lv;
 GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target;
 GBLREF gd_addr			*gd_header;
-GBLREF gd_binding		*gd_map;
-GBLREF gd_binding		*gd_map_top;
 GBLREF dollar_ecode_type	dollar_ecode;
 GBLREF dollar_stack_type	dollar_stack;
 GBLREF mval			dollar_etrap;
@@ -96,7 +93,6 @@ GBLREF ch_ret_type		(*ch_at_trigger_init)();
 #endif
 GBLREF unsigned char		*restart_pc, *restart_ctxt;
 GBLREF mval			*alias_retarg;
-GBLREF tcp_library_struct	tcp_routines;
 GBLREF int			merge_args;
 GBLREF uint4			zwrtacindx;
 GBLREF merge_glvn_ptr		mglvnp;
@@ -153,17 +149,14 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
 			{
 				if (0 != dollar_zgbldir.str.len)
-				{
 					gd_header = zgbldir(&dollar_zgbldir);
-					/* update the gd_map */
-					SET_GD_MAP;
-				} else
-				{
-					dpzgbini();
-					gd_header = NULL;
-				}
+				else
+					dpzgbini();	/* sets gd_header to NULL */
 				if (gv_currkey)
+				{
 					gv_currkey->base[0] = 0;
+					gv_currkey->prev = gv_currkey->end = 0;
+				}
 				if (gv_target)
 					gv_target->clue.end = 0;
 			}
@@ -385,8 +378,10 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 						{	/* clean up socketptr structure */
 							socketptr = (socket_struct *)mv_st_ent->mv_st_cont.mvs_zintdev.socketptr;
 							if (socket_connect_inprogress == socketptr->state
-								&& (FD_INVALID != socketptr->sd))
-								tcp_routines.aa_close(socketptr->sd);
+									&& (FD_INVALID != socketptr->sd))
+								close(socketptr->sd);
+							if (NULL != socketptr->remote.ai_head)
+								freeaddrinfo(socketptr->remote.ai_head);
 							if (NULL != socketptr->zff.addr)
 								free(socketptr->zff.addr);
 							if (NULL != socketptr->buffer)
@@ -400,7 +395,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 					mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 					return;
 				default:
-					GTMASSERT;	/* No other device should be here */
+					assertpro(FALSE);	/* No other device should be here */
 			}
 			break;
 		case MVST_ZINTCMD:
@@ -535,7 +530,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			zwrhtab = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrhtab;
 			return;
 		default:
-			GTMASSERT;
+			assertpro(mv_st_ent->mv_st_type != mv_st_ent->mv_st_type);
 			break;
 	}
 	return; /* This should never get executed, added to make compiler happy */

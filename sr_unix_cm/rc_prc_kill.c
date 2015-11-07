@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@
 #include "error.h"
 #include "gtcm.h"
 #include "gvcst_protos.h"	/* for gvcst_kill prototype */
+#include "hashtab_mname.h"
 
 GBLREF gv_key 		*gv_currkey;
 GBLREF gv_namehead 	*gv_target;
@@ -32,14 +33,14 @@ GBLREF gd_addr		*gd_header;
 GBLREF int		gv_keysize;
 GBLREF sgmnt_data	*cs_data;
 
-int
-rc_prc_kill(rc_q_hdr *qhdr)
+int rc_prc_kill(rc_q_hdr *qhdr)
 {
     rc_kill	*req;
     rc_kill	*rsp;
     int		 i;
-    mval	v;
+    mname_entry	gvname;
     char	*cp1;
+    gvnh_reg_t	*gvnh_reg;
 
     ESTABLISH_RET(rc_dbms_ch, RC_SUCCESS);
     if ((qhdr->a.erc.value = rc_fnd_file(&qhdr->r.xdsid)) != RC_SUCCESS)
@@ -60,12 +61,11 @@ rc_prc_kill(rc_q_hdr *qhdr)
 #endif
 	return -1;
     }
-    v.mvtype = MV_STR;
     for (cp1 = req->key.key; *cp1; cp1++)
 	;
-    v.str.len = INTCAST(cp1 - req->key.key);
-    v.str.addr = req->key.key;
-	if (v.str.len > 8)	/* GT.M does not support global variables > 8 chars */
+    gvname.var_name.len = INTCAST(cp1 - req->key.key);
+    gvname.var_name.addr = req->key.key;
+	if (gvname.var_name.len > 8)	/* GT.M does not support global variables > 8 chars */
 	{	qhdr->a.erc.value = RC_KEYTOOLONG;
 		REVERT;
 #ifdef DEBUG
@@ -73,20 +73,20 @@ rc_prc_kill(rc_q_hdr *qhdr)
 #endif
 		return -1;
 	}
-	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &v.str);
-    memcpy(gv_currkey->base, req->key.key, req->key.len.value);
-    gv_currkey->end = req->key.len.value;
-    gv_currkey->base[gv_currkey->end] = 0;
-    for (i = gv_currkey->end - 2; i > 0; i--)
-	if (!gv_currkey->base[i - 1])
-	    break;
-    gv_currkey->prev = i;
-
-    if (gv_target->root)
-	gvcst_kill(TRUE);
-
-    REVERT;
-    return 0;
-
+	COMPUTE_HASH_MNAME(&gvname);
+	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gvname, gvnh_reg);
+	assert(NULL == gvnh_reg->gvspan); /* so GV_BIND_SUBSNAME_IF_GVSPAN is not needed */
+	memcpy(gv_currkey->base, req->key.key, req->key.len.value);
+	gv_currkey->end = req->key.len.value;
+	gv_currkey->base[gv_currkey->end] = 0;
+	for (i = gv_currkey->end - 2; i > 0; i--)
+	{
+		if (!gv_currkey->base[i - 1])
+			break;
+	}
+	gv_currkey->prev = i;
+	if (gv_target->root)
+	    gvcst_kill(TRUE);
+	REVERT;
+	return 0;
 }
-

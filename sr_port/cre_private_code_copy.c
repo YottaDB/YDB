@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,11 +20,12 @@
 #include "gtm_text_alloc.h"
 #include "gtm_string.h"
 
+error_def(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY);)
+
 CONDITION_HANDLER(cre_priv_ch)
 {
-	error_def(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY);)
 
-	START_CH;
+	START_CH(TRUE);
 	if (SIGNAL == UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY))
 	{
 		UNWIND(NULL, NULL); /* ignore "lack-of-memory" error, rather not set breakpoint than error out in such a case */
@@ -36,8 +37,6 @@ uint4 cre_private_code_copy(rhdtyp *rtn)
 {
 	unsigned char	*new_ptext;
 	int		code_size;
-
-	error_def(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY);)
 
 #ifdef USHBIN_SUPPORTED
 		assert(NULL != rtn->shlib_handle); /* don't need private copy if not shared */

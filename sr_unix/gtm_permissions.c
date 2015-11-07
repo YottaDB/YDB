@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,12 +89,15 @@ int gtm_member_group_id(int uid, int gid)
 }
 
 /* Based on security rules in this routine, set *group_id of the group to be used
-   for shared resources, journals, and temp files.  If a no change then it will be set to -1.
-   Also, set *perm to the permissions to be used.  The precalculated world_write_perm (need to
-   change name to masked_permissions) is to be used in the one case indicated below.
-
-   Populates pdd struct and returns negative value for error, returns non-negative for success. */
-int gtm_set_group_and_perm(struct stat *stat_buff, int *group_id, int *perm, enum perm_target_types target_type,
+ * for shared resources, journals, and temp files.  If a no change then it will be set to -1.
+ * Also, set *perm to the permissions to be used.  The precalculated world_write_perm (need to
+ * change name to masked_permissions) is to be used in the one case indicated below.
+ * If the user is root, the *user_id may be set to a target uid if needed; otherwise, it will
+ * be set to -1.
+ *
+ * Populates pdd struct and returns negative value for error, returns non-negative for success.
+ */
+int gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *perm, enum perm_target_types target_type,
 			   struct perm_diag_data *pdd)
 {
 	int		lib_gid = -1;
@@ -125,58 +128,65 @@ int gtm_set_group_and_perm(struct stat *stat_buff, int *group_id, int *perm, enu
 
 	/* set default gid */
 #ifdef __osf__
+	*user_id = process_uid;
 	*group_id = process_gid;
 #else
+	*user_id = -1;
 	*group_id = -1;
 #endif
 	/* set no permissions as a default in case none of our conditions match */
 	*perm = 0;
 
+	assertpro((PERM_FILE == target_type) || (PERM_IPC == target_type));
 	if (0006 & stat_buff->st_mode)
 	{
 		/* file is accessible to other */
-		if (opener_in_file_group)		/* otherwise, use default gid */
+		if (opener_is_root)					/* otherwise, use default uid */
+			*user_id = stat_buff->st_uid;
+		if (opener_in_file_group || opener_is_root)		/* otherwise, use default gid */
 			*group_id = stat_buff->st_gid;
 		if (PERM_FILE == target_type)
-			*perm = (!opener_in_file_group && (0020 & stat_buff->st_mode)) ? 0666 : (stat_buff->st_mode & 0666);
+			*perm = (!opener_in_file_group && !opener_is_root && (0020 & stat_buff->st_mode))
+					? 0666 : (stat_buff->st_mode & 0666);
 		else if (PERM_IPC == target_type)
 			*perm = 0666;
-		else
-			assertpro(FALSE);
 	} else if (0600 & stat_buff->st_mode && !(0066 & stat_buff->st_mode))
 	{
 		/* file is only user accessible */
 		/* use default group */
 		assert(opener_is_file_owner || opener_is_root);
+		if (opener_is_root)					/* otherwise, use default uid/gid */
+		{
+			*user_id = stat_buff->st_uid;
+			*group_id = stat_buff->st_gid;
+		}
 		if (PERM_FILE == target_type)
 			*perm = 0600;			/* read write for user */
 		else if (PERM_IPC == target_type)
 			*perm = 0600;			/* read write for user */
-		else
-			assertpro(FALSE);
 	} else if (0060 & stat_buff->st_mode && !(0606 & stat_buff->st_mode))
 	{
 		/* file is only group accessible */
+		if (opener_is_root)					/* otherwise, use default uid */
+			*user_id = stat_buff->st_uid;
 		*group_id = stat_buff->st_gid;			/* use file group */
 		assert(opener_in_file_group || opener_is_root);
 		if (PERM_FILE == target_type)
 			*perm = stat_buff->st_mode & 0060;	/* use file permissions, masked for group read/write */
-		else if (PERM_IPC == target_type)
+		if (PERM_IPC == target_type)
 			*perm = 0660;			/* read/write for group - all readers need write for ipc */
-		else
-			assertpro(FALSE);
 	} else
 	{
 		/* file is accessible to user and group */
-		if (opener_is_file_owner && opener_in_file_group)
+		if (opener_is_file_owner && opener_in_file_group || opener_is_root)
 		{
+			if (opener_is_root)					/* otherwise, use default uid */
+				*user_id = stat_buff->st_uid;
 			*group_id = stat_buff->st_gid;		/* use file group */
 			if (PERM_FILE == target_type)
 				*perm = stat_buff->st_mode & 0660;	/* use file permissions, masked for user/group read/write */
-			else if (PERM_IPC == target_type)
+			if (PERM_IPC == target_type)
 				*perm = 0660;			/* read/write for user/group - all readers need write for ipc */
-			else
-				assertpro(FALSE);
 		} else
 		{
 			if (opener_is_file_owner && !opener_in_file_group)
@@ -184,13 +194,11 @@ int gtm_set_group_and_perm(struct stat *stat_buff, int *group_id, int *perm, enu
 				if (gtm_group_restricted)
 				{
 					*group_id = lib_gid;			/* use restricted group */
-					assert(gtm_member_group_id(process_uid, *group_id) || opener_is_root);
+					assert(gtm_member_group_id(process_uid, *group_id));
 					if (PERM_FILE == target_type)
 						*perm = 0660;			/* user/group read/write */
-					else if (PERM_IPC == target_type)
+					if (PERM_IPC == target_type)
 						*perm = 0660;	/* read/write for user/group - all readers need write for ipc */
-					else
-						assertpro(FALSE);
 				} else
 				{
 					/* use default group */
@@ -198,32 +206,26 @@ int gtm_set_group_and_perm(struct stat *stat_buff, int *group_id, int *perm, enu
 						*perm = 0666;			/* read/write for all */
 					else if (PERM_IPC == target_type)
 						*perm = 0666;	/* read/write for all - all readers need write for ipc */
-					else
-						assertpro(FALSE);
 				}
-			} else if (!opener_is_file_owner && opener_in_file_group || opener_is_root)
+			} else if (!opener_is_file_owner && opener_in_file_group)
 			{
-				/* opener has access either via file group membership or because he is root */
+				/* opener has access either via file group membership */
 				if (owner_in_file_group)
 				{
 					*group_id = stat_buff->st_gid;		/* use file group */
 					if (PERM_FILE == target_type)
 						*perm = stat_buff->st_mode & 0660;	/* use masked file permissions */
-					else if (PERM_IPC == target_type)
+					if (PERM_IPC == target_type)
 						*perm = 0660;	/* read/write for user/group - all readers need write for ipc */
-					else
-						assertpro(FALSE);
 
 				} else if (gtm_group_restricted)
 				{
 					*group_id = lib_gid;			/* use restricted group */
-					assert(gtm_member_group_id(process_uid, *group_id) || opener_is_root);
+					assert(gtm_member_group_id(process_uid, *group_id));
 					if (PERM_FILE == target_type)
 						*perm = 0660;			/* user/group read/write */
-					else if (PERM_IPC == target_type)
+					if (PERM_IPC == target_type)
 						*perm = 0660;	/* read/write for user/group - all readers need write for ipc */
-					else
-						assertpro(FALSE);
 				} else
 				{
 					*group_id = stat_buff->st_gid;		/* use file group */
@@ -231,8 +233,6 @@ int gtm_set_group_and_perm(struct stat *stat_buff, int *group_id, int *perm, enu
 						*perm = 0666;	/* read/write for all - ensure file owner read/write access */
 					else if (PERM_IPC == target_type)
 						*perm = 0666;	/* read/write for all - all readers need write for ipc */
-					else
-						assertpro(FALSE);
 				}
 			}
 		}

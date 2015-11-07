@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,17 +36,16 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	unsigned char	*ch, *cp, *ff, *ff_top, fncode, sign, *t;
 
 	if (!MV_DEFINED(fmt))		/* catch this up front so noundef mode can't cause trouble - so fmt no empty context */
-		rts_error(VARLSTCNT(2) ERR_FNUMARG, 0);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_FNUMARG, 0);
 	t_src_p = &t_src;		/* operate on src in a temp, so conversions are possible without modifying src */
 	*t_src_p = *src;
 	if (use_fract)
 		op_fnj3(t_src_p, 0, fract, t_src_p);
-	else if (MV_DEFINED(t_src_p))
-	{	/* if the source operand is not a canonical number, force conversion */
+	else
+	{
 		MV_FORCE_NUM(t_src_p);
-		MV_FORCE_CANONICAL(t_src_p);
-	} else
-		t_src_p = underr(t_src_p);
+		MV_FORCE_CANONICAL(t_src_p);	/* if the source operand is not a canonical number, force conversion */
+	}
 	assert (stringpool.free >= stringpool.base);
 	assert (stringpool.free <= stringpool.top);
 	/* assure there is adequate space for two string forms of a number as a local
@@ -86,12 +85,12 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 				fncode |= PAREN;
 				break;
 			default:
-				rts_error(VARLSTCNT(6) ERR_FNUMARG, 4, fmt->str.len, fmt->str.addr, 1, --ff);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FNUMARG, 4, fmt->str.len, fmt->str.addr, 1, --ff);
 			break;
 		}
 	}
 	if ((0 != (fncode & PAREN)) && (0 != (fncode & FNERROR)))
-		rts_error(VARLSTCNT(4) ERR_FNARGINC, 2, fmt->str.len, fmt->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FNARGINC, 2, fmt->str.len, fmt->str.addr);
 	else
 	{
 		sign = 0;

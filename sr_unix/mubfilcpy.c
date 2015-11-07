@@ -104,6 +104,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	uint4			ustatus, size;
 	muinc_blk_hdr_ptr_t	sblkh_p;
 	ZOS_ONLY(int		realfiletag;)
+	int			user_id;
 	int			group_id;
 	int			perm;
 	struct perm_diag_data	pdd;
@@ -216,7 +217,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	}
 	FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 	if (-1 != fstat_res)
-		if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_FILE, &pdd) < 0)
+		if (gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE, &pdd) < 0)
 		{
 			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
@@ -232,7 +233,8 @@ bool	mubfilcpy (backup_reg_list *list)
 		}
 	/* setup new group and permissions if indicated by the security rules.
 	 */
-	if ((-1 == fstat_res) || (-1 == FCHMOD(backup_fd, perm)) || ((-1 != group_id) && (-1 == fchown(backup_fd, -1, group_id))))
+	if ((-1 == fstat_res) || (-1 == FCHMOD(backup_fd, perm))
+		|| (((-1 != user_id) || (-1 != group_id)) && (-1 == fchown(backup_fd, user_id, group_id))))
 	{
 		save_errno = errno;
 		errptr = (char *)STRERROR(save_errno);

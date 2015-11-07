@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_limits.h"
+#include "gtm_stdlib.h"
+#include "gtm_string.h"
 
 #include "gtmimagename.h"
 #include "gtm_imagetype_init.h"
@@ -23,11 +26,14 @@ GBLREF	enum gtmImageTypes	image_type;
 #ifdef UNIX
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t 		span_nodes_disallowed;
+GBLREF	char			gtm_dist[GTM_PATH_MAX];
 #endif
 
 void	gtm_imagetype_init(enum gtmImageTypes img_type)
 {
 	boolean_t		is_svc_or_gtcm;
+	char			*dist;
+	int			len = 0;
 
 	NON_GTMTRIG_ONLY(skip_dbtriggers = TRUE;) /* Do not invoke triggers for trigger non-supporting platforms. */
 	UNIX_ONLY(span_nodes_disallowed = (GTCM_GNP_SERVER_IMAGE == img_type) || (GTCM_SERVER_IMAGE == img_type);)
@@ -53,6 +59,17 @@ void	gtm_imagetype_init(enum gtmImageTypes img_type)
 	 * of first database open (in gvcst_init). So, set jnlpool_init_needed to TRUE if this is GTM_IMAGE.
 	 */
 	jnlpool_init_needed = (GTM_IMAGE == img_type);
+	/* Read gtm_dist here and use this value everywhere else */
+	dist = (char *)GETENV(GTM_DIST);
+	if (dist)
+		len = STRLEN(dist);
+	if(len)
+	{
+		memcpy(gtm_dist, dist, ((len > GTM_PATH_MAX) ? GTM_PATH_MAX : len));
+		gtm_dist[GTM_PATH_MAX - 1] = '\0';
+	}
+	else
+		gtm_dist[0] = '\0';
 #	endif
 	image_type = img_type;
 	return;

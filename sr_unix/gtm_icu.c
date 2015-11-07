@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -163,7 +163,7 @@ static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char **major_
 	{
 		/* Construct the first part of the ICUVERLT36 error message. */
 		SPRINTF(tmp_errstr, "%s%s", GTM_ICU_VERSION, GTM_ICU_VERSION_SUFFIX);
-		rts_error(VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), major_ver, minor_ver);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), major_ver, minor_ver);
 	}
 	return TRUE;
 }
@@ -201,7 +201,7 @@ void gtm_icu_init(void)
 	locale = setlocale(LC_CTYPE, "");
 	chset = nl_langinfo(CODESET);
 	if ((NULL == locale) || (NULL == chset) || ((0 != strcasecmp(chset, "utf-8")) && (0 != strcasecmp(chset, "utf8"))))
-		rts_error(VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_STR(chset));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_STR(chset));
 	/* By default, GT.M will henceforth expect that ICU has been built with symbol renaming disabled. If that is not the case,
 	 * GT.M can be notified of this through an environment variable (macro GTM_ICU_VERSION).  The variable should contain the
 	 * icu version number formatted as "<major-ver>.<minor-ver>". Example would be "3.6" to indicate ICU 3.6.
@@ -266,8 +266,8 @@ void gtm_icu_init(void)
 	search_path_ptr = search_paths;
 	while(-1 == loadquery(L_GETLIBPATH, search_path_ptr, prev_dyn_size))
 	{
-		if (ENOMEM != errno)
-			GTMASSERT;	/* We don't expect loadquery to fail for reason other than ENOMEM */
+		/* We don't expect loadquery to fail for reason other than ENOMEM */
+		assertpro(ENOMEM == errno);
 		/* If the previous call to loadquery fails and if it's because the input buffer's length was not
 		 * enough for loadquery to fill the library search paths, then do a malloc equal to double the previous
 		 * size and call loadquery again. It's relatively unlikely that this condition would be reached
@@ -308,7 +308,8 @@ void gtm_icu_init(void)
 		free(dyn_search_paths);
 	/* If each_libpath is NULL then we were not able to look for libicuio.a in the loader search path */
 	if (NULL == each_libpath)
-		rts_error(VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname), ERR_TEXT, 2, LEN_AND_LIT(ICU_NOT_FOUND_ERR));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname),
+				ERR_TEXT, 2, LEN_AND_LIT(ICU_NOT_FOUND_ERR));
 	libname = buf;
 	handle = dlopen(libname, ICU_LIBFLAGS | RTLD_MEMBER);
 #else
@@ -322,14 +323,15 @@ void gtm_icu_init(void)
 		 * instead of libicuio36.0.so. Try dlopen with this new naming scheme as well.
 		 * Below SNPRINTF converts /usr/local/lib64/libicuio36.0.a to /usr/local/lib64/libicuio36.0.a(libicuio.so)
 		 */
-		SNPRINTF(buf, ICU_LIBNAME_LEN, "%s(%s.so)", real_path, ICU_LIBNAME_ROOT);
-		libname = buf;
+		SNPRINTF(temp_path, ICU_LIBNAME_LEN, "%s(%s.so)", real_path, ICU_LIBNAME_ROOT);
+		libname = temp_path;
 		handle = dlopen(libname, ICU_LIBFLAGS | RTLD_MEMBER);
 		if (NULL == handle)
 		{
-			COPY_DLLERR_MSG(err_str, err_msg); /* overwrites the previous error */
+			libname = buf;
 #		endif
-			rts_error(VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname), ERR_TEXT, 2, LEN_AND_STR(err_msg));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname),
+					ERR_TEXT, 2, LEN_AND_STR(err_msg));
 #		ifdef _AIX
 		}
 #		endif
@@ -340,8 +342,7 @@ void gtm_icu_init(void)
 	 * where all symbols would have been brought in by previous dlopen() with the RTLD_GLOBAL flag.
 	 */
 	handle = dlopen(NULL, ICU_LIBFLAGS);
-	if (NULL == handle)
-		GTMASSERT;
+	assertpro(handle);
 #	endif
 	assert(((-1 != major_ver_len) && (-1 != minor_ver_len)) || !gtm_icu_ver_defined);
 	DEBUG_ONLY(symbols_renamed = -1;)
@@ -389,7 +390,7 @@ void gtm_icu_init(void)
 			if (NULL == fptr)
 			{
 				COPY_DLLERR_MSG(err_str, err_msg);
-				rts_error(VARLSTCNT(8) ERR_ICUSYMNOTFOUND, 2, LEN_AND_STR(cur_icu_fname),
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ICUSYMNOTFOUND, 2, LEN_AND_STR(cur_icu_fname),
 					ERR_TEXT, 2, LEN_AND_STR(err_msg));
 			}
 			if (0 == findx)	/* record the fact that the symbols ARE renamed */
@@ -415,7 +416,8 @@ void gtm_icu_init(void)
 			{
 				/* Construct the first part of the ICUVERLT36 error message. */
 				SPRINTF(tmp_errstr, "%s%s", ICU_LIBNAME, ICU_LIBNAME_SUFFIX);
-				rts_error(VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), icu_version[0], icu_version[1]);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ICUVERLT36, 4,
+						LEN_AND_STR(tmp_errstr), icu_version[0], icu_version[1]);
 			}
 		}
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,13 @@
 	IA64_ONLY(frame_pointer->old_frame_pointer->mpc = CODE_ADDRESS_C(g);)	\
 	NON_IA64_ONLY(frame_pointer->old_frame_pointer->mpc = CODE_ADDRESS(g);)	\
 }
+
+/* Macro that allows temp_fgncal_stack to override fgncal_stack. This is used in gtm_init (in gtmci.c)
+ * during creation of a new level to solve chicken and egg problem that old fgncal_stack needs to be
+ * saved but cannot be put into an mv_stent until after the level is actually created. This temp serves
+ * that purpose so only has a non-NULL value for the duration of level creation.
+ */
+#define FGNCAL_STACK ((NULL == TREF(temp_fgncal_stack)) ? fgncal_stack : TREF(temp_fgncal_stack))
 
 void	ci_restart(void);
 void	ci_ret_code(void);

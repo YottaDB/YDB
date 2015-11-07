@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@
 #include "t_begin.h"
 #include "t_retry.h"
 #include "t_end.h"
+#include "hashtab_mname.h"
 
 GBLREF int		rc_size_return;
 GBLREF gd_addr		*gd_header;
@@ -39,16 +40,17 @@ GBLDEF rc_oflow	*rc_overflow;
 GBLREF gd_region	*gv_cur_region;
 GBLREF trans_num	rc_read_stamp;
 
+error_def(ERR_GVGETFAIL);
 
 void rc_gbl_ord(rc_rsp_page *rsp)
 {
 	blk_hdr		*bp;
 	bool		found;
 	enum cdb_sc	status;
-	mstr		name;
+	mname_entry	gvname;
 	short		bsiz, size_return;
 	srch_blk_status	*bh;
-	error_def(ERR_GVGETFAIL);
+	gvnh_reg_t	*gvnh_reg;
 
 	for (;;)
 	{
@@ -62,9 +64,11 @@ void rc_gbl_ord(rc_rsp_page *rsp)
 			rsp->rstatus.value = 0;
 			return;
 		}
-		name.addr = (char *)&gv_altkey->base[0];
-		name.len = gv_altkey->end - 1;
-		GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &name);
+		gvname.var_name.addr = (char *)&gv_altkey->base[0];
+		gvname.var_name.len = gv_altkey->end - 1;
+		COMPUTE_HASH_MNAME(&gvname);
+		GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gvname, gvnh_reg);
+		assert(NULL == gvnh_reg->gvspan); /* so GV_BIND_SUBSNAME_IF_GVSPAN is not needed */
 		if (gv_target->root != 0)
 		{
 			/* Look to see if key exists */
@@ -117,9 +121,7 @@ void rc_gbl_ord(rc_rsp_page *rsp)
 			if (found)
 				break;
 		}
-		*(&gv_currkey->base[0] + gv_currkey->end - 1) = 1;
-		*(&gv_currkey->base[0] + gv_currkey->end + 1) = 0;
-		gv_currkey->end += 1;
+		GVKEY_INCREMENT_ORDER(gv_currkey);
 	}
 	PUT_LONG(rsp->pageaddr, bh->blk_num);
 	rsp->frag_offset.value = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,12 @@
 #define ZSHOW_LOCAL		3
 #define ZSHOW_BUFF_ONLY 	4
 #define ZSHOW_NOPARM		-1
-#define ZSHOW_ALL		"IVBDLGSC"
+
+#ifdef UNIX
+# define ZSHOW_ALL		"IVBDLGRC"
+#else
+# define ZSHOW_ALL		"IVBDLGSC"
+#endif
 
 #define CLEANUP_ZSHOW_BUFF				\
 {							\
@@ -80,7 +85,7 @@ typedef struct zshow_out_struct
 #define QUOTE_DZCH 		"\"_$ZCH("
 #define CLOSE_PAREN_DOLLARZCH 	")_$ZCH("
 
-void		zshow_stack(zshow_out *output);
+void		zshow_stack(zshow_out *output, boolean_t show_checksum);
 void		zshow_devices(zshow_out *output);
 void		zshow_format_lock(zshow_out *output, mlk_pvtblk *temp);
 void		zshow_locks(zshow_out *output);

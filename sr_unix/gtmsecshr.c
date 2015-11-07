@@ -28,7 +28,6 @@
 #include <sys/sem.h>
 #include "gtm_stat.h"
 #include "gtm_socket.h"
-#include <sys/un.h>
 #include <sys/param.h>
 #include <signal.h>
 #if !defined(_AIX) && !defined(__linux__) && !defined(__hpux) && !defined(__CYGWIN__) && !defined(__MVS__)
@@ -39,12 +38,14 @@
 #include "gtm_stdlib.h"
 #include "gtm_sem.h"
 #include "gtm_string.h"
+#include "gtm_un.h"
 #include "gtm_fcntl.h"
 #include <errno.h>
 #include "gtm_time.h"
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 #include "gtm_permissions.h"
+#include "gtm_select.h"
 
 #if defined(__MVS__)
 # include "gtm_zos_io.h"
@@ -102,6 +103,7 @@ GBLREF	key_t			gtmsecshr_key;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		need_core;
 GBLREF	boolean_t		first_syslog;		/* Defined in util_output.c */
+GBLREF	char			gtm_dist[GTM_PATH_MAX];
 
 LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;
@@ -163,7 +165,7 @@ error_def(ERR_TEXT);
  */
 CONDITION_HANDLER(gtmsecshr_cond_hndlr)
 {
-	START_CH;
+	START_CH(TRUE);
 	gtmsecshr_exit(arg, DUMPABLE ? TRUE : FALSE);
 }
 
@@ -234,6 +236,7 @@ int main(int argc, char_ptr_t argv[])
 								 * unexpired time when select exits.
 								 */
 		input_timeval.tv_usec = 0;
+		assertpro(FD_SETSIZE > gtmsecshr_sockfd);
 		FD_ZERO(&wait_on_fd);
 		FD_SET(gtmsecshr_sockfd, &wait_on_fd);
 		gtmsecshr_timer_popped = FALSE;
@@ -304,7 +307,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	int		secshr_sem;
 	int		semop_res, rndirln, modlen;
 	char		*name_ptr, *rndir, *cp, realpathbef[GTM_PATH_MAX], *realpathaft, gtmdist[GTM_PATH_MAX];
-	char		*path, *chrrv, *envvarnm;
+	char		*path, *chrrv;
 	pid_t		pid;
 	struct sembuf	sop[4];
 	gtmsecshr_mesg	mesg;
@@ -386,8 +389,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	*rundir = realpathaft;				/* This value for $gtm_dist is used in later validations */
 	*rundir_len = rndirln;				/* .. and can be used either with this len or NULL char terminator */
 	/* Step 3 */
-	envvarnm = GTM_DIST_LOG;
-	path = GETENV(++envvarnm);			/* Retrieve value for $gtm_dist (bumping ptr past the '$' for getenv)*/
+	path = gtm_dist;
 	chrrv = realpath(path, gtmdist);
 	if ((NULL == chrrv) || (0 != strncmp(realpathaft, gtmdist, GTM_PATH_MAX)))
 	{
@@ -681,12 +683,14 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 		case WAKE_MESSAGE:
 			/* if (0 != validate_receiver(buf, rundir, rundir_len, save_code))
 				return;		/ * buf->code already set - to be re-enabled when routine is completed */
-			if (buf->code = (-1 == kill((pid_t)buf->mesg.id, SIGALRM)) ? errno : 0)
+			buf->code = 0;
+			if ((-1 == kill((pid_t)buf->mesg.id, SIGALRM)) && (ESRCH != errno))
 			{
 				save_errno = errno;
+				buf->code = save_errno;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Unable to wake up process"), save_errno);
+					     RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id,
+					     ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to wake up process"), save_errno);
 			}
 #			ifdef DEBUG
 			else
@@ -698,12 +702,16 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 		case CONTINUE_PROCESS:
 			/* if (0 != validate_receiver(buf, rundir, rundir_len, save_code))
 				return;		/ * buf->code already set  - to be re-enabled when routine is completed */
-			if (buf->code = (-1 == kill((pid_t)buf->mesg.id, SIGCONT)) ? errno : 0)
+			buf->code = 0;
+			if ((-1 == kill((pid_t)buf->mesg.id, SIGCONT)) && (ESRCH != errno))
 			{
 				save_errno = errno;
+				buf->code = save_errno;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Unable to request process to resume processing"), save_errno);
+					     RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id,
+					     ERR_TEXT, 2,
+					     RTS_ERROR_LITERAL("Unable to request process to resume processing"),
+					     save_errno);
 			}
 #			ifdef DEBUG
 			else

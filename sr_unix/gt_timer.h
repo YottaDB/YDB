@@ -93,9 +93,12 @@ typedef struct st_timer_alloc
  */
 #define SLACKTIME		10
 
+#define CANCEL_TIMERS		cancel_unsafe_timers()
+
 int4		abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2);
 void		add_int_to_abs_time(ABS_TIME *atps, int4 ival, ABS_TIME *atpd);
 void		cancel_timer(TID tid);
+void		cancel_unsafe_timers(void);
 void		clear_timers(void);
 void		hiber_start(uint4 hiber);
 void		hiber_start_wait_any(uint4 hiber);
@@ -122,8 +125,6 @@ STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
 STATICFNDCL void	add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
 	void *hdata, boolean_t safe_timer);
 STATICFNDCL void	remove_timer(TID tid);
-STATICFNDCL void 	uninit_all_timers(void);
-STATICFNDCL void	cancel_all_timers(void);
 STATICFNDCL void	init_timers(void);
 
 #endif

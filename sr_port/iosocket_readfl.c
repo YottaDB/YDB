@@ -27,8 +27,6 @@
 #include "gt_timer.h"
 #include "io.h"
 #include "iotimer.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "stringpool.h"
 #include "iosocketdef.h"
 #include "min_max.h"
@@ -247,8 +245,11 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		bytes_read = 0;
 		chars_read = 0;
 		buffer_start = NULL;
+		socketptr->pendingevent = FALSE;
+		socketptr->lastaction = dsocketptr->waitcycle;
 	} else
 	{
+		assert(bytes_read);
 		max_bufflen = sockintr->max_bufflen;
 		chars_read = sockintr->chars_read;
 		assert(chars_read <= bytes_read);
@@ -259,7 +260,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 								     end_time.at_usec)));
 		DBGSOCK((stdout, "socrfl: .. buffer address: 0x"lvaddr"  stringpool: 0x"lvaddr"\n",
 			 buffer_start, stringpool.free));
-		if (stringpool.free != (buffer_start + bytes_read))	/* BYPASSOK */
+		if (!IS_AT_END_OF_STRINGPOOL(buffer_start, bytes_read))
 		{	/* Not @ stringpool.free - must move what we have, so we need room for the whole anticipated message */
 			DBGSOCK2((stdout, "socrfl: .. Stuff put on string pool after our buffer\n"));
 			stp_need = max_bufflen;
@@ -279,14 +280,14 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			buffer_start = (unsigned char *)v->str.addr;
 			TRCTBL_ENTRY(SOCKRFL_RSTGC, 0, buffer_start, stringpool.free, NULL);
 		}
-		if ((buffer_start + bytes_read) < stringpool.free)		/* BYPASSOK */
+		assert((buffer_start + bytes_read) <= stringpool.free);	/* BYPASSOK */
+		if (!IS_AT_END_OF_STRINGPOOL(buffer_start, bytes_read))
 		{	/* Now need to move it to the top */
 			assert(stp_need == max_bufflen);
 			memcpy(stringpool.free, buffer_start, bytes_read);	/* BYPASSOK */
 			buffer_start = stringpool.free;				/* BYPASSOK */
 		} else
 		{	/* It should still be just under the used space */
-			assert((buffer_start + bytes_read) == stringpool.free);	/* BYPASSOK */
 			stringpool.free = buffer_start;		/* backup the free pointer */
 		}
 		v->str.len = 0;		/* Clear incase interrupt or error -- don't want to hold this buffer */
@@ -406,7 +407,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				assert(stringpool.free <= stringpool.top);					/* BYPASSOK */
 				INVOKE_STP_GCOL(max_bufflen);
 				old_stringpool_free = stringpool.free;						/* BYPASSOK */
-				assert(stringpool.free == (unsigned char *)(v->str.addr + v->str.len));		/* BYPASSOK */
+				assert(IS_AT_END_OF_STRINGPOOL(v->str.addr, v->str.len));
 				stringpool.free = (unsigned char *)v->str.addr;
 				v->str.len = 0; /* If interrupted, don't hold onto old space */
 				TRCTBL_ENTRY(SOCKRFL_EXPBUFGC, bytes_read, stringpool.free, old_stringpool_free, /* BYPASSOK */
@@ -465,7 +466,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							assert(stringpool.free <= stringpool.top);
 							INVOKE_STP_GCOL(max_bufflen);
 							old_stringpool_free = stringpool.free;
-							assert(stringpool.free == (unsigned char *)(v->str.addr + v->str.len));
+							assert(IS_AT_END_OF_STRINGPOOL(v->str.addr, v->str.len));
 							stringpool.free = (unsigned char *)v->str.addr;
 							v->str.len = 0; /* If interrupted, don't hold onto old space */
 							TRCTBL_ENTRY(SOCKRFL_EXPBUFGC, bytes_read, stringpool.free, /* BYPASSOK */
@@ -817,7 +818,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 								    timeout, msec_timeout)));
 		TRCTBL_ENTRY(SOCKRFL_OUTOFBAND, bytes_read, (INTPTR_T)chars_read, stringpool.free, NULL);	/* BYPASSOK */
 		outofband_action(FALSE);
-		GTMASSERT;	/* Should *never* return from outofband_action */
+		assertpro(FALSE);	/* Should *never* return from outofband_action */
 		return FALSE;	/* For the compiler.. */
 	}
 	if (0 < chars_read)

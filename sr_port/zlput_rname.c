@@ -25,7 +25,12 @@
 #include "gtm_text_alloc.h"
 #ifdef UNIX
 #include "srcline.h"
+#include "gtmlink.h"
 #endif
+#include "mmemory.h"
+
+STATICFNDCL boolean_t handle_active_old_versions(rhdtyp *old_rhead, rhdtyp *hdr);
+void zr_release(rhdtyp *old_rhead);
 
 #define S_CUTOFF 		7
 #define FREE_RTNTBL_SPACE 	17
@@ -37,59 +42,18 @@ GBLREF stack_frame	*frame_pointer;
 
 bool zlput_rname (rhdtyp *hdr)
 {
-	rhdtyp		*old_rhead, *rhead;
-	rtn_tabent	*rbot, *mid, *rtop;
-	stack_frame	*fp, *fpprev;
+	rhdtyp		*old_rhead, *rhead, *prev_active;
+	rtn_tabent	*mid;
 	char		*src, *new, *old_table;
-	int		comp;
-	ht_ent_mname    *tabent;
-	mname_entry	key;
-	uint4		entries;
-	mstr		*curline;
 	mident		*rtn_name;
 	size_t		size, src_len;
-#	ifdef VMS
-	uint4		*src_tbl;
-#	else
-	routine_source	*src_tbl;
-#	endif
+	boolean_t	found;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	rtn_name = &hdr->routine_name;
-	rbot = rtn_names;
-	rtop = rtn_names_end;
-	for (;;)
-	{	/* See if routine exists in list via a binary search which reverts to serial
-		   search when # of items drops below the threshold S_CUTOFF.
-		*/
-		if ((rtop - rbot) < S_CUTOFF)
-		{
-			comp = -1;
-			for (mid = rbot; mid <= rtop ; mid++)
-			{
-				MIDENT_CMP(&mid->rt_name, rtn_name, comp);
-				if (0 <= comp)
-					break;
-			}
-			break;
-		} else
-		{	mid = rbot + (rtop - rbot)/2;
-			MIDENT_CMP(&mid->rt_name, rtn_name, comp);
-			if (0 == comp)
-				break;
-			else if (0 > comp)
-			{
-				rbot = mid + 1;
-				continue;
-			} else
-			{
-				rtop = mid - 1;
-				continue;
-			}
-		}
-	}
-	if (comp)
+	found = find_rtn_tabent(&mid, rtn_name);
+	if (!found)
 	{	/* Entry was not found. Add in a new one */
 		old_table = NULL;
 		src = (char *)mid;
@@ -111,7 +75,6 @@ bool zlput_rname (rhdtyp *hdr)
 			memset(rtn_names_end + 1, 0, size - ((char *)(rtn_names_end + 1) - new));
 		}
 		memmove(mid + 1, src, src_len);
-		mid->rt_name = *rtn_name;
 		rtn_names_end++;
 		if (old_table && old_table != (char *)rtn_fst_table)
 			free(old_table);		/* original table can't be freed */
@@ -119,117 +82,116 @@ bool zlput_rname (rhdtyp *hdr)
 	} else
 	{	/* Entry exists. Update it */
 		old_rhead = (rhdtyp *)mid->rt_adr;
-		/* Verify routine is not currently active. If it is, we cannot replace it */
-		for (fp = frame_pointer; fp ; fp = fpprev)
-		{
-			fpprev = fp->old_frame_pointer;
-#			ifdef GTM_TRIGGER
-			if (NULL != fpprev && SFT_TRIGR & fpprev->type)
-				fpprev = *(stack_frame **)(fpprev + 1);
-#			endif
-			/* Check all possible versions of each routine header */
-			for (rhead = CURRENT_RHEAD_ADR(old_rhead); rhead;
-			     rhead = (rhdtyp *)NON_USHBIN_ONLY(rhead->old_rhead_ptr)USHBIN_ONLY(rhead->old_rhead_adr))
-				if (fp->rvector == rhead)
-					return FALSE;
-		}
-		zr_remove(old_rhead, NOBREAKMSG); /* get rid of the inactive breakpoints and release private code section */
-
-		/* If source has been read in for old routine, free space. Since routine name is the key, do this before
-		   (in USHBIN builds) we release the literal text section as part of the releasable read-only section.
-		*/
-		tabent = NULL;
-		if (NULL != (TREF(rt_name_tbl)).base)
-		{
-			key.var_name = mid->rt_name;
-			COMPUTE_HASH_MNAME(&key);
-			if (NULL != (tabent = lookup_hashtab_mname(TADR(rt_name_tbl), &key)) && tabent->value)
-			{
-#				ifdef VMS
-				src_tbl = (uint4 *)tabent->value;
-				/* Must delete the entries piece-meal */
-				entries = *(src_tbl + 1);
-				if (0 != entries)
-					/* Don't count line 0 which we bypass */
-					entries--;
-				/* curline start is 2 uint4s into src_tbl and then space past line 0 or
-				   we end up freeing the storage for line 0/1 twice since they have the
-				   same pointers.
-				*/
-				for (curline = RECAST(mstr *)(src_tbl + 2) + 1; 0 != entries; --entries, ++curline)
-				{
-					assert(curline->len);
-					free(curline->addr);
-				}
-				free(tabent->value);
-#				elif defined(UNIX)
-				/* Entries and source are malloc'd in two blocks on UNIX */
-				src_tbl = (routine_source *)tabent->value;
-				if (NULL != src_tbl->srcbuff)
-					free(src_tbl->srcbuff);
-				free(src_tbl);
-#				else
-#				  error "unsupported platform"
-#				endif
-				/* Note that there are two possible ways to proceed here to clear this entry:
-				 *   1. Just clear the value as we do below.
-				 *   2. Use the DELETE_HTENT() macro to remove the entry entirely from the hash table.
-				 *
-				 * We choose #1 since a routine that had had its source loaded is likely to have it reloaded
-				 * and if the source load rtn has to re-add the key, it won't reuse the deleted key (if it
-				 * remained a deleted key) until all other hashtable slots have been used up (creating a long
-				 * collision chain). A deleted key may not remain a deleted key if it was reached with no
-				 * collisions but will instead be turned into an unused key and be immediately reusable.
-				 * But since it is likely to be reused, we just zero the entry but this creates a necessity
-				 * that the key be maintained. If this is a non-USBHIN platform, everything stays around
-				 * anyway so that's not an issue. However, in a USHBIN platform, the literal storage the key
-				 * is pointing to gets released. For that reason, in the USHBIN processing section below, we
-				 * update the key to point to the newly loaded module's routine name.
-				 */
-				tabent->value = NULL;
-			}
+		/* Verify routine is not currently active. If it is, we cannot replace it -- wrong */
+		USHBIN_ONLY(prev_active = old_rhead->active_rhead_adr);
+		if (!handle_active_old_versions(old_rhead, hdr))
+			return FALSE;
+		USHBIN_ONLY( if (prev_active == old_rhead->active_rhead_adr))
+		{	/* old version not in use. free it */
+			zr_remove(old_rhead, NOBREAKMSG); /* remove breakpoints (now inactive) */
+			/* If source has been read in for old routine, free space. On VMS, source is associated with a routine name
+			 * table entry. On UNIX, source is associated with a routine header, and we may have different sources for
+			 * different linked versions of the same routine name.
+			 */
+			free_src_tbl(old_rhead);
+			zr_release(old_rhead); /* release private code section */
 		}
 #		ifndef USHBIN_SUPPORTED
 		hdr->old_rhead_ptr = (int4)old_rhead;
-		if (!old_rhead->old_rhead_ptr)
-		{
-		        fix_pages((unsigned char *)old_rhead, (unsigned char *)LNRTAB_ADR(old_rhead)
-				  + (SIZEOF(lnr_tabent) * old_rhead->lnrtab_len));
-		}
 #		else /* USHBIN_SUPPORTED */
-		if (!old_rhead->shlib_handle)
-	        { 	/* Migrate text literals pointing into text area we are about to throw away into the stringpool.
-			   We also can release the read-only releasable segment as it is no longer needed.
-			*/
-			stp_move((char *)old_rhead->literal_text_adr,
-				 (char *)(old_rhead->literal_text_adr + old_rhead->literal_text_len));
-			if (tabent)
-			{	/* There was (at one time) a $TEXT source section for this routine. We may have just
-				   released it but whether the source was for the routine just replaced or for an earlier
-				   replacement, the key for that segment is pointing into the readonly storage we
-				   are just about to release. Replace the key with the current one for this routine.
-				*/
-				assert(MSTR_EQ(&tabent->key.var_name, rtn_name));
-				tabent->key.var_name = *rtn_name;	/* Update key with newly saved mident */
-			}
-			zlmov_lnames(old_rhead); /* copy the label names from literal pool to malloc'd area */
-			GTM_TEXT_FREE(old_rhead->ptext_adr);
-			/* Reset the routine header pointers to the sections we just freed up.
-			 * NOTE: literal_text_adr shouldn't be reset as it points to the label area malloc'd
-			 * in zlmov_lnames() */
-			old_rhead->ptext_adr = old_rhead->ptext_end_adr = NULL;
-			old_rhead->lnrtab_adr = NULL;
-		}
-		urx_remove(old_rhead);
-		free(RW_REL_START_ADR(old_rhead));	/* Release the read-write releasable segments */
-		old_rhead->literal_adr = NULL;
-		old_rhead->vartab_adr = NULL;
-		free(old_rhead->linkage_adr);		/* Release the old linkage section */
-		old_rhead->linkage_adr = NULL;
 		hdr->old_rhead_adr = old_rhead;
 #		endif
-		mid->rt_name = *rtn_name;
 	}
-	mid->rt_adr= hdr;
+	mid->rt_name = *rtn_name;
+	mid->rt_adr = hdr;
+	UNIX_ONLY(hdr->source_code = NULL);
 	return TRUE;
 }
+
+STATICFNDEF boolean_t handle_active_old_versions(rhdtyp *old_rhead, rhdtyp *hdr)
+{
+	stack_frame	*fp;
+	rhdtyp 		*rhead, *new_rhead;
+	boolean_t	need_duplicate, on_stack;
+	ssize_t		sect_rw_nonrel_size;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	assert(old_rhead == CURRENT_RHEAD_ADR(old_rhead));
+	on_stack = FALSE;
+	need_duplicate = FALSE;
+	for (fp = frame_pointer; NULL != fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))
+	{
+		if (MSTR_EQ(&fp->rvector->routine_name, &old_rhead->routine_name))
+		{
+			on_stack = TRUE;
+			if (CURRENT_RHEAD_ADR(fp->rvector) == old_rhead)
+				need_duplicate = TRUE;
+		}
+	}
+	if (on_stack)
+	{
+#		ifdef USHBIN_SUPPORTED
+		if (LINK_NORECURSIVE == TREF(relink_allowed))
+#		endif
+			return FALSE;
+	}
+#	ifdef USHBIN_SUPPORTED
+	if (need_duplicate)
+	{
+		new_rhead = (rhdtyp *)malloc(SIZEOF(rhdtyp));
+		*new_rhead = *old_rhead;
+		new_rhead->current_rhead_adr = new_rhead;
+		old_rhead->active_rhead_adr = new_rhead; /* reserve previous version on active chain */
+		for (fp = frame_pointer; NULL != fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))
+			if (CURRENT_RHEAD_ADR(fp->rvector) == old_rhead)
+				fp->rvector = new_rhead; /* point frame's code vector at reserved copy of old routine version */
+		/* any field (e.g. the label table) that is currently shared by old_rhead needs to be copied to a separate area
+		 * other fields (e.g. literal mvals) will be redirected for old_rhead, so we just need to keep the older version
+		 * around (don't free it).
+		 */
+		sect_rw_nonrel_size = old_rhead->labtab_len * SIZEOF(lab_tabent);
+		new_rhead->labtab_adr = (lab_tabent *)malloc(sect_rw_nonrel_size);
+		memcpy(new_rhead->labtab_adr, old_rhead->labtab_adr, sect_rw_nonrel_size);
+		/* make sure to: skip urx_remove, do not free code section, etc. */
+		/* ALSO: we need to go through resolve linkage table entries corresponding to this the old version, and re-resolve
+		 * them to point into the new version */
+	}
+#	endif /* USHBIN_SUPPORTED */
+	return TRUE;
+}
+
+#ifdef USHBIN_SUPPORTED
+void zr_release(rhdtyp *old_rhead)
+{
+	if (!old_rhead->shlib_handle)
+        { 	/* Migrate text literals pointing into text area we are about to throw away into the stringpool.
+		   We also can release the read-only releasable segment as it is no longer needed.
+		*/
+		stp_move((char *)old_rhead->literal_text_adr,
+			 (char *)(old_rhead->literal_text_adr + old_rhead->literal_text_len));
+		zlmov_lnames(old_rhead); /* copy the label names from literal pool to malloc'd area */
+		GTM_TEXT_FREE(old_rhead->ptext_adr);
+		/* Reset the routine header pointers to the sections we just freed up.
+		 * NOTE: literal_text_adr shouldn't be reset as it points to the label area malloc'd
+		 * in zlmov_lnames() */
+		old_rhead->ptext_adr = old_rhead->ptext_end_adr = NULL;
+		old_rhead->lnrtab_adr = NULL;
+	}
+	urx_remove(old_rhead);
+	free(RW_REL_START_ADR(old_rhead));	/* Release the read-write releasable segments */
+	old_rhead->literal_adr = NULL;
+	old_rhead->vartab_adr = NULL;
+	free(old_rhead->linkage_adr);		/* Release the old linkage section */
+	old_rhead->linkage_adr = NULL;
+}
+#else /* non-USHBIN_SUPPORTED platforms */
+void zr_release(rhdtyp *old_rhead)
+{
+	if (!old_rhead->old_rhead_ptr)
+	{
+	        fix_pages((unsigned char *)old_rhead, (unsigned char *)LNRTAB_ADR(old_rhead)
+			  + (SIZEOF(lnr_tabent) * old_rhead->lnrtab_len));
+	}
+}
+#endif

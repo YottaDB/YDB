@@ -44,11 +44,17 @@ GBLREF srch_hist	dummy_hist;
 GBLREF block_id		patch_curr_blk;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
-GBLREF gd_addr		*gd_header;
 GBLREF char 		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF unsigned short 	patch_comp_count;
 GBLREF gd_region        *gv_cur_region;
 GBLREF cw_set_element   cw_set[];
+
+error_def(ERR_CPBEYALLOC);
+error_def(ERR_DBRDONLY);
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEFAIL);
+error_def(ERR_GVIS);
+error_def(ERR_REC2BIG);
 
 void dse_adrec(void)
 {
@@ -63,15 +69,8 @@ void dse_adrec(void)
 	blk_segment	*bs1, *bs_ptr;
 	srch_blk_status	blkhist;
 
-	error_def(ERR_CPBEYALLOC);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_DSEBLKRDFAIL);
-	error_def(ERR_DSEFAIL);
-	error_def(ERR_GVIS);
-	error_def(ERR_REC2BIG);
-
         if (gv_cur_region->read_only)
-                rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+                rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
@@ -95,7 +94,7 @@ void dse_adrec(void)
 	blk_size = cs_addrs->hdr->blk_size;
 	blkhist.blk_num = patch_curr_blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 
 	lbp = (uchar_ptr_t)malloc(blk_size);
 	memcpy(lbp, blkhist.buffaddr, blk_size);
@@ -147,8 +146,8 @@ void dse_adrec(void)
 		}
 		if (key_len + data_len >  cs_addrs->hdr->max_rec_size)
 		{
- 			rts_error(VARLSTCNT(10) ERR_REC2BIG, 4, key_len + data_len, (int4)cs_addrs->hdr->max_rec_size,
-								REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, LEN_AND_STR(key));
+ 			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(10) ERR_REC2BIG, 4, key_len + data_len,
+				(int4)cs_addrs->hdr->max_rec_size, REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, LEN_AND_STR(key));
 		}
 
 	}

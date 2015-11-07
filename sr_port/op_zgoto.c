@@ -51,11 +51,12 @@ error_def(ERR_ZGOTOTOOBIG);
 
 void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 {
-	stack_frame	*fp, *fpprev, *base_frame;
+	stack_frame	*fp, *fpprev;
 	int4		curlvl;
 	mval		rtnname, lblname;
 	rhdtyp		*rtnhdr;
 	lnr_tabent 	USHBIN_ONLY(*)*lnrptr;
+	void		(*frame_func)();
 	char		rtnname_buff[SIZEOF(mident_fixed)], lblname_buff[SIZEOF(mident_fixed)];
 	DEBUG_ONLY(int4	dlevel;)
 
@@ -156,16 +157,14 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		}
 		/* Full unlink/unwind requested. First unlink everything, then relink our target entryref */
 		gtm_unlink_all();
-		/* Now that everything is unwound except the frame we will rewrite when we start going forward again, we need to
-		 * find the base frame. This frame contains the same rvector pointer that the level 1 stack frame routine has so
-		 * it needs to also be rewritten once we link our new "1st routine". Find the base frame we will be modifying.
+		frame_func = new_stack_frame;
+		/* Now that everything is unwound, frame_pointer is the base frame. This frame contains the same rvector pointer
+		 * that the level 1 stack frame routine has so it needs to also be rewritten once we link our new "1st routine".
 		 */
-		for (base_frame = frame_pointer; ((NULL != base_frame) && (NULL != base_frame->old_frame_pointer));
-		     base_frame = base_frame->old_frame_pointer);
-		assert(NULL != base_frame);
+		assert((NULL != frame_pointer) && (NULL == frame_pointer->old_frame_pointer));
 		rtnhdr = op_rhdaddr(&rtnname, NULL);
 		assert(NULL != rtnhdr);
-		base_frame->rvector = rtnhdr;
+		frame_pointer->rvector = rtnhdr;
 		lnrptr = op_labaddr(rtnhdr, &lblname, offset);
 		assert(NULL != lnrptr);
 	} else
@@ -173,16 +172,19 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	{	/* Unwind to our target level (UNIX if 0 != level  and VMS [all]) */
 		GOLEVEL(level, TRUE);	/* Unwind the trigger base frame if we run into one */
 		assert(level == dollar_zlevel());
+		frame_func = flush_jmp;
 	}
-	/* Convert current stack frame to the frame for the entry ref we want to branch to */
-	USHBIN_ONLY(flush_jmp(rtnhdr, (unsigned char *)LINKAGE_ADR(rtnhdr), LINE_NUMBER_ADDR(rtnhdr, *lnrptr)));
+	/* Convert current stack frame (flush_jmp) to the frame for the entry ref we want to branch to, or create a new level 1
+	 * frame (new_stack_frame) after ZGOTO 0.
+	 */
+	USHBIN_ONLY((* frame_func)(rtnhdr, (unsigned char *)LINKAGE_ADR(rtnhdr), LINE_NUMBER_ADDR(rtnhdr, *lnrptr)));
 	/* on non-shared binary calculate the transfer address to be passed to flush_jmp as follows:
 	 * 	1) get the number stored at lnrptr; this is the offset to the line number entry
 	 *	2) add the said offset to the address of the routine header; this is the address of line number entry
 	 *	3) dereference the said address to get the line number of the actual program
 	 *	4) add the said line number to the address of the routine header
 	 */
-	NON_USHBIN_ONLY(flush_jmp(rtnhdr, (unsigned char *)LINKAGE_ADR(rtnhdr),
+	NON_USHBIN_ONLY((* frame_func)(rtnhdr, (unsigned char *)LINKAGE_ADR(rtnhdr),
 		(unsigned char *)((int)rtnhdr + *(int *)((int)rtnhdr + *lnrptr))));
 	DBGEHND((stderr, "op_zgoto: Resuming at frame 0x"lvaddr" with type 0x%04lx\n", frame_pointer, frame_pointer->type));
 #	ifdef GTM_TRIGGER

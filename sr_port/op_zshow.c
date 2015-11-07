@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,8 @@
 
 GBLREF gv_key *gv_currkey;
 
+error_def(ERR_ZSHOWBADFUNC);
+
 void op_zshow(mval *func,int type,lv_val *lvn)
 {
 	const char	*ptr;
@@ -39,12 +41,11 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 			done_g = FALSE,
 			done_i = FALSE,
 			done_l = FALSE,
+			done_r = FALSE,
 			done_s = FALSE,
 			done_v = FALSE;
 	int		i;
   	zshow_out	output;
-
-	error_def(ERR_ZSHOWBADFUNC);
 
 	MAXSTR_BUFF_DECL(buff);
 
@@ -65,6 +66,8 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 			case 'i':
 			case 'L':
 			case 'l':
+			case 'R':
+			case 'r':
 			case 'S':
 			case 's':
 			case 'V':
@@ -74,7 +77,7 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 				do_all = TRUE;
 				break;
 			default:
-				rts_error(VARLSTCNT(1) ERR_ZSHOWBADFUNC);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSHOWBADFUNC);
 		}
 	}
 	if (do_all)
@@ -153,13 +156,21 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 				output.line_num = 0;	/* L statistics start at 0 for <LUS,LUF> output and not 1 like the others */
 				zshow_locks(&output);
 				break;
+			case 'R':
+			case 'r':
+				if (done_r)
+					break;
+				done_r = TRUE;
+				output.code = 'R';
+				zshow_stack(&output, TRUE);	/* show_checksum = TRUE */
+				break;
 			case 'S':
 			case 's':
 				if (done_s)
 					break;
 				done_s = TRUE;
 				output.code = 'S';
-				zshow_stack(&output);
+				zshow_stack(&output, FALSE);	/* show_checksum = FALSE */
 				break;
 			case 'V':
 			case 'v':

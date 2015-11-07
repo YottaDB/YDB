@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,7 @@
 #include "util.h"
 #include "collseq.h"
 #include "alias.h"
+#include "gtmimagename.h"
 
 #define UNDO_ACTIVE_LV								\
 {										\
@@ -97,14 +98,22 @@ error_def(ERR_STACKOFLOW);
 
 void op_merge(void)
 {
-	boolean_t		found, check_for_null_subs, is_base_var, nontp_and_bgormm;
+	boolean_t		found, check_for_null_subs, is_base_var, nontp_and_bgormm, nospan, act_mismatch;
 	lv_val			*dst_lv;
-	mval 			*mkey, *value, *subsc;
+	mval 			*mkey, *value, *subsc, tmp_mval;
 	int			org_glvn1_keysz, org_glvn2_keysz, delta2, dollardata_src, dollardata_dst, sbs_depth;
-	unsigned char		*ptr, *ptr2;
+	int			gvn1subs, gvn2subs, nsubs, keylen;
+	unsigned char		*ptr, *ptr2, *ptr_top;
 	unsigned char  		buff[MAX_ZWR_KEY_SZ];
 	unsigned char		nullcoll_src, nullcoll_dst;
 	zshow_out		output;
+	gd_addr			*gbl1_gd_addr, *gbl2_gd_addr;
+	gd_binding		*map;
+	gd_region		*reg1, *reg2;
+	gv_key           	*key, *mergekey2;
+	gv_namehead		*gvt1, *gvt2;
+	gvnh_reg_t		*gvnh_reg1, *gvnh_reg2;
+	gvname_info		*gblp1, *gblp2;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -118,12 +127,15 @@ void op_merge(void)
 	PUSH_MV_STENT(MVST_MVAL);
 	value = &mv_chain->mv_st_cont.mvs_mval;
 	value->mvtype = 0; /* initialize mval in the M-stack in case stp_gcol gets called before value gets initialized below */
+	gblp1 = mglvnp->gblp[IND1];
+	gblp2 = mglvnp->gblp[IND2];
 	if (MARG2_IS_GBL(merge_args))
 	{	/* Need to protect mkey returned from gvcst_queryget from stpgcol */
 		PUSH_MV_STENT(MVST_MVAL);
 		mkey = &mv_chain->mv_st_cont.mvs_mval;
 		mkey->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before mkey gets initialized below */
-		gvname_env_restore(mglvnp->gblp[IND2]);
+		gvname_env_restore(gblp2);
+		gbl2_gd_addr = TREF(gd_targ_addr);
 		/* now $DATA will be done for gvn2. op_gvdata input parameters are set in the form of some GBLREF */
 		op_gvdata(value);
 		dollardata_src = MV_FORCE_INT(value);
@@ -133,66 +145,82 @@ void op_merge(void)
 			POP_MV_STENT();	/* value */
 			POP_MV_STENT(); /* mkey */
 			if (MARG1_IS_GBL(merge_args))
-				gvname_env_restore(mglvnp->gblp[IND1]);	 /* store destination as naked indicator in gv_currkey */
+				gvname_env_restore(gblp1);	 /* store destination as naked indicator in gv_currkey */
 			merge_args = 0;	/* Must reset to zero to reuse the Global */
 			return;
 		}
-		nontp_and_bgormm = ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth))
+		nontp_and_bgormm = ((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)))
 				&& !dollar_tlevel;
-		assert(!nontp_and_bgormm || gv_target->root);
 		if (NULL == TREF(gv_mergekey2))
 		{	/* We need to initialize gvn2 (right hand side). */
 			GVKEY_INIT(TREF(gv_mergekey2), DBKEYSIZE(MAX_KEY_SZ));
 		}
-		org_glvn1_keysz = mglvnp->gblp[IND1]->s_gv_currkey->end + 1;
+		mergekey2 = TREF(gv_mergekey2);
+		org_glvn1_keysz = gblp1->s_gv_currkey->end + 1;
 		org_glvn2_keysz = gv_currkey->end + 1;
-		(TREF(gv_mergekey2))->end = gv_currkey->end;
-		(TREF(gv_mergekey2))->prev = gv_currkey->prev;
-		memcpy((TREF(gv_mergekey2))->base, gv_currkey->base, gv_currkey->end + 1);
+		mergekey2->end = gv_currkey->end;
+		mergekey2->prev = gv_currkey->prev;
+		memcpy(mergekey2->base, gv_currkey->base, gv_currkey->end + 1);
 		if (MARG1_IS_GBL(merge_args))
 		{	/*==================== MERGE ^gvn1=^gvn2 =====================*/
-			if (mglvnp->gblp[IND2]->s_gv_target->nct != mglvnp->gblp[IND1]->s_gv_target->nct)
-				rts_error(VARLSTCNT(1) ERR_NCTCOLLDIFF);
-			/* if self merge then NOOP*/
+			gvt1 = gblp1->s_gv_target;
+			gvt2 = gblp2->s_gv_target;
+			if (gvt2->nct != gvt1->nct)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NCTCOLLDIFF);
 			if (!merge_desc_check()) /* will not proceed if one is descendant of another */
-			{
-				gvname_env_restore(mglvnp->gblp[IND1]);	 /* store destination as naked indicator in gv_currkey */
+			{	/* 0 return implies self merge i.e. NOOP */
+				gvname_env_restore(gblp1);	 /* store destination as naked indicator in gv_currkey */
 				POP_MV_STENT();	/* value */
 				merge_args = 0;	/* Must reset to zero to reuse the Global */
 				return;
 			}
-			nullcoll_src = mglvnp->gblp[IND2]->s_gv_cur_region->std_null_coll;
-			nullcoll_dst = mglvnp->gblp[IND1]->s_gv_cur_region->std_null_coll;
+			gvnh_reg1 = gblp1->s_gd_targ_gvnh_reg;
+			gvnh_reg2 = gblp2->s_gd_targ_gvnh_reg;
+			/* A non-NULL value of gvnh_reg indicates a spanning global as confirmed by the asserts below */
+			assert((NULL == gvnh_reg1) || (NULL != gvnh_reg1->gvspan));
+			assert((NULL == gvnh_reg2) || (NULL != gvnh_reg2->gvspan));
+			reg1 = gblp1->s_gv_cur_region;
+			reg2 = gblp2->s_gv_cur_region;
+			nullcoll_src = reg2->std_null_coll;
+			assert((NULL == gvnh_reg2) || nullcoll_src);	/* spanning globals => std_null_coll only option */
+			nullcoll_dst = reg1->std_null_coll;
+			assert((NULL == gvnh_reg1) || nullcoll_dst);	/* spanning globals => std_null_coll only option */
+			act_mismatch = (gvt2->act != gvt1->act);	/* this is accurate for spanning globals too */
 			if (1 == dollardata_src || 11 == dollardata_src)
 			{
 				found = op_gvget(value);  /* value of ^glvn2 */
 				if (found)
 				{	/* SET ^gvn1=^gvn2 */
-					gvname_env_restore(mglvnp->gblp[IND1]);
+					gvname_env_restore(gblp1);
 					op_gvput(value);
 					/* Note: If ^gvn1's null_sub=ALLOWEXISTING and say ^gvn1("")=^gvn,
 					 * this will give NULL_SUBC error
 					 */
 				}
 			}
-			check_for_null_subs = (NEVER != mglvnp->gblp[IND2]->s_gv_cur_region->null_subs) &&
-				(ALWAYS != mglvnp->gblp[IND1]->s_gv_cur_region->null_subs);
+			gbl1_gd_addr = gblp1->s_gd_targ_addr;
+			check_for_null_subs = (NEVER != reg2->null_subs) && (ALWAYS != reg1->null_subs);
+			key = gblp1->s_gv_currkey;
+			GET_NSUBS_IN_GVKEY(key->base, key->end - 1, gvn1subs);	/* sets "gvn1subs" */
+			key = gblp2->s_gv_currkey;
+			GET_NSUBS_IN_GVKEY(key->base, key->end - 1, gvn2subs);	/* sets "gvn2subs" */
+			nospan = (NULL == gvnh_reg1) && (NULL == gvnh_reg2);
 			/* Traverse descendant of ^gvn2 and copy into ^gvn1 */
 			for (; ;)
 			{
 				if (outofband)
 				{
-					gvname_env_restore(mglvnp->gblp[IND1]); /* naked indicator is restored into gv_currkey */
+					gvname_env_restore(gblp1); /* naked indicator is restored into gv_currkey */
 					outofband_action(FALSE);
 				}
-				/* Restore last key under ^gvn2 we worked */
-				gvname_env_restore(mglvnp->gblp[IND2]);
-				assert(0 == gv_currkey->base[gv_currkey->end - 1] && 0 == gv_currkey->base[gv_currkey->end]);
-				/* following is an attempt to find immidiate right sibling */
-				gv_currkey->base[gv_currkey->end] = 1;
-				gv_currkey->base[gv_currkey->end + 1] = 0;
-				gv_currkey->base[gv_currkey->end + 2] = 0;
-				gv_currkey->end += 2;
+				gvname_env_restore(gblp2);	/* Restore last key under ^gvn2 we worked */
+				/* If gblp2 corresponds to a spanning global, then determine
+				 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+				 */
+				assert((NULL == gvnh_reg2) || (TREF(gd_targ_gvnh_reg) == gvnh_reg2));
+				GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg2, gbl2_gd_addr, gv_currkey);
+				/* following is an attempt to find immediate right sibling */
+				GVKEY_INCREMENT_QUERY(gv_currkey);
 #				ifdef UNIX
 				if (nontp_and_bgormm && (0 == gv_target->root))
 				{	/* This is to handle root blocks moved by REORG. Merge alternates between two
@@ -214,46 +242,108 @@ void op_merge(void)
 				assert(MV_IS_STRING(mkey));
 				if (mkey->str.len < org_glvn2_keysz)
 					break;
-				if (0 != *((unsigned char *)mkey->str.addr + (TREF(gv_mergekey2))->end - 1) ||
-					memcmp(mkey->str.addr, (TREF(gv_mergekey2))->base, (TREF(gv_mergekey2))->end - 1))
+				if (0 != *((unsigned char *)mkey->str.addr + mergekey2->end - 1)
+						|| memcmp(mkey->str.addr, mergekey2->base, mergekey2->end - 1))
 					break; 					/* mkey is not under the sub-tree */
-				delta2 = mkey->str.len - org_glvn2_keysz; 	/* length increase of source key */
+				delta2 = mkey->str.len - org_glvn2_keysz; 	/* compute length increase of source key */
 				assert (0 < delta2);
-				/* Save the new source key for next iteration */
-				memcpy(mglvnp->gblp[IND2]->s_gv_currkey->base + org_glvn2_keysz - 2,
-					mkey->str.addr + org_glvn2_keysz - 2, delta2 + 2);
-				mglvnp->gblp[IND2]->s_gv_currkey->end = mkey->str.len - 1;
-				/* Create the destination key for this iteration (under ^glvn1) */
-				gvname_env_restore(mglvnp->gblp[IND1]);
-				if (gv_cur_region->max_key_size < org_glvn1_keysz + delta2)
-					ISSUE_GVSUBOFLOW_ERROR(gv_currkey);
-				assert(gv_currkey->end == org_glvn1_keysz - 1);
-				memcpy(gv_currkey->base + org_glvn1_keysz - 2,
-					mkey->str.addr + org_glvn2_keysz - 2, delta2 + 2);
-				gv_currkey->end = org_glvn1_keysz + delta2 - 1;
-				if (nullcoll_src != nullcoll_dst)
+				GET_NSUBS_IN_GVKEY(mkey->str.addr + org_glvn2_keysz - 2, delta2, nsubs); /* sets "nsubs" */
+				/* Check if the target node in ^gvn1 exceeds max # of subscripts */
+				if (MAX_GVSUBSCRIPTS <= (gvn1subs + gvn2subs + nsubs))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
+				/* Save the new source key for next iteration. Do not use gvname_env_save since that relies
+				 * on gv_currkey holding the key to be saved which is not the case here. Also gvname_env_save
+				 * has a lot of other save code which is redundant.
+				 */
+				assert(gblp2->s_gv_currkey->top >= mkey->str.len);
+				memcpy(gblp2->s_gv_currkey->base + org_glvn2_keysz - 2,
+							mkey->str.addr + org_glvn2_keysz - 2, delta2 + 2);
+				gblp2->s_gv_currkey->end = mkey->str.len - 1;
+				if (!nospan)
 				{
-					if (0 == nullcoll_dst)
-					{	/* Standard to GTM null subscript conversion*/
-						STD2GTMNULLCOLL((unsigned char *)gv_currkey->base + org_glvn1_keysz - 1,
-								delta2 - 1);
-					} else
-					{	/*  GTM to standard null subscript conversion */
-						GTM2STDNULLCOLL((unsigned char *)gv_currkey->base + org_glvn1_keysz - 1,
-								delta2 - 1);
+					if (NULL != gvnh_reg2)
+					{	/* ^gvn2 spans multiple regions. Find region where the current key was obtained */
+						map = gv_srch_map(gbl2_gd_addr, (char *)&gv_currkey->base[0], gv_currkey->end - 1);
+						reg2 = map->reg.addr;
 					}
 				}
-				/* check null subscripts in destination key, note that we have already restored, destination global
-				 * and curresponding region, key information
+				/* Create the destination key for this iteration (under ^glvn1) */
+				gvname_env_restore(gblp1);
+				/* For non-spanning globals, "gv_cur_region" points to the target region for ^gvn1 now.
+				 * For spanning globals though, "gv_cur_region" is not set appropriately until a little later.
+				 * Wait until then to issue GVSUBOFLOW error (if needed).
+				 */
+				if (act_mismatch)
+				{	/* Need to convert subscripts from gvt2->act collation to gvt1->act collation */
+					/* Copy prefix of subscripts that have been pre-computed outside the for loop */
+					gv_currkey->end = org_glvn1_keysz - 1;
+					/* Transform trailing subscripts of ^gvn2 from src collation to dst */
+					ptr = (unsigned char *)mkey->str.addr + mergekey2->end;
+					ptr_top = (unsigned char *)mkey->str.addr + mkey->str.len - 1;
+					for ( ; ptr < ptr_top; )
+					{
+						assert(gv_target == gvt1);
+						gv_target = gvt2;	/* switch gv_target for "mval2subsc" */
+						ptr2 = gvsub2str(ptr, buff, FALSE);
+						gv_target = gvt1;	/* restore "gv_target" */
+						tmp_mval.mvtype = MV_STR;
+						tmp_mval.str.addr = (char *)buff;
+						tmp_mval.str.len = INTCAST(ptr2 - buff);
+						mval2subsc(&tmp_mval, gv_currkey, nullcoll_dst);
+						/* we have now appended the correctly transformed subscript */
+						while (*ptr++)
+							;	/* skip to start of next subscript */
+					}
+					assert(ptr == ptr_top);
+
+				} else
+				{	/* No transformations needed. Key can be copied as is except for null-collation issues
+					 * which are easily handled by the STD2GTMNULLCOLL/GTM2STDNULLCOLL macros.
+					 */
+					assert(gv_currkey->end == org_glvn1_keysz - 1);
+					memcpy(gv_currkey->base + org_glvn1_keysz - 2,
+							mkey->str.addr + org_glvn2_keysz - 2, delta2 + 2);
+					gv_currkey->end = org_glvn1_keysz + delta2 - 1;
+					if (nullcoll_src != nullcoll_dst)
+					{
+						if (0 == nullcoll_dst)
+						{	/* Standard to GTM null subscript conversion*/
+							STD2GTMNULLCOLL((unsigned char *)gv_currkey->base + org_glvn1_keysz - 1,
+									delta2 - 1);
+						} else
+						{	/*  GTM to standard null subscript conversion */
+							GTM2STDNULLCOLL((unsigned char *)gv_currkey->base + org_glvn1_keysz - 1,
+									delta2 - 1);
+						}
+					}
+				}
+				/* If gblp1 corresponds to a spanning global, then determine
+				 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+				 */
+				assert((NULL == gvnh_reg1) || (TREF(gd_targ_gvnh_reg) == gvnh_reg1));
+				GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg1, gbl1_gd_addr, gv_currkey);
+				/* For spanning globals, "gv_cur_region" points to the target region for ^gvn1 only now */
+				if (gv_currkey->end >= gv_cur_region->max_key_size)
+					ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+				if (!nospan)
+				{	/* At least one of ^gvn1 or ^gvn2 spans multiple regions. Recompute check_for_null_subs
+					 * in that case by looking at the specific region that the subscripted reference of
+					 * ^gvn1 or ^gvn2 maps to.
+					 */
+					check_for_null_subs = (NEVER != reg2->null_subs) && (ALWAYS != gv_cur_region->null_subs);
+				}
+				/* Check null subscripts in destination key. Note that we have already restored,
+				 * destination global and curresponding region, key information
 				 */
 				if (check_for_null_subs)
 				{
 					ptr2 = gv_currkey->base + gv_currkey->end - 1;
 					for (ptr = gv_currkey->base + org_glvn1_keysz - 2; ptr < ptr2; )
 					{
-						if (KEY_DELIMITER == *ptr++ && KEY_DELIMITER == *(ptr + 1) &&
-							(0 == gv_cur_region->std_null_coll ? (STR_SUB_PREFIX == *ptr) :
-							(SUBSCRIPT_STDCOL_NULL == *ptr)))
+						if ((KEY_DELIMITER == *ptr++) && (KEY_DELIMITER == *(ptr + 1))
+							&& ((0 == gv_cur_region->std_null_coll)
+								? (STR_SUB_PREFIX == *ptr)
+								: (SUBSCRIPT_STDCOL_NULL == *ptr)))
 							/* Note: For sgnl_gvnulsubsc/rts_error
 							 * 	 we do not restore proper naked indicator.
 							 * The standard states that the effect of a MERGE command
@@ -273,7 +363,7 @@ void op_merge(void)
 				/* Now put value of ^glvn2 descendant into corresponding descendant under ^glvn1 */
 				op_gvput(value);
 			}
-			gvname_env_restore(mglvnp->gblp[IND1]);	 /* store destination as naked indicator in gv_currkey */
+			gvname_env_restore(gblp1);	 /* store destination as naked indicator in gv_currkey */
 		} else
 		{	/*==================== MERGE lvn1=^gvn2 =====================*/
 			assert(MARG1_IS_LCL(merge_args));
@@ -281,36 +371,38 @@ void op_merge(void)
 			/* Need to protect subsc created from global variable subscripts from stpgcol */
 			PUSH_MV_STENT(MVST_MVAL);
 			subsc = &mv_chain->mv_st_cont.mvs_mval;
-			/* Restore ^gvn2 we will work */
-			gvname_env_save(mglvnp->gblp[IND2]);
+			/* At this time gv_currkey already points to gblp2 */
 			if (1 == dollardata_src || 11 == dollardata_src)
 			{	/* SET lvn1=^gvn2 */
 				found = op_gvget(value);
 				if (found)
 					mglvnp->lclp[IND1]->v = *value;
 			}
+			gvnh_reg2 = gblp2->s_gd_targ_gvnh_reg;
+			gbl2_gd_addr = TREF(gd_targ_addr);
 			for (; ;)
 			{
 				if (outofband)
 				{
-					gvname_env_restore(mglvnp->gblp[IND2]);	 /* naked indicator is restored into gv_currkey */
+					gvname_env_restore(gblp2);	 /* naked indicator is restored into gv_currkey */
 					outofband_action(FALSE);
 				}
-				assert(0 == gv_currkey->base[gv_currkey->end - 1] && 0 == gv_currkey->base[gv_currkey->end]);
-				/* following is an attempt to find immidiate right sibling */
-				gv_currkey->base[gv_currkey->end] = 1;
-				gv_currkey->base[gv_currkey->end + 1] = 0;
-				gv_currkey->base[gv_currkey->end + 2] = 0;
-				gv_currkey->end += 2;
+				/* If gblp2 corresponds to a spanning global, then determine
+				 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
+				 */
+				assert((NULL == gvnh_reg2) || (TREF(gd_targ_gvnh_reg) == gvnh_reg2));
+				GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg2, gbl2_gd_addr, gv_currkey);
+				/* following is an attempt to find immediate right sibling */
+				GVKEY_INCREMENT_QUERY(gv_currkey);
 				/* Do $QUERY and $GET of current glvn2. Result will be in mkey and value respectively.
 				 * mkey->str contains data as database format. So no conversion necessary
 				 */
 				if (!op_gvqueryget(mkey, value))
 					break;
-				if (mkey->str.len < (TREF(gv_mergekey2))->end + 1)
+				if (mkey->str.len < mergekey2->end + 1)
 					break;
-				ptr = (unsigned char *)mkey->str.addr +  (TREF(gv_mergekey2))->end - 1;
-				if (0 != *ptr || memcmp(mkey->str.addr, (TREF(gv_mergekey2))->base, (TREF(gv_mergekey2))->end - 1))
+				ptr = (unsigned char *)mkey->str.addr +  mergekey2->end - 1;
+				if (0 != *ptr || memcmp(mkey->str.addr, mergekey2->base, mergekey2->end - 1))
 					break;
 				assert(MV_IS_STRING(mkey));
 				delta2 = mkey->str.len - org_glvn2_keysz; /* length increase of key */
@@ -327,14 +419,15 @@ void op_merge(void)
 				{
 					LV_SBS_DEPTH(dst_lv, is_base_var, sbs_depth);
 					if (MAX_LVSUBSCRIPTS <= sbs_depth)
-						rts_error(VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
 					ptr2 = gvsub2str(ptr, buff, FALSE);
 					subsc->mvtype = MV_STR;
 					subsc->str.addr = (char *)buff;
 					subsc->str.len = INTCAST(ptr2 - buff);
 					s2pool(&subsc->str);
 					dst_lv = op_putindx(VARLSTCNT(2) dst_lv, subsc);
-					while (*ptr++);	/* skip to start of next subscript */
+					while (*ptr++)
+						;	/* skip to start of next subscript */
 					is_base_var = FALSE;
 				} while (*ptr);
 				/* We created the key. Pre-process the node in case a container is being replaced,
@@ -344,7 +437,7 @@ void op_merge(void)
 				DECR_AC_REF(dst_lv, TRUE);
 				dst_lv->v = *value;
 			}
-			gvname_env_restore(mglvnp->gblp[IND2]);	 /* naked indicator is restored into gv_currkey */
+			gvname_env_restore(gblp2);	 /* naked indicator is restored into gv_currkey */
 			POP_MV_STENT();     /* subsc */
 		}
 		POP_MV_STENT();     /* mkey */
@@ -357,7 +450,7 @@ void op_merge(void)
 			UNDO_ACTIVE_LV;
 			POP_MV_STENT();	/* value */
 			if (MARG1_IS_GBL(merge_args))
-				gvname_env_restore(mglvnp->gblp[IND1]);	 /* store destination as naked indicator in gv_currkey */
+				gvname_env_restore(gblp1);	 /* store destination as naked indicator in gv_currkey */
 			merge_args = 0;	/* Must reset to zero to reuse the Global */
 			return;
 		}
@@ -389,7 +482,10 @@ void op_merge(void)
 		} else
 		{	/*==================== MERGE ^gvn1=lvn2 =====================*/
 			assert(MARG1_IS_GBL(merge_args) && MARG2_IS_LCL(merge_args));
-			gvname_env_save(mglvnp->gblp[IND1]);
+			gvname_env_save(gblp1);
+			key = gblp1->s_gv_currkey;
+			GET_NSUBS_IN_GVKEY(key->base, key->end - 1, gvn1subs);	/* sets "gvn1subs" */
+			gblp1->gvkey_nsubs = gvn1subs;	/* used later in lvzwr_out */
 			output.buff = (char *)buff;
 			output.ptr = output.buff;
 			output.out_var.gv.end = gv_currkey->end;
@@ -398,7 +494,7 @@ void op_merge(void)
 			lvzwr_init(zwr_patrn_mident, &mglvnp->lclp[IND2]->v);
 			lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
 			lvzwr_var(mglvnp->lclp[IND2], 0);
-			gvname_env_restore(mglvnp->gblp[IND1]);	 /* store destination as naked indicator in gv_currkey */
+			gvname_env_restore(gblp1);	 /* store destination as naked indicator in gv_currkey */
 		}
 	}
 	POP_MV_STENT();	/* value */

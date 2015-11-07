@@ -43,8 +43,7 @@
    The environment variable gtmgbldir specifies the active global directory.
 
    A gtmgbldir value of mumps.gld tells MUPIP to look for a global directory
-   file mumps.gld in the current directory. See the "Global Directory Editor"
-   chapter for more information on the global directory.
+   file mumps.gld in the current directory.
 
 2 Operations
    Operations
@@ -64,93 +63,7 @@
    require database access, but may require other privileges; EXTRACT, which
    requires read access; and INTEG, which may require write access, depending
    on the circumstances it encounters and the qualifiers with which it is
-   invoked. The following table displays some of the MUPIP operations and
-   their database access requirements.
-
-   +------------------------------------------------------------------------+
-   |       Operations       | MUPIP command | Database Access Requirements  |
-   |------------------------+---------------+-------------------------------|
-   |                        |               | Backup never requires         |
-   | Backup database files  | MUPIP BACKUP  | standalone access and         |
-   |                        |               | concurrent write access is    |
-   |                        |               | controlled by -[NO]ONLINE.    |
-   |------------------------+---------------+-------------------------------|
-   | Create and initialize  | MUPIP CREATE  | Standalone access             |
-   | database files         |               |                               |
-   |------------------------+---------------+-------------------------------|
-   | Converts a database    |               |                               |
-   | file from one endian   | MUPIP         |                               |
-   | format to the other    | ENDIANCVT     | Standalone access             |
-   | (BIG to LITTLE or      |               |                               |
-   | LITTLE to BIG)         |               |                               |
-   |------------------------+---------------+-------------------------------|
-   | Recover database files |               |                               |
-   | (for example, after a  |               |                               |
-   | system crash) and      | MUPIP JOURNAL | Standalone access             |
-   | extract journal        |               |                               |
-   | records                |               |                               |
-   |------------------------+---------------+-------------------------------|
-   | Restore databases from |               |                               |
-   | bytestream backup      | MUPIP RESTORE | Standalone access             |
-   | files                  |               |                               |
-   |------------------------+---------------+-------------------------------|
-   | Properly close         |               |                               |
-   | database files when    | MUPIP RUNDOWN | Standalone access             |
-   | processes terminate    |               |                               |
-   | abnormally.            |               |                               |
-   |------------------------+---------------+-------------------------------|
-   |                        |               | Standalone access is required |
-   |                        |               | if the MUPIP SET command      |
-   | Modify database and/or |               | specifies -ACCESS_METHOD,     |
-   | journal file           | MUPIP SET     | -GLOBAL_BUFFERS, LOCK_SPACE   |
-   | characteristics        |               | or -NOJOURNAL, or if any of   |
-   |                        |               | the -JOURNAL options ENABLE,  |
-   |                        |               | DISABLE, or BUFFER_SIZE are   |
-   |                        |               | specified.                    |
-   |------------------------+---------------+-------------------------------|
-   | Backup database files  | MUPIP BACKUP  | Concurrent access.            |
-   |------------------------+---------------+-------------------------------|
-   | Grow the size of BG    | MUPIP EXTEND  | Concurrent access.            |
-   | database files         |               |                               |
-   |------------------------+---------------+-------------------------------|
-   |                        |               | Although MUPIP EXTRACT        |
-   |                        |               | command works with concurrent |
-   | Export data from       |               | access, it implicitly freezes |
-   | database files into    |               | the database to prevent       |
-   | sequential (flat) or   | MUPIP EXTRACT | updates. Therefore, from an   |
-   | binary files           |               | application standpoint, you   |
-   |                        |               | might plan for a standalone   |
-   |                        |               | access during a MUPIP EXTRACT |
-   |                        |               | operation.                    |
-   |------------------------+---------------+-------------------------------|
-   | Prevent updates to     | MUPIP FREEZE  | Standalone access.            |
-   | database files         |               |                               |
-   |------------------------+---------------+-------------------------------|
-   |                        |               | Concurrent access. However,   |
-   | Check the integrity of | MUPIP INTEG   | standalone access is required |
-   | GDS databases          |               | if MUPIP INTEG specifies      |
-   |                        |               | -FILE.                        |
-   |------------------------+---------------+-------------------------------|
-   |                        |               | Although MUPIP LOAD works     |
-   |                        |               | with concurrent access, you   |
-   |                        |               | should always assess the      |
-   | Import data into       |               | significance of performing a  |
-   | databases              | MUPIP LOAD    | MUPIP LOAD operation when an  |
-   |                        |               | application is running        |
-   |                        |               | because it may result in an   |
-   |                        |               | inconsistent application      |
-   |                        |               | state for the database.       |
-   |------------------------+---------------+-------------------------------|
-   | Defragment database    |               |                               |
-   | files to improve       | MUPIP REORG   | Concurrent access.            |
-   | performance            |               |                               |
-   |------------------------+---------------+-------------------------------|
-   | Send an asynchronous   |               |                               |
-   | signal to a GT.M       | MUPIP INTRPT  | Non-database access.          |
-   | process                |               |                               |
-   |------------------------+---------------+-------------------------------|
-   | Stop GT.M processes    | MUPIP STOP    | Non-database access.          |
-   +------------------------------------------------------------------------+
+   invoked.
 
 2 Syntax
    Syntax
@@ -173,7 +86,7 @@
    the full format of the command is too long for a single line of print, the
    presentation wraps around into additional lines.
 
-   mupip backup -bytestream -transaction=1 accounts,history,tables,miscellaneous /var/production/backup/
+   $ mupip backup -bytestream -transaction=1 accounts,history,tables,miscellaneous /var/production/backup/
 
    When you enter a MUPIP command, one of its variable arguments is the
    region-list. region-list identify the target of the command and may
@@ -190,7 +103,7 @@
 1 GDM
    GDM
 
-   The MUPIP commands described in this seciton are used for common database
+   The MUPIP commands described in this section are used for common database
    operations and serves as the foundation for more advanced functionality
    like Journaling and Replication.
 
@@ -284,23 +197,23 @@
 
    Perform the following tasks before you begin a database backup.
 
-     o Ensure adequate disk space for target location and temporary files.
+     * Ensure adequate disk space for target location and temporary files.
        Set the environment variable gtm_baktmpdir to specify the directory
        where MUPIP BACKUP creates temporary files. If gtm_baktmpdir is not
        defined, GT.M uses the deprecated GTM_BAKTMPDIR environment variable
        if defined, and otherwise uses the current working directory. Do not
        place temporary files in the current directory for large databases in
        production environments.
-     o When using replication, ensure that the Source/Receiver process is
+     * When using replication, ensure that the Source/Receiver process is
        alive (MUPIP REPLIC -SOURCE/-RECEIVER -CHECKHEALTH). Always backup the
        replicating instance file with the database (BACKUP -REPLINST).
-     o If you intend to use a -DATABASE backup at the same time in the same
+     * If you intend to use a -DATABASE backup at the same time in the same
        computer system as the source database, be sure to disable journaling
        in the backed up database with -BKUPDBJNL=DISABLE.
-     o When doing a complete backup, switch journal files as part of the
+     * When doing a complete backup, switch journal files as part of the
        backup command using -NEWJNLFILES=NOPREVLINK. This aligns the journal
        files with the backup and simplifies journal file retention.
-     o If you follow separate procedures for backup and archive (moving to
+     * If you follow separate procedures for backup and archive (moving to
        secondary storage), you can save time by starting archive as soon as
        MUPIP BACKUP completes the process of creating a backup database file
        for a region. You do not need to wait for MUPIP BACKUP to complete
@@ -312,12 +225,12 @@
 
        confirms that gtm.dat is backed up correctly and is ready for archive.
 
-     o Determine an appropriate frequency, timing, and backup method
+     * Determine an appropriate frequency, timing, and backup method
        (-BYTESTREAM or -COMPREHENSIVE) based on the situation.
-     o Ensure the user issuing backup commands has appropriate permissions
-       before starting the backup. Backup files hav e the ownership of the
+     * Ensure the user issuing backup commands has appropriate permissions
+       before starting the backup. Backup files have the ownership of the
        user running MUPIP BACKUP.
-     o There is one circumstance under which a MUPIP BACKUP is not advised.
+     * There is one circumstance under which a MUPIP BACKUP is not advised.
        When your operational procedures call for taking backups of unmodified
        databases and journal files on rebooting a system after a crash, then
        use an underlying operating system command (cp, cpio, gzip, tar, and
@@ -431,11 +344,11 @@
 
      o -NEWJNLFILES can take the following three values:
 
-          o PREVLINK: Back links new journal files with the prior generation
+         1. PREVLINK: Back links new journal files with the prior generation
             journal files. This is the default value.
-          o NOPREVLINK: Indicates that there should be no back link between
+         2. NOPREVLINK: Indicates that there should be no back link between
             the newly created journals and prior generation journal files.
-          o SYNC_IO: Specifies that every WRITE to a journal file to be
+         3. SYNC_IO: Specifies that every WRITE to a journal file to be
             committed directly to disk. On high-end disk subsystems (for
             example, those that include non-volatile cache and that consider
             the data to be committed when it reaches this cache), this might
@@ -533,17 +446,14 @@
 
    -S[INCE]={DATABASE|BYTESTREAM|RECORD}
 
-     o keyword can include any one of the following:
+     * D[ATABASE] - Backup all changes since the last MUPIP BACKUP -DATABASE.
+     * B[YTESTREAM] - Backup all changes since the last MUPIP BACKUP
+       -BYTESTREAM.
+     * R[ECORD] - Backup all changes since the last MUPIP BACKUP -RECORD.
 
-          o D[ATABASE] - Backup all changes since the last MUPIP BACKUP
-            -DATABASE.
-          o B[YTESTREAM] - Backup all changes since the last MUPIP BACKUP
-            -BYTESTREAM.
-          o R[ECORD] - Backup all changes since the last MUPIP BACKUP
-            -RECORD.
+   By default, MUPIP BACKUP -BYTESTREAM operates as -SINCE=DATABASE.
 
-     o By default, MUPIP BACKUP -BYTESTREAM operates as -SINCE=DATABASE.
-     o Incompatible with: -TRANSACTION.
+   Incompatible with: -TRANSACTION.
 
 3 Transaction
    Transaction
@@ -931,10 +841,6 @@
 
    Magnetic tapes may have a smaller maximum file size than disks.
 
-   For information on extracting globals with the %GO utility, refer to "M
-   Utility Routines" chapter of the GT.M Programmer's Guide. MUPIP EXTRACT is
-   typically faster, but %GO can be customized.
-
    The following sections describe the qualifiers of MUPIP EXTRACT command.
 
 3 FOrmat
@@ -947,7 +853,7 @@
 
    The format code is any one of the following:
 
-     o B[INARY] - Binary format, used for database reorganization or short
+    1. B[INARY] - Binary format, used for database reorganization or short
        term backups. MUPIP EXTRACT -FORMAT=BINARY works much faster than
        MUPIP EXTRACT -FORMAT=GO and MUPIP EXTRACT -FORMAT=ZWR. Note: There is
        no defined standard to transport binary data from one GT.M
@@ -983,12 +889,12 @@
        |            | EXTRACT"                                              |
        +--------------------------------------------------------------------+
 
-     o GO - Global Output format, used for files to transport or archive.
+    2. GO - Global Output format, used for files to transport or archive.
        -FORMAT=GO stores the data in record pairs. Each global node produces
        one record for the key and one for the data. MUPIP EXTRACT -FORMAT=GO
        has two header records - the first is a test label (refer to the LABEL
        qualifier) and the second contains a data, and time.
-     o ZWR - ZWRITE format, used for files to transport or archive that may
+    3. ZWR - ZWRITE format, used for files to transport or archive that may
        contain non-graphical information. Each global node produces one
        record with both key and data. MUPIP EXTRACT -FORMAT=ZWR has two
        header records, which are the same as for FORMAT=GO, except that the
@@ -1197,8 +1103,8 @@
 
    Incompatible with: -OFF, -OVERRIDE
 
-3 OVERRIDE
-   OVERRIDE
+3 OVerride
+   OVerride
 
    Release a freeze set by a process with a different userid. GT.M provides
    OVERRIDE to allow error recovery in case a procedure with a freeze fails
@@ -1317,13 +1223,13 @@
 
    Always use MUPIP INTEG in the following conditions:
 
-     o Periodically - to ensure ongoing integrity of the database(s); regular
+     * Periodically - to ensure ongoing integrity of the database(s); regular
        INTEGs help detect any integrity problems before they spread and
        extensively damage the database file.
-     o After a crash - to ensure the database was not corrupted. (Note: When
+     * After a crash - to ensure the database was not corrupted. (Note: When
        using before-image journaling, when the database is recovered from the
        journal file after a crash, an integ is not required).
-     o When database errors are reported - to troubleshoot the problem.
+     * When database errors are reported - to troubleshoot the problem.
 
    Improving the logical and physical adjacency of global nodes may result in
    faster disk I/O. A global node is logically adjacent when it is stored
@@ -1384,18 +1290,18 @@
    database integrity. If operations continue without fixes to serious
    errors, the following problems may occur:
 
-     o Invalid application operation due to missing or incorrect data.
-     o Process errors, including inappropriate indefinite looping, when a
+     * Invalid application operation due to missing or incorrect data.
+     * Process errors, including inappropriate indefinite looping, when a
        database access encounters an error.
-     o Degrading application level consistency as a result of incomplete
+     * Degrading application level consistency as a result of incomplete
        update sequences caused by the prior symptoms.
 
    FIS strongly recommends fixing the following errors as soon as they are
    discovered:
 
-     o Blocks incorrectly marked free - these may cause accelerating damage
+     * Blocks incorrectly marked free - these may cause accelerating damage
        when processes make updates to any part of the database region.
-     o Integrity errors in an index block - these may cause accelerating
+     * Integrity errors in an index block - these may cause accelerating
        damage when processes make updates to that area of the database region
        using the faulty index.
 
@@ -1554,8 +1460,8 @@
 
    -[NO]MAX[KEYSIZE][=integer]
 
-     o By default, INTEG reports a maximum of 10 key size errors (-
-       MAXKEYSIZE=10).
+     o By default, INTEG reports a maximum of 10 key size errors
+       (-MAXKEYSIZE=10).
      o -NOMAXKEYSIZE removes limits on key size reporting so that INTEG
        reports all key size too large errors.
      o -NOMAXKEYSIZE does not accept assignment of an argument.
@@ -1617,15 +1523,15 @@
        immediately terminates. If an online integ does not successfully
        complete, GT.M cleans it up in one of the following ways:
 
-          o A subsequent online integ detects that an earlier one did not
+         1. A subsequent online integ detects that an earlier one did not
             successfully complete and releases the resources held by the
             prior online integ before proceeding.
-          o If a MUPIP STOP was issued to the online integ process, the
+         2. If a MUPIP STOP was issued to the online integ process, the
             process cleans up any resources it held. Note: since the process
             was stopped the results of the integ may not be valid.
-          o subsequent MUPIP RUNDOWN ensures the release of resources held by
+         3. subsequent MUPIP RUNDOWN ensures the release of resources held by
             prior unsuccessful online integs for the specified regions.
-          o For every 64K transactions after the online integ initiation,
+         4. For every 64K transactions after the online integ initiation,
             online integ checks GT.M health for improperly abandoned online
             integs and releases resources held by any it finds.
 
@@ -2187,7 +2093,7 @@
 
    No errors detected by integ.
 
-   Type            Blocks         Records          % Used      Adjacent
+   Type           Blocks         Records          % Used      Adjacent
 
    Directory           2               2           2.490            NA
    Index             153            3902          29.211            57
@@ -2771,7 +2677,7 @@
 
    $ mupip set -version=V4 -file mumps.dat
 
-   Database file mumps.dat now has d esired DB format V4
+   Database file mumps.dat now has desired DB format V4
 
    This example sets the block format to V4 for all subsequent new blocks in
    V6 database file mumps.dat.
@@ -2829,7 +2735,7 @@
 
    estimation-technique is one of the following:
 
-     o scan,level=<lvl>
+     * scan,level=<lvl>
 
        Traverses the global variable tree and counts the actual number of
        records and blocks at levels from the root down to the level specified
@@ -2840,19 +2746,19 @@
        a negative level from the root of the global tree where -1 means
        children of the root.
 
-     o arsample,samples=<smpls>
+     * arsample,samples=<smpls>
 
        Uses acceptance/rejection sampling of random tree traversals to
        estimate the number of blocks at each level. It continues until the
        specified number of samples (default is 1,000) is accepted.
 
-     o impsample,samples=<smpls>
+     * impsample,samples=<smpls>
 
        Uses importance sampling of random tree traversals to weight each
        sample of the specified number of samples (default is 1,000) in order
        to estimate size of the tree at each level.
 
-     o If -HEURISTIC is not specified, MUPIP SIZE uses the
+     * If -HEURISTIC is not specified, MUPIP SIZE uses the
        ARSAMPLE,SAMPLE=1000 estimation technique.
 
    **Important**
@@ -2874,12 +2780,12 @@
 
    global-name-list can be:
 
-     o A comma separated list of global variables.
-     o A range of global variables denoted by start:end syntax. For example,
+     * A comma separated list of global variables.
+     * A range of global variables denoted by start:end syntax. For example,
        -select="g1:g4".
-     o A global variable with wildcards, for example, "g*" (the name must be
+     * A global variable with wildcards, for example, "g*" (the name must be
        escaped to avoid shell filename expansion)
-     o "*" to select all global variables.
+     * "*" to select all global variables.
 
    -Region
 
@@ -3380,7 +3286,7 @@
      o Whenever MUPIP SET creates a new journal file, it uses all values for
        journal-file-options that the user explicitly specifies in the command
        line for the new journal file. If you do not specify a
-       journal-file-option, MUPIP SET takes the char acteristics of the
+       journal-file-option, MUPIP SET takes the characteristics of the
        existing journal file.
      o MUPIP SET supports qualifiers (like -ACCESS_METHOD, and so on) to
        change non-journaling characteristics of database file(s). If you
@@ -3480,13 +3386,11 @@
 
    The default value for AUTOSWITCHLIMIT is 8388600 & the maximum value is
    8388607 blocks (4GB-512 bytes). The minimum value for AUTOSWITCHLIMIT is
-   16384. GT.M produces an error if the AUTOSWITCHLIMIT value is less than
-   the sum of allocation and extension values. If the difference between the
-   AUTOSWITCHLIMIT and the allocation value is not a multiple of the
-   extension value, GT.M rounds-down the value to make it a multiple of the
-   extension value and displays an informational message. GT.M produces an
-   error when the rounded value of AUTOSWITCHLIMIT is less that the minimum
-   value.
+   16384. If the difference between the AUTOSWITCHLIMIT and the allocation
+   value is not a multiple of the extension value, GT.M rounds-down the value
+   to make it a multiple of the extension value and displays an informational
+   message. GT.M produces an error when the rounded value of AUTOSWITCHLIMIT
+   is less that the minimum value.
 
    If you specify values for ALLOCATION, EXTENSION, and AUTOSWITCHLIMIT for a
    region such that (ALLOCATION+EXTENSION>AUTOSWITCHLIMIT), either using GDE
@@ -3944,7 +3848,7 @@
    16. -USER is compatible only with -EXTRACT and -SHOW.
    17. file list must not be asterisk (*) for -REDIRECT.
    18. file list must be asterisk (*) for -ROLLBACK.
-   19. Journal selection qualifiers are incompatib le with -RECOVER,
+   19. Journal selection qualifiers are incompatible with -RECOVER,
        -ROLLBACK, and -VERIFY.
    20. Journal time qualifiers are incompatible with -ROLLBACK.
 
@@ -4272,22 +4176,22 @@
 
    The show-option-list includes (these are not case-sensitive):
 
-     o AL[L]
+    1. AL[L]
 
        Displays all the available type of information about the journal file.
        ALL is the default if you omits the show-option-list.
 
-     o AC[TIVE_PROCESSES]
+    2. AC[TIVE_PROCESSES]
 
        Displays all processes active at the end of the period specified
        implicitly or explicitly by the JOURNAL command time qualifiers.
 
-     o B[ROKEN_TRANSACTIONS]
+    3. B[ROKEN_TRANSACTIONS]
 
        Display all processes that had incomplete fenced transactions at the
        end of the period covered by the JOURNAL command.
 
-     o H[EADER]
+    4. H[EADER]
 
        Displays the journal file header information. If the MUPIP JOURNAL
        command includes only the -SHOW=HEADER action qualifier, GT.M
@@ -4349,12 +4253,12 @@
        ---------------------------------------------------------
        0000006706 jdoe-laptop jdoe    0    2012/11/06 17:30:33
 
-     o P[ROCESSES]
+    5. P[ROCESSES]
 
        Displays all processes active during the period specified implicitly
        or explicitly by the JOURNAL command time qualifiers.
 
-     o S[TATISTICS]
+    6. S[TATISTICS]
 
        Displays a count of all journal record types processed during the
        period specified implicitly or explicitly by the JOURNAL command time
@@ -4534,7 +4438,7 @@
 
    If -BEFORE= time exceeds the last time recorded in journal files, JOURNAL
    processing effectively ignores the qualifier and terminates at the end of
-   the journal file. By default, JOURNAL processing terminates a t the end of
+   the journal file. By default, JOURNAL processing terminates at the end of
    the journal file.
 
    -[NO]LOO[KBACK_LIMIT][=lookback-option-list]
@@ -5143,8 +5047,7 @@
    TZKILL  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
    TZTWORM time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
    TZTRIG  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   USET    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodef
-   lags\node=sarg
+   USET    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
    UKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
    UZKILL  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
    UZTWORM time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
@@ -6156,11 +6059,11 @@
 
    -changelog
 
+   Instructs the Source Server to change its log file.
+
    -instsecondary=<instance_name>
 
    Identifies a Source Server process.
-
-   Instructs the Source Server to change its log file.
 
    -log=<log file name>
 
@@ -6366,7 +6269,7 @@
    appropriately. Hence, this command checks whether the replicating instance
    where the lost transaction was previously generated has communicated with
    the current originating instance after it came up as the originating
-   instance. If it is affirmative, the Zqgblmod Seqno and Zqgbl mod Trans
+   instance. If it is affirmative, the Zqgblmod Seqno and Zqgblmod Trans
    fields would have been appropriately set and hence $ZQGBLMOD() values will
    be correct.
 
@@ -6930,7 +6833,7 @@
    |             |                |-STA[RTBLK]=hexa                               |
    |             |                |-STO[PBLK]=hexa                                |
    |             |                |-T[RUNCATE][=percentage]                       |
-   |             |                |-UP[GRAD E]                                    |
+   |             |                |-UP[GRADE]                                     |
    |             |                |-USER_DEFINED_REORG=reorg_list                 |
    |-------------+----------------+-----------------------------------------------|
    |             |                |-E[DITINSTANCE]                                |
@@ -7128,4 +7031,33 @@
    |                                      |                          |-STOPSOURCEFILTER                         |
    |                                      |                          |-TIMEOUT=seconds                          |
    +------------------------------------------------------------------------------------------------------------+
+
+1 Copyright
+   Copyright
+
+   Copyright 2013
+
+   Fidelity Information Services, Inc. All rights reserved.
+
+   Permission is granted to copy, distribute and/or modify this document
+   under the terms of the GNU Free Documentation License, Version 1.3 or any
+   later version published by the Free Software Foundation; with no Invariant
+   Sections, no Front-Cover Texts and no Back-Cover Texts.
+
+   GT.M(TM) is a trademark of Fidelity Information Services, Inc. Other
+   trademarks are the property of their respective owners.
+
+   This document contains a description of GT.M and the operating
+   instructions pertaining to the various functions that comprise the system.
+   This document does not contain any commitment of FIS. FIS believes the
+   information in this publication is accurate as of its publication date;
+   such information is subject to change without notice. FIS is not
+   responsible for any errors or defects.
+
+   **Note**
+
+   This help file is a concise representation of revision V6.1-000 of the
+   UNIX Administration and Operations Guide. To obtain a copy of the current
+   revision, go to www.fis-gtm.com and then click on the User Documentation
+   tab.
 

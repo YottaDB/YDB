@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,7 @@
 #include "mvalconv.h"
 #include "mu_gvis.h"
 #include "quad2asc.h"
+#include "hashtab_mname.h"
 
 #define NEGORZRO 1
 #define MVX_ZRO 48
@@ -84,6 +85,8 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 		} 	*goq_rp;
 	short int	*goq_blk_used;
 	gv_key		*goq_currkey;
+	mname_entry	gvname;
+	gvnh_reg_t	*gvnh_reg;
 
 	/* goq_key_sub = number of discrete items in key to convert (i.e., global name and subscripts)
 	   goq_subsc_map = array of positions separating discrete items in key:
@@ -138,14 +141,14 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 					   (rec_count * goq_blk_size / 512) + 1,0,0,0);
 
 			if (status != SS$_NORMAL)
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 
 			sys$synch(efn_bg_qio_read, &iosb[0]);
 			if (iosb[0] == SS$_ENDOFFILE)
 				break;
 
 			if (iosb[0] != SS$_NORMAL)
-				rts_error(VARLSTCNT(1) iosb[0]);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) iosb[0]);
 			rec_count++;
 			len = *goq_blk_used;
 		}
@@ -153,7 +156,7 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 		if ((is_end && rec_count > end) || iosb[0] == SS$_ENDOFFILE)
 			break;
 		if (len >= goq_blk_size)
-		{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,0);
+		{	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,0);
 			continue;
 		}
 		goq_rp = in_buff;
@@ -180,13 +183,16 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 
 		if (goq_rp->cmpc != 0 || v.str.len > goq_currkey->top)
 		{
-			rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 			continue;
 		}
-		GV_BIND_NAME_AND_ROOT_SEARCH (gd_header, &v.str);
+		gvname.var_name = v.str;
+		COMPUTE_HASH_MNAME(&gvname);
+		GV_BIND_NAME_AND_ROOT_SEARCH (gd_header, &gvname, gvnh_reg);
+		assert(NULL == gvnh_reg->gvspan); /* so GV_BIND_SUBSNAME_IF_GVSPAN is not needed */
 		if (mupip_error_occurred)
 		{
-			rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 			mu_gvis();
 			util_out_print(0,TRUE);
 			continue;
@@ -216,7 +222,7 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 			n += goq_rp->subsc_len + 2 * SIZEOF(char);
 			if ((unsigned char *) goq_rp + n > btop)
 			{
-				rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 				mu_gvis();
 				util_out_print(0,TRUE);
 				break;
@@ -263,8 +269,8 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 								case '9': *b++ = '0';
 									break;
 								default:
-									rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,
-										global_key_count);
+									rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4)
+										ERR_CORRUPT,2,rec_count, global_key_count);
 									 mu_gvis();
 									 util_out_print(0,TRUE);
 							}
@@ -272,18 +278,20 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 						if (!mupip_error_occurred)
 						{
 							if (cp1 >= cp2)
-							{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+							{
+								rts_error_csa(CSA_ARG(NULL)
+									VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 								mu_gvis();
 								util_out_print(0,TRUE);
 								break;
-							}
-							else if (*cp1++ == MVX_NEG)
+							} else if (*cp1++ == MVX_NEG)
  							{
 								if (cp1 < cp2)
 								{
 									if (*cp1)
-									{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,
-											global_key_count);
+									{
+										rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4)
+											ERR_CORRUPT,2,rec_count, global_key_count);
 										mu_gvis();
 										util_out_print(0,TRUE);
 										break;
@@ -292,9 +300,10 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 									{	cp1++;
 									}
 								}
-							}
-							else
-							{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+							} else
+							{
+								rts_error_csa(CSA_ARG(NULL)
+									VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 								mu_gvis();
 								util_out_print(0,TRUE);
 								break;
@@ -310,31 +319,33 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 							v.str.len = b - (unsigned char *) v.str.addr;
 							s2n(&v);
 							if (mupip_error_occurred)
-							{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+							{
+								rts_error_csa(CSA_ARG(NULL)
+									VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 								mu_gvis();
 								util_out_print(0,TRUE);
 								break;
 							}
 						}
-					}
-					else if (exp == MVX_ZRO)
+					} else if (exp == MVX_ZRO)
 					{
 						MV_FORCE_MVAL(&v,0) ;
 						if (cp1 < cp2)
 						{
 							if (!*cp1)
-							{	cp1++;
-							}
+								cp1++;
 							else
-							{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+							{
+								rts_error_csa(CSA_ARG(NULL)
+									VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 								mu_gvis();
 								util_out_print(0,TRUE);
 								break;
 							}
 						}
-					}
-					else
-					{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+					} else
+					{
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 						mu_gvis();
 						util_out_print(0,TRUE);
 						break;
@@ -356,10 +367,11 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 					if (cp1 < cp2)
 					{
 						if (!*cp1)
-						{	cp1++;
-						}
+							cp1++;
 						else
-						{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+						{
+							rts_error_csa(CSA_ARG(NULL)
+								VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 							mu_gvis();
 							util_out_print(0,TRUE);
 							break;
@@ -371,7 +383,8 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 					}
 					s2n(&v);
 					if (mupip_error_occurred)
-					{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+					{
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 						mu_gvis();
 						util_out_print(0,TRUE);
 						break;
@@ -389,21 +402,22 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 					if (cp1 < cp2)
 					{
 						if (!*cp1)
-						{	cp1++;
-						}
+							cp1++;
 						else
-						{	rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+						{
+							rts_error_csa(CSA_ARG(NULL)
+								VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 							mu_gvis();
 							util_out_print(0,TRUE);
 							break;
 						}
 					}
 				}
-				mval2subsc(&v,gv_currkey);
+				mval2subsc(&v, gv_currkey, gvnh_reg->gd_reg->std_null_coll);
 				gv_currkey->prev = 0;
 				if (mupip_error_occurred)
 				{
-					rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 					mu_gvis();
 					util_out_print(0,TRUE);
 					break;
@@ -464,7 +478,7 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 			{
 				if (!mupip_DB_full)
 				{
-					rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 					util_out_print(0,TRUE);
 				}
 				break;
@@ -480,7 +494,7 @@ void	goq_mvx_load(struct FAB *infab, char *in_buff, uint4 rec_count, uint4 end)
 			{
 				if (goq_rp->cmpc > goq_currkey->end)
 				{
-					rts_error(VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CORRUPT,2,rec_count,global_key_count);
 					break;
 				}
 				cp1 = &goq_rp->subsc[0];

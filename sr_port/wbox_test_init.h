@@ -126,14 +126,16 @@ typedef enum {
 	WBTEST_FSYNC_SYSCALL_FAIL,		/* 88 : Force error from fsync() */
 	WBTEST_HUGE_ALLOC,			/* 89 : Force ZALLOCSTOR, ZREALSTOR, and ZUSEDSTOR to be values exceeding
 						 *	the capacity of four-byte ints */
-	WBTEST_MMAP_SYSCALL_FAIL,		/* 90 : Force mmap() to return an error */
+	WBTEST_MEM_MAP_SYSCALL_FAIL,		/* 90 : Force shmat() on AIX and mmap() on other platforms to return an error */
 	WBTEST_TAMPER_HOSTNAME,			/* 91 : Change host name in db_init to call condition handler */
 	WBTEST_RECOVER_ENOSPC,			/* 92 : Cause ENOSPC error on Xth write to test return status on error */
 	WBTEST_WCS_FLU_FAIL,			/* 93 : Simulates a failure in wcs_flu */
 	WBTEST_PREAD_SYSCALL_FAIL,		/* 94 : Simulate pread() error in dsk_read */
 	WBTEST_HOLD_CRIT_ENABLED,		/* 95 : Enable $view("PROBECRIT","REGION") command to cold crit */
-	WBTEST_HOLD_FTOK_UNTIL_BYPASS		/* 96 : Hold the ftok semaphore until another process comes and bypasses
-						 *      it*/
+	WBTEST_HOLD_FTOK_UNTIL_BYPASS,		/* 96 : Hold the ftok semaphore until another process comes and bypasses it */
+	WBTEST_SLEEP_IN_WCS_WTSTART,		/* 97 : Sleep in one of the predetermined places inside wcs_wtstart.c */
+	WBTEST_SETITIMER_ERROR,			/* 98 : Simulate an error return from setitimer in gt_timers.c */
+	WBTEST_HOLD_GTMSOURCE_SRV_LATCH		/* 99 : Hold the source server latch until rollback process issues a SIGCONT */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be levereged.

@@ -21,7 +21,6 @@
 #include "io.h"
 #include "iormdef.h"
 #include "iotimer.h"
-#include "iotcpdef.h"
 #include "gt_timer.h"
 #include "gtm_caseconv.h"
 #include "min_max.h"

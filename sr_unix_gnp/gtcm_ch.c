@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,7 @@ CONDITION_HANDLER(gtcm_ch)
 	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 	short		short_len;
 
-	START_CH;
+	START_CH(FALSE);
 	undef_inhibit = FALSE;	/* reset undef_inhibit to the default value in case it got reset temporarily and there was an error.
 				 * currently, only $INCREMENT temporarily resets this (in gtcmtr_increment.c)
 				 */
@@ -96,7 +96,7 @@ CONDITION_HANDLER(gtcm_ch)
 	{
 		memcpy(sevmsgbuf, TREF(util_outbuff_ptr), msglen);
 		util_out_print(NULL, OPER);	/* write msg to operator log */
-		gtm_putmsg_noflush(VARLSTCNT(4) ERR_SERVERERR, 2, msglen, sevmsgbuf);
+		gtm_putmsg_noflush_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SERVERERR, 2, msglen, sevmsgbuf);
 		msglen = (int)(TREF(util_outptr) - TREF(util_outbuff_ptr));
 	}
 	if (curr_entry)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
 #include "format_targ_key.h"		/* for COPY_SUBS_TO_GVCURRKEY */
-#include "targ_alloc.h"			/* for SETUP_TRIGGER_GLOBAL & SWITCH_TO_DEFAULT_REGION */
+#include "targ_alloc.h"			/* for SET_GVTARGET_TO_HASHT_GBL & SWITCH_TO_DEFAULT_REGION */
 #include "filestruct.h"			/* for INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED (FILE_INFO) */
 #include "mvalconv.h"
 #include "gdscc.h"			/* needed for tp.h */
@@ -45,7 +45,6 @@
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	gd_addr			*gd_header;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgm_info		*sgm_info_ptr;
@@ -67,7 +66,7 @@ STATICFNDCL void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 /* Similar condition handler to above without the tp-restart - just unwind and let caller do the restart */
 CONDITION_HANDLER(trigger_fill_xecute_buffer_ch)
 {
-	START_CH;
+	START_CH(TRUE);
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 		UNWIND(NULL, NULL);
@@ -108,24 +107,21 @@ int trigger_fill_xecute_buffer(gv_trigger_t *trigdsc)
 	 * weight but has a dependence on the restartability of the trigger-drive logic for getting the triggers reloaded as
 	 * necessary.
 	 */
-	if (0 < dollar_tlevel)
-	{
-		if (!tp_pointer->implicit_trigger		/* Case 2 */
-		    || (tp_pointer->implicit_tstart && tp_pointer->implicit_trigger
-			&& (tstart_trigger_depth != gtm_trigger_depth)))	/* Case 3 */
-		{	/* Test for Case 3/4 where we get to do very little: */
-			assert((!tp_pointer->implicit_trigger) || (0 < gtm_trigger_depth));
-			trigger_fill_xecute_buffer_read_trigger_source(trigdsc);
-		} else
-		{	/* Test for Case 1 where we only need a condition handler */
-			assert(tp_pointer->implicit_tstart && tp_pointer->implicit_trigger);
-			assert(tstart_trigger_depth == gtm_trigger_depth);
-			ESTABLISH_RET(trigger_fill_xecute_buffer_ch, SIGNAL);
-			trigger_fill_xecute_buffer_read_trigger_source(trigdsc);
-			REVERT;
-		}
+	assertpro(0 < dollar_tlevel);
+	if (!tp_pointer->implicit_trigger		/* Case 2 */
+		|| (tp_pointer->implicit_tstart && tp_pointer->implicit_trigger
+		&& (tstart_trigger_depth != gtm_trigger_depth)))	/* Case 3 */
+	{	/* Test for Case 3/4 where we get to do very little: */
+		assert((!tp_pointer->implicit_trigger) || (0 < gtm_trigger_depth));
+		trigger_fill_xecute_buffer_read_trigger_source(trigdsc);
 	} else
-		GTMASSERT;
+	{	/* Test for Case 1 where we only need a condition handler */
+		assert(tp_pointer->implicit_tstart && tp_pointer->implicit_trigger);
+		assert(tstart_trigger_depth == gtm_trigger_depth);
+		ESTABLISH_RET(trigger_fill_xecute_buffer_ch, SIGNAL);
+		trigger_fill_xecute_buffer_read_trigger_source(trigdsc);
+		REVERT;
+	}
 	/* return our bounty to caller */
 	trigdsc->xecute_str.mvtype = MV_STR;
 	return 0;	/* Could return ERR_TPRETRY if return is via our condition handler */
@@ -135,7 +131,6 @@ int trigger_fill_xecute_buffer(gv_trigger_t *trigdsc)
  */
 STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *trigdsc)
 {
-	mname_entry		gvent;
 	enum cdb_sc		cdb_status;
 	int4			index;
 	mstr			gbl, xecute_buff;
@@ -144,15 +139,14 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 	sgmnt_data_ptr_t	csd;
 	gvt_trigger_t		*gvt_trigger;
 	gv_namehead		*gvt;
-	gv_namehead		*hasht_tree, *save_gv_target;
-	gv_key			*save_gv_currkey;
+	gv_namehead		*save_gv_target;
 	gd_region		*save_gv_cur_region;
 	sgm_info		*save_sgm_info_ptr;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 
 	assert(0 < dollar_tlevel);
 	assert(NULL != trigdsc);
-	SAVE_TRIGGER_REGION_INFO;
+	SAVE_TRIGGER_REGION_INFO(save_currkey);
 
 	gvt_trigger = trigdsc->gvt_trigger;			/* We now know our base block now */
 	index = trigdsc - gvt_trigger->gv_trig_array + 1;	/* We now know our trigger index value */
@@ -185,13 +179,13 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 		assert(IS_GTM_IMAGE);
 		t_retry(cdb_sc_triggermod);
 	}
-	SETUP_TRIGGER_GLOBAL;
+	SET_GVTARGET_TO_HASHT_GBL(csa);
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	assert(0 == trigdsc->xecute_str.str.len);	/* Make sure not replacing/losing a buffer */
 	xecute_buff.addr = trigger_gbl_fill_xecute_buffer(gbl.addr, gbl.len, &trig_index, NULL, (int4 *)&xecute_buff.len);
 	trigdsc->xecute_str.str = xecute_buff;
 	/* Restore gv_target/gv_currkey which need to be kept in sync */
-	RESTORE_TRIGGER_REGION_INFO;
+	RESTORE_TRIGGER_REGION_INFO(save_currkey);
 	return;
 }
 #endif /* GTM_TRIGGER */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,9 +56,7 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 
-error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVDATAFAIL);
-error_def(ERR_TPRETRY);
 
 DEFINE_NSB_CONDITION_HANDLER(gvcst_data_ch)
 
@@ -85,19 +83,17 @@ mint	gvcst_data(void)
 		op_tstart((IMPLICIT_TSTART), TRUE, &literal_batch, 0);
 		ESTABLISH_NORET(gvcst_data_ch, est_first_pass);
 		GVCST_ROOT_SEARCH_AND_PREP(est_first_pass);
+		/* fix up since it should only be externally counted as one $data */
+		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_data, (gtm_uint64_t) -1);
+		val = gvcst_data2();
 	} else
 		sn_tpwrapped = FALSE;
-	/* fix up since it should only be externally counted as one $data */
-	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_data, (gtm_uint64_t) -1);
-	val = gvcst_data2();
 	if (-1 == val)
 	{	/* -1 implies node exists. Need to see if a proper descendant exists */
 		val = 1;
 		/* 0 1 0 0 <-- append that to gv_currkey */
-		gv_currkey->end = oldend + 2;
-		gv_currkey->base[oldend + 0] = 1;
-		gv_currkey->base[oldend + 1] = 0;
-		gv_currkey->base[oldend + 2] = 0;
+		assert(oldend == gv_currkey->end);
+		GVKEY_INCREMENT_QUERY(gv_currkey);
 		found = gvcst_query(); /* want to save gv_altkey? */
 		if (found && (0 == memcmp(gv_currkey->base, gv_altkey->base, oldend)))
 			val += 10;

@@ -1701,6 +1701,16 @@ boolean_t	tp_tend()
 			csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;	/* set this BEFORE releasing crit */
 			/* should never increment curr_tn on a frozen database */
 			assert(!(csd->freeze UNIX_ONLY(|| (replication && IS_REPL_INST_FROZEN))));
+			/* For MM, barrier ensures blocks updates complete before incrementing db TN. Otherwise concurrent
+			 * processes could note a premature db TN value in gvcst_search and later fail to detect a block
+			 * modification.
+			 * For BG, no barrier is needed. We increment db TN only after pinning the relevant buffers.
+			 * Concurrent processes wait for the buffer to be unpinned before accessing it and so never mistake
+			 * the old contents for the new contents. The acts of pinning and unpinning use compswap which does the
+			 * needed memory barriers.
+			 */
+			if (is_mm)
+				MM_WRITE_MEMORY_BARRIER;
 			INCREMENT_CURR_TN(csd);
 #			ifdef GTM_TRIGGER
 			if (csa->incr_db_trigger_cycle)
@@ -2110,8 +2120,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 			segment_update_array_size = UA_NON_BM_SIZE(cs_data);
 			ENSURE_UPDATE_ARRAY_SPACE(segment_update_array_size);
 			BLK_INIT(bs_ptr, bs1);
-			if (0 != rc_set_fragment)
-				GTMASSERT;
+			assertpro(0 == rc_set_fragment);
 			BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), bh->curr_rec.offset - SIZEOF(blk_hdr));
 			BLK_ADDR(curr_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 			curr_rec_hdr->rsiz = new_rec_size;
@@ -2256,11 +2265,28 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 		if ((gds_t_acquired != cse->mode) || (ROUND_DOWN2(cse->blk, BLKS_PER_LMAP) != bml))
 			continue;
 		assert(*b_ptr == (cse->blk - bml));
+		/* If bm_find_blk is passed a hint (first arg) it assumes it is less than map_size and gives invalid results (for
+		 * values >= map_size). Instead of changing bm_find_blk we do the check here and assert that "hint" < "map_size" in
+		 * bm_find_blk.
+		 */
+		if (offset >= map_size)
+		{	/* We have a block that needs to be reallocated but there are no free blocks left in this local bitmap.
+			 * Note: It's possible for `offset' to be greater than `map_size' if the cache record holding the bitmap
+			 * gets reused for a non-bitmap block in which case donot_commit should be set (and hence asserted here).
+			 * In such a case, we return FALSE causing the caller to restart the transaction with a cdb_sc_bmlmod
+			 * even though it's a case of cdb_sc_lostbmlcr.
+			 */
+			assert((offset == map_size) || (TREF(donot_commit) & DONOTCOMMIT_REALLOCATE_BITMAP_BMLMOD));
+			return FALSE;
+		}
 		free_bit = bm_find_blk(offset, (sm_uc_ptr_t)bml_cse->old_block + SIZEOF(blk_hdr), map_size, &blk_used);
 		if (MAP_RD_FAIL == free_bit || NO_FREE_SPACE == free_bit)
 			return FALSE;
 		cse->blk = bml + free_bit;
-		assert(cse->blk < total_blks);
+#		ifdef DEBUG
+		if (cse->blk >= total_blks)
+			TREF(donot_commit) |= DONOTCOMMIT_REALLOCATE_BITMAP_BMLMOD;
+#		endif
 		blk_used ? BIT_SET_RECYCLED_AND_CLEAR_FREE(cse->blk_prior_state)
 			 : BIT_CLEAR_RECYCLED_AND_SET_FREE(cse->blk_prior_state);
 		/* re-point before-images into cse->old_block if necessary; if not available restart by returning FALSE */
@@ -2313,14 +2339,6 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 		}
 		*b_ptr++ = free_bit;
 		offset = free_bit + 1;
-		if (offset >= map_size)
-		{	/* If bm_find_blk is passed a hint (first arg) it assumes it is less than map_size
-			 * and gives invalid results (like values >= map_size). Instead of changing bm_find_blk
-			 * we do the check here and assert that "hint" < "map_size" in bm_find_blk.
-			 */
-			assert(offset == map_size);
-			return FALSE;
-		}
 	}
 	if (cse == bmp_begin_cse)
 	{

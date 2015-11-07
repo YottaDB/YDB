@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@
 GBLREF	spdesc			stringpool;
 
 /* [Used by SET] Saves a global in the glvn pool and returns its index. */
-void op_savgvn(UNIX_ONLY_COMMA(int argcnt) mval *val_arg, ...)
+void op_savgvn(UNIX_ONLY_COMMA(int argcnt) int hash_code_dummy, mval *val_arg, ...)
 {
 	va_list			var;
 	mval			*m, *key;
@@ -47,6 +47,7 @@ void op_savgvn(UNIX_ONLY_COMMA(int argcnt) mval *val_arg, ...)
 	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, val_arg);
 	VMS_ONLY(va_count(argcnt));
+	--argcnt;	/* remove hash_code_dummy from parameter list before storing */
 	ENSURE_GLVN_POOL_SPACE(argcnt);
 	GET_GLVN_POOL_STATE(slot, m);
 	gvn_info = (gparam_list *)&slot->glvn_info;

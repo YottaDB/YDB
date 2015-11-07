@@ -13,6 +13,7 @@
 #define GV_TRIGGER_H_INCLUDED
 
 #include "gv_trigger_common.h"	/* ^#t related macros (common to both Unix and VMS) */
+#include "hashtab_mname.h"	/* for COMPUTE_HASH_MNAME macro */
 
 error_def(ERR_GVIS);
 error_def(ERR_GVZTRIGFAIL);
@@ -404,18 +405,23 @@ typedef struct gvtr_invoke_parms_struct
 	}										\
 }
 
-#define SETUP_TRIGGER_GLOBAL									\
+#define SET_GVTARGET_TO_HASHT_GBL(CSA)								\
 {												\
-	hasht_tree = csa->hasht_tree;								\
+	mname_entry	gvname;									\
+	gv_namehead	*hasht_tree;								\
+												\
+	GBLREF	gv_namehead	*gv_target;							\
+												\
+	hasht_tree = CSA->hasht_tree;								\
 	if (NULL == hasht_tree)									\
 	{	/* Allocate gv_target like structure for "^#t" global in this database file */	\
-		gvent.var_name.addr = literal_hasht.str.addr;					\
-		gvent.var_name.len = literal_hasht.str.len;					\
-		gvent.marked = FALSE;								\
-		COMPUTE_HASH_MNAME(&gvent);							\
-		hasht_tree = targ_alloc(csa->hdr->max_key_size, &gvent, NULL);			\
-		hasht_tree->gd_csa = csa;							\
-		csa->hasht_tree = hasht_tree;							\
+		gvname.var_name.addr = literal_hasht.str.addr;					\
+		gvname.var_name.len = literal_hasht.str.len;					\
+		gvname.marked = FALSE;								\
+		COMPUTE_HASH_MNAME(&gvname);							\
+		hasht_tree = targ_alloc(CSA->hdr->max_key_size, &gvname, NULL);			\
+		hasht_tree->gd_csa = CSA;							\
+		CSA->hasht_tree = hasht_tree;							\
 	}											\
 	gv_target = hasht_tree;									\
 }
@@ -433,9 +439,8 @@ typedef struct gvtr_invoke_parms_struct
 	 * gv_currkey, gv_target, gv_cur_region, cs_addrs & cs_data to be set up appropriately. gv_currkey & gv_target	\
 	 * are already set up. The remaining should be set up which is asserted below.					\
 	 */														\
-	assert(&FILE_INFO(gv_cur_region)->s_addrs == csa);								\
-	assert(cs_addrs == csa);											\
-	assert(cs_data == csa->hdr);											\
+	assert(&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs);								\
+	assert(cs_data == cs_addrs->hdr);										\
 	/* Do the actual search for ^#t global in the directory tree */							\
 	GVCST_ROOT_SEARCH;												\
 }
@@ -443,18 +448,17 @@ typedef struct gvtr_invoke_parms_struct
 #define	SWITCH_TO_DEFAULT_REGION			\
 {							\
 	GBLREF	uint4		dollar_tlevel;		\
+	GBLREF	gd_addr		*gd_header;		\
+	GBLREF	gv_namehead	*gv_target;		\
 							\
 	gd_region		*default_region;	\
-	gv_namehead		*hasht_tree;		\
-	mname_entry		gvent;			\
 							\
 	assert(NULL != gd_header);			\
 	default_region = gd_header->maps->reg.addr;	\
 	if (!default_region->open)			\
 		gv_init_reg(default_region);		\
 	TP_CHANGE_REG_IF_NEEDED(default_region);	\
-	csa = cs_addrs;					\
-	SETUP_TRIGGER_GLOBAL;				\
+	SET_GVTARGET_TO_HASHT_GBL(cs_addrs);		\
 	assert(NULL != gv_target);			\
 	if (dollar_tlevel)				\
 		tp_set_sgm();				\

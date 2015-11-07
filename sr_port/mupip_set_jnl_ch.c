@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ error_def(ERR_MUNOFINISH);
 
 CONDITION_HANDLER(mupip_set_jnl_ch)
 {
-	START_CH
+	START_CH(TRUE);
 	mupip_set_jnl_cleanup();
 	PRN_ERROR
 	if (SEVERITY == ERROR  ||  SEVERITY == SEVERE)

@@ -18,6 +18,7 @@
 #define MAX_MBXNAM_LEN		16
 #define MAX_PRCNAM_LEN		15
 #define MAX_STDIOE_LEN		1024
+#define MAX_JOBPARM_LEN		1024
 #define TIMEOUT_ERROR		(MAX_SYSERR + 1)	/* a special value to differentiate it from the rest of errno's */
 
 #define CHILD_FLAG_ENV		"gtmj0"
@@ -35,6 +36,11 @@
 #define STARTUP_ENV		"gtmjb"
 #define GTMJCNT_ENV		"gtmjcnt"
 
+#define JOB_SOCKET_PREFIX		"SOCKET:"
+#define IS_JOB_SOCKET(ADDR, LEN)	((LEN >= SIZEOF(JOB_SOCKET_PREFIX)) && (0 == STRNCMP_LIT(ADDR, JOB_SOCKET_PREFIX)))
+#define JOB_SOCKET_HANDLE(ADDR)		(((char *)(ADDR)) + SIZEOF(JOB_SOCKET_PREFIX) - 1)
+#define JOB_SOCKET_HANDLE_LEN(LEN)	(LEN - SIZEOF(JOB_SOCKET_PREFIX) + 1)
+
 GBLDEF int job_errno;
 
 /********************************************************************************************************************
@@ -45,6 +51,8 @@ GBLDEF int job_errno;
  * the situations where trying again by the main thread might succeed (like errors due to insufficient
  * swap space etc..). When the middle process comes across an error that it thinks is worth trying again,
  * it adds joberr_tryagain to the main status (one of the status' upto joberr_tryagain) and exits with the new status.
+ *
+ * Additions to this enum must match the joberrs array in joberr.h.
  *********************************************************************************************************************/
 
 typedef enum
@@ -62,12 +70,21 @@ typedef enum
 	joberr_cd,
 	joberr_rtn,
 	joberr_sid,
+	joberr_sp,
 	joberr_frk,
 	joberr_stdout_rename,
 	joberr_stderr_rename,
 	joberr_pipe_mp,
 	joberr_pipe_mgc,
-	joberr_stp,
+	joberr_stdin_socket_lookup,
+	joberr_stdout_socket_lookup,
+	joberr_stderr_socket_lookup,
+	joberr_io_stdin_socket_dup,
+	joberr_io_stdout_socket_dup,
+	joberr_io_stderr_socket_dup,
+	joberr_io_setup_op_write,
+	joberr_io_setup_write,
+	joberr_stp,			/* These three should stay at the end of the enum. */
 	joberr_sig,
 	joberr_end
 } joberr_t;
@@ -81,13 +98,14 @@ typedef	struct
 {
 	mstr		input, output, error;
 	mstr		gbldir, startup, directory;
-	mstr		logfile;
 	mstr		routine;
 	mstr		label;
 	mstr		cmdline;
 	int4		baspri;
 	int4		offset;
 	job_parm	*parms;
+	size_t		input_prebuffer_size;
+	char		*input_prebuffer;
 } job_params_type;
 
 typedef enum
@@ -102,6 +120,46 @@ typedef enum
 {
 #include "jobparams.h"
 } jp_type;
+
+typedef enum
+{
+	job_done,			/* last message */
+	job_set_params,			/* followed by a job_params_msg message */
+	job_set_parm_list,		/* followed by a job_arg_count_msg and "arg_count" job_arg_msg messages */
+	job_set_input_buffer		/* followed by a job_buffer_size_msg and a data message of "buffer_size" */
+} job_setup_op;
+
+typedef struct
+{
+	size_t		directory_len;
+	char		directory[MAX_JOBPARM_LEN];
+	size_t		gbldir_len;
+	char		gbldir[MAX_JOBPARM_LEN];
+	size_t		startup_len;
+	char		startup[MAX_JOBPARM_LEN];
+	size_t		input_len;
+	char		input[MAX_JOBPARM_LEN];
+	size_t		output_len;
+	char		output[MAX_JOBPARM_LEN];
+	size_t		error_len;
+	char		error[MAX_JOBPARM_LEN];
+	size_t		routine_len;
+	char		routine[MAX_JOBPARM_LEN];
+	size_t		label_len;
+	char		label[MAX_JOBPARM_LEN];
+	int		offset;
+	int		baspri;
+} job_params_msg;
+
+typedef size_t job_arg_count_msg;
+
+typedef struct
+{
+	ssize_t			len;				/* negative len indicates null arg */
+	char			data[MAX_JOBPARM_LEN];
+} job_arg_msg;
+
+typedef size_t job_buffer_size_msg;
 
 int ojchildioset(job_params_type *jparms);
 int ojstartchild(job_params_type *jparms, int argcnt, boolean_t *non_exit_return, int pipe_fds[]);

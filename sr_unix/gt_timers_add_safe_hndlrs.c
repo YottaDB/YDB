@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "heartbeat_timer.h"
 #include "semwt2long_handler.h"
 #include "secshr_client.h"
+#include "dskspace_msg_timer.h"
 
 /* This optional routine adds entries to the safe_handlers[] array. It is separate because while most executables need
  * these timers listed, there is one executable (gtmsecshr) that decidedly does not - gtmsecshr. If these routines are
@@ -25,5 +26,5 @@
 
 void gt_timers_add_safe_hndlrs(void)
 {
-	add_safe_timer_handler(3, semwt2long_handler, client_timer_handler, heartbeat_timer);
+	add_safe_timer_handler(4, semwt2long_handler, client_timer_handler, heartbeat_timer, dskspace_msg_timer);
 }

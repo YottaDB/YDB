@@ -85,11 +85,11 @@ error_def(ERR_TEXT);
 
 #define	OLD_VERSION_SEM_PER_SET 2
 
-#define ISSUE_CRITSEMFAIL_AND_RETURN(REG, FAILED_OP, ERRNO)								\
-{															\
-	gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(REG));							\
-	gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL(FAILED_OP), CALLFROM, ERRNO);				\
-	return FALSE;													\
+#define ISSUE_CRITSEMFAIL_AND_RETURN(REG, FAILED_OP, ERRNO)									\
+{																\
+	gtm_putmsg_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(REG));					\
+	gtm_putmsg_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL(FAILED_OP), CALLFROM, ERRNO);	\
+	return FALSE;														\
 }
 
 #define CANCEL_TIMER_AND_RETURN_SUCCESS(REG)										\
@@ -222,7 +222,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 	assert(NULL == ftok_sem_reg);
 	if (-1 == (udi->key = FTOK(udi->fn, project_id)))
 	{
-		gtm_putmsg(VARLSTCNT(5) ERR_FTOKERR, 2, DB_LEN_STR(reg), errno);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FTOKERR, 2, DB_LEN_STR(reg), errno);
 		return FALSE;
 	}
 	/* The following loop deals with the possibility that the semaphores can be deleted by someone else AFTER a successful
@@ -238,25 +238,29 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 			{
 				/* Possibly the key is in use by older GTM version */
 				if (-1 != semget(udi->key, OLD_VERSION_SEM_PER_SET, RALL))
-					gtm_putmsg(VARLSTCNT(4) ERR_SEMKEYINUSE, 1, udi->key, errno);
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_SEMKEYINUSE, 1, udi->key, errno);
 			}
 			ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semget()", save_errno);
 		}
 		SET_GTM_ID_SEM(udi->ftok_semid, status); /* sets 3rd semaphore's value to GTM_ID = 43 */
-		if (-1 == status)
-		{
-			save_errno = errno;
-			ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semctl()", save_errno);
-		}
-		SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
-		assert(mupip_jnl_recover || incr_cnt);
-		/* First try is always non-blocking */
-		SEMOP(udi->ftok_semid, ftok_sop, ftok_sopcnt, status, NO_WAIT);
 		if (-1 != status)
 		{
-			SENDMSG_SEMOP_SUCCESS_IF_NEEDED(stacktrace_issued, gtm_ftok_sem);
-			udi->counter_ftok_incremented = incr_cnt;
-			RETURN_SUCCESS(reg);
+			SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
+			assert(mupip_jnl_recover || incr_cnt);
+			/* First try is always non-blocking */
+			SEMOP(udi->ftok_semid, ftok_sop, ftok_sopcnt, status, NO_WAIT);
+			if (-1 != status)
+			{
+				SENDMSG_SEMOP_SUCCESS_IF_NEEDED(stacktrace_issued, gtm_ftok_sem);
+				udi->counter_ftok_incremented = incr_cnt;
+				RETURN_SUCCESS(reg);
+			}
+		} else
+		{
+			save_errno = errno;
+			if (immediate || !SEM_REMOVED(save_errno))
+				ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semctl()", save_errno);
+			continue;
 		}
 		save_errno = errno;
 		if (immediate)
@@ -309,8 +313,8 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 				{	/* we exhausted maximum attempts to do blocking semop. Issue SEMWT2LONG error and return */
 					assert(-1 != sem_pid);
 					tot_wait_time = (semop_wait_time * max_semop_trycnt) / MILLISECS_IN_SEC;
-					gtm_putmsg(VARLSTCNT(9) ERR_SEMWT2LONG, 7, process_id, tot_wait_time, LEN_AND_LIT("ftok"),
-							DB_LEN_STR(reg), sem_pid);
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_SEMWT2LONG, 7, process_id, tot_wait_time,
+						       LEN_AND_LIT("ftok"), DB_LEN_STR(reg), sem_pid);
 					return FALSE;
 				}
 				/* fall-through */
@@ -326,7 +330,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 	assert(-1 == status);
 	assert(MAX_SEMGET_RETRIES < lcnt);
 	assert(FALSE);
-	gtm_putmsg(VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
+	gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("failed to obtain ftok semaphore after maximum retries"));
 	return FALSE;
 }

@@ -53,6 +53,7 @@ error_def(ERR_COLLTYPVERSION);
 error_def(ERR_DBFILERR);
 error_def(ERR_FILEPARSE);
 error_def(ERR_GVIS);
+error_def(ERR_JNLALLOCGROW);
 error_def(ERR_MUNOACTION);
 error_def(ERR_TEXT);
 
@@ -62,7 +63,7 @@ void mucregini(int4 blk_init_size)
 	int4			i;
 	th_index_ptr_t 		th;
 	collseq			*csp;
-	uint4			ustatus;
+	uint4			ustatus, reg_autoswitch;
 	mstr 			jnlfile, jnldef, tmpjnlfile;
 	time_t			ctime;
 
@@ -95,7 +96,6 @@ void mucregini(int4 blk_init_size)
 		cs_data->lock_space_size = gv_cur_region->dyn.addr->lock_space * OS_PAGELET_SIZE;
 	else
 		cs_data->lock_space_size = DEF_LOCK_SIZE;
-	NUM_CRIT_ENTRY(cs_data) = DEFAULT_NUM_CRIT_ENTRY;
 	cs_data->staleness[0] = -300000000;	/* staleness timer = 30 seconds */
 	cs_data->staleness[1] = -1;
 	cs_data->ccp_quantum_interval[0] = -20000000;	/* 2 sec */
@@ -120,15 +120,29 @@ void mucregini(int4 blk_init_size)
 #ifdef UNIX
 	if (JNL_ALLOWED(cs_data))
 	{
-		if (cs_data->jnl_alq + cs_data->jnl_deq > gv_cur_region->jnl_autoswitchlimit)
+		reg_autoswitch = gv_cur_region->jnl_autoswitchlimit;
+		if (cs_data->jnl_alq + cs_data->jnl_deq > reg_autoswitch)
 		{
-			cs_data->autoswitchlimit = gv_cur_region->jnl_autoswitchlimit;
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, cs_data->jnl_alq,
+					gv_cur_region->jnl_autoswitchlimit, "database file", DB_LEN_STR(gv_cur_region));
+			cs_data->autoswitchlimit = reg_autoswitch;
 			cs_data->jnl_alq = cs_data->autoswitchlimit;
 		} else
-			cs_data->autoswitchlimit = ALIGNED_ROUND_DOWN(gv_cur_region->jnl_autoswitchlimit,
-							cs_data->jnl_alq, cs_data->jnl_deq);
-	}
-	else
+		{
+			cs_data->autoswitchlimit = ALIGNED_ROUND_DOWN(reg_autoswitch, cs_data->jnl_alq, cs_data->jnl_deq);
+			/* If rounding down took us to less than the minimum autoswitch, then bump allocation to be
+			 * equal to the pre-round-down autoswitchlimit this way all values are above their respective
+			 * minimums. Note that the extension can be an arbitrary value because alloc == autoswitch.
+			 */
+			if (JNL_AUTOSWITCHLIMIT_MIN > cs_data->autoswitchlimit)
+			{
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, cs_data->jnl_alq,
+						reg_autoswitch, "database file", DB_LEN_STR(gv_cur_region));
+				cs_data->jnl_alq = reg_autoswitch;
+				cs_data->autoswitchlimit = reg_autoswitch;
+			}
+		}
+	} else
 		cs_data->autoswitchlimit = 0;
 	assert(!(MAX_IO_BLOCK_SIZE % DISK_BLOCK_SIZE));
 	if (cs_data->jnl_alq + cs_data->jnl_deq > cs_data->autoswitchlimit)
@@ -154,12 +168,13 @@ void mucregini(int4 blk_init_size)
 			cs_data->def_coll_ver = (csp->version)(cs_data->def_coll);
 			if (!do_verify(csp, cs_data->def_coll, cs_data->def_coll_ver))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_COLLTYPVERSION, 2, cs_data->def_coll, cs_data->def_coll_ver);
+				gtm_putmsg_csa(CSA_ARG(cs_addrs)
+					VARLSTCNT(4) ERR_COLLTYPVERSION, 2, cs_data->def_coll, cs_data->def_coll_ver);
 				mupip_exit(ERR_MUNOACTION);
 			}
 		} else
 		{
-			gtm_putmsg(VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, cs_data->def_coll);
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, cs_data->def_coll);
 			mupip_exit(ERR_MUNOACTION);
 		}
 	}
@@ -194,7 +209,7 @@ void mucregini(int4 blk_init_size)
 		jnldef.len = SIZEOF(JNL_EXT_DEF) - 1;
 		if (FILE_STAT_ERROR == gtm_file_stat(&jnlfile, &jnldef, &tmpjnlfile, TRUE, &ustatus))
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, JNL_LEN_STR(gv_cur_region), ustatus);
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_FILEPARSE, 2, JNL_LEN_STR(gv_cur_region), ustatus);
 			mupip_exit(ERR_MUNOACTION);
 		}
 		cs_data->jnl_file_len = tmpjnlfile.len;
@@ -220,7 +235,7 @@ void mucregini(int4 blk_init_size)
 				       = (int4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(cs_data), UPDATE_ARRAY_ALIGN_SIZE);
 	cs_data->max_update_array_size += (int4)ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
 	/* bt_malloc(cs_addrs) Done by db_init at file open time -- not needed here */
-	if (dba_bg == gv_cur_region->dyn.addr->acc_meth)
+	if (dba_bg == REG_ACC_METH(gv_cur_region))
 		cs_data->flush_time[0] = TIM_FLU_MOD_BG;
 	else
 		cs_data->flush_time[0] = TIM_FLU_MOD_MM;
@@ -229,6 +244,7 @@ void mucregini(int4 blk_init_size)
 	cs_data->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
 	cs_data->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
 	cs_data->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
+	NUM_CRIT_ENTRY(cs_data) = gv_cur_region->dyn.addr->mutex_slots;
 	cs_data->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
 	time(&ctime);
 	assert(SIZEOF(ctime) >= SIZEOF(int4));
@@ -236,11 +252,11 @@ void mucregini(int4 blk_init_size)
 	cs_addrs->bmm = MM_ADDR(cs_data);
 	bmm_init();
 	for (i = 0; i < blk_init_size ; i += cs_data->bplmap)
-	{	status = bml_init(i);
+	{
+		status = bml_init(i);
 		if (status != SS_NORMAL)
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, gv_cur_region->dyn.addr->fname_len,
-					gv_cur_region->dyn.addr->fname, status);
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
 			mupip_exit(ERR_MUNOACTION);
 		}
 	}

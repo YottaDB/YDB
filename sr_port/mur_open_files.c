@@ -84,57 +84,57 @@
 #include "is_proc_alive.h"
 #include "anticipatory_freeze.h"
 
-#define RELEASE_ACCESS_CONTROL(REGLIST)									\
-{													\
-	unix_db_info		*lcl_udi;								\
-	gd_region		*lcl_reg;								\
-	reg_ctl_list		*lcl_rctl;								\
-	int			save_errno;								\
-													\
-	lcl_reg = REGLIST->reg;										\
-	lcl_rctl = REGLIST->rctl;									\
-	lcl_udi = FILE_INFO(lcl_reg);									\
-	assert(INVALID_SEMID != lcl_udi->semid);							\
-	assert(lcl_udi->grabbed_access_sem && lcl_rctl->standalone);					\
-	if (0 != (save_errno = do_semop(lcl_udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO)))			\
-	{												\
-		assert(FALSE);	/* we hold it, so we should be able to release it*/			\
-		rts_error(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(lcl_reg), ERR_SYSCALL, 5,	\
-				RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);			\
-	}												\
-	lcl_udi->grabbed_access_sem = FALSE;								\
-	lcl_rctl->standalone = FALSE;									\
+#define RELEASE_ACCESS_CONTROL(REGLIST)												\
+{																\
+	unix_db_info		*lcl_udi;											\
+	gd_region		*lcl_reg;											\
+	reg_ctl_list		*lcl_rctl;											\
+	int			save_errno;											\
+																\
+	lcl_reg = REGLIST->reg;													\
+	lcl_rctl = REGLIST->rctl;												\
+	lcl_udi = FILE_INFO(lcl_reg);												\
+	assert(INVALID_SEMID != lcl_udi->semid);										\
+	assert(lcl_udi->grabbed_access_sem && lcl_rctl->standalone);								\
+	if (0 != (save_errno = do_semop(lcl_udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO)))						\
+	{															\
+		assert(FALSE);	/* we hold it, so we should be able to release it*/						\
+		rts_error_csa(CSA_ARG(REG2CSA(lcl_reg)) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(lcl_reg), ERR_SYSCALL, 5,	\
+				RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);						\
+	}															\
+	lcl_udi->grabbed_access_sem = FALSE;											\
+	lcl_rctl->standalone = FALSE;												\
 }
 
-#define GRAB_ACCESS_CONTROL(REGLIST)									\
-{													\
-	unix_db_info		*lcl_udi;								\
-	gd_region		*lcl_reg;								\
-	reg_ctl_list		*lcl_rctl;								\
-	int			save_errno, sopcnt, status;						\
-	struct sembuf		sop[3];									\
-													\
-	SET_GTM_SOP_ARRAY(sop, sopcnt, FALSE, SEM_UNDO);						\
-	assert(2 == sopcnt);										\
-	lcl_reg = REGLIST->reg;										\
-	lcl_rctl = REGLIST->rctl;									\
-	lcl_udi = FILE_INFO(lcl_reg);									\
-	assert(INVALID_SEMID != lcl_udi->semid);							\
-	if (lcl_udi->grabbed_access_sem)								\
-		assert(lcl_rctl->standalone);								\
-	else												\
-	{												\
-		SEMOP(lcl_udi->semid, sop, sopcnt, status, NO_WAIT);					\
-		if (0 != status)									\
-		{											\
-			save_errno = errno;								\
-			assert(FALSE);									\
-			rts_error(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(lcl_reg), ERR_SYSCALL, 5,\
-					RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);		\
-		}											\
-		lcl_udi->grabbed_access_sem = TRUE;					\
-		lcl_rctl->standalone = TRUE;								\
-	}												\
+#define GRAB_ACCESS_CONTROL(REGLIST)											\
+{															\
+	unix_db_info		*lcl_udi;										\
+	gd_region		*lcl_reg;										\
+	reg_ctl_list		*lcl_rctl;										\
+	int			save_errno, sopcnt, status;								\
+	struct sembuf		sop[3];											\
+															\
+	SET_GTM_SOP_ARRAY(sop, sopcnt, FALSE, SEM_UNDO);								\
+	assert(2 == sopcnt);												\
+	lcl_reg = REGLIST->reg;												\
+	lcl_rctl = REGLIST->rctl;											\
+	lcl_udi = FILE_INFO(lcl_reg);											\
+	assert(INVALID_SEMID != lcl_udi->semid);									\
+	if (lcl_udi->grabbed_access_sem)										\
+		assert(lcl_rctl->standalone);										\
+	else														\
+	{														\
+		SEMOP(lcl_udi->semid, sop, sopcnt, status, NO_WAIT);							\
+		if (0 != status)											\
+		{													\
+			save_errno = errno;										\
+			assert(FALSE);											\
+			rts_error_csa(CSA_ARG(REG2CSA(lcl_reg)) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(lcl_reg),	\
+					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);		\
+		}													\
+		lcl_udi->grabbed_access_sem = TRUE;									\
+		lcl_rctl->standalone = TRUE;										\
+	}														\
 }
 #endif
 
@@ -244,6 +244,7 @@ boolean_t mur_open_files()
 	DEBUG_ONLY(int			semval;)
 	DEBUG_ONLY(jnl_buffer_ptr_t	jb;)
 #	endif
+	boolean_t			recov_interrupted;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -258,7 +259,7 @@ boolean_t mur_open_files()
 		star_specified = TRUE;
 		if (NULL != mur_options.redirect)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_STARFILE, 2, LEN_AND_LIT("REDIRECT qualifier"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STARFILE, 2, LEN_AND_LIT("REDIRECT qualifier"));
 			mupip_exit(ERR_MUPCLIERR);
 		}
 	} else
@@ -266,7 +267,7 @@ boolean_t mur_open_files()
 		star_specified = FALSE;
 		if (mur_options.rollback)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_NOSTARFILE, 2, LEN_AND_LIT("ROLLBACK qualifier"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOSTARFILE, 2, LEN_AND_LIT("ROLLBACK qualifier"));
 			mupip_exit(ERR_MUPCLIERR);
 		}
 	}
@@ -331,7 +332,7 @@ boolean_t mur_open_files()
 		if (!get_full_path(replpool_id.gtmgbldir, tran_name->len,
 				replpool_id.gtmgbldir, &full_len, MAX_TRANS_NAME_LEN, &status))
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_FILENOTFND, 2, tran_name->len, tran_name->addr);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILENOTFND, 2, tran_name->len, tran_name->addr);
 			return FALSE;
 		}
 		else
@@ -344,11 +345,11 @@ boolean_t mur_open_files()
 			replpool_id.pool_type = JNLPOOL_SEGMENT;
 			sgmnt_found = FALSE;
 			if (mu_rndwn_replpool(&replpool_id, FALSE, &sgmnt_found) && sgmnt_found)
-				gtm_putmsg(VARLSTCNT(6) ERR_MUJPOOLRNDWNSUC, 4, res_name[0], &res_name[1],
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNSUC, 4, res_name[0], &res_name[1],
 						tran_name->len, replpool_id.gtmgbldir);
 			else if (sgmnt_found)
 			{
-				gtm_putmsg(VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, res_name[0], &res_name[1],
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, res_name[0], &res_name[1],
 						tran_name->len, replpool_id.gtmgbldir);
 				return FALSE;
 			}
@@ -358,11 +359,11 @@ boolean_t mur_open_files()
 			replpool_id.pool_type = RECVPOOL_SEGMENT;
 			sgmnt_found = FALSE;
 			if (mu_rndwn_replpool(&replpool_id, FALSE, &sgmnt_found) && sgmnt_found)
-				gtm_putmsg(VARLSTCNT(6) ERR_MURPOOLRNDWNSUC, 4, res_name[0], &res_name[1],
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURPOOLRNDWNSUC, 4, res_name[0], &res_name[1],
 						tran_name->len, replpool_id.gtmgbldir);
 			else if (sgmnt_found)
 			{
-				gtm_putmsg(VARLSTCNT(6) ERR_MURPOOLRNDWNFL, 4, res_name[0], &res_name[1],
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURPOOLRNDWNFL, 4, res_name[0], &res_name[1],
 					tran_name->len, replpool_id.gtmgbldir);
 				return FALSE;
 			}
@@ -405,7 +406,7 @@ boolean_t mur_open_files()
 			rctl->db_present = FALSE;
 			if (mur_options.update || star_specified)
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_FILENOTFND, 2, DB_LEN_STR(rctl->gd));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILENOTFND, 2, DB_LEN_STR(rctl->gd));
 				return FALSE;
 			}
 		} else
@@ -420,7 +421,8 @@ boolean_t mur_open_files()
 					VMS_ONLY(gv_cur_region = rctl->gd); /* VMS mu_rndwn_file() assumes gv_cur_region is set */
 					if (!STANDALONE(rctl->gd))	/* STANDALONE macro calls mu_rndwn_file() */
 					{
-						gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(rctl->gd));
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSTANDALONE, 2,
+							       DB_LEN_STR(rctl->gd));
 						return FALSE;
 					}
 					rctl->standalone = TRUE;
@@ -437,8 +439,8 @@ boolean_t mur_open_files()
 				{
 					if (!cs_data->fully_upgraded)
 					{
-						gtm_putmsg(VARLSTCNT(6) ERR_ORLBKNOV4BLK, 4, REG_LEN_STR(gv_cur_region),
-								DB_LEN_STR(gv_cur_region));
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_ORLBKNOV4BLK, 4,
+							       REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region));
 						return FALSE;
 					}
 					max_epoch_interval = MAX(cs_data->epoch_interval, max_epoch_interval);
@@ -452,7 +454,8 @@ boolean_t mur_open_files()
 					UNIX_ONLY(assert((FILE_INFO(rctl->gd))->grabbed_access_sem));
 					if (rctl->gd->read_only)
 					{	/* recover/rollback cannot proceed if the process has read-only permissions */
-						gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(rctl->gd));
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2,
+							       DB_LEN_STR(rctl->gd));
 						return FALSE;
 					}
 				}
@@ -469,10 +472,10 @@ boolean_t mur_open_files()
 	{
 		inst_requires_rlbk = FALSE;
 		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-		send_msg(VARLSTCNT(6) ERR_ORLBKSTART, 4, LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname),
-				LEN_AND_STR(udi->fn));
-		gtm_putmsg(VARLSTCNT(6) ERR_ORLBKSTART, 4, LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname),
-				LEN_AND_STR(udi->fn));
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ORLBKSTART, 4,
+			     LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ORLBKSTART, 4,
+			       LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
 		/* Need to get the gtmsource_srv_latch BEFORE grab_crit to avoid deadlocks */
 		if (NULL != jnlpool_ctl)
 		{
@@ -539,10 +542,10 @@ boolean_t mur_open_files()
 			}
 			assert((NULL != save_rl) && (tmpcsa->region == save_rl->reg));
 			GET_CUR_TIME;
-			send_msg(VARLSTCNT(8) ERR_ORLBKFRZPROG, 6, CTIME_BEFORE_NL, time_ptr, REG_LEN_STR(save_rl->reg),
-					DB_LEN_STR(save_rl->reg));
-			gtm_putmsg(VARLSTCNT(8) ERR_ORLBKFRZPROG, 6, CTIME_BEFORE_NL, time_ptr, REG_LEN_STR(save_rl->reg),
-					DB_LEN_STR(save_rl->reg));
+			send_msg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZPROG, 6, CTIME_BEFORE_NL, time_ptr,
+				     REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
+			gtm_putmsg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZPROG, 6, CTIME_BEFORE_NL, time_ptr,
+				       REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
 			while (tmpcsd->freeze)
 			{
 				if (MAXHARDCRITS < llcnt)
@@ -550,10 +553,10 @@ boolean_t mur_open_files()
 				llcnt++;
 			}
 			GET_CUR_TIME;
-			send_msg(VARLSTCNT(8) ERR_ORLBKFRZOVER, 6, CTIME_BEFORE_NL, time_ptr, REG_LEN_STR(save_rl->reg),
-					DB_LEN_STR(save_rl->reg));
-			gtm_putmsg(VARLSTCNT(8) ERR_ORLBKFRZOVER, 6, CTIME_BEFORE_NL, time_ptr, REG_LEN_STR(save_rl->reg),
-					DB_LEN_STR(save_rl->reg));
+			send_msg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZOVER, 6, CTIME_BEFORE_NL, time_ptr,
+				     REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
+			gtm_putmsg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZOVER, 6, CTIME_BEFORE_NL, time_ptr,
+				       REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
 		}
 		inst_requires_rlbk |= TREF(wcs_recover_done);
 		assert(x_lock); /* Now we have crit on all the regions (for this global directory) */
@@ -601,16 +604,15 @@ boolean_t mur_open_files()
 				assert(cs_addrs->nl->wcs_phase2_commit_pidcnt); /* only reason why wcs_flu can fail */
 				SET_TRACEABLE_VAR(cs_addrs->nl->wc_blocked, TRUE);
 				BG_TRACE_PRO_ANY(cs_addrs, wc_blocked_onln_rlbk);
-				send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wc_blocked_onln_rlbk"),
-						process_id, &cs_addrs->ti->curr_tn, DB_LEN_STR(gv_cur_region));
+				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wc_blocked_onln_rlbk"),
+					 process_id, &cs_addrs->ti->curr_tn, DB_LEN_STR(gv_cur_region));
 				inst_requires_rlbk = TRUE;
 				assert(TREF(donot_write_inctn_in_wcs_recover)); /* should still be set to TRUE */
 				wcs_recover(reg);
 				/* Now that wcs_recover is done, do a wcs_flu(WCSFLU_NONE) once again. This time we don't expect
 				 * wcs_flu to error out.
 				 */
-				if (!wcs_flu(WCSFLU_NONE))
-					GTMASSERT;
+				assertpro(wcs_flu(WCSFLU_NONE));
 			}
 			assert(0 == cs_addrs->nl->wcs_phase2_commit_pidcnt); /* should be zero after wcs_flu and wcs_recover */
 			/* we played with access control lock before, make sure we hold it on all regions now */
@@ -628,7 +630,8 @@ boolean_t mur_open_files()
 			}
 #			endif
 			if (cs_data->kill_in_prog)
-				gtm_putmsg(VARLSTCNT(6) ERR_MUKILLIP, 4, DB_LEN_STR(reg), LEN_AND_LIT("ONLINE ROLLBACK"));
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_MUKILLIP, 4, DB_LEN_STR(reg),
+					       LEN_AND_LIT("ONLINE ROLLBACK"));
 			/* Ensure that inhibit_kills is ZERO at this point. This is because, we hold crit at this point and anyone
 			 * who wants to set inhibit_kills need crit. The reason this is important is because t_end/tp_tend has
 			 * logic to restart if inhibit_kills is set to TRUE and we don't want online rollback to restart
@@ -666,7 +669,8 @@ boolean_t mur_open_files()
 					 */
 					if (mur_options.forward)
 					{	/* error out. need fresh backup of database for forward recovery */
-						gtm_putmsg(VARLSTCNT(4) ERR_MUPJNLINTERRUPT, 2, DB_LEN_STR(rctl->gd));
+						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUPJNLINTERRUPT, 2,
+							       DB_LEN_STR(rctl->gd));
 						ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES);
 						return FALSE;
 					}
@@ -694,7 +698,8 @@ boolean_t mur_open_files()
 #						endif
 						if (interrupted_rollback)
 						{
-							gtm_putmsg(VARLSTCNT(4) ERR_ROLLBKINTERRUPT, 2, DB_LEN_STR(rctl->gd));
+							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_ROLLBKINTERRUPT, 2,
+								       DB_LEN_STR(rctl->gd));
 							ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES);
 							return FALSE;
 						}
@@ -716,7 +721,8 @@ boolean_t mur_open_files()
 						{
 							if (!star_specified)
 							{
-								gtm_putmsg(VARLSTCNT(4) ERR_JNLSTATEOFF, 2, DB_LEN_STR(rctl->gd));
+								gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_JNLSTATEOFF, 2,
+									       DB_LEN_STR(rctl->gd));
 								return FALSE;
 							}
 							continue;
@@ -731,7 +737,8 @@ boolean_t mur_open_files()
 							 */
 							if (REPL_ALLOWED(csd) || JNL_ENABLED(csd))
 							{
-								gtm_putmsg(VARLSTCNT(4) ERR_REPLSTATEOFF, 2, DB_LEN_STR(rctl->gd));
+								gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_REPLSTATEOFF, 2,
+									       DB_LEN_STR(rctl->gd));
 								return FALSE;
 							}
 							continue;
@@ -743,7 +750,8 @@ boolean_t mur_open_files()
 							 */
 							if (!mur_options.fetchresync_port && !mur_options.resync_specified)
 							{
-								gtm_putmsg(VARLSTCNT(4) ERR_RLBKNOBIMG, 2, DB_LEN_STR(rctl->gd));
+								gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_RLBKNOBIMG, 2,
+									       DB_LEN_STR(rctl->gd));
 								return FALSE;
 							}
 							mur_options.rollback_losttnonly = TRUE;
@@ -762,10 +770,12 @@ boolean_t mur_open_files()
 						assert(REG_FREEZE_SUCCESS == reg_frz_status);
 						if (REG_ALREADY_FROZEN == reg_frz_status)
 						{
-							gtm_putmsg(VARLSTCNT(4) ERR_DBFRZRESETFL, 2, DB_LEN_STR(rctl->gd));
+							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFRZRESETFL, 2,
+								       DB_LEN_STR(rctl->gd));
 							return FALSE;
 						}
-						gtm_putmsg(VARLSTCNT(4) ERR_DBFRZRESETSUC, 2, DB_LEN_STR(rctl->gd));
+						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFRZRESETSUC, 2,
+							       DB_LEN_STR(rctl->gd));
 					}
 					/* save current jnl/repl state before changing in case recovery is interrupted */
 					csd->intrpt_recov_jnl_state = csd->jnl_state;
@@ -800,7 +810,7 @@ boolean_t mur_open_files()
 				 * In this case csa is NULL */
 				if (!file_head_read((char *)rctl->gd->dyn.addr->fname, rctl->csd, SGMNT_HDR_LEN))
 				{
-					gtm_putmsg(VARLSTCNT(4) ERR_DBFILOPERR, 2, REG_LEN_STR(rctl->gd));
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBFILOPERR, 2, REG_LEN_STR(rctl->gd));
 					return FALSE;
 				}
 				rctl->jnl_state = csd->jnl_state;
@@ -828,8 +838,9 @@ boolean_t mur_open_files()
 				}
 				if (SS_NORMAL != (jctl->status = mur_fread_eof(jctl, rctl)))
 				{
-					gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-						jctl->rec_offset, ERR_TEXT, 2, LEN_AND_LIT("mur_fread_eof failed"));
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len,
+						       jctl->jnl_fn, jctl->rec_offset, ERR_TEXT, 2,
+						       LEN_AND_LIT("mur_fread_eof failed"));
 					return FALSE;
 				}
 				assert((csa == rctl->csa) || !mur_options.update);
@@ -849,25 +860,28 @@ boolean_t mur_open_files()
 				}
 				if (mur_options.verbose)
 				{
-					gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4, LEN_AND_LIT("Module : mur_open_files"),
-							LEN_AND_LIT("Post mur_fread_eof details"));
-					gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4, LEN_AND_LIT("    Journal file"),
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOSTR, 4,
+						       LEN_AND_LIT("Module : mur_open_files"),
+						       LEN_AND_LIT("Post mur_fread_eof details"));
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOSTR, 4, LEN_AND_LIT("    Journal file"),
 							JNL_LEN_STR(rctl->csd));
-					gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Last valid record offset"),
-							jctl->lvrec_off, jctl->lvrec_off);
-					gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Last valid record time"),
-							jctl->lvrec_time, jctl->lvrec_time);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4,
+						       LEN_AND_LIT("    Last valid record offset"),
+						       jctl->lvrec_off, jctl->lvrec_off);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4,
+						       LEN_AND_LIT("    Last valid record time"), jctl->lvrec_time,
+						       jctl->lvrec_time);
 					verbose_ptr = jctl->tail_analysis ? "TRUE" : "FALSE";
-					gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4, LEN_AND_LIT("      Tail analysis done"),
-							LEN_AND_STR(verbose_ptr));
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOSTR, 4,
+						       LEN_AND_LIT("      Tail analysis done"), LEN_AND_STR(verbose_ptr));
 					verbose_ptr = jctl->properly_closed ? "TRUE" : "FALSE";
-					gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4, LEN_AND_LIT("      Properly closed"),
-							LEN_AND_STR(verbose_ptr));
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOSTR, 4,
+						       LEN_AND_LIT("      Properly closed"), LEN_AND_STR(verbose_ptr));
 				}
 #				endif
 				if (!is_file_identical((char *)jctl->jfh->data_file_name, (char *)rctl->gd->dyn.addr->fname))
 				{
-					gtm_putmsg(VARLSTCNT(8) ERR_DBJNLNOTMATCH, 6, DB_LEN_STR(rctl->gd),
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBJNLNOTMATCH, 6, DB_LEN_STR(rctl->gd),
 						jctl->jnl_fn_len, jctl->jnl_fn,
 						jctl->jfh->data_file_name_length, jctl->jfh->data_file_name);
 					return FALSE;
@@ -898,7 +912,8 @@ boolean_t mur_open_files()
 			if (!get_full_path(cptr_last, (unsigned int)(cptr - cptr_last),
 						(char *)jctl->jnl_fn, &jctl->jnl_fn_len, MAX_FN_LEN, &jctl->status2))
 			{
-				gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, cptr_last, cptr - cptr_last, jctl->status2);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, cptr_last, cptr - cptr_last,
+					       jctl->status2);
 				return FALSE;
 			}
 			cptr++;	/* skip separator */
@@ -933,8 +948,8 @@ boolean_t mur_open_files()
 							break;
 					}
 				}
-				if (rctl == rctl_top)
-					GTMASSERT;/* db list was created from journal file header. So it is not possible */
+				/* db list was created from journal file header. So it is not possible */
+				assertpro(rctl != rctl_top);
 			}
 			/* Detect and report 1st case of any duplicated files in mupip forward recovery command. */
 			if (mur_options.forward)
@@ -949,8 +964,9 @@ boolean_t mur_open_files()
 						if (UNIX_ONLY(is_gdid_identical(&jctl->fid, &temp_jctl->fid))
 							VMS_ONLY(is_gdid_gdid_identical(&jctl->fid, &temp_jctl->fid)))
 						{
-							gtm_putmsg(VARLSTCNT(6) ERR_JNLFILEDUP, 4, jctl->jnl_fn_len,
-								jctl->jnl_fn, temp_jctl->jnl_fn_len, temp_jctl->jnl_fn);
+							gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(6) ERR_JNLFILEDUP, 4,
+								       jctl->jnl_fn_len, jctl->jnl_fn, temp_jctl->jnl_fn_len,
+								       temp_jctl->jnl_fn);
 							return FALSE;
 						}
 					}
@@ -958,15 +974,16 @@ boolean_t mur_open_files()
 				}
 				else
 				{
-					gtm_putmsg(VARLSTCNT(11) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len, jctl->jnl_fn,
-						ERR_SYSCALL, 5, LEN_AND_LIT("fstat"), CALLFROM, errno);
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(11) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len,
+						       jctl->jnl_fn, ERR_SYSCALL, 5, LEN_AND_LIT("fstat"), CALLFROM, errno);
 					return FALSE;
 				}
 #				endif
 			}
 			if (SS_NORMAL != (jctl->status = mur_fread_eof(jctl, rctl)))
 			{
-				gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset);
+				gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len,
+					       jctl->jnl_fn, jctl->rec_offset);
 				return FALSE;
 			}
 			/* Now, we have found the region for this jctl */
@@ -976,8 +993,8 @@ boolean_t mur_open_files()
 				rctl->jctl = rctl->jctl_head = jctl;
 				if (mur_options.update && !is_file_identical((char *)csd->jnl_file_name, (char *)jctl->jnl_fn))
 				{
-					gtm_putmsg(VARLSTCNT(8) ERR_JNLNMBKNOTPRCD, 6, jctl->jnl_fn_len, jctl->jnl_fn,
-							JNL_LEN_STR(csd), DB_LEN_STR(rctl->gd));
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(8) ERR_JNLNMBKNOTPRCD, 6, jctl->jnl_fn_len,
+						       jctl->jnl_fn, JNL_LEN_STR(csd), DB_LEN_STR(rctl->gd));
 					return FALSE;
 				}
 			} else
@@ -1043,9 +1060,9 @@ boolean_t mur_open_files()
 	}
 	assert(murgbl.reg_full_total == max_reg_total);
 	if (!mur_options.rollback && murgbl.reg_total < murgbl.reg_full_total)
-		gtm_putmsg(VARLSTCNT (1) ERR_NOTALLJNLEN);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_NOTALLJNLEN);
 	else if (mur_options.rollback && murgbl.reg_total < murgbl.reg_full_total)
-		gtm_putmsg(VARLSTCNT (1) ERR_NOTALLREPLON);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_NOTALLREPLON);
 	if (0 == murgbl.reg_total)
 		return FALSE;
 	/* From this point consider only regions with journals to be processed (murgbl.reg_total)
@@ -1064,10 +1081,11 @@ boolean_t mur_open_files()
 				{
 					if (0 == jctl->jfh->prev_jnl_file_name_length)
 					{
-						gtm_putmsg(VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9,jctl->jnl_fn_len, jctl->jnl_fn,
-							LEN_AND_LIT("beginning"), &jctl->jfh->bov_tn,
-							DB_LEN_STR(rctl->gd), &csd->trans_hist.curr_tn, &csd->jnl_eovtn);
-						gtm_putmsg(VARLSTCNT(4) ERR_NOPREVLINK, 2,
+						gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9,
+							       jctl->jnl_fn_len, jctl->jnl_fn, LEN_AND_LIT("beginning"),
+							       &jctl->jfh->bov_tn, DB_LEN_STR(rctl->gd), &csd->trans_hist.curr_tn,
+							       &csd->jnl_eovtn);
+						gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(4) ERR_NOPREVLINK, 2,
 								jctl->jnl_fn_len, jctl->jnl_fn);
 						return FALSE;
 					} else if (!mur_insert_prev(&jctl))
@@ -1078,15 +1096,19 @@ boolean_t mur_open_files()
 			{
 				if (!mur_options.notncheck && (jctl->jfh->bov_tn != csd->trans_hist.curr_tn))
 				{
-					gtm_putmsg(VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9, jctl->jnl_fn_len, jctl->jnl_fn,
-						LEN_AND_LIT("beginning"), &jctl->jfh->bov_tn,
-						DB_LEN_STR(rctl->gd), &csd->trans_hist.curr_tn, &csd->jnl_eovtn);
+					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9,
+						       jctl->jnl_fn_len, jctl->jnl_fn, LEN_AND_LIT("beginning"),
+						       &jctl->jfh->bov_tn, DB_LEN_STR(rctl->gd),
+						       &csd->trans_hist.curr_tn, &csd->jnl_eovtn);
 					return FALSE;
 				}
 			} else /* Backward Recovery */
 			{
 				if (jctl->jfh->eov_tn != csd->trans_hist.curr_tn)
-				{	/* 'outofsync' variable identifies situations in which backward recovery
+				{
+					recov_interrupted = rctl->recov_interrupted || csd->intrpt_recov_resync_seqno
+								|| csd->intrpt_recov_tp_resolve_time;
+					/* 'outofsync' variable identifies situations in which backward recovery
 					 * proceeds if inequality (csd->jnl_eovtn <= jfh->eov_tn <= csd->curr_tn) is TRUE.
 					 * So if,
 					 * i)   backward recovery is interrupted at any time except at turn around point just after
@@ -1100,16 +1122,17 @@ boolean_t mur_open_files()
 					 *iii)  outofsync is TRUE but above mentioned inequality is FALSE and
 					 *      interruption or crash did not occur while processing turn around point
 					 */
-					outofsync = (rctl->recov_interrupted ||
+					outofsync = (recov_interrupted ||
 					  	     (jctl->jfh->crash && (jctl->jfh->eov_tn < csd->trans_hist.curr_tn)));
 					if ((jctl->jfh->crash && (jctl->jfh->eov_tn > csd->trans_hist.curr_tn) &&
-						!rctl->recov_interrupted) || (!jctl->jfh->crash && !outofsync) ||
+						!recov_interrupted) || (!jctl->jfh->crash && !outofsync) ||
 						(outofsync && !csd->turn_around_point && (csd->jnl_eovtn != csd->trans_hist.curr_tn)
 						  && (csd->jnl_eovtn > jctl->jfh->eov_tn)))
 					{
-						gtm_putmsg(VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9,	jctl->jnl_fn_len, jctl->jnl_fn,
-						LEN_AND_LIT("end"), &jctl->jfh->eov_tn, DB_LEN_STR(rctl->gd),
-						&csd->trans_hist.curr_tn, &csd->jnl_eovtn);
+						gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9,
+							       jctl->jnl_fn_len, jctl->jnl_fn, LEN_AND_LIT("end"),
+							       &jctl->jfh->eov_tn, DB_LEN_STR(rctl->gd), &csd->trans_hist.curr_tn,
+							       &csd->jnl_eovtn);
 						return FALSE;
 					}
 				}
@@ -1132,9 +1155,9 @@ boolean_t mur_open_files()
 		{
 			if (!mur_options.notncheck && (jctl->next_gen->jfh->bov_tn != jctl->jfh->eov_tn))
 			{
-				gtm_putmsg(VARLSTCNT(8) ERR_JNLTNOUTOFSEQ, 6,
-					&jctl->jfh->eov_tn, jctl->jnl_fn_len, jctl->jnl_fn,
-					&jctl->next_gen->jfh->bov_tn, jctl->next_gen->jnl_fn_len, jctl->next_gen->jnl_fn);
+				gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(8) ERR_JNLTNOUTOFSEQ, 6,
+					       &jctl->jfh->eov_tn, jctl->jnl_fn_len, jctl->jnl_fn,
+					       &jctl->next_gen->jfh->bov_tn, jctl->next_gen->jnl_fn_len, jctl->next_gen->jnl_fn);
 				return FALSE;
 			}
 			jctl = jctl->next_gen;

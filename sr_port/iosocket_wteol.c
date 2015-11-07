@@ -19,12 +19,11 @@
 
 #include "gt_timer.h"
 #include "io.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "iottdef.h"
 #include "iosocketdef.h"
 
-GBLREF tcp_library_struct	tcp_routines;
+error_def(ERR_CURRSOCKOFR);
+error_def(ERR_NOSOCKETINDEV);
 
 void	iosocket_wteol(int4 val, io_desc *io_ptr)
 {
@@ -35,6 +34,16 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 
 	assert(gtmsocket == io_ptr->type);
 	dsocketptr = (d_socket_struct *)io_ptr->dev_sp;
+	if (0 >= dsocketptr->n_socket)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		return;
+	}
+	if (dsocketptr->current_socket >= dsocketptr->n_socket)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
+		return;
+	}
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	assert(val);
 	io_ptr->esc_state = START;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,8 @@
 #define SHM_WRITE_MEMORY_BARRIER	asm("mb")
 
 #define SHM_READ_MEMORY_BARRIER		SHM_WRITE_MEMORY_BARRIER /* same MB instruction for both read and write barriers */
+
+#define MM_WRITE_MEMORY_BARRIER
 
 #ifdef __vms
 #define SECSHR_SHM_WRITE_MEMORY_BARRIER	asm("mb")
@@ -103,6 +105,12 @@ void do_isync(void);
 	do_isync();			\
 }
 
+#define  MM_WRITE_MEMORY_BARRIER	\
+{					\
+	SHM_WRITE_MEMORY_BARRIER;	\
+	do_eieio();			\
+}
+
 #elif defined(__hppa)
 /* For _PA_RISC1_0, _PA_RISC1_1, accesses to the address space (both to memory and I/O) through load, store and
  * semaphore instructions are strongly ordered. This means that accesses appear to software to be done in program order
@@ -135,18 +143,44 @@ void do_isync(void);
 							  * we load shared fields */
 #elif defined(__ia64)
 
+/* In the database update logic, we must order memory mapped I/O and shared memory accesses with respect to each other.
+ * On Itanium (and on AIX, see eieio above) SHM_WRITE_MEMORY_BARRIER alone is insufficient. We also need an mf.a instruction.
+ *
+ * Refer to http://www.intel.com/content/dam/www/public/us/en/documents/manuals/
+ * 	itanium-architecture-software-developer-rev-2-3-vol-2-manual.pdf - from page 2:616,
+ * "If software needs to ensure that all prior memory operations have been accepted by the platform and have been observed
+ * by all cache coherent agents, both an mf.a and an mf instruction must be issued. The mf.a must be issued first, and the
+ * mf must be issued second."
+ */
+
 #if defined(__hpux)
 
-#include <machine/sys/kern_inline.h>
-#define SHM_WRITE_MEMORY_BARRIER	_MF()
+#	include <machine/sys/kern_inline.h>
+#	define SHM_WRITE_MEMORY_BARRIER	_MF()
+#	define MM_WRITE_MEMORY_BARRIER			\
+{							\
+	_Asm_mf_a();					\
+	SHM_WRITE_MEMORY_BARRIER;			\
+}
 
 #elif defined(__linux__) && defined(__INTEL_COMPILER)
 
 #	define SHM_WRITE_MEMORY_BARRIER		__mf()
+#	define MM_WRITE_MEMORY_BARRIER			\
+{							\
+	__mfa();					\
+	SHM_WRITE_MEMORY_BARRIER;			\
+}
 
 #elif defined(__linux__) /* gcc */
 
 #	define SHM_WRITE_MEMORY_BARRIER		__asm__ __volatile__ ("mf" ::: "memory")
+#	define MM_WRITE_MEMORY_BARRIER			\
+{							\
+	__asm__ __volatile__ ("mf.a" ::: "memory");	\
+	SHM_WRITE_MEMORY_BARRIER;			\
+}
+
 #endif /* __linux__ */
 
 /* On IA64, cross processor notifications of write barriers are automatic so no read barrier is necessary */
@@ -162,6 +196,7 @@ void do_isync(void);
 
 #define SHM_WRITE_MEMORY_BARRIER
 #define SHM_READ_MEMORY_BARRIER
+#define MM_WRITE_MEMORY_BARRIER
 
 #endif
 

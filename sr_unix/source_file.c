@@ -125,7 +125,8 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 			{
 				CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
 				if (-1 == rc)
-					rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2,
+							object_name_len, object_file_name, errno);
 			}
 			if (tt_so_do_once)
 				break;
@@ -139,7 +140,7 @@ CONDITION_HANDLER(source_ch)
 {
 	int	dummy1, dummy2;
 
-	START_CH;
+	START_CH(TRUE);
 	if (DUMP)
 	{
 		NEXTCH;
@@ -170,7 +171,7 @@ bool	open_source_file (void)
 	fstr.len = source_name_len;
 	status = parse_file(&fstr, &pblk);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(5) ERR_FILEPARSE, 2, fstr.len, fstr.addr, status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, fstr.len, fstr.addr, status);
 	pars.mvtype = MV_STR;
 	pars.str.len = SIZEOF(open_params_list);
 	pars.str.addr = (char *)open_params_list;
@@ -244,10 +245,10 @@ int4	read_source_file (void)
 	REVERT;
 	memcpy((char *)source_buffer, val.str.addr, val.str.len);
 	cp = source_buffer + val.str.len;
-	*cp = '\0';
 	/*	if there is a newline charactor (end of a line)	*/
 	if (!(io_curr_device.in->dollar.x))
-		*(cp+1) = '\0';
+		*cp++ = '\n';
+	*cp = '\0';
 	if ( FALSE != io_curr_device.in->dollar.zeof )
 		return -1;
 	io_curr_device = tmp_list_dev;	/*	restore list file after reading	if it's opened	*/
@@ -258,7 +259,7 @@ CONDITION_HANDLER(read_source_ch)
 {
 	int	dummy1, dummy2;
 
-	START_CH;
+	START_CH(TRUE);
 	UNWIND(dummy1, dummy2);
 }
 

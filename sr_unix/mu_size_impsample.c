@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,7 @@
 #include "sleep_cnt.h"
 #include "wcs_sleep.h"
 #include "memcoherency.h"
+#include "change_reg.h"
 
 #include "gtm_time.h"
 #include "mvalconv.h"
@@ -125,7 +126,7 @@ STATICFNDEF void init_stats_impsmpl(stat_t *stat)
 /*
  * Importance Sampling
  */
-int4 mu_size_impsample(mval *gn, int4 M, int4 seed)
+int4 mu_size_impsample(glist *gl_ptr, int4 M, int4 seed)
 {
 	enum cdb_sc		status;
 	trans_num		ret_tn;
@@ -139,10 +140,11 @@ int4 mu_size_impsample(mval *gn, int4 M, int4 seed)
 
 	SETUP_THREADGBL_ACCESS;
 	inctn_opcode = inctn_invalid_op;
-	op_gvname(VARLSTCNT(1) gn);
+	DO_OP_GVNAME(gl_ptr);
+		/* sets gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr */
 	if (0 == gv_target->root)
         {       /* Global does not exist (online rollback). Not an error. */
-                gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+                gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
                 return EXIT_NRM;
         }
 	if (!seed)
@@ -173,7 +175,8 @@ int4 mu_size_impsample(mval *gn, int4 M, int4 seed)
 				ABORT_TRANS_IF_GBL_EXIST_NOMORE(lcl_t_tries, tn_aborted);
 				if (tn_aborted)
 				{	/* Global does not exist (online rollback). Not an error. */
-					gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+					gtm_putmsg_csa(CSA_ARG(NULL)
+						VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
 					return EXIT_NRM;
 				}
 				continue;

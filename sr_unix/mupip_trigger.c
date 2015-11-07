@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,6 @@
 #include "gtm_limits.h"
 #include "gtm_stat.h"
 #include "gtm_string.h"
-#include "muextr.h"		/* for glist */
 #include "cli.h"
 #include "gdsroot.h"
 #include "gdsbt.h"

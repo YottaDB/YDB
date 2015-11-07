@@ -46,7 +46,6 @@
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF gd_region        *gv_cur_region;
 GBLREF uint4		update_array_size;
-GBLREF gd_addr		*gd_header;
 GBLREF srch_hist	dummy_hist;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
@@ -57,8 +56,13 @@ GBLREF iconv_t		dse_over_cvtcd;
 #endif
 GBLREF cw_set_element   cw_set[];
 GBLREF UConverter	*chset_desc[];
-LITREF mstr		chset_names[];
 GBLREF spdesc		stringpool;
+
+LITREF mstr		chset_names[];
+
+error_def(ERR_DBRDONLY);
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEFAIL);
 
 void dse_over(void)
 {
@@ -79,12 +83,8 @@ void dse_over(void)
 	mstr		cvt_src;
 	int		cvt_len;
 
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_DSEBLKRDFAIL);
-	error_def(ERR_DSEFAIL);
-
         if (gv_cur_region->read_only)
-                rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+                rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	blk_size = cs_addrs->hdr->blk_size;
         if (cli_present("BLOCK") == CLI_PRESENT)
@@ -153,7 +153,7 @@ void dse_over(void)
 	t_begin_crit(ERR_DSEFAIL);
 	blkhist.blk_num = blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 
 	size = ((blk_hdr_ptr_t)blkhist.buffaddr)->bsiz;
 	if (size < SIZEOF(blk_hdr))

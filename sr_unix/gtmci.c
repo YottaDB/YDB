@@ -104,8 +104,14 @@ error_def(ERR_MAXSTRLEN);
 #define REVERT_AND_RETURN						\
 {									\
 	REVERT; /* gtmci_ch */						\
-	TREF(in_gtmci) = FALSE;						\
 	return 0;							\
+}
+
+/* Unwind the M stack back to where the stack pointer (msp) was last saved */
+#define FGNCAL_UNWIND							\
+{									\
+	if (msp < fgncal_stack)						\
+		fgncal_unwind();					\
 }
 
 /* When passing arguments from Java, ensure that the expected types match the actual ones. If not,
@@ -152,6 +158,24 @@ error_def(ERR_MAXSTRLEN);
 		arg_types[0] = -1;				\
 		REVERT_AND_RETURN;				\
 	}							\
+}
+
+/* Call-ins uses the fgncal_stack global as a marker in the stack for where to unwind the stack back to. This preserves
+ * the call-in base frame(s) but removes any other frames left on the stack as well as the parameter related mv_stents
+ * and any other mv_stents no longer needed. This macro saves the current value of fgncal_stack on the M stack in an
+ * MVST_STCK_SP type mv_stent. Note MVST_STCK_SP is chosen (instead of MVST_STCK) because MVST_STCK_SP doesn't get removed
+ * if the frame is rewritten by a ZGOTO for instance.
+ *
+ * Note: If call-in's use of setjmp/longjmp for returns is changed to use the trigger method of actually unwinding the M
+ * frames and returning "normally", then the usage of fgncal_stack likely becomes superfluous so should be looked at.
+ */
+# define SAVE_FGNCAL_STACK								\
+{											\
+	if (msp != fgncal_stack)							\
+	{										\
+		push_stck(fgncal_stack, 0, (void **)&fgncal_stack, MVST_STCK_SP);	\
+		fgncal_stack = msp;							\
+	}										\
 }
 
 static callin_entry_list* get_entry(const char* call_name)
@@ -217,19 +241,16 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-	TREF(in_gtmci) = TRUE;
 	if (!gtm_startup_active || !(frame_pointer->flags & SFF_CI))
 	{
-		if ((status = gtm_init()) != 0)
-		{
-			TREF(in_gtmci) = FALSE;
+		if ((status = gtm_init()) != 0)		/* Note - sets fgncal_stack */
 			return status;
-		}
 	}
 	GTM_PTHREAD_ONLY(assert(gtm_main_thread_id_set && pthread_equal(gtm_main_thread_id, pthread_self())));
+	assert(NULL == TREF(temp_fgncal_stack));
+	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
+				 * if this failed, would lead to a nested error which we'd like to avoid */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-	if (msp < fgncal_stack)	/* Unwind all arguments left on the stack by previous gtm_cij. */
-		fgncal_unwind();
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
 	if (!TREF(ci_table))	/* Load the call-in table only once from env variable GTMCI. */
@@ -297,7 +318,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		REVERT_AND_RETURN;
 	}
 	*has_ret_value = has_return;
-	for (i = 0, mask = ~inp_mask; i < count; ++i, mask >>= 1, java_arg_type++, arg_blob_ptr += GTM64_ONLY(1) NON_GTM64_ONLY(2))
+	for (i = 0, mask = inp_mask; i < count; ++i, mask >>= 1, java_arg_type++, arg_blob_ptr += GTM64_ONLY(1) NON_GTM64_ONLY(2))
 	{	/* Copy the arguments' values into mval containers. Since some arguments might be declared as output-only,
 		 * we need to go over all of them unconditionally, but only do the copying for the ones that are used for
 		 * the input direction (I or IO). The integer values passed to CHECK_FOR_TYPE_MISMATCH as a second argument
@@ -309,32 +330,32 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		{
 			case gtm_jboolean:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 0, *java_arg_type);
-				if (!(mask & 1))
+				if (MASK_BIT_ON(mask))
 					i2mval(&arg_mval, *(int *)arg_blob_ptr);
 				break;
 			case gtm_jint:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 1, *java_arg_type);
-				if (!(mask & 1))
+				if (MASK_BIT_ON(mask))
 					i2mval(&arg_mval, *(int *)arg_blob_ptr);
 				break;
 			case gtm_jlong:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 2, *java_arg_type);
-				if (!(mask & 1))
+				if (MASK_BIT_ON(mask))
 				i82mval(&arg_mval, *(gtm_int64_t *)arg_blob_ptr);
 				break;
 			case gtm_jfloat:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 3, *java_arg_type);
-				if (!(mask & 1))
+				if (MASK_BIT_ON(mask))
 					float2mval(&arg_mval, *(float *)arg_blob_ptr);
 				break;
 			case gtm_jdouble:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 4, *java_arg_type);
-				if (!(mask & 1))
+				if (MASK_BIT_ON(mask))
 					double2mval(&arg_mval, *(double *)arg_blob_ptr);
 				break;
 			case gtm_jstring:
 				CHECK_FOR_TYPES_MISMATCH(i + 1, 7, 5, *java_arg_type);
-				if (!(mask & 1))
+				if (MASK_BIT_ON(mask))
 				{
 					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
@@ -347,7 +368,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 				break;
 			case gtm_jbyte_array:
 				CHECK_FOR_TYPES_MISMATCH(i + 1, 8, 6, *java_arg_type);
-				if (!(mask & 1))
+				if (MASK_BIT_ON(mask))
 				{
 					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
@@ -360,7 +381,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 				break;
 			case gtm_jbig_decimal:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 9, *java_arg_type);
-				if (!(mask & 1))
+				if (MASK_BIT_ON(mask))
 				{
 					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
@@ -393,16 +414,19 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	assert(frame_pointer->flags & SFF_CI);
 	frame_pointer->mpc = frame_pointer->ctxt = PTEXT_ADR(frame_pointer->rvector);
 	REVERT;						/* Revert gtmci_ch. */
-
+	/*				*/
+	/* Drive the call_in routine	*/
+	/*				*/
 	ESTABLISH_RET(stop_image_conditional_core, mumps_status);
-	dm_start();					/* Kick off execution. */
+	dm_start(); 	/* Kick off execution */
 	REVERT;
-
+	/*				*/
+	/* Return value processing	*/
+	/*				*/
 	intrpt_ok_state = old_intrpt_state;		/* Restore the old interrupt state. */
 	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr. */
 	if (1 != mumps_status)
 	{
-		TREF(in_gtmci) = FALSE;
 		/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
 		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
 		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
@@ -434,7 +458,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		/* Do not process parameters that are either input-only(I) or output(O/IO)
 		 * parameters that are not modified by the M routine.
 		 */
-		if ((mask & 1) && MV_DEFINED(arg_ptr))
+		if (MV_ON(mask, arg_ptr))
 		{	/* Process all output (O/IO) parameters modified by the M routine */
 			switch (arg_type)
 			{
@@ -461,15 +485,15 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 				case gtm_jstring:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 7, *arg_types);
 					MV_FORCE_STR(arg_ptr);
+					/* Since the ci_gateway.c code temporarily switches the character following the string's
+					 * content in memory to '\0' (for generation of a proper Unicode string), ensure that the
+					 * whole string resides in the stringpool, and that we do have that one byte to play with.
+					 */
+					if (!IS_IN_STRINGPOOL(arg_ptr->str.addr, arg_ptr->str.len))
+						s2pool(&arg_ptr->str);
+					ENSURE_STP_FREE_SPACE(1);
 					(*(gtm_string_t **)arg_blob_ptr)->address = arg_ptr->str.addr;
 					(*(gtm_string_t **)arg_blob_ptr)->length = arg_ptr->str.len;
-					if (((unsigned char *)arg_ptr->str.addr + arg_ptr->str.len) == stringpool.top) /*BYPASSOK*/
-					{	/* Since the ci_gateway.c code temporarily switches the character following the
-						 * string's content in memory to '\n' (for generation of a proper Unicode string),
-						 * ensure that this character is in the stringpool and not elsewhere.
-						 */
-						ENSURE_STP_FREE_SPACE(1);
-					}
 					break;
 				case gtm_jbyte_array:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 8, *arg_types);
@@ -480,15 +504,17 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 				case gtm_jbig_decimal:	/* We currently do not support output for big decimal. */
 					break;
 				default:
-					GTMASSERT;
+					assertpro((arg_type >= gtm_jboolean) && (arg_type <= gtm_jbig_decimal));
 			}
 		}
 	}
 	REVERT;
-	TREF(in_gtmci) = FALSE;
+	assert(NULL == TREF(temp_fgncal_stack));
+	FGNCAL_UNWIND;
 	return 0;
 }
 
+/* Common work-routine for gtm_ci() and gtm_cip() to drive callin */
 int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var)
 {
 	va_list			var;
@@ -524,18 +550,15 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-	TREF(in_gtmci) = TRUE;
 	if (!gtm_startup_active || !(frame_pointer->flags & SFF_CI))
 	{
-		if ((status = gtm_init()) != 0)
-		{
-			TREF(in_gtmci) = FALSE;
+		if ((status = gtm_init()) != 0)		/* Note - sets fgncal_stack */
 			return status;
-		}
 	}
+	assert(NULL == TREF(temp_fgncal_stack));
+	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
+				 * if this failed, would lead to a nested error which we'd like to avoid */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-	if (msp < fgncal_stack)	/* unwind all arguments left on the stack by previous gtm_ci */
-		fgncal_unwind();
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
 	if (!TREF(ci_table))	/* load the call-in table only once from env variable GTMCI  */
@@ -601,7 +624,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		 * inp_mask is inversed to achieve this.
 		 */
 		arg_mval.mvtype = MV_XZERO;
-		if (mask & 1)
+		if (MASK_BIT_ON(mask))
 		{ 	/* Output-only(O) params : advance va_arg pointer */
 			switch (entry->parms[i])
 			{
@@ -752,16 +775,19 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	assert(frame_pointer->flags & SFF_CI);
 	frame_pointer->mpc = frame_pointer->ctxt = PTEXT_ADR(frame_pointer->rvector);
 	REVERT; /* gtmci_ch */
-
+	/*				*/
+	/* Drive the call_in routine	*/
+	/*				*/
 	ESTABLISH_RET(stop_image_conditional_core, mumps_status);
-	dm_start(); /* kick off execution */
+	dm_start(); 	/* Kick off execution */
 	REVERT;
-
+	/*				*/
+	/* Return value processing	*/
+	/*				*/
 	intrpt_ok_state = old_intrpt_state; /* restore the old interrupt state */
 	var_on_cstack_ptr = save_var_on_cstack_ptr; /* restore the old environment's var_on_cstack_ptr */
 	if (1 != mumps_status)
 	{
-		TREF(in_gtmci) = FALSE;
 		/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
 		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
 		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
@@ -789,7 +815,47 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		/* Do not process parameters that are either input-only(I) or output(O/IO)
 		 * parameters that are not modified by the M routine.
 		 */
-		if (!(mask & 1) || !MV_DEFINED(arg_ptr))
+		if (MV_ON(mask, arg_ptr))
+		{	/* Process all output (O/IO) parameters modified by the M routine */
+			switch (arg_type)
+			{
+                                case gtm_int_star:
+                                        *va_arg(temp_var, gtm_int_t *) = mval2i(arg_ptr);
+					break;
+                                case gtm_uint_star:
+                                        *va_arg(temp_var, gtm_uint_t *) = mval2ui(arg_ptr);
+					break;
+				case gtm_long_star:
+					*va_arg(temp_var, gtm_long_t *) =
+						GTM64_ONLY(mval2i8(arg_ptr)) NON_GTM64_ONLY(mval2i(arg_ptr));
+					break;
+				case gtm_ulong_star:
+					*va_arg(temp_var, gtm_ulong_t *) =
+						GTM64_ONLY(mval2ui8(arg_ptr)) NON_GTM64_ONLY(mval2ui(arg_ptr));
+					break;
+				case gtm_float_star:
+					*va_arg(temp_var, gtm_float_t *) = mval2double(arg_ptr);
+					break;
+				case gtm_double_star:
+					*va_arg(temp_var, gtm_double_t *) = mval2double(arg_ptr);
+					break;
+				case gtm_char_star:
+					gtm_char_ptr = va_arg(temp_var, gtm_char_t *);
+					MV_FORCE_STR(arg_ptr);
+					memcpy(gtm_char_ptr, arg_ptr->str.addr, arg_ptr->str.len);
+					gtm_char_ptr[arg_ptr->str.len] = 0; /* trailing null */
+					break;
+				case gtm_string_star:
+					mstr_parm = va_arg(temp_var, gtm_string_t *);
+					MV_FORCE_STR(arg_ptr);
+					mstr_parm->length = arg_ptr->str.len;
+					memcpy(mstr_parm->address, arg_ptr->str.addr, mstr_parm->length);
+					break;
+				default:
+					va_end(temp_var);
+					assertpro(FALSE);
+			}
+		} else
 		{
 			switch (arg_type)
 			{
@@ -837,54 +903,16 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 					va_end(temp_var);
 					assertpro(FALSE);
 			}
-		} else
-		{	/* Process all output (O/IO) parameters modified by the M routine */
-			switch (arg_type)
-			{
-                                case gtm_int_star:
-                                        *va_arg(temp_var, gtm_int_t *) = mval2i(arg_ptr);
-					break;
-                                case gtm_uint_star:
-                                        *va_arg(temp_var, gtm_uint_t *) = mval2ui(arg_ptr);
-					break;
-				case gtm_long_star:
-					*va_arg(temp_var, gtm_long_t *) =
-						GTM64_ONLY(mval2i8(arg_ptr)) NON_GTM64_ONLY(mval2i(arg_ptr));
-					break;
-				case gtm_ulong_star:
-					*va_arg(temp_var, gtm_ulong_t *) =
-						GTM64_ONLY(mval2ui8(arg_ptr)) NON_GTM64_ONLY(mval2ui(arg_ptr));
-					break;
-				case gtm_float_star:
-					*va_arg(temp_var, gtm_float_t *) = mval2double(arg_ptr);
-					break;
-				case gtm_double_star:
-					*va_arg(temp_var, gtm_double_t *) = mval2double(arg_ptr);
-					break;
-				case gtm_char_star:
-					gtm_char_ptr = va_arg(temp_var, gtm_char_t *);
-					MV_FORCE_STR(arg_ptr);
-					memcpy(gtm_char_ptr, arg_ptr->str.addr, arg_ptr->str.len);
-					gtm_char_ptr[arg_ptr->str.len] = 0; /* trailing null */
-					break;
-				case gtm_string_star:
-					mstr_parm = va_arg(temp_var, gtm_string_t *);
-					MV_FORCE_STR(arg_ptr);
-					mstr_parm->length = arg_ptr->str.len;
-					memcpy(mstr_parm->address, arg_ptr->str.addr, mstr_parm->length);
-					break;
-				default:
-					va_end(temp_var);
-					assertpro(FALSE);
-			}
 		}
 	}
 	va_end(temp_var);
 	REVERT;
-	TREF(in_gtmci) = FALSE;
+	assert(NULL == TREF(temp_fgncal_stack));
+	FGNCAL_UNWIND;
 	return 0;
 }
 
+/* Initial call-in driver version - does name lookup on each call */
 int gtm_ci(const char *c_rtn_name, ...)
 {
 	va_list var;
@@ -893,7 +921,9 @@ int gtm_ci(const char *c_rtn_name, ...)
 	return gtm_ci_exec(c_rtn_name, NULL, FALSE, var);
 }
 
-/* Functionality is same as that of gtmci but accepts a struct containing information about the routine. */
+/* Fast path call-in driver version - Adds a struct parm that contains name resolution info after first call
+ * to speed up dispatching.
+ */
 int gtm_cip(ci_name_descriptor* ci_info, ...)
 {
 	va_list var;
@@ -903,6 +933,7 @@ int gtm_cip(ci_name_descriptor* ci_info, ...)
 }
 
 #ifdef GTM_PTHREAD
+/* Java flavor of gtm_init() */
 int gtm_jinit()
 {
 	gtm_jvm_process = TRUE;
@@ -910,6 +941,10 @@ int gtm_jinit()
 }
 #endif
 
+/* Initialization routine - can be called directly by call-in caller or can be driven by gtm_ci*() implicitly. But
+ * if other GT.M services are to be used prior to a gtm_ci*() call (like timers, gtm_malloc/free, etc), this routine
+ * should be called first.
+ */
 int gtm_init()
 {
 	rhdtyp          	*base_addr;
@@ -932,8 +967,6 @@ int gtm_init()
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-	if (!TREF(in_gtmci))
-		return 0;
 	if (!gtm_startup_active)
 	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
 		gtm_imagetype_init(GTM_IMAGE);
@@ -953,7 +986,7 @@ int gtm_init()
 	if (!gtm_startup_active)
 	{	/* GT.M is not active yet. Create GT.M startup environment */
 		invocation_mode = MUMPS_CALLIN;
-		init_gtm();
+		init_gtm();			/* Note - this initializes fgncal_stackbase */
 		gtm_savetraps(); /* nullify default $ZTRAP handling */
 		if (NULL != (dist = (char *)GETENV(GTM_DIST)))
 		{
@@ -966,13 +999,20 @@ int gtm_init()
 		assert(gtm_startup_active);
 		assert(frame_pointer->flags & SFF_CI);
 		TREF(gtmci_nested_level) = 1;
+		/* Now that GT.M is initialized. Mark the new stack pointer (msp) so that errors
+		 * while executing an M routine do not unwind stack below this mark. It important that
+		 * the call-in frames (SFF_CI) that hold nesting information (eg. $ECODE/$STACK data
+		 * of the previous stack) are kept from being unwound.
+		 */
+		SAVE_FGNCAL_STACK;
 	} else if (!(frame_pointer->flags & SFF_CI))
 	{	/* Nested call-in: setup a new CI environment (SFF_CI frame on top of base-frame).
-		 * Mark the beginning of the new stack so that initialization errors in
-		 * call-in frame do not unwind entries of the previous stack (see gtmci_ch).
+		 * Temporarily mark the beginning of the new stack so that initialization errors in
+		 * call-in frame do not unwind entries of the previous stack (see gtmci_ch). For the
+		 * duration that temp_fgncal_stack has a non-NULL value, it overrides fgncal_stack.
 		 */
-		fgncal_stack = msp;
-		/* generate CIMAXLEVELS error if gtmci_nested_level > CALLIN_MAX_LEVEL */
+		TREF(temp_fgncal_stack) = msp;
+		/* Generate CIMAXLEVELS error if gtmci_nested_level > CALLIN_MAX_LEVEL */
 		if (CALLIN_MAX_LEVEL < TREF(gtmci_nested_level))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CIMAXLEVELS, 1, TREF(gtmci_nested_level));
 		/* Disallow call-ins within a TP boundary since TP restarts are not supported
@@ -987,16 +1027,20 @@ int gtm_init()
 		SET_CI_ENV(ci_ret_code_exit);
 		gtmci_isv_save();
 		(TREF(gtmci_nested_level))++;
+		/* Now that the base-frames for this call-in level have been created, we can create the mv_stent
+		 * to save the previous call-in level's fgncal_stack value and clear the override. When this call-in
+		 * level pops, fgncal_stack will be restored to the value for the previous level. When a given call
+		 * at *this* level finishes, this current value of fgncal_stack is where the stack is unrolled to to
+		 * be ready for the next call.
+		 */
+		SAVE_FGNCAL_STACK;
+		TREF(temp_fgncal_stack) = NULL;		/* Drop override */
 	}
-	/* Now that GT.M is initialized. Mark the new stack pointer (msp) so that errors
-	 * while executing an M routine do not unwind stack below this mark. It important that
-	 * the call-in frames (SFF_CI), that hold nesting information (eg. $ECODE/$STACK data
-	 * of the previous stack), are kept from being unwound.
-	 */
-	fgncal_stack = msp;
 	REVERT;
+	assert(NULL == TREF(temp_fgncal_stack));
 	return 0;
 }
+
 /* routine exposed to call-in user to exit from active GT.M environment */
 int gtm_exit()
 {
@@ -1035,14 +1079,15 @@ int gtm_exit()
 	 * our exit handler has already been called. Linux and Solaris don't need this, looking at the
 	 * other platforms we support to see if resolutions can be found. SE 05/2007
 	 */
-#ifdef _AIX
+#	ifdef _AIX
 	unatexit(gtm_exit_handler);
-#endif
+#	endif
 	REVERT;
 	gtm_startup_active = FALSE;
 	return 0;
 }
 
+/* Routine to fetch $ZSTATUS after an error has been raised */
 void gtm_zstatus(char *msg, int len)
 {
 	int msg_len;

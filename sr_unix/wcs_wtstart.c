@@ -74,6 +74,37 @@
 
 #define DBIOERR_LOGGING_PERIOD			100
 
+#ifdef DEBUG
+GBLREF int4	exit_state;
+STATICDEF int	wcs_wtstart_count;
+
+/* White-box-test-activated macro to sleep in one of the predetermined places (based on the count variable)
+ * inside wcs_wtstart. The sleep allows for the delivery of an interrupt in a specific window of code.
+ */
+#  define SLEEP_ON_WBOX_COUNT(COUNT)								\
+{												\
+	if (WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART)						\
+		&& (COUNT == (gtm_white_box_test_case_count % 100)))				\
+	{											\
+		if ((gtm_white_box_test_case_count / 100) == ++wcs_wtstart_count)		\
+		{	/* Resetting this allows us to avoid redundant sleeps while having the	\
+			 * white-box logic variables still enabled (to avoid asserts).		\
+			 */									\
+			gtm_white_box_test_case_count = 0;					\
+			DBGFPF((stderr, "WCS_WTSTART: STARTING SLEEP\n"));			\
+			while (TRUE)								\
+			{									\
+				SHORT_SLEEP(999);						\
+				if (0 < exit_state)						\
+					DBGFPF((stderr, "exit_state is %d\n", exit_state));	\
+			}									\
+		}										\
+	}											\
+}
+#else
+#  define SLEEP_ON_WBOX_COUNT(COUNT)
+#endif
+
 GBLREF	boolean_t	*lseekIoInProgress_flags;	/* needed for the LSEEK* macros in gtmio.h */
 GBLREF	uint4		process_id;
 GBLREF	sm_uc_ptr_t	reformat_buffer;
@@ -155,6 +186,10 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		return err_status;			/* Already here, get out */
 	}
 	cnl = csa->nl;
+	/* Defer interrupts to protect against an inconsistent state caused by mismatch of such values as
+	 * cnl->intent_wtstart and cnl->in_wtstart.
+	 */
+	DEFER_INTERRUPTS(INTRPT_IN_WCS_WTSTART);
 	INCR_INTENT_WTSTART(cnl);	/* signal intent to enter wcs_wtstart */
 	/* the above interlocked instruction does the appropriate write memory barrier to publish this change to the world */
 	SHM_READ_MEMORY_BARRIER;	/* need to do this to ensure uptodate value of cnl->wc_blocked is read */
@@ -164,10 +199,16 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		BG_TRACE_ANY(csa, wrt_blocked);
 		if (ANTICIPATORY_FREEZE_AVAILABLE)
 			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data)
+		ENABLE_INTERRUPTS(INTRPT_IN_WCS_WTSTART);
 		return err_status;
 	}
+	SLEEP_ON_WBOX_COUNT(1);
 	csa->in_wtstart = TRUE;				/* Tell ourselves we're here and make the csa->in_wtstart (private copy) */
+	/* Ideally, we would like another SLEEP_ON_WBOX_COUNT here, but that could cause assert failures in concurrent wcs_wtstarts.
+	 * Because it is highly unlikely for an interrupt-deferred process to get killed at exactly this spot, do not test that.
+	 */
 	INCR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);	/* and cnl->in_wtstart (shared copy) assignments as close as possible.   */
+	SLEEP_ON_WBOX_COUNT(2);
 	SAVE_WTSTART_PID(cnl, process_id, index);
 	assert(cnl->in_wtstart > 0 && csa->in_wtstart);
 
@@ -198,7 +239,9 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	assert(((sm_long_t)ahead & 7) == 0);
 	queue_empty = FALSE;
 	csa->wbuf_dqd++;			/* Tell rundown we have an orphaned block in case of interrupt */
+	SLEEP_ON_WBOX_COUNT(3);
 	was_crit = csa->now_crit;
+	SLEEP_ON_WBOX_COUNT(4);
 	for (n1 = n2 = 0, csrfirst = NULL; (n1 < max_ent) && (n2 < max_writes) && !cnl->wc_blocked; ++n1)
 	{	/* If not-crit, avoid REMQHI by peeking at the active queue and if it is found to have a 0 fl link, assume
 		 * there is nothing to flush and break out of the loop. This avoids unnecessary interlock usage (GTM-7635).
@@ -311,10 +354,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				assert(((blk_hdr_ptr_t)bp)->bver);	/* GDSV4 (0) version uses this field as a block length so
 									   should always be > 0 */
 				if (IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver))
-				{	/* Need to downgrade/reformat this block back to a previous format. But, first defer timer
-					 * or external interrupts from using the reformat buffer while we are modifying it.
-					 */
-					DEFER_INTERRUPTS(INTRPT_IN_REFORMAT_BUFFER_USE);
+				{	/* Need to downgrade/reformat this block back to a previous format. */
 					assert(0 == reformat_buffer_in_use);
 					DEBUG_ONLY(reformat_buffer_in_use++;)
 					DEBUG_DYNGRD_ONLY(PRINTF("WCS_WTSTART: Block %d being dynamically downgraded on write\n", \
@@ -371,11 +411,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				}
 				if ((blk_hdr_ptr_t)reformat_buffer == bp)
 				{
-					assert(INTRPT_OK_TO_INTERRUPT != intrpt_ok_state);
 					DEBUG_ONLY(reformat_buffer_in_use--;)
 					assert(0 == reformat_buffer_in_use);
-					/* allow interrupts now that we are done using the reformat buffer */
-					ENABLE_INTERRUPTS(INTRPT_IN_REFORMAT_BUFFER_USE);
 				}
 			}
 			/* Trigger I/O error if white box test case is turned on */
@@ -465,6 +502,7 @@ writes_completed:
 			BG_TRACE_ANY(csa, wrt_noblks_wrtn);
 		assert(cnl->in_wtstart > 0 && csa->in_wtstart);
 	)
+	SLEEP_ON_WBOX_COUNT(5);
 	if (csa->dbsync_timer && n1)
 	{	/* If we already have a dbsync timer active AND we found at least one dirty cache record in the active queue
 		 * now, this means there has not been enough time period of idleness since the last update and so there is
@@ -473,12 +511,15 @@ writes_completed:
 		 */
 		CANCEL_DBSYNC_TIMER(csa);
 	}
-	DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
+	CAREFUL_DECR_CNT(cnl->in_wtstart, cnl->wc_var_lock);
+	/* Ideally, we would like another SLEEP_ON_WBOX_COUNT here, but that could cause assert failures in concurrent wcs_wtstarts.
+	 * Because it is highly unlikely for an interrupt-deferred process to get killed at exactly this spot, do not test that.
+	 */
 	CLEAR_WTSTART_PID(cnl, index);
-	/* Defer interrupts to protect the decrement of cnl->intent_wtstart and potential addition of a new dbsync timer */
-	DEFER_INTERRUPTS(INTRPT_IN_WCS_WTSTART);
 	csa->in_wtstart = FALSE;			/* This process can write again */
+	SLEEP_ON_WBOX_COUNT(6);
 	DECR_INTENT_WTSTART(cnl);
+	SLEEP_ON_WBOX_COUNT(7);
 	if (queue_empty)			/* Active queue has become empty. */
 		wcs_clean_dbsync_timer(csa);	/* Start a timer to flush-filehdr (and write epoch if before-imaging) */
 	ENABLE_INTERRUPTS(INTRPT_IN_WCS_WTSTART);

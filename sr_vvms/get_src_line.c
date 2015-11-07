@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,26 +25,28 @@
 #include "gt_timer.h"
 #include "zbreak.h"
 #include "hashtab_mname.h"
+#include "rtn_src_chksum.h"
 
 #define RT_TBL_SZ 20
 
 int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_t verifytrig)
 {
-	struct FAB	fab;
-	struct RAB	rab;
-	struct NAM	nam;
-	bool		added;
-	unsigned char	buff[MAX_SRCLINE], *cp1, *cp2, *cp3, *chkcalc;
-	unsigned char	es[255], srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM)];
-	boolean_t	badfmt, found;
-	int		*lt_ptr, tmp_int, status;
-	uint4		checksum, lcnt, srcint, srcstat, *src_tbl;
-	mstr		src;
-	rhdtyp		*rtn_vector;
-	zro_ent		*srcdir;
-	mstr		*base, *current, *top;
-	ht_ent_mname	*tabent;
-	var_tabent	rtnent;
+	struct FAB		fab;
+	struct RAB		rab;
+	struct NAM		nam;
+	bool			added;
+	unsigned char		buff[MAX_SRCLINE], *cp1, *cp2, *cp3;
+	unsigned char		es[255], srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM)];
+	boolean_t		badfmt, found;
+	int			*lt_ptr, tmp_int, status;
+	uint4			lcnt, srcstat, *src_tbl;
+	mstr			src;
+	rhdtyp			*rtn_vector;
+	zro_ent			*srcdir;
+	mstr			*base, *current, *top;
+	ht_ent_mname		*tabent;
+	var_tabent		rtnent;
+	gtm_rtn_src_chksum_ctx	checksum_ctx;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -119,13 +121,13 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 				hiber_start(WAIT_FOR_FILE_TIME);
 			}
 			if (RMS$_NORMAL != status)
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			rab = cc$rms_rab;
 			rab.rab$l_fab = &fab;
 			rab.rab$l_ubf = buff;
 			rab.rab$w_usz = SIZEOF(buff);
 			if (RMS$_NORMAL != (status = sys$connect(&rab)))
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 
 		tmp_int = found ? rtn_vector->lnrtab_len : 0;
@@ -135,7 +137,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 		base = (mstr *)(src_tbl + 2);
 		*(src_tbl + 1) = tmp_int;	/* So zlput_rname knows how big we are */
 		badfmt = FALSE;
-		checksum = 0;
+		rtn_src_chksum_init(&checksum_ctx);
 		for (current = base + 1, top = base + tmp_int;  current < top;  current++)
 		{
 			status = sys$get(&rab);
@@ -146,7 +148,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 			} else  if (RMS$_NORMAL != status)
 			{
 				free(src_tbl);
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			}
 			if (rab.rab$w_rsz)
 			{
@@ -155,21 +157,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 					cp1 < cp2 && (' ' != *cp1) && ('\t' != *cp1);  cp1++)
 						;
 				/* calculate checksum */
-				for (chkcalc = buff;  chkcalc < cp2;)
-				{
-					srcint = 0;
-					if (cp2 - chkcalc < SIZEOF(int4))
-					{
-						memcpy(&srcint, chkcalc, cp2 - chkcalc);
-						chkcalc = cp2;
-					} else
-					{
-						srcint = *(int4 *)chkcalc;
-						chkcalc += SIZEOF(int4);
-					}
-					checksum ^= srcint;
-					checksum >>= 1;
-				}
+				rtn_src_chksum_line(&checksum_ctx, buff, cp2 - buff);
 				current->len = rab.rab$w_rsz;
 				current->addr = malloc(rab.rab$w_rsz);
 				memcpy(current->addr, buff, rab.rab$w_rsz);
@@ -186,7 +174,9 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 			if (!badfmt)
 			{
 				status = sys$get(&rab);
-				if ((RMS$_EOF != status) || checksum != rtn_vector->checksum)
+				rtn_src_chksum_digest(&checksum_ctx);
+				if ((RMS$_EOF != status)
+					|| !rtn_src_chksum_match(get_ctx_checksum(&checksum_ctx), get_rtnhdr_checksum(rtn_vector)))
 					badfmt = TRUE;
 			}
 			sys$close(&fab);
@@ -214,4 +204,63 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 			*srcret = ((mstr *)(src_tbl + 2)) + tmp_int;
 	}
 	return srcstat;
+}
+
+void free_src_tbl(rhdtyp *rtn_vector)
+{
+	ht_ent_mname    *tabent;
+	mname_entry	key;
+	uint4		entries;
+	mstr		*curline;
+	uint4		*src_tbl;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	/* If source has been read in for old routine, free space. Since routine name is the key, do this before
+	   (in USHBIN builds) we release the literal text section as part of the releasable read-only section.
+	 */
+	tabent = NULL;
+	if (NULL != (TREF(rt_name_tbl)).base)
+	{
+		key.var_name = rtn_vector->routine_name;
+		COMPUTE_HASH_MNAME(&key);
+		tabent = lookup_hashtab_mname(TADR(rt_name_tbl), &key);
+		if ((NULL != tabent) && tabent->value)
+		{
+			src_tbl = (uint4 *)tabent->value;
+			/* Must delete the entries piece-meal */
+			entries = *(src_tbl + 1);
+			/* Don't count line 0 which we bypass */
+			if (0 != entries)
+				entries--;
+			/* curline start is 2 uint4s into src_tbl and then space past line 0 or
+			   we end up freeing the storage for line 0/1 twice since they have the
+			   same pointers.
+			*/
+			for (curline = RECAST(mstr *)(src_tbl + 2) + 1; 0 != entries; --entries, ++curline)
+			{
+				assert(curline->len);
+				free(curline->addr);
+			}
+			free(tabent->value);
+			/* Comment below kept intact from when UNIX also used a $TEXT hash table. [BC 9/13]
+			 *
+			 * Note that there are two possible ways to proceed here to clear this entry:
+			 *   1. Just clear the value as we do below.
+			 *   2. Use the DELETE_HTENT() macro to remove the entry entirely from the hash table.
+			 *
+			 * We choose #1 since a routine that had had its source loaded is likely to have it reloaded
+			 * and if the source load rtn has to re-add the key, it won't reuse the deleted key (if it
+			 * remained a deleted key) until all other hashtable slots have been used up (creating a long
+			 * collision chain). A deleted key may not remain a deleted key if it was reached with no
+			 * collisions but will instead be turned into an unused key and be immediately reusable.
+			 * But since it is likely to be reused, we just zero the entry but this creates a necessity
+			 * that the key be maintained. If this is a non-USBHIN platform, everything stays around
+			 * anyway so that's not an issue. However, in a USHBIN platform, the literal storage the key
+			 * is pointing to gets released. For that reason, in the USHBIN processing section below, we
+			 * update the key to point to the newly loaded module's routine name.
+			 */
+			tabent->value = NULL;
+		}
+	}
 }

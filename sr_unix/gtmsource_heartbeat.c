@@ -47,7 +47,6 @@ GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_log_fd;
 GBLREF 	FILE			*gtmsource_log_fp;
 GBLREF  gtmsource_state_t       gtmsource_state;
-GBLREF	gd_addr          	*gd_header;
 
 GBLDEF	boolean_t			heartbeat_stalled = TRUE;
 GBLDEF	repl_heartbeat_que_entry_t	*repl_heartbeat_que_head = NULL;
@@ -163,7 +162,7 @@ int gtmsource_send_heartbeat(time_t *now)
 	repl_heartbeat_que_entry_t	*heartbeat_element;
 	unsigned char			*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
-	int				status;					/* needed for REPL_{SEND,RECV}_LOOP */
+	int				status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	unsigned char			seq_num_str[32], *seq_num_ptr;
 	gtmsource_local_ptr_t		gtmsource_local;
 
@@ -194,7 +193,6 @@ int gtmsource_send_heartbeat(time_t *now)
 
 		return (SS_NORMAL);
 	}
-
 	if (EREPL_SEND == repl_errno && REPL_CONN_RESET(status))
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to send heartbeat. Status = %d ; %s\n",
@@ -206,12 +204,10 @@ int gtmsource_send_heartbeat(time_t *now)
 	if (EREPL_SEND == repl_errno)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Error sending HEARTBEAT message. Error in send"), status);
-
 	if (EREPL_SELECT == repl_errno)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Error sending HEARTBEAT message. Error in select"), status);
-
-	GTMASSERT;
+	assertpro((SS_NORMAL == status));
 	return -1; /* This will never get executed, added to make compiler happy */
 }
 

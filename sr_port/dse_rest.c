@@ -23,7 +23,6 @@
 #include "gdscc.h"
 #include "dse.h"
 #include "cli.h"
-#include "init_root_gv.h"
 #include "filestruct.h"
 #include "jnl.h"
 #include "util.h"
@@ -42,7 +41,6 @@ GBLREF char		*update_array, *update_array_ptr;
 GBLREF uint4		update_array_size;
 GBLREF srch_hist	dummy_hist;
 GBLREF gd_region	*gv_cur_region;
-GBLREF gd_addr		*gd_header;
 GBLREF block_id		patch_curr_blk;
 GBLREF save_strct	patch_save_set[PATCH_SAVE_SIZE];
 GBLREF unsigned short int patch_save_count;
@@ -50,6 +48,10 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
 GBLREF gd_addr		*original_header;
 GBLREF cw_set_element   cw_set[];
+
+error_def(ERR_DBRDONLY);
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEFAIL);
 
 void dse_rest(void)
 {
@@ -62,17 +64,12 @@ void dse_rest(void)
 	int4		blk_seg_cnt, blk_size;
 	unsigned short	rn_len;
 	uint4		version;
-	gd_addr		*temp_gdaddr;
 	gd_binding	*map;
 	boolean_t	found;
 	srch_blk_status	blkhist;
 
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_DSEBLKRDFAIL);
-	error_def(ERR_DSEFAIL);
-
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	if (cli_present("VERSION") != CLI_PRESENT)
 	{
@@ -106,21 +103,15 @@ void dse_rest(void)
 	 	from = to;
 	if (cli_present("REGION") == CLI_PRESENT)
 	{
-
 		rn_len = SIZEOF(rn);
 		if (!cli_get_str("REGION", rn, &rn_len))
 			return;
 		for (i = rn_len; i < MAX_RN_LEN + 1; i++)
 			rn[i] = 0;
 		found = FALSE;
-
-		temp_gdaddr = gd_header;
-		gd_header = original_header;
-
-		for (i=0, region = gd_header->regions; i < gd_header->n_regions ;i++, region++)
+		for (i = 0, region = original_header->regions; i < original_header->n_regions ;i++, region++)
 			if (found = !memcmp(&region->rname[0], &rn[0], MAX_RN_LEN))
 				break;
-		GET_SAVED_GDADDR(gd_header, temp_gdaddr, map, gv_cur_region);
 		if (!found)
 		{
 			util_out_print("Error:  region not found.", TRUE);
@@ -135,9 +126,11 @@ void dse_rest(void)
 	 	region = gv_cur_region;
 	found = FALSE;
 	for (i = 0; i < patch_save_count; i++)
-	 	if (patch_save_set[i].blk == from && patch_save_set[i].region == region
-	 		&& (found = version == patch_save_set[i].ver))
+	{
+	 	if ((patch_save_set[i].blk == from) && (patch_save_set[i].region == region)
+				&& (found = (version == patch_save_set[i].ver)))
 	 		break;
+	}
 	if (!found)
 	{
 	 	util_out_print("Error:  no such version.", TRUE);
@@ -146,10 +139,10 @@ void dse_rest(void)
 	memcpy(util_buff, "!/Restoring block ", 18);
 	util_len = 18;
 	util_len += i2hex_nofill(to, (uchar_ptr_t)&util_buff[util_len], 8);
-	memcpy(&util_buff[util_len]," from version !UL", 17);
+	memcpy(&util_buff[util_len], " from version !UL", 17);
 	util_len += 17;
 	util_buff[util_len] = 0;
-	util_out_print(util_buff,FALSE,version);
+	util_out_print(util_buff, FALSE, version);
 	if (to != from)
 	{
 		memcpy(util_buff, " of block ", 10);
@@ -160,14 +153,14 @@ void dse_rest(void)
 	}
 	if (region != gv_cur_region)
 		util_out_print(" in region !AD", FALSE, LEN_AND_STR(rn));
-	util_out_print("!/",TRUE);
+	util_out_print("!/", TRUE);
 	if (to > cs_addrs->ti->total_blks)
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	t_begin_crit(ERR_DSEFAIL);
 	blk_size = cs_addrs->hdr->blk_size;
 	blkhist.blk_num = to;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	lbp = (uchar_ptr_t)patch_save_set[i].bp;
 
 	BLK_INIT(bs_ptr, bs1);

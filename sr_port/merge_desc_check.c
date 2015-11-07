@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,54 +39,183 @@ GBLREF merge_glvn_ptr	mglvnp;
 
 error_def(ERR_MERGEDESC);
 
+/* returns 1 if no descendant issues found;
+ * returns 0 if src and dst keys of merge are identical (i.e. NOOP - merge self);
+ * issues MERGEDESC error otherwise.
+ */
 boolean_t merge_desc_check(void)
 {
-	unsigned char		buff1[MAX_ZWR_KEY_SZ], buff2[MAX_ZWR_KEY_SZ], *end1, *end2;
+	boolean_t		mergereg_array[256], *is_reg_in_array, intersect;
+	char			*base;
 	enum db_acc_method	acc_meth1, acc_meth2;
-	gd_region		*reg1, *reg2;
+	gd_addr			*addr;
+	gd_binding		*map, *start_map1, *end_map1, *start_map2, *end_map2;
+	gd_region		*reg, *reg1, *reg2;
+	gv_key			*gvkey1, *gvkey2;
 	gv_namehead		*gvt1, *gvt2;
+	gvname_info		*gblp1, *gblp2;
+	gvnh_reg_t		*gvnh_reg1, *gvnh_reg2;
+	int			max_fid_index;
+	sgmnt_addrs		*csa;
+	unsigned char		buff1[MAX_ZWR_KEY_SZ], buff2[MAX_ZWR_KEY_SZ], *end1, *end2;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (MARG1_IS_GBL(merge_args) && MARG2_IS_GBL(merge_args))
 	{
-		reg1 = mglvnp->gblp[IND1]->s_gv_cur_region;
-		reg2 = mglvnp->gblp[IND2]->s_gv_cur_region;
-		gvt1 = mglvnp->gblp[IND1]->s_gv_target;
-		gvt2 = mglvnp->gblp[IND2]->s_gv_target;
-		acc_meth1 = reg1->dyn.addr->acc_meth;
-		acc_meth2 = reg2->dyn.addr->acc_meth;
-		assert(!(dba_bg == acc_meth1 || dba_mm == acc_meth1) || (NULL != gvt1->gd_csa));
-		assert(!(dba_bg == acc_meth2 || dba_mm == acc_meth2) || (NULL != gvt2->gd_csa));
-		/* if (!(both are bg/mm regions && dbs are same && same global) &&
-		 *     !(both are cm regions && on the same remote node && same region)
-		 *     !(both are usr regions && in the same volume set))
-		 *   NO DESCENDANTS
-		 * endif
+		gblp1 = mglvnp->gblp[IND1];
+		gblp2 = mglvnp->gblp[IND2];
+		/* Check if one global name is a descent of the other. If not, we know for sure there is no issue.
+		 * If yes, further check if the database files involved in the source and target global are identical/intersect.
+		 * If either of the globals span multiple regions, we need to check if the database files that the subscripted
+		 * global reference (involved in the merge command) span across intersect in the source and destination globals.
+		 * If intersection found issue MERGEDESC error. If not (e.g. two globals have same name but belong to different
+		 * gld/db) no error needed.
 		 */
-		if (!(((dba_bg == acc_meth1 || dba_mm == acc_meth2) && (dba_bg == acc_meth1 || dba_mm == acc_meth2))
-			&& (gvt1->gd_csa == gvt2->gd_csa) && (gvt1->root == gvt2->root))
-		   && !((dba_cm == acc_meth1) && (dba_cm == acc_meth2)
-			&& (reg1->dyn.addr->cm_blk == reg2->dyn.addr->cm_blk) && (reg1->cmx_regnum == reg2->cmx_regnum))
-		   VMS_ONLY (&&
-		   	!((dba_usr == acc_meth1) && (dba_usr == acc_meth2)
-			&& ((ddp_info *)(&FILE_INFO(reg1)->file_id))->volset == ((ddp_info *)(&FILE_INFO(reg2)->file_id))->volset)))
-		{
-			UNIX_ONLY(assert(dba_usr != acc_meth1 && dba_usr != acc_meth2);)
+		gvkey1 = gblp1->s_gv_currkey;
+		gvkey2 = gblp2->s_gv_currkey;
+		if (0 != memcmp(gvkey1->base, gvkey2->base, MIN(gvkey1->end, gvkey2->end)))
 			return 1;
-		}
-		if (0 == memcmp(mglvnp->gblp[IND1]->s_gv_currkey->base, mglvnp->gblp[IND2]->s_gv_currkey->base,
-			        MIN(mglvnp->gblp[IND1]->s_gv_currkey->end, mglvnp->gblp[IND2]->s_gv_currkey->end)))
-		{
-			if (mglvnp->gblp[IND1]->s_gv_currkey->end == mglvnp->gblp[IND2]->s_gv_currkey->end)
-				return 0; /* NOOP - merge self */
-			if (0 == (end1 = format_targ_key(buff1, MAX_ZWR_KEY_SZ, mglvnp->gblp[IND1]->s_gv_currkey, TRUE)))
-				end1 = &buff1[MAX_ZWR_KEY_SZ - 1];
-			if (0 == (end2 = format_targ_key(buff2, MAX_ZWR_KEY_SZ, mglvnp->gblp[IND2]->s_gv_currkey, TRUE)))
-				end2 = &buff2[MAX_ZWR_KEY_SZ - 1];
-			if (mglvnp->gblp[IND1]->s_gv_currkey->end > mglvnp->gblp[IND2]->s_gv_currkey->end)
-				rts_error(VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
-			else
-				rts_error(VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
-		}
+		if (gblp1->s_gd_targ_addr != gblp2->s_gd_targ_addr)
+		{	/* both globals involved in the merge correspond to different gld.
+			 * check if corresponding db files intersect.
+			 */
+			reg1 = gblp1->s_gv_cur_region;
+			reg2 = gblp2->s_gv_cur_region;
+			gvt1 = gblp1->s_gv_target;
+			gvt2 = gblp2->s_gv_target;
+			acc_meth1 = REG_ACC_METH(reg1);
+			acc_meth2 = REG_ACC_METH(reg2);
+			assert(!(dba_bg == acc_meth1 || dba_mm == acc_meth1) || (NULL != gvt1->gd_csa));
+			assert(!(dba_bg == acc_meth2 || dba_mm == acc_meth2) || (NULL != gvt2->gd_csa));
+			assert((dba_bg == acc_meth1) || (dba_mm == acc_meth1) || (NULL == gvt1->gd_csa));
+			assert((dba_bg == acc_meth2) || (dba_mm == acc_meth2) || (NULL == gvt2->gd_csa));
+			gvnh_reg1 = gblp1->s_gd_targ_gvnh_reg;
+			gvnh_reg2 = gblp2->s_gd_targ_gvnh_reg;
+			/* A non-NULL value of gvnh_reg indicates a spanning global as confirmed by the asserts below */
+			assert((NULL == gvnh_reg1) || (NULL != gvnh_reg1->gvspan));
+			assert((NULL == gvnh_reg2) || (NULL != gvnh_reg2->gvspan));
+			if ((NULL != gvnh_reg1) || (NULL != gvnh_reg2))
+			{	/* At least one of src OR dst global spans multiple regions, check for region/db intersections
+				 * between the two.
+				 */
+				assert((NULL == gvnh_reg1) || (NULL != gvt1->gd_csa));
+				assert((NULL == gvnh_reg2) || (NULL != gvt2->gd_csa));
+				if ((NULL == gvt1->gd_csa) || (NULL == gvt2->gd_csa))
+				{	/* One global spans multiple regions, while another is remote. They cannot intersect
+					 * as a global can never span to remote regions (i.e. no dba_usr or dba_cm).
+					 */
+					return 1;
+				}
+				/* The merge command is MERGE ^gvn1(subs1)=^gvn2(subs2) where "subs1" and "subs2" are
+				 * a comma-separated list of one or more subscripts. Find out regions spanned by
+				 * ^gvn1(subs1) as well as ^gvn2(subs2) and check for intersections in these two lists.
+				 */
+				/* Find list of regions corresponding to ^gvn1(subs1) */
+				base = (char *)&gvkey1->base[0];
+				addr = gblp1->s_gd_targ_addr;
+				start_map1 = gv_srch_map(addr, base, gvkey1->end - 1); /* -1 to remove trailing 0 */
+				GVKEY_INCREMENT_ORDER(gvkey1);
+				end_map1 = gv_srch_map(addr, base, gvkey1->end - 1); /* -1 to remove trailing 0 */
+				BACK_OFF_ONE_MAP_ENTRY_IF_EDGECASE(gvkey1->base, gvkey1->end - 1, end_map1);
+				GVKEY_UNDO_INCREMENT_ORDER(gvkey1);
+				/* Find list of regions corresponding to ^gvn2(subs2) */
+				assert(KEY_DELIMITER == gvkey2->base[gvkey2->end - 1]);
+				assert(KEY_DELIMITER == gvkey2->base[gvkey2->end]);
+				base = (char *)&gvkey2->base[0];
+				addr = gblp2->s_gd_targ_addr;
+				start_map2 = gv_srch_map(addr, base, gvkey2->end - 1); /* -1 to remove trailing 0 */
+				GVKEY_INCREMENT_ORDER(gvkey2);
+				end_map2 = gv_srch_map(addr, base, gvkey2->end - 1); /* -1 to remove trailing 0 */
+				BACK_OFF_ONE_MAP_ENTRY_IF_EDGECASE(gvkey2->base, gvkey2->end - 1, end_map2);
+				GVKEY_UNDO_INCREMENT_ORDER(gvkey2);
+				/* At this point, we are sure all regions involved in ^gvn1 and ^gvn2 are dba_mm or dba_bg.
+				 * This means all the regions would have a csa and a csa->fid_index assigned to them.
+				 * We can use this to determine intersections. Note though that some regions could not yet
+				 * be open so we need to open the regions first in that case and then use max_fid_index.
+				 */
+				for (map = start_map1; map <= end_map1; map++)
+				{
+					reg = map->reg.addr;
+					if (!reg->open)
+						gv_init_reg(reg);
+				}
+				for (map = start_map2; map <= end_map2; map++)
+				{
+					reg = map->reg.addr;
+					if (!reg->open)
+						gv_init_reg(reg);
+				}
+				/* At this point, all regions involved in the merge ^gvn1(subs1)=^gvn2(subs2) are open
+				 * so we can use max_fid_index without issues.
+				 */
+				max_fid_index = TREF(max_fid_index);
+				if (max_fid_index < ARRAYSIZE(mergereg_array))
+					is_reg_in_array = &mergereg_array[0];
+				else
+					is_reg_in_array = (boolean_t *)malloc(SIZEOF(boolean_t) * (max_fid_index + 1));
+				memset(is_reg_in_array, 0, SIZEOF(boolean_t) * (max_fid_index + 1));
+				intersect = FALSE;
+				for (map = start_map1; map <= end_map1; map++)
+				{
+					reg = map->reg.addr;
+					csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
+					assert(NULL != csa);
+					assert(max_fid_index >= csa->fid_index);
+					is_reg_in_array[csa->fid_index] = TRUE;
+				}
+				for (map = start_map2; map <= end_map2; map++)
+				{
+					reg = map->reg.addr;
+					csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
+					assert(NULL != csa);
+					assert(max_fid_index >= csa->fid_index);
+					if (is_reg_in_array[csa->fid_index])
+					{
+						intersect = TRUE;
+						break;
+					}
+				}
+				if (is_reg_in_array != &mergereg_array[0])
+					free(is_reg_in_array);
+				if (!intersect)
+					return 1;
+			} else
+			{	/* Both globals map only to one region (no spanning).
+				 * if (!(both are bg/mm regions && dbs are same) &&
+				 *     !(both are cm regions && on the same remote node && same region)
+				 *     !(both are usr regions && in the same volume set))
+				 *   NO DESCENDANTS
+				 * endif
+				 */
+				assert((NULL == gvt1->gd_csa) || (gvt1->gd_csa != gvt2->gd_csa) || (gvt1->root == gvt2->root));
+				if (!((NULL != gvt1->gd_csa) && (gvt1->gd_csa == gvt2->gd_csa))
+					&& !((dba_cm == acc_meth1) && (dba_cm == acc_meth2)
+						&& (reg1->dyn.addr->cm_blk == reg2->dyn.addr->cm_blk)
+						&& (reg1->cmx_regnum == reg2->cmx_regnum))
+					VMS_ONLY (&&
+						!((dba_usr == acc_meth1) && (dba_usr == acc_meth2)
+							&& ((ddp_info *)(&FILE_INFO(reg1)->file_id))->volset
+								== ((ddp_info *)(&FILE_INFO(reg2)->file_id))->volset)))
+				{
+					UNIX_ONLY(assert((dba_usr != acc_meth1) && (dba_usr != acc_meth2));)
+					return 1;
+				}
+			}
+		} else if (gvkey1->end == gvkey2->end)
+			return 0; /* NOOP - merge self */
+		/* Else glds are identical and global names are identical and one is a descendant of other.
+		 * So need to issue MERGEDESC error for sure (does not matter whether global spans regions
+		 * or not, does not matter if region is remote or not etc.). No other checks necessary.
+		 */
+		if (0 == (end1 = format_targ_key(buff1, MAX_ZWR_KEY_SZ, gvkey1, TRUE)))
+			end1 = &buff1[MAX_ZWR_KEY_SZ - 1];
+		if (0 == (end2 = format_targ_key(buff2, MAX_ZWR_KEY_SZ, gvkey2, TRUE)))
+			end2 = &buff2[MAX_ZWR_KEY_SZ - 1];
+		if (gvkey1->end > gvkey2->end)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
+		else
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
 	} else if (MARG1_IS_LCL(merge_args) && MARG2_IS_LCL(merge_args))
 	{
 		if (mglvnp->lclp[IND1] == mglvnp->lclp[IND2])
@@ -95,12 +224,12 @@ boolean_t merge_desc_check(void)
 		{
 			end1 = format_key_lv_val(mglvnp->lclp[IND1], buff1, SIZEOF(buff1));
 			end2 = format_key_lv_val(mglvnp->lclp[IND2], buff2, SIZEOF(buff2));
-			rts_error(VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
 		} else if (lcl_arg1_is_desc_of_arg2(mglvnp->lclp[IND2], mglvnp->lclp[IND1]))
 		{
 			end1 = format_key_lv_val(mglvnp->lclp[IND1], buff1, SIZEOF(buff1));
 			end2 = format_key_lv_val(mglvnp->lclp[IND2], buff2, SIZEOF(buff2));
-			rts_error(VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
 		}
 	}
 	return 1;

@@ -284,6 +284,7 @@ void mupip_backup(void)
 	int4			shm_id, sem_id;
 	replpool_identifier	replpool_id;
 	sm_uc_ptr_t		start_addr;
+	int			user_id;
 	int			group_id;
 	int			perm;
 	struct perm_diag_data	pdd;
@@ -701,7 +702,7 @@ void mupip_backup(void)
 			/* give temporary files the group and permissions as other shared resources - like journal files */
 			FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 			if (-1 != fstat_res)
-				if (gtm_set_group_and_perm(&stat_buf, &group_id, &perm, PERM_FILE, &pdd) < 0)
+				if (gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE, &pdd) < 0)
 				{
 					send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
@@ -720,7 +721,7 @@ void mupip_backup(void)
 			 * 0770 anded with current mode for the new mode if masked permission selected.
 			 */
 			if ((-1 == fstat_res) || (-1 == FCHMOD(rptr->backup_fd, perm))
-				|| ((-1 != group_id) && (-1 == fchown(rptr->backup_fd, -1, group_id))))
+				|| (((-1 != user_id) || (-1 != group_id)) && (-1 == fchown(rptr->backup_fd, user_id, group_id))))
 			{
 				status = errno;
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);

@@ -99,7 +99,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 	unix_db_info		*udi;
 	int			save_errno, sem_id, shm_id, status;
 	sgmnt_addrs		*repl_csa;
-	boolean_t		was_crit;
+	boolean_t		was_crit, remove_sem;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -177,8 +177,9 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 				ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, shm_id);
 				*ipcs_ptr = '\0';
 				if (rndwn_both_pools && ((SS_NORMAL != jnlpool_stat) || ipc_rmvd))
-					gtm_putmsg(VARLSTCNT(6) (jnlpool_stat ? ERR_MUJPOOLRNDWNFL : ERR_MUJPOOLRNDWNSUC),
-						4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename));
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6)
+							(jnlpool_stat ? ERR_MUJPOOLRNDWNFL : ERR_MUJPOOLRNDWNSUC),
+							4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename));
 			}
 			assert(ipc_rmvd || (NULL != jnlpool_ctl));
 			assert((NULL == jnlpool.jnlpool_ctl) || (SS_NORMAL == jnlpool_stat) || jgbl.onlnrlbk);
@@ -191,8 +192,10 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 				 */
 				if (NULL == jnlpool_ctl)
 				{
-					if (((sem_created || (SS_NORMAL == jnlpool_stat))
-						&& (SS_NORMAL == mu_replpool_release_sem(&repl_instance, JNLPOOL_SEGMENT, TRUE))))
+					remove_sem = sem_created || (SS_NORMAL == jnlpool_stat);
+					if (!remove_sem)
+						add_to_semids_list(repl_instance.jnlpool_semid);
+					if (SS_NORMAL == mu_replpool_release_sem(&repl_instance, JNLPOOL_SEGMENT, remove_sem))
 					{	/* Now that semaphores are removed, reset fields in file header */
 						if (!sem_created)
 						{	/* If sem_id was created by mu_replpool_grab_sem then do NOT report the
@@ -203,8 +206,9 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 							 */
 							ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, sem_id);
 							*ipcs_ptr = '\0';
-							gtm_putmsg(VARLSTCNT(9) ERR_MUJPOOLRNDWNSUC, 4, LEN_AND_STR(ipcs_buff),
-								LEN_AND_STR(instfilename), ERR_SEMREMOVED, 1, sem_id);
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_MUJPOOLRNDWNSUC, 4,
+									LEN_AND_STR(ipcs_buff),
+									LEN_AND_STR(instfilename), ERR_SEMREMOVED, 1, sem_id);
 						}
 						repl_inst_jnlpool_reset();
 					}
@@ -222,25 +226,13 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 						repl_inst_write(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance,
 									SIZEOF(repl_inst_hdr));
 				}
-				/* If semaphore is not created and the journal pool rundown failed (due to attached processes),
-				 * rundown process continues to holds the journal pool access control semaphore. This way, we hold
-				 * the semaphore on behalf of the source server (now no longer alive) to prevent mu_rndwn_sem_all
-				 * (invoked later) from cleaning up this orphaned semaphore (which causes REPLREQROLLBACK if the
-				 * source server is restarted). But, since the semaphore is not released (until the rundown process
-				 * dies), holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] continues to remain TRUE. This causes asserts in
-				 * ftok_sem_get if mu_rndwn_repl_instance is invoked for a different journal/receive pool. To
-				 * workaround it, set holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] to FALSE. This is an interim solution
-				 * until we record such semaphores in an ignore-list (or some such) and change mu_rndwn_sem_all to
-				 * skip the ones that are present in the ignore list.
-				 */
-				holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] = FALSE;
 			}
 		} else if (rndwn_both_pools && (INVALID_SHMID != shm_id))
 		{
 			ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, shm_id);
 			*ipcs_ptr = '\0';
 			if (rndwn_both_pools)
-				gtm_putmsg(VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, LEN_AND_STR(ipcs_buff),
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, LEN_AND_STR(ipcs_buff),
 					LEN_AND_STR(instfilename));
 		}
 		*jnlpool_sem_created = sem_created;
@@ -273,8 +265,9 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 				ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, shm_id);
 				*ipcs_ptr = '\0';
 				if (rndwn_both_pools && ((SS_NORMAL != recvpool_stat) || ipc_rmvd))
-					gtm_putmsg(VARLSTCNT(6) (recvpool_stat ? ERR_MURPOOLRNDWNFL : ERR_MURPOOLRNDWNSUC),
-						4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename));
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6)
+							(recvpool_stat ? ERR_MURPOOLRNDWNFL : ERR_MURPOOLRNDWNSUC),
+							4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename));
 			}
 			assert((TRUE == ipc_rmvd) || (SS_NORMAL != recvpool_stat) || jgbl.onlnrlbk);
 			assert((INVALID_SHMID != repl_instance.recvpool_shmid) || (0 == repl_instance.recvpool_shmid_ctime));
@@ -284,8 +277,10 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 			{	/* Invoked by MUPIP RUNDOWN in which case the semaphores needs to be removed. But, remove the
 				 * semaphore ONLY if we created it here OR the receive pool was successfully removed.
 				 */
-				if ((sem_created || (SS_NORMAL == recvpool_stat))
-					&& (SS_NORMAL == mu_replpool_release_sem(&repl_instance, RECVPOOL_SEGMENT, TRUE)))
+				remove_sem = sem_created || (SS_NORMAL == jnlpool_stat);
+				if (!remove_sem)
+					add_to_semids_list(repl_instance.jnlpool_semid);
+				if (SS_NORMAL == mu_replpool_release_sem(&repl_instance, RECVPOOL_SEGMENT, remove_sem))
 				{	/* Now that semaphores are removed, reset fields in file header */
 					if (!sem_created)
 					{	/* if sem_id was "created" by mu_replpool_grab_sem then do NOT report the
@@ -296,8 +291,9 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 						 */
 						ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, sem_id);
 						*ipcs_ptr = '\0';
-						gtm_putmsg(VARLSTCNT(9) ERR_MURPOOLRNDWNSUC, 4, LEN_AND_STR(ipcs_buff),
-							LEN_AND_STR(instfilename), ERR_SEMREMOVED, 1, sem_id);
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_MURPOOLRNDWNSUC, 4,
+								LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename),
+								ERR_SEMREMOVED, 1, sem_id);
 					}
 					if (NULL != jnlpool_ctl)
 					{	/* Journal pool is not yet removed. So, grab lock before resetting semid/shmid
@@ -321,26 +317,14 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 					if ((NULL != jnlpool_ctl) && !was_crit)
 						rel_lock(jnlpool.jnlpool_dummy_reg);
 				}
-				/* If semaphore is not created and the receive pool rundown failed (due to attached processes),
-				 * rundown process continues to holds the receive pool access control semaphore. This way, we hold
-				 * the semaphore on behalf of the receiver server (now no longer alive) to prevent mu_rndwn_sem_all
-				 * (invoked later) from cleaning up this orphaned semaphore (which causes REPLREQROLLBACK if the
-				 * receiver is restarted). But, since the semaphore is not released (until the rundown process
-				 * dies), holds_sem[RECV][RECV_POOL_ACCESS_SEM] continues to remain TRUE. This causes asserts in
-				 * ftok_sem_get if mu_rndwn_repl_instance is invoked for a different journal/receive pool. To
-				 * workaround it, set holds_sem[SOURCE][RECV_POOL_ACCESS_SEM] to FALSE. This is an interim solution
-				 * until we record such semaphores in an ignore-list (or some such) and change mu_rndwn_sem_all to
-				 * skip the ones that are present in the ignore list.
-				 */
-				assert((sem_created || (SS_NORMAL == recvpool_stat)) || holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
-				DEBUG_ONLY(set_sem_set_recvr(sem_id));
+				assert(!holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
 			}
 		} else if (rndwn_both_pools && (INVALID_SHMID != shm_id))
 		{
 			ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, shm_id);
 			*ipcs_ptr = '\0';
 			if (rndwn_both_pools)
-				gtm_putmsg(VARLSTCNT(6) ERR_MURPOOLRNDWNFL, 4, LEN_AND_STR(ipcs_buff),
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURPOOLRNDWNFL, 4, LEN_AND_STR(ipcs_buff),
 					LEN_AND_STR(instfilename));
 		}
 	}
@@ -389,7 +373,7 @@ CONDITION_HANDLER(mu_rndwn_repl_instance_ch)
 	sgmnt_addrs	*csa;
 	gd_region	*reg;
 
-	START_CH;
+	START_CH(TRUE);
 	reg = jnlpool.jnlpool_dummy_reg;
 	assert(NULL != reg);
 	if (NULL != reg)

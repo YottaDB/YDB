@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,8 @@ GBLREF stack_frame	*frame_pointer;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*msp, *stackbase, *stackwarn, *stacktop;
 GBLREF symval		*curr_symval;
+
+LITREF mval		skiparg;
 
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
@@ -166,8 +168,7 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 		if (!(mask & 1 << i))
 		{	/* Not a dotted pass-by-reference parm. */
 			actpmv = &actp->v;
-			if ((!MV_DEFINED(actpmv)) && (actpmv->str.addr != (char *)&actp->v))
-				actpmv = underr(actpmv);
+			MV_FORCE_DEFINED_UNLESS_SKIPARG(actpmv);
 			PUSH_MV_STENT(MVST_PVAL);
 			mv_chain->mv_st_cont.mvs_pval.mvs_val = lv_getslot(curr_symval);
 			LVVAL_INIT(mv_chain->mv_st_cont.mvs_pval.mvs_val, curr_symval);

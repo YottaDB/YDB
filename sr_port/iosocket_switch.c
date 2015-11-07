@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,25 +19,24 @@
 #include "io.h"
 #include "iosp.h"
 #include "io_params.h"
-#include "iotcpdef.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 
 GBLREF  int4	gtm_max_sockets;
+
+error_def(ERR_SOCKNOTFND);
+error_def(ERR_SOCKETEXIST);
+error_def(ERR_SOCKMAX);
 
 boolean_t iosocket_switch(char *handle, int handle_len, d_socket_struct *from, d_socket_struct *to)
 {
 	int4 		index, ii;
 	socket_struct	*socketptr;
 
-	error_def(ERR_SOCKNOTFND);
-	error_def(ERR_SOCKETEXIST);
-	error_def(ERR_SOCKMAX);
-
 	if ((NULL == from) ||
 		(0 > (index = iosocket_handle(handle, &handle_len, FALSE, from))))
 	{
-		rts_error(VARLSTCNT(4) ERR_SOCKNOTFND, 2, handle_len, handle);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handle_len, handle);
 		return FALSE;
 	} else
 	{
@@ -46,12 +45,12 @@ boolean_t iosocket_switch(char *handle, int handle_len, d_socket_struct *from, d
 		assert(NULL != to);
 		if (0 <= iosocket_handle(handle, &handle_len, FALSE, to))
 		{
-			rts_error(VARLSTCNT(4) ERR_SOCKETEXIST, 2, handle_len, handle);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKETEXIST, 2, handle_len, handle);
 			return FALSE;
 		}
                 if (gtm_max_sockets <= to->n_socket)
                 {
-                        rts_error(VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
                         return FALSE;
                 }
 		socketptr = from->socket[index];

@@ -18,31 +18,30 @@
 UNIX_ONLY(GBLDEF) VMS_ONLY(LITDEF) dev_dispatch_struct io_dev_dispatch[] =
 {
 #	ifdef UNIX
-	iotype(iott, iott, iott),
+	iotype(iott, iott, iott, nil),
 #	else
-	iotype(iott, iott, nil),
+	iotype(iott, iott, nil, nil),
 #	endif
-	iotype(iomt, iomt, nil),
+	iotype(iomt, iomt, nil, nil),
 #	ifdef UNIX
-	iotype(iorm, iorm, iopi),
+	iotype(iorm, iorm, iopi, nil),
 #	else
-	iotype(iorm, iorm, nil),
+	iotype(iorm, iorm, nil, nil),
 #	endif
-	iotype(ious, ious, ious),
+	iotype(ious, ious, ious, nil),
 #	ifdef UNIX
 	ionil_dev,
 #	else
-	iotype(iomb, iomb, nil),
+	iotype(iomb, iomb, nil, nil),
 #	endif
-	iotype(ionl, ionl, nil),
+	iotype(ionl, ionl, nil, nil),
 #	ifdef UNIX
-	iotype(ioff, iorm, iopi),
+	iotype(ioff, iorm, iopi, nil),
 #	else
-	iotype(ioff, iorm, nil),
+	iotype(ioff, iorm, nil, nil),
 #	endif
-	iotype(iotcp, iotcp, iotcp),
-	iotype(iosocket, iosocket, iosocket)
+	iotype(iosocket, iosocket, iosocket, iosocket)
 #	ifdef UNIX
-	,iotype(iopi, iorm, iopi)
+	,iotype(iopi, iorm, iopi, nil)
 #	endif
 };

@@ -19,10 +19,10 @@
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
+#include "gtm_select.h"
 
 #include <errno.h>
 #include <sys/un.h>
-#include <iotcp_select.h>
 #if defined(__sparc) || defined(__hpux) || defined(__MVS__) || defined(__linux__) || defined(__CYGWIN__)
 #include "gtm_limits.h"
 #else
@@ -68,11 +68,11 @@
 #define MUTEX_LCKALERT_PERIOD		4
 #endif
 
-/* The following CAREFUL_* macros invoke the corresponding * macros except in the case csa->hdr is NULL.
+/* The following PROBE_* macros invoke the corresponding * macros except in the case csa->hdr is NULL.
  * This is possible if the csa corresponds to the journal pool where there is no notion of a db hdr.
  * In that case, we skip invoking the * macros.
  */
-#define	CAREFUL_SET_TRACEABLE_VAR(CSA, VALUE)					\
+#define	PROBE_SET_TRACEABLE_VAR(CSA, VALUE)					\
 {										\
 	sgmnt_data_ptr_t	lcl_csd;					\
 										\
@@ -83,7 +83,7 @@
 		SET_TRACEABLE_VAR(CSA->nl->wc_blocked, TRUE);			\
 }
 
-#define	CAREFUL_BG_TRACE_PRO_ANY(CSA, EVENT)					\
+#define	PROBE_BG_TRACE_PRO_ANY(CSA, EVENT)					\
 {										\
 	sgmnt_data_ptr_t	lcl_csd;					\
 										\
@@ -239,14 +239,14 @@ static	void	clean_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 #		  else
 		if ((NULL == (status = msem_init(&q_free_entry->mutex_wake_msem, MSEM_LOCKED))) || ((msemaphore *)-1 == status))
 #		  endif
-			rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 				RTS_ERROR_TEXT("Error with mutex wait memory semaphore initialization"), errno);
 #		endif
 		/* Initialize fl,bl links to 0 before INSQTI as it (gtm_insqti in relqueopi.c) asserts this */
 		DEBUG_ONLY(((que_ent_ptr_t)q_free_entry)->fl = 0;)
 		DEBUG_ONLY(((que_ent_ptr_t)q_free_entry)->bl = 0;)
 		if (INTERLOCK_FAIL == INSQTI((que_ent_ptr_t)q_free_entry++, (que_head_ptr_t)&addr->freehead))
-			rts_error(VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 				RTS_ERROR_TEXT("Interlock instruction failure in mutex initialize"));
 	}
 	SET_LATCH_GLOBAL(&addr->semaphore, LOCK_AVAILABLE);
@@ -374,7 +374,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 						bad_heartbeat = heartbeat_counter + MUTEX_MAX_HEARTBEAT_WAIT - 1;
 					/* -1 since we were interrupted this time */
 				} else
-					rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 						RTS_ERROR_TEXT("Error with mutex wake msem"), errno);
 			}
 			/* wakeup_status is set to true, if I was able to lock...somebody woke me up;
@@ -393,6 +393,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 			 */
 			timeout_intr_slpcnt = MUTEX_INTR_SLPCNT;
 			MUTEX_DPRINT4("%d: Sleeping for %d s %d us\n", process_id, timeout.tv_sec, timeout.tv_usec);
+			assertpro(FD_SETSIZE > mutex_sock_fd);
 			FD_SET(mutex_sock_fd, &mutex_wait_on_descs);
 			MUTEX_TRACE_CNTR(mutex_trc_slp);
 			/*
@@ -412,7 +413,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 						break;
 					}
 				} else
-					rts_error(VARLSTCNT(5) ERR_TEXT, 2,
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_TEXT, 2,
 						RTS_ERROR_TEXT("Error with mutex select. Running in degraded mode"), errno);
 				timeout_val >>= 1;
 				timeout.tv_sec = timeout_val / ONE_MILLION;
@@ -420,6 +421,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 				MUTEX_DPRINT4("%d: Interrupted select, new timeout %d s %d us\n", process_id, timeout.tv_sec,
 					timeout.tv_usec);
 				/* the next line deals with the case that an interrupted select has changed mutex_wait_on_descs */
+				assertpro(FD_SETSIZE > mutex_sock_fd);
 				FD_SET(mutex_sock_fd, &mutex_wait_on_descs);
 				MUTEX_TRACE_CNTR(mutex_trc_slp);
 			}
@@ -596,9 +598,9 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 			{
 				/* Record queue full event in db file header if applicable.
 				 * Take care not to do it for jnlpool which has no concept of a db cache.
-				 * In that case csa->hdr is NULL so use CAREFUL_BG_TRACE_PRO_ANY macro.
+				 * In that case csa->hdr is NULL so use PROBE_BG_TRACE_PRO_ANY macro.
 				 */
-				CAREFUL_BG_TRACE_PRO_ANY(csa, mutex_queue_full);
+				PROBE_BG_TRACE_PRO_ANY(csa, mutex_queue_full);
 				MUTEX_DPRINT2("%d: Free Queue full\n", process_id);
 				/*
 				* When I can't find a free slot in the queue
@@ -859,15 +861,16 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 						{	/* not rollback - send_msg after trace less likely to lose process */
 							GET_C_STACK_FROM_SCRIPT("MUTEXLCKALERT", process_id, in_crit_pid,
 								csa->critical->crit_cycle);
-							send_msg(VARLSTCNT(6) ERR_MUTEXLCKALERT, 4, DB_LEN_STR(reg), in_crit_pid,
-								 csa->critical->crit_cycle);
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MUTEXLCKALERT, 4,
+									DB_LEN_STR(reg), in_crit_pid, csa->critical->crit_cycle);
 							try_recovery = TRUE;	/* set off a salvage */
 							continue;	/* make sure to act on it soon, likely this process */
 						}
 						/* If the holding PID belongs to online rollback which holds crit on database and
 						 * journal pool for its entire duration, use a different message
 						 */
-						send_msg(VARLSTCNT(5) ERR_ORLBKINPROG, 3, csa->nl->onln_rlbk_pid, DB_LEN_STR(reg));
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_ORLBKINPROG, 3,
+								csa->nl->onln_rlbk_pid, DB_LEN_STR(reg));
 						assert(csa->nl->in_crit == csa->nl->onln_rlbk_pid);
 					}
 				} else
@@ -966,24 +969,24 @@ void mutex_salvage(gd_region *reg)
 			csa->nl->in_crit = 0;
 			/* Mutex crash repaired, want to do write cache recovery, just in case.
 			 * Take care not to do it for jnlpool which has no concept of a db cache.
-			 * In that case csa->hdr is NULL so use CAREFUL_SET_TRACEABLE_VAR macro.
+			 * In that case csa->hdr is NULL so use PROBE_SET_TRACEABLE_VAR macro.
 			 */
-			CAREFUL_SET_TRACEABLE_VAR(csa, TRUE);
+			PROBE_SET_TRACEABLE_VAR(csa, TRUE);
 			mutex_salvaged = TRUE;
 			MUTEX_DPRINT2("%d : mutex salvaged, culprit was our own process\n", process_id);
 		} else if (!is_proc_alive(holder_pid, UNIX_ONLY(0) VMS_ONLY(holder_imgcnt)))
 		{	/* Release the COMPSWAP lock AFTER setting csa->nl->in_crit to 0 as an assert in
 			 * grab_crit (checking that csa->nl->in_crit is 0) relies on this order.
 			 */
-			send_msg(VARLSTCNT(5) ERR_MUTEXFRCDTERM, 3, holder_pid, REG_LEN_STR(reg));
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MUTEXFRCDTERM, 3, holder_pid, REG_LEN_STR(reg));
 			csa->nl->in_crit = 0;
 			/* Mutex crash repaired, want to do write cache recovery, in case previous holder of crit had set
 			 * some cr->in_cw_set to a non-zero value. Not doing cache recovery could cause incorrect
-			 * GTMASSERTs in PIN_CACHE_RECORD macro in t_end/tp_tend.
+			 * GTMASSERTs in PIN_CACHE_RECORD macro in t_end/tp_tend.				BYPASSOK(GTMASSERT)
 			 * Take care not to do it for jnlpool which has no concept of a db cache.
-			 * In that case csa->hdr is NULL so use CAREFUL_SET_TRACEABLE_VAR macro.
+			 * In that case csa->hdr is NULL so use PROBE_SET_TRACEABLE_VAR macro.
 			 */
-			CAREFUL_SET_TRACEABLE_VAR(csa, TRUE);
+			PROBE_SET_TRACEABLE_VAR(csa, TRUE);
 			COMPSWAP_UNLOCK(&csa->critical->semaphore, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
 			mutex_salvaged = TRUE;
 			/* Reset jb->blocked as well if the holder_pid had it set */
@@ -1005,10 +1008,10 @@ void mutex_salvage(gd_region *reg)
 		assert((NULL != csa->hdr) || (csa == &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs));
 		if (mutex_salvaged && (NULL != csa->hdr))
 		{
-			BG_TRACE_PRO_ANY(csa, wcb_mutex_salvage); /* no need to use CAREFUL_BG_TRACE_PRO_ANY macro
+			BG_TRACE_PRO_ANY(csa, wcb_mutex_salvage); /* no need to use PROBE_BG_TRACE_PRO_ANY macro
 								   * since we already checked for csa->hdr non-NULL.
 								   */
-			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_mutex_salvage"),
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_mutex_salvage"),
 				process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
 		}
 	}

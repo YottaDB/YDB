@@ -51,6 +51,11 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
+#ifdef GTM_TRIGGER
+#include "hashtab_mname.h"
+#include "gv_trigger.h"
+#include "gv_trigger_common.h"
+#endif
 
 /* Prototypes */
 #include "mupip_reorg.h"
@@ -61,6 +66,7 @@
 #include "mu_outofband_setup.h"
 #include "gtmmsg.h"
 #include "mu_getlst.h"
+#include "gvcst_protos.h"	/* for gvcst_root_search prototype */
 
 error_def(ERR_CONCURTRUNCINPROG);
 error_def(ERR_DBRDONLY);
@@ -81,7 +87,6 @@ GTMTRIG_ONLY(LITREF mval		literal_hasht;)
 GBLREF bool		mu_ctrlc_occurred;
 GBLREF bool		mu_ctrly_occurred;
 GBLREF boolean_t	mu_reorg_process;
-GBLREF gd_addr 		*gd_header;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key           *gv_currkey_next_reorg, *gv_currkey, *gv_altkey;
 GBLREF int		gv_keysize;
@@ -91,6 +96,7 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF uint4		process_id;
 GBLREF tp_region	*grlist;
 GBLREF bool		error_mupip;
+GBLREF inctn_opcode_t	inctn_opcode;
 #ifdef UNIX
 GBLREF	boolean_t	jnlpool_init_needed;
 #endif
@@ -100,12 +106,11 @@ void mupip_reorg(void)
 	int			data_fill_factor, index_fill_factor;
 	int			reorg_op, reg_max_rec, reg_max_key, reg_max_blk;
 	char			cli_buff[MAX_LINE], *ptr;
-	glist			gl_head, exclude_gl_head, *gl_ptr;
+	glist			gl_head, exclude_gl_head, *gl_ptr, hasht_gl;
 	uint4			cli_status;
 	unsigned short		n_len;
 	boolean_t		truncate, cur_success, restrict_reg, arg_present;
 	int			root_swap_statistic;
-	mval			gn;
 #	ifdef GTM_TRUNCATE
 	int4			truncate_percent;
 	boolean_t		gotlock;
@@ -244,35 +249,34 @@ void mupip_reorg(void)
 	root_swap_statistic = 0;
 	mu_reorg_process = TRUE;
 	assert(NULL == gv_currkey_next_reorg);
-	gv_keysize = DBKEYSIZE(MAX_KEY_SZ);
+	GVKEYSIZE_INIT_IF_NEEDED;	/* sets "gv_keysize", "gv_currkey" and "gv_altkey" (if not already done) */
 	GVKEY_INIT(gv_currkey_next_reorg, gv_keysize);
-	GVKEY_INIT(gv_currkey, gv_keysize);
-	GVKEY_INIT(gv_altkey, gv_keysize);
 	reorg_gv_target = targ_alloc(MAX_KEY_SZ, NULL, NULL);
 	reorg_gv_target->hist.depth = 0;
 	reorg_gv_target->alt_hist->depth = 0;
 	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
 	{
 		util_out_print("   ", FLUSH);
-		util_out_print("Global: !AD ", FLUSH, gl_ptr->name.str.len, gl_ptr->name.str.addr);
-		if (in_exclude_list((uchar_ptr_t)gl_ptr->name.str.addr, gl_ptr->name.str.len, &exclude_gl_head))
+		util_out_print("Global: !AD (region !AD)", FLUSH, GNAME(gl_ptr).len, GNAME(gl_ptr).addr, REG_LEN_STR(gl_ptr->reg));
+		if (in_exclude_list((unsigned char *)GNAME(gl_ptr).addr, GNAME(gl_ptr).len, &exclude_gl_head))
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_EXCLUDEREORG, 2, gl_ptr->name.str.len, gl_ptr->name.str.addr);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_EXCLUDEREORG, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
 			reorg_success = FALSE;
 			continue;
 		}
 		/* Save the global name in reorg_gv_target. Via gv_currkey_next_reorg, it's possible for gv_currkey to become
 		 * out of sync with gv_target. We'll use reorg_gv_target->gvname to make sure the correct root block is found.
 		 */
-		reorg_gv_target->gvname.var_name.addr = gl_ptr->name.str.addr;
-		reorg_gv_target->gvname.var_name.len = gl_ptr->name.str.len;
-		cur_success = mu_reorg(&gl_ptr->name, &exclude_gl_head, &resume, index_fill_factor, data_fill_factor, reorg_op);
+		reorg_gv_target->gvname.var_name = GNAME(gl_ptr);
+		GTMTRIG_ONLY(assert(!IS_MNAME_HASHT_GBLNAME(reorg_gv_target->gvname.var_name));)
+		cur_success = mu_reorg(gl_ptr, &exclude_gl_head, &resume, index_fill_factor, data_fill_factor, reorg_op);
 		reorg_success &= cur_success;
-		SET_GV_CURRKEY_FROM_REORG_GV_TARGET;
+		SET_GV_CURRKEY_FROM_GVT(reorg_gv_target);
 #		ifdef GTM_TRUNCATE
 		if (truncate)
 		{	/* No need to move root blocks unless truncating */
-			cur_success &= mu_swap_root(&gl_ptr->name, &root_swap_statistic);
+			cur_success &= mu_swap_root(gl_ptr, &root_swap_statistic);
+			assert(gv_cur_region == gl_ptr->reg);	/* should have been set inside "mu_reorg" call done above */
 			if (cur_success)
 			{	/* add region corresponding to this global to the set (list) of regions to truncate */
 				for (reg_iter = reg_list, prev_reg = reg_list; reg_iter; reg_iter = reg_iter->next)
@@ -292,14 +296,31 @@ void mupip_reorg(void)
 #					ifdef GTM_TRIGGER
 					if (truncate)
 					{	/* Reorg ^#t in this region to move it out of the way. */
-						gn = literal_hasht;
-						reorg_gv_target->gvname.var_name.addr = gn.str.addr;
-						reorg_gv_target->gvname.var_name.len = gn.str.len;
-						cur_success = mu_reorg(&gn, &exclude_gl_head, &resume, index_fill_factor,
-								data_fill_factor, reorg_op);
-						reorg_success &= cur_success;
-						SET_GV_CURRKEY_FROM_REORG_GV_TARGET;
-						reorg_success &= mu_swap_root(&gn, &root_swap_statistic);
+						SET_GVTARGET_TO_HASHT_GBL(cs_addrs);	/* sets gv_target */
+						hasht_gl.next = NULL;
+						hasht_gl.reg = gv_cur_region;
+						hasht_gl.gvt = gv_target;
+						inctn_opcode = inctn_invalid_op;	/* needed for *ROOT_SEARCH */
+						INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;	/* sets gv_target->root */
+						DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+						if (0 != gv_target->root)
+						{
+							util_out_print("   ", FLUSH);
+							util_out_print("Global: !AD (region !AD)", FLUSH,
+								GNAME(&hasht_gl).len, GNAME(&hasht_gl).addr,
+								REG_LEN_STR(gv_cur_region));
+							reorg_gv_target->gvname.var_name = literal_hasht.str;
+							cur_success = mu_reorg(&hasht_gl, &exclude_gl_head, &resume,
+										index_fill_factor, data_fill_factor, reorg_op);
+							reorg_success &= cur_success;
+							SET_GV_CURRKEY_FROM_GVT(reorg_gv_target);
+							/* Recompute gv_target->root in case mu_reorg changed things around */
+							gv_target->root = 0;
+							inctn_opcode = inctn_invalid_op;	/* needed for GVCST_ROOT_SEARCH */
+							GVCST_ROOT_SEARCH;	/* set gv_target->root */
+							if (gv_target->root)
+								reorg_success &= mu_swap_root(&hasht_gl, &root_swap_statistic);
+						}
 					}
 #					endif
 				}
@@ -364,8 +385,6 @@ void mupip_reorg(void)
 		}
 #		endif
 		mupip_exit(SS_NORMAL);
-	}
-	else
+	} else
 		mupip_exit(SS_NORMAL);
 }
-

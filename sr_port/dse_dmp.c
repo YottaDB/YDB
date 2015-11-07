@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ GBLREF int		patch_fdmp_recs;
 
 CONDITION_HANDLER(dse_dmp_handler)
 {
-	START_CH;
+	START_CH(TRUE);
 	PRN_ERROR;
 	util_out_print("!/DSE is not able to complete the dump to file due to the above reason.!/", TRUE);
 	UNWIND(NULL,NULL);

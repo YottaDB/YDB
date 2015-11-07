@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2012 Fidelity Information Services, Inc	!
+!	Copyright 2001, 2013 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -25,14 +25,14 @@ INPINTEG	<Input integrity error -- aborting load>/fatal/fao=0
 KEYTOOBIG	<But record size !AD can only support key size !AD>/info/fao=4
 KEYSIZIS	<Key size is !AD>/info/fao=2
 KEYWRDAMB	<!AD is ambiguous for !AD>/error/fao=4
-KEYWRDBAD	<!AD is not a valid !AD>/error/fao=4
+KEYWRDBAD	<!AD is not a valid !AD in this context>/error/fao=4
 LOADGD		<Loading Global Directory file !/	!AD>/info/fao=2
 LOGOFF		<No longer logging to file !AD>/info/fao=2
 LOGON		<Logging to file !AD>/info/fao=2
 LVSTARALON	<The * name cannot be deleted or renamed>/error/fao=0
 MAPBAD		<!AD !AD for !AD !AD does not exist>/info/fao=8
 MAPDUP		<!AD !AD and !AD both map to !AD !AD>/info/fao=10
-NAMSTARTBAD	<!AD must start with '%' or an alphabetic character>/error/fao=2
+NAMENDBAD	<Subscripted name !AD must end with right parenthesis>/error/fao=2
 NOACTION	<Not updating Global Directory !AD>/info/fao=2
 RPAREN		<List must end with right parenthesis or continue with comma>/error/fao=0
 NOEXIT		<Cannot exit because of verification failure>/info/fao=0
@@ -44,7 +44,7 @@ OBJNOTADD	<Not adding !AD !AD>/error/fao=4
 OBJNOTCHG	<Not changing !AD !AD>/error/fao=4
 OBJNOTFND	<!AD !AD does not exist>/error/fao=4
 OBJREQD		<!AD required>/error/fao=2
-PREFIXBAD	<!AD must start with an alphabetic character to be a !AD>/error/fao=4
+PREFIXBAD	<!AD - !AD !AD must start with an alphabetic character>/error/fao=6
 QUALBAD		<!AD is not a valid qualifier>/error/fao=2
 QUALDUP		<!AD qualifier appears more than once in the list>/error/fao=2
 QUALREQD	<!AD required>/error/fao=2
@@ -69,5 +69,31 @@ WRITEERROR	<Cannot exit because of write failure.  Reason for failure: !AD>/info
 NONASCII	<!AD is illegal for a !AD as it contains non-ASCII characters>/error/fao=4
 CRYPTNOMM	<!AD is an encrypted database. Cannot support MM access method.>/error/fao=2
 JNLALLOCGROW	<Increased Journal ALLOCATION from [!AD blocks] to [!AD blocks] to match AUTOSWITCHLIMIT for !AD !AD>/info/fao=8
-KEYFORBLK	<But block size !AD can only support key size !AD>/info/fao=4
+KEYFORBLK	<But block size !AD and reserved bytes !AD limit key size to !AD>/info/fao=6
+STRMISSQUOTE	<Missing double-quote at end of string specification !AD>/error/fao=2
+GBLNAMEIS	<in gblname !AD>/info/fao=2
+NAMSUBSEMPTY	<Subscript #!UL is empty in name specification>/error/fao=3
+NAMSUBSBAD	<Subscript #!UL with value !AD in name specification is an invalid number or string>/error/fao=3
+NAMNUMSUBSOFLOW	<Subscript #!UL with value !AD in name specification has a numeric overflow>/error/fao=3
+NAMNUMSUBNOTEXACT <Subscript #!UL with value !AD in name specification is not an exact GT.M number>/error/fao=3
+MISSINGDELIM	<Delimiter !AD expected before !AD !AD>/error/fao=6
+NAMRANGELASTSUB	<Ranges in name specification !AD are allowed only in the last subscript>/error/fao=2
+NAMSTARSUBSMIX	<Name specification !AD cannot contain * and subscripts at the same time>/error/fao=2
+NAMLPARENNOTBEG	<Subscripted Name specification !AD needs to have a left parenthesis at the beginning of subscripts>/error/fao=2
+NAMRPARENNOTEND	<Subscripted Name specification !AD cannot have anything following the right parenthesis at the end of subscripts>/error/fao=2
+NAMONECOLON	<Subscripted Name specification !AD must have at most one colon (range) specification>/error/fao=2
+NAMRPARENMISSING <Subscripted Name specification !AD is missing one or more right parentheses at the end of subscripts>/error/fao=2
+NAMGVSUBSMAX	<Subscripted Name specification !AD has more than the maximum # of subscripts (!UL)>/error/fao=3
+NAMNOTSTRSUBS	<Subscript #!UL with value !AD in name specification is not a properly formatted string subscript>/error/fao=3
+NAMSTRSUBSFUN	<Subscript #!UL with value !AD in name specification uses function other than $C/$CHAR/$ZCH/$ZCHAR>/error/fao=3
+NAMSTRSUBSLPAREN <Subscript #!UL with value !AD in name specification does not have left parenthesis following $ specification>/error/fao=3
+NAMSTRSUBSCHINT	<Subscript #!UL with value !AD in name specification does not have a positive integer inside $C/$CHAR/$ZCH/$ZCHAR>/error/fao=3
+NAMSTRSUBSCHARG	<Subscript #!UL with value !AD in name specification specifies a $C/$ZCH with number !UL that is invalid in the current $zchset>/error/fao=4
+GBLNAMCOLLUNDEF	<Error opening shared library of collation sequence #!UL for GBLNAME !AD>/error/fao=3
+NAMRANGEORDER	<Range in name specification !AD specifies out-of-order subscripts using collation sequence #!UL>/error/fao=3
+NAMRANGEOVERLAP	<Range in name specifications !AD and !AD overlap using collation sequence #!UL>/error/fao=5
+NAMGVSUBOFLOW	<Subscripted name !AD...!AD is too long to represent in the database using collation value #!UL>/error/fao=5
+GBLNAMCOLLRANGE	<Collation sequence #!UL is out of range (0 thru 255)>/error/fao=3
+STDNULLCOLLREQ	<Region !AD needs Standard Null Collation enabled because global !AD spans through it>/info/fao=4
+GBLNAMCOLLVER	<Global directory indicates GBLNAME !AD has collation sequence #!UL with a version #!UL but shared library reports different version #!UL>/error/fao=5
 	.end

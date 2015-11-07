@@ -88,10 +88,6 @@ void generic_exit_handler(void)
 {
 	void		(*signal_routine)();
 	boolean_t	is_mupip, is_gtm;
-	int4		lcnt;
-	gd_addr		*addr_ptr;
-	gd_region	*reg, *r_top;
-	sgmnt_addrs	*csa;
 	static int	invoke_cnt = 0;	/* how many times generic_exit_handler was invoked in the lifetime of this process */
 
 	is_gtm = IS_GTM_IMAGE;

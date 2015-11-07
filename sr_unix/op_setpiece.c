@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -125,7 +125,7 @@ void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *
 		str_len += (size_t)(src->str.len - second_src_ind);
 	if (MAX_STRLEN < str_len)
 	{
-		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 		return;
 	}
 	ENSURE_STP_FREE_SPACE((int)str_len);
@@ -153,7 +153,7 @@ void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *
 		memcpy(str_addr, tmp_str, len);
 		str_addr += len;
 	}
-	assert((str_addr - stringpool.free) == str_len);
+	assert(IS_AT_END_OF_STRINGPOOL(str_addr, -str_len));
 	dst->mvtype = MV_STR;
 	dst->str.len = INTCAST(str_addr - stringpool.free);
 	dst->str.addr = (char *)stringpool.free;

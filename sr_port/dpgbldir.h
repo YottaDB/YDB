@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,17 @@
 
 typedef struct gvt_container_struct
 {
-	gvnh_reg_t			*gvnh_reg;
+	gv_namehead			**gvt_ptr;	/* pointer to a location (either the "gvnh_reg_t->gvt" (for globals that
+							 * dont span regions) OR "gvnh_spanreg_t->gvt_array[]" (for globals that
+							 * span regions) that contains a pointer to the "gv_target" and that
+							 * needs to be updated if/when the gv_target gets re-allocated.
+							 */
+	gv_namehead			**gvt_ptr2;	/* only for spanning globals, this points to a SECOND location where the
+							 * gvt corresponding to the region (that maps the unsubscripted global
+							 * reference) is stored (i.e. gvnh_reg_t->gvt). And that needs to be
+							 * updated as well if/when the gv_target gets re-allocated.
+							 */
+	gd_region			*gd_reg;	/* region corresponding to the gv_target that is waiting for reg-open */
 	struct gvt_container_struct	*next_gvtc;
 } gvt_container;
 

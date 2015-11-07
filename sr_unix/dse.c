@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,6 @@
 #include "gtm_string.h"
 #include "stp_parms.h"
 #include "error.h"
-#include "min_max.h"
-#include "init_root_gv.h"
 #include "interlock.h"
 #include "gtmimagename.h"
 #include "stringpool.h"
@@ -80,14 +78,11 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #endif
 
 GBLREF gd_region		*gv_cur_region;
-GBLREF gd_binding		*gd_map;
-GBLREF gd_binding		*gd_map_top;
 GBLREF gd_addr			*gd_header;
 GBLREF gd_addr			*original_header;
 GBLREF bool			licensed;
 GBLREF void			(*func)(void);
 GBLREF gv_namehead		*gv_target;
-GBLREF mval			curr_gbl_root;
 GBLREF int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF boolean_t		dse_running;
 GBLREF spdesc			rts_stringpool, stringpool;
@@ -116,6 +111,7 @@ int main(int argc, char *argv[])
 	gtm_env_init();	/* read in all environment variables */
 	licensed = TRUE;
 	TREF(transform) = TRUE;
+	TREF(no_spangbls) = TRUE;	/* dse operates on a per-region basis irrespective of global mapping in gld */
 	op_open_ptr = op_open;
 	patch_curr_blk = get_dir_root();
 	err_init(util_base_ch);
@@ -136,12 +132,13 @@ int main(int argc, char *argv[])
 	initialize_pattern_table();
 	gvinit();
 	region_init(FALSE);
-	INIT_GBL_ROOT(); /* Needed for GVT initialization */
 	getjobnum();
 	util_out_print("!/File  !_!AD", TRUE, DB_LEN_STR(gv_cur_region));
 	util_out_print("Region!_!AD!/", TRUE, REG_LEN_STR(gv_cur_region));
 	cli_lex_setup(argc, argv);
-	CREATE_DUMMY_GBLDIR(gd_header, original_header, gv_cur_region, gd_map, gd_map_top);
+	/* Since DSE operates on a region-by-region basis (for the most part), do not use a global directory at all from now on */
+	original_header = gd_header;
+	gd_header = NULL;
 	OPERATOR_LOG_MSG;
 #	ifdef DEBUG
 	if ((gtm_white_box_test_case_enabled && (WBTEST_SEMTOOLONG_STACK_TRACE == gtm_white_box_test_case_number) ))
@@ -188,7 +185,7 @@ static bool	dse_process(int argc)
 	{
 		if (util_interrupt)
 		{
-			rts_error(VARLSTCNT(1) ERR_CTRLC);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 			REVERT;
 			return TRUE;
 		} else
@@ -206,9 +203,9 @@ static bool	dse_process(int argc)
 			 * prompt, but UNIX exits
 			 */
 			REVERT;
-			rts_error(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
 		} else
-			gtm_putmsg(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
 	}
 	if (func)
 		func();

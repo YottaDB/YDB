@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ CONDITION_HANDLER(gtm_env_xlate_ch)
 {
 	int4    status;
 
-	START_CH;
+	START_CH(FALSE);
 	PRN_ERROR;
 	if (DUMP)
 		NEXTCH;
@@ -87,22 +87,22 @@ mval* gtm_env_translate(mval* val1, mval* val2, mval* val_xlated)
 			status = lib$find_image_symbol(&filename, &entry_point, &RFPTR(gtm_env_xlate_entry), 0);
 			REVERT;
 			if (0 == (status & 1))
-				rts_error(VARLSTCNT(1) ERR_XTRNTRANSDLL);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_XTRNTRANSDLL);
 		}
 		val_xlated->str.addr = NULL;
 		ret_gtm_env_xlate = IVFPTR(gtm_env_xlate_entry)(&val1->str, &val2->str, &dollar_zdir.str, &val_xlated->str);
 		if (MAX_DBSTRLEN < val_xlated->str.len)
-			rts_error(VARLSTCNT(4) ERR_XTRNRETVAL, 2, val_xlated->str.len, MAX_DBSTRLEN);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_XTRNRETVAL, 2, val_xlated->str.len, MAX_DBSTRLEN);
 		if (0 != ret_gtm_env_xlate)
 		{
 			if ((val_xlated->str.len) && (val_xlated->str.addr))
-				rts_error(VARLSTCNT(6) ERR_XTRNTRANSERR, 0, ERR_TEXT,  2,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_XTRNTRANSERR, 0, ERR_TEXT,  2,
 					  val_xlated->str.len, val_xlated->str.addr);
 			else
-				rts_error(VARLSTCNT(1) ERR_XTRNTRANSERR);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_XTRNTRANSERR);
 		}
 		if ((NULL == val_xlated->str.addr) && (0 != val_xlated->str.len))				\
-			rts_error(VARLSTCNT(1) ERR_XTRNRETSTR);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_XTRNRETSTR);
 		val_xlated->mvtype = MV_STR;
 		val1 = val_xlated;
 	}

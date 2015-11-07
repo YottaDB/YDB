@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +21,6 @@
 #include "gtm_string.h"
 #include "iosp.h"
 #include "error.h"
-#include "min_max.h"
-#include "init_root_gv.h"
 #include "interlock.h"
 #include "gtmimagename.h"
 #include "gdsroot.h"
@@ -78,7 +76,6 @@ GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF	bool			in_backup;
 GBLREF	bool			licensed;
 GBLREF	int			(*func)();
-GBLREF	mval			curr_gbl_root;
 GBLREF	global_latch_t		defer_latch;
 GBLREF	spdesc			rts_stringpool, stringpool;
 GBLREF	char			cli_err_str[];
@@ -113,7 +110,6 @@ int main (int argc, char **argv)
 	if (argc < 2)			/* Interactive mode */
 		display_prompt();
 	/*      this call should be after cli_lex_setup() due to S390 A/E conversion    */
-	INIT_GBL_ROOT(); /* Needed for GVT initialization */
 	init_gtm();
 	while (TRUE)
 	{	func = 0;
@@ -122,9 +118,9 @@ int main (int argc, char **argv)
 		else if (res)
 		{
 			if (1 < argc)
-				rts_error(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
 			else
-				gtm_putmsg(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
 		}
 		if (func)
 			func();

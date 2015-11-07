@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,11 +39,14 @@
 # include "t_retry.h"
 # include "trigger_source_read_andor_verify.h"
 #endif
+#include "stack_frame.h"
+#include "rtn_src_chksum.h"
 
 #define RT_TBL_SZ 20
 
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
+GBLREF stack_frame	*frame_pointer;
 
 LITDEF char		litconst_space = ' ';
 
@@ -52,24 +55,22 @@ error_def(ERR_SYSCALL);
 
 int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_t verifytrig)
 {
-	int		srcrecs, *lt_ptr, size, line_indx, srcfilnamlen;
-	uint4		checksum;
-	boolean_t	found, added, eof_seen, srcstat;
-	mstr		src;
-	rhdtyp		*rtn_vector;
-	zro_ent		*srcdir;
-	mstr		*base, *current, *top;
-	char		buff[MAX_SRCLINE], *cptr, *srcfile_name;
-	char		srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM)];
-	ht_ent_mname	*tabent;
-	var_tabent	rtnent;
-	routine_source	*src_tbl;
-	int		rc, fclose_res;
-	char		*fgets_rc;
-	FILE		*fp;
-	struct stat	srcfile_stat;
-	off_t		srcsize;
-	unsigned char	*srcptr, *srcptr_max, *srcstart;
+	int			srcrecs, *lt_ptr, size, line_indx, srcfilnamlen;
+	boolean_t		found, added, eof_seen, srcstat;
+	mstr			src;
+	rhdtyp			*rtn_vector;
+	zro_ent			*srcdir;
+	mstr			*base, *current, *top;
+	char			buff[MAX_SRCLINE], *cptr, *srcfile_name;
+	char			srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM)];
+	routine_source		*src_tbl;
+	int			rc, fclose_res;
+	char			*fgets_rc;
+	FILE			*fp;
+	struct stat		srcfile_stat;
+	off_t			srcsize;
+	unsigned char		*srcptr, *srcptr_max, *srcstart, *eol_srcstart, *prev_srcptr;
+	gtm_rtn_src_chksum_ctx	checksum_ctx;
 #	ifdef GTM_TRIGGER
 	boolean_t	is_trigger;
 #	endif
@@ -78,8 +79,6 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 	SETUP_THREADGBL_ACCESS;
 	srcstat = 0;
 	*srcret = NULL;
-	if (NULL == (TREF(rt_name_tbl)).base)
-		init_hashtab_mname(TADR(rt_name_tbl), RT_TBL_SZ, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
 	assert (routine->mvtype & MV_STR);
 
 	/* The source to be loaded can be of two types:
@@ -90,12 +89,15 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 	 * Determine which source we need.
 	 */
 	GTMTRIG_ONLY(IS_TRIGGER_RTN(&routine->str, is_trigger));
-	/* Need source on a trigger. Get trigger source loaded and/or verified which may involve
-	 * creating a TP fence and dealing with TP restarts.
-	 */
+	if (WANT_CURRENT_RTN(routine))
+	{	/* we want $TEXT for the routine currently executing. */
+		rtn_vector = CURRENT_RHEAD_ADR(frame_pointer->rvector);
+	} else
 #	ifdef GTM_TRIGGER
 	if (is_trigger)
-	{	/* ZPRINT wants a consistent view of triggers across multiple calls so it bypasses verification
+	{	/* Need source on a trigger. Get trigger source loaded and/or verified which may involve
+		 * creating a TP fence and dealing with TP restarts.
+		 * ZPRINT wants a consistent view of triggers across multiple calls so it bypasses verification
 		 * after the first call. In this case, the trigger had better be found since the first call found it.
 		 */
 		if (verifytrig)
@@ -123,13 +125,9 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 	}
 	if (!rtn_vector->src_full_name.len)
 		return SRCNOTAVAIL;
-	rtnent.var_name = rtn_vector->routine_name;
-	COMPUTE_HASH_MNAME(&rtnent);
-	added = add_hashtab_mname(TADR(rt_name_tbl), &rtnent, NULL, &tabent);
-	src_tbl = (routine_source *)tabent->value;
-	if (added || (NULL == tabent->value))
+	src_tbl = rtn_vector->source_code;
+	if (NULL == src_tbl)
 	{
-		checksum = 0;
 #		ifdef GTM_TRIGGER
 		if (is_trigger)
 		{
@@ -137,6 +135,19 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 			srcsize = ((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len;
 			assert(0 < srcsize);
 			assert(NULL != srcstart);
+			/* Calculate source checksum */
+			if (NULL == memchr(srcstart, '\n', srcsize))
+			{	/* In this case, gtm_trigger_complink() would have written an extra newline character to the
+				 * source file. Since we want to take the checksum of the same data, we append a newline character
+				 * here as well.
+				 */
+				eol_srcstart = (unsigned char *)malloc(srcsize + 1);
+				memcpy(eol_srcstart, srcstart, srcsize);
+				eol_srcstart[srcsize] = '\n';
+				rtn_src_chksum_buffer(&checksum_ctx, eol_srcstart, srcsize + 1);
+				free(eol_srcstart);
+			} else
+				rtn_src_chksum_buffer(&checksum_ctx, srcstart, srcsize);
 			srcrecs = (int)rtn_vector->lnrtab_len;
 			/* Allocate the array to hold the mstr array pointing to the src lines. */
 			src_tbl = (routine_source *)malloc(SIZEOF(routine_source) + ((srcrecs - 1) * SIZEOF(mstr)));
@@ -155,9 +166,9 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 				/* Find end of this record */
 				for (; (srcptr < srcptr_max) && ('\n' != *srcptr); srcptr++)
 					;
-				if (0 != (size = (srcptr - (unsigned char *)current->addr)))	/* note assignment */
-				{	/* Do checksum computation plus set length */
-					RTN_SRC_CHKSUM((char *)srcstart, size, checksum);
+				size = (srcptr - (unsigned char *)current->addr);
+				if (0 != size)
+				{	/* Set line length */
 					current->len = size;
 				} else
 				{	/* Null record -  point to a single space for the record */
@@ -167,16 +178,13 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 				srcptr++;	/* Skip line end char */
 				srcstart = srcptr;
 			}
-			if (checksum != rtn_vector->checksum)
+			if (!rtn_src_chksum_match(get_ctx_checksum(&checksum_ctx), get_rtnhdr_checksum(rtn_vector)))
 			{	/* Should never happen with a trigger unless it ran into some restartable concurrency
 				 * issues. Assert we can restart and do it.
 				 */
-				if (0 < dollar_tlevel)
-				{
-					assert(CDB_STAGNATE > t_tries);
-					t_retry(cdb_sc_triggermod);
-				} else
-					GTMASSERT;
+				assertpro(0 < dollar_tlevel);
+				assert(CDB_STAGNATE > t_tries);
+				t_retry(cdb_sc_triggermod);
 			}
 		} else
 #		endif
@@ -213,7 +221,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 					fp = Fopen(srcfile_name, "r");
 					if (NULL == fp)
 					{
-						rts_error(VARLSTCNT(1) errno);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 						assert(FALSE);
 					}
 					found = TRUE;
@@ -237,7 +245,8 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 					if (0 != rc)
 					{
 						free(srcfile_name);
-						rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM, rc);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL,
+								5, LEN_AND_LIT("stat"), CALLFROM, rc);
 					}
 					srcsize = srcfile_stat.st_size;
 				} else
@@ -270,7 +279,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 						{
 							FCLOSE(fp, fclose_res);
 							assert(!fclose_res);
-							rts_error(VARLSTCNT(3) ERR_TXTSRCFMT, 0, errno);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TXTSRCFMT, 0, errno);
 							assert(FALSE);
 						} else
 						{
@@ -281,6 +290,9 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 					} else
 					{
 						size = (int)STRLEN(buff);
+						prev_srcptr = srcptr;
+						memcpy(srcptr, buff, size);
+						srcptr += size;
 						/* Strip trailing '\n' if any (if at least one byte was read in) */
 						if (size && ('\n' == buff[size - 1]))
 							size--;
@@ -288,14 +300,10 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 				} else	/* eof seen; nothing more to read in file */
 					size = 0;
 				if (size)
-				{	/* Calculate checksum to verify with loaded routine */
-					RTN_SRC_CHKSUM(buff, size, checksum);
-					assert(NULL != srcptr);
-					assert((srcptr + size) <= srcptr_max);
+				{
+					assert((prev_srcptr + size) <= srcptr_max);
 					current->len = size;
-					current->addr = (char *)srcptr;
-					memcpy(srcptr, buff, size);
-					srcptr += size;
+					current->addr = (char *)prev_srcptr;
 				} else
 				{
 					current->addr = (char *)&litconst_space;
@@ -319,14 +327,16 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 						assert(feof(fp));
 					}
 				}
-				if (!eof_seen || (checksum != rtn_vector->checksum))
+				rtn_src_chksum_buffer(&checksum_ctx, src_tbl->srcbuff, srcsize);
+				if (!eof_seen
+					|| !rtn_src_chksum_match(get_ctx_checksum(&checksum_ctx), get_rtnhdr_checksum(rtn_vector)))
 					srcstat |= CHECKSUMFAIL;
 				FCLOSE(fp, fclose_res);
 				assert(!fclose_res);
 			}
 		}
 		src_tbl->srcstat = srcstat;
-		tabent->value = (char *)src_tbl;
+		rtn_vector->source_code = src_tbl;
 	} else
 		srcstat |= src_tbl->srcstat;
 	lt_ptr = (int *)find_line_addr(rtn_vector, &label->str, 0, NULL);
@@ -349,4 +359,18 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 		}
 	}
 	return srcstat;
+}
+
+void free_src_tbl(rhdtyp *rtn_vector)
+{
+	routine_source		*src_tbl;
+
+	src_tbl = rtn_vector->source_code;
+	if (NULL != src_tbl)
+	{	/* Release the source. Entries and source are malloc'd in two blocks on UNIX */
+		if (NULL != src_tbl->srcbuff)
+			free(src_tbl->srcbuff);
+		free(src_tbl);
+		rtn_vector->source_code = NULL;
+	}
 }

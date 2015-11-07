@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,14 +15,14 @@
 
 GBLREF boolean_t	expansion_failed, retry_if_expansion_fails;
 
+error_def(ERR_MEMORY);
+error_def(ERR_VMSMEMORY);
+error_def(ERR_MEMORYRECURSIVE);
+
 CONDITION_HANDLER(stp_gcol_ch)
 {
 	/* If we cannot alloc memory while doing a forced expansion, disable all cases of forced expansion henceforth */
-	error_def(ERR_MEMORY);
-	error_def(ERR_VMSMEMORY);
-	error_def(ERR_MEMORYRECURSIVE);
-
-	START_CH;
+	START_CH(TRUE);
 
 	if ((ERR_MEMORY == SIGNAL || ERR_VMSMEMORY == SIGNAL || ERR_MEMORYRECURSIVE == SIGNAL) && retry_if_expansion_fails)
 	{

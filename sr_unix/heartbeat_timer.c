@@ -143,14 +143,18 @@ void set_enospc_flags(gd_addr *addr_ptr, char enospc_enable_list[], boolean_t ok
 		if ((dba_bg != r_local->dyn.addr->acc_meth) && (dba_mm != r_local->dyn.addr->acc_meth))
 			continue;
 		csa = REG2CSA(r_local);
-		if ((NULL != csa) && (NULL != csa->nl) && ANTICIPATORY_FREEZE_ENABLED(csa))
+		if ((NULL != csa) && (NULL != csa->nl) && INST_FREEZE_ON_NOSPC_ENABLED(csa))
 		{
+			syslog_msg = NULL;
 			switch(enospc_enable_list[i])
 			{
 			case NONE:
-				syslog_msg = "Turning off fake ENOSPC for both database and journal file.";
-				csa->nl->fake_db_enospc = FALSE;
-				csa->nl->fake_jnl_enospc = FALSE;
+				if (csa->nl->fake_db_enospc || csa->nl->fake_jnl_enospc)
+				{
+					syslog_msg = "Turning off fake ENOSPC for both database and journal file.";
+					csa->nl->fake_db_enospc = FALSE;
+					csa->nl->fake_jnl_enospc = FALSE;
+				}
 				break;
 			case DB_ON:
 				syslog_msg = "Turning on fake ENOSPC only for database file.";
@@ -170,7 +174,7 @@ void set_enospc_flags(gd_addr *addr_ptr, char enospc_enable_list[], boolean_t ok
 			default:
 				assert(FALSE);
 			}
-			if (ok_to_interrupt)
+			if (ok_to_interrupt && (NULL != syslog_msg))
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TEXT, 2, DB_LEN_STR(r_local), ERR_TEXT, 2,
 					     LEN_AND_STR(syslog_msg));
 		}

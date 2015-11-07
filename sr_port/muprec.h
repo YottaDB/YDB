@@ -110,27 +110,27 @@ error_def(ERR_MUJNLSTAT);
 	EXTINT(plst->origjpv.jpv_pid);			\
 }
 
-#define JNL_PUT_MSG_PROGRESS(LIT)								\
-{												\
-	now_t	now;	/* for GET_CUR_TIME macro */						\
-	char	*time_ptr, time_str[CTIME_BEFORE_NL + 2];					\
-												\
-	GET_CUR_TIME;										\
-	gtm_putmsg(VARLSTCNT(6) ERR_MUJNLSTAT, 4, LEN_AND_LIT(LIT), CTIME_BEFORE_NL, time_ptr);	\
+#define JNL_PUT_MSG_PROGRESS(LIT)											\
+{															\
+	now_t	now;	/* for GET_CUR_TIME macro */									\
+	char	*time_ptr, time_str[CTIME_BEFORE_NL + 2];								\
+															\
+	GET_CUR_TIME;													\
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJNLSTAT, 4, LEN_AND_LIT(LIT), CTIME_BEFORE_NL, time_ptr);	\
 }
 
-#define JNL_SUCCESS_MSG(mur_options)									\
-{													\
-	if (mur_options.show)										\
-		gtm_putmsg(VARLSTCNT(4) ERR_JNLSUCCESS, 2, LEN_AND_LIT(SHOW_STR));			\
-	if (mur_options.extr[GOOD_TN])									\
-		gtm_putmsg(VARLSTCNT(4) ERR_JNLSUCCESS, 2, LEN_AND_LIT(EXTRACT_STR));			\
-	if (mur_options.verify)										\
-		gtm_putmsg(VARLSTCNT(4) ERR_JNLSUCCESS, 2, LEN_AND_LIT(VERIFY_STR));			\
-	if (mur_options.rollback)									\
-		gtm_putmsg(VARLSTCNT(4) ERR_JNLSUCCESS, 2, LEN_AND_LIT(ROLLBACK_STR));			\
-	else if (mur_options.update)									\
-		gtm_putmsg(VARLSTCNT(4) ERR_JNLSUCCESS, 2, LEN_AND_LIT(RECOVER_STR));			\
+#define JNL_SUCCESS_MSG(mur_options)										\
+{														\
+	if (mur_options.show)											\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLSUCCESS, 2, LEN_AND_LIT(SHOW_STR));		\
+	if (mur_options.extr[GOOD_TN])										\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLSUCCESS, 2, LEN_AND_LIT(EXTRACT_STR));	\
+	if (mur_options.verify)											\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLSUCCESS, 2, LEN_AND_LIT(VERIFY_STR));		\
+	if (mur_options.rollback)										\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLSUCCESS, 2, LEN_AND_LIT(ROLLBACK_STR));	\
+	else if (mur_options.update)										\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLSUCCESS, 2, LEN_AND_LIT(RECOVER_STR));	\
 }
 
 #define	MUR_FIX_JCTL_BACK_POINTER_TO_RCTL(JCTL, NEW_RCTL, OLD_RCTL, CHK_PREV_GEN)	\
@@ -1013,59 +1013,59 @@ typedef struct onln_rlbk_reg_list_struct
 #define MUR_TOKEN_LOOKUP(token, image_count, rec_time, fence) mur_token_lookup(token, image_count, rec_time, fence)
 #endif
 
-#define PRINT_VERBOSE_STAT(JCTL, MODULE)   									\
-{										   				\
-	GBLREF 	jnl_gbls_t	jgbl;			   							\
-	UNIX_ONLY(                             									\
-	uint4 days;                            									\
-	time_t seconds;)											\
-	VMS_ONLY(mval val;)											\
-	if (mur_options.verbose)										\
-	{													\
-		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4,   LEN_AND_LIT("Module"),				\
-				LEN_AND_LIT(MODULE));								\
-		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4,   LEN_AND_LIT("    Journal file"),			\
-			JCTL->jnl_fn_len, JCTL->jnl_fn);							\
-		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Record Offset"),			\
-			JCTL->rec_offset, JCTL->rec_offset);							\
-		if (!jgbl.forw_phase_recovery)									\
-		{												\
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Turn around Offset"), 	\
-				JCTL->turn_around_offset, JCTL->turn_around_offset);   				\
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Turn around timestamp"),	\
-				JCTL->turn_around_time, JCTL->turn_around_time);  				\
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("    Turn around transaction"),	\
-				&JCTL->turn_around_tn, &JCTL->turn_around_tn);  				\
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("    Turn around seqno"), 	\
-				&JCTL->turn_around_seqno, &JCTL->turn_around_seqno);   				\
-			UNIX_ONLY(										\
-				dollarh(jgbl.mur_tp_resolve_time, &days, &seconds);        			\
-				gtm_putmsg(VARLSTCNT(8) ERR_MUINFOUINT6, 6, LEN_AND_LIT("    Tp_resolve_time"), \
-				jgbl.mur_tp_resolve_time, jgbl.mur_tp_resolve_time, days, seconds);		\
-			)	 										\
-			VMS_ONLY(										\
-				op_horolog(&val);	                                                 	\
-            			gtm_putmsg(VARLSTCNT(8) ERR_MUINFOUINT6, 6,  LEN_AND_LIT("    Tp_resolve_time"),\
-                		jgbl.mur_tp_resolve_time, jgbl.mur_tp_resolve_time, val.str.len, val.str.addr)	\
-			);     											\
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Token total"), 		\
-			murgbl.token_table.count, murgbl.token_table.count);					\
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Token broken"), 		\
-				murgbl.broken_cnt, murgbl.broken_cnt);  					\
-		}								   				\
-	}									   				\
+#define PRINT_VERBOSE_STAT(JCTL, MODULE)											   \
+{																   \
+	GBLREF 	jnl_gbls_t	jgbl;												   \
+	UNIX_ONLY(														   \
+	uint4 days;														   \
+	time_t seconds;)													   \
+	VMS_ONLY(mval val;)													   \
+	if (mur_options.verbose)												   \
+	{															   \
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOSTR, 4,   LEN_AND_LIT("Module"),				   \
+				LEN_AND_LIT(MODULE));										   \
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOSTR, 4,   LEN_AND_LIT("    Journal file"),			   \
+			JCTL->jnl_fn_len, JCTL->jnl_fn);									   \
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Record Offset"),		   \
+			JCTL->rec_offset, JCTL->rec_offset);									   \
+		if (!jgbl.forw_phase_recovery)											   \
+		{														   \
+			gtm_putmsg_csa(CSA_ARG(NULL)VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Turn around Offset"),	   \
+				JCTL->turn_around_offset, JCTL->turn_around_offset);						   \
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Turn around timestamp"),   \
+				JCTL->turn_around_time, JCTL->turn_around_time);						   \
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("    Turn around transaction"), \
+				&JCTL->turn_around_tn, &JCTL->turn_around_tn);							   \
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("    Turn around seqno"),	   \
+				&JCTL->turn_around_seqno, &JCTL->turn_around_seqno);						   \
+			UNIX_ONLY(												   \
+				dollarh(jgbl.mur_tp_resolve_time, &days, &seconds);						   \
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUINFOUINT6, 6, LEN_AND_LIT("    Tp_resolve_time"), \
+				jgbl.mur_tp_resolve_time, jgbl.mur_tp_resolve_time, days, seconds);				   \
+			)													   \
+			VMS_ONLY(												   \
+				op_horolog(&val);										   \
+            			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUINFOUINT6, 6, LEN_AND_LIT("    Tp_resolve_time"), \
+                		jgbl.mur_tp_resolve_time, jgbl.mur_tp_resolve_time, val.str.len, val.str.addr)			   \
+			);													   \
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Token total"),		   \
+			murgbl.token_table.count, murgbl.token_table.count);							   \
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Token broken"),		   \
+				murgbl.broken_cnt, murgbl.broken_cnt);								   \
+		}														   \
+	}															   \
 }
 
-#define PRINT_VERBOSE_TAIL_BAD(JCTL)									\
-{													\
-	if (mur_options.verbose)									\
-	{												\
-		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4,						\
-			LEN_AND_LIT("Tail analysis found bad record for journal file"),			\
-			JCTL->jnl_fn_len, JCTL->jnl_fn);						\
-		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Record Offset"),		\
-			JCTL->rec_offset, JCTL->rec_offset);						\
-	}												\
+#define PRINT_VERBOSE_TAIL_BAD(JCTL)										\
+{														\
+	if (mur_options.verbose)										\
+	{													\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOSTR, 4,					\
+			LEN_AND_LIT("Tail analysis found bad record for journal file"),				\
+			JCTL->jnl_fn_len, JCTL->jnl_fn);							\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Record Offset"),	\
+			JCTL->rec_offset, JCTL->rec_offset);							\
+	}													\
 }
 
 #define ASSERT_HOLD_REPLPOOL_SEMS				\

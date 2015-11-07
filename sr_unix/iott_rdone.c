@@ -16,8 +16,7 @@
 #include <wchar.h>
 #include <signal.h>
 #include "gtm_string.h"
-
-#include "iotcp_select.h"
+#include "gtm_select.h"
 
 #include "io.h"
 #include "iottdef.h"
@@ -97,16 +96,14 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	if (tt_ptr->mupintr)
 	{	/* restore state to before job interrupt */
 		tt_state = &tt_ptr->tt_state_save;
-		if (ttwhichinvalid == tt_state->who_saved)
-			GTMASSERT;
+		assertpro(ttwhichinvalid != tt_state->who_saved);
 		if (dollar_zininterrupt)
 		{
 			tt_ptr->mupintr = FALSE;
 			tt_state->who_saved = ttwhichinvalid;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		}
-		if (ttrdone != tt_state->who_saved)
-			GTMASSERT;	/* ZINTRECURSEIO should have caught */
+		assertpro(ttrdone == tt_state->who_saved);	/* ZINTRECURSEIO should have caught */
 		mv_zintdev = io_find_mvstent(io_ptr, FALSE);
 		if (NULL != mv_zintdev)
 		{
@@ -235,6 +232,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			}
 		} else
 			first_time = FALSE;
+		assertpro(FD_SETSIZE > tt_ptr->fildes);
 		FD_ZERO(&input_fd);
 		FD_SET(tt_ptr->fildes, &input_fd);
 		assert(FD_ISSET(tt_ptr->fildes, &input_fd) != 0);

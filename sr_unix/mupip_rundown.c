@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,6 +66,7 @@ GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	boolean_t		argumentless_rundown;
+GBLREF	semid_queue_elem	*keep_semids;
 
 error_def(ERR_MUFILRNDWNSUC);
 error_def(ERR_MUJPOOLRNDWNFL);
@@ -92,6 +93,7 @@ void mupip_rundown(void)
 	unsigned int		full_len;
 	char			*instfilename;
 	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
+	semid_queue_elem	*prev_elem;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -166,7 +168,7 @@ void mupip_rundown(void)
 				}
 			}
 			if (TRUE == mu_rndwn_file(gv_cur_region, FALSE))
-				gtm_putmsg(VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));
 			else
 				exit_status = ERR_MUNOTALLSEC;
 		}
@@ -234,8 +236,8 @@ void mupip_rundown(void)
 						mupip_exit(ERR_MUNOTALLSEC);
 					} else
 					{
-						gtm_putmsg(VARLSTCNT(6) ERR_MUJPOOLRNDWNSUC, 4, LEN_AND_STR(ipcs_buff),
-								LEN_AND_STR(instfilename));
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNSUC, 4,
+							       LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename));
 						repl_instance.jnlpool_shmid = INVALID_SHMID;
 						repl_instance.jnlpool_shmid_ctime = 0;
 						shm_removed = TRUE;
@@ -244,7 +246,7 @@ void mupip_rundown(void)
 				{
 					util_out_print("Replpool segment (id = !UL) for replication instance !AD is in"
 							" use by another process.", TRUE, shmid, LEN_AND_STR(instfilename));
-					gtm_putmsg(VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, LEN_AND_STR(ipcs_buff),
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, LEN_AND_STR(ipcs_buff),
 								LEN_AND_STR(instfilename));
 				}
 				/* Now, go ahead and release/remove the access control semaphores */
@@ -258,8 +260,9 @@ void mupip_rundown(void)
 						assert(0 == repl_instance.jnlpool_semid_ctime);
 						if (!jnlpool_sem_created)
 						{
-							gtm_putmsg(VARLSTCNT(9) ERR_MUJPOOLRNDWNSUC, 4, LEN_AND_STR(ipcs_buff),
-									LEN_AND_STR(instfilename), ERR_SEMREMOVED, 1, semid);
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_MUJPOOLRNDWNSUC, 4,
+								       LEN_AND_STR(ipcs_buff), LEN_AND_STR(instfilename),
+								       ERR_SEMREMOVED, 1, semid);
 						}
 						repl_instance.crash = FALSE; /* No more semaphore IDs. Reset crash bit */
 					}
@@ -306,6 +309,13 @@ void mupip_rundown(void)
 			exit_status = mu_rndwn_sem_all();
 		else
 			mu_rndwn_sem_all();
+		/* Free keep_semids queue */
+		while (keep_semids)
+		{
+			prev_elem = keep_semids->prev;
+			free(keep_semids);
+			keep_semids = prev_elem;
+		}
 	}
 	mupip_exit(exit_status);
 }

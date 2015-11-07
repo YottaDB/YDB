@@ -47,6 +47,14 @@
 	} while(-1 == RC && EINTR == errno);		\
 }
 
+#define CLOSE(FD, RC)					\
+{							\
+	do						\
+	{						\
+		RC = close(FD);				\
+	} while(-1 == RC && EINTR == errno);		\
+}
+
 #define CLOSEDIR(DIR, RC)				\
 {							\
 	do						\
@@ -56,12 +64,7 @@
 }
 
 #define CONNECT_SOCKET(SOCKET, ADDR, LEN, RC)		\
-{							\
-	do						\
-	{						\
-		RC = CONNECT(SOCKET, ADDR, LEN);	\
-	} while(-1 == RC && EINTR == errno);		\
-}
+	RC = gtm_connect(SOCKET, ADDR, LEN)
 
 #define CREATE_FILE(PATHNAME, MODE, RC)			\
 {							\
@@ -166,6 +169,15 @@
 	do						\
 	{						\
 		RC = read(FD, BUF, SIZE);		\
+	} while(-1 == RC && EINTR == errno);		\
+}
+
+#define RECV(SOCKET, BUF, LEN, FLAGS, RC)		\
+{							\
+	do						\
+	{						\
+		RC = (int)recv(SOCKET, BUF, (int)(LEN),	\
+			 FLAGS);			\
 	} while(-1 == RC && EINTR == errno);		\
 }
 

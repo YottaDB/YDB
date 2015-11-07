@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,12 +12,12 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <sys/un.h>
 
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_ipc.h"
 #include "gtm_stat.h"
+#include "gtm_un.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_socket.h"
@@ -44,6 +44,7 @@ GBLREF mstr 			gtmsecshr_pathname;
 GBLREF boolean_t		gtmsecshr_sock_init_done;
 GBLREF uint4			process_id;
 GBLREF int			gtmsecshr_sockfd;
+GBLREF	char			gtm_dist[GTM_PATH_MAX];
 
 static char			gtmsecshr_sockpath[GTM_PATH_MAX];
 static char			gtmsecshr_path[GTM_PATH_MAX];
@@ -63,10 +64,9 @@ error_def(ERR_TEXT);
 
 int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 {
-	int			ret_status = 0, status;
+	int			ret_status = 0, status, len;
 	char			*error_mesg;
 	mstr			secshrsock_lognam, secshrsock_transnam;
-	mstr			gtmsecshr_logname;
 	struct stat		buf;
 	int4			max_sock_path_len;
 
@@ -89,11 +89,11 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 		if (SS_LOG2LONG == status)
 		{
 			if (SERVER == caller)
-				send_msg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, secshrsock_lognam.len, secshrsock_lognam.addr,
-					 max_sock_path_len);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3,
+						secshrsock_lognam.len, secshrsock_lognam.addr, max_sock_path_len);
 			else
-				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, secshrsock_lognam.len, secshrsock_lognam.addr,
-					   max_sock_path_len);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3,
+						secshrsock_lognam.len, secshrsock_lognam.addr, max_sock_path_len);
 		}
 		ret_status = INVLOGNAME;
 		strcpy(gtmsecshr_sockpath, DEFAULT_GTMSECSHR_SOCK_DIR);
@@ -107,11 +107,11 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 		else
 			error_mesg = "$gtm_tmp not a directory";
 		if (SERVER == caller)
-			send_msg(VARLSTCNT(9) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3,
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3,
 				 RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
 				 ERR_TEXT, 2, RTS_ERROR_STRING(error_mesg));
 		else
-			gtm_putmsg(VARLSTCNT(9) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3,
 				   RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
 				   ERR_TEXT, 2, RTS_ERROR_STRING(error_mesg));
 		return INVLOGNAME;
@@ -133,21 +133,25 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 		gtmsecshr_pathname.len = execpathln + STRLEN(GTMSECSHR_EXECUTABLE);
 	} else
 	{	/* Discover path name */
-		gtmsecshr_logname.addr = GTMSECSHR_PATH;
-		gtmsecshr_logname.len = SIZEOF(GTMSECSHR_PATH) - 1;
-		if (SS_NORMAL !=
-		    (status = TRANS_LOG_NAME(&gtmsecshr_logname, &gtmsecshr_pathname, gtmsecshr_path, SIZEOF(gtmsecshr_path),
-					     dont_sendmsg_on_log2long)))
+		len = STRLEN(gtm_dist);
+		if (!len)
 		{
-			if (SS_LOG2LONG == status)
-				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtmsecshr_logname.len, gtmsecshr_logname.addr,
-					   SIZEOF(gtmsecshr_path) - 1);
 			gtmsecshr_pathname.len = 0;
-			gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSOCKET, 3,
-				   RTS_ERROR_STRING("Caller"), process_id, ERR_TEXT, 2,
-				   RTS_ERROR_LITERAL("Environment variable gtm_dist pointing to an invalid path"),
-				   ERR_TEXT, 2, RTS_ERROR_STRING(gtmsecshr_logname.addr));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSOCKET, 3,
+					RTS_ERROR_STRING("Caller"), process_id, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Environment variable gtm_dist pointing to an invalid path"));
 			ret_status = INVLOGNAME;
+
+		}
+		else {
+			memcpy(gtmsecshr_path, gtm_dist, len);
+			gtmsecshr_path[len] = '/';
+			memcpy(gtmsecshr_path + len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
+			gtmsecshr_pathname.addr = gtmsecshr_path;
+			gtmsecshr_pathname.len = len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
+			if (GTM_PATH_MAX <= gtmsecshr_pathname.len)
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("gtmsecshr path too long"));
 		}
 		gtmsecshr_path[gtmsecshr_pathname.len] = '\0';
 	}
@@ -156,12 +160,12 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 	{
 		ret_status = FTOKERR;
 		if (SERVER == caller)
-			gtm_putmsg(VARLSTCNT(14) ERR_GTMSECSHRSOCKET, 3,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_GTMSECSHRSOCKET, 3,
 				   RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
 				   ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr ftok :"),
 				   ERR_TEXT, 2, RTS_ERROR_STRING(gtmsecshr_path), errno);
 		else
-			send_msg(VARLSTCNT(14) ERR_GTMSECSHRSOCKET, 3,
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_GTMSECSHRSOCKET, 3,
 				 RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
 				 ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr ftok :"),
 				 ERR_TEXT, 2, RTS_ERROR_STRING(gtmsecshr_path), errno);
@@ -205,8 +209,9 @@ int4 gtmsecshr_sock_init(int caller)
 	gtmsecshr_sockpath_len = (int)(SUN_LEN(&gtmsecshr_sock_name));
 	if (FD_INVALID == (gtmsecshr_sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)))
 	{
-		rts_error(VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"),
-			  process_id, ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr socket create"), errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
+				RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"),
+				process_id, ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr socket create"), errno);
 		ret_status = SOCKETERR;
 	}
 	if (SERVER == caller)
@@ -218,7 +223,7 @@ int4 gtmsecshr_sock_init(int caller)
 				if (ENOENT != errno)
 				{
 					save_errno = errno;
-					send_msg(VARLSTCNT(9) ERR_GTMSECSHRSOCKET, 3,
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSOCKET, 3,
 						 RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
 						 ERR_TEXT, 2, RTS_ERROR_LITERAL("Error unlinking leftover gtmsecshr socket"),
 						save_errno);
@@ -230,7 +235,7 @@ int4 gtmsecshr_sock_init(int caller)
 		{
 			if (0 > BIND(gtmsecshr_sockfd, (struct sockaddr *)&gtmsecshr_sock_name, gtmsecshr_sockpath_len))
 			{
-				rts_error(VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
 					  RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
 					  ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr socket bind"),
 			  		errno);
@@ -260,7 +265,7 @@ int4 gtmsecshr_sock_init(int caller)
 				} else if (ENOENT != errno)
 				{
 					save_errno = errno;
-					send_msg(VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
 						 RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
 						 ERR_TEXT, 2, RTS_ERROR_LITERAL("Error unlinking leftover gtmsecshr_cli socket"),
 						save_errno);
@@ -272,7 +277,7 @@ int4 gtmsecshr_sock_init(int caller)
 		}
                 if ( 'z' < suffix)
 		{
-			send_msg(VARLSTCNT(9) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_LITERAL("Client"), process_id,
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_LITERAL("Client"), process_id,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Too many left over gtmsecshr_cli sockets"));
 			ret_status = UNLINKERR;
 		}
@@ -280,7 +285,7 @@ int4 gtmsecshr_sock_init(int caller)
 		{
 			if (0 > BIND(gtmsecshr_sockfd, (struct sockaddr *)&gtmsecshr_cli_sock_name, gtmsecshr_cli_sockpath_len))
 			{
-				rts_error(VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
 					  RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
 					  ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr_cli socket bind"), errno);
 				ret_status = BINDERR;
@@ -300,7 +305,7 @@ int4 gtmsecshr_sock_init(int caller)
 					|| ((lib_gid != GETGID())
 					    && (-1 == CHOWN(gtmsecshr_cli_sock_name.sun_path, -1, lib_gid)))))
 				{
-					rts_error(VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
 						  RTS_ERROR_STRING("Caller"), process_id, ERR_TEXT, 2,
 						  RTS_ERROR_LITERAL("Error changing socket permissions/group"), errno);
 				}

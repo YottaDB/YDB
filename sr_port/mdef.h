@@ -530,9 +530,12 @@ mval *underr_strict(mval *start, ...);
 #define	IS_ASCII(X)		((uint4)(X) <= ASCII_MAX)	/* X can be greater than 255 hence the typecast to uint4 */
 
 #ifdef UNICODE_SUPPORTED
-#	define	MV_FORCE_LEN(X) ((!((X)->mvtype & MV_UTF_LEN)) 							\
-				 ? (utf8_len(&(X)->str), ((X)->mvtype |= MV_UTF_LEN), (X)->str.char_len)	\
-				 : (X)->str.char_len)
+#	define	MV_FORCE_LEN(X)	    ((!((X)->mvtype & MV_UTF_LEN)) 							\
+				     ? (utf8_len(&(X)->str), ((X)->mvtype |= MV_UTF_LEN), (X)->str.char_len)		\
+				     : (X)->str.char_len)
+#	define	MV_FORCE_LEN_DEC(X) ((!((X)->mvtype & MV_UTF_LEN)) 							\
+				     ? (utf8_len_dec(&(X)->str), ((X)->mvtype |= MV_UTF_LEN), (X)->str.char_len)	\
+				     : (X)->str.char_len)
 
 /* MV_FORCE_LEN_STRICT() is used to ensure that mval is valid in addition to computing the char_len.
  * Note that the validation is always forced even if MV_UTF_LEN is set since the previously computed
@@ -543,6 +546,7 @@ mval *underr_strict(mval *start, ...);
 #	define	MV_IS_SINGLEBYTE(X)	(((X)->mvtype & MV_UTF_LEN) && ((X)->str.len == (X)->str.char_len))
 #else
 #	define MV_FORCE_LEN(X)		((X)->str.len)
+#	define MV_FORCE_LEN_DEC(X)	((X)->str.len)
 #	define MV_FORCE_LEN_STRICT(X)	((X)->str.len)
 #	define MV_IS_SINGLEBYTE(X)	(TRUE)	/* all characters are single-byte in non-Unicode platforms */
 #endif
@@ -629,11 +633,17 @@ int4 timeout2msec(int4 timeout);
 #define	RTS_ERROR_LITERAL(LITERAL)	LENGTH_AND_LITERAL(LITERAL)
 #define	RTS_ERROR_STRING(STRING)	LENGTH_AND_STRING(STRING)
 
-#define	SET_PROCESS_EXITING_TRUE				\
-{								\
-	GBLREF	int		process_exiting;		\
-								\
-	process_exiting = TRUE;					\
+#define	SET_PROCESS_EXITING_TRUE						\
+{										\
+	GBLREF	int		process_exiting;				\
+	GBLREF	intrpt_state_t	intrpt_ok_state;				\
+										\
+	/* Since the process is exiting at this point, we want to clear the 	\
+	 * interrupt-deferring mode to prevent issues with nesting interrupt-	\
+	 * deferring states and timer delivery.					\
+	 */									\
+	process_exiting = TRUE;							\
+	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;				\
 }
 
 /* *********************************************************************************************************** */
@@ -741,11 +751,12 @@ int m_usleep(int useconds);
 #endif
 
 /* Note: LONG_SLEEP *MUST*NOT* be the sleep() function because use of the sleep() function in
-   GT.M causes problems with GT.M's timers on some platforms. Specifically, the sleep() function
-   causes the SIGARLM handler to be silently deleted on Solaris systems (through Solaris 9 at least).
-   This leads to lost timer pops and has the potential for system hangs.
+ * GT.M causes problems with GT.M's timers on some platforms. Specifically, the sleep() function
+ * causes the SIGARLM handler to be silently deleted on Solaris systems (through Solaris 9 at least).
+ * This leads to lost timer pops and has the potential for system hangs.
  */
-#define LONG_SLEEP(x)		hiber_start((x) * 1000)
+#define LONG_SLEEP(X)		hiber_start((X) * 1000)
+#define LONG_SLEEP_MSEC(X)	hiber_start(X)
 
 #define OS_PAGE_SIZE		gtm_os_page_size
 #define OS_PAGE_SIZE_DECLARE	GBLREF int4 gtm_os_page_size;
@@ -1627,7 +1638,7 @@ typedef struct repl_histinfo_struct
 	(HISTINFO).strm_seqno = 0;									\
 }
 
-/* A structure to hold ALL aspects of ONE side (could be local or remote) of a replication connection */
+/* A structure to hold ALL aspects of ONE side (could be local or remote) of a replication connection. */
 typedef struct repl_conn_info_struct
 {
 	int4		proto_ver;		/* The replication communication protocol version of this side of the pipe.
@@ -1643,6 +1654,11 @@ typedef struct repl_conn_info_struct
 						 * Non-zero (GTMNULL_TO_STDNULL_COLL or STDNULL_TO_GTMNULL_COLL) if different
 						 */
 	boolean_t	is_supplementary;	/* Whether one side of the connection is a supplementary instance */
+	boolean_t	tls_requested;		/* Whether one side of the connection requests SSL/TLS secure communication */
+	/* Since this structure is a member of jnlpool_ctl_struct which needs to be 16-byte aligned, align this structure to a
+	 * 16-byte boundary.
+	 */
+	char		filler_16[12];
 } repl_conn_info_t;
 
 #endif	/* Replication instance file related structures */
@@ -1669,16 +1685,29 @@ typedef enum
 #define IS_UTF_CHSET(chset) ((CHSET_UTF_MIN <= (chset)) && (CHSET_UTF_MAX >= (chset)))
 
 #define CHK_BOUNDARY_ALIGNMENT(pointer) (((UINTPTR_T)pointer) & (SIZEOF(UINTPTR_T) - 1))
-#if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__MVS__)	\
-				|| defined(__s390__)
-#define GTM_CRYPT
-#define GTMCRYPT_ONLY(X)		X
+
+/* Encryption and TLS related macros */
+#if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__s390__)
+# define GTM_CRYPT
+# define GTMCRYPT_ONLY(X)		X
+# define GTM_TLS
+# define GTMTLS_ONLY(X)			X
+# define GTMTLS_ONLY_COMMA(X)		, X
+# define NON_GTMTLS_ONLY(X)
 #else
-#define GTMCRYPT_ONLY(X)
+# define GTMCRYPT_ONLY(X)
+# define GTMTLS_ONLY(X)
+# define GTMTLS_ONLY_COMMA(X)
+# define NON_GTMTLS_ONLY(X)		X
 #endif
+
 #define GTMCRYPT_HASH_LEN		64
 #define GTMCRYPT_HASH_HEX_LEN		GTMCRYPT_HASH_LEN * 2
 #define GTMCRYPT_RESERVED_HASH_LEN	256
+
+#define GTMCRYPT_PLUGIN_DIR_NAME	"plugin"
+#define GTMCRYPT_UTIL_LIBNAME		"libgtmcryptutil.so"
+
 #define GET_HASH_IN_HEX(in, out, len)						\
 {										\
 	int i;									\
@@ -1786,6 +1815,21 @@ enum
 #ifdef DEBUG
 # define MVAL_IN_RANGE(V, START, END)	(((char *)(V) >= (char *)(START))					\
 				      && ((char *)(V) < ((char *)(START) + (INTPTR_T)(END) * SIZEOF(mval))))
+#endif
+
+/* Whenever an M argument (an actual) is skipped (rather than undefined) in a label call, the resulting mval pointer refers to the
+ * skiparg, which is a special mval designated for this purpose. This is ensured by OC_NULLEXP, which is the opcode inserted for all
+ * skipped arguments.
+ */
+#define M_ARG_SKIPPED(V)			((V) == (mval *)&skiparg)
+
+/* Ensures that the argument is defined if it was not skipped. */
+#define MV_FORCE_DEFINED_UNLESS_SKIPARG(V)	((!M_ARG_SKIPPED(V)) ? (MV_FORCE_DEFINED(V)) : (V))
+
+#ifdef _AIX
+#define LIBPATH_ENV	"LIBPATH"
+#else
+#define LIBPATH_ENV	"LD_LIBRARY_PATH"
 #endif
 
 #endif /* MDEF_included */

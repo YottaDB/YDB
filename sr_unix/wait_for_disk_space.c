@@ -27,7 +27,7 @@ GBLDEF	uint4			lseekwrite_target;
 #endif
 
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	volatile int4		exit_state;
+GBLREF	int4			exit_state;
 GBLREF	int4			exi_condition;
 GBLREF	int4			forced_exit_err;
 
@@ -61,8 +61,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	/* If anticipatory freeze scheme is not in effect, or if this database does not care about it,
 	 * or DSKNOSPCAVAIL is not configured as a custom error, return right away.
 	 */
-	if (!ANTICIPATORY_FREEZE_ENABLED(csa) || (NULL == is_anticipatory_freeze_needed_fnptr)
-			|| !(*is_anticipatory_freeze_needed_fnptr)(csa, ERR_DSKNOSPCAVAIL))
+	if (!INST_FREEZE_ON_NOSPC_ENABLED(csa))
 		return;
 	fn_len = STRLEN(fn);
 	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;

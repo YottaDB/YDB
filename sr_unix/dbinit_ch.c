@@ -40,12 +40,7 @@ GBLREF gd_region		*db_init_region;
 
 CONDITION_HANDLER(dbinit_ch)
 {
-	START_CH;
-	if (SUCCESS == SEVERITY || INFO == SEVERITY)
-	{
-		PRN_ERROR;
-		CONTINUE;
-	}
+	START_CH(TRUE);
 	db_init_err_cleanup(FALSE);
 	NEXTCH
 }
@@ -68,18 +63,13 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 			CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 		assert(FD_INVALID == udi->fd || retry_dbinit);
 		csa = &udi->s_addrs;
-#		ifdef GTM_CRYPT
-		if (NULL != csa->encrypted_blk_contents)
-		{
-			free(csa->encrypted_blk_contents);
-			csa->encrypted_blk_contents = NULL;
-		}
-#		endif
+#		ifdef _AIX
 		if ((NULL != csa->hdr) && (dba_mm == db_init_region->dyn.addr->acc_meth))
 		{
 			assert((NULL != csa->db_addrs[1]) && (csa->db_addrs[1] > csa->db_addrs[0]));
 			munmap((caddr_t)csa->db_addrs[0], (size_t)(csa->db_addrs[1] - csa->db_addrs[0]));
 		}
+#		endif
 		if (NULL != csa->jnl)
 		{
 			free(csa->jnl);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,7 @@
 #include "cache.h"
 #include "gtmio.h"
 #include "have_crit.h"
+#include "mdq.h"
 
 LITDEF char *oprtype_names[] =
 {
@@ -74,6 +75,7 @@ GBLREF char	*oc_tab_graphic[];
 GBLREF spdesc	indr_stringpool;
 GBLREF int4	sa_temps_offset[];
 GBLREF int4	sa_temps[];
+GBLREF triple	t_orig;			/* head of triples */
 
 LITREF int4	sa_class_sizes[];
 
@@ -81,6 +83,19 @@ LITREF int4	sa_class_sizes[];
 STATICDEF char	*indent_str;
 STATICDEF int	last_indent = 0;
 
+/* Routine to dump all triples on the current chain - also callable from debugger */
+void cdbg_dump_triple_all(void)
+{
+	triple	*ct;
+
+	dqloop(&t_orig, exorder, ct)
+	{
+		PRINTF("\n ************************ Triple Start **********************\n");
+		cdbg_dump_triple(ct, 0);
+	}
+}
+
+/* Routine to dump a single triple and its followers */
 void cdbg_dump_triple(triple *dtrip, int indent)
 {
 	int		len;
@@ -105,6 +120,7 @@ void cdbg_dump_triple(triple *dtrip, int indent)
 	FFLUSH(stdout);
 }
 
+/* Routine to dump a triple that's been shrunken(?) by shrink_trips() */
 void cdbg_dump_shrunk_triple(triple *dtrip, int old_size, int new_size)
 {
 	PRINTF("Shrunken triple %s [0x"lvaddr"]   fwdptr: 0x"lvaddr"   bkwdptr: 0x"lvaddr"  srcline: %d  colmn: %d  rtaddr: %d\n",
@@ -114,6 +130,7 @@ void cdbg_dump_shrunk_triple(triple *dtrip, int old_size, int new_size)
 	FFLUSH(stdout);
 }
 
+/* Routine to dump a triple operand (note possible recursion) */
 void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 {
 	triple	*rtrip;
@@ -152,7 +169,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 				       (long unsigned int) opr->oprval.vref->rson, opr->oprval.vref->mvidx,
 				       cdbg_makstr(opr->oprval.vref->mvname.addr, &buff, opr->oprval.vref->mvname.len),
 				       (long unsigned int) opr->oprval.vref->last_fetch);
-				free(buff);
+				free(buff);	/* allocated by cdbg_makstr */
 			}
 			else
 				PRINTF("%s   ** Warning ** oprval.vref is NULL\n", cdbg_indent(indent));
@@ -230,6 +247,9 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 	FFLUSH(stdout);
 }
 
+/* Routine to dump a literal mval - note strings that either aren't setup completely yet or contain $ZCHAR() type
+ * data can come out as garbage. Improvement would be to print value in $ZWRITE() format.
+ */
 void cdbg_dump_mval(int indent, mval *mv)
 {
 	boolean_t	first;
@@ -318,13 +338,12 @@ char *cdbg_indent(int indent)
 {
 	if (10 >= indent)
 		return (char *)indents[indent];
-
 	if (NULL == indent_str)
 		indent_str = malloc(MAX_INDENT);
-	if (MAX_INDENT < indent * 2)
+	if (MAX_INDENT < (indent * 2))
 	{
 		FFLUSH(stdout);
-		GTMASSERT;
+		assertpro(MAX_INDENT < (indent * 2));
 	}
 	if (indent > last_indent)
 		memset(indent_str, ' ', indent * 2);

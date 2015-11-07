@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,11 +31,7 @@ CONDITION_HANDLER(rc_dbms_ch)
     GBLREF int4	 rc_errno;
     int		dummy1, dummy2;
 
-    START_CH;
-
-    if (SEVERITY == SUCCESS || SEVERITY == INFO) {
-	CONTINUE;
-    }
+    START_CH(TRUE);
 
     if (SEVERITY == WARNING || SEVERITY == ERROR) {
 	rc_errno = RC_GLOBERRUNSPEC;
@@ -44,5 +40,4 @@ CONDITION_HANDLER(rc_dbms_ch)
     }
 
     NEXTCH;
-
 }

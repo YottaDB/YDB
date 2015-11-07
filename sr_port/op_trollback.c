@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,6 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	void			(*tp_timeout_clear_ptr)(void);
 GBLREF	int			process_exiting;
-GBLREF	gd_binding		*gd_map;
 #ifdef GTM_TRIGGER
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
@@ -85,13 +84,13 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		implicit_trollback = FALSE;
 	}
 	if (!dollar_tlevel)
-		rts_error(VARLSTCNT(1) ERR_TLVLZERO);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TLVLZERO);
 	if (0 > rb_levels)
 	{
 		if (dollar_tlevel < -rb_levels)
-			rts_error(VARLSTCNT(4) ERR_TROLLBK2DEEP, 2, -rb_levels, dollar_tlevel);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TROLLBK2DEEP, 2, -rb_levels, dollar_tlevel);
 	} else if (dollar_tlevel <= rb_levels)
-		rts_error(VARLSTCNT(4) ERR_INVROLLBKLVL, 2, rb_levels, dollar_tlevel);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVROLLBKLVL, 2, rb_levels, dollar_tlevel);
 	newlevel = (0 > rb_levels) ? dollar_tlevel + rb_levels : rb_levels;
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	save_cur_region = gv_cur_region;
@@ -132,10 +131,10 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 			assert(tp_pointer <= (tp_frame *)tpstackbase);
 			assert(NULL != gv_currkey);
 			gv_orig_key_ptr = tp_pointer->orig_key;
+			assert(NULL != gv_orig_key_ptr);
 			COPY_KEY(gv_currkey, gv_orig_key_ptr);
 			gv_target = tp_pointer->orig_gv_target;
 			gd_header = tp_pointer->gd_header;
-			gd_map = gd_header->maps;
 			gv_cur_region = tp_pointer->gd_reg;
 			TP_CHANGE_REG(gv_cur_region);
 			reg_reset = TRUE;	/* so we dont restore gv_cur_region again */

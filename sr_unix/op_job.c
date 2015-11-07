@@ -48,6 +48,7 @@
 #include "change_reg.h"
 #include "setterm.h"
 #include "getzposition.h"
+#include "iosocketdef.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
@@ -61,6 +62,7 @@ GBLREF	uint4		dollar_trestart;
 GBLREF	int		dollar_truth;
 GBLREF	uint4		dollar_zjob;
 GBLREF	int4		outofband;
+GBLREF	d_socket_struct	*socket_pool;
 static	int4	tid;	/* Job Timer ID */
 
 error_def(ERR_TEXT);
@@ -108,6 +110,8 @@ int	op_job(int4 argcnt, ...)
 	char		combuf[128];
 	mstr		command;
 	job_parm	*jp;
+	mstr_len_t	handle_len;
+	int4		index;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -188,6 +192,10 @@ int	op_job(int4 argcnt, ...)
 	job_errno = -1;
 	non_exit_return = FALSE;
 	status = ojstartchild(&job_params, argcnt, &non_exit_return, pipe_fds);
+	/* the child process (M), that wrote to pipe, would have been exited by now. Close the write-end to make the following read
+	 * non-blocking. also resets "pipe_fds[1]" to FD_INVALID
+	 */
+	CLOSEFILE_RESET(pipe_fds[1], pipe_status);
 	if (!non_exit_return)
 	{
 #ifdef _BSD
@@ -220,10 +228,6 @@ int	op_job(int4 argcnt, ...)
 		free(job_params.parms);
 	if (timed && !ojtimeout)
 		cancel_timer((TID)&tid);
-	/* the child process (M), that wrote to pipe, would have been exited by now. Close the write-end to make the following read
-	 * non-blocking. also resets "pipe_fds[1]" to FD_INVALID
-	 */
-	CLOSEFILE_RESET(pipe_fds[1], pipe_status);
 	assert(SIZEOF(pid_t) == SIZEOF(zjob_pid));
 	DOREADRC(pipe_fds[0], &zjob_pid, SIZEOF(zjob_pid), pipe_status);
 	/* empty pipe (pipe_status == -1) is ignored and not reported as error */
@@ -296,6 +300,29 @@ int	op_job(int4 argcnt, ...)
 			dollar_truth = 1;
 		assert(0 < zjob_pid);
 		dollar_zjob = zjob_pid;
+
+		if (IS_JOB_SOCKET(job_params.input.addr, job_params.input.len))
+		{
+			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.input.len);
+			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.input.addr), &handle_len, FALSE, socket_pool);
+			if (-1 != index)
+				iosocket_close_one(socket_pool, index);
+		}
+		if (IS_JOB_SOCKET(job_params.output.addr, job_params.output.len))
+		{
+			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.output.len);
+			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.output.addr), &handle_len, FALSE, socket_pool);
+			if (-1 != index)
+				iosocket_close_one(socket_pool, index);
+		}
+		if (IS_JOB_SOCKET(job_params.error.addr, job_params.error.len))
+		{
+			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.error.len);
+			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.error.addr), &handle_len, FALSE, socket_pool);
+			if (-1 != index)
+				iosocket_close_one(socket_pool, index);
+		}
+
 		return TRUE;
 	}
 	return FALSE; /* This will never get executed, added to make compiler happy */

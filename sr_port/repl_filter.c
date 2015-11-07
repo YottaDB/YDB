@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "gtm_unistd.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
+#include "gtm_select.h"
 #ifdef UNIX
 #include "gtm_ipc.h"
 #endif
@@ -30,7 +31,6 @@
 #include <errno.h>
 #include <sys/wait.h>
 
-#include "iotcp_select.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -56,6 +56,10 @@
 #include "jnl_typedef.h"
 #include "gv_trigger_common.h" /* for HASHT* macros */
 #include "replgbl.h"
+#ifdef UNIX
+#include "heartbeat_timer.h"
+#include "gtm_c_stack_trace.h"
+#endif
 #ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 #include <sys/poll.h>
 #endif
@@ -71,6 +75,7 @@
 	{									\
 		assert(SIZEOF(jnl_str_len_t) == SIZEOF(uint4));			\
 		keylen = *((jnl_str_len_t *)(PTR));				\
+		keylen &= 0xFFFFFF;	/* to remove 8-bit nodeflags if any */	\
 		lclptr = PTR + SIZEOF(jnl_str_len_t);				\
 		if (STDNULL_TO_GTMNULL_COLL == REMOTE_NULL_SUBS_XFORM)		\
 		{								\
@@ -194,7 +199,7 @@
 	nodelen = *((uint4 *)jb);										\
 	assert(tail_minus_suffix_len >= (SIZEOF(jnl_str_len_t) + nodelen));					\
 	memcpy(cb, jb, tail_minus_suffix_len);									\
-	NULLSUBSC_TRANSFORM_IF_NEEDED(cb + SIZEOF(jnl_str_len_t));						\
+	NULLSUBSC_TRANSFORM_IF_NEEDED(cb);									\
 	jb += tail_minus_suffix_len;										\
 	cb += tail_minus_suffix_len;										\
 }
@@ -264,7 +269,7 @@
 	 */													\
 	((jnl_string *)cb)->nodeflags = 0;									\
 	GET_JREC_UPD_TYPE(jb, trigupd_type);									\
-	NULLSUBSC_TRANSFORM_IF_NEEDED(cb + SIZEOF(jnl_str_len_t));						\
+	NULLSUBSC_TRANSFORM_IF_NEEDED(cb);									\
 	jb += tail_minus_suffix_len;										\
 	cb += tail_minus_suffix_len;										\
 }
@@ -379,6 +384,9 @@
 #define MORE_TO_TRANSFER -99
 #define DUMMY_TCOMMIT_LENGTH 3	/* A dummy commit is 09\n */
 
+#define FILTER_HALF_TIMEOUT	4			/* 4 heartbeats : 32 seconds. */
+#define FILTER_FULL_TIMEOUT	8			/* 4 heartbeats : 64 seconds. */
+
 /* repl_filter_recv receive state */
 
 enum
@@ -430,7 +438,9 @@ GBLREF	int			repl_filter_bufsiz;
 GBLREF	boolean_t		is_src_server, is_rcvr_server;
 #ifdef UNIX
 GBLREF	repl_conn_info_t	*this_side, *remote_side;
+GBLREF	volatile uint4		heartbeat_counter;
 #endif
+GBLREF	uint4			process_id;
 
 error_def(ERR_FILTERBADCONV);
 error_def(ERR_FILTERCOMM);
@@ -439,6 +449,7 @@ error_def(ERR_REPLFILTER);
 error_def(ERR_REPLNOXENDIAN);
 error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
+error_def(ERR_FILTERTIMEDOUT);
 
 static	pid_t	repl_filter_pid = -1;
 static	int	repl_srv_filter_fd[2] = {FD_INVALID, FD_INVALID};
@@ -462,8 +473,8 @@ void jnl_extr_init(void)
 
 	SETUP_THREADGBL_ACCESS;
 	/* Should be a non-filter related function. But for now,... Needs GBLREFs gv_currkey and transform */
-	TREF(transform) = FALSE;      /* to avoid the assert in mval2subsc() */
-	GVKEYSIZE_INCREASE_IF_NEEDED(DBKEYSIZE(MAX_KEY_SZ));
+	TREF(transform) = FALSE;      /* to avoid SIG-11 in "mval2subsc" as it expects gv_target to be set up and we dont set it */
+	GVKEYSIZE_INIT_IF_NEEDED;
 }
 
 static void repl_filter_close_all_pipes(void)
@@ -495,7 +506,7 @@ int repl_filter_init(char *filter_cmd)
 	if (0 > status)
 	{
 		repl_filter_close_all_pipes();
-		gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Could not create pipe for Server->Filter I/O"), ERRNO);
 		repl_errno = EREPL_FILTERSTART_PIPE;
 		return(FILTERSTART_ERR);
@@ -505,7 +516,7 @@ int repl_filter_init(char *filter_cmd)
 	if (0 > status)
 	{
 		repl_filter_close_all_pipes();
-		gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Could not create pipe for Server->Filter I/O"), ERRNO);
 		repl_errno = EREPL_FILTERSTART_PIPE;
 		return(FILTERSTART_ERR);
@@ -516,7 +527,8 @@ int repl_filter_init(char *filter_cmd)
 	if (NULL == (arg_ptr = strtok(cmd, FILTER_CMD_ARG_DELIM_TOKENS)))
 	{
 		repl_filter_close_all_pipes();
-		gtm_putmsg(VARLSTCNT(6) ERR_REPLFILTER, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Null filter command specified"));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLFILTER, 0, ERR_TEXT, 2,
+				RTS_ERROR_LITERAL("Null filter command specified"));
 		repl_errno = EREPL_FILTERSTART_NULLCMD;
 		return(FILTERSTART_ERR);
 	}
@@ -566,12 +578,10 @@ int repl_filter_init(char *filter_cmd)
 								* also resets "repl_srv_filter_fd[READ_END]" to FD_INVALID */
 			/* Make the server->filter pipe stdin for filter */
 			DUP2(repl_srv_filter_fd[READ_END], 0, status);
-			if (0 > status)
-				GTMASSERT;
+			assertpro(0 <= status);
 			/* Make the filter->server pipe stdout for filter */
 			DUP2(repl_filter_srv_fd[WRITE_END], 1, status);
-			if (0 > status)
-				GTMASSERT;
+			assertpro(0 <= status);
 		)
 		VMS_ONLY(decc$set_child_standard_streams(repl_srv_filter_fd[READ_END], repl_filter_srv_fd[WRITE_END], -1));
 		/* Start the filter */
@@ -585,13 +595,15 @@ int repl_filter_init(char *filter_cmd)
 				F_CLOSE(repl_filter_srv_fd[READ_END], close_res);
 					/* resets "repl_filter_srv_fd[READ_END]" to FD_INVALID */
 			)
-			gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Could not exec filter"), ERRNO);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Could not exec filter"), ERRNO);
 			repl_errno = EREPL_FILTERSTART_EXEC;
 			return(FILTERSTART_ERR);
 		}
 	} else
 	{	/* Error in fork */
-		gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Could not fork filter"), ERRNO);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
+				RTS_ERROR_LITERAL("Could not fork filter"), ERRNO);
 		repl_errno = EREPL_FILTERSTART_FORK;
 		return(FILTERSTART_ERR);
 	}
@@ -615,8 +627,8 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len, boole
 			is_null = (JRT_NULL == first_rectype);
 			save_jnl_seqno = GET_JNL_SEQNO(tr);
 			save_strm_seqno = GET_STRM_SEQNO(tr);
-			if (NULL == (extr_end = jnl2extcvt((jnl_record *)tr, tr_len, extract_buff)))
-				GTMASSERT;
+			extr_end = jnl2extcvt((jnl_record *)tr, tr_len, extract_buff);
+			assertpro(NULL != extr_end);
 			extr_len = extr_end - extract_buff;
 			extract_buff[extr_len] = '\0';
 		} else
@@ -656,7 +668,7 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len, boole
 static int repl_filter_recv_line(char *line, int *line_len, int max_line_len, boolean_t send_done)
 { /* buffer input read from repl_filter_srv_fd[READ_END], return one line at a time; line separator is '\n' */
 
-	int		save_errno;
+	int		save_errno, orig_heartbeat;
 	int		status;
 	ssize_t		l_len, r_len, buff_remaining ;
 	muextract_type	exttype;
@@ -667,6 +679,7 @@ static int repl_filter_recv_line(char *line, int *line_len, int max_line_len, bo
 	struct pollfd	poll_fdlist[1];
 #endif
 	struct timeval	repl_filter_poll_interval;
+	boolean_t	half_timeout_done;
 
 	for (; ;)
 	{
@@ -711,6 +724,7 @@ static int repl_filter_recv_line(char *line, int *line_len, int max_line_len, bo
 					repl_filter_poll_interval.tv_sec = 0;
 					repl_filter_poll_interval.tv_usec = 1000;
 #ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+					assertpro(FD_SETSIZE > repl_filter_srv_fd[READ_END]);
 					FD_ZERO(&input_fds);
 					FD_SET(repl_filter_srv_fd[READ_END], &input_fds);
 #else
@@ -742,9 +756,46 @@ static int repl_filter_recv_line(char *line, int *line_len, int max_line_len, bo
 					break;
 				}
 			}
-			while (-1 == (r_len = read(repl_filter_srv_fd[READ_END], srv_read_end, buff_remaining)) &&
-					(EINTR == errno || ENOMEM == errno))
+#			ifdef UNIX
+			/* Before starting the `read', note down the current heartbeat counter. This is used to break from the
+			 * read if the filter program takes too long to send records back to us. Do it only if send_done is TRUE
+			 * which indicates the end of a mini-transaction or a commit record for an actual transaction.
+			 */
+			assert(-1 != repl_filter_pid);
+			assert(heartbeat_started);
+			half_timeout_done = FALSE;
+			if (send_done)
+				orig_heartbeat = heartbeat_counter;
+			do
+			{
+				r_len = read(repl_filter_srv_fd[READ_END], srv_read_end, buff_remaining);
+				if (0 < r_len)
+					break;
+				save_errno = errno;
+				if ((ENOMEM != save_errno) && (EINTR != save_errno))
+					break;
+				/* EINTR/ENOMEM -- check if it's time to take the stack trace. */
+				if (send_done)
+				{
+					if (!half_timeout_done && ((heartbeat_counter - orig_heartbeat) >= FILTER_HALF_TIMEOUT))
+					{
+						/* Half-timeout : take C-stack of the filter program. */
+						half_timeout_done = TRUE;
+						GET_C_STACK_FROM_SCRIPT("FILTERTIMEDOUT_HALF_TIME", process_id, repl_filter_pid, 0);
+					} else if ((heartbeat_counter - orig_heartbeat) >= FILTER_FULL_TIMEOUT)
+					{
+						/* Full-timeout : take C-stack of the filter program. */
+						GET_C_STACK_FROM_SCRIPT("FILTERTIMEDOUT_FULL_TIME", process_id, repl_filter_pid, 1);
+						return (repl_errno = EREPL_FILTERTIMEDOUT);
+					}
+					continue;
+				}
+			} while (TRUE);
+#			else
+			while (-1 == (r_len = read(repl_filter_srv_fd[READ_END], srv_read_end, buff_remaining))
+					&& (EINTR == errno || ENOMEM == errno))
 				;
+#			endif
 			if (0 < r_len) /* successful read */
 			{
 				/* if send is not done then need to do select/poll if we try read again */
@@ -787,8 +838,7 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len, bool
 		if (SS_NORMAL != (status = repl_filter_recv_line(extr_rec, &firstrec_len, ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE),
 								 send_done)))
 		{
-			if (EREPL_FILTERNOSPC == repl_errno)
-				GTMASSERT; /* why didn't we pre-allocate enough memory? */
+			assertpro(EREPL_FILTERNOSPC != repl_errno);	/* why didn't we pre-allocate enough memory? */
 			return status;
 		}
 		/* if send not done make sure we do a select before reading any more */
@@ -822,8 +872,7 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len, bool
 			if (SS_NORMAL != (status = repl_filter_recv_line(extr_rec, &extr_reclen,
 									 ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE), send_done)))
 			{
-				if (EREPL_FILTERNOSPC == repl_errno)
-					GTMASSERT; /* why didn't we pre-allocate enough memory? */
+				assertpro(EREPL_FILTERNOSPC != repl_errno);	/* why didn't we pre-allocate enough memory? */
 				return status;
 			}
 			/* We don't want a null transaction inside a tp so get rid of it */
@@ -921,6 +970,7 @@ int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize)
 				repl_filter_poll_interval.tv_sec = 0;
 				repl_filter_poll_interval.tv_usec = 1000;
 #ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+				assertpro(FD_SETSIZE > repl_srv_filter_fd[WRITE_END]);
 				FD_ZERO(&output_fds);
 				FD_SET(repl_srv_filter_fd[WRITE_END], &output_fds);
 #else
@@ -975,6 +1025,7 @@ int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize)
 				repl_filter_poll_interval.tv_sec = 0;
 				repl_filter_poll_interval.tv_usec = 1000;
 #ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+				assertpro(FD_SETSIZE > repl_filter_srv_fd[READ_END]);
 				FD_ZERO(&input_fds);
 				FD_SET(repl_filter_srv_fd[READ_END], &input_fds);
 #else
@@ -1051,19 +1102,22 @@ void repl_filter_error(seq_num filter_seqno, int why)
 	switch (repl_errno)
 	{
 		case EREPL_FILTERNOTALIVE :
-			rts_error(VARLSTCNT(3) ERR_FILTERNOTALIVE, 1, &filter_seqno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FILTERNOTALIVE, 1, &filter_seqno);
 			break;
 		case EREPL_FILTERSEND :
-			rts_error(VARLSTCNT(4) ERR_FILTERCOMM, 1, &filter_seqno, why);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILTERCOMM, 1, &filter_seqno, why);
 			break;
 		case EREPL_FILTERBADCONV :
-			rts_error(VARLSTCNT(3) ERR_FILTERBADCONV, 1, &filter_seqno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FILTERBADCONV, 1, &filter_seqno);
 			break;
 		case EREPL_FILTERRECV :
-			rts_error(VARLSTCNT(4) ERR_FILTERCOMM, 1, &filter_seqno, why);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILTERCOMM, 1, &filter_seqno, why);
+			break;
+		case EREPL_FILTERTIMEDOUT :
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FILTERTIMEDOUT, 1, &filter_seqno);
 			break;
 		default :
-			GTMASSERT;
+			assertpro(repl_errno != repl_errno);
 	}
 	return;
 }
@@ -1081,7 +1135,7 @@ void repl_check_jnlver_compat(UNIX_ONLY(boolean_t same_endianness))
 	assert(is_src_server || is_rcvr_server);
 	assert(JNL_VER_EARLIEST_REPL <= REMOTE_JNL_VER);
 	if (JNL_VER_EARLIEST_REPL > REMOTE_JNL_VER)
-		rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Dual/Multi site replication not supported between these two GT.M versions"));
 #	ifdef UNIX
 	else if ((V18_JNL_VER > REMOTE_JNL_VER) && !same_endianness)
@@ -1091,8 +1145,9 @@ void repl_check_jnlver_compat(UNIX_ONLY(boolean_t same_endianness))
 		else if (is_rcvr_server)
 			other_side = "Originating";
 		else
-			GTMASSERT; /* repl_check_jnlver_compat is called only from source server and receiver server */
-		rts_error(VARLSTCNT(6) ERR_REPLNOXENDIAN, 4, LEN_AND_STR(other_side), LEN_AND_STR(other_side));
+			/* repl_check_jnlver_compat is called only from source server and receiver server */
+			assertpro(is_src_server || is_rcvr_server);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLNOXENDIAN, 4, LEN_AND_STR(other_side), LEN_AND_STR(other_side));
 	}
 #	endif
 }
@@ -2380,7 +2435,7 @@ int jnl_v22TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				mumps_node_ptr = cb + FIXED_UPD_RECLEN;
 				if (!remote_supports_triggers)
 					((jnl_string *)mumps_node_ptr)->nodeflags = 0;
-				NULLSUBSC_TRANSFORM_IF_NEEDED(mumps_node_ptr + SIZEOF(jnl_str_len_t));
+				NULLSUBSC_TRANSFORM_IF_NEEDED(mumps_node_ptr);
 				if (IS_TUPD(rectype))
 					tupd_num++;
 				else if (IS_UUPD(rectype) && promote_uupd_to_tupd)

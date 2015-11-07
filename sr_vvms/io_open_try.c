@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,10 +62,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 			if (!tl->iod->type && mspace && mspace->str.len)
 			{
 				lower_to_upper(dev_type, mspace->str.addr, mspace->str.len);
-				if (((SIZEOF("TCP") - 1) == mspace->str.len)
-					&& (0 == memcmp(dev_type, LIT_AND_LEN("TCP"))))
-					tl->iod->type = tcp;
-				else if (((SIZEOF("SOCKET") - 1) == mspace->str.len)
+				if (((SIZEOF("SOCKET") - 1) == mspace->str.len)
 					&& (0 == memcmp(dev_type, LIT_AND_LEN("SOCKET"))))
 					tl->iod->type = gtmsocket;
 				else

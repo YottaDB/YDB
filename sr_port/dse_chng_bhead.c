@@ -53,7 +53,6 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	block_id		patch_curr_blk;
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	gd_addr			*gd_header;
 GBLREF	cache_rec		*cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
 GBLREF	boolean_t		unhandled_stale_timer_pop;
 GBLREF	cw_set_element		cw_set[];
@@ -86,11 +85,11 @@ void dse_chng_bhead(void)
 	gd_segment		*seg;
 #	endif
 
+	csa = cs_addrs;
         if (gv_cur_region->read_only)
-                rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+                rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	chng_blk = FALSE;
-	csa = cs_addrs;
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
 		if (!cli_get_hex("BLOCK", (uint4 *)&blk))
@@ -111,7 +110,7 @@ void dse_chng_bhead(void)
 	t_begin_crit(ERR_DSEFAIL);
 	blkhist.blk_num = patch_curr_blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	new_hdr = *(blk_hdr_ptr_t)blkhist.buffaddr;
 
 	if (cli_present("LEVEL") == CLI_PRESENT)

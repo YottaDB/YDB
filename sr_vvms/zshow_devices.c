@@ -26,7 +26,6 @@
 #include "iombdef.h"
 #include "iomtdef.h"
 #include "iormdef.h"
-#include "iotcpdef.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "nametabtyp.h"
@@ -42,7 +41,7 @@ typedef struct
 } uic_struct;
 
 LITREF nametabent dev_param_names[];
-LITREF unsigned char dev_param_index[];
+LITREF uint4 dev_param_index[];
 LITREF zshow_index zshow_param_index[];
 
 static readonly char space_text[] = {' '};

@@ -15,8 +15,8 @@
 #include <wctype.h>
 #include <wchar.h>
 #include "gtm_string.h"
+#include "gtm_select.h"
 
-#include "iotcp_select.h"
 #include "io_params.h"
 #include "io.h"
 #include "trmdef.h"
@@ -111,7 +111,7 @@ void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
 		} else
 			vmvalptr->str.len = datalen;
 		vmvalptr->str.addr = (char *)buffer_start;
-		if (buffer_start == stringpool.free)
+		if (IS_AT_END_OF_STRINGPOOL(buffer_start, 0))
 			stringpool.free += vmvalptr->str.len;	/* The BADCHAR error after this won't do this for us */
         }
         if (NULL != strend && NULL != delimptr)
@@ -190,8 +190,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	if (tt_ptr->mupintr)
 	{	/* restore state to before job interrupt */
 		tt_state = &tt_ptr->tt_state_save;
-		if (ttwhichinvalid == tt_state->who_saved)
-			GTMASSERT;
+		assertpro(ttwhichinvalid != tt_state->who_saved);
 		if (dollar_zininterrupt)
 		{
 			tt_ptr->mupintr = FALSE;
@@ -199,8 +198,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		}
 		assert(length == tt_state->length);
-		if (ttread != tt_state->who_saved)
-			GTMASSERT;	/* ZINTRECURSEIO should have caught */
+		assertpro(ttread == tt_state->who_saved);	/* ZINTRECURSEIO should have caught */
 		mv_zintdev = io_find_mvstent(io_ptr, FALSE);
 		if (NULL != mv_zintdev && mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid)
 		{	/* looks good so use it */
@@ -363,7 +361,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 					tt_state->more_ptr = more_ptr;
 					memcpy(tt_state->more_buf, more_buf, SIZEOF(more_buf));
 				}
-				if (buffer_start == stringpool.free)
+				if (IS_AT_END_OF_STRINGPOOL(buffer_start, 0))
 					stringpool.free += exp_length;	/* reserve space */
 				tt_state->instr = instr;
 				tt_state->outlen = outlen;
@@ -387,6 +385,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			break;
 		}
 		errno = 0;
+		assertpro(FD_SETSIZE > tt_ptr->fildes);
 		FD_ZERO(&input_fd);
 		FD_SET(tt_ptr->fildes, &input_fd);
 		assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));

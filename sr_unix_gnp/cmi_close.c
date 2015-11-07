@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@ cmi_status_t cmi_close(struct CLB *lnk)
 	previous = QUEENT2CLB(qp, cqe);
 	remqt(&previous->cqe);
 	CLOSEFILE(lnk->mun, status);
+	assertpro(FD_SETSIZE > lnk->mun);
 	FD_CLR(lnk->mun, &tsk->rs);
 	FD_CLR(lnk->mun, &tsk->ws);
 	FD_CLR(lnk->mun, &tsk->es);

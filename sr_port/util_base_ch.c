@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,65 +63,65 @@ CONDITION_HANDLER(util_base_ch)
 		$DESCRIPTOR(msgbuf, msg_buff);
 	)
 
-	START_CH;
+	START_CH(TRUE);
 	PRN_ERROR;
-	if (SUCCESS == SEVERITY || INFO == SEVERITY)
-	{
-		CONTINUE;
-	} else
-	{
-		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+	VMS_ONLY (
+		if (SUCCESS == SEVERITY || INFO == SEVERITY)
 		{
-			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
+			CONTINUE;
+		}
+	)
+	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+	{
+		for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
+		{
+			if (r_local->open && !r_local->was_open)
 			{
-				if (r_local->open && !r_local->was_open)
-				{
-					csa = &FILE_INFO(r_local)->s_addrs;
-					if (!csa->persistent_freeze)
-						region_freeze(r_local, FALSE, FALSE, FALSE);
-				}
+				csa = &FILE_INFO(r_local)->s_addrs;
+				if (!csa->persistent_freeze)
+					region_freeze(r_local, FALSE, FALSE, FALSE);
 			}
 		}
-		if (IS_MUPIP_IMAGE)
-			preemptive_db_clnup(SEVERITY);	/* for other utilities, preemptive_db_clnup() is called from util_ch() */
-		UNIX_ONLY(
-			if ((DUMPABLE) && !SUPPRESS_DUMP)
-			{
-				need_core = TRUE;
-				gtm_fork_n_core();
-			}
-			/* rts_error sets error_condition, and util_base_ch is called only if
-			 * exiting thru rts_error. Setup exi_condition to reflect error
-			 * exit status. Note, if the last eight bits (the only relevant bits
-			 * for Unix exit status) of error_condition is non-zero in case of
-			 * errors, we make sure that an error exit status (non-zero value -1)
-			 * is setup. This is a hack.
-			 */
-			if (0 == exi_condition)
-				exi_condition = (((error_condition & UNIX_EXIT_STATUS_MASK) != 0) ? error_condition : -1);
-		)
-		VMS_ONLY(
-			if ((DUMPABLE) && !SUPPRESS_DUMP)
-			{
-				gtm_dump();
-				TERMINATE;
-			}
-			exi_condition = SIGNAL;
-			/* following is a hack to avoid FAO directives getting printed without expanding
-			 * in the error message during EXIT()
-			 */
-			if (IS_GTM_ERROR(SIGNAL))
-			{
-				status = sys$getmsg(SIGNAL, &msglen, &msgbuf, 0, msginfo);
-				if (status & 1)
-				{
-					if (0 < msginfo[1])
-						exi_condition = (IS_MUPIP_IMAGE ? ERR_MUNOFINISH :
-								(IS_DSE_IMAGE ? ERR_DSENOFINISH : ERR_LKENOFINISH));
-				}
-			}
-		)
-		UNSUPPORTED_PLATFORM_CHECK;
-		EXIT(exi_condition);
 	}
+	if (IS_MUPIP_IMAGE)
+		preemptive_db_clnup(SEVERITY);	/* for other utilities, preemptive_db_clnup() is called from util_ch() */
+	UNIX_ONLY(
+		if ((DUMPABLE) && !SUPPRESS_DUMP)
+		{
+			need_core = TRUE;
+			gtm_fork_n_core();
+		}
+		/* rts_error sets error_condition, and util_base_ch is called only if
+		 * exiting thru rts_error. Setup exi_condition to reflect error
+		 * exit status. Note, if the last eight bits (the only relevant bits
+		 * for Unix exit status) of error_condition is non-zero in case of
+		 * errors, we make sure that an error exit status (non-zero value -1)
+		 * is setup. This is a hack.
+		 */
+		if (0 == exi_condition)
+			exi_condition = (((error_condition & UNIX_EXIT_STATUS_MASK) != 0) ? error_condition : -1);
+	)
+	VMS_ONLY(
+		if ((DUMPABLE) && !SUPPRESS_DUMP)
+		{
+			gtm_dump();
+			TERMINATE;
+		}
+		exi_condition = SIGNAL;
+		/* following is a hack to avoid FAO directives getting printed without expanding
+		 * in the error message during EXIT()
+		 */
+		if (IS_GTM_ERROR(SIGNAL))
+		{
+			status = sys$getmsg(SIGNAL, &msglen, &msgbuf, 0, msginfo);
+			if (status & 1)
+			{
+				if (0 < msginfo[1])
+					exi_condition = (IS_MUPIP_IMAGE ? ERR_MUNOFINISH :
+							(IS_DSE_IMAGE ? ERR_DSENOFINISH : ERR_LKENOFINISH));
+			}
+		}
+	)
+	UNSUPPORTED_PLATFORM_CHECK;
+	EXIT(exi_condition);
 }

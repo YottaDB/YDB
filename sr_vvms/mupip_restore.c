@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,10 @@
 #include <errno.h>
 #include "gtm_socket.h"
 #include "gtm_inet.h"
+#include "gtm_netdb.h"
 #include "gtm_time.h"
+#include "eintr_wrappers.h"
+#include "gtm_select.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -34,8 +37,6 @@
 #include "gdsbml.h"
 #include "mupipbckup.h"
 #include "murest.h"
-#include "iotcproutine.h"
-#include "iotcpdef.h"
 #include "gt_timer.h"
 #include "io.h"
 #include "iotimer.h"
@@ -69,10 +70,13 @@
 					}					\
 				}
 
+
+/* No csa needed for VMS code, so use GTM_PUTMSG to avoid lots of CSA_ARG(NULL) boilerplate. */
+#define GTM_PUTMSG	gtm_putmsg
+
 GBLDEF	inc_list_struct 	in_files;
 GBLREF 	gd_region		*gv_cur_region;
 GBLREF	uint4			restore_read_errno;
-GBLREF  tcp_library_struct	tcp_routines;
 GBLREF  bool			mubtomag;
 GBLREF 	int4 			mubmaxblk;
 
@@ -122,7 +126,7 @@ void mupip_restore(void)
 		mupip_exit(ERR_MUNODBNAME);
 	if (!mu_rndwn_file(TRUE))
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
+		GTM_PUTMSG(VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
 		mupip_exit(ERR_MUPRESTERR);
 	}
 	fc = gv_cur_region->dyn.addr->file_cntl;
@@ -131,7 +135,7 @@ void mupip_restore(void)
 	status = dbfilop(fc);
 	if (SS$_NORMAL != status)
 	{
-		gtm_putmsg(VARLSTCNT(1) status);
+		GTM_PUTMSG(VARLSTCNT(1) status);
 		util_out_print("Error accessing output file !AD. Aborting restore.", TRUE, DB_LEN_STR(gv_cur_region));
 		mupip_exit(status);
 	}
@@ -199,7 +203,7 @@ void mupip_restore(void)
 				if ((RMS$_NORMAL != (status = sys$open(&infab))) ||
 					(RMS$_NORMAL != (status = sys$connect(&inrab))))
 				{
-					gtm_putmsg(VARLSTCNT(1) status);
+					GTM_PUTMSG(VARLSTCNT(1) status);
 					util_out_print("Error accessing input file !AD. Aborting restore.", TRUE,
 						infab.fab$b_fns, infab.fab$l_fna);
 					free(inbuf);
@@ -242,7 +246,6 @@ void mupip_restore(void)
 				}
 				if ((0 == cli_get_int("NETTIMEOUT", &timeout)) || (0 > timeout))
 					timeout = DEFAULT_BKRS_TIMEOUT;
-				iotcp_fillroutine();
 				if (0 > (backup_socket = tcp_open(addr, port, timeout, TRUE)))
 				{
 					util_out_print("Error establishing TCP connection to !AD.", TRUE,
@@ -462,7 +465,7 @@ void mupip_restore(void)
 			case backup_to_file:
 				if (RMS$_NORMAL != (status = sys$close(&infab)))
 				{
-					gtm_putmsg(VARLSTCNT(1) status);
+					GTM_PUTMSG(VARLSTCNT(1) status);
 					util_out_print("WARNING:  DB file !AD restore aborted, file !AD not valid", TRUE,
 						DB_LEN_STR(gv_cur_region),
 						ptr->input_file.len, ptr->input_file.addr);;
@@ -480,7 +483,7 @@ void mupip_restore(void)
 #			endif
 				break;
 			case backup_to_tcp:
-				tcp_routines.aa_close(backup_socket);
+				close(backup_socket);
 				break;
 		}
 	}
@@ -503,7 +506,7 @@ static void record_read(char *temp, char *buf, int nbytes) /* *nbytes is what we
 	status = sys$get(rab);
 	if (RMS$_NORMAL != status)
 	{
-		gtm_putmsg(VARLSTCNT(1) status);
+		GTM_PUTMSG(VARLSTCNT(1) status);
 		util_out_print("Error accessing input file !AD. Aborting restore.", TRUE,
 			rab->rab$l_fab->fab$b_fns, rab->rab$l_fab->fab$l_fna);
 		sys$close(rab->rab$l_fab);
@@ -518,22 +521,23 @@ static void tcp_read(char *temp, char *buf, int nbytes) /* asking for *nbytes, h
 	int		socket, needed, status;
 	char		*curr;
 	fd_set		fs;
-	ABS_TIME	nap;
+	struct timeval	nap;
 
 	needed = nbytes;
 	curr = buf;
 	socket = *(int *)(temp);
-	nap.at_sec = 1;
-	nap.at_usec = 0;
+	nap.tv_sec = 1;
+	nap.tv_usec = 0;
 	while (1)
 	{
+		assertpro(FD_SETSIZE > socket);
 		FD_ZERO(&fs);
 		FD_SET(socket, &fs);
 		assert(0 != FD_ISSET(socket, &fs));
-		status = tcp_routines.aa_select(socket + 1, (void *)(&fs), (void *)0, (void *)0, &nap);
+		status = select(socket + 1, (void *)(&fs), (void *)0, (void *)0, &nap);
 		if (status > 0)
 		{
-			status = tcp_routines.aa_recv(socket, curr, needed, 0);
+			RECV(socket, curr, needed, 0, status);
 			if ((0 == status) || (needed == status))	/* lost connection or all set */
 			{
 				break;
@@ -545,8 +549,8 @@ static void tcp_read(char *temp, char *buf, int nbytes) /* asking for *nbytes, h
 		}
 		if ((status < 0) && (errno != EINTR))
 		{
-			gtm_putmsg(VARLSTCNT(1) errno);
-			tcp_routines.aa_close(socket);
+			GTM_PUTMSG(VARLSTCNT(1) errno);
+			close(socket);
 			restore_read_errno = errno;
 			break;
 		}

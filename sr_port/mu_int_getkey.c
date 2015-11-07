@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,7 @@
 #include "util.h"
 #include "mupint.h"
 #include "mvalconv.h"
+#include "collseq.h"
 
 GBLDEF	gv_key		*muint_start_key;
 GBLDEF	gv_key		*muint_end_key;
@@ -43,6 +44,8 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 	unsigned char	*top, *startsrc, *src, *dest, slit[MAX_KEY_SZ + 1], *tmp;
 	int		iter;
 	gv_key		*muint_tmpkey;
+	gd_region	*reg;
+	boolean_t	nullsubs_seen;
 
 	src = key_buff;
 	if ('"' == key_buff[keylen - 1])
@@ -61,6 +64,7 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 	top = src + keylen;
 	startsrc = src;
 	keysize = DBKEYSIZE(MAX_KEY_SZ);
+	assert(MUINTKEY_FALSE == muint_key);
 	for (iter = 0, top = src + keylen; (iter < 2) && (src < top); iter++)
 	{
 		muint_tmpkey = NULL;	/* GVKEY_INIT macro requires this */
@@ -74,6 +78,7 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 			assert(NULL == muint_end_key);
 			muint_end_key = muint_tmpkey;	/* used by CLNUP_AND_RETURN_FALSE macro */
 		}
+		nullsubs_seen = FALSE;
 		dest = muint_tmpkey->base;
 		if ('^' != *src++)
 		{
@@ -158,8 +163,17 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 					}
 					tmpmval.str.addr = (char*)slit;
 					tmpmval.str.len = INTCAST(tmp - slit);
+					if (!tmpmval.str.len)
+						nullsubs_seen = TRUE;
 				}
-				mval2subsc(&tmpmval, muint_tmpkey);
+				/* We could be looking for this -subscript=... specification in one of many database files
+				 * each with a different standard null collation setting. As MUPIP INTEG switches to different
+				 * database files, it needs to recompute the subscript representation of the input subscript
+				 * if there are null subscripts in it and the regions have different standard null collation
+				 * properties. For now assume standard null collation is FALSE in all regions. And note down
+				 * if any null subscript was seen. If so do recomputation of key as db files get switched in integ.
+				 */
+				mval2subsc(&tmpmval, muint_tmpkey, STD_NULL_COLL_FALSE);
 				if ((src >= top) || (',' != *src))
 					break;
 				src++;
@@ -181,7 +195,8 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 		}
 		if (':' == *src)
 			src++;
-		muint_key = TRUE;
+		if (MUINTKEY_NULLSUBS != muint_key)
+			muint_key = (nullsubs_seen ? MUINTKEY_NULLSUBS : MUINTKEY_TRUE);
 	}
 	if (src < top)
 	{

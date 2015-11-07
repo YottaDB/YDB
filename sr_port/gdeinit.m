@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2012 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -39,7 +39,8 @@ GDEINIT
 	s gtm64=$p($zver," ",4)
 	i "/IA64/RS6000/SPARC/x86_64/x86/S390/S390X"[("/"_gtm64) s encsupportedplat=TRUE,gtm64=$s("x86"=gtm64:FALSE,1:TRUE)
 	e  s (encsupportedplat,gtm64)=FALSE
-	i (gtm64=TRUE) f x=1:1:16 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
+	i (gtm64=TRUE) d
+	. f x=1:1:16 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
 	e  f x=1:1:8 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
 	f i=25:1:30 s TWO(i)=TWO(i-1)*2
 	s TWO(31)=TWO(32)*.5
@@ -48,34 +49,71 @@ GDEINIT
 	s ver=$p($zver," ",3)
 	s defglo=glo(ver)
 	s comline=$zcmdline
-	s nullsubs="\NEVER\FALSE\ALWAYS\TRUE\EXISTING"
-	s nommbi=1              ; this is used in gdeverif and should be removed along with the code when support is added
+	s typevalue("STR2NUM","TNULLSUB","N")=0
+	s typevalue("STR2NUM","TNULLSUB","NE")=0
+	s typevalue("STR2NUM","TNULLSUB","NEV")=0
+	s typevalue("STR2NUM","TNULLSUB","NEVE")=0
+	s typevalue("STR2NUM","TNULLSUB","NEVER")=0
+	s typevalue("STR2NUM","TNULLSUB","F")=0
+	s typevalue("STR2NUM","TNULLSUB","FA")=0
+	s typevalue("STR2NUM","TNULLSUB","FAL")=0
+	s typevalue("STR2NUM","TNULLSUB","FALS")=0
+	s typevalue("STR2NUM","TNULLSUB","FALSE")=0
+	s typevalue("STR2NUM","TNULLSUB","T")=1
+	s typevalue("STR2NUM","TNULLSUB","TR")=1
+	s typevalue("STR2NUM","TNULLSUB","TRU")=1
+	s typevalue("STR2NUM","TNULLSUB","TRUE")=1
+	s typevalue("STR2NUM","TNULLSUB","A")=1
+	s typevalue("STR2NUM","TNULLSUB","AL")=1
+	s typevalue("STR2NUM","TNULLSUB","ALW")=1
+	s typevalue("STR2NUM","TNULLSUB","ALWA")=1
+	s typevalue("STR2NUM","TNULLSUB","ALWAY")=1
+	s typevalue("STR2NUM","TNULLSUB","ALWAYS")=1
+	s typevalue("STR2NUM","TNULLSUB","E")=2
+	s typevalue("STR2NUM","TNULLSUB","EX")=2
+	s typevalue("STR2NUM","TNULLSUB","EXI")=2
+	s typevalue("STR2NUM","TNULLSUB","EXIS")=2
+	s typevalue("STR2NUM","TNULLSUB","EXIST")=2
+	s typevalue("STR2NUM","TNULLSUB","EXISTI")=2
+	s typevalue("STR2NUM","TNULLSUB","EXISTIN")=2
+	s typevalue("STR2NUM","TNULLSUB","EXISTING")=2
+	s typevalue("NUM2STR","TNULLSUB",0)="NEVER"
+	s typevalue("NUM2STR","TNULLSUB",1)="ALWAYS"
+	s typevalue("NUM2STR","TNULLSUB",2)="EXISTING"
+	s typevalue("STR2NUM","TACCMETH","BG")=0
+	s typevalue("STR2NUM","TACCMETH","MM")=1
+	s nommbi=1              ; this is used in GDEVERIF and should be removed along with the code when support is added
 	d UNIX:ver'="VMS"
 	d VMS:ver="VMS"
 	d syntabi
 ;
+	; Explanation of some of the SIZEOF local variable subscripts.
+	;	SIZEOF("gd_segment")		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
+	;
 	i (gtm64=FALSE) d
-	. s SIZEOF("am_offset")=324
-	. s SIZEOF("file_spec")=256
-	. s SIZEOF("gd_header")=16
-	. s SIZEOF("gd_contents")=44
-	. s SIZEOF("gd_map")=36
+	. s SIZEOF("am_offset")=328		; --> offset of "acc_meth" field in the "gd_segment" structure
+	. s SIZEOF("file_spec")=256		; --> maximum size (in bytes) of a file name specified in gde command line
+	. s SIZEOF("gd_header")=16		; --> 16-byte header structure at offset 0 of .gld (12 byte label, 4-byte filesize)
+	. s SIZEOF("gd_contents")=76		; --> size of the "gd_addr" structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_map")=16			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
 	. if ver'="VMS" d
-	. . s SIZEOF("gd_region")=356
-	. . s SIZEOF("gd_region_padding")=0			; not used on VMS
-	. . s SIZEOF("gd_segment")=340
+	. . s SIZEOF("gd_region")=372		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
+	. . s SIZEOF("gd_region_padding")=0	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
+	. . s SIZEOF("gd_segment")=360		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
 	. e  d
-	. . s SIZEOF("gd_region")=332
-	. . s SIZEOF("gd_segment")=336
+	. . s SIZEOF("gd_region")=348		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
+	. . ; SIZEOF("gd_region_padding")	 is not used in VMS
+	. . s SIZEOF("gd_segment")=356		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
 	e  d
-	. s SIZEOF("am_offset")=332
-	. s SIZEOF("file_spec")=256
-	. s SIZEOF("gd_header")=16
-	. s SIZEOF("gd_contents")=80
-	. s SIZEOF("gd_map")=40
-	. s SIZEOF("gd_region")=368
-	. s SIZEOF("gd_region_padding")=4
-	. s SIZEOF("gd_segment")=360
+	. s SIZEOF("am_offset")=336		; --> offset of "acc_meth" field in the "gd_segment" structure
+	. s SIZEOF("file_spec")=256		; --> maximum size (in bytes) of a file name specified in gde command line
+	. s SIZEOF("gd_header")=16		; --> 16-byte header structure at offset 0 of .gld (12 byte label, 4-byte filesize)
+	. s SIZEOF("gd_contents")=112		; --> size of the "gd_addr" structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_map")=24			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_region")=384		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_region_padding")=4	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
+	. s SIZEOF("gd_segment")=384		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
+	s SIZEOF("gd_gblname")=40
 	s SIZEOF("mident")=32
 	s SIZEOF("blk_hdr")=16
 	i ver'="VMS" d
@@ -90,33 +128,37 @@ GDEINIT
 	s SIZEOF("reg_jnl_deq")=4				; not used on VMS
 	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32	; maximum name length allowed is 31 characters
 	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
+	s MAXSTRLEN=(2**20)					; needs to be equal to MAX_STRLEN in mdef.h at all times
+	s MAXGVSUBS=31						; needs to be equal to (MAX_GVSUBSCRIPTS-1) in mdef.h at all times
 ;
-; tokens are used for error reporting only
+; tokens are used for parsing and error reporting
 	s tokens("TKIDENT")="identifier"
-	s tokens("TKNUMLIT")="number"
 	s tokens("TKEOL")="end-of-line"
 	s tokens("""")="TKSTRLIT",tokens("TKSTRLIT")="string literal"
-	s tokens("@")="TKAMPER",tokens("TKAMPER")="ampersand"
-	s tokens("*")="TKASTER",tokens("TKASTER")="asterisk"
-	s tokens(":")="TKCOLON",tokens("TKCOLON")="colon"
+	s tokens("@")="TKAT",tokens("TKAT")="at sign"
 	s tokens(",")="TKCOMMA",tokens("TKCOMMA")="comma"
-	s tokens("$")="TKDOLLAR",tokens("TKDOLLAR")="dollar sign"
 	s tokens("=")="TKEQUAL",tokens("TKEQUAL")="equal sign"
-	s tokens("<")="TKLANGLE",tokens("TKLANGLE")="left angle bracket"
-	s tokens("[")="TKLBRACK",tokens("TKLBRACK")="left bracket"
 	s tokens("(")="TKLPAREN",tokens("TKLPAREN")="left parenthesis"
-	s tokens("-")="TKDASH",tokens("TKDASH")="dash"
-	s tokens("%")="TKPCT",tokens("TKPCT")="percent sign"
-	s tokens(".")="TKPERIOD",tokens("TKPERIOD")="period"
 	s tokens(")")="TKRPAREN",tokens("TKRPAREN")="right parenthesis"
-	s tokens("]")="TKRBRACK",tokens("TKRBRACK")="right bracket"
-	s tokens(">")="TKRANGLE",tokens("TKRANGLE")="right angle bracket"
-	s tokens(";")="TKSCOLON",tokens("TKSCOLON")="semicolon"
-	s tokens("/")="TKSLASH",tokens("TKSLASH")="slash"
-	s tokens("_")="TKUSCORE",tokens("TKUSCORE")="underscore"
 	s tokens("!")="TKEXCLAM",tokens("TKEXCLAM")="exclamation point"
-	s tokens("TKOTHER")="other"
+	i ver'="VMS" s tokens("-")="TKDASH",tokens("TKDASH")="dash"
+	e            s tokens("/")="TKSLASH",tokens("TKSLASH")="slash"
+	s tokens("")="TKEOL"	; for parsing purposes
+; tokendelim is used for parsing; it is defined for all characters that can terminate a valid token during parsing
+	for c=" ",TAB,"=",",",")","" s tokendelim(c)=""
+	; in case of VMS, we want the "/" qualifier separator to be treated as a delimiter even if not preceded by white space
+	; this is how VMS tools work. Whereas in the Unix shell command line, space is by default the separator for multiple
+	; qualifiers. Hence GDE also is similarly different between Unix vs VMS in terms of separator handling ("-" vs "/").
+	i ver="VMS" s tokendelim("/")=""
+; spacedelim is used for parsing when we want to terminate token parsing only if we see a white space (a subset of "tokendelim")
+; this is needed in case we are parsing say a filename and we dont want a "-" or "=" in the file name to terminate the parse.
+	for c=" ",TAB,"" s spacedelim(c)=""
+	i ver="VMS" s spacedelim("/")=""
+	k c
 ; maximums and mimimums
+; gblname
+	s mingnam("COLLATION")=0
+	s maxgnam("COLLATION")=255
 ; region
 	s minreg("ALLOCATION")=$s(ver'="VMS":200,1:10)
 	s minreg("BEFORE_IMAGE")=0,minreg("COLLATION_DEFAULT")=0,minreg("STDNULLCOLL")=0
@@ -139,6 +181,7 @@ GDEINIT
 	i ver="VMS" do
 	. s maxreg("EXTENSION")=HEX(4)-1
 	. s maxreg("BUFFER_SIZE")=2000
+	. s maxreg("KEY_SIZE")=255
 	e  d
 	. s maxreg("EXTENSION")=1073741823
 	. s maxreg("AUTOSWITCHLIMIT")=8388607
@@ -149,29 +192,61 @@ GDEINIT
 	. s maxreg("INST_FREEZE_ON_ERROR")=1
 	. s maxreg("BUFFER_SIZE")=32768
 	. s maxreg("QDBRUNDOWN")=1
-	s maxreg("JOURNAL")=1,maxreg("KEY_SIZE")=1019,maxreg("NULL_SUBSCRIPTS")=2
+	. s maxreg("KEY_SIZE")=1019	; = max value of KEY->end that returns TRUE for CAN_APPEND_HIDDEN_SUBS(KEY) in gdsfhead.h
+	s maxreg("JOURNAL")=1,maxreg("NULL_SUBSCRIPTS")=2
 	s maxreg("RECORD_SIZE")=SIZEOF("max_str")
 ; segments
+	; First define segment characteristics (minimum and maximum) that are identical to BG and MM access methods
+	; Then define overrides specific to BG and MM
+	n minsegcommon,maxsegcommon
+	s minsegcommon("ALLOCATION")=10
+	s maxsegcommon("ALLOCATION")=TWO(27)
+	i ver'="VMS" s maxsegcommon("ALLOCATION")=TWO(30)-TWO(25) ; supports 992M blocks for UNIX only
+	s minsegcommon("BLOCK_SIZE")=SIZEOF("dsk_blk")
+	s maxsegcommon("BLOCK_SIZE")=HEX(4)-SIZEOF("dsk_blk")
+	s minsegcommon("EXTENSION_COUNT")=0
+	s maxsegcommon("EXTENSION_COUNT")=HEX(4)-1
+	s minsegcommon("LOCK_SPACE")=10
+	s maxsegcommon("LOCK_SPACE")=65536
+	s minsegcommon("MUTEX_SLOTS")=64	; keep this in sync with MIN_CRIT_ENTRY in gdsbt.h
+	s maxsegcommon("MUTEX_SLOTS")=32768	; keep this in sync with MAX_CRIT_ENTRY in gdsbt.h
+	s minsegcommon("RESERVED_BYTES")=0
+	s maxsegcommon("RESERVED_BYTES")=HEX(4)-SIZEOF("dsk_blk")
 ; bg
-	s minseg("BG","ALLOCATION")=10,minseg("BG","BLOCK_SIZE")=SIZEOF("dsk_blk"),minseg("BG","EXTENSION_COUNT")=0
-	s minseg("BG","GLOBAL_BUFFER_COUNT")=64,minseg("BG","LOCK_SPACE")=10,minseg("BG","RESERVED_BYTES")=0
-	s maxseg("BG","ALLOCATION")=TWO(27),(maxseg("BG","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
-	i ver'="VMS" s maxseg("BG","ALLOCATION")=TWO(30)-TWO(25) ; supports 992M blocks for UNIX only
-	s maxseg("BG","EXTENSION_COUNT")=HEX(4)-1,maxseg("BG","LOCK_SPACE")=65536
+	m minseg("BG")=minsegcommon	; copy over all common stuff into BG access method first
+	m maxseg("BG")=maxsegcommon	; copy over all common stuff into BG access method first
+	; now add BG specific overrides
+	s minseg("BG","GLOBAL_BUFFER_COUNT")=64
 	i (gtm64=TRUE) s maxseg("BG","GLOBAL_BUFFER_COUNT")=2147483647 ; 2G-1
 	e  s maxseg("BG","GLOBAL_BUFFER_COUNT")=65536
 ; mm
-	s minseg("MM","ALLOCATION")=10,minseg("MM","BLOCK_SIZE")=SIZEOF("dsk_blk"),minseg("MM","DEFER")=0
-	s minseg("MM","LOCK_SPACE")=10,minseg("MM","EXTENSION_COUNT")=0,minseg("MM","RESERVED_BYTES")=0
-	s maxseg("MM","ALLOCATION")=TWO(27),(maxseg("MM","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
-	i ver'="VMS" s maxseg("MM","ALLOCATION")=TWO(30)-TWO(25) ; supports 992M blocks for UNIX only
-	s maxseg("MM","DEFER")=86400,maxseg("MM","LOCK_SPACE")=1000,maxseg("MM","EXTENSION_COUNT")=HEX(4)-1
+	m minseg("MM")=minsegcommon	; copy over all common stuff into MM access method first
+	m maxseg("MM")=maxsegcommon	; copy over all common stuff into BG access method first
+	; now add MM specific overrides
+	s minseg("MM","DEFER")=0
+	s maxseg("MM","DEFER")=86400
+	; Now define default segment characteristics
+	; This is particularly needed for fields that are only available in more recent .gld formats
+	; So if we are reading an older format .gld file, we can use these as the default values.
+	s defseg("ALLOCATION")=100
+	s defseg("BLOCK_SIZE")=1024
+	s defseg("BUCKET_SIZE")=""
+	s defseg("EXTENSION_COUNT")=100
+	s defseg("FILE_TYPE")="DYNAMIC"
+	s defseg("MUTEX_SLOTS")=1024 ; keep this in sync with DEFAULT_NUM_CRIT_ENTRY in gdsbt.h
+	s defseg("RESERVED_BYTES")=0
+	s defseg("LOCK_SPACE")=40
+	s defseg("WINDOW_SIZE")=""
+	i ver'="VMS" s defseg("ENCRYPTION_FLAG")=0
 	q
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
 
 ; gde command language syntax table
 syntabi:
+	s syntab("ADD","GBLNAME")=""
+	s syntab("ADD","GBLNAME","COLLATION")="REQUIRED"
+	s syntab("ADD","GBLNAME","COLLATION","TYPE")="TNUMBER"
 	s syntab("ADD","NAME")=""
 	s syntab("ADD","NAME","REGION")="REQUIRED"
 	s syntab("ADD","NAME","REGION","TYPE")="TREGION"
@@ -194,19 +269,16 @@ syntabi:
 	s syntab("ADD","REGION","JOURNAL","EXTENSION","TYPE")="TNUMBER"
 	s syntab("ADD","REGION","JOURNAL","FILE_NAME")="REQUIRED"
 	s syntab("ADD","REGION","JOURNAL","FILE_NAME","TYPE")="TFSPEC"
-	;s syntab("ADD","REGION","JOURNAL","STOP_ENABLED")="NEGATABLE"
 	s syntab("ADD","REGION","KEY_SIZE")="REQUIRED"
 	s syntab("ADD","REGION","KEY_SIZE","TYPE")="TNUMBER"
 	s syntab("ADD","REGION","NULL_SUBSCRIPTS")="NEGATABLE,REQUIRED"
 	s syntab("ADD","REGION","NULL_SUBSCRIPTS","TYPE")="TNULLSUB"
-	s syntab("ADD","REGION","NULL_SUBSCRIPTS","TYPE","VALUES")=nullsubs
 	i ver'="VMS" s syntab("ADD","REGION","QDBRUNDOWN")="NEGATABLE"
 	s syntab("ADD","REGION","RECORD_SIZE")="REQUIRED"
 	s syntab("ADD","REGION","RECORD_SIZE","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT")=""
 	s syntab("ADD","SEGMENT","ACCESS_METHOD")="REQUIRED"
 	s syntab("ADD","SEGMENT","ACCESS_METHOD","TYPE")="TACCMETH"
-	s syntab("ADD","SEGMENT","ACCESS_METHOD","TYPE","VALUES")=accmeth
 	s syntab("ADD","SEGMENT","ALLOCATION")="REQUIRED"
 	s syntab("ADD","SEGMENT","ALLOCATION","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","BLOCK_SIZE")="REQUIRED"
@@ -219,6 +291,8 @@ syntabi:
 	s syntab("ADD","SEGMENT","EXTENSION_COUNT","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","FILE_NAME")="REQUIRED"
 	s syntab("ADD","SEGMENT","FILE_NAME","TYPE")="TFSPEC"
+	s syntab("ADD","SEGMENT","MUTEX_SLOTS")="REQUIRED"
+	s syntab("ADD","SEGMENT","MUTEX_SLOTS","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","GLOBAL_BUFFER_COUNT")="REQUIRED"
 	s syntab("ADD","SEGMENT","GLOBAL_BUFFER_COUNT","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","LOCK_SPACE")="REQUIRED"
@@ -227,6 +301,9 @@ syntabi:
 	s syntab("ADD","SEGMENT","RESERVED_BYTES","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","WINDOW_SIZE")="REQUIRED"
 	s syntab("ADD","SEGMENT","WINDOW_SIZE","TYPE")="TNUMBER"
+	s syntab("CHANGE","GBLNAME")=""
+	s syntab("CHANGE","GBLNAME","COLLATION")="REQUIRED"
+	s syntab("CHANGE","GBLNAME","COLLATION","TYPE")="TNUMBER"
 	s syntab("CHANGE","NAME")=""
 	s syntab("CHANGE","NAME","REGION")="REQUIRED"
 	s syntab("CHANGE","NAME","REGION","TYPE")="TREGION"
@@ -249,19 +326,16 @@ syntabi:
 	s syntab("CHANGE","REGION","JOURNAL","EXTENSION","TYPE")="TNUMBER"
 	s syntab("CHANGE","REGION","JOURNAL","FILE_NAME")="REQUIRED"
 	s syntab("CHANGE","REGION","JOURNAL","FILE_NAME","TYPE")="TFSPEC"
-	;s syntab("CHANGE","REGION","JOURNAL","STOP_ENABLED")="NEGATABLE"
 	s syntab("CHANGE","REGION","KEY_SIZE")="REQUIRED"
 	s syntab("CHANGE","REGION","KEY_SIZE","TYPE")="TNUMBER"
 	s syntab("CHANGE","REGION","NULL_SUBSCRIPTS")="NEGATABLE,REQUIRED"
 	s syntab("CHANGE","REGION","NULL_SUBSCRIPTS","TYPE")="TNULLSUB"
-	s syntab("CHANGE","REGION","NULL_SUBSCRIPTS","TYPE","VALUES")=nullsubs
 	i ver'="VMS" s syntab("CHANGE","REGION","QDBRUNDOWN")="NEGATABLE"
 	s syntab("CHANGE","REGION","RECORD_SIZE")="REQUIRED"
 	s syntab("CHANGE","REGION","RECORD_SIZE","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT")=""
 	s syntab("CHANGE","SEGMENT","ACCESS_METHOD")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","ACCESS_METHOD","TYPE")="TACCMETH"
-	s syntab("CHANGE","SEGMENT","ACCESS_METHOD","TYPE","VALUES")=accmeth
 	s syntab("CHANGE","SEGMENT","ALLOCATION")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","ALLOCATION","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","BLOCK_SIZE")="REQUIRED"
@@ -274,6 +348,8 @@ syntabi:
 	s syntab("CHANGE","SEGMENT","EXTENSION_COUNT","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","FILE_NAME")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","FILE_NAME","TYPE")="TFSPEC"
+	s syntab("CHANGE","SEGMENT","MUTEX_SLOTS")="REQUIRED"
+	s syntab("CHANGE","SEGMENT","MUTEX_SLOTS","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","GLOBAL_BUFFER_COUNT")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","GLOBAL_BUFFER_COUNT","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","LOCK_SPACE")="REQUIRED"
@@ -288,12 +364,13 @@ syntabi:
 	s syntab("TEMPLATE","REGION","STDNULLCOLL")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","DYNAMIC_SEGMENT")="REQUIRED"
 	s syntab("TEMPLATE","REGION","DYNAMIC_SEGMENT","TYPE")="TSEGMENT"
-	i ver'="VMS" s syntab("TEMPLATE","REGION","INST_FREEZE_ON_ERROR")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("TEMPLATE","REGION","JOURNAL","ALLOCATION")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","ALLOCATION","TYPE")="TNUMBER"
-	s syntab("TEMPLATE","REGION","JOURNAL","AUTOSWITCHLIMIT")="REQUIRED"
-	s syntab("TEMPLATE","REGION","JOURNAL","AUTOSWITCHLIMIT","TYPE")="TNUMBER"
+	i ver'="VMS" d
+	. s syntab("TEMPLATE","REGION","INST_FREEZE_ON_ERROR")="NEGATABLE"
+	. s syntab("TEMPLATE","REGION","JOURNAL","AUTOSWITCHLIMIT")="REQUIRED"
+	. s syntab("TEMPLATE","REGION","JOURNAL","AUTOSWITCHLIMIT","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","JOURNAL","BUFFER_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","BUFFER_SIZE","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","JOURNAL","BEFORE_IMAGE")="NEGATABLE"
@@ -301,19 +378,16 @@ syntabi:
 	s syntab("TEMPLATE","REGION","JOURNAL","EXTENSION","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","JOURNAL","FILE_NAME")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","FILE_NAME","TYPE")="TFSPEC"
-	;s syntab("TEMPLATE","REGION","JOURNAL","STOP_ENABLED")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","KEY_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","REGION","KEY_SIZE","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","NULL_SUBSCRIPTS")="NEGATABLE,REQUIRED"
 	s syntab("TEMPLATE","REGION","NULL_SUBSCRIPTS","TYPE")="TNULLSUB"
-	s syntab("TEMPLATE","REGION","NULL_SUBSCRIPTS","TYPE","VALUES")=nullsubs
 	i ver'="VMS" s syntab("TEMPLATE","REGION","QDBRUNDOWN")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","RECORD_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","REGION","RECORD_SIZE","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT")=""
 	s syntab("TEMPLATE","SEGMENT","ACCESS_METHOD")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","ACCESS_METHOD","TYPE")="TACCMETH"
-	s syntab("TEMPLATE","SEGMENT","ACCESS_METHOD","TYPE","VALUES")=accmeth
 	s syntab("TEMPLATE","SEGMENT","ALLOCATION")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","ALLOCATION","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","BLOCK_SIZE")="REQUIRED"
@@ -326,6 +400,8 @@ syntabi:
 	s syntab("TEMPLATE","SEGMENT","EXTENSION_COUNT","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","FILE_NAME")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","FILE_NAME","TYPE")="TFSPEC"
+	s syntab("TEMPLATE","SEGMENT","MUTEX_SLOTS")="REQUIRED"
+	s syntab("TEMPLATE","SEGMENT","MUTEX_SLOTS","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","GLOBAL_BUFFER_COUNT")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","GLOBAL_BUFFER_COUNT","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","LOCK_SPACE")="REQUIRED"
@@ -334,6 +410,7 @@ syntabi:
 	s syntab("TEMPLATE","SEGMENT","RESERVED_BYTES","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","WINDOW_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","WINDOW_SIZE","TYPE")="TNUMBER"
+	s syntab("DELETE","GBLNAME")=""
 	s syntab("DELETE","NAME")=""
 	s syntab("DELETE","REGION")=""
 	s syntab("DELETE","SEGMENT")=""
@@ -344,27 +421,30 @@ syntabi:
 	s syntab("LOG","OFF")=""
 	s syntab("LOG","ON")="OPTIONAL"
 	s syntab("LOG","ON","TYPE")="TFSPEC"
-	s syntab("SETGD","FILE")="REQUIRED"
-	s syntab("SETGD","FILE","TYPE")="TFSPEC"
-	s syntab("SETGD","QUIT")=""
 	s syntab("QUIT")=""
+	s syntab("RENAME","GBLNAME")=""
 	s syntab("RENAME","NAME")=""
 	s syntab("RENAME","REGION")=""
 	s syntab("RENAME","SEGMENT")=""
+	s syntab("SETGD","FILE")="REQUIRED"
+	s syntab("SETGD","FILE","TYPE")="TFSPEC"
+	s syntab("SETGD","QUIT")=""
 	s syntab("SHOW")=""
 	s syntab("SHOW","ALL")=""
-	s syntab("SHOW","TEMPLATE")=""
+	s syntab("SHOW","COMMANDS")=""
+	s syntab("SHOW","COMMANDS","FILE")="OPTIONAL"
+	s syntab("SHOW","COMMANDS","FILE","TYPE")="TFSPEC"
+	s syntab("SHOW","GBLNAME")=""
 	s syntab("SHOW","MAP")=""
 	s syntab("SHOW","MAP","REGION")="REQUIRED"
 	s syntab("SHOW","MAP","REGION","TYPE")="TREGION"
 	s syntab("SHOW","NAME")=""
 	s syntab("SHOW","REGION")=""
 	s syntab("SHOW","SEGMENT")=""
-	s syntab("SHOW","COMMANDS")=""
-	s syntab("SHOW","COMMANDS","FILE")="OPTIONAL"
-	s syntab("SHOW","COMMANDS","FILE","TYPE")="TFSPEC"
+	s syntab("SHOW","TEMPLATE")=""
 	s syntab("SPAWN")=""
 	s syntab("VERIFY","ALL")=""
+	s syntab("VERIFY","GBLNAME")=""
 	s syntab("VERIFY","MAP")=""
 	s syntab("VERIFY","NAME")=""
 	s syntab("VERIFY","REGION")=""
@@ -373,9 +453,10 @@ syntabi:
 	q
 VMS
 	s endian=FALSE
-	s hdrlab="GTCGBLDIR009"		; must be concurrently maintained in gbldirnam.h!!!
+	s hdrlab="GTCGBLDIR010"		; must be concurrently maintained in gbldirnam.h!!!
 	s tfile="GTM$GBLDIR"
 	s accmeth="\BG\MM\USER"
+	s typevalue("STR2NUM","TACCMETH","USER")=2
 	s helpfile="GTM$HELP:GDE.HLB"
 	s defdb="MUMPS"
 	s defgld="MUMPS.GLD",defgldext=".GLD"
@@ -387,8 +468,8 @@ VMS
 	q
 
 UNIX:
-	s hdrlab="GTCGBDUNX008"         ; must be concurrently maintained in gbldirnam.h!!!
-	i (gtm64=TRUE) s hdrlab="GTCGBDUNX108" ; the high order digit is a 64-bit flag
+	s hdrlab="GTCGBDUNX009"         ; must be concurrently maintained in gbldirnam.h!!!
+	i (gtm64=TRUE) s hdrlab="GTCGBDUNX109" ; the high order digit is a 64-bit flag
 	s tfile="$gtmgbldir"
 	s accmeth="\BG\MM"
 	s helpfile="$gtm_dist/gdehelp.gld"

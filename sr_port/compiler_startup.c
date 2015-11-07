@@ -28,15 +28,14 @@
 #include "comp_esc.h"
 #include "resolve_blocks.h"
 #include "hashtab_str.h"
+#include <rtnhdr.h>
+#include "rtn_src_chksum.h"
 
 #define HOPELESS_COMPILE 128
 
 GBLREF short int source_column, source_line;
 
-/* ensure source_buffer is aligned on a int4 word boundary so that
- * we can calculate the checksum a longword at a time.
- */
-GBLREF int4 			aligned_source_buffer[MAX_SRCLINE / SIZEOF(int4) + 1];
+GBLREF unsigned char		source_file_name[];
 GBLREF unsigned char 		*source_buffer;
 GBLREF src_line_struct 		src_head;
 GBLREF triple			t_orig, *curr_fetch_trip, *curr_fetch_opr;
@@ -53,17 +52,18 @@ LITDEF char compile_terminated[] = "COMPILATION TERMINATED DUE TO EXCESS ERRORS"
 boolean_t compiler_startup(void)
 {
 #ifdef DEBUG
-	void		dumpall();
+	void			dumpall();
 #endif
-	boolean_t	compile_w_err;
-	unsigned char	err_buf[45];
-	unsigned char 	*cp, *cp2;
-	int		errknt;
-	int4            n;
-	uint4		checksum, line_count;
-	mlabel		*null_lab;
-	src_line_struct	*sl;
-	mident		null_mident;
+	boolean_t		compile_w_err;
+	unsigned char		err_buf[45];
+	unsigned char 		*cp, *cp2;
+	int			errknt;
+	int4			n;
+	uint4			line_count;
+	mlabel			*null_lab;
+	src_line_struct		*sl;
+	mident			null_mident;
+	gtm_rtn_src_chksum_ctx	checksum_ctx;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -87,12 +87,13 @@ boolean_t compiler_startup(void)
 	mstr_native_align = FALSE; /* TODO: remove this line and  uncomment the above line */
 	cg_phase = CGP_NOSTATE;
 	TREF(source_error_found) = errknt = 0;
-	if(!open_source_file())
+	if (!open_source_file())
 	{
 		mstr_native_align = save_mstr_native_align;
 		REVERT;
 		return FALSE;
 	}
+	rtn_src_chksum_init(&checksum_ctx);
 	cg_phase = CGP_PARSE;
 	if (cmd_qlf.qlf & CQ_LIST || cmd_qlf.qlf & CQ_CROSS_REFERENCE)
 	{
@@ -109,12 +110,14 @@ boolean_t compiler_startup(void)
 	curr_fetch_trip = curr_fetch_opr = newtriple(OC_LINEFETCH);
 	curr_fetch_count = 0;
 	TREF(code_generated) = FALSE;
-	checksum = 0;
 	line_count = 1;
 	for (source_line = 1;  errknt <= HOPELESS_COMPILE;  source_line++)
 	{
 		if (-1 == (n = read_source_file()))
 			break;
+		rtn_src_chksum_line(&checksum_ctx, source_buffer, n);
+		if ('\n' == source_buffer[n - 1])
+			source_buffer[n - 1] = '\0'; /* compiler doesn't like trailing newlines (gives SPOREOL errors) */
 		if (cmd_qlf.qlf & CQ_LIST || cmd_qlf.qlf & CQ_CROSS_REFERENCE)
 		{
 			if (cmd_qlf.qlf & CQ_MACHINE_CODE)
@@ -130,8 +133,6 @@ boolean_t compiler_startup(void)
 				list_line((char *)source_buffer);
 			}
 		}
-		/* calculate checksum */
-		RTN_SRC_CHKSUM((char *)source_buffer, n, checksum);
 		TREF(source_error_found) = 0;
 		lb_init();
 		if (cmd_qlf.qlf & CQ_CE_PREPROCESS)
@@ -142,6 +143,7 @@ boolean_t compiler_startup(void)
 			errknt++;
 		}
 	}
+	rtn_src_chksum_digest(&checksum_ctx);
 	close_source_file();
 	if (cmd_qlf.qlf & CQ_CE_PREPROCESS)
 		close_ceprep_file();
@@ -186,7 +188,7 @@ boolean_t compiler_startup(void)
 	}
 	if ((!errknt || compile_w_err) && (cmd_qlf.qlf & CQ_OBJECT || cmd_qlf.qlf & CQ_MACHINE_CODE))
 	{
-		obj_code(line_count, checksum);
+		obj_code(line_count, &checksum_ctx);
 		cg_phase = CGP_FINI;
 	}
 	if (cmd_qlf.qlf & CQ_LIST || cmd_qlf.qlf & CQ_CROSS_REFERENCE)

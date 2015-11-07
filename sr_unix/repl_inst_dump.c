@@ -36,7 +36,6 @@
 #include "gtmrecv.h"
 #include "repl_inst_dump.h"
 #include "repl_log.h"		/* for "repl_log" prototype */
-#include "iotcpdef.h"		/* for SA_MAXLEN */
 
 LITDEF	char	state_array[][23] = {
 			"DUMMY_STATE",
@@ -987,6 +986,14 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 			util_out_print( PREFIX_SOURCELOCAL "Filter Command              !AZ",
 				TRUE, idx, gtmsourcelocal_ptr->filter_cmd);
 		}
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, next_renegotiate_time),
+					SIZEOF(gtmsourcelocal_ptr->next_renegotiate_time));
+		util_out_print(PREFIX_SOURCELOCAL, FALSE, idx);
+		PRINT_TIME("Next Renegotiate Time       ", gtmsourcelocal_ptr->next_renegotiate_time);
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, num_renegotiations),
+					SIZEOF(gtmsourcelocal_ptr->num_renegotiations));
+		util_out_print(PREFIX_SOURCELOCAL "Number of TLS/SSL renegotiations      !10UL [0x!XL]", TRUE, idx,
+					gtmsourcelocal_ptr->num_renegotiations, gtmsourcelocal_ptr->num_renegotiations);
 		PRINT_DASHES;
 	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,7 @@ void preemptive_db_clnup(int preemptive_severe)
 			/* We know of a few cases in Unix where gv_target and gv_currkey could be out of sync at this point.
 			 *   a) If we are inside trigger code which in turn does an update that does
 			 *	reads of ^#t global and ends up in a restart. This restart would
-			 *	in turn do a rts_error(TPRETRY) which would invoke mdb_condition_handler
+			 *	in turn do a rts_error_csa(TPRETRY) which would invoke mdb_condition_handler
 			 *	that would in turn invoke preemptive_db_clnup which invokes this macro.
 			 *	In this tp restart case though, it is ok for gv_target and gv_currkey
 			 *	to be out of sync because they are going to be reset by tp_clean_up anyways.
@@ -114,11 +114,11 @@ void preemptive_db_clnup(int preemptive_severe)
 			{
 				csa = si->tp_csa;
 				assert(si->tp_csa == si->kip_csa);
-				CAREFUL_DECR_KIP(csa->hdr, csa, si->kip_csa);
+				PROBE_DECR_KIP(csa->hdr, csa, si->kip_csa);
 			}
 		}
 	} else if (NULL != kip_csa && (NULL != kip_csa->hdr) && (NULL != kip_csa->nl))
-		CAREFUL_DECR_KIP(kip_csa->hdr, kip_csa, kip_csa);
+		PROBE_DECR_KIP(kip_csa->hdr, kip_csa, kip_csa);
 	if (IS_DSE_IMAGE)
 	{	/* Release crit on any region that was obtained for the current erroring DSE operation.
 		 * Take care NOT to release crits obtained by a previous CRIT -SEIZE command.

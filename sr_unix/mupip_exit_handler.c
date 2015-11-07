@@ -106,7 +106,7 @@ void mupip_exit_handler(void)
 		mupip_jnl_recover = FALSE;
 	}
 	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = FALSE;
-	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
+	CANCEL_TIMERS;			/* Cancel all unsafe timers - No unpleasant surprises */
 	secshr_db_clnup(NORMAL_TERMINATION);
 	if (dollar_tlevel)
 		OP_TROLLBACK(0);

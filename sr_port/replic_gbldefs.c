@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,22 +37,28 @@
 #include "gtmsource.h"
 #include "gtmrecv.h"
 #include "read_db_files_from_gld.h"
+#ifdef GTM_TLS
+#include "gtm_repl.h"
+#endif
 
-GBLDEF	unsigned char	*gtmsource_tcombuff_start = NULL;
-GBLDEF	unsigned char	*repl_filter_buff = NULL;
-GBLDEF	int		repl_filter_bufsiz = 0;
-GBLDEF	unsigned int	jnl_source_datalen, jnl_dest_maxdatalen;
-GBLDEF	unsigned char	jnl_source_rectype, jnl_dest_maxrectype;
-GBLDEF	char		*ext_stop;
-GBLDEF	char		*jb_stop;
-GBLDEF	seq_num		lastlog_seqno;
-GBLDEF	qw_num		trans_sent_cnt, last_log_tr_sent_cnt, trans_recvd_cnt, last_log_tr_recvd_cnt;
+GBLDEF	unsigned char		*gtmsource_tcombuff_start = NULL;
+GBLDEF	unsigned char		*repl_filter_buff = NULL;
+GBLDEF	int			repl_filter_bufsiz = 0;
+GBLDEF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
+GBLDEF	unsigned char		jnl_source_rectype, jnl_dest_maxrectype;
+GBLDEF	char			*ext_stop;
+GBLDEF	char			*jb_stop;
+GBLDEF	seq_num			lastlog_seqno;
+GBLDEF	qw_num			trans_sent_cnt, last_log_tr_sent_cnt, trans_recvd_cnt, last_log_tr_recvd_cnt;
 GBLDEF	upd_helper_entry_ptr_t	helper_entry;
+#ifdef GTM_TLS
+GBLDEF	repl_tls_info_t		repl_tls;
+#endif
 
 #ifdef VMS
-GBLDEF	unsigned char	jnl_ver, remote_jnl_ver;
-GBLDEF	boolean_t	primary_side_std_null_coll;
-GBLDEF	boolean_t	primary_side_trigger_support;
-GBLDEF	boolean_t	secondary_side_std_null_coll;
-GBLDEF	boolean_t	secondary_side_trigger_support;
+GBLDEF	unsigned char		jnl_ver, remote_jnl_ver;
+GBLDEF	boolean_t		primary_side_std_null_coll;
+GBLDEF	boolean_t		primary_side_trigger_support;
+GBLDEF	boolean_t		secondary_side_std_null_coll;
+GBLDEF	boolean_t		secondary_side_trigger_support;
 #endif

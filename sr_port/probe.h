@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ boolean_t	probe(uint4 len, sm_uc_ptr_t addr, boolean_t write);
 #define		PROBE_EVEN(X)	(!((UINTPTR_T)(X) & 1))
 #define		PROBE_ODD(X)	(!PROBE_EVEN(X))
 
-#define		CAREFUL_DECR_CNT(X,Y)	if (PROBE_EVEN(X)) DECR_CNT((X),(Y))
-#define		CAREFUL_INCR_CNT(X,Y)	if (PROBE_EVEN(X)) INCR_CNT((X),(Y))
+#define		PROBE_DECR_CNT(X,Y)	if (PROBE_EVEN(X)) DECR_CNT((X),(Y))
+#define		PROBE_INCR_CNT(X,Y)	if (PROBE_EVEN(X)) INCR_CNT((X),(Y))
 
 #endif

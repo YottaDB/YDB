@@ -182,12 +182,15 @@ gtmcrypt_dbk_ref gtmcrypt
 gtmcrypt_pk_ref gtmcrypt
 gtmcrypt_sym_ref gtmcrypt
 gtmcrypt_ref gtmcrypt
+gtmcrypt_util gtmcrypt
 maskpass gtmcrypt
+gtm_tls_impl gtmcrypt
 LABEL
 
 # this first set of excluded modules are from the list above of modules that get built as plugins. Only plugins
 # should be metioned in this list.
-set exclude_compile_list = "gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_pk_ref gtmcrypt_ref maskpass"
+set exclude_compile_list = "gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_pk_ref gtmcrypt_ref maskpass gtm_tls_impl"
+set exclude_compile_list = "$exclude_compile_list gtmcrypt_util"
 # modules that should never be built or compiled are in this list. They are used in other capacities (e.g. used to
 # generate other routines) but are NOT part of the GTM runtime. Other scripts compile and use these routines.
 set exclude_build_list = "gtm_threadgbl_deftypes"

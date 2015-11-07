@@ -69,6 +69,7 @@
 #define EXTEND_SUSPECT		-3
 #define FILE_EXTENDED		-4
 #define FINAL_RETRY_FREEZE_PROG	-5
+#define FINAL_RETRY_INST_FREEZE	-6
 
 #define	GET_CDB_SC_CODE(gdsfilext_code, status)			\
 {								\
@@ -80,6 +81,8 @@
 		status = cdb_sc_gbloflow;			\
 	else if (FINAL_RETRY_FREEZE_PROG == gdsfilext_code)	\
 		status = cdb_sc_needcrit;			\
+	else if (FINAL_RETRY_INST_FREEZE == gdsfilext_code)	\
+		status = cdb_sc_instancefreeze;			\
 }
 
 #define MASTER_MAP_BITS_PER_LMAP	1

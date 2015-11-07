@@ -358,13 +358,16 @@ typedef struct ua_list_struct
 
 #define TP_MAX_NEST	127
 
-/* Note gv_orig_key[i] is assigned to tp_pointer->orig_key which then tries to dereference the "begin", "end", "prev", "top"
+/* Note gv_orig_key is assigned to tp_pointer->orig_key which then tries to dereference the "begin", "end", "prev", "top"
  * 	fields like it were a gv_currkey pointer. Since these members are 2-byte fields, we need atleast 2 byte alignment.
- * We want to be safer and hence give 4-byte alignment by declaring the array as an array of integers.
+ * We want to be safer and hence give 4-byte alignment by declaring it as an array of integers.
+ * Note that the array stores only ONE key since we need to store gv_currkey at the outermost TSTART only since this needs
+ *	to be restored only in case of a TRESTART or TROLLBACK where the objective is to restore it to what the state was
+ *	at the outermost TSTART.
  */
 typedef struct gv_orig_key_struct
 {
-	int4	gv_orig_key[TP_MAX_NEST + 1][DIVIDE_ROUND_UP((SIZEOF(gv_key) + MAX_KEY_SZ + 1), SIZEOF(int4))];
+	int4	gv_orig_key[DIVIDE_ROUND_UP((SIZEOF(gv_key) + MAX_KEY_SZ + 1), SIZEOF(int4))];
 }gv_orig_key_array;
 
 GBLREF	block_id	t_fail_hist_blk[];

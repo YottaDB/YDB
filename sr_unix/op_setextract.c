@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,7 +99,7 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 	/* Calculate total string len */
 	dstlen = (size_t)pfxlen + padlen + (size_t)expr->str.len + (size_t)sfxlen;
 	if (MAX_STRLEN < dstlen)
-		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 	ENSURE_STP_FREE_SPACE((int)dstlen);
 	srcbase = (unsigned char *)src->str.addr;
 	straddr = stringpool.free;
@@ -123,7 +123,7 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 		memcpy(straddr, srcbase + sfxoff, sfxlen);
 		straddr += sfxlen;
 	}
-	assert((straddr - stringpool.free) == dstlen);
+	assert(IS_AT_END_OF_STRINGPOOL(straddr, -dstlen));
 	MV_INIT_STRING(dst, straddr - stringpool.free, (char *)stringpool.free);
 	if (0 < char_len)
 	{

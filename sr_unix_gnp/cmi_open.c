@@ -17,7 +17,7 @@
 #include "gtm_netdb.h"
 #include "gtm_inet.h"
 #include "gtm_string.h"
-#include "iotcp_select.h"
+#include "gtm_select.h"
 
 #include "cmidef.h"
 #include "gtmio.h"
@@ -80,13 +80,14 @@ cmi_status_t cmi_open(struct CLB *lnk)
 		freeaddrinfo(ai_head);
 		return errno;
 	}
-	rval = connect(new_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
+	rval = connect(new_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);		/* BYPASSOK(connect) */
 	if ((-1 == rval) && ((EINTR == errno) || (EINPROGRESS == errno)
 #if (defined(__osf__) && defined(__alpha)) || defined(__sun) || defined(__vms)
             || (EWOULDBLOCK == errno)
 #endif
 		))
 	{	/* connection attempt will continue so wait for completion */
+		assertpro(FD_SETSIZE > new_fd);
 		do
 		{
 			if ((EINTR == errno) && outofband && (jobinterrupt != outofband))

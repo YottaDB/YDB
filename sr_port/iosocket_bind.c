@@ -22,15 +22,16 @@
 #include "gt_timer.h"
 #include "io.h"
 #include "iotimer.h"
-#include "iotcpdef.h"
 #include "iosocketdef.h"
-#include "iotcproutine.h"
 #include "gtm_stdlib.h"
+#include "gtm_unistd.h"
+#ifndef VMS				/* for LOCAL sockets */
+#include "gtm_stat.h"
+#include "eintr_wrappers.h"		/* for STAT_FILE  and CHG_OWNER */
+#endif
 
 #define	BOUND	"BOUND"
 #define IPV6_UNCERTAIN 2
-
-GBLREF	tcp_library_struct	tcp_routines;
 
 error_def(ERR_GETNAMEINFO);
 error_def(ERR_GETSOCKNAMERR);
@@ -40,14 +41,14 @@ error_def(ERR_SOCKBIND);
 error_def(ERR_SOCKINIT);
 error_def(ERR_TEXT);
 
-boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz)
+boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz, boolean_t newversion)
 {
 	int			temp_1 = 1;
-	char			*errptr;
+	char			*errptr, *charptr;
 	int4			errlen, msec_timeout, real_errno;
 	short			len;
 	in_port_t		actual_port;
-	boolean_t		no_time_left = FALSE;
+	boolean_t		no_time_left = FALSE, ioerror;
 	d_socket_struct		*dsocketptr;
 	struct addrinfo		*ai_ptr;
 	char			port_buffer[NI_MAXSERV];
@@ -55,11 +56,17 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 	ABS_TIME        	cur_time, end_time;
 	GTM_SOCKLEN_TYPE	addrlen;
 	GTM_SOCKLEN_TYPE	sockbuflen;
+#	ifndef VMS
+	struct stat		statbuf;
+	mode_t			filemode;
+#	endif
 
 	dsocketptr = socketptr->dev;
 	ai_ptr = (struct addrinfo*)(&socketptr->local.ai);
 	assert(NULL != dsocketptr);
 	dsocketptr->iod->dollar.key[0] = '\0';
+	dsocketptr->iod->dollar.device[0] = '\0';
+	ioerror = socketptr->ioerror;
 	if (FD_INVALID != socketptr->temp_sd)
 	{
 		socketptr->sd = socketptr->temp_sd;
@@ -75,66 +82,103 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 	do
 	{
 		temp_1 = 1;
-		if (-1 == tcp_routines.aa_setsockopt(socketptr->sd,
+		if (socket_local != socketptr->protocol)
+		{
+			if (-1 == setsockopt(socketptr->sd,
 				SOL_SOCKET, SO_REUSEADDR, &temp_1, SIZEOF(temp_1)))
-		{
-		        real_errno = errno;
-			errptr = (char *)STRERROR(real_errno);
-			errlen = STRLEN(errptr);
-			SOCKET_FREE(socketptr);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+			{
+				real_errno = errno;
+				errptr = (char *)STRERROR(real_errno);
+				errlen = STRLEN(errptr);
+				SOCKET_FREE(socketptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					RTS_ERROR_LITERAL("SO_REUSEADDR"), real_errno, errlen, errptr);
-			return FALSE;
-		}
-#ifdef TCP_NODELAY
-		temp_1 = socketptr->nodelay ? 1 : 0;
-		if (-1 == tcp_routines.aa_setsockopt(socketptr->sd,
+				return FALSE;
+			}
+#			ifdef TCP_NODELAY
+			temp_1 = socketptr->nodelay ? 1 : 0;
+			if (-1 == setsockopt(socketptr->sd,
 				IPPROTO_TCP, TCP_NODELAY, &temp_1, SIZEOF(temp_1)))
-		{
-		        real_errno = errno;
-			errptr = (char *)STRERROR(real_errno);
-			errlen = STRLEN(errptr);
-			SOCKET_FREE(socketptr);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-					RTS_ERROR_LITERAL("TCP_NODELAY"), real_errno, errlen, errptr);
-			return FALSE;
-		}
-#endif
-		if (update_bufsiz)
-		{
-			if (-1 == tcp_routines.aa_setsockopt(socketptr->sd,
-				SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, SIZEOF(socketptr->bufsiz)))
 			{
 			        real_errno = errno;
 				errptr = (char *)STRERROR(real_errno);
 				errlen = STRLEN(errptr);
 				SOCKET_FREE(socketptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-						RTS_ERROR_LITERAL("SO_RCVBUF"), real_errno, errlen, errptr);
+					RTS_ERROR_LITERAL("TCP_NODELAY"), real_errno, errlen, errptr);
 				return FALSE;
 			}
-		} else
-		{
-			sockbuflen = SIZEOF(socketptr->bufsiz);
-			if (-1 == tcp_routines.aa_getsockopt(socketptr->sd,
-				SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, &sockbuflen))
+#			endif
+			if (update_bufsiz)
 			{
-			        real_errno = errno;
-				errptr = (char *)STRERROR(real_errno);
-				errlen = STRLEN(errptr);
-				SOCKET_FREE(socketptr);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
-					RTS_ERROR_LITERAL("SO_RCVBUF"), real_errno, errlen, errptr);
-				return FALSE;
+				if (-1 == setsockopt(socketptr->sd,
+					SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, SIZEOF(socketptr->bufsiz)))
+				{
+				        real_errno = errno;
+					errptr = (char *)STRERROR(real_errno);
+					errlen = STRLEN(errptr);
+					SOCKET_FREE(socketptr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+						RTS_ERROR_LITERAL("SO_RCVBUF"), real_errno, errlen, errptr);
+					return FALSE;
+				}
+			} else
+			{
+				sockbuflen = SIZEOF(socketptr->bufsiz);
+				if (-1 == getsockopt(socketptr->sd,
+					SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, &sockbuflen))
+				{
+				        real_errno = errno;
+					errptr = (char *)STRERROR(real_errno);
+					errlen = STRLEN(errptr);
+					SOCKET_FREE(socketptr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
+						RTS_ERROR_LITERAL("SO_RCVBUF"), real_errno, errlen, errptr);
+					return FALSE;
+				}
 			}
 		}
-		temp_1 = tcp_routines.aa_bind(socketptr->sd, SOCKET_LOCAL_ADDR(socketptr), ai_ptr->ai_addrlen);
+#		ifndef VMS
+		if (socket_local == socketptr->protocol)
+		{
+			charptr = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
+			STAT_FILE(charptr, &statbuf, temp_1);
+			if (!temp_1)
+			{
+				if (!S_ISSOCK(statbuf.st_mode))
+				{
+					temp_1 = -1;	/* bypass unlink and issue error */
+					errno = ENOTSOCK;
+				}
+			}
+			if (!temp_1)
+				if (newversion)
+					temp_1 = UNLINK(charptr);
+			if (temp_1 && ENOENT != errno)
+			{
+					real_errno = errno;
+					if (ioerror)
+						SOCKET_FREE(socketptr);
+					MEMCPY_LIT(dsocketptr->iod->dollar.device, ONE_COMMA);
+					errptr = (char *)STRERROR(real_errno);
+					errlen = STRLEN(errptr);
+					memcpy(&dsocketptr->iod->dollar.device[SIZEOF(ONE_COMMA) - 1]
+						, errptr, errlen + 1);   /* + 1 for null */
+					if (ioerror)
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKBIND, 0, real_errno);
+					return FALSE;
+			}
+		}
+#		endif
+		temp_1 = bind(socketptr->sd, SOCKET_LOCAL_ADDR(socketptr), ai_ptr->ai_addrlen);
 		if (temp_1 < 0)
 		{
 			real_errno = errno;
 			no_time_left = TRUE;
 			switch (real_errno)
 			{
+				case EINTR:
+					break;
 				case EADDRINUSE:
 					if (NO_M_TIMEOUT != timepar)
 					{
@@ -142,27 +186,40 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 						cur_time = sub_abs_time(&end_time, &cur_time);
 						if (cur_time.at_sec > 0)
 							no_time_left = FALSE;
-					}
-					break;
-				case EINTR:
-					break;
+					} else
+						no_time_left = FALSE;	/* retry */
+					if (socket_local != socketptr->protocol)
+						break;
+					/* fall through for LOCAL sockets since it unlikely the file will go away */
 				default:
-					SOCKET_FREE(socketptr);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKBIND, 0, real_errno, 0);
-					break;
+					if (ioerror)
+						SOCKET_FREE(socketptr);
+					MEMCPY_LIT(dsocketptr->iod->dollar.device, ONE_COMMA);
+					errptr = (char *)STRERROR(real_errno);
+					errlen = STRLEN(errptr);
+					memcpy(&dsocketptr->iod->dollar.device[SIZEOF(ONE_COMMA) - 1]
+						, errptr, errlen + 1);   /* + 1 for null */
+					if (ioerror)
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKBIND, 0, real_errno);
+					return FALSE;
 			}
 			if (no_time_left)
 				return FALSE;
 			hiber_start(100);
-			tcp_routines.aa_close(socketptr->sd);
-			if (-1 == (socketptr->sd = tcp_routines.aa_socket(ai_ptr->ai_family,ai_ptr->ai_socktype,
+			close(socketptr->sd);
+			if (-1 == (socketptr->sd = socket(ai_ptr->ai_family,ai_ptr->ai_socktype,
 									  ai_ptr->ai_protocol)))
 			{
 				real_errno = errno;
 				errptr = (char *)STRERROR(real_errno);
 				errlen = STRLEN(errptr);
-				SOCKET_FREE(socketptr);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, real_errno, errlen, errptr);
+				MEMCPY_LIT(dsocketptr->iod->dollar.device, ONE_COMMA);
+				memcpy(&dsocketptr->iod->dollar.device[SIZEOF(ONE_COMMA) - 1], errptr, errlen + 1);   /* get null */
+				if (ioerror)
+				{
+					SOCKET_FREE(socketptr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, real_errno, errlen, errptr);
+				}
 				return FALSE;
 			}
 		}
@@ -170,26 +227,89 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 
 	/* obtain actual port from the bound address if port 0 was specified */
 	addrlen = SOCKET_ADDRLEN(socketptr, ai_ptr, local);
-	if (-1 == tcp_routines.aa_getsockname(socketptr->sd, SOCKET_LOCAL_ADDR(socketptr), &addrlen))
+	if (-1 == getsockname(socketptr->sd, SOCKET_LOCAL_ADDR(socketptr), &addrlen))
 	{
 		real_errno = errno;
 		errptr = (char *)STRERROR(real_errno);
 		errlen = STRLEN(errptr);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, real_errno, errlen, errptr);
+		MEMCPY_LIT(dsocketptr->iod->dollar.device, ONE_COMMA);
+		memcpy(&dsocketptr->iod->dollar.device[SIZEOF(ONE_COMMA) - 1], errptr, errlen + 1);   /* + 1 for null */
+		if (ioerror)
+		{
+			SOCKET_FREE(socketptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, real_errno, errlen, errptr);
+		}
 	        return FALSE;
 	}
-	assert(ai_ptr->ai_addrlen == addrlen);
-	GETNAMEINFO(SOCKET_LOCAL_ADDR(socketptr), addrlen, NULL, 0, port_buffer, NI_MAXSERV, NI_NUMERICSERV, errcode);
-	if (0 != errcode)
+	if (socket_local != socketptr->protocol)
 	{
-		SOCKET_FREE(socketptr);
-		RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
-		return FALSE;
+		assert(ai_ptr->ai_addrlen == addrlen);	/* not right for local */
+		GETNAMEINFO(SOCKET_LOCAL_ADDR(socketptr), addrlen, NULL, 0, port_buffer, NI_MAXSERV, NI_NUMERICSERV, errcode);
+		if (0 != errcode)
+		{
+			real_errno = errno;
+			MEMCPY_LIT(dsocketptr->iod->dollar.device, ONE_COMMA);
+			TEXT_ADDRINFO(errptr, errcode, real_errno);
+			errlen = STRLEN(errptr);
+			memcpy(&dsocketptr->iod->dollar.device[SIZEOF(ONE_COMMA) - 1], errptr, errlen + 1);   /* + 1 for null */
+			if (ioerror)
+			{
+				SOCKET_FREE(socketptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GETNAMEINFO, 0, ERR_TEXT, 2, errlen, errptr);
+			}
+			return FALSE;
+		}
+		actual_port = ATOI(port_buffer);
+		if (0 == socketptr->local.port)
+			socketptr->local.port = actual_port;
+		assert(socketptr->local.port == actual_port);
+#	ifndef VMS
+	} else
+	{
+		if (socketptr->filemode_mask)
+		{
+			charptr = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
+			STAT_FILE(charptr, &statbuf, temp_1);
+			assertpro(!temp_1);	/* we just created socket so it should be there */
+			filemode = (statbuf.st_mode & ~socketptr->filemode_mask) | socketptr->filemode;
+			temp_1 = CHMOD(charptr, filemode);
+			if (temp_1)
+			{
+				real_errno = errno;
+				errptr = (char *)STRERROR(real_errno);
+				errlen = STRLEN(errptr);
+				MEMCPY_LIT(dsocketptr->iod->dollar.device, ONE_COMMA);
+				memcpy(&dsocketptr->iod->dollar.device[SIZEOF(ONE_COMMA) - 1], errptr, errlen + 1);   /* for null */
+				if (ioerror)
+				{
+					SOCKET_FREE(socketptr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SOCKINIT, 3, real_errno, errlen, errptr
+						, ERR_TEXT, 2, RTS_ERROR_LITERAL("setting protection"));
+				}
+				return FALSE;
+			}
+		}
+		if (((gid_t)-1 != socketptr->uic.grp) || ((uid_t)-1 != socketptr->uic.mem))
+		{
+			CHG_OWNER(charptr, socketptr->uic.mem, socketptr->uic.grp, temp_1);
+			if (temp_1)
+			{
+				real_errno = errno;
+				errptr = (char *)STRERROR(real_errno);
+				errlen = STRLEN(errptr);
+				MEMCPY_LIT(dsocketptr->iod->dollar.device, ONE_COMMA);
+				memcpy(&dsocketptr->iod->dollar.device[SIZEOF(ONE_COMMA) - 1], errptr, errlen + 1);   /* for null */
+				if (ioerror)
+				{
+					SOCKET_FREE(socketptr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SOCKINIT, 3, real_errno, errlen, errptr,
+					ERR_TEXT, 2, RTS_ERROR_LITERAL("setting ownership"));
+				}
+				return FALSE;
+			}
+		}
+#	endif
 	}
-	actual_port = ATOI(port_buffer);
-	if (0 == socketptr->local.port)
-		socketptr->local.port = actual_port;
-	assert(socketptr->local.port == actual_port);
 	socketptr->state = socket_bound;
 	len = SIZEOF(BOUND) - 1;
         memcpy(&dsocketptr->iod->dollar.key[0], BOUND, len);
@@ -197,6 +317,13 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
         memcpy(&dsocketptr->iod->dollar.key[len], socketptr->handle, socketptr->handle_len);
         len += socketptr->handle_len;
         dsocketptr->iod->dollar.key[len++] = '|';
-        SPRINTF(&dsocketptr->iod->dollar.key[len], "%d", socketptr->local.port);
+	if (socket_local != socketptr->protocol)
+		SPRINTF(&dsocketptr->iod->dollar.key[len], "%d", socketptr->local.port);
+#	ifndef VMS
+	else /* path goes in $key */
+		strncpy(&dsocketptr->iod->dollar.key[len], ((struct sockaddr_un *)(socketptr->local.sa))->sun_path,
+			DD_BUFLEN - len - 1);
+#	endif
+	dsocketptr->iod->dollar.key[DD_BUFLEN - 1] = '\0';
 	return TRUE;
 }

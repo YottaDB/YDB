@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,43 +25,49 @@
 #include "dpgbldir.h"
 #include "lv_val.h"	/* needed for "symval" structure */
 #include "min_max.h"
+#include "gvnh_spanreg.h"
+#include "process_gvt_pending_list.h"	/* for "is_gvt_in_pending_list" prototype used in ADD_TO_GVT_PENDING_LIST_IF_REG_NOT_OPEN */
+#include "gtmimagename.h"
+#include "gv_trigger_common.h"	/* for *HASHT* macros used inside GVNH_REG_INIT macro */
+#include "filestruct.h"		/* needed for "jnl.h" */
+#include "jnl.h"		/* needed for "jgbl" */
 
 LITREF mval 		literal_one;
 
 GBLREF	gd_addr 	*gd_header;
-GBLREF	gvt_container	*gvt_pending_list;
 GBLREF	buddy_list	*gvt_pending_buddy_list;
 GBLREF	symval		*curr_symval;
+GBLREF	buddy_list	*noisolation_buddy_list;	/* a buddy_list for maintaining the globals that are noisolated */
 
-static	buddy_list	*noisolation_buddy_list;	/* a buddy_list for maintaining the globals that are noisolated */
+error_def(ERR_NOREGION);
+error_def(ERR_NOTGBL);
+error_def(ERR_VIEWARGCNT);
+error_def(ERR_VIEWGVN);
+error_def(ERR_VIEWLVN);
 
-void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
+void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *parmblk, boolean_t is_dollar_view)
 {
 	static	int4		first_time = TRUE;
-	int			n, res;
+	int			n, reg_index;
 	ht_ent_mname		*tabent;
 	mstr			tmpstr, namestr;
-	gd_region		*r_top, *r_ptr;
+	gd_region		*r_top, *r_ptr, *gd_reg_start;
 	mname_entry		gvent, lvent;
 	mident_fixed		lcl_buff;
 	unsigned char		global_names[1024], stashed;
-	noisolation_element	*gvnh_entry;
 	unsigned char 		*src, *nextsrc, *src_top, *dst, *dst_top, y;
-	gd_binding		*temp_gd_map, *temp_gd_map_top;
-	gv_namehead		*temp_gv_target;
-	gvt_container		*gvtc;
+	unsigned char		*c, *c_top;
+	gd_binding		*gd_map;
+	gv_namehead		*tmp_gvt;
 	gvnh_reg_t		*gvnh_reg;
+	gvnh_spanreg_t		*gvspan;
 
-	error_def(ERR_VIEWARGCNT);
-	error_def(ERR_NOREGION);
-	error_def(ERR_VIEWGVN);
-	error_def(ERR_VIEWLVN);
-
-	switch(vtp->parm)
+	switch (vtp_parm)
 	{
 		case VTP_NULL:
 			if (parm != 0)
-				rts_error(VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			break;
 		case (VTP_NULL | VTP_VALUE):
 			if (NULL == parm)
@@ -72,7 +78,8 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 			/* caution:  fall through */
 		case VTP_VALUE:
 			if (NULL == parm)
-				rts_error(VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			parmblk->value = parm;
 			break;
 		case (VTP_NULL | VTP_DBREGION):
@@ -84,7 +91,8 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 			/* caution:  fall through */
 		case VTP_DBREGION:
 			if (NULL == parm)
-				rts_error(VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			if (!gd_header)		/* IF GD_HEADER ==0 THEN OPEN GBLDIR */
 				gvinit();
 			r_ptr = gd_header->regions;
@@ -95,7 +103,8 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 				for (r_top = r_ptr + gd_header->n_regions; ; r_ptr++)
 				{
 					if (r_ptr >= r_top)
-						rts_error(VARLSTCNT(4) ERR_NOREGION,2, parm->str.len, parm->str.addr);
+						rts_error_csa(CSA_ARG(NULL)
+							VARLSTCNT(4) ERR_NOREGION,2, parm->str.len, parm->str.addr);
 					tmpstr.len = r_ptr->rname_len;
 					tmpstr.addr = (char *) r_ptr->rname;
 					MSTR_CMP(tmpstr, parm->str, n);
@@ -107,26 +116,28 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 			break;
 		case VTP_DBKEY:
 			if (NULL == parm)
-				rts_error(VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			if (!gd_header)		/* IF GD_HEADER ==0 THEN OPEN GBLDIR */
 				gvinit();
-			memset(&parmblk->ident.c[0], 0, SIZEOF(parmblk->ident));
-			if (parm->str.len >= 2 && *parm->str.addr == '^')
-			{
-				namestr.addr = parm->str.addr + 1;	/* skip initial '^' */
-				namestr.len = parm->str.len - 1;
-				if (namestr.len > MAX_MIDENT_LEN)
-					namestr.len = MAX_MIDENT_LEN;
-				if (valid_mname(&namestr))
-					memcpy(&parmblk->ident.c[0], namestr.addr, namestr.len);
-				else
-					rts_error(VARLSTCNT(4) ERR_VIEWGVN, 2, parm->str.len, parm->str.addr);
-			} else
-				rts_error(VARLSTCNT(4) ERR_VIEWGVN, 2, parm->str.len, parm->str.addr);
+			c = (unsigned char *)parm->str.addr;
+			if ('^' != *c)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTGBL, 2, parm->str.len, c);
+			c_top = c + parm->str.len;
+			c++;				/* skip initial '^' */
+			parmblk->str.addr = (char *)c;
+			for ( ; (c < c_top) && ('(' != *c); c++)
+				;
+			parmblk->str.len = (char *)c - parmblk->str.addr;
+			if (MAX_MIDENT_LEN < parmblk->str.len)
+				parmblk->str.len = MAX_MIDENT_LEN;
+			if (!valid_mname(&parmblk->str))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, parmblk->str.len, parmblk->str.addr);
 			break;
 		case VTP_RTNAME:
 			if (NULL == parm)
-				rts_error(VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			memset(&parmblk->ident.c[0], 0, SIZEOF(parmblk->ident));
 			if (parm->str.len > 0)
 				memcpy(&parmblk->ident.c[0], parm->str.addr,
@@ -142,7 +153,8 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 			/* caution : explicit fall through */
 		case VTP_DBKEYLIST:
 			if (NULL == parm)
-				rts_error(VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			if (!gd_header)
 				gvinit();
 			if (first_time)
@@ -153,8 +165,7 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 				initialize_list(gvt_pending_buddy_list, SIZEOF(gvt_container), NOISOLATION_INIT_ALLOC);
 				first_time = FALSE;
 			}
-			if (SIZEOF(global_names) <= parm->str.len)
-				GTMASSERT;
+			assertpro(SIZEOF(global_names) > parm->str.len);
 			tmpstr.len = parm->str.len;	/* we need to change len and should not change parm->str, so take a copy */
 			tmpstr.addr = parm->str.addr;
 			if (0 != tmpstr.len)
@@ -196,70 +207,65 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 							memcpy(&lcl_buff.c[0], namestr.addr, namestr.len);
 							gvent.var_name.len = namestr.len;
 						} else
-							rts_error(VARLSTCNT(4) ERR_VIEWGVN, 2, nextsrc - src - 1, src);
+							rts_error_csa(CSA_ARG(NULL)
+								VARLSTCNT(4) ERR_VIEWGVN, 2, nextsrc - src - 1, src);
 					} else
-						rts_error(VARLSTCNT(4) ERR_VIEWGVN, 2, nextsrc - src - 1, src);
-					temp_gv_target = NULL;
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, nextsrc - src - 1, src);
+					tmp_gvt = NULL;
 					gvent.var_name.addr = &lcl_buff.c[0];
 					COMPUTE_HASH_MNAME(&gvent);
-					if (NULL == (tabent = lookup_hashtab_mname(gd_header->tab_ptr, &gvent))
-					    || (NULL == (gvnh_reg = (gvnh_reg_t *)tabent->value)))
+					if (NULL != (tabent = lookup_hashtab_mname(gd_header->tab_ptr, &gvent)))
 					{
-						temp_gd_map = gd_header->maps;
-						temp_gd_map_top = temp_gd_map + gd_header->n_maps;
-						temp_gd_map++;	/* get past local locks */
-						for (; (res = memcmp(gvent.var_name.addr, &(temp_gd_map->name[0]),
-								     gvent.var_name.len)) >= 0; temp_gd_map++)
+						gvnh_reg = (gvnh_reg_t *)tabent->value;
+						assert(NULL != gvnh_reg);
+						tmp_gvt = gvnh_reg->gvt;
+					} else
+					{
+						gd_map = gv_srch_map(gd_header, gvent.var_name.addr, gvent.var_name.len);
+						r_ptr = gd_map->reg.addr;
+						tmp_gvt = (gv_namehead *)targ_alloc(r_ptr->max_key_size, &gvent, r_ptr);
+						GVNH_REG_INIT(gd_header, gd_header->tab_ptr, gd_map, tmp_gvt,
+											r_ptr, gvnh_reg, tabent);
+						/* In case of a global spanning multiple regions, the gvt pointer corresponding to
+						 * the region where the unsubscripted global reference maps to is stored in TWO
+						 * locations (one in gvnh_reg->gvspan->gvt_array[index] and one in gvnh_reg->gvt.
+						 * So pass in both these pointer addresses to be stored in the pending list in
+						 * case this gvt gets reallocated (due to different keysizes between gld and db).
+						 */
+						if (NULL == (gvspan = gvnh_reg->gvspan))
 						{
-							assert (temp_gd_map < temp_gd_map_top);
-							if (0 == res && 0 != temp_gd_map->name[gvent.var_name.len])
-								break;
-						}
-						r_ptr = temp_gd_map->reg.addr;
-						assert(r_ptr->max_key_size <= MAX_KEY_SZ);
-						temp_gv_target = (gv_namehead *)targ_alloc(r_ptr->max_key_size, &gvent, r_ptr);
-						gvnh_reg = (gvnh_reg_t *)malloc(SIZEOF(gvnh_reg_t));
-						gvnh_reg->gvt = temp_gv_target;
-						gvnh_reg->gd_reg = r_ptr;
-						if (NULL != tabent)
-						{	/* Since the global name was found but gv_target was null and
-							 * now we created a new gv_target, the hash table key must point
-							 * to the newly created gv_target->gvname. */
-							tabent->key = temp_gv_target->gvname;
-							tabent->value = (char *)gvnh_reg;
+							ADD_TO_GVT_PENDING_LIST_IF_REG_NOT_OPEN(r_ptr, &gvnh_reg->gvt, NULL);
 						} else
 						{
-							if (!add_hashtab_mname((hash_table_mname *)gd_header->tab_ptr,
-									       &temp_gv_target->gvname, gvnh_reg, &tabent))
-								GTMASSERT;
+							gd_reg_start = &gd_header->regions[0];
+							GET_REG_INDEX(gd_header, gd_reg_start, r_ptr, reg_index);
+								/* the above sets "reg_index" */
+							assert(reg_index >= gvspan->min_reg_index);
+							assert(reg_index <= gvspan->max_reg_index);
+							reg_index -= gvspan->min_reg_index;
+							ADD_TO_GVT_PENDING_LIST_IF_REG_NOT_OPEN(r_ptr,
+								&gvspan->gvt_array[reg_index], &gvnh_reg->gvt);
 						}
-						if (!r_ptr->open)
-						{	/* Record list of all gv_targets that have been allocated BEFORE the
-							 * region has been opened. Once the region gets opened, we will re-examine
-							 * this list and reallocate them (if needed) since they have now been
-							 * allocated using the region's max_key_size value which could potentially
-							 * be different from the max_key_size value in the corresponding database
-							 * file header.
-							 */
-							gvtc = (gvt_container *)get_new_free_element(gvt_pending_buddy_list);
-							gvtc->gvnh_reg = gvnh_reg;
-							assert(!gvtc->gvnh_reg->gd_reg->open);
-							gvtc->next_gvtc = (struct gvt_container_struct *)gvt_pending_list;
-							gvt_pending_list = gvtc;
-						}
-					} else
-						temp_gv_target = gvnh_reg->gvt;
-					gvnh_entry = (noisolation_element *)get_new_element(noisolation_buddy_list, 1);
-					gvnh_entry->gvnh = temp_gv_target;
-					gvnh_entry->next = parmblk->ni_list.gvnh_list;
-					parmblk->ni_list.gvnh_list = gvnh_entry;
+					}
+					ADD_GVT_TO_VIEW_NOISOLATION_LIST(tmp_gvt, parmblk);
+					if (!is_dollar_view && (NULL != gvnh_reg->gvspan))
+					{	/* Global spans multiple regions. Make sure gv_targets corresponding to ALL
+						 * spanned regions are allocated so NOISOLATION status can be set in all of
+						 * them even if the corresponding regions are not open yet. Do this only for
+						 * VIEW "NOISOLATION" commands which change the noisolation characteristic.
+						 * $VIEW("NOISOLATION") only examines the characteristics and so no need to
+						 * allocate all the gv-targets in that case. Just one is enough.
+						 */
+						gvnh_spanreg_subs_gvt_init(gvnh_reg, gd_header, parmblk);
+					}
 				}
 			} else
-				rts_error(VARLSTCNT(4) ERR_VIEWGVN, 2, tmpstr.len, tmpstr.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, tmpstr.len, tmpstr.addr);
 			break;
 		case VTP_LVN:
 			if (NULL == parm)
-				rts_error(VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			if (0 < parm->str.len)
 			{
 				lvent.var_name.addr = parm->str.addr;
@@ -267,17 +273,17 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 				if (lvent.var_name.len > MAX_MIDENT_LEN)
 					lvent.var_name.len = MAX_MIDENT_LEN;
 				if (!valid_mname(&lvent.var_name))
-					rts_error(VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
 			} else
-				rts_error(VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
 			/* Now look up the name.. */
 			COMPUTE_HASH_MNAME(&lvent);
 			if ((tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent)) && (NULL != tabent->value))
 				parmblk->value = (mval *)tabent->value;	/* Return lv_val ptr */
 			else
-				rts_error(VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && vtp_parm);
 	}
 }

@@ -50,7 +50,9 @@
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #include "filestruct.h"
-#include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
+#include "hashtab_mname.h"
+#include "gvcst_protos.h"	/* for gvcst_root_search in DO_OP_GVNAME macro */
+#include "change_reg.h"		/* for change_reg call in DO_OP_GVNAME macro */
 
 GBLREF	int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF	bool		mu_ctrlc_occurred;
@@ -65,7 +67,6 @@ GBLREF	mstr		sys_output;
 
 error_def(ERR_EXTRACTCTRLY);
 error_def(ERR_EXTRACTFILERR);
-error_def(ERR_GTMASSERT);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
@@ -110,10 +111,8 @@ static readonly unsigned char no_param = (unsigned char)iop_eol;
 {									\
 	MV_FORCE_MVAL(&val, nmfield);					\
 	n2s(&val);							\
-	if (val.mvtype & MV_NUM_APPROX)					\
-		GTMASSERT;						\
-	if (val.str.len > BIN_HEADER_NUMSZ)				\
-		GTMASSERT;						\
+	assertpro(!(val.mvtype & MV_NUM_APPROX));			\
+	assertpro(BIN_HEADER_NUMSZ >= val.str.len);			\
 	for (iter = val.str.len;  iter < BIN_HEADER_NUMSZ;  iter++)	\
 		*outptr++ = '0';					\
 	memcpy(outptr, val.str.addr, val.str.len);			\
@@ -126,7 +125,7 @@ CONDITION_HANDLER(mu_extract_handler)
 	mval				op_val, op_pars;
 	unsigned char			delete_params[2] = { (unsigned char)iop_delete, (unsigned char)iop_eol };
 
-	START_CH;
+	START_CH(TRUE);
 	op_val.mvtype = op_pars.mvtype = MV_STR;
 	op_val.str.addr = (char *)outfilename;
 	op_val.str.len = filename_len;
@@ -141,7 +140,7 @@ CONDITION_HANDLER(mu_extract_handler)
 
 CONDITION_HANDLER(mu_extract_handler1)
 {
-	START_CH;
+	START_CH(TRUE);
 	util_out_print("!/MUPIP is not able to complete the extract due the the above error!/", TRUE);
 	util_out_print("!/WARNING!!!!!! Extract file !AD is incomplete!!!/",
 			TRUE, filename_len, outfilename);
@@ -153,28 +152,31 @@ void mu_extract(void)
 	int 				stat_res, truncate_res;
 	int				reg_max_rec, reg_max_key, reg_max_blk, reg_std_null_coll;
 	int				iter, format, local_errno, int_nlen;
-	boolean_t			freeze = FALSE, logqualifier, success;
+	boolean_t			freeze = FALSE, logqualifier, success, success2;
 	char				format_buffer[FORMAT_STR_MAX_SIZE],  ch_set_name[MAX_CHSET_NAME], cli_buff[MAX_LINE],
-					label_buff[LABEL_STR_MAX_SIZE], gbl_name_buff[MAX_MIDENT_LEN + 2]; /* 2 for null and '^' */
-	glist				gl_head, *gl_ptr;
+					label_buff[LABEL_STR_MAX_SIZE];
+	glist				gl_head, *gl_ptr, *next_gl_ptr;
 	gd_region			*reg, *region_top;
-	mu_extr_stats			global_total, grand_total;
+	mu_extr_stats			global_total, grand_total, spangbl_total;
 	uint4				item_code, devbufsiz, maxfield;
 	unsigned short			label_len, n_len, ch_set_len, buflen;
 	unsigned char			*outbuf, *outptr, *chptr, *leadptr;
 	struct stat                     statbuf;
 	mval				val, curr_gbl_name, op_val, op_pars;
 	mstr				chset_mstr;
+	mname_entry			gvname;
 	gtm_chset_t 			saved_out_set;
 	coll_hdr			extr_collhdr;
 	int				bin_header_size;
 	int	 			reg_no;
 	boolean_t			is_any_file_encrypted = FALSE;
+	gvnh_reg_t			*gvnh_reg;
+	gvnh_spanreg_t			*gvspan, *last_gvspan;
 #	ifdef GTM_CRYPT
-	unsigned short			hash_buff_len;
+	unsigned short			encrypted_hash_array_len;
+	unsigned char			*curr_hash_ptr, *encrypted_hash_array_ptr;
 	sgmnt_data_ptr_t		csd;
 	sgmnt_addrs			*csa;
-	muext_hash_hdr_ptr_t		hash_array;
 #	endif
 
 	/* Initialize all local character arrays to zero before using */
@@ -252,9 +254,9 @@ void mu_extract(void)
 	if (MU_FMT_BINARY == format)
 	{
 #		ifdef GTM_CRYPT
-		hash_buff_len = (SIZEOF(muext_hash_hdr) * gd_header->n_regions);
-		hash_array = (muext_hash_hdr *)malloc(hash_buff_len);
-		memset(hash_array, 0, hash_buff_len);
+		encrypted_hash_array_len = GTMCRYPT_HASH_LEN * gd_header->n_regions;
+		encrypted_hash_array_ptr = malloc(encrypted_hash_array_len);
+		memset(encrypted_hash_array_ptr, 0, encrypted_hash_array_len);
 #		endif
 		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions,
 				reg_std_null_coll = -1, reg_no = 0;
@@ -273,22 +275,24 @@ void mu_extract(void)
 					}
 				}
 #				ifdef GTM_CRYPT
-				csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
+				csa = &FILE_INFO(reg)->s_addrs;
 				csd = csa->hdr;
-				memcpy(hash_array[reg_no].gtmcrypt_hash, csd->encryption_hash, GTMCRYPT_HASH_LEN);
 				if (csd->is_encrypted)
+				{
+					curr_hash_ptr = encrypted_hash_array_ptr + (reg_no * GTMCRYPT_HASH_LEN);
+					memcpy(curr_hash_ptr, csd->encryption_hash, GTMCRYPT_HASH_LEN);
 					is_any_file_encrypted = TRUE;
+				}
 #				endif
 			}
 		}
 		assert(-1 != reg_std_null_coll);
 	}
-	grand_total.recknt = grand_total.reclen = grand_total.keylen = grand_total.datalen = 0;
-	global_total.recknt = global_total.reclen = global_total.keylen = global_total.datalen = 0;
+	MU_EXTR_STATS_INIT(grand_total);
+	MU_EXTR_STATS_INIT(global_total);
 	n_len = SIZEOF(outfilename);
 	if (CLI_PRESENT == cli_present("STDOUT"))
-		/* Redirect to standard output */
-		op_val.str = sys_output;
+		op_val.str = sys_output;	/* Redirect to standard output */
 	else if (FALSE == cli_get_str("FILE", outfilename, &n_len))
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
@@ -394,13 +398,15 @@ void mu_extract(void)
 #		ifdef GTM_CRYPT
 		if (is_any_file_encrypted)
 		{
-			op_val.str.addr = (char *)(&hash_buff_len);
-			op_val.str.len = SIZEOF(hash_buff_len);
+			op_val.str.addr = (char *)(&encrypted_hash_array_len);
+			op_val.str.len = SIZEOF(encrypted_hash_array_len);
 			op_write(&op_val);
-			op_val.str.addr = (char *)hash_array;
-			op_val.str.len = hash_buff_len;
+			op_val.str.addr = (char *)encrypted_hash_array_ptr;
+			op_val.str.len = encrypted_hash_array_len;
 			op_write(&op_val);
 		}
+		assert(NULL != encrypted_hash_array_ptr);
+		free(encrypted_hash_array_ptr);
 #		endif
 	} else
 	{
@@ -438,19 +444,13 @@ void mu_extract(void)
 	REVERT;
 	ESTABLISH(mu_extract_handler1);
 	success = TRUE;
-	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
+	gvspan = NULL;
+	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = next_gl_ptr)
 	{
 		if (mu_ctrly_occurred)
 			break;
-		if (mu_ctrlc_occurred)
-		{
-			gbl_name_buff[0]='^';
-			memcpy(&gbl_name_buff[1], gl_ptr->name.str.addr, gl_ptr->name.str.len);
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RECORDSTAT, 6, gl_ptr->name.str.len + 1, gbl_name_buff,
-				global_total.recknt, global_total.keylen, global_total.datalen, global_total.reclen);
-			mu_ctrlc_occurred = FALSE;
-		}
-		GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gl_ptr->name.str);
+		DO_OP_GVNAME(gl_ptr);
+			/* sets gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr */
 		if (MU_FMT_BINARY == format)
 		{
 			label_len = SIZEOF(extr_collhdr);
@@ -466,32 +466,31 @@ void mu_extract(void)
 			op_write(&op_val);
 		}
 #		ifdef GTM_CRYPT
-		success = mu_extr_gblout(&gl_ptr->name,
-					 &global_total,
-					 format,
-					 hash_array,
-					 is_any_file_encrypted) && success;
+		success2 = mu_extr_gblout(gl_ptr, &global_total, format, is_any_file_encrypted);
 #		else
-		/* Note: Do not change the order of the expression below.
-		 * Otherwise if success is FALSE, mu_extr_gblout() will not be called at all.
-		 * We want mu_extr_gblout() to be called irrespective of the value of success */
-		success = mu_extr_gblout(&gl_ptr->name, &global_total, format) && success;
+		success2 = mu_extr_gblout(gl_ptr, &global_total, format);
 #		endif
-		if (logqualifier)
+		success = success2 && success;
+		gvnh_reg = gl_ptr->gvnh_reg;
+		last_gvspan = gvspan;
+		gvspan = gvnh_reg->gvspan;
+		if (NULL != gvspan)
+		{	/* this global spans more than one region. aggregate stats across all regions */
+			if (last_gvspan != gvspan)
+				MU_EXTR_STATS_INIT(spangbl_total); /* this is the FIRST spanned region. initialize spangbl_total */
+			MU_EXTR_STATS_ADD(spangbl_total, global_total);	/* add global_total to grand_total */
+		}
+		next_gl_ptr = gl_ptr->next;
+		if ((logqualifier || mu_ctrlc_occurred) && (0 < global_total.recknt))
 		{
-			gbl_name_buff[0]='^';
-			memcpy(&gbl_name_buff[1], gl_ptr->name.str.addr, gl_ptr->name.str.len);
-			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_RECORDSTAT, 6, gl_ptr->name.str.len + 1, gbl_name_buff,
-				global_total.recknt, global_total.keylen, global_total.datalen, global_total.reclen);
+			ISSUE_RECORDSTAT_MSG(gl_ptr, global_total, PRINT_REG_TRUE);
+			if ((NULL != gvspan) && ((NULL == next_gl_ptr) || (next_gl_ptr->gvnh_reg != gvnh_reg)))
+			{	/* this is the LAST spanned region. Display summary line across all spanned regions */
+				ISSUE_RECORDSTAT_MSG(gl_ptr, spangbl_total, PRINT_REG_FALSE);
+			}
 			mu_ctrlc_occurred = FALSE;
 		}
-		grand_total.recknt += global_total.recknt;
-		if (grand_total.reclen < global_total.reclen)
-			grand_total.reclen = global_total.reclen;
-		if (grand_total.keylen < global_total.keylen)
-			grand_total.keylen = global_total.keylen;
-		if (grand_total.datalen < global_total.datalen)
-			grand_total.datalen = global_total.datalen;
+		MU_EXTR_STATS_ADD(grand_total, global_total);	/* add global_total to grand_total */
 	}
 	assert((MV_STR == op_val.mvtype) && (MV_STR == op_pars.mvtype));
 	op_val.str.addr = (char *)outfilename;;
@@ -505,14 +504,15 @@ void mu_extract(void)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXTRACTCTRLY);
 		mupip_exit(ERR_MUNOFINISH);
 	}
-	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RECORDSTAT, 6, LEN_AND_LIT("TOTAL"),
-		grand_total.recknt, grand_total.keylen, grand_total.datalen, grand_total.reclen);
-		if (MU_FMT_BINARY == format)
-	{	/*      truncate the last newline charactor flushed by op_close */
-		GTMCRYPT_ONLY(
-			if (hash_array)
-				free(hash_array);
-		)
+	if (0 < grand_total.recknt)
+	{
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RECORDSTAT, 6, LEN_AND_LIT("TOTAL"),
+				grand_total.recknt, grand_total.keylen, grand_total.datalen, grand_total.reclen);
+	} else
+	{
+                gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSELECT);
+		UNLINK(outfilename);
+                mupip_exit(ERR_NOSELECT);
 	}
 	mupip_exit(success ? SS_NORMAL : ERR_MUNOFINISH);
 }

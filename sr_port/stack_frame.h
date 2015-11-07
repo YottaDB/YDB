@@ -133,6 +133,15 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 	}							\
 }
 
+/*
+ * Skip past trigger base frames
+ */
+#ifdef GTM_TRIGGER
+# define SKIP_BASE_FRAME(FP) (((NULL != (FP)) && (SFT_TRIGR & (FP)->type)) ? *(stack_frame **)((FP) + 1) : (FP))
+#else
+# define SKIP_BASE_FRAME(FP) (FP)
+#endif
+
 void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);
 void new_stack_frame_sp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);
 int4 symbinit(void);

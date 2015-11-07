@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ CONDITION_HANDLER(fgncal_ch)
 {
         int4            status;
 
-        START_CH;
+        START_CH(FALSE);
         if (DUMP)
         {
                 gtm_dump();

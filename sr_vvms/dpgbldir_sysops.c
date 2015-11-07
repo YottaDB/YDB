@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,10 @@
 #include "trans_log_name.h"
 #include "gtm_logicals.h"
 
-GBLREF mval		dollar_zgbldir;
+GBLREF mval	dollar_zgbldir;
+GBLREF gd_addr	*gd_header;
+
+error_def(ERR_ZGBLDIRACC);
 
 char LITDEF gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE] =
 {
@@ -72,8 +75,6 @@ void *open_gd_file(mstr *v)
 	struct FAB	*fab;
 	int4		status;
 
-	error_def(ERR_ZGBLDIRACC);
-
 	fab = malloc(SIZEOF(struct FAB));
 	*fab = cc$rms_fab;
 	fab->fab$l_fna = v->addr;
@@ -90,11 +91,11 @@ void *open_gd_file(mstr *v)
 		if (!dollar_zgbldir.str.len || ((dollar_zgbldir.str.len == v->len)
 							&& !memcmp(dollar_zgbldir.str.addr, v->addr, v->len)))
 		{
-			rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, v->len, v->addr,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, v->len, v->addr,
 				LEN_AND_LIT(".  Cannot continue"), LEN_AND_LIT(""), status);
 			assert(FALSE);
 		}
-		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, v->len, v->addr, LEN_AND_LIT(".  Retaining "),
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, v->len, v->addr, LEN_AND_LIT(".  Retaining "),
 			dollar_zgbldir.str.len, dollar_zgbldir.str.addr, status);
 	}
 	return fab;
@@ -105,13 +106,11 @@ void file_read(struct FAB *file_ptr, int4 size, char *buff, int4 pos)
 	int4		status;
 	short		iosb[4];
 
-	error_def(ERR_ZGBLDIRACC);
-
 	status = sys$qiow(EFN$C_ENF,file_ptr->fab$l_stv, IO$_READVBLK, &iosb[0], 0, 0, buff, size, pos, 0, 0, 0);
 	if (status == SS$_NORMAL)
 		status = iosb[0];
 	if (status != SS$_NORMAL)
-		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->fab$b_fns,file_ptr->fab$l_fna,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->fab$b_fns,file_ptr->fab$l_fna,
 			LEN_AND_LIT(""), LEN_AND_LIT(""), status);
 	return;
 }
@@ -140,6 +139,7 @@ void dpzgbini(void)
 		dollar_zgbldir.str.addr = temp_mstr.addr;
 	}
 	s2pool(&dollar_zgbldir.str);
+	gd_header = NULL;
 }
 
 mstr *get_name(mstr *ms)
@@ -148,12 +148,11 @@ mstr *get_name(mstr *ms)
 	char	c[MAX_TRANS_NAME_LEN];
 	mstr	ms1, *new;
 
-	error_def(ERR_ZGBLDIRACC);
-
 	if ((status = trans_log_name(ms,&ms1,&c[0])) == SS$_NORMAL)
 		ms = &ms1;
 	else if (status != SS$_NOLOGNAM)
-		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, ms->len, ms->addr, LEN_AND_LIT(""), LEN_AND_LIT(""), status);
+		rts_error_csa(CSA_ARG(NULL)
+			VARLSTCNT(9) ERR_ZGBLDIRACC, 6, ms->len, ms->addr, LEN_AND_LIT(""), LEN_AND_LIT(""), status);
 	new = malloc(SIZEOF(mstr));
 	new->len = ms->len;
 	new->addr = malloc(ms->len);

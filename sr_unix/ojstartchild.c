@@ -112,6 +112,24 @@ GBLREF char	gtm_dist[GTM_PATH_MAX];
 	}												\
 }
 
+#define SETUP_OP_FAIL()									\
+{											\
+	kill(child_pid, SIGTERM);							\
+	joberr = joberr_io_setup_op_write;						\
+	job_errno = errno;								\
+	DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);		\
+	_exit(joberr);									\
+}
+
+#define SETUP_DATA_FAIL()								\
+{											\
+	kill(child_pid, SIGTERM);							\
+	joberr = joberr_io_setup_write;							\
+	job_errno = errno;								\
+	DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);		\
+	_exit(joberr);									\
+}
+
 error_def(ERR_JOBFAIL);
 error_def(ERR_JOBPARTOOLONG);
 error_def(ERR_LOGTOOLONG);
@@ -122,7 +140,7 @@ error_def(ERR_TEXT);
  */
 
 void job_term_handler(int sig);
-static int io_rename(job_params_type *jparms, const int jobid);
+static int io_rename(job_params_msg *params, const int jobid);
 
 /* Middle process sets the entryref for the jobbed-off process by calling job_addr(). job_addr() internally calls op_zlink(). If
  * rts_error occurs when we are in the job_addr() function, the topmost condition handler inherited from parent process will be
@@ -132,9 +150,12 @@ static int io_rename(job_params_type *jparms, const int jobid);
 static CONDITION_HANDLER(middle_child)
 {
 	int pipe_status;
-	/* As of now, middle process could encounter rts_error only while setting entryref. Hence the following assert. */
-	assert(joberr == joberr_rtn);
+	START_CH(FALSE);
 	DOWRITERC(pipe_fd, &job_errno, SIZEOF(job_errno), pipe_status);
+	/* As of now, middle process could encounter rts_error only while setting entryref. Hence the following assert.
+	 * Do assert after write to prevent parent hang.
+	 */
+	assert(joberr == joberr_rtn);
 	_exit(joberr);
 }
 
@@ -171,26 +192,26 @@ void job_term_handler(int sig)
 			return;
 }
 
-static int io_rename(job_params_type *jparms, const int jobid)
+static int io_rename(job_params_msg *params, const int jobid)
 {
 	char path[MAX_STDIOE_LEN];
 
-	strncpy(path, jparms->output.addr, jparms->output.len);
-	*(jparms->output.addr + jparms->output.len) = '\0';
-	SPRINTF(&path[jparms->output.len], ".%d", jobid);
-	if (rename(jparms->output.addr, path))
+	strncpy(path, params->output, params->output_len);
+	SNPRINTF(&path[params->output_len], MAX_STDIOE_LEN - params->output_len, ".%d", jobid);
+	if (rename(params->output, path))
 	{
 		job_errno = errno;
 		return(joberr_stdout_rename);
 	}
-	strncpy(path, jparms->error.addr, jparms->error.len);
-	*(jparms->error.addr + jparms->error.len) = '\0';
-	SPRINTF(&path[jparms->error.len], ".%d", jobid);
-	if (rename(jparms->error.addr, path))
+	params->output_len = strlen(params->output);
+	strncpy(path, params->error, params->error_len);
+	SNPRINTF(&path[params->error_len], MAX_STDIOE_LEN - params->error_len,  ".%d", jobid);
+	if (rename(params->error, path))
 	{
 		job_errno = errno;
 		return(joberr_stderr_rename);
 	}
+	params->error_len = strlen(params->error);
 	return 0;
 }
 
@@ -225,13 +246,19 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	int			wait_status, save_errno, kill_ret;
 	int			rc, dup_ret, in_fd;
 	int			status;
-	pid_t			par_pid, child_pid, done_pid;
+	pid_t			child_pid, done_pid;
 	job_parm		*jp;
 	rhdtyp			*base_addr;
 	struct sigaction	act, old_act;
 	int			pipe_status, env_len;
 	int			mproc_fds[2]; 	/* pipe between middle process and grandchild process */
 	int			decision;
+	int			setup_fds[2];	/* socket pair for setup of final mumps process */
+	job_setup_op		setup_op;
+	job_params_msg		params;
+	job_arg_count_msg	arg_count;
+	job_arg_msg		arg_msg;
+	job_buffer_size_msg	buffer_size;
 
 #ifdef	__osf__
 /* These must be O/S-compatible 64-bit pointers for OSF/1.  */
@@ -247,8 +274,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef	__osf__
 #pragma pointer_size (restore)
 #endif
-	par_pid = getppid();
-
 	FORK_RETRY(child_pid);
 	if (child_pid == 0)
 	{
@@ -277,31 +302,36 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 			_exit(joberr);
 		}
-		/* Redirect input before potentially changing the default directory below.*/
-		strncpy(fname_buf, jparms->input.addr, jparms->input.len);
-		*(fname_buf + jparms->input.len) = '\0';
+		if (!IS_JOB_SOCKET(jparms->input.addr, jparms->input.len))
+		{
+			/* Redirect input before potentially changing the default directory below.*/
+			strncpy(fname_buf, jparms->input.addr, jparms->input.len);
+			*(fname_buf + jparms->input.len) = '\0';
 
-		OPENFILE(fname_buf, O_RDONLY, in_fd);
-		if (FD_INVALID == in_fd)
-		{
-			joberr = joberr_io_stdin_open;
-			job_errno = errno;
-			return joberr;
-		}
-		CLOSEFILE(0, rc);
-		FCNTL3(in_fd, F_DUPFD, 0, dup_ret);
-		if (-1 == dup_ret)
-		{
-			joberr = joberr_io_stdin_dup;
-			job_errno = errno;
-			return joberr;
-		}
+			OPENFILE(fname_buf, O_RDONLY, in_fd);
+			if (FD_INVALID == in_fd)
+			{
+				joberr = joberr_io_stdin_open;
+				job_errno = errno;
+				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+				_exit(joberr);
+			}
+			CLOSEFILE(0, rc);
+			FCNTL3(in_fd, F_DUPFD, 0, dup_ret);
+			if (-1 == dup_ret)
+			{
+				joberr = joberr_io_stdin_dup;
+				job_errno = errno;
+				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+				_exit(joberr);
+			}
 #ifdef __MVS__
-		/* policy tagging because by default input is /dev/null */
-		if (-1 == gtm_zos_tag_to_policy(in_fd, TAG_UNTAGGED, &realfiletag))
-			TAG_POLICY_SEND_MSG(fname_buf, errno, realfiletag, TAG_UNTAGGED);
+			/* policy tagging because by default input is /dev/null */
+			if (-1 == gtm_zos_tag_to_policy(in_fd, TAG_UNTAGGED, &realfiletag))
+				TAG_POLICY_SEND_MSG(fname_buf, errno, realfiletag, TAG_UNTAGGED);
 #endif
-		CLOSEFILE_RESET(in_fd, rc);	/* resets "in_fd" to FD_INVALID */
+			CLOSEFILE_RESET(in_fd, rc);	/* resets "in_fd" to FD_INVALID */
+		}
 		if (0 != jparms->directory.len)
 		{
 			/* If directory is specified, change it */
@@ -347,18 +377,36 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			_exit(joberr);
 		}
 
+		joberr = joberr_sp;
+		if (-1 == (rc = socketpair(AF_UNIX, SOCK_DGRAM, 0, setup_fds)))
+		{
+			job_errno = errno;
+			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+			_exit(joberr);
+		}
+
 		/* clone self and exit */
 		FORK_RETRY(child_pid);
-		if (child_pid)	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+		if (child_pid)
 		{
 			/* This is still the middle process.  */
 			/* Close the read end of the pipe between middle process and grandchild process. */
-			CLOSEFILE_RESET(mproc_fds[0], pipe_status);	/* resets "pipe_fds[0]" to FD_INVALID */
+			CLOSEFILE_RESET(mproc_fds[0], pipe_status);	/* resets "mproc_fds[0]" to FD_INVALID */
+			CLOSEFILE_RESET(setup_fds[1], pipe_status);	/* resets "setup_fds[0]" to FD_INVALID */
 			assert(SIZEOF(pid_t) == SIZEOF(child_pid));
+			/* params data for 'output' and 'error' is populated here because io_rename() needs it in case appending of
+			 * JOB ID to Standard Output and Standard Error is required.
+			 */
+			params.output_len = jparms->output.len;
+			memcpy(params.output, jparms->output.addr, jparms->output.len);
+			params.output[jparms->output.len] = '\0';
+			params.error_len = jparms->error.len;
+			memcpy(params.error, jparms->error.addr, jparms->error.len);
+			params.error[jparms->error.len] = '\0';
 			/* if the Job pid need to be appended to the std out/err file names */
 			if (jobpid)
 			{
-				joberr = io_rename(jparms, child_pid);
+				joberr = io_rename(&params, child_pid);
 				if (joberr)
 				{
 					/* Inform grandchild that it will have to exit. If pipe operation failed terminate
@@ -372,31 +420,118 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 					_exit(joberr);
 				}
 			}
-			/* write child_pid into pipe to be read by parent process(P) for $ZJOB */
-			DOWRITERC(pipe_fds[1], &child_pid, SIZEOF(child_pid), pipe_status);
-			/* Failed to send parent new JOBID. Terminate the child and exit middle process. */
+
+			/* Inform grandchild that everything is properly set for it and it is ready to continue. */
+			decision = JOB_CONTINUE;
+			DOWRITERC(mproc_fds[1], &decision, SIZEOF(decision), pipe_status);
 			if (pipe_status)
 			{
-				/* Inform grandchild that it will have to exit. If pipe operation failed terminate the
-				 * grandchild.
-				 */
-				joberr = joberr_pipe_mp;
-				decision = JOB_EXIT;
-				DOWRITERC(mproc_fds[1], &decision, SIZEOF(decision), pipe_status);
-				if (pipe_status)
-					kill(child_pid, SIGTERM);
+				kill(child_pid, SIGTERM);
+				joberr = joberr_pipe_mgc;
+				job_errno = errno;
+				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 				_exit(joberr);
+			}
+
+			/* send job parameters and arguments to final mumps process over setup socket */
+			setup_op = job_set_params;
+			SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
+			if (rc < 0)
+				SETUP_OP_FAIL();
+
+			params.directory_len = jparms->directory.len;
+			memcpy(params.directory, jparms->directory.addr, jparms->directory.len);
+			if (0 < jparms->gbldir.len)
+			{
+				params.gbldir_len = jparms->gbldir.len;
+				memcpy(params.gbldir, jparms->gbldir.addr, jparms->gbldir.len);
+				params.gbldir[jparms->gbldir.len] = '\0';
 			} else
 			{
-				/* Inform grandchild that everything is properly set for it and it is ready to continue. */
-				decision = JOB_CONTINUE;
-				DOWRITERC(mproc_fds[1], &decision, SIZEOF(decision), pipe_status);
-				/* If pipe_status is non-zero i.e. error occurred in pipe operation or total
-				 * SIZEOF(decision) bytes are not written in the pipe. In this case, we let the grandchild
-				 * handle its own fate as we have already conveyed back the grandchild's pid to parent
-				 * process and all the setup for the grandchild is successfully done.
-				 */
+				pgbldir_str = GETENV(GBLDIR_ENV);
+				if (pgbldir_str && *pgbldir_str)
+				{
+					params.gbldir_len = STRLEN(pgbldir_str);
+					memcpy(params.gbldir, pgbldir_str, params.gbldir_len);
+				} else
+					params.gbldir_len = 0;
 			}
+			params.startup_len = jparms->startup.len;
+			memcpy(params.startup, jparms->startup.addr, jparms->startup.len);
+			params.startup[jparms->startup.len] = '\0';
+			params.input_len = jparms->input.len;
+			memcpy(params.input, jparms->input.addr, jparms->input.len);
+			params.input[jparms->input.len] = '\0';
+			/* 'output' and 'error' are already moved to params above */
+			params.routine_len = jparms->routine.len;
+			memcpy(params.routine, jparms->routine.addr, jparms->routine.len);
+			params.routine[jparms->routine.len] = '\0';
+			params.label_len = jparms->label.len;
+			memcpy(params.label, jparms->label.addr, jparms->label.len);
+			params.label[jparms->label.len] = '\0';
+			params.offset = jparms->offset;
+			params.baspri = jparms->baspri;
+			SEND(setup_fds[0], &params, SIZEOF(params), 0, rc);
+			if (rc < 0)
+				SETUP_DATA_FAIL();
+
+			setup_op = job_set_parm_list;
+			SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
+			if (rc < 0)
+				SETUP_OP_FAIL();
+
+			arg_count = argcnt;
+			SEND(setup_fds[0], &arg_count, SIZEOF(arg_count), 0, rc);
+			if (rc < 0)
+				SETUP_DATA_FAIL();
+
+			for (jp = jparms->parms;  jp ; jp = jp->next)
+			{
+				if (jp->parm->str.len > MAX_JOB_LEN - 2)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
+				if (0 == jp->parm->mvtype)
+					arg_msg.len = -1;	/* negative len indicates null arg */
+				else
+				{
+					MV_FORCE_STR(jp->parm);
+					arg_msg.len = jp->parm->str.len;
+					memcpy(arg_msg.data, jp->parm->str.addr, jp->parm->str.len);
+				}
+
+				SEND(setup_fds[0], &arg_msg, SIZEOF(arg_msg), 0, rc);
+				if (rc < 0)
+					SETUP_DATA_FAIL();
+			}
+
+			if (0 < jparms->input_prebuffer_size)
+			{
+				setup_op = job_set_input_buffer;
+				SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
+				if (rc < 0)
+					SETUP_OP_FAIL();
+
+				buffer_size = jparms->input_prebuffer_size;
+				SEND(setup_fds[0], &buffer_size, SIZEOF(buffer_size), 0, rc);
+				if (rc < 0)
+					SETUP_DATA_FAIL();
+
+				SEND(setup_fds[0], jparms->input_prebuffer, jparms->input_prebuffer_size, 0, rc);
+				if (rc < 0)
+					SETUP_DATA_FAIL();
+				/* input_prebuffer leaks, but the middle process is about to exit, so don't worry about it */
+			}
+
+			/* tell job to proceed */
+			setup_op = job_done;
+			SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
+			if (rc < 0)
+				SETUP_OP_FAIL();
+
+			/* write child_pid into pipe to be read by parent process(P) for $ZJOB */
+			/* Ignore the status if this fails, as the child is already running, and there is likely not a parent
+			 * to report to.
+			 */
+			DOWRITERC(pipe_fds[1], &child_pid, SIZEOF(child_pid), pipe_status);
 			_exit(EXIT_SUCCESS);
 		}
 		/* This is now the grandchild process (actual Job process) -- an orphan as soon as the exit(EXIT_SUCCESS) above
@@ -405,6 +540,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		ESTABLISH_RET(grand_child, 0);
 		sigaction(SIGTERM, &old_act, 0);		/* restore the SIGTERM handler */
 		CLOSEFILE_RESET(mproc_fds[1], pipe_status);	/* resets "mproc_fds[0]" to FD_INVALID */
+		CLOSEFILE_RESET(setup_fds[0], pipe_status);	/* resets "setup_fds[0]" to FD_INVALID */
 		DOREADRC(mproc_fds[0], &decision, SIZEOF(decision), pipe_status);
 		if (pipe_status)	 /* We failed to read the communication from middle process */
 	                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
@@ -463,7 +599,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 *	each line above is an entry in the environment array.
 		 */
 
-		env_ind = env_ary = (char **)malloc((environ_count + MAX_JOB_QUALS + argcnt + 1)*SIZEOF(char *));
+		env_ind = env_ary = (char **)malloc((environ_count + MAX_JOB_QUALS + 1)*SIZEOF(char *));
 
 #ifdef	__osf__
 #pragma pointer_size (restore)
@@ -476,7 +612,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
-		SPRINTF_ENV_NUM(c1, CHILD_FLAG_ENV, par_pid, env_ind);
+		SPRINTF_ENV_NUM(c1, CHILD_FLAG_ENV, setup_fds[1], env_ind);
 #ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
@@ -503,188 +639,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #pragma convlit(resume)
 #endif
 		}
-		/* pass startup program to child */
-		if (jparms->startup.len != 0)
-		{
-			if (jparms->startup.len > TEMP_BUFF_SIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			strncpy(pbuff, jparms->startup.addr, jparms->startup.len);
-			*(pbuff + jparms->startup.len) = '\0';
-			string_len = STRLEN("%s=%s") + STRLEN(STARTUP_ENV) + STRLEN(pbuff) - 4;
-			if (string_len > TEMP_BUFF_SIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			c1 = (char *)malloc(string_len + 1);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(suspend)
-#endif
-			SPRINTF_ENV_STR(c1, STARTUP_ENV, pbuff, env_ind);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(resume)
-#endif
-		}
-		/* pass input file to child */
-		if (jparms->input.len != 0)
-		{
-			if (jparms->input.len > TEMP_BUFF_SIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			strncpy(pbuff, jparms->input.addr, jparms->input.len);
-			*(pbuff + jparms->input.len) = '\0';
-			string_len = STRLEN("%s=%s") + STRLEN(IN_FILE_ENV) + STRLEN(pbuff) - 4;
-			if (string_len > TEMP_BUFF_SIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			c1 = (char *)malloc(string_len + 1);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(suspend)
-#endif
-			SPRINTF_ENV_STR(c1, IN_FILE_ENV, pbuff, env_ind);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(resume)
-#endif
-		}
-
-		/* pass output file to child */
-		if (jparms->output.addr != 0)
-		{
-			if (jparms->output.len > TEMP_BUFF_SIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			strncpy(pbuff, jparms->output.addr, jparms->output.len);
-			*(pbuff + jparms->output.len) = '\0';
-			if (jobpid)
-				SPRINTF(&pbuff[jparms->output.len], ".%d", getpid());
-			string_len = STRLEN("%s=%s") + STRLEN(OUT_FILE_ENV) + STRLEN(pbuff) - 4;
-			if (string_len > TEMP_BUFF_SIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			c1 = (char *)malloc(string_len + 1);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(suspend)
-#endif
-			SPRINTF_ENV_STR(c1, OUT_FILE_ENV, pbuff, env_ind);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(resume)
-#endif
-		}
-
-		/* pass error file to child */
-		if (jparms->error.len != 0)
-		{
-			if (jparms->error.len > TEMP_BUFF_SIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			strncpy(pbuff, jparms->error.addr, jparms->error.len);
-			*(pbuff + jparms->error.len) = '\0';
-			if (jobpid)
-				SPRINTF(&pbuff[jparms->error.len], ".%d", getpid());
-			string_len = STRLEN("%s=%s") + STRLEN(ERR_FILE_ENV) + STRLEN(pbuff) - 4;
-			if (string_len > TEMP_BUFF_SIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			c1 = (char *)malloc(string_len + 1);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(suspend)
-#endif
-			SPRINTF_ENV_STR(c1, ERR_FILE_ENV, pbuff, env_ind);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(resume)
-#endif
-		}
-
-		/* pass routine name to child */
-		if (jparms->routine.len != 0)
-		{
-			if (jparms->routine.len > TEMP_BUFF_SIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			strncpy(pbuff, jparms->routine.addr, jparms->routine.len);
-			*(pbuff + jparms->routine.len) = '\0';
-			string_len = STRLEN("%s=%s") + STRLEN(ROUTINE_ENV) + STRLEN(pbuff) - 4;
-			if (string_len > TEMP_BUFF_SIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			c1 = (char *)malloc(string_len + 1);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(suspend)
-#endif
-			SPRINTF_ENV_STR(c1, ROUTINE_ENV, pbuff, env_ind);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(resume)
-#endif
-		}
-
-		/* pass label name to child */
-		if (jparms->label.len > TEMP_BUFF_SIZE)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-		strncpy(pbuff, jparms->label.addr, jparms->label.len);
-		*(pbuff + jparms->label.len) = '\0';
-		string_len = STRLEN("%s=%s") + STRLEN(LABEL_ENV) + STRLEN(pbuff) - 4;
-		if (string_len > TEMP_BUFF_SIZE)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-		c1 = (char *)malloc(string_len + 1);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(suspend)
-#endif
-		SPRINTF_ENV_STR(c1, LABEL_ENV, pbuff, env_ind);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(resume)
-#endif
-
-		/* pass the offset */
-		string_len = STRLEN("%s=%ld") + STRLEN(OFFSET_ENV) + MAX_NUM_LEN - 5;
-		if (string_len > TEMP_BUFF_SIZE)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-		c1 = (char *)malloc(string_len + 1);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(suspend)
-#endif
-		SPRINTF_ENV_NUM(c1, OFFSET_ENV, jparms->offset, env_ind);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(resume)
-#endif
-
-		/* pass Priority to child */
-		if (jparms->baspri != 0)
-		{
-			string_len = STRLEN("%s=%ld") + STRLEN(PRIORITY_ENV) + MAX_NUM_LEN - 5;
-			if (string_len > TEMP_BUFF_SIZE)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			c1 = (char *)malloc(string_len + 1);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(suspend)
-#endif
-			SPRINTF_ENV_NUM(c1, PRIORITY_ENV, jparms->baspri, env_ind);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(resume)
-#endif
-		}
-
-		for (index = 0, jp = jparms->parms;  jp ;  index++, jp = jp->next)
-		{
-			if (jp->parm->str.len > MAX_JOB_LEN - 2)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			if (0 != jp->parm->mvtype)
-			{
-				MV_FORCE_STR(jp->parm);
-				string_len = STRLEN(PARM_STR) + jp->parm->str.len + 1;
-				if (string_len > MAX_JOB_LEN)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-				c1 = (char *)malloc(string_len);
-#			ifdef KEEP_zOS_EBCDIC
-				__getEstring1_a_copy(c1, STR_AND_LEN(PARM_STRING));
-				__getEstring1_a_copy(c1 + strlen(PARM_STRING), jp->parm->str.addr, jp->parm->str.len);
-#			else
-				SPRINTF(c1, GTMJ_FMT, index);
-				memcpy(c1 + strlen(PARM_STR), jp->parm->str.addr, jp->parm->str.len);
-#			endif
-				*(c1 + string_len - 1) = 0;
-				*env_ind++ = c1;
-			}
-		}
-		string_len = STRLEN("%s=%ld") + STRLEN(GTMJCNT_ENV) + MAX_NUM_LEN - 5;
-		if (string_len > TEMP_BUFF_SIZE)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
-		c1 = (char *)malloc(string_len + 1);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(suspend)
-#endif
-		SPRINTF_ENV_NUM(c1, GTMJCNT_ENV, index, env_ind);
-#ifdef KEEP_zOS_EBCDIC
-#pragma convlit(resume)
-#endif
 
 #ifdef	__osf__
 /* Make sure SIZEOF(char *) is correct.  */

@@ -35,6 +35,8 @@
 #include "mu_outofband_setup.h"
 #include "gtmmsg.h"
 #include "mvalconv.h"
+#include "hashtab_mname.h"
+#include "change_reg.h"		/* for DO_OP_GVNAME macro */
 
 error_def(ERR_DBRDONLY);
 error_def(ERR_EXTRACTCTRLY);
@@ -43,7 +45,6 @@ error_def(ERR_EXTRCLOSEERR);
 error_def(ERR_EXTRFMT);
 error_def(ERR_EXTRIOERR);
 error_def(ERR_FREEZE);
-error_def(ERR_GTMASSERT);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
@@ -68,17 +69,15 @@ GBLREF gv_namehead      *gv_target;
 	MV_FORCE_MVAL(&val, nmfield);					\
 	stringpool.free = stringpool.base;				\
 	n2s(&val);							\
-	if (val.mvtype & MV_NUM_APPROX)					\
-		GTMASSERT;						\
-	if (val.str.len > BIN_HEADER_NUMSZ)				\
-		GTMASSERT;						\
+	assertpro(!(val.mvtype & MV_NUM_APPROX));			\
+	assertpro(BIN_HEADER_NUMSZ >= val.str.len);			\
 	for (iter = val.str.len;  iter < BIN_HEADER_NUMSZ;  iter++)	\
 		*outptr++ = '0';					\
 	memcpy(outptr, val.str.addr, val.str.len);			\
 	outptr += val.str.len;						\
 }
 
-LITDEF mval	mu_bin_datefmt	= DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(BIN_HEADER_DATEFMT) - 1, BIN_HEADER_DATEFMT, 0, 0);
+LITDEF mval	mu_bin_datefmt	= DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(BIN_HEADER_DATEFMT) - 1, BIN_HEADER_DATEFMT, 0, 0);	/* BYPASSOK */
 GBLDEF struct FAB	mu_outfab;
 GBLDEF struct RAB 	mu_outrab;
 
@@ -87,13 +86,12 @@ void mu_extract(void)
 	int				reg_max_rec, reg_max_key, reg_max_blk, max_extract_rec_len, status,len, i, format;
 	int				reg_std_null_coll, iter;
 	unsigned char                  	cli_buff[MAX_LINE];
-	boolean_t			logqualifier, freeze = FALSE, success;
+	boolean_t			logqualifier, freeze = FALSE, success, success2;
 	mval				val;
 	char				format_buffer[FORMAT_STR_MAX_SIZE];
-	char				gbl_name_buff[MAX_MIDENT_LEN + 2]; /* 2 for null and '^' */
-	glist				gl_head, *gl_ptr;
+	glist				gl_head, *gl_ptr, *next_gl_ptr;
 	gd_region			*reg, *region_top;
-	mu_extr_stats			global_total,grand_total;
+	mu_extr_stats			global_total, grand_total, spangbl_total;
 	uint4			        item_code, devbufsiz, maxfield;
 	unsigned char			outfilename[256];
 	unsigned short			label_len, n_len;
@@ -109,7 +107,9 @@ void mu_extract(void)
 	static readonly $DESCRIPTOR(log_str,log_text);
 	struct dsc$descriptor_s label_buff;
 	$DESCRIPTOR(dir, "");
-	coll_hdr        extr_collhdr;
+	coll_hdr        		extr_collhdr;
+	gvnh_reg_t			*gvnh_reg;
+	gvnh_spanreg_t			*gvspan, *last_gvspan;
 
 	mu_outofband_setup();
 
@@ -141,8 +141,8 @@ void mu_extract(void)
 		cli_buff[0] = '*';
 		n_len = 1;
 	}
-	grand_total.recknt = grand_total.reclen = grand_total.keylen = grand_total.datalen = 0;
-	global_total.recknt = global_total.reclen = global_total.keylen = global_total.datalen = 0;
+	MU_EXTR_STATS_INIT(grand_total);
+	MU_EXTR_STATS_INIT(global_total);
 	/* gv_select will select globals */
 	gv_select(cli_buff, n_len, freeze, select_text, &gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk, FALSE);
 	if (!gl_head.next)
@@ -323,19 +323,13 @@ void mu_extract(void)
 		}
 	}
 	success = TRUE;
-	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
+	gvspan = NULL;
+	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = next_gl_ptr)
 	{
 		if (mu_ctrly_occurred)
 			break;
-		if (mu_ctrlc_occurred)
-		{
-			gbl_name_buff[0]='^';
-			memcpy(&gbl_name_buff[1], gl_ptr->name.str.addr, gl_ptr->name.str.len);
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RECORDSTAT, 6, gl_ptr->name.str.len + 1, gbl_name_buff,
-				global_total.recknt, global_total.keylen, global_total.datalen, global_total.reclen);
-			mu_ctrlc_occurred = FALSE;
-		}
-		GV_BIND_NAME_AND_ROOT_SEARCH(gd_header,&gl_ptr->name.str);
+		DO_OP_GVNAME(gl_ptr);
+			/* sets gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr */
                 if (MU_FMT_BINARY == format)
                 {
                        	extr_collhdr.act = gv_target->act;
@@ -352,26 +346,28 @@ void mu_extract(void)
 				mupip_exit(ERR_MUNOACTION);
 			}
 		}
-		/* Note: Do not change the order of the expression below.
-		 * Otherwise if success is FALSE, mu_extr_gblout() will not be called at all.
-		 * We want mu_extr_gblout() to be called irrespective of the value of success */
-		success = mu_extr_gblout(&gl_ptr->name, &mu_outrab, &global_total, format) && success;
-		if (logqualifier)
+		success2 = mu_extr_gblout(gl_ptr, &mu_outrab, &global_total, format);
+		success = success2 && success;
+		gvnh_reg = gl_ptr->gvnh_reg;
+		last_gvspan = gvspan;
+		gvspan = gvnh_reg->gvspan;
+		if (NULL != gvspan)
+		{	/* this global spans more than one region. aggregate stats across all regions */
+			if (last_gvspan != gvspan)
+				MU_EXTR_STATS_INIT(spangbl_total); /* this is the FIRST spanned region. initialize spangbl_total */
+			MU_EXTR_STATS_ADD(spangbl_total, global_total);	/* add global_total to grand_total */
+		}
+		next_gl_ptr = gl_ptr->next;
+		if (logqualifier || mu_ctrlc_occurred)
 		{
-			gbl_name_buff[0]='^';
-			memcpy(&gbl_name_buff[1], gl_ptr->name.str.addr, gl_ptr->name.str.len);
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RECORDSTAT, 6,  gl_ptr->name.str.len + 1, gbl_name_buff,
-				global_total.recknt, global_total.keylen, global_total.datalen, global_total.reclen);
+			ISSUE_RECORDSTAT_MSG(gl_ptr, global_total, PRINT_REG_TRUE);
+			if ((NULL != gvspan) && ((NULL == next_gl_ptr) || (next_gl_ptr->gvnh_reg != gvnh_reg)))
+			{	/* this is the LAST spanned region. Display summary line across all spanned regions */
+				ISSUE_RECORDSTAT_MSG(gl_ptr, spangbl_total, PRINT_REG_FALSE);
+			}
 			mu_ctrlc_occurred = FALSE;
 		}
-		grand_total.recknt += global_total.recknt;
-		if (grand_total.reclen < global_total.reclen)
-			grand_total.reclen = global_total.reclen;
-		if (grand_total.keylen < global_total.keylen)
-			grand_total.keylen = global_total.keylen;
-		if (grand_total.datalen < global_total.datalen)
-			grand_total.datalen = global_total.datalen;
-
+		MU_EXTR_STATS_ADD(grand_total, global_total);	/* add global_total to grand_total */
 	}
 	status = sys$close(&mu_outfab);
 	if (status != RMS$_NORMAL)

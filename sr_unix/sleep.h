@@ -170,7 +170,7 @@ int m_nsleep(int nseconds);
 # endif
 
 # ifdef _UWIN
-# include "iotcp_select.h"
+# include "gtm_select.h"
 # define usleep_func gtm_usleep
 # endif
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,6 @@
 #define GTMSECSHR_SOCK_PREFIX		"gtm_secshr"
 #define GTMSECSHR_DIR_SUFFIX		"/gtmsecshrdir"
 #define GTMSECSHR_EXECUTABLE		"gtmsecshr"
-#define GTMSECSHR_PATH			GTM_DIST_LOG "/" GTMSECSHR_EXECUTABLE
 
 #define	ROOTUID				0
 

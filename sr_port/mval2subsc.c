@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,8 +23,7 @@
 #include "do_xform.h"
 #include "format_targ_key.h"
 
-GBLREF gv_namehead	*gv_target;
-GBLREF gd_region       *gv_cur_region;
+GBLREF	gv_namehead	*gv_target;
 
 static readonly unsigned char pos_code[100] =
 {
@@ -54,7 +53,7 @@ static readonly unsigned char neg_code[100] =
 	0x6e, 0x6d, 0x6c, 0x6b, 0x6a, 0x69, 0x68, 0x67, 0x66, 0x65
 };
 
-unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
+unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll)
 {
 	boolean_t	is_negative;
 	unsigned char	buf1[MAX_KEY_SZ + 1], ch, *cvt_table, *in_ptr, *out_ptr;
@@ -75,8 +74,11 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 	 * of trouble with $ORDER in a database when -1 was treated as a string. This assert is not a 100%
 	 * catchall of invalid settings but it provides at least some barrier. A full barrier would require
 	 * complete conversion which is a bit expensive to always re-do at this point - even in a dbg version.
+	 * There is an exception though and that is if the caller is op_fnview. In that case, it could set
+	 * MV_NUM_APPROX to indicate a number needs to be treated as a string subscript. Skip that in the assert.
 	 */
-	assert(!(MV_NUM_APPROX & in_val->mvtype) || (NUM_DEC_DG_2L < in_val->str.len) || !val_iscan(in_val));
+	assert(!(MV_NUM_APPROX & in_val->mvtype) || (NUM_DEC_DG_2L < in_val->str.len) || !val_iscan(in_val)
+		|| TREF(skip_mv_num_approx_assert));
 	out_ptr = out_key->base + out_key->end;
 	if (TREF(transform) && gv_target->nct)
 	{
@@ -120,7 +122,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 		 */
 		avail_bytes = out_key->top - (out_key->end + tmp_len + 3);
 		if (0 > avail_bytes)
-			ISSUE_GVSUBOFLOW_ERROR(out_key);
+			ISSUE_GVSUBOFLOW_ERROR(out_key, KEY_COMPLETE_FALSE);
 		if (0 < tmp_len)
 		{
 			*out_ptr++ = STR_SUB_PREFIX;
@@ -135,17 +137,14 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 						/* Ensure input key to format_targ_key is double null terminated */
 						assert(STR_SUB_PREFIX == out_key->base[out_key->end]);
 						out_key->base[out_key->end] = KEY_DELIMITER;
-						ISSUE_GVSUBOFLOW_ERROR(out_key);
+						ISSUE_GVSUBOFLOW_ERROR(out_key, KEY_COMPLETE_FALSE);
 					}
 					ch++;	/* promote character */
 				}
 				*out_ptr++ = ch;
 			} while (--tmp_len > 0);
 		} else
-		{
-			*out_ptr++ = (!TREF(transform) || (0 == gv_cur_region->std_null_coll))
-				? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL;
-		}
+			*out_ptr++ = (0 == std_null_coll) ? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL;
 		goto ALLDONE;
 	}
 	/* Its a number, is it an integer? But before this assert that we have enough allocated space in the key
@@ -300,6 +299,6 @@ ALLDONE:
 	 * If not, we have overflown the original max-key-size length. Issue error.
 	 */
 	if ((MAX_GVKEY_PADDING_LEN + 1) > (int)(out_key->top - out_key->end))
-		ISSUE_GVSUBOFLOW_ERROR(out_key);
+		ISSUE_GVSUBOFLOW_ERROR(out_key, KEY_COMPLETE_FALSE);
 	return out_ptr;
 }

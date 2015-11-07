@@ -204,7 +204,7 @@ DBOPNERR	<Error opening database file !AD>/error/fao=2!/ansi=0
 DBRDERR		<Cannot read database file !AD after opening>/error/fao=2!/ansi=0
 CCEDUMPNOW	<>/fatal/fao=0!/ansi=0
 DEVPARINAP	<Device parameter inappropriate to this command>/error/fao=0!/ansi=0
-RECORDSTAT	<!AD:!_  Key cnt: !UL  max subsc len: !UL  max data len: !UL  max rec len: !UL>/info/fao=6!/ansi=0
+RECORDSTAT	<!AD:!_  Key cnt: !UL  max subsc len: !UL  max rec len: !UL  max node len: !UL>/info/fao=6!/ansi=0
 NOTGBL		<!_!AD!/!_!_!_"^" Expected>/error/fao=2!/ansi=0
 DEVPARPROT	<The protection specification is invalid>/error/fao=0!/ansi=0
 PREMATEOF	<Premature end of file detected>/error/fao=0!/ansi=0
@@ -674,12 +674,12 @@ CCPSIGDMP	<CCP non fatal dump, continuing operation. Report to your GT.M Support
 NOPRINCIO	<Unable to write to principal device>/fatal/fao=0!/ansi=0
 INVPORTSPEC	<Invalid port specification>/error/fao=0!/ansi=0
 INVADDRSPEC	<Invalid IP address specification>/error/fao=0!/ansi=0
-SOCKPARMREQ	<Socket device parameter is required for TCP open>/error/fao=0!/ansi=78
-IPADDRREQ	<Active connection requires IP address>/error/fao=0!/ansi=0
+UNUSEDMSG677	<SOCKPARMREQ last used in V6.0-002>/error/fao=0!/ansi=78
+UNUSEDMSG678	<IPADDRREQ last used in V6.0-002>/error/fao=0!/ansi=0
 SOCKWAIT	<Error waiting for socket connection>/error/fao=0!/ansi=80
 SOCKACPT	<Error accepting socket connection>/error/fao=0!/ansi=81
-SOCKINIT	<Error initializing TCP socket: (errno == !UL) !AD>/error/fao=3!/ansi=80
-OPENCONN	<Error opening TCP connection>/error/fao=0!/ansi=81
+SOCKINIT	<Error initializing socket: (errno == !UL) !AD>/error/fao=3!/ansi=80
+OPENCONN	<Error opening socket connection>/error/fao=0!/ansi=81
 DEVNOTIMP	<!AD device not implemented on in this environment>/error/fao=2!/ansi=0
 JNLEXTR		<Error writing journal extract file: !AD>/error/fao=2!/ansi=0
 DBREMOTE	<Database region !AD is remote; perform maintenance on the server node>/error/fao=2!/ansi=0
@@ -705,7 +705,7 @@ MUSTANDALONE	<Could not get exclusive access to !AD> /info /fao=2!/ansi=0
 MUNOACTION	<MUPIP unable to perform requested action> /error /fao=0!/ansi=0
 RMBIGSHARE	<File with BIGRECORD specified may only be shared if READONLY>/error/fao=0!/ansi=0
 TPRESTART	<Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: 0x!16@XQ> /info /fao=14!/ansi=0
-SOCKWRITE	<Write to a TCP/IP socket failed> /error /fao=0!/ansi=0
+SOCKWRITE	<Write to a socket failed> /error /fao=0!/ansi=0
 DBCNTRLERR	<Database file !AD: control error suspected but not found> /info /fao=2!/ansi=0
 NOTERMENV	<Environment variable TERM not set.  Assuming "unknown."> /info /fao=0!/ansi=0
 NOTERMENTRY	<TERM = "!AD" has no "terminfo" entry.  Possible terminal handling problems.> /info /fao=2!/ansi=0
@@ -778,7 +778,7 @@ BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
 JNLREAD		<Error reading from journal file !AD at offset [0x!XL]>/error/fao=3!/ansi=0
 JNLMINALIGN	<Journal Record Alignment !UL is less than the minimum value of !UL>/warning/fao=2!/ansi=0
-UNUSEDMSG781	<JNLDSKALIGN : Last used in V4.3-000>/error/fao=0!/ansi=0
+JOBSTARTCMDFAIL	<JOB command STARTUP script invocation failed>/error/fao=0!/ansi=0
 JNLPOOLSETUP	<Journal Pool setup error>/error/fao=0!/ansi=0
 JNLSTATEOFF	<ROLLBACK or RECOVER BACKWARD cannot proceed as database file !AD does not have journaling ENABLED and ON>/error/fao=2!/ansi=0
 RECVPOOLSETUP	<Receive Pool setup error>/error/fao=0!/ansi=0
@@ -841,7 +841,7 @@ RECSIZENOTEVEN	<RECORDSIZE [!UL] needs to be a multiple of 2 if ICHSET or OCHSET
 BUFFLUFAILED	<Error flushing buffers from !AD for database file !AD>/error/fao=4!/ansi=0
 MUQUALINCOMP	<Incompatible qualifiers - FILE and REGION>/error/fao=0!/ansi=0
 DISTPATHMAX	<$gtm_dist path is greater than maximum (!UL)>/error/fao=1!/ansi=0
-UNUSEDMSG844	<MAXTRACEHEIGHT last used in V5.4-002>/error/fao=0!/ansi=0
+FILEOPENFAIL	<Failed to open file !AD>/error/fao=2!/ansi=0
 IMAGENAME	<The executing module name should be !AD instead of !AD>/error/fao=4!/ansi=0
 GTMSECSHRPERM	<The gtmsecshr module in $gtm_dist does not have the correct permission and uid>/error/fao=0!/ansi=0
 GTMDISTUNDEF	<Environment variable $gtm_dist is not defined>/error/fao=0!/ansi=0
@@ -969,7 +969,7 @@ MUTEXRSRCCLNUP	<Mutex subsystem leftover resource !AD removed>/info/fao=2!/ansi=
 SEMWT2LONG	<Process !UL waited !UL second(s) for the !AD lock for region !AD, lock held by pid !UL>/error/fao=7!/ansi=0
 REPLINSTOPEN	<Error opening replication instance file !AD>/error/fao=2!/ansi=0
 REPLINSTCLOSE	<Error closing replication instance file !AD>/error/fao=2!/ansi=0
-UNUSEDMSG972	<JNLNOTFOUND : Last used in V4.4-000>/error/fao=0!/ansi=0
+JOBSETUP	<Error receiving !AD from parent process>/error/fao=2!/ansi=0
 DBCRERR8	<Database file !AD, cr location 0x!XJ blk = 0x!XL error: !AD was 0x!16@XQ, expecting 0x!16@XQ -- called from module !AD at line !UL> /info /fao=11!/ansi=0
 NUMPROCESSORS	<Could not determine number of processors>/warning/fao=0!/ansi=0
 DBADDRANGE8	<Database file !AD, element location 0x!XJ: blk = 0x!XL: control 0x!16@XQ was outside !AD range 0x!16@XQ to 0x!16@XQ> /info /fao=9!/ansi=0
@@ -1104,7 +1104,7 @@ INVZDIRFORM	<Invalid value (!UL) specified for ZDIR_FORM>/error/fao=1!/ansi=0
 ZDIROUTOFSYNC	<$ZDIRECTORY !AD is not the same as its cached value !AD>/warning/fao=4!/ansi=0
 GBLNOEXIST	<Global !AD no longer exists>/info/fao=2!/ansi=0
 MAXBTLEVEL	<Global !AD reached maximum level>/error/fao=2!/ansi=0
-UNUSEDMSG1107	<JNLSTRESTFL : found no evidence it ever was used in a production release>/error/fao=0!/ansi=0
+INVMNEMCSPC	<Unsupported mnemonicspace !AD>/error/fao=2!/ansi=35
 JNLALIGNSZCHG	<Journal ALIGNSIZE is rounded up to !UL blocks (closest next higher power of two)>/info/fao=1!/ansi=0
 UNUSEDMSG1109	<MAXTRACELEVEL : last used in V5.4-002B>/error/fao=0!/ansi=0
 GVFAILCORE	<A core file is being created for later analysis if necessary>/error/fao=0!/ansi=0
@@ -1316,7 +1316,7 @@ CRYPTJNLWRONGHASH	<Encryption key hash mismatch between journal file !AD and cor
 CRYPTKEYFETCHFAILED	<Could not retrieve encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
 CRYPTKEYFETCHFAILEDNF	<Could not retrieve encryption key during !AD operation key. !AD>/error/fao=4!/ansi=0
 CRYPTHASHGENFAILED	<Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
-CRYPTNOPSWDINTP	<Cannot prompt for password inside a TP transaction.>/error/fao=0!/ansi=0
+UNUSEDMSG1319	<CRYPTNOPSWDINTP : Last used in V6.0-003>/error/fao=0!/ansi=0
 BADTAG		<Unable to use file !AD (CCSID !UL) with CCSID !UL>/error/fao=4!/ansi=0
 ICUVERLT36	<!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used>/error/fao=4!/ansi=0
 ICUSYMNOTFOUND	<Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified>/error/fao=2!/ansi=0
@@ -1415,7 +1415,7 @@ MUUSERECOV	<Abnormal shutdown of journaled database !AD detected>/error/fao=2!/a
 SECNOTSUPPLEMENTARY	<!AD is a Supplementary Instance and so cannot act as a source to non-Supplementary Instance !AD >/error/fao=4!/ansi=0
 SUPRCVRNEEDSSUPSRC	<Instance !AD is not configured to perform local updates so it cannot act as a receiver for non-Supplementary Instance !AD>/error/fao=4!/ansi=0
 UNUSEDMSG1417	<SYNCTOSAMETYPE: Never used before so slot free for reuse>/info/fao=0!/ansi=0
-UNUSEDMSG1418	<TARGINSRUNNING: Never used before so slot free for reuse>/info/fao=0!/ansi=0
+SETITIMERFAILED	<A setitimer() call returned an error status of !UL>/fatal/fao=1!/ansi=0
 UPDSYNC2MTINS	<Can only UPDATERESYNC with an empty instance file>/error/fao=0!/ansi=0
 UPDSYNCINSTFILE	<Error with instance file name specified in UPDATERESYNC qualifier>/error/fao=0!/ansi=0
 REUSEINSTNAME	<Error with instance name specified in REUSE qualifier>/error/fao=0!/ansi=0
@@ -1523,10 +1523,29 @@ MALLOCMAXVMS	<Exceeded maximum allocation defined by GTM_MAX_STORALLOC>/error/fa
 HOSTCONFLICT	<Host !AD could not open database file !AD because it is marked as already open on node !AD>/error/fao=6!/ansi=0
 GETADDRINFO	<Error in getting address info>/error/fao=0!/ansi=0
 GETNAMEINFO	<Error in getting name info>/error/fao=0!/ansi=0
-SOCKBIND	<Error in binding TCP socket>/error/fao=0!/ansi=0
+SOCKBIND	<Error in binding socket>/error/fao=0!/ansi=0
 INSTFRZDEFER	<Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict>/info/fao=4!/ansi=0
 REGOPENRETRY	<Attempt to open region !AD (!AD) using startup shortcut failed due to conflicting database shutdown. Retrying...>/info/fao=4!/ansi=0
 REGOPENFAIL	<Failed to open region !AD (!AD) due to conflicting database shutdown activity>/error/fao=4!/ansi=0
+REPLINSTNOSHM	<Database !AD has no active connection to a replication journal pool; please verify that the database is listed in your instance file>/error/fao=2!/ansi=0
+DEVPARMTOOSMALL	<Deviceparameter must be greater than zero (0)>/error/fao=0!/ansi=0
+REMOTEDBNOSPGBL	<Database region !AD contains portion of a spanning global and so cannot point to a remote file>/error/fao=2!/ansi=0
+NCTCOLLSPGBL	<Database region !AD contains portion of spanning global ^!AD and so cannot support non-zero numeric collation type>/error/fao=4!/ansi=0
+ACTCOLLMISMTCH	<Global ^!AD inherits alternative collation sequence #!UL from global directory but database file !AD contains different collation sequence #!UL for this global>/error/fao=6!/ansi=0
+GBLNOMAPTOREG	<Global !AD does not map to region !AD in current global directory>/error/fao=4!/ansi=0
+ISSPANGBL	<Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory>/error/fao=2!/ansi=0
+TPNOSUPPORT	<Operation cannot be performed while inside of a TP transaction>/error/fao=0!/ansi=0
+GVSUBSERR	<Invalid subscripted global name specification in $VIEW() function>/error/fao=0!/ansi=0
+TRIGNOSPANGBL	<Triggers cannot be installed/deleted for global name !AD as it spans multiple regions in current global directory>/error/fao=2!/ansi=0
+FILTERTIMEDOUT	<Replication server timed out attempting to read seqno !16@XQ from external filter>/error/fao=1!/ansi=0
+TLSDLLNOOPEN	<Failed to load GT.M TLS/SSL library for secure communication>/error/fao=0!/ansi=0
+TLSINIT		<Failed to initialize GT.M TLS/SSL library for secure communication>/error/fao=0!/ansi=0
+TLSCONVSOCK	<Failed to convert Unix TCP/IP socket to TLS/SSL aware socket>/error/fao=0!/ansi=0
+TLSHANDSHAKE	<Connection to remote side using TLS/SSL protocol failed>/error/fao=0!/ansi=0
+TLSCONNINFO	<Failed to obtain information on the TLS/SSL connection>/warning/fao=0!/ansi=0
+TLSIOERROR	<Error during TLS/SSL !AD operation>/error/fao=2!/ansi=0
+TLSRENEGOTIATE	<Failed to renegotiate TLS/SSL connection>/error/fao=0!/ansi=0
+REPLNOTLS	<!AD requested TLS/SSL communication but the !AD was either not started with TLSID qualifier or does not support TLS/SSL protocol>/error/fao=4!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

@@ -20,12 +20,8 @@
 #include "gtm_string.h"
 
 #include "io.h"
-#include "iotcpdef.h"
-#include "iotcproutine.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
-
-GBLREF tcp_library_struct       tcp_routines;
 
 error_def(ERR_SOCKWRITE);
 error_def(ERR_TEXT);
@@ -53,8 +49,8 @@ void iosocket_flush(io_desc *iod)
 		return;
 	}
         memcpy(iod->dollar.device, "0", SIZEOF("0"));
-        if ( -1 == tcp_routines.aa_setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &on, SIZEOF(on)) ||
-		(-1 == tcp_routines.aa_setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &off, SIZEOF(off))))
+        if ( -1 == setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &on, SIZEOF(on)) ||
+		(-1 == setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &off, SIZEOF(off))))
         {
 		errptr = (char *)STRERROR(errno);
                 errlen = strlen(errptr);

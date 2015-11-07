@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,9 +80,9 @@ void mupip_cvtgbl(void)
 			mupip_exit(ERR_MUPCLIERR);
 	} else if (!cli_get_str("FILE", fn, &fn_len))  /* User wants to read from a file. */
 		mupip_exit(ERR_MUPCLIERR); /* Neither -STDIN nor file name specified. */
+	file_input_init(fn, fn_len);
 	if (mupip_error_occurred)
 		exit(-1);
-	file_input_init(fn, fn_len);
 	mu_outofband_setup();
 	if ((cli_status = cli_present("BEGIN")) == CLI_PRESENT)
 	{

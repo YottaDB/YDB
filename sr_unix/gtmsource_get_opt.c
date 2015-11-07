@@ -44,17 +44,20 @@
 #include "trans_log_name.h"
 #include "iosp.h"		/* for SS_NORMAL */
 #include "gtm_zlib.h"
+#ifdef GTM_TLS
+#include "gtm_repl.h"
+#include "heartbeat_timer.h"
+#endif
 
-#define MAX_SECONDARY_LEN 	(MAX_HOST_NAME_LEN + 11) /* +11 for ':' and
-							  * port number */
-
+#define MAX_SECONDARY_LEN 		(MAX_HOST_NAME_LEN + 11) /* +11 for ':' and port number */
 #define DEFAULT_JNLPOOL_SIZE		(64 * 1024 * 1024)
-
 #define DEFAULT_SHUTDOWN_TIMEOUT	30
-
-#define GTMSOURCE_CONN_PARMS_LEN ((10 + 1) * GTMSOURCE_CONN_PARMS_COUNT - 1)
+#define GTMSOURCE_CONN_PARMS_LEN 	((10 + 1) * GTMSOURCE_CONN_PARMS_COUNT - 1)
 
 GBLREF	gtmsource_options_t	gtmsource_options;
+#ifdef GTM_TLS
+GBLREF	repl_tls_info_t		repl_tls;
+#endif
 
 error_def(ERR_GETADDRINFO);
 error_def(ERR_LOGTOOLONG);
@@ -64,7 +67,6 @@ error_def(ERR_TEXT);
 
 int gtmsource_get_opt(void)
 {
-	boolean_t	secondary, dotted_notation, log, log_interval_specified, connect_parms_badval;
 	char		*connect_parm_token_str, *connect_parm;
 	char		*connect_parms_str, tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
 	char		secondary_sys[MAX_SECONDARY_LEN], *c, inst_name[MAX_FN_LEN + 1];
@@ -72,15 +74,16 @@ int gtmsource_get_opt(void)
 	char		update_val[SIZEOF("DISABLE")]; /* "ENABLE" or "DISABLE" */
 	char		freeze_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
 	char		freeze_comment[SIZEOF(gtmsource_options.freeze_comment)];
-	int		tries, index = 0, timeout_status, connect_parms_index, status;
-	mstr		log_nam, trans_name;
+	int		tries, index = 0, timeout_status, connect_parms_index, status, renegotiate_interval;
 	struct hostent	*sec_hostentry;
 	unsigned short	log_file_len, filter_cmd_len;
 	unsigned short	secondary_len, inst_name_len, statslog_val_len, update_val_len, connect_parms_str_len;
-	unsigned short	freeze_val_len, freeze_comment_len;
+	unsigned short	freeze_val_len, freeze_comment_len, tlsid_len;
 	int		errcode;
 	int		port_len;
 	char		*ip_end;
+	mstr		log_nam, trans_name;
+	boolean_t	secondary, dotted_notation, log, log_interval_specified, connect_parms_badval, plaintext_fallback;
 
 	memset((char *)&gtmsource_options, 0, SIZEOF(gtmsource_options));
 	gtmsource_options.start = (CLI_PRESENT == cli_present("START"));
@@ -342,6 +345,43 @@ int gtmsource_get_opt(void)
 			gtm_zlib_cmp_level = gtmsource_options.cmplvl;
 		} else
 			gtmsource_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
+		/* Check if SSL/TLS secure communication is requested. */
+#		ifdef GTM_TLS
+		if (CLI_PRESENT == cli_present("TLSID"))
+		{
+			tlsid_len = MAX_TLSID_LEN;
+			if (!cli_get_str("TLSID", repl_tls.id, &tlsid_len))
+			{
+				util_out_print("Error parsing TLSID qualifier", TRUE);
+				return -1;
+			}
+			assert(0 < tlsid_len);
+			if (CLI_PRESENT == cli_present("RENEGOTIATE_INTERVAL"))
+			{
+				if (!cli_get_int("RENEGOTIATE_INTERVAL", &renegotiate_interval))
+				{
+					util_out_print("Error parsing RENEGOTIATE_INTERVAL qualifier", TRUE);
+					return -1;
+				}
+				if (0 > renegotiate_interval)
+				{
+					util_out_print("Negative values are not allowed for RENEGOTIATE_INTERVAL qualifier", TRUE);
+					return -1;
+				} else if ((0 < renegotiate_interval) && (renegotiate_interval < MIN_RENEGOTIATE_TIMEOUT))
+					renegotiate_interval = MIN_RENEGOTIATE_TIMEOUT;
+				renegotiate_interval = renegotiate_interval * 60;	   /* Convert to seconds. */
+			} else
+				renegotiate_interval = DEFAULT_RENEGOTIATE_TIMEOUT * 60; /* Convert to seconds. */
+			/* Convert renegotiate_interval to heartbeat units (# of 8 second intervals). */
+			renegotiate_interval = DIVIDE_ROUND_UP(renegotiate_interval, HEARTBEAT_INTERVAL_IN_SECS);
+			gtmsource_options.renegotiate_interval = renegotiate_interval;
+			/* Check if plaintext-fallback mode is specified. Default option is NOPLAINTEXTFALLBACK. */
+			if (CLI_PRESENT == (plaintext_fallback = cli_present("PLAINTEXTFALLBACK")))
+				repl_tls.plaintext_fallback = (plaintext_fallback != CLI_NEGATED);
+			else
+				repl_tls.plaintext_fallback = FALSE;
+			}
+#		endif
 	}
 	if (gtmsource_options.shut_down)
 	{

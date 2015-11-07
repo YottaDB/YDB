@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@
 #include "tp.h"
 #include "gvcst_blk_build.h"
 #include "gtmimagename.h"
+#include "spec_type.h"
 
 #ifdef DEBUG
 GBLREF	boolean_t		skip_block_chain_tail_check;
@@ -50,7 +51,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 {
 	blk_segment	*seg, *stop_ptr, *array;
 	off_chain	chain;
-	sm_uc_ptr_t	ptr, ptrtop;
+	sm_uc_ptr_t	ptr, ptrtop, c;
 	sm_ulong_t	n;
 	int4		offset;
 	trans_num	blktn;
@@ -208,16 +209,39 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 						integ_error_found = TRUE;
 						break;
 					}
+					c = ptr;
+					c += SIZEOF(rec_hdr);
+					/* The *-key does not have a key. Everything else has one. Account for that. */
+					if (BSTAR_REC_SIZE != nRecLen)
+					{
+						for ( ; (c < ptrtop) && ((*c++ != KEY_DELIMITER) || (*c != KEY_DELIMITER)); )
+							;
+						if (c >= ptrtop)
+						{
+							assert(NULL == input_base_addr);
+							integ_error_found = TRUE;
+							break;
+						}
+						c++;
+					}
 					ptr += nRecLen;
-					if (ptr - SIZEOF(off_chain) == chainptr)
+					if (c == chainptr)
+					{
+						if (((ptr - SIZEOF(off_chain)) != chainptr)
+							&& ((ptr - SIZEOF(off_chain) - COLL_SPEC_LEN) != chainptr))
+						{
+							assert(NULL == input_base_addr);
+							integ_error_found = TRUE;
+						}
 						break;
-					if ((ptr - SIZEOF(off_chain)) > chainptr)
+					}
+					if (c > chainptr)
 					{
 						assert(NULL == input_base_addr);
 						integ_error_found = TRUE;
 						break;
 					}
-					GET_LONGP(&chain, ptr - SIZEOF(off_chain));
+					GET_LONGP(&chain, c);
 					if (chain.flag)
 					{
 						assert(NULL == input_base_addr);

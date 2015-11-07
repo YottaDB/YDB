@@ -72,7 +72,7 @@ error_def(ERR_TEXT);
 
 CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 {
-	START_CH;
+	START_CH(FALSE);
 	/* Remove semaphores created */
 	remove_sem_set(RECV);
 	repl_close(&gtmrecv_listen_sock_fd);
@@ -164,6 +164,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 	primary_ai.ai_addr = (sockaddr_ptr)&primary_sas;
 	primary_ai.ai_addrlen = SIZEOF(primary_sas);
 	repl_log(stdout, TRUE, TRUE, "Waiting for a connection...\n");
+	assertpro(FD_SETSIZE > gtmrecv_listen_sock_fd);
 	FD_ZERO(&input_fds);
 	FD_SET(gtmrecv_listen_sock_fd, &input_fds);
 	t1 = time(NULL);

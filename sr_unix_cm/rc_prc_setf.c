@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@
 #include "error.h"
 #include "gtcm.h"
 #include "gvcst_protos.h"	/* for gvcst_put prototype */
+#include "hashtab_mname.h"	/* for COMPUTE_HASH_MNAME prototype */
 
 GBLREF gv_key 		*gv_currkey;
 GBLREF gv_namehead 	*gv_target;
@@ -38,6 +39,8 @@ int rc_prc_setf(rc_q_hdr *qhdr)
     char	*cp1;
     int		 i;
     mval	 v;
+    mname_entry	gvname;
+    gvnh_reg_t	*gvnh_reg;
 
     ESTABLISH_RET(rc_dbms_ch, RC_SUCCESS);
     if ((qhdr->a.erc.value = rc_fnd_file(&qhdr->r.xdsid)) != RC_SUCCESS)
@@ -62,7 +65,10 @@ int rc_prc_setf(rc_q_hdr *qhdr)
 #endif
 		return -1;
 	}
-	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &v.str);
+	gvname.var_name = v.str;
+	COMPUTE_HASH_MNAME(&gvname);
+	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gvname, gvnh_reg);
+	assert(NULL == gvnh_reg->gvspan); /* so GV_BIND_SUBSNAME_IF_GVSPAN is not needed */
     memcpy(gv_currkey->base, req->key.key, req->key.len.value);
     gv_currkey->end = req->key.len.value;
     gv_currkey->base[gv_currkey->end] = 0;

@@ -58,19 +58,23 @@
 	if (SS_NORMAL != info->status2)									\
 	{												\
 		if (IS_GTM_IMAGE)									\
-			send_msg(VARLSTCNT(12) ERR_JNLCRESTATUS, 7, CALLFROM, info->jnl_len, info->jnl,	\
-				info->fn_len, info->fn, info->status, 0, info->status2);		\
+			send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(12) ERR_JNLCRESTATUS, 7, CALLFROM,	\
+					info->jnl_len, info->jnl, info->fn_len, info->fn, info->status,	\
+					0, info->status2);						\
 		else											\
-			gtm_putmsg(VARLSTCNT1(11) ERR_JNLCRESTATUS, 7, CALLFROM, info->jnl_len, info->jnl,\
-				info->fn_len, info->fn, info->status, PUT_SYS_ERRNO(info->status2));	\
+			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT1(11) ERR_JNLCRESTATUS, 7, CALLFROM,	\
+					info->jnl_len, info->jnl, info->fn_len, info->fn, info->status,	\
+					PUT_SYS_ERRNO(info->status2));					\
 	} else if (SS_NORMAL != info->status)								\
 	{												\
 		if (IS_GTM_IMAGE)									\
-			send_msg(VARLSTCNT(10) ERR_JNLCRESTATUS, 7, CALLFROM, info->jnl_len, 		\
-				info->jnl, info->fn_len, info->fn, info->status);			\
+			send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(10) ERR_JNLCRESTATUS, 7, CALLFROM,	\
+					info->jnl_len, info->jnl, info->fn_len, info->fn,		\
+					info->status);							\
 		else											\
-			gtm_putmsg(VARLSTCNT(10) ERR_JNLCRESTATUS, 7, CALLFROM, info->jnl_len, 		\
-				info->jnl, info->fn_len, info->fn, info->status);			\
+			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(10) ERR_JNLCRESTATUS, 7, CALLFROM,	\
+					info->jnl_len, info->jnl, info->fn_len, info->fn,		\
+					info->status);							\
 	}												\
 }
 #define RETURN_ON_ERROR(info)						\
@@ -135,9 +139,9 @@ uint4	cre_jnl_file(jnl_create_info *info)
 					return EXIT_ERR;
 				}
 				if (IS_GTM_IMAGE)
-					send_msg(VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
+					send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
 				else
-					gtm_putmsg(VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
+					gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
 				no_rename = TRUE;
 			}
 			/* Note if info->no_prev_link == TRUE, we do not keep previous link, though rename can happen */
@@ -184,6 +188,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	int			fstat_res;
 	ZOS_ONLY(int		realfiletag;)
 	int			stat_res;
+	int			user_id;
 	int			group_id;
 	struct stat		sb;
 	int			perm;
@@ -248,24 +253,25 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	}
 	/* setup new group and permissions if indicated by the security rules.
 	 */
-	if (gtm_set_group_and_perm(&sb, &group_id, &perm, PERM_FILE, &pdd) < 0)
+	if (gtm_permissions(&sb, &user_id, &group_id, &perm, PERM_FILE, &pdd) < 0)
 	{
-		send_msg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+		send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 			ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
 			PERMGENDIAG_ARGS(pdd));
 		if (IS_GTM_IMAGE)
-			rts_error(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+			rts_error_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
 				PERMGENDIAG_ARGS(pdd));
 		else
-			gtm_putmsg(VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
+			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
 				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
 				PERMGENDIAG_ARGS(pdd));
 		F_CLOSE(channel, status);
 		return EXIT_ERR;
 	}
 	/* if group not the same then change group of temporary file */
-	if ((-1 != group_id) && (group_id != stat_buf.st_gid) && (-1 == fchown(channel, -1, group_id)))
+	if ((((-1 != user_id) && (user_id != stat_buf.st_uid)) || ((-1 != group_id) && (group_id != stat_buf.st_gid)))
+		&& (-1 == fchown(channel, user_id, group_id)))
 	{
 		info->status = errno;
 		STATUS_MSG(info);
@@ -479,9 +485,11 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 						    (char *)rename_fn, rename_fn_len, &info->status2)))
 	{
 		if (IS_GTM_IMAGE)
-			send_msg(VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
+			send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
+					rename_fn);
 		else
-			gtm_putmsg(VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
+			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
+					rename_fn);
 		STATUS_MSG(info);
 		return EXIT_ERR;
 	}
@@ -493,23 +501,27 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 						     (char *)info->jnl, (int)info->jnl_len, &info->status2)))
 	{
 		if (IS_GTM_IMAGE)
-			send_msg(VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
+			send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
+					rename_fn);
 		else
-			gtm_putmsg(VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
+			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
+					rename_fn);
 		STATUS_MSG(info);
 		return EXIT_ERR;
 	}
 	if (IS_GTM_IMAGE)
-		send_msg(VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
+		send_msg_csa(CSA_ARG(info->csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len,
+				rename_fn);
 	else
-		gtm_putmsg(VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
-	DEBUG_ONLY(
+		gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len,
+				rename_fn);
+#		ifdef DEBUG
 		if (gtm_white_box_test_case_enabled && (WBTEST_JNL_CREATE_INTERRUPT == gtm_white_box_test_case_number))
 		{
 			UNIX_ONLY(DBGFPF((stderr, "CRE_JNL_FILE: started a wait\n")));	/* this white-box test is for UNIX */
 			LONG_SLEEP(600);
 			assert(FALSE); /* Should be killed before that */
 		}
-	)
+#		endif
 	return EXIT_NRM;
 }

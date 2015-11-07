@@ -46,6 +46,7 @@
 #include "jnl.h"
 #include "replgbl.h"
 #include "gtm_semutils.h"
+#include "gtmlink.h"
 #ifdef __linux__
 #include "hugetlbfs_overrides.h"
 #endif
@@ -91,6 +92,7 @@ GTMTRIG_ONLY(GBLREF	mval	gtm_trigger_etrap;)
 LITDEF mval default_mupip_trigger_etrap = DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , (SIZEOF(DEFAULT_MUPIP_TRIGGER_ETRAP) - 1),
 							      DEFAULT_MUPIP_TRIGGER_ETRAP , 0 , 0 );
 #endif
+LITREF mstr relink_allowed_mstr[];
 
 static readonly nametabent editing_params[] =
 {
@@ -116,7 +118,7 @@ void	gtm_env_init_sp(void)
 	size_t		cwdlen;
 	boolean_t	ret, is_defined;
 	char		buf[MAX_TRANS_NAME_LEN], *token, cwd[GTM_PATH_MAX];
-	char		*cwdptr, *trigger_etrap;
+	char		*cwdptr, *trigger_etrap, *c, *end;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -325,6 +327,16 @@ void	gtm_env_init_sp(void)
 		dollar_ztrap.mvtype = MV_STR;
 		dollar_ztrap.str.len = SIZEOF(init_break);
 		dollar_ztrap.str.addr = (char *)init_break;
+	}
+	/* See if gtm_link is set */
+	val.addr = GTM_LINK;
+	val.len = SIZEOF(GTM_LINK) - 1;
+	TREF(relink_allowed) = LINK_NORECURSIVE; /* default */
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	{
+		init_relink_allowed(&trans); /* set TREF(relink_allowed) */
+		/*for (c = trans.addr, end = c + trans.len; c < end; c++)
+			*c = TOUPPER(*c);*/ /* convert trans (an mstr) to all caps */
 	}
 #	ifdef DEBUG
 	/* DEBUG-only option to bypass 'easy' methods of things and always use gtmsecshr for IPC cleanups, wakeups, file removal,

@@ -36,6 +36,7 @@
 #include "objlabel.h"
 #include "stringpool.h"
 #include "min_max.h"
+#include "rtn_src_chksum.h"
 
 GBLDEF uint4 			lits_text_size, lits_mval_size;
 
@@ -103,7 +104,7 @@ error_def(ERR_TEXT);
 
 void cg_lab (mlabel *mlbl, char *do_emit);
 
-void obj_code (uint4 src_lines, uint4 checksum)
+void obj_code (uint4 src_lines, void *checksum_ctx)
 {
 	int		i;
 	uint4		lits_pad_size, object_pad_size, lnr_pad_size;
@@ -203,7 +204,7 @@ void obj_code (uint4 src_lines, uint4 checksum)
 	object_pad_size = PADLEN(code_size, OBJECT_SIZE_ALIGNMENT);
 	code_size += object_pad_size;
 	gtm_object_size = code_size;
-	rhead.checksum = checksum;
+	set_rtnhdr_checksum(&rhead, (gtm_rtn_src_chksum_ctx *)checksum_ctx);
 	rhead.objlabel = MAGIC_COOKIE;
 	rhead.temp_mvals = sa_temps[TVAL_REF];
 	rhead.temp_size = sa_temps_offset[TCAD_REF];
