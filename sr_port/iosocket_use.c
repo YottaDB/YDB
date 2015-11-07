@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,7 @@ GBLREF	boolean_t		dollar_zininterrupt;
 LITREF	nametabent		filter_names[];
 LITREF	unsigned char		filter_index[27];
 LITREF 	unsigned char		io_params_size[];
+LITREF	mstr			chset_names[];
 
 error_def(ERR_ABNCOMPTINC);
 error_def(ERR_ACOMPTBINC);
@@ -69,13 +70,13 @@ error_def(ERR_ZINTRECURSEIO);
 void	iosocket_use(io_desc *iod, mval *pp)
 {
 	unsigned char	ch, len;
-	int		handled_len, handlea_len, handles_len;
+	int		handled_len, handlea_len, handles_len, int_len;
 	int4		length, width, new_len;
 	d_socket_struct *dsocketptr;
 	socket_struct	*socketptr, newsocket;
 	char		handlea[MAX_HANDLE_LEN], handles[MAX_HANDLE_LEN], handled[MAX_HANDLE_LEN];
  	char            addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
-		        temp_addr[SA_MAXLITLEN], ioerror;
+		        temp_addr[SA_MAXLITLEN], ioerror, *free_ozff = NULL;
 	unsigned char	delimiter_buffer[MAX_N_DELIMITER * (MAX_DELIM_LEN + 1)];
 	unsigned char	zff_buffer[MAX_ZFF_LEN];
 	boolean_t	attach_specified = FALSE,
@@ -96,7 +97,6 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	char		*tab;
 	int		save_errno;
 	size_t		d_socket_struct_len;
-	mstr		lcl_zff;
 
         assert(iod->state == dev_open);
         assert(iod->type == gtmsocket);
@@ -134,7 +134,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		switch (ch)
 		{
 			case iop_exception:
-				iod->error_handler.len = *(pp->str.addr + p_offset);
+				iod->error_handler.len = (int)(*(pp->str.addr + p_offset));
 				iod->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
 				s2pool(&iod->error_handler);
 				break;
@@ -180,14 +180,14 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			case iop_connect:
 				n_specified++;
 				connect_specified = TRUE;
-				len = *(pp->str.addr + p_offset);
-				if (len < USR_SA_MAXLITLEN)
+				int_len = (int)(*(pp->str.addr + p_offset));
+				if (int_len < USR_SA_MAXLITLEN)
 				{
-					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), len);
-					sockaddr[len] = '\0';
+					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), int_len);
+					sockaddr[int_len] = '\0';
 				} else
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ADDRTOOLONG,
-						  4, len, pp->str.addr + p_offset + 1, len, USR_SA_MAXLITLEN);
+						  4, int_len, pp->str.addr + p_offset + 1, int_len, USR_SA_MAXLITLEN);
 				break;
 			case iop_delimiter:
 				n_specified++;
@@ -226,14 +226,14 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			case iop_zlisten:
 				n_specified++;
 				listen_specified = TRUE;
-				len = *(pp->str.addr + p_offset);
-				if (len < USR_SA_MAXLITLEN)
+				int_len = (int)(*(pp->str.addr + p_offset));
+				if (int_len < USR_SA_MAXLITLEN)
 				{
-					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), len);
-					sockaddr[len] = '\0';
+					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), int_len);
+					sockaddr[int_len] = '\0';
 				} else
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ADDRTOOLONG,
-						  4, len, pp->str.addr + p_offset + 1, len, USR_SA_MAXLITLEN);
+						  4, int_len, pp->str.addr + p_offset + 1, int_len, USR_SA_MAXLITLEN);
 				break;
 			case iop_socket:
 				n_specified++;
@@ -386,6 +386,14 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		/* allocate the structure for a new socket */
                 if (NULL == (socketptr = iosocket_create(sockaddr, bfsize, -1, listen_specified)))
                         return;
+		if (gtm_max_sockets <= newdsocket->n_socket)
+		{
+			if (FD_INVALID != socketptr->temp_sd)
+				close(socketptr->temp_sd);
+			SOCKET_FREE(socketptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+			return;
+		}
 		/* give the new socket a handle */
 		iosocket_handle(handles, &handles_len, TRUE, dsocketptr);
                 socketptr->handle_len = handles_len;
@@ -419,7 +427,12 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		{
 			if (0 >= newdsocket->n_socket)
 			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+#				ifndef VMS
+				if (iod == io_std_device.out)
+					ionl_use(iod, pp);
+				else
+#				endif
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
 				return;
 			}
      			if (newdsocket->n_socket <= newdsocket->current_socket)
@@ -438,77 +451,35 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	if (0 <= delimiter_len)
 	{
 		iosocket_delimiter(delimiter_buffer, delimiter_len, &newsocket, (0 == delimiter_len));
-		/* The delimiter has changed. The iosocket_readfl/write routine won't notice so we have to do
-		   the UTF16xx conversion since we changed it.
-		*/
-		DBGSOCK2((stdout, "socuse: Delimiter(s) replaced - num delims: %d  delimiter_len: %d  ichset: %d  ochset: %d\n",
-			  newsocket.n_delimiter, delimiter_len, iod->ichset, iod->ochset));
-		if  (0 < delimiter_len)
-		{
-			if (!newsocket.first_read && (CHSET_UTF16BE == iod->ichset || CHSET_UTF16LE == iod->ichset))
-			{	/* We have been reading with this socket so convert this new delimiter set */
-				DBGSOCK2((stdout, "socuse: Converting new delimiters for input\n"));
-				iosocket_delim_conv(&newsocket, iod->ichset);
-			}
-			if (!newsocket.first_write && (CHSET_UTF16BE == iod->ochset || CHSET_UTF16LE == iod->ochset))
-			{	/* We have been writing with this socket so convert the new default output delimiter */
-				DBGSOCK2((stdout, "socuse: Converting new delimiters for output\n"));
-				if (newsocket.first_read || (CHSET_UTF16BE != iod->ichset && CHSET_UTF16LE != iod->ichset))
-				{	/* Need to do conversion as iosocket_delim_conv above didn't do it for us */
-					DBGSOCK2((stdout, "socuse: running convert for write since input didn't do it\n"));
-					new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset],
-							   &newsocket.delimiter[0], NULL, NULL);
-					if (MAX_DELIM_LEN < new_len)
-					{
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
-						return;
-					}
-				} else
-				{
-					DBGSOCK2((stdout, "socuse: using previous length from read conversion\n"));
-					new_len = newsocket.idelimiter[0].len;
-				}
-                                newsocket.odelimiter0.len = new_len;
-                                UNICODE_ONLY(newsocket.odelimiter0.char_len = newsocket.delimiter[0].char_len);
-                                newsocket.odelimiter0.addr = malloc(new_len);
-                                memcpy(newsocket.odelimiter0.addr,
-				       (newsocket.first_read ? (char *)stringpool.free : newsocket.idelimiter[0].addr),
-				       new_len);
-			}
-		}
+		socketptr->n_delimiter = 0;	/* prevent double frees if error */
 	}
 	if (iod->wrap && 0 != newsocket.n_delimiter && iod->width < newsocket.delimiter[0].len)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DELIMWIDTH, 2, iod->width, newsocket.delimiter[0].len);
 	if (0 <= zff_len && /* ZFF or ZNOFF specified */
 	    0 < (newsocket.zff.len = zff_len)) /* assign the new ZFF len, might be 0 from ZNOFF, or ZFF="" */
 	{	/* ZFF="non-zero-len-string" specified */
-                if (CHSET_UTF16BE == iod->ochset || CHSET_UTF16LE == iod->ochset) /* need conversion of ZFF */
-		{
-			DBGSOCK2((stdout, "socuse: Converting zff\n"));
-			lcl_zff.addr = (char *)zff_buffer;
-			lcl_zff.len = zff_len;
-			new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset], &lcl_zff, NULL, NULL);
-			if (MAX_ZFF_LEN < new_len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFF2MANY, 2, new_len, MAX_ZFF_LEN);
-                        if (NULL == newsocket.zff.addr) /* we rely on newsocket.zff.addr being set to 0 in iosocket_create() */
-                                newsocket.zff.addr = (char *)malloc(MAX_ZFF_LEN);
-			newsocket.zff.len = new_len;
-			UNICODE_ONLY(newsocket.zff.char_len = 0); /* don't care */
-			memcpy(newsocket.zff.addr, stringpool.free, new_len);
-
-		} else
-		{	/* Store parm without conversion */
-			if (gtm_utf8_mode) /* Check if ZFF has any invalid UTF-8 character */
-			{	/* Note: the ZFF string originates from the source program, so is in UTF-8 mode or M mode
-				   regardless of OCHSET of this device. ZFF is output on WRITE # command, and MUST contain
-				   valid UTF-8 sequence. This validation is handled by gtm_conv in the path above.
-				*/
-				utf8_len_strict(zff_buffer, zff_len);
-			}
-			if (NULL == newsocket.zff.addr) /* we rely on newsocket.zff.addr being set to 0 in iosocket_create() */
-				newsocket.zff.addr = (char *)malloc(MAX_ZFF_LEN);
-			memcpy(newsocket.zff.addr, zff_buffer, zff_len);
+		if (gtm_utf8_mode) /* Check if ZFF has any invalid UTF-8 character */
+		{	/* Note: the ZFF string originates from the source program, so is in UTF-8 mode or M mode
+			   regardless of OCHSET of this device. ZFF is output on WRITE # command, and MUST contain
+			   valid UTF-8 sequence.
+			*/
+			utf8_len_strict(zff_buffer, zff_len);
 		}
+		if ((NULL != newsocket.ozff.addr) && (socketptr->ozff.addr != socketptr->zff.addr))
+			free_ozff = newsocket.ozff.addr;	/* previously converted */
+		if (NULL == newsocket.zff.addr) /* we rely on newsocket.zff.addr being set to 0 in iosocket_create() */
+		{
+			socketptr->zff.addr = newsocket.zff.addr = (char *)malloc(MAX_ZFF_LEN);
+			socketptr->zff.len = zff_len;		/* in case error so SOCKET_FREE frees */
+		}
+		memcpy(newsocket.zff.addr, zff_buffer, zff_len);
+		newsocket.ozff = newsocket.zff;
+	} else if (0 == zff_len)
+	{
+		if ((NULL != newsocket.ozff.addr) && (socketptr->ozff.addr != socketptr->zff.addr))
+			free_ozff = newsocket.ozff.addr;	/* previously converted */
+		newsocket.ozff = newsocket.zff;
+
 	}
 	if (ioerror_specified)
 		newsocket.ioerror = ('T' == ioerror || 't' == ioerror);
@@ -527,16 +498,19 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		if (bfsize_specified)
 			newsocket.buffer_size = bfsize;
 #ifdef TCP_NODELAY
-		nodelay = newsocket.nodelay ? 1 : 0;
-		if ((socketptr->nodelay != newsocket.nodelay) &&
-		    (-1 == setsockopt(newsocket.sd, IPPROTO_TCP,
-						      TCP_NODELAY, &nodelay, SIZEOF(nodelay))))
+		if (socket_local != newsocket.protocol)
 		{
-			save_errno = errno;
-			errptr = (char *)STRERROR(save_errno);
-                	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("TCP_NODELAY"), save_errno,
-					 LEN_AND_STR(errptr));
-			return;
+			nodelay = newsocket.nodelay ? 1 : 0;
+			if ((socketptr->nodelay != newsocket.nodelay) &&
+			    (-1 == setsockopt(newsocket.sd, IPPROTO_TCP,
+						      TCP_NODELAY, &nodelay, SIZEOF(nodelay))))
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(save_errno);
+                		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("TCP_NODELAY"),
+					save_errno, LEN_AND_STR(errptr));
+				return;
+			}
 		}
 #endif
 		if ((socketptr->bufsiz != newsocket.bufsiz) &&
@@ -575,18 +549,18 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	/* ------------------------------------ commit changes -------------------------------------- */
 	if (create_new_socket)
 	{
-                if (gtm_max_sockets <= newdsocket->n_socket)
-                {
-                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
-                        return;
-                }
 		/* a new socket is created. so add to the list */
 		newsocket.dev = dsocketptr;
                 newdsocket->socket[newdsocket->n_socket++] = socketptr;
                 newdsocket->current_socket = newdsocket->n_socket - 1;
 	}
-	else if (socketptr->buffer_size != newsocket.buffer_size)
-		free(socketptr->buffer);
+	else
+	{
+		if (NULL != free_ozff)
+			free(free_ozff);
+		if (socketptr->buffer_size != newsocket.buffer_size)
+			free(socketptr->buffer);
+	}
 	*socketptr = newsocket;
 	memcpy(dsocketptr, newdsocket, d_socket_struct_len);
 	return;

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2014 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -419,12 +419,16 @@ OC_FNZPRIV:	pushab	val.0
 OC_FNZQGBLMOD:	pushab	val.0
 		calls	#1,xfer.xf_fnzqgblmod
 OC_FNZSEA:	pushab	val.0
+		pushl	val.3
 		pushl	val.2
 		pushab	val.1
-		calls	#3,xfer.xf_fnzsearch
+		calls	#4,xfer.xf_fnzsearch
 OC_FNZSETPRV:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnzsetprv
+OC_FNZSOCKET:	irepab	val.2
+		pushab	val.0
+		calls	val.1,xfer.xf_fnzsocket
 OC_FNZSUBSTR:	pushab  val.0                   ; Destination mval
 		pushl   val.3                   ; max byte length
 		pushl   val.2                   ; starting character position

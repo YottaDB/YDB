@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 /* gtm_logicals.h - Environment variables used by GT.M. */
 /* within each group, the entries are in alpha order of the third column */
-/* -------------------------- Common to Unix and VMS --------------------------  */
+/* -------------------------- Common to UNIX and VMS --------------------------  */
 
 #define	GTM_DIST_LOG			"$gtm_dist"
 
@@ -81,7 +81,7 @@
 #define	ZTRAP_NEW			"$gtm_ztrap_new"
 #define	ZYERROR				"$gtm_zyerror"
 
-/* -------------------------- Unix only --------------------------  */
+/* -------------------------- UNIX only --------------------------  */
 
 /* Database */
 #define	GTM_TMP_ENV			"$gtm_tmp"
@@ -110,10 +110,13 @@
 #define	GTM_BADCHAR_ENV			"$gtm_badchar"
 #define	GTM_ICU_VERSION			"$gtm_icu_version"
 
+/* [Auto]Relink related */
+#define	GTM_LINK			"$gtm_link"
+#define GTM_LINKTMPDIR			"$gtm_linktmpdir"
+
 /* Miscellaneous */
 #define GTM_ERROR_ON_JNL_FILE_LOST	"$gtm_error_on_jnl_file_lost"
 #define GTM_ETRAP			"$gtm_etrap"
-#define	GTM_LINK			"$gtm_link"
 #define	GTM_LOG_ENV			"$gtm_log"
 #define	GTM_LVNULLSUBS			"$gtm_lvnullsubs"
 #define	GTM_NOCENABLE			"$gtm_nocenable"
@@ -126,3 +129,4 @@
 #define	GTMDBGFLAGS_FREQ		"$gtmdbgflags_freq"
 #define GTM_MAX_STORALLOC		"$gtm_max_storalloc"
 #define GTM_IPV4_ONLY			"$gtm_ipv4_only"
+#define GTM_DMTERM			"$gtm_dmterm"

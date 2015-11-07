@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@
 #include "op_merge.h"
 #include "format_targ_key.h"
 #include "ddphdr.h"
+#include "mvalconv.h"
 
 GBLREF int              merge_args;
 GBLREF merge_glvn_ptr	mglvnp;
@@ -45,17 +46,19 @@ error_def(ERR_MERGEDESC);
  */
 boolean_t merge_desc_check(void)
 {
-	boolean_t		mergereg_array[256], *is_reg_in_array, intersect;
+	boolean_t		intersect, *is_reg_in_array, mergereg_array[256];
 	char			*base;
 	enum db_acc_method	acc_meth1, acc_meth2;
 	gd_addr			*addr;
-	gd_binding		*map, *start_map1, *end_map1, *start_map2, *end_map2;
+	gd_binding		*end_map1, *end_map2, *map, *start_map1, *start_map2;
 	gd_region		*reg, *reg1, *reg2;
 	gv_key			*gvkey1, *gvkey2;
 	gv_namehead		*gvt1, *gvt2;
 	gvname_info		*gblp1, *gblp2;
 	gvnh_reg_t		*gvnh_reg1, *gvnh_reg2;
-	int			max_fid_index;
+	int			dollardata_src, max_fid_index;
+	lv_val			*dst, *src;
+	mval			tmp_mval;
 	sgmnt_addrs		*csa;
 	unsigned char		buff1[MAX_ZWR_KEY_SZ], buff2[MAX_ZWR_KEY_SZ], *end1, *end2;
 	DCL_THREADGBL_ACCESS;
@@ -218,18 +221,40 @@ boolean_t merge_desc_check(void)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
 	} else if (MARG1_IS_LCL(merge_args) && MARG2_IS_LCL(merge_args))
 	{
-		if (mglvnp->lclp[IND1] == mglvnp->lclp[IND2])
-			return 0; /* NOOP - merge self */
-		if (lcl_arg1_is_desc_of_arg2(mglvnp->lclp[IND1], mglvnp->lclp[IND2]))
+		dst = mglvnp->lclp[IND1];
+		src = mglvnp->lclp[IND2];
+		if ((dst == src) || (NULL == src))
+		{	/* NOOP - merge self OR empty subscripted source */
+			UNDO_ACTIVE_LV(actlv_merge_desc_check1); /* kill "dst" and parents as applicable if $data(dst)=0 */
+			return 0;
+		}
+		if (lcl_arg1_is_desc_of_arg2(dst, src))
 		{
-			end1 = format_key_lv_val(mglvnp->lclp[IND1], buff1, SIZEOF(buff1));
-			end2 = format_key_lv_val(mglvnp->lclp[IND2], buff2, SIZEOF(buff2));
+			end1 = format_key_lv_val(dst, buff1, SIZEOF(buff1));
+			UNDO_ACTIVE_LV(actlv_merge_desc_check2); /* kill "dst" and parents as applicable if $data(dst)=0 */
+			op_fndata(src, &tmp_mval);
+			dollardata_src = MV_FORCE_INTD(&tmp_mval);
+			if (0 == dollardata_src)
+				return 0; /* NOOP - merge x(subs)=x, but x is undefined */
+			end2 = format_key_lv_val(src, buff2, SIZEOF(buff2));
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
-		} else if (lcl_arg1_is_desc_of_arg2(mglvnp->lclp[IND2], mglvnp->lclp[IND1]))
+		}
+		if (lcl_arg1_is_desc_of_arg2(src, dst))
 		{
-			end1 = format_key_lv_val(mglvnp->lclp[IND1], buff1, SIZEOF(buff1));
-			end2 = format_key_lv_val(mglvnp->lclp[IND2], buff2, SIZEOF(buff2));
+			/* No need of UNDO_ACTIVE_LV since src is a descendant of dst and so $data(dst) is != 0 */
+			end1 = format_key_lv_val(dst, buff1, SIZEOF(buff1));
+			end2 = format_key_lv_val(src, buff2, SIZEOF(buff2));
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
+		}
+		if (LV_IS_BASE_VAR(src))
+		{	/* source is unsubscripted. check if source is empty */
+			op_fndata(src, &tmp_mval);
+			dollardata_src = MV_FORCE_INTD(&tmp_mval);
+			if (0 == dollardata_src)
+			{	/* NOOP - merge with empty unsubscripted source local variable */
+				UNDO_ACTIVE_LV(actlv_merge_desc_check3); /* kill "dst" and parents as applicable if $data(dst)=0 */
+				return 0;
+			}
 		}
 	}
 	return 1;

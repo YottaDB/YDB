@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,16 +25,17 @@
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #endif
+#include "gtmcrypt.h"
 
 GBLREF io_pair		io_curr_device;
 #ifdef UNICODE_SUPPORTED
 LITREF	mstr		chset_names[];
 #endif
 
-#define MAX_WIDTH 65535
-
-error_def(ERR_NOTTOEOFONPUT);
+error_def(ERR_CRYPTBADWRTPOS);
 error_def(ERR_DEVICEREADONLY);
+error_def(ERR_IOERROR);
+error_def(ERR_NOTTOEOFONPUT);
 error_def(ERR_SYSCALL);
 
 /* write ASCII characters converting to UTF16 if needed
@@ -45,6 +46,7 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 	int		outlen, mblen, status;
 	wint_t		utf_code;
 	unsigned char	*outstart, *out, *top, *outptr, *nextoutptr, *outptrtop, *nextmb;
+	char		*out_ptr;
 	d_rm_struct	*rm_ptr;
 
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
@@ -84,13 +86,21 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 	}
 	if (0 < outlen)
 	{
-		DOWRITERC(rm_ptr->fildes, outstart, outlen, status);
+		if (rm_ptr->output_encrypted)
+		{
+			REALLOC_CRYPTBUF_IF_NEEDED(outlen);
+			WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, outstart, outlen, pvt_crypt_buf.addr);
+			out_ptr = pvt_crypt_buf.addr;
+		} else
+			out_ptr = (char *)outstart;
+		DOWRITERC(rm_ptr->fildes, out_ptr, outlen, status);
 		if (0 != status)
 		{
 			DOLLAR_DEVICE_WRITE(iod, status);
 			iod->dollar.za = 9;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
+		rm_ptr->write_occurred = TRUE;
 		rm_ptr->out_bytes += outlen;
 	}
 	return outlen;
@@ -101,12 +111,16 @@ void iorm_write_utf(mstr *v)
 	int4		inchars, char_count;		/* in characters */
 	int4		inlen, outbytes, mblen;		/* in bytes */
 	int4		availwidth, usedwidth, mbwidth;	/* in display columns */
-	int		status, padsize;
+	int		status, padsize,fstat_res,save_errno;
 	wint_t		utf_code;
 	io_desc		*iod;
 	d_rm_struct	*rm_ptr;
 	unsigned char	*inptr, *top, *nextmb, *outptr, *nextoutptr, *outstart, temppad, temppadarray[2];
+	char		*out_ptr;
 	boolean_t	utf8_active = TRUE;		/* needed by GTM_IO_WCWIDTH macro */
+	boolean_t	stream, wrap;
+	struct stat	statbuf;
+
 
 	iod = io_curr_device.out;
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
@@ -120,15 +134,11 @@ void iorm_write_utf(mstr *v)
 	if (0 >= inchars)
 		return;
 	usedwidth = 0;
-	if (rm_ptr->stream && !iod->wrap)
-	{
-		availwidth = iod->width;
-		/* For STREAM and NOWRAP, allow a maximum of "rm_ptr->recordsize" bytes to be written as part of
-		 * the current WRITE. Any number of future WRITEs to this same record are allowed as long as
-		 * each of them is within "rm_ptr->recordsize" bytes (truncated otherwise). This means that
-		 * it does not matter how many bytes we have already written as part of the current record
-		 * which is "rm_ptr->out_bytes". Reset it to 0 so we can use it for the current WRITE calculations.
-		 */
+	stream = rm_ptr->stream;
+	wrap = iod->wrap;
+	if (stream && !wrap)
+	{	/* For STREAM and NOWRAP, allow the entire record to be written without any record truncations/terminations */
+		availwidth = inlen;	/* calculate worst case requirement of width (in chars) to write out input bytes */
 		rm_ptr->out_bytes = 0;
 	} else
 		availwidth = iod->width - iod->dollar.x;
@@ -137,21 +147,47 @@ void iorm_write_utf(mstr *v)
 	{
 		outstart = nextoutptr = outptr = &rm_ptr->outbuf[rm_ptr->out_bytes];
 		if (!rm_ptr->done_1st_write)
-		{
+		{	/* get the file size  */
+			FSTAT_FILE(rm_ptr->fildes, &statbuf, fstat_res);
+			if (-1 == fstat_res)
+			{
+				save_errno = errno;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
+					      CALLFROM, save_errno);
+			}
 			if (CHSET_UTF16 == iod->ochset)
 			{	/* Write BOM but do not count it towards the bytes in the current record */
-				memcpy(outptr, UTF16BE_BOM, UTF16BE_BOM_LEN);
-				outbytes = UTF16BE_BOM_LEN;
-				outptr += UTF16BE_BOM_LEN;
-				DOWRITERC(rm_ptr->fildes, outstart, outbytes, status);
-				if (0 != status)
+				/* write BOM if file is empty */
+				if (0 == statbuf.st_size)
 				{
-					DOLLAR_DEVICE_WRITE(iod, status);
-					iod->dollar.za = 9;
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
+					memcpy(outptr, UTF16BE_BOM, UTF16BE_BOM_LEN);
+					outbytes = UTF16BE_BOM_LEN;
+					outptr += UTF16BE_BOM_LEN;
+					if (rm_ptr->output_encrypted)
+					{
+						REALLOC_CRYPTBUF_IF_NEEDED(outbytes);
+						WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, outstart, outbytes,
+							pvt_crypt_buf.addr);
+						out_ptr = pvt_crypt_buf.addr;
+					} else
+						out_ptr = (char *)outstart;
+					DOWRITERC(rm_ptr->fildes, out_ptr, outbytes, status);
+					if (0 != status)
+					{
+						DOLLAR_DEVICE_WRITE(iod, status);
+						iod->dollar.za = 9;
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
+					}
+					rm_ptr->write_occurred = TRUE;
+					outptr = outstart;
+					rm_ptr->out_bytes = outbytes = 0;
+					/* save UTF16BE_BOM_LEN in bom_num_bytes until bom is checked, but don't
+					 indicate that bom has been checked - which still needs to be done for reading
+					 the exception is if the file was opened WRITEONLY */
+					rm_ptr->bom_num_bytes = UTF16BE_BOM_LEN;
+					if (rm_ptr->write_only)
+						rm_ptr->bom_checked = TRUE;
 				}
-				outptr = outstart;
-				rm_ptr->out_bytes = outbytes = 0;
 				iod->ochset = CHSET_UTF16BE;
 				get_chset_desc(&chset_names[iod->ochset]);
 			}
@@ -193,16 +229,23 @@ void iorm_write_utf(mstr *v)
 		/* Note that "mblen" and "mbwidth" are valid only if "inptr < top".
 		 * This is why they are used after the "inptr >= top" check below
 		 */
-		if (inptr >= top || ((usedwidth + mbwidth) > availwidth) || ((rm_ptr->out_bytes + mblen) > rm_ptr->recordsize))
+		if ((inptr >= top) || ((usedwidth + mbwidth) > availwidth) || ((rm_ptr->out_bytes + mblen) > rm_ptr->recordsize))
 		{	/* filled to WIDTH or end of input or full record */
 			if (0 < outbytes)
 			{
+				if (rm_ptr->output_encrypted)
+				{
+					REALLOC_CRYPTBUF_IF_NEEDED(outbytes);
+					WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, outstart, outbytes, pvt_crypt_buf.addr);
+					out_ptr = pvt_crypt_buf.addr;
+				} else
+					out_ptr = (char *)outstart;
 				if (rm_ptr->fifo || rm_ptr->pipe)
 				{
-					WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, outstart, outbytes, status);
+					WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, out_ptr, outbytes, status);
 				} else
 				{
-					DOWRITERC(rm_ptr->fildes, outstart, outbytes, status);
+					DOWRITERC(rm_ptr->fildes, out_ptr, outbytes, status);
 				}
 				if (0 != status)
 				{
@@ -210,18 +253,19 @@ void iorm_write_utf(mstr *v)
 					iod->dollar.za = 9;
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
+				rm_ptr->write_occurred = TRUE;
 			}
 			iod->dollar.x += usedwidth;
 			if (inptr >= top)
 				break;					/* end of input */
 			if (char_count >= inchars)
 				break;					/* end of adjusted input characters */
-			if (!rm_ptr->stream || iod->wrap)
-			{ /* implicit record termination for non-stream files or stream files with the "wrap" option. */
-				if (!iod->wrap)	/* non-stream device wants NOWRAP, so break right away without writing any more */
+			if (!stream || wrap)
+			{	/* implicit record termination for non-stream files or stream files with the "wrap" option. */
+				if (!wrap)	/* non-stream device wants NOWRAP, so break right away without writing any more */
 					break;
-				if (!rm_ptr->fixed && iod->wrap)
-					iorm_write_utf_ascii(iod, RMEOL, STRLEN(RMEOL));
+				if (!rm_ptr->fixed && wrap)
+					iorm_write_utf_ascii(iod, RMEOL, RMEOL_LEN);
 				else if (rm_ptr->fixed && rm_ptr->out_bytes < rm_ptr->recordsize)
 				{	/* padding bytes needed */
 					temppad = rm_ptr->padchar;
@@ -243,13 +287,22 @@ void iorm_write_utf(mstr *v)
 					}
 					for ( ; rm_ptr->out_bytes < rm_ptr->recordsize; rm_ptr->out_bytes += padsize)
 					{
-						DOWRITERC(rm_ptr->fildes, temppadarray, padsize, status);
+						if (rm_ptr->output_encrypted)
+						{
+							REALLOC_CRYPTBUF_IF_NEEDED(padsize);
+							WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, temppadarray, padsize,
+								pvt_crypt_buf.addr);
+							out_ptr = pvt_crypt_buf.addr;
+						} else
+							out_ptr = (char *)temppadarray;
+						DOWRITERC(rm_ptr->fildes, out_ptr, padsize, status);
 						if (0 != status)
 						{
 							DOLLAR_DEVICE_WRITE(iod, status);
 							iod->dollar.za = 9;
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 						}
+						rm_ptr->write_occurred = TRUE;
 					}
 					assert(rm_ptr->out_bytes == rm_ptr->recordsize);
 				}
@@ -258,19 +311,10 @@ void iorm_write_utf(mstr *v)
 				if (iod->length)	/* and fixed format requires no padding for wrapped records */
 					iod->dollar.y %= iod->length;
 				availwidth = iod->width;
-			} else
-			{	/* STREAM specified with NOWRAP */
-				/* We can continue to write even if device width is exceeded since NOWRAP has
-				 * been specified. But if RECORDSIZE limit has been exceeded then we need to
-				 * automatically terminate this WRITE (not the RECORD though) and return right away.
-				 * In order to allow further WRITEs to add to this RECORD, reset rm_ptr->out_bytes to 0.
-				 */
-				if ((rm_ptr->out_bytes + mblen) > rm_ptr->recordsize)
-				{
-					rm_ptr->out_bytes = 0;
-					break;
-				}
 			}
+			/* else STREAM specified with NOWRAP.
+			 * We can continue to write even if device width is exceeded since NOWRAP has been specified.
+			 */
 			rm_ptr->out_bytes = 0;
 			/* For UTF16, since input and output streams ("inptr" and "outstart") point to different buffers,
 			 * the last parsed UTF16 character in "inptr" has not yet been written to "outstart" so
@@ -305,11 +349,14 @@ void iorm_write_utf(mstr *v)
 void iorm_write(mstr *v)
 {
 	io_desc		*iod;
-	char		*out;
+	char		*out, *out_ptr;
 	int		inlen, outlen, status, len;
 	d_rm_struct	*rm_ptr;
 	int		flags;
 	int		fcntl_res;
+	boolean_t	stream, wrap;
+	struct stat	statbuf;
+	int		fstat_res, save_errno;
 
 	iod = io_curr_device.out;
 #ifdef __MVS__
@@ -322,12 +369,37 @@ void iorm_write(mstr *v)
 #endif
 	memcpy(iod->dollar.device, "0", SIZEOF("0"));
 
-	if (rm_ptr->noread)
+	if (rm_ptr->read_only)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEREADONLY);
-	if (!iod->dollar.zeof && !rm_ptr->fifo && !rm_ptr->pipe)
+	if ((!rm_ptr->fifo) && (!rm_ptr->pipe) && rm_ptr->output_encrypted)
 	{
-	 	iod->dollar.za = 9;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTTOEOFONPUT);
+		if (!iod->dollar.zeof)
+		{
+	 		iod->dollar.za = 9;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTTOEOFONPUT);
+		} else
+		{	/* If there have not been any writes, and input encryption attributes are different from those for output,
+			 * and the file is not empty, disallow the write.
+			 */
+			if ((!rm_ptr->write_occurred)
+			    && ((!rm_ptr->input_encrypted)
+				|| (rm_ptr->input_iv.len != rm_ptr->output_iv.len)
+				|| memcmp(rm_ptr->input_iv.addr, rm_ptr->output_iv.addr, rm_ptr->input_iv.len)
+				|| (((rm_ptr->input_key.len != rm_ptr->output_key.len)
+				    || memcmp(rm_ptr->input_key.addr, rm_ptr->output_key.addr, rm_ptr->input_key.len))
+					&& (!GTMCRYPT_SAME_KEY(rm_ptr->input_cipher_handle, rm_ptr->output_cipher_handle)))))
+			{
+				FSTAT_FILE(rm_ptr->fildes, &statbuf, fstat_res);
+				if (-1 == fstat_res)
+				{
+					save_errno = errno;
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
+						CALLFROM, save_errno);
+				}
+				if (0 != statbuf.st_size)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTBADWRTPOS);
+			}
+		}
 	}
 
 	/* if it's a fifo and not system output/error, last operation was not a write and O_NONBLOCK is not set
@@ -346,6 +418,31 @@ void iorm_write(mstr *v)
 		}
 	}
 
+	if (!rm_ptr->fifo && !rm_ptr->pipe && !rm_ptr->fixed && (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
+	{
+		/* need to do an lseek to set current location in file */
+		if (-1 == (lseek(rm_ptr->fildes, (off_t)rm_ptr->file_pos, SEEK_SET)))
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+				      RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, errno);
+		}
+	}
+
+
+	/* if current file position is less than bom_num_bytes and it is a disk in utf mode and last op not a WRITE
+	   skip past the BOM */
+	if (!rm_ptr->fifo && !rm_ptr->pipe && IS_UTF_CHSET(iod->ochset) && (rm_ptr->file_pos < rm_ptr->bom_num_bytes) &&
+	    (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
+	{
+		/* need to do lseek to skip the BOM before writing*/
+		if (-1 == (lseek(rm_ptr->fildes, (off_t)rm_ptr->bom_num_bytes, SEEK_SET)))
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+				      RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, errno);
+		}
+	}
+
+
 	rm_ptr->lastop = RM_WRITE;
 	if (IS_UTF_CHSET(iod->ochset))
 	{
@@ -353,26 +450,34 @@ void iorm_write(mstr *v)
 		return;
 	}
 	inlen = v->len;
-	if (rm_ptr->stream && !iod->wrap)
-		outlen = iod->width;
-	else
-		outlen = iod->width - iod->dollar.x;
-
-	if (!iod->wrap && inlen > outlen && outlen != MAX_WIDTH)
-		inlen = outlen;
 	if (!inlen)
 		return;
-	if (outlen > inlen)
+	stream = rm_ptr->stream;
+	wrap = iod->wrap;
+	if (stream && !wrap)
 		outlen = inlen;
+	else
+	{
+		outlen = iod->width - iod->dollar.x;
+		if (!wrap && !stream && (inlen > outlen))
+			inlen = outlen; /* implicit input truncation for non-stream files with the "nowrap" option. */
+	}
 	for (out = v->addr; ; out += len)
 	{
 		len = MIN(inlen, outlen);
+		if (rm_ptr->output_encrypted)
+		{
+			REALLOC_CRYPTBUF_IF_NEEDED(len);
+			WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, out, len, pvt_crypt_buf.addr);
+			out_ptr = pvt_crypt_buf.addr;
+		} else
+			out_ptr = out;
 		if (rm_ptr->fifo || rm_ptr->pipe)
 		{
-			WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, out, len, status);
+			WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, out_ptr, len, status);
 		} else
 		{
-			DOWRITERC(rm_ptr->fildes, out, len, status);
+			DOWRITERC(rm_ptr->fildes, out_ptr, len, status);
 		}
 		if (0 != status)
 		{
@@ -380,35 +485,36 @@ void iorm_write(mstr *v)
 			iod->dollar.za = 9;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
+		rm_ptr->write_occurred = TRUE;
 		iod->dollar.x += len;
-		if ((inlen -= len) <= 0)
+		if (0 >= (inlen -= len))
 			break;
-
-		if (!rm_ptr->stream || iod->wrap)
-		/* implicit record termination for non-stream files
-		 * or stream files with the "wrap" option.
-		 */
-		{
-			if (!rm_ptr->fixed && iod->wrap)
+		if (!stream || wrap)
+		{	/* implicit record termination for non-stream files or stream files with the "wrap" option. */
+			if (!rm_ptr->fixed && wrap)
 			{
-				DOWRITERC(rm_ptr->fildes, RMEOL, STRLEN(RMEOL), status);
+				out_ptr = RMEOL;
+				if (rm_ptr->output_encrypted)
+				{
+					assert(pvt_crypt_buf.len >= RMEOL_LEN);
+					WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, out_ptr, RMEOL_LEN, pvt_crypt_buf.addr);
+					out_ptr = pvt_crypt_buf.addr;
+				}
+				DOWRITERC(rm_ptr->fildes, out_ptr, RMEOL_LEN, status);
 				if (0 != status)
 				{
 					DOLLAR_DEVICE_WRITE(iod, status);
 					iod->dollar.za = 9;
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
+				rm_ptr->write_occurred = TRUE;
 			}
-
 			iod->dollar.x = 0;	/* don't use wteol to terminate wrapped records for fixed. */
 			iod->dollar.y++;	/* \n is reserved as an end-of-rec delimiter for variable format */
 			if (iod->length)	/* and fixed format requires no padding for wrapped records */
 				iod->dollar.y %= iod->length;
-
 			outlen = iod->width;
 		}
-		if (outlen > inlen)
-			outlen = inlen;
 	}
 	iod->dollar.za = 0;
         return;

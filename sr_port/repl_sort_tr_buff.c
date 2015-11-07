@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@
 
 void repl_sort_tr_buff(uchar_ptr_t tr_buff, uint4 tr_bufflen)
 {
-	boolean_t		already_sorted, is_set_kill_zkill_ztrig_ztworm, sorting_needed;
+	boolean_t		already_sorted, is_set_kill_zkill_ztworm_lgtrig_ztrig, sorting_needed;
 	uchar_ptr_t		tb, dst_addr, this_jrec_addr, working_record_addr, next_record_addr, reg_top;
 	static uchar_ptr_t	private_tr_buff;
 	static reg_jrec_info_t	*reg_jrec_info_array;
@@ -98,12 +98,13 @@ void repl_sort_tr_buff(uchar_ptr_t tr_buff, uint4 tr_bufflen)
 			assert(FALSE);
 			return;
 		}
-		is_set_kill_zkill_ztrig_ztworm = IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype);
+		is_set_kill_zkill_ztworm_lgtrig_ztrig = IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype);
 		assert(IS_REPLICATED(rectype));
-		assert(is_set_kill_zkill_ztrig_ztworm || (JRT_TCOM == rectype));
-		if (is_set_kill_zkill_ztrig_ztworm)
+		assert(is_set_kill_zkill_ztworm_lgtrig_ztrig || (JRT_TCOM == rectype));
+		if (is_set_kill_zkill_ztworm_lgtrig_ztrig)
 		{
 			assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
+			assert(&rec->jrec_set_kill.update_num == &rec->jrec_lgtrig.update_num);
 			cur_updnum = rec->jrec_set_kill.update_num;
 			already_sorted = (already_sorted && (prev_updnum <= cur_updnum));
 			max_updnum = MAX(max_updnum, cur_updnum);
@@ -186,9 +187,11 @@ void repl_sort_tr_buff(uchar_ptr_t tr_buff, uint4 tr_bufflen)
 			/* Extract the update_num of the current record */
 			this_jrec_addr = (private_tr_buff + reg_jrec_info_array[reg_idx].working_offset);
 			prefix = (jrec_prefix *)(this_jrec_addr);
-			assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(prefix->jrec_type));
+			assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(prefix->jrec_type));
 			assert(SIZEOF(struct_jrec_upd) == SIZEOF(struct_jrec_ztworm));
+			assert(SIZEOF(struct_jrec_upd) == SIZEOF(struct_jrec_lgtrig));
 			assert(OFFSETOF(struct_jrec_upd, update_num) == OFFSETOF(struct_jrec_ztworm, update_num));
+			assert(OFFSETOF(struct_jrec_upd, update_num) == OFFSETOF(struct_jrec_lgtrig, update_num));
 			this_reg_updnum = ((struct_jrec_upd *)(this_jrec_addr))->update_num;
 			assert(this_reg_updnum < (max_updnum + 1));
 			assert(min_val != this_reg_updnum);

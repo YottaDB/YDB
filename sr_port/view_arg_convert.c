@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,6 +118,8 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			if (NULL == parm)
 				rts_error_csa(CSA_ARG(NULL)
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+			if (!parm->str.len)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTGBL, 2, parm->str.len, NULL);
 			if (!gd_header)		/* IF GD_HEADER ==0 THEN OPEN GBLDIR */
 				gvinit();
 			c = (unsigned char *)parm->str.addr;

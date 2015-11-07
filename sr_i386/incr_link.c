@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ static char 		*code;
 GBLREF mident_fixed 	zlink_mname;
 GBLREF  boolean_t	gtm_utf8_mode;
 
-error_def(ERR_INVOBJ);
+error_def(ERR_INVOBJFILE);
 error_def(ERR_LOADRUNNING);
 error_def(ERR_TEXT);
 
@@ -49,9 +49,9 @@ typedef struct res_list_struct
 
 void res_free(res_list *root);
 bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code);
-void zl_error(int4 file, int4 err, int4 err2, int4 len, char *addr);
+void zl_error(int4 file, int4 err, int4 len, char *addr, int4 err2, int4 len2, char *addr2);
 
-bool incr_link(int file_desc)
+boolean_t incr_link(int file_desc, zro_ent *dummy, uint4 fname_len, char *fname)
 {
 	rhdtyp		*hdr, *old_rhead;
 	int 		code_size, save_errno, cnt;
@@ -64,6 +64,7 @@ bool incr_link(int file_desc)
 	int		order;
 	struct exec 	file_hdr;
 
+	assert(file_desc);
 	urx_lcl_anchor.len = 0;
 	urx_lcl_anchor.addr = 0;
 	urx_lcl_anchor.lab = 0;
@@ -75,14 +76,14 @@ bool incr_link(int file_desc)
 		if (-1 == read_size)
 		{
 			save_errno = errno;
-			zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, strlen(STRERROR(save_errno)),
+			zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT, strlen(STRERROR(save_errno)),
 					STRERROR(save_errno));
 		} else
-			zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("reading file header"));
+			zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT, RTS_ERROR_TEXT("reading file header"));
 	} else if (OMAGIC != file_hdr.a_magic)
-		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("bad magic"));
+		zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT, RTS_ERROR_TEXT("bad magic"));
 	else if (OBJ_LABEL != file_hdr.a_stamp)
-		return FALSE;	/* wrong version */
+		return IL_RECOMPILE;	/* wrong version */
 	assert(0 == file_hdr.a_bss);
 	code_size = file_hdr.a_text + file_hdr.a_data;
 	code = GTM_TEXT_ALLOC(code_size);
@@ -92,20 +93,22 @@ bool incr_link(int file_desc)
 		if (-1 == read_size)
 		{
 			save_errno = errno;
-			zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, strlen(STRERROR(save_errno)), STRERROR(save_errno)); /* BYPASSOK */
+			zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT, strlen(STRERROR(save_errno)),
+				 STRERROR(save_errno));
 		} else
-			zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("reading code"));
+			zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT, RTS_ERROR_TEXT("reading code"));
 	}
 	hdr = (rhdtyp *)code;
 	if (memcmp(&hdr->jsb[0], "GTM_CODE", SIZEOF(hdr->jsb)))
-		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("missing GTM_CODE"));
+		zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT, RTS_ERROR_TEXT("missing GTM_CODE"));
 	if ((hdr->compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
-		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT,
+		zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT,
 			RTS_ERROR_TEXT("Object compiled with CHSET=UTF-8 which is different from $ZCHSET"));
 	if (!(hdr->compiler_qlf & CQ_UTF8) && gtm_utf8_mode)
-		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT,
+		zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT,
 			RTS_ERROR_TEXT("Object compiled with CHSET=M which is different from $ZCHSET"));
 	literal_ptr = code + file_hdr.a_text;
+	hdr->routine_source_offset += (uint4)literal_ptr; /* now an absolute pointer, not an offset */
 	for (cnt = hdr->vartab_len, curvar = VARTAB_ADR(hdr); cnt; --cnt, ++curvar)
 	{ /* relocate the variable table */
 		assert(0 < curvar->var_name.len);
@@ -117,14 +120,14 @@ bool incr_link(int file_desc)
 	if (!addr_fix(file_desc, &file_hdr, &urx_lcl_anchor, hdr))
 	{
 		urx_free(&urx_lcl_anchor);
-		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("address fixup failure"));
+		zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT, RTS_ERROR_TEXT("address fixup failure"));
 	}
 	if (!zlput_rname(hdr))
 	{
 		urx_free(&urx_lcl_anchor);
 		/* Copy routine name to local variable because zl_error free's it.  */
 		memcpy(&module_name[0], hdr->routine_name.addr, hdr->routine_name.len);
-		zl_error(file_desc, 0, ERR_LOADRUNNING, hdr->routine_name.len, &module_name[0]);
+		zl_error(file_desc, ERR_LOADRUNNING, hdr->routine_name.len, &module_name[0], 0, 0, NULL);
 	}
 	urx_add(&urx_lcl_anchor);
 	old_rhead = (rhdtyp *)hdr->old_rhead_ptr;
@@ -162,7 +165,7 @@ bool incr_link(int file_desc)
 		old_rhead = (rhdtyp *) old_rhead->old_rhead_ptr;
 	}
 	urx_resolve(hdr, lbt_bot, lbt_top);
-	return TRUE;
+	return IL_DONE;
 }
 
 bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
@@ -406,7 +409,7 @@ void res_free(res_list *root)
  * err - an error code that accepts no arguments and
  * err2 - an error code that accepts two arguments (!AD)
  */
-void zl_error(int4 file, int4 err, int4 err2, int4 len, char *addr)
+void zl_error(int4 file, int4 err, int4 len, char *addr, int4 err2, int4 len2, char *addr2)
 {
 	int rc;
 
@@ -416,13 +419,8 @@ void zl_error(int4 file, int4 err, int4 err2, int4 len, char *addr)
 		code = NULL;
 	}
 	CLOSEFILE_RESET(file, rc);	/* resets "file" to FD_INVALID */
-	if ((0 != err) && (0 != err2))
-		rts_error(VARLSTCNT(6) err, 0, err2, 2, len, addr);
-	else if (0 != err)
-		rts_error(VARLSTCNT(1) err);
+	if (0 != err2)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) err, 2, len, addr, err2, 2, len2, addr2);
 	else
-	{
-		assert(0 != err2);
-		rts_error(VARLSTCNT(4) err2, 2, len, addr);
-	}
+		rts_error_csa(CSA_ARG(NULL)  VARLSTCNT(4) err, 2, len, addr);
 }

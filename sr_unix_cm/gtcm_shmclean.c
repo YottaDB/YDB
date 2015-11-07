@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -199,4 +199,5 @@ int main(int argc, char_ptr_t argv[])
 	}
 	if (server == 1 && daemon == 0)
 		clean_mem(RC_CPT_PATH);
+	return 0;
 }

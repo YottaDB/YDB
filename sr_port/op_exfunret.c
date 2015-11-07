@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,9 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+
+#include "gtmio.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"
@@ -48,13 +51,18 @@ void op_exfunret(mval *retval)
 	savtyp = retval->mvtype;
 	retval->mvtype &= ~MV_RETARG;
 	if (0 == (MV_RETARG & savtyp))
-		/* if dollar_zquit_anyway is TRUE, then do not give an error when no value is returned from an
+	{	/* if dollar_zquit_anyway is TRUE, then do not give an error when no value is returned from an
 		 * extrinsic; just make the return value NULL instead
 		 */
 		if (dollar_zquit_anyway)
 			*retval = literal_null;
 		else
-			rts_error(VARLSTCNT(1) ERR_QUITARGREQD);
+		{
+			assert(0 == (MV_ALIASCONT & savtyp));
+			assert(NULL == alias_retarg);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_QUITARGREQD);
+		}
+	}
 	if (0 != (MV_ALIASCONT & savtyp))
 	{	/* We have an alias container return which has already had its reference counts increased. Remove
 		 * the extra reference counts before we raise the actual error since the assignment and thus the
@@ -65,9 +73,9 @@ void op_exfunret(mval *retval)
 		assert(srclvc->stats.trefcnt >= srclvc->stats.crefcnt);
 		assert(1 <= srclvc->stats.crefcnt);	/* Verify is existing container ref */
 		DECR_CREFCNT(srclvc);
-		DECR_TREFCNT(srclvc);
+		DECR_BASE_REF_NOSYM(srclvc, FALSE);
 		alias_retarg = NULL;
-		rts_error(VARLSTCNT(1) ERR_QUITALSINV);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_QUITALSINV);
 	}
 	assert(NULL == alias_retarg);
 }

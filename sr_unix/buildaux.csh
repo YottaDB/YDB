@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2013 Fidelity Information Services, Inc #
+#	Copyright 2001, 2014 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -29,15 +29,15 @@ set mach_type = `uname -m`
 set platform_name = `uname | sed 's/-//g' | tr '[A-Z]' '[a-z]'`
 
 if ( $1 == "" ) then
-	set buildaux_status = `expr $buildaux_status + 1`
+	@ buildaux_status++
 endif
 
 if ( $2 == "" ) then
-	set buildaux_status = `expr $buildaux_status + 1`
+	@ buildaux_status++
 endif
 
 if ( $3 == "" ) then
-	set buildaux_status = `expr $buildaux_status + 1`
+	@ buildaux_status++
 endif
 
 
@@ -58,14 +58,14 @@ case "[pP]*":
 	breaksw
 
 default:
-	set buildaux_status = `expr $buildaux_status + 1`
+	@ buildaux_status++
 	breaksw
 
 endsw
 
 
 version $1 $2
-if ( $buildaux_status != 0 ) then
+if ( $buildaux_status ) then
 	echo "buildaux-I-usage, Usage: $shell buildaux.csh <version> <image type> <target directory> [auxillary]"
 	exit $buildaux_status
 endif
@@ -95,7 +95,7 @@ if (4 <= $#) then
 			set new_auxillarylist = "$new_auxillarylist lke gtcm_gnp_server"
 		else if ( "$auxillary" == "gnpclient") then
 			$shell $gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2
-			if (0 != $status) @ buildaux_status = $status
+			if ($status) @ buildaux_status++
 		else if ( "$auxillary" == "gnpserver") then
 			set new_auxillarylist = "$new_auxillarylist gtcm_gnp_server"
 		else if ( "$auxillary" == "cmisockettcp") then
@@ -108,13 +108,10 @@ if (4 <= $#) then
 			set new_auxillarylist = "$new_auxillarylist gtcm_pkdisp gtcm_shmclean"
 		else if ("$auxillary" == "mumps") then
 			$shell $gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2
-			if (0 != $status) @ buildaux_status = $status
+			if ($status) @ buildaux_status++
 			if ($#argv == 4) then
 				exit $buildaux_status
 			endif
-		else if ( "$auxillary" == "gtmrpc" || "$auxillary" == "gtm_svc") then
-			$shell $gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2
-			if (0 != $status) @ buildaux_status = $status
 		else
 			set new_auxillarylist = "$new_auxillarylist $auxillary"
 		endif
@@ -138,7 +135,7 @@ else
 	if ( $buildaux_validexecutable == 0 && "$new_auxillarylist" != "" ) then
 		echo "buildaux-E-AuxUnknown -- Auxillary, ""$argv[4-]"", is not a valid one"
 		echo "buildaux-I-usage, Usage: $shell buildaux.csh <version> <image type> <target directory> [auxillary-list]"
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		exit $buildaux_status
 	endif
 endif
@@ -186,8 +183,8 @@ if ( $buildaux_gde == 1 ) then
 		setenv LC_CTYPE C
 		setenv gtm_chset M
 		./mumps *.m
-		if (0 != $status) @ buildaux_status = $status
-		if ($buildaux_status != 0) then
+		if ($status) then
+			@ buildaux_status++
 			echo "buildaux-E-compile_M, Failed to compile .m programs in M mode" \
 				>> $gtm_log/error.${gtm_exe:t}.log
 		endif
@@ -210,8 +207,8 @@ if ( $buildaux_gde == 1 ) then
 				ln -s ../$mfile $mfile
 			end
 			../mumps *.m
-			if (0 != $status) @ buildaux_status = $status
-			if ($buildaux_status != 0) then
+			if ($status) then
+				@ buildaux_status++
 				echo "buildaux-E-compile_UTF8, Failed to compile .m programs in UTF-8 mode" \
 					>> $gtm_log/error.${gtm_exe:t}.log
 			endif
@@ -239,7 +236,7 @@ if ( $buildaux_dse == 1 ) then
 			$gt_ld_sysrtns $gt_ld_options_all_exe -ldse -lmumps -lstub \
 			$gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/dse.map
 	if ( $status != 0  ||  ! -x $3/dse ) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linkdse, Failed to link dse (see ${dollar_sign}gtm_map/dse.map)" \
 			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -261,7 +258,7 @@ if ( $buildaux_geteuid == 1 ) then
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/geteuid	-L$gtm_obj $gtm_obj/geteuid.o \
 			$gt_ld_sysrtns $gt_ld_extra_libs -lmumps $gt_ld_syslibs >& $gtm_map/geteuid.map
 	if ( $status != 0  ||  ! -x $3/geteuid ) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linkgeteuid, Failed to link geteuid (see ${dollar_sign}gtm_map/geteuid.map)" \
 			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -284,7 +281,7 @@ if ( $buildaux_gtmsecshr == 1 ) then
 		gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/${file} -L$gtm_obj $gtm_obj/${file}.o \
 				$gt_ld_sysrtns $gt_ld_extra_libs -lmumps $gt_ld_syslibs >& $gtm_map/${file}.map
 		if ( $status != 0  ||  ! -x $3/${file} ) then
-			set buildaux_status = `expr $buildaux_status + 1`
+			@ buildaux_status++
 			echo "buildaux-E-link${file}, Failed to link ${file} (see ${dollar_sign}gtm_map/${file}.map)" \
 				>> $gtm_log/error.${gtm_exe:t}.log
 		else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -304,7 +301,7 @@ if ( $buildaux_gtmsecshr == 1 ) then
 		cd utf8; ln -s ../gtmsecshrdir gtmsecshrdir; cd -
 	endif
 	$gtm_com/IGS $3/gtmsecshr "CHOWN" # make gtmsecshr, gtmsecshrdir, gtmsecshrdir/gtmsecshr files/dirs root owned
-	if (0 != $status) @ buildaux_status = $status
+	if ($status) @ buildaux_status++
 endif
 
 if ( $buildaux_lke == 1 ) then
@@ -316,7 +313,7 @@ if ( $buildaux_lke == 1 ) then
 			$gt_ld_sysrtns $gt_ld_options_all_exe -llke -lmumps -lgnpclient -lmumps -lgnpclient -lcmisockettcp \
 			$gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/lke.map
 	if ( $status != 0  ||  ! -x $3/lke ) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linklke, Failed to link lke (see ${dollar_sign}gtm_map/lke.map)" \
 			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -337,7 +334,7 @@ if ( $buildaux_mupip == 1 ) then
 		$gt_ld_sysrtns $gt_ld_options_all_exe -lmupip -lmumps -lstub \
 		$gt_ld_extra_libs $gt_ld_aio_syslib $gt_ld_syslibs >& $gtm_map/mupip.map
 	if ( $status != 0  ||  ! -x $3/mupip ) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linkmupip, Failed to link mupip (see ${dollar_sign}gtm_map/mupip.map)" \
 			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -360,7 +357,7 @@ if ( $buildaux_gtcm_server == 1 ) then
 		$gtm_obj/gtcm_main.o $gtm_obj/omi_srvc_xct.o $gt_ld_sysrtns $gt_ld_options_all_exe \
 		-lgtcm -lmumps -lstub $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/gtcm_server.map
 	if ( $status != 0  ||  ! -x $3/gtcm_server) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linkgtcm_server, Failed to link gtcm_server (see ${dollar_sign}gtm_map/gtcm_server.map)" \
 			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -384,7 +381,7 @@ if ( $buildaux_gtcm_gnp_server == 1 ) then
 		-lgnpserver -llke -lmumps -lcmisockettcp -lstub \
 		$gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/gtcm_gnp_server.map
 	if ( $status != 0  ||  ! -x $3/gtcm_gnp_server) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linkgtcm_gnp_server, Failed to link gtcm_gnp_server" \
 			"(see ${dollar_sign}gtm_map/gtcm_gnp_server.map)" >> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -408,7 +405,7 @@ if ( $buildaux_gtcm_play == 1 ) then
 		$gtm_obj/gtcm_play.o $gtm_obj/omi_sx_play.o $gt_ld_sysrtns $gt_ld_options_all_exe \
 		-lgtcm -lmumps -lstub $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/gtcm_play.map
 	if ( $status != 0  ||  ! -x $3/gtcm_play) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linkgtcm_play, Failed to link gtcm_play (see ${dollar_sign}gtm_map/gtcm_play.map)" \
 			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -431,7 +428,7 @@ if ( $buildaux_gtcm_pkdisp == 1 ) then
 		$gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_extra_libs $gt_ld_syslibs \
 			>& $gtm_map/gtcm_pkdisp.map
 	if ( $status != 0  ||  ! -x $3/gtcm_pkdisp) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linkgtcm_pkdisp, Failed to link gtcm_pkdisp (see ${dollar_sign}gtm_map/gtcm_pkdisp.map)" \
 			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -452,7 +449,7 @@ if ( $buildaux_gtcm_shmclean == 1 ) then
 		$gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_extra_libs $gt_ld_syslibs	\
 			>& $gtm_map/gtcm_shmclean.map
 	if ( $status != 0  ||  ! -x $3/gtcm_shmclean) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linkgtcm_shmclean, Failed to link gtcm_shmclean (see ${dollar_sign}gtm_map/gtcm_shmclean.map)" \
 			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -472,7 +469,7 @@ if ( $buildaux_semstat2 == 1 ) then
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/semstat2 -L$gtm_obj $gtm_obj/semstat2.o \
 		$gt_ld_sysrtns $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/semstat2.map
 	if ( $status != 0  ||  ! -x $3/semstat2 ) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linksemstat2, Failed to link semstat2 (see ${dollar_sign}gtm_map/semstat2.map)" \
 			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -490,7 +487,7 @@ if ( $buildaux_ftok == 1 ) then
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/ftok -L$gtm_obj $gtm_obj/ftok.o \
 			$gt_ld_sysrtns -lmumps $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/ftok.map
 	if ( $status != 0  ||  ! -x $3/ftok ) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linkftok, Failed to link ftok (see ${dollar_sign}gtm_map/ftok.map)" \
 			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -511,7 +508,7 @@ if ( $buildaux_dbcertify == 1 ) then
 		$gtm_obj/{dbcertify,dbcertify_cmd}.o $gt_ld_sysrtns -ldbcertify -lmupip -lmumps -lstub $gt_ld_aio_syslib \
 		$gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/dbcertify.map
 	if ( $status != 0  ||  ! -x $3/dbcertify ) then
-		set buildaux_status = `expr $buildaux_status + 1`
+		@ buildaux_status++
 		echo "buildaux-E-linkdbcertify, Failed to link dbcertify (see ${dollar_sign}gtm_map/dbcertify.map)" \
 			>> $gtm_log/error.${gtm_exe:t}.log
 	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
@@ -540,7 +537,7 @@ if ($buildaux_gtmcrypt == 1) then
 				breaksw
 		endsw
 		# First copy all the necessary source and script files to $gtm_dist/plugin/gtmcrypt
-		set helpers = "add_db_key,encrypt_sign_db_key,gen_keypair,gen_sym_hash,gen_sym_key,import_and_sign_key"
+		set helpers = "encrypt_sign_db_key,gen_keypair,gen_sym_hash,gen_sym_key,import_and_sign_key"
 		set helpers = "$helpers,pinentry-gtm,show_install_config"
 
 		set srcfiles = "gtmcrypt_dbk_ref.c gtmcrypt_pk_ref.c gtmcrypt_sym_ref.c gtmcrypt_ref.c gtm_tls_impl.c maskpass.c"
@@ -573,9 +570,9 @@ if ($buildaux_gtmcrypt == 1) then
 		# okay since pfloyd is AIX 5.3 which isn't a supported AIX version anyways.
 		set host=$HOST:r:r:r
 		if ($host !~ pfloyd) then
-			$make gtmtls
-			if (0 != $status) then
-				set buildaux_status = `expr $buildaux_status + 1`
+			$make gtmtls image=$plugin_build_type
+			if ($status) then
+				@ buildaux_status++
 				echo "buildaux-E-tls, failed to build libgtmtls.so." >> $gtm_log/error.${gtm_exe:t}.log
 			endif
 		endif
@@ -592,19 +589,18 @@ if ($buildaux_gtmcrypt == 1) then
 				if ("gcrypt" == "$supported_lib" && "BLOWFISHCFB" == "$algorithm") continue
 				echo "####### Building encryption plugin using $supported_lib with $algorithm algorithm #########"
 				$make gtmcrypt image=$plugin_build_type thirdparty=$supported_lib algo=$algorithm $fips_flag
-				set bstat = $status
-				echo ""
-				if (0 != $bstat) then
-					set buildaux_status = `expr $buildaux_status + 1`
+				if ($status) then
+					@ buildaux_status++
 					echo "buildaux-E-libgtmcrypt, failed to build gtmcrypt and/or helper scripts."	\
 									>> $gtm_log/error.${gtm_exe:t}.log
 				endif
+				echo ""
 			end
 		end
 		# Now that the individual libraries are built, go ahead and build the maskpass
 		$make maskpass
-		if (0 != $status) then
-			set buildaux_status = `expr $buildaux_status + 1`
+		if ($status) then
+			@ buildaux_status++
 			echo "buildaux-E-maskpass, failed to build maskpass." >> $gtm_log/error.${gtm_exe:t}.log
 		endif
 		#
@@ -619,7 +615,7 @@ if ($buildaux_gtmcrypt == 1) then
 		else
 			# Now that we've built "possibly" more than one encryption library, choose one configuration (based on
 			# third-party library and algorithm) randomly and install that.
-			set rand = `$gtm_dist/mumps -run %XCMD 'write 1+$random('$#supported_list')'`
+			set rand = `echo $#supported_list | awk '{srand() ; print 1+int(rand()*$1)}'`
 			set encryption_lib = $supported_list[$rand]
 			if ("gcrypt" == "$encryption_lib") then
 				# Force AES as long as the plugin is linked against libgcrypt
@@ -628,13 +624,13 @@ if ($buildaux_gtmcrypt == 1) then
 				# OpenSSL, V9* build. Go ahead and randomize the algorithm
 				# increase probability of AES256CFB, the industry standard and the one we officially support
 				set algorithms = ("AES256CFB" "AES256CFB" "BLOWFISHCFB")
-				set rand = `$gtm_dist/mumps -run %XCMD 'write 1+$random('$#algorithms')'`
+				set rand = `echo $#algorithms | awk '{srand() ; print 1+int(rand()*$1)}'`
 				set algorithm = $algorithms[$rand]
 			endif
 		endif
 		$make install thirdparty=$encryption_lib algo=$algorithm
-		if (0 != $status) then
-			set buildaux_status = `expr $buildaux_status + 1`
+		if ($status) then
+			@ buildaux_status++
 			echo "buildaux-E-libgtmcrypt, failed to install libgtmcrypt and/or helper scripts"		\
 						>> $gtm_log/error.${gtm_exe:t}.log
 		endif

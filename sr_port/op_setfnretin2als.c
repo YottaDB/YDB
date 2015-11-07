@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "gtmio.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"
@@ -29,7 +30,6 @@
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
 GBLREF uint4		dollar_tlevel;
-GBLREF lv_val		*active_lv;
 GBLREF mval		*alias_retarg;
 
 /*  Operation - The destination variable becomes a new alias of the data pointed to by the source container variable:
@@ -60,6 +60,8 @@ void op_setfnretin2als(mval *srcmv, int destindx)
 	int4		srcsymvlvl;
 	boolean_t	added;
 
+	SET_ACTIVE_LV(NULL, TRUE, actlv_op_setfnretin2als);	/* If we get here, subscript set was successful.
+								 * Clear active_lv to avoid later cleanup issues */
 	assert(alias_retarg == srcmv);
 	assert(srcmv);
 	assert(srcmv->mvtype & MV_ALIASCONT);
@@ -118,7 +120,5 @@ void op_setfnretin2als(mval *srcmv, int destindx)
 	 * symtab which popped during the return.
 	 */
 	MARK_ALIAS_ACTIVE(MIN(srcsymvlvl, LV_SYMVAL(srclvc)->symvlvl));
-	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
-					   cleanup problems */
 	alias_retarg = NULL;
 }

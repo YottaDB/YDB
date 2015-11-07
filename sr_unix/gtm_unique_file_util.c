@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 #include "gtmxc_types.h"
 #include "gdsroot.h"
 #include "is_file_identical.h"
+#include "iosp.h"		/* for SS_NORMAL */
 
 /* Checks whether the two fileids passed are identical  */
 xc_status_t gtm_is_file_identical(xc_fileid_ptr_t fileid1, xc_fileid_ptr_t fileid2)
@@ -26,14 +27,14 @@ xc_status_t gtm_is_file_identical(xc_fileid_ptr_t fileid1, xc_fileid_ptr_t filei
  * allocated pointer via gtm_xcfileid_free. */
 xc_status_t gtm_filename_to_id(xc_string_t *filename, xc_fileid_ptr_t *fileid)
 {
-	gd_id_ptr_t	tmp_fileid;
 	boolean_t	status;
+	gd_id_ptr_t	tmp_fileid;
 
 	if (!filename)
 		return FALSE;
 	assert(fileid && !*fileid);
 	tmp_fileid = (gd_id_ptr_t)malloc(SIZEOF(gd_id));
-	status = filename_to_id(tmp_fileid, filename->address);
+	status = (SS_NORMAL == filename_to_id(tmp_fileid, filename->address));
 	*fileid = (xc_fileid_ptr_t)tmp_fileid;
 	return status;
 }

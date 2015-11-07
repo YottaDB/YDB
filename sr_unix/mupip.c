@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,13 +40,10 @@
 #include "stp_parms.h"
 #include "stringpool.h"
 #include "cli.h"
-#include "gt_timer.h"
 #include "io.h"
 #include "mupip_exit.h"
-#include "getjobnum.h"
 #include "patcode.h"
 #include "lke.h"
-#include "get_page_size.h"
 #include "gtm_startup_chk.h"
 #include "generic_signal_handler.h"
 #include "init_secshr_addrs.h"
@@ -56,12 +53,11 @@
 #include "mu_term_setup.h"
 #include "sig_init.h"
 #include "gtmmsg.h"
-#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "suspsigs_handler.h"
 #include "startup.h"
 #include "gtm_startup.h"
 #include "invocation_mode.h"
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 #include "continue_handler.h"
 
@@ -91,11 +87,8 @@ int main (int argc, char **argv)
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	set_blocksig();
-	gtm_imagetype_init(MUPIP_IMAGE);
+	common_startup_init(MUPIP_IMAGE);
 	invocation_mode = MUMPS_UTILTRIGR;
-	gtm_wcswidth_fnptr = gtm_wcswidth;
-	gtm_env_init();	/* read in all environment variables */
 	err_init(util_base_ch);
 	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
@@ -129,6 +122,7 @@ int main (int argc, char **argv)
 		display_prompt();
 	}
 	mupip_exit(SS_NORMAL);
+	return 0;
 }
 
 void display_prompt(void)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,6 +140,11 @@
 #ifdef GTM_TRIGGER
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
+#endif
+
+#ifdef USHBIN_SUPPORTED
+# include "relinkctl.h"
+# include "zhist.h"
 #endif
 
 /* This module's purpose is to generate gtm_threadgbl_deftypes.h for a given platform. This header file

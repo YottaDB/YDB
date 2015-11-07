@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,6 @@
 
 GBLREF symval			*curr_symval;
 GBLREF boolean_t		dollar_truth;
-GBLREF lv_val			*active_lv;
 GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target;
 GBLREF gd_addr			*gd_header;
@@ -123,7 +122,8 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	active_lv = (lv_val *)NULL; /* if we get here, subscript set was successful, clear active_lv to avoid cleanup problems */
+	SET_ACTIVE_LV(NULL, TRUE, actlv_unw_mv_ent);	/* If we get here, subscript set was successful.
+							 * Clear active_lv to avoid later cleanup issues */
 	switch (mv_st_ent->mv_st_type)
 	{
 		case MVST_MSAV:
@@ -209,7 +209,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 						lvval_ptr = (lv_val *)hte->value;
 						assert(lvval_ptr);
 						DECR_CREFCNT(lvval_ptr);
-						assert(1 < lvval_ptr->stats.trefcnt);
+						assert(1 <= lvval_ptr->stats.trefcnt);
 						DECR_BASE_REF_NOSYM(lvval_ptr, TRUE);
 						xnewvarnext = xnewvar->next;
 						xnewvar->next = xnewvar_anchor;

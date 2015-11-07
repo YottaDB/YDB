@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "gtmio.h"
 #include "lv_val.h"
 #include <rtnhdr.h>
 #include "mv_stent.h"
@@ -114,6 +115,7 @@ void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 		{	/* Actual list parm - dotted pass-by-reference parm */
 			PUSH_MV_STENT(MVST_NTAB);
 			ntab = &mv_chain->mv_st_cont.mvs_ntab;
+			ntab->hte_addr = NULL;		/* In case table gets expanded before we set it below */
 			new_var = *actp;
 			/* This sort of parameter is considered an alias */
 			assert(0 < new_var->stats.trefcnt);

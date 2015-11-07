@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,7 +91,7 @@ int	op_job(int4 argcnt, ...)
 {
 	va_list		var;
 	int4		i;
-	mval		*label, *inp;
+	mval		*label;
 	int4		offset;
 	mval		*routine, *param_buf;
 	int4		timeout;	/* timeout in seconds */
@@ -113,6 +113,8 @@ int	op_job(int4 argcnt, ...)
 	mstr_len_t	handle_len;
 	int4		index;
 	DCL_THREADGBL_ACCESS;
+
+	LITREF mval		skiparg;
 
 	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, argcnt);
@@ -152,8 +154,6 @@ int	op_job(int4 argcnt, ...)
 		va_end(var);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBFAIL, 0, ERR_NULLENTRYREF, 0);
 	}
-	/* Clear the buffers */
-	flush_pio();
 	/* Start the timer */
 	ojtimeout = FALSE;
 	if (timeout < 0)
@@ -177,8 +177,9 @@ int	op_job(int4 argcnt, ...)
 		i = argcnt;
 		for(;;)
 		{
-			inp = va_arg(var, mval *);
-			jp->parm = inp;
+			jp->parm = va_arg(var, mval *);
+			if (!M_ARG_SKIPPED(jp->parm))
+				MV_FORCE_STR(jp->parm);
 			if (0 == --i)
 				break;
 			jp->next = jp + 1;

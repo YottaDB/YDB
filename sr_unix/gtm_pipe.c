@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ int gtm_pipe(char *command, pipe_type pt)
 		PERROR("pipe : ");
 		return -2;
 	}
-	FORK(child_pid);	/* BYPASSOK: we exit immediately, no FORK_CLEAN needed */
+	FORK(child_pid);
 	if (-1 == child_pid)
 	{
 		PERROR("fork : ");

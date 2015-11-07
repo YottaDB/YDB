@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -22,7 +22,7 @@
 #	PAGE	+
 	.DATA
 .extern	ERR_GTMCHECK
-.extern	ERR_LABELUNKNOWN
+.extern	ERR_LABELNOTFND
 .extern	frame_pointer
 
 	.text
@@ -79,7 +79,7 @@ l3:	addl	$4,%esp
 	getframe
 	ret
 
-l4:	pushl	ERR_LABELUNKNOWN
+l4:	pushl	ERR_LABELNOTFND
 	pushl	$1
 	call	rts_error
 	addl	$8,%esp

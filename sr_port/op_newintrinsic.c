@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@ error_def(ERR_NOZTRAPINTRIG);
 void op_newintrinsic(int intrtype)
 {
 	mval		*intrinsic;
-	boolean_t	stored_explicit_null;
+	boolean_t	stored_explicit_null, etrap_was_active;
 
 	switch (intrtype)
 	{
@@ -60,20 +60,6 @@ void op_newintrinsic(int intrtype)
 			if (0 < gtm_trigger_depth)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOZTRAPINTRIG);
 #			endif
-			/* Due to the potential intermix of $ETRAP and $ZTRAP, we put a condition on the
-			   explicit NEWing of these two special variables. If "the other" trap handler
-			   definition is not null (meaning this handler is not in control) then we will
-			   ignore the NEW. This is necessary for example when a frame with $ZT set calls
-			   a routine that NEWs and sets $ET. When it unwinds, we don't want it to pop off
-			   the old "null" value for $ET which then triggers the nulling out of our current
-			   $ZT value. Note that op_svput no longer calls this routine for "implicit" NEWs
-			   but calls directly to gtm_newintrinsic instead.
-			*/
-			if (dollar_etrap.str.len)
-			{
-				assert(FALSE == ztrap_explicit_null);
-				return;
-			}
 			assert(!ztrap_explicit_null || (0 == dollar_ztrap.str.len));
 			DEBUG_ONLY(stored_explicit_null = FALSE;)
 			if (ztrap_explicit_null && (0 == dollar_ztrap.str.len))
@@ -81,16 +67,13 @@ void op_newintrinsic(int intrtype)
 				DEBUG_ONLY(stored_explicit_null = TRUE;)
 				dollar_ztrap.str.len = STACK_ZTRAP_EXPLICIT_NULL;	/* to be later used by unw_mv_ent() */
 			}
-			intrinsic = &dollar_ztrap;
-			break;
+			/* Intentionally omitted the "break" here */
 		case SV_ETRAP:
-			/* See comment above for SV_ZTRAP */
-			if (dollar_ztrap.str.len)
-			{
-				assert(FALSE == ztrap_explicit_null);
-				return;
-			}
-			intrinsic = &dollar_etrap;
+			/* Save the active error trap to the stack if either of them is new'ed */
+			if (etrap_was_active = ETRAP_IN_EFFECT)
+				intrinsic = &dollar_etrap;
+			else
+				intrinsic = &dollar_ztrap;
 			break;
 		case SV_ESTACK:
 			intrinsic = &dollar_estack_delta;
@@ -110,7 +93,16 @@ void op_newintrinsic(int intrtype)
 			assertpro(FALSE && intrtype);
 	}
 	gtm_newintrinsic(intrinsic);
-	if (SV_ESTACK == intrtype)
+	if (SV_ZTRAP == intrtype)
+	{
+		ztrap_explicit_null = TRUE;
+		if(etrap_was_active)
+			NULLIFY_TRAP(dollar_etrap)
+	} else if (SV_ETRAP == intrtype) {
+		ztrap_explicit_null = FALSE;
+		if(!etrap_was_active)
+			NULLIFY_TRAP(dollar_ztrap)
+	} else if (SV_ESTACK == intrtype)
 	{	/* Some extra processing for new of $ETRAP:
 		   The delta from $zlevel we keep for estack is kept in an mval for sake of
 		   ease -- gtm_newintrinic knows how to save, new and restore an mval -- but

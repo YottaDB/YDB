@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #include "gtm_iconv.h"
 #ifndef  VMS
 #include "gtm_stat.h"
+#include "gtmio.h"
 #endif
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
@@ -37,10 +38,16 @@
 #include "stringpool.h"
 #include "eintr_wrappers.h"
 
-GBLREF io_desc		*active_device;
+GBLREF	io_desc		*active_device;
+GBLREF	int		process_exiting;
+#ifndef VMS
+GBLREF	boolean_t	gtm_pipe_child;
+#endif
+
 LITREF unsigned char		io_params_size[];
 
 error_def(ERR_CLOSEFAIL);
+error_def(ERR_FILEOPENFAIL);
 error_def(ERR_SOCKNOTFND);
 error_def(ERR_SYSCALL);
 
@@ -66,12 +73,12 @@ void iosocket_close(io_desc *iod, mval *pp)
 		switch (ch)
 		{
 		case iop_exception:
-			iod->error_handler.len = *(pp->str.addr + p_offset);
+			iod->error_handler.len = (int)(*(pp->str.addr + p_offset));
 			iod->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
 			s2pool(&iod->error_handler);
 			break;
 		case iop_socket:
-			handle_len = (short)(*(pp->str.addr + p_offset));
+			handle_len = (int)(*(pp->str.addr + p_offset));
 			assert(handle_len > 0);
 			memcpy(sock_handle, (char *)(pp->str.addr + p_offset + 1), handle_len);
 			socket_specified = TRUE;
@@ -150,14 +157,16 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	struct stat	statbuf, fstatbuf;
 	char		*path;
 	int		res;
+	int		null_fd = 0;
 #	endif
 
 	for (ii = start; ii >= end; ii--)
 	{
 		socketptr = dsocketptr->socket[ii];
 #		ifndef VMS
-		if (socket_specified && socket_delete && (socket_local == socketptr->protocol) && socketptr->passive)
-		{	/* only delete if SOCKET= specified  and passive/listening */
+		/* Don't reap if in a child process creating a new job or pipe device */
+		if ((socket_local == socketptr->protocol) && socketptr->passive && !gtm_pipe_child)
+		{	/* only delete if passive/listening */
 			assertpro(socketptr->local.sa);
 			path = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
 			FSTAT_FILE(socketptr->sd, &fstatbuf, res);
@@ -180,6 +189,17 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 			save_fd = socketptr->sd;
 			save_errno = errno;
 		}
+#		ifndef VMS
+		else if (!process_exiting && (3 > socketptr->sd))
+		{
+			OPENFILE("/dev/null", O_RDWR, null_fd);
+			if (-1 == null_fd)
+			{
+				save_errno = errno;
+			}
+			assert(socketptr->sd == null_fd);
+		}
+#		endif
 		SOCKET_FREE(socketptr);
 		if (dsocketptr->current_socket >= ii)
 			dsocketptr->current_socket--;
@@ -191,6 +211,12 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, save_errno);
 	}
+#	ifndef VMS
+	else if (-1 == null_fd)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LIT_AND_LEN("/dev/null"), save_errno, 0);
+	}
+#	endif
 }
 
 void iosocket_close_one(d_socket_struct *dsocketptr, int index)

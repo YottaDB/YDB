@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -254,7 +254,6 @@ void set_blocksig(void)
 	sigaddset(&block_sigsent, SIGTSTP);
 	sigaddset(&block_sigsent, SIGCONT);
 	sigaddset(&block_sigsent, SIGALRM);
-
 	blocksig_initialized = TRUE;	/* note the fact that blockalrm and block_sigsent are initialized */
 }
 
@@ -425,11 +424,12 @@ void start_timer(TID tid,
 	} else if (wcs_clean_dbsync_fptr == handler)
 	{	/* Account for known instances of the above function being called from within a deferred zone. */
 		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_WCS_WTSTART == intrpt_ok_state)
-			|| (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state));
+			|| (INTRPT_IN_GDS_RUNDOWN == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state));
 		safe_to_add = TRUE;
 	} else if (wcs_stale_fptr == handler)
 	{	/* Account for known instances of the above function being called from within a deferred zone. */
-		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state));
+		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state)
+			|| (INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state));
 		safe_to_add = TRUE;
 	} else
 	{
@@ -510,12 +510,21 @@ void clear_timers(void)
 {
 	sigset_t savemask;
 
+	if (NULL == timeroot)
+	{	/* If no timers have been initialized in this process, take fast path (avoid system call) */
+		assert(FALSE == timer_in_handler);
+		assert(FALSE == timer_active);
+		assert(FALSE == heartbeat_started);
+		assert(FALSE == deferred_timers_check_needed);
+		return;
+	}
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
 	while (timeroot)
 		remove_timer(timeroot->tid);
 	timer_in_handler = FALSE;
 	timer_active = FALSE;
 	heartbeat_started = FALSE;
+	deferred_timers_check_needed = FALSE;
 	sigprocmask(SIG_SETMASK, &savemask, NULL);
 	return;
 }
@@ -751,8 +760,8 @@ STATICFNDEF void timer_handler(int why)
 	 * code do not affect the error_condition global variable that mainline code was relying on. For example, not doing this
 	 * restore caused the update process (in updproc_ch) to issue a GTMASSERT (GTM-7526). BYPASSOK.
 	 */
-	error_condition = save_error_condition;
-	errno = save_errno;		/* restore mainline errno by similar reasoning as mainline error_condition */
+	SET_ERROR_CONDITION(save_error_condition);	/* restore error_condition & severity */
+	errno = save_errno;			/* restore mainline errno by similar reasoning as mainline error_condition */
 	timer_stack_count--;
 }
 
@@ -917,8 +926,7 @@ void sys_canc_timer()
 	timer_active = FALSE;		/* no timer is active now */
 }
 
-/* Cancel all unsafe timers.
- */
+/* Cancel all unsafe timers. */
 void cancel_unsafe_timers(void)
 {
         ABS_TIME	at;
@@ -940,8 +948,8 @@ void cancel_unsafe_timers(void)
 	}
 	assert((NULL == timeroot) || (0 < safe_timer_cnt));
 	if (timeroot)
-	{	/* If the head of the queue has changed, start the current first timer. */
-		if (timeroot != active)
+	{	/* If the head of the queue has changed, or the system timer was not running, start the current first timer. */
+		if ((active != timeroot) || (!timer_active))
 		{
 			sys_get_curr_time(&at);
 			start_first_timer(&at);

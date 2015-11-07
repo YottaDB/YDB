@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +21,8 @@ GBLREF int4		break_message_mask;
 
 GTMTRIG_ONLY(error_def(ERR_TRIGZBREAKREM);)
 
-/* remove all breaks in rtn */
-void zr_remove(rhdtyp *rtn, boolean_t notify_is_trigger)
+/* Remove all ZBREAKs in given rtn */
+void zr_remove_zbrks(rhdtyp *rtn, boolean_t notify_is_trigger)
 {
 	zbrk_struct		*zb_ptr;
 	GTMTRIG_ONLY(boolean_t	msg_done = FALSE;)
@@ -34,7 +34,8 @@ void zr_remove(rhdtyp *rtn, boolean_t notify_is_trigger)
 #			ifdef GTM_TRIGGER
 			if ((BREAKMSG == notify_is_trigger) && !msg_done && (break_message_mask & TRIGGER_ZBREAK_REMOVED_MASK))
 			{	/* Message is info level */
-				gtm_putmsg(VARLSTCNT(4) ERR_TRIGZBREAKREM, 2, rtn->routine_name.len, rtn->routine_name.addr);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGZBREAKREM, 2, rtn->routine_name.len,
+					       rtn->routine_name.addr);
 				msg_done = TRUE;
 			}
 #			endif

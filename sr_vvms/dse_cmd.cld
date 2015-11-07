@@ -1,3 +1,13 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!								!
+!	Copyright 2014 Fidelity Information Services, Inc	!
+!								!
+!	This source code contains the intellectual property	!
+!	of its copyright holder(s), and is made available	!
+!	under a license.  If you do not know the terms of	!
+!	the license, please stop and do not read further.	!
+!								!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 MODULE DSE_CMD
 
 DEFINE VERB add
@@ -336,6 +346,7 @@ DEFINE VERB save
 DEFINE VERB shift
 	ROUTINE dse_shift
 	QUALIFIER backward					NONNEGATABLE	VALUE(REQUIRED)
+	QUALIFIER block						NONNEGATABLE	VALUE(REQUIRED)
 	QUALIFIER forward					NONNEGATABLE	VALUE(REQUIRED)
 	QUALIFIER offset					NONNEGATABLE	VALUE(REQUIRED)
 

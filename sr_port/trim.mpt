@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2012 Fidelity Information Services, Inc.    	;
+;	Copyright 2012, 2014 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -8,17 +8,21 @@
 ;	the license, please stop and do not read further.	;
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%TRIM	; routine to strip of leading and trailing spaces/tabs
-	for  quit:$zeof  read line write !,$$FUNC(line),!
+%TRIM	; routine to strip of leading and trailing characters; defaulting to spaces and tabs
+	for  read line quit:$zeof  write $$FUNC(line),!
 	quit
 
-FUNC(s) quit $$L($$R(s))
+FUNC(s,ch)
+	set:'$length($get(ch)) ch=$char(9,32)
+	quit $$L($$R(s,ch),ch)
 
-L(s)	new i,l,tmp
-	set l=$length(s)
-	for  set tmp=$extract(s,$increment(i)) quit:" "'=tmp&($c(9)'=tmp)!'$length(tmp)
-	quit $extract(s,i,$length(s))
+L(s,ch)	new i,len,tmp
+	set:'$length($get(ch)) ch=$char(9,32)
+	set len=$length(s)
+	for i=1:1:len+1 quit:ch'[$extract(s,i)
+	quit $extract(s,i,len)
 
-R(s)	new i,l,tmp
-	set i=$length(s)+1 for  set tmp=$extract(s,$increment(i,-1)) quit:" "'=tmp&($c(9)'=tmp)!'i
+R(s,ch)	new i,tmp
+	set:'$length($get(ch)) ch=$c(9,32)
+	for i=$length(s):-1:0 quit:ch'[$extract(s,i)
 	quit $extract(s,1,i)

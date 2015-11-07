@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,6 @@
 #include "gtm_string.h"
 #include "gtm_stat.h"
 #include "gtm_limits.h"
-
 #include <errno.h>
 
 #include "zroutines.h"
@@ -22,19 +21,24 @@
 #include "error.h"
 #include "lv_val.h"	/* needed for "fgncal.h" */
 #include "fgncal.h"
+#include "min_max.h"
+#ifdef USHBIN_SUPPORTED
+#include <rtnhdr.h>	/* needed for "zhist.h" */
+#include "zhist.h"
+#endif
 
 error_def	(ERR_ZFILENMTOOLONG);
 error_def	(ERR_SYSCALL);
 
-/*
- * mstr		*objstr;	if NULL, do not search for object, else pointer to object file text string
- * zro_ent	**objdir;	NULL if objstr is NULL, otherwise, return pointer to associated object directory
- *				objdir is NULL if object directory is not found
- * mstr		*srcstr;	like objstr, except for associated source program
- * zro_ent	**srcdir;	like objdir, except for associated source program directory
- * boolean_t	skip;		if TRUE, skip over shared libraries. If FALSE, probe shared libraries.
+/* TODO: description
+ * mstr		*objstr;	If NULL, do not search for object, else pointer to object file text string.
+ * zro_ent	**objdir;	NULL if objstr is NULL, otherwise, return pointer to associated object directory.
+ *				Note objdir is NULL if object directory is not found.
+ * mstr		*srcstr;	Like objstr, except for associated source program.
+ * zro_ent	**srcdir;	Like objdir, except for associated source program directory.
+ * boolean_t	skip;		If TRUE, skip over shared libraries. If FALSE, probe shared libraries.
  */
-void zro_search (mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, boolean_t skip)
+void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, boolean_t skip)
 {
 	uint4	status;
 	zro_ent		*op, *sp, *op_result, *sp_result;
@@ -43,6 +47,10 @@ void zro_search (mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir,
 	struct  stat	outbuf;
 	int		stat_res;
 	mstr		rtnname;
+#	ifdef USHBIN_SUPPORTED
+	zro_validation_entry	zhent_base[ZRO_MAX_ENTS];
+	zro_validation_entry	*zhent;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -55,7 +63,8 @@ void zro_search (mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir,
 	op_result = sp_result = NULL;
 	objcnt = (TREF(zro_root))->count;
 	assert(objcnt);
-	for (op = TREF(zro_root) + 1; !op_result && !sp_result && objcnt-- > 0; )
+	USHBIN_ONLY(zhent = &zhent_base[0]);
+	for (op = TREF(zro_root) + 1; !op_result && !sp_result && (0 < objcnt--); )
 	{
 		assert((ZRO_TYPE_OBJECT == op->type) || (ZRO_TYPE_OBJLIB == op->type));
 		if (objstr)
@@ -77,7 +86,7 @@ void zro_search (mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir,
 				continue;
 			}
 			if ((op->str.len + objstr->len + 2) > SIZEOF(objfn))
-				rts_error(VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, op->str.len, op->str.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, op->str.len, op->str.addr);
 			obp = &objfn[0];
 			if (op->str.len)
 			{
@@ -92,9 +101,20 @@ void zro_search (mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir,
 			if (-1 == stat_res)
 			{
 				if (errno != ENOENT)
-					rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM, errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM,
+						      errno);
 			} else
 				op_result = op;
+#			ifdef USHBIN_SUPPORTED
+			if ((NULL != op) && (NULL != op->relinkctl_sgmaddr))
+			{	/* If this directory is auto-relink enabled, make sure to track the usages */
+				rtnname.len = MIN(objstr->len - (int)STR_LIT_LEN(DOTOBJ), MAX_MIDENT_LEN);
+				memcpy(objfn, objstr->addr, rtnname.len);
+				objfn[rtnname.len] = '\0';
+				rtnname.addr = objfn;
+				zro_record_zhist(zhent++, op, &rtnname);
+			}
+#			endif
 		}
 		if (srcstr)
 		{
@@ -110,7 +130,7 @@ void zro_search (mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir,
 			{
 				assert(sp->type == ZRO_TYPE_SOURCE);
 				if (sp->str.len + srcstr->len + 2 > SIZEOF(srcfn)) /* extra 2 for '/' & null */
-					rts_error(VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, sp->str.len, sp->str.addr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, sp->str.len, sp->str.addr);
 				sbp = &srcfn[0];
 				if (sp->str.len)
 				{
@@ -125,7 +145,8 @@ void zro_search (mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir,
 				if (-1 == stat_res)
 				{
 					if (ENOENT != errno)
-						rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM, errno);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"),
+							      CALLFROM, errno);
 				} else
 				{
 					sp_result = sp;
@@ -141,6 +162,16 @@ void zro_search (mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir,
 			op++;
 		}
 	}
+#	ifdef USHBIN_SUPPORTED
+	if ((NULL != op_result) && (NULL != op_result->relinkctl_sgmaddr))
+		/* If this directory is auto-relink enabled, make sure to track the usages */
+		zro_zhist_saverecent(zhent, &zhent_base[0]);
+	else
+		/* If didn't find a binary result, or we didn't find a relinkable routine, we have no "recent zhist" value
+		 * to return so just clear it.
+		 */
+		TREF(recent_zhist) = NULL;
+#	endif
 	if (objdir)
 		*objdir = op_result;
 	if (srcdir)

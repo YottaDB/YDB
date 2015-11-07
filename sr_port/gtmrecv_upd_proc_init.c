@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,9 +44,10 @@
 #include "trans_log_name.h"
 #include "repl_log.h"
 #include "eintr_wrappers.h"
+#include "gtmimagename.h"
 
 #define UPDPROC_CMD_MAXLEN	1024
-#define UPDPROC_CMD		"$gtm_dist/mupip"
+#define UPDPROC_CMD		"%s/mupip"
 #define UPDPROC_CMD_FILE	"mupip"
 #define UPDPROC_CMD_ARG1	"replicate"
 #define UPDPROC_CMD_ARG2	"-updateproc"
@@ -55,10 +56,14 @@
 GBLREF recvpool_addrs	recvpool;
 GBLREF int		recvpool_shmid;
 
+GBLREF char		gtm_dist[GTM_PATH_MAX];
+GBLREF boolean_t	gtm_dist_ok_to_use;
 GBLREF int		gtmrecv_log_fd;
 GBLREF FILE		*gtmrecv_log_fp;
 GBLREF int		updproc_log_fd;
+LITREF gtmImageName	gtmImageNames[];
 
+error_def(ERR_GTMDISTUNVERIF);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_REPLINFO);
@@ -68,8 +73,8 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 {
 	/* Update Process initialization */
 
-	mstr	upd_proc_log_cmd, upd_proc_trans_cmd;
 	char	upd_proc_cmd[UPDPROC_CMD_MAXLEN];
+	int	upd_proc_cmd_len;
 	int	status, save_errno;
 	int	upd_status, save_upd_status;
 #ifdef UNIX
@@ -105,7 +110,10 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	recvpool.upd_proc_local->upd_proc_shutdown = NO_SHUTDOWN;
 
 #ifdef UNIX
-	FORK(upd_pid);	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+	if (!gtm_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+	FORK(upd_pid);
 	if (0 > upd_pid)
 	{
 		recvpool.upd_proc_local->upd_proc_shutdown = save_upd_status;
@@ -117,21 +125,14 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	if (0 == upd_pid)
 	{
 		/* Update Process */
-		upd_proc_log_cmd.len = SIZEOF(UPDPROC_CMD) - 1;
-		upd_proc_log_cmd.addr = UPDPROC_CMD;
-		status = TRANS_LOG_NAME(&upd_proc_log_cmd, &upd_proc_trans_cmd, upd_proc_cmd, SIZEOF(upd_proc_cmd),
-						dont_sendmsg_on_log2long);
-		if (status != SS_NORMAL)
+		upd_proc_cmd_len = SNPRINTF(upd_proc_cmd, UPDPROC_CMD_MAXLEN, UPDPROC_CMD, gtm_dist);
+		if (-1 == upd_proc_cmd_len)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				   RTS_ERROR_LITERAL("Could not find path of Update Process. Check value of $gtm_dist"));
-			if (SS_LOG2LONG == status)
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5)
-					ERR_LOGTOOLONG, 3, LEN_AND_LIT(UPDPROC_CMD), SIZEOF(upd_proc_cmd) - 1);
 			repl_errno = EREPL_UPDSTART_BADPATH;
 			return(UPDPROC_START_ERR);
 		}
-		upd_proc_cmd[upd_proc_trans_cmd.len] = '\0';
 		if (EXECL(upd_proc_cmd, upd_proc_cmd, UPDPROC_CMD_ARG1, UPDPROC_CMD_ARG2, NULL) < 0)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,

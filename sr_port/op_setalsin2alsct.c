@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "gtmio.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"

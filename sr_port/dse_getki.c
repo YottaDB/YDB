@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,8 +120,8 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 				}
 			} else if ('#' == *src)
 			{	/*Special spanning global subscript*/
-				if ('S' != toupper(*(src + 1)) && 'P' != toupper(*(src + 2))
-				     && 'A' != toupper(*(src + 3)) && 'N' != toupper(*(src + 4)))
+				if ('S' != TOUPPER(*(src + 1)) && 'P' != TOUPPER(*(src + 2))
+				     && 'A' != TOUPPER(*(src + 3)) && 'N' != TOUPPER(*(src + 4)))
 				{
 					util_out_print("Error:  invalid key.", TRUE);
 					return FALSE;
@@ -211,7 +211,6 @@ int parse_dlr_char(char *src, char *top, char *dlr_subsc)
 	boolean_t	dlrzchar = FALSE;
 
 	tmp_buf = src;
-
 	if ('Z' == TOUPPER(*tmp_buf))
 	{
 		dlrzchar = TRUE;
@@ -229,10 +228,8 @@ int parse_dlr_char(char *src, char *top, char *dlr_subsc)
 		}
 		else
 			tmp_buf += STR_LIT_LEN("har");
-
 	} else if (dlrzchar)
 		return 0;
-
 	if (*tmp_buf++ != '(')
 		return 0;
 	if (!ISDIGIT_ASCII(*tmp_buf))
@@ -253,14 +250,14 @@ int parse_dlr_char(char *src, char *top, char *dlr_subsc)
 					return 0;
 				*dlr_subsc++ = dlr_val;
 			}
-#ifdef UNICODE_SUPPORTED
+#			ifdef UNICODE_SUPPORTED
 			else {
 				strnext = (char *)UTF8_WCTOMB(dlr_val, dlr_subsc);
 				if (strnext == dlr_subsc)
 					return 0;
 				dlr_subsc = strnext;
 			}
-#endif
+#			endif
 			indx = 0;
 			if (')' == *tmp_buf)
 			{

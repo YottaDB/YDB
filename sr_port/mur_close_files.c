@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -145,6 +145,7 @@ boolean_t mur_close_files(void)
 	repl_inst_hdr_ptr_t	inst_hdr = NULL;
 	seq_num			max_strm_seqno[MAX_SUPPL_STRMS], this_strm_seqno;
 	boolean_t		incr_jnlpool_rlbk_cycle = TRUE, got_ftok, anticipatory_freeze_available, was_crit;
+	boolean_t		inst_frozen = FALSE;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
 	global_latch_t		*latch;
 	seq_num			max_zqgblmod_seqno = 0, last_histinfo_seqno;
@@ -172,7 +173,7 @@ boolean_t mur_close_files(void)
 #	ifdef UNIX
 	if (mur_options.rollback)
 		memset(&max_strm_seqno[0], 0, SIZEOF(max_strm_seqno));
-	anticipatory_freeze_available = ANTICIPATORY_FREEZE_AVAILABLE;
+	anticipatory_freeze_available = INST_FREEZE_ON_ERROR_POLICY;
 	inst_hdr = jnlpool.repl_inst_filehdr;
 	/* Note that murgbl.consist_jnl_seqno is maintained even if the only thing done by rollback was lost transaction processing.
 	 * In this case, we shouldn't consider the instance as being rolled back. So, set murgbl.incr_db_rlbkd_cycle = FALSE;
@@ -701,13 +702,13 @@ boolean_t mur_close_files(void)
 		reg = rctl->gd;
 		if (NULL == reg)
 			continue;
+		udi = (NULL != reg->dyn.addr->file_cntl) ? FILE_INFO(reg) : NULL;
 		if (reg->open)
 		{
 			assert(!mur_options.forward); /* for forward recovery, gds_rundown should have been done before */
 			gv_cur_region = reg;
 			TP_CHANGE_REG(reg);
 			assert(!jgbl.onlnrlbk || (cs_addrs->now_crit && cs_addrs->hold_onto_crit) || !murgbl.clean_exit);
-			DEBUG_ONLY(udi = FILE_INFO(reg));
 			assert(!rctl->standalone || (1 == (semval = semctl(udi->semid, 0, GETVAL))));
 			UNIX_ONLY(rundown_status =) gds_rundown(); /* does the final rel_crit */
 			if (EXIT_NRM != rundown_status)
@@ -721,7 +722,8 @@ boolean_t mur_close_files(void)
 		 */
 		assert(!mur_options.update || rctl->standalone || !murgbl.clean_exit);
 		if (rctl->standalone UNIX_ONLY(&& EXIT_NRM == rundown_status))
-			if (!db_ipcs_reset(reg))
+			/* Avoid db_ipcs_reset if gds_rundown did not remove shared memory */
+			if ((NULL != udi) && !udi->new_shm && !db_ipcs_reset(reg))
 				wrn_count++;
 		rctl->standalone = FALSE;
 		rctl->gd = NULL;
@@ -766,6 +768,8 @@ boolean_t mur_close_files(void)
 			 * an assert to validate our understanding and has no implications in PRO
 			 */
 			assert(INVALID_SHMID == repl_instance.recvpool_shmid || jgbl.onlnrlbk);
+			/* Check frozen state before detaching the journal pool */
+			inst_frozen = IS_REPL_INST_FROZEN;
 			/* Ensure that no new processes have attached to the journal pool */
 			if (-1 == shmctl(repl_instance.jnlpool_shmid, IPC_STAT, &shm_buf))
 			{
@@ -788,7 +792,7 @@ boolean_t mur_close_files(void)
 			jnlpool.gtmsource_local_array = NULL;
 			jnlpool.jnldata_base = NULL;
 			jnlpool.repl_inst_filehdr = NULL;
-			if (1 == shm_buf.shm_nattch)
+			if ((1 == shm_buf.shm_nattch) && !inst_frozen)
 			{	/* We are the only one attached. Go ahead and remove the shared memory ID and invalidate it in the
 				 * instance file header as well.
 				 */
@@ -832,9 +836,9 @@ boolean_t mur_close_files(void)
 		if (got_ftok)
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, TRUE); /* immediate=TRUE */
 		ASSERT_DONOT_HOLD_REPLPOOL_SEMS;
-		assert(jgbl.onlnrlbk ||
+		assert(jgbl.onlnrlbk || inst_frozen ||
 			((INVALID_SEMID == repl_instance.jnlpool_semid) && (0 == repl_instance.jnlpool_semid_ctime)));
-		assert(jgbl.onlnrlbk ||
+		assert(jgbl.onlnrlbk || inst_frozen ||
 			((INVALID_SEMID == repl_instance.recvpool_semid) && (0 == repl_instance.recvpool_semid_ctime)));
 		repl_inst_write(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		/* Now that the standalone access is released, we should decrement the counter in the ftok semaphore obtained in
@@ -877,6 +881,7 @@ boolean_t mur_close_files(void)
 				|| (WBTEST_JNL_FILE_OPEN_FAIL == gtm_white_box_test_case_number)
 				|| (WBTEST_JNL_CREATE_FAIL == gtm_white_box_test_case_number)
 				|| (WBTEST_RECOVER_ENOSPC == gtm_white_box_test_case_number)
+				|| (WBTEST_FAIL_ON_SHMGET == gtm_white_box_test_case_number)
 				|| (WBTEST_WCS_FLU_FAIL == gtm_white_box_test_case_number)));
 		assert(!murgbl.clean_exit);
 		if (murgbl.wrn_count)

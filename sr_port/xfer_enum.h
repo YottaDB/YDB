@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,18 @@
  ****************************************************************/
 
 /*	File modified by Hallgarth on 28-APR-1986 08:39:49.98    */
+
+/* Define some macros to allow conditional commas at the end of statements useful for when the last entry in the
+ * xfer table is surrounded by #ifdef. This is sort of like UNIX_ONLY_COMMA() except that macro drops the entire
+ * argument if not UNIX, not just the comma.
+ */
+#ifdef UNIX
+# define UNIX_COMMA(x) x,
+# define VMS_COMMA(x) x
+#else
+# define UNIX_COMMA(x) x
+# define VMS_COMMA(x) x,
+#endif
 
 /* Declare all xf_* enumerators */
 #ifndef XFER_ENUM_H

@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2011, 2013 Fidelity Information Services, Inc       #
+#	Copyright 2011, 2014 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -231,13 +231,10 @@ foreach image ($imagetype)
 	cd ${tmp_dist}/${image} || exit 7
 	echo ""
 	echo "Copying files from ${gtm_ver}/${image}"
-	if ("aix" == $osname) then
-		/bin/cp -rh ${gtm_ver}/${image}/* . || exit 8
-	else if ("solaris" == $osname) then
-		/usr/local/bin/cp -r ${gtm_ver}/${image}/* . || exit 8
-	else
-		/bin/cp -r ${gtm_ver}/${image}/* . || exit 8
-	endif
+	set cpflags="-r"
+	if ("aix" == $osname) set cpflags="-rh"
+	if ("solaris" == $osname) set cpflags="-rH"
+	cp ${cpflags} ${gtm_ver}/${image}/* . || exit 8
 	echo ""
 	echo "Removing files that are not distributed (${notdistributed})"
 	/bin/rm -rf ${notdistributed} || exit 9

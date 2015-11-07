@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -214,6 +214,8 @@ void	mupip_recover(void)
 	mur_get_options();
 	/*DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES); */
 	mur_open_files_status = mur_open_files();
+	if (WBTEST_ENABLED(WBTEST_KILL_ROLLBACK))
+		kill(getpid(), SIGKILL);
 	jgbl.mur_extract = mur_options.extr[GOOD_TN]; /* journal extract process */
 	/*ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES);*/
 	if (!mur_open_files_status) /* mur_open_files already issued error */
@@ -265,7 +267,7 @@ void	mupip_recover(void)
 		{
 			TREF(jnl_extract_nocol) = !mur_options.update && jgbl.mur_extract && TREF(jnl_extract_nocol);
 			if (db_absent)
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBCOLLREQ, 4, LEN_AND_LIT("Mising Database file"),
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBCOLLREQ, 4, LEN_AND_LIT("Missing Database file"),
 						DB_LEN_STR(db_absent_rctl->gd));
 			else
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBCOLLREQ, 4, LEN_AND_LIT("Instance is frozen."),

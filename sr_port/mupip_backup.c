@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,7 +88,6 @@
 #include "trans_log_name.h"
 #include "shmpool.h"
 #include "mupip_backup.h"
-#include "gtm_rename.h"		/* for cre_jnl_file_intrpt_rename() prototype */
 #include "gvcst_protos.h"	/* for gvcst_init prototype */
 #include "add_inter.h"
 #include "gtm_logicals.h"
@@ -123,7 +122,6 @@ GBLREF 	int4		mubmaxblk;
 GBLREF	tp_region	*grlist;
 GBLREF 	tp_region 	*halt_ptr;
 GBLREF 	bool		in_backup;
-GBLREF 	bool		is_directory;
 GBLREF 	bool		mu_ctrly_occurred;
 GBLREF 	bool		mu_ctrlc_occurred;
 GBLREF 	bool		mubtomag;
@@ -661,7 +659,7 @@ void mupip_backup(void)
 					util_out_print("!/Cannot create the temporary file in directory !AD for online backup",
 						TRUE, tempdir_trans.len, tempdir_trans.addr);
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
-				error_condition = status;
+				SET_ERROR_CONDITION(status);	/* sets "error_condition" & "severity" */
 				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(status);
@@ -683,7 +681,7 @@ void mupip_backup(void)
 				status = errno;
 				util_out_print("!/Error re-opening temporary file created by mkstemp()!/", TRUE);
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
-				error_condition = status;
+				SET_ERROR_CONDITION(status);	/* sets "error_condition" & "severity" */
 				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(status);
@@ -725,7 +723,7 @@ void mupip_backup(void)
 			{
 				status = errno;
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
-				error_condition = status;
+				SET_ERROR_CONDITION(status);	/* sets "error_condition" & "severity" */
 				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(status);
@@ -845,8 +843,8 @@ void mupip_backup(void)
 				MEMCPY_LIT(reg->rname, JNLPOOL_DUMMY_REG_NAME);
 				reg->rname_len = STR_LIT_LEN(JNLPOOL_DUMMY_REG_NAME);
 				reg->rname[reg->rname_len] = '\0';
-				if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error))
-					GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
+				assertpro(repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error));
+					/* rts_error should have been issued by repl_inst_get_name in case of 0 return */
 				udi = FILE_INFO(reg);
 				seg = reg->dyn.addr;
 				memcpy((char *)seg->fname, instfilename, full_len);
@@ -1121,8 +1119,7 @@ repl_inst_bkup_done1:
 			assert(!pool_init || (INVALID_SHMID != shm_id));
 			if (INVALID_SHMID != shm_id)
 			{
-				if (INVALID_SEMID == sem_id)
-					GTMASSERT; /* out-of-design situation */
+				assertpro(INVALID_SEMID != sem_id); /* out-of-design situation */
 				/* The journal pool exists. Note down the journal seqno from there and copy that onto the backed up
 				 * instance file header. Also, clean up other fields in the backed up instance file header.
 				 */
@@ -1233,8 +1230,7 @@ repl_inst_bkup_done2:
 				if (udi->grabbed_access_sem)
 				{
 					assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] && (INVALID_SEMID != sem_id));
-					if (SS_NORMAL != rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM))
-						GTMASSERT;
+					assertpro(SS_NORMAL == rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM));
 				}
 				if (udi->grabbed_ftok_sem)
 					ftok_sem_release(jnlpool.jnlpool_dummy_reg, decr_cnt, TRUE);
@@ -1312,7 +1308,7 @@ repl_inst_bkup_done2:
 				if (newjnlfiles)
 				{
 					if (cs_data->jnl_file_len)
-						cre_jnl_file_intrpt_rename(((int)cs_data->jnl_file_len), cs_data->jnl_file_name);
+						cre_jnl_file_intrpt_rename(cs_addrs);
 					if (JNL_ALLOWED(cs_data))
 					{
 						memset(&jnl_info, 0, SIZEOF(jnl_info));

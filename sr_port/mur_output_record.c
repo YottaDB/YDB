@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,9 @@
 #ifdef GTM_TRIGGER
 #include <rtnhdr.h>
 #include "gv_trigger.h"
+#include "gdskill.h"
+#include "tp.h"
+#include "t_begin.h"
 #endif
 /* Include prototypes */
 #include "t_qread.h"
@@ -56,20 +59,21 @@
 #include "gtmcrypt.h"
 #endif
 
-GBLREF  mur_opt_struct  	mur_options;
-GBLREF 	jnl_gbls_t		jgbl;
-GBLREF	gv_namehead		*gv_target;
-GBLREF	gd_region		*gv_cur_region;
-GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF  sgmnt_data_ptr_t 	cs_data;
-GBLREF	uint4			dollar_tlevel;
 GBLREF	boolean_t		write_after_image;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_namehead		*gv_target;
 GBLREF	jnl_fence_control	jnl_fence_ctl; /* Needed to set the token, optimize jnl_write_logical for recover */
-GBLREF	struct_jrec_tcom	tcom_record;
+GBLREF 	jnl_gbls_t		jgbl;
 GBLREF  jnl_process_vector	*prc_vec;
 GBLREF 	mur_gbls_t		murgbl;
+GBLREF  mur_opt_struct  	mur_options;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF  sgmnt_data_ptr_t 	cs_data;
+GBLREF	struct_jrec_tcom	tcom_record;
+GBLREF	uint4			dollar_tlevel;
 
 error_def(ERR_JNLBADRECFMT);
+error_def(ERR_TRIGLOADFAIL);
 
 /* This routine is called only for recover and rollback (that is, mur_options.update).
  * It applies the set/kill/zkill, tcom, inctn, and aimg records during forward processing.
@@ -259,19 +263,37 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 #	ifdef GTM_TRIGGER
 	case JRT_TZTWORM:
 	case JRT_UZTWORM:
+	case JRT_TLGTRIG:
+	case JRT_ULGTRIG:
+		assert(JRT_TLGTRIG > JRT_UZTWORM);
+		assert(JRT_TLGTRIG > JRT_TZTWORM);
+		assert(JRT_TLGTRIG < JRT_ULGTRIG);
+		if (JRT_TLGTRIG <= rectype)
+		{
+			assert(dollar_tlevel);
+			/* Below is needed to set update_trans TRUE on this region even if NO db updates happen to ^#t nodes.
+			 * Only then is the db curr_tn incremented as part of the tcommit and the tn numbers played by forward
+			 * phase of recovery (backward or forward recovery) will match the tn numbers in later journal records.
+			 */
+			T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL);
+		}
 		if (jnl_enabled)
-		{	/* Format the ZTWORM journal record */
+		{	/* Format the ZTWORM or LGTRIG journal record (both have same jnl record layout) */
 			assert(dollar_tlevel);	/* op_tstart should already have been done by mur_forward */
+			assert(rec->jrec_ztworm.token_seq.token == rec->jrec_lgtrig.token_seq.token);
 			MUR_SET_JNL_FENCE_CTL_TOKEN(rec->jrec_ztworm.token_seq.token, rctl);
+			assert(rec->jrec_ztworm.strm_seqno == rec->jrec_lgtrig.strm_seqno);
 			jnl_fence_ctl.strm_seqno = rec->jrec_ztworm.strm_seqno;
+			assert(rec->jrec_ztworm.update_num == rec->jrec_lgtrig.update_num);
 			jgbl.tp_ztp_jnl_upd_num = rec->jrec_ztworm.update_num;
 			DEBUG_ONLY(jgbl.max_tp_ztp_jnl_upd_num = MAX(jgbl.max_tp_ztp_jnl_upd_num, jgbl.tp_ztp_jnl_upd_num);)
 			jgbl.mur_jrec_nodeflags = 0;
+			assert(&rec->jrec_ztworm.ztworm_str == &rec->jrec_lgtrig.lgtrig_str);
 			keystr = (jnl_string *)&rec->jrec_ztworm.ztworm_str;
 			mv.str.addr = &keystr->text[0];
 			mv.str.len = keystr->length;
 			mv.mvtype = MV_STR;
-			ztworm_jfb = jnl_format(JNL_ZTWORM, NULL, &mv, 0);
+			ztworm_jfb = jnl_format((JRT_TLGTRIG > rectype) ? JNL_ZTWORM : JNL_LGTRIG, NULL, &mv, 0);
 			assert(NULL != ztworm_jfb);
 		}
 		break;

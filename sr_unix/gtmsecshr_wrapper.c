@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,6 +99,31 @@ extern	char	**environ;
 	"%%GTM-E-SECSHRSTATFAILED, stat failed on %s, errno %d. gtmsecshr will not be started\n"
 #define ERR_SECSHRWRITABLE			\
 	"%%GTM-E-SECSHRWRITABLE, %s writable. gtmsecshr will not be started\n"
+
+/*
+Make sure these are synced with the above. We need this comment for the InfoHub tools to generate message
+information for gtmsecshr_wrapper.c, since it does not have a stand-alone .msg file.
+
+	.FACILITY	GTMSECSHRINIT,251/PREFIX=ERR_
+
+SECSHRCHDIRFAILED	<chdir failed on !AD, errno !UL. gtmsecshr will not be started>/error/fao=3!/ansi=0
+SECSHRCLEARENVFAILED	<clearenv failed. gtmsecshr will not be started>/error/fao=0!/ansi=0
+SECSHREXECLFAILED	<execl of !AD failed>/error/fao=2!/ansi=0
+SECSHRGTMDBGLVL2LONG	<gtmdbglvl env var too long. gtmsecshr will not be started>/error/fao=0!/ansi=0
+SECSHRGTMDIST2LONG	<gtm_dist env var too long. gtmsecshr will not be started>/error/fao=0!/ansi=0
+SECSHRGTMTMP2LONG	<gtm_tmp env var too long. gtmsecshr will not be started>/error/fao=0!/ansi=0
+SECSHRNOGTMDIST		<gtm_dist env var does not exist. gtmsecshr will not be started>/error/fao=0!/ansi=0
+SECSHRNOTOWNEDBYROOT	<!AD not owned by root. gtmsecshr will not be started>/error/fao=3!/ansi=0
+SECSHRNOTSETUID		<!AD not set-uid. gtmsecshr will not be started>/error/fao=2!/ansi=0
+SECSHRPERMINCRCT	<!AD permissions incorrect (0!UL). gtmsecshr will not be started>/error/fao=3!/ansi=0
+SECSHRSETGTMDISTFAILED	<setenv for gtm_dist failed. gtmsecshr will not be started>/error/fao=0!/ansi=0
+SECSHRSETGTMTMPFAILED	<setenv for gtm_tmp failed. gtmsecshr will not be started>/error/fao=0!/ansi=0
+SECSHRSETUIDFAILED	<setuid failed. gtmsecshr will not be started>/error/fao=0!/ansi=0
+SECSHRSTATFAILED	<stat failed on !AD, errno !UL. gtmsecshr will not be started>/error/fao=3!/ansi=0
+SECSHRWRITABLE		<!AD writable. gtmsecshr will not be started>/error/fao=2!/ansi=0
+! the following line stops getmsginfo.m
+	.end
+*/
 
 int gtm_setenv(char * env_var_name, char * env_var_val, int overwrite);
 int gtm_setenv(char * env_var_name, char * env_var_val, int overwrite)

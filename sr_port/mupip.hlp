@@ -45,6 +45,33 @@
    A gtmgbldir value of mumps.gld tells MUPIP to look for a global directory
    file mumps.gld in the current directory.
 
+   **Important**
+
+   FIS recommends against running GT.M components as root. When run as root,
+   GT.M components use the owner and group of the database file as the owner
+   and group of newly created journal files, backup files, snapshot files,
+   shared memory, and semaphores. In addition, they set the permissions on
+   the resulting files, shared memory, and semaphores, as if running as the
+   owner of the database file and as a member of the database file group.
+
+   **Note**
+
+   You can perform read operations on a GT.M database residing on a read-only
+   mounted filesystem. However, please note:
+
+     o The filesystem must remain read-only for the duration of any process
+       that opens a database file resident on it. If a read-only file system
+       is switched to read-write while GT.M processes have database files
+       open on it, and other processes update those databases, the read-only
+       processes are likely to read incorrect or corrupt data.
+     o When the filesystem is read-only the shared memory resources which are
+       typically shared among multiple processes instead become private to
+       each process, so memory resource use increases with each additional
+       concurrent process.
+     o M locks mapped to regions that map to database files on read-only
+       filesystems are visible only to the process that owns the locks, and
+       are invisible to other processes.
+
 2 Operations
    Operations
 
@@ -157,14 +184,15 @@
        any element of the destination list is invalid, BACKUP rejects the
        command with an error.
      o region-list may specify more than one region of the current global
-       directory in a list. Regions are separated by a comma, and wildcards
-       can be used to specify them. Any region-name may include the wildcard
-       characters * and % (remember to escape them to protect them from
-       inappropriate expansion by the shell). Any region name expansion
-       occurs in M (ASCII) collation order.
+       directory in a list. Regions are case insensitive, separated by a
+       comma, and wildcards can be used to specify them. Any region-name may
+       include the wildcard characters * and % (remember to escape them to
+       protect them from inappropriate expansion by the shell). Any region
+       name expansion occurs in M (ASCII) collation order.
      o Depending on the type of backup, destination-list may be a single
        directory, or a comma separated list of destinations including files,
-       piped commands, or TCP sockets.
+       piped commands, or a TCP socket address (a combination of IPv4 or IPV6
+       hostname and a port number).
      o Region-list and destination-list items are matched in order - the
        first region is mapped to the first destination, the second to the
        second destination, and so on. If GT.M encounters a region mapped to a
@@ -619,7 +647,7 @@
    (234,881,024) blocks. This means, for example, that with an 8KB block
    size, the maximum single database file size is 1,792GB (8KB*224M). Note
    that this is the size of one database file -- a logical database (an M
-   global variable name space) can consist of an arbitrary number of database
+   global variable namespace) can consist of an arbitrary number of database
    files.
 
 3 Region
@@ -807,7 +835,7 @@
    Backups certain globals or to extract data from the database for use by
    another system. The MUPIP EXTRACT command copies globals from the current
    database to a sequential output file in one of three formats-GO, BINARY,
-   or ZWR. The format of the EXTRACT command is:
+   or ZWR. The format of the MUPIP EXTRACT command is:
 
    EXTR[ACT]
    [
@@ -815,6 +843,7 @@
     -FR[EEZE]
     -LA[BEL]=text
     -[NO]L[OG]
+    -R[EGION]=region-list
     -S[ELECT]=global-name-list]
    ]
    {-ST[DOUT]|file-name}
@@ -939,6 +968,21 @@
 
    By default, EXTRACT operates -LOG.
 
+3 Region
+   Region
+
+   Restricts MUPIP EXTRACT to a set of regions. The format of the REGION
+   qualifier is:
+
+   -R[EGION]=region-list
+
+   region-list may specify more than one region of the current global
+   directory in a list. Regions are case-insensitive, separated by a comma,
+   and wildcards can be used to specify them. Any region-name may include the
+   wildcard characters * and % (remember to escape them to protect them from
+   inappropriate expansion by the shell). Any region name expansion occurs in
+   M (ASCII) collation order.
+
 3 Select
    Select
 
@@ -1045,7 +1089,13 @@
 
    F[REEZE] {-OF[F] [-OV[ERRIDE]]|-ON [-R[ECORD]]} region-list
 
-     o The region-list identifies the target of the FREEZE.
+     o The region-list identifies the target of the FREEZE. region-list may
+       specify more than one region of the current global directory in a
+       list. Regions are case-insensitive, separated by a comma, and
+       wildcards can be used to specify them. Any region-name may include the
+       wildcard characters * and % (remember to escape them to protect them
+       from inappropriate expansion by the shell). Any region name expansion
+       occurs in M (ASCII) collation order.
      o MUPIP FREEZE waits for one minute so that concurrent KILL or MUPIP
        REORG operations can complete. If the KILL or MUPIP REORG commands do
        not complete within one minute, MUPIP FREEZE terminates operations and
@@ -1252,7 +1302,7 @@
    cylinder. You can also choose two or three cylinders, with the assumption
    that short seeks are fast.
 
-   The format of the INTEG command is:
+   The format of the MUPIP INTEG command is:
 
    I[NTEG]
    [
@@ -1269,7 +1319,7 @@
     -[NO]TR[ANSACTION][=integer]
     -[NO]O[NLINE]
    ]
-   {[-FILE] file-name|-REG[ION] region-name}
+   {[-FILE] file-name|-REG[ION] region-list}
 
      o MUPIP INTEG requires specification of either file(s) or region(s).
      o Press <CTRL-C> to stop MUPIP INTEG before the process completes.
@@ -1374,6 +1424,7 @@
        prevent accelerated database damage.
      o By default, INTEG checks all active index and data blocks in the
        database.
+     o -FAST reports adjacency information.
      o Incompatible with: -TN_RESET.
 
 3 FIle
@@ -1508,13 +1559,13 @@
        GT.M processes automatically cleans up these temporary snapshot files
        under a wider variety of conditions.
      o Temporary directory security settings must allow write access by the
-       the MUPIP process and read access by all processes updating the
-       database. MUPIP creates the temporary file with the same access as the
-       database file so processes updating the database can write to the
-       temporary file. If the database is encrypted, the updating processes
-       write encrypted blocks to the snapshot file and the MUPIP INTEG
-       process must start with access to appropriate key information as it
-       does even -NOONLINE.
+       MUPIP process and read access by all processes updating the database.
+       MUPIP creates the temporary file with the same access as the database
+       file so processes updating the database can write to the temporary
+       file. If the database is encrypted, the updating processes write
+       encrypted blocks to the snapshot file and the MUPIP INTEG process must
+       start with access to appropriate key information as it does even
+       -NOONLINE.
      o MUPIP INTEG -NOONLINE [-FAST] {-REGION|-FILE} clears the KILLs in
        progress and Abandoned Kills flags if the run includes the entire
        database and there are no incorrectly marked busy blocks.
@@ -1544,8 +1595,15 @@
    Specifies that the INTEG parameter identifies one or more regions rather
    than a database file. The format of the REGION qualifier is:
 
-   -R[EGION]
+   -R[EGION]=region-list
 
+     o The region-list identifies the target of INTEG. region-list may
+       specify more than one region of the current global directory in a
+       list. Regions are case-insensitive, separated by a comma, and
+       wildcards can be used to specify them. Any region-name may include the
+       wildcard characters * and % (remember to escape them to protect them
+       from inappropriate expansion by the shell). Any region name expansion
+       occurs in M (ASCII) collation order.
      o MUPIP INTEG -REGION does not require stand alone access to databases.
        Instead, it freezes updates (but not reads) to the database during the
        check. The region-list argument may specify more than one region of
@@ -1802,6 +1860,7 @@
     -E[ND]=integer
     -FI[LLFACTOR]=integer
     -FO[RMAT]={GO|B[INARY]|Z[WR]]}
+    -[O]NERROR={STOP|PROCEED|INTERACTIVE}
     -S[TDIN]
    ]
     file-name
@@ -1934,6 +1993,20 @@
    descending keys, or if the record set and record sizes are relatively
    static in the face of updates, FILL_FACTOR won't provide much benefit.
 
+3 Onerror
+   Onerror
+
+   Determines the MUPIP LOAD behavior when it encounters an error. The format
+   of the ONERROR qualifier is:
+
+   -[O]NERROR={STOP|PROCEED|INTERACTIVE}
+
+     o STOP causes MUPIP LOAD to exit immediately.
+     o PROCEED proceeds to the next record.
+     o PROMPTS prompts to continue or stop.
+
+   By default MUPIP LOAD exits on encountering an error.
+
 3 Stdin
    Stdin
 
@@ -1996,7 +2069,7 @@
    Competing activity generally increases the time required to perform a
    REORG, as well as that of the competing operations.
 
-   The format of the REORG command is:
+   The format of the MUPIP REORG command is:
 
    REO[RG]
    [
@@ -2005,13 +2078,9 @@
     -FI[LL_FACTOR]=integer
     -I[NDEX_FILL_FACTOR]=integer
     -R[ESUME]
-    -SAFEJNL
     -S[ELECT]=global-name-list
-    -STA[RTBLK]=hexa
-    -STO[PBLK]=hexa
     -T[RUNCATE][=percentage]
     -UP[GRADE]
-    -US[ER_DEFINED_REORG]=reorg_list
     -REG[ION]=region-list
    ]
 
@@ -2042,6 +2111,16 @@
      o <CTRL-C> terminates REORG. A REORG terminated abnormally by operator
        action or error is incomplete but does not adversely affect the
        database structure, unless terminated with a kill -9.
+
+   **Caution**
+
+   REORG focuses on optimum adjacency and a change to even a single block can
+   cause it to perform a large number of updates with only marginal benefit.
+   Therefore, FIS recommends not running successive REORGs close together in
+   time as that can provide minimal benefit for a significant increase in
+   database and journal activity. For the same reason, FIS recommends careful
+   research and planning before using the -RESUME qualifier or complex uses
+   of -EXCLUDE and -SELECT.
 
    Assume two scenarios of putting values of ^x(1) to ^x(10000). In the first
    scenarios, fill values in a sequential manner. In the second scenario,
@@ -2223,6 +2302,13 @@
 
    -R[EGION]=region-list
 
+   region-list may specify more than one region of the current global
+   directory in a list. Regions are case-insensitive, separated by a comma,
+   and wildcards can be used to specify them. Any region-name may include the
+   wildcard characters * and % (remember to escape them to protect them from
+   inappropriate expansion by the shell). Any region name expansion occurs in
+   M (ASCII) collation order.
+
 3 Select
    Select
 
@@ -2393,7 +2479,7 @@
    machine. Note that GT.M does not support concurrent access to the same
    database file by multiple versions of the software.
 
-   The format of the RUNDOWN command is:
+   The format of the MUPIP RUNDOWN command is:
 
    RU[NDOWN] {-FILE file-name|-REGION region-list]}
 
@@ -2413,7 +2499,7 @@
    The RUNDOWN command may include one of the following qualifiers:
 
    -F[ile]
-   -R[egion]
+   -R[egion]=region-list
 
    If the RUNDOWN command does not specify either -File or -Region, it checks
    all the IPC resources (shared memory) on the system and if they are
@@ -2432,9 +2518,16 @@
 3 Region
    Region
 
-   Specifies that the argument contains one or more region-names that
-   identify database files mapped by the current Global Directory. Use the
-   wild card "*" to rundown all inactive regions in a global directory.
+   The region-list identifies the target of the RUNDOWN. region-list may
+   specify more than one region of the current global directory in a list.
+   Regions are case-insensitive, separated by a comma, and wildcards can be
+   used to specify them. Any region-name may include the wildcard characters
+   * and % (remember to escape them to protect them from inappropriate
+   expansion by the shell). Any region name expansion occurs in M (ASCII)
+   collation order.
+
+   Use the wildcard "*" to rundown all inactive regions in a global
+   directory.
 
    Incompatible with: -FILE
 
@@ -2442,6 +2535,18 @@
    database memory sections on the node. Because this form has no explicit
    list of databases, it does not perform any clean up on regions that have
    no abandoned memory segments but may not have been shutdown in a crash.
+
+3 Override
+   Override
+
+   Overrides the protection that prevents MUPIP RUNDOWN from performing a
+   rundown of a replication-enabled (with BEFORE_IMAGE) database or a
+   non-replicated NOBEFORE-journaled database that was abnormally shutdown.
+   The protection involves issuing the MUUSERLBK error for a previously
+   crashed replication-enabled (with BEFORE IMAGE journaling) database and
+   the MUUSERECOV error for a non-replicated or NOBEFORE-journaled database.
+   Both these errors prevent complications related to data recovery from a
+   journal file or a replication-enabled database.
 
 2 SET
    SET
@@ -2466,6 +2571,7 @@
     -JN[LFILE]
     -JO[URNAL]=journal-option-list
     -L[OCK_SPACE]=integer
+    -M[UTEX_SLOTS]=integer
     -[NO]INST[_FREEZE_ON_ERROR]
     -PA[RTIAL_RECOV_BYPASS]
     -REP[LICATION]={ON|OFF}
@@ -2518,10 +2624,14 @@
    file(s) mapped by the current Global Directory. The format of the REGION
    qualifier is:
 
-   -R[EGION]
+   -R[EGION]=region-list
 
-   SET -REGION changes multiple files when the parameter contains a list
-   and/or wildcards.
+   The region-list identifies the target of SET. region-list may specify more
+   than one region of the current global directory in a list. Regions are
+   case-insensitive, separated by a comma, and wildcards can be used to
+   specify them. Any region-name may include the wildcard characters * and %
+   (remember to escape them to protect them from inappropriate expansion by
+   the shell). Any region name expansion occurs in M (ASCII) collation order.
 
    Incompatible with: -FILE
 
@@ -2595,6 +2705,19 @@
    Enables or disables custom errors in a region to automatically cause an
    Instance Freeze. This flag modifies the "Inst Freeze on Error" file header
    flag.
+
+3 Mutex_slots
+   Mutex_slots
+
+   Sets the size of a structure that GT.M uses to manage contention for the
+   principal critical section for a database. Performance issues may occur
+   when there are many processes contending for database access and if this
+   structure cannot accommodate all waiting processes. Therefore, FIS
+   recommends setting this value to a minimum of slightly more than the
+   maximum number of concurrent processes you expect to access the database.
+
+   The minimum value is 64 and the maximum value is 32768. The default value
+   is 1024.
 
 3 Journal
    Journal
@@ -2718,7 +2841,7 @@
    vary in measurement speed and estimate accuracy. The format of the MUPIP
    SIZE command is:
 
-   MUPIP SI[ZE] [-h[euristic]=estimation_technique] [-s[elect]=global-name-list] [-r[egion]=region-list]
+   MUPIP SI[ZE] [-h[euristic]=estimation_technique] [-s[elect]=global-name-list] [-r[egion]=region-list] [-a[djacency]=integer]
 
    The optional qualifiers of MUPIP SIZE are:
 
@@ -2746,6 +2869,9 @@
        a negative level from the root of the global tree where -1 means
        children of the root.
 
+       The technique reports the results for levels other than 0 show
+       adjacency for the next lower (one less) level.
+
      * arsample,samples=<smpls>
 
        Uses acceptance/rejection sampling of random tree traversals to
@@ -2768,6 +2894,15 @@
    ARSAMPLE and then SCAN.
 
    In terms of accuracy, MUPIP INTEG -FAST -FULL is the most accurate.
+
+   -Adjacency=integer
+
+   Specifies the logical adjacency of data blocks that MUPIP SIZE should
+   assume during estimation. By default, MUPIP SIZE assumes -ADJACENCY=10 and
+   reports the logical adjacency in the "Adjacent" column of the MUPIP SIZE
+   report. Note that adjacency is only a proxy for database organization and
+   its usefulness may be limited by the technology and configuration of your
+   secondary storage.
 
    -Select
 
@@ -2836,6 +2971,28 @@
        privileges. To STOP a process belonging to another account, MUPIP STOP
        must execute as root.
 
+   **Caution**
+
+   On receipt of a MUPIP STOP signal, a GT.M process cleans up its
+   participation in managing the database before shutting down. On receipt of
+   three MUPIP STOP signals in a row, a GT.M process shuts down forthwith
+   without cleaning up - the equivalent of a kill -9 signal. This can result
+   in structural database damage, because GT.M does not have sufficient
+   control of what happens in response to an immediate process termination to
+   protect against database damage under all circumstances.
+
+   In all cases, on receipt of a MUPIP STOP, a process will eventually
+   terminate once it gets the resources needed to clean up. Use three MUPIP
+   STOPs in a row only as a last resort, and when you do, perform a MUPIP
+   INTEG at your earliest opportunity thereafter to check for database
+   structural damage, and repair any damage following the procedures in
+   Chapter 11 (Maintaining Database Integrity).
+
+   You may never have to perform a MUPIP STOP if your application is designed
+   in a way that it reduces or eliminates the probability of a process
+   getting in the final try of a transaction. For more information, refer to
+   the Programmers Guide.
+
 2 TRIGGER
    TRIGGER
 
@@ -2863,8 +3020,7 @@
 
    -TRIG[GERFILE]=<trigger_definitions_file> [-NOPR[OMPT]]
 
-     o For information on the syntax and usage of a trigger definition file,
-       refer to GT.M Programmer's Guide.
+     o
      o A MUPIP TRIGGER -TRIGGERFILE operation occurs within a transaction
        boundary, therefore, if even one trigger from the trigger definition
        file fails to parse correctly, MUPIP TRIGGER rolls back the entire
@@ -2886,6 +3042,12 @@
        for all database updates, should be to ensure that you provide the
        same value for gtm_chset during load compilation and run-time
        compilation.
+     o MUPIP TRIGGER replicate trigger definitions as logical actions from an
+       originating/primary instance to a replicating/secondary instance based
+       on LGTRIG journal records. This permits the instances to have
+       different sets of triggers and differing database layouts (for
+       example, different # of regions, different block sizes, different
+       maximum-record-size, and so on).
      o Incompatible with: -SELECT
 
    **Note**
@@ -2922,6 +3084,15 @@
    same meaning. Additionally, MUPIP TRIGGER -SELECT displays a field called
    "Cycle" as part of a comment. Cycle is the number of trigger definition
    updates (addition, modification, or deletion) performed on a global.
+
+   **Important**
+
+   MUPIP TRIGGER treats the deletion of a non-existent trigger as a success;
+   if that is the only operation, or one of a set of successful operations,
+   it return success 0 to the shell Also, MUPIP TRIGGER returns failure in
+   case of trigger selection using trigger names where the number after the
+   pound-sign (#) starts with a 0 (which is an impossible auto-generated
+   trigger name).
 
 3 Examples
    Examples
@@ -3384,7 +3555,7 @@
    system. Therefore, ensure that the AUTOSWITCHLIMIT never exceeds the
    file-system limit.
 
-   The default value for AUTOSWITCHLIMIT is 8388600 & the maximum value is
+   The default value for AUTOSWITCHLIMIT is 8386560 & the maximum value is
    8388607 blocks (4GB-512 bytes). The minimum value for AUTOSWITCHLIMIT is
    16384. If the difference between the AUTOSWITCHLIMIT and the allocation
    value is not a multiple of the extension value, GT.M rounds-down the value
@@ -4574,7 +4745,7 @@
 
    -RES[YNC]=<journal sequence number>
 
-   Specifies the journal sequence number to which GT.M must rollback the the
+   Specifies the journal sequence number to which GT.M must rollback the
    database/journal files need to be rolled back to a specific point. If you
    specify a journal sequence number that is greater than the last consistent
    state, GT.M rolls back the database/journal files to the last consistent
@@ -4628,8 +4799,8 @@
    the begin transaction number of the earliest journal file to be processed
    for that region is same as the current transaction in the database file
    and that the end transaction number of every journal file is equal to the
-   the begin transaction number of the next generation journal file for a
-   given region. By default, -FORWARD uses -CHECKTN.
+   begin transaction number of the next generation journal file for a given
+   region. By default, -FORWARD uses -CHECKTN.
 
    -NOCHECKTN forces forward recovery by overriding inbuilt mechanisms for
    checking transaction integrity. Use -NOCHECKTN with caution because it may
@@ -4982,6 +5153,7 @@
    ZKILL   10\time\tnum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
    ZTWORM  11\time\tnum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
    ZTRIG   12\time\tnum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   LGTRIG  13\time\tnum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\trigdefinition
 
    where:
 
@@ -5012,6 +5184,9 @@
    turned on).
 
    12 record indicates a ZTRIGGER command.
+
+   13 record indicates a trigger definition as a logical action from an
+   originating/primary instance to a replicating/secondary instance
 
    Journal extracts contain NULL records only in a multisite replication
    configuration where triggers or external M-filters are active. Here are
@@ -5047,17 +5222,19 @@
    TZKILL  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
    TZTWORM time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
    TZTRIG  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   TLGTRIG time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\trigdefinition
    USET    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
    UKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
    UZKILL  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
    UZTWORM time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
    UZTRIG  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   ULGTRIG time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\trigdefinition
    TCOM    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\partners\tid
    INCTN   time\tnum\chksum\pid\clntpid\opcode\incdetail
    EPOCH   time\tnum\chksum\pid\clntpid\jsnum\blks_to_upgrd\free_blocks\total_blks\fully_upgraded[\strm_num\strm_seq]...
    PBLK    time\tnum\chksum\pid\clntpid\blknum\bsiz\blkhdrtn\ondskbver
    AIMG    time\tnum\chksum\pid\clntpid\blknum\bsiz\blkhdrtn\ondskbver
-   NULL    time\tnum\pid\clntpid\jsnum\strm_num\strm_seq
+   NULL    time\tnum\chksum\pid\clntpid\jsnum\strm_num\strm_seq
    ZTSTART time\tnum\chksum\pid\clntpid\token
    FSET    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
    FKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
@@ -5146,6 +5323,9 @@
    |----------------+-------------------------------------------------------|
    | token_seq      | If replication is turned on, it is the journal        |
    |                | sequence number. If not, it is a unique 8-byte token. |
+   |----------------+-------------------------------------------------------|
+   | trigdefinition | Trigger definition string corresponding to an LGTRIG  |
+   |                | journal record.                                       |
    |----------------+-------------------------------------------------------|
    |                | =n where this is the nth update in the TP or ZTP      |
    | updnum         | transaction. n=1 for the 1st update etc. 0 for        |
@@ -5490,6 +5670,9 @@
     -log=<log file name> [-log_interval=<integer>]
     {-rootprimary|-propagateprimary} [{-updok|-updnotok}]
     [-cmplvl=<compression level>]
+    [-tlsid=<label>]
+    [-[no]plaintextfallback]
+    [-renegotiate_interval=<minutes>]
 
    Qualifiers:
 
@@ -5507,9 +5690,17 @@
 
    -secondary=<hostname:port>
 
-   Identifies the replicating instance. <hostname:port> includes an IP
-   address (or a hostname that resolves to an IP address) and the port at
-   which the Receiver Server is waiting for a connection.
+   Identifies the replicating instance. <hostname:port> specifies an IPv4 or
+   IPv6 address optionally encapsulated by square-brackets ([]) like
+   "127.0.0.1", "::1", "[127.0.0.1]", or "[::1]" or a hostname that resolves
+   to an IPv4 or IPv6 address and the port at which the Receiver Server is
+   waiting for a connection.
+
+   If, in your environment, the same hostname is used for both IPv4 and IPv6,
+   GT.M defaults to IPv6. If you wish to use IPv4, perhaps because you have a
+   Receiver Server running a pre-V6.0-003 version of GT.M that does not
+   support IPv6, set the environment variable gtm_ipv4_only to "TRUE", "YES",
+   or a non-zero integer in order to force GT.M to use IPv4.
 
    -passive
 
@@ -5891,6 +6082,46 @@
    insufficient authorization), the replication logic logs a DLLNOOPEN error
    and continues with no compression.
 
+   -tlsid=<label>
+
+   Instructs the Source or Receiver Server to use the TLS certificate and
+   private key pairs having <label> as the TLSID in the configuration file
+   pointed to by the gtmcrypt_config environment variable. TLSID is a
+   required parameter if TLS/SSL is to be used to secure replication
+   connection between instances. If private keys are encrypted, an
+   environment variable of the form gtmtls_passwd_<label> specifies their
+   obfuscated password. You can obfuscate passwords using the 'maskpass'
+   utility provided along with the encryption plugin. If you use unencrypted
+   private keys, set the gtmtls_passwd_<label> environment variable to a
+   non-null dummy value; this prevents inappropriate prompting for a
+   password.
+
+   -[NO]PLAINtextfallback
+
+   Specifies whether the replication server is permitted to fallback to
+   plaintext communication. The default is -NOPLAINtextfallback. If
+   NOPLAINTEXTFALLBACK is in effect, GT.M issues a REPLNOTLS error in the
+   event it is unable to establish a TLS connection. [Note: GT.M versions
+   prior to V6.1-000 did not support TLS for replication - if needed it could
+   be implemented with an external application such as stunnel
+   (http://stunnel.org).] If PLAINTEXTFALLBACK is in effect, in the event of
+   a failure to establish a TLS connection, GT.M issues REPLNOTLS as a
+   warning. Once a permitted plaintext replication connection is established
+   for a connection session, GT.M never attempts to switch that connection
+   session to TLS connection.
+
+   -RENEGotiate_interval=<minutes >
+
+   Specifies the time in mintues to wait before attempting to perform a TLS
+   renegotiation. The default -RENEGOTIATE_INTERVAL is a little over 120
+   minutes. A value of zero causes GT.M never to attempt a renegotiation. The
+   MUPIP REPLIC -SOURCE -JNLPOOL -SHOW [-DETAIL] command shows the time at
+   which the next TLS renegotiation is scheduled, and how many such
+   renegotiations have occurred thus far for a given secondary instance
+   connection. As renegotiation requires the replication pipeline to be
+   temporarily flushed, followed by the actual renegotiation, TLS
+   renegotiation can cause momentary spikes in replication backlog.
+
 2 Shutdown_Source_Server
    Shutdown Source Server
 
@@ -5931,6 +6162,11 @@
    Activates a passive Source Server. Once activated, the Source Server reads
    journal records from the Journal Pool and transports them to the system
    specified by -secondary.
+
+   Before activation, -activate sets the Source Server to ACTIVE_REQUESTED
+   mode. On successful activation, GT.M sets the Source Server mode to
+   ACTIVE. GT.M produces an error when there is an attempt to activate a
+   Source Server in ACTIVE_REQUESTED mode.
 
    -instsecondary=<instance_name>
 
@@ -5975,6 +6211,11 @@
    with which the Source Server is communicating, deactivate the Source
    Server and then activate it with a different replicating instance.
 
+   Before deactivation, -deactivate sets the Source Server to
+   PASSIVE_REQUESTED mode. On successful deactivation, GT.M sets the Source
+   Server mode to PASSIVE. GT.M produces an error when there is an attempt to
+   deactivate a Source Server in PASSIVE_REQUESTED mode.
+
    -instsecondary=<instance_name>
 
    Identifies the active Source Server to transition to the passive (standby)
@@ -6003,6 +6244,12 @@
        Source Server.
      o Specify -stopsourcefilter as an option for starting the Receiver
        Server.
+
+  Note
+
+   If a filter fails to respond within just over a minute to delivery of a
+   mini-transaction or TP transaction, a Source or Receiver Server issues a
+   FILTERTIMEDOUT error, stops the filter, and exits.
 
 2 Check_Server_Health
    Check Server Health
@@ -6299,12 +6546,17 @@
     [-updateresync=</path/to/bkup-orig-repl-inst-file>
     {[-resume=<strm_num>|-reuse=<instname>]}
     [-initialize] [-cmplvl=n]
+    [-tlsid=<label>]
 
    Qualifiers:
 
    -receiver
 
    Identifies the Receiver Server.
+
+   -start
+
+   Starts the Receiver Server and Update Process.
 
    -listenport=<port number>
 
@@ -6326,12 +6578,20 @@
    considered field test grade functionality as long as that function is
    considered field test grade functionality.
 
+   -log=<recsrv_log_file_name >
+
+   Specifies the location of the log file of the Receiver Server. When -log
+   is specified, the Update Process writes to a log file named
+   <recsrv_log_file_name>.updproc. Note that the name of the Update Process
+   log file name has .updproc at the end to distinguish it from the Receiver
+   Server's log file name.
+
    -log_interval="[integer1],[integer2]"
 
    integer1 specifies the number of transactions for which the Receiver
-   Server should wait before writing to the log file. integer2 specifies the
+   Server should wait before writing to its log file. integer2 specifies the
    number of transactions for which the Update Process should wait before
-   writing to the log file. The default logging interval is 1000
+   writing to its log file. The default logging interval is 1000
    transactions.
 
    If integer1 or integer2 is 0, the logging interval is set to the default
@@ -6466,6 +6726,20 @@
    the opposite of the resync qualifier of rollback (mupip journal -rollback
    -resync), which is intended for use under the direction of FIS GT.M
    support.
+
+   -tlsid=<label>
+
+   Instructs the Source or Receiver Server to use the TLS certificate and
+   private key pairs having <label> as the TLSID in the configuration file
+   pointed to by the gtmcrypt_config environment variable. TLSID is a
+   required parameter if TLS/SSL is to be used to secure replication
+   connection between instances. If private keys are encrypted, an
+   environment variable of the form gtmtls_passwd_<label> specifies their
+   obfuscated password. You can obfuscate passwords using the 'maskpass'
+   utility provided along with the encryption plugin. If you use unencrypted
+   private keys, set the gtmtls_passwd_<label> environment variable to a
+   non-null dummy value; this prevents inappropriate prompting for a
+   password.
 
 2 Start_Update_Process
    Start Update Process
@@ -6666,6 +6940,9 @@
    is, the one received from originating instance or the one maintained
    locally). If you do not use -fetchresync, the database rolls back to the
    last consistent replicating instance state.
+
+   A FETCHRESYNC ROLLBACK operation sends its current working directory to
+   the Source Server log.
 
    The system stores extracted lost transactions in the file <extract file>
    specified by this mandatory qualifier. The starting point for the search
@@ -7035,7 +7312,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2013
+   Copyright 2014
 
    Fidelity Information Services, Inc. All rights reserved.
 
@@ -7056,7 +7333,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.1-000 of the
+   This help file is a concise representation of revision V6.2-000 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

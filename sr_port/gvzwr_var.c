@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@ GBLREF gvzwrite_datablk *gvzwrite_block;
 GBLREF int4		outofband;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*gd_header;
+GBLREF bool		undef_inhibit;
 
 LITREF mval		literal_null;
 
@@ -78,7 +79,7 @@ void gvzwr_var(uint4 data, int4 n)
 			save_gv_last_subsc_null = TREF(gv_last_subsc_null);
 			gvzwr_var((int4)MV_FORCE_INTD(&subdata), n + 1);
 			TREF(gv_last_subsc_null) = save_gv_last_subsc_null;
-		} else if (gvzwrite_block->fixed)
+		} else if (gvzwrite_block->fixed && (!undef_inhibit))
 			sgnl_gvundef();
 	} else
 	{

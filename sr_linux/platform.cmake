@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2013 Fidelity Information Services, Inc	#
+#	Copyright 2013, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -13,6 +13,9 @@ if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
   set(arch "x86")
   set(bits 32)
   set(FIND_LIBRARY_USE_LIB64_PATHS FALSE)
+  # Set arch to i586 in order to compile for Galileo
+  set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -march=i586")
+  set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=i586")
 else()
   set(arch "x86_64")
   set(bits 64)
@@ -32,7 +35,7 @@ set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
 
 # Compiler
 set(CMAKE_C_FLAGS
-  "${CMAKE_C_FLAGS} -ansi -fsigned-char -fPIC -Wmissing-prototypes -fno-omit-frame-pointer")
+  "${CMAKE_C_FLAGS} -ansi -fsigned-char -fPIC -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
 
 set(CMAKE_C_FLAGS_RELEASE
   "${CMAKE_C_FLAGS_RELEASE} -fno-defer-pop -fno-strict-aliasing -ffloat-store")

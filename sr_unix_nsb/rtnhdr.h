@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,6 +97,10 @@ typedef struct	rhead_struct
 #	endif
 	unsigned char	checksum_md5[16];	/* 16-byte MD5 checksum of routine source code */
 	routine_source	*source_code;		/* source code used by $TEXT */
+	uint4		routine_source_offset;	/* (updated) when compiled with EMBED_SOURCE: offset of M source within literal text
+						 * pool; becomes absolute address in incr_link
+						 */
+	uint4		routine_source_length;	/* if compiled with EMBED_SOURCE: length of source text */
 } rhdtyp;
 
 /* Routine table entry */
@@ -154,5 +158,6 @@ rhdtyp	*op_rhdaddr1(mval *name);
 lnr_tabent *op_labaddr(rhdtyp *routine, mval *label, int4 offset);
 void urx_resolve(rhdtyp *rtn, lab_tabent *lbl_tab, lab_tabent *lbl_top);
 char *rtnlaboff2entryref(char *entryref_buff, mident *rtn, mident *lab, int offset);
+boolean_t on_stack(rhdtyp *rtnhdr, boolean_t *need_duplicate);
 
 #endif /* RTNHDR_H_INCLUDED */

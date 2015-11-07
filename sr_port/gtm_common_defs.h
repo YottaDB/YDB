@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,10 +80,6 @@
 #  define DIR_SEPARATOR		'/'
 #endif
 
-/* Use the below macros for function declarations and definitions that are part of an API */
-#define _GTM_APIDECL
-#define _GTM_APIDEF
-
 /* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */
 #define	STR_LIT_LEN(LITERAL)			(SIZEOF(LITERAL) - 1)
 #define	LITERAL_AND_LENGTH(LITERAL)		(LITERAL), (SIZEOF(LITERAL) - 1)
@@ -110,6 +106,14 @@
 #define ROUND_UP(VALUE, MODULUS)		(DIVIDE_ROUND_UP(VALUE, MODULUS) * (MODULUS))
 #define ROUND_DOWN(VALUE, MODULUS)		(DIVIDE_ROUND_DOWN(VALUE, MODULUS) * (MODULUS))
 
+/* Macros to enable block macros to be used in any context taking a single statement.
+ * See MALLOC_* macros below for examples of use.
+ * Note that if the macro block does a break or continue and expects it to transfer control
+ * to the calling context, these cannot be used.
+ */
+#define MBSTART		do
+#define MBEND		while (FALSE)
+
 /* Macro to copy a source string to a malloced area that is set to the destination pointer.
  * Since it is possible that DST might have multiple pointer dereferences in its usage, we
  * use a local pointer variable and finally assign it to DST thereby avoiding duplication of
@@ -117,7 +121,7 @@
  * There are two macros depending on whether a string or literal is passed.
  */
 #define	MALLOC_CPY_STR(DST, SRC)		\
-{						\
+MBSTART {					\
 	char	*mcs_ptr;			\
 	int	mcs_len;			\
 						\
@@ -125,10 +129,10 @@
 	mcs_ptr = malloc(mcs_len);		\
 	memcpy(mcs_ptr, SRC, mcs_len);		\
 	DST = mcs_ptr;				\
-}
+} MBEND
 
 #define	MALLOC_CPY_LIT(DST, SRC)		\
-{						\
+MBSTART {					\
 	char	*mcs_ptr;			\
 	int	mcs_len;			\
 						\
@@ -136,15 +140,15 @@
 	mcs_ptr = malloc(mcs_len);		\
 	memcpy(mcs_ptr, SRC, mcs_len);		\
 	DST = mcs_ptr;				\
-}
+} MBEND
 
 #define MALLOC_INIT(DST, SIZ)			\
-{						\
+MBSTART {					\
 	void	*lcl_ptr;			\
 						\
 	lcl_ptr = malloc(SIZ);			\
 	memset(lcl_ptr, 0, SIZ);		\
 	DST = lcl_ptr;				\
-}
+} MBEND
 
 #endif /* GTM_COMMON_DEFS_H */

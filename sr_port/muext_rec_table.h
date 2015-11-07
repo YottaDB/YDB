@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2010 Fidelity Information Services, Inc       *
+ *      Copyright 2010, 2014 Fidelity Information Services, Inc       *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -27,5 +27,6 @@ MUEXT_TABLE_ENTRY (MUEXT_TSTART,   '0',	  '8')	/* 08 : TSTART     record */
 MUEXT_TABLE_ENTRY (MUEXT_TCOMMIT,  '0',	  '9')	/* 09 : TCOMMIT    record */
 MUEXT_TABLE_ENTRY (MUEXT_ZKILL,    '1',	  '0')	/* 10 : ZKILL      record */
 MUEXT_TABLE_ENTRY (MUEXT_ZTWORM,   '1',	  '1')	/* 11 : ZTWORMHOLE record */
-MUEXT_TABLE_ENTRY (MUEXT_ZTRIG,	   '1',   '2')  /* 12 : ZTRIGGER   record */
+MUEXT_TABLE_ENTRY (MUEXT_ZTRIG,	   '1',	  '2')	/* 12 : ZTRIGGER   record */
+MUEXT_TABLE_ENTRY (MUEXT_LGTRIG,   '1',	  '3')	/* 13 : LGTRIG     record */
 /* End of table (enforces last record has line end) */

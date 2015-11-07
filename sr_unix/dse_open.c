@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,6 +74,7 @@ void	dse_open (void)
 	{
 		(unsigned char)iop_newversion,
 		(unsigned char)iop_m,
+		(unsigned char)iop_stream,
 		(unsigned char)iop_nowrap,
 		(unsigned char)iop_eol
 	};
@@ -83,10 +84,11 @@ void	dse_open (void)
 	{
 		(unsigned char)iop_width,
 #       ifdef BIGENDIAN
-		(unsigned char)0x0, (unsigned char)0x10, (unsigned char)0x0, (unsigned char)0x0
+		(unsigned char)0x0, (unsigned char)0x10, (unsigned char)0x0, (unsigned char)0x0,
 #       else
-		(unsigned char)0x0, (unsigned char)0x0, (unsigned char)0x10, (unsigned char)0x0
+		(unsigned char)0x0, (unsigned char)0x0, (unsigned char)0x10, (unsigned char)0x0,
 #       endif
+		(unsigned char)iop_eol
 	};
 
 	if (cli_present("FILE") == CLI_PRESENT)

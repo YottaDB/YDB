@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 
 GBLREF symval		*curr_symval;
 GBLREF lvzwrite_datablk	*lvzwrite_block;
+GBLREF bool		undef_inhibit;
 GBLREF zshow_out	*zwr_output;
 
 error_def(ERR_UNDEF);
@@ -52,7 +53,8 @@ void lvzwr_fini(zshow_out *out, int t)
 		if (!tabent || !LV_IS_VAL_DEFINED(tabent->value) && !LV_HAS_CHILD(tabent->value))
 		{
 			lvzwrite_block->subsc_count = 0;
-			rts_error(VARLSTCNT(4) ERR_UNDEF, 2, size, lvzwrite_block->pat->str.addr);
+			if (!undef_inhibit)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_UNDEF, 2, size, lvzwrite_block->pat->str.addr);
 		} else
 		{
 			lvzwrite_block->curr_name = &tabent->key.var_name;

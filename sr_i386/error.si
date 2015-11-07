@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -16,14 +16,14 @@
 #-----------------------------------------------
 .ifdef cygwin
 # will need another 8 to save sigmasks
-chnd_size	=	220
+chnd_size	=	224
 .else
-chnd_size	=	168
+chnd_size	=	172
 .endif
 chnd_save_active =	0
 chnd_ch_active	=	4
-chnd_ch		=	8
-chnd_jmp	=	12
+chnd_ch		=	12
+chnd_jmp	=	16
 
 .data
 .extern	ctxt

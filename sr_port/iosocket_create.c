@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,6 @@
 #include "trans_log_name.h"
 #endif
 
-
 error_def(ERR_ADDRTOOLONG);
 error_def(ERR_GETSOCKNAMERR);
 error_def(ERR_GETADDRINFO);
@@ -63,7 +62,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 	socket_struct		*socketptr;
 	socket_struct		*prev_socketptr;
 	socket_struct		*socklist_head;
-	boolean_t			passive = FALSE;
+	boolean_t		passive = FALSE;
 	unsigned short		port;
 	int			ii, save_errno, tmplen, errlen, sockaddrlen;
 	char 			temp_addr[SA_MAXLITLEN], protocolstr[6], *adptr;
@@ -80,6 +79,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 	int			af;
 	int			sd;
 	int			errcode;
+	char			host_buffer[NI_MAXHOST];
 	char			port_buffer[NI_MAXSERV];
 	int			port_buffer_len;
 	int			colon_cnt, protooffset;
@@ -264,13 +264,14 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 		} else
 			assertpro(socket_tcpip == protocol || socket_local == protocol);	/* protocol already checked */
 		socketptr->state = socket_created;
+		socketptr->howcreated = passive ? creator_listen : creator_connect;
 		SOCKET_BUFFER_INIT(socketptr, bfsize);
 		socketptr->passive = passive;
 		socketptr->moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
 
 		return socketptr;
 	} else
-	{	/* socket already setup by inetd */
+	{	/* socket already setup by inetd or passed via JOB or LOCAL socket */
 		SOCKET_ALLOC(socketptr);
 		socketptr->sd = file_des;
 		socketptr->temp_sd = FD_INVALID;
@@ -279,48 +280,101 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 		if (-1 == getsockname(socketptr->sd, SOCKET_LOCAL_ADDR(socketptr), &tmp_addrlen))
 		{
 			save_errno = errno;
-			errptr = (char *)STRERROR(save_errno);
-			tmplen = STRLEN(errptr);
-			SOCKET_FREE(socketptr);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
-			return NULL;
+#			if !defined(__linux__) && !defined(VMS)
+			if ((EOPNOTSUPP == save_errno)
+#				if defined(_AIX)
+				|| (ENOTCONN == save_errno)
+#				endif
+#				if defined(__sun) || defined(__hpux)
+				|| (EINVAL == save_errno)
+#				endif
+				)
+			{
+				SOCKET_LOCAL_ADDR(socketptr)->sa_family = AF_UNIX;
+				((struct sockaddr_un *)SOCKET_LOCAL_ADDR(socketptr))->sun_path[0] = '\0';
+				tmp_addrlen = SIZEOF(struct sockaddr_un);
+			}
+			else
+#			endif
+			{
+				errptr = (char *)STRERROR(save_errno);
+				tmplen = STRLEN(errptr);
+				SOCKET_FREE(socketptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
+				return NULL;
+			}
 		}
+#		if !defined(VMS)
+		else if (((size_t) (((struct sockaddr *) 0)->sa_data) >= tmp_addrlen)
+			|| (0 == SOCKET_LOCAL_ADDR(socketptr)->sa_family))
+		{
+			SOCKET_LOCAL_ADDR(socketptr)->sa_family = AF_UNIX;
+			((struct sockaddr_un *)SOCKET_LOCAL_ADDR(socketptr))->sun_path[0] = '\0';
+			tmp_addrlen = SIZEOF(struct sockaddr_un);
+		}
+		if (AF_UNIX == SOCKET_LOCAL_ADDR(socketptr)->sa_family)
+			protocol = socket_local;
+		else
+#		endif
+			protocol = socket_tcpip;
 		ai_ptr->ai_addrlen = tmp_addrlen;
-		/* extract port information */
-		GETNAMEINFO(SOCKET_LOCAL_ADDR(socketptr), tmp_addrlen, NULL, 0, port_buffer,
-			NI_MAXSERV, NI_NUMERICSERV, errcode);
-		if (0 != errcode)
-		{
-			SOCKET_FREE(socketptr);
-			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
-			return NULL;
+		ai_ptr->ai_family = SOCKET_LOCAL_ADDR(socketptr)->sa_family;
+		ai_ptr->ai_socktype = SOCK_STREAM;
+		if (socket_tcpip == protocol)
+		{	/* extract port information */
+			GETNAMEINFO(SOCKET_LOCAL_ADDR(socketptr), tmp_addrlen, host_buffer, NI_MAXHOST, port_buffer,
+				NI_MAXSERV, NI_NUMERICHOST|NI_NUMERICSERV, errcode);
+			if (0 != errcode)
+			{
+				SOCKET_FREE(socketptr);
+				RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+				return NULL;
+			}
+			STRNDUP(host_buffer, NI_MAXHOST, socketptr->local.saddr_ip);
+			socketptr->local.port = ATOI(port_buffer);
+			tmp_addrlen = SIZEOF(struct sockaddr_storage);
+			if (-1 == getpeername(socketptr->sd, SOCKET_REMOTE_ADDR(socketptr), &tmp_addrlen))
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(save_errno);
+				tmplen = STRLEN(errptr);
+				SOCKET_FREE(socketptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
+				return NULL;
+			}
 		}
-		socketptr->local.port = ATOI(port_buffer);
-		tmp_addrlen = SIZEOF(struct sockaddr_storage);
-		if (-1 == getpeername(socketptr->sd, SOCKET_REMOTE_ADDR(socketptr), &tmp_addrlen))
+#		if !defined(VMS)
+		else if (socket_local == protocol)
 		{
-			save_errno = errno;
-			errptr = (char *)STRERROR(save_errno);
-			tmplen = STRLEN(errptr);
-			SOCKET_FREE(socketptr);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
-			return NULL;
+			SOCKET_REMOTE_ADDR(socketptr)->sa_family = AF_UNIX;
+			((struct sockaddr_un *)SOCKET_REMOTE_ADDR(socketptr))->sun_path[0] = '\0';
+			tmp_addrlen = SIZEOF(struct sockaddr_un);
 		}
+#		endif
 		socketptr->remote.ai.ai_addrlen = tmp_addrlen;
 		assert(0 != SOCKET_REMOTE_ADDR(socketptr)->sa_family);
-		GETNAMEINFO(SOCKET_REMOTE_ADDR(socketptr), socketptr->remote.ai.ai_addrlen, NULL, 0,
-			 port_buffer, NI_MAXSERV, NI_NUMERICSERV, errcode);
-		if (0 != errcode)
+		socketptr->remote.ai.ai_family = SOCKET_REMOTE_ADDR(socketptr)->sa_family;
+		socketptr->remote.ai.ai_socktype = SOCK_STREAM;
+		assert((socket_tcpip != protocol) || (0 != SOCKET_REMOTE_ADDR(socketptr)->sa_family));
+		if (socket_tcpip == protocol)
 		{
-			SOCKET_FREE(socketptr);
-			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
-			return NULL;
-		}
-		socketptr->remote.port = ATOI(port_buffer);
+			GETNAMEINFO(SOCKET_REMOTE_ADDR(socketptr), socketptr->remote.ai.ai_addrlen, host_buffer, NI_MAXHOST,
+				 port_buffer, NI_MAXSERV, NI_NUMERICHOST|NI_NUMERICSERV, errcode);
+			if (0 != errcode)
+			{
+				SOCKET_FREE(socketptr);
+				RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+				return NULL;
+			}
+			STRNDUP(host_buffer, NI_MAXHOST, socketptr->remote.saddr_ip);
+			socketptr->remote.port = ATOI(port_buffer);
+		} else
+			assertpro(socket_tcpip == protocol || socket_local == protocol);	/* protocol already checked */
 		socketptr->state = socket_connected;
-		socketptr->protocol = socket_tcpip;
+		socketptr->protocol = protocol;
 		SOCKET_BUFFER_INIT(socketptr, bfsize);
 		socketptr->passive = passive;
+		socketptr->howcreated = (2 >= file_des) ? creator_principal : creator_passed;
 		socketptr->moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
 		return socketptr;
 	}

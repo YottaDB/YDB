@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,7 +69,7 @@ for (msg_ptr = (unsigned char *)(BUFF), recvd_len = 0, recvd_this_iter = torecv_
 #define VMS_MAX_TCP_SEND_SIZE	VMS_MAX_TCP_IO_SIZE
 #define VMS_MAX_TCP_RECV_SIZE	VMS_MAX_TCP_IO_SIZE
 
-#define GTMSOURCE_IDLE_POLL_WAIT	100			/* 100ms sleep in case nothing sent to the other side */
+#define GTMSOURCE_IDLE_POLL_WAIT	1			/* 1ms sleep in case nothing sent to the other side */
 #define REPL_POLL_WAIT			(MILLISECS_IN_SEC - 1)	/* Maximum time (in ms) for select()/poll() to timeout */
 #define REPL_POLL_NOWAIT		0			/* Forces poll()/select() to return immediately */
 #define REPL_INVALID_POLL_DIRECTION	-1

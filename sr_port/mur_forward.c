@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,6 @@ static	void	(* const extraction_routine[])() =
 uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num losttn_seqno)
 {
 	boolean_t		added, this_reg_stuck;
-	boolean_t		is_set_kill_zkill_ztworm, is_set_kill_zkill;
 	jnl_record		*rec;
 	enum jnl_record_type	rectype;
 	enum rec_fence_type	rec_fence;
@@ -291,14 +290,16 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 				rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 				if (IS_TP(rectype) && IS_TUPD(rectype))
 				{
-					assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
+					assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype));
 					assert(&rec->jrec_set_kill.num_participants == &rec->jrec_ztworm.num_participants);
+					assert(&rec->jrec_set_kill.num_participants == &rec->jrec_lgtrig.num_participants);
 					num_partners = rec->jrec_set_kill.num_participants;
 					assert(0 < num_partners);
 					if (1 < num_partners)
 					{
 						this_reg_stuck = TRUE;
 						assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
+						assert(&rec->jrec_set_kill.update_num == &rec->jrec_lgtrig.update_num);
 					}
 				}
 			}

@@ -23,6 +23,7 @@ dse_fdmp
 dse_find_gvt
 dse_find_roots
 dse_flush
+dse_getblk
 dse_getki
 dse_help
 dse_integ

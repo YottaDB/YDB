@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,18 +88,13 @@ void dse_chng_fhead(void)
 
 	SETUP_THREADGBL_ACCESS;
 	if (gv_cur_region->read_only)
-		rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	memset(temp_str, 0, 256);
 	memset(temp_str1, 0, 256);
 	memset(buf, 0, MAX_LINE);
 	was_crit = cs_addrs->now_crit;
-	/* If the user requested DSE CHANGE -FILE -CORRUPT, then skip the check in grab_crit, which triggers an rts_error, as this
-	 * is one of the ways of turning off the file_corrupt flag in the file header
-	 */
-	TREF(skip_file_corrupt_check) = corrupt_file_present = (CLI_PRESENT == cli_present("CORRUPT_FILE"));
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-	TREF(skip_file_corrupt_check) = FALSE;	/* Now that grab_crit is done, reset the global variable */
 	if (CLI_PRESENT == cli_present("OVERRIDE"))
 		override = TRUE;
 #	ifdef VMS
@@ -114,7 +109,7 @@ void dse_chng_fhead(void)
 		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
                 util_out_print("Region: !AD  is frozen by another user, not releasing freeze.",
                                         TRUE, REG_LEN_STR(gv_cur_region));
-                rts_error(VARLSTCNT(4) ERR_FREEZE, 2, REG_LEN_STR(gv_cur_region));
+                rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FREEZE, 2, REG_LEN_STR(gv_cur_region));
                 return;
 
 	}
@@ -193,7 +188,7 @@ void dse_chng_fhead(void)
 			(SIZEOF(gtm_int64_t) == size)))
 		{
 			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-                        rts_error(VARLSTCNT(1) ERR_SIZENOTVALID8);
+                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIZENOTVALID8);
 		}
 		if ((0 > (int4)size) || ((uint4)SGMNT_HDR_LEN < (uint4)location)
 				|| ((uint4)SGMNT_HDR_LEN < ((uint4)location + (uint4)size)))
@@ -257,7 +252,7 @@ void dse_chng_fhead(void)
 		else
 		{
 			cs_data->blk_size = ((x/DISK_BLOCK_SIZE) + 1) * DISK_BLOCK_SIZE;
-			gtm_putmsg(VARLSTCNT(4) ERR_BLKSIZ512, 2, x, cs_data->blk_size);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BLKSIZ512, 2, x, cs_data->blk_size);
 		}
 	}
 	if ((CLI_PRESENT == cli_present("RECORD_MAX_SIZE")) && (cli_get_int("RECORD_MAX_SIZE", &x)))
@@ -440,6 +435,7 @@ void dse_chng_fhead(void)
 		if ( -1 != (x = cli_t_f_n("STDNULLCOLL")))
 			gv_cur_region->std_null_coll = cs_data->std_null_coll = x;
 	}
+	corrupt_file_present = (CLI_PRESENT == cli_present("CORRUPT_FILE"));
 	if (corrupt_file_present)
 	{
 		x = cli_t_f_n("CORRUPT_FILE");
@@ -551,7 +547,7 @@ void dse_chng_fhead(void)
 				hiber_start(1000);
 				if (util_interrupt)
 				{
-					gtm_putmsg(VARLSTCNT(1) ERR_FREEZECTRL);
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FREEZECTRL);
 					break;
 				}
 			}

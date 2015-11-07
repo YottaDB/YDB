@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,11 +16,11 @@
 #include <sys/param.h>
 #endif
 #include <errno.h>
-#include <sys/un.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <sys/time.h>
 #include "gtm_ipc.h"
+#include "gtm_un.h"
 #include "gtm_socket.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
@@ -484,6 +484,7 @@ int db_init(gd_region *reg)
 	char			s[JNLBUFFUPDAPNDX_SIZE];	/* JNLBUFFUPDAPNDX_SIZE is defined in jnl.h */
 	char			*syscall;
 	void			*mmapaddr;
+	int			secshrstat;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -561,6 +562,14 @@ int db_init(gd_region *reg)
 				if (bypassed_ftok)
 					SEND_MSG(VARLSTCNT(4) ERR_TEXT, 2,
 						 LEN_AND_LIT("bypassed at database encryption initialization"));
+				/* Re-read now possibly stale file header and redo the above based on the new header info */
+				READ_DB_FILE_HEADER(reg, tsd); /* file already opened by dbfilopn() done from gvcst_init() */
+				DO_BADDBVER_CHK(reg, tsd); /* need to do BADDBVER check before de-referencing shmid and semid from
+							    * file header as they could be at different offsets if the database is
+							    * V4-format
+							    */
+				reg->dyn.addr->is_encrypted = tsd->is_encrypted; /* override with the value in file header */
+				do_crypt_init = (tsd->is_encrypted && !IS_LKE_IMAGE);
 			} /* else encryption is turned off in the file header. Continue as-is. Any encryption initialization done
 			   * before is discarded
 			   */
@@ -1213,10 +1222,11 @@ int db_init(gd_region *reg)
 		memcpy(db_ipcs.fn, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
 		db_ipcs.fn[reg->dyn.addr->fname_len] = 0;
 		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-		if (0 != send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0))
+		secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
+		csa->read_only_fs = (EROFS == secshrstat);
+		if ((0 != secshrstat) && !csa->read_only_fs)
 			RTS_ERROR(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				  ERR_TEXT, 2, LEN_AND_LIT("gtmsecshr failed to update database file header"));
-
 	}
 	if (gtm_fullblockwrites)
 	{	/* We have been asked to do FULL BLOCK WRITES for this database. On *NIX, attempt to get the filesystem

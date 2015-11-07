@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +23,11 @@
 #include "gt_timer.h"
 #include "iosocketdef.h"
 
+error_def(ERR_CURRSOCKOFR);
+error_def(ERR_NOSOCKETINDEV);
+error_def(ERR_SOCKPASSDATAMIX);
 error_def(ERR_SOCKWRITE);
 error_def(ERR_TEXT);
-error_def(ERR_CURRSOCKOFR);
 
 void iosocket_flush(io_desc *iod)
 {
@@ -43,11 +45,22 @@ void iosocket_flush(io_desc *iod)
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 
+	if (0 >= dsocketptr->n_socket)
+	{
+#		ifndef VMS
+		if (iod == io_std_device.out)
+			ionl_flush(iod);
+		else
+#		endif
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		return;
+	}
 	if (dsocketptr->current_socket >= dsocketptr->n_socket)
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 		return;
 	}
+	ENSURE_DATA_SOCKET(socketptr);
         memcpy(iod->dollar.device, "0", SIZEOF("0"));
         if ( -1 == setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &on, SIZEOF(on)) ||
 		(-1 == setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &off, SIZEOF(off))))

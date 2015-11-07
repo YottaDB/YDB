@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,10 +110,6 @@ typedef struct backup_reg_list_struct
 LITREF  mval            	mu_bin_datefmt;
 
 boolean_t backup_block(sgmnt_addrs *csa, block_id blk, cache_rec_ptr_t backup_cr, sm_uc_ptr_t backup_blk_p);
-bool mubfilcpy(backup_reg_list *list);
-bool mubgetfil(backup_reg_list *list, char *name, unsigned short len);
-bool mubinccpy(backup_reg_list *list);
-bool mubgetfil(backup_reg_list *list, char *name, unsigned short len);
 boolean_t backup_buffer_flush(gd_region *reg);
 void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage);
 #ifdef VMS
@@ -123,7 +119,9 @@ void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list);
 #else
 #error Unsupported Platform
 #endif
-gd_region *mubfndreg(unsigned char *regbuf, unsigned short len);
+bool mubfilcpy(backup_reg_list *list);
+boolean_t mubgetfil(backup_reg_list *list, char *name, unsigned short len);
+bool mubinccpy(backup_reg_list *list);
 void mup_bak_mag(void);
 void mup_bak_pause(void);
 

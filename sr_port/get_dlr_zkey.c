@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,26 @@ GBLREF io_pair		io_curr_device;
 
 void get_dlr_zkey(mval *v)
 {
-	(io_curr_device.out->disp_ptr->dlr_zkey)(&v->str);
-	v->mvtype = MV_STR;
+#	ifdef UNIX
+	mstr x;
+	char buff[128], *cp, *cend;
+
+	if (rm == io_curr_device.in->type)
+	{
+		x.len = SIZEOF(buff);
+		x.addr = buff;
+		(io_curr_device.in->disp_ptr->dlr_zkey)(&x);
+		v->mvtype = MV_STR;
+		v->str.addr = cp = x.addr;
+		cend = cp + x.len;
+		for ( ; cp < cend && *cp ; cp++)
+			;
+		v->str.len = INTCAST(cp - v->str.addr);
+		s2pool(&v->str);
+	} else
+#	endif
+	{
+		(io_curr_device.in->disp_ptr->dlr_zkey)(&v->str);
+		v->mvtype = MV_STR;
+	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include <stddef.h>		/* for offsetof, needed for JNL_FILE_TAIL_PRESERVE */
 
 #include "gtm_time.h"
 #include "gtm_string.h"
@@ -49,6 +51,7 @@
 #include "send_msg.h"
 #include "eintr_wrappers.h"
 #include "anticipatory_freeze.h"
+#include "error.h"
 
 #ifdef UNIX
 #include "wcs_clean_dbsync.h"
@@ -59,7 +62,8 @@ GBLREF	short	astq_dyn_avail;
 static	const	unsigned short	zero_fid[3];
 #endif
 
-GBLREF 	jnl_gbls_t	jgbl;
+GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		in_jnl_file_autoswitch;
 
 error_def(ERR_JNLCLOSE);
 error_def(ERR_JNLFLUSH);
@@ -81,6 +85,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	uint4			status, read_write_size;
 	int			rc, save_errno, idx;
 	uint4			jnl_fs_block_size;
+	boolean_t		was_in_jnl_file_autoswitch, was_last_eof_written, in_tail;
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
@@ -109,8 +114,51 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, jnl_fs_block_size));
 	if (clean)
 	{
-		if(!jgbl.mur_extract)
+		was_last_eof_written = jb->last_eof_written;
+		if (!jgbl.mur_extract && !was_last_eof_written)
+		{
+			was_in_jnl_file_autoswitch = in_jnl_file_autoswitch;
+			/* We don't want to switch while closing, so set in_jnl_file_autoswitch,
+			 * which allows writing to the tail.
+			 */
+			in_jnl_file_autoswitch = TRUE;
+			if (!was_in_jnl_file_autoswitch)
+			{
+				assert(!jgbl.save_dont_reset_gbl_jrec_time);
+				/* Make sure the condition handler can restore the correct value */
+				jgbl.save_dont_reset_gbl_jrec_time = jgbl.dont_reset_gbl_jrec_time;
+				ESTABLISH(jnl_file_autoswitch_ch);
+			}
+			/* Otherwise the caller which set was_in_jnl_file_autoswitch also should have
+			 * established the condition handler already.
+			 */
+			/* It is possible we still have not written a PINI record in this journal file
+			 * (e.g. mupip extend saw the need to do jnl_file_extend inside jnl_write while
+			 * trying to write a PINI record). Write a PINI record in that case before closing
+			 * the journal file that way the EOF record will have a non-zero pini_addr.
+			 * However, if we are already in the tail due to a prior disruption, skip the
+			 * pini/pfin and just write the eof.
+			 */
+			DEBUG_ONLY(jpc->status = SS_NORMAL);
+			in_tail = (jb->freeaddr > jb->filesize - JNL_FILE_TAIL_PRESERVE);
+			if ((0 == jpc->pini_addr) && !in_tail)
+			{
+				jnl_put_jrt_pini(csa);
+				jnl_put_jrt_pfin(csa);
+			}
 			jnl_write_eof_rec(csa, &eof_record);
+			if (!was_in_jnl_file_autoswitch)
+			{
+				jgbl.dont_reset_gbl_jrec_time = jgbl.save_dont_reset_gbl_jrec_time;
+				jgbl.save_dont_reset_gbl_jrec_time = FALSE;
+				REVERT;
+			} else
+				/* We were called in autoswitch, so prevent further records from being
+				 * written to this file by marking it as last_eof_written.
+				 */
+				jb->last_eof_written = TRUE;
+			in_jnl_file_autoswitch = was_in_jnl_file_autoswitch;
+		}
 		if (SS_NORMAL != (jpc->status = jnl_flush(reg)))
 		{
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
@@ -130,8 +178,9 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 		DO_FILE_READ(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 		if (SYSCALL_SUCCESS(jpc->status))
 		{
-			if(!jgbl.mur_extract)
+			if (!jgbl.mur_extract && !was_last_eof_written)
 			{
+				/* If was_last_eof_written is TRUE, we didn't write an eof, so nothing to update. */
 				assert(header->end_of_data <= eof_addr);
 				header->end_of_data = eof_addr;
 				header->eov_timestamp = eof_record.prefix.time;
@@ -148,6 +197,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 				MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(csd, header->strm_end_seqno);
 			}
 #			endif
+			header->last_eof_written = jb->last_eof_written;
 			header->crash = FALSE;
 			JNL_DO_FILE_WRITE(csa, csd->jnl_file_name, jpc->channel,
 				0, header, read_write_size, jpc->status, jpc->status2);

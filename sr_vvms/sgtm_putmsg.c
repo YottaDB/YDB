@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,15 +84,16 @@ void sgtm_putmsg(char *out_str, ...)
 			--arg_count;
 		}
 
-		/* Currently there are a max of 20 fao parms (MAX_FAO_PARMS) allowed, hence passing upto fao_list[19].
+		/* Currently there are a max of 34 fao parms (MAX_FAO_PARMS) allowed, hence passing upto fao_list[33].
 		 * An assert is added to ensure this code is changed whenever the macro MAX_FAO_PARMS is changed.
 		 * The # of arguments passed below should change accordingly.
 		 */
-		assert(MAX_FAO_PARMS == 20);
+		assert(MAX_FAO_PARMS == 34);
 		util_out_print(msg_string.addr, NOFLUSH, fao_list[0], fao_list[1], fao_list[2], fao_list[3], fao_list[4],
-			fao_list[5], fao_list[6], fao_list[7], fao_list[8], fao_list[9], fao_list[10], fao_list[11],
-			fao_list[12], fao_list[13], fao_list[14], fao_list[15], fao_list[16], fao_list[17],
-			fao_list[18], fao_list[19]);
+			fao_list[5], fao_list[6], fao_list[7], fao_list[8], fao_list[9], fao_list[10], fao_list[11], fao_list[12],
+			fao_list[13], fao_list[14], fao_list[15], fao_list[16], fao_list[17], fao_list[18], fao_list[19],
+			fao_list[20], fao_list[21], fao_list[22], fao_list[23], fao_list[24], fao_list[25], fao_list[26],
+			fao_list[27], fao_list[28], fao_list[29], fao_list[30], fao_list[31], fao_list[32], fao_list[33]);
 
 		if (arg_count < 1)
 			break;

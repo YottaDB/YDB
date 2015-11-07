@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -255,9 +255,10 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 				if (!was_crit)
 					rel_crit(reg);
 				if (SS_NORMAL != jpc->status)
-					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
+						DB_LEN_STR(reg), jpc->status);
 				else
-					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
 			} else
 			{
 				tmp_ctl->jnl_fn_len = csd->jnl_file_len;
@@ -315,9 +316,10 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		tmp_jfh = NULL;
 		tmp_jfh_base = NULL;
 		if (SS_NORMAL != status)
-			rts_error(VARLSTCNT(7) ERR_JNLFILRDOPN, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg), status);
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_JNLFILRDOPN, 4, lcl_jnl_fn_len,
+				lcl_jnl_fn, DB_LEN_STR(reg), status);
 		else
-			rts_error(VARLSTCNT(6) ERR_JNLNOREPL, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg));
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLNOREPL, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg));
 	}
 	assert(SS_NORMAL == status);	/* so jnl_fs_block_size is guaranteed to have been initialized */
 	tmp_ctl->repl_buff = repl_buff_create(tmp_jfh->alignsize, jnl_fs_block_size);
@@ -331,7 +333,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	if (tmp_jfh->is_encrypted)
 	{
 		ASSERT_ENCRYPTION_INITIALIZED;	/* should be done in db_init (gtmsource() -> gvcst_init() -> db_init()) */
-		GTMCRYPT_GETKEY(csa, tmp_jfh->encryption_hash, tmp_ctl->encr_key_handle, gtmcrypt_errno);
+		GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(csa, tmp_jfh->encryption_hash, tmp_ctl->encr_key_handle, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, tmp_ctl->jnl_fn_len, tmp_ctl->jnl_fn);
 	}
@@ -402,8 +404,8 @@ int gtmsource_ctl_init(void)
 			prev_ctl = tmp_ctl;
 		}
 	}
-	if (NULL == repl_ctl_list->next) /* No replicated region */
-		GTMASSERT;
+	/* This function should never be invoked unless there is at least one replicated region. */
+	assertpro(NULL != repl_ctl_list->next);
 	return (SS_NORMAL);
 }
 

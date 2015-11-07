@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -145,6 +145,7 @@ int4 gds_rundown(void)
 	boolean_t		was_crit;
 	boolean_t		safe_mode; /* Do not flush or take down shared memory. */
 	boolean_t		bypassed_ftok = FALSE, bypassed_access = FALSE, may_bypass_ftok, inst_is_frozen;
+	int			secshrstat;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -183,9 +184,9 @@ int4 gds_rundown(void)
 	ESTABLISH_NORET(gds_rundown_ch, err_caught);
 	if (err_caught)
 	{
+		REVERT;
 		gds_rundown_err_cleanup(have_standalone_access);
 		ENABLE_INTERRUPTS(INTRPT_IN_GDS_RUNDOWN);
-		REVERT;
 		DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = FALSE);
 		return EXIT_ERR;
 	}
@@ -511,18 +512,15 @@ int4 gds_rundown(void)
 					{	/* If we_are_last_writer, we would have already done a wcs_flu() which would
 						 * have written an epoch record and we are guaranteed no further updates
 						 * since we are the last writer. So, just close the journal.
-						 * Although we assert pini_addr should be non-zero for last_writer, we
-						 * play it safe in PRO and write a PINI record if not written already.
+						 * If the freeaddr == post_epoch_freeaddr, wcs_flu may have skipped writing
+						 * a pini, so allow for that.
 						 */
 						assert(!jbp->before_images || is_mm
-						    || !we_are_last_writer || (0 != jpc->pini_addr || jgbl.mur_extract));
-						if (!jgbl.mur_extract)
-						{
-							if (we_are_last_writer && 0 == jpc->pini_addr)
-								jnl_put_jrt_pini(csa);
-							if (0 != jpc->pini_addr)
-								jnl_put_jrt_pfin(csa);
-						}
+						    || !we_are_last_writer || (0 != jpc->pini_addr) || jgbl.mur_extract
+						    || (jpc->jnl_buff->freeaddr == jpc->jnl_buff->post_epoch_freeaddr));
+						/* If we haven't written a pini, let jnl_file_close write the pini/pfin. */
+						if (!jgbl.mur_extract && (0 != jpc->pini_addr))
+							jnl_put_jrt_pfin(csa);
 						/* If not the last writer and no pending flush timer left, do jnl flush now */
 						if (!we_are_last_writer && (0 > csa->nl->wcs_timers))
 						{
@@ -608,9 +606,13 @@ int4 gds_rundown(void)
 		db_ipcs.fn[reg->dyn.addr->fname_len] = 0;
  		/* request gtmsecshr to flush. read_only cannot flush itself */
 		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-		if (0 != send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0))
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				  ERR_TEXT, 2, RTS_ERROR_TEXT("gtmsecshr failed to update database file header"));
+		if (!csa->read_only_fs)
+		{
+			secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
+			if (0 != secshrstat)
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+					  ERR_TEXT, 2, RTS_ERROR_TEXT("gtmsecshr failed to update database file header"));
+		}
 	}
 	/* Done with file now, close it */
 	CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
@@ -671,6 +673,8 @@ int4 gds_rundown(void)
 			if (0 != shm_rmid(udi->shmid))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 					ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove shared memory"));
+			/* Note that we no longer have a new shared memory. Currently only used/usable for standalone rollback. */
+			udi->new_shm = FALSE;
 			/* mupip recover/rollback don't release the semaphore here, but do it later in db_ipcs_reset (invoked from
 			 * mur_close_files())
 			 */
@@ -679,6 +683,7 @@ int4 gds_rundown(void)
 				if (0 != sem_rmid(udi->semid))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 						      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"));
+				udi->new_sem = FALSE;			/* Note that we no longer have a new semaphore */
 				udi->grabbed_access_sem = FALSE;
 				udi->counter_acc_incremented = FALSE;
 			}

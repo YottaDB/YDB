@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,9 @@ GBLREF	short 			crash_count;
 GBLREF	volatile int4		crit_count;
 GBLREF	uint4 			process_id;
 GBLREF	node_local_ptr_t	locknl;
+#ifdef DEBUG
 GBLREF	boolean_t		mupip_jnl_recover;
+#endif
 
 error_def(ERR_CRITRESET);
 error_def(ERR_DBCCERR);
@@ -47,7 +49,9 @@ boolean_t grab_crit_immediate(gd_region *reg)
 	node_local_ptr_t	cnl;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	csd = csa->hdr;
@@ -68,11 +72,15 @@ boolean_t grab_crit_immediate(gd_region *reg)
 				case cdb_sc_nolock:
 					return(FALSE);
 				case cdb_sc_critreset:
-					rts_error(VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
 				case cdb_sc_dbccerr:
-					rts_error(VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
 				default:
-					GTMASSERT;
+					/* An out-of-design return value. assertpro(FALSE) but spell out the failing condition
+					 * details instead of just FALSE. Hence the complex structure below.
+					 */
+					assertpro((cdb_sc_nolock != status) && (cdb_sc_critreset != status)
+						&& (cdb_sc_dbccerr != status) && FALSE);
 			}
 			return(FALSE);
 		}
@@ -88,13 +96,15 @@ boolean_t grab_crit_immediate(gd_region *reg)
 	}
 	else
 		assert(FALSE);
-	if (csd->file_corrupt && !mupip_jnl_recover)
-	{
-		if (!IS_DSE_IMAGE)
-			rts_error(VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
-		else
-			gtm_putmsg(VARLSTCNT(4) MAKE_MSG_WARNING(ERR_DBFLCORRP), 2, DB_LEN_STR(reg));
-	}
+	/* Commands/Utilties that plays with the file_corrupt flags (DSE/MUPIP SET -PARTIAL_RECOV_BYPASS/RECOVER/ROLLBACK) should
+	 * NOT issue DBFLCORRP. Use skip_file_corrupt_check global variable for this purpose. Ideally we need this check only
+	 * in grab_crit.c and not grab_crit_immediate.c as all the above commands/utilities only go to grab_crit and do not come
+	 * here but we keep it the same for consistency.
+	 */
+	/* Assert that MUPIP RECOVER/ROLLBACK has TREF(skip_file_corrupt_check)=TRUE and so does not issue DBFLCORRP error */
+	assert(!mupip_jnl_recover || TREF(skip_file_corrupt_check));
+	if (csd->file_corrupt && !TREF(skip_file_corrupt_check))
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
 	/* Ideally we do not want to do wcs_recover if we are in interrupt code (as opposed to mainline code).
 	 * This is easily accomplished in VMS with a library function lib$ast_in_prog but in Unix there is no way
 	 * to tell mainline code from interrupt code without the caller providing that information. Hence we

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@
 #include "io.h"
 #include "error.h"
 #include "gtmsecshr.h"
+#include "gtmimagename.h"
 #include "iosp.h"
 #include "send_msg.h"
 #include "getjobnum.h"
@@ -44,7 +45,10 @@ GBLREF mstr 			gtmsecshr_pathname;
 GBLREF boolean_t		gtmsecshr_sock_init_done;
 GBLREF uint4			process_id;
 GBLREF int			gtmsecshr_sockfd;
-GBLREF	char			gtm_dist[GTM_PATH_MAX];
+GBLREF char			gtm_dist[GTM_PATH_MAX];
+GBLREF boolean_t		gtm_dist_ok_to_use;
+
+LITREF gtmImageName            gtmImageNames[];
 
 static char			gtmsecshr_sockpath[GTM_PATH_MAX];
 static char			gtmsecshr_path[GTM_PATH_MAX];
@@ -58,6 +62,7 @@ unsigned char		*mypid2ascx(unsigned char *, pid_t);
 #  define EXACT_SIZE_SOCKNAME
 #endif
 
+error_def(ERR_GTMDISTUNVERIF);
 error_def(ERR_GTMSECSHRSOCKET);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_TEXT);
@@ -72,6 +77,13 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 
 	if (!process_id)
 		getjobnum();
+	if (!gtm_dist_ok_to_use)
+		if (SERVER == caller)
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+					gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+		else
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+					gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	secshrsock_lognam.addr = GTMSECSHR_SOCK_DIR;
 	secshrsock_lognam.len = SIZEOF(GTMSECSHR_SOCK_DIR) - 1;
 	/* Get the maximum size of the path excluding the socket filename */
@@ -134,25 +146,12 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 	} else
 	{	/* Discover path name */
 		len = STRLEN(gtm_dist);
-		if (!len)
-		{
-			gtmsecshr_pathname.len = 0;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSOCKET, 3,
-					RTS_ERROR_STRING("Caller"), process_id, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Environment variable gtm_dist pointing to an invalid path"));
-			ret_status = INVLOGNAME;
-
-		}
-		else {
-			memcpy(gtmsecshr_path, gtm_dist, len);
-			gtmsecshr_path[len] = '/';
-			memcpy(gtmsecshr_path + len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
-			gtmsecshr_pathname.addr = gtmsecshr_path;
-			gtmsecshr_pathname.len = len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
-			if (GTM_PATH_MAX <= gtmsecshr_pathname.len)
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("gtmsecshr path too long"));
-		}
+		memcpy(gtmsecshr_path, gtm_dist, len);
+		gtmsecshr_path[len] = '/';
+		memcpy(gtmsecshr_path + len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
+		gtmsecshr_pathname.addr = gtmsecshr_path;
+		gtmsecshr_pathname.len = len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
+		assertpro(GTM_PATH_MAX > gtmsecshr_pathname.len);
 		gtmsecshr_path[gtmsecshr_pathname.len] = '\0';
 	}
 	/* We have different project id here. This guarantees to avoid deadlock, if only one gtm installation is there */

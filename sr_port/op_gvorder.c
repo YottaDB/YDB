@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,7 @@ void op_gvorder(mval *v)
 	gv_namehead		*gvt;
 	gvnh_reg_t		*gvnh_reg;
 	gvnh_spanreg_t		*gvspan;
+	mstr			opstr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -106,7 +107,9 @@ void op_gvorder(mval *v)
 				ENSURE_STP_FREE_SPACE(n);
 			}
 			v->str.addr = (char *)stringpool.free;
-			stringpool.free = gvsub2str (&gv_altkey->base[0] + gv_altkey->prev, stringpool.free, FALSE);
+			opstr.addr = v->str.addr;
+			opstr.len = MAX_ZWR_KEY_SZ;
+			stringpool.free = gvsub2str(&gv_altkey->base[0] + gv_altkey->prev, &opstr, FALSE);
 			v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
 			assert(v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
 			assert(v->str.addr + v->str.len <= (char *)stringpool.top &&

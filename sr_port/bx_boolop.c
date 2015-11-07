@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,12 +56,21 @@ GBLREF command_qualifier	cmd_qlf;
 	}															\
 }
 
+#define TRACK_JMP_TARGET(T, REF0)												\
+{ 	/* T is triple to tag; REF0 is the new target with which it's tagged */						\
+	tripbp = &T->jmplist;						/* borrow jmplist to track jmp targets */		\
+	assert(NULL == tripbp->bpt);												\
+	assert((tripbp == tripbp->que.fl) && (tripbp == tripbp->que.bl));							\
+	tripbp->bpt = REF0;						/* point to the new location */				\
+	dqins(TREF(bool_targ_ptr), que, tripbp);			/* queue jmplist for clean-up */			\
+}
+
 void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr)
 {
 	boolean_t	expr_fini;
 	oprtype		*adj_addr, *i, *p;
 	tbp		*tripbp;
-	triple		*ref0, *ref1, *ref2, *t0, *t1;
+	triple		*ref0, *ref1, *ref2, *t0, *t1, *tb, *tj;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -112,52 +121,52 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 	for (i = t->operand; i < ARRAYTOP(t->operand); i++)
 	{
 		assert(NULL != TREF(boolchain_ptr));
-		t1 = i->oprval.tref;
+		tb = i->oprval.tref;
 		if (&(t->operand[0]) == i)
-			bx_tail(t1, jmp_type_one, p);				/* do normal transform */
+			bx_tail(tb, jmp_type_one, p);				/* do normal transform */
 		else
 		{	/* operand[1] */
-			bx_tail(t1, sense, addr);				/* do normal transform */
+			bx_tail(tb, sense, addr);				/* do normal transform */
 			if (!expr_fini)
 				break;						/* only need to relocate last operand[1] */
 		}
-		if (OC_NOOP == t1->opcode)
+		if (OC_NOOP == tb->opcode)
 		{	/* the technique of sprinkling noops means fishing around for the actual instruction */
 			do
 			{
-				t1 = t1->exorder.bl;
-				assert(TREF(curtchain) != t1->exorder.bl);
-			} while (OC_NOOP == t1->opcode);
-			if ((oc_tab[t1->opcode].octype & OCT_JUMP) && (OC_JMPTSET != t1->opcode) && (OC_JMPTCLR != t1->opcode))
-				t1 = t1->exorder.bl;
-			if (OC_NOOP == t1->opcode)
+				tb = tb->exorder.bl;
+				assert(TREF(curtchain) != tb->exorder.bl);
+			} while (OC_NOOP == tb->opcode);
+			if ((oc_tab[tb->opcode].octype & OCT_JUMP) && (OC_JMPTSET != tb->opcode) && (OC_JMPTCLR != tb->opcode))
+				tb = tb->exorder.bl;
+			if (OC_NOOP == tb->opcode)
 			{
-				for (t1 = i->oprval.tref; OC_NOOP == t1->opcode; t1 = t1->exorder.fl)
-					assert(TREF(curtchain) != t1->exorder.fl);
+				for (tb = i->oprval.tref; OC_NOOP == tb->opcode; tb = tb->exorder.fl)
+					assert(TREF(curtchain) != tb->exorder.fl);
 			}
 		}
-		assert(OC_NOOP != t1->opcode);
-		assert((oc_tab[t1->exorder.fl->opcode].octype & OCT_JUMP)
-			||(OC_JMPTSET != t1->exorder.fl->opcode) || (OC_JMPTCLR != t1->exorder.fl->opcode));
-		ref0 = maketriple(t1->opcode);					/* copy operation for place in new ladder */
+		assert(OC_NOOP != tb->opcode);
+		assert((oc_tab[tb->exorder.fl->opcode].octype & OCT_JUMP)
+			|| (OC_JMPTSET != tb->exorder.fl->opcode) || (OC_JMPTCLR != tb->exorder.fl->opcode));
+		ref0 = maketriple(tb->opcode);					/* copy operation for place in new ladder */
 		ref1 = (TREF(boolchain_ptr))->exorder.bl;			/* common setup for above op insert */
-		switch (t1->opcode)
+		switch (tb->opcode)
 		{								/* time to subvert original jump ladder entry */
 			case OC_COBOOL:
 				/* insert COBOOL and copy of following JMP in boolchain; overlay them with STOTEMP and NOOP  */
-				assert(TRIP_REF == t1->operand[0].oprclass);
+				assert(TRIP_REF == tb->operand[0].oprclass);
 				dqins(ref1, exorder, ref0);
-				if (oc_tab[t1->operand[0].oprval.tref->opcode].octype & OCT_MVAL)
+				if (oc_tab[tb->operand[0].oprval.tref->opcode].octype & OCT_MVAL)
 				{						/* do we need a STOTEMP? */
-					STOTEMP_IF_NEEDED(ref0, 0, t1, t1->operand[0]);
+					STOTEMP_IF_NEEDED(ref0, 0, tb, tb->operand[0]);
 				} else
 				{						/* make it an mval instead of COBOOL now */
-					t1->opcode = OC_COMVAL;
-					ref0->operand[0] = put_tref(t1);	/* new COBOOL points to this OC_COMVAL  */
+					tb->opcode = OC_COMVAL;
+					ref0->operand[0] = put_tref(tb);	/* new COBOOL points to this OC_COMVAL  */
 				}
-				t1 = t1->exorder.fl;
-				ref0 = maketriple(t1->opcode);			/* create new jmp on result of coerce */
-				ref0->operand[0] = t1->operand[0];
+				t1 = tb->exorder.fl;
+				tj = maketriple(t1->opcode);			/* create new jmp on result of coerce */
+				tj->operand[0] = t1->operand[0];
 				t1->opcode = OC_NOOP;				/* wipe out original jmp */
 				t1->operand[0].oprclass = NO_REF;
 				break;
@@ -168,24 +177,23 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 			case OC_PATTERN:
 			case OC_SORTS_AFTER:
 				/* insert copies of orig OC and following JMP in boolchain & overly originals with STOTEMPs */
-				assert(TRIP_REF == t1->operand[0].oprclass);
-				assert(TRIP_REF == t1->operand[1].oprclass);
+				assert(TRIP_REF == tb->operand[0].oprclass);
+				assert(TRIP_REF == tb->operand[1].oprclass);
 				dqins(ref1, exorder, ref0);
-				STOTEMP_IF_NEEDED(ref0, 0, t1, t1->operand[0]);
-				ref1 = t1;
-				t1 = t1->exorder.fl;
-				ref2 = maketriple(t1->opcode);			/* copy jmp */
-				ref2->operand[0] = t1->operand[0];
-				STOTEMP_IF_NEEDED(ref0, 1, t1, ref1->operand[1]);
-				if (OC_NOOP == ref1->opcode)			/* does op[0] need cleanup? */
-					ref1->operand[0].oprclass = ref1->operand[1].oprclass = NO_REF;
-				ref0 = ref2;
+				STOTEMP_IF_NEEDED(ref0, 0, tb, tb->operand[0]);
+				t1 = tb->exorder.fl;
+				tj = maketriple(t1->opcode);			/* copy jmp */
+				tj->operand[0] = t1->operand[0];
+				STOTEMP_IF_NEEDED(ref0, 1, t1, tb->operand[1]);
+				if (OC_NOOP == tb->opcode)			/* does op[0] need cleanup? */
+					tb->operand[0].oprclass = tb->operand[1].oprclass = NO_REF;
 				break;
 			case OC_JMPTSET:
 			case OC_JMPTCLR:
-										/* move copy of jmp to boolchain and NOOP it */
-				ref0->operand[0] = t1->operand[0];		/* new jmpt gets old target */
-				ref2 = maketriple(OC_NOOP);			/* insert a NOOP in new chain inplace of COBOOL */
+				t1 = tb;					/* move copy of jmp to boolchain and NOOP it */
+				tj = ref0;
+				tj->operand[0] = t1->operand[0];		/* new jmpt gets old target */
+				ref2 = maketriple(OC_NOOP);			/* insert a NOOP in new chain in place of COBOOL */
 				dqins(ref1, exorder, ref2);
 				t1->opcode = OC_NOOP;				/* wipe out original jmp */
 				t1->operand[0].oprclass = NO_REF;
@@ -195,18 +203,15 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		}
 		assert((OC_STOTEMP == t1->opcode) || (OC_NOOP == t1->opcode) || (OC_COMVAL == t1->opcode)
 			  || (OC_LITC == t1->opcode));
-		assert(oc_tab[ref0->opcode].octype & OCT_JUMP);
+		assert(oc_tab[tj->opcode].octype & OCT_JUMP);
 		ref1 = (TREF(boolchain_ptr))->exorder.bl;
-		dqins(ref1, exorder, ref0);					/* common insert for new jmp */
+		dqins(ref1, exorder, tj);					/* common insert for new jmp */
+		TRACK_JMP_TARGET(tb, ref0);
 	}
 	assert(oc_tab[t->opcode].octype & OCT_BOOL);
 	t->opcode = OC_NOOP;							/* wipe out the original boolean op */
 	t->operand[0].oprclass = t->operand[1].oprclass = NO_REF;
-	tripbp = &t->jmplist;							/* borrow jmplist to track jmp targets */
-	assert(NULL == tripbp->bpt);
-	assert((tripbp == tripbp->que.fl) && (tripbp == tripbp->que.bl));
-	tripbp->bpt = jmp_to_next ? (TREF(boolchain_ptr))->exorder.bl : ref0;	/* point op triple at op[1] position or op[0] */
-	dqins(TREF(bool_targ_ptr), que, tripbp);				/* queue jmplist for clean-up */
+	TRACK_JMP_TARGET(t, jmp_to_next ? (TREF(boolchain_ptr))->exorder.bl : ref0);	/* point at op[1] or op[0] respectively */
 	if (!expr_fini)
 		return;
 	/* time to deal with new jump ladder */
@@ -215,15 +220,15 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 	assert(TREF(bool_targ_ptr) != (TREF(bool_targ_ptr))->que.fl);
 	assert(t0->exorder.bl == t);
 	assert(t0 == t->exorder.fl);
-	dqadd(t, TREF(boolchain_ptr), exorder);					/* insert the new jump ladder */
+	dqadd(t, TREF(boolchain_ptr), exorder);				/* insert the new jump ladder */
 	ref0 = (TREF(boolchain_ptr))->exorder.bl->exorder.fl;
-	t0 = t->exorder.fl;
 	if (ref0 == TREF(curtchain))
 	{									/* add a safe target */
 		newtriple(OC_NOOP);
 		ref0 = (TREF(curtchain))->exorder.bl;
 	}
-	assert((OC_COBOOL == t0->opcode) ||(OC_JMPTSET != t0->opcode) || (OC_JMPTCLR != t0->opcode)) ;
+	t0 = t->exorder.fl;
+	assert((OC_COBOOL == t0->opcode) || (OC_JMPTSET != t0->opcode) || (OC_JMPTCLR != t0->opcode)) ;
 	t0 = t0->exorder.fl;
 	assert(oc_tab[t0->opcode].octype & OCT_JUMP);
 	for (; (t0 != ref0) && oc_tab[t0->opcode].octype & OCT_JUMP; t0 = t0->exorder.fl)
@@ -232,8 +237,20 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		assert(INDR_REF == adj_addr->oprclass);
 		if (NULL != (t1 = (adj_addr = adj_addr->oprval.indr)->oprval.tref))
 		{								/*  need to adjust target; NOTE assignments above */
-			if (OC_BOOLFINI != t1->opcode)
-			{							/* not past the end of the new chain */
+			if (TNXT_REF == adj_addr->oprclass)				/* TNXT requires a different adjustment */
+			{
+				for (ref1 = t1->exorder.fl; ref1 != ref0; ref1 = ref1->exorder.fl)
+				{
+					if (NULL != ref1->jmplist.bpt)			/* find 1st recorded target after TNXT */
+					{
+						assert((OC_NOOP == ref1->opcode) || (OC_STOTEMP == ref1->opcode));
+						ref1 = ref1->jmplist.bpt;		/* should point to appropriate new target */
+						assert((oc_tab[ref1->opcode].octype & OCT_BOOL) || (OC_NOOP == ref1->opcode));
+						break;
+					}
+				}
+			} else
+			{
 				assert(TJMP_REF == adj_addr->oprclass);
 				if ((t == t1) || (t1 == ref0))
 					ref1 = ref0;				/* adjust to end of boolean expression */
@@ -257,8 +274,8 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 						|| (OC_JMPTSET == ref1->exorder.fl->opcode)
 						|| (TREF(curtchain) == ref1->exorder.fl))));
 				}
-				t0->operand[0] = put_tjmp(ref1);		/* no indrection simplifies later interations */
 			}
+			t0->operand[0] = put_tjmp(ref1);		/* no indirection simplifies later interations */
 		}
 		t0 = t0->exorder.fl;
 		if ((OC_BOOLFINI == t0->opcode) || (TREF(curtchain) == t0->exorder.fl))

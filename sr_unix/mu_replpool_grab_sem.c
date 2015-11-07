@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,38 +54,38 @@
 	*sem_created_ptr = SEM_CREATED = FALSE;									\
 }
 
-#define DO_CLNUP_AND_RETURN(SAVE_ERRNO, SEM_CREATED, POOL_TYPE, INSTFILENAME, INSTFILELEN, SEM_ID, FAILED_OP)	\
-{														\
-	REMOVE_SEM_SET(SEM_CREATED, REPLPOOL_ID);								\
-	gtm_putmsg(VARLSTCNT(5) ERR_REPLACCSEM, 3, SEM_ID, INSTFILELEN, INSTFILENAME);				\
-	gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT(FAILED_OP), CALLFROM, SAVE_ERRNO);			\
-	return -1;												\
+#define DO_CLNUP_AND_RETURN(SAVE_ERRNO, SEM_CREATED, POOL_TYPE, INSTFILENAME, INSTFILELEN, SEM_ID, FAILED_OP)			\
+{																\
+	REMOVE_SEM_SET(SEM_CREATED, REPLPOOL_ID);										\
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLACCSEM, 3, SEM_ID, INSTFILELEN, INSTFILENAME);			\
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT(FAILED_OP), CALLFROM, SAVE_ERRNO);		\
+	return -1;														\
 }
 
-#define RELEASE_ALREADY_HELD_SEMAPHORE(SEM_SET, SEM_NUM)							\
-{														\
-	int		status, lcl_save_errno;									\
-														\
-	assert(holds_sem[SEM_SET][SEM_NUM]);									\
-	status = rel_sem_immediate(SEM_SET, SEM_NUM);								\
-	if (-1 == status)											\
-	{													\
-		lcl_save_errno = errno;										\
-		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("semop()"), CALLFROM, lcl_save_errno);	\
-	}													\
+#define RELEASE_ALREADY_HELD_SEMAPHORE(SEM_SET, SEM_NUM)									\
+{																\
+	int		status, lcl_save_errno;											\
+																\
+	assert(holds_sem[SEM_SET][SEM_NUM]);											\
+	status = rel_sem_immediate(SEM_SET, SEM_NUM);										\
+	if (-1 == status)													\
+	{															\
+		lcl_save_errno = errno;												\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("semop()"), CALLFROM, lcl_save_errno);	\
+	}															\
 }
 
-#define DECR_ALREADY_INCREMENTED_SEMAPHORE(SEM_SET, SEM_NUM)							\
-{														\
-	int		status, lcl_save_errno;									\
-														\
-	assert(holds_sem[SEM_SET][SEM_NUM]);									\
-	status = decr_sem(SEM_SET, SEM_NUM);									\
-	if (-1 == status)											\
-	{													\
-		lcl_save_errno = errno;										\
-		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("semop()"), CALLFROM, lcl_save_errno);	\
-	}													\
+#define DECR_ALREADY_INCREMENTED_SEMAPHORE(SEM_SET, SEM_NUM)									\
+{																\
+	int		status, lcl_save_errno;											\
+																\
+	assert(holds_sem[SEM_SET][SEM_NUM]);											\
+	status = decr_sem(SEM_SET, SEM_NUM);											\
+	if (-1 == status)													\
+	{															\
+		lcl_save_errno = errno;												\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("semop()"), CALLFROM, lcl_save_errno);	\
+	}															\
 }
 
 GBLREF	jnlpool_addrs		jnlpool;
@@ -125,7 +125,7 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 
 	SETUP_THREADGBL_ACCESS;
 	*sem_created_ptr = sem_created = FALSE; /* assume semaphore not created by default */
-	force_increment = (jgbl.onlnrlbk || (!jgbl.mur_rollback && !argumentless_rundown && ANTICIPATORY_FREEZE_AVAILABLE));
+	force_increment = (jgbl.onlnrlbk || (!jgbl.mur_rollback && !argumentless_rundown && INST_FREEZE_ON_ERROR_POLICY));
 	/* First ensure that the caller has grabbed the ftok semaphore on the replication instance file */
 	assert((NULL != jnlpool.jnlpool_dummy_reg) && (jnlpool.jnlpool_dummy_reg == recvpool.recvpool_dummy_reg));
 	replreg = jnlpool.jnlpool_dummy_reg;

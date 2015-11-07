@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "gtmio.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"
@@ -28,7 +29,6 @@
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
 GBLREF uint4		dollar_tlevel;
-GBLREF lv_val		*active_lv;
 
 /* Operation - The destination variable becomes a new alias of the source variable:
  * 1) Index into the variable name table to get the variable name for the new alias (destination).
@@ -45,6 +45,8 @@ void op_setals2als(lv_val *srclv, int destindx)
 	lv_val		*dstlv;
 	boolean_t	added;
 
+	SET_ACTIVE_LV(NULL, TRUE, actlv_op_setals2als);	/* If we get here, subscript set was successful.
+							 * Clear active_lv to avoid later cleanup issues */
 	assert(srclv);
 	assert(LV_IS_BASE_VAR(srclv));	/* Verify base var */
 	DEBUG_ONLY(added = FALSE);
@@ -81,6 +83,4 @@ void op_setals2als(lv_val *srclv, int destindx)
 	tabent->value = (void *)srclv;
 	INCR_TREFCNT(srclv);
 	MARK_ALIAS_ACTIVE(LV_SYMVAL(srclv)->symvlvl);		/* This symval has had alias activity */
-	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
-					   cleanup problems */
 }

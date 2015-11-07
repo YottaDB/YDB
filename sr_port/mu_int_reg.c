@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,44 +44,43 @@
 
 #define MUPIP_INTEG "MUPIP INTEG"
 
+GBLREF boolean_t		ointeg_this_reg;
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_data		mu_int_data;
-GBLREF unsigned char		*mu_int_master;
-GBLREF uint4			mu_int_errknt;
-GBLREF uint4			mu_int_skipreg_cnt;
 GBLREF sgmnt_data_ptr_t		cs_data;
+GBLREF unsigned char		*mu_int_master;
+GBLREF uint4			mu_int_skipreg_cnt;
+#ifdef DEBUG
 GBLREF pid_t			process_id;
-GBLREF boolean_t		ointeg_this_reg;
+#endif
 #ifdef GTM_CRYPT
 GBLREF gtmcrypt_key_t		mu_int_encrypt_key_handle;
 GBLREF sgmnt_addrs		*cs_addrs;
 #endif
 #ifdef UNIX
-GBLREF boolean_t		jnlpool_init_needed;
+GBLREF boolean_t		jnlpool_init_needed, online_specified, preserve_snapshot;
 GBLREF util_snapshot_ptr_t	util_ss_ptr;
-GBLREF boolean_t		preserve_snapshot;
-GBLREF boolean_t		online_specified;
 #endif
 
 error_def(ERR_BUFFLUFAILED);
-error_def(ERR_DBRDONLY);
-error_def(ERR_MUKILLIP);
 error_def(ERR_SSV4NOALLOW);
 error_def(ERR_SSMMNOALLOW);
 
 void mu_int_reg(gd_region *reg, boolean_t *return_value)
 {
-	sgmnt_addrs     	*csa;
+	boolean_t		read_only, was_crit;
 	freeze_status		status;
 	node_local_ptr_t	cnl;
-	boolean_t		need_to_wait = FALSE, read_only, was_crit;
+	sgmnt_addrs     	*csa;
+#	ifdef DEBUG
+	boolean_t		need_to_wait = FALSE;
 	int			trynum;
 	uint4			curr_wbox_seq_num;
-#	ifdef GTM_CRYPT
-	int			gtmcrypt_errno;
-	gd_segment		*seg;
 #	endif
-
+#	ifdef GTM_CRYPT
+	gd_segment		*seg;
+	int			gtmcrypt_errno;
+#	endif
 	*return_value = FALSE;
 	UNIX_ONLY(jnlpool_init_needed = TRUE);
 	ESTABLISH(mu_int_reg_ch);
@@ -111,8 +110,9 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 #	ifdef GTM_CRYPT
 	if (cs_data->is_encrypted)
 	{ 	/* Initialize mu_int_encrypt_key_handle to be used in mu_int_read */
+		assert(csa == cs_addrs);
 		ASSERT_ENCRYPTION_INITIALIZED;	/* should have happened in db_init() */
-		GTMCRYPT_GETKEY(cs_addrs, cs_data->encryption_hash, mu_int_encrypt_key_handle, gtmcrypt_errno);
+		GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(cs_addrs, cs_data->encryption_hash, mu_int_encrypt_key_handle, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			seg = gv_cur_region->dyn.addr;
@@ -135,7 +135,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		ointeg_this_reg = FALSE; /* Turn off ONLINE INTEG for this region */
 		if (online_specified)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_SSV4NOALLOW, 2, DB_LEN_STR(gv_cur_region));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_SSV4NOALLOW, 2, DB_LEN_STR(gv_cur_region));
 			util_out_print(NO_ONLINE_ERR_MSG, TRUE);
 			mu_int_skipreg_cnt++;
 			return;
@@ -148,6 +148,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		switch (status)
 		{
 			case REG_ALREADY_FROZEN:
+				UNIX_ONLY(if (csa->read_only_fs) break);
 				util_out_print("!/Database for region !AD is already frozen, not integing",
 					TRUE, REG_LEN_STR(gv_cur_region));
 				mu_int_skipreg_cnt++;
@@ -157,6 +158,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 				status = region_freeze(gv_cur_region, TRUE, FALSE, FALSE);
 				if (REG_ALREADY_FROZEN == status)
 				{
+					UNIX_ONLY(if (csa->read_only_fs) break);
 					util_out_print("!/Database for region !AD is already frozen, not integing",
 						TRUE, REG_LEN_STR(gv_cur_region));
 					mu_int_skipreg_cnt++;
@@ -178,7 +180,8 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 	{
 		if (!read_only && !wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH))
 		{
-			gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT(MUPIP_INTEG), DB_LEN_STR(gv_cur_region));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT(MUPIP_INTEG),
+				DB_LEN_STR(gv_cur_region));
 			mu_int_skipreg_cnt++;
 			return;
 		}
@@ -201,10 +204,12 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 			ointeg_this_reg = FALSE; /* Turn off ONLINE INTEG for this region */
 			assert(process_id != cnl->in_crit); /* Ensure ss_initiate released the crit before returning */
 			assert(process_id != cs_data->freeze); /* Ensure region is unfrozen before returning from ss_initiate */
+			assert(INTRPT_IN_SS_INITIATE != intrpt_ok_state); /* Ensure ss_initiate released intrpt_ok_state */
 			return;
 		}
 		assert(process_id != cnl->in_crit); /* Ensure ss_initiate released the crit before returning */
 		assert(process_id != cs_data->freeze); /* Ensure region is unfrozen before returning from ss_initiate */
+		assert(INTRPT_IN_SS_INITIATE != intrpt_ok_state); /* Ensure ss_initiate released intrpt_ok_state */
 #		if defined(DEBUG)
 		curr_wbox_seq_num = 1;
 		cnl->wbox_test_seq_num = curr_wbox_seq_num; /* indicate we took the next step */

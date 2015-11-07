@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@
 #include "min_max.h"
 #include "cli.h"
 #include "have_crit.h"
+#include "op_fnzsearch.h"
 
 GBLREF unsigned short	source_name_len;
 GBLREF unsigned char	source_file_name[];
@@ -45,6 +46,8 @@ GBLREF char		object_file_name[];
 GBLREF short		object_name_len;
 GBLREF int		object_file_des;
 GBLREF command_qualifier cmd_qlf;
+
+LITREF mval		literal_null;
 
 static bool	tt_so_do_once;
 static io_pair	compile_src_dev;
@@ -92,9 +95,10 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 		fstr.str.len = flen;
 		ESTABLISH(source_ch);
 		tt_so_do_once = FALSE;
+		op_fnzsearch((mval *)&literal_null, STRM_COMP_SRC, 0, &ret);	/* Clear any remaining stream cache */
 		for (i = 0 ;  ; i++)
 		{
-			plen.p.pint = op_fnzsearch(&fstr, 0, &ret);
+			plen.p.pint = op_fnzsearch(&fstr, STRM_COMP_SRC, 0, &ret);
 			if (!ret.str.len)
 			{
 				if (!i)

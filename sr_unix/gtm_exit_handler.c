@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,8 @@
 #include "print_exit_stats.h"
 #include "invocation_mode.h"
 #include "secshr_db_clnup.h"
+#include "gtmcrypt.h"
+#include "relinkctl.h"
 
 GBLREF	int4			exi_condition;
 GBLREF	uint4			dollar_tlevel;
@@ -102,6 +104,7 @@ void gtm_exit_handler(void)
 		package_ptr->package_clnup_rtn();
 	    fgn_closepak(package_ptr->package_handle, INFO);
 	}
+	relinkctl_rundown(TRUE);
 	/* We know of at least one case where the below code would error out. That is if this were a replication external
 	 * filter M program halting out after the other end of the pipe has been closed by the source server. In this case,
 	 * the io_rundown call below would error out and would invoke the lastchance3 condition handler which will do an
@@ -118,6 +121,7 @@ void gtm_exit_handler(void)
 	} else
 		io_rundown(NORMAL_RUNDOWN);
 	DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = FALSE;)
+	GTMCRYPT_CLOSE;
 	REVERT;
 
 	print_exit_stats();

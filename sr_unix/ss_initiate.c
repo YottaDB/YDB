@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,18 +62,16 @@
 #include "ss_lock_facility.h"
 #include "gtmimagename.h"
 
-GBLREF	uint4			process_id;
-GBLREF	uint4			mu_int_errknt;
-GBLREF	boolean_t		ointeg_this_reg;
-GBLREF  boolean_t		online_specified;
+GBLREF	boolean_t		muint_fast, ointeg_this_reg, online_specified;
 GBLREF	gd_region		*gv_cur_region;
+GBLREF	uint4			process_id;
 GBLREF 	void			(*call_on_signal)();
+#ifdef DEBUG_ONLY
 GBLREF	int			process_exiting;
-GBLREF	boolean_t		muint_fast;
+#endif
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBROLLEDBACK);
-error_def(ERR_FILEPARSE);
 error_def(ERR_MAXSSREACHED);
 error_def(ERR_PERMGENFAIL);
 error_def(ERR_SSFILOPERR);
@@ -199,30 +197,32 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 			    boolean_t preserve_snapshot, 	/* Should the snapshots be preserved ? */
 			    char *calling_utility)		/* Who called ss_initiate */
 {
+	boolean_t		debug_mupip = FALSE;
+	boolean_t		final_retry, wait_for_zero_kip;
+	char			*tempfilename, eof_marker[EOF_MARKER_SIZE], tempdir_trans_buffer[GTM_PATH_MAX];
+	char			tempdir_full_buffer[GTM_PATH_MAX], tempnamprefix[MAX_FN_LEN + 1];
+	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
+	enum db_acc_method	acc_meth;
+	gtm_uint64_t		db_file_size, native_size;
+	DEBUG_ONLY(gtm_uint64_t	db_size;)
+	int			dsk_addr = 0;
+	int			fclose_res, fstat_res, group_id, perm, pwrite_res, retries;
+	int			save_errno, shdw_fd, ss_shmsize, ss_shm_vbn, status, tmpfd, user_id;
+	ZOS_ONLY(int		realfiletag;)
+	long			ss_shmid = INVALID_SHMID;
+	mstr			tempdir_full, tempdir_log, tempdir_trans;
+	now_t			now;
+	pid_t			*kip_pids_arr_ptr;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	shm_snapshot_ptr_t	ss_shm_ptr;
-	snapshot_context_ptr_t	lcl_ss_ctx, ss_orphan_ctx;
+	snapshot_context_ptr_t	lcl_ss_ctx;
 	snapshot_filhdr_ptr_t	ss_filhdr_ptr;
-	int			shdw_fd, tmpfd, fclose_res, fstat_res, status, perm, user_id, group_id, pwrite_res, dsk_addr = 0;
-	int			retries, idx, this_snapshot_idx, save_errno, ss_shmsize, ss_shm_vbn;
-	ZOS_ONLY(int		realfiletag;)
-	long			ss_shmid = INVALID_SHMID;
-	char			tempnamprefix[MAX_FN_LEN + 1], tempdir_full_buffer[GTM_PATH_MAX], *tempfilename;
-	char			tempdir_trans_buffer[GTM_PATH_MAX], eof_marker[EOF_MARKER_SIZE];
-	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
-	struct stat		stat_buf;
-	enum db_acc_method	acc_meth;
-	void			*ss_shmaddr;
-	gtm_uint64_t		db_file_size, native_size;
-	DEBUG_ONLY(gtm_uint64_t db_size;)
-	uint4			tempnamprefix_len, crit_counter, tot_blks, prev_ss_shmsize, fstat_status;
-	pid_t			*kip_pids_arr_ptr;
-	mstr			tempdir_log, tempdir_full, tempdir_trans;
-	boolean_t		debug_mupip = FALSE, wait_for_zero_kip, final_retry;
-	now_t			now;
 	struct perm_diag_data	pdd;
+	struct stat		stat_buf;
+	uint4			crit_counter, fstat_status, prev_ss_shmsize, tempnamprefix_len, tot_blks;
+	void			*ss_shmaddr;
 
 	assert(IS_MUPIP_IMAGE);
 	assert(NULL != calling_utility);
@@ -231,7 +231,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	cnl = csa->nl;
 	acc_meth = csd->acc_meth;
 	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
-
 	/* Create a context containing default information pertinent to this initiate invocation */
 	lcl_ss_ctx = malloc(SIZEOF(snapshot_context_t)); /* should be free'd by ss_release */
 	DEFAULT_INIT_SS_CTX(lcl_ss_ctx);
@@ -266,7 +265,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	cnl->num_snapshots_in_effect++;
 	assert(ss_lock_held_by_us(reg));
 	ss_release_lock(reg);
-
 	/* For a readonly database for the current process, we better have the region frozen */
 	assert(!reg->read_only || csd->freeze);
 	/* ============================ STEP 1 : Shadow file name construction ==============================
@@ -282,7 +280,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	 * borrowed from mupip_backup.c. This code should be modularized and should be used in both mupip_backup
 	 * as well as here.
 	 */
-
 	/* set up a prefix for the temporary file. */
 	tempnamprefix_len = 0;
 	memset(tempnamprefix, 0, MAX_FN_LEN);
@@ -291,7 +288,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	memcpy(tempnamprefix + tempnamprefix_len, reg->rname, reg->rname_len);
 	tempnamprefix_len += reg->rname_len;
 	SNPRINTF(&tempnamprefix[tempnamprefix_len], MAX_FN_LEN, "_%x", process_id);
-
 	tempdir_log.addr = GTM_SNAPTMPDIR;
 	tempdir_log.len = STR_LIT_LEN(GTM_SNAPTMPDIR);
 	tempfilename = tempdir_full.addr = tempdir_full_buffer;
@@ -304,7 +300,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 				tempdir_trans_buffer,
 				SIZEOF(tempdir_trans_buffer),
 				do_sendmsg_on_log2long);
-
 	if (SS_NORMAL == status && (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
 		*(tempdir_trans.addr + tempdir_trans.len) = 0;
 	else
@@ -325,7 +320,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 			tempdir_trans.len = 1;
 		}
 	}
-
 	/* Verify if we can stat the temporary directory */
 	if (FILE_STAT_ERROR == (fstat_res = gtm_file_stat(&tempdir_trans, NULL, &tempdir_full, FALSE, &fstat_status)))
 	{
@@ -334,7 +328,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		return FALSE;
 	}
 	SNPRINTF(tempfilename + tempdir_full.len, GTM_PATH_MAX, "/%s_XXXXXX", tempnamprefix);
-
 	/* ========================== STEP 2 : Create the shadow file ======================== */
 	/* get a unique temporary file name. The file gets created on success */
 	DEFER_INTERRUPTS(INTRPT_IN_SS_INITIATE); /* Defer MUPIP STOP till the file is created */
@@ -349,6 +342,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		status = errno;
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_SSTMPCREATE, 2, tempdir_trans.len, tempdir_trans.addr, status);
 		UNFREEZE_REGION_IF_NEEDED(csd, reg);
+		ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE);
 		return FALSE;
 	}
 #	ifdef __MVS__
@@ -368,6 +362,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"),
 				tempdir_full.len, tempdir_full.addr, status);
 		UNFREEZE_REGION_IF_NEEDED(csd, reg);
+		ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE);
 		return FALSE;
 	}
 #	ifdef __MVS__
@@ -380,7 +375,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE);
 	tempdir_full.len = STRLEN(tempdir_full.addr); /* update the length */
 	assert(GTM_PATH_MAX >= tempdir_full.len);
-
 	/* give temporary files the group and permissions as other shared resources - like journal files */
 	FSTAT_FILE(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 	assert(-1 != fstat_res);
@@ -419,7 +413,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 				tempdir_full.len,
 				tempdir_full.addr);
 	}
-
 	/* STEP 3: Wait for kills-in-progress and initialize snapshot shadow file
 	 *
 	 * Snapshot Shadow File Layout -
@@ -491,6 +484,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		{	/* error while creating shared memory */
 			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
 			UNFREEZE_REGION_IF_NEEDED(csd, reg);
+			ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE);
 			return FALSE;
 		}
 		/* At this point, we are done with allocating shared memory (aligned with OS_PAGE_SIZE) enough to hold
@@ -633,7 +627,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		}
 	}
 	/* ===================== STEP 5: Flush the pending updates in the global cache =================== */
-
 	/* For a readonly database for the current process, we cannot do wcs_flu. We would have waited for the active queues
 	 * to complete in mu_int_reg after doing a freeze. Now that we have crit, unfreeze the region
 	 */
@@ -652,11 +645,9 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	assert(0 < cnl->num_snapshots_in_effect || (!SNAPSHOTS_IN_PROG(cnl)));
 	assert(csa->now_crit);
 	/* ========== STEP 6: Copy the file header, master map and the native file size into a private structure =========== */
-
 	memcpy(util_ss_ptr->header, csd, SGMNT_HDR_LEN);
 	memcpy(util_ss_ptr->master_map, MM_ADDR(csd), MASTER_MAP_SIZE(csd));
 	util_ss_ptr->native_size = native_size;
-
 	/* We are about to copy the process private variables to shared memory. Although we have done grab_crit above, we take
 	 * snapshot crit lock to ensure that no other process attempts snapshot cleanup.
 	 */
@@ -706,6 +697,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		 */
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBROLLEDBACK);
 		UNFREEZE_REGION_IF_NEEDED(csa, reg);
+		ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE);
 		return FALSE;
 	}
 	/* ============= STEP 8: Write the database file header and the master map =============
@@ -714,13 +706,19 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	 * shared memory information at the beginning of the file. */
 	LSEEKWRITE(shdw_fd, (off_t)ss_shmsize, (sm_uc_ptr_t)util_ss_ptr->header, SGMNT_HDR_LEN, pwrite_res);
 	if (0 != pwrite_res)
+	{
+		ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE);
 		ISSUE_WRITE_ERROR_AND_EXIT(reg, pwrite_res, csa, tempfilename);
+	}
 	dsk_addr += ((int)ss_shmsize + (int)SGMNT_HDR_LEN);
 	/* write the database master map to the shadow file */
 	assert(0 == ((dsk_addr + MASTER_MAP_SIZE_MAX) % OS_PAGE_SIZE));
 	LSEEKWRITE(shdw_fd, dsk_addr, (sm_uc_ptr_t)util_ss_ptr->master_map, MASTER_MAP_SIZE(csd), pwrite_res);
 	if (0 != pwrite_res)
+	{
+		ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE);
 		ISSUE_WRITE_ERROR_AND_EXIT(reg, pwrite_res, csa, tempfilename);
+	}
 	/* The size of the master map written to snap-shot file is read from database header i.e. MASTER_MAP_SIZE(csd).
 	 * That is the actual size which may differ depending on the version that created the database file.
 	 * But this sets the dsk_addr for the Starting VBN using the current MASTER_MAP_SIZE_MAX to keep it aligned

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@
 #include "dm_setup.h"	/* for GTM_DMOD */
 #include "urx.h"
 #include "stringpool.h"
+#include "zr_unlink_rtn.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -106,7 +107,7 @@ void gtm_unlink_all(void)
 	for (gvt = gv_target_list; gvt; gvt = gvt->next_gvnh)
 		gvtr_free(gvt);
 #	endif
-	/* Step 5: Unlink all routines, remove $TEXT cache and remove breakpoints.Note that for the purposes of this section,
+	/* Step 5: Unlink all routines, remove $TEXT cache and remove breakpoints. Note that for the purposes of this section,
 	 * there is no difference between normal routines and trigger routines. Both are being removed completely so the code
 	 * below is a hodgepodge of code from zlput_rname and gtm_trigger_cleanup(). Note process in reverse order so we can
 	 * move rtn_names_end up leaving processed entries (whose keys no longer work) off the end of the table without moving
@@ -116,73 +117,13 @@ void gtm_unlink_all(void)
 	for (rtab = rtn_names_end; rtab > rtn_names; rtab--, rtn_names_end = rtab)
 	{	/* [0] is not used (for some reason) */
 		rtnhdr = rtab->rt_adr;
-		zr_remove(rtnhdr, FALSE);		/* Remove all breakpoints in this routine */
-		urx_remove(rtnhdr);			/* Remove all unresolved entries for this routine */
-		/* If source has been read in for this routine, free the space. Since routine name is the key, do this before
-		 * (in USHBIN builds) we release the literal text section as part of the releasable read-only section.
-		 * Note this code is similar to code in zlput_rname() 'cept this is necessarily UNIX-only.
-		 */
-		free_src_tbl(rtnhdr);
 		if ((0 == strcmp(rtnhdr->routine_name.addr, GTM_DMOD)) || (0 == strcmp(rtnhdr->routine_name.addr, GTM_CIMOD)))
 		{	/* If the routine is GTM$DMOD or GTM$CIMOD, it is allocated in one chunk by make_*mode(). Release it in
 			 * one chunk too.
 			 */
 			GTM_TEXT_FREE(rtnhdr);
 		} else
-		{
-#			ifdef USHBIN_SUPPORTED
-			/* We are about to release program areas containing literal text that could be pointed to by
-			 * local var mvals that are being kept so migrate program literals to the stringpool. Note zlput_rname()
-			 * only does this if not a shared library but since we are releasing shared libraries too, do it
-			 * regardless.
-			 */
-			if (0 < rtnhdr->literal_text_len)
-			{
-				stp_move((char *)rtnhdr->literal_text_adr,
-					 (char *)(rtnhdr->literal_text_adr + rtnhdr->literal_text_len));
-			}
-			if (NULL == rtnhdr->shlib_handle)
-				/* We can only release this section if this is not a shared library */
-				GTM_TEXT_FREE(rtnhdr->ptext_adr);			/* R/O releasable section */
-			free(RW_REL_START_ADR(rtnhdr));				/* R/W releasable section part 1 */
-			free(rtnhdr->linkage_adr);				/* R/W releasable section part 2 */
-			free(rtnhdr->labtab_adr);				/* Usually non-releasable but not in this case */
-			/* Run the chain of old (replaced) versions freeing them also */
-			for (rhdr = OLD_RHEAD_ADR(rtnhdr); NULL != rhdr; rhdr = next_rhdr)
-			{
-				next_rhdr = rhdr->old_rhead_adr;
-				free(rhdr->labtab_adr);				/* Free dangling label table */
-				free(rhdr);
-			}
-			free(rtnhdr);
-#			else
-#		 	  if (!defined(__linux__) && !defined(__CYGWIN__)) || !defined(__i386) || !defined(COMP_GTA)
-#			    error Unsupported NON-USHBIN platform
-#			  endif
-			/* For a non-shared binary platform we need to get an approximate addr range for stp_move. This is not
-			 * done when a routine is replaced on these platforms but in this case we need to since the routines are
-			 * going away which will cause problems with any local variables or environment varspointing to these
-			 * literals.
-			 *
-			 * In this format, the only platform we support currently is Linux-x86 (i386) which uses GTM_TEXT_ALLOC()
-			 * to allocate special storage for it to put executable code in. We can access the storage header for
-			 * this storage and find out how big it is and use that information to give stp_move a good range since
-			 * the literal segment occurs right at the end of allocated storage (for which there is no pointer
-			 * in the fileheader). (Note we allow CYGWIN in here too but it has not been tested at this time)
-			 */
-			telem = (textElem *)((char *)rtnhdr - offsetof(textElem, userStorage));
-			assert(TextAllocated == telem->state);
-			stp_move((char *)LNRTAB_ADR(rtnhdr) + (rtnhdr->lnrtab_len * SIZEOF(lnr_tabent)),
-				 (char *)rtnhdr + telem->realLen);
-			/* Run the chain of old (replaced) versions freeing them first */
-			for (rhdr = OLD_RHEAD_ADR(rtnhdr); rtnhdr != rhdr; rhdr = next_rhdr)
-			{
-				next_rhdr = (rhdtyp *)rhdr->old_rhead_ptr;
-				GTM_TEXT_FREE(rhdr);
-			}
-			GTM_TEXT_FREE(rtnhdr);
-#			endif
-		}
+			zr_unlink_rtn(rtnhdr, TRUE);
 	}
 	/* All programs have been removed. If this is the "first" table allocated which cannot be removed, just reinitialize
 	 * the table and we're done. If a new table, release it, recover the first table, initialize and we're done.
@@ -207,6 +148,6 @@ void gtm_unlink_all(void)
 	}
 	reinitialize_hashtab_objcode(&cache_table);	/* Completely re-initialize the hash table */
 	indir_cache_mem_size = 0;
-	/* Step 6: Close M code shared libraries */
+	/* Step 6: Close all M code shared libraries */
 	zro_shlibs_unlink_all();
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include "gtm_stdio.h"
 
+#include "gtmio.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mv_stent.h"
@@ -70,7 +71,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	alias_retarg = NULL;
 	DBGEHND_ONLY(prevfp = frame_pointer);
 	if (tp_pointer && tp_pointer->fp <= frame_pointer)
-		rts_error(VARLSTCNT(1) ERR_TPQUIT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPQUIT);
 	assert(msp <= stackbase && msp > stacktop);
 	assert(mv_chain <= (mv_stent *)stackbase && mv_chain > (mv_stent *)stacktop);
 	assert(frame_pointer <= (stack_frame *)stackbase && frame_pointer > (stack_frame *)stacktop);
@@ -85,43 +86,44 @@ int unw_retarg(mval *src, boolean_t alias_return)
 		ret_value = *src;
 		ret_value.mvtype &= ~MV_ALIASCONT;	/* Make sure alias container of regular return does not propagate */
 	} else
-	{	/* QUIT *var or *var(indx..) syntax was used - see which one it was */
-		assert(NULL != src);
-		srclv = (lv_val *)src;		/* Since can never be an expression, this relationship is guaranteed */
-		if (!LV_IS_BASE_VAR(srclv))
-		{	/* Have a potential container var - verify */
-			if (!(MV_ALIASCONT & srclv->v.mvtype))
-				rts_error(VARLSTCNT(1) ERR_ALIASEXPECTED);
-			ret_value = *src;
-			srclvc = (lv_val *)srclv->v.str.addr;
-			assert(LV_IS_BASE_VAR(srclvc));	/* Verify base var */
-			assert(srclvc->stats.trefcnt >= srclvc->stats.crefcnt);
-			assert(1 <= srclvc->stats.crefcnt);				/* Verify is existing container ref */
-			base_lv = LV_GET_BASE_VAR(srclv);
-			symlv = LV_GET_SYMVAL(base_lv);
-			symlvc = LV_GET_SYMVAL(srclvc);
-			MARK_ALIAS_ACTIVE(MIN(symlv->symvlvl, symlvc->symvlvl));
-			DBGRFCT((stderr, "unw_retarg: Returning alias container 0x"lvaddr" pointing to 0x"lvaddr" to caller\n",
-				 src, srclvc));
-		} else
-		{	/* Creating a new alias - create a container to pass back */
-			memcpy(&ret_value, &literal_null, SIZEOF(mval));
-			ret_value.mvtype |= MV_ALIASCONT;
-			ret_value.str.addr = (char *)srclv;
-			srclvc = srclv;
-			MARK_ALIAS_ACTIVE(LV_SYMVAL(srclv)->symvlvl);
-			DBGRFCT((stderr, "unw_retarg: Returning alias 0x"lvaddr" to caller\n", srclvc));
-		}
-		INCR_TREFCNT(srclvc);
-		INCR_CREFCNT(srclvc);		/* This increment will be reversed if this container gets put into an alias */
-		/* We have a slight chicken-and-egg problem now. The mv_stent unwind loop below may pop a symbol table thus
+	{	/* QUIT *var or *var(indx..) syntax was used.
+		 * We have a slight chicken-and-egg problem now. The mv_stent unwind loop below may pop a symbol table thus
 		 * destroying the lv_val in our container. To prevent this, we need to locate the parm block before the symval is
 		 * unwound and set the return value and alias_retarg appropriately so the symtab unwind logic called by
 		 * unw_mv_ent() can work any necessary relocation magic on the return var.
 		 */
 		trg = get_ret_targ(NULL);
 		if (NULL != trg)
-		{
+		{	/* QUIT *var or *var(indx..) syntax was used - see which one it was */
+			assert(NULL != src);
+			srclv = (lv_val *)src;		/* Since can never be an expression, this relationship is guaranteed */
+			if (!LV_IS_BASE_VAR(srclv))
+			{	/* Have a potential container var - verify */
+				if (!(MV_ALIASCONT & srclv->v.mvtype))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ALIASEXPECTED);
+				ret_value = *src;
+				srclvc = (lv_val *)srclv->v.str.addr;
+				assert(LV_IS_BASE_VAR(srclvc));	/* Verify base var */
+				assert(srclvc->stats.trefcnt >= srclvc->stats.crefcnt);
+				assert(1 <= srclvc->stats.crefcnt);	/* Verify is existing container ref */
+				base_lv = LV_GET_BASE_VAR(srclv);
+				symlv = LV_GET_SYMVAL(base_lv);
+				symlvc = LV_GET_SYMVAL(srclvc);
+				MARK_ALIAS_ACTIVE(MIN(symlv->symvlvl, symlvc->symvlvl));
+				DBGRFCT((stderr,
+					"unw_retarg: Returning alias container 0x"lvaddr" pointing to 0x"lvaddr" to caller\n",
+					 src, srclvc));
+			} else
+			{	/* Creating a new alias - create a container to pass back */
+				memcpy(&ret_value, &literal_null, SIZEOF(mval));
+				ret_value.mvtype |= MV_ALIASCONT;
+				ret_value.str.addr = (char *)srclv;
+				srclvc = srclv;
+				MARK_ALIAS_ACTIVE(LV_SYMVAL(srclv)->symvlvl);
+				DBGRFCT((stderr, "unw_retarg: Returning alias 0x"lvaddr" to caller\n", srclvc));
+			}
+			INCR_TREFCNT(srclvc);
+			INCR_CREFCNT(srclvc);	/* This increment will be reversed if this container gets put into an alias */
 			*trg = ret_value;
 			alias_retarg = trg;
 			got_ret_target = TRUE;
@@ -153,7 +155,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	}
 	/* do not throw an error if return value is expected from a non-extrinsic, but dollar_zquit_anyway is true */
 	if (!dollar_zquit_anyway && !got_ret_target)
-		rts_error(VARLSTCNT(1) ERR_NOTEXTRINSIC);	/* This routine was not invoked as an extrinsic function */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTEXTRINSIC);	/* Routine not invoked as an extrinsic function */
 	/* Note that error_ret() should be invoked only after the rts_error() of TPQUIT and NOTEXTRINSIC.
 	 * This is so the TPQUIT/NOTEXTRINSIC error gets noted down in $ECODE (which wont happen if error_ret() is called before).
 	 */
@@ -169,7 +171,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	if ((NULL != zyerr_frame) && (frame_pointer > zyerr_frame))
 		zyerr_frame = NULL;
 	if (!frame_pointer)
-		rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
 	assert(frame_pointer >= (stack_frame *)msp);
 	/* ensuring that trg is not NULL */
 	if (!dollar_zquit_anyway || trg)

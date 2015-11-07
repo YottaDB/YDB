@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,13 +48,12 @@ enum	parse_state
 	SLASH
 };
 
-GBLREF mval	dollar_zdir;
+GBLREF mval dollar_zdir;
 
-int4	parse_file(mstr *file, parse_blk *pblk)
+int4 parse_file(mstr *file, parse_blk *pblk)
 {
 	struct stat		statbuf;
-	struct addrinfo		*ai_ptr = NULL, *localhost_ai_ptr = NULL, *temp_ai_ptr = NULL;
-	struct addrinfo		hints;
+	struct addrinfo		*ai_ptr, *localhost_ai_ptr, *temp_ai_ptr, hints;
 	mstr			trans, tmp;
 	int			status, diff, local_node_len, query_node_len, node_name_len;
 	parse_blk		def;
@@ -70,6 +69,7 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 	int			errcode;
 
 	pblk->fnb = 0;
+	ai_ptr = localhost_ai_ptr = temp_ai_ptr = NULL;
 	assert(((unsigned int)pblk->buff_size + 1) <= (MAX_FBUFF + 1));
 	/* All callers of parse_blk set buff_size to 1 less than the allocated buffer. This is because buff_size is a char
 	 * type (for historical reasons) and so cannot go more than 255 whereas we support a max of 255 characters. So we
@@ -80,8 +80,7 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 	if (SS_LOG2LONG == status)
 		return ERR_PARBUFSM;
 	assert(trans.addr == pblk->buffer);
-
-	memset(&def, 0, SIZEOF(def));	/* initial the defaults to zero */
+	memset(&def, 0, SIZEOF(def));	/* Initial the defaults to zero */
 	if (pblk->def1_size > 0)
 	{	/* Parse default filespec if supplied */
 		def.fop = F_SYNTAXO;
@@ -93,22 +92,20 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 		tmp.addr = pblk->def1_buf;
 		if ((status = parse_file(&tmp, &def)) != ERR_PARNORMAL)
 			return status;
-
 		assert(!def.b_node);
 		if (def.b_dir)	def.fnb |= F_HAS_DIR;
 		if (def.b_name)	def.fnb |= F_HAS_NAME;
 		if (def.b_ext)	def.fnb |= F_HAS_EXT;
 	}
-
 	wildname = wilddir = hasnode = hasdir = hasname = hasext = FALSE;
 	node = base = ptr = trans.addr;
 	top = ptr + trans.len;
-	if (trans.len == 0  ||  *ptr != '/')
+	if ((0 == trans.len) || ('/' != *ptr))
 	{	/* No file given, no full path given, or a nodename was specified */
 		setzdir(NULL, &def_trans); /* Default current directory if none given */
-		assert(0 == dollar_zdir.str.len || /* dollar_zdir not initialized yet, possible thru main() -> gtm_chk_dist() */
-		       (def_trans.str.len == dollar_zdir.str.len && /* check if cwd and cached value are the same */
-			0 == memcmp(def_trans.str.addr, dollar_zdir.str.addr, def_trans.str.len)));
+		assert((0 == dollar_zdir.str.len) /* dollar_zdir not initialized yet, possible thru main() -> gtm_chk_dist() */
+			|| ((def_trans.str.len == dollar_zdir.str.len) /* Check if cwd and cached value are the same */
+				&& (0 == memcmp(def_trans.str.addr, dollar_zdir.str.addr, def_trans.str.len))));
 		if (pblk->fop & F_PARNODE)
 		{	/* What we have could be a nodename */
 			assert(pblk->fop & F_SYNTAXO);
@@ -123,32 +120,30 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 					break;
 				}
 			}
-
 			if (node < top)
 			{
 				hasnode = TRUE;
-				ptr = base = node;	/* Update pointers past node name */
-
+				ptr = base = node;				/* Update pointers past node name */
 				/* See if the desired (query) node is the local node */
 				node_name_len = (int)(node - trans.addr);	/* Scanned node including ':' */
-				query_node_len = node_name_len - 1;	/* Pure name length, no ':' on end */
+				query_node_len = node_name_len - 1;		/* Pure name length, no ':' on end */
 				assert(MAX_HOST_NAME_LEN >= query_node_len);
 				assert(0 < query_node_len);
 				assert(':' == *(trans.addr + query_node_len));
 				memcpy(query_node_name, trans.addr, query_node_len);
 				query_node_name[query_node_len] = 0;
-				localhost_sa_ptr = NULL;	/* null value needed if not find query node (remote default) */
+				localhost_sa_ptr = NULL;	/* Null value needed if not find query node (remote default) */
 				CLIENT_HINTS(hints);
-				if (0 != (errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr)))
-					ai_ptr = NULL;		/* skip additional lookups */
+				if (0 != (errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr)))	/* Assignment! */
+					ai_ptr = NULL;		/* Skip additional lookups */
 				else
 					memcpy((sockaddr_ptr)&query_sas, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
 				CLIENT_HINTS(hints);
-				if (0 == (errcode = getaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr)))
+				if (0 == (errcode = getaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr))
+					&& (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
+						localhost_ai_ptr->ai_addrlen)))
 				{
-					if (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
-							localhost_ai_ptr->ai_addrlen))
-						localhost_sa_ptr = localhost_ai_ptr->ai_addr;
+					localhost_sa_ptr = localhost_ai_ptr->ai_addr;
 				}
 				FREEADDRINFO(localhost_ai_ptr);
 				if (ai_ptr && !localhost_sa_ptr)
@@ -159,7 +154,7 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 								LEN_AND_LIT("gethostname"), CALLFROM, errno);
 					CLIENT_HINTS(hints);
 					if (0 != (errcode = getaddrinfo(local_node_name, NULL, &hints, &localhost_ai_ptr)))
-						localhost_ai_ptr = NULL;	/* empty address list */
+						localhost_ai_ptr = NULL;	/* Empty address list */
 					for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
 					     temp_ai_ptr = temp_ai_ptr->ai_next)
 					{
@@ -176,7 +171,7 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 				{
 					CLIENT_HINTS(hints);
 					if (0 != (errcode = getaddrinfo(LOCALHOSTNAME6, NULL, &hints, &localhost_ai_ptr)))
-						localhost_ai_ptr = NULL;	/* empty address list */
+						localhost_ai_ptr = NULL;	/* Empty address list */
 					for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
 					     temp_ai_ptr = temp_ai_ptr->ai_next)
 					{
@@ -216,11 +211,9 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 				node = trans.addr;
 			}
 		}
-
 		/* If parse buffer is not large enough, return error */
 		if (def_trans.str.len + trans.len > pblk->buff_size)
 			return ERR_PARBUFSM;
-
 		/* Construct full filename to parse prefixing given filename with default path prefix */
 		if (0 < def_trans.str.len)
 		{
@@ -231,10 +224,9 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 			top += def_trans.str.len;
 		}
 	}
-
 	name = ptr;
 	state = NOSTATE;
-	for (;ptr < top;)
+	for (; ptr < top;)
 	{
 		ch = *ptr;
 		if ('.' == ch)
@@ -244,14 +236,12 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 		} else if (ch == '/')
 		{	/* We must still be doing the path */
 			ptr++;
-
 			hasdir = TRUE;
 			hasname = FALSE;
 			hasext = FALSE;
 			wilddir |= wildname;
 			wildname = FALSE;
-
-			if (DOT1 != state  &&  DOT2 != state && SLASH != state)
+			if ((DOT1 != state) && (DOT2 != state) && (SLASH != state))
 			{	/* No dots seen recently so scan as if this is start of filename */
 				state = SLASH;
 				name = ptr;
@@ -270,12 +260,12 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 					while ('/' != *del)
 						del--;
 				}
-				assert(del >= base && '/' == *del);
+				assert((del >= base) && ('/' == *del));
 				del++;
 			} else if (SLASH == state)
 			{	/* Remove duplicate slash from path */
 				del = ptr - 1;
-				while (ptr < top && '/' == *ptr)
+				while ((ptr < top) && ('/' == *ptr))
 					ptr++;
 			}
 			memmove(del, ptr, top - ptr);
@@ -296,7 +286,7 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 				{/* Filename has an extension */
 					hasext = TRUE;
 					ext = ptr;
-				} else if ('?' == ch || '*' == ch)
+				} else if (('?' == ch) || ('*' == ch))
 					wildname = TRUE;
 				ptr++;
 			}
@@ -304,7 +294,7 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 		}
 	}
 	/* Handle scan end with non-normal state */
-	if (SLASH == state || DOT1 == state || DOT2 == state)
+	if ((SLASH == state) || (DOT1 == state) || (DOT2 == state))
 	{
 		assert(!hasname && !hasext);
 		hasdir = TRUE;
@@ -314,22 +304,21 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 			ptr--;
 		}
 		if (DOT2 == state)
-		{	/* ignore ../ plus last directory level specified */
+		{	/* Ignore ../ plus last directory level specified */
 			del = ptr - 3;		/* on the end */
 			assert ('/' == *del);
 			if (del > base)
 			{
 				del--;
-				while ('/' == *del)
+				while ('/' != *del)
 					del--;
 			}
-			assert(del >= base && '/' == *del);
+			assert((del >= base) && ('/' == *del));
 			del++;
 			ptr = top = del;
 			name = ptr;
 		}
 	}
-
 	if (!hasname)
 	{
 		assert(!hasext);
@@ -358,8 +347,7 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 	}
 	pblk->b_name = ext - name;
 	pblk->b_ext = ptr - ext;
-
-	if (!hasdir  &&  (def.fnb & F_HAS_DIR))
+	if (!hasdir && (def.fnb & F_HAS_DIR))
 	{
 		diff = (int)(name - base);
 		diff = def.b_dir - diff;
@@ -378,13 +366,11 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 	pblk->l_dir = base;
 	pblk->l_name = base + pblk->b_dir;
 	pblk->l_ext = pblk->l_name + pblk->b_name;
-
 	pblk->fnb |= (hasdir << V_HAS_DIR);
 	pblk->fnb |= (hasname << V_HAS_NAME);
 	pblk->fnb |= (hasext << V_HAS_EXT);
 	pblk->fnb |= (wildname << V_WILD_NAME);
 	pblk->fnb |= (wilddir << V_WILD_DIR);
-
 	if (!(pblk->fop & F_SYNTAXO)  &&  !wilddir)
 	{
 		assert('/' == pblk->l_dir[pblk->b_dir - 1]);
@@ -393,10 +379,9 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 			pblk->l_dir[pblk->b_dir - 1] = 0;
 			STAT_FILE(pblk->l_dir, &statbuf, status);
 			pblk->l_dir[pblk->b_dir - 1] = '/';
-			if (-1 == status || !(statbuf.st_mode & S_IFDIR))
+			if ((-1 == status) || !(statbuf.st_mode & S_IFDIR))
 				return ERR_FILENOTFND;
 		}
 	}
-
 	return ERR_PARNORMAL;
 }

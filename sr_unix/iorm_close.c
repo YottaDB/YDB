@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,9 +36,9 @@ GBLREF io_pair		io_std_device;
 GBLREF	boolean_t	gtm_pipe_child;
 GBLREF	volatile bool	out_of_time;
 
-error_def(ERR_CLOSEFAIL);
 error_def(ERR_SYSCALL);
 error_def(ERR_DEVPARMTOOSMALL);
+error_def(ERR_IOERROR);
 
 LITREF unsigned char	io_params_size[];
 
@@ -49,7 +49,6 @@ void iorm_close(io_desc *iod, mval *pp)
 	d_rm_struct	*stderr_rm_ptr;
 	unsigned char	c;
 	char		*path, *path2;
-	int		fclose_res;
 	int		stat_res;
 	int		fstat_res;
 	struct stat	statbuf, fstatbuf;
@@ -61,7 +60,7 @@ void iorm_close(io_desc *iod, mval *pp)
         int4            wait_status;
 #endif
 
-	int  		status,rc;
+	int  		status;
 	unsigned int	*dollarx_ptr;
 	unsigned int	*dollary_ptr;
 	char 		*savepath2 = 0;
@@ -70,6 +69,7 @@ void iorm_close(io_desc *iod, mval *pp)
 	boolean_t	rm_rundown = FALSE;
 	TID		timer_id;
 	int4		pipe_timeout = 2;	/* default timeout in sec waiting for waitpid */
+	off_t		cur_position;
 
 	DCL_THREADGBL_ACCESS;
 
@@ -98,7 +98,8 @@ void iorm_close(io_desc *iod, mval *pp)
 	}
 
 	iorm_use(iod,pp);
-	if (*dollarx_ptr && rm_ptr->lastop == RM_WRITE && !iod->dollar.za)
+	/* We do not want a NEWLINE to be issued by the middle process. */
+	if (!gtm_pipe_child)
 		iorm_flush(iod);
 
 	p_offset = 0;
@@ -172,19 +173,42 @@ void iorm_close(io_desc *iod, mval *pp)
 		assert(iod->pair.in == iod);
 
 	iod->state = dev_closed;
-	iod->dollar.zeof = FALSE;
-	*dollarx_ptr = 0;
-	*dollary_ptr = 0;
-	rm_ptr->lastop = RM_NOOP;
-	if (rm_ptr->inbuf)
+	/* save no_destroy for disk device */
+	if ((FALSE == rm_destroy) && !rm_ptr->fifo && !rm_ptr->pipe && (2 < rm_ptr->fildes))
 	{
-		free(rm_ptr->inbuf);
-		rm_ptr->inbuf = NULL;
-	}
-	if (rm_ptr->outbuf)
+		rm_ptr->no_destroy = TRUE;
+		/* We can write anywhere in the file so need to save current file pointer for re-open
+		 if last operation was a write*/
+		/* if last operation was a write then set file_pos to position after write */
+		if (RM_WRITE == rm_ptr->lastop)
+		{
+			/* need to do an lseek to get current location in file */
+			cur_position = lseek(rm_ptr->fildes, (off_t)0, SEEK_CUR);
+			if ((off_t)-1 == cur_position)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
+					      RTS_ERROR_LITERAL("lseek"),
+					      RTS_ERROR_LITERAL("iorm_close()"), CALLFROM, errno);
+			} else
+				rm_ptr->file_pos = cur_position;
+		}
+
+	} else
 	{
-		free(rm_ptr->outbuf);
-		rm_ptr->outbuf = NULL;
+		iod->dollar.zeof = FALSE;
+		*dollarx_ptr = 0;
+		*dollary_ptr = 0;
+		rm_ptr->lastop = RM_NOOP;
+		if (rm_ptr->inbuf)
+		{
+			free(rm_ptr->inbuf);
+			rm_ptr->inbuf = NULL;
+		}
+		if (rm_ptr->outbuf)
+		{
+			free(rm_ptr->outbuf);
+			rm_ptr->outbuf = NULL;
+		}
 	}
 
 	/* Do the close first. If the fclose is done first and we are being called from io_rundown just prior to the execv
@@ -196,37 +220,17 @@ void iorm_close(io_desc *iod, mval *pp)
 	/* Close the fildes unless this is a direct close of the stderr device */
 	if (!rm_ptr->stderr_parent)
 	{
-		int save_fd;
 		/* Before closing a pipe device file descriptor, check if the fd was already closed as part of a "write /eof".
 		 * If so, do not attempt the close now. Only need to free up the device structures.
 		 */
-		if (FD_INVALID != rm_ptr->fildes)
-		{
-			save_fd = rm_ptr->fildes;
-			CLOSEFILE_RESET(rm_ptr->fildes, rc);	/* resets "rm_ptr->fildes" to FD_INVALID */
-			if (0 != rc)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);
-		}
-		if (rm_ptr->filstr != NULL)
-		{
-			FCLOSE(rm_ptr->filstr, fclose_res);
-			rm_ptr->filstr = NULL;
-		}
+		IORM_FCLOSE(rm_ptr, fildes, filstr);
+		assert(FD_INVALID == rm_ptr->fildes);
+		assert(NULL == rm_ptr->filstr);
 		/* if this is a pipe and read_fildes and read_filstr are set then close them also */
-		if (0 < rm_ptr->read_fildes)
-		{
-			save_fd = rm_ptr->read_fildes;
-			CLOSEFILE_RESET(rm_ptr->read_fildes, rc);	/* resets "rm_ptr->read_fildes" to FD_INVALID */
-			if (0 != rc)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);
-		}
-		if (rm_ptr->read_filstr != NULL)
-		{
-			FCLOSE(rm_ptr->read_filstr, fclose_res);
-			rm_ptr->read_filstr = NULL;
-		}
+		IORM_FCLOSE(rm_ptr, read_fildes, read_filstr);
+		assert(FD_INVALID == rm_ptr->read_fildes);
+		assert(NULL == rm_ptr->read_filstr);
 	}
-
 	/* reap the forked shell process if a pipe - it will be a zombie, otherwise*/
 	if (rm_ptr->pipe_pid > 0)
 	{
@@ -295,7 +299,7 @@ void iorm_close(io_desc *iod, mval *pp)
 			iorm_close(rm_ptr->stderr_child,pp);
 		}
 	}
-	if ((rm_destroy || rm_ptr->pipe) && !rm_rundown)
+	if ((rm_destroy || rm_ptr->pipe || rm_ptr->fifo) && !rm_rundown)
 	        remove_rms (iod);
 	return;
 }

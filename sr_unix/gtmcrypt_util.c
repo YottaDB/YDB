@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,17 +40,14 @@ GBLDEF	char	gtmcrypt_err_string[MAX_GTMCRYPT_ERR_STRLEN];
 #ifndef USE_SYSLIB_FUNCS
 GBLDEF gtm_malloc_fnptr_t		gtm_malloc_fnptr;
 GBLDEF gtm_free_fnptr_t			gtm_free_fnptr;
-GBLDEF gtm_filename_to_id_fnptr_t	gtm_filename_to_id_fnptr;
-GBLDEF gtm_is_file_identical_fnptr_t	gtm_is_file_identical_fnptr;
-GBLDEF gtm_xcfileid_free_fnptr_t	gtm_xcfileid_free_fnptr;
 #endif
 
 #define SIGPROCMASK(FUNC, NEWSET, OLDSET, RC)										\
 {															\
-        do														\
-        {														\
-          RC = sigprocmask(FUNC, NEWSET, OLDSET);									\
-        } while (-1 == RC && EINTR == errno);										\
+	do														\
+	{														\
+		RC = sigprocmask(FUNC, NEWSET, OLDSET);									\
+	} while (-1 == RC && EINTR == errno);										\
 }
 
 #define Tcsetattr(FDESC, WHEN, TERMPTR, RC, ERRNO)									\
@@ -65,7 +62,7 @@ GBLDEF gtm_xcfileid_free_fnptr_t	gtm_xcfileid_free_fnptr;
 	SIGPROCMASK(SIG_BLOCK, &block_ttinout, &oldset, rc);								\
 	do														\
 	{														\
-	   RC = tcsetattr(FDESC, WHEN, TERMPTR);									\
+		RC = tcsetattr(FDESC, WHEN, TERMPTR);									\
 	} while(-1 == RC && EINTR == errno);										\
 	ERRNO = errno;													\
 	SIGPROCMASK(SIG_SETMASK, &oldset, NULL, rc);									\
@@ -78,7 +75,7 @@ GBLDEF gtm_xcfileid_free_fnptr_t	gtm_xcfileid_free_fnptr;
 	if (0 >= RC)													\
 	{														\
 		RC = -1;												\
-		GC_APPEND_OPENSSL_ERROR("OpenSSL function `EVP_sha512' failed.");					\
+		GC_APPEND_OPENSSL_ERROR("OpenSSL function 'EVP_sha512' failed.");					\
 	} else														\
 		RC = 0;													\
 }
@@ -101,9 +98,6 @@ int gc_load_gtmshr_symbols()
 #	ifndef USE_SYSLIB_FUNCS
 	gtm_malloc_fnptr = &gtm_malloc;
 	gtm_free_fnptr = &gtm_free;
-	gtm_is_file_identical_fnptr = &gtm_is_file_identical;
-	gtm_filename_to_id_fnptr = &gtm_filename_to_id;
-	gtm_xcfileid_free_fnptr = &gtm_xcfileid_free;
 #	endif
 	return 0;
 }
@@ -126,7 +120,7 @@ int gc_read_passwd(char *prompt, char *buf, int maxlen)
 	char			c;
 
 	/* Display the prompt */
-	printf("\n%s", prompt);
+	printf("%s", prompt);
 	fflush(stdout);			/* BYPASSOK -- cannot use FFLUSH */
 	/* Determine if the process has a terminal device associated with it */
 	fd = fileno(stdin);
@@ -211,7 +205,7 @@ int gc_read_passwd(char *prompt, char *buf, int maxlen)
  * ------------------
  * The input character pointer (in->address) is XOR'ed with the above XOR mask and copied into out->address.
  *
- * The `nparm' value is unused when called from C and is there only so that this function can be used as an external call entry-
+ * The 'nparm' value is unused when called from C and is there only so that this function can be used as an external call entry-
  * point for M.
  */
 int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
@@ -308,7 +302,18 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 	if ((NULL != pwent) && (0 == strcmp(pwent->env_value, lpasswd)))
 		return 0;	/* No change in the environment value. Nothing more to do. */
 	len = STRLEN(lpasswd);
-	assert((0 == len % 2) && (GTM_PASSPHRASE_MAX * 2 > len));
+	if (0 != len % 2)
+	{
+		UPDATE_ERROR_STRING("Environment variable %s must be a valid hexadecimal string of even length less than %d. "
+			"Length is odd", name, GTM_PASSPHRASE_MAX);
+		return -1;
+	}
+	if (GTM_PASSPHRASE_MAX * 2 <= len)
+	{
+		UPDATE_ERROR_STRING("Environment variable %s must be a valid hexadecimal string of even length less than %d. "
+			"Length is %d", name, GTM_PASSPHRASE_MAX, len);
+		return -1;
+	}
 	if (NULL != pwent)
 		gc_freeup_pwent(pwent);
 	pwent = MALLOC(SIZEOF(passwd_entry_t));
@@ -324,6 +329,12 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 	{
 		/* First, convert from hexadecimal representation to regular representation */
 		GC_UNHEX(lpasswd, passwd, len);
+		if (len < 0)
+		{
+			UPDATE_ERROR_STRING("Environment variable %s must be a valid hexadecimal string of even length "
+				"less than %d. '%c' is not a valid digit (0-9, a-f, or A-F)", name, GTM_PASSPHRASE_MAX, passwd[0]);
+			return -1;
+		}
 		/* Now, unobfuscate to get the real password */
 		passwd_str.address = passwd;
 		passwd_str.length = len / 2;

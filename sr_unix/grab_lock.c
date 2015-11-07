@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,13 +84,13 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 			switch(status)
 			{
 				case cdb_sc_critreset: /* As of 10/07/98, this return value is not possible */
-					rts_error(VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
 				case cdb_sc_dbccerr:
-					rts_error(VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
 				case cdb_sc_nolock:
 					return FALSE;
 				default:
-					GTMASSERT;
+					assertpro(FALSE && status);
 			}
 			return FALSE;
 		}
@@ -108,8 +108,9 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 			 * command is re-run to bring the journal pool/file and instance file to a consistent state.
 			 */
 			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Instance file header has file_corrupt field set to TRUE");
-			/* No need to do rel_lock before rts_error (mupip_exit_handler will do it for us) */
-			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn), ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
+			/* No need to do rel_lock before rts_error (mupip_exit_handler will do it for us) - BYPASSOK rts_error */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
+					ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 		}
 		/* If ASSERT_NO_ONLINE_ROLLBACK, then no concurrent online rollbacks can happen at this point. So, the jnlpool
 		 * should be in in sync. There are two exceptions. If this is GT.CM GNP Server and the last client disconnected, the
@@ -130,7 +131,7 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 		 */
 		assert((ASSERT_NO_ONLINE_ROLLBACK != onln_rlbk_action)
 		       || (csa->onln_rlbk_cycle == jnlpool.jnlpool_ctl->onln_rlbk_cycle) || IS_GTCM_GNP_SERVER_IMAGE
-		       || (jnlpool_init_needed && ANTICIPATORY_FREEZE_AVAILABLE));
+		       || (jnlpool_init_needed && INST_FREEZE_ON_ERROR_POLICY));
 		if ((HANDLE_CONCUR_ONLINE_ROLLBACK == onln_rlbk_action)
 		    && (csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle))
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,9 @@
 #include "error.h"
 #include "gv_rundown.h"
 #include "util.h"
+#ifdef GTM_CRYPT
+# include "gtmcrypt.h"
+#endif
 
 GBLREF int4		exi_condition;
 GBLREF boolean_t	created_core;
@@ -45,6 +48,7 @@ CONDITION_HANDLER(lastchance1)
 	REVERT;
 	ESTABLISH(lastchance3);
 	io_rundown(NORMAL_RUNDOWN);
+	GTMCRYPT_ONLY(GTMCRYPT_CLOSE;)
 	REVERT;
 	if (DUMPABLE && !SUPPRESS_DUMP)
 		DUMP_CORE;

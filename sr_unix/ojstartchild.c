@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,8 +69,10 @@ GBLREF	int			sys_nerr;
 #pragma pointer_size (long)
 #endif
 
-GBLREF char	**environ;
-GBLREF char	gtm_dist[GTM_PATH_MAX];
+GBLREF char		**environ;
+GBLREF char		gtm_dist[GTM_PATH_MAX];
+GBLREF boolean_t	gtm_dist_ok_to_use;
+LITREF gtmImageName	gtmImageNames[];
 
 #ifdef	__osf__
 #pragma pointer_size (restore)
@@ -101,15 +103,15 @@ GBLREF char	gtm_dist[GTM_PATH_MAX];
 	}										\
 }
 
-#define FORK_RETRY(PID)											\
-{													\
-	FORK(PID); /* BYPASSOK: we die after creating a child, no FORK_CLEAN needed */			\
-	while (-1 == PID)										\
-	{												\
-		assertpro(EAGAIN == errno || ENOMEM == errno);						\
-		usleep(50000);										\
-		FORK(PID);	/* BYPASSOK: we die after creating a child, no FORK_CLEAN needed */	\
-	}												\
+#define FORK_RETRY(PID)						\
+{								\
+	FORK(PID);						\
+	while (-1 == PID)					\
+	{							\
+		assertpro(EAGAIN == errno || ENOMEM == errno);	\
+		usleep(50000);					\
+		FORK(PID);					\
+	}							\
 }
 
 #define SETUP_OP_FAIL()									\
@@ -130,6 +132,7 @@ GBLREF char	gtm_dist[GTM_PATH_MAX];
 	_exit(joberr);									\
 }
 
+error_def(ERR_GTMDISTUNVERIF);
 error_def(ERR_JOBFAIL);
 error_def(ERR_JOBPARTOOLONG);
 error_def(ERR_LOGTOOLONG);
@@ -274,6 +277,13 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef	__osf__
 #pragma pointer_size (restore)
 #endif
+	/* Do the fork and exec but BEFORE that do a FFLUSH(NULL) to make sure any fclose (done in io_rundown
+	 * in the child process) does not affect file offsets in this (parent) process' file descriptors
+	 */
+	if (!gtm_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+	FFLUSH(NULL);
 	FORK_RETRY(child_pid);
 	if (child_pid == 0)
 	{

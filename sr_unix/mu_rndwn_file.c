@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,6 +94,9 @@ static sgmnt_data_ptr_t	temp_cs_data;
 static sgmnt_addrs	*temp_cs_addrs;
 static boolean_t	restore_rndwn_gbl;
 static boolean_t	mu_rndwn_file_standalone;
+static boolean_t	sem_created;
+static boolean_t	no_shm_exists;
+static boolean_t	shm_status_confirmed;
 
 LITREF char             gtm_release_name[];
 LITREF int4             gtm_release_name_len;
@@ -211,8 +214,8 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	int			status, save_errno, sopcnt, tsd_size, save_udi_semid = INVALID_SEMID, semop_res, stat_res, rc;
 	int			csd_size;
 	char                    now_running[MAX_REL_NAME];
-	boolean_t		rc_cpt_removed = FALSE, sem_created = FALSE, is_gtm_shm;
-	boolean_t		glob_sec_init, db_shm_in_sync, remove_shmid, no_shm_exists;
+	boolean_t		rc_cpt_removed, is_gtm_shm;
+	boolean_t		glob_sec_init, db_shm_in_sync, remove_shmid;
 	sgmnt_data_ptr_t	csd, tsd = NULL;
 	sgmnt_addrs		*csa;
 	jnl_private_control	*jpc;
@@ -238,11 +241,15 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	jnl_file_header		header;
 	int4			status1;
 	uint4			status2;
+	int			secshrstat;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	mu_rndwn_file_standalone = standalone;
+	rc_cpt_removed = FALSE;
 	restore_rndwn_gbl = FALSE;
+	sem_created = FALSE;
+	shm_status_confirmed = FALSE;
 	assert(!jgbl.onlnrlbk);
 	assert(!mupip_jnl_recover || standalone);
 	temp_region = gv_cur_region; 	/* save gv_cur_region wherever there is scope for it to be changed */
@@ -377,6 +384,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	no_shm_exists = (INVALID_SHMID == udi->shmid || -1 == shmctl(udi->shmid, IPC_STAT, &shm_buf) ||
 				tsd->gt_shm_ctime.ctime != shm_buf.shm_ctime);
 #	endif
+	shm_status_confirmed = TRUE;	/* Now we have ascertained the status of shared memory. */
 	/* Whether we want to wait for the counter semaphore to become zero NOW (or defer it) depends on the following conditions :
 	 * a) MUPIP RUNDOWN : If shared memory exists, then it is possible that the database we are attempting to rundown does not
 	 * match the existing shared memory (DBSHMNAMEDIFF case). If so, we should not wait for the counter semaphore, but proceed
@@ -488,7 +496,9 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 					}
 					db_ipcs.fn[db_ipcs.fn_len] = 0;
 					WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-					if (0 != send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0))
+					secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
+					csa->read_only_fs = (EROFS == secshrstat);
+					if ((0 != secshrstat) && !csa->read_only_fs)
 					{
 						RNDWN_ERR("!AD -> gtmsecshr was unable to write header to disk.", reg);
 						CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
@@ -1070,8 +1080,19 @@ CONDITION_HANDLER(mu_rndwn_file_ch)
 		csa = &udi->s_addrs;
 		DEBUG_ONLY(in_mu_rndwn_file = FALSE);
 		TREF(donot_write_inctn_in_wcs_recover) = FALSE;
+		if (udi->counter_acc_incremented)
+		{	/* Decrement the access control semaphore in case we incremented it. */
+			do_semop(udi->semid, DB_CONTROL_SEM, -1, IPC_NOWAIT | SEM_UNDO);
+			udi->counter_acc_incremented = FALSE;
+		}
+		if (sem_created || (shm_status_confirmed && no_shm_exists))
+		{	/* Remove the access control semaphore if either we just created it, or we know for a fact that there is
+			 * no shared memory */
+			sem_rmid(udi->semid);
+			udi->semid = INVALID_SEMID;
+		}
 		if (udi->grabbed_ftok_sem)
-			ftok_sem_release(rundown_reg, FALSE, TRUE);
+			ftok_sem_release(rundown_reg, !mu_rndwn_file_standalone, !mu_rndwn_file_standalone);
 	}
 	if (restore_rndwn_gbl)
 	{

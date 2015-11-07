@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,93 +31,86 @@
 /* Include prototypes*/
 #include "t_qread.h"
 
-GBLDEF bool		patch_exh_found, patch_find_root_search, patch_find_sibs;
+GBLDEF boolean_t	patch_exh_found, patch_find_root_search, patch_find_sibs;
 GBLDEF block_id		patch_find_blk, patch_left_sib, patch_right_sib;
 GBLDEF block_id		patch_path[MAX_BT_DEPTH + 1], patch_path1[MAX_BT_DEPTH + 1];
 GBLDEF global_root_list	*global_roots_head, *global_roots_tail;
 GBLDEF int4		patch_offset[MAX_BT_DEPTH + 1], patch_offset1[MAX_BT_DEPTH + 1];
-GBLDEF short int	patch_dir_path_count;
+GBLDEF short int	patch_dir_path_count, patch_path_count;
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
-GBLREF block_id		patch_curr_blk;
-GBLREF short int	patch_path_count;
 
 #define MAX_UTIL_LEN 33
 
 static boolean_t	was_crit, was_hold_onto_crit, nocrit_present;
 
-error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_CTRLC);
+error_def(ERR_DSEBLKRDFAIL);
 
 void dse_f_blk(void)
 {
-	block_id		blk, last, look;
+	block_id		last, look;
 	boolean_t		exhaust;
 	cache_rec_ptr_t		dummy_cr;
 	char			targ_key[MAX_KEY_SZ + 1], util_buff[MAX_UTIL_LEN];
-	global_root_list	*temp;
 	global_dir_path		*d_ptr, *dtemp;
-	int			util_len;
+	global_root_list	*temp;
+	int			util_len, lvl, parent_lvl;
 	int4			dummy_int;
 	sm_uc_ptr_t		blk_id, bp, b_top, key_top, rp, r_top, sp, srp, s_top;
 	short int		count, rsize, size;
-	char			lvl;
 
-	if (CLI_PRESENT == cli_present("BLOCK"))
-	{
-		if (!cli_get_hex("BLOCK", (uint4 *)&blk))
-			return;
-		if ((0 > blk) || (blk >= cs_addrs->ti->total_blks) || !(blk % cs_addrs->hdr->bplmap))
-		{
-			util_out_print("Error: invalid block number.", TRUE);
-			return;
-		}
-		patch_curr_blk = blk;
-	}
+	if (BADDSEBLK == (patch_find_blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
+		return;
 	patch_find_sibs = (CLI_PRESENT == cli_present("SIBLINGS"));
-	patch_find_blk = patch_curr_blk;
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	/* ESTABLISH is done here because dse_f_blk_ch() assumes we already have crit. */
 	ESTABLISH(dse_f_blk_ch);
-	if (!(bp = t_qread(patch_find_blk, &dummy_int, &dummy_cr)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
-		b_top = bp + cs_addrs->hdr->blk_size;
-	else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t) bp)->bsiz)
-		b_top = bp + SIZEOF(blk_hdr);
-	else
-		b_top = bp + ((blk_hdr_ptr_t)bp)->bsiz;
-	rp = bp + SIZEOF(blk_hdr);
-	GET_SHORT(rsize, &((rec_hdr_ptr_t) rp)->rsiz);
-	if (SIZEOF(rec_hdr) > rsize)
-		r_top = rp + SIZEOF(rec_hdr);
-	else
-		r_top = rp + rsize;
-	if (r_top > b_top)
-		r_top = b_top;
-	for (key_top = rp + SIZEOF(rec_hdr); (key_top < r_top) && *key_top++; )
-		;
-	if (((blk_hdr_ptr_t)bp)->levl && key_top > (blk_id = r_top - SIZEOF(block_id)))	/* NOTE assignment */
-		key_top = blk_id;
+	look = patch_find_blk;
+	parent_lvl = 0;
+	do
+	{
+		if (!(bp = t_qread(look, &dummy_int, &dummy_cr)))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
+			b_top = bp + cs_addrs->hdr->blk_size;
+		else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t) bp)->bsiz)
+			b_top = bp + SIZEOF(blk_hdr);
+		else
+			b_top = bp + ((blk_hdr_ptr_t)bp)->bsiz;
+		rp = bp + SIZEOF(blk_hdr);
+		GET_SHORT(rsize, &((rec_hdr_ptr_t) rp)->rsiz);
+		if (SIZEOF(rec_hdr) > rsize)
+			r_top = rp + SIZEOF(rec_hdr);
+		else
+			r_top = rp + rsize;
+		if (r_top > b_top)
+			r_top = b_top;
+		for (key_top = rp + SIZEOF(rec_hdr); (key_top < r_top) && *key_top++; )
+			;
+		lvl = ((blk_hdr_ptr_t)bp)->levl;
+		if (lvl && key_top > (blk_id = r_top - SIZEOF(block_id)))	/* NOTE assignment */
+			key_top = blk_id;
+		size = key_top - rp - SIZEOF(rec_hdr);
+		if (SIZEOF(targ_key) < size)
+			size = SIZEOF(targ_key);
+		if (!lvl || size)
+			break;	/* data block OR index block with a non-* key found. break right away to do search */
+		if ((0 > lvl) || (lvl >= MAX_BT_DEPTH) || (parent_lvl && (parent_lvl != (lvl + 1))))
+			break; /* out-of-design level (integ error in db). do not descend anymore. do exhaustive search */
+		parent_lvl = lvl;
+		/* while it is an index block with only a *-record keep looking in child blocks for key */
+		GET_ULONG(look, blk_id);
+	} while (TRUE);
 	patch_path_count = 1;
 	patch_path[0] = get_dir_root();
 	patch_left_sib = patch_right_sib = 0;
-	size = key_top - rp - SIZEOF(rec_hdr);
-	if (SIZEOF(targ_key) < size)
-		size = SIZEOF(targ_key);
 	patch_find_root_search = TRUE;
-	if ((exhaust = (cli_present("EXHAUSTIVE") == CLI_PRESENT)) || (0 >= size))		/* NOTE assignment */
+	if ((exhaust = (CLI_PRESENT == cli_present("EXHAUSTIVE"))) || (0 >= size))		/* NOTE assignment */
 	{
-		if (size < 0)
-		{
-			util_out_print("No keys in block, cannot perform ordered search.", TRUE);
-			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-			REVERT;
-			return;
-		}
 		if (patch_exh_found = (patch_find_blk == patch_path[0]))			/* NOTE assignment */
 		{
 			if (patch_find_sibs)
@@ -483,7 +476,7 @@ void dse_f_blk(void)
 /* Control-C condition handler */
 CONDITION_HANDLER(dse_f_blk_ch)
 {
-	START_CH(SIGNAL != ERR_CTRLC);
+	START_CH(TRUE);
 
 	if (ERR_CTRLC == SIGNAL)
 		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);

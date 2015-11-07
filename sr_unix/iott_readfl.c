@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,6 @@ LITREF	UChar32		u32_line_term[];
 #endif
 
 GBLREF	int		AUTO_RIGHT_MARGIN, EAT_NEWLINE_GLITCH;
-GBLREF	char		*CURSOR_UP, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT, *CLR_EOL;
 GBLREF	char		*KEY_BACKSPACE, *KEY_DC;
 GBLREF	char		*KEY_DOWN, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
 GBLREF	char		*KEY_INSERT;
@@ -581,8 +580,9 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				/* For most of the terminal the 'kbs' string capability is a byte in length. It means that it is
 				  Not treated as escape sequence. So explicitly check if the input corresponds to the 'kbs' */
 				if ((((int)inchar == tt_ptr->ttio_struct->c_cc[VERASE]) ||
-				    (empterm && ('\0' == KEY_BACKSPACE[1]) && (inchar == KEY_BACKSPACE[0])))
-					&& !(mask & TRM_PASTHRU))
+				    (empterm && (NULL != KEY_BACKSPACE) && ('\0' == KEY_BACKSPACE[1])
+				     && (inchar == KEY_BACKSPACE[0])))
+				    && !(mask & TRM_PASTHRU))
 				{
 					if (0 < instr && (edit_mode || 0 < dx))
 					{
@@ -963,23 +963,20 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			int zb_len = (int)(zb_ptr - io_ptr->dollar.zb);
 
 			escape_edit = FALSE;
-			down = strncmp((const char *)io_ptr->dollar.zb, KEY_DOWN, zb_len);
-			up = strncmp((const char *)io_ptr->dollar.zb, KEY_UP, zb_len);
-			right = strncmp((const char *)io_ptr->dollar.zb, KEY_RIGHT, zb_len);
-			left = strncmp((const char *)io_ptr->dollar.zb, KEY_LEFT, zb_len);
-			backspace = delete = insert_key = -1;
+			/* The arbitrary value -1 signifies inequality in case KEY_* is NULL */
+			down = (NULL != KEY_DOWN) ? strncmp((const char *)io_ptr->dollar.zb, KEY_DOWN, zb_len) : -1;
+			up = (NULL != KEY_UP) ? strncmp((const char *)io_ptr->dollar.zb, KEY_UP, zb_len) : -1;
+			right = (NULL != KEY_RIGHT) ? strncmp((const char *)io_ptr->dollar.zb, KEY_RIGHT, zb_len) : -1;
+			left = (NULL != KEY_LEFT) ? strncmp((const char *)io_ptr->dollar.zb, KEY_LEFT, zb_len) : -1;
+			backspace = (KEY_BACKSPACE != NULL) ? strncmp((const char *)io_ptr->dollar.zb, KEY_BACKSPACE, zb_len) : -1;
+			delete = (KEY_DC != NULL) ? strncmp((const char *)io_ptr->dollar.zb, KEY_DC, zb_len) : -1;
+			insert_key = (KEY_INSERT != NULL && '\0' != KEY_INSERT[0])
+				?  strncmp((const char *)io_ptr->dollar.zb, KEY_INSERT, zb_len) : -1;
 
-			if (KEY_BACKSPACE != NULL)
-				backspace = strncmp((const char *)io_ptr->dollar.zb, KEY_BACKSPACE, zb_len);
-			if (KEY_DC != NULL)
-				delete = strncmp((const char *)io_ptr->dollar.zb, KEY_DC, zb_len);
-			if (KEY_INSERT != NULL && '\0' != KEY_INSERT[0])
-				insert_key = strncmp((const char *)io_ptr->dollar.zb, KEY_INSERT, zb_len);
-
-			if (backspace == 0  ||  delete == 0)
+			if (0 == backspace || 0 == delete)
 			{
-				if (instr > 0)
-				{
+				if ((0 == backspace) && (instr > 0))
+				{	/* Move one character to the left */
 					dx_prev = compute_dx(BUFF_ADDR(0), instr - 1, ioptr_width, dx_start);
 					delchar_width = dx_instr - dx_prev;
 					if (!(mask & TRM_NOECHO))
@@ -990,6 +987,9 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 					dx = (dx - delchar_width + ioptr_width) % ioptr_width;
 					instr--;
 					dx_instr -= delchar_width;
+				}
+				if (instr != outlen)
+				{
 					STORE_OFF(' ', outlen);
 					outlen--;
 					if (!(mask & TRM_NOECHO))

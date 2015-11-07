@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,8 +69,8 @@ typedef struct	rhead_struct
 							 * describing shared library resident routine and this is its handle.
 							 * Note this is an 8 byte field on Tru64 (hence its position near top).
 							 */
-	mstr			src_full_name;		/* (#) fully qualified path of routine source code */
-	uint4			compiler_qlf;		/* bit flags of compiler qualifiers used (see cmd_qlf.h) */
+	mstr			src_full_name;		/* (#) Fully qualified path of routine source code */
+	uint4			compiler_qlf;		/* Bit flags of compiler qualifiers used (see cmd_qlf.h) */
 	uint4			objlabel;		/* Object code level/label (see objlable.h).
 							 * Note: this field must be the 10th word (11th on Tru64) on 32-bit
 							 * environments so that incr_link() can deference object label from old
@@ -78,35 +78,45 @@ typedef struct	rhead_struct
 							 * situation wouldn't occur since dlopen() would/should have failed
 							 * when a 32-bit shared library is loaded
 							 */
-	mident			routine_name;		/* external routine name */
-	var_tabent		*vartab_adr;		/* (#) address of variable table (offset in original rtnhdr) */
-	int4			vartab_len;		/* (#) number of variable table entries */
-	lab_tabent		*labtab_adr;		/* address of label table (offset in original rtnhdr) */
-	int4			labtab_len;		/* number of label table entries */
-	lnr_tabent		*lnrtab_adr;		/* address of linenumber table (offset in original rtnhdr) */
-	int4			lnrtab_len;		/* number of linenumber table entries */
-	unsigned char		*literal_text_adr;	/* address of literal text pool (offset in original rtnhdr) */
-	int4			literal_text_len;	/* length of literal text pool */
-	mval			*literal_adr;		/* (#) address of literal mvals (offset in original rtnhdr) */
-	int4			literal_len;		/* number of literal mvals */
-	lnk_tabent		*linkage_adr;		/* (#) address of linkage Psect (offset in original rtnhdr) */
-	int4			linkage_len;		/* number of linkage entries */
-	int4			rel_table_off;		/* offset to relocation table (not kept) */
-	int4			sym_table_off;		/* offset to symbol table (not kept) */
-	unsigned char		*shared_ptext_adr;	/* If set, ptext_adr points to local copy, this points to old shared copy */
-	unsigned char		*ptext_adr;		/* (#) address of start of instructions (offset in original rtnhdr) */
-	unsigned char		*ptext_end_adr;		/* (#) address of end of instructions + 1 (offset in original rtnhdr) */
+	mident			routine_name;		/* External routine name */
+	var_tabent		*vartab_adr;		/* (#) Address of variable table (offset in original rtnhdr) */
+	int4			vartab_len;		/* (#) Number of variable table entries */
+	lab_tabent		*labtab_adr;		/* Address of label table (offset in original rtnhdr) */
+	int4			labtab_len;		/* Number of label table entries */
+	lnr_tabent		*lnrtab_adr;		/* Address of linenumber table (offset in original rtnhdr) */
+	int4			lnrtab_len;		/* Number of linenumber table entries */
+	unsigned char		*literal_text_adr;	/* Address of literal text pool (offset in original rtnhdr) */
+	int4			literal_text_len;	/* Length of literal text pool */
+	mval			*literal_adr;		/* (#) Address of literal mvals (offset in original rtnhdr) */
+	int4			literal_len;		/* Number of literal mvals */
+	lnk_tabent		*linkage_adr;		/* (#) Address of linkage Psect (offset in original rtnhdr) */
+	int4			linkage_len;		/* Number of linkage entries */
+	int4			rel_table_off;		/* Offset to relocation table (not kept) */
+	int4			sym_table_off;		/* Offset to symbol table (not kept) */
+	unsigned char		*shared_ptext_adr;	/* If shared routine (shared library or object), points to shared copy */
+	unsigned char		*ptext_adr;		/* (#) address of start of instructions (offset in original rtnhdr)
+							 * If shared routine, points to shared copy unless breakpoints are active.
+							 * In that case, points to private copy.
+							 */
+	unsigned char		*ptext_end_adr;		/* (#) Address of end of instructions + 1 (offset in original rtnhdr) */
 	int4			checksum;		/* 4-byte source code checksum (for platforms where MD5 is unavailable) */
 	int4			temp_mvals;		/* (#) temp_mvals value of current module version */
 	int4			temp_size;		/* (#) temp_size value of current module version */
-	struct rhead_struct	*current_rhead_adr;	/* (#) address of routine header of current module version */
-	struct rhead_struct	*old_rhead_adr;		/* (#) chain of replaced routine headers */
+	struct rhead_struct	*current_rhead_adr;	/* (#) Address of routine header of current module version */
+	struct rhead_struct	*old_rhead_adr;		/* (#) Chain of replaced routine headers */
 #	ifdef GTM_TRIGGER
 	void_ptr_t		trigr_handle;		/* Type is void to avoid needing gv_trigger.h for gv_trigger_t type addr */
+#	else
+	void_ptr_t		filler1;
 #	endif
 	unsigned char		checksum_md5[16];	/* 16-byte MD5 checksum of routine source code */
-	struct rhead_struct	*active_rhead_adr;	/* chain of active old versions, fully reserved for continued use */
-	routine_source		*source_code;		/* source code used by $TEXT */
+	struct rhead_struct	*active_rhead_adr;	/* Chain of active old versions, fully reserved for continued use */
+	routine_source		*source_code;		/* Source code used by $TEXT */
+	void_ptr_t		zhist;			/* If shared object -> validation list/array (actual type is zro_hist *) */
+	unsigned char		*lbltext_ptr;		/* Label name text blob if shared object replaced */
+	uint4			shared_len;		/* Length of mmaped segment (needed for munmap) */
+	uint4			routine_source_offset;	/* Offset of M source within literal text pool */
+	IA64_ONLY(void_ptr_t	filler2;)		/* IA64 needs 16 byte alignment */
 } rhdtyp;
 
 /* Routine table entry */
@@ -116,10 +126,10 @@ typedef struct
 	rhdtyp		*rt_adr;	/* Pointer to its routine header */
 } rtn_tabent;
 
-/* byte offset of the routine_name field in the routine headers of pre-V5 releases */
+/* Byte offset of the routine_name field in the routine headers of pre-V5 releases */
 #define PRE_V5_RTNHDR_RTNOFF		24
 
-/* byte offset of the routine_name mstr (len,addr) in V50 and V51 - only used in Tru64/HPUX-HPPA */
+/* Byte offset of the routine_name mstr (len,addr) in V50 and V51 - only used in Tru64/HPUX-HPPA */
 #if defined(__osf__) || defined(__hppa)
 #  define V50V51_RTNHDR_RTNMSTR_OFFSET	24
 #  ifdef __osf__
@@ -135,7 +145,7 @@ typedef struct
 	int4		*addr;		/* Offset at this stage */
 } v50v51_mstr;
 #endif
-#
+
 /* Macros for accessing routine header fields in a portable way */
 #define VARTAB_ADR(rtnhdr) ((rtnhdr)->vartab_adr)
 #define LABTAB_ADR(rtnhdr) ((rtnhdr)->labtab_adr)
@@ -188,8 +198,8 @@ struct	rel_table
  */
 struct	nlist
 {
-	int4		n_type;		/* type flag, i.e. N_TEXT etc; see below */
-	uint4		n_value;	/* value of this symbol (or sdb offset) */
+	int4		n_type;		/* Type flag, i.e. N_TEXT etc; see below */
+	uint4		n_value;	/* Value of this symbol (or sdb offset) */
 };
 
 struct	sym_table
@@ -203,8 +213,8 @@ struct	sym_table
 };
 
 /* Simple values for n_type. */
-#define	N_TEXT	0x04		/* text */
-#define	N_EXT	0x01		/* external bit, or'ed in */
+#define	N_TEXT	0x04		/* Text */
+#define	N_EXT	0x01		/* cexternal bit, or'ed in */
 
 /* Flag values for get_src_line call */
 #define VERIFY		TRUE
@@ -226,5 +236,8 @@ rhdtyp	*op_rhdaddr1(mval *name);
 lnr_tabent **op_labaddr(rhdtyp *routine, mval *label, int4 offset);
 void urx_resolve(rhdtyp *rtn, lab_tabent *lbl_tab, lab_tabent *lbl_top);
 char *rtnlaboff2entryref(char *entryref_buff, mident *rtn, mident *lab, int offset);
+boolean_t on_stack(rhdtyp *rtnhdr, boolean_t *need_duplicate);
+rhdtyp *op_rhd_ext(mval *rtname, mval *lblname, rhdtyp *rhd, void *lnr);
+void *op_lab_ext(void);
 
 #endif /* RTNHDR_H_INCLUDED */

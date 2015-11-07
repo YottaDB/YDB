@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,7 +100,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	get_page_size();
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 #	ifndef GTCM_DEBUG_NOBACKGROUND
-	FORK_CLEAN(pid);
+	FORK(pid);
 	if (0 > pid)
 	{
 		save_errno = errno;

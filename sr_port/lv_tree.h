@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -224,7 +224,7 @@ lvTreeNode	*lvAvlTreeFirstPostOrder(lvTree *lvt);
 lvTreeNode	*lvAvlTreeNextPostOrder(lvTreeNode *node);
 lvTreeNode	*lvAvlTreeKeyCollatedNext(lvTree *lvt, treeKeySubscr *key);
 lvTreeNode	*lvAvlTreeNodeCollatedNext(lvTreeNode *node);
-lvTreeNode	*lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl_parent);
+lvTreeNode	*lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl_parent, boolean_t refCntMaint);
 
 #ifdef DEBUG
 boolean_t	lvTreeIsWellFormed(lvTree *lvt);
@@ -268,7 +268,7 @@ void		lvAvlTreeNodeDelete(lvTree *lvt, lvTreeNode *node);
 	TREE_DEBUG_ONLY(assert(lvTreeIsWellFormed(LVT));)					\
 }
 
-#define	LV_TREE_CLONE(LVT, SBS_PARENT, BASE_LV)										\
+#define	LV_TREE_CLONE(LVT, SBS_PARENT, BASE_LV, REFCNTMAINT)								\
 {															\
         lvTree		*cloneTree;											\
 	lvTreeNode	*avl_root;											\
@@ -293,7 +293,7 @@ void		lvAvlTreeNodeDelete(lvTree *lvt, lvTreeNode *node);
 	/* reset clue in cloned tree as source tree pointers are no longer relevant in cloned tree */			\
 	cloneTree->lastLookup.lastNodeLookedUp = NULL;									\
 	if (NULL != (avl_root = (LVT)->avl_root))									\
-        	cloneTree->avl_root = lvAvlTreeCloneSubTree(avl_root, cloneTree, NULL);					\
+        	cloneTree->avl_root = lvAvlTreeCloneSubTree(avl_root, cloneTree, NULL, (REFCNTMAINT));			\
 	else														\
         	cloneTree->avl_root = NULL;										\
 }

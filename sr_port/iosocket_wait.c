@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+#include "gtm_unistd.h"
 #ifdef USE_POLL
 #include <sys/poll.h>
 #endif
@@ -57,6 +58,7 @@ GBLREF mv_stent			*mv_chain;
 GBLREF int			dollar_truth;
 
 error_def(ERR_GETNAMEINFO);
+error_def(ERR_GETSOCKNAMERR);
 error_def(ERR_SOCKACPT);
 error_def(ERR_SOCKWAIT);
 error_def(ERR_TEXT);
@@ -67,7 +69,7 @@ error_def(ERR_STACKOFLOW);
 
 boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 {
-	struct 	timeval  	utimeout;
+	struct 	timeval  	utimeout, *utimeoutptr;
 	ABS_TIME		cur_time, end_time;
 #ifdef USE_POLL
 	nfds_t			poll_nfds;
@@ -81,7 +83,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	fd_set			select_fdset;
 #endif
 	d_socket_struct 	*dsocketptr;
-	socket_struct   	*socketptr, *newsocketptr;
+	socket_struct   	*socketptr;
 	socket_interrupt	*sockintr;
 	char            	*errptr, *charptr;
 	int4            	errlen, ii, jj, msec_timeout;
@@ -234,13 +236,22 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 			for ( ; ; )
 			{
 #ifdef USE_POLL
-				poll_timeout = (utimeout.tv_sec * 1000) + (utimeout.tv_usec / 1000);
+				if ((0 < rconnected) || (0 <rlisten))
+					poll_timeout = 0;
+				else if (NO_M_TIMEOUT == timepar)
+					poll_timeout = -1;
+				else
+					poll_timeout = (utimeout.tv_sec * 1000) + (utimeout.tv_usec / 1000);
 				poll_fd = -1;
 				rv = poll(poll_fds, poll_nfds, poll_timeout);
 #endif
 #ifdef USE_SELECT
-				rv = select(select_max_fd + 1, (void *)&select_fdset, (void *)0, (void *)0,
-					    (timepar == NO_M_TIMEOUT ? (struct timeval *)NULL : &utimeout));
+				utimeoutptr = &utimeout;
+				if ((0 < rconnected) || (0 <rlisten))
+					utimeout.tv_sec = utimeout.tv_usec = 0;
+				else if (NO_M_TIMEOUT == timepar)
+					utimeoutptr = (struct timeval *)NULL;
+				rv = select(select_max_fd + 1, (void *)&select_fdset, (void *)0, (void *)0, utimeoutptr);
 #endif
 				if (0 > rv && EINTR == errno)
 				{
@@ -301,14 +312,19 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		/* find out which sockets are ready */
 		oldestlistencycle = oldestconnectedcycle = oldesteventcycle = 0;
 		oldestlistenindex = oldestconnectedindex = oldesteventindex = -1;
-		for (ii = jj = 0; ii < dsocketptr->n_socket; ii++)
+		for (ii = 0; ii < dsocketptr->n_socket; ii++)
 		{
 			socketptr = dsocketptr->socket[ii];
 			if ((socket_listening != socketptr->state) && (socket_connected != socketptr->state))
 				continue;	/* not a candidate for /WAIT */
 #ifdef USE_POLL
-			assertpro((0 == jj) || (jj <= poll_nfds));	/* equal after last polled fd checked */
-			if (nselect && (socketptr->sd == poll_fds[jj].fd) && (poll_fds[jj++].revents & POLLIN))
+			for (jj = 0; jj < poll_nfds; jj++)
+			{
+				if (socketptr == poll_socketptr[jj])
+					break;
+			}
+			assertpro((0 == jj) || (jj <= poll_nfds));	/* equal poll_nfds if not polled */
+			if (nselect && (jj != poll_nfds) && (socketptr->sd == poll_fds[jj].fd) && (poll_fds[jj].revents & POLLIN))
 #endif
 #ifdef USE_SELECT
 			assertpro(FD_SETSIZE > socketptr->sd);
@@ -387,7 +403,12 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 			} else
 			{
 				assertpro(socket_local == socketptr->protocol);
-				charptr = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
+				if (NULL != socketptr->local.sa)
+					charptr = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
+				else if (NULL != socketptr->remote.sa)
+					charptr = ((struct sockaddr_un *)(socketptr->remote.sa))->sun_path;
+				else
+					charptr = (char *)"";
 				strncpy(&dsocketptr->iod->dollar.key[len], charptr, DD_BUFLEN - len - 1);
 #			endif
 			}
@@ -404,7 +425,7 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 {
 	char            	*errptr;
 	int4            	errlen;
-	int			rv, len, errcode;
+	int			rv, len, errcode, save_errno;
 	char			port_buffer[NI_MAXSERV], ipaddr[SA_MAXLEN + 1];
 #ifdef USE_POLL
 	struct pollfd		poll_fds;
@@ -414,7 +435,7 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	fd_set			select_fdset;
 #endif
 	struct timeval		utimeout;
-	GTM_SOCKLEN_TYPE	size;
+	GTM_SOCKLEN_TYPE	size, addrlen;
 	socket_struct		*newsocketptr;
 	struct sockaddr_storage	peer;           /* socket address + port */
 	struct sockaddr		*peer_sa_ptr;
@@ -470,13 +491,18 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 		}
 	}
 	SOCKET_DUP(socketptr, newsocketptr);
+	newsocketptr->remote.ai.ai_socktype = socketptr->local.ai.ai_socktype;
+	newsocketptr->remote.ai.ai_protocol = socketptr->local.ai.ai_protocol;
+	newsocketptr->lastaction = newsocketptr->readycycle = 0;
+	newsocketptr->pendingevent = FALSE;
 	newsocketptr->sd = rv;
 	if (socket_local != newsocketptr->protocol)
 	{	/* translate internal address to numeric ip address */
 		SOCKET_ADDR_COPY(newsocketptr->remote, peer_sa_ptr, size);	/* info not set for socket_local */
-		if (0 != (errcode = getnameinfo(peer_sa_ptr, size, ipaddr, SA_MAXLEN,
-				NULL, 0, NI_NUMERICHOST)))
+		GETNAMEINFO(peer_sa_ptr, size, ipaddr, SA_MAXLEN, NULL, 0, NI_NUMERICHOST, errcode);
+		if (0 != errcode)
 		{
+			close(newsocketptr->sd);
 			SOCKET_FREE(newsocketptr);
 			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
 			return -1;
@@ -488,17 +514,46 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 		GETNAMEINFO(peer_sa_ptr, size, NULL, 0, port_buffer, NI_MAXSERV, NI_NUMERICSERV, errcode);
 		if (0 != errcode)
 		{
+			close(newsocketptr->sd);
 			SOCKET_FREE(newsocketptr);
 			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
 			return -1;
 		}
 		newsocketptr->remote.port = ATOI(port_buffer);
+		newsocketptr->remote.ai.ai_addrlen = size;
+		addrlen = SIZEOF(struct sockaddr_storage);
+		if (-1 == getsockname(newsocketptr->sd, SOCKET_LOCAL_ADDR(newsocketptr), &addrlen))
+		{
+			save_errno = errno;
+			errptr = (char *)STRERROR(save_errno);
+			errlen = STRLEN(errptr);
+			close(newsocketptr->sd);
+			SOCKET_FREE(newsocketptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, errlen, errptr);
+			return -1;
+		}
+		newsocketptr->local.ai.ai_addrlen = addrlen;
+		newsocketptr->local.ai.ai_family = SOCKET_LOCAL_ADDR(newsocketptr)->sa_family;
+		GETNAMEINFO(SOCKET_LOCAL_ADDR(newsocketptr), newsocketptr->local.ai.ai_addrlen, ipaddr,
+			SA_MAXLEN, NULL, 0, NI_NUMERICHOST, errcode);
+		if (0 != errcode)
+		{
+			close(newsocketptr->sd);
+			SOCKET_FREE(newsocketptr);
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+			return -1;
+		}
+		if (NULL != newsocketptr->local.saddr_ip)
+			free(newsocketptr->local.saddr_ip);
+		STRNDUP(ipaddr, SA_MAXLEN, newsocketptr->local.saddr_ip);
 	}
 	newsocketptr->state = socket_connected;
 	newsocketptr->passive = FALSE;
+	newsocketptr->howcreated = creator_accept;
 	newsocketptr->first_read = newsocketptr->first_write = TRUE;
 	/* put the new-born socket to the list and create a handle for it */
 	iosocket_handle(newsocketptr->handle, &newsocketptr->handle_len, TRUE, dsocketptr);
+	STRNDUP(socketptr->handle, socketptr->handle_len, newsocketptr->parenthandle);
 	socketptr->lastaction = dsocketptr->waitcycle;	/* record cycle for last connect */
 	dsocketptr->socket[dsocketptr->n_socket++] = newsocketptr;
 	dsocketptr->current_socket = dsocketptr->n_socket - 1;
@@ -513,11 +568,14 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 #	ifndef VMS
 	else
 	{ /* get path from listening socket local side */
+		assert(NULL != socketptr->local.sa);
 		STRNCPY_STR(&dsocketptr->iod->dollar.key[len], ((struct sockaddr_un *)(socketptr->local.sa))->sun_path,
 			DD_BUFLEN - len);
 		SOCKET_ADDR_COPY(newsocketptr->remote, socketptr->local.sa, SIZEOF(struct sockaddr_un));
+		newsocketptr->remote.ai.ai_addrlen = socketptr->local.ai.ai_addrlen;
 	}
 #	endif
 	dsocketptr->iod->dollar.key[DD_BUFLEN - 1] = '\0';		/* In case we fill the buffer */
+	newsocketptr->remote.ai.ai_family = SOCKET_REMOTE_ADDR(newsocketptr)->sa_family;
 	return 0;
 }

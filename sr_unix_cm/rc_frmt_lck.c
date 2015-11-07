@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@ short *subcnt;
 	unsigned char	*g, *g_top;
 	char		*length, *start;
 	char		buff[MAX_ZWR_KEY_SZ], *b_top, *b, *c_top, *sub_start;
+	mstr		opstr;
 
 	c_top = c + max_size;
 	g = key;
@@ -65,7 +66,9 @@ short *subcnt;
 		if (*g == '\0')		/* not a valid number or a string */
 		    return -RC_BADXBUF;
 
-		b_top = (char *)gvsub2str(g,(uchar_ptr_t)buff,FALSE);
+		opstr.addr = buff;
+		opstr.len = MAX_ZWR_KEY_SZ;
+		b_top = (char *)gvsub2str(g, &opstr, FALSE);
 
 		sub_start = c;
 		for (b = buff; b < b_top;)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,14 +42,14 @@ LITDEF nametabent dev_param_names[] =
 	,{2,"BL*"}	,{4,"BLOC"}
 	,{4,"BU*"}
 
-	,{2,"CA"}, {4,"CANT*"}
+	,{2,"CA"}	,{4,"CANT*"}
 	,{4,"CANO*"}
 	,{2,"CE*"}
 	,{3,"CHA*"}
 	,{3,"CHS*"}
 	,{3,"CLE*"}
 	,{3,"CLI"}
-	,{4,"COMM*"},	{7,"COMMAND"}
+	,{4,"COMM*"}	,{7,"COMMAND"}
 	,{4,"CONN*"}
 	,{4,"CONT*"}
 	,{4,"CONV*"}
@@ -92,9 +92,14 @@ LITDEF nametabent dev_param_names[] =
 	,{3,"HOS*"}	,{4,"HOST"}
 
 	,{6,"ICHSET"}
+	,{4,"IKEY"}
 	,{4,"INDE*"}	,{11,"INDEPENDENT"}
+	,{8,"INREWIND"}
+	,{6,"INSEEK"}
 	,{2,"IN*"}	,{4,"INSE"}
 	,{3,"IOE*"}
+
+	,{3,"KEY"}
 
 	,{3,"LAB*"}
 	,{3,"LAS*"}
@@ -163,7 +168,10 @@ LITDEF nametabent dev_param_names[] =
 
 	,{1,"O"}
 	,{6,"OCHSET"}
+	,{4,"OKEY"}
 	,{2,"OP*"}
+	,{9,"OUTREWIND"}
+	,{7,"OUTSEEK"}
 	,{2,"OV*"}
 	,{2,"OW*"}
 
@@ -200,6 +208,7 @@ LITDEF nametabent dev_param_names[] =
 	,{3,"RFM"}
 
 	,{1,"S"}
+	,{3,"SEE*"}
 	,{3,"SEQ*"}
 	,{3,"SET*"}
 	,{2,"SH"}	,{3,"SHA*"}	,{4,"SHAR"}
@@ -208,7 +217,7 @@ LITDEF nametabent dev_param_names[] =
 	,{2,"SO*"}
 	,{3,"SPA*"}
 	,{3,"SPO*"}
-	,{2,"ST"}	,{3,"STR*"}
+	,{2,"ST"}	,{3,"STR*"}	,{6,"STREAM"}
 	,{4,"STDE*"}	,{6,"STDERR"}
 	,{2,"SU*"}
 	,{2,"SY*"}
@@ -262,15 +271,18 @@ LITDEF nametabent dev_param_names[] =
 	,{4,"ZWID*"}
 	,{4,"ZWRA*"}
 };
-/* Offset of letter in dev_param_names */
 
+/* Offset of letter in dev_param_names */
 LITDEF	uint4 dev_param_index[27] =
 {
 /*	A    B    C    D    E    F    G    H    I    J    K    L    M    N   */
-	0,   5,   9,   26,  34,  49,  64,  66,  70,  76,  76,  76,  84,  87,
+	0,   5,   9,   26,  34,  49,  64,  66,  70,  79,  79,  80,  88,  91,
+
+
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	153, 158, 177, 178, 191, 209, 219, 225, 226, 241, 242, 243, 257
+	157, 165, 184, 185, 198, 218, 228, 234, 235, 250, 251, 252, 266
 };
+
 /* Offset of string within letter in dev_param_names */
 /* maintained in conjunction with zshow_params.h   = offset in letter, letter  */
 LITDEF zshow_index zshow_param_index[] =
@@ -280,15 +292,15 @@ LITDEF zshow_index zshow_param_index[] =
 /*	FIL     FIXED  FOLLOW */
 	{5,5},  {8,5},  {14,5},
 /*  	HOST    ICHSET   INDEPENDENT  INSE     LAB */
-	{3,7},	{0,8},   {2,8},      {4,8},   {1,11},
+	{3,7},	{0,8},   {2,8},      {7,8},   {1,11},
 /*	LENG     NOCENE   NODEST    NOECHO   NOEDIT   NOEMPTERM NOESCA   NOFOLLOW  NOHOST   NOINSE     */
 	{3,11},  {7,13},  {10,13},  {15,13}, {17,13}, {19,13},  {21,13}, {27,13},  {31,13}, {33,13},
 /*	NOPAST   NOREADS  NOTTSY   NOTYPE   NOWRAP   OCHSET   PAD     PARSE   PAST     PRMMBX   RCHK    */
 	{39,13}, {44,13}, {55,13}, {57,13}, {63,13}, {1,14},  {8,15}, {11,15}, {13,15}, {17,15}, {1,17},
-/*      READ     READS	  REC      SHAR     SHELL    STDERR   TERM     TTSY     TYPE    UIC      WAIT     WCHK   */
-	{2,17},  {4,17},  {5,17},  {5,18},  {7,18},  {15,18},  {1,19},  {7,19},  {9,19}, {1,20},  {2,22},  {4,22},
-/*      WIDTH   WRITE  */
-	{6,22}, {10,22}
+/*      READ     READS	  REC      SHAR     SHELL    STDERR   STREAM   TERM     TTSY     TYPE    UIC     */
+	{2,17},  {4,17},  {5,17},  {6,18},  {8,18},  {17,18}, {15,18}, {1,19},  {7,19},  {9,19}, {1,20},
+/*      WAIT     WCHK    WIDTH   WRITE  */
+        {2,22},  {4,22}, {6,22}, {10,22}
 };
 
 int deviceparameters(oprtype *c, char who_calls)
@@ -366,9 +378,14 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_hostsync, iop_hostsync
 
 		,iop_ipchset
+		,iop_input_key
 		,iop_independent ,iop_independent
+		,iop_inrewind
+		,iop_inseek
 		,iop_insert ,iop_insert
 		,iop_ioerror
+
+		,iop_key
 
 		,iop_label
 		,iop_lastpage
@@ -437,7 +454,10 @@ int deviceparameters(oprtype *c, char who_calls)
 
 		,iop_o_protection
 		,iop_opchset
+		,iop_output_key
 		,iop_operator
+		,iop_outrewind
+		,iop_outseek
 		,iop_noinsert
 		,iop_o_protection
 
@@ -474,6 +494,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_rfm
 
 		,iop_s_protection
+		,iop_seek
 		,iop_sequential
 		,iop_setup
 		,iop_shared ,iop_shared, iop_shared
@@ -482,7 +503,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_socket
 		,iop_space
 		,iop_spool
-		,iop_stream, iop_stream
+		,iop_stream, iop_stream, iop_stream
 		,iop_stderr, iop_stderr
 		,iop_submit
 		,iop_s_protection

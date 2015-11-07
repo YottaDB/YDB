@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -131,6 +131,7 @@
 # include "gtmcrypt.h"
 # include "gdsblk.h"
 # include "muextr.h"
+# include "gtmxc_types.h"
 # endif
 #ifdef GTM_TLS
 #include "gtm_tls_interface.h"
@@ -926,10 +927,13 @@ GBLDEF	char		*gtm_utf8_locale_object;
 GBLDEF	boolean_t	gtm_tag_utf8_as_ascii = TRUE;
 #endif
 #ifdef GTM_CRYPT
-LITDEF	char			gtmcrypt_repeat_msg[] = "Please look at prior messages related to encryption for more details";
-GBLDEF	boolean_t		gtmcrypt_initialized;	/* Set to TRUE if gtmcrypt_init() completes successfully */
-GBLDEF	char			dl_err[MAX_ERRSTR_LEN];
-GBLDEF	mstr			pvt_crypt_buf;	/* Temporary buffer needed where in-place encryption/decryption is not an option */
+LITDEF	char		gtmcrypt_repeat_msg[] = "Please look at prior messages related to encryption for more details";
+GBLDEF	char		*gtmcrypt_badhash_size_msg;
+GBLDEF	boolean_t	gtmcrypt_initialized;	/* Set to TRUE if gtmcrypt_init() completes successfully */
+GBLDEF	char		dl_err[MAX_ERRSTR_LEN];
+GBLDEF	mstr		pvt_crypt_buf;		/* Temporary buffer needed where in-place encryption/decryption is not an option */
+LITDEF	gtm_string_t	null_iv = {0, ""};
+GBLDEF	boolean_t	err_same_as_out;
 #endif /* GTM_CRYPT */
 #ifdef DEBUG
 /* Following definitions are related to white_box testing */
@@ -1074,7 +1078,9 @@ GBLDEF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLDEF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
 GBLDEF	boolean_t	is_jnlpool_creator;
 GBLDEF	char		gtm_dist[GTM_PATH_MAX];		/* Value of $gtm_dist env variable */
+GBLDEF	boolean_t	gtm_dist_ok_to_use = FALSE;		/* Whether or not we can use $gtm_dist */
 GBLDEF	semid_queue_elem	*keep_semids;		/* Access semaphores that should be kept because shared memory is up */
+GBLDEF	boolean_t		dmterm_default;		/* Retain default line terminators in the direct mode */
 #endif
 GBLDEF	boolean_t	in_jnl_file_autoswitch;		/* Set to TRUE for a short window inside jnl_file_extend when we are about
 							 * to autoswitch; used by jnl_write. */
@@ -1107,3 +1113,5 @@ GBLDEF	gtm_tls_ctx_t	*tls_ctx;			/* Process private pointer to SSL/TLS context. 
 							 * Socket devices.
 							 */
 #endif
+
+GBLDEF lv_val		*active_lv;

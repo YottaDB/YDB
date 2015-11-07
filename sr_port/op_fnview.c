@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,6 +72,7 @@ GBLREF int		gv_fillfactor;
 GBLREF int4		gtm_max_sockets;
 GBLREF gv_key		*gv_currkey;
 GBLREF boolean_t	is_gtm_chset_utf8;
+UNIX_ONLY(GBLREF	boolean_t		dmterm_default;)
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_GBLNOMAPTOREG);
@@ -84,6 +85,14 @@ LITREF	mstr		relink_allowed_mstr[];
 LITREF	mval		literal_zero;
 LITREF	mval		literal_one;
 LITREF	mval		literal_null;
+
+#define		MM_RES		"MM"
+#define		BG_RES		"BG"
+#define		CM_RES		"CM"
+#define		USR_RES		"USR"
+#define		GTM_BOOL_RES	"GT.M Boolean short-circuit"
+#define		STD_BOOL_RES	"Standard Boolean evaluation side effects"
+#define		WRN_BOOL_RES	"Standard Boolean with side-effect warning"
 
 STATICFNDCL unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act);
 
@@ -202,20 +211,20 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			switch (REG_ACC_METH(parmblk.gv_ptr))
 			{
 				case dba_mm:
-					tmpstr.addr = "MM";
-					tmpstr.len = SIZEOF("MM")-1;
+					tmpstr.addr = MM_RES;
+					tmpstr.len = SIZEOF(MM_RES)-1;
 					break;
 				case dba_bg:
-					tmpstr.addr = "BG";
-					tmpstr.len = SIZEOF("BG")-1;
+					tmpstr.addr = BG_RES;
+					tmpstr.len = SIZEOF(BG_RES)-1;
 					break;
 				case dba_cm:
-					tmpstr.addr = "CM";
-					tmpstr.len = SIZEOF("CM")-1;
+					tmpstr.addr = CM_RES;
+					tmpstr.len = SIZEOF(CM_RES)-1;
 					break;
 				case dba_usr:
-					tmpstr.addr = "USR";
-					tmpstr.len = SIZEOF("USR")-1;
+					tmpstr.addr = USR_RES;
+					tmpstr.len = SIZEOF(USR_RES)-1;
 					break;
 				default:
 					assertpro(FALSE && REG_ACC_METH(parmblk.gv_ptr));
@@ -226,16 +235,16 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			switch (TREF(gtm_fullbool))
 			{
 				case GTM_BOOL:
-					tmpstr.addr = "GT.M Boolean short-circuit";
-					tmpstr.len = SIZEOF("GT.M Boolean short-circuit")-1;
+					tmpstr.addr = GTM_BOOL_RES;
+					tmpstr.len = SIZEOF(GTM_BOOL_RES)-1;
 					break;
 				case FULL_BOOL:
-					tmpstr.addr = "Standard Boolean evaluation side effects";
-					tmpstr.len = SIZEOF("Standard Boolean evaluation side effects")-1;
+					tmpstr.addr = STD_BOOL_RES;
+					tmpstr.len = SIZEOF(STD_BOOL_RES)-1;
 					break;
 				case FULL_BOOL_WARN:
-					tmpstr.addr = "Boolean side-effect warning";
-					tmpstr.len = SIZEOF("Boolean side-effect warning")-1;
+					tmpstr.addr = WRN_BOOL_RES;
+					tmpstr.len = SIZEOF(WRN_BOOL_RES)-1;
 					break;
 				default:
 					assertpro(FALSE && TREF(gtm_fullbool));
@@ -691,6 +700,9 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			dst->str = relink_allowed_mstr[TREF(relink_allowed)];
 			s2pool(&dst->str);
 			break;
+		case VTK_DMTERM:
+			n = dmterm_default;
+			break;
 #		endif
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWFN);
@@ -855,7 +867,7 @@ STATICFNDEF unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 					break;		/* bad function name. issue error after breaking from for loop */
 				}
 				for (c2 = (unsigned char *)&fnname[0]; c1 < c; c2++, c1++)
-					*c2 = toupper(*c1);
+					*c2 = TOUPPER(*c1);
 				if (!MEMCMP_LIT(fnname, "ZCHAR") || !MEMCMP_LIT(fnname, "ZCH"))
 					is_zchar = 1;
 				else if (!MEMCMP_LIT(fnname, "CHAR") || !MEMCMP_LIT(fnname, "C"))

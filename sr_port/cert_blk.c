@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +70,7 @@ error_def(ERR_DBDIRTSUBSC);
 error_def(ERR_DBMAXNRSUBS); /* same error as ERR_MAXNRSUBSCRIPTS, but has a string output as well */
 error_def(ERR_DBINVGBL);
 error_def(ERR_DBBDBALLOC);
+error_def(ERR_GVINVALID);
 
 #define BITS_PER_UCHAR	8
 #define BLKS_PER_UINT4	((SIZEOF(uint4) / SIZEOF(unsigned char)) * BITS_PER_UCHAR) / BML_BITS_PER_BLK
@@ -86,7 +87,7 @@ error_def(ERR_DBBDBALLOC);
 #define	RTS_ERROR_FUNC(CSA, ERR, BUFF)									\
 {													\
 	if (gtmassert_on_error)										\
-		GTMASSERT;										\
+		assertpro(0 != ERR);										\
 	rts_error_csa(CSA_ARG(CSA) VARLSTCNT(4) MAKE_MSG_INFO(ERR), 2, LEN_AND_STR((char_ptr_t)BUFF));	\
 }
 
@@ -304,7 +305,10 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			{
 				ch = *((sm_uc_ptr_t)rp + SIZEOF(rec_hdr));
 				if (!(VALFIRSTCHAR_WITH_TRIG(ch)))
-					GTMASSERT;
+				{
+					RTS_ERROR_FUNC(csa, ERR_GVINVALID, util_buff);
+					return FALSE;
+				}
 			}
 		}
 		if (r_top == (rec_hdr_ptr_t)blk_top && blk_levl)

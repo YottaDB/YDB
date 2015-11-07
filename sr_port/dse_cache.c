@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ GBLREF gd_addr		*original_header;
 
 error_def(ERR_SIZENOTVALID4);
 
-#define	DB_ABS2REL(X)	((sm_uc_ptr_t)(X) - (sm_uc_ptr_t)csa->nl)
+#define	DB_ABS2REL(X)			(uintszofptr_t)((uintszofptr_t)(X) - (uintszofptr_t)csa->nl)
 #define MAX_UTIL_LEN 			40
 #define	CLEAN_VERIFY			"verification is clean"
 #define	UNCLEAN_VERIFY			"verification is NOT clean (see operator log for details)"
@@ -49,18 +49,20 @@ error_def(ERR_SIZENOTVALID4);
 
 void dse_cache(void)
 {
-	boolean_t	all_present, change_present, recover_present, show_present, verify_present, was_crit, is_clean;
-	boolean_t	nocrit_present, offset_present, size_present, value_present;
-	gd_region	*reg, *r_top;
-	sgmnt_addrs	*csa;
-	mval		dollarh_mval, zdate_mval;
-	int4		size;
-	uint4		offset, value, old_value, lcnt;
-	char		dollarh_buffer[MAXNUMLEN], zdate_buffer[SIZEOF(DSE_DMP_TIME_FMT)];
-	char		temp_str[256], temp_str1[256];
-	sm_uc_ptr_t	chng_ptr;
-	cache_rec_ptr_t	cr_que_lo;
-	boolean_t	is_mm, was_hold_onto_crit, wc_blocked_ok;
+	boolean_t		all_present, change_present, recover_present, show_present, verify_present, was_crit, is_clean;
+	boolean_t		nocrit_present, offset_present, size_present, value_present;
+	gd_region		*reg, *r_top;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	mval			dollarh_mval, zdate_mval;
+	int4			size;
+	uint4			offset, value, old_value, lcnt;
+	char			dollarh_buffer[MAXNUMLEN], zdate_buffer[SIZEOF(DSE_DMP_TIME_FMT)];
+	char			temp_str[256], temp_str1[256];
+	sm_uc_ptr_t		chng_ptr;
+	cache_rec_ptr_t		cr_que_lo;
+	boolean_t		is_mm, was_hold_onto_crit, wc_blocked_ok;
+	uintszofptr_t		section_offset;
 
 	all_present = (CLI_PRESENT == cli_present("ALL"));
 
@@ -200,35 +202,47 @@ void dse_cache(void)
 				TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->shmpool_buffer));
 			util_out_print("Region !AD :  lock_space         = 0x!XJ",
 				TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->lock_addrs[0]));
+			csd = csa->hdr;
 			if (!is_mm)
 			{
 				util_out_print("Region !AD :  cache_queues_state = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->acc_meth.bg.cache_state));
 				cr_que_lo = &csa->acc_meth.bg.cache_state->cache_array[0];
 				util_out_print("Region !AD :  cache_que_header   = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo), csa->hdr->bt_buckets, SIZEOF(cache_rec));
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo), csd->bt_buckets, SIZEOF(cache_rec));
 				util_out_print("Region !AD :  cache_record       = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets), csa->hdr->n_bts,
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo + csd->bt_buckets), csd->n_bts,
 					SIZEOF(cache_rec));
+				section_offset = ROUND_UP2(DB_ABS2REL(cr_que_lo + csd->bt_buckets + csd->n_bts), OS_PAGE_SIZE);
 				util_out_print("Region !AD :  global_buffer      = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg),
-					ROUND_UP2(DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets + csa->hdr->n_bts), OS_PAGE_SIZE),
-					csa->hdr->n_bts, csa->hdr->blk_size);
+					TRUE, REG_LEN_STR(reg), section_offset, csd->n_bts, csd->blk_size);
+#				ifdef GTM_CRYPT
+				if (csd->is_encrypted)
+				{
+					section_offset += (gtm_uint64_t)csd->n_bts * csd->blk_size;
+					/* In case of an encrypted database, bp_top is actually the beginning of the encrypted
+					 * global buffer array (an array maintained parallely with the regular unencrypted
+					 * global buffer array).
+					 */
+					util_out_print("Region !AD :  encrypted_globuff  = 0x!XJ : Numelems = 0x!XL : Elemsize = "
+						"0x!XL", TRUE, REG_LEN_STR(reg), section_offset, csd->n_bts, csd->blk_size);
+				}
+#				endif
 				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE,
-					REG_LEN_STR(reg), DB_ABS2REL(csa->hdr));
+					REG_LEN_STR(reg), DB_ABS2REL(csd));
 				util_out_print("Region !AD :  bt_que_header      = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_header), csa->hdr->bt_buckets, SIZEOF(bt_rec));
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_header), csd->bt_buckets, SIZEOF(bt_rec));
 				util_out_print("Region !AD :  th_base            = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->th_base));
 				util_out_print("Region !AD :  bt_record          = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_base), csa->hdr->n_bts, SIZEOF(bt_rec));
-				util_out_print("Region !AD :  shared_memory_size = 0x!XL",
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_base), csd->n_bts, SIZEOF(bt_rec));
+				util_out_print("Region !AD :  shared_memory_size = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), csa->nl->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
 			} else
 			{
-				util_out_print("Region !AD :  shared_memory_size = 0x!XL",
+				util_out_print("Region !AD :  shared_memory_size = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), csa->nl->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
-				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE, REG_LEN_STR(reg), csa->hdr);
+				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE, REG_LEN_STR(reg), csd);
 			}
 		}
 		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, csa, reg);

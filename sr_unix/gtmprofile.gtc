@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-#       Copyright 2010, 2013 Fidelity Information Services, Inc.#
+#       Copyright 2010, 2014 Fidelity Information Services, Inc.#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -81,7 +81,7 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
 	which="which"
     fi
     if [ -z "$gtm_icu_version" -a -n "`$which icu-config`" ] ; then
-        gtm_icu_version=`icu-config --version | gtm_chset=M $gtm_dist/mumps -run %XCMD 'Read x Write $Piece(x,".",1,2)'`
+	gtm_icu_version=`icu-config --version | gtm_chset=M $gtm_dist/mumps -run %XCMD 'Read x Write $Select(+x>48:$Piece(x,".",1)/10,1:$Piece(x,".",1,2))'`
         export gtm_icu_version
     fi
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,7 @@ boolean_t mu_int_init(void)
 	int			gtmcrypt_errno;
 	gd_segment		*seg;
 #	endif
+	sgmnt_addrs		*csa;
 
 	mu_gv_cur_reg_init();
 	/* get filename */
@@ -68,7 +69,8 @@ boolean_t mu_int_init(void)
 		mupip_exit(ERR_MUNODBNAME);
 	if (!STANDALONE(gv_cur_region))
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
+		csa = &FILE_INFO(gv_cur_region)->s_addrs;
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
 		mu_int_skipreg_cnt++;
 		return (FALSE);
 	}
@@ -78,7 +80,8 @@ boolean_t mu_int_init(void)
 	status = dbfilop(fc);
 	if (SS_NORMAL != status)
 	{
-		gtm_putmsg(VARLSTCNT(1) status);
+		csa = &FILE_INFO(gv_cur_region)->s_addrs;
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) status);
 		mu_int_skipreg_cnt++;
 		return FALSE;
 	}
@@ -104,7 +107,7 @@ boolean_t mu_int_init(void)
 	if (mu_int_data.is_encrypted)
 	{ 	/* Initialize encryption and the key information for the current segment to be used in mu_int_read. */
 		ASSERT_ENCRYPTION_INITIALIZED;	/* should have been done in mu_rndwn_file called from STANDALONE macro */
-		GTMCRYPT_GETKEY(NULL, mu_int_data.encryption_hash, mu_int_encrypt_key_handle, gtmcrypt_errno);
+		GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, mu_int_data.encryption_hash, mu_int_encrypt_key_handle, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			seg = gv_cur_region->dyn.addr;

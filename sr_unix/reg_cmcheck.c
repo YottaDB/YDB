@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,8 @@
 
 #define MAX_NODE_NAME 32
 
+error_def(ERR_DBFILERR);
+
 bool reg_cmcheck(gd_region *reg)
 {
 	gd_segment	*seg;
@@ -28,9 +30,10 @@ bool reg_cmcheck(gd_region *reg)
 	parse_blk	pblk;
 	mstr		file;
 	int		status;
-	error_def(ERR_DBFILERR);
 
 	seg = reg->dyn.addr;
+	if (dba_cm == seg->acc_meth)
+		return TRUE;	/* if access method has already been set to dba_cm, return right away (avoid recomputation) */
 	file.addr = (char *)seg->fname;
 	file.len = seg->fname_len;
 	memset(&pblk, 0, SIZEOF(pblk));
@@ -43,17 +46,14 @@ bool reg_cmcheck(gd_region *reg)
 	{
 		pblk.def1_buf = DEF_NODBEXT;
 		pblk.def1_size = SIZEOF(DEF_NODBEXT) - 1;
-	}
-	else
+	} else
 	{
 		pblk.def1_buf = DEF_DBEXT;
 		pblk.def1_size = SIZEOF(DEF_DBEXT) - 1;
 	}
-
 	status = parse_file(&file, &pblk);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(5) ERR_DBFILERR,2, seg->fname_len, seg->fname, status);
-
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR,2, seg->fname_len, seg->fname, status);
 	assert((int)pblk.b_esl + 1 <= SIZEOF(seg->fname));
 	memcpy(seg->fname, pblk.buffer, pblk.b_esl);
 	pblk.buffer[pblk.b_esl] = 0;
@@ -62,6 +62,7 @@ bool reg_cmcheck(gd_region *reg)
 	if (pblk.fnb & F_HAS_NODE)
 	{
 		assert(pblk.b_node && ':' == pblk.l_node[pblk.b_node - 1]);
+		seg->acc_meth = dba_cm;
 		return TRUE;
 	}
 	return FALSE;

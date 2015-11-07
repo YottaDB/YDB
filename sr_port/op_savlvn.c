@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +70,7 @@ void op_savlvn(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	for (i = 0; i < argcnt; i++, m++)
 	{	/* now all the pieces of the key */
 		key = va_arg(var, mval *);
+		MV_FORCE_DEFINED(key);
 		*m = *key;
 		lvn_info->lv_subs[i] = m;
 		(TREF(glvn_pool_ptr))->mval_top++;

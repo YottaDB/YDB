@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ static char		*load_fn_ptr;
 static int		load_fn_len;
 static readonly unsigned char open_params_list[] =
 {
-	(unsigned char)iop_recordsize,		/* 64K - 2 - big enough for MAX_BLK_SZ */
+	(unsigned char)iop_recordsize,	/* 64K enough to hold MAX_BLK_SZ */
 #	ifdef BIGENDIAN
 	(unsigned char)0, (unsigned char)0, (unsigned char)255, (unsigned char)255,
 #	else
@@ -56,6 +56,7 @@ static readonly unsigned char open_params_list[] =
 	(unsigned char)iop_readonly,
 	(unsigned char)iop_rewind,
 	(unsigned char)iop_m,
+	/* iop_stream not included since it is necessary only if we are opening file for write (which is not the case here) */
 	(unsigned char)iop_nowrap,
 	(unsigned char)iop_eol
 };
@@ -102,10 +103,10 @@ void file_input_close(void)
 	op_close(&val, &pars);
 }
 
-int	file_input_bin_get(char **in_ptr, ssize_t *file_offset, char **buff_base)
+int file_input_bin_get(char **in_ptr, ssize_t *file_offset, char **buff_base, boolean_t do_rts_error)
 {
 	char	*ptr;
-	int	rd_cnt, rd_len, s1;
+	int	rd_cnt, rd_len, ret, s1;
 	unsigned short	s1s;
 
 	ESTABLISH_RET(mupip_load_ch, 0);
@@ -113,14 +114,23 @@ int	file_input_bin_get(char **in_ptr, ssize_t *file_offset, char **buff_base)
 	{
 		if (0 >= (rd_len = file_input_bin_read()))	/* NOTE assignment */
 		{
+			ret = 0;
 			if (buff1_end != buff1_ptr)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
-			else  if (-1 == rd_len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADFILERR, 2, load_fn_len, load_fn_ptr);
-			else
+			{
+				if (do_rts_error)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
+				ret = ERR_PREMATEOF;
+			}
+			else if (-1 == rd_len)
+			{
+				if (do_rts_error)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADFILERR, 2, load_fn_len, load_fn_ptr);
+				ret = ERR_LOADFILERR;
+			}
+			if (!do_rts_error || 0 == ret)
 			{
 				REVERT;
-				return 0;
+				return -ret;
 			}
 		}
 		buff1_end += rd_len;
@@ -136,9 +146,17 @@ int	file_input_bin_get(char **in_ptr, ssize_t *file_offset, char **buff_base)
 		rd_len = file_input_bin_read();
 		if ((rd_len + buff1_end - buff1_ptr) < s1)
 		{
+			if (!do_rts_error)
+				REVERT;
 			if (-1 == rd_len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADFILERR, 2, load_fn_len, load_fn_ptr);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
+			{
+				if (do_rts_error)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADFILERR, 2, load_fn_len, load_fn_ptr);
+				return -ERR_LOADFILERR;
+			}
+			if (do_rts_error)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
+			return -ERR_PREMATEOF;
 		}
 		buff1_end += rd_len;
 	}
@@ -198,7 +216,7 @@ int file_input_get(char **in_ptr)
 		}
 		if (mbuff_len < ret_len + rd_len)
 		{
-			new_mbuff_len = MAX(ret_len,(2 * mbuff_len));
+			new_mbuff_len = MAX((ret_len + rd_len), (2 * mbuff_len));
 			tmp_ptr = (char *)malloc(new_mbuff_len);
 			if (NULL == tmp_ptr)
 			{
@@ -209,10 +227,8 @@ int file_input_get(char **in_ptr)
 			{
 				memcpy(tmp_ptr, mbuff, (ret_len));
 				free (mbuff);
-			}
-			else
+			} else
 				memcpy(tmp_ptr, buff1, (ret_len));
-
 			mbuff = tmp_ptr;
 			mbuff_len = new_mbuff_len;
 

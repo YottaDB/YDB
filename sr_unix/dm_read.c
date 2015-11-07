@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +54,7 @@ GBLREF stack_frame	*frame_pointer;
 GBLREF spdesc 		stringpool;
 GBLREF unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF volatile int4	outofband;
+GBLREF	boolean_t	dmterm_default;
 
 LITREF unsigned char	lower_to_upper_table[];
 #ifdef UNICODE_SUPPORTED
@@ -275,7 +276,17 @@ void	dm_read (mval *v)
 		cl = clmod(comline_index - index);
 	}
 	mask = tt_ptr->term_ctrl;
-	mask_term = tt_ptr->mask_term;
+	if (dmterm_default)
+	{	/* $view("DMTERM") or gtm_dmterm is set. Ignore the customized terminators; use the default terinators */
+		memset(&mask_term.mask[0], 0, SIZEOF(io_termmask));
+		if (utf8_active)
+		{
+			mask_term.mask[0] = TERM_MSK_UTF8_0;
+			mask_term.mask[4] = TERM_MSK_UTF8_4;
+		} else
+			mask_term.mask[0] = TERM_MSK;
+	} else
+		mask_term = tt_ptr->mask_term;
 	mask_term.mask[ESC / NUM_BITS_IN_INT4] &= ~(1 << ESC);
 	ioptr_width = io_ptr->width;
 	if (!zint_restart)
@@ -627,7 +638,8 @@ void	dm_read (mval *v)
 				continue;	/* to allow more input */
 			}
 			if ((((int)inchar == tt_ptr->ttio_struct->c_cc[VERASE])
-				|| ((('\0' == KEY_BACKSPACE[1]) && (inchar == KEY_BACKSPACE[0])))) && !(mask & TRM_PASTHRU))
+			     || (((NULL != KEY_BACKSPACE) && ('\0' == KEY_BACKSPACE[1]) && (inchar == KEY_BACKSPACE[0]))))
+			    && !(mask & TRM_PASTHRU))
 			{
 				if (0 < instr)
 				{
@@ -782,17 +794,16 @@ void	dm_read (mval *v)
 		}
 		if ((0 != escape_length) && (FINI <= io_ptr->esc_state))
 		{
-			down = strncmp((const char *)escape_sequence, KEY_DOWN, escape_length);
-			up = strncmp((const char *)escape_sequence, KEY_UP, escape_length);
-			right = strncmp((const char *)escape_sequence, KEY_RIGHT, escape_length);
-			left = strncmp((const char *)escape_sequence, KEY_LEFT, escape_length);
-			backspace = delete = insert_key = -1;
-			if (NULL != KEY_BACKSPACE)
-				backspace = strncmp((const char *)escape_sequence, KEY_BACKSPACE, escape_length);
-			if (NULL != KEY_DC)
-				delete = strncmp((const char *)escape_sequence, KEY_DC, escape_length);
-			if ((NULL != KEY_INSERT) && ('\0' != KEY_INSERT[0]))
-				insert_key = strncmp((const char *)escape_sequence, KEY_INSERT, escape_length);
+			/* The arbitrary value -1 signifies inequality in case KEY_* is NULL */
+			down = (NULL != KEY_DOWN) ? strncmp((const char *)escape_sequence, KEY_DOWN, escape_length) : -1;
+			up = (NULL != KEY_UP) ? strncmp((const char *)escape_sequence, KEY_UP, escape_length) : -1;
+			right = (NULL != KEY_RIGHT) ? strncmp((const char *)escape_sequence, KEY_RIGHT, escape_length) : -1;
+			left = 	(NULL != KEY_LEFT) ? strncmp((const char *)escape_sequence, KEY_LEFT, escape_length) : -1;
+			backspace = (NULL != KEY_BACKSPACE)
+				? strncmp((const char *)escape_sequence, KEY_BACKSPACE, escape_length) : -1;
+			delete = (NULL != KEY_DC) ? strncmp((const char *)escape_sequence, KEY_DC, escape_length) : -1;
+			insert_key = ((NULL != KEY_INSERT) && ('\0' != KEY_INSERT[0]))
+				? strncmp((const char *)escape_sequence, KEY_INSERT, escape_length) : -1;
 			memset(escape_sequence, '\0', escape_length);
 			escape_length = 0;
 			if (BADESC == io_ptr->esc_state)
@@ -800,13 +811,11 @@ void	dm_read (mval *v)
 				io_ptr->esc_state = START;
 				break;
 			}
-			if ((0 == backspace) || (0 == delete))
+			if ((0 == delete) || (0 == backspace))
 			{
-				if (0 < instr)
-				{
-					MOVE_CURSOR_LEFT_ONE_CHAR(dx, instr, dx_instr, dx_start, ioptr_width);
-					DEL_ONE_CHAR_AT_CURSOR(outlen, dx_outlen, dx, dx_instr, dx_start, ioptr_width);
-				}
+				if ((0 == backspace) && (0 < instr))
+					MOVE_CURSOR_LEFT_ONE_CHAR(dx, instr, dx_instr, dx_start, ioptr_width)
+				DEL_ONE_CHAR_AT_CURSOR(outlen, dx_outlen, dx, dx_instr, dx_start, ioptr_width);
 			}
 			if (0 == insert_key)
 				insert_mode = !insert_mode;	/* toggle */
@@ -814,7 +823,8 @@ void	dm_read (mval *v)
 			{
 				DOWRITE_A(tt_ptr->fildes, &cr, 1);
 				WRITE_GTM_PROMPT;
-				gtm_tputs(CLR_EOL, 1, outc);
+				if (NULL != CLR_EOL)
+					gtm_tputs(CLR_EOL, 1, outc);
 				instr = dx_instr = outlen = dx_outlen = 0;
 				if (0 == up)
 				{

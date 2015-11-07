@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ error_def(ERR_TEXT);
 
 #define ENABLE_FREEZE_ON_ERROR											\
 {														\
-	if (ANTICIPATORY_FREEZE_AVAILABLE)									\
+	if (INST_FREEZE_ON_ERROR_POLICY)									\
 	{	/* Set anticipatory freeze function pointers to be used later (in send_msg and rts_error) */	\
 		is_anticipatory_freeze_needed_fnptr = &is_anticipatory_freeze_needed;				\
 		set_anticipatory_freeze_fnptr = &set_anticipatory_freeze;					\
@@ -63,10 +63,8 @@ error_def(ERR_TEXT);
 #define CHECK_IF_FREEZE_ON_ERROR_NEEDED(CSA, MSG_ID, FREEZE_NEEDED, FREEZE_MSG_ID)					\
 {															\
 	GBLREF	jnlpool_addrs		jnlpool;									\
-	DCL_THREADGBL_ACCESS;												\
 															\
-	SETUP_THREADGBL_ACCESS;												\
-	if (!FREEZE_NEEDED && ANTICIPATORY_FREEZE_AVAILABLE && (NULL != is_anticipatory_freeze_needed_fnptr))		\
+	if (!FREEZE_NEEDED && CUSTOM_ERRORS_LOADED && (NULL != is_anticipatory_freeze_needed_fnptr))			\
 	{	/* NOT gtmsecshr */											\
 		if (IS_REPL_INST_UNFROZEN && (*is_anticipatory_freeze_needed_fnptr)((sgmnt_addrs *)CSA, MSG_ID))	\
 		{													\
@@ -111,18 +109,22 @@ error_def(ERR_TEXT);
 }
 
 #define AFREEZE_MASK				0x01
-#define ANTICIPATORY_FREEZE_AVAILABLE		(0 != (TREF(gtm_custom_errors)).len)
+#define CUSTOM_ERRORS_AVAILABLE			(0 != (TREF(gtm_custom_errors)).len)
+#define CUSTOM_ERRORS_LOADED			((NULL != jnlpool.jnlpool_ctl)							\
+							&& jnlpool.jnlpool_ctl->instfreeze_environ_inited)
+#define INST_FREEZE_ON_ERROR_POLICY		(CUSTOM_ERRORS_AVAILABLE || CUSTOM_ERRORS_LOADED)
 #define INSTANCE_FREEZE_HONORED(CSA)		(DBG_ASSERT(NULL != CSA)							\
 							((NULL != jnlpool.jnlpool_ctl)						\
 								&& ((REPL_ALLOWED(((sgmnt_addrs *)CSA)->hdr))			\
 							    		|| mupip_jnl_recover	/* recover or rollback */	\
 									|| ((sgmnt_addrs *)CSA)->nl->onln_rlbk_pid )))
-#define INST_FREEZE_ON_ERROR_ENABLED(CSA)	(INSTANCE_FREEZE_HONORED(CSA)				\
-							&& ANTICIPATORY_FREEZE_AVAILABLE		\
+#define INST_FREEZE_ON_ERROR_ENABLED(CSA)	(INSTANCE_FREEZE_HONORED(CSA)							\
+							&& CUSTOM_ERRORS_LOADED							\
 							&& (((sgmnt_addrs *)CSA)->hdr->freeze_on_fail))
-#define INST_FREEZE_ON_NOSPC_ENABLED(CSA)	(INST_FREEZE_ON_ERROR_ENABLED(CSA)						\
+#define INST_FREEZE_ON_MSG_ENABLED(CSA, MSG)	(INST_FREEZE_ON_ERROR_ENABLED(CSA)						\
 							&& (NULL != is_anticipatory_freeze_needed_fnptr)			\
-							&& (*is_anticipatory_freeze_needed_fnptr)(CSA, ERR_DSKNOSPCAVAIL))
+							&& (*is_anticipatory_freeze_needed_fnptr)(CSA, MSG))
+#define INST_FREEZE_ON_NOSPC_ENABLED(CSA)	INST_FREEZE_ON_MSG_ENABLED(CSA, ERR_DSKNOSPCAVAIL)
 #define IS_REPL_INST_FROZEN			((NULL != jnlpool.jnlpool_ctl) && jnlpool.jnlpool_ctl->freeze)
 #define IS_REPL_INST_UNFROZEN			((NULL != jnlpool.jnlpool_ctl) && !jnlpool.jnlpool_ctl->freeze)
 
@@ -336,7 +338,7 @@ void clear_fake_enospc_if_master_dead(void);
 							return_on_error))
 
 #else	/* #ifdef UNIX */
-#	define ANTICIPATORY_FREEZE_AVAILABLE			FALSE
+#	define INST_FREEZE_ON_ERROR_POLICY			FALSE
 #	define INST_FREEZE_ON_ERROR_ENABLED(CSA)		FALSE
 #	define REPL_INST_AVAILABLE				FALSE
 #	define WAIT_FOR_REPL_INST_UNFREEZE

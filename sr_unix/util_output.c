@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,8 +53,10 @@ GBLDEF	boolean_t		first_syslog = TRUE;	/* Global for a process - not thread spec
 GBLDEF	char			facility[MAX_INSTNAME_LEN + 100];
 
 GBLREF	io_pair			io_std_device;
+GBLREF	io_pair			io_curr_device;
 GBLREF	boolean_t		blocksig_initialized;
 GBLREF  sigset_t		block_sigsent;
+GBLREF	boolean_t		err_same_as_out;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		is_src_server;
@@ -616,9 +618,6 @@ void	util_out_send_oper(char *addr, unsigned int len)
 			case DBCERTIFY_IMAGE:
 				img_type = "DBCERTIFY";
 				break;
-			case GTM_SVC_DAL_IMAGE:
-				img_type = "GTM_SVC_DAL";
-				break;
 			case GTCM_SERVER_IMAGE:
 				img_type = "GTCM";
 				break;
@@ -727,11 +726,14 @@ void	util_out_send_oper(char *addr, unsigned int len)
 
 void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 {
-	char	fmt_buff[OUT_BUFF_SIZE];	/* needs to be same size as that of the util out buffer */
-	caddr_t	fmtc;
-	int	rc, count;
-	char	*fmt_top1, *fmt_top2; /* the top of the buffer after leaving 1 (and 2 bytes respectively) at the end */
-	int	util_avail_len;
+	char		fmt_buff[OUT_BUFF_SIZE];	/* needs to be same size as that of the util out buffer */
+	caddr_t		fmtc;
+	int		rc, count;
+	char		*fmt_top1, *fmt_top2; /* the top of the buffer after leaving 1 (and 2 bytes respectively) at the end */
+	int		util_avail_len;
+	mstr		flushtxt;
+	boolean_t	use_stdio;
+	io_pair		save_io_curr_device;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -746,6 +748,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 		if (0 < util_avail_len)
 			TREF(util_outptr) = util_format(message, var, TREF(util_outptr), util_avail_len, faocnt);
 	}
+	use_stdio = (IS_MCODE_RUNNING && (NULL != io_std_device.out) && (tt != io_std_device.out->type) && err_same_as_out);
 	switch (flush)
 	{
 		case NOFLUSH:
@@ -753,7 +756,8 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 		case RESET:
 			break;
 		case FLUSH:
-			*(TREF(util_outptr))++ = '\n';
+			if (!use_stdio)
+				*(TREF(util_outptr))++ = '\n';
 		case OPER:
 		case SPRINT:
 			/* For all three of these actions we need to do some output buffer translation. In all cases a '%'
@@ -792,7 +796,20 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 			switch (flush)
 			{
 				case FLUSH:
-					FPRINTF(stderr, "%s", fmt_buff);
+					if (use_stdio)
+					{
+						assert(NULL != op_write_ptr);
+						flushtxt.addr = fmt_buff;
+						flushtxt.len = INTCAST(TREF(util_outptr) - TREF(util_outbuff_ptr));
+						save_io_curr_device = io_curr_device;
+						io_curr_device = io_std_device;
+						(io_std_device.out->disp_ptr->write)(&flushtxt);
+						io_curr_device = save_io_curr_device;
+						(io_std_device.out->disp_ptr->wteol)(1, io_std_device.out);
+					} else
+					{
+						FPRINTF(stderr, "%s", fmt_buff);
+					}
 					break;
 				case OPER:
 					util_out_send_oper(fmt_buff, UINTCAST(fmtc - fmt_buff));
@@ -869,12 +886,25 @@ void	util_out_print_gtmio(caddr_t message, int flush, ...)
  */
 void util_cond_flush(void)
 {
+	boolean_t	use_stdio, buffer_empty;
+	mval		flushtxt;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (NULL != io_std_device.out && 0 < io_std_device.out->dollar.x && TREF(util_outptr) != TREF(util_outbuff_ptr))
-		FPRINTF(stderr, "\n");
-	if (TREF(util_outptr) != TREF(util_outbuff_ptr))
+	use_stdio = FALSE;
+	buffer_empty = TREF(util_outptr) == TREF(util_outbuff_ptr);
+	if (NULL != io_std_device.out)
+	{
+		use_stdio = IS_MCODE_RUNNING && (tt != io_std_device.out->type) && err_same_as_out;
+		if (0 < io_std_device.out->dollar.x)
+		{
+			if (use_stdio)
+				(io_std_device.out->disp_ptr->wteol)(1, io_std_device.out);
+			else if (!buffer_empty)
+				FPRINTF(stderr, "\n");
+		}
+	}
+	if (!buffer_empty)
 		util_out_print(NULL, FLUSH);
 }
 

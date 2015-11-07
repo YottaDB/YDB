@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,10 @@
 #include <assert.h>
 #include <errno.h>
 
+#include <gpgme.h>			/* gpgme functions */
+#include <gpg-error.h>			/* gcry*_err_t */
+#include <libconfig.h>
+
 #include "gtmxc_types.h"
 
 #include "gtmcrypt_util.h"
@@ -26,13 +30,18 @@
 #include "gtmcrypt_ref.h"
 #include "gtmcrypt_dbk_ref.h"
 #include "gtmcrypt_sym_ref.h"
+#include "gtmcrypt_pk_ref.h"
 
 #ifndef USE_OPENSSL
+/*
+ * Initialize encryption state if libgcrypt is used.
+ *
+ * Returns:	0 if the initialization succeeded; -1 otherwise.
+ */
 int gc_sym_init()
 {
-	gcry_error_t	rv;
+	gcry_error_t rv;
 
-	memset(iv, 0, IV_LEN);
 	if (!gcry_check_version(GCRYPT_VERSION))
 	{
 		UPDATE_ERROR_STRING("libgcrypt version mismatch. %s or higher is required", GCRYPT_VERSION);
@@ -52,87 +61,104 @@ int gc_sym_init()
 }
 #endif
 
-int gc_sym_create_key_handles(gtm_dbkeys_tbl *entry)
+/*
+ * Destroy the specified encryption / decryption state object.
+ *
+ * Arguments:	handle	Encryption / decryption state object to destroy.
+ */
+void gc_sym_destroy_cipher_handle(crypt_key_t handle)
 {
-	int		rv;
-	unsigned char	*key;
-
-	key = entry->symmetric_key;
 #	ifdef USE_OPENSSL
-	/* Create the encryption key handle. */
-	EVP_CIPHER_CTX_init(&entry->encr_key_handle);
-	if (!EVP_CipherInit(&entry->encr_key_handle, ALGO, key, NULL, GC_ENCRYPT))
+	EVP_CIPHER_CTX_cleanup(&handle);
+#	endif
+#	ifdef USE_GCRYPT
+	if (handle)
+		gcry_cipher_close(handle);
+#	endif
+}
+
+/*
+ * Create an encryption / decryption state object based on the specified key and IV and assign it to the passed pointer.
+ *
+ * Arguments:	raw_key		Raw contents of the symmetric key to use.
+ * 		iv		Initialization vector to use.
+ * 		handle		Pointer to assign the newly created encryption / decryption state object to.
+ * 		direction	Indicator of whether encryption or decryption state object is to be constructed.
+ *
+ * Returns:	0 if the state object was successfully constructed; -1 otherwise.
+ */
+int gc_sym_create_cipher_handle(unsigned char *raw_key, unsigned char *iv, crypt_key_t *handle, int direction)
+{
+	int rv, plain_text_length;
+
+#	ifdef USE_OPENSSL
+	EVP_CIPHER_CTX_init(handle);
+	if (!EVP_CipherInit(handle, ALGO, raw_key, iv, direction))
 	{
 		GC_APPEND_OPENSSL_ERROR("Failed to initialize encryption key handle.");
 		return -1;
 	}
-	/* Create the decryption key handle. */
-	EVP_CIPHER_CTX_init(&entry->decr_key_handle);
-	if (0 == (rv = EVP_CipherInit(&entry->decr_key_handle, ALGO, key, NULL, GC_DECRYPT)))
-	{
-		GC_APPEND_OPENSSL_ERROR("Failed to initialize decryption key handle.");
-		return -1;
-	}
 #	else
-	if (0 != (rv = gcry_cipher_open(&entry->encr_key_handle, ALGO, MODE, 0)))
+	if (0 != (rv = gcry_cipher_open(handle, ALGO, MODE, 0)))
 	{
-		GC_APPEND_GCRY_ERROR(rv, "Failed to initialize encryption key handle (`gcry_cipher_open').");
+		GC_APPEND_GCRY_ERROR(rv, "Failed to initialize encryption key handle ('gcry_cipher_open').");
 		return -1;
 	}
-	if (0 != (rv = gcry_cipher_setkey(entry->encr_key_handle, key, SYMMETRIC_KEY_MAX)))
+	if (0 != (rv = gcry_cipher_setkey(*handle, raw_key, SYMMETRIC_KEY_MAX)))
 	{
-		GC_APPEND_GCRY_ERROR(rv, "Failed to initialize encryption key handle (`gcry_cipher_setkey').");
+		GC_APPEND_GCRY_ERROR(rv, "Failed to initialize encryption key handle ('gcry_cipher_setkey').");
 		return -1;
 	}
-	if (0 != (rv = gcry_cipher_open(&entry->decr_key_handle, ALGO, MODE, 0)))
-	{
-		GC_APPEND_GCRY_ERROR(rv, "Failed to initialize decryption key handle (`gcry_cipher_open').");
-		return -1;
-	}
-	if (0 != (rv = gcry_cipher_setkey(entry->decr_key_handle, key, SYMMETRIC_KEY_MAX)))
-	{
-		GC_APPEND_GCRY_ERROR(rv, "Failed to initialize decryption key handle (`gcry_cipher_setkey').");
-		return -1;
-	}
+	gcry_cipher_setiv(*handle, iv, GTMCRYPT_IV_LEN);
 #	endif
 	return 0;
 }
 
-int gc_sym_encrypt_decrypt(crypt_key_t *key, gtm_string_t *in_block, gtm_string_t *out_block, int flag)
+/*
+ * Perform an encryption or decryption operation using the specified state object and buffers (or buffer, if in-place).
+ *
+ * Arguments:	key		Pointer to the encryption / decryption state object.
+ * 		in_block	Block from which to take the input data for the operation.
+ * 		in_block_len	Length of the block from which to take the input data for the operation; it should match the length
+ * 				of the block for the output data, if not NULL.
+ * 		out_block	Block where to place the output data from the operation.
+ * 		flag		Indicator of whether encryption or decryption is to be performed.
+ *
+ * Returns:	0 if the operation went successfully; -1 otherwise.
+ */
+int gc_sym_encrypt_decrypt(crypt_key_t *key, unsigned char *in_block, int in_block_len, unsigned char *out_block, int flag)
 {
-	int		inl, outl, rv, tmp_len;
-	unsigned char	*in, *out;
+	int rv, tmp_len, out_block_len;
 
-	assert(in_block->address);
-	assert(0 < in_block->length);
-	in = (unsigned char *)in_block->address;
-	out = (NULL == out_block->address) ? in : (unsigned char *)out_block->address;
-	outl = inl = in_block->length;
-#	ifndef USE_OPENSSL
-	if (out == in)
+	assert(in_block);
+	assert(0 < in_block_len);
+	if (NULL == out_block)
+		out_block = in_block;
+	out_block_len = in_block_len;
+#	ifdef USE_GCRYPT
+	if (out_block == in_block)
 	{
-		in = NULL;
-		inl = 0;
+		in_block = NULL;
+		in_block_len = 0;
 	}
-	/* This is important. We have to reset the IV back to all zeros to reset the encryption state machine. Otherwise, the 'iv'
-	 * from the previous call to this function would be reused for this call resulting in incorrect encryption/decryption.
-	 */
-	gcry_cipher_setiv(*key, iv, IV_LEN);
-	rv = (GC_ENCRYPT == flag) ? gcry_cipher_encrypt(*key, out, outl, in, inl) : gcry_cipher_decrypt(*key, out, outl, in, inl);
+	rv = (GTMCRYPT_OP_ENCRYPT == flag)
+		? gcry_cipher_encrypt(*key, out_block, out_block_len, in_block, in_block_len)
+		: gcry_cipher_decrypt(*key, out_block, out_block_len, in_block, in_block_len);
 	if (0 != rv)
 	{
-		GC_APPEND_GCRY_ERROR(rv, "Libgcrypt function `gcry_cipher_encrypt' or `gcry_cipher_decrypt' failed.");
+		GC_APPEND_GCRY_ERROR(rv, "Libgcrypt function 'gcry_cipher_encrypt' or 'gcry_cipher_decrypt' failed.");
 		return -1;
 	}
-#	else
-	if (!EVP_CipherUpdate(key, out, &outl, in, inl))
+#	endif
+#	ifdef USE_OPENSSL
+	if (!EVP_CipherUpdate(key, out_block, &out_block_len, in_block, in_block_len))
 	{
-		GC_APPEND_OPENSSL_ERROR("OpenSSL function `EVP_CipherUpdate' failed.")
+		GC_APPEND_OPENSSL_ERROR("OpenSSL function 'EVP_CipherUpdate' failed.")
 		return -1;
 	}
-	if (!EVP_CipherFinal(key, out + outl, &tmp_len))
+	if (!EVP_CipherFinal(key, out_block + out_block_len, &tmp_len))
 	{
-		GC_APPEND_OPENSSL_ERROR("OpenSSL function `EVP_CipherFinal' failed.")
+		GC_APPEND_OPENSSL_ERROR("OpenSSL function 'EVP_CipherFinal' failed.")
 		return -1;
 	}
 #	endif

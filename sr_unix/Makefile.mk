@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2013 Fidelity Information Services, Inc	#
+#	Copyright 2013, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -133,9 +133,11 @@ endif
 # Common header and library paths
 IFLAGS += -I /usr/local/ssl/include -I /usr/local/include -I /usr/include -I $(gtm_dist) -I $(CURDIR)
 ifeq ($(BIT64),0)
-	LIBFLAGS += -L /usr/local/ssl/lib -L /usr/local/lib64 -L /usr/local/lib -L /usr/lib64 -L /usr/lib -L /lib64 -L /lib -L `pwd`
+	LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86_64-linux-gnu -L /usr/local/lib64
+	LIBFLAGS += -L /usr/local/lib -L /usr/lib64 -L /usr/lib -L /lib64 -L /lib -L `pwd`
 else
-	LIBFLAGS += -L /usr/local/ssl/lib -L /usr/local/lib32 -L /usr/local/lib -L /usr/lib32 -L /usr/lib -L /lib32 -L /lib -L `pwd`
+	LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86-linux-gnu -L /usr/local/lib32
+	LIBFLAGS += -L /usr/local/lib -L /usr/lib32 -L /usr/lib -L /lib32 -L /lib -L `pwd`
 endif
 
 CFLAGS += $(IFLAGS)

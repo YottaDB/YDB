@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,7 +118,8 @@ void op_zprevious(mval *v)
 				ENSURE_STP_FREE_SPACE(n);
 			}
 			v->str.addr = (char *)stringpool.free;
-			stringpool.free = gvsub2str(&gv_altkey->base[gv_altkey->prev], stringpool.free, FALSE);
+			v->str.len = MAX_KEY_SZ;
+			stringpool.free = gvsub2str(&gv_altkey->base[gv_altkey->prev], &(v->str), FALSE);
 			v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
 			assert(v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
 			assert(v->str.addr + v->str.len <= (char *)stringpool.top &&

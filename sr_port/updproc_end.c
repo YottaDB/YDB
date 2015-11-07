@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,9 +24,9 @@
 
 #ifdef UNIX
 #include "gtm_ipc.h"
+#include <gtm_un.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
-#include <sys/un.h>
 #ifndef __MVS__
 #include <sys/param.h>
 #endif
@@ -121,7 +121,7 @@ void  updproc_stop(boolean_t exit)
 		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Update process Read Seqno : %llu\n", log_seqno1);
 		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n", log_seqno);
 #		ifdef UNIX
-		if (!ANTICIPATORY_FREEZE_AVAILABLE)
+		if (!INST_FREEZE_ON_ERROR_POLICY)
 		{
 			mutex_cleanup(jnlpool.jnlpool_dummy_reg);
 			JNLPOOL_SHMDT(status, save_errno);

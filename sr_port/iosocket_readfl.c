@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,6 +65,7 @@ error_def(ERR_IOEOF);
 error_def(ERR_MAXSTRLEN);
 error_def(ERR_NOSOCKETINDEV);
 error_def(ERR_SETSOCKOPTERR);
+error_def(ERR_SOCKPASSDATAMIX);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TEXT);
@@ -124,7 +125,7 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 {
 	int		ret, byteperchar;
-	boolean_t 	timed, vari, more_data, terminator, has_delimiter, requeue_done;
+	boolean_t 	timed, vari, more_data, terminator, has_delimiter, requeue_done, do_delim_conv, need_get_chset;
 	boolean_t	zint_restart, outofband_terminate, one_read_done, utf8_active;
 	int		flags, len, real_errno, save_errno, fcntl_res, errlen, charlen, stp_need;
 	int		bytes_read, orig_bytes_read, ii, max_bufflen, bufflen, chars_read, mb_len, match_delim;
@@ -153,9 +154,18 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	dsocketptr = (d_socket_struct *)(iod->dev_sp);
 	if (0 >= dsocketptr->n_socket)
 	{
-		iod->dollar.za = 9;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
-		return 0;
+#		ifndef VMS
+		if (iod == io_std_device.in)
+			return ionl_readfl(v, width, timeout);
+		else
+		{
+#		endif
+			iod->dollar.za = 9;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+			return 0;
+#		ifndef VMS
+		}
+#		endif
 	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
 	{
@@ -179,6 +189,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	 */
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	assert(socketptr);
+	ENSURE_DATA_SOCKET(socketptr);
 	sockintr = &dsocketptr->sock_save_state;
 	assert(sockintr);
 	outofband_terminate = FALSE;
@@ -306,6 +317,13 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	socketptr->lastop = TCP_READ;
 	ret = TRUE;
 	has_delimiter = (0 < socketptr->n_delimiter);
+	do_delim_conv = FALSE;
+	if (has_delimiter && IS_UTF16_CHSET(iod->ichset))
+	{
+		if (socketptr->delimiter[0].addr == socketptr->idelimiter[0].addr)
+			do_delim_conv = TRUE;
+	}
+	need_get_chset = FALSE;		/* if we change ichset, make sure converter available */
 	time_for_read.at_sec  = 0;
 	if (0 == timeout)
 		time_for_read.at_usec = 0;
@@ -547,6 +565,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							} else
 							{
 								iod->ichset = ichset = CHSET_UTF16BE;
+								need_get_chset = TRUE;
 								bytes_read -= UTF16BE_BOM_LEN;	/* Throw way BOM */
 								DBGSOCK2((stdout, "socrfl: UTF16BE BOM detected\n"));
 							}
@@ -563,6 +582,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							} else
 							{
                                                                 iod->ichset = ichset = CHSET_UTF16LE;
+								need_get_chset = TRUE;
 								bytes_read -= UTF16BE_BOM_LEN;	/* Throw away BOM */
                                                                 DBGSOCK2((stdout, "socrfl: UTF16LE BOM detected\n"));
                                                         }
@@ -574,6 +594,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							{
 								DBGSOCK2((stdout, "socrfl: UTF16BE BOM assumed\n"));
 								iod->ichset = ichset = CHSET_UTF16BE;
+								need_get_chset = TRUE;
 							}
 						}
 					} else
@@ -584,6 +605,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 						{
 							DBGSOCK2((stdout, "socrfl: UTF16BE BOM assumed\n"));
 							iod->ichset = ichset = CHSET_UTF16BE;
+							need_get_chset = TRUE;
 						}
 					}
 				} else
@@ -594,16 +616,18 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 						DBGSOCK2((stdout, "socrfl: UTF8 BOM detected/ignored\n"));
 					}
 				}
-			}
-			if (socketptr->first_read)
-			{
-				if  ((CHSET_UTF16BE == ichset) || (CHSET_UTF16LE == ichset))
-				{
-					get_chset_desc(&chset_names[ichset]);
-					if (has_delimiter)
-						iosocket_delim_conv(socketptr, ichset);
-				}
 				socketptr->first_read = FALSE;
+			} else if (socketptr->first_read)
+				socketptr->first_read = FALSE;
+			if (need_get_chset)
+			{
+				get_chset_desc(&chset_names[ichset]);
+				need_get_chset = FALSE;
+			}
+			if (do_delim_conv)
+			{
+				iosocket_delim_conv(socketptr, ichset);
+				do_delim_conv = FALSE;
 			}
 			if (bytes_read && has_delimiter)
 			{	/* Check to see if it is a delimiter */

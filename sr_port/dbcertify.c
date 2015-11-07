@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,10 +51,9 @@
 #include "gtmimagename.h"
 #include "error.h"
 #include "iosp.h"
-#include "gtm_env_init.h"
 #include "dbcertify.h"
 #include "cli.h"
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 #include "wbox_test_init.h"
 
@@ -79,8 +78,7 @@ int UNIX_ONLY(main)VMS_ONLY(dbcertify)(int argc, char **argv)
 
 	/* Initialization of scaffolding we run on */
 	GTM_THREADGBL_INIT;
-	gtm_imagetype_init(DBCERTIFY_IMAGE);
-	gtm_env_init();
+	common_startup_init(DBCERTIFY_IMAGE);
 	gtm_utf8_mode = FALSE; 		/* Only ever runs in V4 database so NO utf8 mode -- ever */
 	psa_gbl = malloc(SIZEOF(*psa_gbl));
 	memset(psa_gbl, 0, SIZEOF(*psa_gbl));
@@ -89,7 +87,6 @@ int UNIX_ONLY(main)VMS_ONLY(dbcertify)(int argc, char **argv)
 	VMS_ONLY(util_out_open(0));
 	VMS_ONLY(SET_EXIT_HANDLER(exi_blk, dbcertify_exit_handler, exi_condition));	/* Establish exit handler */
 	VMS_ONLY(ESTABLISH(dbcertify_base_ch));
-	process_id = getpid();
 	/* Structure checks .. */
 	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
 	OPERATOR_LOG_MSG;

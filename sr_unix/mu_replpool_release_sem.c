@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,11 +45,11 @@
 #include "ftok_sems.h"
 #include "anticipatory_freeze.h"
 
-#define DO_CLNUP_AND_RETURN(SAVE_ERRNO, INSTFILENAME, INSTFILELEN, SEM_ID, FAILED_OP)	\
-{														\
-	gtm_putmsg(VARLSTCNT(5) ERR_REPLACCSEM, 3, SEM_ID, INSTFILELEN, INSTFILENAME);				\
-	gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT(FAILED_OP), CALLFROM, SAVE_ERRNO);			\
-	return -1;												\
+#define DO_CLNUP_AND_RETURN(SAVE_ERRNO, INSTFILENAME, INSTFILELEN, SEM_ID, FAILED_OP)						\
+{																\
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLACCSEM, 3, SEM_ID, INSTFILELEN, INSTFILENAME);			\
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT(FAILED_OP), CALLFROM, SAVE_ERRNO);		\
+	return -1;														\
 }
 
 GBLREF	jnlpool_addrs		jnlpool;
@@ -91,7 +91,7 @@ int mu_replpool_release_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_typ
 		 * with anticipatory freeze scheme in effect.
 		 */
 		assert((1 == semval) || ((1 <= semval)
-			&& (jgbl.onlnrlbk || (!jgbl.mur_rollback && !argumentless_rundown && ANTICIPATORY_FREEZE_AVAILABLE))));
+			&& (jgbl.onlnrlbk || (!jgbl.mur_rollback && !argumentless_rundown && INST_FREEZE_ON_ERROR_POLICY))));
 		remove_sem &= (1 == semval); /* we can remove the sem if the caller intends to and the counter semaphore is 1 */
 		if (0 < semval)
 		{

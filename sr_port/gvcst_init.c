@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -135,8 +135,8 @@ void	assert_jrec_member_offsets(void)
 	/* Following assert is for JNL_FILE_TAIL_PRESERVE macro in tp.h */
 	assert(PINI_RECLEN >= EPOCH_RECLEN && PINI_RECLEN >= PFIN_RECLEN && PINI_RECLEN >= EOF_RECLEN);
 	/* jnl_string structure has a 8-bit nodeflags field and a 24-bit length field. In some cases, this is
-	 * used as a 32-bit length field (e.g. in the value part of the SET record or ZTWORMHOLE record). These
-	 * usages treat the 32-bits as a jnl_str_len_t type and access it directly. Hence the requirement that
+	 * used as a 32-bit length field (e.g. in the value part of the SET record or ZTWORMHOLE or LGTRIG record).
+	 * These usages treat the 32-bits as a jnl_str_len_t type and access it directly. Hence the requirement that
 	 * jnl_str_len_t be the same size as 32-bits and also the same as the offset to the "text" member.
 	 * If this assert fails, all places that reference jnl_str_len_t need to be revisited.
 	 */
@@ -153,11 +153,13 @@ void	assert_jrec_member_offsets(void)
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_eof, jnl_seqno));
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_tcom, token_seq.jnl_seqno));
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_ztworm, token_seq.jnl_seqno));
+	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_lgtrig, token_seq.jnl_seqno));
 
 	/* Make sure all strm_seqno fields start at same offset. Lot of modules rely on this */
 	assert(offsetof(struct_jrec_null, strm_seqno) == offsetof(struct_jrec_upd, strm_seqno));
 	assert(offsetof(struct_jrec_null, strm_seqno) == offsetof(struct_jrec_tcom, strm_seqno));
 	assert(offsetof(struct_jrec_null, strm_seqno) == offsetof(struct_jrec_ztworm, strm_seqno));
+	assert(offsetof(struct_jrec_null, strm_seqno) == offsetof(struct_jrec_lgtrig, strm_seqno));
 	/* EOF and EPOCH are not included in the above asserts because they have not ONE but 16 strm_seqno values each */
 
 	assert(offsetof(struct_jrec_ztcom, token) == offsetof(struct_jrec_upd, token_seq));
@@ -412,7 +414,7 @@ void gvcst_init(gd_region *greg)
 	assert(36 == MAX_REL_NAME);
 #	ifdef UNIX
 	START_HEARTBEAT_IF_NEEDED;
-	if (!pool_init && jnlpool_init_needed && ANTICIPATORY_FREEZE_AVAILABLE && REPL_INST_AVAILABLE)
+	if (!pool_init && jnlpool_init_needed && CUSTOM_ERRORS_AVAILABLE && REPL_INST_AVAILABLE)
 		jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL);
 	/* Any LSEEKWRITEs hence forth will wait if the instance is frozen. To aid in printing the region information before
 	 * and after the wait, csa->region is referenced. Since it is NULL at this point, set it to greg. This is a safe
@@ -495,7 +497,24 @@ void gvcst_init(gd_region *greg)
 	 */
 	csa->pblk_align_jrecsize = (int4)MIN_PBLK_RECLEN + csd->blk_size + (int4)MIN_ALIGN_RECLEN;
 	segment_update_array_size = UA_SIZE(csd);
-
+	assert(!greg->was_open);
+	SET_REGION_OPEN_TRUE(greg, WAS_OPEN_FALSE);
+	if (NULL != csa->dir_tree)
+	{	/* It is possible that dir_tree has already been targ_alloc'ed. This is because GT.CM or VMS DAL
+		 * calls can run down regions without the process halting out. We don't want to double malloc.
+		 */
+		csa->dir_tree->clue.end = 0;
+	}
+	SET_CSA_DIR_TREE(csa, greg->max_key_size, greg);
+	/* Now that reg->open is set to TRUE and directory tree is initialized, go ahead and set rts_error back to being usable */
+	UNIX_ONLY(DBG_MARK_RTS_ERROR_USABLE);
+	/* gds_rundown if invoked from now on will take care of cleaning up the shared memory segment */
+	/* The below code, until the ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT), can do mallocs which in turn can issue a
+	 * GTM-E-MEMORY error which would invoke rts_error. Hence these have to be done AFTER the
+	 * UNIX_ONLY(DBG_MARK_RTS_ERROR_USABLE) call. Since these are only private memory initializations, it is safe to
+	 * do these after reg->open is set. Any rts_errors from now on still do the needful cleanup of shared memory in
+	 * gds_rundown since reg->open is already TRUE.
+	 */
 	if (first_ua == NULL)
 	{	/* first open of first database - establish an update array system */
 		assert(update_array == NULL);
@@ -589,18 +608,6 @@ void gvcst_init(gd_region *greg)
 		global_tlvl_info_list = (buddy_list *)malloc(SIZEOF(buddy_list));
 		initialize_list(global_tlvl_info_list, SIZEOF(global_tlvl_info), GBL_TLVL_INFO_LIST_INIT_ALLOC);
 	}
-	assert(!greg->was_open);
-	SET_REGION_OPEN_TRUE(greg, WAS_OPEN_FALSE);
-	if (NULL != csa->dir_tree)
-	{	/* It is possible that dir_tree has already been targ_alloc'ed. This is because GT.CM or VMS DAL
-		 * calls can run down regions without the process halting out. We don't want to double malloc.
-		 */
-		csa->dir_tree->clue.end = 0;
-	}
-	SET_CSA_DIR_TREE(csa, greg->max_key_size, greg);
-	/* Now that reg->open is set to TRUE and directory tree is initialized, go ahead and set rts_error back to being usable */
-	UNIX_ONLY(DBG_MARK_RTS_ERROR_USABLE);
-	/* gds_rundown if invoked from now on will take care of cleaning up the shared memory segment */
 	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT);
 	if (dba_bg == greg_acc_meth)
 	{	/* Check if (a) this region has non-upgraded blocks and if so, (b) the reformat buffer exists and

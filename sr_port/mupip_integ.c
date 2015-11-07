@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
+#include "gdsblk.h"
 #include "gdsfhead.h"
 #include "error.h"
 #include "cli.h"
@@ -54,7 +55,6 @@
 #define MAX_UTIL_LEN 80
 #define APPROX_ALL_ERRORS 1000000
 #define DEFAULT_ERR_LIMIT 10
-#define DEFAULT_ADJACENCY 10
 #define PERCENT_FACTOR 100
 #define PERCENT_DECIMAL_SCALE 100000
 #define PERCENT_SCALE_FACTOR 1000
@@ -185,6 +185,7 @@ void mupip_integ(void)
 	uint4			cli_status;
 	block_id		dir_root, mu_index_adj, mu_data_adj, muint_block;
 	uint4			prev_errknt, mu_dir_blks, mu_dir_recs, mu_data_blks, mu_data_recs, mu_index_blks, mu_index_recs;
+	uint4			tot_blks;
 	qw_num			mu_dir_size, mu_index_size, mu_data_size;
 	tp_region		*rptr;
 	file_control		*fc;
@@ -198,9 +199,6 @@ void mupip_integ(void)
 	span_node_integ		span_node_data;
 
 	sndata = &span_node_data;
-	sndata->sn_cnt = 0;
-	sndata->sn_blk_cnt = 0;
-	sndata->sn_type = SN_NOT;
 	error_mupip = FALSE;
 	if (NULL == gv_target)
 		gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL, NULL);
@@ -351,7 +349,7 @@ void mupip_integ(void)
 		mu_data_blks = mu_data_recs = 0;
 		mu_index_blks = mu_index_recs = 0;
 		mu_int_err_ranges = (CLI_NEGATED != cli_present("KEYRANGES"));
-		mu_int_root_level = (unsigned char)-1;
+		mu_int_root_level = BML_LEVL;	/* start with what is an invalid level for a root block */
 		mu_map_errs = 0, prev_errknt = 0, largest_tn = 0;
 		mu_int_blks_to_upgrd = 0;
 		for (idx = 0;  idx <= MAX_BT_DEPTH;  idx++)
@@ -363,6 +361,9 @@ void mupip_integ(void)
 		mu_int_offset[0] = 0;
 		mu_int_plen = 1;
 		memset(mu_int_adj, 0, SIZEOF(mu_int_adj));
+		sndata->sn_cnt = 0;
+		sndata->sn_blk_cnt = 0;
+		sndata->sn_type = SN_NOT;
 		if (region)
 		{
 			util_out_print("!/!/Integ of region !AD", TRUE, REG_LEN_STR(rptr->reg));
@@ -530,8 +531,8 @@ void mupip_integ(void)
 					for (idx = mu_int_root_level;  idx >= 0;  idx--)
 					{
 						if ((0 == idx) && muint_fast && (trees->root != dir_root))
-						util_out_print("!5UL    !12UL              NA              NA            NA", TRUE,
-								idx, mu_int_blks[idx]);
+						util_out_print("!5UL    !12UL              NA              NA  !12UL", TRUE,
+								idx, mu_int_blks[idx],  mu_int_adj[idx]);
 						else
 						{
 							QWPERCENTCALC(leftpt, rightpt, mu_int_size[idx], mu_int_blks[idx],
@@ -654,7 +655,7 @@ void mupip_integ(void)
 		util_out_print("Index    !12UL    !12UL    !8UL.!3ZL  !12UL", TRUE, mu_index_blks, mu_index_recs, leftpt, rightpt,
 			mu_index_adj);
 		if (muint_fast)
-			util_out_print("Data     !12UL              NA              NA            NA", TRUE, mu_data_blks);
+			util_out_print("Data     !12UL              NA              NA  !12UL", TRUE, mu_data_blks, mu_data_adj);
 		else
 		{
 			QWPERCENTCALC(leftpt, rightpt, mu_data_size, mu_data_blks, mu_int_data.blk_size);
@@ -662,24 +663,22 @@ void mupip_integ(void)
 					leftpt, rightpt, mu_data_adj);
 		}
 		if ((FALSE == block) && (MUINTKEY_FALSE == muint_key))
+		{
 			util_out_print("Free     !12UL              NA              NA            NA", TRUE,
 				mu_int_data.trans_hist.total_blks -
 				(mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap -
 				mu_data_blks - mu_index_blks - mu_dir_blks);
-		if (muint_fast)
-		{
-			util_out_print("Total    !12UL              NA              NA  !12UL", TRUE,
-				mu_int_data.trans_hist.total_blks -
-				(mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap,
-				mu_data_adj + mu_index_adj);
+			tot_blks = mu_int_data.trans_hist.total_blks
+					- (mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap;
 		} else
-		{
+			tot_blks = mu_data_blks + mu_index_blks + mu_dir_blks;
+		if (muint_fast)
+			util_out_print("Total    !12UL              NA              NA  !12UL", TRUE,
+				tot_blks, mu_data_adj + mu_index_adj);
+		else
 			util_out_print("Total    !12UL    !12UL              NA  !12UL", TRUE,
-				mu_int_data.trans_hist.total_blks -
-				(mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap,
-				mu_dir_recs + mu_index_recs + mu_data_recs, mu_data_adj + mu_index_adj);
-		}
-		if(sndata->sn_cnt)
+				tot_blks, mu_dir_recs + mu_index_recs + mu_data_recs, mu_data_adj + mu_index_adj);
+		if (sndata->sn_cnt)
 		{
 			util_out_print("[Spanning Nodes:!UL ; Blocks:!UL]", TRUE, sndata->sn_cnt, sndata->sn_blk_cnt);
 			/*[span_node:<no of span-node in DB>; blks: <total number of spanning blocks used by all span-node>]*/

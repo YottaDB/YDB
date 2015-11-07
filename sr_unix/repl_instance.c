@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1175,7 +1175,7 @@ boolean_t	repl_inst_was_rootprimary(void)
 		 * to be FALSE. Assert accordingly.
 		 */
 		assert(((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
-				|| jgbl.onlnrlbk || (jgbl.mur_rollback && ANTICIPATORY_FREEZE_AVAILABLE));
+				|| jgbl.onlnrlbk || (jgbl.mur_rollback && INST_FREEZE_ON_ERROR_POLICY));
 		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 		ASSERT_VALID_JNLPOOL(csa);
 		assert(csa->now_crit);

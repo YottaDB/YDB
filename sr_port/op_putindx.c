@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
+#include "gtmio.h"
 #include "lv_val.h"
 #include "collseq.h"
 #include "stringpool.h"
@@ -35,17 +36,62 @@
 #include "stack_frame.h"
 #ifdef DEBUG
 #include "gtm_ctype.h"
+#include "trans_numeric.h"
 #endif
 
-GBLDEF lv_val		*active_lv;
+#ifdef DEBUG
+#define	ACTIVELV_DBG_ARRAY_SIZE_DEF	64
+#endif
 
 GBLREF symval		*curr_symval;
 GBLREF stack_frame	*frame_pointer;
 GBLREF bool		undef_inhibit;
+#ifdef DEBUG
+GBLREF	lv_val		*active_lv;
+#endif
 
 error_def(ERR_LVNULLSUBS);
 error_def(ERR_MAXSTRLEN);
 error_def(ERR_UNDEF);
+
+#ifdef DEBUG
+void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type)
+{
+	activelv_dbg_t	*dbg_array;
+	int		lv_index;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	if (NULL == (dbg_array = TREF(activelv_dbg_array)))
+	{
+		TREF(activelv_dbg_array) = (activelv_dbg_t *)malloc(ACTIVELV_DBG_ARRAY_SIZE_DEF * SIZEOF(activelv_dbg_t));
+		dbg_array = TREF(activelv_dbg_array);
+	}
+	if (do_assert)
+		ASSERT_ACTIVELV_GOOD(active_lv);
+	if (NULL != newlv)
+		assert(!LV_IS_BASE_VAR(newlv));	/* active_lv should never be set to a base variable */
+	lv_index = TREF(activelv_index);
+	assert((0 <= lv_index) && (ACTIVELV_DBG_ARRAY_SIZE_DEF > lv_index));
+	if ((active_lv != newlv) || (0 == TREF(activelv_cycle)))
+	{
+		(TREF(activelv_cycle))++;
+		(TREF(activelv_index))++;
+		if (ACTIVELV_DBG_ARRAY_SIZE_DEF == TREF(activelv_index))
+			TREF(activelv_index) = 0;
+		dbg_array[lv_index].active_lv = active_lv;
+		dbg_array[lv_index].newlv = newlv;
+		dbg_array[lv_index].count = 0;
+	} else
+		dbg_array[lv_index].count++;
+	dbg_array[lv_index].type = type;
+	dbg_array[lv_index].frame_pointer = frame_pointer;
+	dbg_array[lv_index].curr_symval = curr_symval;
+	dbg_array[lv_index].mpc = frame_pointer->mpc;
+	dbg_array[lv_index].ctxt = frame_pointer->ctxt;
+	active_lv = newlv;
+}
+#endif
 
 lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 {
@@ -57,6 +103,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	lvTree			*lvt;
 	lvTreeNode		*parent;
 	lv_val			*base_lv;
+	DEBUG_ONLY(int		orig_subs_level;)
 	VMS_ONLY(int		argcnt;)
 	DCL_THREADGBL_ACCESS;
 
@@ -84,6 +131,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	lv = start;
 	assert(NULL != lv);
 	LV_SBS_DEPTH(start, is_base_var, subs_level);
+	DEBUG_ONLY(orig_subs_level = subs_level;)
 	for (subs_level++; --argcnt > 0; subs_level++)
 	{
 		key = va_arg(var, mval *);
@@ -96,9 +144,8 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			{
 				if (LVNULLSUBS_OK != TREF(lv_null_subs))	/* Error for both LVNULLSUBS_{NO,NEVER} */
 				{
-					active_lv = lv;
 					va_end(var);
-					rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVNULLSUBS);
 				}
 			}
 			if (TREF(local_collseq))
@@ -147,17 +194,25 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 		{
 			lv = (lv_val *)lvAvlTreeNodeInsert(lvt, key, parent);
 			lv->v.mvtype = 0;	/* initialize mval to undefined value at this point */
+			/* maintain active_lv so we free this lv_val (and parent lv_vals as appropriate) in case of a
+			 * runtime error (e.g. UNDEF or LVNULLSUBS) in this for loop.
+			 */
+			SET_ACTIVE_LV(lv, (orig_subs_level == (subs_level + 1)) ? TRUE : FALSE, actlv_op_putindx1);
 		}
 	}
 	va_end(var);
-	/* This var is about to be set/modified. If it exists and is an alias container var,
-	 * that reference is going to go away. Take care of that possibility now.
-	 */
-	if (LV_IS_VAL_DEFINED(lv))
+	if (base_lv != lv)
 	{
-		DECR_AC_REF(lv, TRUE);
-		lv->v.mvtype &= ~MV_ALIASCONT;	/* Value being replaced is now no longer a container var */
+		/* This var is about to be set/modified. If it exists and is an alias container var,
+		 * that reference is going to go away. Take care of that possibility now.
+		 */
+		if (LV_IS_VAL_DEFINED(lv))
+		{
+			DECR_AC_REF(lv, TRUE);
+			lv->v.mvtype &= ~MV_ALIASCONT;	/* Value being replaced is now no longer a container var */
+		}
+		assert(NULL != lv);
+		SET_ACTIVE_LV(lv, (orig_subs_level == (subs_level + 1)) ? TRUE : FALSE, actlv_op_putindx2);
 	}
-	active_lv = lv;
 	return lv;
 }

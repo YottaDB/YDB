@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2014 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -19,18 +19,24 @@ spkitbld	; ; ; edit the gtm$vrt:[t%%]*_spkitbld.dat version
 	Set gtmvrt=$Piece(gtmvrt,"]")
 	Set newver=$$FUNC^%ucase($Piece(gtmvrt,".",2))
 	If newver'?1"V"2N.2A1.3N.1A Write !,"Invalid version designation" Quit
+	Write "Fixing the version in packaging config files to ",newver,!
 	Set newver=$Extract(newver,2,9999)
 	For tv="BL","FT" If newver[tv Set newver=$Piece(newver,tv)_$Select(tv="BL":88,1:99)_$Piece(newver,tv,2)
 	If newver?.N1.A For i=$Length(newver):-1:2 Set newver=$Extract(newver,1,i-1)_($Ascii(newver,i)#10)_$Extract(newver,i+1,9999)
 	Set file=$ZSEARCH("foo.bar")	;clear any current search
 	For  Set file=$Piece($ZSEARCH(mask),";") Quit:'$l(file)  Do
+	. Use $principal
+	. Write "Opening file ",file,!
 	. Open file:(readonly:exception="Goto eof"),temp:newversion
 	. Use file
 	. Read line
+	. Use $principal
+	. Write "Old version: ",line,!
 	. Set oldver=$Piece(line," ",3)
 	. For i=1:1:$l(oldver) Quit:$Extract(oldver,i)?1N
 	. Set prod=$Extract(oldver,1,i-1)
 	. Set $Piece(line," ",3)=prod_newver
+	. Write "New version: ",line,!,!
 	. Use temp
 	. Write line,!
 	. For  Use file Read line Use temp Write line,!

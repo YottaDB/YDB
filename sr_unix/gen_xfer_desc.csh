@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-#       Copyright 2008, 2011 Fidelity Information Services, Inc	#
+#       Copyright 2008, 2014 Fidelity Information Services, Inc	#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -93,6 +93,7 @@ cat << TEST >! temp_xyz_ia.c
 /* We have not yet created gtm_threadgbl_deftypes.h and don't need it, signal gtm_threadgbl.h to avoid including it */
 #define NO_THREADGBL_DEFTYPES
 #include "mdef.h"
+#include "xfer_enum.h"
 #define XFER(a,b) MY_XF,b
 #include "xfer.h"
 TEST

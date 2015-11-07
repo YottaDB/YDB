@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,8 +78,7 @@
 #include "gtmio.h"
 #include "file_head_read.h"
 #include "file_head_write.h"
-#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 #include "hashtab.h"
 #include "fork_init.h"
@@ -87,6 +86,7 @@
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
 #endif
+#include "getjobnum.h"
 
 #define execname 	"gtmsecshr"	/* this is what this executable is supposed to be called. A different name is verboten */
 #define intent_open	"for open"	/* FLUSH_DB_IPCS_INFO types */
@@ -104,6 +104,7 @@ GBLREF	uint4			process_id;
 GBLREF	boolean_t		need_core;
 GBLREF	boolean_t		first_syslog;		/* Defined in util_output.c */
 GBLREF	char			gtm_dist[GTM_PATH_MAX];
+GBLREF	boolean_t		gtm_dist_ok_to_use;
 
 LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;
@@ -224,9 +225,7 @@ int main(int argc, char_ptr_t argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	gtm_imagetype_init(GTMSECSHR_IMAGE); 	/* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
-	gtm_wcswidth_fnptr = NULL;
-	gtm_env_init();				/* read in all environment variables */
+	common_startup_init(GTMSECSHR_IMAGE); 	/* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
 	err_init(gtmsecshr_cond_hndlr);
 	gtmsecshr_init(argv, &rundir, &rundir_len);
 	timer_id = (TID)main;
@@ -325,8 +324,6 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	process_id = getpid();
-	set_blocksig();
 	/* Before priv escalation need to understand how/where we were invoked in terms of module path and name.
 	 *
 	 * Steps:
@@ -486,7 +483,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	CLOSELOG();
 	ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
 	first_syslog = TRUE;
-	FORK(pid);	/* Timers have not been initialized, no need to do FORK_CLEAN; BYPASSOK */
+	FORK(pid);
 	if (0 > pid)
 	{	/* Fork failed */
 		save_errno = errno;
@@ -497,8 +494,9 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		/* This is the original process - it dies quietly (no exit handler of any sort) to isolate us */
 		_exit(EXIT_SUCCESS);
 	/****** We are now in the (isolated) child process ******/
-	process_id = getpid();
+	getjobnum();
 	pid = getsid(process_id);
+	gtm_dist_ok_to_use = TRUE;
 	if ((pid != process_id) && ((pid_t)-1 == setsid()))
 	{
 		save_errno = errno;
@@ -1058,7 +1056,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 	ppptr = procpath;
 	MEMCPY_LIT(procpath, PROCPATH_PREFIX);
 	ppptr += STRLEN(PROCPATH_PREFIX);
-	ppptr = i2asc(ppptr, buf->mesg.id);
+	ppptr = (char*)i2asc((uchar_ptr_t)ppptr, buf->mesg.id);
 	ppptr_save = ppptr;			/* Save where adding cmdline so can replace if need to move to check #2 */
 	memcpy(ppptr, PROCPATH_CMDLSUFFIX, SIZEOF(PROCPATH_CMDLSUFFIX));	/* Copy includes terminating null of literal */
 	procstrm = Fopen(procpath, "r");

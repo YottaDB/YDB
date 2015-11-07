@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -142,24 +142,6 @@ else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
 	else
 	        chatr +as mpas $3/mumps
         endif
-endif
-
-# Note: gtm_svc should link with gtm_dal_svc.o before gtm_mumps_call_clnt.o(libgtmrpc.a) to
-#       resolve conflicting symbols (gtm_init_1, gtm_halt_1 etc..) appropriately.
-if ( $gt_ar_gtmrpc_name != "" ) then
-	set aix_loadmap_option = ''
-	if ( $HOSTOS == "AIX") then
-		set aix_loadmap_option = "-bloadmap:$gtm_map/gtmsvc.loadmap"
-	endif
-	# export gtm_filename_to_id and dependent modules from gtm_svc.
-	gt_ld $gt_ld_options $gt_ld_options_all_exe $aix_loadmap_option ${gt_ld_option_output}$3/gtm_svc \
-		-L$gtm_obj $gtm_obj/{gtm_svc,gtm_rpc_init,gtm_dal_svc}.o $gt_ld_sysrtns -lmumps -lgnpclient \
-		$gt_ld_extra_libs  -lcmisockettcp -L$gtm_exe -l$gt_ar_gtmrpc_name $gt_ld_syslibs >& $gtm_map/gtm_svc.map
-	if ( $status != 0  ||  ! -x $3/gtm_svc ) then
-		set buildshr_status = `expr $buildshr_status + 1`
-		echo "buildshr-E-linkgtm_svc, Failed to link gtm_svc (see ${dollar_sign}gtm_map/gtm_svc.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
-	endif
 endif
 
 unset echo

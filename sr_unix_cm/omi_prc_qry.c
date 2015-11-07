@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,12 +40,13 @@ int
 omi_prc_qry(omi_conn *cptr, char *xend, char *buff, char *bend)
 {
     char	*bptr, *eptr;
-    int		 rv;
-    omi_li	 len;
-    mval	 v;
+    int		rv;
+    omi_li	len;
+    mval	v;
+    mstr	opstr;
     uns_char	*bgn1, *bgn2, *sbsp;
     char	*grp;
-    int		 grl;
+    int		grl;
 
     bptr = buff;
 
@@ -99,7 +100,9 @@ omi_prc_qry(omi_conn *cptr, char *xend, char *buff, char *bend)
 /*  Subscripts */
     for (grp += grl + 1; *grp; grp += strlen(grp) + 1) {
 	bgn2   = (uns_char *)bptr++;
-	sbsp   = gvsub2str((uchar_ptr_t)grp, (uchar_ptr_t)bptr, FALSE);
+	opstr.addr = bptr;
+	opstr.len = MAX_ZWR_KEY_SZ;
+	sbsp   = gvsub2str((uchar_ptr_t)grp, &opstr, FALSE);
 	grl    = (int)(sbsp - (uns_char *)bptr);
 	OMI_SI_WRIT(grl, bgn2);
 	bptr  += grl;

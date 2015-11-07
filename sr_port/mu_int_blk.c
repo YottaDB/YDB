@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +60,6 @@ GBLREF boolean_t		tn_reset_this_reg;
 GBLREF int			disp_maxkey_errors;
 GBLREF int			disp_trans_errors;
 GBLREF int			maxkey_errors;
-GBLREF int			muint_adj;
 GBLREF int			muint_end_keyend;
 GBLREF int			muint_start_keyend;
 GBLREF int			mu_int_plen;
@@ -71,7 +70,6 @@ GBLREF uint4			mu_int_offset[];
 GBLREF uint4			mu_int_recs[];
 GBLREF qw_num			mu_int_size[];
 GBLREF uint4			mu_int_errknt;
-GBLREF block_id			mu_int_adj_prev[];
 GBLREF block_id			mu_int_path[];
 GBLREF int4			mu_int_blks_to_upgrd;
 GBLREF global_list		*trees;
@@ -243,7 +241,7 @@ boolean_t mu_int_blk(
 	}
 	blk_top = blk_base + blk_size;
 	blk_levl = ((blk_hdr_ptr_t)blk_base)->levl;
-	if (block)
+	if (block && (BML_LEVL == mu_int_root_level))
 		mu_int_root_level = level = blk_levl;
 	else  if (is_root)
 	{
@@ -267,11 +265,7 @@ boolean_t mu_int_blk(
 		return FALSE;
 	}
 	if (!master_dir)
-	{
-		if (mu_int_adj_prev[level] <= blk + muint_adj && mu_int_adj_prev[level] >= blk - muint_adj)
-			mu_int_adj[level] += 1;
-		mu_int_adj_prev[level] = blk;
-	}
+		CHECK_ADJACENCY(blk, level, mu_int_adj[level]);
 	blk_tn = ((blk_hdr_ptr_t)blk_base)->tn;
 	if (blk_tn >= mu_int_data.trans_hist.curr_tn)
 	{
@@ -280,7 +274,7 @@ boolean_t mu_int_blk(
 			mu_int_err(ERR_DBTNTOOLG, TRUE, TRUE, bot_key, bot_len, top_key, top_len,
 					(unsigned int)blk_levl);
 			mu_int_plen++;	/* continuing, so compensate for mu_int_err decrement */
-			gtm_putmsg(VARLSTCNT(3) ERR_DBTN, 1, &blk_tn);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DBTN, 1, &blk_tn);
 			trans_errors++;
 		} else
 		{
@@ -397,9 +391,18 @@ boolean_t mu_int_blk(
 						if (!master_dir)
 						{	/* If NOT directory tree and this is the first key in the block,
 							 * make sure the global name part of the key matches the name
-							 * corresponding to the current global variable tree.
+							 * corresponding to the current global variable tree. The only
+							 * exception is a MUPIP INTEG -BLOCK= in which case, trees->keysize
+							 * and trees->key will be uninitialized the first time we come here.
+							 * In that case, initialize them.
 							 */
 							assert(strlen(trees->key) == trees->keysize);
+							assert(block || trees->keysize);
+							if (block && !trees->keysize)
+							{
+								memcpy(trees->key, key_base, name_len);
+								trees->keysize = name_len - 1;
+							}
 							if (0 != memcmp(trees->key, key_base, trees->keysize + 1))
 							{
 								mu_int_err(ERR_DBINVGBL, TRUE, TRUE, bot_key, bot_len,
@@ -823,6 +826,8 @@ boolean_t mu_int_blk(
 					return FALSE;
 				}
 				mu_int_blks[0]++;
+				if (muint_fast && (1 == level))
+					CHECK_ADJACENCY(child, 0, mu_int_adj[0]);
 			}
 		} else
 		{

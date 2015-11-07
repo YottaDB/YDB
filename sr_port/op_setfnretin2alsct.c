@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include "gtm_stdio.h"
 
+#include "gtmio.h"
 #include "op.h"
 #include "lv_val.h"
 #include "gdsroot.h"

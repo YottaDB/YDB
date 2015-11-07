@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,82 +30,63 @@
 /* Include prototypes */
 #include "t_qread.h"
 
-#define MAX_UTIL_LEN 20
-
-GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF block_id		patch_find_blk, patch_path[MAX_BT_DEPTH + 1];
+GBLREF boolean_t	patch_find_root_search;
 GBLREF gd_region	*gv_cur_region;
-GBLREF VSIG_ATOMIC_T	util_interrupt;
-GBLREF block_id		patch_find_blk;
-GBLREF block_id		patch_path[MAX_BT_DEPTH + 1];
 GBLREF short int	patch_path_count;
-GBLREF bool		patch_find_root_search;
+GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF VSIG_ATOMIC_T	util_interrupt;
 
-error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_CTRLC);
+error_def(ERR_DSEBLKRDFAIL);
 
 void dse_range(void)
 {
-    char		lower[MAX_KEY_SZ + 1], targ_key[MAX_KEY_SZ + 1], upper[MAX_KEY_SZ + 1], util_buff[MAX_UTIL_LEN];
-    block_id		from, to, blk, blk_child;
-    sm_uc_ptr_t		bp, b_top, key_bot, key_top, key_top1, rp, r_top;
-    char		level;
-    int4		dummy_int, nocrit_present;
     cache_rec_ptr_t	dummy_cr;
+    char		level, lower[MAX_KEY_SZ + 1], targ_key[MAX_KEY_SZ + 1], upper[MAX_KEY_SZ + 1];
+    block_id		from, to, blk, blk_child;
+    boolean_t		busy_matters, free, got_lonely_star, index, lost, low, star, up, was_crit, was_hold_onto_crit;
+    int			cnt, dummy, lower_len, upper_len;
+    int4		dummy_int, nocrit_present;
     short int		rsize, size, size1;
-    int			cnt, dummy, lower_len, util_len, upper_len;
-    boolean_t		busy_matters, free, got_lonely_star, index, low, lost, star, up, was_crit, was_hold_onto_crit;
+    sm_uc_ptr_t		bp, b_top, key_bot, key_top, key_top1, rp, r_top;
 
-    if (cli_present("FROM") == CLI_PRESENT)
+    if (CLI_PRESENT == cli_present("FROM"))
     {
-	if (!cli_get_hex("FROM", (uint4 *)&from))
-	    return;
-	if (from < 0 || from > cs_addrs->ti->total_blks
-	    || !(from % cs_addrs->hdr->bplmap))
-	{
-	    util_out_print("Error: invalid block number.", TRUE);
-	    return;
-	}
-    }
-    else
+	if (BADDSEBLK == (from = dse_getblk("FROM", DSEBMLOK, DSEBLKNOCUR)))		/* WARNING: assignment */
+		return;
+    } else
 	from = 1;
-    if (cli_present("TO") == CLI_PRESENT)
+    if (CLI_PRESENT == cli_present("TO"))
     {
-	if(!cli_get_hex("TO", (uint4 *)&to))
-	    return;
-	if (to < 0 || to > cs_addrs->ti->total_blks
-	    || !(to % cs_addrs->hdr->bplmap))
-	{
-	    util_out_print("Error: invalid block number.", TRUE);
-	    return;
-	}
-    }
-    else
+	if (BADDSEBLK == (to = dse_getblk("TO", DSEBMLOK, DSEBLKNOCUR)))		/* WARNING: assignment */
+		return;
+    } else
 	to = cs_addrs->ti->total_blks - 1;
-    if (low = (cli_present("LOWER") == CLI_PRESENT))
+    if (low = (CLI_PRESENT == cli_present("LOWER")))					/* WARNING: assignment */
     {
 	if (!dse_getki(&lower[0], &lower_len, LIT_AND_LEN("LOWER")))
 	    return;
     }
-    if (up = (cli_present("UPPER") == CLI_PRESENT))
+    if (up = (CLI_PRESENT == cli_present("UPPER")))					/* WARNING: assignment */
     {
 	if (!dse_getki(&upper[0], &upper_len, LIT_AND_LEN("UPPER")))
 	    return;
     }
-    star = (cli_present("STAR") == CLI_PRESENT);
+    star = (CLI_PRESENT == cli_present("STAR"));
     if (!low && !up && !star)
     {
 	util_out_print("Must specify star, or a lower or upper key limit.", TRUE);
 	return;
     }
-    index = (cli_present("INDEX") == CLI_PRESENT);
-    lost = (cli_present("LOST") == CLI_PRESENT);
+    index = (CLI_PRESENT == cli_present("INDEX"));
+    lost = (CLI_PRESENT == cli_present("LOST"));
     dummy = cli_present("BUSY");
-    if (dummy == CLI_PRESENT)
+    if (CLI_PRESENT == dummy)
     {
 	busy_matters = TRUE;
 	free = FALSE;
-    }
-    else if (dummy == CLI_NEGATED)
+    } else if (CLI_NEGATED == dummy)
 	busy_matters = free = TRUE;
     else
 	busy_matters = free = FALSE;
@@ -119,15 +100,15 @@ void dse_range(void)
 	if (util_interrupt)
 	{
 	    DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-	    rts_error(VARLSTCNT(1) ERR_CTRLC);
+	    rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 	    break;
 	}
 	if (!(blk % cs_addrs->hdr->bplmap))
 	    continue;
 	if (!(bp = t_qread(blk, &dummy_int, &dummy_cr)))
-	    rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+	    rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	level = ((blk_hdr_ptr_t)bp)->levl;
-	if (index && (level == 0))
+	if (index && (0 == level))
 	    continue;
 	if (busy_matters && (free != dse_is_blk_free(blk, &dummy_int, &dummy_cr)))
 	    continue;
@@ -192,7 +173,7 @@ void dse_range(void)
 		{
 			blk_child = *(block_id_ptr_t)key_top;
 			if (!(bp = t_qread(blk_child, &dummy_int, &dummy_cr)))
-			    rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+			    rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 			if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 			    b_top = bp + cs_addrs->hdr->blk_size;
 			else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))

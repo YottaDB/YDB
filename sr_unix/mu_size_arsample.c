@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,15 +21,12 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include "jnl.h"
 #include "gdsblkops.h"
 #include "gdskill.h"
 #include "gdscc.h"
-#include "copy.h"
 #include "interlock.h"
 #include "muextr.h"
 #include "mu_reorg.h"
-
 /* Include prototypes */
 #include "t_end.h"
 #include "t_retry.h"
@@ -47,11 +44,9 @@
 #include "wcs_sleep.h"
 #include "memcoherency.h"
 #include "change_reg.h"
-
 #include "gtm_time.h"
 #include "mvalconv.h"
-#include "t_qread.h"
-#include "longset.h"            /* needed for cws_insert.h */
+#include "longset.h"	    /* needed for cws_insert.h */
 #include "hashtab_int4.h"
 #include "cws_insert.h"
 #include "min_max.h"
@@ -62,24 +57,25 @@ error_def(ERR_MUSIZEFAIL);
 
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	inctn_opcode_t	  	inctn_opcode;
+GBLREF	int			muint_adj;
+GBLREF	int4			mu_int_adj[];
+GBLREF	int4			process_id;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	gv_namehead		*gv_target;
 GBLREF	unsigned int		t_tries;
-GBLREF	int4			process_id;
-GBLREF  inctn_opcode_t          inctn_opcode;
-GBLREF  unsigned char		rdfail_detail;
 
-#define MAX_RECS_PER_BLK	65535
-#define	MAX_RELIABLE		10000		/* Used to tweak the error estimates */
-#define EPS			1e-6
 #define APPROX_F_MAX		500		/* Approximate upper bound for the number of records per index block in
-						 * a realistic database.
+						 * a database. The estimated max fanning factor is initially APPROX_F_MAX.
+						 * After DYNAMIC_F_MAX samples, we try to get a closer approximation, by
+						 * dynamically adjusting the estimated max fanning factor to be EXTRA_F_MAX
+						 * more than the maximum fanning observed ("fanning" is number of records in
+						 * a block a particular level). We want a closer approximation so that we reject
+						 * fewer samples, and therefore get a size estimation more quickly
 						 */
-#define	DYNAMIC_F_MAX		10		/* Choice of these two constants relates to choice of APPROX_F_MAX */
+#define	DYNAMIC_F_MAX		10		/* Choice of these two constants relates to choice of APPROX_F_MAX - how? */
 #define EXTRA_F_MAX		50
-#define SQR(X)			((double)(X) * (double)(X))
-#define ROUND(X)		((int)((X) + 0.5)) /* c89 does not have round() and some Solaris machines uses that compiler */
 
 typedef struct
 {	/* cumulative running stats */
@@ -95,6 +91,7 @@ typedef struct
 				 	 */
 	double	f_max[MAX_BT_DEPTH + 1];	/* estimated max fanning factor */
 	double	r_max[MAX_BT_DEPTH + 1];	/* max records found in a block at a given level */
+	double	A[MAX_BT_DEPTH + 1];		/* A[j] := mean of a[j] over previous n traversals]; see note on M */
 	/* Final estimates */
 	double	blktot[MAX_BT_DEPTH + 1];	/* estimated #blocks at each level */
 	double	blkerr[MAX_BT_DEPTH + 1];	/* approximate variance of blktot */
@@ -102,27 +99,19 @@ typedef struct
 	double	B;				/* estimated total blocks */
 	double	error;				/* approximate error in estimate B */
 	double	R;				/* estimated total records */
+	double	AT;				/* estimated total adjacency */
 } stat_t;
 
-STATICFNDCL void finalize_stats_ar(stat_t *stat, boolean_t ar);
-STATICFNDCL void accum_stats_ar(stat_t *stat, double *r, boolean_t ar);
-
-#define CLEAR_VECTOR(v)								\
-{										\
-	int	j;								\
-										\
-	for (j = 0; j <= MAX_BT_DEPTH; j++)					\
-		v[j] = 0;							\
-}
+/* macro makes it convenient to manange initialization with changes to stat_t */
 #define INIT_STATS(stat)							\
 {										\
-	int	j;								\
+	int	J;								\
 										\
 	stat.n = 0;								\
-	for (j = 0; j <= MAX_BT_DEPTH; j++)					\
+	for (J = 0; MAX_BT_DEPTH >= J; J++)					\
 	{									\
-		stat.f_max[j] = APPROX_F_MAX;					\
-		stat.r_max[j] = 1;						\
+		stat.f_max[J] = APPROX_F_MAX;					\
+		stat.r_max[J] = 1;						\
 	}									\
 	CLEAR_VECTOR(stat.N);							\
 	CLEAR_VECTOR(stat.M);							\
@@ -130,34 +119,36 @@ STATICFNDCL void accum_stats_ar(stat_t *stat, double *r, boolean_t ar);
 	CLEAR_VECTOR(stat.blktot);						\
 	CLEAR_VECTOR(stat.blkerr);						\
 	CLEAR_VECTOR(stat.rectot);						\
+	CLEAR_VECTOR(stat.A);							\
 }
 
+STATICFNDCL void accum_stats_ar(stat_t *stat, double *r, double *a);
+STATICFNDCL void finalize_stats_ar(stat_t *stat);
 
-int4 mu_size_arsample(glist *gl_ptr, uint4 M, boolean_t ar, int seed)
+int4 mu_size_arsample(glist *gl_ptr, uint4 M, int seed)
 {
-	enum cdb_sc		status;
-	trans_num		ret_tn;
-	int			k, h;
-	boolean_t		verify_reads;
 	boolean_t		tn_aborted;
-	unsigned int		lcl_t_tries;
+	double			a[MAX_BT_DEPTH + 1];	/* a[j] is # of adjacent block pointers in level j block of cur traversal */
 	double			r[MAX_BT_DEPTH + 1];	/* r[j] is #records in level j block of current traversal */
-	stat_t		rstat, ustat;
+	enum cdb_sc		status;
+	int			k, h;
+	stat_t			rstat;
+	trans_num		ret_tn;
+	unsigned int		lcl_t_tries;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	inctn_opcode = inctn_invalid_op;
+	/* set gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr */
 	DO_OP_GVNAME(gl_ptr);
-		/* sets gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr */
 	if (0 == gv_target->root)
-        {       /* Global does not exist (online rollback). Not an error. */
-                gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
-                return EXIT_NRM;
-        }
+	{       /* Global does not exist (online rollback). Not an error. */
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
+		return EXIT_NRM;
+	}
 	if (!seed)
 		seed = (int4)(time(0) * process_id);
 	srand48(seed);
-
 	/* do random traversals until M of them are accepted at level 1 */
 	INIT_STATS(rstat);
 	for (k = 1; rstat.N[1] < M; k++)
@@ -168,103 +159,96 @@ int4 mu_size_arsample(glist *gl_ptr, uint4 M, boolean_t ar, int seed)
 		for (;;)
 		{
 			CLEAR_VECTOR(r);
-			if (cdb_sc_normal != (status = rand_traverse(r)))
+			CLEAR_VECTOR(a);
+			if (cdb_sc_normal != (status = mu_size_rand_traverse(r, a)))			/* WARNING assignment */
 			{
 				assert(CDB_STAGNATE > t_tries);
 				t_retry(status);
 				continue;
 			}
 			gv_target->clue.end = 0;
-			gv_target->hist.h[0] = gv_target->hist.h[1];	/* No level 0 block to validate */
+			gv_target->hist.h[0] = gv_target->hist.h[1];				/* No level 0 block to validate */
 			DEBUG_ONLY(lcl_t_tries = t_tries);
-			if ((trans_num)0 == (ret_tn = t_end(&gv_target->hist, NULL, TN_NOT_SPECIFIED)))
+			if ((trans_num)0 == (ret_tn = t_end(&gv_target->hist, NULL, TN_NOT_SPECIFIED)))	/* WARNING: assignment */
 			{
 				ABORT_TRANS_IF_GBL_EXIST_NOMORE(lcl_t_tries, tn_aborted);
 				if (tn_aborted)
 				{	/* Global does not exist (online rollback). Not an error. */
-                			gtm_putmsg_csa(CSA_ARG(NULL)
+					gtm_putmsg_csa(CSA_ARG(NULL)
 						VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
 					return EXIT_NRM;
 				}
 				continue;
 			}
-			accum_stats_ar(&rstat, r, ar);
+			accum_stats_ar(&rstat, r, a);
 			break;
 		}
 	}
-	finalize_stats_ar(&rstat, ar);
-
-	/* display rstat data */
-	/* Showing the error as 2 standard deviations which is a 95% confidence interval for the mean number of blocks at
-	 * each level*/
+	finalize_stats_ar(&rstat);
+	/* display rstat data
+	 * Showing error as 2 standard deviations which is a 95% confidence interval for the mean number of blocks at each level
+	 */
 	util_out_print("!/Number of generated samples = !UL", FLUSH, rstat.n);
 	util_out_print("Number of accepted samples = !UL", FLUSH, rstat.N[1]);
-	util_out_print("Level          Blocks           2 sigma(+/-)      % Accepted", FLUSH);
-	for (h = MAX_BT_DEPTH; (h >= 0) && (rstat.blktot[h] < EPS); h--);
+	util_out_print("Level          Blocks        Adjacent           2 sigma(+/-)      % Accepted", FLUSH);
+	for (h = MAX_BT_DEPTH; (0 <= h) && (rstat.blktot[h] < EPS); h--)
+		;
 	for ( ; h > 0; h--)
-		util_out_print("!5UL !15UL !15UL ~ !3UL% !15UL", FLUSH, h, (int)ROUND(rstat.blktot[h]),
-				(int)ROUND(sqrt(rstat.blkerr[h])*2),
-				(int)ROUND(sqrt(rstat.blkerr[h])*2/rstat.blktot[h]*100),
-				(int)ROUND(100.0*rstat.N[h]/rstat.n)
+		util_out_print("!5UL !15UL !15UL !15UL ~ !3UL% !15UL", FLUSH, h, (int)ROUND(rstat.blktot[h]),
+				(int)ROUND(sqrt(rstat.blkerr[h]) * 2),
+				(int)ROUND(mu_int_adj[h]),
+				(int)ROUND(sqrt(rstat.blkerr[h]) * 2 / rstat.blktot[h] * 100),
+				(int)ROUND(100.0 * rstat.N[h] / rstat.n)
 				);
-	util_out_print("!5UL !15UL !15UL ~ !3UL%             N/A", FLUSH, h, (int)ROUND(rstat.blktot[h]),
-			(int)ROUND(sqrt(rstat.blkerr[h])*2),
-			(int)ROUND(sqrt(rstat.blkerr[h])*2/rstat.blktot[h]*100.0)
+	util_out_print("!5UL !15UL !15UL !15UL ~ !3UL%             N/A", FLUSH, h, (int)ROUND(rstat.blktot[h]),
+			(int)ROUND(mu_int_adj[h]),
+			(int)ROUND(sqrt(rstat.blkerr[h]) * 2),
+			(int)ROUND(sqrt(rstat.blkerr[h]) * 2 / rstat.blktot[h] * 100.0)
 			);
-	util_out_print("Total !15UL !15UL ~ !3UL%             N/A", FLUSH, (int)ROUND(rstat.B),
-			(int)ROUND(sqrt(rstat.error)*2),
-			(int)ROUND(sqrt(rstat.error)*2/rstat.B*100.0)
+	util_out_print("Total !15UL !15UL !15UL ~ !3UL%             N/A", FLUSH, (int)ROUND(rstat.B),
+			(int)ROUND(rstat.AT),
+			(int)ROUND(sqrt(rstat.error) * 2),
+			(int)ROUND(sqrt(rstat.error) * 2 / rstat.B * 100.0)
 			);
-
 	return EXIT_NRM;
 }
 
-
-void accum_stats_ar(stat_t *stat, double *r, boolean_t ar)
+STATICFNDCL void accum_stats_ar(stat_t *stat, double *r, double *a)
 {
+	double		random, M0, accept[MAX_BT_DEPTH + 1];
 	int		j, depth, n;
-	double	random, M0, accept[MAX_BT_DEPTH + 1];
 
 	++stat->n;
-	for (j = MAX_BT_DEPTH; (j >= 0) && (r[j] < EPS); j--)
+	for (j = MAX_BT_DEPTH; (0 <= j) && (r[j] < EPS); j--)
 		accept[j] = 0;
 	depth = j;
-	assert(depth >= 0);				/* r[0] should remain zero since we don't maintain it */
+	assert(0 <= depth);				/* r[0] should remain zero since we don't maintain it */
 	accept[depth] = 1;				/* always accept the root */
-	for (j = depth - 1; j >= 1; j--)
-	{
-		if (!ar)
-			accept[j] = 1;			/* don't reject anything */
-		else if (j == depth - 1)
-			accept[j] = accept[j + 1];	/* always accept level beneath root, too */
-		else
-			accept[j] = accept[j + 1] * (r[j + 1] / stat->f_max[j + 1]);
-	}
+	for (; 2 <= j; j--)
+		accept[j - 1] = accept[j] * ((j == depth) ? 1 : (r[j] / stat->f_max[j]));
 	accept[0] = 0;					/* computing #blks (e.g #recs in lvl 1+), not #recs in lvl 0+ */
-
 	random = drand48();
-	for (j = 0; j <= MAX_BT_DEPTH; j++)
+	for (j = 0; MAX_BT_DEPTH >= j; j++)
 	{
 		if (random < accept[j])
 		{
 			n = ++stat->N[j];
 			M0 = stat->M[j];
-			stat->M[j] += (r[j] - stat->M[j]) / n;
+			stat->M[j] += ((r[j] - M0) / n);
 			stat->S[j] += (r[j] - stat->M[j]) * (r[j] - M0);
 			if (n > DYNAMIC_F_MAX)
 				stat->f_max[j] = stat->r_max[j] + EXTRA_F_MAX;
+			stat->A[j] += ((a[j] - stat->A[j]) / n);
 		}
 		stat->r_max[j] = MAX(stat->r_max[j], r[j]);
 	}
 }
 
-
-void finalize_stats_ar(stat_t *stat, boolean_t ar)
+STATICFNDCL void finalize_stats_ar(stat_t *stat)
 {
-	int	j;
-	double	factor;
+	int	j, k;
 
-	for (j = 0; j <= MAX_BT_DEPTH; j++)
+	for (j = 0; MAX_BT_DEPTH >= j; j++)
 		/* Variance of the mean (mean referes to avg number of records per block) is Var(R)/N where N is samples size */
 		if (stat->N[j] > 0)
 		{
@@ -272,132 +256,28 @@ void finalize_stats_ar(stat_t *stat, boolean_t ar)
 			stat->S[j] /= stat->N[j];
 		}
 	stat->N[0] = stat->n;				/* for arithmetic below */
-	for (j = MAX_BT_DEPTH; (j >= 0) && (stat->M[j] < EPS); j--);
-	assert(j >= 0);					/* stat->M[0] should remain zero since we don't maintain it */
-	stat->blktot[j] = 1;
-	stat->blkerr[j] = 0;
-	for (j-- ; j >= 0; j--)
+	for (j = MAX_BT_DEPTH; (0 <= j) && (stat->M[j] < EPS); j--)
+		;
+	assert(0 <= j);					/* stat->M[0] should remain zero since we don't maintain it */
+	mu_int_adj[j] = stat->AT = stat->blkerr[j] = stat->error = 0;
+	stat->B = stat->blktot[j] = 1;
+	for (k = j - 1; j > 0; j--, k--)
 	{
-		if (stat->M[j + 1] == 0)
-			stat->M[j + 1] = EPS;		/* remove any chance of division by zero */
-		stat->blktot[j] = stat->blktot[j + 1] * stat->M[j + 1];
+		if (0 == stat->M[j])
+			stat->M[j] = EPS;		/* remove any chance of division by zero */
+		stat->blktot[k] = stat->blktot[j] * stat->M[j];
+		stat->B += stat->blktot[k];
+		mu_int_adj[k] = stat->blktot[j] * stat->A[j];
+		stat->AT += mu_int_adj[k];
 		/* Var(XY) assuming X and Y are independent = E[X]^2*Var(Y) + E[Y]^2*Var(X) + Var(X)*Var(Y) */
-		stat->blkerr[j] = SQR(stat->M[j + 1])*stat->blkerr[j + 1] +
-						  SQR(stat->blktot[j + 1])*stat->S[j + 1] + stat->blkerr[j + 1]*stat->S[j + 1];
-	}
-	stat->B = 0;
-	stat->error = 0;
-	for (j = 0; j <= MAX_BT_DEPTH; j++)
-	{
-		stat->B += stat->blktot[j];
-		stat->error += stat->blkerr[j];
+		stat->blkerr[k] = SQR(stat->M[j]) * stat->blkerr[j]
+						+ SQR(stat->blktot[j]) * stat->S[j] + stat->blkerr[j] * stat->S[j];
+		stat->error += stat->blkerr[k];
 	}
 	stat->R = 0;
-	for (j = 0; j <= MAX_BT_DEPTH; j++)
+	for (j = 0; MAX_BT_DEPTH >= j; j++)
 	{
 		stat->rectot[j] = stat->blktot[j] * stat->M[j];
 		stat->R += stat->rectot[j];
 	}
-}
-
-
-/*
- * Performs a random traversal for the sampling methods
- */
-enum cdb_sc rand_traverse(double *r)
-{
-	sm_uc_ptr_t			pVal, pTop, pRec, pBlkBase;
-	register gv_namehead		*pTarg;
-	register srch_blk_status	*pCurr;
-	register srch_hist		*pTargHist;
-	block_id			nBlkId;
-	block_id			valBlk[MAX_RECS_PER_BLK];	/* valBlk[j] := value in j-th record of current block */
-	unsigned char			nLevl;
-	cache_rec_ptr_t			cr;
-	int				cycle;
-	trans_num			tn;
-	sm_uc_ptr_t			buffaddr;
-	unsigned short			nRecLen;
-	uint4				tmp;
-	boolean_t			is_mm;
-	int4				random;
-	int4				rCnt;			/* number of entries in valBlk */
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	is_mm = (dba_mm == cs_data->acc_meth);
-	pTarg = gv_target;
-	pTargHist = &gv_target->hist;
-	/* The following largely mimics gvcst_search/gvcst_search_blk */
-	nBlkId = pTarg->root;
-	tn = cs_addrs->ti->curr_tn;
-	if (NULL == (pBlkBase = t_qread(nBlkId, (sm_int_ptr_t)&cycle, &cr)))
-		return (enum cdb_sc)rdfail_detail;
-	nLevl = ((blk_hdr_ptr_t)pBlkBase)->levl;
-	if (MAX_BT_DEPTH < (int)nLevl)
-	{
-		assert(CDB_STAGNATE > t_tries);
-		return cdb_sc_maxlvl;
-	}
-	if (0 == (int)nLevl)
-	{
-		assert(CDB_STAGNATE > t_tries);
-		return cdb_sc_badlvl;
-	}
-	pTargHist->depth = (int)nLevl;
-	pCurr = &pTargHist->h[nLevl];
-	(pCurr + 1)->blk_num = 0;
-	pCurr->tn = tn;
-	pCurr->cycle = cycle;
-	pCurr->cr = cr;
-	for (;;)
-	{
-		assert(pCurr->level == nLevl);
-		pCurr->cse = NULL;
-		pCurr->blk_num = nBlkId;
-		pCurr->buffaddr = pBlkBase;
-		for (	rCnt = 0, pRec = pBlkBase + SIZEOF(blk_hdr), pTop = pBlkBase + ((blk_hdr_ptr_t)pBlkBase)->bsiz;
-				pRec != pTop && rCnt < MAX_RECS_PER_BLK;
-				rCnt++, pRec += nRecLen		)
-		{	/* enumerate records in block */
-			GET_USHORT(nRecLen, &((rec_hdr_ptr_t)pRec)->rsiz);
-			pVal = pRec + nRecLen - SIZEOF(block_id);
-			if (nRecLen == 0)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				return cdb_sc_badoffset;
-			}
-			if (pRec + nRecLen > pTop)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				return cdb_sc_blklenerr;
-			}
-			GET_LONG(tmp, pVal);
-			valBlk[rCnt] = tmp;
-		}
-		r[nLevl] = rCnt;
-		/* randomly select next block */
-		random = (int4)(rCnt * drand48());
-		random = random & 0x7fffffff; /* to make sure that the sign bit(msb) is off */
-		nBlkId = valBlk[random];
-		if (is_mm && (nBlkId > cs_addrs->total_blks))
-		{
-			if (cs_addrs->total_blks < cs_addrs->ti->total_blks)
-				return cdb_sc_helpedout;
-			else
-				return cdb_sc_blknumerr;
-		}
-		--pCurr; --nLevl;
-		if (nLevl < 1)
-			break;
-		pCurr->tn = cs_addrs->ti->curr_tn;
-		if (NULL == (pBlkBase = t_qread(nBlkId, (sm_int_ptr_t)&pCurr->cycle, &pCurr->cr)))
-			return (enum cdb_sc)rdfail_detail;
-		if (((blk_hdr_ptr_t)pBlkBase)->levl != nLevl)
-		{
-			assert(CDB_STAGNATE > t_tries);
-			return cdb_sc_badlvl;
-		}
-	}
-	return cdb_sc_normal;
 }

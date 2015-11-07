@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ error_def(ERR_TEXT);
 #define LAB_TERM_SZ	(SIZEOF(LAB_TERM) - 1)
 
 /* This routine formats and outputs journal extract records
-   corresponding to M SET, KILL, ZKILL, TSTART, ZTSTART, and ZTRIGGER  commands as well as $ZTWORMHOLE */
+   corresponding to M SET, KILL, ZKILL, TSTART, ZTSTART, and ZTRIGGER commands, $ZTRIGGER function (LGTRIG) and $ZTWORMHOLE */
 void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 {
 	enum jnl_record_type	rectype;
@@ -104,7 +104,7 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 			EXT_STRM_SEQNO(rec->jrec_set_kill.strm_seqno);
 		jnlext_write(fi, murgbl.extr_buff, extract_len);
 	}
-	/* Output the SET or KILL or ZKILL or ZTWORMHOLE record */
+	/* Output the SET or KILL or ZKILL or ZTWORMHOLE or LGTRIG or ZTRIG record */
 	if (!mur_options.detail)
 	{
 		extract_len = 0;
@@ -120,6 +120,9 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 		} else if (IS_ZTWORM(rectype))
 		{
 			EXT2BYTES(&muext_code[MUEXT_ZTWORM][0]);
+		} else if (IS_LGTRIG(rectype))
+		{
+			EXT2BYTES(&muext_code[MUEXT_LGTRIG][0]);
 		} else if (IS_ZTRIG(rectype))
 		{
 			EXT2BYTES(&muext_code[MUEXT_ZTRIG][0]);
@@ -149,10 +152,12 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 		EXTQW(rec->jrec_set_kill.token_seq.token);
 	} else
 		EXTQW(rec->jrec_set_kill.token_seq.jnl_seqno);
-	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
+	assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype));
 	assert(&rec->jrec_set_kill.strm_seqno == &rec->jrec_ztworm.strm_seqno);
+	assert(&rec->jrec_set_kill.strm_seqno == &rec->jrec_lgtrig.strm_seqno);
 	EXT_STRM_SEQNO(rec->jrec_set_kill.strm_seqno);
 	assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
+	assert(&rec->jrec_set_kill.update_num == &rec->jrec_lgtrig.update_num);
 	EXTINT(rec->jrec_set_kill.update_num);
 	do_format2zwr = FALSE;
 	if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
@@ -174,8 +179,9 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 			val_ptr += SIZEOF(mstr_len_t);
 			do_format2zwr = TRUE;
 		}
-	} else if (IS_ZTWORM(rectype))
+	} else if (IS_ZTWORM(rectype) || IS_LGTRIG(rectype))
 	{
+		assert(&rec->jrec_ztworm.ztworm_str == &rec->jrec_lgtrig.lgtrig_str);
 		keystr = (jnl_string *)&rec->jrec_ztworm.ztworm_str;
 		val_len = keystr->length;
 		val_ptr = &keystr->text[0];

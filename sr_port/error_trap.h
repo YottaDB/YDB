@@ -1,5 +1,5 @@
 /****************************************************************
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #define IS_ETRAP	(err_act == &dollar_etrap.str)
 #define ETRAP_IN_EFFECT (!ztrap_explicit_null && (0 == dollar_ztrap.str.len))
+#define NULLIFY_TRAP(TRAP) {TRAP.mvtype = MV_STR; TRAP.str.len = 0;}
 
 #define	DOLLAR_ECODE_MAXINDEX	32	/* maximum of 32 ecodes in $ECODE */
 #define	DOLLAR_STACK_MAXINDEX	256	/* maximum of 256 levels will be stored for $STACK(level) */

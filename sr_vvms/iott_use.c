@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,11 +42,16 @@ LITDEF unsigned char filter_index[27] =
 	,4, 4, 4
 };
 
-GBLREF bool		ctrlc_on;
-GBLREF uint4		std_dev_outofband_msk;
-GBLREF uint4		spc_inp_prc;
+GBLREF boolean_t	ctrlc_on;
 GBLREF io_pair		io_std_device;
+GBLREF uint4		spc_inp_prc, std_dev_outofband_msk;
+
 LITREF unsigned char	io_params_size[];
+
+error_def(ERR_DEVPARMNEG);
+error_def(ERR_TTINVFILTER);
+error_def(ERR_TTWIDTHTOOBIG);
+error_def(ERR_TTLENGTHTOOBIG);
 
 void iott_use(io_desc *iod, mval *pp)
 {
@@ -67,11 +72,6 @@ void iott_use(io_desc *iod, mval *pp)
 	t_cap		s_mode;
 	int		p_offset;
 
-	error_def(ERR_DEVPARMNEG);
-	error_def(ERR_TTINVFILTER);
-	error_def(ERR_TTWIDTHTOOBIG);
-	error_def(ERR_TTLENGTHTOOBIG);
-
 	assert(iod->state == dev_open);
 	assert(iod->type == tt);
 	assert(iod->pair.in == iod || iod->pair.out == iod);
@@ -91,7 +91,7 @@ void iott_use(io_desc *iod, mval *pp)
 		if (status == SS$_NORMAL)
 			status = stat_blk.status;
 		if (status != SS$_NORMAL)
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		/* although it is only for safety, the following covers for
 			read * (iott_rdone) and dm_read use of pasthru et al */
 		s_mode.ext_cap &= (~TT2$M_PASTHRU);
@@ -146,7 +146,7 @@ void iott_use(io_desc *iod, mval *pp)
 					if (status == SS$_NORMAL)
 						status = stat_blk.status;
 					if (status != SS$_NORMAL)
-						rts_error(VARLSTCNT(1) status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
 				break;
 			case iop_convert:
@@ -172,14 +172,13 @@ void iott_use(io_desc *iod, mval *pp)
 					status = smg$get_term_data (&out_ttptr->term_tab_entry,
 						&req_code, &bufsz, &buflen, buf, args);
 					if (!(status & 1))
-						rts_error(VARLSTCNT(1) status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 					status = sys$qiow(EFN$C_ENF, out_ttptr->channel, IO$_WRITEVBLK,
 						&stat_blk, NULL, 0, buf, buflen, 0, 0, 0, 0);
 					if (status == SS$_NORMAL)
 						status = stat_blk.status;
 					if (status != SS$_NORMAL)
-						rts_error(VARLSTCNT(1) status);
-
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 					if (d_out->dollar.y > 0)
 					{
 						d_out->dollar.y --;
@@ -224,7 +223,7 @@ void iott_use(io_desc *iod, mval *pp)
 					if (status == SS$_NORMAL)
 						status = stat_blk.status;
 					if (status != SS$_NORMAL)
-						rts_error(VARLSTCNT(1) status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
 				break;
 			case iop_exception:
@@ -237,7 +236,7 @@ void iott_use(io_desc *iod, mval *pp)
 				tab = pp->str.addr + p_offset + 1;
 				if ((fil_type = namelook(filter_index, filter_names, tab, len)) < 0)
 				{
-					rts_error(VARLSTCNT(1) ERR_TTINVFILTER);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TTINVFILTER);
 					return;
 				}
 				switch (fil_type)
@@ -262,7 +261,7 @@ void iott_use(io_desc *iod, mval *pp)
 			case iop_field:
 				GET_SHORT(field, pp->str.addr + p_offset);
 				if (field < 0)
-					rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 				if (in_ttptr)
 					if (field == 0)
 						in_ttptr->in_buf_sz = TTDEF_BUF_SZ;
@@ -291,9 +290,9 @@ void iott_use(io_desc *iod, mval *pp)
 			case iop_length:
 				GET_LONG(length, pp->str.addr + p_offset);
 				if (length < 0)
-					rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 				if (length > TTMAX_PG_LENGTH)
-					rts_error(VARLSTCNT(1) ERR_TTLENGTHTOOBIG);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TTLENGTHTOOBIG);
 				s_mode.pg_length = length;
 				d_out->length = length;
 				break;
@@ -366,13 +365,13 @@ void iott_use(io_desc *iod, mval *pp)
 					status = smg$get_term_data (&out_ttptr->term_tab_entry, &req_code,
 						&bufsz, &buflen, buf, args);
 					if (!(status & 1))
-						rts_error(VARLSTCNT(1) status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 					status = sys$qiow(EFN$C_ENF, out_ttptr->channel, IO$_WRITEVBLK,
 						&stat_blk, NULL, 0, buf, buflen, 0, 0, 0, 0);
 					if (status == SS$_NORMAL)
 						status = stat_blk.status;
 					if (status != SS$_NORMAL)
-						rts_error(VARLSTCNT(1) status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 
 					d_out->dollar.y++;
 					if (d_out->length)
@@ -383,9 +382,9 @@ void iott_use(io_desc *iod, mval *pp)
 			case iop_width:
 				GET_LONG(width, pp->str.addr + p_offset);
 				if (width < 0)
-					rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 				if (width > TTMAX_PG_WIDTH)
-					rts_error(VARLSTCNT(1) ERR_TTWIDTHTOOBIG);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TTWIDTHTOOBIG);
 				if (width == 0)
 				{
 					s_mode.term_char &= (~TT$M_WRAP);
@@ -430,13 +429,13 @@ void iott_use(io_desc *iod, mval *pp)
 					status = smg$get_term_data (&out_ttptr->term_tab_entry,
 						&req_code, &bufsz, &buflen, buf, args);
 					if (!(status & 1))
-						rts_error(VARLSTCNT(1) status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 					status = sys$qiow(EFN$C_ENF, out_ttptr->channel, IO$_WRITEVBLK,
 						&stat_blk, NULL, 0, buf, buflen, 0, 0, 0, 0);
 					if (status == SS$_NORMAL)
 						status = stat_blk.status;
 					if (status != SS$_NORMAL)
-						rts_error(VARLSTCNT(1) status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
 				break;
 			case iop_y:
@@ -454,13 +453,13 @@ void iott_use(io_desc *iod, mval *pp)
 					status = smg$get_term_data (&out_ttptr->term_tab_entry,
 						&req_code, &bufsz, &buflen, buf, args);
 					if (!(status & 1))
-						rts_error(VARLSTCNT(1) status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 					status = sys$qiow(EFN$C_ENF, out_ttptr->channel, IO$_WRITEVBLK,
 						&stat_blk, NULL, 0, buf, buflen, 0, 0, 0, 0);
 					if (status == SS$_NORMAL)
 						status = stat_blk.status;
 					if (status != SS$_NORMAL)
-						rts_error(VARLSTCNT(1) status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
 				break;
 			}
@@ -472,7 +471,7 @@ void iott_use(io_desc *iod, mval *pp)
 		if (status == SS$_NORMAL)
 			status = stat_blk.status;
 		if (status != SS$_NORMAL)
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		if (in_ttptr)
 		{
 			in_ttptr->item_list[0].addr = mask_in;
@@ -487,7 +486,7 @@ void iott_use(io_desc *iod, mval *pp)
 				if (status == SS$_NORMAL)
 					status = stat_blk.status;
 				if ((status != SS$_NORMAL) && (status != SS$_TIMEOUT))
-					rts_error(VARLSTCNT(1) status);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			}
 		}
 	}

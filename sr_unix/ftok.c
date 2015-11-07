@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,6 +66,6 @@ int main (int argc, char *argv[])
 	{
 		PRINTF("%20s  ::  %d  [ 0x%x ]\n", argv[i], FTOK(argv[i], id), FTOK(argv[i], id));
 	}
-
 	PRINTF("\n");
+	return 0;
 }

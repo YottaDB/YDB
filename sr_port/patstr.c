@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@ GBLREF	boolean_t	gtm_utf8_mode;
 LITREF	char		ctypetab[NUM_CHARS];
 LITREF	uint4		typemask[PATENTS];
 
+error_def(ERR_COMMAORRPAREXP);
 error_def(ERR_PATCLASS);
 error_def(ERR_PATCODE);
 error_def(ERR_PATLIT);
@@ -162,7 +163,11 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 		prev_fixed_len = fixed_len;
 		if ((NULL != relay) && !saw_delimiter)
 		{
-			assert(!topseen);
+			if (topseen)
+			{
+				instr->addr = (char *)(in_top + 1);
+				return ERR_COMMAORRPAREXP;
+			}
 			if ((',' == curchar) || (')' == curchar))
 			{
 				*relay = (inchar - 1);
@@ -512,6 +517,11 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				} while (TRUE);
 				if (0 == pattern_mask)
 				{
+					if (any_alt)
+					{
+						instr->addr = alttail.addr + 1;
+						return ERR_PATCODE;
+					}
 					instr->addr = topseen ? (char *)inchar + 1 : (char *)inchar;
 					return ERR_PATCLASS;
 				}

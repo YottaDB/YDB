@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,12 +9,9 @@
  *								*
  ****************************************************************/
 
-#ifndef DSE_IS_BLK_FREE_DEFINED
+#ifndef GTM_UNLINK_H_INCLUDED
+#define GTM_UNLINK_H_INCLUDED
 
-/* Declare parms for dse_is_blk_free.c */
+void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all);
 
-bool dse_is_blk_free (block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr);
-
-#define DSE_IS_BLK_FREE_DEFINED
-
-#endif
+#endif /* GTM_UNLINK_H_INCLUDED */

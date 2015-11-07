@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,9 @@
 
 int main(int argc, char **argv)
 {
-if (geteuid() == 0)
-	PRINTF("root\n");
-else
-	PRINTF("other\n");
+	if (geteuid() == 0)
+		PRINTF("root\n");
+	else
+		PRINTF("other\n");
+	return 0;
 }

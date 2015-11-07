@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -246,7 +246,11 @@ boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 	char		buf[MAX_LINE];
 	char		local_str[MAX_LINE];
 	size_t		maxdstlen, maxbuflen, copylen;
+#	ifdef DEBUG
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	maxbuflen = SIZEOF(buf);
 	maxdstlen = *max_len;
 
@@ -256,12 +260,16 @@ boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
-	if (!(cli_present(local_str) == CLI_PRESENT
-	  && cli_get_value(local_str, buf)))
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = maxdstlen;)	/* for use inside cli_get_value -> get_parm_entry ... */
+	if (!((CLI_PRESENT == cli_present(local_str)) && cli_get_value(local_str, buf)))
 	{
 		if (!cli_get_parm(local_str, buf))
+		{
+			DEBUG_ONLY(TREF(cli_get_str_max_len) = 0;)	/* for use inside cli_get_value -> get_parm_entry ... */
 			return FALSE;
+		}
 	}
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = 0;)	/* for use inside cli_get_value -> get_parm_entry ... */
 	copylen = strlen(buf);
 	copylen = MIN(copylen, maxdstlen);
 	memset(dst, 0, maxdstlen);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,7 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum)
 	assert((0 != jpc->pini_addr) || REPL_WAS_ENABLED(csa));
 	assert(jgbl.gbl_jrec_time || REPL_WAS_ENABLED(csa));
 	assert(csa->now_crit);
-	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(jfb->rectype) || (JRT_NULL == jfb->rectype));
+	assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(jfb->rectype) || (JRT_NULL == jfb->rectype));
 	assert(!IS_ZTP(jfb->rectype));
 	jrec = (struct_jrec_upd *)jfb->buff;
 	assert(OFFSETOF(struct_jrec_null, prefix) == OFFSETOF(struct_jrec_upd, prefix));
@@ -76,14 +76,12 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum)
 	assert(OFFSETOF(struct_jrec_null, strm_seqno) == OFFSETOF(struct_jrec_upd, strm_seqno));
 	assert(SIZEOF(jrec_null->strm_seqno) == SIZEOF(jrec->strm_seqno));
 	jrec->strm_seqno = jnl_fence_ctl.strm_seqno;
-	/*update checksum below*/
+	/* update checksum below */
 	if(JRT_NULL != jrec->prefix.jrec_type)
 	{
 		COMPUTE_LOGICAL_REC_CHECKSUM(jfb->checksum, jrec, com_csum, jrec->prefix.checksum);
-	}
-	else
+	} else
 		jrec->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)jrec, SIZEOF(struct_jrec_null));
-
 #	ifdef GTM_CRYPT
 	if (csa->hdr->is_encrypted && REPL_ALLOWED(csa))
 	{

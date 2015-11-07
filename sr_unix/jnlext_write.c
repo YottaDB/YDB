@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@ GBLREF mstr		sys_output;
 
 static readonly unsigned char open_params_list[] =
 {
+	(unsigned char)iop_stream,
 	(unsigned char)iop_nowrap,
 	(unsigned char)iop_eol
 };

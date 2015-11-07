@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,14 +48,14 @@
 
 static readonly char	space_text[] = {' '};
 
+GBLREF boolean_t	ctrlc_on, gtm_utf8_mode;
+GBLREF io_log_name	*io_root_log_name;
+GBLREF io_pair		*io_std_device;
+
 LITREF mstr		chset_names[];
 LITREF nametabent	dev_param_names[];
 LITREF uint4		dev_param_index[];
 LITREF zshow_index	zshow_param_index[];
-GBLREF bool		ctrlc_on;
-GBLREF io_log_name	*io_root_log_name;
-GBLREF io_pair		*io_std_device;
-GBLREF boolean_t	gtm_utf8_mode;
 
 void zshow_devices(zshow_out *output)
 {
@@ -361,7 +361,13 @@ void zshow_devices(zshow_out *output)
 						{
 							ZS_PARM_SP(&v, zshow_fixed);
 						}
-						if (rm_ptr->noread)
+#						ifdef UNIX
+						else if (rm_ptr->stream)
+						{
+							ZS_PARM_SP(&v, zshow_stream);
+						}
+#						endif
+						if (rm_ptr->read_only)
 						{
 							ZS_PARM_SP(&v, zshow_read);
 						}
@@ -485,6 +491,10 @@ void zshow_devices(zshow_out *output)
 						ZS_STR_OUT(&v, socket_text);
 						dsocketptr = (d_socket_struct *)l->iod->dev_sp;
 						ZS_ONE_OUT(&v, space_text);
+						if (!l->iod->wrap)
+						{
+							ZS_PARM_SP(&v, zshow_nowrap);
+						}
 						ZS_STR_OUT(&v, total_text);
 						MV_FORCE_MVAL(&m, (int)dsocketptr->n_socket);
 						mval_write(output, &m, FALSE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,13 +38,13 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 			z_ptr->action = NULL;
 	}
 	/* In the generated code, change the offset in TRANSFER TABLE */
-#ifdef COMPLEX_INSTRUCTION_UPDATE
+#	ifdef COMPLEX_INSTRUCTION_UPDATE
 	EXTRACT_AND_UPDATE_INST(z_ptr->mpc, z_ptr->m_opcode);
-#else
+#	else
 	*z_ptr->mpc = z_ptr->m_opcode;
-#endif
+#	endif
 	inst_flush(z_ptr->mpc, SIZEOF(INST_TYPE));
-#ifdef USHBIN_SUPPORTED
+#	ifdef USHBIN_SUPPORTED
 	if (((z_ptr == zrecs->beg) || !MIDENT_EQ((z_ptr - 1)->rtn, z_ptr->rtn)) &&
 	    (((z_ptr + 1) == zrecs->free) || !MIDENT_EQ((z_ptr + 1)->rtn, z_ptr->rtn)))
 	{	/* No more breakpoints in the routine we just removed a break from. Note that since zrecs is sorted based
@@ -56,10 +56,10 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 		rtn_str.len = z_ptr->rtn->len;
 		rtn_str.addr = z_ptr->rtn->addr;
 		routine = find_rtn_hdr(&rtn_str);
-		if (NULL != routine->shlib_handle) /* don't need the private copy any more, revert back to shared copy */
+		if (NULL != routine->shared_ptext_adr) /* don't need the private copy any more, revert back to shared copy */
 			release_private_code_copy(routine);
 	}
-#endif
+#	endif
 	zrecs->free--;
 	/* potentially overlapped memory, use memmove, not memcpy */
 	memmove((char *)z_ptr, (char *)(z_ptr + 1), (zrecs->free - z_ptr) * SIZEOF(zbrk_struct));

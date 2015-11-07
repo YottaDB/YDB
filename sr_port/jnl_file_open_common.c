@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -205,7 +205,9 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	assert((sm_uc_ptr_t)&jb->buff[jb->buff_off + jb->size] < ((sm_uc_ptr_t)csa->nl + NODE_LOCAL_SPACE(csd)
 											+ JNL_SHARE_SIZE(csd)));
 	assert((sm_uc_ptr_t)jb == ((sm_uc_ptr_t)csa->nl + NODE_LOCAL_SPACE(csd) + JNL_NAME_EXP_SIZE));
+	jb->last_eof_written = header->last_eof_written;
 	jb->freeaddr = jb->dskaddr = UNIX_ONLY(jb->fsync_dskaddr = ) header->end_of_data;
+	jb->post_epoch_freeaddr = jb->freeaddr;
 	jb->fs_block_size = jnl_fs_block_size;
 	/* The following is to make sure that the data in jnl_buffer is aligned with the data in the
 	 * disk file on an jnl_fs_block_size boundary. Since we assert that jb->size is a multiple of jnl_fs_block_size,

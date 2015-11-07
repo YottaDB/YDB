@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -298,7 +298,7 @@ STATICFNDEF boolean_t process_dollar_char(char **src_ptr, int *src_len, boolean_
 	len = *src_len;
 	lcl_dst_len = *dst_len;
 	assert('$' == *ptr);
- 	UPDATE_DST(ptr, len, have_star, dst_ptr, lcl_dst_len, MAX_GVSUBS_LEN);
+	UPDATE_DST(ptr, len, have_star, dst_ptr, lcl_dst_len, MAX_GVSUBS_LEN);
 	if (0 == len)
 		return FALSE;
 	switch (*ptr)
@@ -592,7 +592,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 				}
 				break;
 			default:
-				GTMASSERT;	/* Parsing should have found invalid command */
+				assertpro(FALSE);	/* Parsing should have found invalid command */
 				break;
 		}
 	} while (ptr = strtok(NULL, ","));
@@ -789,7 +789,7 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 							util_out_print_gtmio("Invalid pattern match range", FLUSH);
 							return FALSE;
 						}
-						switch (toupper(*ptr))
+						switch (TOUPPER(*ptr))
 						{
 							case 'E':
 								if (have_dot && (0 >= num1) && (-1 == num2))
@@ -1413,10 +1413,10 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 	GET_CLI_STR_AND_CHECK("ZDELIM", zdelim_present, max_output_len, process_delim, values[ZDELIM_SUB], value_len[ZDELIM_SUB],
 			      values[XECUTE_SUB], "Error parsing ZDELIM string: ");
 	/* Since process_xecute() does a test compile of the xecute string, it changes the parsing table from MUPIP TRIGGER
- 	 * to GT.M.  To avoid problems with saving and restoring the parse state (which would have to be done with globals
- 	 * that are static in cli_parse.c), it is much easier to put process_xecute() last in the list of qualifiers to check -
- 	 * solving the problem.  In other words, don't try to neaten things up by making the qualifiers alphabetical!
- 	 */
+	 * to GT.M.  To avoid problems with saving and restoring the parse state (which would have to be done with globals
+	 * that are static in cli_parse.c), it is much easier to put process_xecute() last in the list of qualifiers to check -
+	 * solving the problem.  In other words, don't try to neaten things up by making the qualifiers alphabetical!
+	 */
 	if (CLI_PRESENT == (xecute_present = cli_present("XECUTE")))
 	{
 		GET_CLI_STR("XECUTE", max_output_len, values[XECUTE_SUB], value_len[XECUTE_SUB]);
@@ -1462,7 +1462,6 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 			ERROR_STR_RETURN("Entry too large to properly index");
 		}
 	}
-
 	*multi_line_xecute = out_multi_line_xecute;
 	*max_len = max_output_len;
 	return TRIG_SUCCESS;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,24 +23,25 @@
 #include "gtmdbglvl.h"
 
 GBLREF boolean_t		run_time;
-GBLREF triple			t_orig;
-GBLREF mlabel			*mlabtab;
 GBLREF command_qualifier	cmd_qlf;
+GBLREF mlabel			*mlabtab;
+GBLREF triple			t_orig;
 GBLREF uint4			gtmDebugLevel;
 
-error_def(ERR_LABELMISSING);
-error_def(ERR_LABELUNKNOWN);
-error_def(ERR_FMLLSTMISSING);
 error_def(ERR_ACTLSTTOOLONG);
+error_def(ERR_FMLLSTMISSING);
+error_def(ERR_LABELMISSING);
+error_def(ERR_LABELNOTFND);
+error_def(ERR_LABELUNKNOWN);
 
 int resolve_ref(int errknt)
 {
-	triple	*curtrip, *tripref, *chktrip, *ref, *y;
-	tbp	*tripbp;
+	int	actcnt;
 	mline	*mxl;
 	mlabel	*mlbx;
-	oprtype *opnd, *j, *k;
-	int	actcnt;
+	oprtype *j, *k, *opnd;
+	tbp	*tripbp;
+	triple	*chktrip, *curtrip, *ref, *tripref, *y;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -165,7 +166,8 @@ int resolve_ref(int errknt)
 						stx_error(ERR_LABELMISSING, 2, mlbx->mvname.len, mlbx->mvname.addr);
 						TREF(source_error_found) = 0;
 						tripref = newtriple(OC_RTERROR);
-						tripref->operand[0] = put_ilit(ERR_LABELUNKNOWN);
+						tripref->operand[0] = put_ilit(OC_JMP == curtrip->opcode
+							? ERR_LABELNOTFND : ERR_LABELUNKNOWN); /* special error for GOTO jmp */
 						/* This is a subroutine/func reference */
 						tripref->operand[1] = put_ilit(TRUE);
 						opnd->oprval.tref = tripref;
@@ -255,7 +257,7 @@ int resolve_ref(int errknt)
 
 /* If for example there are nested $SELECT routines feeding a value to a SET $PIECE/$EXTRACT, this nested checking is
  * necessary to make sure no OC_PASSTHRUs remain in the parameter chain to get turned into OC_NOOPs that will
- * cause GTMASSERTs in emit_code.
+ * cause assertpro in emit_code.
  */
 void resolve_tref(triple *curtrip, oprtype *opnd)
 {

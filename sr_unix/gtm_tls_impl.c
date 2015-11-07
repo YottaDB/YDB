@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -233,17 +233,17 @@ STATICFNDEF DH *tmp_dh_callback(SSL *ssl, int is_export, int keylength)
 	return (512 == keylength) ? dh512 : dh1024;
 }
 
-_GTM_APIDEF int		gtm_tls_errno(void)
+int gtm_tls_errno(void)
 {
 	return tls_errno;
 }
 
-_GTM_APIDEF const char	*gtm_tls_get_error(void)
+const char *gtm_tls_get_error(void)
 {
 	return gtmcrypt_err_string;
 }
 
-_GTM_APIDEF gtm_tls_ctx_t	*gtm_tls_init(int version, int flags)
+gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 {
 	const char		*CAfile = NULL, *CApath = NULL, *crl, *CAptr;
 	char			*config_env;
@@ -391,7 +391,7 @@ _GTM_APIDEF gtm_tls_ctx_t	*gtm_tls_init(int version, int flags)
 	return gtm_tls_ctx;
 }
 
-_GTM_APIDEF void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
+void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 {
 	char			*env_name_ptr, *env_value, prompt[256];
 	gtmtls_passwd_list_t	*pwent_node;
@@ -418,7 +418,7 @@ _GTM_APIDEF void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 	 */
 }
 
-_GTM_APIDEF gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_socket, int sockfd, char *id, int flags)
+gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_socket, int sockfd, char *id, int flags)
 {
 	int			len;
 	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN], input_env_name[PASSPHRASE_ENVNAME_MAX], *env_name_ptr;
@@ -613,7 +613,7 @@ _GTM_APIDEF gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_soc
 	return socket;
 }
 
-_GTM_APIDEF int		gtm_tls_connect(gtm_tls_socket_t *socket)
+int gtm_tls_connect(gtm_tls_socket_t *socket)
 {
 	int		rv;
 
@@ -635,7 +635,7 @@ _GTM_APIDEF int		gtm_tls_connect(gtm_tls_socket_t *socket)
 	return ssl_error(socket->ssl, rv);
 }
 
-_GTM_APIDEF int		gtm_tls_accept(gtm_tls_socket_t *socket)
+int gtm_tls_accept(gtm_tls_socket_t *socket)
 {
 	int		rv;
 
@@ -645,7 +645,7 @@ _GTM_APIDEF int		gtm_tls_accept(gtm_tls_socket_t *socket)
 	return ssl_error(socket->ssl, rv);
 }
 
-_GTM_APIDEF int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
+int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 {
 	int		rv;
 
@@ -667,7 +667,7 @@ _GTM_APIDEF int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 	return rv;
 }
 
-_GTM_APIDEF int		gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info)
+int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info)
 {
 	long			verify_result, timeout, creation_time;
 	unsigned int		session_id_length, ssl_version;
@@ -778,7 +778,7 @@ _GTM_APIDEF int		gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_in
 	return -1;
 }
 
-_GTM_APIDEF int		gtm_tls_send(gtm_tls_socket_t *socket, char *buf, int send_len)
+int gtm_tls_send(gtm_tls_socket_t *socket, char *buf, int send_len)
 {
 	int		rv;
 
@@ -791,7 +791,7 @@ _GTM_APIDEF int		gtm_tls_send(gtm_tls_socket_t *socket, char *buf, int send_len)
 	return ssl_error(socket->ssl, rv);
 }
 
-_GTM_APIDEF int		gtm_tls_recv(gtm_tls_socket_t * socket, char *buf, int recv_len)
+int gtm_tls_recv(gtm_tls_socket_t * socket, char *buf, int recv_len)
 {
 	int		rv;
 
@@ -804,12 +804,12 @@ _GTM_APIDEF int		gtm_tls_recv(gtm_tls_socket_t * socket, char *buf, int recv_len
 	return ssl_error(socket->ssl, rv);
 }
 
-_GTM_APIDEF int		gtm_tls_cachedbytes(gtm_tls_socket_t *socket)
+int gtm_tls_cachedbytes(gtm_tls_socket_t *socket)
 {
 	return SSL_pending(socket->ssl);
 }
 
-_GTM_APIDEF void	gtm_tls_socket_close(gtm_tls_socket_t *socket)
+void gtm_tls_socket_close(gtm_tls_socket_t *socket)
 {
 	assert(socket);
 	tls_errno = 0;
@@ -827,7 +827,7 @@ _GTM_APIDEF void	gtm_tls_socket_close(gtm_tls_socket_t *socket)
 	socket->ssl = NULL;
 }
 
-_GTM_APIDEF void	gtm_tls_session_close(gtm_tls_socket_t **socket)
+void gtm_tls_session_close(gtm_tls_socket_t **socket)
 {
 	SSL_SESSION		*session;
 	gtm_tls_socket_t	*sock;
@@ -846,7 +846,7 @@ _GTM_APIDEF void	gtm_tls_session_close(gtm_tls_socket_t **socket)
 	*socket = NULL;
 }
 
-_GTM_APIDEF void	gtm_tls_fini(gtm_tls_ctx_t **tls_ctx)
+void gtm_tls_fini(gtm_tls_ctx_t **tls_ctx)
 {
 	gtmtls_passwd_list_t	*node, *prev_node;
 

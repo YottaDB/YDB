@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc.*
+ *	Copyright 2005, 2014 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,9 +43,10 @@
 #include "eintr_wrappers.h"
 #include "memcoherency.h"
 #include "getjobnum.h"
+#include "gtmimagename.h"
 
 #define UPDHELPER_CMD_MAXLEN		1024
-#define UPDHELPER_CMD			"$gtm_dist/mupip"
+#define UPDHELPER_CMD			"%s/mupip"
 #define UPDHELPER_CMD_FILE		"mupip"
 #define UPDHELPER_CMD_ARG1		"replicate"
 #define UPDHELPER_CMD_ARG2		"-updhelper"
@@ -57,9 +58,13 @@
 						/* U for update process, R for receiver, S for source, H for helper */
 
 GBLREF	recvpool_addrs		recvpool;
+GBLREF	char			gtm_dist[GTM_PATH_MAX];
+GBLREF	boolean_t		gtm_dist_ok_to_use;
 GBLREF	FILE			*gtmrecv_log_fp;
 GBLREF	uint4			process_id;
+LITREF	gtmImageName		gtmImageNames[];
 
+error_def(ERR_GTMDISTUNVERIF);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_TEXT);
@@ -68,9 +73,9 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 {
 	int			save_errno, save_shutdown;
 	char			helper_cmd[UPDHELPER_CMD_MAXLEN];
+	int			helper_cmd_len;
 	int			status;
 	int4			i4status;
-	mstr			helper_log_cmd, helper_trans_cmd;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 #ifdef UNIX
 	pid_t			helper_pid, waitpid_res;
@@ -85,7 +90,10 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	save_shutdown = helper->helper_shutdown;
 	helper->helper_shutdown = NO_SHUTDOWN;
 #ifdef UNIX
-	FORK(helper_pid);	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+	if (!gtm_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+	FORK(helper_pid);
 	if (0 > helper_pid)
 	{
 		save_errno = errno;
@@ -99,21 +107,15 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	{	/* helper */
 		getjobnum();
 		helper->helper_pid_prev = process_id; /* identify owner of slot */
-		helper_log_cmd.len  = STR_LIT_LEN(UPDHELPER_CMD);
-		helper_log_cmd.addr = UPDHELPER_CMD;
-		if (SS_NORMAL != (i4status = TRANS_LOG_NAME(&helper_log_cmd, &helper_trans_cmd, helper_cmd, SIZEOF(helper_cmd),
-								dont_sendmsg_on_log2long)))
+		helper_cmd_len = SNPRINTF(helper_cmd, UPDHELPER_CMD_MAXLEN, UPDHELPER_CMD, gtm_dist);
+		if(-1 == helper_cmd_len)
 		{
 			helper->helper_shutdown = save_shutdown;
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				   LEN_AND_LIT("Could not find path of Helper Process. Check value of $gtm_dist"));
-			if (SS_LOG2LONG == i4status)
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3,
-						LEN_AND_LIT(UPDHELPER_CMD), SIZEOF(helper_cmd) - 1);
 			repl_errno = EREPL_UPDSTART_BADPATH;
 			return UPDPROC_START_ERR;
 		}
-		helper_cmd[helper_trans_cmd.len] = '\0';
 		if (-1 == EXECL(helper_cmd, helper_cmd, UPDHELPER_CMD_ARG1, UPDHELPER_CMD_ARG2,
 				(UPD_HELPER_READER == helper_type) ? UPDHELPER_READER_CMD_ARG3 : UPDHELPER_WRITER_CMD_ARG3, NULL))
 		{
@@ -192,8 +194,7 @@ int gtmrecv_helpers_init(int n_readers, int n_writers)
 	{
 		for (; 0 != helper->helper_pid && helper < helper_top; helper++) /* find next vacant slot */
 			;
-		if (helper == helper_top)
-			GTMASSERT;
+		assertpro(helper != helper_top);
 		status = helper_init(helper, ((reader_count + error_count) < n_readers) ? UPD_HELPER_READER : UPD_HELPER_WRITER);
 		if (UPDPROC_STARTED == status)
 		{

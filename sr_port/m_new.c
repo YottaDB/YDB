@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,12 +22,12 @@
 #include "cmd.h"
 #include "namelook.h"
 
-GBLREF triple 		*curr_fetch_trip, *curr_fetch_opr;
 GBLREF int4 		curr_fetch_count;
+GBLREF triple		*curr_fetch_opr, *curr_fetch_trip;
 
-LITREF unsigned char 	svn_index[];
 LITREF nametabent 	svn_names[];
 LITREF svn_data_type 	svn_data[];
+LITREF unsigned char 	svn_index[];
 
 error_def(ERR_INVSVN);
 error_def(ERR_RPARENMISSING);
@@ -37,12 +37,11 @@ error_def(ERR_VAREXPECTED);
 
 int m_new(void)
 {
-	oprtype		tmparg;
-	triple		*ref, *next, *org, *tmp, *s, *fetch;
-	int		n;
-	int		count;
-	mvar		*var;
 	boolean_t	parse_warn;
+	int		count, n;
+	mvar		*var;
+	oprtype		tmparg;
+	triple		*fetch, *next, *org, *ref, *s, *tmp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -113,13 +112,12 @@ int m_new(void)
 		return FALSE;
 	case TK_EOL:
 	case TK_SPACE:
+		/* This actually a NEW all, but an XNEW with no arguments does the job */
 		tmp = maketriple(OC_XNEW);
 		tmp->operand[0] = put_ilit((mint) 0);
 		ins_triple(tmp);
-		if (TREF(for_stack_ptr) == TADR(for_stack))
-			start_fetches (OC_FETCH);
-		else
-			start_for_fetches ();
+		/* start a new fetch for whatever follows on the line */
+		MID_LINE_REFETCH;
 		return TRUE;
 	case TK_LPAREN:
 		ref = org = maketriple(OC_XNEW);
@@ -158,10 +156,8 @@ int m_new(void)
 		advancewindow();
 		org->operand[0] = put_ilit((mint) count);
 		ins_triple(org);
-		if (TREF(for_stack_ptr) == TADR(for_stack))
-			start_fetches (OC_FETCH);
-		else
-			start_for_fetches ();
+		/* start a new fetch for whatever follows on the line */
+		MID_LINE_REFETCH;
 		return TRUE;
 	default:
 		stx_error(ERR_VAREXPECTED);

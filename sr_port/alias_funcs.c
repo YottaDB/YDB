@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,8 +53,6 @@ GBLREF zwr_hash_table	*zwrhtab;
 GBLREF trans_num	local_tn;					/* transaction number for THIS PROCESS */
 GBLREF uint4		tstartcycle;
 GBLREF uint4		lvtaskcycle;					/* lv_val cycle for misc lv_val related tasks */
-GBLREF mstr		**stp_array;
-GBLREF int		stp_array_size;
 GBLREF lv_val		*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF tp_frame		*tp_pointer;
 GBLREF int4		SPGC_since_LVGC;				/* stringpool GCs since the last dead-data GC */
@@ -70,6 +68,9 @@ STATICFNDCL void als_xnew_killaliasarray(lvTree *lvt);
 STATICFNDCL void als_prcs_xnew_alias_cntnr(lvTree *lvt, symval *popdsymval, symval *cursymval);
 STATICFNDCL void als_prcs_markreached_cntnr(lvTree *lvt);
 
+DBGRFCT_ONLY(STATICDEF int resolve_alias_depth;)
+DBGRFCT_ONLY(STATICDEF int prcs_xnew_alias_depth;)
+DBGRFCT_ONLY(STATICDEF int prcs_xnew_reflist_depth;)
 CONDITION_HANDLER(als_check_xnew_var_aliases_ch);
 
 /* Define macros locally used by this routine only. General use macros are defined in alias.h */
@@ -161,16 +162,29 @@ CONDITION_HANDLER(als_check_xnew_var_aliases_ch);
 	}												\
 }
 
-/* Macro to clone an lv_val */
-#define CLONE_LVVAL(oldlv, newlv, cursymval)		\
-{							\
-	assert(LV_IS_BASE_VAR(oldlv));			\
-	newlv = lv_getslot(cursymval);			\
-	*newlv = *oldlv;				\
-	LV_SYMVAL(newlv) = cursymval;			\
-	lv_var_clone(newlv, newlv);			\
-	oldlv->v.mvtype = MV_LVCOPIED;			\
-	oldlv->ptrs.copy_loc.newtablv = newlv;		\
+/* Macro to clone an lv_val. Note clones to self because newlv is an exact copy of oldlv and we
+ * don't want to touch oldlv AT ALL during the cloning process. This effectively replaces the child
+ * tree.
+ */
+#define CLONE_LVVAL(oldlv, newlv, cursymval, popdsymval)									\
+{																\
+	assert(LV_IS_BASE_VAR(oldlv));												\
+	newlv = lv_getslot(cursymval);												\
+	DBGRFCT((stderr, "CLONE_LVVAL: Copy started - oldlv: 0x"lvaddr"  newlv: 0x"lvaddr"  cursymval: 0x"lvaddr" at "		\
+		 "%s at line %d\n", (oldlv), (newlv), (cursymval), __FILE__, __LINE__));					\
+	*newlv = *oldlv;													\
+	assert(NULL == newlv->tp_var);												\
+	LV_SYMVAL(newlv) = cursymval;												\
+	lv_var_clone(newlv, newlv, FALSE);			/* no refcnt maint here */					\
+	oldlv->v.mvtype = MV_LVCOPIED;												\
+	oldlv->ptrs.copy_loc.newtablv = newlv;											\
+	/* If popdsymval had alias activity, it is possible the alias activity got inherited into cursymval.			\
+	 * Since we cannot easily determine this for sure, err on the side of caution.						\
+	 */															\
+	if (popdsymval->alias_activity)												\
+		cursymval->alias_activity = TRUE;										\
+	DBGRFCT((stderr, "CLONE_LVVAL: Copy complete - oldlv: 0x"lvaddr"  newlv: 0x"lvaddr" - refcnts of copied node: "		\
+		 "%d/%d\n", (oldlv), (newlv), (newlv)->stats.trefcnt, (newlv)->stats.crefcnt));					\
 }
 
 /* Macro to initialize a ZWR_ZAV_BLK structure */
@@ -185,16 +199,22 @@ CONDITION_HANDLER(als_check_xnew_var_aliases_ch);
  * container var. Like the _CNTNRS_IN_TREE macros, in dbg mode, we will scan the array for containers even if has_aliascont
  * flag is FALSE.
  */
-#define RESOLV_ALIAS_CNTNRS_IN_TREE(LV_BASE, POPDSYMVAL, CURSYMVAL)					\
-{													\
-	lvTree	*lvt;											\
-													\
-	if ((NULL != (lvt = LV_GET_CHILD(LV_BASE))) && ((LV_BASE)->stats.lvtaskcycle != lvtaskcycle)	\
-		PRO_ONLY(&& (LV_BASE)->has_aliascont))							\
-	{												\
-		(LV_BASE)->stats.lvtaskcycle = lvtaskcycle;						\
-		als_prcs_xnew_alias_cntnr(lvt, POPDSYMVAL, CURSYMVAL);					\
-	}												\
+#define RESOLV_ALIAS_CNTNRS_IN_TREE(LV_BASE, POPDSYMVAL, CURSYMVAL)							\
+{															\
+	lvTree	*lvt;													\
+															\
+	if ((NULL != (lvt = LV_GET_CHILD(LV_BASE))) && ((LV_BASE)->stats.lvtaskcycle != lvtaskcycle)			\
+		PRO_ONLY(&& (LV_BASE)->has_aliascont))									\
+	{														\
+		DBGRFCT((stderr, "\nRESOLV_ALIAS_CNTNRS_IN_TREE: Beginning scan of lvbase 0x"lvaddr" at depth %d\n",	\
+			 (LV_BASE), ++resolve_alias_depth));		       	  	 	       	     		\
+		(LV_BASE)->stats.lvtaskcycle = lvtaskcycle;								\
+		als_prcs_xnew_alias_cntnr(lvt, POPDSYMVAL, CURSYMVAL);							\
+		DBGRFCT((stderr, "\nRESOLV_ALIAS_CNTNRS_IN_TREE: Completed scan of lvbase 0x"lvaddr" at depth %d\n",	\
+			 (LV_BASE), resolve_alias_depth--));		       	  	 	       	     		\
+	} else														\
+		DBGRFCT((stderr, "\nRESOLV_ALIAS_CNTNRS_IN_TREE: Scan bypassed for 0x"lvaddr" because %s\n", (LV_BASE),	\
+			 (NULL == lvt) ? "has no children" : "already been processed"));				\
 }
 
 /* Routine to repair the l_symtab entries in the stack due to hash table expansion such that the
@@ -304,8 +324,6 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 			default:
 				continue;
 		}
-		if (NULL == *htep)
-			continue;
 		if ((*htep < table_base_orig) || (*htep >= table_top_orig))
 			/* Entry doesn't point to the current symbol table so ignore it since it didn't change */
 			continue;
@@ -333,7 +351,7 @@ CONDITION_HANDLER(als_check_xnew_var_aliases_ch)
  * 1) If a variable was passed through to the new symtab and then was aliased to a var that belonged to the new symbol table,
  *    the lv_val in the old symtab was released and a new one assigned in the new symbol table. We have to:
  *    a) copy that value back to the previous symtab and
- *    b) we have to fix the reference count since the alias owned by the new symtab is going away.
+ *    b) we have to fix the reference count since the alias owned by the symtab being popped is going away.
  * 2) If a variable is passed through to the new symtab and within that variable an alias container is created that points
  *    to a var in the newer symtab we need to copy that var/array back to the older symtab so the value remains.
  * 3) This gets more interesting to deal with when that var is also aliased by a passed through variable (combining issues 1 & 2).
@@ -347,6 +365,9 @@ CONDITION_HANDLER(als_check_xnew_var_aliases_ch)
  *    a) Run the hash table looking for aliased variables. If found, do the reference count maintenance but don't worry about
  *       deleting any data since it will all go away after we return and unw_mv_ent() releases the symbol table and lv_blk chains.
  *    b) While running the hash table, run any variable trees we find anchored.
+ *    Note we can only use the DECR_BASE_REF_LIGHT method when the lv_val is owned by the same symbol table as is being released.
+ *    Else we need to use the regular DECR_BASE_REF() macro so the lv_val can be requeued to the proper queue and not be left in
+ *    place where it causes problems later.
  * 4) Go through the list of forwarded vars again (xnew_var_list) in the popped symval and see if any of the lv_vals are owned
  *    by the symval being popped. If they are, then the lv_vals involved need to be copied to lv_vals owned by the (now)
  *    current symtab because the popped symtab's lv_vals will be released by unw_mv_ent() when we return. Note that this also
@@ -372,7 +393,6 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 	lv_val			*lv, *prevlv, *currlv, *popdlv;
 	lv_val			*newlv, *oldlv;
 	boolean_t		bypass_lvscan, bypass_lvrepl;
-	DBGRFCT_ONLY(mident_fixed vname;)
 
 	ESTABLISH(als_check_xnew_var_aliases_ch);
 	suspend_lvgcol = TRUE;
@@ -394,12 +414,29 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 		xnewvar->lvval = (lv_val *)tabent->value;	/* Cache lookup results for 2nd pass in step 4 */
 		delete_hashtab_ent_mname(popdsymtab, tabent);
 	}
-	/* Step 3: Run popped hash table undoing alias references. */
-	DBGRFCT((stderr, "als_check_xnew_var_aliases: Step 3 - running popped symtab tree undoing local refcounts\n"));
+	/* Step 3: Run popped hash table undoing alias references. Note that is is possible to find a local var that
+	 * was NOT passed through here. For example:
+	 *
+	 *   SET *a(1)=b	; Set a container to b
+	 *   NEW (a)		; Pass thru 'a'
+	 *   SET *b=a(1)	; Recreates 'b' as it was before but is not a resident of this array
+	 *
+	 * For this case, ignore the lv (don't decrement it) because we'll be handling that situation later.
+	 */
+	DBGRFCT((stderr, "als_check_xnew_var_aliases: Step 3 - running popped symtab tree undoing local refcounts for all local "
+		 "vars that were not passed-thru XNEW\n"));
 	for (htep = popdsymtab->base, htep_top = popdsymtab->top; htep < htep_top; htep++)
 	{
 		if (HTENT_VALID_MNAME(htep, lv_val, lv))
-			DECR_BASE_REF_LIGHT(lv);
+		{
+			if (popdsymval == LV_SYMVAL(lv))
+			{
+				DECR_BASE_REF_LIGHT(lv);		/* Just clean up ref counts */
+			} else
+			{
+				DECR_BASE_REF_NOSYM(lv, FALSE);		/* lv_val not owned by popping symval */
+			}
+		}
 	}
 	/* Step 4: See what, if anything, needs to be copied from popped level to current level. There are 3 possible
 	 * cases here. Note in all cases, we must decrement the use counters of prevlv since they were incremented in
@@ -408,7 +445,7 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 	 *
 	 * Vars used:
 	 *
-	 *   prevlv == lv from the current symbol table.
+	 *   prevlv == lv from the current (popping-to) symbol table.
 	 *   currlv == lv we are going to eventually put into the current symbol table
 	 *   popdlv == lv from the popped symbol table
 	 *
@@ -421,28 +458,24 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 	 * c) prevlv != popdlv && popdlv not in popd symtab.	Same as case (a). Note this includes the case where popdlv
 	 *                                                      already resides in cursymtab.
 	 */
-	DBGRFCT((stderr, "als_check_xnew_var_aliases: Step 4 - beginning unwind scan of passed through vars\n"));
+	DBGRFCT((stderr, "\nals_check_xnew_var_aliases: Step 4 - beginning unwind scan of passed through vars\n"));
 	INCR_LVTASKCYCLE;
 	for (xnewvar = popdsymval->xnew_var_list; xnewvar; xnewvar = xnewvar_next)
 	{
 		bypass_lvscan = bypass_lvrepl = FALSE;
 		tabent = lookup_hashtab_mname(cursymtab, &xnewvar->key);
 		assert(tabent);				/* Had better be there since it was passed in thru the exclusive new */
-		DBGRFCT_ONLY(
-			memcpy(vname.c, tabent->key.var_name.addr, tabent->key.var_name.len);
-			vname.c[tabent->key.var_name.len] = '\0';
-		);
 		prevlv = (lv_val *)tabent->value;
 		popdlv = xnewvar->lvval;		/* Value of this var in popped symtab */
-		DBGRFCT((stderr, "als_check_xnew_var_aliases: var '%s' prevlv: 0x"lvaddr" popdlv: 0x"lvaddr"\n",
-			 &vname.c, prevlv, popdlv));
+		DBGRFCT((stderr, "\nals_check_xnew_var_aliases: var '%.*s' prevlv: 0x"lvaddr" popdlv: 0x"lvaddr"\n",
+			 tabent->key.var_name.len, tabent->key.var_name.addr, prevlv, popdlv));
 		if (prevlv == popdlv)
 		{	/* Case (a) - Just do the scan below */
 			currlv = prevlv;
 			bypass_lvrepl = TRUE;
 		} else if (popdsymval == LV_GET_SYMVAL(popdlv))
 		{	/* Case (b) - Clone the var and tree into blocks owned by current symtab with the caveat that we need not
-			 * do this if the array has already been cloned (because more than one var that was passed through it
+			 * do this if the array has already been cloned (because more than one var that was passed through is
 			 * pointing to it.
 			 */
 			if (MV_LVCOPIED == popdlv->v.mvtype)
@@ -458,7 +491,7 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 			{
 				assert(LV_IS_BASE_VAR(popdlv));
 				/* lv_val is owned by the popped symtab .. clone it to the new current tree */
-				CLONE_LVVAL(popdlv, currlv, cursymval);
+				CLONE_LVVAL(popdlv, currlv, cursymval, popdsymval);
 				DBGRFCT((stderr, "als_check_xnew_var_aliases: lv has been cloned from 0x"lvaddr" to 0x"lvaddr"\n",
 					 popdlv, currlv));
 			}
@@ -474,14 +507,14 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 		}
 		if (1 < prevlv->stats.trefcnt)
 			/* If prevlv is going to be around after we drop op_xnew's refcnt bumps, make sure it gets processed.
-			 * If it was processed above, then it is marked such and the macro will bypass processing it again.
+			 * If it was processed above, then it is marked as such and the macro will bypass processing it again.
 			 */
 			RESOLV_ALIAS_CNTNRS_IN_TREE(prevlv, popdsymval, cursymval);
 		DECR_CREFCNT(prevlv);		/* undo bump by op_xnew */
 		if (!bypass_lvrepl)
 		{	/* Replace the lvval in the current symbol table */
-			DBGRFCT((stderr, "als_check_xnew_var_aliases: Resetting variable '%s' hte at 0x"lvaddr" from 0x"lvaddr
-				 " to 0x"lvaddr"\n", &vname.c, tabent, prevlv, currlv));
+			DBGRFCT((stderr, "als_check_xnew_var_aliases: Resetting variable '%.*s' hte at 0x"lvaddr" from 0x"lvaddr
+				 " to 0x"lvaddr"\n", tabent->key.var_name.len, tabent->key.var_name.addr, tabent, prevlv, currlv));
 			tabent->value = (void *)currlv;
 		}
 		assert(1 <= prevlv->stats.trefcnt);	/* verify op_xnew's bump is still there (may be only one) */
@@ -491,11 +524,11 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 		xnewvar_anchor = xnewvar;
 	}
 	/* Step 5: See if anything on the xnew_ref_list needs to be handled */
-	DBGRFCT((stderr, "als_check_xnew_var_aliases: Step 5: Process xnew_ref_list if any\n"));
+	DBGRFCT((stderr, "\n\nals_check_xnew_var_aliases: Step 5: Process xnew_ref_list if any\n"));
 	for (xnewref = popdsymval->xnew_ref_list; xnewref; xnewref = xnewref_next)
 	{
 		prevlv = xnewref->lvval;
-		DBGRFCT((stderr, "als_check_xnew_var_aliases:  xnewref-prevlv: 0x"lvaddr"\n", prevlv));
+		DBGRFCT((stderr, "\nals_check_xnew_var_aliases:  xnewref-prevlv: 0x"lvaddr"\n", prevlv));
 		DECR_CREFCNT(prevlv);		/* Will remove the trefcnt in final desposition below */
 		/* Only do the scan if the reference count is greater than 1 since we are going to remove the
 		 * refcnts added by op_xnew as we finish here. So if the var is going away anyway, no need
@@ -503,10 +536,11 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 		 */
 		if (1 < prevlv->stats.trefcnt)
 		{	/* Process the array */
-			DBGRFCT((stderr, "als_check_xnew_var_aliases: potentially scanning lv 0x"lvaddr"\n", prevlv));
+			DBGRFCT((stderr, "als_check_xnew_var_aliases: potentially scanning lv 0x"lvaddr" due to refcnt > 1\n",
+				 prevlv));
 			RESOLV_ALIAS_CNTNRS_IN_TREE(prevlv, popdsymval, cursymval);
 		} else
-			DBGRFCT((stderr, "als_check_xnew_var_aliases: prevlv was deleted\n"));
+			DBGRFCT((stderr, "als_check_xnew_var_aliases: prevlv about to be deleted - scan bypassed\n"));
 		/* Remove refcnt and we are done */
 		DECR_BASE_REF_NOSYM(prevlv, TRUE);
 		xnewref_next = xnewref->next;
@@ -534,7 +568,7 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 			assert(LV_IS_BASE_VAR(oldlv));
 			if (popdsymval == LV_SYMVAL(oldlv))
 			{	/* lv_val is owned by the popped symtab .. clone it to the new current tree */
-				CLONE_LVVAL(oldlv, newlv, cursymval);
+				CLONE_LVVAL(oldlv, newlv, cursymval, popdsymval);
 				alias_retarg->str.addr = (char *)newlv;		/* Replace container ptr */
 				DBGRFCT((stderr, "\nals_check_xnew_var_aliases: alias retarg var found - aliascont mval 0x"lvaddr
 					 " being reset to point to lv 0x"lvaddr" which is a clone of lv 0x"lvaddr"\n",
@@ -599,7 +633,7 @@ STATICFNDEF void als_xnew_killaliasarray(lvTree *lvt)
 
 /* Local routine!
  * Routine to process an alias container found in a node of a var being "returned" back through an exclusive new.
- * We may have to move the data.
+ * We may have to move/copy the data.
  */
 STATICFNDEF void als_prcs_xnew_alias_cntnr(lvTree *lvt, symval *popdsymval, symval *cursymval)
 {
@@ -607,6 +641,8 @@ STATICFNDEF void als_prcs_xnew_alias_cntnr(lvTree *lvt, symval *popdsymval, symv
 	lvTreeNode	*node;
 	lv_val		*newlv, *oldlv;
 
+	DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr: Entered to process tree 0x"lvaddr" with popping symval 0x"lvaddr
+		 " and current (pop-to) symval 0x"lvaddr" level %d\n", lvt, popdsymval, cursymval, ++prcs_xnew_alias_depth));
 	assert(NULL != lvt);	/* caller should not call if no subtree */
 	/* In the case of lv_killarray, the only option we have is to do post-order traversal since we are freeing
 	 * nodes in the tree as we traverse. But in this case, we dont change the tree structure so we are free to
@@ -627,24 +663,24 @@ STATICFNDEF void als_prcs_xnew_alias_cntnr(lvTree *lvt, symval *popdsymval, symv
 				assert(LV_IS_BASE_VAR(newlv));
 				node->v.str.addr = (char *)newlv;			/* Replace container ptr */
 				DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr: aliascont var found - referenced array already "
-					 "copied - Setting pointer in aliascont lv 0x"lvaddr" to lv 0x"lvaddr"\n", node, newlv));
+					 "copied - Setting pointer in aliascont node 0x"lvaddr" to lv 0x"lvaddr"\n", node, newlv));
 			} else
 			{
 				assert(LV_IS_BASE_VAR(oldlv));
 				if (popdsymval == LV_SYMVAL(oldlv))
 				{	/* lv_val is owned by the popped symtab .. clone it to the new current tree */
-					CLONE_LVVAL(oldlv, newlv, cursymval);
+					CLONE_LVVAL(oldlv, newlv, cursymval, popdsymval);
 					assert(LV_IS_BASE_VAR(newlv));
 					node->v.str.addr = (char *)newlv;		/* Replace container ptr */
-					DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr: aliascont var found - aliascont lv 0x"lvaddr
-						 " being reset to point to lv 0x"lvaddr" which is a clone of lv 0x"lvaddr"\n", node,
-						 newlv, oldlv));
+					DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr: aliascont var found at node 0x"lvaddr
+						 " being reset to point to lv 0x"lvaddr" which is a new copy of lv 0x"lvaddr
+						 " which lived in previous symval -- scanning copied tree\n", node, newlv, oldlv));
 				} else
 				{	/* lv_val is owned by current or older symval .. just use it in the subsequent scan in case
 					 * it leads us to other lv_vals owned by the popped symtab.
 					 */
-					DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr: aliascont var found - aliascont lv 0x"lvaddr
-						 " just being (potentially) scanned for container vars\n", node));
+					DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr: aliascont var found at node 0x"lvaddr
+						 " being (potentially) scanned for container vars\n", node));
 					newlv = oldlv;
 				}
 				RESOLV_ALIAS_CNTNRS_IN_TREE(newlv, popdsymval, cursymval);
@@ -654,6 +690,8 @@ STATICFNDEF void als_prcs_xnew_alias_cntnr(lvTree *lvt, symval *popdsymval, symv
 		if (NULL != lvt_child)	/* Descend recursively down this tree as well */
 			als_prcs_xnew_alias_cntnr(lvt_child, popdsymval, cursymval);
 	}
+	DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr: Processing complete for tree 0x"lvaddr" level %d\n\n", lvt,
+		 prcs_xnew_alias_depth--));
 }
 
 /* Routine to process an alias container found in an array being "saved" by TSTART (op_tstart). We need to set this array up
@@ -678,7 +716,7 @@ void als_prcs_tpsav_cntnr(lvTree *lvt)
 		{
 			assert(lvt->base_lv->has_aliascont);
 			assert(!LV_IS_BASE_VAR(node));
-			cntnr_lv_base = (lv_val *)node->v.str.addr;	/* Extract container pointer */
+			cntnr_lv_base = (lv_val *)node->v.str.addr;		/* Extract container pointer */
 			assert(NULL != cntnr_lv_base);
 			assert(LV_IS_BASE_VAR(cntnr_lv_base));
 			assert(1 <= cntnr_lv_base->stats.trefcnt);
@@ -686,34 +724,18 @@ void als_prcs_tpsav_cntnr(lvTree *lvt)
 			if (NULL == cntnr_lv_base->tp_var)
 			{	/* Save this var if it hasn't already been saved */
 				assert(cntnr_lv_base->stats.tstartcycle != tstartcycle);
-				DBGRFCT((stderr, "\ntpSAV_container: Container at 0x"lvaddr
-					" refers to lv 0x"lvaddr" -- Creating tpsav block\n", node, cntnr_lv_base));
-				TP_SAVE_RESTART_VAR(cntnr_lv_base, tp_pointer, &null_mname_entry);
-				INCR_CREFCNT(cntnr_lv_base);	/* 2nd increment for reference via a container node */
-				INCR_TREFCNT(cntnr_lv_base);
+				DBGRFCT((stderr, "\ntpSAV_container: Container at 0x"lvaddr" refers to lv 0x"lvaddr
+					 " -- Creating tpsav block\n", node, cntnr_lv_base));
+				TP_SAVE_RESTART_VAR(cntnr_lv_base, tp_pointer, &null_mname_entry); /* increments refcnts */
 				if (LV_HAS_CHILD(cntnr_lv_base))
 					TPSAV_CNTNRS_IN_TREE(cntnr_lv_base);
 			} else
-			{	/* If not saving it, we still need to bump the ref count(s) for this reference and
-				 * process any children if we have't already seen this node (taskcycle check will tell us this).
+			{	/* If already saved, we still need to bump the ref count(s) for this reference and
+				 * process any children if we have't already seen this node (taskcycle check tells us this).
 				 */
 				DBGRFCT((stderr, "\ntpSAV_container: Container at 0x"lvaddr" refers to lv 0x"lvaddr
-					" -- Incrementing refcnts\n", node, cntnr_lv_base));
-				INCR_CREFCNT(cntnr_lv_base);
-				INCR_TREFCNT(cntnr_lv_base);
-				assert(0 < cntnr_lv_base->stats.trefcnt);
-				assert(0 < cntnr_lv_base->stats.crefcnt);
-				if (cntnr_lv_base->stats.tstartcycle != tstartcycle)
-				{
-					DBGRFCT((stderr, "\ntpSAV_container: .. Container at 0x"lvaddr" refers to lv 0x"lvaddr
-						 " -- processing tree\n", node, cntnr_lv_base));
-					if (LV_HAS_CHILD(cntnr_lv_base))
-						TPSAV_CNTNRS_IN_TREE(cntnr_lv_base);
-				} else
-				{
-					DBGRFCT((stderr, "\ntpSAV_container: .. Container at 0x"lvaddr" refers to lv 0x"lvaddr
-						 " -- Already processed -- bypassing\n", node, cntnr_lv_base));
-				}
+					 " which already has a backup (tp_var 0x"lvaddr" -- bypassing\n", node, cntnr_lv_base,
+					 cntnr_lv_base->tp_var));
 			}
 		}
 		lvt_child = LV_GET_CHILD(node);
@@ -722,84 +744,8 @@ void als_prcs_tpsav_cntnr(lvTree *lvt)
 	}
 }
 
-/* For a given container var found in the tree  we need to re-establish the reference counts for the base var
- * the container is pointing to. Used during a local var restore on a TP restart.
- */
-void als_prcs_tprest_cntnr(lvTree *lvt)
-{
-	lvTree		*lvt_child;
-	lvTreeNode	*node;
-	lv_val		*cntnr_lv_base;
-
-	assert(NULL != lvt);	/* caller should not call if no subtree */
-	/* In the case of lv_killarray, the only option we have is to do post-order traversal since we are freeing
-	 * nodes in the tree as we traverse. But in this case, we dont change the tree structure so we are free to
-	 * choose any order. We choose in-order as that is faster than post-order.
-	 */
-	for (node = lvAvlTreeFirst(lvt); NULL != node; node = lvAvlTreeNext(node))
-	{
-		if (node->v.mvtype & MV_ALIASCONT)
-		{
-			assert(lvt->base_lv->has_aliascont);
-			assert(!LV_IS_BASE_VAR(node));
-			cntnr_lv_base = (lv_val *)node->v.str.addr;	/* Extract container pointer */
-			assert(NULL != cntnr_lv_base);
-			assert(LV_IS_BASE_VAR(cntnr_lv_base));
-			assert(1 <= cntnr_lv_base->stats.trefcnt);
-			assert(1 <= cntnr_lv_base->stats.crefcnt);
-			assert(cntnr_lv_base->tp_var);
-			DBGRFCT((stderr, "\ntpREST_cntnr_node: Processing container at 0x"lvaddr"\n", node));
-			INCR_CREFCNT(cntnr_lv_base);
-			INCR_TREFCNT(cntnr_lv_base);
-			assert(0 < (cntnr_lv_base)->stats.trefcnt);
-			assert(0 < (cntnr_lv_base)->stats.crefcnt);
-		}
-		lvt_child = LV_GET_CHILD(node);
-		if (NULL != lvt_child)	/* Descend recursively down this tree as well */
-			als_prcs_tprest_cntnr(lvt_child);
-	}
-}
-
-/* For a given container, decrement the ref count of the creature it points to. Part of unwinding an unmodified
- * tp saved variable.
- */
-void als_prcs_tpunwnd_cntnr(lvTree *lvt)
-{
-	lvTree		*lvt_child;
-	lvTreeNode	*node;
-	lv_val		*cntnr_lv_base;
-
-	assert(NULL != lvt);	/* caller should not call if no subtree */
-	/* In the case of lv_killarray, the only option we have is to do post-order traversal since we are freeing
-	 * nodes in the tree as we traverse. But in this case, we dont change the tree structure so we are free to
-	 * choose any order. We choose in-order as that is faster than post-order.
-	 */
-	for (node = lvAvlTreeFirst(lvt); NULL != node; node = lvAvlTreeNext(node))
-	{
-		if (node->v.mvtype & MV_ALIASCONT)
-		{
-			assert(lvt->base_lv->has_aliascont);
-			assert(!LV_IS_BASE_VAR(node));
-			cntnr_lv_base = (lv_val *)node->v.str.addr;	/* Extract container pointer */
-			assert(NULL != cntnr_lv_base);
-			assert(LV_IS_BASE_VAR(cntnr_lv_base));
-			assert(1 <= cntnr_lv_base->stats.trefcnt);
-			assert(1 <= cntnr_lv_base->stats.crefcnt);
-			/* Note we cannot assert cntnr_lv_base->tp_var here since the tp_var node may have already been freed and
-			 * cleared by unwind processing of the base var itself. We just have to undo our counts here and keep going.
-			 */
-			DBGRFCT((stderr, "\ntpUNWND_cntnr_node: Processing container at 0x"lvaddr"\n", cntnr_lv_base));
-			DECR_CREFCNT(cntnr_lv_base);
-			DECR_BASE_REF_NOSYM(cntnr_lv_base, FALSE);
-		}
-		lvt_child = LV_GET_CHILD(node);
-		if (NULL != lvt_child)	/* Descend recursively down this tree as well */
-			als_prcs_tpunwnd_cntnr(lvt_child);
-	}
-}
-
-/* This routine deletes the data pointed to by the lv_val and removes the container flag from the value making it just
- * a regular NULL/0 value.
+/* This routine locates containers in the given array, removes the container type flag making the node a regular NULL/0 value and
+ * and decrements the reference counts of the lv_val the container pointed to thus removing the reference.
  */
 void als_prcs_kill_cntnr(lvTree *lvt)
 {
@@ -816,7 +762,7 @@ void als_prcs_kill_cntnr(lvTree *lvt)
 	{
 		if (node->v.mvtype & MV_ALIASCONT)
 		{
-			assert(lvt->base_lv->has_aliascont);
+			assert(lvt->base_lv->has_aliascont);			/* Verify flag is on if found container */
 			assert(!LV_IS_BASE_VAR(node));
 			cntnr_lv_base = (lv_val *)node->v.str.addr;
 			assert(NULL != cntnr_lv_base);
@@ -881,6 +827,8 @@ void als_prcs_xnewref_cntnr(lvTree *lvt)
 	 * nodes in the tree as we traverse. But in this case, we dont change the tree structure so we are free to
 	 * choose any order. We choose in-order as that is faster than post-order.
 	 */
+	DBGRFCT((stderr, "\nals_prcs_xnewref_cntnr: Starting to process lvTree 0x"lvaddr" at depth %d\n", lvt,
+		 ++prcs_xnew_reflist_depth));
 	for (node = lvAvlTreeFirst(lvt); NULL != node; node = lvAvlTreeNext(node))
 	{
 		if (node->v.mvtype & MV_ALIASCONT)
@@ -892,8 +840,8 @@ void als_prcs_xnewref_cntnr(lvTree *lvt)
 			assert(LV_IS_BASE_VAR(cntnr_lv_base));
 			if (cntnr_lv_base->stats.lvtaskcycle != lvtaskcycle)
 			{
-				INCR_CREFCNT(cntnr_lv_base);
 				INCR_TREFCNT(cntnr_lv_base);
+				INCR_CREFCNT(cntnr_lv_base);
 				cntnr_lv_base->stats.lvtaskcycle = lvtaskcycle;
 				if (NULL != xnewref_anchor)
 				{	/* Reuse entry from list */
@@ -910,6 +858,8 @@ void als_prcs_xnewref_cntnr(lvTree *lvt)
 				xnewref->lvval = cntnr_lv_base;
 				xnewref->next = curr_symval->xnew_ref_list;
 				curr_symval->xnew_ref_list = xnewref;
+				DBGRFCT((stderr, "als_prcs_xnewref_cntnr: Base lv at 0x"lvaddr" pointed to by container 0x"lvaddr
+					 " added to xnewref list for subsequent processing\n", cntnr_lv_base, node));
 				if (LV_HAS_CHILD(cntnr_lv_base))
 					XNEWREF_CNTNRS_IN_TREE(cntnr_lv_base);
 			}
@@ -918,6 +868,8 @@ void als_prcs_xnewref_cntnr(lvTree *lvt)
 		if (NULL != lvt_child)	/* Descend recursively down this tree as well */
 			als_prcs_xnewref_cntnr(lvt_child);
 	}
+	DBGRFCT((stderr, "\nals_prcs_xnewref_cntnr: Completed processing lvTree 0x"lvaddr" at depth %d\n", lvt,
+		 prcs_xnew_reflist_depth--));
 }
 
 /* Initialize ZWRite hash table structures used when ZWRiting in an aliased variable environment */
@@ -1047,7 +999,7 @@ int als_lvval_gc(void)
 	lv_blk		*lv_blk_ptr;
 	ht_ent_mname	*htep, *htep_top;
 	lv_val		*lvp, *lvlimit;
-	lv_val		**lvarraycur, **lvarray, **lvarraytop, **lvptr;
+	lv_val		**lvarraycur = NULL, **lvarray = NULL, **lvarraytop, **lvptr;
 	mv_stent 	*mv_st_ent;
 	tp_frame	*tf;
 	tp_var		*restore_ent;
@@ -1059,11 +1011,6 @@ int als_lvval_gc(void)
 	SETUP_THREADGBL_ACCESS;
 	assert(!suspend_lvgcol);
 	DBGRFCT((stderr, "als_lvval_gc: Beginning lv_val garbage collection\n"));
-	if (NULL == stp_array)
-		/* Same initialization as is in stp_gcol_src.h */
-		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
-	lvarraycur = lvarray = (lv_val **)stp_array;
-	lvarraytop = lvarraycur + stp_array_size;
 	/* Steps 1,2 - find all the base lv_vals and put in list */
 	for (lv_blk_ptr = curr_symval->lv_first_block; lv_blk_ptr; lv_blk_ptr = lv_blk_ptr->next)
 	{
@@ -1073,16 +1020,10 @@ int als_lvval_gc(void)
 			sym = LV_SYMVAL(lvp);
 			assert((NULL == sym) || SYM_IS_SYMVAL(sym));
 			if ((NULL != sym) UNIX_ONLY(&& (TREF(zsearch_var) != lvp))
-			    UNIX_ONLY(&& (TREF(zsearch_dir1) != lvp) && (TREF(zsearch_dir2) != lvp)))
+				UNIX_ONLY(&& (TREF(zsearch_dir1) != lvp) && (TREF(zsearch_dir2) != lvp)))
 			{	/* Put it in the list */
 				assert(0 < lvp->stats.trefcnt);
-				if (lvarraycur >= lvarraytop)
-				{	/* Need more room -- expand */
-					stp_expand_array();
-					lvarraycur = lvarray = (lv_val **)stp_array;
-					lvarraytop = lvarraycur + stp_array_size;
-				}
-				*lvarraycur++ = lvp;
+				ADD_TO_STPARRAY(lvp, lvarray, lvarraycur, lvarraytop, lv_val);
 			}
 		}
 	}
@@ -1142,6 +1083,16 @@ int als_lvval_gc(void)
 				MARK_REACHABLE(mv_st_ent->mv_st_cont.mvs_nval.mvs_val);
 				assert(NULL != lvp);
 				break;
+			case MVST_LVAL:
+				/* This is a lv_val pushed by push_lvval. At this point in time gtmci.c is the only one
+				 * that does this for return values and parameters. These need to be marked reachable
+				 * as well even though they are not reachable from the lv hashtable.
+				 */
+				lvp = mv_st_ent->mv_st_cont.mvs_lvval;
+				DBGRFCT((stderr, "als_lvval_gc: NVAL at 0x"lvaddr" has save value 0x"lvaddr"\n",
+					 mv_st_ent, lvp));
+				assert(NULL != lvp);
+				break;
 			case MVST_STAB:
 				/* The symbol table is changing to be other than the table we are using so we can
 				 * stop the loop now. Exiting the switch with lvp NULL indicates that.
@@ -1199,7 +1150,7 @@ int als_lvval_gc(void)
 			++killcnt;
 			if (LV_SYMVAL(lvp))
 			{	/* Var is still intact, kill it. Note that in this situation, since there are no hash table
-				 * entries pointing to us, our container refs and total refs should be equal. We can't
+				 * entries pointing to the var, its container refs and total refs should be equal. We can't
 				 * use the "regular" DECR macros because those get us into trouble. For example if this
 				 * var has a container pointing to another var who has a container pointing to us and it
 				 * is only those pointers keeping both vars alive, decrementing our counter causes it to
@@ -1220,7 +1171,7 @@ int als_lvval_gc(void)
 				}
 				DECR_BASE_REF_NOSYM(lvp, FALSE); /* Var might go away now, or later if need more deletes first */
 			} else
-				DBGRFCT((stderr, "\nals_lvval_gc: Seems to have become released -- lvval 0x"lvaddr"\n", lvp));
+				DBGRFCT((stderr, "\nals_lvval_gc: Orphaned lvval 0x"lvaddr" has been freed\n", lvp));
 		}
 	}
 	DBGRFCT((stderr, "\nals_lvval_gc: final orphaned lvval scan completed\n"));

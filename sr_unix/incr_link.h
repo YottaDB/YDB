@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,12 +12,15 @@
 #ifndef INCR_LINK_INCLUDED
 #define INCR_LINK_INCLUDED
 
+#define IL_DONE		1	/* calling convention descended from VMS */
+#define IL_RECOMPILE	0
+
 #ifdef USHBIN_SUPPORTED
 #include <incr_link_sp.h>
-bool incr_link(int file_desc, zro_ent *zro_entry);
 #else
-bool incr_link(int file_desc);
+#include "zroutinessp.h"	/* need zro_ent typedef for i386 dummy argument */
 #endif
+boolean_t incr_link(int file_desc, zro_ent *zro_entry, uint4 fname_len, char *fname);
 
 #ifdef __MVS__
 #define ZOS_FREE_TEXT_SECTION 		\

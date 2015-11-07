@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 #define REPL_DBG_H
 
 #ifdef REPL_DEBUG
+#include "gtmio.h"
 #include "gtm_stdio.h"
 
 #define REPL_DEBUG_ONLY(stmt)		stmt

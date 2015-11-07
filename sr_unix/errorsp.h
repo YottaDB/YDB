@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,9 @@
 
 #include "gtm_stdio.h"
 #include "have_crit.h"
+#include "gtmimagename.h"
+#include <rtnhdr.h>
+#include "stack_frame.h"
 
 #ifdef __MVS__
 #  define GTMCORENAME "gtmcore"
@@ -56,10 +59,19 @@
 #define TPRESTART_ARG_CNT 6
 
 typedef void	ch_ret_type;
+
+/* Note that the condition_handler structure layout is relied upon by assembly code (see chnd_size, chnd_* in error.si).
+ * Any changes here need corresponding changes in error.si.
+ */
 typedef struct condition_handler_struct
 {
 	struct condition_handler_struct	*save_active_ch;	/* -> Previous active condition handler */
 	boolean_t			ch_active;		/* True when *THIS* condition handler is active (not usable) */
+	uint4				dollar_tlevel;		/* $tlevel at time of ESTABLISH; needed at UNWIND time.
+								 * Used only in DEBUG code. But defined in PRO to keep error.si
+								 * simple (it keeps track of offsets of members in structures
+								 * and we dont want it to be conditional on PRO vs DBG).
+								 */
 	ch_ret_type			(*ch)();		/* Condition handler address */
 	jmp_buf				jmp;			/* setjmp/longjmp buffer associated with ESTABLISH point */
 } condition_handler;
@@ -142,7 +154,7 @@ void ch_trace_point() {return;}
 					GBLREF int		process_exiting;						\
 																\
 					assert(!process_exiting);								\
-                                        CHTRACEPOINT;										\
+					CHTRACEPOINT;										\
 					for ( ;(ctxt > &chnd[0]) && (ctxt->ch != &mdb_condition_handler); ctxt--);		\
 					CHECKLOWBOUND(ctxt);									\
 					assert((ctxt->ch == &mdb_condition_handler)						\
@@ -151,7 +163,7 @@ void ch_trace_point() {return;}
 					assertpro(!(SFF_IMPLTSTART_CALLD & frame_pointer->flags) || (0 != proc_act_type)	\
 						  || (SFF_ETRAP_ERR & frame_pointer->flags));					\
 					DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
-                                        ctxt->ch_active = FALSE; 								\
+					ctxt->ch_active = FALSE; 								\
 					restart = mum_tstart;									\
 					active_ch = ctxt;									\
 					longjmp(ctxt->jmp, 1);									\
@@ -161,13 +173,13 @@ void ch_trace_point() {return;}
 					GBLREF int		process_exiting;						\
 																\
 					assert(!process_exiting);								\
-                                        CHTRACEPOINT;										\
+					CHTRACEPOINT;										\
 					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--); 			\
 					CHECKLOWBOUND(ctxt);									\
 					assert((ctxt->ch == &mdb_condition_handler)						\
 					       && (FALSE == ctxt->save_active_ch->ch_active));					\
 					DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
-                                        ctxt->ch_active = FALSE; 								\
+					ctxt->ch_active = FALSE; 								\
 					restart = mum_tstart;									\
 					active_ch = ctxt;									\
 					longjmp(ctxt->jmp, 1);									\
@@ -175,13 +187,16 @@ void ch_trace_point() {return;}
 #endif
 
 #define GTM_ASM_ESTABLISH	{	/* So named because gtm_asm_establish does exactly this */		\
+					GBLREF     uint4           dollar_tlevel;				\
+														\
 					CHTRACEPOINT;								\
 					ctxt++;									\
 					if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))	\
 						condstk_expand();						\
-                                        CHECKHIGHBOUND(ctxt);							\
-                                        ctxt->save_active_ch = active_ch;					\
-                                        ctxt->ch_active = FALSE;						\
+					CHECKHIGHBOUND(ctxt);							\
+					ctxt->save_active_ch = active_ch;					\
+					ctxt->ch_active = FALSE;						\
+					DEBUG_ONLY(ctxt->dollar_tlevel = dollar_tlevel;)			\
 					active_ch = ctxt;							\
 				}
 #define ESTABLISH_NOJMP(x)	{										\
@@ -220,19 +235,19 @@ void ch_trace_point() {return;}
 #endif
 
 #define REVERT			{										\
-                                        CHTRACEPOINT;								\
+					CHTRACEPOINT;								\
 					active_ch = ctxt->save_active_ch;					\
 					CHECKHIGHBOUND(active_ch);						\
 					CHECKLOWBOUND(active_ch);						\
 					ctxt--;									\
-                                        CHECKLOWBOUND(ctxt);							\
+					CHECKLOWBOUND(ctxt);							\
 				}
 
 #define CONTINUE		{									\
-                                        CHTRACEPOINT;							\
+					CHTRACEPOINT;							\
 					active_ch++;							\
-                                        CHECKHIGHBOUND(active_ch);					\
-                                        chnd[current_ch].ch_active = FALSE;				\
+					CHECKHIGHBOUND(active_ch);					\
+					chnd[current_ch].ch_active = FALSE;				\
 					return;								\
 				}
 
@@ -261,12 +276,12 @@ void ch_trace_point() {return;}
 						stop_image_ch();					\
 					}								\
 					assert((SUCCESS == SEVERITY) || (INFO == SEVERITY));		\
-                                }
+				}
 
 #define NEXTCH			{									\
-                                        CHTRACEPOINT;							\
-                                        chnd[current_ch].ch_active = FALSE;				\
-                                        DRIVECH(arg);							\
+					CHTRACEPOINT;							\
+					chnd[current_ch].ch_active = FALSE;				\
+					DRIVECH(arg);							\
 					/* If ever DRIVECH does a CONTINUE and returns back to us, we	\
 					 * need to do a CONTINUE as well so we re-establish ourselves	\
 					 * on the condition handler stack. This cancels out the		\
@@ -284,39 +299,56 @@ void ch_trace_point() {return;}
 /* Should never unwind a condition handler established with ESTABLISH_NOUNWIND. Currently t_ch and dbinit_ch are the only ones. */
 #define UNWINDABLE(unw_ch)	((&t_ch != unw_ch->ch) && (&dbinit_ch != unw_ch->ch))
 #define UNWIND(dummy1, dummy2)	{												\
-					GBLREF	int		process_exiting;						\
-					GBLREF	boolean_t	ok_to_UNWIND_in_exit_handling;					\
+					GBLREF	int			process_exiting;					\
+					GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;				\
+					GBLREF	volatile boolean_t	in_wcs_recover;						\
+					GBLREF	uint4			dollar_tlevel;						\
 																\
 					assert(!process_exiting || ok_to_UNWIND_in_exit_handling);				\
 					/* When we hit an error in the midst of commit, t_ch/t_commit_cleanup should be invoked	\
 					 * and clean it up before any condition handler on the stack unwinds. 			\
 					 */											\
-					assert(0 == have_crit(CRIT_IN_COMMIT));							\
-                                        CHTRACEPOINT;										\
-                                        chnd[current_ch].ch_active = FALSE;							\
+					assert((0 == have_crit(CRIT_IN_COMMIT)) || in_wcs_recover);				\
+					CHTRACEPOINT;										\
+					chnd[current_ch].ch_active = FALSE;							\
 					active_ch++;										\
-                                        CHECKHIGHBOUND(active_ch);								\
+					CHECKHIGHBOUND(active_ch);								\
 					ctxt = active_ch;									\
 					assert(UNWINDABLE(active_ch));								\
+					assert(active_ch->dollar_tlevel == dollar_tlevel);					\
 					longjmp(active_ch->jmp, -1);								\
 				}
 
-#define START_CH(flag_assert)	int current_ch;										\
-				DCL_THREADGBL_ACCESS;									\
-															\
-				SETUP_THREADGBL_ACCESS;									\
-				CHTRACEPOINT;										\
-				current_ch = (active_ch - chnd);							\
-				active_ch->ch_active = TRUE;								\
-				active_ch--;										\
-				CHECKLOWBOUND(active_ch);								\
-				DBGEHND((stderr, "%s: Condition handler entered at line %d - arg: %d  SIGNAL: %d\n",	\
-				         __FILE__, __LINE__, arg, SIGNAL));						\
-				if ((flag_assert) && ((SUCCESS == SEVERITY) || (INFO == SEVERITY)))			\
-				{											\
-					PRN_ERROR;									\
-					CONTINUE;									\
-				}
+/* This macro short-circuits the condition_handler for INFO or SUCCESS errors other than CTRLC and CTRLY and returns control
+ * to the command after the rts_error_csa invocation, which is what the base condition handler (mdb_condition_handler or util_ch)
+ * would do anyway, but if we are going to return control we don't want any condition handlers messing with state.
+ * The base condition handlers and other code in the utilities have special logic to treat CTRLC and CTRLY as operator
+ * actions with a semantic significance, so this macro does not intercept those.
+ * In the MUMPS run-time, unless in a direct mode frame, we skip displaying the error because we don't want to mess with
+ * the application's design for user interaction.
+ */
+#define START_CH(continue_on_success) 		/* info is a form of success */				\
+	GBLREF boolean_t	ctrlc_on;								\
+	error_def(ERR_CTRLC);			/* BYPASSOK */						\
+	error_def(ERR_CTRLY);			/* BYPASSOK */						\
+	int 		current_ch;									\
+	DCL_THREADGBL_ACCESS;										\
+													\
+	SETUP_THREADGBL_ACCESS;										\
+	CHTRACEPOINT;											\
+	current_ch = (active_ch - chnd);								\
+	active_ch->ch_active = TRUE;									\
+	active_ch--;											\
+	CHECKLOWBOUND(active_ch);									\
+	DBGEHND((stderr, "%s: Condition handler entered at line %d - arg: %d  SIGNAL: %d\n",		\
+		 __FILE__, __LINE__, arg, SIGNAL));							\
+	if ((continue_on_success) && ((SUCCESS == SEVERITY) || (INFO == SEVERITY)			\
+		&& ((int)ERR_CTRLY != SIGNAL) && ((int)ERR_CTRLC != SIGNAL)))				\
+	{												\
+		if (ctrlc_on || !IS_GTM_IMAGE)								\
+			PRN_ERROR;									\
+		CONTINUE;										\
+	}
 
 #define MDB_START
 
@@ -325,11 +357,11 @@ void stop_image_conditional_core(void);
 void stop_image_no_core(void);
 
 #define TERMINATE		{					\
-                                        CHTRACEPOINT;			\
+					CHTRACEPOINT;			\
 					if (SUPPRESS_DUMP)		\
-				                stop_image_no_core();	\
+						stop_image_no_core();	\
 					else				\
-					        stop_image();		\
+						stop_image();		\
 				}
 
 #define SUPPRESS_DUMP		(created_core || dont_want_core)
@@ -337,8 +369,8 @@ void stop_image_no_core(void);
 
 #define MUMPS_EXIT		{							\
 					GBLREF int4 exi_condition;			\
-                                        GBLREF int  mumps_status;			\
-                                        CHTRACEPOINT;					\
+					GBLREF int  mumps_status;			\
+					CHTRACEPOINT;					\
 					mumps_status = SIGNAL;				\
 					exi_condition = -mumps_status;  		\
 					EXIT(-exi_condition);				\
@@ -365,9 +397,10 @@ error_def(ERR_OUTOFSPACE);
 				 || SIGNAL == (int)ERR_STACKOFLOW)
 
 /* true if above or SEVERE and GTM error (perhaps add some "system" errors) */
-#define DUMPABLE                ( DUMP ||                                       \
-				 ( SEVERITY == SEVERE && IS_GTM_ERROR(SIGNAL)   \
-					&& SIGNAL != (int)ERR_OUTOFSPACE) )
+#define DUMPABLE                ((SEVERITY == SEVERE) && IS_GTM_ERROR(SIGNAL)						\
+					&& (SIGNAL != (int)ERR_OUTOFSPACE)						\
+					DEBUG_ONLY(&& (WBTEST_ENABLED(WBTEST_SKIP_CORE_FOR_MEMORY_ERROR)		\
+							? (!process_exiting || (SIGNAL != (int)ERR_MEMORY)) : TRUE)))
 
 unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t need_rtsloc);
 

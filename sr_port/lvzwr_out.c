@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
+#include "gtmio.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -43,6 +44,8 @@
 #include "callg.h"
 #include "gtmimagename.h"
 #include "format_targ_key.h"	/* for ISSUE_GVSUBOFLOW_ERROR macro */
+#include <rtnhdr.h>
+#include "stack_frame.h"
 
 GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF zshow_out	*zwr_output;
@@ -324,7 +327,7 @@ void lvzwr_out(lv_val *lvp)
 			param_list.n = n + 1;
 			dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &param_list);
 			MV_FORCE_STR(val);
-			DECR_AC_REF(dst_lv, TRUE);
+			assert(!(MV_ALIASCONT & dst_lv->v.mvtype));	/* op_putindx would have already done DECR_AC_REF for us */
 			dst_lv->v = *val;
 			dst_lv->v.mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 		}

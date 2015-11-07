@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,11 +33,9 @@
 #include "jobchild_init.h"
 #include "cli_parse.h"
 #include "invocation_mode.h"
-#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_main.h"		/* for "gtm_main" prototype */
 #include "io.h"
-#include "gt_timer.h"
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 
 #ifdef UNICODE_SUPPORTED
@@ -55,6 +53,7 @@
 GBLREF	IN_PARMS			*cli_lex_in_ptr;
 GBLREF	char				cli_token_buf[];
 GBLREF	char				cli_err_str[];
+GBLREF	boolean_t			gtm_dist_ok_to_use;
 GBLREF	CLI_ENTRY			mumps_cmd_ary[];
 GBLREF	boolean_t			skip_dbtriggers;
 #if defined (GTM_TRIGGER) && (DEBUG)
@@ -106,12 +105,10 @@ int gtm_main (int argc, char **argv, char **envp)
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	set_blocksig();
 	gtmenvp = envp;
-	gtm_imagetype_init(GTM_IMAGE);
+	gtm_dist_ok_to_use = TRUE;
+	common_startup_init(GTM_IMAGE);
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
-	gtm_wcswidth_fnptr = gtm_wcswidth;
-	gtm_env_init();	/* read in all environment variables */
 	err_init(stop_image_conditional_core);
 	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
@@ -168,7 +165,7 @@ int gtm_main (int argc, char **argv, char **envp)
 				else if (ERR_CRYPTINIT == gtmcrypt_errno)
 					gtmcrypt_errno = ERR_CRYPTINIT2;
 				gtmcrypt_errno = SET_CRYPTERR_MASK(gtmcrypt_errno);
-				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, SIZEOF(GTMCRYPT_ERRLIT) - 1, GTMCRYPT_ERRLIT);
+				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, SIZEOF(GTMCRYPT_ERRLIT) - 1, GTMCRYPT_ERRLIT); /* BYPASSOK */
 			}
 		}
 #		ifdef GTM_SOCKET_SSL_SUPPORT

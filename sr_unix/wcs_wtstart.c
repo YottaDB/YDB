@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,6 +112,7 @@ GBLREF	int		reformat_buffer_len;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	sgmnt_data	*cs_data;
+GBLREF	jnlpool_addrs	jnlpool;
 #ifdef DEBUG
 GBLREF	volatile int	reformat_buffer_in_use;
 GBLREF	volatile int4	gtmMallocDepth;
@@ -169,7 +170,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (ANTICIPATORY_FREEZE_AVAILABLE)
+	if (INST_FREEZE_ON_ERROR_POLICY)
 		PUSH_GV_CUR_REGION(region, sav_cur_region, sav_cs_addrs, sav_cs_data)
 	udi = FILE_INFO(region);
 	csa = &udi->s_addrs;
@@ -181,7 +182,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	if (csa->in_wtstart)
 	{
 		BG_TRACE_ANY(csa, wrt_busy);
-		if (ANTICIPATORY_FREEZE_AVAILABLE)
+		if (INST_FREEZE_ON_ERROR_POLICY)
 			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data)
 		return err_status;			/* Already here, get out */
 	}
@@ -197,7 +198,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	{
 		DECR_INTENT_WTSTART(cnl);
 		BG_TRACE_ANY(csa, wrt_blocked);
-		if (ANTICIPATORY_FREEZE_AVAILABLE)
+		if (INST_FREEZE_ON_ERROR_POLICY)
 			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data)
 		ENABLE_INTERRUPTS(INTRPT_IN_WCS_WTSTART);
 		return err_status;
@@ -375,7 +376,10 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					size = (((v15_blk_hdr_ptr_t)bp)->bsiz + 1) & ~1;
 				} else DEBUG_ONLY(if (GDSV6 == csr->ondsk_blkver))
 					size = (bp->bsiz + 1) & ~1;
-				DEBUG_ONLY(else GTMASSERT);
+#				ifdef DEBUG
+				else
+					assert(IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver) || (GDSV6 == csr->ondsk_blkver));
+#				endif
 				if (csa->do_fullblockwrites)
 					size = ROUND_UP(size, csa->fullblockwrite_len);
 				assert(size <= csd->blk_size);
@@ -532,7 +536,7 @@ writes_completed:
 		GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
 	}
 #	endif
-	if (ANTICIPATORY_FREEZE_AVAILABLE)
+	if (INST_FREEZE_ON_ERROR_POLICY)
 		POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data)
 	return err_status;
 }

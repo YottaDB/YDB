@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,8 @@
 #endif
 #include <errno.h>
 #include <sys/sem.h>
+#include <sys/types.h>
+#include "gtm_stat.h"
 #include "gtm_string.h"
 #include "gtm_strings.h"
 #include "gtm_ctype.h"
@@ -47,6 +49,8 @@
 #include "replgbl.h"
 #include "gtm_semutils.h"
 #include "gtmlink.h"
+#include "send_msg.h"
+#include "eintr_wrappers.h"
 #ifdef __linux__
 #include "hugetlbfs_overrides.h"
 #endif
@@ -84,6 +88,8 @@ GBLREF	char			*gtm_core_file;
 GBLREF	char			*gtm_core_putenv;
 GBLREF	mval			dollar_etrap;
 GBLREF	mval			dollar_ztrap;
+GBLREF	boolean_t		dmterm_default;
+GBLREF	boolean_t		ipv4_only;		/* If TRUE, only use AF_INET. */
 ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
 ZOS_ONLY(GBLREF	boolean_t	gtm_tag_utf8_as_ascii;)
 GTMTRIG_ONLY(GBLREF	mval	gtm_trigger_etrap;)
@@ -111,14 +117,17 @@ static readonly unsigned char editing_index[27] =
 };
 static readonly unsigned char init_break[1] = {'B'};
 
+error_def(ERR_INVLINKTMPDIR);
+
 void	gtm_env_init_sp(void)
 {	/* Unix only environment initializations */
 	mstr		val, trans;
-	int4		status, index, len, hrtbt_cntr_delta;
+	int4		status, index, len, hrtbt_cntr_delta, stat_res;
 	size_t		cwdlen;
 	boolean_t	ret, is_defined;
 	char		buf[MAX_TRANS_NAME_LEN], *token, cwd[GTM_PATH_MAX];
 	char		*cwdptr, *trigger_etrap, *c, *end;
+	struct stat	outbuf;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -318,7 +327,7 @@ void	gtm_env_init_sp(void)
 		{	/* Only set $ETRAP if the length is usable (may be NULL) */
 			dollar_etrap.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
 			memcpy(dollar_etrap.str.addr, trans.addr, trans.len);
-			*(dollar_etrap.str.addr + trans.len + 1) = '\0';
+			dollar_etrap.str.addr[trans.len] = '\0';
 			dollar_etrap.str.len = trans.len;
 			dollar_etrap.mvtype = MV_STR;
 		}
@@ -335,9 +344,39 @@ void	gtm_env_init_sp(void)
 	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
 	{
 		init_relink_allowed(&trans); /* set TREF(relink_allowed) */
-		/*for (c = trans.addr, end = c + trans.len; c < end; c++)
-			*c = TOUPPER(*c);*/ /* convert trans (an mstr) to all caps */
 	}
+#	ifdef USHBIN_SUPPORTED
+	/* Set default or supplied value for $gtm_linktmpdir */
+	val.addr = GTM_LINKTMPDIR;
+	val.len = SIZEOF(GTM_LINKTMPDIR) - 1;
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	{	/* Else use default $gtm_tmp value or its default */
+		val.addr = GTM_TMP_ENV;
+		val.len = SIZEOF(GTM_TMP_ENV) - 1;
+		if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
+			trans.addr = DEFAULT_GTM_TMP;
+			trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
+		}
+	}
+	assert(GTM_PATH_MAX > trans.len);
+	(TREF(gtm_linktmpdir)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
+	(TREF(gtm_linktmpdir)).len = trans.len;
+	/* For now, we assume that if the environment variable is defined to NULL, anticipatory freeze is NOT in effect */
+	if (0 < trans.len)
+	{
+		memcpy((TREF(gtm_linktmpdir)).addr, trans.addr, trans.len);
+		((TREF(gtm_linktmpdir)).addr)[trans.len] = '\0';
+	}
+	STAT_FILE((TREF(gtm_linktmpdir)).addr, &outbuf, stat_res);
+	if ((-1 == stat_res) || !S_ISDIR(outbuf.st_mode))
+	{	/* Either the directory doesn't exist or the entity is not a directory */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVLINKTMPDIR, 2, (TREF(gtm_linktmpdir)).len,
+			     (TREF(gtm_linktmpdir)).addr);
+		(TREF(gtm_linktmpdir)).len = SIZEOF(DEFAULT_GTM_TMP) - 1;
+		(TREF(gtm_linktmpdir)).addr = DEFAULT_GTM_TMP;
+	}
+#	endif
 #	ifdef DEBUG
 	/* DEBUG-only option to bypass 'easy' methods of things and always use gtmsecshr for IPC cleanups, wakeups, file removal,
 	 * etc. Basically use gtmsecshr for anything where it is an option - helps with testing gtmsecshr for proper operation.
@@ -362,4 +401,12 @@ void	gtm_env_init_sp(void)
 	val.len = SIZEOF(GTMDBGFLAGS_FREQ) - 1;
 	TREF(gtmdbgflags_freq) = trans_numeric(&val, &is_defined, TRUE);
 #	endif
+	/* See if gtm_ipv4_only is set */
+	val.addr = GTM_IPV4_ONLY;
+	val.len = SIZEOF(GTM_IPV4_ONLY) - 1;
+	ipv4_only = logical_truth_value(&val, FALSE, NULL);
+	/* See if gtm_dmterm is set */
+	val.addr = GTM_DMTERM;
+	val.len = SIZEOF(GTM_DMTERM) - 1;
+	dmterm_default = logical_truth_value(&val, FALSE, NULL);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2013 Fidelity Information Services, Inc.*
+ *	Copyright 2011, 2014 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,26 +14,22 @@
 
 #include "have_crit.h"
 
-/* This macro takes care of safely clearing the timer queue and resetting the
- * timer-related globals when we need to fork-off a process. Please note that
- * it is unnecessary to use this macro when the fork is immediately followed
- * by an exec (of any flavor), because the globals would get cleared
- * automatically in that case. To avoid warning messages from ftpput.csh in such
- * situations, append BYPASSOK comment directives to the lines with fork
- * instances.
+/* This macro takes care of safely clearing the timer queue and resetting the timer-related globals when we need
+ * to fork-off a process. Note that it is necessary to use this macro EVEN WHEN the fork is immediately followed
+ * by an exec (of any flavor), because of the ENABLE_INTERRUPTS macro usage right after the "fork" call.
+ * If this call is done in the child process (0 == pid), and timer variables are not cleared, it is possible
+ * (if the right conditions are met) that "have_crit" gets invoked as part of the ENABLE_INTERRUPTS macro in
+ * the child process and ends up with a GTMASSERT -- BYPASSOK -- (GTM-8050). If timers have not been initialized at all,
+ * then "clear_timers" does no system calls so the only overhead is a function call invocation which is okay considering
+ * we anyways have invoked the "fork()" system call just now.
  */
 
-#define FORK_CLEAN(pid)			\
-{					\
-	FORK(pid);			\
-	if (0 == pid)			\
-		clear_timers();		\
-}
-
-#define FORK(pid)                       		\
-{                                       		\
+#define FORK(pid)					\
+{							\
 	DEFER_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM)	\
-	pid = fork();                   		\
+	pid = fork();					\
+	if (0 == pid)					\
+		clear_timers();				\
 	ENABLE_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM)	\
 }
 

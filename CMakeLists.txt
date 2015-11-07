@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2012, 2013 Fidelity Information Services, Inc	#
+#	Copyright 2012, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -26,7 +26,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version V6.1-000)
+set(version V6.2-000)
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -36,8 +36,11 @@ if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# If it's a debug build make sure GT.M uses all of its debug options
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
+# Enable GT.M debug options unless directed not to enable them. Added to build without whitebox tests.
+set(GTM_ENABLE_DEBUG 1 CACHE BOOL "Enable GT.M debug options")
+if(GTM_ENABLE_DEBUG)
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
+endif()
 
 set(install_permissions_script
   OWNER_READ OWNER_EXECUTE OWNER_WRITE
@@ -57,9 +60,8 @@ set(gtm_osarch_libs "")
 set(gt_src_list)
 set(sources_used "")
 set(extralibs "")
-# Disable encryption for the time being. Need to change this to invoke the gtmcrypt Makefile AS 2013.12.18
-set(is_encryption_supported 0)
-set(libmumpsrestoreregex "")
+set(GTMCRYPTLIB "GCRYPT")
+set(GTMCRYPTALGO "AES256CFB")
 message("--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 # Establish platform
 # Except for Solaris, CMAKE_COMPILER_IS_GNUCC is true
@@ -74,6 +76,7 @@ elseif("${CMAKE_SYSTEM_NAME}" MATCHES "SunOS")
 else()
   message(FATAL_ERROR "--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
+message("--> Encryption Library = ${GTMCRYPTLIB} / Algorithm = ${GTMCRYPTALGO}")
 
 # Choose where to get bootstrap sources.
 set(GTM_DIST "" CACHE PATH "Existing GT.M Distribution")
@@ -169,11 +172,6 @@ macro(set_source_list target)
 	set(src ${d}/${fname})
 	set("source_used_${fname}" 1)
 	list(APPEND sources_used ${source_dir_${d}}/${fname})
-	if(NOT "${libmumpsrestoreregex}" STREQUAL "")
-	  if(";${name};" MATCHES ";(${libmumpsrestoreregex});")
-	   set("source_used_${fname}" 0)
-          endif()
-        endif()
 	break()
       endif()
     endforeach()
@@ -204,9 +202,6 @@ load_source_list(libgtcm         sr_unix_cm/libgtcm.list)
 load_source_list(liblke          sr_unix/liblke.list)
 load_source_list(libmupip        sr_unix/libmupip.list)
 load_source_list(libstub         sr_unix/libstub.list)
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
-  load_source_list(libgtmrpc	sr_sun/libgtmrpc.list)
-endif()
 
 # Assign sources to executables.
 set_source_list(gtm_threadgbl_deftypes gtm_threadgbl_deftypes)
@@ -221,18 +216,14 @@ set_source_list(gtcm_server      gtcm_main omi_srvc_xct)
 set_source_list(gtcm_shmclean    gtcm_shmclean)
 set_source_list(gtmsecshr        gtmsecshr_wrapper)
 set_source_list(gtmsecshr_real   gtmsecshr)
-set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref)
-set_source_list(libgtmtls        gtm_tls_impl)
-set_source_list(libgtmcryptutil  gtmcrypt_util)
+set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_util)
+set_source_list(libgtmtls        gtm_tls_impl gtmcrypt_util)
 set_source_list(libgtmshr        gtm_main)
 set_source_list(lke              lke lke_cmd)
 set_source_list(maskpass         maskpass gtmcrypt_util)
 set_source_list(mumps            gtm)
 set_source_list(mupip            mupip mupip_cmd)
 set_source_list(semstat2         semstat2)
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
-  set_source_list(gtm_svc  	gtm_svc gtm_rpc_init gtm_dal_svc)
-endif()
 
 #-----------------------------------------------------------------------------
 # libmumps gets leftover sources, so compute the remaining list.
@@ -386,7 +377,7 @@ foreach(lib
 endforeach()
 
 # TODO: find_package or find_library for system libs?
-include_directories ("/usr/local/include")
+include_directories (/usr/local/include)
 target_link_libraries(libmumps		${libmumpslibs})
 
 add_executable(mumps			${mumps_SOURCES})
@@ -444,18 +435,6 @@ add_executable(semstat2		 	${semstat2_SOURCES})
 add_executable(ftok 			${ftok_SOURCES})
 target_link_libraries(ftok 		libmumps libstub)
 
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
-  add_executable(gtm_svc		${gtm_svc_SOURCES})
-  target_link_libraries(gtm_svc		libmumps libgnpclient libcmisockettcp libgtmrpc)
-endif()
-foreach(t ${with_export})
-  set_target_properties(${t} PROPERTIES
-    LINK_FLAGS "${gtm_link}"
-    LINK_DEPENDS "${gtm_dep}"
-    )
-  add_dependencies(${t} gen_export)
-endforeach()
-
 add_library(libgtmshr MODULE ${libgtmshr_SOURCES})
 set_property(TARGET libgtmshr PROPERTY OUTPUT_NAME gtmshr)
 target_link_libraries(libgtmshr libmumps libgnpclient libcmisockettcp)
@@ -466,62 +445,51 @@ set_target_properties(libgtmshr PROPERTIES
 add_dependencies(libgtmshr gen_export)
 add_dependencies(mumps libgtmshr)
 
-if(is_encryption_supported)
-  # Iterate over the list of GPG related libraries
-  foreach(gpglib gpg-error gpgme gcrypt)
-    # For each library, we need a new CMake variable, hence GPGLIB_${gpglib}
-    find_library(GPGLIB_${gpglib} NAME ${gpglib} PATHS ${CMAKE_LIBRARY_PATH})
-    # Append the found library to the list
-    set(GPG_LIBRARIES ${GPG_LIBRARIES} ${GPGLIB_${gpglib}})
-  endforeach()
+# Iterate over the list of GPG related libraries
+foreach(gpglib gpg-error gpgme gcrypt config)
+  # For each library, we need a new CMake variable, hence GPGLIB_${gpglib}
+  find_library(GPGLIB_${gpglib} NAME ${gpglib} PATHS ${CMAKE_LIBRARY_PATH})
+  # Append the found library to the list
+  set(GPG_LIBRARIES ${GPG_LIBRARIES} ${GPGLIB_${gpglib}})
+endforeach()
 
-  # Iterate over the list of SSL related libraries
-  foreach(ssl)
-    # For each library, we need a new CMake variable, hence TLSLIB_${tlslib}
-    find_library(TLSLIB_${tlslib} NAME ${tlslib} PATHS ${CMAKE_LIBRARY_PATH})
-    # Append the found library to the list
-    set(TLS_LIBRARIES ${TLS_LIBRARIES} ${TLSLIB_${tlslib}})
-  endforeach()
+# Iterate over the list of SSL related libraries
+foreach(tlslib ssl crypto config)
+  # For each library, we need a new CMake variable, hence TLSLIB_${tlslib}
+  find_library(TLSLIB_${tlslib} NAME ${tlslib} PATHS ${CMAKE_LIBRARY_PATH})
+  # Append the found library to the list
+  set(TLS_LIBRARIES ${TLS_LIBRARIES} ${TLSLIB_${tlslib}})
+endforeach()
 
-  add_library(libgtmcrypt MODULE ${libgtmcrypt_SOURCES})
-  set_target_properties(libgtmcrypt PROPERTIES
-    OUTPUT_NAME gtmcrypt
-    COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
-    LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
-    )
-  target_link_libraries(libgtmcrypt ${GPG_LIBRARIES})
-  install(TARGETS libgtmcrypt DESTINATION ${GTM_INSTALL_DIR}/plugin)
+add_library(libgtmcrypt MODULE ${libgtmcrypt_SOURCES})
+set_target_properties(libgtmcrypt PROPERTIES
+  OUTPUT_NAME gtmcrypt
+  COMPILE_DEFINITIONS "USE_${GTMCRYPTLIB} -DUSE_${GTMCRYPTALGO}"
+  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+  )
+target_link_libraries(libgtmcrypt ${GPG_LIBRARIES})
+install(TARGETS libgtmcrypt DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
-  add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
-  set_target_properties(libgtmtls PROPERTIES
-    OUTPUT_NAME gtmtls
-    LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
-    )
-  target_link_libraries(libgtmtls ${TLS_LIBRARIES})
-  install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
+add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
+set_target_properties(libgtmtls PROPERTIES
+  OUTPUT_NAME gtmtls
+  COMPILE_DEFINITIONS "USE_OPENSSL"
+  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+  )
+target_link_libraries(libgtmtls ${TLS_LIBRARIES})
+install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
-  add_library(libgtmcryptutil MODULE ${libgtmcryptutil_SOURCES})
-  set_target_properties(libgtmcryptutil PROPERTIES
-    OUTPUT_NAME gtmcryptutil
-    COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
-    LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
-    )
-  target_link_libraries(libgtmcryptutil ${GPG_LIBRARIES})
-  install(TARGETS libgtmcryptutil DESTINATION ${GTM_INSTALL_DIR}/plugin)
-
-  add_executable(maskpass ${maskpass_SOURCES})
-  target_link_libraries(maskpass ${GPG_LIBRARIES})
-  set_target_properties(maskpass PROPERTIES
-    COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_SYSLIB_FUNCS"
-    RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
-    )
-  install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)
-endif()
+add_executable(maskpass ${maskpass_SOURCES})
+target_link_libraries(maskpass ${GPG_LIBRARIES} ${TLS_LIBRARIES})
+set_target_properties(maskpass PROPERTIES
+  COMPILE_DEFINITIONS "USE_${GTMCRYPTLIB} -DUSE_SYSLIB_FUNCS"
+  RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
+  )
+install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)
 
 # Always copy files into the plugin directory
 foreach(f
       Makefile.mk
-      add_db_key.sh
       encrypt_sign_db_key.sh
       gen_keypair.sh
       gen_sym_hash.sh

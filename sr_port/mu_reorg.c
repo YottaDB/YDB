@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -351,7 +351,8 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					status = mu_split(level, i_max_fill, d_max_fill, &cnt1, &cnt2);
 					if (cdb_sc_maxlvl == status)
 					{
-						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_MAXBTLEVEL, 2, gn->len, gn->addr);
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_MAXBTLEVEL, 4, gn->len, gn->addr,
+							REG_LEN_STR(gv_cur_region));
 						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
 							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
 						return FALSE;

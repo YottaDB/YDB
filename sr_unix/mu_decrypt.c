@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@ int	mu_decrypt(char *fname, uint4 off, uint4 len)
 	if (is_encrypted)
 	{
 		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
-		GTMCRYPT_GETKEY(NULL, hash, key_handle, gtmcrypt_errno);
+		GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, hash, key_handle, gtmcrypt_errno);
 		if (0 == gtmcrypt_errno)
 			GTMCRYPT_DECRYPT(NULL, key_handle, buff, len, NULL, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)

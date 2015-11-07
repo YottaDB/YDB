@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,10 +28,11 @@ GBLREF mlabel			*mlabtab;
 GBLREF command_qualifier	cmd_qlf;
 GBLREF uint4			gtmDebugLevel;
 
-error_def(ERR_LABELMISSING);
-error_def(ERR_LABELUNKNOWN);
-error_def(ERR_FMLLSTMISSING);
 error_def(ERR_ACTLSTTOOLONG);
+error_def(ERR_FMLLSTMISSING);
+error_def(ERR_LABELMISSING);
+error_def(ERR_LABELNOTFND);
+error_def(ERR_LABELUNKNOWN);
 
 int resolve_ref(int errknt)
 {
@@ -96,7 +97,8 @@ int resolve_ref(int errknt)
 						stx_error(ERR_LABELMISSING, 2, mlbx->mvname.len, mlbx->mvname.addr);
 						TREF(source_error_found) = 0;
 						y = newtriple(OC_RTERROR);
-						y->operand[0] = put_ilit(ERR_LABELUNKNOWN);
+						y->operand[0] = put_ilit(OC_JMP == x->opcode
+							? ERR_LABELNOTFND : ERR_LABELUNKNOWN); /* special error for GOTO jmp */
 						y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
 						n->oprval.tref = y;
 						n->oprclass = TJMP_REF;
@@ -177,7 +179,7 @@ int resolve_ref(int errknt)
 
 /* If for example there are nested $SELECT routines feeding a value to a SET $PIECE/$EXTRACT, this nested checking is
  * necessary to make sure no OC_PASSTHRUs remain in the parameter chain to get turned into OC_NOOPs that will
- * cause GTMASSERTs in emit_code.
+ * cause assertpro in emit_code.
  */
 void resolve_tref(triple *curtrip, oprtype *opnd)
 {

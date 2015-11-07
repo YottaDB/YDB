@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,7 +100,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 	int 		depth_count, fnname_type;
 	mval		*dst, *arg, *depth;
 	VMS_ONLY(int	sub_count;)
-	mstr		format_out;
+	mstr		format_out, opstr;
 	va_list		var;
 	unsigned char	*sptr, *key_ptr, *key_top;
 
@@ -114,7 +114,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 	if (depth_count < 0)
 	{
 		va_end(var);
-		rts_error(VARLSTCNT(1) ERR_FNNAMENEG);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_FNNAMENEG);
 	}
 	/* Note about garbage collection : *dst and all possible *arg's in this function are anchored in the stringpool chains
 	 * and preserved during garbage collection (run time argument mvals provided by compiler). So, if we maintain dst->str.len
@@ -136,7 +136,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 		if (!gv_currkey || gv_currkey->prev == 0)
 		{
 			va_end(var);
-			rts_error(VARLSTCNT(1) ERR_GVNAKED);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GVNAKED);
 		}
 		/* Reserve enough space for naked reference. Include space for ^() and a maximum of sub_count ',' separators for
 		 * subscripts specified as arguments to $NAME() in addition to those in the naked reference
@@ -157,7 +157,9 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 			{
 				for ( ; ; )
 				{
-					sptr = gvsub2str(key_ptr, sptr, TRUE); /* gvsub2str assumes enough buffer available */
+					opstr.addr = (char *)sptr;
+					opstr.len = space_needed;
+					sptr = gvsub2str(key_ptr, &opstr, TRUE); /* gvsub2str assumes enough buffer available */
 					while (*key_ptr++)
 						;
 					if (depth_count != MAXPOSINT4) /* although this may not make a difference in reality, */
@@ -244,7 +246,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 	}
 	va_end(var);
 	if (MAX_STRLEN < dst->str.len)
-		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 	*finaldst = *dst;
 	POP_MV_STENT(); /* don't need no temporary no more */
 	return;

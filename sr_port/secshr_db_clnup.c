@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -134,7 +134,7 @@
 {	/* "wcblocked" is relevant only if X is the database crit semaphore. In this case, BEFORE salvaging crit,	\
 	 * (but AFTER ensuring the previous holder pid is dead) we need to set cnl->wc_blocked to TRUE to		\
 	 * ensure whoever grabs crit next does a cache-recovery. This is necessary in case previous holder of crit	\
-	 * had set some cr->in_cw_set to a non-zero value. Not doing cache recovery could cause incorrect GTMASSERTs	\
+	 * had set some cr->in_cw_set to a non-zero value. Not doing cache recovery could cause incorrect assertpro()s	\
 	 * in PIN_CACHE_RECORD macro in t_end/tp_tend.									\
 	 */														\
 	uint4 pid;													\
@@ -628,14 +628,12 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					/* else is the case where we had a duplicate set that did not update any cw-set */
 					assert(!tp_update_underway);
 					assert(non_tp_update_underway);	/* should have already determined update is underway */
-					if (!non_tp_update_underway)
-					{	/* This is a situation where we are in non-TP and have a region that we hold
-						 * crit in and are in the midst of commit but this region was not the current
-						 * region when we entered secshr_db_clnup. This is an out-of-design situation
-						 * that we want to catch in Unix (not VMS because it runs in kernel mode).
-						 */
-						UNIX_ONLY(GTMASSERT;)	/* in Unix we want to catch this situation even in pro */
-					}
+					/* This is a situation where we are in non-TP and have a region that we hold
+					 * crit in and are in the midst of commit but this region was not the current
+					 * region when we entered secshr_db_clnup. This is an out-of-design situation
+					 * that we want to catch in Unix (not VMS because it runs in kernel mode).
+					 */
+					UNIX_ONLY(assertpro(non_tp_update_underway));
 					non_tp_update_underway = TRUE;	/* just in case */
 					update_underway = TRUE;		/* just in case */
 				}
@@ -1106,10 +1104,13 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							if (SNAPSHOTS_IN_PROG(csa))
 							{
 								lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);
-								assert(NULL != snapshot_cr);
-								assert((snapshot_cr == cr) || (snapshot_cr == cr_alt));
-								WRITE_SNAPSHOT_BLOCK(csa, snapshot_cr, NULL, snapshot_cr->blk,
-											lcl_ss_ctx);
+								if (snapshot_cr->blk < lcl_ss_ctx->total_blks)
+								{
+									assert(NULL != snapshot_cr);
+									assert((snapshot_cr == cr) || (snapshot_cr == cr_alt));
+									WRITE_SNAPSHOT_BLOCK(csa, snapshot_cr, NULL,
+												snapshot_cr->blk, lcl_ss_ctx);
+								}
 							}
 #							endif
 						}
@@ -1617,8 +1618,10 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				if (dlr_tlevel || (NULL != firstsgminfo))
 				{
 					si = csa->sgm_info_ptr;
+					/* Note that it is possible "si" is NULL in case of a GTM-E-MEMORY error in gvcst_init.
+					 * Handle that accordingly in the code below.
+					 */
 					kip_csa_usable = (GTM_PROBE(SIZEOF(sgm_info), si, WRITE)) ? TRUE : FALSE;
-					assert(kip_csa_usable);
 					/* Since the kill process cannot be completed, we need to decerement KIP count
 					 * and increment the abandoned_kills count.
 					 */
@@ -1628,7 +1631,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						PROBE_DECR_KIP(csd, csa, si->kip_csa);
 						PROBE_INCR_ABANDONED_KILLS(csd, csa);
 					} else
-						assert((NULL == si->kill_set_head) || (NULL == si->kip_csa));
+						assert((NULL == si) || (NULL == si->kill_set_head) || (NULL == si->kip_csa));
 				} else if (!dlr_tlevel)
 				{
 					kip_csa_usable =
@@ -1737,7 +1740,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				{	/* there can be at most one region in non-TP with different curr_tn and early_tn */
 					assert(!non_tp_update_underway || first_time);
 					/* for normal termination we should not have been in the midst of commit */
-					assert((NORMAL_TERMINATION != secshr_state) || WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART));
+					assert((NORMAL_TERMINATION != secshr_state)
+						|| WBTEST_ENABLED(WBTEST_JNL_CREATE_FAIL)
+						|| WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART));
 					DEBUG_ONLY(first_time = FALSE;)
 					if (update_underway)
 					{

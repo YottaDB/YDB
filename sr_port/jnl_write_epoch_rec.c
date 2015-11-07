@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,16 +100,6 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 			epoch_record.strm_seqno[idx] = csd->strm_reg_seqno[idx];
 		/* If MUPIP JOURNAL -ROLLBACK, might need to do additional processing. See macro definition for comments */
 		MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(csd, epoch_record.strm_seqno);
-#		ifdef DEBUG
-		if (jgbl.mur_rollback)
-		{	/* Assert that the unified jnl_seqno is always >= the individual stream seqnos. While this is not
-			 * guaranteed to be true if users play with the seqnos in the db file header, it is mostly true
-			 * and hence a good indicator to have particularly since it catches code issues right away.
-			 */
-			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
-				assert(epoch_record.strm_seqno[idx] <= epoch_record.jnl_seqno);
-		}
-#		endif
 	} else if (REPL_ALLOWED(csd))
 	{
 		epoch_record.jnl_seqno = csd->reg_seqno;	/* Note we cannot use jnlpool_ctl->jnl_seqno since
@@ -172,4 +162,5 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	epoch_record.filler = 0;
 	epoch_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&epoch_record, SIZEOF(struct_jrec_epoch));
 	jnl_write(jpc, JRT_EPOCH, (jnl_record *)&epoch_record, NULL, NULL);
+	jb->post_epoch_freeaddr = jb->freeaddr;
 }

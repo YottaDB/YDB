@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 
 error_def(ERR_COMMAORRPAREXP);
 error_def(ERR_CTLMNEXPECTED);
+error_def(ERR_NAMEEXPECTED);
 error_def(ERR_RWFORMAT);
 
 int rwformat(void)
@@ -79,7 +80,21 @@ int rwformat(void)
 				advancewindow();
 				for (;;)
 				{
-					if (EXPR_FAIL == expr(&x, MUMPS_EXPR))
+					if ((TK_COMMA == TREF(window_token)) || ((n > 1) && TK_RPAREN == TREF(window_token)))
+					{ 	/* language extension - allow empty expr */
+						ref = newtriple(OC_NULLEXP);
+						x = put_tref(ref);
+					} else if (TK_PERIOD == TREF(window_token))
+					{ 	/* language extension - allow pass-by-reference */
+						advancewindow();
+						if (TK_IDENT != TREF(window_token))
+						{
+							stx_error(ERR_NAMEEXPECTED);
+							return FALSE;
+						}
+						x = put_mvar(&(TREF(window_ident)));
+						advancewindow();
+					} else if (EXPR_FAIL == expr(&x, MUMPS_EXPR))
 						return FALSE;
 					n++;
 					ref = newtriple(OC_PARAMETER);

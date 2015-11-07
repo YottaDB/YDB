@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,109 +32,124 @@
 #include "t_write.h"
 #include "t_end.h"
 #include "t_begin_crit.h"
+#include "process_deferred_stale.h"
 #include "gvcst_blk_build.h"
 #include "t_abort.h"
+#include "gtmmsg.h"
 
 #define MAX_UTIL_LEN 80
 
-GBLREF char		*update_array, *update_array_ptr;
-GBLREF uint4		update_array_size;
-GBLREF srch_hist	dummy_hist;
-GBLREF gd_region	*gv_cur_region;
 GBLREF block_id		patch_curr_blk;
-GBLREF save_strct	patch_save_set[PATCH_SAVE_SIZE];
-GBLREF unsigned short int patch_save_count;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t cs_data;
+GBLREF char		*update_array, *update_array_ptr;
+GBLREF cw_set_element	cw_set[];
 GBLREF gd_addr		*original_header;
-GBLREF cw_set_element   cw_set[];
+GBLREF gd_region	*gv_cur_region;
+GBLREF save_strct	patch_save_set[PATCH_SAVE_SIZE];
+GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF sgmnt_data_ptr_t	cs_data;
+GBLREF srch_hist	dummy_hist;
+GBLREF uint4		patch_save_count, update_array_size;
 
+error_def(ERR_AIMGBLKFAIL);
 error_def(ERR_DBRDONLY);
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEFAIL);
+error_def(ERR_DSENOTOPEN);
+error_def(ERR_NOREGION);
 
 void dse_rest(void)
 {
+	blk_segment	*bs1, *bs_ptr;
 	block_id	to, from;
+	char		util_buff[MAX_UTIL_LEN], rn[MAX_RN_LEN + 1];
+	gd_binding	*map;
 	gd_region	*region;
 	int		i, util_len;
-	uchar_ptr_t	lbp;
-	char		util_buff[MAX_UTIL_LEN], rn[MAX_RN_LEN + 1];
-	blk_segment	*bs1, *bs_ptr;
 	int4		blk_seg_cnt, blk_size;
-	unsigned short	rn_len;
-	uint4		version;
-	gd_binding	*map;
-	boolean_t	found;
 	srch_blk_status	blkhist;
+	uchar_ptr_t	lbp;
+	uint4		found_index, version;
+	unsigned short	rn_len;
 
 	if (gv_cur_region->read_only)
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
-	if (cli_present("VERSION") != CLI_PRESENT)
+	if (cli_get_int("VERSION", (int4 *)&version))
 	{
-		util_out_print("Error:  save version number must be specified.", TRUE);
-		return;
-	}
-	if (!cli_get_int("VERSION", (int4 *)&version))
-		return;
-	if (cli_present("BLOCK") == CLI_PRESENT)
-	{
-		if (!cli_get_hex("BLOCK", (uint4 *)&to))
-			return;
-		if (to < 0 || to >= cs_addrs->ti->total_blks)
+		if (0 == version)
 		{
-			util_out_print("Error: invalid block number.", TRUE);
+			util_out_print("Error:  no such version.", TRUE);
 			return;
 		}
-		patch_curr_blk = to;
 	} else
-		to = patch_curr_blk;
-	if (cli_present("FROM") == CLI_PRESENT)
-	{
+		version = 0;
+	if (BADDSEBLK == (to = dse_getblk("BLOCK", DSEBMLOK, DSEBLKCUR)))			/* WARNING: assignment */
+		return;
+	if (CLI_PRESENT == cli_present("FROM"))
+	{	/* don't use dse_getblk because we're working out of the save set, not the db */
 		if (!cli_get_hex("FROM", (uint4 *)&from))
-	 		return;
-	 	if (from < 0 || from >= cs_addrs->ti->total_blks)
-	 	{
-	 		util_out_print("Error: invalid block number.", TRUE);
-	 		return;
-	 	}
+			from = patch_curr_blk;
 	} else
 	 	from = to;
-	if (cli_present("REGION") == CLI_PRESENT)
+	if (CLI_PRESENT == cli_present("REGION"))
 	{
 		rn_len = SIZEOF(rn);
 		if (!cli_get_str("REGION", rn, &rn_len))
 			return;
-		for (i = rn_len; i < MAX_RN_LEN + 1; i++)
+		for (i = 0; i < rn_len; i++)
+			rn[i] = TOUPPER(rn[i]);	/* Region names are always upper-case ASCII and thoroughly NUL terminated */
+		for ( ; i < ARRAYSIZE(rn); i++)
 			rn[i] = 0;
-		found = FALSE;
+		found_index = 0;
 		for (i = 0, region = original_header->regions; i < original_header->n_regions ;i++, region++)
-			if (found = !memcmp(&region->rname[0], &rn[0], MAX_RN_LEN))
+			if (found_index = !memcmp(&region->rname[0], &rn[0], MAX_RN_LEN))	/* WARNING: assignment */
 				break;
-		if (!found)
+		if (!found_index)
 		{
-			util_out_print("Error:  region not found.", TRUE);
-	 		return;
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, rn_len, rn);
+			return;
 		}
 		if (!region->open)
 		{
-			util_out_print("Error:  that region was not opened because it is not bound to any namespace.", TRUE);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DSENOTOPEN, 2, rn_len, rn);
 			return;
 		}
 	} else
-	 	region = gv_cur_region;
-	found = FALSE;
+		region = gv_cur_region;
+	found_index = 0;
 	for (i = 0; i < patch_save_count; i++)
 	{
-	 	if ((patch_save_set[i].blk == from) && (patch_save_set[i].region == region)
-				&& (found = (version == patch_save_set[i].ver)))
-	 		break;
+		if ((patch_save_set[i].blk == from) && (patch_save_set[i].region == region))
+		{
+			if (version == patch_save_set[i].ver)
+			{
+				assert(version);
+				found_index = i + 1;
+				break;
+			}
+			if (!version)
+			{
+				if (found_index)
+				{
+					util_out_print("Error:  save version number must be specified.", TRUE);
+					return;
+				}
+				found_index = i + 1;
+			}
+		}
 	}
-	if (!found)
+	if (0 == found_index)
 	{
-	 	util_out_print("Error:  no such version.", TRUE);
-	 	return;
+		if (version)
+			util_out_print("Error: Version !UL of block !XL not found in set of saved blocks", TRUE, version, from);
+		else
+			util_out_print("Error: Block !XL not found in set of saved blocks", TRUE, from);
+		return;
+	}
+	if (!version)
+	{
+		i = found_index - 1;
+		version = patch_save_set[i].ver;
 	}
 	memcpy(util_buff, "!/Restoring block ", 18);
 	util_len = 18;
@@ -142,6 +157,7 @@ void dse_rest(void)
 	memcpy(&util_buff[util_len], " from version !UL", 17);
 	util_len += 17;
 	util_buff[util_len] = 0;
+	assert(ARRAYSIZE(util_buff) >= util_len);
 	util_out_print(util_buff, FALSE, version);
 	if (to != from)
 	{
@@ -149,14 +165,15 @@ void dse_rest(void)
 		util_len = 10;
 		util_len += i2hex_nofill(from, (uchar_ptr_t)&util_buff[util_len], 8);
 		util_buff[util_len] = 0;
+		assert(ARRAYSIZE(util_buff) >= util_len);
 		util_out_print(util_buff, FALSE);
 	}
 	if (region != gv_cur_region)
 		util_out_print(" in region !AD", FALSE, LEN_AND_STR(rn));
 	util_out_print("!/", TRUE);
-	if (to > cs_addrs->ti->total_blks)
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	t_begin_crit(ERR_DSEFAIL);
+	if (to >= cs_addrs->ti->total_blks)
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	blk_size = cs_addrs->hdr->blk_size;
 	blkhist.blk_num = to;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
@@ -167,12 +184,11 @@ void dse_rest(void)
 	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + SIZEOF(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - SIZEOF(blk_hdr));
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
-		util_out_print("Error: bad blk build.", TRUE);
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_AIMGBLKFAIL, 3, to, DB_LEN_STR(gv_cur_region));
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
-	BUILD_AIMG_IF_JNL_ENABLED(cs_data, cs_addrs->ti->curr_tn);
-	t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
+	BUILD_AIMG_IF_JNL_ENABLED_AND_T_END_WITH_EFFECTIVE_TN(cs_addrs, cs_data, ((blk_hdr_ptr_t)lbp)->tn, &dummy_hist);
 	return;
 }

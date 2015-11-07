@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,10 +26,10 @@
 #include "t_qread.h"
 #include "mmemory.h"
 
-GBLREF char		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF block_id		patch_find_blk, patch_left_sib, patch_right_sib;
 GBLREF block_id		patch_path[MAX_BT_DEPTH + 1], patch_path1[MAX_BT_DEPTH + 1];
-GBLREF bool		patch_find_root_search;
+GBLREF boolean_t	patch_find_root_search;
+GBLREF char		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF short int	patch_path_count;
 GBLREF unsigned short	patch_comp_count;
@@ -43,18 +43,17 @@ int dse_order(block_id srch,
 	      short int targ_len,
 	      bool dir_data_blk)
 {
+	block_id	last;
+	cache_rec_ptr_t	dummy_cr;
+	int4		dummy_int;
+	short int	rsize, size;
 	sm_uc_ptr_t	bp, b_top, key_top, ptr, rp, r_top;
 	unsigned short	cc;
-	int		tmp_cmpc;
-	block_id	last;
-	short int	rsize, size;
-	int4		dummy_int;
-	cache_rec_ptr_t	dummy_cr;
 
 	last = 0;
 	patch_path_count++;
 	if (!(bp = t_qread(srch, &dummy_int, &dummy_cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t)bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
 	else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)bp)->bsiz)

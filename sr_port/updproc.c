@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,6 +63,11 @@
 #include <rtnhdr.h>			/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "targ_alloc.h"
+#include "trigger.h"
+#include "hashtab_str.h"
+#include "io.h"
+#include "trigger_update_protos.h"
+#include "util.h"
 #endif
 #ifdef VMS
 #include <fab.h>
@@ -100,6 +105,9 @@
 #include "tp_frame.h"
 #include "gvcst_jrt_null.h"	/* for gvcst_jrt_null prototype */
 #include "preemptive_db_clnup.h"
+#ifdef DEBUG
+#include "repl_filter.h"	/* needed by an assert in UPD_GV_BIND_NAME_APPROPRIATE macro */
+#endif
 
 #define	UPDPROC_WAIT_FOR_READJNLSEQNO	100	/* ms */
 #define UPDPROC_WAIT_FOR_STARTJNLSEQNO	100	/* ms */
@@ -141,6 +149,7 @@ DEBUG_ONLY(GBLREF ch_ret_type	(*ch_at_trigger_init)();)
 GBLREF	int			tprestart_state;        /* When triggers restart, multiple states possible. See tp_restart.h */
 GBLREF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related information */
 GBLREF	mval			dollar_ztwormhole;
+GBLREF	boolean_t		dollar_ztrigger_invoked;
 #endif
 GBLREF	boolean_t		skip_dbtriggers;
 GBLREF	gv_namehead		*gv_target;
@@ -293,6 +302,18 @@ CONDITION_HANDLER(updproc_ch)
 #			  error unsupported platform
 #			endif
 			{
+				/* It is possible that dollar_tlevel at the time of the ESTABLISH of updproc_ch was 0
+				 * and the op_tstart happened inside updproc_actions and later as part of op_tcommit a
+				 * restart happens which brings dollar_tlevel to 1 before coming here. Even though
+				 * dollar_tlevel before the UNWIND done below is not the same as that at ESTABLISH time,
+				 * the flow of control happens correctly so op_tstart is not done again but everything
+				 * else in this transaction is re-executed. So treat this as an exception and adjust
+				 * active_ch->dollar_tlevel so it is in sync with the current dollar_tlevel. This prevents
+				 * an assert failure in UNWIND. START_CH would have done a active_ch-- so we need a
+				 * active_ch[1] to get at the desired active_ch.
+				 */
+				UNIX_ONLY(assert(active_ch[1].dollar_tlevel <= dollar_tlevel);)
+				UNIX_ONLY(DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;))
 				UNWIND(NULL, NULL);
 			}
 #			ifdef VMS
@@ -321,6 +342,13 @@ CONDITION_HANDLER(updproc_ch)
 		preemptive_db_clnup(SEVERITY);
 		assert(INVALID_GV_TARGET == reset_gv_target);
 		set_onln_rlbk_flg = TRUE;
+		/* Just like the UNWIND done above in the tprestart case, this is a case where an online rollback is signaled
+		 * inside updproc_actions. The ESTABLISH might have been done many transactions back as part of a restart or
+		 * as part of an online rollback or as part of a bad-trans. So the dollar_tlevel at the ESTABLISH time could
+		 * be 0 or non-zero and has no relation to the dollar_tlevel currently. So just fix active_ch->dollar_tlevel
+		 * before the UNWIND call to avoid any dollar_tlevel related assert failures.
+		 */
+		UNIX_ONLY(DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;))
 		UNWIND(NULL, NULL);
 	}
 #	endif
@@ -982,7 +1010,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					bad_trans_type = upd_bad_key;
 					assert(FALSE);
 				}
-			} else if (IS_ZTWORM(rectype))
+			} else if (IS_ZTWORM(rectype) || IS_LGTRIG(rectype))
 			{
 				assert(IS_FENCED(rectype));
 				assert(IS_TP(rectype));
@@ -990,7 +1018,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				assert(0 == tcom_num);
 				if (0 > tupd_num || 0 != tcom_num)
 				{
-					bad_trans_type = upd_fence_bad_ztworm_t_num;
+					bad_trans_type = IS_ZTWORM(rectype)
+								? upd_fence_bad_ztworm_t_num
+								: upd_fence_bad_lgtrig_t_num;
 					assert(FALSE);
 				} else if (IS_TUPD(rectype))
 				{
@@ -1252,14 +1282,34 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						csa->n_pre_read_trigger--;
 					disk_blk_read = FALSE;
 				}
-			} else if (IS_ZTWORM(rectype))
+			}
+#			ifdef GTM_TRIGGER
+			else if (IS_ZTWORM(rectype))
 			{
 				assert(dollar_tlevel);	/* op_tstart should already have been done */
 				val_mv.mvtype = MV_STR;
 				val_mv.str.len = rec->jrec_ztworm.ztworm_str.length;
 				val_mv.str.addr = &rec->jrec_ztworm.ztworm_str.text[0];
 				op_svput(SV_ZTWORMHOLE, &val_mv);
+			} else if (IS_LGTRIG(rectype))
+			{
+				int		i;
+				boolean_t	trigger_status;
+				uint4		trig_stats[NUM_STATS];
+
+				assert(dollar_tlevel);
+				for (i = 0; NUM_STATS > i; i++)
+					trig_stats[i] = 0;
+				/* clear any pending data in util_outptr as trigger_update_rec will otherwise append to it */
+				util_out_print(NULL, RESET);
+				dollar_ztrigger_invoked = TRUE;	/* needed to ensure later SET/KILLs done in this TP transaction
+								 * read triggers installed by the below trigger_update_rec call.
+								 */
+				trigger_status = trigger_update_rec(rec->jrec_lgtrig.lgtrig_str.text,
+							rec->jrec_lgtrig.lgtrig_str.length, TRUE, trig_stats, NULL, NULL);
+				assert(TRIG_SUCCESS == trigger_status);
 			}
+#			endif
 		}
 		if (upd_good_record != bad_trans_type)
 		{

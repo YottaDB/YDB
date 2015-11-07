@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -125,12 +125,6 @@ endsw
 
 
 
-if ( $gt_ar_gtmrpc_name == "" ) then
-	set gt_lint_gtmrpc_library_option = ""
-else
-	set gt_lint_gtmrpc_library_option = "llib-l$gt_ar_gtmrpc_name.ln"
-endif
-
 cd $gtm_exe
 
 
@@ -154,7 +148,7 @@ chmod +w *.c *.h
 
 set lintgtm_verbose = $?verbose
 
-set lintgtm_liblist = "dse $gt_ar_gtmrpc_name lke mupip stub mumps"
+set lintgtm_liblist = "dse lke mupip stub mumps"
 
 foreach i ( $lintgtm_liblist )
 
@@ -164,7 +158,6 @@ foreach i ( $lintgtm_liblist )
 
 	switch ( $i )
 	case "dse":
-	case "gtmrpc":		# couldn't use "$gt_ar_gtmrpc_name", so had to hard-code "gtmrpc"
 	case "lke":
 	case "mupip":
 	case "stub":
@@ -182,7 +175,7 @@ foreach i ( $lintgtm_liblist )
 		# Exclude files that define the same externals (e.g., "main" and the VMS CLI [command line interpreter]
 		# emulator arrays):
 		pwd
-		rm -f gtm.c gtm_svc.c \
+		rm -f gtm.c \
 			lke.c lke_cmd.c \
 			dse.c dse_cmd.c \
 			mupip.c mupip_cmd.c \
@@ -201,14 +194,8 @@ end
 
 # $shell $gtm_tools/lintshr.csh $p1	# for true parallelism, the following commands would be in lintshr.csh
 cp $gtm_src/{gtm.c .
-gt_lint $gt_lint_options gtm.c llib-l{mumps,stub}.ln $gt_lint_gtmrpc_library_option $gt_lint_syslibs \
+gt_lint $gt_lint_options gtm.c llib-l{mumps,stub}.ln $gt_lint_syslibs \
 	>& lint.mumps.log
-
-if ( $gt_ar_gtmrpc_name != "" ) then
-	cp $gtm_src/gtm_svc.c .
-	gt_lint $gt_lint_options gtm_svc.c \
-		llib-l{mumps,stub}.ln $gt_lint_gtmrpc_library_option $gt_lint_syslibs >& lint.gtm_svc.log
-endif
 
 # $shell $gtm_tools/lintaux.csh $p1	# for true parallelism, the following commands would be in lingaux.csh
 cp $gtm_src/{dse,dse_cmd}.c .

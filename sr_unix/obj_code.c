@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +61,7 @@ GBLREF int4			sym_table_size;
 GBLREF int4			linkage_size;
 GBLREF uint4			lnkrel_cnt;	/* number of entries in linkage Psect to relocate */
 GBLREF spdesc			stringpool;
+GBLREF char			object_file_name[];
 
 #define PTEXT_OFFSET SIZEOF(rhdtyp)
 
@@ -113,7 +114,9 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	rhdtyp		rhead;
 	mline		*mlx, *mly;
 	var_tabent	*vptr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(!run_time);
 	obj_init();
 	/* Define the routine name global symbol */
@@ -209,6 +212,8 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	rhead.temp_mvals = sa_temps[TVAL_REF];
 	rhead.temp_size = sa_temps_offset[TCAD_REF];
 	rhead.compiler_qlf = cmd_qlf.qlf;
+	if (cmd_qlf.qlf & CQ_EMBED_SOURCE)
+		rhead.routine_source_offset = TREF(routine_source_offset);
 	/* Start the creation of the output object */
 	create_object_file(&rhead);
 	cg_phase = CGP_MACHINE;
@@ -293,6 +298,8 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 		emit_immed(PADCHARS, object_pad_size);
 	}
 	close_object_file();
+	/* Ready to make object visible. Rename from tmp name to real routine name */
+	rename_tmp_object_file(object_file_name);
 }
 
 /* Routine called to process a given label. Cheezy 2nd parm is due to general purpose

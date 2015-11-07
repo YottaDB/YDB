@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -165,7 +165,7 @@ void gtm_fork_n_core(void)
 	/* block SIGALRM signal */
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
 
-	FORK(childid);	/* BYPASSOK: we exit immediately, no FORK_CLEAN needed */
+	FORK(childid);
 	if (childid)
 	{
 		if (-1 == childid)

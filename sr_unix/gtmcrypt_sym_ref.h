@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2013 Fidelity Information Services, Inc *
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,6 @@
 # endif
 #elif defined USE_GCRYPT
 # if defined(USE_AES256CFB)
-#  define IV_LEN		16
 #  define ALGO			GCRY_CIPHER_AES256
 #  define MODE			GCRY_CIPHER_MODE_CFB
 #  define UNIQ_ENC_PARAM_STRING	"AES256CFB"
@@ -33,7 +32,6 @@
 #  error			"Unsupported Algorithm for Libgcrypt"
 # endif
 STATICDEF int			gcry_already_inited;
-STATICDEF char			iv[IV_LEN];
 #else
 # error 			"Unsupported encryption library. Reference implementation currently supports OpenSSL and Libgcrypt"
 #endif	/* USE_GCRYPT */
@@ -41,15 +39,11 @@ STATICDEF char			iv[IV_LEN];
 #define UNIQ_ENC_PARAM_LEN	SIZEOF(UNIQ_ENC_PARAM_STRING) - 1
 #define HASH_INPUT_BUFF_LEN	UNIQ_ENC_PARAM_LEN + SYMMETRIC_KEY_MAX
 
-#define GC_SYM_DECRYPT(KEY_HANDLE, ENCRYPTED_BLOCK, UNENCRYPTED_BLOCK)								\
-	gc_sym_encrypt_decrypt(KEY_HANDLE, ENCRYPTED_BLOCK, UNENCRYPTED_BLOCK, GC_DECRYPT)
-
-#define GC_SYM_ENCRYPT(KEY_HANDLE, UNENCRYPTED_BLOCK, ENCRYPTED_BLOCK)								\
-	gc_sym_encrypt_decrypt(KEY_HANDLE, UNENCRYPTED_BLOCK, ENCRYPTED_BLOCK, GC_ENCRYPT)
-
 #ifndef USE_OPENSSL
 int gc_sym_init(void);
 #endif
-int gc_sym_create_key_handles(gtm_dbkeys_tbl *entry);
-int gc_sym_encrypt_decrypt(crypt_key_t *key, gtm_string_t *in_block, gtm_string_t *out_block, int flag);
+void gc_sym_destroy_key_handles(gtm_keystore_t *entry);
+int gc_sym_create_cipher_handle(unsigned char *raw_key, unsigned char *iv, crypt_key_t *handle, int direction);
+void gc_sym_destroy_cipher_handle(crypt_key_t handle);
+int gc_sym_encrypt_decrypt(crypt_key_t *key, unsigned char *in_block, int in_block_len, unsigned char *out_block, int flag);
 #endif /* GTMCRYPT_SYM_REF_H */

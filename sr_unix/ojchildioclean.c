@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,9 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+#include <rtnhdr.h>
+#include "relinkctl.h"
+#include "zhist.h"
 
 GBLREF	int			mutex_sock_fd;
 
@@ -39,10 +42,12 @@ void ojchildioclean(void)
 	sgmnt_data_ptr_t	csd;
 	gd_region		*r_top, *r_local;
 	gd_addr			*addr_ptr;
+	open_relinkctl_sgm 	*linkctl;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Close any encryption related fds that the plug-in might have opened */
 	GTMCRYPT_ONLY(GTMCRYPT_CLOSE;)
-
 	/* Run through the list of databases to simply close them out (still open by parent) */
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
@@ -70,4 +75,9 @@ void ojchildioclean(void)
 	if (FD_INVALID != mutex_sock_fd)
 		CLOSEFILE_RESET(mutex_sock_fd, rc);	/* resets "mutex_sock_fd" to FD_INVALID */
 #endif
+	/* Since we are removing artifacts from the originating process (which still has these files open), there is
+	 * no need to decrement the counts (they will increase if this process links the same files). The FALSE
+	 * argument prevents the count from being modified in this cleanup.
+	 */
+	USHBIN_ONLY(relinkctl_rundown(FALSE));
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -142,9 +142,9 @@
 }
 
 /* Increment the cycle for tstarts. Field is compared to same name field in lv_val to signify an lv_val has been seen
-   during a given transaction so reference counts are kept correct. If counter wraps, clear all the counters in all
-   accessible lv_vals.
-*/
+ * during a given transaction so reference counts are kept correct. If counter wraps, clear all the counters in all
+ * accessible lv_vals.
+ */
 #define INCR_TSTARTCYCLE												\
 {															\
 	symval		*lvlsymtab;											\
@@ -160,12 +160,13 @@
 					lvp->stats.tstartcycle = 0;							\
 		tstartcycle = 1;											\
 	}														\
+	DBGRFCT((stderr, "INCR_TSTARTCYCLE: Bumped tstartcycle to 0x%08lx\n", tstartcycle));				\
 }
 
 /* Increment the cycle for misc lv tasks. Field is compared to same name field in lv_val to signify an lv_val has been seen
-   during a given transaction so reference counts are kept correct. If counter wraps, clear all the counters in all
-   accessible lv_vals.
-*/
+ * during a given transaction so reference counts are kept correct. If counter wraps, clear all the counters in all
+ * accessible lv_vals.
+ */
 #define INCR_LVTASKCYCLE												\
 {															\
 	symval		*lvlsymtab;											\
@@ -181,12 +182,14 @@
 					lvp->stats.lvtaskcycle = 0;							\
 		lvtaskcycle = 1;											\
 	}														\
+	DBGRFCT((stderr, "INCR_LVTASKCYCLE: Bumped lvtaskcycle to 0x%08lx\n", lvtaskcycle));				\
 }
 
 /* Initialize given lv_val (should be of type "lv_val *" and not "lvTreeNode *") */
 #define LVVAL_INIT(lv, symvalarg)											\
 {															\
 	DBGALS_ONLY(GBLREF boolean_t lvmon_enabled;)									\
+	DBGALS_ONLY(GBLREF stack_frame *frame_pointer;)									\
 	assert(MV_SYM == symvalarg->ident); /* ensure above macro is never used to initialize a "lvTreeNode *" */	\
 	(lv)->v.mvtype = 0;												\
 	(lv)->stats.trefcnt = 1;											\
@@ -198,6 +201,8 @@
 	(lv)->tp_var = NULL;												\
 	LV_CHILD(lv) = NULL;												\
 	LV_SYMVAL(lv) = symvalarg;											\
+	DBGALS_ONLY((lv)->stats.init_mpc = frame_pointer->mpc);								\
+	DBGALS_ONLY((lv)->stats.init_cpc = CURRENT_PC);	/* Currently only works for Linux */				\
 }
 
 /* Macro to call lv_var_clone and set the cloned status in the tp_var structure.
@@ -205,31 +210,41 @@
  * This is because in case we want to restore the lv, we can then safely move the saved tree
  * back to "lv" without then having to readjust the base_lv linked in the "lvTree *" structures beneath
  */
-#define TP_VAR_CLONE(lv)				\
-{							\
-	lv_val 	*lcl_savelv;				\
-	tp_var	*lcl_tp_var;				\
-							\
-	assert(LV_IS_BASE_VAR(lv));			\
-	lcl_tp_var = (lv)->tp_var;			\
-	assert(lcl_tp_var);				\
-	assert(!lcl_tp_var->var_cloned);		\
-	lcl_savelv = lcl_tp_var->save_value;		\
-	assert(NULL != lcl_savelv);			\
-	assert(NULL == LV_CHILD(lcl_savelv));		\
-	LV_CHILD(lcl_savelv) = LV_CHILD(lv);		\
-	lv_var_clone(lcl_savelv, lv);			\
-	lcl_tp_var->var_cloned = TRUE;			\
+#define TP_VAR_CLONE(lv)									\
+{												\
+	lv_val 	*lcl_savelv;									\
+	tp_var	*lcl_tp_var;									\
+												\
+	assert(LV_IS_BASE_VAR(lv));								\
+	lcl_tp_var = (lv)->tp_var;								\
+	assert(lcl_tp_var);									\
+	assert(!lcl_tp_var->var_cloned);							\
+	lcl_savelv = lcl_tp_var->save_value;							\
+	assert(NULL != lcl_savelv);								\
+	assert(NULL == LV_CHILD(lcl_savelv));							\
+	DBGRFCT((stderr, "\nTP_VAR_CLONE: invoked from %s at line %d\n", __FILE__, __LINE__));	\
+	LV_CHILD(lcl_savelv) = LV_CHILD(lv);							\
+	lv_var_clone(lcl_savelv, lv, TRUE);							\
+	lcl_tp_var->var_cloned = TRUE;								\
+	DBGRFCT((stderr, "TP_VAR_CLONE: complete\n"));						\
 }
 
 /* Macro to indicate if a given lv_val is an alias or not */
 #define IS_ALIASLV(lv) (DBG_ASSERT(LV_IS_BASE_VAR(lv)) ((1 < (lv)->stats.trefcnt) || (0 < (lv)->stats.crefcnt)) \
 			DEBUG_ONLY(&& assert(IS_PARENT_MV_SYM(lv))))
 
-
 #define	LV_NEWBLOCK_INIT_ALLOC			16
 #define	LV_BLK_GET_BASE(LV_BLK)			(((sm_uc_ptr_t)LV_BLK) + SIZEOF(lv_blk))
 #define	LV_BLK_GET_FREE(LV_BLK, LVBLK_BASE)	(&LVBLK_BASE[LV_BLK->numUsed])
+
+#ifdef DEBUG_ALIAS
+# ifdef __linux__
+/*void * __attribute ((noinline)) __builtin_return_address(unsigned int level); Currently gives a warning we don't need */
+#  define CURRENT_PC __builtin_return_address(0)
+# else
+#  define CURRENT_PC NULL
+# endif
+#endif
 
 typedef struct lv_val_struct
 {
@@ -266,6 +281,13 @@ typedef struct lv_val_struct
 		int4			crefcnt;		/* Container reference count */
 		uint4			tstartcycle;		/* Cycle of level 0 tstart command */
 		uint4			lvtaskcycle;		/* Cycle of various lv related tasks */
+#		ifdef DEBUG_ALIAS
+		/* Keep these debugging fields inside "stats" so as not to upset the asserts in tp_unwind() and also
+		 * since they don't change once set while being allocated anyway.
+		 */
+		unsigned char		*init_mpc;		/* frame_pointer->mpc when LVVAL_INIT() was done */
+		unsigned char		*init_cpc;		/* current pc so know which C routine did LVVAL_INIT() */
+#		endif
 	} stats;
 	boolean_t			has_aliascont;		/* This base var has or had an alias container in it */
 	boolean_t			lvmon_mark;		/* This lv_val is being monitored; Used only #ifdef DEBUG_ALIAS */
@@ -280,10 +302,10 @@ typedef struct lv_blk_struct
 } lv_blk;
 
 /* When op_xnew creates a symtab, these blocks will describe the vars that were passed through from the
-   previous symtab. They need special alias processing. Note we keep our own copy of the key (rather than
-   pointing to the hash table entry) since op_xnew processing can cause a hash table expansion and we have
-   no good way to update pointers so save the hash values as part of the key to eliminate another lookup.
-*/
+ * previous symtab. They need special alias processing. Note we keep our own copy of the key (rather than
+ * pointing to the hash table entry) since op_xnew processing can cause a hash table expansion and we have
+ * no good way to update pointers so save the hash values as part of the key to eliminate another lookup.
+ */
 typedef struct lv_xnew_var_struct
 {
 	struct lv_xnew_var_struct	*next;
@@ -296,10 +318,10 @@ typedef struct lv_xnew_var_struct
 							*/
 } lv_xnew_var;
 /* While lv_xnew_var_struct are the structures that were explicitly passed through, this is a list of the structures
-   that are pointed to by any container vars in any of the passed through vars and any of the vars those point to, etc.
-   The objective is to come up with a definitive list of structures to search to see if containers got created in them
-   that point to the structure being torn down.
-*/
+ * that are pointed to by any container vars in any of the passed through vars and any of the vars those point to, etc.
+ * The objective is to come up with a definitive list of structures to search to see if containers got created in them
+ * that point to the structure being torn down.
+ */
 typedef struct lv_xnewref_struct
 {
 	struct lv_xnewref_struct	*next;
@@ -328,21 +350,22 @@ typedef struct symval_struct
 	int4			symvlvl;		/* Level of symval struct (nesting) */
 	boolean_t		trigr_symval;		/* Symval is owned by a trigger */
 	boolean_t		alias_activity;
+	GTM64_ONLY(int4		filler;)
 } symval;
 
 /* Structure to describe the block allocated to describe a var specified on a TSTART to be restored
-   on a TP restart. Block moved here from tpframe.h due to the structure references it [now] makes.
-   Block can take two forms: (1) the standard tp_data form which marks vars to be modified or (2) the
-   tp_change form where a new symbol table was stacked.
-*/
+ * on a TP restart. Block moved here from tpframe.h due to the structure references it [now] makes.
+ * Block can take two forms: (1) the standard tp_data form which marks vars to be modified or (2) the
+ * tp_change form where a new symbol table was stacked.
+ */
 typedef struct tp_var_struct
 {
-	struct tp_var_struct		*next;
-	struct lv_val_struct		*current_value;
-	struct lv_val_struct		*save_value;
-	mname_entry			key;
-	boolean_t			var_cloned;
-	GTM64_ONLY(int4			filler;)
+	struct tp_var_struct	*next;
+	struct lv_val_struct	*current_value;
+	struct lv_val_struct	*save_value;
+	mname_entry		key;
+	boolean_t		var_cloned;
+	GTM64_ONLY(int4		filler;)
 } tp_var;
 
 typedef struct lvname_info_struct
@@ -353,6 +376,81 @@ typedef struct lvname_info_struct
 	lv_val		*end_lvp;
 } lvname_info;
 typedef lvname_info	*lvname_info_ptr;
+
+#define	ASSERT_ACTIVELV_GOOD(LV)	assert((NULL == LV) || (NULL == LV_AVLNODE_PARENT(LV))			\
+							|| LV_IS_VAL_DEFINED(LV) || LV_HAS_CHILD(LV));
+
+/* Although the below typedef is used only in DBG, define it for PRO too as gtmpcat requires this */
+typedef struct activelv_dbg_struct
+{
+	lv_val				*active_lv;
+	lv_val				*newlv;
+	struct stack_frame_struct	*frame_pointer;
+	symval				*curr_symval;
+	unsigned char			*mpc;
+	unsigned char			*ctxt;
+	uint4				count;
+	uint4				type;
+} activelv_dbg_t;
+
+enum actlv_type
+{
+	actlv_op_putindx1 = 1,		/* =  1 */
+	actlv_op_putindx2,		/* =  2 */
+	actlv_lv_kill,			/* =  3 */
+	actlv_op_zshow,			/* =  4 */
+	actlv_op_killalias,		/* =  5 */
+	actlv_op_killaliasall,		/* =  6 */
+	actlv_op_setals2als,		/* =  7 */
+	actlv_op_setalsctin2als,	/* =  8 */
+	actlv_op_setfnretin2als,	/* =  9 */
+	actlv_op_xkill,			/* = 10 */
+	actlv_unw_mv_ent,		/* = 11 */
+	actlv_op_tstart,		/* = 12 */
+	actlv_gtm_fetch,		/* = 13 */
+	actlv_mdb_condition_handler,	/* = 14 */
+	actlv_merge_desc_check1,	/* = 15 */
+	actlv_merge_desc_check2,	/* = 16 */
+	actlv_merge_desc_check3,	/* = 17 */
+	actlv_op_merge1,		/* = 18 */
+	actlv_op_merge2,		/* = 19 */
+	actlv_tp_unwind_restart,	/* = 20 */
+	actlv_tp_unwind_rollback,	/* = 21 */
+	actlv_tp_unwind_commit		/* = 22 */
+};
+
+#ifdef DEBUG
+void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type);
+
+# define	SET_ACTIVE_LV(NEWLV, DO_ASSERT, TYPE)	set_active_lv((lv_val *)NEWLV, DO_ASSERT, TYPE)
+#else
+# define	SET_ACTIVE_LV(NEWLV, DO_ASSERT, TYPE)				\
+{										\
+	GBLREF lv_val		*active_lv;					\
+										\
+	active_lv = (lv_val *)NEWLV;						\
+}
+#endif
+
+#define UNDO_ACTIVE_LV(ACTIVELV_CODE)							\
+{											\
+	GBLREF lv_val		*active_lv;						\
+											\
+	if (NULL != active_lv)								\
+	{	/* If LV_AVLNODE_PARENT is NULL, it means the node has already been	\
+		 * freed. We dont know of any such case right now so assert. In PRO	\
+		 * though we want to be safe so we skip the kill in that case but	\
+		 * reset active_lv to NULL.						\
+		 */									\
+		assert(NULL != LV_AVLNODE_PARENT(active_lv));				\
+		if (NULL != LV_AVLNODE_PARENT(active_lv))				\
+		{									\
+			if (!LV_IS_VAL_DEFINED(active_lv) && !LV_HAS_CHILD(active_lv))	\
+				op_kill(active_lv);					\
+		}									\
+		SET_ACTIVE_LV(NULL, FALSE, ACTIVELV_CODE);				\
+	}										\
+}
 
 #define	DOTPSAVE_FALSE		FALSE	/* macro to indicate parameter by name "dotpsave" is passed a value of "FALSE" */
 #define	DOTPSAVE_TRUE		TRUE	/* macro to indicate parameter by name "dotpsave" is passed a value of "TRUE"  */
@@ -377,7 +475,7 @@ typedef lvname_info	*lvname_info_ptr;
 	assert(NULL != LVT_GET_PARENT(LVT));				\
 	LVT_PARENT(LVT) = NULL;	/* indicates this is free */		\
 	/* avl_root is overloaded to store linked list in free state */	\
-	LVT->avl_root = (lvTreeNode *)sym->lvtree_flist;			\
+	LVT->avl_root = (lvTreeNode *)sym->lvtree_flist;		\
 	sym->lvtree_flist = LVT;					\
 }
 
@@ -406,7 +504,7 @@ void	lv_newblock(symval *sym, int numElems);
 void	lv_newname(ht_ent_mname *hte, symval *sym);
 void	lvtree_newblock(symval *sym, int numElems);
 void	lvtreenode_newblock(symval *sym, int numElems);
-void	lv_var_clone(lv_val *clone_var, lv_val *base_lv);
+void	lv_var_clone(lv_val *clone_var, lv_val *base_lv, boolean_t refCntMaint);
 void	lvzwr_var(lv_val *lv, int4 n);
 
 void	op_clralsvars(lv_val *dst);

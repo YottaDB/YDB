@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 #include "cli_parse.h"
 #include "error.h"
 #include "cli_disallow.h"
+#include "gtmio.h"
 
 #define	NO_STRING	"NO"
 
@@ -910,7 +911,13 @@ bool cli_get_value(char *entry, char val_buf[])
 {
 	CLI_ENTRY	*pparm;
 	char		local_str[MAX_LINE];
+#	ifdef DEBUG
+	int		ind, len;
+	CLI_ENTRY	*parm_vals;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 	cli_strupper(local_str);
 	if (NULL == (pparm = get_parm_entry(local_str)))
@@ -918,7 +925,24 @@ bool cli_get_value(char *entry, char val_buf[])
 	if (!pparm->present || NULL == pparm->pval_str)
 		return (FALSE);
 	else
+	{
+#		ifdef DEBUG
+		if (TREF(cli_get_str_max_len) && (NULL != (parm_vals = pparm->qual_vals)))
+		{
+			for (ind = 0; ; ind++)
+			{
+				len = strlen(parm_vals[ind].name);
+				if (!len)
+					break;
+				/* Assert that we have allocated enough space to store all possible values for this parameter.
+				 * If this assert fails, fix caller of cli_get_str to allocate enough space.
+				 */
+				assert(len <= TREF(cli_get_str_max_len));
+			}
+		}
+#		endif
 		strcpy(val_buf, pparm->pval_str);
+	}
 	return (TRUE);
 }
 
@@ -985,7 +1009,7 @@ bool cli_get_parm(char *entry, char val_buf[])
 				return FALSE;
 			/* If no value and required, prompt for it */
 			PRINTF("%s", (gpcmd_parm_vals + match_ind)->prompt);
-			fflush(stdout);
+			FFLUSH(stdout);
 			gets_res = cli_fgets(local_str, MAX_LINE, stdin, FALSE);
 			if (gets_res)
 			{
@@ -1026,7 +1050,7 @@ bool cli_get_parm(char *entry, char val_buf[])
 			if (MAX_LINE < parm_len)
 			{
 				PRINTF("Parameter string too long\n");
-				fflush(stdout);
+				FFLUSH(stdout);
 				return (FALSE);
 			}
 			TAREF1(parm_str_len, match_ind) = parm_len;

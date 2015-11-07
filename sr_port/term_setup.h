@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef TERM_SETUP_INCLUDED
 #define TERM_SETUP_INCLUDED
 
-void term_setup(bool ctrlc_enable);
+void term_setup(boolean_t ctrlc_enable);
 
 #endif /* TERM_SETUP_INCLUDED */

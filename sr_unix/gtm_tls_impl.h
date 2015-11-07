@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,7 @@ typedef struct gtmtls_passwd_list_struct
 #define DBG_VERIFY_AUTORETRY_SET(TLS_DESC)	assert(SSL_MODE_AUTO_RETRY & SSL_CTX_get_mode((SSL_CTX *)TLS_DESC));
 
 #else
-#define DBG_VERIFY_SOCK_IS_NONBLOCKING(SOCKFD)
+#define DBG_VERIFY_SOCK_IS_BLOCKING(SOCKFD)
 #define DBG_VERIFY_AUTORETRY_SET(TLS_DESC)
 #endif
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,7 @@ int m_do(void)
 				assert(TRIP_REF == calltrip->operand[1].oprclass);
 				if (OC_CDLIT == calltrip->operand[1].oprval.tref->opcode)
 					assert(CDLT_REF == calltrip->operand[1].oprval.tref->operand[0].oprclass);
-				else
+				else USHBIN_ONLY(if (OC_LAB_EXT != calltrip->operand[1].oprval.tref->opcode))
 				{
 					assert(OC_LABADDR == calltrip->operand[1].oprval.tref->opcode);
 					assert(TRIP_REF == calltrip->operand[1].oprval.tref->operand[1].oprclass);

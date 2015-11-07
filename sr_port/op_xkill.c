@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,14 +12,20 @@
 #include "mdef.h"
 
 #include <stdarg.h>
-
+#include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "gtmio.h"
 #include "lv_val.h"
 #include "op.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "alias.h"
 
 GBLREF symval		*curr_symval;
-GBLREF lv_val		*active_lv;
 GBLREF uint4		lvtaskcycle;
 GBLREF boolean_t	gtm_stdxkill;
 
@@ -34,8 +40,8 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 	ht_ent_mname	*tabent, *top;
 	boolean_t	lcl_stdxkill;
 
-	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
-					   cleanup problems */
+	SET_ACTIVE_LV(NULL, TRUE, actlv_op_xkill);	/* If we get here, subscript set was successful.
+								 * Clear active_lv to avoid later cleanup issues */
 	/* GTM supports two methods for exclusive kill that affect the way aliases and pass-by-reference (PBR) parameters are
 	 * treated when used in an exclusive kill.
 	 *  - M Standard    - An alias or PBR var specified in an xkill list while its aliases are NOT in the list is killed.

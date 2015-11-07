@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2002, 2010 Fidelity Information Services, Inc	;
+;	Copyright 2002, 2014 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -10,101 +10,108 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 gtmhelp(subtopic,gbldir)
 	;
-	;
-	new (subtopic,gbldir)
-	new $ztrap
-	set $ztrap="zgoto "_$zl_":error"
+	new (gbldir,subtopic)
+	zshow "d":zshow						; to capture original $P state - assumes $P is always subscript 1
+	set IO(1)=$io						; to capture the original $IO
+	use $principal:nocenable				; do as soon as there's hope of undoing it, i.e, after 2 prior lines
+	set pio=$zwrite($io)					; in case of an early error
+	new $etrap						; also inportant to get in place
+	set $etrap="zgoto "_$zlevel_":error"			; the code below sets up pio to restore the original $P state
+	set:$io'=IO(1) IO(0)=$io				; now capture $P state - IO(0) means there' a device other than $P
+	if zshow("D",1)["TERMINAL" do
+ .		set tmp="$principal:("_$select(zshow("D",1)["NOCENE":"no",1:"")_"cenable"
+ .		set tmp=tmp_":ctrap="_$select(zshow("D",1)["CTRA=":$piece($piece(zshow("D",1),"CTRA=",2)," "),1:"""""")
+ .		set exception=$zwrite($select(zshow("D",1)["EXCE=""":$piece(zshow("D",1),"EXCE=",2),1:""""""))	; assumes EXCE last
+ .		set tmp=tmp_":exception="_$extract(exception,3,$length(exception)-2)
+ .		set pio=tmp_")"					; USE below relies on $ZLEVEL so it's outside this embedded subrout
+ .		quit						; the line below enables routine-private CTRAP for CTRL-C;
+	if  use $principal:(ctrap=$char(3):exception="zgoto "_$zlevel_":again:$zstatus[""CTRAP"","_$zlevel_":error")
 	set %gbldir=$zgbldir
 	set $zgbldir=gbldir
-	set dio=$io
-	set COUNT=0,NOTFOUND=0
-	do parse(subtopic)
-	for  do display quit:COUNT<0
-	if ($zsearch(%gbldir)'="") set $zgbldir=%gbldir
+again	set:$data(COUNT) subtopic=""				; <CTRL-C> comes back to here and clears any topic
+	kill (%gbldir,IO,pio,subtopic)				; X-NEW is evil, but performance is not an issue here
+	set COUNT=0,IO="",NOTFOUND=0				; some initialization
+	do parse(subtopic)					; check for topic passed in
+	for  do display quit:COUNT<0				; drive the real work
+	if ($zsearch(%gbldir)'="") set $zgbldir=%gbldir	; restore caller's global directory
 	else  set $zgbldir=""
-	use dio
+	use @pio,IO(1)						; restore $P state and original $IO
 	quit
 	;
-	;
-parse(subtopic)
-	;
-	;
+parse(subtopic)							; organize space-delimited input memes into a topic hierarchy
 	new (subtopic,NEW,COUNT,TOPIC)
 	set NEW=0
-	f i=1:1:$length(subtopic," ") set x=$p(subtopic," ",i) if x'="" do
+	for i=1:1:$length(subtopic," ") set x=$piece(subtopic," ",i) if x'="" do
  .		set COUNT=COUNT+1,NEW=NEW+1
- .		set TOPIC(COUNT)=$$UCASE(x)
+ .		set TOPIC(COUNT)=$zconvert(x,"U")
  .		quit
 	quit
 	;
-	;
-display
-	;
-	;
-	new (COUNT,TOPIC,MATCH,PROMPT,NEW,NOTFOUND)
-	if $g(TOPIC(COUNT))="?" set COUNT=COUNT-1
+display								; do the real work
+	new (COUNT,IO,MATCH,NEW,NOTFOUND,PROMPT,TOPIC)
+	if $get(TOPIC(COUNT))="?" set COUNT=COUNT-1		; refresh choices on the same topic (leve)
 	write #
-	if $$MATCH do
+	if $$MATCH do						; look up the topic
  .		if NOTFOUND do
  ..			write !!,"Sorry, no Documentation on "
  ..			for i=COUNT+1:1:NEW+COUNT write TOPIC(i)," "
  ..			set NOTFOUND=0
  ..			quit
- .		for i=1:1:MATCH do print(MATCH(i),i)
- .		if $data(@MATCH(MATCH)@("s"))>1&(MATCH=1) do
+ .		for  set IO=$order(IO(IO),-1) quit:""=IO  do	; if juggling devices, send content to both; do $P 2nd
+ ..			use IO(IO)
+ ..			for i=1:1:MATCH do print(MATCH(i),i)	; drive out lines of text using print
+ ..			quit
+ .		if $data(@MATCH(MATCH)@("s"))>1&(MATCH=1) do	; if descendent topics show the choices only on $P
  ..			write $$FORMAT(4)
  ..			write !!,"Additional information available: ",!!
  ..			set x=""
  ..			set subref=$name(@MATCH(MATCH)@("s"))
- ..			for   set x=$order(@subref@(x)) quit:x=""  do
+ ..			for   set x=$order(@subref@(x)) quit:x=""  do		; use a "tabbed" list display
  ...				write $$FORMAT(0)
  ...				write @subref@(x)
  ...				write $$COLUMNS(subref,x)
  ...				do qualifiers($name(@subref@(x)))
  ...				quit
  ..			quit
- .		else   for i=1:1:NEW  set COUNT=COUNT-1
- .		if $zeof write # set COUNT=COUNT-1 quit
+ .		else   set COUNT=COUNT-NEW			; otherwise, reposition to the start of the current level
+ .		if $zeof write # set COUNT=COUNT-1 quit	; No more input, peel back out write # could cause an error
  .		write $$PROMPT
  .		read subtopic,!
- .		if subtopic="" set COUNT=COUNT-1
- .		if subtopic'="" do parse(subtopic)
+ .		if subtopic="" set COUNT=COUNT-1 quit:0>COUNT	; no answer means peal back a level
+ .		else  do parse(subtopic)			; check out the response
  .		quit
-	else  do
- .		set NOTFOUND=1
- .		for i=1:1:COUNT write TOPIC(i)," "
- .		for i=1:1:NEW set COUNT=COUNT-1
+	else  do						; look up failed
+ .		set NOTFOUND=1					; flag the next call
+ .		set COUNT=COUNT-NEW				; reset to the last working level
  .		quit
 	quit
 	;
-	;
-print(ref,i);
-	;
+print(ref,i);							; text output function
 	new (ref,i,MATCH,COUNT)
 	write !,@ref
- 	set y=""
- 	for  set y=$order(@ref@(y)) q:(y="s")!(y="")  do
+	set y=""
+	for  set y=$order(@ref@(y)) quit:(y="s")!(y="")  do
  .		write $$FORMAT(1)
- .		w !,@ref@(y)
- 	if $data(@ref)>1 do
+ .		write !,@ref@(y)
+ .		quit
+	if $data(@ref)>1 do
  .		set subref=$name(@ref@("s")),x=""
- .		for  set x=$order(@subref@(x)) q:x=""  do:($e(^(x))="-")
+ .		for  set x=$order(@subref@(x)) quit:x=""  do:($extract(^(x))="-")	; do lines at this level
  ..			set MATCH(i)=$name(MATCH(i),COUNT-1*2)
  ..			write $$FORMAT(1)
  ..			write !,@subref@(x)
  ..			set z=""
- ..			for  set z=$order(@subref@(x,z)) q:z=""  do
+ ..			for  set z=$order(@subref@(x,z)) quit:z=""  do			; and its descendents
  ...				write !,@subref@(x,z)
  ...				quit
  ..			quit
  .		quit
- 	quit
+	quit
 	;
-recursiv(ref,level)
-	;
+recursiv(ref,level)						;
 	new (COUNT,TOPIC,ref,MATCH,level,PROMPT,FLAG)
 	set level=level+1
- 	if ($extract(TOPIC(level))="-")&($get(FLAG)'=1) do
+	if ($extract(TOPIC(level))="-")&($get(FLAG)'=1) do
  .		set FLAG=1
  .		for i=COUNT:-1:level set TOPIC(i+1)=TOPIC(i)
  .		set COUNT=COUNT+1
@@ -113,6 +120,7 @@ recursiv(ref,level)
 	set ref=$name(@ref@("s",TOPIC(level)))
 	if TOPIC(level)'="" do:$data(@ref)
  .		if level=COUNT do
+ ..			set PROMPT(level)=TOPIC(level)
  ..			set MATCH=MATCH+1
  ..			set MATCH(MATCH)=ref
  ..			quit
@@ -120,23 +128,22 @@ recursiv(ref,level)
  .		quit
 	if TOPIC(level)="*" set TOPIC(level)=""
 	set x=""
-	for  set x=$o(@ref) quit:(x="")!("\"_x'[("\"_TOPIC(level)))  do
+	for  set x=$order(@ref) quit:(x="")!("\"_x'[("\"_TOPIC(level)))  do
  .		set ref=$name(@ref,(level*2)-1)
  .		set ref=$name(@ref@(x))
+ .		set (TOPIC(level),PROMPT(level))=@$name(@ref,level*2)
  .		if level=COUNT do
- ..			for j=1:1:COUNT set PROMPT(j)=@$name(@ref,j*2)
- ..		 	set MATCH=MATCH+1
+ ..			set MATCH=MATCH+1
  ..			set MATCH(MATCH)=ref
  ..			quit
  .		if level'=COUNT do recursiv(ref,level)
  .		quit
 	quit
-qualifiers(ref) ;
-	   ;
+qualifiers(ref)							; qualifier lister
 	new (ref)
 	if $data(@ref)>1 do
  .		set ref=$name(@ref@("s")),x="-"
- .		for  s x=$o(@ref@(x)) quit:x=""!($e(x)'="-")   do:($e(^(x))="-")
+ .		for  set x=$order(@ref@(x)) quit:x=""!($extract(x)'="-")   do:($extract(^(x))="-")
  ..			set count=$get(count)+1
  ..			if count=1 write !
  ..			write ^(x)
@@ -145,19 +152,18 @@ qualifiers(ref) ;
  .		quit
 	if $get(count)>0 write !!
 	quit
-error	; Error handler called by $ztrap
 	;
-	set $ztrap=""
-	write !,"Error in GT.M  help utility"
-	set outfile="gtmhelp.dmp"
-	open outfile:newversion
-	use outfile
-	zshow "*"
-	close outfile
-	use dio
-	set $ecode=""
+error								; Error handler called by $etrap
+	set $etrap=""
+	if $zstatus'["IOEOF" do					; EOF is not a "real" error
+ .		write !,"Error in GT.M help utility - look at ",$zjobexam("gtmhelpdmp")," for additional information",!
+ .		quit
+	if ""'=$get(%gbldir),($zsearch(%gbldir)'="") set $zgbldir=%gbldir	; restore caller's global directory
+	else  set $zgbldir=""
+	use @pio,IO(1)						; restore $P state and original $IO
+	set $ecode=""						; caller loses error trace, but generally called by direct mode
 	quit
-MATCH() ; Return array MATCH which contains all Global references which match
+MATCH()								; return array MATCH containing all global references that match
 	; the TOPIC array.
 	new (TOPIC,COUNT,MATCH,PROMPT)
 	set QUALIFIERS=0
@@ -168,8 +174,9 @@ MATCH() ; Return array MATCH which contains all Global references which match
  .		set ref="^HELP"
  .		do recursiv(ref,level)
  .		quit
-	if $g(FLAG)=1 set COUNT=COUNT-1
+	if $get(FLAG)=1 set COUNT=COUNT-1
 	quit MATCH
+	;
 WIDTH()	quit 80	; Width of the current device
 PAGE()	quit 24	; Page length of the current device
 FORMAT(newlines)
@@ -180,23 +187,18 @@ FORMAT(newlines)
 	quit ""
 COLUMNS(subref,x)
 	if $x+12'>$$WIDTH write ?$x\12+1*12
-	if $x+$l($o(@subref@(x)))>$$WIDTH w !
+	if $x+$l($order(@subref@(x)))>$$WIDTH write !
 	if $x+12>$$WIDTH write !
 	quit ""
 PROMPT()
 	new (COUNT,TOPIC,PROMPT)
 	write !!
 	set ref="^HELP"
- 	for i=1:1:COUNT do
- .		set TOPIC(i)=$$UCASE($s($d(PROMPT(i)):PROMPT(i),1:TOPIC(i)))
+	for i=1:1:COUNT do
+ .		set TOPIC(i)=$zconvert($select($data(PROMPT(i)):PROMPT(i),1:TOPIC(i)),"U")
  .		set ref=$name(@ref@("s",TOPIC(i)))
  .		write @ref," "
  .		quit
- 	if COUNT=0 kill PROMPT write "Topic? "
- 	if COUNT>0 write "Subtopic? "
+	if COUNT=0 kill PROMPT write "Topic? "
+	if COUNT>0 write "Subtopic? "
 	quit ""
-UCASE(string)
-	set lo="abcdefghijklmnopqrstuvwxyz"
-	set up="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	quit $translate(string,lo,up)
-

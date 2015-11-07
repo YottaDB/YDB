@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,6 @@
 #include "tp_change_reg.h"
 #include "gtm_file_stat.h"
 #include "min_max.h"		/* for MAX and JNL_MAX_RECLEN macro */
-#include "gtm_rename.h"		/* for cre_jnl_file_intrpt_rename() prototype */
 #include "send_msg.h"
 #include "gtmio.h"
 #include "is_file_identical.h"
@@ -133,7 +132,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	jnl_file_header		header;
 	int4			status1;
 	uint4			status2;
-	boolean_t		header_is_usable = FALSE;
+	boolean_t		header_is_usable = FALSE, noprevlink_requested;
 #	endif
 	boolean_t		jnl_buffer_updated = FALSE, jnl_buffer_invalid = FALSE;
 	int			jnl_buffer_size;
@@ -146,7 +145,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	if (!mupip_set_journal_parse(&jnl_options, &jnl_info))
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
-		error_condition = ERR_MUPCLIERR;
+		SET_ERROR_CONDITION(ERR_MUPCLIERR);	/* sets "error_condition" & "severity" */
 		return ERR_MUPCLIERR;
 	}
 	if (region && (NULL == grlist))
@@ -442,7 +441,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			jnl_info.prev_jnl = (char *)prev_jnl_fn;
 			jnl_info.prev_jnl_len = 0;
 			if (csd->jnl_file_len)
-				cre_jnl_file_intrpt_rename(((int)csd->jnl_file_len), csd->jnl_file_name);
+				cre_jnl_file_intrpt_rename(cs_addrs);
 			assert(0 == csd->jnl_file_len || 0 == csd->jnl_file_name[csd->jnl_file_len]);
 			csd->jnl_file_name[csd->jnl_file_len] = 0;
 			if (!jnl_options.filename_specified)
@@ -526,7 +525,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				break;
 			}
 			jnlname_same = ((jnl_info.jnl_len == csd->jnl_file_len)
-				&& (0 == memcmp(jnl_info.jnl, csd->jnl_file_name, jnl_info.jnl_len))) ? TRUE : FALSE;
+					&& (0 == memcmp(jnl_info.jnl, csd->jnl_file_name, jnl_info.jnl_len))) ? TRUE : FALSE;
 			jnlfile.addr = (char *)csd->jnl_file_name;
 			jnlfile.len = csd->jnl_file_len;
 			if (!jnlname_same)
@@ -589,11 +588,12 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				 * common journal file name. Also this way we disallow switching to a user-specified new
 				 * journal file that already exists (say the database file itself due to a command line typo).
 				 */
-				if (FILE_PRESENT & curr_stat_res)
+				noprevlink_requested = (CLI_NEGATED == cli_present("PREVJNLFILE"));
+				if ((FILE_PRESENT & curr_stat_res) && !noprevlink_requested)
 				{
 					keep_prev_link = jnl_points_to_db;
 					safe_to_switch = (jnlname_same && keep_prev_link);
-				} else if (FILE_PRESENT & new_stat_res)
+				} else if ((FILE_PRESENT & new_stat_res) && !noprevlink_requested)
 				{
 					keep_prev_link = FALSE;
 					/* In this case, the current jnl file does not exist. And so the prevlinks are
@@ -629,8 +629,15 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				curr_jnl_present = (FILE_PRESENT & curr_stat_res) ? TRUE : FALSE;
 				if (curr_jnl_present)
 				{
-					if (FILE_READONLY & curr_stat_res)
-					{
+					if ((FILE_READONLY & curr_stat_res) && (((NULL != cs_addrs->nl)
+										 && (0 != cs_addrs->nl->jnl_file.u.inode))
+										|| jnlname_same))
+					{	/* Current journal file is read-only and a) it is open by another process in the
+						 * shared memory. We do not want to interfere until it is properly terminated by the
+						 * process who uses it b) new and old journal names are the same (e.g. one did not
+						 * specify -journal="filename" in the command line). Such an attempt will rename the
+						 * current journal file. We don't want renaming for the read-only files.
+						 */
 						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLRDONLY, 2,
 								JNL_LEN_STR(csd));
 						if (newjnlfiles)

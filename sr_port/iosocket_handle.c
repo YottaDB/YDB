@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,13 +45,15 @@
 int4 iosocket_handle(char *handle, int *len, boolean_t newhandle, d_socket_struct *dsocketptr)
 {
 	boolean_t	unique;
-	int4 		ii, counter = 0, loop_flag = 1;
+	int4 		ii, loop_flag = 1;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	while(loop_flag)
 	{
 		if (newhandle)
 		{
-			SPRINTF(handle, "h%ld%d", time((time_t *)0), counter);
+			SPRINTF(handle, "h%ld%03d", time((time_t *)0), ((TREF(socket_handle_counter))++ % 1000));
 			*len = (short)strlen(handle);
 		}
 		ii = 0;
@@ -70,7 +72,6 @@ int4 iosocket_handle(char *handle, int *len, boolean_t newhandle, d_socket_struc
 			return	(unique ? -1 : ii);
 		if (unique)
 			return ii;
-		counter++;
 	}
 	/* it will never reach here */
 	return -1;

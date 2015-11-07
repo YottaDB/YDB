@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,11 +26,15 @@ IA64_ONLY(GBLREF uint8 		imm14;)
 IA64_ONLY(GBLREF char 		asm_mode;)
 
 /* Due to the complex instruction set of x86_64, we require a function to implement the macro VALID_CALLING_SEQUENCE
-   and this function will calculate both the offsets (rtnhdr & labaddr) and store them into these global variables */
+ * and this function will calculate both the offsets (rtnhdr & labaddr) and store them into these global variables.
+ */
 #if defined(__x86_64__) || defined(__MVS__) || defined(Linux390)
 GBLDEF int4		rtnhdr_off;
 GBLDEF int4		labaddr_off;
 #endif
+
+error_def	(ERR_LABELUNKNOWN);
+error_def	(ERR_ROUTINEUNKNOWN);
 
 rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line)
 {
@@ -42,9 +46,13 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line)
 	rhdtyp		*rhead;
 	urx_rtnref	*rtnurx;
 
-	error_def	(ERR_LABELUNKNOWN);
-	error_def	(ERR_ROUTINEUNKNOWN);
-
+#	ifdef USHBIN_SUPPORTED
+	/* With the current autorelink multi-opcode call (OP_RHD_EXT and OP_LAB_EXT prior to actual call), auto_zlink()
+	 * isn't really at all used but this is likely to change in the next release which streamlines some of this so
+	 * for now, this routine is not being nixed.
+	 */
+	USHBIN_ONLY(assertpro(FALSE));
+#	else
 /* (ASSUMPTION)
  * The instructions immediately preceding the current mpc form a transfer table call.
  *	There will be two arguments to this call:
@@ -60,10 +68,7 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line)
  *	registers are loaded via "load" instructions.  However, this routine should never be invoked from direct
  *	mode because the applicable routine should have been ZLINK'ed by prior calls to op_labaddr and op_rhdaddr.
  */
-
-	NON_IA64_ONLY(if (!VALID_CALLING_SEQUENCE(pc)))
-		NON_IA64_ONLY(GTMASSERT;)
-
+	NON_IA64_ONLY(assertpro(VALID_CALLING_SEQUENCE(pc)));
 	/* Calling sequence O.K.; get address(address(routine header)) and address(address(label offset)).  */
 #	ifdef __ia64 /* __ia64 */
 	{
@@ -80,21 +85,17 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line)
 		A_labaddr = (lnk_tabent *)(imm + frame_pointer->ctxt);
 	}
 #	endif /* __ia64 */
-
         NON_IA64_ONLY(A_rtnhdr  = (lnk_tabent *)(RTNHDR_PV_OFF(pc) + frame_pointer->ctxt);)
         NON_IA64_ONLY(A_labaddr = (lnk_tabent *)(LABADDR_PV_OFF(pc) + frame_pointer->ctxt);)
-
 	if (azl_geturxrtn((char *)A_rtnhdr, &rname, &rtnurx))
 	{
 		assert(rname.len <= MAX_MIDENT_LEN);
 		assert(0 != rname.addr);
-
 		/* Copy rname into local storage because azl_geturxrtn sets rname.addr to an address that is
 		 * free'd during op_zlink and before the call to find_rtn_hdr.
 		 */
                 memcpy(rname_buff.c, rname.addr, rname.len);
                 rname.addr = rname_buff.c;
-
 		assert(0 != rtnurx);
 		assert(azl_geturxlab((char *)A_labaddr, rtnurx));
 		assert(0 == find_rtn_hdr(&rname));
@@ -106,10 +107,11 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line)
 		{	/* Pull the linkage table reference out and return it to caller */
 			*line = (lnr_tabent **)(A_labaddr->ext_ref);
 			if (0 == *line)
-				rts_error(VARLSTCNT(1) ERR_LABELUNKNOWN);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LABELUNKNOWN);
 			return rhead;
 		}
 	}
-	rts_error(VARLSTCNT(1) ERR_ROUTINEUNKNOWN);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ROUTINEUNKNOWN);
+#	endif		/* ifdef USHBIN_SUPPORTED */
 	return NULL;	/* Compiler happiness phase */
 }

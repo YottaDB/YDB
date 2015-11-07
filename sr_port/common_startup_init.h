@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +9,9 @@
  *								*
  ****************************************************************/
 
-#ifndef GTM_IMAGETYPE_INIT_INCLUDED
-#define GTM_IMAGETYPE_INIT_INCLUDED
+#ifndef _COMMON_STARTUP_INIT_DEFINED
+#define _COMMON_STARTUP_INIT_DEFINED
 
-void	gtm_imagetype_init(enum gtmImageTypes img_type);
+void	common_startup_init(enum gtmImageTypes img_type);
 
 #endif

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2013 Fidelity Information Services, Inc #
+#	Copyright 2007, 2014 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -30,24 +30,24 @@ endif
 #    ssh <some host> ls -l {/usr/local,/usr,}/lib{64,,32}/libicuio.{a,so,sl}
 
 foreach libdir ( {/usr/local,/usr,}/lib{64,/x86_64-linux-gnu,,32,/i386-linux-gnu}/libicuio.{a,so,sl} )
-	# 36 is the least version GT.M supports for ICU.
-	# We have to get the numeric value from the ICU library. On non-AIX platforms, this can be done by
-	# first getting the library to which libicuio.so is pointing to (this is always TRUE, in the sense
-	# ICU always ships libicuio.so linked to the appropriate version'ed library).
-	# The ICU libraries are formatted like "libicu<ALPHANUM>.<EXT>.<MAJOR_VER><MINOR_VER>". So, we can
-	# use awk to get the last part of the 'ls -l' on libicuio.so and use awk and cut to get the version
-	# numbers. However on AIX and z/OS, ICU libraries are formatted like "libicu<ALPHANUM><MAJOR_VER><MINOR_VER>.<EXT>"
-	# and hence it is not as straightforward to extract the MAJOR_VER. So, we first eliminate the prefix
-	# part of the library name that contains libicu<ALPHANUM> using sed and use cut now to extract the
-	# version number.
+	# 36 is the least version GT.M supports for ICU. We have to get the numeric value from the ICU library.
+	# ICU ships libicuio.so linked to the appropriate versioned library - so using filetype -L works well
+	# The below is the format of the libraries on various platforms:
+	# AIX, z/OS : libicu<alphanum><majorver><minorver>.<ext>   (e.g libicuio42.1.a)
+	# Others    : libicu<alphanum>.<ext>.<majorver>.<minorver> (e.g libicuio.so.42.1)
+
 	if ( ! -l $libdir ) continue
 
-	set icu_versioned_lib = `ls -l $libdir | awk '{print $NF}'`
+	set icu_versioned_lib = `filetest -L $libdir`
+	set verinfo = ${icu_versioned_lib:s/libicuio//}
+	set parts = ( ${verinfo:as/./ /} )
 
 	if ($HOSTOS == "AIX" || $HOSTOS == "OS/390") then
-		set icu_ver = `echo $icu_versioned_lib | sed 's/libicuio//g' | cut -f 1 -d '.'`
+		# for the above example parts = (42 1 a)
+		set icu_ver = $parts[1]
 	else
-		set icu_ver = `echo $icu_versioned_lib | cut -f 3 -d '.'`
+		# for the above example parts = (so 42 1)
+		set icu_ver = $parts[2]
 	endif
 
 	if ($icu_ver >= "36") then

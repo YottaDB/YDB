@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@ enum upd_bad_trans_type
 	upd_bad_histinfo_start_seqno1,
 	upd_bad_histinfo_start_seqno2,
 	upd_fence_bad_ztworm_t_num,
+	upd_fence_bad_lgtrig_t_num,
 	upd_bad_key
 };
 
@@ -47,8 +48,11 @@ enum upd_bad_trans_type
 													\
 	if (IS_MNAME_HASHT_GBLNAME(GVNAME.var_name))							\
 	{	/* gbl is ^#t. In this case, do special processing. Look at the first subscript and	\
-		 * bind to the region mapped to by that global name (not ^#t).				\
+		 * bind to the region mapped to by that global name (not ^#t). Also since V62 will	\
+		 * never receive ^#t records from V62 source (it will receive TLGTRIG/ULGTRIG logical	\
+		 * journal records only) assert accordingly.						\
 		 */											\
+		assert(V24_JNL_VER > gtmrecv_local->remote_side.jnl_ver);				\
 		tr_ptr = KEY;			/* Skip to the first subscript */			\
 		tr_len = STRLEN(KEY);		/* Only want length to first 0, not entire length */	\
 		assert(tr_len < KEYLEN);	/* If ^#t, there has to be a subscript */		\
@@ -64,8 +68,7 @@ enum upd_bad_trans_type
 			GV_BIND_NAME_ONLY(GD_HEADER, &gvname1, GVNH_REG);				\
 			csa = cs_addrs;									\
 			SET_GVTARGET_TO_HASHT_GBL(csa);							\
-			if (!dollar_ztrigger_invoked)							\
-				dollar_ztrigger_invoked = TRUE;						\
+			dollar_ztrigger_invoked = TRUE;							\
 			csa->incr_db_trigger_cycle = TRUE;						\
 			csa->db_dztrigger_cycle++;							\
 		} else											\

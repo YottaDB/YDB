@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -394,11 +394,12 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				rec_token_seq = GET_JNL_SEQNO(jnlrec);
 				MUR_BACK_PROCESS_ERROR_STR(jctl, jjctl, s);
 			}
-			if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
+			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
 			{
 				keystr = (jnl_string *)&jnlrec->jrec_set_kill.mumps_node;
-				/* Assert that ZTWORMHOLE type record too has same layout as KILL/SET */
+				/* Assert that ZTWORMHOLE and LGTRIG type records have same layout as KILL/SET */
 				assert((sm_uc_ptr_t)keystr == (sm_uc_ptr_t)&jnlrec->jrec_ztworm.ztworm_str);
+				assert((sm_uc_ptr_t)keystr == (sm_uc_ptr_t)&jnlrec->jrec_lgtrig.lgtrig_str);
 #				ifdef GTM_CRYPT
 				if (jctl->jfh->is_encrypted)
 				{
@@ -418,8 +419,14 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 					if (MAX_ZTWORMHOLE_SIZE < keystr->length)
 						MUR_BACK_PROCESS_ERROR(jctl, jjctl, "ZTWORMHOLE size check failed");
 #					endif
+				} else if (IS_LGTRIG(rectype))
+				{	/* LGTRIG type */
+#					ifdef GTM_TRIGGER
+					if (MAX_LGTRIG_LEN < keystr->length)
+						MUR_BACK_PROCESS_ERROR(jctl, jjctl, "LGTRIG size check failed");
+#					endif
 				} else
-				{	/* SET or KILL type */
+				{	/* SET or KILL or ZTRIG type */
 					if (keystr->length > max_key_size)
 						MUR_BACK_PROCESS_ERROR(jctl, jjctl, "Key size check failed");
 					if (0 != keystr->text[keystr->length - 1])
@@ -493,8 +500,8 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 		 */
 		if (REC_HAS_TOKEN_SEQ(rectype))
 		{
-			assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype) || IS_COM(rectype) || (JRT_EPOCH == (rectype))
-				|| (JRT_EOF == (rectype)) || (JRT_NULL == (rectype)));
+			assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype) || IS_COM(rectype)
+				|| (JRT_EPOCH == (rectype)) || (JRT_EOF == (rectype)) || (JRT_NULL == (rectype)));
 			assert(&jnlrec->jrec_set_kill.token_seq == (token_seq_t *)&jnlrec->jrec_epoch.jnl_seqno);
 			assert(&jnlrec->jrec_set_kill.token_seq == (token_seq_t *)&jnlrec->jrec_eof.jnl_seqno);
 			assert(&jnlrec->jrec_set_kill.token_seq == (token_seq_t *)&jnlrec->jrec_null.jnl_seqno);
@@ -510,7 +517,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				 */
 				if (murgbl.resync_strm_seqno_nonzero && IS_REPLICATED(rectype))
 				{
-					assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype) || IS_COM(rectype)
+					assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype) || IS_COM(rectype)
 						|| (JRT_NULL == (rectype)));
 					assert(&jnlrec->jrec_set_kill.strm_seqno == &jnlrec->jrec_null.strm_seqno);
 					assert(&jnlrec->jrec_tcom.strm_seqno == &jnlrec->jrec_null.strm_seqno);
@@ -620,7 +627,8 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 							for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 							{
 								strm_seqno = jnlrec->jrec_epoch.strm_seqno[idx];
-								if (strm_seqno > murgbl.resync_strm_seqno[idx])
+								if (murgbl.resync_strm_seqno[idx]
+									&& (strm_seqno > murgbl.resync_strm_seqno[idx]))
 								{
 									reached_trnarnd = FALSE;
 									break;
@@ -660,7 +668,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 			rec_fence = GET_REC_FENCE_TYPE(rectype);
 			VMS_MUR_BACK_PROCESS_GET_IMAGE_COUNT(jctl, jnlrec, jjctl, rec_image_count, status);
 			assert(token == ((struct_jrec_upd *)jnlrec)->token_seq.token);
-			if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))	/* TUPD/UUPD/FUPD/GUPD */
+			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))	/* TUPD/UUPD/FUPD/GUPD */
 			{
 				if (NULL != (multi = MUR_TOKEN_LOOKUP(token, rec_image_count, rec_time, rec_fence)))
 				{
@@ -722,7 +730,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				assert(!murgbl.resync_strm_seqno_nonzero || !mur_options.forward);
 				if (!skip_rec && murgbl.resync_strm_seqno_nonzero)
 				{
-					assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype) || (JRT_NULL == (rectype)));
+					assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype) || (JRT_NULL == (rectype)));
 					assert(&jnlrec->jrec_set_kill.strm_seqno == &jnlrec->jrec_null.strm_seqno);
 					/* strm_seqno & strm_idx have already been initialized before for this record.
 					 * Assert that (i.e. they have not been changed since then) before using them.
@@ -802,7 +810,8 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 								for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 								{
 									strm_seqno = jnlrec->jrec_epoch.strm_seqno[idx];
-									if (strm_seqno > murgbl.resync_strm_seqno[idx])
+									if (murgbl.resync_strm_seqno[idx]
+										&& (strm_seqno > murgbl.resync_strm_seqno[idx]))
 									{
 										reached_trnarnd = FALSE;
 										break;
@@ -840,8 +849,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 		}
 		/* for mur_options.forward ERR_JNLREADBOF is not error but others are */
 	}
-	if (!mur_options.forward && (NULL == rctl->jctl_turn_around))
-		GTMASSERT;
+	assertpro(mur_options.forward || (NULL != rctl->jctl_turn_around));
 	return SS_NORMAL;
 }
 

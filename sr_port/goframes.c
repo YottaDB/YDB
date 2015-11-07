@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,9 +36,10 @@
 
 GBLREF	boolean_t	goframes_unwound_trigger;
 #endif
+GBLREF	mval		*alias_retarg;
+GBLREF	stack_frame	*frame_pointer;
 GBLREF	boolean_t	skip_error_ret;
 GBLREF	tp_frame	*tp_pointer;
-GBLREF	stack_frame	*frame_pointer;
 
 LITREF mval             literal_null;
 
@@ -60,7 +61,11 @@ void	goframes(int4 frames)
 		if (0 == frames)
 		{
 			ret_targ = (mval *)get_ret_targ(NULL);
-	       		if (NULL != ret_targ)
+			/* If alias_retarg is non-NULL, *ret_targ would have been already initialized so no need to set it.
+			 * Setting it to literal_null in that case would cause reference counts to not be decremented later
+			 * in op_unwind/mdb_condition_handler so it is actually necessary to skip it in that case.
+			 */
+	       		if ((NULL != ret_targ) && (NULL == alias_retarg))
 	       		{
 	       		        *ret_targ = literal_null;
 	       		        ret_targ->mvtype |= MV_RETARG;

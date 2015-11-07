@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,7 @@ THREADGBLDEF(indirection_mval,			mval)				/* used for parsing subscripted indire
 THREADGBLDEF(last_source_column,		short int)			/* parser tracker */
 THREADGBLDEF(pos_in_chain,			triple)				/* anchor used to restart after a parsing error */
 THREADGBLDEF(s2n_intlit, 			boolean_t)			/* type info from s2n for advancewindow */
+THREADGBLDEF(routine_source_offset,		uint4)				/* offset of M source within literal text pool */
 THREADGBLDEF(saw_side_effect,			boolean_t)			/* need side effect handling other than naked */
 THREADGBLDEF(shift_side_effects, 		int)				/* flag shifting of side-effects ahead of boolean
 										 * evalation */
@@ -222,6 +223,7 @@ THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() function point
 THREADGBLDEF(gtm_environment_init,		boolean_t)			/* indicates GT.M development environment rather
 										 * than a production environment */
 THREADGBLFPTR(gtm_sigusr1_handler,		void, 		(void))		/* SIGUSR1 signal handler function ptr */
+THREADGBLDEF(gtm_linktmpdir,			mstr)				/* Directory to use for relinkctl files */
 THREADGBLDEF(gtm_trctbl_cur,			trctbl_entry *)			/* Current gtm trace table entry */
 THREADGBLDEF(gtm_trctbl_end,			trctbl_entry *)			/* End of gtm trace table (last entry + 1) */
 THREADGBLDEF(gtm_trctbl_groups,			unsigned int)			/* Trace group mask (max 31 groups) */
@@ -232,6 +234,9 @@ THREADGBLDEF(gtmprompt,				mstr)				/* mstr pointing to prombuf containing the G
 THREADGBLDEF(gtmsecshr_comkey,			unsigned int)			/* Hashed version key for gtmsecshr communications
 										 * eliminates cross-version issues */
 THREADGBLDEF(in_zwrite,				boolean_t)			/* ZWrite is active */
+THREADGBLDEF(lab_lnr,				lnr_tabent **)			/* Passes address from op_rhd_ext to op_extcall etc.
+										 * Points into either lab_proxy or linkage table
+										 */
 THREADGBLDEF(lab_proxy,				lab_tabent_proxy)		/* Placeholder storing lab_ln_ptr offset / lnr_adr
 										 * pointer and has_parms value, so they are
 										 * contiguous in memory */
@@ -255,6 +260,10 @@ THREADGBLDEF(mprof_reclaim_cnt,			int)				/* Amount of mem to reclaim after unw_
 THREADGBLDEF(mprof_stack_curr_frame, 		mprof_stack_frame *)		/* Pointer to the last frame on the mprof stack */
 THREADGBLDEF(mprof_stack_next_frame, 		mprof_stack_frame *)		/* Pointer to the next frame to be put on the
 										 * mprof stack */
+#ifdef USHBIN_SUPPORTED
+THREADGBLDEF(open_relinkctl_list,		open_relinkctl_sgm *)		/* Anchor for open relinkctl list; similar to
+										 * open_shlib_root */
+#endif
 #ifdef UNIX
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
 #endif
@@ -268,7 +277,13 @@ THREADGBLDEF(pipefifo_interrupt,		int)				/* count of number of times a pipe or 
 										 * interrupted */
 #endif
 THREADGBLDEF(prof_fp,				mprof_stack_frame *)		/* Stack frame that mprof currently operates on */
+#ifdef USHBIN_SUPPORTED
+THREADGBLDEF(recent_zhist,			zro_hist *)			/* Saved history from last zro_search */
+#endif
 THREADGBLDEF(relink_allowed,			int)				/* Non-zero if recursive relink permitted */
+THREADGBLDEF(set_zroutines_cycle,		uint4)				/* Informs us if we changed $ZROUTINES between
+										 * linking a routine and invoking it
+										 */
 THREADGBLDEF(trans_code_pop,			mval *)				/* trans_code holder for $ZTRAP popping */
 THREADGBLDEF(view_ydirt_str,			char *)				/* op_view working storage for ydir* ops */
 THREADGBLDEF(view_ydirt_str_len,		int4)				/* Part of op_view working storage for ydir* ops */
@@ -282,6 +297,7 @@ THREADGBLDEF(zsearch_dir2,			lv_val *)			/* UNIX $zsearch() directory 2 */
 #endif
 THREADGBLDEF(poll_fds_buffer,			char *)				/* Buffer for poll() argument */
 THREADGBLDEF(poll_fds_buffer_size,		size_t)				/* Current allocated size of poll_fds_buffer */
+THREADGBLDEF(socket_handle_counter,		int)				/* Counter for generated socket handles */
 
 /* Larger structures and char strings */
 THREADGBLAR1DEF(director_string,		char,	SIZEOF(mident_fixed))	/* Buffer for director_ident */
@@ -294,6 +310,7 @@ THREADGBLDEF(lcl_coll_xform_buff,		char *)				/* This buffer is for local collat
 										 * a transformation routine must not call another,
 										 * or itself. This kind of nesting would cause
 										 * overwriting of the buffer */
+THREADGBLDEF(protmem_ba,			mstr)				/* Protected buffer */
 #ifdef UNIX
 THREADGBLAR1DEF(parm_ary,                       char *,         MAX_PARMS)      /* Parameter strings buffer */
 THREADGBLAR1DEF(parm_ary_len,                   int,            MAX_PARMS)      /* Array element allocation length */
@@ -384,7 +401,12 @@ THREADGBLDEF(gvt_triggers_read_this_tn,		boolean_t)			/* if non-zero, indicates 
 										 * useful to invalidate all those triggers in case
 										 * of a transaction restart or rollback.
 										 */
-THREADGBLDEF(in_op_fntext,			boolean_t)			/* Denote the trigger was processed in $Text() */
+THREADGBLDEF(op_fntext_tlevel,			uint4)				/* Non-zero implies $TEXT argument is a trigger
+										 *	routine.
+										 * If non-zero, this is 1 + dollar_tlevel at
+										 * the time of the call to "get_src_line" in
+										 * op_fntext.c. Later used by fntext_ch.c.
+										 */
 #endif
 
 /* Debug values */
@@ -407,4 +429,10 @@ THREADGBLDEF(gtm_gvundef_fatal,			boolean_t)			/* core and die intended for test
 THREADGBLDEF(gtm_dirtree_collhdr_always,	boolean_t)	/* Initialize 4-byte collation header in directory tree always.
 								 * Used by tests that are sensitive to DT leaf block layout.
 								 */
+THREADGBLDEF(activelv_cycle,			int)			/* # of times SET_ACTIVE_LV macro has been invoked */
+THREADGBLDEF(activelv_index,			int)			/* == (activelv_cycle % ACTIVELV_DBG_ARRAY_SIZE_DEF) */
+THREADGBLDEF(activelv_dbg_array,		activelv_dbg_t *)	/* pointer to array holding trace details for
+									 * ACTIVELV_DBG_ARRAY_SIZE_DEF most recent
+									 * invocations of SET_ACTIVE_LV */
+THREADGBLDEF(cli_get_str_max_len,		uint4)
 #endif

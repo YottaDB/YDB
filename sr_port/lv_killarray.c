@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "gtmio.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -21,6 +22,8 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include <rtnhdr.h>
+#include "stack_frame.h"
 
 /* Note it is important that callers of this routine make sure that the pointer that is passed as
  * an argument is removed from the lv_val it came from prior to the call. This prevents arrays

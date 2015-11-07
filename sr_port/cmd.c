@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,6 +97,9 @@ LITDEF nametabent cmd_names[] =
 		,{2, "ZL"}, {5, "ZLINK"}
 		,{2, "ZM"}, {8, "ZMESSAGE"}
 		,{2, "ZP"}, {6, "ZPRINT"}
+#		ifdef USHBIN_SUPPORTED
+		,{3, "ZRU"}, {8, "ZRUPDATE"}
+#		endif
 		,{3, "ZSH"}, {5, "ZSHOW"}
 		,{3, "ZST"}, {5, "ZSTEP"}
 		,{3, "ZSY"}, {7, "ZSYSTEM"}
@@ -131,7 +134,7 @@ LITDEF unsigned char cmd_index[27] =
 	{
 		0, 0, 2, 4, 6, 8, 10, 12, 15, 17, 19, 21, 23
 		,25, 27, 29, 29, 31, 33, 35, 43, 45, 47, 49
-		,51, 51, GTMTRIG_ONLY(96) NON_GTMTRIG_ONLY(94)
+		,51, 51, 94 GTMTRIG_ONLY(+ 2) USHBIN_ONLY(+ 2) /* add ztrigger and zrupdate, respectively */
 	};
 LITDEF struct
 	{
@@ -186,6 +189,9 @@ LITDEF struct
 		,{m_zlink, 1, 1, ALL_SYS}, {m_zlink, 1, 1, ALL_SYS}
 		,{m_zmessage, 0, 1, ALL_SYS}, {m_zmessage, 0, 1, ALL_SYS}
 		,{m_zprint, 1, 1, ALL_SYS}, {m_zprint, 1, 1, ALL_SYS}
+#		ifdef USHBIN_SUPPORTED
+		,{m_zrupdate, 0, 1, ALL_SYS}, {m_zrupdate, 0, 1, ALL_SYS}
+#		endif
 		,{m_zshow, 1, 1, ALL_SYS}, {m_zshow, 1, 1, ALL_SYS}
 		,{m_zstep, 1, 1, ALL_SYS}, {m_zstep, 1, 1, ALL_SYS}
 		,{m_zsystem, 1, 1, ALL_SYS}, {m_zsystem, 1, 1, ALL_SYS}
@@ -288,7 +294,7 @@ LITDEF struct
 		if (fetch0 != curr_fetch_trip)
 		{
 			assert(OC_FETCH == curr_fetch_trip->opcode);
-			*cr = put_tjmp((TREF(curtchain))->exorder.bl);
+			*cr = put_tjmp(curr_fetch_trip);
 		} else
 		{
 			if (shifting)

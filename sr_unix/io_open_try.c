@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,9 +33,7 @@
 #include "iottdef.h"
 #include "iomtdef.h"
 #include "io_dev_dispatch.h"
-#ifdef __MVS__
 #include "iormdef.h"
-#endif
 #include "eintr_wrappers.h"
 #include "mmemory.h"
 #include "gtm_caseconv.h"
@@ -95,9 +93,9 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 
 	int		p_offset, len;
 	boolean_t	mknod_err , stat_err, dir_err;
-	int 		save_mknod_err, save_stat_err;
+	int 		save_mknod_err, save_stat_err, save_gsn_err;
 
-	int		sockstat, sockoptval;
+	int		gso_stat, gsn_stat, sockoptval;
 	in_port_t	sockport;
 	GTM_SOCKLEN_TYPE	socknamelen;
 	struct sockaddr_storage	sockname;
@@ -253,27 +251,32 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 						tl->iod->type = rm;
 						break;
 					case S_IFSOCK:
-						/*	If SOCK_STREAM, AF_INET, and not [kr]shell port assume we were
-							started by inetd.
-							We are not able to trigger exception until active_device set
-							and exception parsed which is not done for fd == 0/1 which
-							is from io_init called from gtm_startup before condition handlers
-							are setup so we can't report errors, just will be treated as rm.
-							Note the fall through if the above conditions are not true to
-							maintain compatibility for rshd startup PER 3252.
-							28-JUL-1995 14:24:31 FERTIG REPLACE IO_OPEN_TRY.C(18)
-							"PER 3252: fix problems starting up mumps from an ""rsh"" or ""remsh"""
-						*/
+						/* If SOCK_STREAM, AF_INET/AF_INET6, and not [kr]shell port assume we were
+						 * started by inetd.
+						 * We are not able to trigger exception until active_device set
+						 * and exception parsed which is not done for fd == 0/1 which
+						 * is from io_init called from gtm_startup before condition handlers
+						 * are setup so we can't report errors, just will be treated as rm.
+						 * Note the fall through if the above conditions are not true to
+						 * maintain compatibility for rshd startup PER 3252.
+						 * 28-JUL-1995 14:24:31 FERTIG REPLACE IO_OPEN_TRY.C(18)
+						 * "PER 3252: fix problems starting up mumps from an ""rsh"" or ""remsh"""
+						 *
+						 * Different UNIX flavors behave differently when given an AF_UNIX socket,
+						 * some errors and some setting sa_family to zero, so recognize each platform
+						 * behavior and assume a local socket for those cases.
+						 */
 						sockoptlen = SIZEOF(sockoptval);
-						sockstat = getsockopt(file_des, SOL_SOCKET, SO_TYPE, &sockoptval,
+						gso_stat = getsockopt(file_des, SOL_SOCKET, SO_TYPE, &sockoptval,
 								      (GTM_SOCKLEN_TYPE *)&sockoptlen);
-						if (!sockstat && SOCK_STREAM == sockoptval)
+						if (!gso_stat && SOCK_STREAM == sockoptval)
 						{
 							socknamelen = SIZEOF(sockname);
-							sockstat = getsockname(file_des,
+							gsn_stat = getsockname(file_des,
 									       (struct sockaddr *)&sockname,
 									       (GTM_SOCKLEN_TYPE *)&socknamelen);
-							if (!sockstat && ((AF_INET == ((sockaddr_ptr)&sockname)->sa_family)
+							save_gsn_err = errno;
+							if (!gsn_stat && ((AF_INET == ((sockaddr_ptr)&sockname)->sa_family)
 									 || (AF_INET6 == ((sockaddr_ptr)&sockname)->sa_family)))
 							{
 								port_len = NI_MAXSERV;
@@ -292,12 +295,33 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 									break;
 								}
 							}
+							else if ((!gsn_stat && ((AF_UNIX == ((sockaddr_ptr)&sockname)->sa_family)
+										|| (0 == socknamelen)
+										|| (0 == ((sockaddr_ptr)&sockname)->sa_family)))
+									|| (EOPNOTSUPP == save_gsn_err)
+#									if defined(_AIX)
+									|| (ENOTCONN == save_gsn_err)
+#									endif
+#									if defined(__sun) || defined(__hpux)
+									|| (EINVAL == save_gsn_err)
+#									endif
+									)
+							{
+								tl->iod->type = gtmsocket;
+								break;
+							}
 						}
+						/* We don't expect any unusual socket types (e.g. SOCK_DGRAM) in testing,
+						 * so assert instead of falling through in DEBUG.
+						 */
+						assert(NULL == "Unknown socket type");
 						/* fall through */
 					case 0:
+						assert(NULL == "Zero file type");
 						tl->iod->type = ff;
 						break;
 					default:
+						assert(NULL == "Unknown value for (outbuf.st_mode & S_IFMT)");
 						break;
 				}
 			}
@@ -326,8 +350,8 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					break;
 				}
 				case iop_append:
-					if (rm == naml->iod->type)
-						oflag |= O_APPEND;
+					/* this deviceparameter will move the file pointer to EOF in iorm_open.c
+					 but will no longer force write to the EOF, so nothing to do here */
 					break;
 				case iop_contiguous:
 					break;
@@ -529,6 +553,25 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	}
 	assert(naml->iod->type < n_io_dev_types);
 	naml->iod->disp_ptr = &io_dev_dispatch[naml->iod->type];
+
+	/* Do this deviceparameter check only if type is rm, it is closed, and no_destroy is defined. If a deviceparameter other
+	 * than SEEK or APPEND is defined, then clear no_destroy as state will not be restored.
+	 */
+	if ((rm == naml->iod->type) && (dev_closed == naml->iod->state) && ((d_rm_struct *)naml->iod->dev_sp)->no_destroy)
+	{
+		for (p_offset = 0; iop_eol != *(pp->str.addr + p_offset); p_offset += ((IOP_VAR_SIZE == io_params_size[ch])
+				? (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]))
+		{
+			ch = *(pp->str.addr + p_offset++);
+			assert((params)ch < (params)n_iops);
+			if ((iop_seek != ch) && (iop_append != ch))
+			{
+				((d_rm_struct *)naml->iod->dev_sp)->no_destroy = FALSE;
+				break;
+			}
+		}
+	}
+
 	if (dev_never_opened == naml->iod->state)
 	{
 		naml->iod->wrap = DEFAULT_IOD_WRAP;
@@ -538,8 +581,13 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	}
 	if (dev_open != naml->iod->state)
 	{
-		naml->iod->dollar.x = 0;
-		naml->iod->dollar.y = 0;
+		/* initialize x and y unless it is closed and rm and no_destroy is TRUE */
+		if (!((dev_closed == naml->iod->state) && (rm == naml->iod->type) &&
+		    ((d_rm_struct *)naml->iod->dev_sp)->no_destroy))
+		{
+			naml->iod->dollar.x = 0;
+			naml->iod->dollar.y = 0;
+		}
 		naml->iod->dollar.za = 0;
 		naml->iod->dollar.zb[0] = 0;
 		naml->iod->dollar.key[0] = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +11,10 @@
 
 #include "mdef.h"
 
-#include "cmd.h"
 #include "compiler.h"
 #include "indir_enum.h"
 #include "opcode.h"
+#include "cmd.h"
 #include "toktyp.h"
 
 LITREF mval	literal_zero;
@@ -35,17 +35,17 @@ int m_zhalt(void)
 		return m_halt();
 	switch (status = expr(&ot, MUMPS_NUM))		/* NOTE assignment */
 	{
-	case EXPR_FAIL:
-		return FALSE;
-	case EXPR_GOOD:
-		triptr = newtriple(OC_ZHALT);
-		triptr->operand[0] = ot;
-		return TRUE;
-	case EXPR_INDR:
-		make_commarg(&ot, indir_zhalt);
-		return TRUE;
-	default:
-		GTMASSERT;
+		case EXPR_FAIL:
+			return FALSE;
+		case EXPR_GOOD:
+			triptr = newtriple(OC_ZHALT);
+			triptr->operand[0] = ot;
+			return TRUE;
+		case EXPR_INDR:
+			make_commarg(&ot, indir_zhalt);
+			return TRUE;
+		default:
+			assertpro(FALSE);
 	}
 	return FALSE; /* This should never get executed, added to make compiler happy */
 }

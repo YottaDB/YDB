@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -173,5 +173,11 @@ void get_cmd_qlf(command_qualifier *qualif)
 #	ifdef USHBIN_SUPPORTED
 	if (CLI_PRESENT == cli_present("DYNAMIC_LITERALS"))
 		qualif->qlf |= CQ_DYNAMIC_LITERALS;
+#	endif
+#	ifdef UNIX
+	if (CLI_PRESENT == cli_present("EMBED_SOURCE"))
+		qualif->qlf |= CQ_EMBED_SOURCE;
+	else if (cli_negated("EMBED_SOURCE"))
+		qualif->qlf &= ~CQ_EMBED_SOURCE;
 #	endif
 }

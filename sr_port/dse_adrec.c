@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,18 +37,18 @@
 #include "gvcst_blk_build.h"
 #include "util.h"
 #include "t_abort.h"
+#include "gtmmsg.h"
 
-GBLREF char		*update_array, *update_array_ptr;
-GBLREF uint4		update_array_size;
-GBLREF srch_hist	dummy_hist;
-GBLREF block_id		patch_curr_blk;
+GBLREF char		patch_comp_key[MAX_KEY_SZ + 1], *update_array, *update_array_ptr;
+GBLREF cw_set_element	cw_set[];
+GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t cs_data;
-GBLREF char 		patch_comp_key[MAX_KEY_SZ + 1];
-GBLREF unsigned short 	patch_comp_count;
-GBLREF gd_region        *gv_cur_region;
-GBLREF cw_set_element   cw_set[];
+GBLREF sgmnt_data_ptr_t	cs_data;
+GBLREF srch_hist	dummy_hist;
+GBLREF uint4		update_array_size;
+GBLREF unsigned short	patch_comp_count;
 
+error_def(ERR_AIMGBLKFAIL);
 error_def(ERR_CPBEYALLOC);
 error_def(ERR_DBRDONLY);
 error_def(ERR_DSEBLKRDFAIL);
@@ -58,32 +58,24 @@ error_def(ERR_REC2BIG);
 
 void dse_adrec(void)
 {
+	block_id	blk, blk_ptr;
+	blk_segment	*bs1, *bs_ptr;
 	char		data[MAX_LINE], key[MAX_KEY_SZ + 1];
-	unsigned short	cc;
-	int		tmp_cmpc;
-	sm_uc_ptr_t	new_bp, lbp, b_top, rp, r_top, key_top;
-	short int	size, new_len, rsize;
 	int		data_len, key_len;
 	int4		blk_seg_cnt, blk_size;
-	block_id	blk;
-	blk_segment	*bs1, *bs_ptr;
+	short int	new_len, rsize, size;
+	sgmnt_addrs	*csa;
+	sm_uc_ptr_t	b_top, key_top, lbp, new_bp, rp, r_top;
 	srch_blk_status	blkhist;
+	unsigned short	cc;
 
-        if (gv_cur_region->read_only)
-                rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+	csa = cs_addrs;
+	if (gv_cur_region->read_only)
+                rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
-	if (cli_present("BLOCK") == CLI_PRESENT)
-	{
-		if(!cli_get_hex("BLOCK", (uint4 *)&blk))
-			return;
-		patch_curr_blk = blk;
-	}
-	if (patch_curr_blk < 0 || patch_curr_blk >= cs_addrs->ti->total_blks || !(patch_curr_blk % cs_addrs->hdr->bplmap))
-	{
-		util_out_print("Error: invalid block number.", TRUE);
+	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
 		return;
-	}
-	if (cli_present("KEY") != CLI_PRESENT)
+	if (CLI_PRESENT != cli_present("KEY"))
 	{
 		util_out_print("Error: key must be specified.", TRUE);
 		return;
@@ -91,90 +83,84 @@ void dse_adrec(void)
 	if (!dse_getki(&key[0], &key_len, LIT_AND_LEN("KEY")))
 		return;
 	t_begin_crit(ERR_DSEFAIL);
-	blk_size = cs_addrs->hdr->blk_size;
-	blkhist.blk_num = patch_curr_blk;
+	blk_size = csa->hdr->blk_size;
+	blkhist.blk_num = blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	lbp = (uchar_ptr_t)malloc(blk_size);
 	memcpy(lbp, blkhist.buffaddr, blk_size);
-
 	if (((blk_hdr_ptr_t)lbp)->bsiz > blk_size)
 		((blk_hdr_ptr_t)lbp)->bsiz = blk_size;
 	else if (((blk_hdr_ptr_t)lbp)->bsiz < SIZEOF(blk_hdr))
 		((blk_hdr_ptr_t)lbp)->bsiz = SIZEOF(blk_hdr);
-
 	b_top = lbp + ((blk_hdr_ptr_t)lbp)->bsiz;
 	if (((blk_hdr_ptr_t)lbp)->levl)
 	{
-		if (cli_present("POINTER") != CLI_PRESENT)
+		if (CLI_PRESENT != cli_present("POINTER"))
 		{
 			util_out_print("Error: block pointer must be specified for this index block record.", TRUE);
+			t_abort(gv_cur_region, csa);
 			free(lbp);
-			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-		if (!cli_get_hex("POINTER", (uint4 *)&blk))
+		if (BADDSEBLK == (blk_ptr = dse_getblk("POINTER", DSENOBML, DSEBLKNOCUR)))		/* WARNING: assignment */
 		{
-			t_abort(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, csa);
 			free(lbp);
 			return;
 		}
-		if (blk < 0 || blk >= cs_addrs->ti->total_blks || !(blk % cs_addrs->hdr->bplmap))
-		{
-			util_out_print("Error: pointer is an invalid block number.", TRUE);
-			free(lbp);
-			t_abort(gv_cur_region, cs_addrs);
-			return;
-		}
-		MEMCP(&data[0], (char *)&blk, 0, SIZEOF(block_id), SIZEOF(block_id));
+		MEMCP(&data[0], (char *)&blk_ptr, 0, SIZEOF(block_id), SIZEOF(block_id));
 		data_len = SIZEOF(block_id);
 	} else
 	{
-		if (cli_present("DATA") != CLI_PRESENT)
+		if (CLI_PRESENT != cli_present("DATA"))
 		{
 			util_out_print("Error:  data must be specified for this data block record.", TRUE);
+			t_abort(gv_cur_region, csa);
 			free(lbp);
-			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (FALSE == dse_data(&data[0], &data_len))
-		{
+		{	/* dse_data return of FALSE means cli_parse already issued an error */
+			t_abort(gv_cur_region, csa);
 			free(lbp);
-			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-		if (key_len + data_len >  cs_addrs->hdr->max_rec_size)
+		if (key_len + data_len >  csa->hdr->max_rec_size)
 		{
- 			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(10) ERR_REC2BIG, 4, key_len + data_len,
-				(int4)cs_addrs->hdr->max_rec_size, REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, LEN_AND_STR(key));
+			t_abort(gv_cur_region, csa);
+			free(lbp);
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_REC2BIG, 4, key_len + data_len,
+				(int4)csa->hdr->max_rec_size, REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, LEN_AND_STR(key));
 		}
-
 	}
-	if (cli_present("RECORD") == CLI_PRESENT)
+	if (CLI_PRESENT == cli_present("RECORD"))
 	{
 		if (!(rp = skan_rnum(lbp, TRUE)))
-		{
+		{	/* a FALSE return from skan_rnum means either a cli parser problem or a record beyond the end of the block
+			 * both of which cause output
+			 */
+			t_abort(gv_cur_region, csa);
 			free(lbp);
-			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-	} else if (cli_present("OFFSET") == CLI_PRESENT)
+	} else if (CLI_PRESENT == cli_present("OFFSET"))
 	{
 		if (!(rp = skan_offset(lbp, TRUE)))
-		{
+		{	/* a FALSE return from skan_rnum means either a cli parser problem or an offset beyond the end of the block
+			 * both of which cause output
+			 */
+			t_abort(gv_cur_region, csa);
 			free(lbp);
-			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 	} else
 	{
 		util_out_print("Error:  must specify a record number or offset for the record to be added.", TRUE);
+		t_abort(gv_cur_region, csa);
 		free(lbp);
-		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-
 	new_bp = (uchar_ptr_t)malloc(blk_size);
 	size = (key_len < patch_comp_count) ? key_len : patch_comp_count;
 	for (cc = 0; cc < size && patch_comp_key[cc] == key[cc]; cc++)
@@ -225,28 +211,26 @@ void dse_adrec(void)
 	if (rp - lbp + new_len > blk_size)
 	{
 		util_out_print("Error: record too large for remaining space in block.", TRUE);
+		t_abort(gv_cur_region, csa);
 		free(lbp);
 		free(new_bp);
-		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	memcpy(rp, new_bp, new_len);
 	free(new_bp);
 	((blk_hdr_ptr_t)lbp)->bsiz += new_len + (unsigned int)(rp - b_top);
-
 	BLK_INIT(bs_ptr, bs1);
 	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + SIZEOF(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - SIZEOF(blk_hdr));
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
-		util_out_print("Error: bad blk build.", TRUE);
+		t_abort(gv_cur_region, csa);
 		free(lbp);
-		t_abort(gv_cur_region, cs_addrs);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_AIMGBLKFAIL, 3, blk, DB_LEN_STR(gv_cur_region));
 		return;
 	}
 	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
-	BUILD_AIMG_IF_JNL_ENABLED(cs_data, cs_addrs->ti->curr_tn);
+	BUILD_AIMG_IF_JNL_ENABLED(cs_data, csa->ti->curr_tn);
 	t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
-
 	free(lbp);
 	return;
 }

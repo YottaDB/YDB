@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -275,7 +275,9 @@ LITDEF nametabent fun_names[] =
 	,{7, "ZSEARCH"}
 	,{7, "ZSETPRV"}
 	,{8, "ZSIGPROC"}
+	,{7, "ZSOCKET"}
 	,{4, "ZSUB"}, {7, "ZSUBSTR"}
+	,{7, "ZSYSLOG"}
 	,{3, "ZTR"}, {8, "ZTRANSLA*"}
 	,{4, "ZTRI"}, {8, "ZTRIGGER"}
 	,{7, "ZTRNLNM"}
@@ -288,7 +290,7 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 48, 48, 48, 48, 116	/* s t u v w x y z ~ */
+	39, 43, 47, 47, 48, 48, 48, 48, 118	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -331,11 +333,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZBITSET, ALL_SYS }
 	,{ OC_FNZBITSTR, ALL_SYS }
 	,{ OC_FNZBITXOR, ALL_SYS }
-#	ifdef __sun
-	,{ OC_FNZCALL,UNIX_OS}, { OC_FNZCALL,UNIX_OS}
-#	else
 	,{ OC_FNZCALL, VMS_OS }, { OC_FNZCALL, VMS_OS }
-#	endif
 	,{ OC_FNZCHAR, ALL_SYS }, { OC_FNZCHAR, ALL_SYS }
 	,{ OC_FNZCONVERT2, UNIX_OS }, { OC_FNZCONVERT2, UNIX_OS }
 	,{ OC_FNZDATE, ALL_SYS }
@@ -364,7 +362,9 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZSEA, ALL_SYS }
 	,{ OC_FNZSETPRV, VMS_OS }
 	,{ OC_FNZSIGPROC, ALL_SYS }
+	,{ OC_FNZSOCKET, ALL_SYS }
 	,{ OC_FNZSUBSTR, ALL_SYS }, { OC_FNZSUBSTR, ALL_SYS }
+	,{ OC_FNZSYSLOG, UNIX_OS }
 	,{ OC_FNZTRANSLATE, ALL_SYS }, { OC_FNZTRANSLATE, ALL_SYS }
 	,{ OC_FNZTRIGGER, TRIGGER_OS }, { OC_FNZTRIGGER, TRIGGER_OS }
 	,{ OC_FNZTRNLNM, ALL_SYS }
@@ -441,7 +441,9 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_zsearch,
 	f_mstr,
 	f_zsigproc,
+	f_zsocket,
 	f_extract, f_extract,		/* $ZSUBSTR */
+	f_one_mval,			/* $ZSYSLOG */
 	f_translate, f_translate,
 	f_ztrigger, f_ztrigger,
 	f_ztrnlnm,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,13 @@
 #include "gtmmsg.h"
 #include "error.h"
 
+error_def(ERR_DLLNOCLOSE);
+error_def(ERR_DLLNOOPEN);
+error_def(ERR_DLLNORTN);
+error_def(ERR_TEXT);
+
 /* below comments applicable only to tru64 */
-/* dlsym() is bound to return short pointer because of -taso loader flag. GTMASSERT on this assumption.
+/* dlsym() is bound to return short pointer because of -taso loader flag
  * dlopen() returns a long pointer. All the callers of fgn_getpak() should take care of this.
  * dlclose() uses the handle generated above. So, the same semantics apply.
  * dlerror() returns a char pointer, which is again long.
@@ -48,8 +53,6 @@ void_ptr_t fgn_getpak(char *package_name, int msgtype)
 	void_ptr_t 	ret_handle;
 	char_ptr_t	dummy_err_str;
 	char		err_str[MAX_ERRSTR_LEN]; /* needed as util_out_print doesn't handle 64bit pointers */
-	error_def(ERR_TEXT);
-	error_def(ERR_DLLNOOPEN);
 
 	if (!(ret_handle = dlopen(package_name, RTLD_LAZY)))
 	{
@@ -57,8 +60,12 @@ void_ptr_t fgn_getpak(char *package_name, int msgtype)
 		{
 			assert(!(msgtype & ~SEV_MSK));
 			COPY_DLLERR_MSG(dummy_err_str, err_str);
-			rts_error(VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNOOPEN, msgtype), 2, LEN_AND_STR(package_name),
-				ERR_TEXT, 2, LEN_AND_STR(err_str));
+			if ((INFO == msgtype))
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNOOPEN, msgtype),
+					2, LEN_AND_STR(package_name), ERR_TEXT, 2, LEN_AND_STR(err_str));
+			else
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNOOPEN, msgtype),
+					2, LEN_AND_STR(package_name), ERR_TEXT, 2, LEN_AND_STR(err_str));
 		}
 	}
 	return ret_handle;
@@ -77,8 +84,6 @@ fgnfnc fgn_getrtn(void_ptr_t package_handle, mstr *entry_name, int msgtype)
 	char_ptr_t	dummy_err_str;
 	void		*short_sym_addr;
 	char		err_str[MAX_ERRSTR_LEN]; /* needed as util_out_print doesn't handle 64bit pointers */
-	error_def(ERR_DLLNORTN);
-	error_def(ERR_TEXT);
 
 	if (!(sym_addr = dlsym(package_handle, entry_name->addr)))
 	{
@@ -86,8 +91,12 @@ fgnfnc fgn_getrtn(void_ptr_t package_handle, mstr *entry_name, int msgtype)
 		{
 			assert(!(msgtype & ~SEV_MSK));
 			COPY_DLLERR_MSG(dummy_err_str, err_str);
-			rts_error(VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNORTN, msgtype), 2, LEN_AND_STR(entry_name->addr),
-				ERR_TEXT, 2, LEN_AND_STR(err_str));
+			if ((INFO == msgtype))
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNORTN, msgtype),
+					2, LEN_AND_STR(entry_name->addr), ERR_TEXT, 2, LEN_AND_STR(err_str));
+			else
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNORTN, msgtype),
+					2, LEN_AND_STR(entry_name->addr), ERR_TEXT, 2, LEN_AND_STR(err_str));
 		}
 	} else
 	{  /* Tru64 - dlsym() is bound to return short pointer because of ld -taso flag used for GT.M */
@@ -98,7 +107,7 @@ fgnfnc fgn_getrtn(void_ptr_t package_handle, mstr *entry_name, int msgtype)
 			sym_addr = NULL;
 			/* always report an error irrespective of msgtype - since this code should never
 			 * have executed and/or the DLL might need to be rebuilt with 32-bit options */
-			rts_error(VARLSTCNT(8) ERR_DLLNORTN, 2, LEN_AND_STR(entry_name->addr),
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNORTN, 2, LEN_AND_STR(entry_name->addr),
 				ERR_TEXT, 2, LEN_AND_LIT("Symbol is loaded above the lower 31-bit address space"));
 		}
 #endif
@@ -111,14 +120,17 @@ void fgn_closepak(void_ptr_t package_handle, int msgtype)
 	char_ptr_t      dummy_err_str;
   	int 		status;
 	char		err_str[MAX_ERRSTR_LEN];
-	error_def(ERR_TEXT);
-	error_def(ERR_DLLNOCLOSE);
 
 	status = dlclose(package_handle);
 	if (0 != status && SUCCESS != msgtype)
 	{
 		assert(!(msgtype & ~SEV_MSK));
 		COPY_DLLERR_MSG(dummy_err_str, err_str);
-		rts_error(VARLSTCNT(6) MAKE_MSG_TYPE(ERR_DLLNOCLOSE, msgtype), 0, ERR_TEXT, 2, LEN_AND_STR(err_str));
+		if ((INFO == msgtype))
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_TYPE(ERR_DLLNOCLOSE, msgtype), 0,
+				ERR_TEXT, 2, LEN_AND_STR(err_str));
+			else
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_TYPE(ERR_DLLNOCLOSE, msgtype), 0,
+				ERR_TEXT, 2, LEN_AND_STR(err_str));
 	}
 }

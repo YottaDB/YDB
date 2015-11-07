@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,6 +62,7 @@
 #include "srcline.h"
 #include "zshow.h"
 #include "zwrite.h"
+#include "zr_unlink_rtn.h"
 
 #ifdef GTM_TRIGGER
 #define PREFIX_SPACE		" "
@@ -189,44 +190,44 @@ void gtm_levl_ret_code(void);
 STATICFNDEF int gtm_trigger_invoke(void);
 
 /* gtm_trigger - saves (some of) current environment, sets up new environment and drives a trigger.
-
-   Triggers are one of two places where compiled M code is driven while the C stack is not at a constant level.
-   The other place that does this is call-ins. Because this M code invocation needs to be separate from other
-   running code, a new running environment is setup with its own base frame to prevent random unwinding back
-   into earlier levels. All returns from the invoked generated code come back through gtm_trigger_invoke() with
-   the exception of error handling looking for a handler or not having an error "handled" (clearing $ECODE) can
-   just keep unwinding until all trigger levels are gone.
-
-   Trigger names:
-
-   Triggers have a base name set by MUPIP TRIGGER in the TRIGNAME hasht entry which is read by gv_trigger.c and
-   passed to us. If it collides with an existing trigger name, we add some suffixing to it (up to two chars)
-   and create it with that name.
-
-   Trigger compilation:
-
-   - When a trigger is presented to us for the first time, it needs to be compiled. We do this by writing it out
-     using a system generated unique name to a temp file and compiling it with the -NAMEOFRTN parameter which
-     sets the name of the routine different than the unique random object name.
-   - The file is then linked in and its address recorded so the compilation only happens once.
-
-   Trigger M stack format:
-
-   - First created frame is a "base frame" (created by base_frame). This frame is set up to return to us
-     (the caller) and has no backchain (old_frame_pointer is null). It also has the type SFT_TRIGR | SFT_COUNT
-     so it is a counted frame (it is important to be counted so the mv_stents we create don't try to backup to
-     a previous counted frame.
-   - The second created frame is for the trigger being executed. We fill in the stack_frame from the trigger
-     description and then let it rip by calling dm_start(). When the trigger returns through the base frame
-     which calls gtm_levl_ret_code and pulls the return address of our call to dm_start off the stack and
-     unwinds the appropriate saved regs, it returns back to us.
-
-   Error handling in a trigger frame:
-
-   - $ETRAP only. $ZTRAP is forbidden. Standard rules apply.
-   - Error handling does not return to the trigger base frame but unwinds the base frame doing a rollback if
-     necessary.
-*/
+ *
+ * Triggers are one of two places where compiled M code is driven while the C stack is not at a constant level.
+ * The other place that does this is call-ins. Because this M code invocation needs to be separate from other
+ * running code, a new running environment is setup with its own base frame to prevent random unwinding back
+ * into earlier levels. All returns from the invoked generated code come back through gtm_trigger_invoke() with
+ * the exception of error handling looking for a handler or not having an error "handled" (clearing $ECODE) can
+ * just keep unwinding until all trigger levels are gone.
+ *
+ * Trigger names:
+ *
+ * Triggers have a base name set by MUPIP TRIGGER in the TRIGNAME hasht entry which is read by gv_trigger.c and
+ * passed to us. If it collides with an existing trigger name, we add some suffixing to it (up to two chars)
+ * and create it with that name.
+ *
+ * Trigger compilation:
+ *
+ * - When a trigger is presented to us for the first time, it needs to be compiled. We do this by writing it out
+ *   using a system generated unique name to a temp file and compiling it with the -NAMEOFRTN parameter which
+ *   sets the name of the routine different than the unique random object name.
+ * - The file is then linked in and its address recorded so the compilation only happens once.
+ *
+ * Trigger M stack format:
+ *
+ * - First created frame is a "base frame" (created by base_frame). This frame is set up to return to us
+ *   (the caller) and has no backchain (old_frame_pointer is null). It also has the type SFT_TRIGR | SFT_COUNT
+ *   so it is a counted frame (it is important to be counted so the mv_stents we create don't try to backup to
+ *   a previous counted frame.
+ * - The second created frame is for the trigger being executed. We fill in the stack_frame from the trigger
+ *   description and then let it rip by calling dm_start(). When the trigger returns through the base frame
+ *   which calls gtm_levl_ret_code and pulls the return address of our call to dm_start off the stack and
+ *   unwinds the appropriate saved regs, it returns back to us.
+ *
+ * Error handling in a trigger frame:
+ *
+ * - $ETRAP only. $ZTRAP is forbidden. Standard rules apply.
+ * - Error handling does not return to the trigger base frame but unwinds the base frame doing a rollback if
+ *   necessary.
+ */
 
 CONDITION_HANDLER(gtm_trigger_complink_ch)
 {	/* Condition handler for trigger compilation and link - be noisy but don't error out. Note that compilations do
@@ -259,10 +260,10 @@ CONDITION_HANDLER(gtm_trigger_complink_ch)
 
 CONDITION_HANDLER(gtm_trigger_ch)
 {	/* Condition handler for trigger execution - This handler is pushed on first for a given trigger level, then
-	   mdb_condition_handler is pushed on so will appearr multiple times as trigger depth increases. There is
-	   always an mdb_condition_handler behind us for an earlier trigger level and we let it handle severe
-	   errors for us as it gives better diagnostics (e.g. GTM_FATAL_ERROR dumps) in addition to the file core dump.
-	*/
+	 * mdb_condition_handler is pushed on so will appearr multiple times as trigger depth increases. There is
+	 * always an mdb_condition_handler behind us for an earlier trigger level and we let it handle severe
+	 * errors for us as it gives better diagnostics (e.g. GTM_FATAL_ERROR dumps) in addition to the file core dump.
+	 */
 	START_CH(TRUE);
 	DBGTRIGR((stderr, "gtm_trigger_ch: Failsafe condition cond handler entered with SIGNAL = %d\n", SIGNAL));
 	if (DUMPABLE)
@@ -510,7 +511,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	mv_stent	*mv_st_ent;
 	symval		*new_symval;
 	uint4		dollar_tlevel_start;
-	stack_frame	*fp, *fpprev;
+	stack_frame	*fp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -864,15 +865,11 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
  */
 void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 {
-	rtn_tabent	*rbot, *mid, *rtop;
+	rtn_tabent	*mid;
 	mident		*rtnname;
 	rhdtyp		*rtnhdr;
-	textElem	*telem;
-	int		comp, size;
-	stack_frame	*fp, *fpprev;
-	mname_entry	key;
-	ht_ent_mname    *tabent;
-	routine_source	*src_tbl;
+	int		size;
+	stack_frame	*fp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -886,96 +883,29 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	/* Next thing to do is find the routine header in the rtn_names list so we can remove it. */
 	rtnname = &trigdsc->rtn_desc.rt_name;
 	rtnhdr = trigdsc->rtn_desc.rt_adr;
-	rbot = rtn_names;
-	rtop = rtn_names_end;
-	for (;;)
-	{	/* See if routine exists in list via a binary search which reverts to serial
-		   search when # of items drops below the threshold S_CUTOFF.
-		*/
-		if ((rtop - rbot) < S_CUTOFF)
-		{
-			comp = -1;
-			for (mid = rbot; mid <= rtop ; mid++)
-			{
-				MIDENT_CMP(&mid->rt_name, rtnname, comp);
-				if (0 == comp)
-					break;
-				assertpro(0 >= comp);	/* Routine should be found */
-			}
-			break;
-		} else
-		{	mid = rbot + (rtop - rbot)/2;
-			MIDENT_CMP(&mid->rt_name, rtnname, comp);
-			if (0 == comp)
-				break;
-			else if (0 > comp)
-			{
-				rbot = mid + 1;
-				continue;
-			} else
-			{
-				rtop = mid - 1;
-				continue;
-			}
-		}
-	}
-#	ifdef DEBUG
-	assert(rtnhdr == mid->rt_adr);
+	/* Only one possible version of a trigger routine */
+	assert(USHBIN_ONLY(NULL) NON_USHBIN_ONLY(rtnhdr) == OLD_RHEAD_ADR(CURRENT_RHEAD_ADR(rtnhdr)));
 	/* Verify trigger routine we want to remove is not currently active. If it is, we need to assert fail.
 	 * Triggers are not like regular routines since they should only ever be referenced from the stack during a
 	 * transaction. Likewise, we should only ever load the triggers as the first action in that transaction.
 	 */
-	for (fp = frame_pointer; fp ; fp = fpprev)
-	{
-		fpprev = fp->old_frame_pointer;
-#		ifdef GTM_TRIGGER
-		if (NULL != fpprev && SFT_TRIGR & fpprev->type)
-			fpprev = *(stack_frame **)(fpprev + 1);
-#		endif
-		/* Only one possible version of a trigger routine */
-		assert(USHBIN_ONLY(NULL) NON_USHBIN_ONLY(fp->rvector) == OLD_RHEAD_ADR(CURRENT_RHEAD_ADR(fp->rvector)));
+#	ifdef DEBUG
+	for (fp = frame_pointer; NULL != fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))
 		assert(fp->rvector != rtnhdr);
-	}
 #	endif
-	/* Remove break points in this routine before rmv from rtntbl */
-	zr_remove(rtnhdr, BREAKMSG);
-	/* Release any $TEXT() info this trigger has loaded */
-	free_src_tbl(rtnhdr);
+	/* Locate the routine in the routine table while all the pieces are available. Then remove from routine table
+	 * after the routine is unlinked.
+	 */
+	assertpro(find_rtn_tabent(&mid, rtnname));		/* Routine should be found (sets "mid" with found entry) */
+	assert(rtnhdr == mid->rt_adr);
+	/* Free all storage allocated on behalf of this trigger routine. Do this before removing from routine table since
+	 * some of the activities called during unlink look for the routine so it must be found.
+	 */
+	zr_unlink_rtn(rtnhdr, TRUE);
 	/* Remove the routine from the rtn_table */
 	size = INTCAST((char *)rtn_names_end - (char *)mid);
 	if (0 < size)
 		memmove((char *)mid, (char *)(mid + 1), size);	/* Remove this routine name from sorted table */
 	rtn_names_end--;
-	urx_remove(rtnhdr);					/* Remove any unresolved entries */
-#	ifdef USHBIN_SUPPORTED
-	stp_move((char *)rtnhdr->literal_text_adr,
-		 (char *)(rtnhdr->literal_text_adr + rtnhdr->literal_text_len));
-	GTM_TEXT_FREE(rtnhdr->ptext_adr);			/* R/O releasable section */
-	free(RW_REL_START_ADR(rtnhdr));				/* R/W releasable section part 1 */
-	free(rtnhdr->linkage_adr);				/* R/W releasable section part 2 */
-	free(rtnhdr->labtab_adr);				/* Usually non-releasable but triggers don't have labels so
-								 * this is just cleaning up a dangling null malloc
-								 */
-	free(rtnhdr);
-#	else
-#		if (!defined(__linux__) && !defined(__CYGWIN__)) || !defined(__i386) || !defined(COMP_GTA)
-#			error Unsupported NON-USHBIN platform
-#		endif
-	/* For a non-shared binary platform we need to get an approximate addr range for stp_move. This is not
-	 * done when a routine is replaced on these platforms but in this case we are able to due to the isolated
-	 * environment if we only take the precautions of migrating potential literal text which may have been
-	 * pointed to by any set environment variables.
-	 * In this format, the only platform we support currently is Linux-x86 (i386) which uses GTM_TEXT_ALLOC
-	 * to allocate special storage for it to put executable code in. We can access the storage header for
-	 * this storage and find out how big it is and use that information to give stp_move a good range since
-	 * the literal segment occurs right at the end of allocated storage (for which there is no pointer
-	 * in the fileheader).
-	 */
-	telem = (textElem *)((char *)rtnhdr - offsetof(textElem, userStorage));
-	assert(TextAllocated == telem->state);
-	stp_move((char *)LNRTAB_ADR(rtnhdr) + (rtnhdr->lnrtab_len * SIZEOF(lnr_tabent)),
-		 (char *)rtnhdr + telem->realLen);
-	GTM_TEXT_FREE(rtnhdr);
-#	endif
 }
 #endif /* GTM_TRIGGER */

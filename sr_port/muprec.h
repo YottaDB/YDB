@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
 #define MUPREC_H_INCLUDED
 
 #include "muprecsp.h" /* non-portable interface prototype */
-
+#include "mu_interactive.h"
 #include "jnl_typedef.h"	/* for IS_VALID_JRECTYPE macro */
 
 #if defined(UNIX)
@@ -22,8 +22,8 @@
 #include "op.h"	    /* for dollarh function */
 #endif
 
-#define JNL_EXTR_LABEL		"GDSJEX06"	/* format of the simple journal extract */
-#define JNL_DET_EXTR_LABEL	"GDSJDX06"	/* format of the detailed journal extract */
+#define JNL_EXTR_LABEL		"GDSJEX07"	/* format of the simple journal extract */
+#define JNL_DET_EXTR_LABEL	"GDSJDX07"	/* format of the detailed journal extract */
 
 error_def(ERR_MUINFOSTR);
 error_def(ERR_MUINFOUINT6);
@@ -986,7 +986,8 @@ typedef struct onln_rlbk_reg_list_struct
 	}													\
 }
 
-#define	MUR_WITHIN_ERROR_LIMIT(err_cnt, error_limit) ((++err_cnt <= error_limit) || (mur_options.interactive && mur_interactive()))
+#define	MUR_WITHIN_ERROR_LIMIT(err_cnt, error_limit) ((++err_cnt <= error_limit) || (mur_options.interactive && \
+		mu_interactive("Recovery terminated by operator")))
 
 #ifdef DEBUG
 #	define	MUR_DBG_SET_LAST_PROCESSED_JNL_SEQNO(TOKEN, RCTL)					\
@@ -1120,7 +1121,6 @@ void			mur_free(void);
 void			mur_rctl_desc_alloc(reg_ctl_list *rctl);
 void			mur_rctl_desc_free(reg_ctl_list *rctl);
 boolean_t		mur_insert_prev(jnl_ctl_list **jjctl);
-boolean_t		mur_interactive(void);
 boolean_t		mur_jctl_from_next_gen(void);
 void 			mur_multi_rehash(void);
 uint4			mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr);

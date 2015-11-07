@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,8 +28,8 @@
 /* Include prototypes */
 #include "t_qread.h"
 
-GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
+GBLREF sgmnt_addrs	*cs_addrs;
 
 error_def(ERR_DSEBLKRDFAIL);
 
@@ -38,31 +38,24 @@ error_def(ERR_DSEBLKRDFAIL);
 void dse_f_free(void)
 {
 	block_id	blk;
-	bool		in_last_bmap;
-	char		util_buff[MAX_UTIL_LEN];
-	sm_uc_ptr_t	lmap_base;
-	int4		bplmap, total_blks;
-	int4		util_len, master_bit, lmap_bit, hint_over_bplmap, hint_mod_bplmap;
-	boolean_t	was_crit, was_hold_onto_crit;
-	int4		dummy_int, nocrit_present;
+	boolean_t	in_last_bmap, was_crit, was_hold_onto_crit;
 	cache_rec_ptr_t	dummy_cr;
+	char		util_buff[MAX_UTIL_LEN];
+	int4		bplmap, dummy_int, hint_mod_bplmap, hint_over_bplmap;
+	int4		lmap_bit, master_bit, nocrit_present, total_blks, util_len;
+	sm_uc_ptr_t	lmap_base;
 
-	if (cs_addrs->hdr->bplmap == 0)
+	if (0 == cs_addrs->hdr->bplmap)
 	{	util_out_print("Cannot perform free block search:  bplmap field of file header is zero.", TRUE);
 		return;
 	}
 	bplmap = cs_addrs->hdr->bplmap;
-
-	if(!cli_get_hex("HINT", (uint4 *)&blk))
+	if (BADDSEBLK == (blk = dse_getblk("HINT", DSEBMLOK, DSEBLKNOCUR)))		/* WARNING: assignment */
 		return;
-	if (blk < 0 || blk >= cs_addrs->ti->total_blks || (blk / bplmap * bplmap == blk))
-	{	util_out_print("Error: invalid block number.", TRUE);
-		return;
-	}
 	hint_over_bplmap = blk / bplmap;
 	master_bit = bmm_find_free(hint_over_bplmap, cs_addrs->bmm,
 			(cs_addrs->ti->total_blks + bplmap - 1)/ bplmap);
-	if (master_bit == -1)
+	if (-1 == master_bit)
 	{	util_out_print("Error: database full.", TRUE);
 		return;
 	}
@@ -71,7 +64,7 @@ void dse_f_free(void)
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if(!(lmap_base = t_qread(master_bit * bplmap, &dummy_int, &dummy_cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (master_bit == hint_over_bplmap)
 		hint_mod_bplmap = blk - blk / bplmap * bplmap;
 	else
@@ -81,7 +74,7 @@ void dse_f_free(void)
 	else
 		total_blks = bplmap;
 	lmap_bit = bml_find_free(hint_mod_bplmap, lmap_base + SIZEOF(blk_hdr), total_blks);
-	if (lmap_bit == -1)
+	if (-1 == lmap_bit)
 	{	memcpy(util_buff, "Error: bit map in block ", 24);
 		util_len = 24;
 		util_len += i2hex_nofill(master_bit * bplmap, (uchar_ptr_t)&util_buff[util_len], 8);

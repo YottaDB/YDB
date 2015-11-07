@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,11 @@
 
 void file_input_init(char *fn, short fn_len);
 void file_input_close(void);
-int file_input_bin_get(char **in_ptr, ssize_t *file_offset, char **buff_base);
+int file_input_bin_get(char **in_ptr, ssize_t *file_offset, char **buff_base, boolean_t do_rts_error);
 int file_input_bin_read(void);
 int file_input_get(char **in_ptr);
+
+#define DO_RTS_ERROR_TRUE TRUE
+#define DO_RTS_ERROR_FALSE FALSE
 
 #endif

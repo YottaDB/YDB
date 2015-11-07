@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -151,5 +151,6 @@ lnr_tabent *op_labaddr(rhdtyp *routine, mval *label, int4 offset);
 void urx_resolve(rhdtyp *rtn, lab_tabent *lbl_tab, lab_tabent *lbl_top);
 char *rtnlaboff2entryref(char *entryref_buff, mident *rtn, mident *lab, int offset);
 void rtn_tbl_sort(rtn_tabent *base, rtn_tabent *end);
+boolean_t on_stack(rhdtyp *rtnhdr, boolean_t *need_duplicate);
 
 #endif /* RTNHDR_H_INCLUDED */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,8 +79,6 @@ error_def(ERR_REPLCOMM);
 error_def(ERR_REPLWARN);
 error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
-
-static	unsigned char		*tcombuff, *msgbuff, *filterbuff;
 
 int gtmsource_est_conn()
 {
@@ -227,42 +225,38 @@ int gtmsource_est_conn()
 int gtmsource_alloc_tcombuff(void)
 { /* Allocate buffer for TCOM, ZTCOM records */
 
-	if (NULL == tcombuff)
+	if (NULL == gtmsource_tcombuff_start)
 	{
 		assert(NULL == gtmsource_tcombuff_start);
-		tcombuff = (unsigned char *)malloc(gd_header->n_regions * TCOM_RECLEN + OS_PAGE_SIZE);
-		gtmsource_tcombuff_start = (unsigned char *)ROUND_UP2((unsigned long)tcombuff, OS_PAGE_SIZE);
+		gtmsource_tcombuff_start = (unsigned char *)malloc(gd_header->n_regions * TCOM_RECLEN);
 	}
 	return (SS_NORMAL);
 }
 
 void gtmsource_free_tcombuff(void)
 {
-	if (NULL != tcombuff)
+	if (NULL != gtmsource_tcombuff_start)
 	{
-		free(tcombuff);
-		tcombuff = gtmsource_tcombuff_start = NULL;
+		free(gtmsource_tcombuff_start);
+		gtmsource_tcombuff_start = NULL;
 	}
 	return;
 }
 
 int gtmsource_alloc_filter_buff(int bufsiz)
 {
-	unsigned char	*old_filter_buff, *free_filter_buff;
+	unsigned char	*old_filter_buff;
 
-	bufsiz = ROUND_UP2(bufsiz, OS_PAGE_SIZE);
-	if (gtmsource_filter != NO_FILTER && bufsiz > repl_filter_bufsiz)
+	if ((NO_FILTER != gtmsource_filter) && (bufsiz > repl_filter_bufsiz))
 	{
 		REPL_DPRINT3("Expanding filter buff from %d to %d\n", repl_filter_bufsiz, bufsiz);
-		free_filter_buff = filterbuff;
 		old_filter_buff = repl_filter_buff;
-		filterbuff = (unsigned char *)malloc(bufsiz + OS_PAGE_SIZE);
-		repl_filter_buff = (unsigned char *)ROUND_UP2((unsigned long)filterbuff, OS_PAGE_SIZE);
-		if (NULL != free_filter_buff)
+		repl_filter_buff = (unsigned char *)malloc(bufsiz);
+		if (NULL != old_filter_buff)
 		{
 			assert(NULL != old_filter_buff);
 			memcpy(repl_filter_buff, old_filter_buff, repl_filter_bufsiz);
-			free(free_filter_buff);
+			free(old_filter_buff);
 		}
 		repl_filter_bufsiz = bufsiz;
 	}
@@ -271,35 +265,29 @@ int gtmsource_alloc_filter_buff(int bufsiz)
 
 void gtmsource_free_filter_buff(void)
 {
-	if (NULL != filterbuff)
+	if (NULL != repl_filter_buff)
 	{
 		assert(NULL != repl_filter_buff);
-		free(filterbuff);
-		filterbuff = repl_filter_buff = NULL;
+		free(repl_filter_buff);
+		repl_filter_buff = NULL;
 		repl_filter_bufsiz = 0;
 	}
 }
 
 int gtmsource_alloc_msgbuff(int maxbuffsize)
-{ /* Allocate message buffer */
-
+{	/* Allocate message buffer */
 	repl_msg_ptr_t	oldmsgp;
-	unsigned char	*free_msgp;
 
 	assert(MIN_REPL_MSGLEN < maxbuffsize);
-	maxbuffsize = ROUND_UP2(maxbuffsize, OS_PAGE_SIZE);
-	if (maxbuffsize > gtmsource_msgbufsiz || NULL == gtmsource_msgp)
+	if ((maxbuffsize > gtmsource_msgbufsiz) || (NULL == gtmsource_msgp))
 	{
 		REPL_DPRINT3("Expanding message buff from %d to %d\n", gtmsource_msgbufsiz, maxbuffsize);
-		free_msgp = msgbuff;
 		oldmsgp = gtmsource_msgp;
-		msgbuff = (unsigned char *)malloc(maxbuffsize + OS_PAGE_SIZE);
-		gtmsource_msgp = (repl_msg_ptr_t)ROUND_UP2((unsigned long)msgbuff, OS_PAGE_SIZE);
-		if (NULL != free_msgp)
-		{ /* Copy existing data */
-			assert(NULL != oldmsgp);
+		gtmsource_msgp = (repl_msg_ptr_t)malloc(maxbuffsize);
+		if (NULL != oldmsgp)
+		{	/* Copy existing data */
 			memcpy((unsigned char *)gtmsource_msgp, (unsigned char *)oldmsgp, gtmsource_msgbufsiz);
-			free(free_msgp);
+			free(oldmsgp);
 		}
 		gtmsource_msgbufsiz = maxbuffsize;
 		gtmsource_alloc_filter_buff(gtmsource_msgbufsiz);
@@ -309,11 +297,9 @@ int gtmsource_alloc_msgbuff(int maxbuffsize)
 
 void gtmsource_free_msgbuff(void)
 {
-	if (NULL != msgbuff)
+	if (NULL != gtmsource_msgp)
 	{
-		assert(NULL != gtmsource_msgp);
-		free(msgbuff);
-		msgbuff = NULL;
+		free(gtmsource_msgp);
 		gtmsource_msgp = NULL;
 		gtmsource_msgbufsiz = 0;
 	}

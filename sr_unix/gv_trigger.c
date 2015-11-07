@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -196,6 +196,7 @@ LITREF	mval	literal_zero;
 #define	KEYSUB_S2POOL_IF_NEEDED(KEYSUB_MVAL, KEYSUB, THISSUB)				\
 {											\
 	unsigned char		str_buff[MAX_ZWR_KEY_SZ], *str_end;			\
+	mstr			opstr;							\
 											\
 	KEYSUB_MVAL = lvvalarray[KEYSUB];						\
 	if (NULL == KEYSUB_MVAL)							\
@@ -205,7 +206,9 @@ LITREF	mval	literal_zero;
 		KEYSUB_MVAL->mvtype = 0;						\
 		lvvalarray[KEYSUB] = KEYSUB_MVAL;					\
 		THISSUB = keysub_start[KEYSUB];						\
-		str_end = gvsub2str((unsigned char *)THISSUB, str_buff, FALSE);		\
+		opstr.addr = (char *)str_buff;						\
+		opstr.len = MAX_ZWR_KEY_SZ;						\
+		str_end = gvsub2str((unsigned char *)THISSUB, &opstr, FALSE);		\
 		KEYSUB_MVAL->str.addr = (char *)str_buff;				\
 		KEYSUB_MVAL->str.len = INTCAST(str_end - str_buff);			\
 		KEYSUB_MVAL->mvtype = MV_STR;						\

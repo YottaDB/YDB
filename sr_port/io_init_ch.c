@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,11 +26,13 @@ CONDITION_HANDLER(io_init_ch)
 	io_log_name	*iol;
 
 	START_CH(TRUE);
+#	ifdef VMS
 	if (INFO == SEVERITY)
 	{
 		PRN_ERROR;
 		CONTINUE;
 	}
+#	endif
 	for (iol = io_root_log_name;  0 != iol;  iol = iol->next)
 	{
 		if (iol->iod && (iol->iod->type == tt) && iol->iod->dev_sp)

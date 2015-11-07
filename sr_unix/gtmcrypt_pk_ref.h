@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2013 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc 	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ int			gc_pk_gpghome_has_permissions(void);
 	{														\
 		pk_crypt_ctx = NULL;											\
 		UPDATE_ERROR_STRING("Error initializing GpgME: %s/%s", gpgme_strsource(err), gpgme_strerror(err));	\
-		return GC_FAILURE;											\
+		return -1;												\
 	}														\
 }
 

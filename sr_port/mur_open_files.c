@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,6 @@
 #include "mu_rndwn_file.h"
 #include "read_db_files_from_gld.h"
 #include "mur_db_files_from_jnllist.h"
-#include "gtm_rename.h"
 #include "gtmmsg.h"
 #include "file_head_read.h"
 #include "mupip_exit.h"
@@ -138,23 +137,21 @@
 }
 #endif
 
-GBLREF	boolean_t		blocksig_initialized;
-GBLREF	sigset_t		block_sigsent;
-GBLREF	reg_ctl_list		*mur_ctl;
-GBLREF	mur_opt_struct		mur_options;
-GBLREF 	mur_gbls_t		murgbl;
+GBLREF	gd_addr			*gd_header;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	gd_addr			*gd_header;
+GBLREF	mur_opt_struct		mur_options;
+GBLREF 	mur_gbls_t		murgbl;
+GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF	sgmnt_data		*cs_data;
 #ifdef UNIX
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	int4			strm_index;
-GBLREF	uint4			process_id;
 GBLREF	jnl_gbls_t		jgbl;
-GBLREF	boolean_t		jnlpool_init_needed;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	uint4			process_id;
 #endif
 
 
@@ -196,12 +193,12 @@ error_def (ERR_ORLBKSTART);
 error_def (ERR_REPLSTATEOFF);
 error_def (ERR_RLBKNOBIMG);
 error_def (ERR_ROLLBKINTERRUPT);
-error_def (ERR_SRVLCKWT2LNG);
 error_def (ERR_STARFILE);
 error_def (ERR_TEXT);
 error_def (ERR_WCBLOCKED);
 
 #define		STAR_QUOTE "\"*\""
+
 boolean_t mur_open_files()
 {
 	boolean_t			interrupted_rollback;
@@ -236,6 +233,7 @@ boolean_t mur_open_files()
 	sgmnt_data			*tmpcsd;
 	gd_region			*reg;
 	int4				llcnt, max_epoch_interval = 0, idx;
+	int				save_errno;
 	unix_db_info			*udi;
 	now_t				now;
 	char				*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
@@ -307,7 +305,7 @@ boolean_t mur_open_files()
 		if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE, &jnlpool_sem_created))
 			return FALSE;	/* mu_rndwn_repl_instance will have printed appropriate message in case of error */
 		assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
-		assert(jgbl.onlnrlbk || ANTICIPATORY_FREEZE_AVAILABLE || (NULL == jnlpool_ctl));
+		assert(jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY || (NULL == jnlpool_ctl));
 		ASSERT_HOLD_REPLPOOL_SEMS;
 		assert(NULL != jnlpool.repl_inst_filehdr);
 		assert(INVALID_SEMID != jnlpool.repl_inst_filehdr->jnlpool_semid);
@@ -334,8 +332,7 @@ boolean_t mur_open_files()
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILENOTFND, 2, tran_name->len, tran_name->addr);
 			return FALSE;
-		}
-		else
+		} else
 		{
 			tran_name->len = full_len;	/* since on vax, mstr.len is a 'short' */
 			set_gdid_from_file((gd_id_ptr_t)&file_id, replpool_id.gtmgbldir, tran_name->len);
@@ -380,7 +377,8 @@ boolean_t mur_open_files()
 		rctl->csd = NULL;
 		rctl->jctl = rctl->jctl_head = rctl->jctl_alt_head = rctl->jctl_turn_around = rctl->jctl_apply_pblk = NULL;
 		murgbl.reg_full_total++;	/* mur_close_files() expects rctl->csa and rctl->jctl to be initialized.
-						 * so consider this rctl only after those have been initialized. */
+						 * so consider this rctl only after those have been initialized.
+						 */
 		/* Do region specific initialization */
 		init_hashtab_mname(&rctl->gvntab, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);	/* for mur_forward() */
 		rctl->db_ctl = (file_control *)malloc(SIZEOF(file_control));
@@ -649,7 +647,6 @@ boolean_t mur_open_files()
 			{	/* NOTE: Only for collation info extract needs database access */
 				DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES); /* temporarily disable MUPIP STOP/signal handling. */
 				TP_CHANGE_REG(rctl->gd);
-
 				csa = rctl->csa = &FILE_INFO(rctl->gd)->s_addrs;
 				csd = rctl->csd = rctl->csa->hdr;
 				UNIX_ONLY(assert(!jgbl.onlnrlbk || (csa->now_crit && csa->hold_onto_crit)));
@@ -764,7 +761,8 @@ boolean_t mur_open_files()
 					}
 					if (csd->freeze UNIX_ONLY(&& !jgbl.onlnrlbk))
 					{	/* region_freeze should release freeze here. For ONLINE ROLLBACK we would have
-						 * waited for the freeze to be lifted off before */
+						 * waited for the freeze to be lifted off before
+						 */
 						reg_frz_status = region_freeze(rctl->gd, FALSE, TRUE, FALSE);
 						assert (0 == rctl->csa->hdr->freeze);
 						assert(REG_FREEZE_SUCCESS == reg_frz_status);
@@ -802,12 +800,12 @@ boolean_t mur_open_files()
 			} else
 			{	/* temporarily disable MUPIP STOP/signal handling. */
 				DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES);
-
 				/* NOTE: csa field is NULL, if we do not open database */
 				csd = rctl->csd = (sgmnt_data_ptr_t)malloc(SGMNT_HDR_LEN);
 				assert(0 == rctl->gd->dyn.addr->fname[rctl->gd->dyn.addr->fname_len]);
 				/* 1) show 2) extract 3) verify action does not need standalone access.
-				 * In this case csa is NULL */
+				 * In this case csa is NULL
+				 */
 				if (!file_head_read((char *)rctl->gd->dyn.addr->fname, rctl->csd, SGMNT_HDR_LEN))
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBFILOPERR, 2, REG_LEN_STR(rctl->gd));
@@ -820,7 +818,8 @@ boolean_t mur_open_files()
 				ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES); /* reenable the interrupts */
 			}
 			/* For star_specified we open journal files here.
-			 * For star_specified we cannot do anything if journaling is disabled */
+			 * For star_specified we cannot do anything if journaling is disabled
+			 */
 			if (star_specified && JNL_ALLOWED(csd))
 			{
 				jctl = (jnl_ctl_list *)malloc(SIZEOF(jnl_ctl_list));
@@ -830,8 +829,10 @@ boolean_t mur_open_files()
 				memcpy(jctl->jnl_fn, csd->jnl_file_name, csd->jnl_file_len);
 				jctl->jnl_fn[jctl->jnl_fn_len] = 0;
 				/* If system crashed during rename, following will fix it .
-				 * Following function is directly related to cre_jnl_file_common */
-				cre_jnl_file_intrpt_rename(jctl->jnl_fn_len, jctl->jnl_fn);
+				 * Following function is directly related to cre_jnl_file_common
+				 */
+				if (rctl->standalone || (rctl->csa && rctl->csa->now_crit))
+					cre_jnl_file_intrpt_rename(rctl->csa);
 				if (!mur_fopen(jctl))
 				{
 					return FALSE;
@@ -896,7 +897,8 @@ boolean_t mur_open_files()
 	/* At this point mur_ctl[] has been created from the current global directory database file names
 	 * or from the journal file header's database names.
 	 * For star_specified == TRUE implicitly only current generation journal files are specified and already opened
-	 * For star_specified == FALSE user can specify multiple generations. We need to sort them */
+	 * For star_specified == FALSE user can specify multiple generations. We need to sort them
+	 */
 	if (!star_specified)
 	{
 		jnlno = 0;
@@ -917,7 +919,6 @@ boolean_t mur_open_files()
 				return FALSE;
 			}
 			cptr++;	/* skip separator */
-			/* Note cre_jnl_file_intrpt_rename was already called in mur_db_files_from_jnllist */
 			if (!mur_fopen(jctl))	/* dont know rctl yet */
 			{
 				return FALSE;
@@ -956,8 +957,8 @@ boolean_t mur_open_files()
 			{
 				VMS_ONLY(set_gdid_from_file(&jctl->fid, (char *)jctl->jnl_fn, jctl->jnl_fn_len);)
 #				if defined(UNIX)
-				if (filename_to_id(&jctl->fid, (char *)jctl->jnl_fn))
-				{
+				if (SS_NORMAL == (save_errno = filename_to_id(&jctl->fid, (char *)jctl->jnl_fn)))
+				{	/* WARNING: assignment above */
 #				endif
 					for (temp_jctl = rctl->jctl_head; temp_jctl; temp_jctl = temp_jctl->next_gen)
 					{
@@ -971,11 +972,10 @@ boolean_t mur_open_files()
 						}
 					}
 #				if defined(UNIX)
-				}
-				else
+				} else
 				{
 					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(11) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len,
-						       jctl->jnl_fn, ERR_SYSCALL, 5, LEN_AND_LIT("fstat"), CALLFROM, errno);
+						       jctl->jnl_fn, ERR_SYSCALL, 5, LEN_AND_LIT("fstat"), CALLFROM, save_errno);
 					return FALSE;
 				}
 #				endif
@@ -1034,9 +1034,9 @@ boolean_t mur_open_files()
 			}   /* mur_options.forward */
 		} /* for jnlno */
 	}
-
 	/* If not all regions of a global directory are processed, we shrink mur_ctl array and conserve space.
-	 * It is specially needed for later code */
+	 * It is specially needed for later code
+	 */
 	murgbl.reg_total = murgbl.reg_full_total;
 	for (regno = 0; regno < murgbl.reg_total; regno++)
 	{
@@ -1066,7 +1066,8 @@ boolean_t mur_open_files()
 	if (0 == murgbl.reg_total)
 		return FALSE;
 	/* From this point consider only regions with journals to be processed (murgbl.reg_total)
-	 * However mur_close_files will close all regions opened (murgbl.reg_full_total) */
+	 * However mur_close_files will close all regions opened (murgbl.reg_full_total)
+	 */
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
 		jctl = rctl->jctl_head;

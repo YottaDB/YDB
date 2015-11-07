@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -463,7 +463,7 @@ void mupip_restore(void)
 			{
 				if (is_bkup_file_encrypted)
 				{
-					GTMCRYPT_GETKEY(NULL, bkup_hash, bkup_key_handle, gtmcrypt_errno);
+					GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, bkup_hash, bkup_key_handle, gtmcrypt_errno);
 					if (0 != gtmcrypt_errno)
 					{
 						GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, ptr->input_file.len,
@@ -473,7 +473,8 @@ void mupip_restore(void)
 				}
 				if (old_data.is_encrypted)
 				{
-					GTMCRYPT_GETKEY(NULL, old_data.encryption_hash, target_key_handle, gtmcrypt_errno);
+					GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, old_data.encryption_hash, target_key_handle,
+						gtmcrypt_errno);
 					if (0 != gtmcrypt_errno)
 					{
 						GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, n_len, db_name);

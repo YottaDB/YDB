@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,9 +12,10 @@
 #include "mdef.h"
 
 #include <stddef.h>
-
 #include "gtm_string.h"
+#include "gtm_stdio.h"
 
+#include "gtmio.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gtm_facility.h"
@@ -56,6 +57,12 @@
 #include "srcline.h"
 #include "opcode.h"
 #include "glvn_pool.h"
+#ifdef GTM_CRYPT
+# include "iormdef.h"
+#endif
+#ifdef USHBIN_SUPPORTED
+# include "relinkctl.h"
+#endif
 
 #ifndef STP_MOVE
 GBLDEF int	indr_stp_low_reclaim_passes = 0;
@@ -98,6 +105,7 @@ GBLREF boolean_t		suspend_lvgcol;
 GBLREF hash_table_str		*complits_hashtab;
 GBLREF mval			*alias_retarg;
 GTMTRIG_ONLY(GBLREF mval 	dollar_ztwormhole;)
+DEBUG_ONLY(GBLREF   boolean_t	ok_to_UNWIND_in_exit_handling;)
 
 OS_PAGE_SIZE_DECLARE
 
@@ -294,6 +302,23 @@ error_def(ERR_STPEXPFAIL);
 	}													\
 }
 
+#define MOVE_WITHIN_STPOOL(cstr, topstr)									\
+{														\
+	while (cstr < topstr)											\
+	{													\
+		/* Determine extent of next contiguous block to move and move it. */				\
+		if (mstr_native_align)										\
+			stringpool.free = (unsigned char *)ROUND_UP2((INTPTR_T)stringpool.free, NATIVE_WSIZE);	\
+		begaddr = endaddr = (unsigned char *)((*cstr)->addr);						\
+		delta = (*cstr)->addr - (char *)stringpool.free;						\
+		PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta);					\
+		blklen = endaddr - begaddr;									\
+		if (delta)											\
+			memmove(stringpool.free, begaddr, blklen);						\
+		stringpool.free += blklen;									\
+	}													\
+}
+
 #define LVZWRITE_BLOCK_GC(LVZWRITE_BLOCK)									\
 {														\
 	if ((NULL != (LVZWRITE_BLOCK)) && ((LVZWRITE_BLOCK)->curr_subsc))					\
@@ -350,7 +375,7 @@ static void expand_stp(unsigned int new_size)	/* BYPASSOK */
 {
 	if (retry_if_expansion_fails)
 		ESTABLISH(stp_gcol_ch);
-	assert(IS_GTM_IMAGE || IS_MUPIP_IMAGE || IS_GTM_SVC_DAL_IMAGE);
+	assert(IS_GTM_IMAGE || IS_MUPIP_IMAGE);
 	assert(!stringpool_unexpandable);
 	DBGSTPGCOL((stderr, "expand_stp(new_size=%u)\n", new_size));
 	stp_init(new_size);
@@ -470,10 +495,17 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 	lv_xnew_var		*xnewvar;
 	lvzwrite_datablk	*lvzwrblk;
 	tp_var			*restore_ent;
-	boolean_t		non_mandatory_expansion, exp_gt_spc_needed, first_expansion_try;
+	boolean_t		non_mandatory_expansion, exp_gt_spc_needed;
 	routine_source		*rsptr;
 	glvn_pool_entry		*slot, *top;
 	int			i, n;
+	unsigned char		*old_free;
+#	ifdef USHBIN_SUPPORTED
+	open_relinkctl_sgm	*linkctl;
+#	endif
+#	ifdef GTM_CRYPT
+	d_rm_struct		*rm_ptr;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -649,7 +681,25 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 		for (l = io_root_log_name; 0 != l; l = l->next)
 		{
 			if ((IO_ESC != l->dollar_io[0]) && (l->iod->trans_name == l))
+			{
 				MSTR_STPG_ADD(&l->iod->error_handler);
+#				ifdef GTM_CRYPT
+				rm_ptr = (d_rm_struct *)l->iod->dev_sp;
+				if (NULL != rm_ptr)
+				{	/* Protect the IVs and KEYs as needed. */
+					if (rm_ptr->input_encrypted)
+					{
+						MSTR_STPG_ADD(&rm_ptr->input_iv);
+						MSTR_STPG_ADD(&rm_ptr->input_key);
+					}
+					if (rm_ptr->output_encrypted)
+					{
+						MSTR_STPG_ADD(&rm_ptr->output_iv);
+						MSTR_STPG_ADD(&rm_ptr->output_key);
+					}
+				}
+#				endif
+			}
 		}
 		MVAL_STPG_ADD(&dollar_etrap);
 		MVAL_STPG_ADD(&dollar_system);
@@ -835,9 +885,22 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 				tf = tf->old_tp_frame;
 			}
 		}
+#		ifdef USHBIN_SUPPORTED
+		/* Make sure we keep track of the relinkable directory names */
+		for (linkctl = TREF(open_relinkctl_list); NULL != linkctl; linkctl = linkctl->next)
+		{
+			MSTR_STPG_ADD(&linkctl->zro_entry_name);
+		}
+#		endif
 	}
 	space_before_compact = stringpool.top - stringpool.free; /* Available space before compaction */
 	DEBUG_ONLY(blklen = stringpool.free - stringpool.base);
+	old_free = stringpool.free;
+	/* Reset stringpool.free in the hope stringpool garbage collection (and expansion if needed) would happen.
+	 * If there are any errors in this process, we need to remember to restore stringpool.free as otherwise
+	 * any mval in the stringpool could potentially be overwritten later (for a new mval since there is an
+	 * incorrect view of available stringpool space) resulting in memory corruption.
+	 */
 	stringpool.free = stringpool.base;
 	if (topstr != array)
 	{
@@ -903,29 +966,8 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 		strpool_base = stringpool.base;
 		/* Grow stringpool geometrically */
 		stp_incr = (stringpool.top - stringpool.base) * *incr_factor / STP_NUM_INCRS;
-		first_expansion_try = TRUE;
-		while (first_expansion_try || (retry_if_expansion_fails && expansion_failed))
+		do
 		{
-			if (!first_expansion_try)
-			{
-				/* Once we hit the memory wall no more non_mandatory expansions */
-				if (non_mandatory_expansion)
-					stop_non_mandatory_expansion = TRUE;
-				/* We were not able to get the memory we wanted. Plan B it to get as much of what we wanted
-				 * (down to what was actually needed). If we can't get what was actually needed allow
-				 * the user to get a memory error.
-				 */
-				if (1 < *incr_factor)
-				{
-					/* if we hit the memory wall with an elevated incr_factor drop back a notch and retry */
-					*incr_factor = *incr_factor - 1;
-					stp_incr = (stringpool.top - stringpool.base) * *incr_factor / STP_NUM_INCRS;
-				} else
-					/* if we are already at the lowest incr_factor half our way down */
-					if (stp_incr > space_needed)
-						stp_incr = stp_incr / 2;
-			}
-			first_expansion_try = FALSE;
 			if (stp_incr < space_needed)
 				stp_incr = space_needed;
 			/* If we are asking for more than is actually needed we want to try again if we do not get it. */
@@ -942,7 +984,34 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 			assert((stp_incr + stringpool.top - stringpool.base) >= (space_needed + blklen));
 			DBGSTPGCOL((stderr, "incr_factor=%i stp_incr=%i space_needed=%i\n", *incr_factor, stp_incr, space_needed));
 			expand_stp((unsigned int)(stp_incr + stringpool.top - stringpool.base));
-		}
+#			ifdef DEBUG
+			/* If expansion failed and stp_gcol_ch did an UNWIND and we were already in exit handling code,
+			 * ok_to_UNWIND_in_exit_handling would have been set to avoid an assert in UNWIND macro. Now that
+			 * we are back from stp_gcol_ch, reset it so future UNWINDs in exit-handling are assert checked.
+			 */
+			if (expansion_failed && process_exiting)
+				ok_to_UNWIND_in_exit_handling = FALSE;
+#			endif
+			if (!retry_if_expansion_fails || !expansion_failed)
+				break;
+			/* Once we hit the memory wall no more non_mandatory expansions */
+			if (non_mandatory_expansion)
+				stop_non_mandatory_expansion = TRUE;
+			/* We were not able to get the memory we wanted. Plan B it to get as much of what we wanted
+			 * (down to what was actually needed). If we can't get what was actually needed allow
+			 * the user to get a memory error.
+			 */
+			if (1 < *incr_factor)
+			{
+				/* if we hit the memory wall with an elevated incr_factor drop back a notch and retry */
+				*incr_factor = *incr_factor - 1;
+				stp_incr = (stringpool.top - stringpool.base) * *incr_factor / STP_NUM_INCRS;
+			} else
+			{	/* if we are already at the lowest incr_factor half our way down */
+				if (stp_incr > space_needed)
+					stp_incr = stp_incr / 2;
+			}
+		} while (TRUE);
 		if (strpool_base != stringpool.base) /* expanded successfully */
 		{
 			cstr = array;
@@ -958,8 +1027,12 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 		{	/* Could not expand during forced expansion */
 			assert(non_mandatory_expansion && stop_non_mandatory_expansion);
 			if (space_after_compact < space_needed)
+			{	/* Restore stringpool.free since no garbage collection happened. */
+				stringpool.free = old_free;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_STPEXPFAIL, 1,
 					      (stp_incr + stringpool.top - stringpool.base));
+			}
+			MOVE_WITHIN_STPOOL(cstr, topstr);
 		}
 		*low_reclaim_passes = 0;
 	} else
@@ -989,19 +1062,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 			 */
 			cstr = array;
 			begaddr = endaddr = (unsigned char *)((*cstr)->addr);
-			while (cstr < topstr)
-			{
-				/* Determine extent of next contiguous block to move and move it. */
-				if (mstr_native_align)
-					stringpool.free = (unsigned char *)ROUND_UP2((INTPTR_T)stringpool.free, NATIVE_WSIZE);
-				begaddr = endaddr = (unsigned char *)((*cstr)->addr);
-				delta = (*cstr)->addr - (char *)stringpool.free;
-				PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta);
-				blklen = endaddr - begaddr;
-				if (delta)
-					memmove(stringpool.free, begaddr, blklen);
-				stringpool.free += blklen;
-			}
+			MOVE_WITHIN_STPOOL(cstr, topstr);
 		}
 #		ifdef STP_MOVE
 		if (0 != stp_move_count)

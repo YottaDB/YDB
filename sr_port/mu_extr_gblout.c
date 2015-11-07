@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,13 +127,7 @@ boolean_t mu_extr_gblout(glist *gl_ptr, struct RAB *outrab, mu_extr_stats *st, i
 		if (prev_csd != cs_data)
 		{
 			prev_csd = cs_data;
-			for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions, index = 0;
-					reg < reg_top; reg++, index++)
-			{
-				if (gv_cur_region == reg)
-					break;
-			}
-			assert(gv_cur_region < reg_top);
+			index = find_reg_hash_idx(gv_cur_region);
 		}
 		/* We have to write the encrypted version of the block. Instead of encrypting the plain-text version of the
 		 * block, we just reference the encrypted version of the block that is already maintained in sync with the
@@ -151,7 +145,7 @@ boolean_t mu_extr_gblout(glist *gl_ptr, struct RAB *outrab, mu_extr_stats *st, i
 		if (mu_ctrlc_occurred)
 		{
 			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_RECORDSTAT, 6, LEN_AND_LIT("TOTAL"),
-				 st->recknt, st->keylen, st->datalen, st->reclen);
+				 &st->recknt, st->keylen, st->datalen, st->reclen);
 			mu_ctrlc_occurred = FALSE;
 		}
 		encrypted_bp = NULL;

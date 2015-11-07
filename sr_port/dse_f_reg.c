@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #include "util.h"
 #include "cli.h"
 #include "dse.h"
+#include "gtmmsg.h"
 
 GBLREF block_id		patch_curr_blk;
 GBLREF gd_region	*gv_cur_region;
@@ -32,6 +33,11 @@ GBLREF mval		dollar_zgbldir;
 GBLREF gd_addr		*original_header;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
+
+error_def(ERR_DSENOTOPEN);
+error_def(ERR_NOGTCMDB);
+error_def(ERR_NOREGION);
+error_def(ERR_NOUSERDB);
 
 void dse_f_reg(void)
 {
@@ -55,6 +61,8 @@ void dse_f_reg(void)
 		return;
 	}
 	assert(rn[0]);
+	for (i = 0; i < rnlen; i++)				/* Region names are always upper-case ASCII */
+		rn[i] = TOUPPER(rn[i]);
 	found = FALSE;
 	for (i = 0, ptr = original_header->regions; i < original_header->n_regions ;i++, ptr++)
 	{
@@ -63,7 +71,7 @@ void dse_f_reg(void)
 	}
 	if (!found)
 	{
-		util_out_print("Error:  region not found.", TRUE);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, rnlen, rn);
 		return;
 	}
 	if (ptr == gv_cur_region)
@@ -71,26 +79,29 @@ void dse_f_reg(void)
 		util_out_print("Error:  already in region: !AD", TRUE, REG_LEN_STR(gv_cur_region));
 		return;
 	}
-	if (dba_cm == REG_ACC_METH(ptr))
+	/* reg_cmcheck would have already been called for ALL regions at region_init time. In Unix, this would have set
+	 * reg->dyn.addr->acc_meth to dba_cm if it is remote database. So we can safely use this to check if the region
+	 * is dba_cm or not. In VMS though reg_cmcheck does not modify acc_meth so we call reg_cmcheck in that case.
+	 */
+	if (UNIX_ONLY(dba_cm == ptr->dyn.addr->acc_meth) VMS_ONLY(reg_cmcheck(ptr)))
 	{
-		util_out_print("Error:  Cannot edit an GT.CM database file.", TRUE);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOGTCMDB, 4, LEN_AND_LIT("DSE"), rnlen, rn);	/* no VMS test */
 		return;
 	}
+#	ifdef VMS
 	if (dba_usr == REG_ACC_METH(ptr))
-	{
-		util_out_print("Error:  Cannot edit a non-GDS format database file.", TRUE);
+	{	/* VMS only; no test */
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOUSERDB, 4, LEN_AND_LIT("DSE"), rnlen, rn);
 		return;
 	}
+#	endif
 	if (!ptr->open)
 	{
-		util_out_print("Error:  that region was not opened because it is not bound to any namespace.", TRUE);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DSENOTOPEN, 2, rnlen, rn);
 		return;
 	}
 	if (cs_addrs->now_crit)
-	{
-		util_out_print("Warning:  now leaving region in critical section: !AD", TRUE, gv_cur_region->rname_len,
-				gv_cur_region->rname);
-	}
+		util_out_print("Warning:  now leaving region in critical section: !AD", TRUE, REG_LEN_STR(gv_cur_region));
 	gv_cur_region = ptr;
 	gv_target = NULL;	/* to prevent out-of-sync situations between gv_target and cs_addrs */
 	assert((dba_mm == REG_ACC_METH(gv_cur_region)) || (dba_bg == REG_ACC_METH(gv_cur_region)));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,9 +52,6 @@
 #include "rc_cpt_ops.h"
 #include "gv_rundown.h"
 #include "targ_alloc.h"
-#ifdef GTM_CRYPT
-#include "gtmcrypt.h"
-#endif
 #if defined(DEBUG) && defined(UNIX)
 #include "anticipatory_freeze.h"
 #endif
@@ -107,7 +104,8 @@ void gv_rundown(void)
 				 * region->open is TRUE although cs_addrs is NULL.
 			 	 */
 #				if defined(DEBUG) && defined(UNIX)
-				if (is_jnlpool_creator && ANTICIPATORY_FREEZE_AVAILABLE && TREF(gtm_test_fake_enospc))
+				if (is_jnlpool_creator
+					&& INST_FREEZE_ON_NOSPC_ENABLED(REG2CSA(r_local)) && TREF(gtm_test_fake_enospc))
 				{	/* Clear ENOSPC faking now that we are running down */
 					csa = REG2CSA(r_local);
 					if (csa->nl->fake_db_enospc || csa->nl->fake_jnl_enospc)
@@ -199,7 +197,6 @@ void gv_rundown(void)
 	rc_close_section();
 	gv_cur_region = r_save;		/* Restore value for dumps but this region is now closed and is otherwise defunct */
 	cs_addrs = NULL;
-	GTMCRYPT_ONLY(GTMCRYPT_CLOSE;)
 #ifdef UNIX
 	gtmsecshr_sock_cleanup(CLIENT);
 #ifndef MUTEX_MSEM_WAKE

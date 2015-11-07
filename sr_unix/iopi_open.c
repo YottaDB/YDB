@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,7 @@ LITREF	unsigned char		io_params_size[];
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
 GBLREF	boolean_t		gtm_pipe_child;
 GBLREF	char			gtm_dist[GTM_PATH_MAX];
+GBLREF	boolean_t		gtm_dist_ok_to_use;
 
 error_def(ERR_DEVOPENFAIL);
 error_def(ERR_SYSCALL);
@@ -203,7 +204,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 		} else
 		{
 			/* look in $gtm_dist in case not explicitly listed or not in the $PATH variable */
-			if (!STRLEN(gtm_dist))
+			if (gtm_dist_ok_to_use)
 			{
 				/* build a translated path to command */
 				SPRINTF(temp, "%s/%s", gtm_dist, token2);
@@ -474,8 +475,11 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		}
 	}
 	file_des_write = pfd_write[1];
-	/*do the fork and exec */
-	FORK(cpid);	/* BYPASSOK: we exec() immediately, no FORK_CLEAN needed */
+	/* Do the fork and exec but BEFORE that do a FFLUSH(NULL) to make sure any fclose (done in io_rundown
+	 * in the child process) does not affect file offsets in this (parent) process' file descriptors
+	 */
+	FFLUSH(NULL);
+	FORK(cpid);
 	if (-1 == cpid)
 	{
 		save_errno = errno;
@@ -612,7 +616,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 					  ERR_TEXT, 2, LEN_AND_LIT("Error in stream open"), save_errno);
 			}
 			d_rm->read_fildes = file_des_read;
-		}
+		} else
+			d_rm->read_fildes = FD_INVALID;
 		SPRINTF(&iod->dollar.key[0], "%d", cpid); /* save in pipe specific structure for $KEY access */
 		memcpy(iod->dollar.device, "0", SIZEOF("0"));
 		iod->state = dev_closed;
@@ -624,7 +629,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		d_rm->recordsize = DEF_RM_RECORDSIZE;
 		d_rm->def_width = d_rm->def_recsize = TRUE;
                 d_rm->fixed = FALSE;
-                d_rm->noread = FALSE;
+                d_rm->read_only = FALSE;
 		d_rm->padchar = DEF_RM_PADCHAR;
 		d_rm->inbuf = NULL;
 		d_rm->outbuf = NULL;
@@ -697,7 +702,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				io_ptr->dollar.device[0] = 0;
 				io_ptr->disp_ptr = iod->disp_ptr;
 				in_d_rm->fixed = d_rm->fixed;
-				in_d_rm->noread = TRUE;
+				in_d_rm->read_only = TRUE;
 				in_d_rm->padchar = d_rm->padchar;
 				in_d_rm->inbuf = d_rm->inbuf;
 				in_d_rm->outbuf = d_rm->outbuf;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@ UNIX_ONLY(GBLDEF) VMS_ONLY(LITDEF) dev_dispatch_struct io_dev_dispatch[] =
 #	endif
 	iotype(iomt, iomt, nil, nil),
 #	ifdef UNIX
-	iotype(iorm, iorm, iopi, nil),
+	iotype(iorm, iorm, iopi, iopi),
 #	else
 	iotype(iorm, iorm, nil, nil),
 #	endif
@@ -42,6 +42,6 @@ UNIX_ONLY(GBLDEF) VMS_ONLY(LITDEF) dev_dispatch_struct io_dev_dispatch[] =
 #	endif
 	iotype(iosocket, iosocket, iosocket, iosocket)
 #	ifdef UNIX
-	,iotype(iopi, iorm, iopi, nil)
+	,iotype(iopi, iorm, iopi, iopi)
 #	endif
 };

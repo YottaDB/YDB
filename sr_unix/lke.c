@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,20 +46,17 @@
 #include "gt_timer.h"
 #include "lke.h"
 #include "lke_fileio.h"
-#include "get_page_size.h"
 #include "gtm_startup_chk.h"
 #include "generic_signal_handler.h"
 #include "init_secshr_addrs.h"
 #include "cli_parse.h"
 #include "getzdir.h"
 #include "getjobname.h"
-#include "getjobnum.h"
 #include "sig_init.h"
 #include "gtmmsg.h"
 #include "suspsigs_handler.h"
 #include "patcode.h"
-#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 #include "gtmio.h"
 #include "have_crit.h"
@@ -93,10 +90,7 @@ int main (int argc, char *argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	set_blocksig();
-	gtm_imagetype_init(LKE_IMAGE);
-	gtm_wcswidth_fnptr = gtm_wcswidth;
-	gtm_env_init();	/* read in all environment variables */
+	common_startup_init(LKE_IMAGE);
 	licensed = TRUE;
 	err_init(util_base_ch);
 	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
@@ -104,7 +98,6 @@ int main (int argc, char *argv[])
 	sig_init(generic_signal_handler, lke_ctrlc_handler, suspsigs_handler, continue_handler);
 	atexit(util_exit_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
-	get_page_size();
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
 	getjobname();
@@ -116,7 +109,6 @@ int main (int argc, char *argv[])
 	initialize_pattern_table();
 	gvinit();
 	region_init(TRUE);
-	getjobnum();
 
 	cli_lex_setup(argc, argv);
 	/*      this should be after cli_lex_setup() due to S390 A/E conversion    */
@@ -127,6 +119,7 @@ int main (int argc, char *argv[])
 			break;
 	}
 	lke_exit();
+	return 0;
 }
 
 static bool lke_process(int argc)
@@ -137,7 +130,7 @@ static bool lke_process(int argc)
 
 	ESTABLISH_RET(util_ch, TRUE);
 	if (util_interrupt)
-		rts_error(VARLSTCNT(1) ERR_CTRLC);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 	if (SYS_STDERR != save_stderr)  /* necesary in case of rts_error */
 		close_fileio(&save_stderr);
 	assert(SYS_STDERR == save_stderr);
@@ -150,7 +143,7 @@ static bool lke_process(int argc)
 	{
 		if (util_interrupt)
 		{
-			rts_error(VARLSTCNT(1) ERR_CTRLC);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 			REVERT;
 			return TRUE;
 		}
@@ -164,9 +157,9 @@ static bool lke_process(int argc)
 		if (1 < argc)
 		{
 			REVERT;
-			rts_error(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
 		} else
-			gtm_putmsg(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
 	}
 	if (func)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,7 @@
 #include "gtm_stdlib.h"
 #include "gtm_inet.h"	/* Required for gtmsource.h */
 #include "gtm_stdio.h"
+#include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
 
 #ifdef VMS
 # include <descrip.h>	/* required for gtmsource.h */
@@ -35,6 +36,7 @@
 #include "gdscc.h"
 #include "gdskill.h"
 #include "gt_timer.h"
+#include "gtmio.h"
 #include "filestruct.h"
 #include "gtmdbglvl.h"
 #include "error.h"
@@ -90,67 +92,51 @@
 # include "gtm_trigger.h"
 #endif
 
-GBLREF	spdesc		stringpool, rts_stringpool, indr_stringpool;
-GBLREF	volatile int4	outofband;
-GBLREF	volatile bool	std_dev_outbnd;
-GBLREF	unsigned char   *restart_pc;
-GBLREF	unsigned char	*restart_ctxt;
-GBLREF	unsigned char	*stackwarn, *tpstackwarn;
-GBLREF	unsigned char	*stacktop, *tpstacktop;
-GBLREF	unsigned char	*msp, *tp_sp;
-GBLREF	mv_stent	*mv_chain;
-GBLREF	stack_frame	*frame_pointer, *zyerr_frame, *error_frame;
-GBLREF	tp_frame	*tp_pointer;
-GBLREF	io_desc		*active_device;
-GBLREF	lv_val		*active_lv;
-GBLREF	io_pair		io_std_device, io_curr_device;
-GBLREF	mval		dollar_ztrap;
-GBLREF	volatile bool	neterr_pending;
-GBLREF	xfer_entry_t	xfer_table[];
-GBLREF	unsigned short	proc_act_type;
-GBLREF	int		mumps_status;
-GBLREF	mstr		*err_act;
-GBLREF	tp_region	*tp_reg_list;		/* Chained list of regions used in this transaction not cleared on tp_restart */
-GBLREF	uint4		gtmDebugLevel;		/* Debug level */
-GBLREF	uint4		process_id;
-GBLREF	jnlpool_addrs	jnlpool;
-GBLREF	boolean_t	pool_init;
-GBLREF	boolean_t	created_core;
-GBLREF	boolean_t	dont_want_core;
-GBLREF	mval		dollar_zstatus, dollar_zerror;
-GBLREF	mval		dollar_etrap;
-GBLREF	volatile int4	gtmMallocDepth;
-GBLREF	int4		exi_condition;
-GBLREF	inctn_opcode_t	inctn_opcode;
-#ifdef VMS
-GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
-GBLREF	boolean_t		tp_restart_fail_sig_used;
-#endif
-GBLREF	int			merge_args;
-GBLREF	lvzwrite_datablk	*lvzwrite_block;
-GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	boolean_t		ctrlc_on, created_core, dont_want_core, in_gvcst_incr, pool_init;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
-GBLREF	boolean_t		in_gvcst_incr;
-GBLREF	gv_namehead		*gv_target;
+GBLREF	dollar_stack_type	dollar_stack;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	int			mumps_status, merge_args;
+GBLREF	int4			exi_condition;
+GBLREF	io_desc			*active_device, *gtm_err_dev;
+GBLREF	io_pair			io_std_device, io_curr_device;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	lvzwrite_datablk	*lvzwrite_block;
+GBLREF	mstr			*err_act;
+GBLREF	mval			*alias_retarg, dollar_etrap, dollar_zstatus, dollar_zerror, dollar_ztrap;
+GBLREF	mv_stent		*mv_chain;
+GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	sgm_info		*first_sgm_info;
-GBLREF	dollar_stack_type	dollar_stack;
-GBLREF	mval			*alias_retarg;
+GBLREF	spdesc			indr_stringpool, rts_stringpool, stringpool;
+GBLREF	stack_frame		*frame_pointer, *zyerr_frame, *error_frame;
+GBLREF	tp_frame		*tp_pointer;
+GBLREF	tp_region		*tp_reg_list;		/* Chained list of regions in this transaction not cleared on tp_restart */
+GBLREF	uint4			gtmDebugLevel;		/* Debug level */
+GBLREF	uint4			process_id;
+GBLREF	unsigned char		*msp, *restart_ctxt, *restart_pc, *stacktop, *stackwarn, *tp_sp, *tpstacktop, *tpstackwarn;
+GBLREF	unsigned short		proc_act_type;
+GBLREF	volatile bool		neterr_pending, std_dev_outbnd;
+GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	volatile int4		gtmMallocDepth, outofband;
+GBLREF	xfer_entry_t		xfer_table[];
+#ifdef DEBUG
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#endif
+#ifdef GTM_TRIGGER
+GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible - see tp_restart.h */
+GBLREF	int4			gtm_trigger_depth;
+#endif
 #ifdef UNIX
 GBLREF	jnl_gbls_t		jgbl;
 #endif
-GBLREF	io_desc			*gtm_err_dev;
-#ifdef GTM_TRIGGER
-GBLREF	int			tprestart_state;		/* When triggers restart, multiple states possible.
-								   See tp_restart.h */
-GBLREF	int4			gtm_trigger_depth;
-#endif
-#ifdef DEBUG
-GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#ifdef VMS
+GBLREF	boolean_t		tp_restart_fail_sig_used;
+GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
 #endif
 
 error_def(ERR_ASSERT);
@@ -208,6 +194,26 @@ void setup_error(sgmnt_addrs *csa, int argcnt, ...);
 #define MUM_TSTART_FRAME_CHECK
 #endif
 
+/* Since a call to SET_ZSTATUS may cause the stringpool expansion, record whether we are using an indirection pool or not
+ * in a local variable rather than recompare the stringpool bases.
+ */
+#define SAVE_ZSTATUS_INTO_RTS_STRINGPOOL(VAR, ARG)							\
+{													\
+	boolean_t using_indrpool;									\
+													\
+	using_indrpool = (stringpool.base != rts_stringpool.base);					\
+	if (using_indrpool)										\
+	{												\
+		indr_stringpool = stringpool;   /* update indr_stringpool */				\
+		stringpool = rts_stringpool;    /* change for set_zstatus */				\
+	}												\
+	VAR = SET_ZSTATUS(ARG);										\
+	if (using_indrpool)										\
+	{												\
+		rts_stringpool = stringpool;    /* update rts_stringpool */				\
+		stringpool = indr_stringpool;   /* change back */					\
+	}												\
+}
 
 /* We ignore errors in the $ZYERROR routine. When an error occurs, we unwind all stack frames upto and including
  * zyerr_frame. MUM_TSTART then transfers control to the $ZTRAP frame.
@@ -251,7 +257,7 @@ void setup_error(sgmnt_addrs *csa, int argcnt, ...)
 
 CONDITION_HANDLER(mdb_condition_handler)
 {
-	unsigned char		*cp, *context, *sp_base;
+	unsigned char		*cp, *context;
 	boolean_t		dm_action;	/* did the error occur on a action from direct mode */
 	boolean_t		trans_action;	/* did the error occur during "transcendental" code */
 	char			src_line[MAX_ENTRYREF_LEN];
@@ -265,7 +271,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 	boolean_t		error_in_zyerror;
 	boolean_t		repeat_error, etrap_handling, reset_mpc;
 	int			level, rc;
-	lv_val			*lvptr;
 	boolean_t		reserve_sock_dev = FALSE;
 #	ifdef UNIX
 	unix_db_info		*udi;
@@ -293,22 +298,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
 		SIGNAL = dollar_ecode.error_last_ecode;
 	preemptive_db_clnup(SEVERITY);
+	assert(NULL == alias_retarg);
 	if (NULL != alias_retarg)
-	{	/* An error has occurred while an alias return arg was in-flight. Delivery won't happen now
-		 * so we need to remove the extra counts that were added in unw_retarg() and dis-enchant
-		 * the alias container itself.
-		 */
-		assert(alias_retarg->mvtype & MV_ALIASCONT);
-		if (alias_retarg->mvtype & MV_ALIASCONT)
-		{	/* Protect the refs were are about to make in case ptr got banged up somehow */
-			lvptr = (lv_val *)alias_retarg->str.addr;
-			assert(LV_IS_BASE_VAR(lvptr));
-			DECR_CREFCNT(lvptr);
-			DECR_TREFCNT(lvptr);
-		}
-		alias_retarg->mvtype = 0;	/* Kill the temp var (no longer a container) */
-		alias_retarg = NULL;		/* .. and no more in-flight return argument */
-	}
+		CLEAR_ALIAS_RETARG;
 	if ((int)ERR_UNSOLCNTERR == SIGNAL)
 	{
 		/* This is here for linking purposes.  We want to delay the receipt of
@@ -386,6 +378,17 @@ CONDITION_HANDLER(mdb_condition_handler)
 				assertpro((SFT_TRIGR & frame_pointer->type) && (0 < gtm_trigger_depth));
 				mumps_status = rc;
 				DBGEHND((stderr, "mdb_condition_handler: Unwind-return to caller (gtm_trigger)\n"));
+				/* It is possible that dollar_tlevel at the time of the ESTABLISH of mdb_condition_handler
+				 * was higher than the current dollar_tlevel. This is because tp_restart done above could
+				 * have decreased dollar_tlevel. Even though dollar_tlevel before the UNWIND done
+				 * below is not the same as that at ESTABLISH_RET time, the flow of control bubbles back
+				 * correctly to the op_tstart at $tlevel=1 and resumes execution. So treat this as an exception
+				 * and adjust active_ch->dollar_tlevel so it is in sync with the current dollar_tlevel. This
+				 * prevents an assert failure in UNWIND. START_CH would have done a active_ch-- So we need a
+				 * active_ch[1] to get at the desired active_ch. See similar code in tp_restart.c.
+				 */
+				UNIX_ONLY(assert(active_ch[1].dollar_tlevel >= dollar_tlevel);)
+				UNIX_ONLY(DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;))
 				UNWIND(NULL, NULL);
 			}
 			/* "tp_restart" has succeeded so we have unwound back to the return point but check if the
@@ -554,12 +557,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 #	ifdef GTM_TRIGGER
 	assertpro(TPRESTART_STATE_NORMAL == tprestart_state);	/* Can't leave half-restarted transaction around - out of design */
 #	endif
-	if (active_lv)
-	{
-		if (!LV_IS_VAL_DEFINED(active_lv) && !LV_HAS_CHILD(active_lv))
-			op_kill(active_lv);
-		active_lv = (lv_val *)0;
-	}
+	UNDO_ACTIVE_LV(actlv_mdb_condition_handler);
 	/*
 	 * If error is at least severity "WARNING", do some cleanups. Note: crit is no longer unconditionally
 	 * released here. It is now released if NOT in TP (any retry) or if in TP but NOT in the final retry.
@@ -727,22 +725,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 		if (!repeat_error)
 			/* This has already been done if we are re-throwing the error */
 			outofband_clear();
-		if (!trans_action && !dm_action && !(frame_pointer->type & SFT_DM))
+		if (!trans_action && !ctrlc_on && !(frame_pointer->type & SFT_DM))
 		{
-			sp_base = stringpool.base;
-			if (sp_base != rts_stringpool.base)
-			{
-				indr_stringpool = stringpool;	/* update indr_stringpool */
-				stringpool = rts_stringpool;	/* change for set_zstatus */
-			}
 			if (!repeat_error)
 			{
-				dollar_ecode.error_last_b_line = SET_ZSTATUS(NULL);
-			}
-			if (sp_base != rts_stringpool.base)
-			{
-				rts_stringpool = stringpool;	/* update rts_stringpool */
-				stringpool = indr_stringpool;	/* change back */
+				SAVE_ZSTATUS_INTO_RTS_STRINGPOOL(dollar_ecode.error_last_b_line, NULL);
 			}
 			assert(NULL != dollar_ecode.error_last_b_line);
 			/* Only (re)set restart_pc if we are in the original frame. This is needed to restart execution at the
@@ -893,27 +880,20 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 */
 	if (!dm_action)
 	{
-		sp_base = stringpool.base;
-		if (sp_base != rts_stringpool.base)
-		{
-			indr_stringpool = stringpool;	/* update indr_stringpool */
-			stringpool = rts_stringpool;	/* change for set_zstatus */
-		}
 		if (!repeat_error)
-			dollar_ecode.error_last_b_line = SET_ZSTATUS(&context);
-		assert(NULL != dollar_ecode.error_last_b_line);
-		if (sp_base != rts_stringpool.base)
 		{
-			rts_stringpool = stringpool;	/* update rts_stringpool */
-			stringpool = indr_stringpool;	/* change back */
+			SAVE_ZSTATUS_INTO_RTS_STRINGPOOL(dollar_ecode.error_last_b_line, &context);
 		}
+		assert(NULL != dollar_ecode.error_last_b_line);
 	}
 	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
 	{
-		/* skip printing error messages for INFO messages if this variable is set.
+		/* In VMS skip printing error messages for INFO messages if skip_gtm_putmsg is TRUE.
 		 * this is currently relied upon by GDE for the VIEW "YCHKCOLL" command.
+		 * In UNIX send out messages only in utilities or direct mode, this addresses the GDE
+		 * issue described above for VMS as GDE is never in direct mode
 		 */
-		if (!TREF(skip_gtm_putmsg))
+		if (UNIX_ONLY(!IS_GTM_IMAGE || dm_action) VMS_ONLY(!TREF(skip_gtm_putmsg)))
 			PRN_ERROR;
 		CONTINUE;
 	}

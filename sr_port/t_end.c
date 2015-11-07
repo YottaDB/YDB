@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1479,7 +1479,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				 * effectively gets deferred but does happen.
 				 */
 				lcl_ss_ctx = SS_CTX_CAST(cs_addrs->ss_ctx);
-				if (lcl_ss_ctx && FASTINTEG_IN_PROG(lcl_ss_ctx))
+				if (lcl_ss_ctx && FASTINTEG_IN_PROG(lcl_ss_ctx) && (blkid < lcl_ss_ctx->total_blks))
 					WRITE_SNAPSHOT_BLOCK(cs_addrs, cr, NULL, blkid, lcl_ss_ctx);
 			}
 #			endif

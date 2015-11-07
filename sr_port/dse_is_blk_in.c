@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,20 +22,16 @@
 #include "dsefind.h"
 #include "dse.h"
 
+GBLREF block_id		patch_find_blk, patch_path[MAX_BT_DEPTH + 1], patch_path1[MAX_BT_DEPTH + 1];
+GBLREF boolean_t	patch_find_root_search;
+GBLREF int4		patch_offset[MAX_BT_DEPTH + 1], patch_offset1[MAX_BT_DEPTH + 1];
+GBLREF short int	patch_dir_path_count, patch_path_count;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF short int	patch_dir_path_count;
-GBLREF block_id		patch_find_blk;
-GBLREF bool		patch_find_root_search;
-GBLREF int4		patch_offset[MAX_BT_DEPTH + 1];
-GBLREF int4		patch_offset1[MAX_BT_DEPTH + 1];
-GBLREF block_id		patch_path[MAX_BT_DEPTH + 1];
-GBLREF block_id		patch_path1[MAX_BT_DEPTH + 1];
-GBLREF short int	patch_path_count;
 
 int dse_is_blk_in(sm_uc_ptr_t rp, sm_uc_ptr_t r_top, short size)
 {
-	sm_uc_ptr_t	key_top;
 	char		targ_key[MAX_KEY_SZ + 1];
+	sm_uc_ptr_t	key_top;
 
 	memcpy(targ_key, rp + SIZEOF(rec_hdr), size);
 	if ((patch_find_blk != patch_path[0])

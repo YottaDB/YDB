@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2013 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2014 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -162,6 +162,7 @@ key2blk:
 	; the computation below allows for at least 1 max-key record in a data OR index block.
 	; since an index block always contains a *-key, we need to account for that too.
 	; bs:block size, y:supportable max key size, f:size of reserved bytes, ks:key size
+	i REGION="TEMPLATE" q  ; do not do keysize/blksize check for TEMPLATE region as this is not a real region
 	s y=bs-f-SIZEOF("blk_hdr")-len("min_val")-SIZEOF("rec_hdr")-len("hide_subs")-len("bstar_rec")
 	i ks>y s verified=0 zm gdeerr("KEYSIZIS"):ks,gdeerr("KEYFORBLK"):bs:f:y,gdeerr("REGIS"):REGION
 	q

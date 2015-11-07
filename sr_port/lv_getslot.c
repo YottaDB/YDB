@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include "gtm_stdio.h"
 
+#include "gtmio.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -21,7 +22,17 @@
 #include "gdsfhead.h"
 #include "caller_id.h"
 #include "alias.h"
+#include <rtnhdr.h>
+#include "stack_frame.h"
 
+GBLREF stack_frame	*frame_pointer;
+GBLREF symval		*curr_symval;
+
+/* Allocate a local variable slot (lv_val) in an lv_blk that contains one or more unallocated entries.
+ *
+ * Argument: symval pointer to allocate the lv_val from.
+ * Returns:  allocated lv_val pointer.
+ */
 lv_val *lv_getslot(symval *sym)
 {
 	lv_blk		*p,*q;
@@ -31,7 +42,7 @@ lv_val *lv_getslot(symval *sym)
 	numElems = MAXUINT4;	/* maximum value */
 	if (lv = sym->lv_flist)
 	{
-		assert(NULL == LV_PARENT(lv));	/* stp_gcol relies on this for correct garbage collection */
+		assert(NULL == LV_PARENT(lv));		/* stp_gcol relies on this for correct garbage collection */
 		sym->lv_flist = (lv_val *)lv->ptrs.free_ent.next_free;
 	} else
 	{
@@ -57,12 +68,11 @@ lv_val *lv_getslot(symval *sym)
 				p->numUsed++;
 				break;
 			}
-			assert(numElems >= p->numAlloc);
-			DEBUG_ONLY(numElems = p->numAlloc);
 		}
 	}
 	assert(lv);
-	DBGRFCT((stderr, ">> lv_getslot(): Allocating new lv_val at 0x"lvaddr" by routine 0x"lvaddr"\n", lv, caller_id()));
+	DBGRFCT((stderr, "\n>> lv_getslot(): Allocating new lv_val at 0x"lvaddr" by routine 0x"lvaddr" at mpc 0x"lvaddr
+		 " for symval 0x"lvaddr" (curr_symval: 0x"lvaddr")\n", lv, caller_id(), frame_pointer->mpc, sym, curr_symval));
 	return lv;
 }
 

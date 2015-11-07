@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,10 @@
 #ifdef GTM_PTHREAD
 #  include <pthread.h>
 #endif
+#include "gtm_stat.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
+#include "gtm_limits.h"
 #include "cli.h"
 #include "stringpool.h"
 #include <rtnhdr.h>
@@ -32,17 +34,17 @@
 #include "mv_stent.h"
 #include "op.h"
 #include "gtm_startup.h"
+#include "gtmsecshr.h"
 #include "job_addr.h"
 #include "invocation_mode.h"
 #include "gtmimagename.h"
 #include "gtm_exit_handler.h"
 #include "gtm_savetraps.h"
-#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "code_address_type.h"
 #include "push_lvval.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 #ifdef GTM_TRIGGER
 # include "gdsroot.h"
@@ -62,11 +64,9 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "hashtab.h"
 #include "hashtab_str.h"
 #include "compiler.h"
-#include "gt_timer.h"
 #include "have_crit.h"
 #include "callg.h"
 #include "min_max.h"
-#include "gtm_limits.h"
 
 GBLREF	parmblk_struct 		*param_list;
 GBLREF  stack_frame     	*frame_pointer;
@@ -87,6 +87,7 @@ GBLREF	pthread_t		gtm_main_thread_id;
 GBLREF	boolean_t		gtm_main_thread_id_set;
 #endif
 GBLREF	char			gtm_dist[GTM_PATH_MAX];
+GBLREF boolean_t		gtm_dist_ok_to_use;
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 LITREF  gtmImageName            gtmImageNames[];
 
@@ -96,10 +97,14 @@ error_def(ERR_CIMAXLEVELS);
 error_def(ERR_CINOENTRY);
 error_def(ERR_CIRCALLNAME);
 error_def(ERR_CITPNESTED);
+error_def(ERR_DISTPATHMAX);
+error_def(ERR_GTMDISTUNDEF);
+error_def(ERR_GTMSECSHRPERM);
 error_def(ERR_INVGTMEXIT);
 error_def(ERR_JOBLABOFF);
 error_def(ERR_MAXACTARG);
 error_def(ERR_MAXSTRLEN);
+error_def(ERR_SYSCALL);
 
 #define REVERT_AND_RETURN						\
 {									\
@@ -230,7 +235,6 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	set_blocksig();
 	added = FALSE;
 	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_ci to be
 	 * invoked after a gtm_exit
@@ -538,7 +542,6 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	set_blocksig();
 	VAR_COPY(var, temp_var);
 	added = FALSE;
 	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_ci to be
@@ -950,6 +953,10 @@ int gtm_init()
 	rhdtyp          	*base_addr;
 	unsigned char   	*transfer_addr;
 	char			*dist;
+	int			dist_len;
+	char			gtmsecshr_path[GTM_PATH_MAX];
+	int			gtmsecshr_path_len;
+	struct stat		stat_buf;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -969,12 +976,37 @@ int gtm_init()
 	}
 	if (!gtm_startup_active)
 	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
-		gtm_imagetype_init(GTM_IMAGE);
-		gtm_wcswidth_fnptr = gtm_wcswidth;
-		gtm_env_init();	/* read in all environment variables */
+		common_startup_init(GTM_IMAGE);
 		err_init(stop_image_conditional_core);
 		UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
+		/* Ensure that $gtm_dist exists */
+		if (NULL == (dist = (char *)GETENV(GTM_DIST)))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
+		/* Ensure that $gtm_dist is non-zero and does not exceed GTM_DIST_PATH_MAX */
+		dist_len = STRLEN(dist);
+		if (!dist_len)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
+		else if (GTM_DIST_PATH_MAX <= dist_len)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_DIST_PATH_MAX);
+		/* Verify that $gtm_dist/gtmsecshr is available with setuid root */
+		memcpy(gtmsecshr_path, gtm_dist, dist_len);
+		gtmsecshr_path[dist_len] =  '/';
+		memcpy(gtmsecshr_path + dist_len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
+		gtmsecshr_path_len = dist_len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
+		assertpro(GTM_PATH_MAX > gtmsecshr_path_len);
+		gtmsecshr_path[gtmsecshr_path_len] = '\0';
+		if (-1 == Stat(gtmsecshr_path, &stat_buf))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("stat for $gtm_dist/gtmsecshr"), CALLFROM, errno);
+		/* Ensure that the call-in can execute $gtm_dist/gtmsecshr. This not sufficient for security purposes */
+		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
+		else
+		{	/* $gtm_dist validated */
+			gtm_dist_ok_to_use = TRUE;
+			memcpy(gtm_dist, dist, dist_len);
+		}
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,
 		 * the unwind logic in gtmci_ch() will get rid of the whole stack.
@@ -988,14 +1020,7 @@ int gtm_init()
 		invocation_mode = MUMPS_CALLIN;
 		init_gtm();			/* Note - this initializes fgncal_stackbase */
 		gtm_savetraps(); /* nullify default $ZTRAP handling */
-		if (NULL != (dist = (char *)GETENV(GTM_DIST)))
-		{
-			assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
-			if ((GTM_PATH_MAX - 2) <= (STRLEN(dist) + gtmImageNames[image_type].imageNameLen))
-				dist = NULL;
-			else
-				memcpy(gtm_dist, dist, STRLEN(dist));
-		}
+		assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
 		assert(gtm_startup_active);
 		assert(frame_pointer->flags & SFF_CI);
 		TREF(gtmci_nested_level) = 1;

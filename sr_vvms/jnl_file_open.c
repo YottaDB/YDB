@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -144,8 +144,7 @@ uint4	jnl_file_open(gd_region *reg, bool init, void	oper_ast())
 	boolean_t		retry;
 	$DESCRIPTOR(desc, name_buffer);
 
-	if ((dba_bg != reg->dyn.addr->acc_meth) && (dba_mm != reg->dyn.addr->acc_meth))
-		GTMASSERT;
+	assertpro((dba_bg == reg->dyn.addr->acc_meth) || (dba_mm == reg->dyn.addr->acc_meth));
 	if (NULL == oper_ast)
 		oper_ast = jnl_oper_krnl_ast;
 	csa = &FILE_INFO(reg)->s_addrs;
@@ -184,7 +183,7 @@ uint4	jnl_file_open(gd_region *reg, bool init, void	oper_ast())
 	fab.fab$l_nam = &nam;
 	if (init)
 	{
-		cre_jnl_file_intrpt_rename(((int)csd->jnl_file_len), csd->jnl_file_name);
+		cre_jnl_file_intrpt_rename(csa);
 		nam.nam$l_esa = es_buffer;	/* Though conclealed name is not possible, we use it */
 		nam.nam$b_ess = SIZEOF(es_buffer);
 		fab.fab$l_fna = csd->jnl_file_name;

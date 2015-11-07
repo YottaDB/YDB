@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,15 +64,15 @@ GBLREF merge_glvn_ptr	mglvnp;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key		*gv_currkey;
 
+error_def(ERR_UNIMPLOP);
+error_def(ERR_TEXT);
+error_def(ERR_GVIS);
+
 void op_merge_arg(int m_opr_type, lv_val *lvp)
 {
 	int 			maxkeysz;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
 	char			*err_str;
-
-	error_def(ERR_UNIMPLOP);
-	error_def(ERR_TEXT);
-	error_def(ERR_GVIS);
 
 	if (!mglvnp)
 	{
@@ -113,19 +113,19 @@ void op_merge_arg(int m_opr_type, lv_val *lvp)
 		   * operation won't work */
 			assert(dba_cm == gv_cur_region->dyn.addr->acc_meth); /* we should've covered all access methods */
 			end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
-			rts_error(VARLSTCNT(14) ERR_UNIMPLOP, 0,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_UNIMPLOP, 0,
 				  	        ERR_TEXT, 2, LEN_AND_LIT("GT.CM server does not support MERGE operation"),
 				  		ERR_GVIS, 2, end - buff, buff,
 				  		ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
 		}
 		break;
 	default:
-		GTMASSERT;
+		assertpro(FALSE);
 	}
-	assert ((merge_args == (MARG1_LCL | MARG2_LCL)) ||
-		(merge_args == (MARG1_LCL | MARG2_GBL)) ||
-		(merge_args == (MARG1_GBL | MARG2_LCL)) ||
-		(merge_args == (MARG1_GBL | MARG2_GBL)) ||
-		(merge_args == MARG2_GBL) ||
-		(merge_args == MARG2_LCL));
+	assert ((merge_args == (MARG1_LCL | MARG2_LCL))
+		|| (merge_args == (MARG1_LCL | MARG2_GBL))
+		|| (merge_args == (MARG1_GBL | MARG2_LCL))
+		|| (merge_args == (MARG1_GBL | MARG2_GBL))
+		|| (merge_args == MARG2_GBL)
+		|| (merge_args == MARG2_LCL));
 }

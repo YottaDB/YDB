@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -147,6 +147,7 @@ error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVINCRISOLATION);
 error_def(ERR_GVIS);
 error_def(ERR_GVPUTFAIL);
+error_def(ERR_MAXBTLEVEL);
 error_def(ERR_REC2BIG);
 error_def(ERR_RSVDBYTE2HIGH);
 error_def(ERR_TEXT);
@@ -2267,9 +2268,13 @@ tn_restart:
 			{	/* Create new root */
 				if ((bh_level + 1) == MAX_BT_DEPTH)
 				{
-					assert(CDB_STAGNATE > t_tries);
-					status = cdb_sc_maxlvl;
-					GOTO_RETRY;
+					if (CDB_STAGNATE > t_tries)
+					{
+						status = cdb_sc_maxlvl;
+						GOTO_RETRY;
+					}
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MAXBTLEVEL, 4, gv_target->gvname.var_name.len,
+					 	gv_target->gvname.var_name.addr, REG_LEN_STR(gv_cur_region));
 				}
 				ins_chain_index = t_create(blk_num, (uchar_ptr_t)bs1, ins_chain_offset, ins_chain_index, bh_level);
 				make_it_null = FALSE;

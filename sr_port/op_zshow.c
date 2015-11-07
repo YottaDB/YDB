@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,11 +27,12 @@
 #include "gtm_maxstr.h"
 #include "svnames.h"
 
-GBLREF gv_key *gv_currkey;
+GBLREF lv_val	*active_lv;
+GBLREF gv_key	*gv_currkey;
 
 error_def(ERR_ZSHOWBADFUNC);
 
-void op_zshow(mval *func,int type,lv_val *lvn)
+void op_zshow(mval *func, int type, lv_val *lvn)
 {
 	const char	*ptr;
 	boolean_t	do_all = FALSE,
@@ -186,4 +187,9 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 	output.flush = TRUE;
 	zshow_output(&output,0);
 	MAXSTR_BUFF_FINI;
+	/* If ZSHOW was done onto a subscripted lvn but no zshow records got dumped in that lvn, it might have $data = 0.
+	 * Kill it in that case as otherwise it will create an out-of-design situation for $query(lvn).
+	 */
+	if ((type == ZSHOW_LOCAL) && (active_lv == lvn))
+		UNDO_ACTIVE_LV(actlv_op_zshow);
 }

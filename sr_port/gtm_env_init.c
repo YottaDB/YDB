@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,6 @@ GBLREF	block_id	gtm_tp_allocation_clue;	/* block# hint to start allocation for c
 GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
 GBLREF	boolean_t	ztrap_new;		/* Each time $ZTRAP is set it is automatically NEW'd */
 GBLREF	size_t		gtm_max_storalloc;	/* Used for testing: creates an allocation barrier */
-GBLREF	boolean_t	ipv4_only;		/* If TRUE, only use AF_INET. */
 
 void	gtm_env_init(void)
 {
@@ -113,12 +112,30 @@ void	gtm_env_init(void)
 		val.addr = GTM_BOOLEAN;
 		val.len = SIZEOF(GTM_BOOLEAN) - 1;
 		TREF(gtm_fullbool) = trans_numeric(&val, &is_defined, TRUE);
-		/* gtm_boolean environment/logical */
+		switch (TREF(gtm_fullbool))
+		{
+			case GTM_BOOL:			/* original GT.M short-circuit Boolean evaluation with naked maintenance */
+			case FULL_BOOL:			/* standard behavior - evaluate everything with a side effect */
+			case FULL_BOOL_WARN:		/* like FULL_BOOL but give compiler warnings when it makes a difference */
+				break;
+			default:
+				TREF(gtm_fullbool) = GTM_BOOL;
+		}
+		/* gtm_side_effects environment/logical */
 		val.addr = GTM_SIDE_EFFECT;
 		val.len = SIZEOF(GTM_SIDE_EFFECT) - 1;
 		TREF(side_effect_handling) = trans_numeric(&val, &is_defined, TRUE);
-		if (!is_defined)	/* default to original behavior */
-			TREF(side_effect_handling) = OLD_SE;
+		switch (TREF(side_effect_handling))
+		{
+			case OLD_SE:				/* ignore side effect implications */
+			case STD_SE:				/* reorder argument processing for left-to-right side effects */
+			case SE_WARN:				/* like STD but give compiler warnings when it makes a difference */
+				break;
+			default:
+				TREF(side_effect_handling) = OLD_SE;	/* default is: ignore side effect implications */
+		}
+		if ((OLD_SE != TREF(side_effect_handling)) && (GTM_BOOL == TREF(gtm_fullbool)))	/* side effect implies full bool */
+			TREF(gtm_fullbool) = FULL_BOOL;
 		/* NOUNDEF environment/logical */
 		val.addr = GTM_NOUNDEF;
 		val.len = SIZEOF(GTM_NOUNDEF) - 1;
@@ -317,12 +334,6 @@ void	gtm_env_init(void)
 		val.addr = GTM_MAX_STORALLOC;
 		val.len = SIZEOF(GTM_MAX_STORALLOC) - 1;
 		gtm_max_storalloc = trans_numeric(&val, &is_defined, TRUE);
-#		ifdef UNIX
-		/* See if gtm_ipv4_only is set */
-		val.addr = GTM_IPV4_ONLY;
-		val.len = SIZEOF(GTM_IPV4_ONLY) - 1;
-		ipv4_only = logical_truth_value(&val, FALSE, NULL);
-#		endif
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,27 @@
 
 #ifndef LOAD_INCLUDED
 #define LOAD_INCLUDED
+
+#define ONERROR_STOP		0
+#define ONERROR_PROCEED		1
+#define ONERROR_INTERACTIVE	2
+#define ONERROR_PROCESS														\
+{																\
+	GBLREF int onerror;													\
+																\
+	if (ONERROR_STOP == onerror)												\
+	{															\
+		break;														\
+	}															\
+	if (ONERROR_INTERACTIVE == onerror && !mu_interactive("Load terminated by operator\n"))					\
+	{															\
+		onerror = ONERROR_STOP;												\
+		/* User selected Not to proceed */										\
+		break;														\
+	}															\
+	mupip_error_occurred = FALSE;												\
+	continue; /* continue, when (onerror = ONERROR_PROCEED) or when user selects Yes in ONERROR_INTERACTIVE */		\
+}
 
 void bin_load(uint4 begin, uint4 end);
 void go_load(uint4 begin, uint4 end);

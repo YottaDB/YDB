@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -610,6 +610,7 @@ int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[]
 #define	DBG_MARK_RTS_ERROR_USABLE
 #define	DBG_MARK_RTS_ERROR_UNUSABLE
 #endif
+
 int	rts_error(int argcnt, ...);
 int	rts_error_csa(void *csa, int argcnt, ...);		/* Use CSA_ARG(CSA) for portability */
 #define CSA_ARG(CSA)	(CSA),
@@ -628,10 +629,11 @@ int4 timeout2msec(int4 timeout);
 
 /* the RTS_ERROR_TEXT macro will stay till all existing references to it have been renamed to RTS_ERROR_{LITERAL,STRING} */
 #define	RTS_ERROR_TEXT(STRING)		LENGTH_AND_STRING(STRING)
-
 /* for those who prefer not remembering the order of the length and the literal/string in the rts_error command line */
 #define	RTS_ERROR_LITERAL(LITERAL)	LENGTH_AND_LITERAL(LITERAL)
 #define	RTS_ERROR_STRING(STRING)	LENGTH_AND_STRING(STRING)
+#define RTS_ERROR_MSTR(MSTR)		(MSTR)->len, (MSTR)->addr
+#define RTS_ERROR_MVAL(MVAL)		RTS_ERROR_MSTR(&(MVAL)->str)
 
 #define	SET_PROCESS_EXITING_TRUE						\
 {										\

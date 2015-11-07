@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -128,7 +128,11 @@ XFER(xf_rdone, op_rdone),
 XFER(xf_readfl, op_readfl),
 XFER(xf_rhdaddr, op_rhdaddr),
 XFER(xf_setpiece, op_setpiece),
+#ifdef USHBIN_SUPPORTED
+XFER(xf_setzbrk, opp_setzbrk), /* need assembly wrapper to handle shared routines - need to burn return pc */
+#else
 XFER(xf_setzbrk, op_setzbrk),
+#endif
 XFER(xf_svput, op_svput),
 XFER(xf_view, op_view),
 XFER(xf_xnew, opp_xnew),
@@ -302,4 +306,15 @@ XFER(xf_indmerge2, op_indmerge2),
 XFER(xf_fnzpeek, op_fnzpeek),
 #endif
 XFER(xf_litc, op_litc),
-XFER(xf_stolitc, op_stolitc)
+XFER(xf_stolitc, op_stolitc),
+XFER(xf_fnzsocket, op_fnzsocket)
+#ifdef UNIX
+,
+XFER(xf_fnzsyslog, op_fnzsyslog),
+XFER(xf_zrupdate, op_zrupdate)
+#endif
+#ifdef USHBIN_SUPPORTED
+,
+XFER(xf_rhd_ext, op_rhd_ext),
+XFER(xf_lab_ext, op_lab_ext)
+#endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@ error_def(ERR_CURRSOCKOFR);
 error_def(ERR_DELIMSIZNA);
 UNIX_ONLY(error_def(ERR_NOPRINCIO);)
 error_def(ERR_NOSOCKETINDEV);
+error_def(ERR_SOCKPASSDATAMIX);
 error_def(ERR_SOCKWRITE);
 error_def(ERR_TEXT);
 error_def(ERR_ZFF2MANY);
@@ -101,7 +102,12 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	if (0 >= dsocketptr->n_socket)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+#		ifndef VMS
+		if (iod == io_std_device.out)
+			ionl_write(v);
+		else
+#		endif
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
 		return;
 	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
@@ -112,17 +118,17 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	if (dsocketptr->mupintr)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
+	ENSURE_DATA_SOCKET(socketptr);
 #ifdef MSG_NOSIGNAL
 	flags = MSG_NOSIGNAL;		/* return EPIPE instead of SIGPIPE */
 #else
 	flags = 0;
 #endif
+	tempv = *v;
 	socketptr->lastop = TCP_WRITE;
 	if (socketptr->first_write)
 	{ /* First WRITE, do following
-	     1. Transition to UTF16BE if ochset is UTF16 and WRITE a BOM
-	     2. Convert ZFF into ochset format so we don't need to convert every time ZFF is output
-	     3. Convert DELIMITER 0 to OCHSET format to avoid repeated conversions of DELIM0 on output
+	     Transition to UTF16BE if ochset is UTF16 and WRITE a BOM
 	   */
 		if (CHSET_UTF16 == iod->ochset)
 		{
@@ -142,38 +148,40 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 				prin_out_dev_failure = FALSE;
 #endif
 		}
-		if (CHSET_UTF16BE == iod->ochset || CHSET_UTF16LE == iod->ochset) /* need conversion of ZFF and DELIM0 */
-		{
-			if (0 < socketptr->zff.len)
-			{
-				new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset], &socketptr->zff, NULL,
-							NULL);
-				if (MAX_ZFF_LEN < new_len)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFF2MANY, 2, new_len, MAX_ZFF_LEN);
-				if (NULL != socketptr->zff.addr) /* we rely on newsocket.zff.addr being set to NULL
-								    in iosocket_create() */
-					socketptr->zff.addr = (char *)malloc(MAX_ZFF_LEN);
-				socketptr->zff.len = new_len;
-				UNICODE_ONLY(socketptr->zff.char_len = 0); /* don't care */
-				memcpy(socketptr->zff.addr, stringpool.free, new_len);
-			}
-
-			if (0 < socketptr->n_delimiter)
-			{
-				new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset],
-								&socketptr->delimiter[0], NULL, NULL);
-				if (MAX_DELIM_LEN < new_len)
-				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
-					return;
-				}
-				socketptr->odelimiter0.len = new_len;
-				UNICODE_ONLY(socketptr->odelimiter0.char_len = socketptr->delimiter[0].char_len);
-				socketptr->odelimiter0.addr = malloc(new_len);
-				memcpy(socketptr->odelimiter0.addr, stringpool.free, new_len);
-			}
-		}
 		socketptr->first_write = FALSE;
+
+	}
+	if (CHSET_UTF16BE == iod->ochset || CHSET_UTF16LE == iod->ochset)
+	{
+		if ((0 < socketptr->zff.len) && (socketptr->zff.addr == socketptr->ozff.addr))
+		{ /* Convert ZFF into ochset format so we don't need to convert every time ZFF is output */
+			new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset], &socketptr->zff, NULL,
+						NULL);
+			if (MAX_ZFF_LEN < new_len)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFF2MANY, 2, new_len, MAX_ZFF_LEN);
+			socketptr->ozff.addr = (char *)malloc(MAX_ZFF_LEN);	/* should not need */
+			socketptr->ozff.len = new_len;
+			UNICODE_ONLY(socketptr->ozff.char_len = 0); /* don't care */
+			memcpy(socketptr->ozff.addr, stringpool.free, new_len);
+			if (tempv.addr == socketptr->zff.addr)
+				tempv = socketptr->ozff;	/* from iosocket_wtff so use converted form */
+		}
+		if ((0 < socketptr->n_delimiter) && (socketptr->odelimiter0.addr == socketptr->delimiter[0].addr))
+		{	/* Convert DELIMITER 0 to OCHSET format to avoid repeated conversions of DELIM0 on output */
+			new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset],
+							&socketptr->delimiter[0], NULL, NULL);
+			if (MAX_DELIM_LEN < new_len)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
+				return;
+			}
+			socketptr->odelimiter0.len = new_len;
+			UNICODE_ONLY(socketptr->odelimiter0.char_len = socketptr->delimiter[0].char_len);
+			socketptr->odelimiter0.addr = malloc(new_len);
+			memcpy(socketptr->odelimiter0.addr, stringpool.free, new_len);
+			if (tempv.addr == socketptr->delimiter[0].addr)
+				tempv = socketptr->odelimiter0;	/* from iosocket_wteol so use converted form */
+		}
 	}
 	memcpy(iod->dollar.device, "0", SIZEOF("0"));
 	if (CHSET_M != iod->ochset)
@@ -200,11 +208,9 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 				   by whomever needs it without us forcing a garbage collection due to IO reformat.
 				*/
 				/* stringpool.free += new_len; */
-			} else
-				tempv = *v;
+			}
 		}
-	} else
-		tempv = *v;
+	}
 	if (0 != (in_b_len = tempv.len))
 	{
 		DBGSOCK2((stdout, "socwrite: starting output loop (%d bytes) - iodwidth: %d  wrap: %d\n",

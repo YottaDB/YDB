@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@
 #include "gtm_utf8.h"
 #include <rtnhdr.h>
 #include "gv_trigger.h"
+#include "mu_interactive.h"
 
 GBLREF bool		mupip_error_occurred;
 GBLREF bool		mu_ctrly_occurred;
@@ -45,6 +46,7 @@ GBLREF bool		mu_ctrlc_occurred;
 GBLREF spdesc		stringpool;
 GBLREF gv_key		*gv_currkey;
 GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF int		onerror;
 
 error_def(ERR_LOADCTRLY);
 error_def(ERR_LOADEOF);
@@ -52,6 +54,7 @@ error_def(ERR_LOADFILERR);
 error_def(ERR_LOADINVCHSET);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_TRIGDATAIGNORE);
+error_def(ERR_RECLOAD);
 
 #define GO_PUT_SUB		0
 #define GO_PUT_DATA		1
@@ -150,6 +153,8 @@ void go_load(uint4 begin, uint4 end)
 	{
 		if (++iter > end)
 			break;
+		if (mupip_error_occurred && ONERROR_STOP == onerror)
+			break;
 		if (mu_ctrly_occurred)
 			break;
 		if (mu_ctrlc_occurred)
@@ -199,10 +204,11 @@ void go_load(uint4 begin, uint4 end)
 			go_call_db(GO_PUT_SUB, ptr, keylength, 0, 0);
 			if (mupip_error_occurred)
 			{
-			        mu_gvis();
-				util_out_print("Error loading record number: !UL\n", TRUE, iter);
-				mupip_error_occurred = FALSE;
-				continue;
+				mu_gvis();
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, iter);
+				gv_target = NULL;
+				gv_currkey->base[0] = '\0';
+				ONERROR_PROCESS;
 			}
 			assert(keylength < len - 1);
 			if (max_subsc_len < (gv_currkey->end + 1))
@@ -229,10 +235,9 @@ void go_load(uint4 begin, uint4 end)
 					: go_call_db(GO_PUT_DATA, (char *)rec_buff, des.len, 0, 0);
 			if (mupip_error_occurred)
 			{
-			        mu_gvis();
-				util_out_print("Error loading record number: !UL\n", TRUE, iter);
-				mupip_error_occurred = FALSE;
-				continue;
+				mu_gvis();
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, iter);
+				ONERROR_PROCESS;
 			}
 			key_count++;
 		} else
@@ -246,27 +251,28 @@ void go_load(uint4 begin, uint4 end)
 				hasht_gbl = FALSE;
 				continue;
 			}
-		        go_call_db(GO_PUT_SUB, ptr, len, 0, 0);
+			go_call_db(GO_PUT_SUB, ptr, len, 0, 0);
 			if (mupip_error_occurred)
 			{
-			        mu_gvis();
-				util_out_print("Error loading record number: !UL\n", TRUE, iter);
-				mupip_error_occurred = FALSE;
-				continue;
+				mu_gvis();
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, iter);
+				gv_target = NULL;
+				gv_currkey->base[0] = '\0';
+				ONERROR_PROCESS;
 			}
 			if (max_subsc_len < (gv_currkey->end + 1))
 				max_subsc_len = gv_currkey->end + 1;
 			if (++iter > end)
 			{
-			        iter--;	/* Decrement as didn't load key */
+				iter--;	/* Decrement as didn't load key */
 				break;
 			}
 			if ((len = file_input_get(&ptr)) < 0)
 			        break;
 			if (mupip_error_occurred)
 			{
-			        mu_gvis();
-				util_out_print("Error loading record number: !UL\n", TRUE, iter);
+				mu_gvis();
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, iter);
 				break;
 			}
 			stringpool.free = stringpool.base;
@@ -275,10 +281,9 @@ void go_load(uint4 begin, uint4 end)
 			go_call_db(GO_PUT_DATA, ptr, len, 0, 0);
 			if (mupip_error_occurred)
 			{
-			        mu_gvis();
-				util_out_print("Error loading record number: !UL\n", TRUE, iter);
-				mupip_error_occurred = FALSE;
-				continue;
+				mu_gvis();
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, iter);
+				ONERROR_PROCESS;
 			}
 			key_count++;
 		}

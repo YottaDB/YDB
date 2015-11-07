@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,14 +19,16 @@
 #include "op.h"
 #include "lv_val.h"
 
-#ifdef DEBUG	/* all of below is needed by the gv_target/cs_addrs assert */
-#include "gdsroot.h"
+#ifdef DEBUG
+#include "gdsroot.h"	/* all of below until gdsfhead.h is needed by the gv_target/cs_addrs assert */
 #include "gdskill.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "mvalconv.h"
+#include "alias.h"
 #endif
 
 GBLREF stack_frame	*frame_pointer;
@@ -45,11 +47,13 @@ void gtm_fetch(unsigned int indxarg, ...)
 #error unsupported platform
 #endif
 {
-	va_list		var;
-	unsigned int 	indx;
-	unsigned int 	cnt;
-	stack_frame	*fp;
 	ht_ent_mname	**htepp;
+	stack_frame	*fp;
+	unsigned int 	cnt, indx;
+	va_list		var;
+#	ifdef DEBUG
+	static int	als_lvval_gc_frequency, fetch_invocation;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -60,9 +64,26 @@ void gtm_fetch(unsigned int indxarg, ...)
 									   * compile-time error.
 									   */
 	assert(!TREF(in_zwrite));	/* Verify in_zwrite was not left on */
+	DEBUG_ONLY(SET_ACTIVE_LV(NULL, TRUE, actlv_gtm_fetch);)
+#	ifdef DEBUG
+	if (0 == als_lvval_gc_frequency)
+	{
+		mval	tmpmval, *random_mval = &tmpmval;
+
+		op_fnrandom(1024, random_mval);
+		als_lvval_gc_frequency = 8 + MV_FORCE_INT(random_mval);
+	}
+	if (++fetch_invocation == als_lvval_gc_frequency)
+	{
+		als_lvval_gc();
+		fetch_invocation = 0;
+		if (als_lvval_gc_frequency < 1024)
+			als_lvval_gc_frequency *= 2;
+	}
+#	endif
 	VAR_START(var, indxarg);
-	VMS_ONLY(va_count(cnt);)
-	UNIX_ONLY(cnt = cnt_arg;)	/* need to preserve stack copy on i386 */
+	VMS_ONLY(va_count(cnt));
+	UNIX_ONLY(cnt = cnt_arg);	/* need to preserve stack copy on i386 */
 	fp = frame_pointer;
 	if (0 < cnt)
 	{	/* All generated code comes here to verify instantiation

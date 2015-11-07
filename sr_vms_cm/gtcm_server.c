@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,6 @@
 #include "desblk.h"		/* for desblk structure */
 #include "gtcmtr_protos.h"
 #include "trans_log_name.h"
-#include "get_page_size.h"
 #include "filestruct.h"
 #include "jnl.h"
 #include "gdskill.h"
@@ -79,7 +78,6 @@ LITREF char		cm_prd_name[];
 LITREF char		cm_ver_name[];
 LITREF int4		cm_prd_len;
 LITREF int4		cm_ver_len;
-OS_PAGE_SIZE_DECLARE
 
 #define GTCM_AST_OVRHD 4	/* init ast, read/write overlap, mbx, safety */
 
@@ -125,9 +123,8 @@ gtcm_server()
 
 	GTM_THREADGBL_INIT;
         assert(0 == EMPTY_QUEUE);       /* check so dont need gdsfhead everywhere */
-	gtm_imagetype_init(GTCM_GNP_SERVER_IMAGE); /* Side-effect: Sets skip_dbtriggers to TRUE for non-trigger platforms */
+	common_startup_init(GTCM_GNP_SERVER_IMAGE); /* Side-effect: Sets skip_dbtriggers to TRUE for non-trigger platforms */
 	gtm_env_init();	/* read in all environment variables */
-	get_page_size();
 	name1.addr = "GTCMSVRNAM";
 	name1.len = SIZEOF("GTCMSVRNAM") - 1;
 	status = trans_log_name(&name1, &name2, nbuff);
@@ -167,7 +164,6 @@ gtcm_server()
 	dver.dsc$b_dtype  = DSC$K_DTYPE_T;
 	dver.dsc$b_class  = DSC$K_CLASS_S;
 	dver.dsc$a_pointer= cm_ver_name;
-	getjobnum();
 	ast_init();
 	licensed = TRUE;
 	lkid = 2;
@@ -215,7 +211,7 @@ gtcm_server()
 	sys$dclexh(&gtcm_exi_blk);
 	INVOKE_INIT_SECSHR_ADDRS;
 	initialize_pattern_table();
-	assert(run_time); /* Should have been set by gtm_imagetype_init */
+	assert(run_time); /* Should have been set by common_startup_init */
 	while (!cm_shutdown)
 	{
 		if (blkdlist)

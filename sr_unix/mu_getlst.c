@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,22 +32,23 @@
 #include "mupip_exit.h"
 #include "str_match.h"
 #include "mu_getlst.h"
+#include "gtmmsg.h"
 
+GBLDEF	boolean_t		is_directory;
 GBLDEF	mstr			directory;
-GBLDEF	bool			is_directory;
 
+GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
 GBLREF 	bool			error_mupip;
 GBLREF 	bool			in_backup;
+GBLREF	boolean_t		mu_star_specified;
 GBLREF	gd_addr			*gd_header;
 GBLREF	tp_region		*grlist;
-GBLREF	boolean_t		mu_star_specified;
-GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
 
 error_def(ERR_MUBCKNODIR);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNODBNAME);
 error_def(ERR_MUPCLIERR);
-error_def(ERR_TEXT);
+error_def(ERR_NOREGION);
 
 #define	CHECK_IF_NOT_ABSENT(QUALIFIER)										\
 {														\
@@ -60,11 +61,11 @@ error_def(ERR_TEXT);
 
 void mu_getlst(char *name, int4 size)
 {
-	char		*c1, *c2, *c3, *c4, rbuff[GTM_PATH_MAX], fbuff[GTM_PATH_MAX];
-	unsigned short	rlen, flen, i;
+	boolean_t	matched;
+	char		*c1, *c2, *c3, *c4, fbuff[GTM_PATH_MAX], rbuff[GTM_PATH_MAX];
 	gd_region	*reg;
 	tp_region	*list;
-	boolean_t	matched;
+	unsigned short	flen, i, rlen;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -72,12 +73,15 @@ void mu_getlst(char *name, int4 size)
 	assert(size > 0);
 	rlen = SIZEOF(rbuff);
 	flen = SIZEOF(fbuff);
-
 	is_directory = FALSE;
 	if (!in_backup)
 	{
 		if (!cli_get_str(name, rbuff, &rlen))
 			mupip_exit(ERR_MUNODBNAME);
+		for (i = 0; i < rlen; i++)
+			rbuff[i] = TOUPPER(rbuff[i]); /* Region names are always upper-case ASCII and thoroughly NUL terminated */
+		for ( ; i < ARRAYSIZE(rbuff); i++)
+			rbuff[i] = 0;
 	} else
 	{
 		if (CLI_PRESENT == cli_present("REPLINSTANCE"))
@@ -119,6 +123,10 @@ void mu_getlst(char *name, int4 size)
 		}
 		if (!cli_get_str(name, rbuff, &rlen))
 			mupip_exit(ERR_MUNODBNAME);
+		for (i = 0; i < rlen; i++)
+			rbuff[i] = TOUPPER(rbuff[i]); /* Region names are always upper-case ASCII and thoroughly NUL terminated */
+		for ( ; i < ARRAYSIZE(rbuff); i++)
+			rbuff[i] = 0;
 		flen = SIZEOF(fbuff);	/* reset max_buflen to original before call to "cli_get_str" */
 		if ((!cli_get_str("SAVE_DIR", fbuff, &flen)) || (0 == flen))
 			mupip_exit(ERR_MUBCKNODIR);
@@ -144,7 +152,7 @@ void mu_getlst(char *name, int4 size)
 					if (NULL == (list = insert_region(reg, &(grlist), NULL, size)))
 					{
 						error_mupip = TRUE;
-						rts_error(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_STRING("Region not found"));
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, REG_LEN_STR(reg));
 						continue;
 					}
 					if ((FALSE == in_backup) || (0 != ((backup_reg_list *)list)->backup_file.len))
@@ -166,7 +174,7 @@ void mu_getlst(char *name, int4 size)
 			}
 			if (!matched)
 			{
-				util_out_print("REGION !AD not found", TRUE, c2 - c1, c1);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, c2 - c1, c1);
 				mupip_exit(ERR_MUNOACTION);
 			}
 		}

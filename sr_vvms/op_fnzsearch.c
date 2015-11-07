@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,13 +12,13 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
 #include <rms.h>
 #include <ssdef.h>
+
 #include "stringpool.h"
 #include "op.h"
+#include "op_fnzsearch.h"
 
-#define MAX_STRM_CT	256
 
 typedef struct fnzsearch
 {	short	index;
@@ -37,7 +37,7 @@ GBLREF spdesc stringpool;
 error_def(ERR_ZFILENMTOOLONG);
 error_def(ERR_ZSRCHSTRMCT);
 
-int op_fnzsearch(mval *file,mint strm,mval *ret)
+int op_fnzsearch(mval *file, mint strm, mint mcmd, mval *ret)
 {
 	search_struct	*sea_ptr,*sea,*ptr;
 	unsigned char	esa[MAX_FN_LEN];
@@ -64,11 +64,11 @@ int op_fnzsearch(mval *file,mint strm,mval *ret)
 	}
 	assert(fab_sea != 0);
 	index = (short)strm;
-	if (index > MAX_STRM_CT || index < 0)
-		rts_error(VARLSTCNT(1) ERR_ZSRCHSTRMCT);
+	if (mcmd && ((MAX_STRM_CT < index) || ( 0 > index)))	/* Bypass stream check for internal uses */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSRCHSTRMCT);
 	MV_FORCE_STR(file);
 	if (file->str.len > MAX_FN_LEN)
-		rts_error(VARLSTCNT(4) ERR_ZFILENMTOOLONG,2,file->str.len,file->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, file->str.len, file->str.addr);
 	sea_ptr = fab_sea;
 	while(sea_ptr->next != 0 && sea_ptr->next->index <= index)
 		sea_ptr = sea_ptr->next;
@@ -91,7 +91,7 @@ int op_fnzsearch(mval *file,mint strm,mval *ret)
 		sea_ptr =sea_ptr->next;
 		memcpy(sea_ptr->fab.fab$l_fna,file->str.addr,file->str.len);
 		if ((status = sys$parse(&(sea_ptr->fab),0,0)) != RMS$_NORMAL)
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	} else
 	{
 		if (file->str.len > sea_ptr->fab.fab$b_fns)
@@ -104,7 +104,7 @@ int op_fnzsearch(mval *file,mint strm,mval *ret)
 			memcpy(sea_ptr->fab.fab$l_fna,file->str.addr,file->str.len);
 			sea_ptr->fab.fab$b_fns = file->str.len;
 			if ((status = sys$parse(&(sea_ptr->fab),0,0)) != RMS$_NORMAL)
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 	}
 	status = sys$search(&(sea_ptr->fab), 0, 0);
@@ -138,7 +138,7 @@ int op_fnzsearch(mval *file,mint strm,mval *ret)
 				sea_ptr->fab.fab$b_fns = 0;
 			break;
 		default:
-			rts_error(VARLSTCNT(1)  status );
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	}
 	ret->mvtype = MV_STR;
 	return 0; /* dummy for compatibility with unix prototype */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,8 +45,8 @@
 	 * of "lv" through a "KILL *". Necessary because we need the "lv_val" of "lv"		\
 	 * untouched (i.e. not freed and/or reused after a "kill *").				\
 	 */											\
-	INCR_CREFCNT(lv);									\
 	INCR_TREFCNT(lv);									\
+	INCR_CREFCNT(lv);									\
 	assert(1 < (lv)->stats.trefcnt);							\
 	assert(0 < (lv)->stats.crefcnt);							\
 	(tf)->vars = restore_ent;								\
@@ -91,4 +91,5 @@ typedef struct tp_frame_struct
 	mstr				extnam_str;	/* saved/restored only for OUTERMOST tstart */
 	struct tp_frame_struct 		*old_tp_frame;
 	unsigned char			*restart_ctxt;
+	struct lv_val_struct		*active_lv;	/* saved/restored only for OUTERMOST tstart */
 } tp_frame;

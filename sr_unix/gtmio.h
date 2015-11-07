@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -193,93 +193,9 @@ error_def(ERR_PREMATEOF);
 #else
 #define LOCK_IS_ALLOWED(FDESC, STATUS)	STATUS = 0
 #endif
-/* The for loop is the workaround for a glitch in read locking in zlink.  The primary steps to acquire a
- * read-lock are 1. open the file, and 2. read lock it.	 If a process creates the initial, empty version
- * of the file (with the OPEN3), but has not yet write-locked it, and meanwhile, another process does its
- * open and gets a read-lock, then a later read within incr_link() will end up reading an empty file. To
- * avoid that problem, readers have to poll for a non-empty object file before reading.	 If the read lock
- * is obtained, but the file is empty, then release the read lock, sleep for a while, and retry the file open.
- */
-#define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC)									\
-{														\
-	int		status;											\
-	struct flock	lock;	 /* arg to lock the file thru fnctl */						\
-	int		cntr;											\
-	struct stat	stat_buf;										\
-	pid_t		l_pid;											\
-	ZOS_ONLY(int	realfiletag;)										\
-														\
-	l_pid = getpid();											\
-	for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)							\
-	{													\
-		while (FD_INVALID == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)			\
-			;											\
-		if (-1 != FDESC)										\
-		{												\
-			LOCK_IS_ALLOWED(FDESC, status);								\
-			if (-2 != status)									\
-			{											\
-				do {										\
-					lock.l_type = ((O_WRONLY == ((FFLAG) & O_ACCMODE)) ||			\
-						( O_RDWR == ((FFLAG) & O_ACCMODE))) ? F_WRLCK : F_RDLCK;	\
-					lock.l_whence = SEEK_SET;	/*locking offsets from file beginning*/	\
-					lock.l_start = lock.l_len = 0;	/* lock the whole file */		\
-					lock.l_pid = l_pid;							\
-				} while (-1 == (status = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno);	\
-			}											\
-			if (-1 != status)									\
-			{											\
-				if ((FFLAG) & O_CREAT)								\
-				{										\
-					FTRUNCATE(FDESC, 0, status);						\
-					ZOS_ONLY(								\
-						status = gtm_zos_set_tag(FDESC, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag); \
-					)									\
-				} else										\
-				{										\
-					FSTAT_FILE(FDESC, &stat_buf, status);					\
-					if (status || (0 == stat_buf.st_size))					\
-					{									\
-						CLOSE_OBJECT_FILE(FDESC, status);				\
-						SHORT_SLEEP(WAIT_FOR_FILE_TIME);				\
-						continue;							\
-					}									\
-					ZOS_ONLY(								\
-						status = gtm_zos_tag_to_policy(FDESC, TAG_BINARY, &realfiletag);	\
-					)									\
-				}										\
-			}											\
-			if (-1 == status)									\
-				CLOSEFILE_RESET(FDESC, status);/* can't fail - no writes, no writes-behind */ 	\
-		}												\
-		break;												\
-	}													\
-}
-#define CONVERT_OBJECT_LOCK(FDESC, FFLAG, RC)						\
-{											\
-	struct flock	lock;	 /* arg to lock the file thru fnctl */			\
-	pid_t		l_pid;								\
-											\
-	l_pid = getpid();								\
-	do {										\
-		lock.l_type = FFLAG;							\
-		lock.l_whence = SEEK_SET;	/*locking offsets from file beginning*/	\
-		lock.l_start = lock.l_len = 0;	/* lock the whole file */		\
-		lock.l_pid = l_pid;							\
-	} while (-1 == (RC = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno);		\
-}
+#define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC)	FDESC = open_object_file(FNAME, FFLAG);
 
-#define CLOSE_OBJECT_FILE(FDESC, RC)						\
-{										\
-	struct flock lock;    /* arg to unlock the file thru fnctl */		\
-	do {									\
-		lock.l_type = F_UNLCK;						\
-		lock.l_whence = SEEK_SET;					\
-		lock.l_start = lock.l_len = 0; /* unlock the whole file */	\
-		lock.l_pid = getpid();						\
-	} while (-1 == (RC = fcntl(FDESC, F_SETLK, &lock)) && EINTR == errno);	\
-	CLOSEFILE_RESET(FDESC, RC);						\
-}
+#define CLOSE_OBJECT_FILE(FDESC, RC)		CLOSEFILE_RESET(FDESC, RC)
 
 #define CLOSEFILE(FDESC, RC)					\
 {								\
@@ -738,7 +654,7 @@ error_def(ERR_PREMATEOF);
 		else if (EINTR != errno)						\
 		  break;								\
 	}										\
-	/* GTMASSERT? */								\
+	/* assertpro(FALSE)? */								\
 }
 
 #define DOWRITERC(FDESC, FBUFF, FBUFF_LEN, RC)							\
@@ -916,5 +832,11 @@ typedef struct
 	fflush(STREAM);					\
 	ENABLE_INTERRUPTS(INTRPT_IN_FFLUSH);		\
 }
+
+/* Prototypes */
+int open_object_file(const char *fname, int fflag);
+int mk_tmp_object_file(const char *object_fname, int object_fname_len);
+void rename_tmp_object_file(const char *object_fname);
+void init_object_file_name(void);
 
 #endif

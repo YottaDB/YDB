@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,20 +27,22 @@
 #include "mupip_exit.h"
 #include "mupip_create.h"
 #include "mu_cre_file.h"
+#include "gtmmsg.h"
 
 GBLREF gd_addr 		*gd_header;
 GBLREF gd_region 	*gv_cur_region;
 
+error_def(ERR_DBNOCRE);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_NOREGION);
+
 void mupip_create(void)
 {
-	bool		found;
+	boolean_t	found;
 	char		buff[MAX_RN_LEN + 1], create_stat, exit_stat;
-	unsigned short	reglen;
-	int		i;
 	gd_region	*reg, *reg_top;
-
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_DBNOCRE);
+	int		i;
+	unsigned short	reglen;
 
 	exit_stat = EXIT_NRM;
 	gvinit();
@@ -49,9 +51,9 @@ void mupip_create(void)
 		reglen = SIZEOF(buff);
 	 	if (0 == cli_get_str("REGION", buff, &reglen))
 			mupip_exit(ERR_MUPCLIERR);
-	 	for (i=0; (MAX_RN_LEN + 1 > i) && (' ' != buff[i]); i++)
+	 	for (i=0; i < reglen; i++)
 	 		buff[i] = TOUPPER(buff[i]); /* ensure uppercase to match gde conventions */
-	 	for ( ; MAX_RN_LEN + 1 > i; i++)
+	 	for ( ; ARRAYSIZE(buff) > i; i++)
 			buff[i] = 0;
 		found = FALSE;
 		for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions; reg < reg_top; reg++)
@@ -64,7 +66,7 @@ void mupip_create(void)
 		}
 		if (FALSE == found)
 		{
-			util_out_print("Error:  region not found.",TRUE);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, reglen, buff);
 			mupip_exit(ERR_MUPCLIERR);
 		}
 		gv_cur_region = reg;

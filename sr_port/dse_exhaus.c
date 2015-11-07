@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,15 +31,13 @@
 
 #define MAX_UTIL_LEN 32
 
-GBLDEF short int	patch_path_count;
 
 GBLREF block_id		patch_find_blk, patch_left_sib, patch_path[MAX_BT_DEPTH + 1], patch_right_sib;
-GBLREF bool		patch_exh_found;
-GBLREF bool		patch_find_sibs;
-GBLREF bool		patch_find_root_search;
+GBLREF boolean_t	patch_exh_found, patch_find_root_search, patch_find_sibs;
 GBLREF global_root_list	*global_roots_head;
 GBLREF int4		patch_offset[MAX_BT_DEPTH + 1];
 GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF short int	patch_path_count;
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 
 error_def(ERR_DSEBLKRDFAIL);
@@ -54,12 +52,12 @@ void dse_exhaus(int4 pp, int4 op)
 	int4		dummy_int;
 	global_dir_path	*d_ptr, *temp;
 	short		temp_short;
-	sm_uc_ptr_t	bp, b_top, np, nrp, nr_top, ptr, rp, r_top;
+	sm_uc_ptr_t	bp, b_top, nrp, nr_top, ptr, rp, r_top;
 
 	last = 0;
 	patch_path_count++;
-	if(!(bp = t_qread(patch_path[pp - 1], &dummy_int, &dummy_cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+	if (!(bp = t_qread(patch_path[pp - 1], &dummy_int, &dummy_cr)))
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
 	else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t) bp)->bsiz)
@@ -70,17 +68,8 @@ void dse_exhaus(int4 pp, int4 op)
 	{
 		if (util_interrupt)
 		{
-			rts_error(VARLSTCNT(1) ERR_CTRLC);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 			break;
-		}
-		if (!(np = t_qread(patch_path[pp - 1], &dummy_int, &dummy_cr)))
-			rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-		if (np != bp)
-		{
-			b_top = np + (b_top - bp);
-			rp = np + (rp - bp);
-			r_top = np + (r_top - bp);
-			bp = np;
 		}
 		GET_SHORT(temp_short, &((rec_hdr_ptr_t)rp)->rsiz);
 		r_top = rp + temp_short;

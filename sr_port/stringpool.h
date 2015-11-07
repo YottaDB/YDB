@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,3 +65,28 @@ GBLREF	boolean_t	stringpool_unexpandable;
 		INVOKE_STP_GCOL(lcl_spc_needed);				\
 	assert(IS_STP_SPACE_AVAILABLE(lcl_spc_needed));				\
 }
+
+#define	ADD_TO_STPARRAY(PTR, PTRARRAY, PTRARRAYCUR, PTRARRAYTOP, TYPE)					\
+{													\
+	GBLREF mstr	**stp_array;									\
+	GBLREF int	stp_array_size;									\
+													\
+	if (NULL == PTRARRAY)										\
+	{												\
+		if (NULL == stp_array)									\
+		{											\
+			/* Same initialization as is in stp_gcol_src.h */				\
+			stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));	\
+		}											\
+		PTRARRAYCUR = PTRARRAY = (TYPE **)stp_array;						\
+		PTRARRAYTOP = PTRARRAYCUR + stp_array_size;						\
+	} else if (PTRARRAYCUR >= PTRARRAYTOP)								\
+	{												\
+		stp_expand_array();									\
+		PTRARRAYCUR = (TYPE **)stp_array + (PTRARRAYCUR - PTRARRAY);				\
+		PTRARRAY = (TYPE **)stp_array;								\
+		PTRARRAYTOP = PTRARRAY + stp_array_size;						\
+	}												\
+	*PTRARRAYCUR++ = PTR;										\
+}
+

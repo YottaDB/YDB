@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,7 +88,7 @@ int gtmsource_end1(boolean_t auto_shutdown)
 		jnlpool_strm_seqno[idx] = jnlpool.jnlpool_ctl->strm_seqno[idx];
 	jnlpool.gtmsource_local->gtmsource_pid = 0;
 	jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
-	if (!auto_shutdown && !ANTICIPATORY_FREEZE_AVAILABLE)
+	if (!auto_shutdown && !CUSTOM_ERRORS_LOADED)
 	{	/* Detach from journal pool */
 		JNLPOOL_SHMDT(status, save_errno);
 		if (0 > status)

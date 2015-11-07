@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,9 +25,13 @@ GBLREF stack_frame	*frame_pointer;
 GBLREF tp_frame		*tp_pointer;
 GBLREF symval		*curr_symval;
 GBLREF uint4		dollar_tlevel;
+GBLREF mval		dollar_etrap;
 #ifdef GTM_TRIGGER
 GBLREF mval		dollar_ztwormhole;
 #endif
+
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
 
 /* Note this module follows the basic pattern of op_newvar which handles the same
    function except for local vars instead of intrinsic vars. */
@@ -39,9 +43,6 @@ void gtm_newintrinsic(mval *intrinsic)
 	unsigned char	*old_sp, *top;
 	int		indx;
 	int4		shift_size;
-
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
 
 	assert(intrinsic);
 	if (frame_pointer->type & SFT_COUNT)
@@ -84,10 +85,10 @@ void gtm_newintrinsic(mval *intrinsic)
 			if (msp <= stacktop)
 			{
 				msp = old_sp;
-	   			rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
+	   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
 			}
 	   		else
-	   			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
+	   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
 	   	}
 		/* Ready, set, shift the younger indirect frames to make room for mv_stent */
 		memmove(msp, old_sp, top - (unsigned char *)old_sp);
@@ -145,15 +146,11 @@ void gtm_newintrinsic(mval *intrinsic)
 		mv_st_ent->mv_st_cont.mvs_msav.v = *intrinsic;
 		mv_st_ent->mv_st_cont.mvs_msav.addr = intrinsic;
 	}
-	/* New the intrinsic var's current value if not $ZTWORMHOLE */
-#	ifdef GTM_TRIGGER
-	if (&dollar_ztwormhole != intrinsic)
+	/* Clear the intrinsic var's current value if not $ZTWORMHOLE or $ETRAP */
+	if ((&dollar_etrap != intrinsic) GTMTRIG_ONLY(&& (&dollar_ztwormhole != intrinsic)))
 	{
-#	endif
 		intrinsic->mvtype = MV_STR;
 		intrinsic->str.len = 0;
-#	ifdef GTM_TRIGGER
 	}
-#	endif
 	return;
 }

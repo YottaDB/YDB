@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,10 +43,11 @@ boolean_t mur_validate_checksum(jnl_ctl_list *jctl)
 	mur_desc = rctl->mur_desc;
 	jnlrec = mur_desc->jnlrec;
 	rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
-	if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))	/* TUPD/UUPD/FUPD/GUPD */
+	if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))	/* TUPD/UUPD/FUPD/GUPD */
 	{
 		COMPUTE_COMMON_CHECKSUM(tmp_csum, jnlrec->prefix);
 		assert(&jnlrec->jrec_set_kill.mumps_node == &jnlrec->jrec_ztworm.ztworm_str);
+		assert(&jnlrec->jrec_set_kill.mumps_node == &jnlrec->jrec_lgtrig.lgtrig_str);
 		start_ptr = (unsigned char *)&jnlrec->jrec_set_kill.mumps_node;
 		end_ptr =  (unsigned char *)(jnlrec) + mur_desc->jreclen - JREC_SUFFIX_SIZE;
 		rec_csum = jnl_get_checksum((uint4 *)start_ptr, NULL, (int)(end_ptr - start_ptr));

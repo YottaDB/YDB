@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,7 @@
 #include "gtmio.h"
 #include "io.h"
 #include "gtmsecshr.h"
+#include "gtmimagename.h"
 #include "iosp.h"
 #include "error.h"
 #include "eintr_wrappers.h"
@@ -65,9 +66,11 @@ GBLREF boolean_t		gtmsecshr_sock_init_done;
 GBLREF uint4			process_id;
 GBLREF ipcs_mesg		db_ipcs;
 GBLREF char			gtm_dist[GTM_PATH_MAX];
+GBLREF boolean_t		gtm_dist_ok_to_use;
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
+LITREF gtmImageName		gtmImageNames[];
 
 static int			secshr_sem;
 static boolean_t		gtmsecshr_file_check_done;
@@ -139,6 +142,7 @@ const static char readonly *secshrstart_error_code[] = {
 	start_timer(timer_id, msec_timeout, client_timer_handler, 0, NULL);			\
 }
 
+error_def(ERR_GTMDISTUNVERIF);
 error_def(ERR_GTMSECSHR);
 error_def(ERR_GTMSECSHRPERM);
 error_def(ERR_GTMSECSHRSOCKET);
@@ -184,6 +188,9 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 
 	SETUP_THREADGBL_ACCESS;
 	DBGGSSHR((LOGFLAGS, "secshr_client: New send request\n"));
+	if (!gtm_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	/* Create communication key (hash of release name) if it has not already been done */
 	if (0 == TREF(gtmsecshr_comkey))
 	{
@@ -193,23 +200,12 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	if (!gtmsecshr_file_check_done)
 	{
 		len = STRLEN(gtm_dist);
-		if (!len)
-		{
-                        send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3,
-					RTS_ERROR_TEXT("Client"), process_id, ERR_TEXT, 2,
-					RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
-                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3,
-					RTS_ERROR_TEXT("Client"), process_id, ERR_TEXT, 2,
-					RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
-		}
 		memcpy(gtmsecshr_path, gtm_dist, len);
 		gtmsecshr_path[len] =  '/';
 		memcpy(gtmsecshr_path + len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
 		gtmsecshr_pathname.addr = gtmsecshr_path;
 		gtmsecshr_pathname.len = len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
-		if (GTM_PATH_MAX <= gtmsecshr_pathname.len)
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("gtmsecshr path too long"));
+		assertpro(GTM_PATH_MAX > gtmsecshr_pathname.len);
 		gtmsecshr_pathname.addr[gtmsecshr_pathname.len] = '\0';
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
@@ -441,7 +437,7 @@ int create_server(void)
 #	endif
 	int		save_errno;
 
-	FORK(child_pid);	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+	FORK(child_pid);
 	if (0 == child_pid)
 	{
 		process_id = getpid();

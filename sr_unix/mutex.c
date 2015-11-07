@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +20,9 @@
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 #include "gtm_select.h"
+#include "gtm_un.h"
 
 #include <errno.h>
-#include <sys/un.h>
 #if defined(__sparc) || defined(__hpux) || defined(__MVS__) || defined(__linux__) || defined(__CYGWIN__)
 #include "gtm_limits.h"
 #else
@@ -95,7 +95,6 @@
 }
 
 GBLREF pid_t			process_id;
-GBLREF int			process_exiting;
 GBLREF uint4			image_count;
 GBLREF int			num_additional_processors;
 #ifdef MUTEX_MSEM_WAKE
@@ -534,14 +533,14 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 #			ifdef MUTEX_MSEM_WAKE
 			msem_slot = free_slot;
 #			endif
-			if (!process_exiting && (NULL != free_slot) && (mutex_que_entry_ptr_t)INTERLOCK_FAIL != free_slot)
+			if ((NULL != free_slot) && (mutex_que_entry_ptr_t)INTERLOCK_FAIL != free_slot)
 			{
 				free_slot->pid = process_id;
 				free_slot->mutex_wake_instance = mutex_expected_wake_instance;
 #				ifdef MUTEX_MSEM_WAKE
 				mutex_wake_msem_ptr = &free_slot->mutex_wake_msem;
-				/* this loop makes sure that the msemaphore is locked initially
-				 * before the process goes to long sleep
+				/* this loop makes sure that the msemaphore is locked initially before the process goes to
+				 * long sleep
 				 */
 				do
 				{
@@ -549,22 +548,13 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 				} while (-1 == rc && EINTR == errno);
 #				endif
 				/*
-				 * Significance of mutex_wake_instance field :
-				 * -----------------------------------------
-				 * After queueing itself, a process
-				 * might go to sleep (select call in
-				 * mutex_long_sleep) awaiting a wakeup message
-				 * or a timeout. It is possible that a wakeup
-				 * message might arrive after timeout. In this
-				 * case, a later attempt at waiting for a
-				 * wakeup message will falsely succeed on an
-				 * old wakeup message. We use the
-				 * mutex_wake_instance field (value 0 or 1)
-				 * to distinguish between an old and a new
-				 * wakeup message. Since at any given time
-				 * there is atmost one entry in the queue for
-				 * a process, the only values we need for
-				 * mutex_wake_instance are 0 and 1.
+				 * Significance of mutex_wake_instance field : After queueing itself, a process might go to
+				 * sleep -select call in mutex_long_sleep- awaiting a wakeup message or a timeout. It is
+				 * possible that a wakeup message might arrive after timeout. In this case, a later attempt
+				 * at waiting for a wakeup message will falsely succeed on an old wakeup message. We use the
+				 * mutex_wake_instance field (value 0 or 1) to distinguish between an old and a new wakeup
+				 * message. Since at any given time there is atmost one entry in the queue for a process,
+				 * the only values we need for mutex_wake_instance are 0 and 1.
 				 */
 				mutex_expected_wake_instance = BIN_TOGGLE(mutex_expected_wake_instance);
 				quant_retry_counter_insq = QUANT_RETRY;
@@ -574,11 +564,11 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 					do
 					{
 						if (INTERLOCK_FAIL !=
-							INSQTI((que_ent_ptr_t)free_slot, (que_head_ptr_t)&addr->prochead))
+						    INSQTI((que_ent_ptr_t)free_slot, (que_head_ptr_t)&addr->prochead))
 						{
 							MUTEX_DPRINT3("%d: Inserted %d into wait queue\n", process_id,
-									free_slot->pid);
-							return (mutex_long_sleep(addr, mutex_lock_type, csa));
+								      free_slot->pid);
+							return mutex_long_sleep(addr, mutex_lock_type, csa);
 						}
 					} while (--queue_retry_counter_insq);
 					if (!(--quant_retry_counter_insq))
@@ -589,33 +579,25 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 			}
 			if ((mutex_que_entry_ptr_t)INTERLOCK_FAIL == free_slot)
 			{
-				/* secondary interlock failed on an attempt to
-				* remove an entry from the free queue */
+				/* secondary interlock failed on an attempt to remove an entry from the free queue */
 				redo_cntr = 0;
 				continue;
 			}
 			if ((mutex_que_entry_ptr_t)NULL == free_slot)
 			{
-				/* Record queue full event in db file header if applicable.
-				 * Take care not to do it for jnlpool which has no concept of a db cache.
-				 * In that case csa->hdr is NULL so use PROBE_BG_TRACE_PRO_ANY macro.
+				/* Record queue full event in db file header if applicable.  Take care not to do it for
+				 * jnlpool which has no concept of a db cache.  In that case csa->hdr is NULL so use
+				 * PROBE_BG_TRACE_PRO_ANY macro.
 				 */
 				PROBE_BG_TRACE_PRO_ANY(csa, mutex_queue_full);
 				MUTEX_DPRINT2("%d: Free Queue full\n", process_id);
-				/*
-				* When I can't find a free slot in the queue
-				* repeatedly, it means that there is no
-				* progress in the system. A recovery attempt
-				* might be warranted in this scenario. The
-				* trick is to return cdb_sc_normal which in
-				* turn causes another spin-loop initiation (or
-				* recovery when implemented).
-				* The objective of mutex_sleep is achieved
-				* (partially) in that sleep is done, though
-				* queueing isn't.
-				*/
-			} else
-				assert(process_exiting);	/* timers might be off, but this adds CPU load at an awkward time */
+				/* When I can't find a free slot in the queue repeatedly, it means that there is no progress
+				 * in the system. A recovery attempt might be warranted in this scenario. The trick is to
+				 * return cdb_sc_normal which in turn causes another spin-loop initiation (or recovery when
+				 * implemented).  The objective of mutex_sleep is achieved (partially) in that sleep is
+				 * done, though queueing isn't.
+				 */
+			}
 			MICROSEC_SLEEP(ONE_MILLION - 1);	/* Wait a second, then try again */
 			mutex_deadlock_check(addr, csa);
 			if (++redo_cntr < MUTEX_MAX_WAIT_FOR_PROGRESS_CNTR)

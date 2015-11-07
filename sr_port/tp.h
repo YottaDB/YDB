@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -367,7 +367,7 @@ typedef struct ua_list_struct
  */
 typedef struct gv_orig_key_struct
 {
-	int4	gv_orig_key[DIVIDE_ROUND_UP((SIZEOF(gv_key) + MAX_KEY_SZ + 1), SIZEOF(int4))];
+	gv_key	gv_orig_key[DBKEYALLOC(MAX_KEY_SZ)];
 }gv_orig_key_array;
 
 GBLREF	block_id	t_fail_hist_blk[];

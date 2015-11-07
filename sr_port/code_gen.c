@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "compiler.h"
 #include "opcode.h"
 #include "mdq.h"
@@ -54,13 +57,17 @@ void	code_gen(void)
 			if (ct->src.line != old_line)
 			{
 				list_line("");
-				for (sl = src_head.que.bl; sl->line <= ct->src.line && sl != &src_head; )
+				dqloop(&src_head, que, sl)
 				{
+					if (sl->line > ct->src.line)
+						break;
+					assert(sl->str.len == STRLEN(sl->str.addr));
+					NEWLINE_TO_NULL(sl->str.addr[sl->str.len - 1]);
 					list_line_number();
-					dqdel(sl,que);
-					list_line(sl->addr);
-					sl = src_head.que.bl;
+					list_line(sl->str.addr);
 				}
+				/* Delete traversed lines, so we don't list them again during subsequent iters of the outer loop */
+				dqdelchain(&src_head, sl, que);
 				old_line = ct->src.line;
 			}
 		}

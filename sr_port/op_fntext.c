@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,10 +25,10 @@
 #endif
 #include "stack_frame.h"
 
-GBLREF spdesc 		stringpool;
-GBLREF stack_frame	*frame_pointer;
+GBLREF	spdesc		stringpool;
+GBLREF	stack_frame	*frame_pointer;
+GBLREF	uint4		dollar_tlevel;
 
-error_def(ERR_TXTSRCMAT);
 error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLMODULE);
 
@@ -66,12 +66,12 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 		if (is_trigger)
 		{
 			DBGTRIGR((stderr, "op_fntext: fetching $TEXT() source for a trigger\n"));
-			assert(FALSE == TREF(in_op_fntext));
-			TREF(in_op_fntext) = TRUE;
+			assert(0 == TREF(op_fntext_tlevel));
+			TREF(op_fntext_tlevel) = 1 + dollar_tlevel;
 		}
 #endif
 		stat = get_src_line(temp_rtn, label, int_exp, &sld, VERIFY);
-		GTMTRIG_ONLY(TREF(in_op_fntext) = FALSE);
+		GTMTRIG_ONLY(TREF(op_fntext_tlevel) = 0);
 	}
 	if (0 == (stat & (CHECKSUMFAIL | NEGATIVELINE)))
 	{

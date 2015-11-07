@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,40 +36,38 @@
 #include "t_begin_crit.h"
 #include "gvcst_blk_build.h"
 #include "t_abort.h"
+#include "gtmmsg.h"
 
 GBLREF char		*update_array, *update_array_ptr;
+GBLREF cw_set_element   cw_set[];
 GBLREF gd_region        *gv_cur_region;
-GBLREF uint4		update_array_size;
-GBLREF srch_hist	dummy_hist;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
-GBLREF block_id 	patch_curr_blk;
-GBLREF cw_set_element   cw_set[];
+GBLREF srch_hist	dummy_hist;
+GBLREF uint4		update_array_size;
 
+error_def(ERR_AIMGBLKFAIL);
 error_def(ERR_DBRDONLY);
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEFAIL);
 
 void dse_shift(void)
 {
-	bool		forward;
-	uint4		offset, shift;
-	int4		size;
-	sm_uc_ptr_t	bp;
-	uchar_ptr_t	lbp;
 	blk_segment	*bs1, *bs_ptr;
-	int4		blk_seg_cnt, blk_size;
+	block_id	blk;
+	boolean_t	forward;
+	int4		blk_seg_cnt, blk_size, size;
+	sm_uc_ptr_t	bp;
 	srch_blk_status	blkhist;
+	uchar_ptr_t	lbp;
+	uint4		offset, shift;
 
         if (gv_cur_region->read_only)
                 rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
-	if (patch_curr_blk < 0 || patch_curr_blk >= cs_addrs->ti->total_blks || !(patch_curr_blk % cs_addrs->hdr->bplmap))
-	{
-		util_out_print("Error: invalid block number.", TRUE);
+	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
 		return;
-	}
-	if (cli_present("OFFSET") != CLI_PRESENT)
+	if (CLI_PRESENT != cli_present("OFFSET"))
 	{
 		util_out_print("Error:  offset must be specified.", TRUE);
 		return;
@@ -77,13 +75,13 @@ void dse_shift(void)
 	if (!cli_get_hex("OFFSET", &offset))
 		return;
 	shift = 0;
-	if (cli_present("FORWARD") == CLI_PRESENT)
+	if (CLI_PRESENT == cli_present("FORWARD"))
 	{
 		if (!cli_get_hex("FORWARD", &shift))
 			return;
 		forward = TRUE;
 		lbp = (unsigned char *)malloc((size_t)shift);
-	} else if (cli_present("BACKWARD") == CLI_PRESENT)
+	} else if (CLI_PRESENT == cli_present("BACKWARD"))
 	{
 		if (!cli_get_hex("BACKWARD", &shift))
 			return;
@@ -104,7 +102,7 @@ void dse_shift(void)
 	}
 	blk_size = cs_addrs->hdr->blk_size;
 	t_begin_crit(ERR_DSEFAIL);
-	blkhist.blk_num = patch_curr_blk;
+	blkhist.blk_num = blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 	{
 		if (lbp)
@@ -152,7 +150,7 @@ void dse_shift(void)
 	}
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
-		util_out_print("Error: bad blk build.", TRUE);
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_AIMGBLKFAIL, 3, blk, DB_LEN_STR(gv_cur_region));
 		t_abort(gv_cur_region, cs_addrs);
 		if (lbp)
 			free(lbp);

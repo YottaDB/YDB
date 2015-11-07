@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,18 @@
 #define	MUINTKEY_NULLSUBS	2 /* -subscript was specified as part of mupip integ AND there was at least one null subscript */
 
 #define	NO_ONLINE_ERR_MSG	"ONLINE qualifier for this region will be ignored"
+
+#define DEFAULT_ADJACENCY 10
+#define CHECK_ADJACENCY(BLK, LVL, CNTR)								\
+{													\
+	GBLREF int			muint_adj;							\
+	GBLREF int4			mu_int_adj[];							\
+	GBLREF block_id			mu_int_adj_prev[];						\
+													\
+	if (mu_int_adj_prev[LVL] <= BLK + muint_adj && mu_int_adj_prev[LVL] >= BLK - muint_adj)	\
+		CNTR += 1;									\
+	mu_int_adj_prev[LVL] = BLK;									\
+}
 
 typedef	struct global_list_struct
 {

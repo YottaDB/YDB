@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2014 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -22,10 +22,11 @@ COMMANDS
 	k tmpreg2,tmpseg2
 	s BOL="!"
 	set delim=$select("VMS"=ver:"/",1:"-")
+	; show NAMES after GBLNAME to avoid potential NAMRANGEORDER errors in case of non-zero collation
 	i '$l($get(cfile)) d
-	. f i="@useio",$s(log:"@uself",1:"") q:'$l(i)  u @i d templatec,regionc,segmentc,namec,gblnamec
+	. f i="@useio",$s(log:"@uself",1:"") q:'$l(i)  u @i d templatec,regionc,segmentc,gblnamec,namec
 	e  o cfile:(newversion:exc="w !,$ztatus c cfile zgoto $zl:cfilefail") u cfile d
-	. d templatec,regionc,segmentc,namec,gblnamec
+	. d templatec,regionc,segmentc,gblnamec,namec
 	. c cfile
 cfilefail:
 	s BOL=""
@@ -138,6 +139,9 @@ onejnl:
 regionc:
 	n s,q,val,synval,tmpval,type
 	w !,"DELETE "_delim_"REGION "_defreg
+	; delete DEFAULT SEGMENT at same time DEFAULT REGION is deleted to avoid potential KEYSIZIS issues when
+	; playing the GDE SHOW -COMMANDS output in a fresh GDE session (GTM-7954).
+	w !,"DELETE "_delim_"SEGMENT "_defseg
 	s s=""
 	f  s s=$o(regs(s)) q:'$l(s)  d
 	. w !,"ADD "_delim_"REGION ",s
@@ -221,7 +225,6 @@ MM	w ?x(8),$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
 segmentc:
 	n s,q,val,synval,tmpval,type,am
 	s s=""
-	w !,"DELETE "_delim_"SEGMENT "_defseg
 	f  s s=$o(segs(s)) q:'$l(s)  d
 	. s am=segs(s,"ACCESS_METHOD")
 	. w !,"ADD "_delim_"SEGMENT ",s
@@ -310,9 +313,6 @@ tmpjnlbd:
 	w !,BOL
 	q
 templatec:
-	; ---------------------------------------------------------
-	; dump TEMPLATE -REGION section
-	; ---------------------------------------------------------
 	n q,synval,tmpval,type,cmd,defercnt,defercmd,i,am,s,freq,freqx,val
 	; compute template values that are most common across regions and store these into tmpreg
 	s s=""
@@ -346,6 +346,9 @@ templatec:
 	. . s val=freqx(am,q,freq)
 	. . s tmpseg(am,q)=val
 	; use more optimal templates (tmpreg/tmpseg) while generating template commands below
+	; ---------------------------------------------------------
+	; dump TEMPLATE -REGION section
+	; ---------------------------------------------------------
 	s q=""
 	s cmd="TEMPLATE "_delim_"REGION ",defercmd="",defercnt=0
 	f  s q=$o(syntab("TEMPLATE","REGION",q)) q:""=q  d
@@ -565,10 +568,10 @@ namedisplaycalc:(name)
 	i namedispmaxlen<namedisplen s namedispmaxlen=namedisplen
 	q
 mapdispcalc:
-	n m,gblname,offset,coll,isplusplus,mlen,mtmp,name,mapdisplen,namelen,namedisp
+	n coll,gblname,isplusplus,m,mapdisplen,mlen,mprev,mtmp,name,namedisp,namelen,offset
 	s m=""
-	f  s m=$o(map(m)) q:'$zl(m)  d
-	. i $l(mapreg),(mapreg'=map(m)) q
+	f  s mprev=m,m=$o(map(m)) q:'$zl(m)  d
+	. i $l(mapreg),(mapreg'=map(m)),('$zl(mprev)!(mapreg'=map(mprev))) q
 	. s offset=$zfind(m,ZERO,0)
 	. i offset=0  s mapdisp(m)=$tr(m,")","0") q  ; no subscripts case. finish it off first
 	. s gblname=$ze(m,1,offset-2),coll=+$g(gnams(gblname,"COLLATION")),mlen=$zl(m)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -342,3 +342,8 @@ OPCODE_DEF(OC_INDMERGE2, (OCT_NULL))
 OPCODE_DEF(OC_LITC, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_STOLITC, (OCT_NULL))
 OPCODE_DEF(OC_FNZPEEK, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_FNZSOCKET, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_FNZSYSLOG, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_RHD_EXT, (OCT_CDADDR))
+OPCODE_DEF(OC_LAB_EXT, (OCT_CDADDR))
+OPCODE_DEF(OC_ZRUPDATE, (OCT_NULL))

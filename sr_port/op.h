@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -102,11 +102,9 @@ void	op_fnzbitor(mval *dst, mval *bitstr1, mval *bitstr2);
 void	op_fnzbitset(mval *dst, mval *bitstr, int pos, int truthval);
 void	op_fnzbitstr(mval *bitstr, int size, int truthval);
 void	op_fnzbitxor(mval *dst, mval *bitstr1, mval *bitstr2);
-#ifdef __sun
-void	op_fnzcall(unsigned int n_mvals, ...);
-#elif defined(VMS)
+#ifdef VMS
 void	op_fnzcall(mval *dst, ...);
-#elif defined(UNIX)
+#else
 void	op_fnzcall(void);	/* stub only */
 #endif
 void	op_fnzchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...);
@@ -136,13 +134,15 @@ void	op_fnzpopulation(mval *arg1, mval *arg2, mval *dst);
 void	op_fnzpriv(mval *prv, mval *ret);
 void	op_fnzqgblmod(mval *v);
 void	op_fnzreverse(mval *src, mval *dst);
-int	op_fnzsearch(mval *file, mint indx, mval *ret);		/***type int added***/
+int	op_fnzsearch(mval *file, mint indx, mint mfunc, mval *ret);		/***type int added***/
 void	op_fnzsetprv(mval *prv, mval *ret);
 void	op_fnzsigproc(int processid, int signum, mval *retcode);
+void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...);
 void	op_fnzsqlexpr(mval *value, mval *target);
 void	op_fnzsqlfield(int findex, mval *target);
 #ifdef UNIX
 void	op_fnzsubstr(mval *src, int start, int bytelen, mval *dest);
+void	op_fnzsyslog(mval *src, mval *dst);
 #endif
 void	op_fnztranslate(mval *src, mval *in_str , mval *out_str, mval *dst);
 void	op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst);
@@ -298,6 +298,7 @@ void	op_zdeallocate(int4 timeout);
 void	op_zedit(mval *v, mval *p);
 void	op_zg1(int4 level);
 void	op_zgoto(mval *rtnname, mval *lblname, int offset, int level);
+void    op_zrupdate(int argcnt, ...);
 #	ifdef UNIX
         /* note op_ztrigger.c is present even in non-GTM_TRIGGER UNIX environments but is not runnable */
 void	op_ztrigger(void);

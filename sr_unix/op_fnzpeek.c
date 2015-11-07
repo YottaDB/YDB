@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,8 +41,6 @@ error_def(ERR_MAXSTRLEN);
 error_def(ERR_ZPEEKNORPLINFO);
 
 #define FMTHEXDGT(spfree, digit) *spfree++ = digit + ((digit <= 9) ? '0' : ('A' - 0x0A))
-#define ZPEEKDEFFMT		"C"
-#define ZPEEKDEFFMT_LEN 	(SIZEOF(ZPEEKDEFFMT) - 1)
 #define ARGUMENT_MAX_LEN	MAX_MIDENT_LEN
 
 /* Codes for peek operation mnemonics */
@@ -68,9 +66,10 @@ GBLREF boolean_t	pool_init;
 GBLREF boolean_t	jnlpool_init_needed;
 GBLREF jnlpool_addrs	jnlpool;
 GBLREF recvpool_addrs	recvpool;
-DEBUG_ONLY(GBLREF boolean_t ok_to_UNWIND_in_exit_handling;)
+#ifdef DEBUG
+GBLREF	int		process_exiting;
+#endif
 
-LITDEF mval literal_zpeekdeffmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, ZPEEKDEFFMT_LEN, (char *)ZPEEKDEFFMT, 0, 0);
 LITREF unsigned char lower_to_upper_table[];
 
 STATICFNDCL void op_fnzpeek_signal_handler(int sig, siginfo_t *info, void *context);
@@ -153,7 +152,7 @@ void op_fnzpeek_signal_handler(int sig, siginfo_t *info, void *context)
 	{	/* Needs new block since START_CH declares a new var used in UNWIND() */
 		int arg = 0;	/* Needed for START_CH macro if debugging enabled */
 		START_CH(TRUE);
-		DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);
+		assert(!process_exiting);
 		UNWIND(NULL, NULL);
 	}
 }
@@ -422,10 +421,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	/* Initialize */
 	fmtcode = 'C';			/* If arg is NULL string (noundef default), provide default */
 	MV_FORCE_STR(structid);
-	if (MV_DEFINED(format))
-	{
-		MV_FORCE_STR(format);
-	} else format = (mval *)&literal_zpeekdeffmt;	/* Cast to avoid compiler warning about dropping readonly type attributes */
+	MV_FORCE_STR(format);
 	/* Parse and lookup the first arg's mnemonic and arg (if supplied) */
 	for (nptr = mnemonic, cptr = (unsigned char *)structid->str.addr, cptrend = cptr + structid->str.len;
 	     cptr < cptrend; ++cptr)

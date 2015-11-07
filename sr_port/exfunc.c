@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ int exfunc(oprtype *a, boolean_t alias_target)
 		{
 			if (OC_CDLIT == calltrip_opr1_tref->opcode)
 				assert(CDLT_REF == calltrip_opr1_tref->operand[0].oprclass);
-			else
+			else USHBIN_ONLY(if (OC_LAB_EXT != calltrip_opr1_tref->opcode))
 			{
 				assert(OC_LABADDR == calltrip_opr1_tref->opcode);
 				assert(TRIP_REF == calltrip_opr1_tref->operand[1].oprclass);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,37 +54,51 @@
 	CURR = (char *)i2ascl((uchar_ptr_t)CURR, lcl_strm_seqno);	\
 }
 
-/*
- * Generic function to convert a journal record into an extract format record.
- * Expects a pointer to the journal record and the length of the buffer and
- * returns the result in ext_buff. If there is a bad format record in between,
- * it returns NULL. It sets jb_stop to the offset of the jnl_buff where
- * the last jnlrecord was processed. On successful conversion, it returns a value
- * ptr, such that ptr - ext_buff would be the length of the extracted buffer.
- * If the ext_len is not enough for the conversion, it returns ext_buff + ext_len
- */
-
+#ifdef DEBUG
 GBLREF	char		*jb_stop;
+#endif
 GBLREF	char		muext_code[][2];
 
 static	boolean_t	first_tstart = FALSE;
 static	int4		num_tstarts = 0;
 static	int4		num_tcommits = 0;
 
-
-char 	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char *ext_buff)
+/* Generic function to convert a journal record into an extract format record.
+ * Expects a pointer to the journal record and the length of the buffer and
+ * returns the result in ext_buff. If there is a bad format record in between,
+ * it does an assertpro. It sets jb_stop to the offset of the jnl_buff where
+ * the last jnlrecord was processed. On successful conversion, it returns a value
+ * ptr, such that ptr - ext_buff would be the length of the extracted buffer.
+ */
+char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char **ext_buff, int *extract_bufsiz)
 {
-	int4		rec_len;
+	int	rec_len, tmpbufsiz, tmpsize;
+	char	*extbuf, *exttop, *tmp, *origbuf;
 
+	extbuf = *ext_buff;
+	exttop = extbuf + *extract_bufsiz;
 	for ( ; jnl_len > JREC_PREFIX_UPTO_LEN_SIZE && jnl_len >= (rec_len = rec->prefix.forwptr) && rec_len > MIN_JNLREC_SIZE; )
 	{
-		ext_buff = jnl2ext((char *)rec, ext_buff);
+		if (MAX_ONE_JREC_EXTRACT_BUFSIZ > (exttop - extbuf))
+		{	/* Remaining space not enough to hold the worst-case journal extract of ONE jnl record. Expand linearly */
+			tmpsize = *extract_bufsiz;
+			tmpbufsiz = tmpsize + (JNL2EXTCVT_EXPAND_FACTOR * MAX_ONE_JREC_EXTRACT_BUFSIZ);
+			tmp = malloc(tmpbufsiz);
+			origbuf = *ext_buff;
+			tmpsize = extbuf - origbuf;
+			memcpy(tmp, origbuf, tmpsize);
+			free(origbuf);
+			*ext_buff = tmp;
+			*extract_bufsiz = tmpbufsiz;
+			extbuf = tmp + tmpsize;
+			exttop = tmp + tmpbufsiz;
+		}
+		extbuf = jnl2ext((char *)rec, extbuf);
 		jnl_len -= rec_len;
 		rec = (jnl_record *)((char *)rec + rec_len);
 	}
-
-	jb_stop = (char *)rec;
-	return ext_buff;
+	DEBUG_ONLY(jb_stop = (char *)rec;)
+	return extbuf;
 }
 
 /* This was earlier declared as a local variable, but was moved up, because the HPIA compiler for some reason seems to
@@ -107,19 +121,19 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	rec_len = rec->prefix.forwptr;
 	if ((ROUND_DOWN2(rec_len, JNL_REC_START_BNDRY) != rec_len) || rec_len != REC_LEN_FROM_SUFFIX(jnl_buff, rec_len))
 	{
-		assert(FALSE);
+		assertpro(FALSE);
 		return ext_buff;
 	}
 	if (!IS_REPLICATED(rectype))
 	{
-		assert(FALSE);
+		assertpro(FALSE);
 		return ext_buff;
 	}
 	curr = ext_buff;
-	/* The following assumes the journal extract format is "GDSJEX06". Whenever that changes (in mur_jnl_ext.c),
-	 * the below code as well as ext2jnl.c needs to change. Add an assert to let us know of that event.
+	/* The following assumes the journal extract format is "GDSJEX07". Whenever that changes (in mur_jnl_ext.c),
+	 * the below code as well as ext2jnl.c will need to change. Add an assert to let us know of that event.
 	 */
-	assert(!MEMCMP_LIT(JNL_EXTR_LABEL,"GDSJEX06"));
+	assert(!MEMCMP_LIT(JNL_EXTR_LABEL,"GDSJEX07"));
 	if (IS_TUPD(rectype))
 	{
 		if (FALSE == first_tstart)
@@ -180,6 +194,8 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 		GET_SHORTP(curr, &muext_code[MUEXT_ZKILL][0]);
 	else if (IS_ZTWORM(rectype))
 		GET_SHORTP(curr, &muext_code[MUEXT_ZTWORM][0]);
+	else if (IS_LGTRIG(rectype))
+		GET_SHORTP(curr, &muext_code[MUEXT_LGTRIG][0]);
 	else if (IS_ZTRIG(rectype))
 		GET_SHORTP(curr, &muext_code[MUEXT_ZTRIG][0]);
 	else /* if (JRT_NULL == rectype) */
@@ -205,12 +221,14 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	}
 	DELIMIT_CURR;
 	/* print "update_num" */
-	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
+	assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype));
 	assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
+	assert(&rec->jrec_set_kill.update_num == &rec->jrec_lgtrig.update_num);
 	curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_set_kill.update_num);
 	DELIMIT_CURR;
-	if (IS_ZTWORM(rectype))
+	if (IS_ZTWORM(rectype) || IS_LGTRIG(rectype))
 	{
+		assert(&rec->jrec_ztworm.ztworm_str == &rec->jrec_lgtrig.lgtrig_str);
 		ztwormstr = &rec->jrec_ztworm.ztworm_str;
 		val_len = ztwormstr->length;
 		val_ptr = &ztwormstr->text[0];
@@ -230,7 +248,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	key->end = keystr->length;
 	if (key->end > key->top)
 	{
-		assert(FALSE);
+		assertpro(FALSE);
 		return ext_buff;
 	}
 	memcpy(key->base, &keystr->text[0], keystr->length);

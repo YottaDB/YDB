@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,10 +42,13 @@
 #include "iosp.h"
 #include "gtmio.h"
 #include "gtmmsg.h"
-#include "gtm_rename.h"
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gd_addr		*gd_header;
+
+error_def(ERR_JNLREAD);
+error_def(ERR_PREMATEOF);
+error_def(ERR_FILEPARSE);
 
 gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short jnl_file_list_len, int *db_total)
 {
@@ -61,9 +64,6 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 #if defined(VMS)
 	io_status_block_disk	iosb;
 #endif
-	error_def(ERR_JNLREAD);
-	error_def(ERR_PREMATEOF);
-	error_def(ERR_FILEPARSE);
 
 	db_tot = 0;
 	tdblist = head.next = NULL;
@@ -88,7 +88,7 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 		if (!get_full_path((char *)seg->fname, (unsigned int)seg->fname_len,
 					(char *)&db_fname[0], &db_fname_len, MAX_FN_LEN, &ustatus))
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, seg->fname, seg->fname_len, ustatus);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, seg->fname, seg->fname_len, ustatus);
 			return NULL;
 		}
 		assert(db_fname_len);
@@ -106,13 +106,10 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 		if (!get_full_path(cptr_last, (unsigned int)(cptr - cptr_last),
 					(char *)jctl->jnl_fn, &jctl->jnl_fn_len, MAX_FN_LEN, &ustatus))
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, cptr_last, cptr - cptr_last, ustatus);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, cptr_last, cptr - cptr_last, ustatus);
 			return NULL;
 		}
 		cptr++;	/* skip separator */
-		/* Followings fix file name if system crashed during rename
-		 * (directly related to cre_jnl_file_common) */
-		cre_jnl_file_intrpt_rename(jctl->jnl_fn_len, jctl->jnl_fn);
 		if (!mur_fopen_sp(jctl))
 			return NULL;
 		jctl->jfh = (jnl_file_header *)malloc(REAL_JNL_HDR_LEN);
@@ -120,7 +117,7 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 		DO_FILE_READ(jctl->channel, 0, jfh, REAL_JNL_HDR_LEN, jctl->status, jctl->status2);
 		if (SS_NORMAL != jctl->status) /* read fails */
 		{
-			gtm_putmsg(VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, 0, jctl->status);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, 0, jctl->status);
 			/* should we do mur_fclose(jctl) here ? */
 			return NULL;
 		}

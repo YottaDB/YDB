@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -299,7 +299,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		return (sm_uc_ptr_t)(mm_read(blk));
 	}
 #	ifdef GTM_CRYPT
-	if ((GTMCRYPT_INVALID_KEY_HANDLE == csa->encr_key_handle) && !IS_BITMAP_BLK(blk))
+	if (csd->is_encrypted && (GTMCRYPT_INVALID_KEY_HANDLE == csa->encr_key_handle) && !IS_BITMAP_BLK(blk))
 	{	/* A non-GT.M process is attempting to read a non-bitmap block but doesn't have a valid encryption key handle. This
 		 * is an indication that the process encountered an error during db_init and reported it with a -W- severity. But,
 		 * since the block it is attempting to read can be in the unencrypted shared memory, we cannot let it access it
@@ -518,7 +518,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				 * do a read memory barrier to ensure we read a consistent state. Otherwise, we could see
 				 * cr->in_tend as 0 even though it is actually non-zero in another processor (due to cache
 				 * coherency delays in multi-processor environments) and this could lead to mysterious
-				 * failures including GTMASSERTs and database damage as the validation logic in t_end/tp_tend
+				 * failures including assertpros and database damage as the validation logic in t_end/tp_tend
 				 * relies on the fact that the cr->in_tend check here is accurate as of this point.
 				 *
 				 * Note that on architectures where a change done by another process needs two steps to be made
@@ -686,15 +686,10 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			break;
 		ocnt++;
 		assert((0 == was_crit) || (1 == was_crit));
-		/* if we held crit while entering t_qread we might need BAD_LUCK_ABOUNDS - 1 passes.
-		 * otherwise we might need BAD_LUCK_ABOUNDS passes. if we are beyond this GTMASSERT.
+		/* If we held crit while entering t_qread we might need BAD_LUCK_ABOUNDS - 1 passes.
+		 * Otherwise, we might need BAD_LUCK_ABOUNDS passes if we are beyond this assertpro.
 		 */
-		if ((BAD_LUCK_ABOUNDS - was_crit) < ocnt)
-		{
-			assert(!hold_onto_crit);
-			assert(!csa->now_crit);
-			GTMASSERT;
-		}
+		assertpro((BAD_LUCK_ABOUNDS - was_crit) >= ocnt);
 		if (!csa->now_crit && !hold_onto_crit)
 			grab_crit(gv_cur_region);
 	} while (TRUE);

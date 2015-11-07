@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,7 @@ int rts_error(int argcnt, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = (ANTICIPATORY_FREEZE_AVAILABLE && jnlpool.jnlpool_ctl) ? REG2CSA(gv_cur_region) : NULL;
+	csa = CUSTOM_ERRORS_LOADED ? REG2CSA(gv_cur_region) : NULL;
 	VAR_START(var, argcnt);
 	return rts_error_va(csa, argcnt, var);
 }
@@ -80,7 +80,6 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 {
 	int 		msgid;
 	va_list		var_dup;
-	const err_msg	*msg;
 	const err_ctl	*ctl;
 #	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
@@ -109,21 +108,17 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 		PRN_ERROR;
 	/* This is simply a place holder msg to signal tp restart or otherwise rethrow an error */
 	if ((ERR_TPRETRY == msgid) || (ERR_REPEATERROR == msgid) || (ERR_REPLONLNRLBK == msgid) || (ERR_JOBINTRRQST == msgid)
-	    || (ERR_JOBINTRRETHROW == msgid))
-		error_condition = msgid;
-	else
+			|| (ERR_JOBINTRRETHROW == msgid))
+	{
+		SET_ERROR_CONDITION(msgid);	/* sets "error_condition" & "severity" */
+	} else
 	{	/* Note this message is not flushed out. This is so user console is not polluted with messages that are going to be
 		 * handled by a ZTRAP. If ZTRAP is not active, the message will be flushed out in mdb_condition_handler - which is
 		 * usually the top level handler or is rolled over into by higher handlers.
 		 */
 		if (IS_GTMSECSHR_IMAGE)
 			util_out_print(NULL, RESET);
-		if (NULL == (ctl = err_check(msgid)))
-			msg = NULL;
-		else
-			GET_MSG_INFO(msgid, ctl, msg);
-		error_condition = msgid;
-		severity = NULL == msg ? ERROR : SEVMASK(msgid);
+		SET_ERROR_CONDITION(msgid);	/* sets "error_condition" & "severity" */
 		gtm_putmsg_list(csa, argcnt, var);
 		if (DUMPABLE)
 			created_core = dont_want_core = FALSE;		/* We can create a(nother) core now */

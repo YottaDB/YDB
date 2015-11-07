@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,15 +106,18 @@
 #define ISXDIGIT isxdigit
 #define ISXDIGIT_ASCII(CH)	(IS_ASCII(CH) && ISXDIGIT(CH))
 
+LITREF unsigned char	lower_to_upper_table[];
+LITREF unsigned char	upper_to_lower_table[];
+
 #ifdef TOLOWER
 #undef TOLOWER
-#endif
-#define TOLOWER	tolower
+#endif		/* this macro works only on lower-case ASCII characters and leaves others as-is */
+#define TOLOWER(C)	upper_to_lower_table[(unsigned char)C]
 
 #ifdef TOUPPER
 #undef TOUPPER
-#endif
-#define TOUPPER	toupper
+#endif		/* this macro works only on upper-case ASCII characters and leaves others as-is */
+#define TOUPPER(C)	lower_to_upper_table[(unsigned char)C]
 
 #if defined(__osf__) && defined(__alpha)
 

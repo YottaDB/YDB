@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@
 GBLREF  gv_namehead     *gv_target;
 LITREF	unsigned short	dpos[], dneg[];
 
+error_def(ERR_GVSUBOFLOW);
 /*
  * -----------------------------------------------------
  * Convert a string subscript to MUMPS string
@@ -42,7 +43,7 @@ LITREF	unsigned short	dpos[], dneg[];
  *
  * Entry:
  *	sub	- input string in subscript format
- *	targ	- output string buffer
+ *	targ	- output mstr value.
  *	xlat_flg- translate flag.
  *		  If true convert string to MUMPS format (aka ZWRITE format)
  * Return:
@@ -50,9 +51,9 @@ LITREF	unsigned short	dpos[], dneg[];
  *	converted in the targ string) + 1.
  * -----------------------------------------------------
  */
-unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat_flg)
+unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 {
-	unsigned char	buf[MAX_KEY_SZ + 1], buf1[MAX_KEY_SZ + 1], ch, *ptr, trail_ch, *str;
+	unsigned char	buf[MAX_KEY_SZ + 1], buf1[MAX_KEY_SZ + 1], ch, *ptr, trail_ch, *str, *targ, *targ_end;
 	unsigned short	*tbl_ptr;
 	int		num, rev_num, trail_zero;
 	span_subs	*subs_ptr;
@@ -62,6 +63,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat
 
 	SETUP_THREADGBL_ACCESS;
 	ch = *sub++;
+	targ = (unsigned char *)opstr->addr;
 	if (STR_SUB_PREFIX == ch || (SUBSCRIPT_STDCOL_NULL == ch && KEY_DELIMITER == *sub))
 	{	/* If this is a string */
 		in_length = 0;
@@ -80,6 +82,14 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat
 			mstr_targ.len = SIZEOF(buf1);
 			mstr_targ.addr = (char *)buf1;
 			do_xform(gv_target->collseq, XBACK, &mstr_ch, &mstr_targ, &targ_len);
+			if (targ_len > opstr->len)
+			{
+				/* The only way we know of for targ_len to be greater than opstr->len is if the collation
+				 * library allocated an external buffer greater than opstr->len
+				 */
+				assert(mstr_targ.addr != (char *)buf1);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GVSUBOFLOW);
+			}
 			if (!xlat_flg)
 			{
 				memcpy(targ, mstr_targ.addr, targ_len);	/* mstr_targ.addr is used just in case it is
@@ -100,10 +110,13 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat
 		if (xlat_flg)
 		{
 			format2zwr((sm_uc_ptr_t)ptr, in_length, targ, &targ_len);
+			assert(targ_len <= opstr->len);
 			targ = targ + targ_len;
 		}
 	} else
 	{	/* Number */
+		targ_end = targ + opstr->len;
+		assert(opstr->len >= SPAN_PREFIX_LEN);
 		if (SUBSCRIPT_ZERO == ch)
 			*targ++ = '0';
 		else if(SPANGLOB_SUB_ESCAPE == ch)
@@ -121,9 +134,10 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat
 				;
 			for (rev_num = 0; num > 0; rev_num = (rev_num * DECIMAL_BASE + num % DECIMAL_BASE), num /= DECIMAL_BASE)
 				;
-			for (; rev_num > 0; *targ++ = (rev_num % DECIMAL_BASE + ASCII_0), rev_num /= DECIMAL_BASE)
+			for (; rev_num > 0 && targ < targ_end;
+				*targ++ = (rev_num % DECIMAL_BASE + ASCII_0), rev_num /= DECIMAL_BASE)
 				;
-			for (; trail_zero > 0 ; *targ++ = '0', trail_zero--);
+			for (; trail_zero > 0 && targ < targ_end; *targ++ = '0', trail_zero--);
 			if (*sub != 0)
 				*targ++ = '*';
 		}
@@ -131,7 +145,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat
 		{
 			tbl_ptr = (unsigned short *)&dpos[0] - 1;
 			trail_ch = KEY_DELIMITER;
-			if (0 <= (signed char)ch)
+			if (0 <= (signed char)ch && targ < targ_end)
 			{	/* Bit 7 of the exponent is set for positive numbers; must be negative */
 				trail_ch = NEG_MNTSSA_END;
 				tbl_ptr = (unsigned short *)dneg;
@@ -147,7 +161,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat
 				*targ++ = '.';
 					/* generate leading 0's */
 				do *targ++ = '0';
-				while ((signed char)ch-- > 0)
+				while ((signed char)ch-- > 0 && targ < targ_end)
 					;
 					/* make expon. really large to avoid
 					 * generating extra dots */
@@ -186,7 +200,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat
 				if ('.' == *(targ - 1))
 					targ--;
 			} else
-				while (--expon > 0)
+				while (--expon > 0 && targ < targ_end)
 					*targ++ = '0';
 		}
 	}

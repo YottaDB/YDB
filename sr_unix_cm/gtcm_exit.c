@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@ static char rcsid[] = "$Header:$";
 
 #include "gv_rundown.h"		/* for gv_rundown() prototype */
 #include "op.h"			/* for op_unlock() and op_lkinit() prototype */
+#include "gtmcrypt.h"
 
 GBLREF int4	 gtcm_exi_condition;
 
@@ -46,5 +47,6 @@ void gtcm_exit()
 	rc_delete_cpt();
 	rc_rundown();
 #endif
+	GTMCRYPT_CLOSE;
 	exit(gtcm_exi_condition);
 }

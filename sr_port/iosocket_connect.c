@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
+#include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include "stringpool.h"
 #include "gt_timer.h"
@@ -43,6 +44,7 @@ GBLREF	d_socket_struct		*newdsocket;	/* in case jobinterrupt */
 GBLREF	int4			gtm_max_sockets;
 
 error_def(ERR_GETNAMEINFO);
+error_def(ERR_GETSOCKNAMERR);
 error_def(ERR_GETSOCKOPTERR);
 error_def(ERR_OPENCONN);
 error_def(ERR_SETSOCKOPTERR);
@@ -68,10 +70,11 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 	ABS_TIME        cur_time, end_time;
 	struct timeval	*sel_time;
         mv_stent        *mv_zintdev;
-	struct addrinfo *remote_ai_ptr, *raw_ai_ptr;
+	struct addrinfo *remote_ai_ptr, *raw_ai_ptr, *local_ai_ptr;
 	int		errcode, real_errno;
 	char		ipaddr[SA_MAXLEN + 1];
-	GTM_SOCKLEN_TYPE	sockbuflen;
+	char		port_buffer[NI_MAXSERV];
+	GTM_SOCKLEN_TYPE	sockbuflen, tmp_addrlen;
 
 	DBGSOCK((stdout, "socconn: ************* Entering socconn - timepar: %d\n",timepar));
         /* check for validity */
@@ -506,8 +509,41 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 		freeaddrinfo(sockptr->remote.ai_head);
 		sockptr->remote.ai_head = NULL;
 	}
+	local_ai_ptr = &(sockptr->local.ai);
 	if (socket_local != sockptr->protocol)
 	{
+		tmp_addrlen = SIZEOF(struct sockaddr_storage);
+		if (-1 == getsockname(sockptr->sd, SOCKET_LOCAL_ADDR(sockptr), &tmp_addrlen))
+		{
+			save_errno = errno;
+			errptr = (char *)STRERROR(save_errno);
+			errlen = STRLEN(errptr);
+			if (FD_INVALID != sockptr->sd)
+			{
+				close(sockptr->sd);	/* Don't leave a dangling socket around */
+				sockptr->sd = FD_INVALID;
+			}
+			SOCKET_FREE(sockptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, errlen, errptr);
+			return FALSE;
+		}
+		local_ai_ptr->ai_addrlen = tmp_addrlen;
+		local_ai_ptr->ai_family = SOCKET_LOCAL_ADDR(sockptr)->sa_family;
+		GETNAMEINFO(SOCKET_LOCAL_ADDR(sockptr), local_ai_ptr->ai_addrlen, ipaddr, SA_MAXLEN, port_buffer,
+			NI_MAXSERV, NI_NUMERICSERV | NI_NUMERICHOST, errcode);
+		if (0 != errcode)
+		{
+			if (FD_INVALID != sockptr->sd)
+			{
+				close(sockptr->sd);	/* Don't leave a dangling socket around */
+				sockptr->sd = FD_INVALID;
+			}
+			SOCKET_FREE(sockptr);
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+			return FALSE;
+		}
+		sockptr->local.port = ATOI(port_buffer);
+		STRNDUP(ipaddr, SA_MAXLEN, sockptr->local.saddr_ip);
 		GETNAMEINFO(SOCKET_REMOTE_ADDR(sockptr), remote_ai_ptr->ai_addrlen, ipaddr, SA_MAXLEN, NULL, 0
 			, NI_NUMERICHOST, errcode);
 		if (0 != errcode)
@@ -517,6 +553,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 				close(sockptr->sd);	/* Don't leave a dangling socket around */
 				sockptr->sd = FD_INVALID;
 			}
+			SOCKET_FREE(sockptr);
 			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
 			return FALSE;
 		}
@@ -524,7 +561,11 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t updat
 		strncpy(&iod->dollar.key[len], sockptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
 #	ifndef VMS
 	} else
-	{
+	{	/* getsockname does not return info for AF_UNIX connected socket so copy from remote side */
+		local_ai_ptr->ai_socktype = sockptr->remote.ai.ai_socktype;
+		local_ai_ptr->ai_addrlen = sockptr->remote.ai.ai_addrlen;
+		local_ai_ptr->ai_protocol = sockptr->remote.ai.ai_protocol;
+		SOCKET_ADDR_COPY(sockptr->local, sockptr->remote.sa, sockptr->remote.ai.ai_addrlen);
 		STRNCPY_STR(&iod->dollar.key[len], ((struct sockaddr_un *)(sockptr->remote.sa))->sun_path, DD_BUFLEN - len - 1);
 #	endif
 	}

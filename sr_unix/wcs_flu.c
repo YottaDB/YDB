@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -160,7 +160,7 @@ boolean_t wcs_flu(uint4 options)
 {
 	bool			success, was_crit;
 	boolean_t		fix_in_wtstart, flush_hdr, jnl_enabled, sync_epoch, write_epoch, need_db_fsync, in_commit;
-	boolean_t		flush_msync, speedup_nobefore, clean_dbsync, return_early;
+	boolean_t		flush_msync, speedup_nobefore, clean_dbsync, return_early, epoch_already_current;
 	unsigned int		lcnt, pass;
 	int			save_errno, wtstart_errno;
 	jnl_buffer_ptr_t	jb;
@@ -215,6 +215,8 @@ boolean_t wcs_flu(uint4 options)
 	if (jnl_enabled)
 	{
 		jb = jpc->jnl_buff;
+		/* Assert that we aren't trying to flush a completed journal file */
+		assert(!jb->last_eof_written);
 		/* Assert that we never flush the cache in the midst of a database commit. The only exception is MUPIP RUNDOWN */
 		assert((csa->ti->curr_tn == csa->ti->early_tn) || in_mu_rndwn_file);
 		if (!jgbl.dont_reset_gbl_jrec_time)
@@ -244,6 +246,7 @@ boolean_t wcs_flu(uint4 options)
 	if (jnl_enabled)
 	{
 		assert(SS_NORMAL == jnl_status);
+		epoch_already_current = (jb->post_epoch_freeaddr == jb->freeaddr);	/* crit held, so this stays valid */
 		if (return_early = (speedup_nobefore && !csd->jnl_before_image))
 		{	/* Finish easiest option first. This database has NOBEFORE image journaling and caller has asked for
 			 * processing to be speeded up in that case. Write only an epoch record, dont do heavyweight flush or fsync
@@ -264,9 +267,12 @@ boolean_t wcs_flu(uint4 options)
 			 */
 			fileheader_sync(gv_cur_region);
 			assert(NULL != jpc);
-			if (0 == jpc->pini_addr)
-				jnl_put_jrt_pini(csa);
-			JNL_WRITE_EPOCH_REC(csa, cnl, clean_dbsync);
+			if (!jgbl.mur_extract && !epoch_already_current)
+			{
+				if (0 == jpc->pini_addr)
+					jnl_put_jrt_pini(csa);
+				JNL_WRITE_EPOCH_REC(csa, cnl, clean_dbsync);
+			}
 		}
 		fsync_dskaddr = jb->fsync_dskaddr;	/* take a local copy as it could change concurrently */
 		if (fsync_dskaddr != jb->freeaddr)
@@ -517,15 +523,16 @@ boolean_t wcs_flu(uint4 options)
 			if ((MAXJNLQIOLOCKWAIT / 2 == lcnt) || (MAXJNLQIOLOCKWAIT == lcnt))
 				performCASLatchCheck(&jb->io_in_prog_latch, TRUE);
 		}
-		if (csd->jnl_before_image)
+		if (csd->jnl_before_image && !epoch_already_current)
 			jb->need_db_fsync = TRUE;	/* for comments on need_db_fsync, see jnl_output_sp.c */
 		/* else the journal files do not support before images and hence can only be used for forward recovery. So skip
 		 * fsync of the database (jb->need_db_fsync = FALSE) because we don't care if the on-disk db is up-to-date or not.
+		 * Also skip the fsync if we aren't actually going to write an epoch.
 		 */
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 		assert(!(JNL_FILE_SWITCHED(jpc)));
 		assert(jgbl.gbl_jrec_time);
-		if (!jgbl.mur_extract)
+		if (!jgbl.mur_extract && !epoch_already_current)
 		{
 			if (0 == jpc->pini_addr)
 				jnl_put_jrt_pini(csa);

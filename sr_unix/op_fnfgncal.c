@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,7 @@
  *		lookup package
  *		Return package_handle if success, NULL otherwise.
  *
- *		void * fgn_getpak(char *package_name)
+ *		void * fgn_getpak(char *package_name, int error_severity)
  *		{
  *			lookup package
  *			If not found, return NULL;

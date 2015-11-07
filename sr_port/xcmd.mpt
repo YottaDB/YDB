@@ -11,11 +11,11 @@
 	; Utility to execute a shell command and return a non-zero status on error
 	;
 %XCMD	; Usage: mumps -run %XCMD '<string>'
-	;
-	set $ETRAP="goto CLIERR^%XCMD"
-	do  ; protect %XCMD's error handler
-	. new $ETRAP set $ETRAP="goto CLIERR^%XCMD"
-	. xecute $zcmdline
+	; If no $ETRAP defined, use CLIERR^%XCMD overriding a potential $ZTRAP error handler
+	if ""=$ETRAP new $ETRAP set $ETRAP="goto CLIERR^%XCMD"
+	new etrap set etrap=$ETRAP
+	; Protect %XCMD's error handler by NEWing and SETing $ETRAP at the begining of the XECUTEd command
+	xecute "new $ETRAP set $ETRAP=etrap "_$zcmdline
 	quit
 
 CLIERR
@@ -30,9 +30,10 @@ CLIERR
 	; Perform a given command on every line of input
 	;
 LOOP	; Usage: mumps -run LOOP^%XCMD [--before=|<string>|] [--after=|<string>|] --xec=|<string>|
-	set $ETRAP="do LOOPERR^%XCMD"
-	new %cli,%l,%NR,%xcmd
-	set %cli=$zcmdline
+	; If no $ETRAP defined, use LOOPERR^%XCMD overriding a potential $ZTRAP error handler
+	if ""=$ETRAP new $ETRAP set $ETRAP="goto LOOPERR^%XCMD"
+	new %cli,%l,%NR,%xcmd,etrap
+	set %cli=$zcmdline,etrap=$ETRAP
 	for  quit:'$$trimleadingstr(.%cli,"--")  do 	; process command line options
 	. if $$trimleadingstr(.%cli,"after=") set %xcmd("after")=$$trimleadingdelimstr(.%cli)
 	. else  if $$trimleadingstr(.%cli,"before=") set %xcmd("before")=$$trimleadingdelimstr(.%cli)
@@ -42,16 +43,16 @@ LOOP	; Usage: mumps -run LOOP^%XCMD [--before=|<string>|] [--after=|<string>|] -
 	set:'$length($get(%xcmd("xec"))) $ecode=",U253,"
 	set:$length(%cli) $ecode=",U252,"
 	kill %cli
-	do  ; protect %XCMD's error handler
-	. new $ETRAP set $ETRAP="do LOOPERR^%XCMD"
-	. do cmd($get(%xcmd("before")),0,"")
-	. for %NR=1:1 read %l quit:$zeof  do cmd(%xcmd("xec"),%NR,%l)
-	. do cmd($get(%xcmd("after")),%NR,%l)
+	do cmd($get(%xcmd("before")),0,"",etrap)
+	for %NR=1:1 read %l quit:$zeof  do cmd(%xcmd("xec"),%NR,%l,etrap)
+	do cmd($get(%xcmd("after")),%NR,%l,etrap)
 	quit
 
-cmd(cmd,%NR,%l)
+cmd(cmd,%NR,%l,ltrap)
 	quit:$length(cmd)=0
-	new %xcmd
+	; Protect LOOP^%XCMD's internal variables %xcmd and etrap and $ETRAP from modification by the XECUTEd command
+	new %xcmd,etrap,$ETRAP
+	set $ETRAP=ltrap
 	xecute cmd
 	quit
 

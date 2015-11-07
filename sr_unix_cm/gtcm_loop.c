@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -244,7 +244,7 @@ void gcore_server(void)
 		dump_rc_hist();
 	}
 
-	FORK(pid);	/* BYPASSOK: we are dumping a core, so no FORK_CLEAN needed */
+	FORK(pid);
 	if (pid < 0)	/* fork error */
 	{
 		OMI_DBG((omi_debug,

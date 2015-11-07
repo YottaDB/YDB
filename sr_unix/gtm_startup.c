@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -143,10 +143,6 @@ OS_PAGE_SIZE_DECLARE
 
 error_def(ERR_COLLATIONUNDEF);
 
-#ifdef __sun
-#define PACKAGE_ENV_TYPE  "GTMXC_RPC"  /* env var to use rpc instead of xcall */
-#endif
-
 #define MIN_INDIRECTION_NESTING 32
 #define MAX_INDIRECTION_NESTING 256
 
@@ -202,7 +198,6 @@ void gtm_startup(struct startup_vector *svec)
 	switch (image_type)
 	{
 		case GTM_IMAGE:
-		case GTM_SVC_DAL_IMAGE:
 			assert(is_replicator && run_time);
 			break;
 		case MUPIP_IMAGE:
@@ -226,10 +221,6 @@ void gtm_startup(struct startup_vector *svec)
 	zcall_init();
 	cmd_qlf.qlf = glb_cmd_qlf.qlf;
 	cache_init();
-#	ifdef __sun
-	if (NULL != GETENV(PACKAGE_ENV_TYPE))	/* chose xcall (default) or rpc zcall */
-		xfer_table[xf_fnfgncal] = (xfer_entry_t)op_fnfgncal_rpc;  /* using RPC */
-#	endif
 	msp -= SIZEOF(stack_frame);
 	frame_pointer = (stack_frame *)msp;
 	memset(frame_pointer,0, SIZEOF(stack_frame));
@@ -297,7 +288,7 @@ void gtm_startup(struct startup_vector *svec)
 		if (!TREF(local_collseq))
 		{
 			exi_condition = -ERR_COLLATIONUNDEF;
-			gtm_putmsg(VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
 			exit(exi_condition);
 		}
 	} else

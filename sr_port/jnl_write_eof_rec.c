@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 
 	assert(csa->now_crit);
 	jpc = csa->jnl;
-	assert(0 != jpc->pini_addr);
+	assert((0 != jpc->pini_addr) || (jpc->jnl_buff->freeaddr > jpc->jnl_buff->filesize - JNL_FILE_TAIL_PRESERVE));
 	eof_record->prefix.jrec_type = JRT_EOF;
 	eof_record->prefix.forwptr = eof_record->suffix.backptr = EOF_RECLEN;
 	eof_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;

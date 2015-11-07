@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,10 +42,11 @@ gtm_tls_func_n			/* total number of TLS functions that needs to be dlsym()ed */
 
 #define GTM_TLS_LIBNAME		"libgtmtls.so"
 
-GBLREF	char	dl_err[MAX_ERRSTR_LEN];
-GBLREF	char	gtm_dist[GTM_PATH_MAX];
+GBLREF	char		dl_err[MAX_ERRSTR_LEN];
+GBLREF	char		gtm_dist[GTM_PATH_MAX];
+GBLREF	boolean_t	gtm_dist_ok_to_use;
 
-error_def(ERR_GTMDISTUNDEF);
+error_def(ERR_GTMDISTUNVERIF);
 
 /* Cannot include gtm_tls.h in this module due to conflicting GBLDEF/GBLREFs. So, redefine the function prototype here to silent
  * the compiler.
@@ -77,7 +78,12 @@ int	gtm_tls_loadlibrary()
 	char			save_libpath[GTM_PATH_MAX];
 #	endif
 
-	assert(STRLEN(gtm_dist));
+	if(!gtm_dist_ok_to_use)
+	{
+		SNPRINTF(dl_err, MAX_ERRSTR_LEN, "%%GTM-E-GTMDISTUNVERIF, Environment variable $gtm_dist (%s) "
+				"could not be verified against the executables path", gtm_dist);
+		return -1;
+	}
 #	ifdef _AIX
 	SNPRINTF(plugin_dir_path, GTM_PATH_MAX, "%s/%s", gtm_dist, GTMCRYPT_PLUGIN_DIR_NAME);
 	SNPRINTF(libpath, GTM_PATH_MAX, "%s/%s/%s", gtm_dist, GTMCRYPT_PLUGIN_DIR_NAME, GTM_TLS_LIBNAME);

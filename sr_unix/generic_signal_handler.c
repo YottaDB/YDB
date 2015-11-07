@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -131,7 +131,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				}
 				++core_in_progress;
 				DUMP_CORE;
-				GTMASSERT;
+				assertpro(!((SIGSEGV == sig) || (SIGBUS == sig) || (SIGKILL == sig)));
 			default:
 				;
 		}
@@ -191,7 +191,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					break;
 				default:
 					exit_state = EXIT_IMMED;
-					GTMASSERT;
+					assertpro(FALSE && signal_info.infotype);	/* show signal_info if there's a failure */
 			}
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
 			if (DEFER_EXIT_PROCESSING)
@@ -293,7 +293,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				default:
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
-					GTMASSERT;
+					assertpro(FALSE && signal_info.infotype);;	/* show signal_info if there's a failure */
 			}
 			if (0 != signal_info.sig_err)
 			{

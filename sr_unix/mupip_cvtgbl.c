@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,7 @@ GBLREF	bool		mupip_error_occurred;
 GBLREF	boolean_t	is_replicator;
 GBLREF	boolean_t	skip_dbtriggers;
 GBLREF	mstr		sys_input;
+GBLDEF	int		onerror;
 
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
@@ -46,11 +47,14 @@ error_def(ERR_LOADBGSZ2);
 error_def(ERR_LOADEDSZ);
 error_def(ERR_LOADEDSZ2);
 
+#define	MAX_ONERROR_VALUE_LEN	11	/* PROCEED, STOP, INTERACTIVE are the choices with INTERACTIVE being the maximum */
+#define	MAX_FORMAT_VALUE_LEN	 6	/* ZWR, BINARY, GO, GOQ are the choices with BINARY being the longest */
+
 void mupip_cvtgbl(void)
 {
 	unsigned short	fn_len, len;
-	char		fn[256];
-	unsigned char	buff[7];
+	char		fn[MAX_FN_LEN + 1];
+	unsigned char	buff[MAX_ONERROR_VALUE_LEN];
 	uint4		begin, end;
 	int		i, format;
 	uint4	        cli_status;
@@ -58,9 +62,10 @@ void mupip_cvtgbl(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(MAX_ONERROR_VALUE_LEN > MAX_FORMAT_VALUE_LEN);	/* so the buff[] definition above is good for FORMAT and ONERROR */
 	/* If an online rollback occurs when we are loading up the database with new globals and takes us back to a prior logical
 	 * state, then we should not continue with the load. The reason being that the application might rely on certain globals to
-	 * be present before loading others and that property could be voilated if online rollback takes the database back to a
+	 * be present before loading others and that property could be violated if online rollback takes the database back to a
 	 * completely different logical state. Set the variable issue_DBROLLEDBACK_anyways that forces the restart logic to issue
 	 * an rts_error the first time it detects an online rollback (that takes the database to a prior logical state).
 	 */
@@ -123,9 +128,38 @@ void mupip_cvtgbl(void)
 	} else
 		gv_fillfactor = MAX_FILLFACTOR;
 
+	if (cli_present("ONERROR") == CLI_PRESENT)
+	{
+		len = SIZEOF(buff);
+		if (!cli_get_str("ONERROR", (char *)buff, &len))
+		{
+			assert(FALSE);
+			onerror = ONERROR_PROCEED;
+		} else
+		{
+			lower_to_upper(buff, buff, len);
+			if (!memcmp(buff, "STOP", len))
+				onerror = ONERROR_STOP;
+			else if (!memcmp(buff, "PROCEED", len))
+				onerror = ONERROR_PROCEED;
+			else if (!memcmp(buff, "INTERACTIVE", len))
+			{
+				if (isatty(0)) /*if stdin is a terminal*/
+					onerror = ONERROR_INTERACTIVE;
+				else
+					onerror = ONERROR_STOP;
+			} else
+			{
+				util_out_print("Illegal ONERROR parameter for load",TRUE);
+				mupip_exit(ERR_MUPCLIERR);
+			}
+		}
+	} else
+		onerror = ONERROR_PROCEED; /* Default: Proceed on error */
+
 	if (cli_present("FORMAT") == CLI_PRESENT)
 	{
-	        len = SIZEOF("FORMAT");
+		len = SIZEOF(buff);
 		if (!cli_get_str("FORMAT", (char *)buff, &len))
 			go_load(begin, end);
 		else

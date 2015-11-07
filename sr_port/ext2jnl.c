@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,10 @@
 #include "mdef.h"
 
 #include <stddef.h> /* for offsetof() macro */
+#ifdef VMS
+#include <descrip.h>		/* required for gtmsource.h */
+#endif
+
 #include "gtm_ctype.h"
 
 #include "mlkdef.h"
@@ -29,39 +33,85 @@
 #include "zshow.h"
 #include "mvalconv.h"
 #include "str2gvkey.h"
+#include "repl_filter.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "gdsblk.h"
 
 GBLREF	char		*ext_stop;
 GBLREF	gv_key		*gv_currkey;
+GBLREF	boolean_t	is_src_server;
+GBLREF	repl_msg_ptr_t	gtmsource_msgp;
+GBLREF	int		gtmsource_msgbufsiz;
+
 static	boolean_t	in_tp;
 static	int4		num_records;
 
 /* callers please set up the proper condition-handlers */
 /* expects a null-terminated ext_buff. does the equivalent but inverse of jnl2ext */
 
-char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved_strm_seqno)
+unsigned char *ext2jnlcvt(char *ext_buff, int4 ext_len, unsigned char **tr, int *tr_bufsiz,
+						seq_num saved_jnl_seqno, seq_num saved_strm_seqno)
 {
 	char		*ext_next;
-	jnl_record	*temp_rec;
+	unsigned char	*rec, *rectop, *tmp, *origbuf, *temp_rec;
+	int		tmpbufsiz, tmpsize;
 
+	rec = *tr;
+	rectop = rec + *tr_bufsiz;
 	temp_rec = rec;
 	for ( ; (NULL != (ext_next = strchr(ext_buff, '\n'))); )
 	{
 		*ext_next++ = '\0';
-		rec = (jnl_record *)ext2jnl(ext_buff, rec, saved_jnl_seqno, saved_strm_seqno);
+		if (MAX_JNL_REC_SIZE > (rectop - rec))
+		{	/* Remaining space not enough to hold ONE max-sized jnl record. Expand linearly */
+			tmpsize = *tr_bufsiz;
+			tmpbufsiz = tmpsize + (EXT2JNLCVT_EXPAND_FACTOR * MAX_JNL_REC_SIZE);
+			origbuf = *tr;
+			tmpsize = rec - origbuf;
+			if (is_src_server)
+			{	/* In the case of the source server, the pointer "tr" passed in is actually
+				 * 8 bytes after gtmsource_msgp and so the malloc/realloc needs to happen
+				 * 8 bytes before. Also compression buffers need to be reallocated so hardcode
+				 * all of this even though it is violation of information hiding in this generic
+				 * routine. The alternative is to return an out-of-space status and bubble it up
+				 * through all the callers until the caller of "repl_filter" and do the reallocation
+				 * there and reinvoke through the same caller graph to come back here and resume
+				 * operation. That is tricky and not considered worth the effort since there are only
+				 * two callers of this function (one through source server and one through the receiver
+				 * server). Hence this choice.
+				 */
+				assert((unsigned char *)&gtmsource_msgp->msg[0] == *tr);
+				assert(*tr_bufsiz == gtmsource_msgbufsiz);
+				UNIX_ONLY(gtmsource_alloc_msgbuff(tmpbufsiz, FALSE);)
+				VMS_ONLY(gtmsource_alloc_msgbuff(tmpbufsiz);)
+				*tr_bufsiz = gtmsource_msgbufsiz;
+				*tr = &gtmsource_msgp->msg[0];
+				rec = *tr + tmpsize;
+				rectop = (unsigned char *)gtmsource_msgp + gtmsource_msgbufsiz;
+			} else
+			{
+				tmp = malloc(tmpbufsiz);
+				memcpy(tmp, origbuf, tmpsize);
+				free(origbuf);
+				*tr = tmp;
+				*tr_bufsiz = tmpbufsiz;
+				rec = tmp + tmpsize;
+				rectop = tmp + tmpbufsiz;
+			}
+		}
+		rec = (unsigned char *)ext2jnl(ext_buff, (jnl_record *)rec, saved_jnl_seqno, saved_strm_seqno);
 		assert(0 == (INTPTR_T)rec % JNL_REC_START_BNDRY);
 		if (ext_stop == ext_buff)
 			break;
 		ext_buff = ext_next;
 	}
-
-	assert(rec != temp_rec);
+	assertpro(rec != temp_rec);
 	ext_stop = ext_buff;
-	return (char *)rec;
+	return rec;
 }
 
-
-/* expects a single null-terminated ptr (equivalent to one line in the extract-file) */
-
+/* expects a single null-terminated ptr (equivalent to one line in the journal extract file) */
 char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved_strm_seqno)
 {
 	unsigned char	*pool_save, ch, chtmp;
@@ -122,26 +172,28 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 
 #	ifdef GTM_TRIGGER
 	case MUEXT_ZTWORM:
-		if (in_tp)
-		{
-			if (0 == num_records)
-				rec->prefix.jrec_type = JRT_TZTWORM;
-			else
-				rec->prefix.jrec_type = JRT_UZTWORM;
-			num_records++;
-		} else
-			GTMASSERT;	/* ZTWORMHOLE should always been seen only inside a TP fence */
+		assertpro(in_tp);
+		if (0 == num_records)
+			rec->prefix.jrec_type = JRT_TZTWORM;
+		else
+			rec->prefix.jrec_type = JRT_UZTWORM;
+		num_records++;
+		break;
+	case MUEXT_LGTRIG:
+		assertpro(in_tp);
+		if (0 == num_records)
+			rec->prefix.jrec_type = JRT_TLGTRIG;
+		else
+			rec->prefix.jrec_type = JRT_ULGTRIG;
+		num_records++;
 		break;
 	case MUEXT_ZTRIG:
-		if (in_tp)
-		{
-			if (0 == num_records)
-				rec->prefix.jrec_type = JRT_TZTRIG;
-			else
-				rec->prefix.jrec_type = JRT_UZTRIG;
-			num_records++;
-		} else
-			GTMASSERT;	/* ZTRIGGER should always been seen only inside a TP fence */
+		assertpro(in_tp);
+		if (0 == num_records)
+			rec->prefix.jrec_type = JRT_TZTRIG;
+		else
+			rec->prefix.jrec_type = JRT_UZTRIG;
+		num_records++;
 		break;
 #	endif
 
@@ -221,12 +273,12 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 			rec->jrec_tcom.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 			return ((char_ptr_t)rec) + TCOM_RECLEN;
 	}
-	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
+	assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype));
 	ptr = strtok(NULL, "\\");	/* get the update_num field */
 	assert(NULL != ptr);
 	assert(OFFSETOF(struct_jrec_upd, update_num) == OFFSETOF(struct_jrec_ztworm, update_num));
 	rec->jrec_set_kill.update_num = num_records;
-	if (MUEXT_ZTWORM != exttype)
+	if ((MUEXT_ZTWORM != exttype) && (MUEXT_LGTRIG != exttype))
 	{
 		ptr = strtok(NULL, "\\");		/* get the nodeflags field */
 		assert(NULL != ptr);
@@ -234,7 +286,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 	}
 	ptr += (strlen(ptr) + 1); /* get the key-value and data also; can't use strtok since there might be '\\' in the subscript */
 	assert(NULL != ptr);
-	if (MUEXT_ZTWORM != exttype)
+	if ((MUEXT_ZTWORM != exttype) && (MUEXT_LGTRIG != exttype))
 	{
 		assert(IS_SET_KILL_ZKILL_ZTRIG(rectype));
 		len = STRLEN(ptr);
@@ -260,10 +312,11 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 		src.len = val_len;
 		src.addr = val_off;
 	} else
-	{	/* ZTWORMHOLE */
-		assert(IS_ZTWORM(rectype));
+	{	/* ZTWORMHOLE or LGTRIG jnl record */
+		assert(IS_ZTWORM(rectype) || IS_LGTRIG(rectype));
 		src.addr = ptr;
 		src.len = STRLEN(ptr);
+		assert(FIXED_ZTWORM_RECLEN == FIXED_LGTRIG_RECLEN);
 		temp_reclen = (int)(FIXED_ZTWORM_RECLEN);
 	}
 	des.len = 0;

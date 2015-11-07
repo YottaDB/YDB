@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,9 +16,11 @@
 #define ASCII_RMEOL "\n"
 
 #if defined(KEEP_zOS_EBCDIC) || defined(VMS)
-#define RMEOL ((ascii != iod->out_code_set) ? EBCDIC_RMEOL : ASCII_RMEOL )
+#define RMEOL 		((ascii != iod->out_code_set) ? EBCDIC_RMEOL : ASCII_RMEOL)
+#define RMEOL_LEN	((ascii != iod->out_code_set) ? SIZEOF(EBCDIC_RMEOL) - 1 : SIZEOF(ASCII_RMEOL) - 1)
 #else
-#define RMEOL ASCII_RMEOL
+#define RMEOL 		ASCII_RMEOL
+#define RMEOL_LEN	(SIZEOF(ASCII_RMEOL) - 1)
 #endif
 
 #endif /* IORMDEFSP_H */

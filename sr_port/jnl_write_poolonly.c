@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,9 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	jnl_gbls_t		jgbl;
 
+error_def(ERR_JNLWRTDEFER);
+error_def(ERR_JNLWRTNOWWRTR);
+
 /* This function does a subset of what "jnl_write" does. While "jnl_write" writes the journal record to the journal buffer,
  * journal file and journal pool, this function writes the journal records ONLY TO the journal pool. This function should
  * be invoked only if replication state is WAS_ON (repl_was_open) and journaling state is jnl_closed.
@@ -68,9 +71,6 @@ void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, 
 	DEBUG_ONLY(uint4	lcl_dskaddr;)
 	uchar_ptr_t		tmp_buff;
 
-	error_def(ERR_JNLWRTNOWWRTR);
-	error_def(ERR_JNLWRTDEFER);
-
 	assert(NULL != jnl_rec);
 	assert(rectype > JRT_BAD  &&  rectype < JRT_RECTYPES && JRT_ALIGN != rectype);
 	assert(jrt_is_replicated[rectype]);
@@ -90,7 +90,7 @@ void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, 
 	if (jrt_fixed_size[rectype])
 		jnlrecptr = (uchar_ptr_t)jnl_rec;
 #	ifdef GTM_CRYPT
-	else if(csa->hdr->is_encrypted && IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
+	else if (csa->hdr->is_encrypted && IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
 		jnlrecptr = (uchar_ptr_t)jfb->alt_buff;
 #	endif
 	else

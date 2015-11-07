@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@ void print_target(unsigned char *c)
 	uint4		ch;
 	boolean_t	bad_sub = FALSE;
 	boolean_t	is_string;
+	mstr		opstr;
 
 	ptop = c + MAX_KEY_SZ;
 	for (p = buff, ptr = c;  *ptr && (ptr < ptop);  ptr++)
@@ -77,7 +78,9 @@ void print_target(unsigned char *c)
 				break;
 			}
 		}
-		top = gvsub2str(ptr, buff, FALSE);
+		opstr.addr = (char *)buff;
+		opstr.len = MAX_ZWR_KEY_SZ + SIZEOF("?.0");
+		top = gvsub2str(ptr, &opstr, FALSE);
 		if (!is_string && (0x80 != *ptr++) && (KEY_DELIMITER == *ptr))
 		{
 			top = (unsigned char *)(buff + SIZEOF("?.0"));	/* to allow a bit of garbage, in case it's helpful */

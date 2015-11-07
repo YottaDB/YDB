@@ -1,7 +1,7 @@
 	.title	op_extjmp - jump to a label in an external (MUMPS) routine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2005, 2012 Fidelity Information Services, Inc	;
+;	Copyright 2005, 2014 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -29,7 +29,7 @@
 A_frame_pointer:	.address	frame_pointer
 
 L_ERR_GTMCHECK:		.long		ERR_GTMCHECK
-L_ERR_LABELUNKNOWN:	.long		ERR_LABELUNKNOWN
+L_ERR_LABELNOTFND:	.long		ERR_LABELNOTFND
 
 
 	$data_section
@@ -100,7 +100,7 @@ L30:	$call	lib$signal, args=<L_ERR_GTMCHECK/L>
 	ret	r26
 	$end_epilogue
 
-L40:	$call	lib$signal, args=<L_ERR_LABELUNKNOWN/L>
+L40:	$call	lib$signal, args=<L_ERR_LABELNOTFND/L>
 	$begin_epilogue
 	getframe
 	imb

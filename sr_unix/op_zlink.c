@@ -1,5 +1,6 @@
-/**************************************************************** *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+/****************************************************************
+ *								*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +34,17 @@
 #define OBJ			2
 #define NOTYPE			3
 
+/* On shared platforms, skip parameter should be FALSE to indicate an auto-ZLINK so that
+ * zro_search looks into shared libraries. On non-shared platforms, it should be
+ * TRUE to instruct zro_search to always skip shared libraries
+ */
+#define SKIP_SHLIBS	TRUE
+#ifdef USHBIN_SUPPORTED
+#define PROBE_SHLIBS	(!SKIP_SHLIBS) /* i.e., don't skip (skip = FALSE) */
+#else
+#define PROBE_SHLIBS	SKIP_SHLIBS
+#endif
+
 /* On certain platforms the st_mtime field of the stat structure got replaced by a timespec st_mtim field, which in turn has tv_sec
  * and tv_nsec fields. For compatibility reasons, those platforms define an st_mtime macro which points to st_mtim.tv_sec. Whenever
  * we detect such a situation, we define a nanosecond flavor of that macro to point to st_mtim.tv_nsec. On HPUX Itanium and older
@@ -46,6 +58,8 @@
 #elif defined(__hpux) && defined(__ia64)
 #  define st_nmtime		st_nmtime
 #endif
+
+#define CLOSE_OBJECT_FD(FD, STATUS)	CLOSEFILE_RESET(FD, STATUS)       /* resets "object_file_des" to FD_INVALID */
 
 GBLREF spdesc			stringpool;
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
@@ -61,6 +75,20 @@ error_def(ERR_FILEPARSE);
 error_def(ERR_TEXT);
 ZOS_ONLY(error_def(ERR_BADTAG);)
 
+/* Routine to locate object files, or source and compile to an object file if necessary, and drive the linker to link the file
+ * into this process appropriately. Three types of linking are currently supported on UNIX platforms (excepting Linux i386 which
+ * has its own less fully-featured linker):
+ *
+ * 1. Link into process private - Executable code becomes part of the process private space.
+ * 2. Link from a shared library - M routines linked into a shared library can be linked into a process allowing much of the
+ *    object file to be shared.
+ * 3. Link from a shared object - Current mechanism is to mmap() the object file and link it similar to how shared library links
+ *    are done.
+ *
+ * Parameters:
+ *   - v     - mval containing the name/path of the object file.
+ *   - quals - mval containing the ZLINK command options (see GT.M User's Guide).
+ */
 void op_zlink (mval *v, mval *quals)
 {
 	int			status, qlf, tslash;
@@ -80,26 +108,26 @@ void op_zlink (mval *v, mval *quals)
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(v);
 	if (!v->str.len || (MAX_FBUFF < v->str.len))
-		rts_error_csa(NULL, VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 	object_file_des = FD_INVALID;
-	srcdir = objdir = (zro_ent *) 0;
+	srcdir = objdir = NULL;
 	expdir = FALSE;
 	if (quals)
-	{ /* explicit ZLINK */
+	{	/* Explicit ZLINK */
 		memset(&pblk, 0, SIZEOF(pblk));
 		pblk.buff_size = MAX_FBUFF;
 		pblk.buffer = inputf;
 		pblk.fop = F_SYNTAXO;
 		status = parse_file(&v->str, &pblk);
 		if (!(status & 1))
-			rts_error_csa(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, v->str.len, v->str.addr, status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, v->str.len, v->str.addr, status);
 		if (pblk.fnb & F_WILD)
-			rts_error_csa(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 				ERR_WILDCARD, 2, v->str.len, v->str.addr);
 		file.addr = pblk.buffer;
 		file.len = pblk.b_esl;
 		type = NOTYPE;
-		expdir = 0 != (pblk.fnb & F_HAS_DIR);
+		expdir = (0 != (pblk.fnb & F_HAS_DIR));
 		if (pblk.b_ext)
 		{
 			file.len -= pblk.b_ext;
@@ -139,9 +167,9 @@ void op_zlink (mval *v, mval *quals)
 			assert (objnamelen + SIZEOF(DOTOBJ) <= MAX_FBUFF + 1);
 		} else
 		{
-			if (file.len + SIZEOF(DOTM) > SIZEOF(srcnamebuf) ||
-			  file.len + SIZEOF(DOTOBJ) > SIZEOF(objnamebuf))
-				rts_error_csa(NULL, VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
+			if ((file.len + SIZEOF(DOTM) > SIZEOF(srcnamebuf)) ||
+			    (file.len + SIZEOF(DOTOBJ) > SIZEOF(objnamebuf)))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			memmove(srcnamebuf, file.addr, file.len);
 			memcpy(&srcnamebuf[file.len], DOTM, SIZEOF(DOTM));
 			srcnamelen = file.len + SIZEOF(DOTM) - 1;
@@ -159,30 +187,30 @@ void op_zlink (mval *v, mval *quals)
 			objstr.len = objnamelen;
 			if (OBJ == type)
 			{
-				zro_search(&objstr, &objdir, 0, 0, TRUE);
+				zro_search(&objstr, &objdir, NULL, NULL, SKIP_SHLIBS);
 				if (!objdir)
-					rts_error_csa(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
 						dollar_zsource.str.addr, ERR_FILENOTFND,2, dollar_zsource.str.len,
 						dollar_zsource.str.addr);
 			} else if (SRC == type)
 			{
-				zro_search(&objstr, &objdir, &srcstr, &srcdir, TRUE);
+				zro_search(&objstr, &objdir, &srcstr, &srcdir, SKIP_SHLIBS);
 				if (!srcdir)
-					rts_error_csa(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf,
 						ERR_FILENOTFND, 2, srcnamelen, srcnamebuf);
 			} else
 			{
-				zro_search(&objstr, &objdir, &srcstr, &srcdir, NON_USHBIN_ONLY(TRUE) USHBIN_ONLY(FALSE));
+				zro_search(&objstr, &objdir, &srcstr, &srcdir, PROBE_SHLIBS);
 				if (!objdir && !srcdir)
-					rts_error_csa(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
 						dollar_zsource.str.addr, ERR_FILENOTFND,2, dollar_zsource.str.len,
 						dollar_zsource.str.addr);
 			}
 		}
 	} else
-	{ /* auto-ZLINK */
+	{	/* auto-ZLINK */
 		type = NOTYPE;
-		memcpy(srcnamebuf,v->str.addr,v->str.len);
+		memcpy(srcnamebuf, v->str.addr, v->str.len);
 		memcpy(&srcnamebuf[v->str.len], DOTM, SIZEOF(DOTM));
 		srcnamelen = v->str.len + SIZEOF(DOTM) - 1;
 		if ('%' == srcnamebuf[0])
@@ -194,13 +222,9 @@ void op_zlink (mval *v, mval *quals)
 		srcstr.len = srcnamelen;
 		objstr.addr = objnamebuf;
 		objstr.len = objnamelen;
-		/* On shared platforms, skip parameter should be FALSE to indicate an auto-ZLINK so that
-		 * zro_search looks into shared libraries. On non-shared platforms, it should be
-		 * TRUE to instruct zro_search to always skip shared libraries
-		 */
-		zro_search(&objstr, &objdir, &srcstr, &srcdir, NON_USHBIN_ONLY(TRUE) USHBIN_ONLY(FALSE));
+		zro_search(&objstr, &objdir, &srcstr, &srcdir, PROBE_SHLIBS);
 		if (!objdir && !srcdir)
-			rts_error_csa(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 				ERR_FILENOTFND, 2, v->str.len, v->str.addr);
 		qualifier.mvtype = MV_STR;
 		qualifier.str = TREF(dollar_zcompile);
@@ -212,7 +236,7 @@ void op_zlink (mval *v, mval *quals)
 		{
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
 			if (objdir->str.len + objnamelen + 2 > SIZEOF(objnamebuf))
-				rts_error_csa(NULL, VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			if (objdir->str.len)
 			{
 				tslash = ('/' == objdir->str.addr[objdir->str.len - 1]) ? 0 : 1;
@@ -226,17 +250,22 @@ void op_zlink (mval *v, mval *quals)
 		}
 		OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, object_file_des);
 		if (FD_INVALID == object_file_des)
-			rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr,
 			errno);
-		if (USHBIN_ONLY(!incr_link(object_file_des, NULL)) NON_USHBIN_ONLY(!incr_link(object_file_des)))
-			rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr,
-			ERR_VERSION);
-		CLOSEFILE_RESET(object_file_des, status);	/* resets "object_file_des" to FD_INVALID */
+		if (IL_RECOMPILE == incr_link(object_file_des, NULL, objnamelen, objnamebuf))
+		{
+			CLOSE_OBJECT_FD(object_file_des, status);	/* No checking for error here as the priority error
+									 * right now is the version issue.
+									 */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr,
+				ERR_VERSION);
+		}
+		CLOSE_OBJECT_FD(object_file_des, status);
 		if (-1 == status)
-			rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr,
 			errno);
-	} else	/* either NO type or SOURCE type */
-	{
+	} else
+	{	/* either NO type or SOURCE type */
 		cmd_qlf.object_file.str.addr = obj_file;
 		cmd_qlf.object_file.str.len = MAX_FBUFF;
 		cmd_qlf.list_file.str.addr = list_file;
@@ -247,7 +276,7 @@ void op_zlink (mval *v, mval *quals)
 		{
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
 			if (srcdir->str.len + srcnamelen > SIZEOF(srcnamebuf) - 1)
-				rts_error_csa(NULL, VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			if (srcdir->str.len)
 			{
 				tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1;
@@ -263,14 +292,16 @@ void op_zlink (mval *v, mval *quals)
 		{
 			if (ZRO_TYPE_OBJLIB == objdir->type)
 			{
-				NON_USHBIN_ONLY(assertpro(FALSE));
 				assert(objdir->shrlib);
 				assert(objdir->shrsym);
-				USHBIN_ONLY(assertpro(incr_link(0, objdir)));
+				/* The incr_link() routine should drive errors for any issue found with linking from a shared
+				 * library so IL_DONE is the only valid return code we *ever* expect back.
+				 */
+				assertpro(IL_DONE == incr_link(0, objdir, objnamelen, objnamebuf));
 				return;
 			}
 			if (objdir->str.len + objnamelen > SIZEOF(objnamebuf) - 1)
-				rts_error_csa(NULL, VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			if (objdir->str.len)
 			{
 				tslash = ('/' == objdir->str.addr[objdir->str.len - 1]) ? 0 : 1;
@@ -291,7 +322,7 @@ void op_zlink (mval *v, mval *quals)
 				if (ENOENT == errno)
 					obj_found = FALSE;
 				else
-					rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 			} else
 				obj_found = TRUE;
 		} else
@@ -302,7 +333,7 @@ void op_zlink (mval *v, mval *quals)
 			if ((ENOENT == errno) && (SRC != type))
 				src_found = FALSE;
 			else
-				rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE,2,srcnamelen,srcnamebuf,errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE,2,srcnamelen,srcnamebuf,errno);
 		} else
 			src_found = TRUE;
 		if (SRC != type)
@@ -313,22 +344,22 @@ void op_zlink (mval *v, mval *quals)
 				{
 					FSTAT_FILE(object_file_des, &obj_stat, status);
 					if (-1 == status)
-						rts_error_csa(NULL,VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
+						rts_error_csa(CSA_ARG(NULL)VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
+							      errno);
 					if ((src_stat.st_mtime > obj_stat.st_mtime)
 						|| ((src_stat.st_mtime == obj_stat.st_mtime)
 							&& (src_stat.st_nmtime > obj_stat.st_nmtime)))
 					{
-						CLOSEFILE_RESET(object_file_des, status);	/* resets "object_file_des"
-												 * to FD_INVALID */
+						CLOSE_OBJECT_FD(object_file_des, status);
 						if (-1 == status)
-							rts_error_csa(NULL,VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
-								errno);
+							rts_error_csa(CSA_ARG(NULL)VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen,
+								      objnamebuf, errno);
 						compile = TRUE;
 					}
 				} else
 					compile = TRUE;
 			} else if (!obj_found)
-				rts_error_csa(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
 					ERR_FILENOTFND, 2, objnamelen, objnamebuf);
 		}
 		if (compile)
@@ -344,24 +375,21 @@ void op_zlink (mval *v, mval *quals)
 			if (!(cmd_qlf.qlf & CQ_OBJECT) && (SRC != type))
 			{
 				cmd_qlf.qlf = glb_cmd_qlf.qlf;
-				rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_ZLNOOBJECT);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_ZLNOOBJECT);
 			}
 			zlcompile(srcnamelen, (uchar_ptr_t)srcnamebuf);
 			if ((SRC == type) && !(qlf & CQ_OBJECT))
 				return;
 		}
-		CONVERT_OBJECT_LOCK(object_file_des, F_RDLCK, status);
-		if (-1 == status)
-			rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
-		status = USHBIN_ONLY(incr_link(object_file_des, NULL)) NON_USHBIN_ONLY(incr_link(object_file_des));
-		if (!status)
+		status = incr_link(object_file_des, objdir, objnamelen, objnamebuf);
+		if (IL_RECOMPILE == status)
 		{	/* due only to version mismatch, so recompile */
-			CLOSEFILE_RESET(object_file_des, status);	/* resets "object_file_des" to FD_INVALID */
+			CLOSE_OBJECT_FD(object_file_des, status);
 			if (-1 == status)
-				rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 			assertpro(!compile);
 			if (!src_found)
-				rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_VERSION);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_VERSION);
 			zl_cmd_qlf(&quals->str, &cmd_qlf);
 			if (!MV_DEFINED(&cmd_qlf.object_file))
 			{
@@ -373,16 +401,17 @@ void op_zlink (mval *v, mval *quals)
 			if (!(cmd_qlf.qlf & CQ_OBJECT) && (SRC != type))
 			{
 				cmd_qlf.qlf = glb_cmd_qlf.qlf;
-				rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_ZLNOOBJECT);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_ZLNOOBJECT);
 			}
-			CONVERT_OBJECT_LOCK(object_file_des, F_RDLCK, status);
-			if (-1 == status)
-				rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
-				assertpro(! (USHBIN_ONLY(!incr_link(object_file_des, NULL))
-					NON_USHBIN_ONLY(!incr_link(object_file_des))) );
+			/* We just did a fresh re-compile a few lines above so IL_DONE is the only return code we ever
+			 * expect to see back. Only a race-condition created by a different version overlaying the newly
+			 * created object file could conceivably cause an IL_RECOMPILE code here (incr_link handles all
+			 * the other errors itself). Not at this time considered worthy of special coding.
+			 */
+			assertpro(IL_DONE == incr_link(object_file_des, objdir, objnamelen, objnamebuf));
 		}
-		CLOSEFILE_RESET(object_file_des, status);	/* resets "object_file_des" to FD_INVALID */
+		CLOSE_OBJECT_FD(object_file_des, status);
 		if (-1 == status)
-			rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 	}
 }

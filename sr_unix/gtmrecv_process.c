@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -229,7 +229,7 @@ typedef enum
 	GTM_RECV_CMPBUFF
 } gtmrecv_buff_t;
 
-static	unsigned char	*buffp, *buff_start, *msgbuff, *filterbuff;
+static	unsigned char	*buffp, *buff_start, *msgbuff;
 static	int		buff_unprocessed;
 static	int		buffered_data_len;
 static	int		max_recv_bufsiz;
@@ -456,7 +456,7 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 			break;
 		}
 		assert(!IS_ZTP(rectype));
-		assert((JRT_HISTREC == rectype) || (JRT_TRIPLE == rectype) || IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype)
+		assert((JRT_HISTREC == rectype) || (JRT_TRIPLE == rectype) || IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype)
 		       || (JRT_TCOM == rectype) || (JRT_NULL == rectype));
 		DEBUG_ONLY(jstart = jb;)
 		if (JRT_HISTREC == rectype)
@@ -484,24 +484,26 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 				assert(&rec->jrec_null.strm_seqno == &rec->jrec_tcom.strm_seqno);
 				rec->jrec_null.strm_seqno = GTM_BYTESWAP_64(rec->jrec_null.strm_seqno);
 			}
-			if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
+			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
 			{
-				/* This code will need changes in case the jnl-ver changes from V23 to V24 so add an assert to
+				/* This code will need changes in case the jnl-ver changes from V24 to V25 so add an assert to
 				 * alert to that possibility. Once the code is fixed for the new jnl format, change the assert
 				 * to reflect the new latest jnl-ver.
 				 */
-				assert(JNL_VER_THIS == V23_JNL_VER);
+				assert(JNL_VER_THIS == V24_JNL_VER);
 				/* To better understand the logic below (particularly the use of hardcoded offsets), see comment
 				 * in repl_filter.c (search for "struct_jrec_upd layout" for the various jnl versions we support).
 				 */
 				if (V22_JNL_VER <= remote_jnl_ver)
 				{	/* byte-swap update_num */
 					assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
+					assert(&rec->jrec_set_kill.update_num == &rec->jrec_lgtrig.update_num);
 					rec->jrec_set_kill.update_num = GTM_BYTESWAP_32(rec->jrec_set_kill.update_num);
 					/* No need to byte-swap num_participants as it is not used by the update process */
 					/* Get pointer to mumps_node */
 					keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 					assert(keystr == (jnl_string *)&rec->jrec_ztworm.ztworm_str);
+					assert(keystr == (jnl_string *)&rec->jrec_lgtrig.lgtrig_str);
 				} else if (V19_JNL_VER <= remote_jnl_ver)
 				{	/* byte-swap update_num */
 					ptr = (unsigned char *)rec + 32; /* is offset of update_num in V19 struct_jrec_upd */
@@ -526,6 +528,7 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 				if (IS_SET(rectype))
 				{
 					assert(!IS_ZTWORM(rectype));
+					assert(!IS_LGTRIG(rectype));
 					/* SET records have a 'value' part which needs to be endian converted */
 					vallen_ptr = (mstr_len_t *)&keystr->text[keystr->length];
 					GET_MSTR_LEN(temp_val, vallen_ptr);
@@ -850,21 +853,18 @@ STATICFNDEF int gtmrecv_est_conn(void)
 
 int gtmrecv_alloc_filter_buff(int bufsiz)
 {
-	unsigned char	*old_filter_buff, *free_filter_buff;
+	unsigned char	*old_filter_buff;
 
 	bufsiz = ROUND_UP2(bufsiz, OS_PAGE_SIZE);
 	if ((NO_FILTER != gtmrecv_filter) && (repl_filter_bufsiz < bufsiz))
 	{
 		REPL_DPRINT3("Expanding filter buff from %d to %d\n", repl_filter_bufsiz, bufsiz);
-		free_filter_buff = filterbuff;
 		old_filter_buff = repl_filter_buff;
-		filterbuff = (unsigned char *)malloc(bufsiz + OS_PAGE_SIZE);
-		repl_filter_buff = (uchar_ptr_t)ROUND_UP2((unsigned long)filterbuff, OS_PAGE_SIZE);
-		if (NULL != free_filter_buff)
+		repl_filter_buff = malloc(bufsiz);
+		if (NULL != old_filter_buff)
 		{
-			assert(NULL != old_filter_buff);
 			memcpy(repl_filter_buff, old_filter_buff, repl_filter_bufsiz);
-			free(free_filter_buff);
+			free(repl_filter_buff);
 		}
 		repl_filter_bufsiz = bufsiz;
 	}
@@ -873,11 +873,10 @@ int gtmrecv_alloc_filter_buff(int bufsiz)
 
 void gtmrecv_free_filter_buff(void)
 {
-	if (NULL != filterbuff)
+	if (NULL != repl_filter_buff)
 	{
-		assert(NULL != repl_filter_buff);
-		free(filterbuff);
-		filterbuff = repl_filter_buff = NULL;
+		free(repl_filter_buff);
+		repl_filter_buff = NULL;
 		repl_filter_bufsiz = 0;
 	}
 }
@@ -1004,7 +1003,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	assert(inst_hdr->lms_group_info.created_time
 		|| need_instinfo_msg->lms_group_info.created_time || !need_instinfo_msg->is_rootprimary);
 	assert((is_rcvr_srvr && (NULL != jnlpool_ctl)) || (!is_rcvr_srvr && (NULL == jnlpool_ctl)) || jgbl.onlnrlbk
-			|| (jgbl.mur_rollback && ANTICIPATORY_FREEZE_AVAILABLE));
+			|| (jgbl.mur_rollback && INST_FREEZE_ON_ERROR_POLICY));
 	/* If this instance is supplementary and the journal pool exists (to indicate whether updates are enabled or not
 	 * which in turn helps us know whether this is an originating instance or not) do some additional checks.
 	 */
@@ -1037,7 +1036,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	 */
 	assert((NULL == jnlpool_ctl) || jnlpool_ctl->upd_disabled
 		|| inst_hdr->is_supplementary && IS_REPL_INST_UUID_NON_NULL(inst_hdr->lms_group_info)
-		|| jgbl.onlnrlbk || (jgbl.mur_rollback && ANTICIPATORY_FREEZE_AVAILABLE));
+		|| jgbl.onlnrlbk || (jgbl.mur_rollback && INST_FREEZE_ON_ERROR_POLICY));
 	/* Check if primary and secondary are in same LMS group. Otherwise issue error. An exception is if the group info has
 	 * not yet been filled in after instance file creation. In that case, copy the info from primary and skip the error check.
 	 */
@@ -1567,7 +1566,6 @@ STATICFNDEF void prepare_recvpool_for_write(int datalen, int pre_filter_write_le
 		SHM_WRITE_MEMORY_BARRIER;
 		recvpool_ctl->wrapped = TRUE;
 	}
-	assert(buffered_data_len <= recvpool_size);
 	DO_FLOW_CONTROL(write_loc);
 }
 
@@ -1618,9 +1616,9 @@ STATICFNDEF void process_tr_buff(int msg_type)
 {
 	recvpool_ctl_ptr_t		recvpool_ctl;
 	seq_num				log_seqno, recv_jnl_seqno, upd_seqno, diff_seqno;
-	uint4				in_size, out_size, out_bufsiz, tot_out_size, upd_read, max_strm_histinfo;
+	uint4				in_size, out_size, upd_read, max_strm_histinfo;
 	boolean_t			filter_pass = FALSE, is_new_histrec, is_repl_cmpc;
-	uchar_ptr_t			save_buffp, save_filter_buff, in_buff, out_buff;
+	uchar_ptr_t			save_buffp, save_filter_buff, in_buff;
 	int				idx, status, num_strm_histinfo;
 	qw_num				msg_total;
 	repl_old_triple_jnl_t		old_triple_content;
@@ -1698,8 +1696,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Update process has successfully cleared the backlog\n");
 			gtmrecv_send_cmp2uncmp = TRUE;	/* trigger REPL_CMP2UNCMP message processing */
 			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-			assert(!gtmrecv_send_cmp2uncmp);
-			assert(gtmrecv_wait_for_jnl_seqno);
+			assert(repl_connection_reset || (!gtmrecv_send_cmp2uncmp && gtmrecv_wait_for_jnl_seqno));
 			return;
 		}
 		assert(0 == destlen % REPL_MSG_ALIGN);
@@ -1751,29 +1748,37 @@ STATICFNDEF void process_tr_buff(int msg_type)
 			{	/* Need to pass through filter */
 				pre_filter_write = write_off;
 				pre_filter_write_len = write_len;
+				/* If input transaction cannot fit in currently allocated buffer, expand buffer
+				 * directly to that needed length hoping this should be enough (minimizes the # of
+				 * 50% expansions we do). If this is still not enough (because the filter function
+				 * results in bigger sized jnl records) we will then do geometric expansion of this
+				 * buffer in the while loop below as much as needed.
+				 */
+				if (write_len > repl_filter_bufsiz)
+				{
+					gtmrecv_free_filter_buff();
+					gtmrecv_alloc_filter_buff(write_len);
+				}
 				if (gtmrecv_filter & INTERNAL_FILTER)
 				{
 					in_buff = recvpool.recvdata_base + write_off;
 					in_size = write_len;
-					out_buff = repl_filter_buff;
-					out_bufsiz = repl_filter_bufsiz;
-					tot_out_size = 0;
 					while (SS_NORMAL != (status =
 						repl_filter_old2cur[remote_side->jnl_ver - JNL_VER_EARLIEST_REPL](
-								in_buff, &in_size, out_buff, &out_size, out_bufsiz))
+								in_buff, &in_size, repl_filter_buff, &out_size, repl_filter_bufsiz))
 						&& (EREPL_INTLFILTER_NOSPC == repl_errno))
-					{
-						save_filter_buff = repl_filter_buff;
+					{	/* We ran out of space in current buffer. We can try and use the transformed
+						 * records as is and resume transformation from where the space-issue occurred
+						 * but the transformation function might rely on seeing the entire transaction
+						 * context in one shot so better not to take a risk. So free old buffer and
+						 * allocate new buffer and redo transformation from scratch.
+						 */
+						gtmrecv_free_filter_buff();
 						gtmrecv_alloc_filter_buff(repl_filter_bufsiz + (repl_filter_bufsiz >> 1));
-						in_buff += in_size;
-						in_size = (uint4)(pre_filter_write_len -
-								(in_buff - recvpool.recvdata_base - write_off));
-						out_bufsiz = (uint4)(repl_filter_bufsiz - (out_buff - save_filter_buff) - out_size);
-						out_buff = repl_filter_buff + (out_buff - save_filter_buff) + out_size;
-						tot_out_size += out_size;
+						in_size = write_len;	/* just in case in_size was modified */
 					}
 					if (SS_NORMAL == status)
-						write_len = tot_out_size + out_size;
+						write_len = out_size;
 					else
 					{
 						assert(EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno);
@@ -1795,11 +1800,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 							assertpro(repl_errno != repl_errno);
 					}
 				} else
-				{
-					if (write_len > repl_filter_bufsiz)
-						gtmrecv_alloc_filter_buff(write_len);
 					memcpy(repl_filter_buff, recvpool.recvdata_base + write_off, write_len);
-				}
 				assert(write_len <= repl_filter_bufsiz);
 				GTMTRIG_ONLY(
 					if ((unsigned char)V19_JNL_VER <= remote_side->jnl_ver)
@@ -1808,9 +1809,10 @@ STATICFNDEF void process_tr_buff(int msg_type)
 						DBG_VERIFY_TR_BUFF_SORTED(repl_filter_buff, write_len);
 					}
 				)
-				if ((gtmrecv_filter & EXTERNAL_FILTER) &&
-				    (SS_NORMAL != (status = repl_filter(recvpool_ctl->jnl_seqno, repl_filter_buff, (int*)&write_len,
-									repl_filter_bufsiz))))
+				if ((gtmrecv_filter & EXTERNAL_FILTER)
+					&& (SS_NORMAL !=
+						(status = repl_filter(recvpool_ctl->jnl_seqno, &repl_filter_buff,
+											(int*)&write_len, &repl_filter_bufsiz))))
 					repl_filter_error(recvpool_ctl->jnl_seqno, status);
 				GTMTRIG_ONLY(
 					/* Ensure that the external filter has not disturbed the sorted sequence of the

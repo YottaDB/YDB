@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "gtmio.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"
@@ -29,7 +30,8 @@
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
 GBLREF uint4		dollar_tlevel;
-GBLREF lv_val		*active_lv;
+
+error_def(ERR_ALIASEXPECTED);
 
 /* Operation - The destination variable becomes a new alias of the data pointed to by the source container variable:
  *
@@ -50,12 +52,12 @@ void op_setalsctin2als(lv_val *srclv, int destindx)
 	int4		srcsymvlvl;
 	boolean_t	added;
 
-	error_def(ERR_ALIASEXPECTED);
-
+	SET_ACTIVE_LV(NULL, TRUE, actlv_op_setalsctin2als);	/* If we get here, subscript set was successful.
+								 * Clear active_lv to avoid later cleanup issues */
 	assert(srclv);
 	assert(!LV_IS_BASE_VAR(srclv));	/* Verify subscripted var */
 	if (!(srclv->v.mvtype & MV_ALIASCONT))
-		rts_error(VARLSTCNT(1) ERR_ALIASEXPECTED);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ALIASEXPECTED);
 	srclvc = (lv_val *)srclv->v.str.addr;
 	assert(srclvc);
 	assert(LV_IS_BASE_VAR(srclvc));	/* Verify base var */
@@ -84,7 +86,9 @@ void op_setalsctin2als(lv_val *srclv, int destindx)
 	}
 	/* Note dstlv could still be NULL if this is the first assignment to the target and the var is not being TPSAVed */
 	assert(dstlv != srclv);					/* Since source is container, this is an impossible situation */
-	INCR_TREFCNT(srclvc);	/* Increment before dstlv processing to prevent removal of last reference to srclvc */
+	INCR_TREFCNT(srclvc);	/* Increment before dstlv processing to prevent removal of last reference to srclvc. This is
+				 * also the trefcnt bump since srclv is now in the hash table (symval).
+				 */
 	if (dstlv)
 	{
 		assert(LV_IS_BASE_VAR(dstlv));	/* Verify base var */
@@ -106,6 +110,4 @@ void op_setalsctin2als(lv_val *srclv, int destindx)
 	tabent->value = (void *)srclvc;
 	/* These symvals have had alias activity */
 	MARK_ALIAS_ACTIVE(MIN(srcsymvlvl, LV_SYMVAL(srclvc)->symvlvl));
-	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful. clear active_lv to avoid later
-					   cleanup problems */
 }

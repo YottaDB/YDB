@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -454,6 +454,18 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 	repl_close(&gtmrecv_sock_fd);
 	REVERT;
 	repl_log(stdout, TRUE, TRUE, "Received RESYNC SEQNO is %llu [0x%llx]\n", *resync_seqno, *resync_seqno);
-	assert(*resync_seqno <= max_reg_seqno);
+	/* We expect the resync_seqno to be less than or equal to the instance jnl_seqno (which is the maximum reg_seqno
+	 * across all regions). The only exception is if this is a supplementary instance and the source side is a
+	 * non-supplementary instance in which case the resync_seqno corresponds to a strm_seqno whereas max_reg_seqno
+	 * corresponds to the unified jnl_seqno (across all streams) and those are two different dimensions and so cannot
+	 * be compared directly. It is possible that the strm_seqno is GREATER than the unified jnl_seqno. Take below example.
+	 *
+	 * Say in instance A (from A->P terminology) I keep updating the same node ^a=1 a million times.
+	 * And do say 100 local updates on P. And then do a mupip load of A's extract onto P and initialize -updateresync
+	 * replication between A->P. Then the strm_seqno of strm # 1 would be 1 million + 1 but the jnl_seqno of P would be
+	 * only 100 + 1. So the unified jnl_seqno 101 is a lot less than the strm_seqno of 1,000,001. This is a valid scenario
+	 * and there is nothing in the code that otherwise requires this ordering for their correct operation.
+	 */
+	assert((*resync_seqno <= max_reg_seqno) || jnlpool.repl_inst_filehdr->is_supplementary);
 	return SS_NORMAL;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +21,9 @@
 
 error_def(ERR_LOGTOOLONG);
 
-#define MAX_NUMBER_FILENAMES	256*MAX_TRANS_NAME_LEN
+#define MAX_NUMBER_FILENAMES	(256 * MAX_TRANS_NAME_LEN)
 
-void zro_init (void)
+void zro_init(void)
 {
 	int4	status;
 	mstr	val, tn;
@@ -40,10 +40,10 @@ void zro_init (void)
 	{
 #		ifdef UNIX
 		if (SS_LOG2LONG == status)
-			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf1) - 1);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf1) - 1);
 		else
 #		endif
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	}
 	if (status == SS_NOLOGNAM)
 		(TREF(dollar_zroutines)).len = 0;

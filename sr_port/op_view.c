@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,6 +69,9 @@
 #  include "gtmsecshr.h"
 # endif
 #endif
+#if defined(DEBUG) && defined(USHBIN_SUPPORTED)
+# include "relinkctl.h"
+#endif
 #include "gtmimagename.h"
 
 STATICFNDCL void view_dbflushop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
@@ -99,6 +102,8 @@ GBLREF	boolean_t		lvmon_enabled;
 GBLREF	spdesc			stringpool;
 GBLREF	boolean_t		is_updproc;
 GBLREF	pid_t			process_id;
+GBLREF	uint4			dollar_tlevel;
+UNIX_ONLY(GBLREF	boolean_t		dmterm_default;)
 
 error_def(ERR_ACTRANGE);
 error_def(ERR_COLLATIONUNDEF);
@@ -111,6 +116,7 @@ error_def(ERR_JNLFLUSH);
 error_def(ERR_PATLOAD);
 error_def(ERR_PATTABNOTFND);
 error_def(ERR_REQDVIEWPARM);
+error_def(ERR_SEFCTNEEDSFULLB);
 error_def(ERR_TEXT);
 error_def(ERR_TRACEON);
 error_def(ERR_VIEWCMD);
@@ -140,7 +146,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 {
 	int4			testvalue, tmpzdefbufsiz;
 	uint4			jnl_status, dummy_errno;
-	int			status, lcnt, icnt;
+	int			status, lcnt, icnt, recnum;
 	gd_region		*reg, *r_top, *save_reg;
 	gv_namehead		*gvnh;
 	mval			*arg, *nextarg, outval;
@@ -167,6 +173,10 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	symval			*lvlsymtab;
 	lv_blk			*lvbp;
 	lv_val			*lvp, *lvp_top;
+#	if defined(DEBUG) && defined(USHBIN_SUPPORTED)
+	open_relinkctl_sgm	*linkctl;
+	relinkrec_t		*linkrec;
+#	endif
 	VMS_ONLY(int		numarg;)
 
 	static readonly char msg1[] = "Caution: Database Block Certification Has Been ";
@@ -230,6 +240,14 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			arg = (numarg > 1) ? va_arg(var, mval *) : NULL;
 			view_dbflushop(vtp->keycode, &parmblk, arg);
 			break;
+#		ifdef UNIX
+		case VTK_DMTERM:
+			dmterm_default = TRUE;
+			break;
+		case VTK_NODMTERM:
+			dmterm_default = FALSE;
+			break;
+#		endif
 		case VTK_FULLBOOL:
 			TREF(gtm_fullbool) = FULL_BOOL;
 			break;
@@ -237,7 +255,10 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			TREF(gtm_fullbool) = FULL_BOOL_WARN;
 			break;
 		case VTK_NOFULLBOOL:
-			TREF(gtm_fullbool) = GTM_BOOL;
+			if (OLD_SE == TREF(side_effect_handling))
+				TREF(gtm_fullbool) = GTM_BOOL;
+			else
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SEFCTNEEDSFULLB);
 			break;
 		case VTK_GDSCERT0:
 			outval.mvtype = MV_STR;
@@ -329,9 +350,12 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 #		endif
 		case VTK_JNLWAIT:
 			/* go through all regions that could have possibly been open across all global directories */
-			for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
-				for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions; reg < r_top; reg++)
-					jnl_wait(reg);
+			if (!dollar_tlevel)
+			{	/* Only if we're not in a TP transaction */
+				for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+					for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions; reg < r_top; reg++)
+						jnl_wait(reg);
+			}
 			break;
 		case VTK_JOBPID:
 			outval.mvtype = MV_STR;
@@ -781,6 +805,27 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			op_wteol(1);
 			break;
 #		endif
+#		if defined(DEBUG) && defined(USHBIN_SUPPORTED)
+		case VTK_RCTLDUMP:
+			util_out_print("", RESET);	/* Reset output buffer */
+			for (linkctl = TREF(open_relinkctl_list); NULL != linkctl; linkctl = linkctl->next)
+			{
+				util_out_print_gtmio("relinkctl: 0x!XJ  entryname: !AD  records: !UL  hdr: 0x!XJ  base: 0x!XJ"
+						     "  locked: !UL", FLUSH, linkctl, linkctl->zro_entry_name.len,
+						     linkctl->zro_entry_name.addr, linkctl->n_records, linkctl->hdr,
+						     linkctl->rec_base, linkctl->locked);
+				util_out_print_gtmio("  hdr: records: !UL  nattached: !UL", FLUSH, linkctl->hdr->n_records,
+						     linkctl->hdr->nattached);
+				for (linkrec = linkctl->rec_base, recnum = 1; recnum <= linkctl->hdr->n_records;
+				     linkrec++, recnum++)
+				{
+					util_out_print_gtmio("    rec#!4UL: rtnname: !AD  cycle: !UL", FLUSH, recnum,
+							     mid_len(&linkrec->rtnname_fixed), &linkrec->rtnname_fixed.c,
+							     linkrec->cycle);
+				}
+			}
+			break;
+#		endif
 		default:
 			va_end(var);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWCMD);
@@ -848,7 +893,7 @@ void view_dbflushop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 					 * TPFAIL error because we are already in the final retry. By passing the WCSFLU_IN_COMMIT
 					 * bit, we instruct wcs_flu to avoid wcs_recover.
 					 */
-					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH | WCSFLU_IN_COMMIT);
+					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_IN_COMMIT | WCSFLU_SPEEDUP_NOBEFORE);
 				}
 				break;
 			case VTK_JNLFLUSH:

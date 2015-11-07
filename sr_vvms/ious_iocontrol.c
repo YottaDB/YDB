@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,16 +16,16 @@
 
 GBLREF io_pair		io_curr_device;
 
-void ious_iocontrol(mstr *d)
+void ious_iocontrol(mstr *mn, int4 argcnt, va_list args)
 {
 	struct dsc$descriptor val;
 
-	val.dsc$w_length = d->len;
+	val.dsc$w_length = mn->len;
 	val.dsc$b_dtype = DSC$K_DTYPE_T;
 	val.dsc$b_class = DSC$K_CLASS_S;
-	val.dsc$a_pointer = d->addr;
+	val.dsc$a_pointer = mn->addr;
 
-	(((d_us_struct*)(io_curr_device.out->dev_sp))->disp->iocontrol)(&val);
+	(((d_us_struct*)(io_curr_device.out->dev_sp))->disp->iocontrol)(&val, 0, NULL);
 	return;
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -158,7 +158,11 @@ typedef struct
 	if (NULL != SOCKPTR->buffer) 						\
 		free(SOCKPTR->buffer);						\
 	if (NULL != SOCKPTR->zff.addr)						\
+	{									\
+		if ((NULL != SOCKPTR->ozff.addr) && (SOCKPTR->ozff.addr != SOCKPTR->zff.addr))				\
+			free(SOCKPTR->ozff.addr);				\
 		free(SOCKPTR->zff.addr);					\
+	}									\
 	if (NULL != SOCKPTR->local.sa)						\
 		free(SOCKPTR->local.sa);					\
 	if (NULL != SOCKPTR->remote.sa)						\
@@ -167,6 +171,8 @@ typedef struct
 		free(SOCKPTR->local.saddr_ip);					\
 	if (NULL != SOCKPTR->remote.saddr_ip)					\
 		free(SOCKPTR->remote.saddr_ip);					\
+	if (NULL != SOCKPTR->parenthandle)					\
+		free(SOCKPTR->parenthandle);					\
 	iosocket_delimiter((unsigned char *)NULL, 0, SOCKPTR, TRUE);		\
 	free(SOCKPTR);								\
 }
@@ -176,28 +182,80 @@ typedef struct
 	NEWSOCKPTR = (socket_struct *)malloc(SIZEOF(socket_struct));						\
 	*NEWSOCKPTR = *SOCKPTR;											\
 	if (NULL != SOCKPTR->buffer) 										\
+	{													\
+		NEWSOCKPTR->buffered_length = NEWSOCKPTR->buffered_offset = 0;					\
 		NEWSOCKPTR->buffer = (char *)malloc(SOCKPTR->buffer_size);					\
-	if (NULL != SOCKPTR->zff.addr)										\
+	}													\
+	if ((0 != SOCKPTR->zff.len) && (NULL != SOCKPTR->zff.addr))						\
 	{													\
 		NEWSOCKPTR->zff.addr = (char *)malloc(MAX_ZFF_LEN);						\
 		memcpy(NEWSOCKPTR->zff.addr, SOCKPTR->zff.addr, SOCKPTR->zff.len);				\
+		if ((NULL != SOCKPTR->ozff.addr) && (SOCKPTR->zff.addr != SOCKPTR->ozff.addr))			\
+		{												\
+			NEWSOCKPTR->ozff.addr = (char *)malloc(MAX_ZFF_LEN);					\
+			memcpy(NEWSOCKPTR->ozff.addr, SOCKPTR->ozff.addr, SOCKPTR->ozff.len);			\
+			NEWSOCKPTR->ozff.len = SOCKPTR->ozff.len;						\
+		} else												\
+			NEWSOCKPTR->ozff = NEWSOCKPTR->zff;							\
+	} else													\
+	{													\
+		NEWSOCKPTR->zff.len = NEWSOCKPTR->ozff.len = 0;							\
+		NEWSOCKPTR->zff.addr = NEWSOCKPTR->ozff.addr = NULL;							\
 	}													\
 	if (NULL != SOCKPTR->local.sa)										\
 	{													\
 		NEWSOCKPTR->local.sa = (struct sockaddr *)malloc(SOCKPTR->local.ai.ai_addrlen);			\
 		memcpy(NEWSOCKPTR->local.sa, SOCKPTR->local.sa, SOCKPTR->local.ai.ai_addrlen);			\
+		NEWSOCKPTR->local.ai.ai_addr = NEWSOCKPTR->local.sa;						\
 	}													\
 	if (NULL != SOCKPTR->remote.sa)										\
 	{													\
 		NEWSOCKPTR->remote.sa = (struct sockaddr *)malloc(SOCKPTR->remote.ai.ai_addrlen);		\
 		memcpy(NEWSOCKPTR->remote.sa, SOCKPTR->remote.sa, SOCKPTR->remote.ai.ai_addrlen);		\
+		NEWSOCKPTR->remote.ai.ai_addr = NEWSOCKPTR->remote.sa;						\
 	}													\
 	if (NULL != SOCKPTR->local.saddr_ip)									\
 		STRNDUP(SOCKPTR->local.saddr_ip, SA_MAXLEN, NEWSOCKPTR->local.saddr_ip);			\
 	if (NULL != SOCKPTR->remote.saddr_ip)									\
 		STRNDUP(SOCKPTR->remote.saddr_ip, SA_MAXLEN, NEWSOCKPTR->remote.saddr_ip);			\
+	if (NULL != SOCKPTR->parenthandle)									\
+		NEWSOCKPTR->parenthandle = NULL;									\
 	iosocket_delimiter_copy(SOCKPTR, NEWSOCKPTR);								\
 }
+
+#ifndef VMS
+enum socket_pass_type
+{
+	sockpass_new,
+	sockpass_data,
+	sockpass_sock
+};
+
+#define		ENSURE_DATA_SOCKET(SOCKPTR)					\
+{										\
+	if (socket_local == (SOCKPTR)->protocol)				\
+	{									\
+		if (sockpass_new == (SOCKPTR)->passtype)			\
+			(SOCKPTR)->passtype = sockpass_data;			\
+		else if (sockpass_sock == (SOCKPTR)->passtype)			\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKPASSDATAMIX, 0);	\
+	}									\
+}
+
+#define		ENSURE_PASS_SOCKET(SOCKPTR)					\
+{										\
+	if (socket_local == (SOCKPTR)->protocol)				\
+	{									\
+		if (sockpass_new == (SOCKPTR)->passtype)			\
+			(SOCKPTR)->passtype = sockpass_sock;			\
+		else if (sockpass_data == (SOCKPTR)->passtype)			\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKPASSDATAMIX, 0);	\
+	}                                                                      \
+}
+#else
+#define ENSURE_DATA_SOCKET(SOCKPTR)
+#define ENSURE_PASS_SOCKET(SOCKPTR)
+#endif
 
 enum socket_state
 {
@@ -206,6 +264,15 @@ enum socket_state
 	socket_bound,
 	socket_created,
 	socket_connect_inprogress
+};
+
+enum socket_creator
+{
+	creator_listen,
+	creator_accept,
+	creator_connect,
+	creator_principal,
+	creator_passed
 };
 
 enum socket_protocol
@@ -266,15 +333,18 @@ typedef struct socket_struct_type
 	boolean_t			first_write;
 	boolean_t			def_moreread_timeout;	/* true if deviceparameter morereadtime defined in open or use */
 #ifndef VMS
-	boolean_t			passedfd;		/* true if WRITE /ACCEPT or /PASS */
+	enum socket_pass_type		passtype;		/* prevent mix of data and socket passing on LOCAL sockets */
 	uint				filemode;		/* for LOCAL */
 	uint				filemode_mask;		/* to tell which modes specified */
 	uic_struct_int			uic;
 #endif
 	mstr				zff;
+	mstr				ozff;			/* UTF-16 if chset is UTF-16 else copy  of zff */
 	uint4				lastaction;		/* waitcycle  count */
 	uint4				readycycle;		/* when was ready */
 	boolean_t			pendingevent;		/* if listening, needs accept */
+	enum socket_creator		howcreated;
+	char				*parenthandle;		/* listening socket this created from */
 } socket_struct;
 
 typedef struct socket_interrupt_type
@@ -296,6 +366,8 @@ typedef struct d_socket_struct_type
 	int4				current_socket;			/* current socket index */
 	int4				n_socket;			/* number of sockets	*/
 	uint4				waitcycle;			/* count waits */
+	boolean_t			ichset_specified;
+	boolean_t			ochset_specified;
 	struct io_desc_struct		*iod;				/* Point back to main IO descriptor block */
 	struct socket_struct_type 	*socket[1];			/* Array size determined by gtm_max_sockets */
 } d_socket_struct;

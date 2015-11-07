@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +12,8 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-#include "gtm_string.h"
 
+#include "gtmio.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -31,7 +31,6 @@ GBLREF stack_frame	*frame_pointer;
 ht_ent_mname *lookup_variable_htent(unsigned int x)
 {
 	ht_ent_mname	*tabent;
-	mident_fixed	varname;
 	boolean_t	added;
 
 	assert(x < frame_pointer->vartab_len);
@@ -40,11 +39,10 @@ ht_ent_mname *lookup_variable_htent(unsigned int x)
 	if (NULL == tabent->value)
 	{
 		assert(added);		/* Should never be a valid name without an lv */
-#ifdef DEBUG_REFCNT
-		memset(varname.c, '\0', SIZEOF(varname));
-		memcpy(varname.c, tabent->key.var_name.addr, tabent->key.var_name.len);
-		DBGRFCT((stderr, "lookup_variable_htent: Allocating lv_val for variable '%s'\n", varname.c));
-#endif
+#		ifdef DEBUG_REFCNT
+		DBGRFCT((stderr, "\nlookup_variable_htent: Allocating lv_val for variable '%.*s'\n", tabent->key.var_name.len,
+			 tabent->key.var_name.addr));
+#		endif
 		lv_newname(tabent, curr_symval);
 	}
 	assert(NULL != LV_GET_SYMVAL((lv_val *)tabent->value));

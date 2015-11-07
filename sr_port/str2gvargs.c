@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,17 @@
 #include "gv_trigger.h"
 #endif
 
+error_def(ERR_NOTGBL);
+error_def(ERR_GVINVALID);
+error_def(ERR_LPARENREQD);
+error_def(ERR_NUMUNXEOR);
+error_def(ERR_STRUNXEOR);
+error_def(ERR_DLRCUNXEOR);
+error_def(ERR_DLRCTOOBIG);
+error_def(ERR_EORNOTFND);
+error_def(ERR_RPARENREQD);
+error_def(ERR_DLRCILLEGAL);
+
 static mval subsc[MAX_GVSUBSCRIPTS]; 	/* At return, op_gvargs elements will be pointing to elements of this array, hence static */
 static MSTR_DEF(subsc_buffer, 0, NULL); /* Buffer space (subsc_buffer.addr) will be allocated on the first call.
 					 * Buffer space to hold string mvals in subsc; we don't want to use stringpool because
@@ -41,22 +52,11 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 { /* IMPORTANT : op_gvargs will point to static area which gets overwritten by the next call to this function. Callers should
      make a copy of op_gvargs if necessary */
 
-	char		*p1, *p2, *c_top, *c_ref, ch, *subsc_ptr, *dstptr, *strnext;
-	int		count;
-	mval		*spt;
-	int 		chcode, chtmp;
+	boolean_t	concat, dot_seen, dollarzch, isdolar, naked;
+	char		*c_ref, *c_top, ch, *dstptr, *p1, *p2, *strnext, *subsc_ptr;
+	int 		chcode, chtmp, count;
 	mstr_len_t	chlen;
-	boolean_t	naked, concat, dot_seen, dollarzch, isdolar;
-	error_def(ERR_NOTGBL);
-	error_def(ERR_GVINVALID);
-	error_def(ERR_LPARENREQD);
-	error_def(ERR_NUMUNXEOR);
-	error_def(ERR_STRUNXEOR);
-	error_def(ERR_DLRCUNXEOR);
-	error_def(ERR_DLRCTOOBIG);
-	error_def(ERR_EORNOTFND);
-	error_def(ERR_RPARENREQD);
-	error_def(ERR_DLRCILLEGAL);
+	mval		*spt;
 
 	assert(SIZEOF(op_gvargs->count) == SIZEOF(op_gvargs->args[0]));
 	naked = FALSE;
@@ -74,7 +74,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	spt = subsc;
 	count = 0;
 	if (0 >= len || '^' != *cp++)
-		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, (len > 0) ? len : 0, c_ref);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTGBL, 2, (len > 0) ? len : 0, c_ref);
 	spt->mvtype = MV_STR;
 	spt->str.addr = cp;
 	ch = *cp;
@@ -86,12 +86,12 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	{
 		cp++;
 		if (!(VALFIRSTCHAR_WITH_TRIG(ch)))
-			rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
 		for ( ; cp < c_top && *cp != '('; )
 		{
 			ch = *cp++;
 			if (!ISALPHA_ASCII(ch) && !ISDIGIT_ASCII(ch))
-				rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
 		}
 		spt->str.len = INTCAST(cp - spt->str.addr);
 		op_gvargs->args[count] = spt;
@@ -102,7 +102,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	if (cp < c_top)
 	{
 		if ('(' != *cp++)
-			rts_error(VARLSTCNT(4) ERR_LPARENREQD, 2, len, c_ref);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LPARENREQD, 2, len, c_ref);
 		for (; ;)
 		{
 			spt->mvtype = MV_STR;
@@ -119,7 +119,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 				for (; ;)
 				{
 					if (cp == c_top)
-						rts_error(VARLSTCNT(4) ERR_STRUNXEOR, 2, len, c_ref);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STRUNXEOR, 2, len, c_ref);
 					if ('\"' == *cp)
 						if ('\"' != *++cp)
 							break;
@@ -143,12 +143,12 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 			} else if ('$' == ch)
 			{
 				cp++;
-				chtmp = toupper(*cp);
+				chtmp = TOUPPER(*cp);
 				isdolar = (3 <= c_top - cp && 'C' == chtmp || '(' == cp[1]);
 				if (!isdolar)
 					isdolar = (5 <= c_top - cp && 'Z' == chtmp && 'C' == cp[1] && 'H' == cp[2] && '(' == cp[3]);
 				if (!isdolar)
-					rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 
 				if ('Z' == chtmp)
 				{
@@ -163,7 +163,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 				{
 					A2I(cp, c_top, chcode);
 					if (0 > chcode)
-						rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 
 					dstptr = (!concat) ? subsc_ptr : p1;
 
@@ -172,23 +172,24 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 						if (255 < chcode)
 						{
 							if (dollarzch)
-								rts_error(VARLSTCNT(6) ERR_DLRCTOOBIG, 4, len, c_ref,
-										LEN_AND_LIT("$CHAR()"));
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DLRCTOOBIG, 4,
+									len, c_ref, LEN_AND_LIT("$CHAR()"));
 							else
-								rts_error(VARLSTCNT(6) ERR_DLRCTOOBIG, 4, len, c_ref,
-										LEN_AND_LIT("$ZCHAR()"));
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DLRCTOOBIG, 4,
+									len, c_ref, LEN_AND_LIT("$ZCHAR()"));
 						}
 						*dstptr = chcode;
 						chlen = 1;
 					}
-#ifdef UNICODE_SUPPORTED
+#					ifdef UNICODE_SUPPORTED
 					else {
 						strnext = (char *)UTF8_WCTOMB(chcode, dstptr);
 						chlen = INTCAST(strnext - dstptr);
 						if (0 == chlen)
-							rts_error(VARLSTCNT(5) ERR_DLRCILLEGAL, 3, len, c_ref, chcode);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DLRCILLEGAL, 3,
+								len, c_ref, chcode);
 					}
-#endif
+#					endif
 					if (!concat)
 					{
 						spt->str.addr = subsc_ptr;
@@ -205,11 +206,11 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 					{
 						concat = TRUE;
 						if (++cp == c_top)
-							rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 						continue;
 					}
 					if (')' != *cp)
-						rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 					break;
 				}
 				cp++;
@@ -223,7 +224,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 			{
 				dot_seen = FALSE;
 				if (!ISDIGIT_ASCII(ch) && '.' != ch && '-' != ch && '+' != ch)
-					rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
 				if (!concat)
 				{
 					spt->str.addr = subsc_ptr;
@@ -234,7 +235,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 				for (; ;)
 				{
 					if (cp == c_top)
-						rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
 					if (!ISDIGIT_ASCII(*cp))
 					{
 						if ('.' != *cp)
@@ -242,7 +243,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 						else if (!dot_seen)
 							dot_seen = TRUE;
 						else
-							rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
 					}
 					*p1++ = *cp++;
 				}
@@ -271,9 +272,9 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 			cp++;
 		}
 		if (')' != *cp++)
-			rts_error(VARLSTCNT(4) ERR_RPARENREQD, 2, len, c_ref);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RPARENREQD, 2, len, c_ref);
 		if (cp < c_top)
-			rts_error(VARLSTCNT(4) ERR_EORNOTFND, 2, len, c_ref);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_EORNOTFND, 2, len, c_ref);
 	}
 	op_gvargs->count = count;
 	return naked;

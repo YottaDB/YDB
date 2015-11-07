@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,7 @@ unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_ke
 {
 	unsigned char			ch, *gvkey_char_ptr, *out_top, *work_char_ptr, work_buff[MAX_ZWR_KEY_SZ], *work_top;
 	boolean_t			is_string;
+	mstr				opstr;
 	DEBUG_ONLY(unsigned char	*gvkey_top_ptr;)
 
 	assert(12 < max_size);
@@ -62,7 +63,9 @@ unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_ke
 				is_string = TRUE;
 				*out_char_ptr++ = '"';
 			}
-			work_top = gvsub2str(gvkey_char_ptr, work_buff, dollarc);
+			opstr.addr = (char *)work_buff;
+			opstr.len = MAX_ZWR_KEY_SZ;
+			work_top = gvsub2str(gvkey_char_ptr, &opstr, dollarc);
 			if (!is_string)
 			{
 				for (work_char_ptr = work_buff;  work_char_ptr < work_top;)

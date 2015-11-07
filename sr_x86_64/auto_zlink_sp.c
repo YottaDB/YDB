@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2008, 2010 Fidelity Information Services, Inc *
+ *      Copyright 2008, 2014 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -69,7 +69,7 @@ short opcode_correct(unsigned char *curr_pc, short opcode, short reg_opcode, sho
 }
 
 
-short valid_calling_sequence(unsigned char *pc)
+short valid_calling_sequence(mach_inst *pc)
 {
 	short curr_offset = 0, inst_sz;
 
@@ -82,10 +82,11 @@ short valid_calling_sequence(unsigned char *pc)
 	modrm_byte_long.modrm.r_m = GTM_REG_XFER_TABLE;
 
 			/*	 inst = call off(%reg_xfer) 	*/
-	if (curr_offset += opcode_correct(pc, I386_INS_Grp5_Prefix, I386_INS_CALL_Ev, TRUE, GTM_REG_XFER_TABLE))
+	if (curr_offset += opcode_correct((unsigned char*)pc, I386_INS_Grp5_Prefix, I386_INS_CALL_Ev, TRUE, GTM_REG_XFER_TABLE))
 	{
 			/* 	inst is :: mov R0 = MEM 	*/
-		inst_sz = 1 + opcode_correct((pc - curr_offset),I386_INS_MOV_Gv_Ev,I386_REG_RDI,TRUE,GTM_REG_PV & 0x7);
+		inst_sz = 1 + opcode_correct(((unsigned char*)pc) - curr_offset, I386_INS_MOV_Gv_Ev, I386_REG_RDI, TRUE,
+					     GTM_REG_PV & 0x7);
 		switch(inst_sz - 1)
 		{
 			case FALSE :
@@ -100,12 +101,13 @@ short valid_calling_sequence(unsigned char *pc)
 				rtnhdr_off = (int4) *((int4 *)(pc - curr_offset - 4));
 				break;
 			default :
-				GTMASSERT;
+				assertpro(FALSE && (inst_sz - 1));
 		}
 		curr_offset += inst_sz;
 		/* if invalid, would've returned before... */
 			/*	inst is :: mov R1 = MEM		*/
-		inst_sz = 1 + opcode_correct((pc - curr_offset),I386_INS_MOV_Gv_Ev,I386_REG_RSI,TRUE,GTM_REG_PV & 0x7);
+		inst_sz = 1 + opcode_correct(((unsigned char*)pc) - curr_offset, I386_INS_MOV_Gv_Ev, I386_REG_RSI, TRUE,
+					     GTM_REG_PV & 0x7);
 		switch(inst_sz - 1)
 		{
 			case FALSE :
@@ -120,7 +122,7 @@ short valid_calling_sequence(unsigned char *pc)
 				labaddr_off = (int4) *((int4 *)(pc - curr_offset - 4));
 				break;
 			default :
-				GTMASSERT;
+				assertpro(FALSE && (inst_sz - 1));
 		}
 		return TRUE;
 	}

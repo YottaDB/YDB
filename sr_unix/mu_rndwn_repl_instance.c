@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -195,7 +195,8 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 					remove_sem = sem_created || (SS_NORMAL == jnlpool_stat);
 					if (!remove_sem)
 						add_to_semids_list(repl_instance.jnlpool_semid);
-					if (SS_NORMAL == mu_replpool_release_sem(&repl_instance, JNLPOOL_SEGMENT, remove_sem))
+					status = mu_replpool_release_sem(&repl_instance, JNLPOOL_SEGMENT, remove_sem);
+					if ((SS_NORMAL == status) && remove_sem)
 					{	/* Now that semaphores are removed, reset fields in file header */
 						if (!sem_created)
 						{	/* If sem_id was created by mu_replpool_grab_sem then do NOT report the
@@ -216,7 +217,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 				{	/* Anticipatory Freeze scheme is turned ON. So, release just the JNL_POOL_ACCESS_SEM. The
 					 * semaphore will be released/removed in the caller (mupip_rundown)
 					 */
-					assert(ANTICIPATORY_FREEZE_AVAILABLE);
+					assert(INST_FREEZE_ON_ERROR_POLICY);
 					assertpro(SS_NORMAL == (status = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM)));
 					assert(!holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 					/* Since we are not resetting the semaphore IDs in the file header, we need to write out
@@ -280,7 +281,8 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 				remove_sem = sem_created || (SS_NORMAL == jnlpool_stat);
 				if (!remove_sem)
 					add_to_semids_list(repl_instance.jnlpool_semid);
-				if (SS_NORMAL == mu_replpool_release_sem(&repl_instance, RECVPOOL_SEGMENT, remove_sem))
+				status = mu_replpool_release_sem(&repl_instance, RECVPOOL_SEGMENT, remove_sem);
+				if ((SS_NORMAL == status) && remove_sem)
 				{	/* Now that semaphores are removed, reset fields in file header */
 					if (!sem_created)
 					{	/* if sem_id was "created" by mu_replpool_grab_sem then do NOT report the
@@ -328,10 +330,10 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 					LEN_AND_STR(instfilename));
 		}
 	}
-	assert(jgbl.onlnrlbk || ANTICIPATORY_FREEZE_AVAILABLE || (NULL == jnlpool.repl_inst_filehdr));
+	assert(jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY || (NULL == jnlpool.repl_inst_filehdr));
 	if (mur_options.rollback && (SS_NORMAL == jnlpool_stat) && (SS_NORMAL == recvpool_stat))
 	{
-		assert(jgbl.onlnrlbk || ANTICIPATORY_FREEZE_AVAILABLE || ((INVALID_SHMID == repl_instance.jnlpool_shmid)
+		assert(jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY || ((INVALID_SHMID == repl_instance.jnlpool_shmid)
 			&& (INVALID_SHMID == repl_instance.recvpool_shmid)));
 		/* Initialize jnlpool.repl_inst_filehdr as it is used later by gtmrecv_fetchresync() */
 		decr_cnt = FALSE;

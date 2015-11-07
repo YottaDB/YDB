@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +55,9 @@ int m_zinvcmd(void);
 int m_zlink(void);
 int m_zmessage(void);
 int m_zprint(void);
+#ifdef USHBIN_SUPPORTED
+int m_zrupdate(void);
+#endif
 int m_zshow(void);
 int m_zstep(void);
 int m_zsystem(void);
@@ -66,5 +69,4 @@ int m_ztstart(void);
 int m_zwatch(void);
 int m_zwithdraw(void);
 int m_zwrite(void);
-
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,6 @@
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"		/* for exit() */
 #include "gtm_time.h"		/* for time() */
-#include "gt_timer.h"		/* for set_blocksig() */
 #include "gtm_fcntl.h"
 #include "gtm_string.h"		/* for strerror() */
 #include <sys/types.h>
@@ -30,10 +29,9 @@
 
 #include "gtcm.h"
 #include "error.h"
-#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_threadgbl_init.h"
 #include "gtmimagename.h"
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
@@ -68,12 +66,6 @@ GBLREF int		 rc_nxact;
 GBLREF int		 rc_nerrs;
 #endif /* defined(GTCM_RC) */
 
-/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
- * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
- * the only exception and, in particular because the operating system does not support such an exception, the argv
- * array passed to the main program is an array of 64-bit pointers.  Thus the C program needs to declare argv[]
- * as an array of 64-bit pointers and needs to do the same for any pointer it sets to an element of argv[].
- */
 int main(int argc, char_ptr_t argv[])
 {
 	omi_conn	*cptr, conn;
@@ -82,9 +74,7 @@ int main(int argc, char_ptr_t argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	set_blocksig();
-	gtm_imagetype_init(GTCM_SERVER_IMAGE);
-	gtm_env_init(); /* read in all environment variables before calling any function particularly malloc (from err_init below)*/
+	common_startup_init(GTCM_SERVER_IMAGE);
 	/*  Open the packet log file for playback */
 	if (1 == argc)
 		conn.fd = fileno(stdin);

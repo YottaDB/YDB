@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -717,8 +717,7 @@ uint4 mur_fread_eof_crash(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off
 	mur_read_desc_t	*mur_desc;
 
 	assert(JNL_HDR_LEN <= jctl->jfh->alignsize);
-	if (lo_off < jctl->jfh->end_of_data || lo_off > hi_off)
-		GTMASSERT;
+	assertpro((lo_off >= jctl->jfh->end_of_data) && (lo_off <= hi_off));
 	jctl->properly_closed = FALSE;
 	if (SS_NORMAL != (status = mur_valrec_prev(jctl, lo_off, hi_off)))
 		return status;
@@ -824,18 +823,16 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 			break;
 		mid_off = new_mid_off + mid_further;
 	}
-	if (0 == jctl->rec_offset)
-	{	/* Unexpected condition:
-		 * a) If lo_off was 0 while entering this routine, this means there was no good record at or after the beginning
-		 * 	of the journal file (i.e. offset of JNL_HDR_LEN). This is impossible since a PINI record was written at
-		 * 	journal file creation time and at least that should have been seen as a good record.
-		 * b) If lo_off was non-zero while entering this routine, this implies there was no good record anywhere at or
-		 * 	after an offset of lo_off in the journal file. But this is impossible since a non-zero value of lo_off
-		 * 	implies it is equal to jfh->end_of_data which means that an EPOCH/EOF record written at that offset
-		 * 	and the journal file was synced so we should at least see that good record.
-		 */
-		GTMASSERT;
-	}
+	/* Unexpected condition:
+	 * a) If lo_off was 0 while entering this routine, this means there was no good record at or after the beginning
+	 * 	of the journal file (i.e. offset of JNL_HDR_LEN). This is impossible since a PINI record was written at
+	 * 	journal file creation time and at least that should have been seen as a good record.
+	 * b) If lo_off was non-zero while entering this routine, this implies there was no good record anywhere at or
+	 * 	after an offset of lo_off in the journal file. But this is impossible since a non-zero value of lo_off
+	 * 	implies it is equal to jfh->end_of_data which means that an EPOCH/EOF record written at that offset
+	 * 	and the journal file was synced so we should at least see that good record.
+	 */
+	assertpro(0 != jctl->rec_offset);
 	/* We found a valid record at mid_off, go forward to find the last valid record.  Before the for loop
 	 * of mur_next(0) following call is necessary to initialize buffers and for the assumptions in mur_next() */
 	rec_offset = jctl->rec_offset;
@@ -872,14 +869,12 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 	jctl->rec_offset = rec_offset;
 	/* now set mur_desc fields to point to valid record */
 	assert(rec_offset);
-	if (SS_NORMAL != mur_prev(jctl, rec_offset))
-	{	/* Since valid record may have been overwritten we must do this.
-		 * We call mur_prev, not mur_next, although both position mur_desc to the same
-		 * record (when called with non zero arg) to make sure no assumptions in
-		 * successive calls to mur_prev(jctl, 0) are violated.
-		 */
-		GTMASSERT;
-	}
+	/* Since valid record may have been overwritten we must do this.
+	 * We call mur_prev, not mur_next, although both position mur_desc to the same
+	 * record (when called with non zero arg) to make sure no assumptions in
+	 * successive calls to mur_prev(jctl, 0) are violated.
+	 */
+	assertpro(SS_NORMAL == mur_prev(jctl, rec_offset));
 	return SS_NORMAL;
 }
 
@@ -909,8 +904,7 @@ uint4 mur_valrec_next(jnl_ctl_list *jctl, off_jnl_t lo_off)
 			break;
 		if (ERR_JNLBADRECFMT != status)
 			return status; /* I/O error or unexpected failure */
-		if (jctl->rec_offset >= jctl->lvrec_off) /* lvrec_off must have a valid record */
-			GTMASSERT;
+		assertpro(jctl->rec_offset < jctl->lvrec_off); /* lvrec_off must have a valid record */
 	}
 	assert(SS_NORMAL == status);
 	/* now work backwards to find the earliest valid record in the immediately preceding alignsize chunk */
@@ -1067,7 +1061,7 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 	{
 		INIT_PROC_ENCRYPTION(cs_addrs, gtmcrypt_errno);
 		if (0 == gtmcrypt_errno)
-			GTMCRYPT_GETKEY(cs_addrs, jfh->encryption_hash, jctl->encr_key_handle, gtmcrypt_errno);
+			GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(cs_addrs, jfh->encryption_hash, jctl->encr_key_handle, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 			GTMCRYPT_REPORT_ERROR(MAKE_MSG_WARNING(gtmcrypt_errno), gtm_putmsg, jctl->jnl_fn_len, jctl->jnl_fn);
 		if (NULL != mur_ctl->csd && (0 != memcmp(mur_ctl->csd->encryption_hash, jfh->encryption_hash, GTMCRYPT_HASH_LEN)))

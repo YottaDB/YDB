@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,60 +75,30 @@ error_def(ERR_REPLPOOLINST);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 
-#define ISSUE_REPLPOOLINST_AND_RETURN(SAVE_ERRNO, SHM_ID, INSTFILENAME, FAILED_OP)				\
-{														\
-	ISSUE_REPLPOOLINST(SAVE_ERRNO, SHM_ID, INSTFILENAME, FAILED_OP)						\
-	return -1;												\
+#define DETACH(START_ADDR, SHM_ID, INSTFILENAME)					\
+{											\
+	int		lcl_save_errno;							\
+											\
+	if (-1 == shmdt((void *)START_ADDR))						\
+	{										\
+		lcl_save_errno = errno;							\
+		ISSUE_REPLPOOLINST(lcl_save_errno, SHM_ID, INSTFILENAME, "shmdt()");	\
+	}										\
 }
 
-#define DETACH_AND_RETURN(START_ADDR, SHM_ID, INSTFILENAME)							\
-{														\
-	int		lcl_save_errno;										\
-														\
-	if (-1 == shmdt((void *)START_ADDR))									\
-	{													\
-		lcl_save_errno = errno; 									\
-		ISSUE_REPLPOOLINST_AND_RETURN(lcl_save_errno, SHM_ID, INSTFILENAME, "shmdt()");			\
-	}													\
-	return -1;												\
-}
-
-int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t repl_inst_filehdr, int shm_id, boolean_t *ipc_rmvd)
+int     mu_rndwn_replpool2(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t repl_inst_filehdr, int shm_id, boolean_t *ipc_rmvd,
+			   char *instfilename, sm_uc_ptr_t start_addr, int nattch)
 {
-	int			semval, status, save_errno, nattch;
-	char			*instfilename, pool_type;
-	sm_uc_ptr_t		start_addr;
-	struct shmid_ds		shm_buf;
+	int			save_errno;
+	char			pool_type;
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;
-	boolean_t		anticipatory_freeze_available, force_attach;
+	boolean_t		anticipatory_freeze_available, reset_crash;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(INVALID_SHMID != shm_id);
-	instfilename = replpool_id->instfilename;
 	pool_type = replpool_id->pool_type;
-	assert((JNLPOOL_SEGMENT == pool_type) || (RECVPOOL_SEGMENT == pool_type));
-	anticipatory_freeze_available = ANTICIPATORY_FREEZE_AVAILABLE;
-	force_attach = (jgbl.onlnrlbk || (!jgbl.mur_rollback && !argumentless_rundown && anticipatory_freeze_available));
-	if (-1 == shmctl(shm_id, IPC_STAT, &shm_buf))
-	{
-		save_errno = errno;
-		ISSUE_REPLPOOLINST_AND_RETURN(save_errno, shm_id, instfilename, "shmctl()");
-	}
-	nattch = shm_buf.shm_nattch;
-	if ((0 != nattch) && !force_attach)
-	{
-		util_out_print("Replpool segment (id = !UL) for replication instance !AD is in use by another process.",
-				TRUE, shm_id, LEN_AND_STR(instfilename));
-		return -1;
-	}
-	if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(shm_id, 0, 0)))
-	{
-		save_errno = errno;
-		ISSUE_REPLPOOLINST_AND_RETURN(save_errno, shm_id, instfilename, "shmat()");
-	}
-	ESTABLISH_RET(mu_rndwn_replpool_ch, -1);
+	anticipatory_freeze_available = INST_FREEZE_ON_ERROR_POLICY;
 	/* assert that the identifiers are at the top of replpool control structure */
 	assert(0 == offsetof(jnlpool_ctl_struct, jnlpool_id));
 	assert(0 == offsetof(recvpool_ctl_struct, recvpool_id));
@@ -142,15 +112,18 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 		else
 			util_out_print("Incorrect replpool format for the segment (id = !UL) belonging to replication instance !AD",
 					TRUE, shm_id, LEN_AND_STR(instfilename));
-		DETACH_AND_RETURN(start_addr, shm_id, instfilename);
+		DETACH(start_addr, shm_id, instfilename);
+		return -1;
 	}
 	if (memcmp(replpool_id->now_running, gtm_release_name, gtm_release_name_len + 1))
 	{
 		util_out_print("Attempt to access with version !AD, while already using !AD for replpool segment (id = !UL)"
 				" belonging to replication instance !AD.", TRUE, gtm_release_name_len, gtm_release_name,
 				LEN_AND_STR(replpool_id->now_running), shm_id, LEN_AND_STR(instfilename));
-		DETACH_AND_RETURN(start_addr, shm_id, instfilename);
+		DETACH(start_addr, shm_id, instfilename);
+		return -1;
 	}
+	reset_crash = (!anticipatory_freeze_available || argumentless_rundown);
 	/* Assert that if we haven't yet attached to the journal pool yet, jnlpool_ctl better be NULL */
 	assert((JNLPOOL_SEGMENT != pool_type) || (NULL == jnlpool.jnlpool_ctl));
 	if (JNLPOOL_SEGMENT == pool_type)
@@ -187,11 +160,11 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 					&& (0 != repl_inst_filehdr->jnlpool_semid_ctime));
 			jnlpool.repl_inst_filehdr->jnlpool_semid = repl_inst_filehdr->jnlpool_semid;
 			jnlpool.repl_inst_filehdr->jnlpool_semid_ctime = repl_inst_filehdr->jnlpool_semid_ctime;
-			repl_inst_flush_jnlpool(FALSE, !anticipatory_freeze_available);
-			assert(!jnlpool.repl_inst_filehdr->crash || anticipatory_freeze_available);
+			repl_inst_flush_jnlpool(FALSE, reset_crash);
+			assert(!jnlpool.repl_inst_filehdr->crash || !reset_crash);
 			/* Refresh local copy (repl_inst_filehdr) with the copy that was just flushed (jnlpool.repl_inst_filehdr) */
 			memcpy(repl_inst_filehdr, jnlpool.repl_inst_filehdr, SIZEOF(repl_inst_hdr));
-			if (!anticipatory_freeze_available || argumentless_rundown)
+			if (reset_crash)
 			{ 	/* Now that jnlpool has been flushed and there is going to be no journal pool, reset
 				 * "jnlpool.repl_inst_filehdr" as otherwise other routines (e.g. "repl_inst_recvpool_reset") are
 				 * affected by whether this is NULL or not.
@@ -205,17 +178,19 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 			}
 		} /* else we are ONLINE ROLLBACK. repl_inst_flush_jnlpool will be done later after gvcst_init in mur_open_files */
 	}
-	if ((0 == nattch) && (!anticipatory_freeze_available || argumentless_rundown || (RECVPOOL_SEGMENT == pool_type)))
+	if ((0 == nattch) && (reset_crash || (RECVPOOL_SEGMENT == pool_type)))
 	{
 		if (-1 == shmdt((caddr_t)start_addr))
 		{
 			save_errno = errno;
-			ISSUE_REPLPOOLINST_AND_RETURN(save_errno, shm_id, instfilename, "shmdt()");
+			ISSUE_REPLPOOLINST(save_errno, shm_id, instfilename, "shmdt()");
+			return -1;
 		}
 		if (0 != shm_rmid(shm_id))
 		{
 			save_errno = errno;
-			ISSUE_REPLPOOLINST_AND_RETURN(save_errno, shm_id, instfilename, "shm_rmid()");
+			ISSUE_REPLPOOLINST(save_errno, shm_id, instfilename, "shm_rmid()");
+			return -1;
 		}
 		if (JNLPOOL_SEGMENT == pool_type)
 		{
@@ -244,8 +219,47 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 		if (RECVPOOL_SEGMENT == pool_type)
 			*ipc_rmvd = FALSE;
 	}
-	REVERT;
 	return 0;
+}
+
+int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t repl_inst_filehdr, int shm_id, boolean_t *ipc_rmvd)
+{
+	int			status, save_errno, nattch;
+	char			*instfilename;
+	sm_uc_ptr_t		start_addr;
+	struct shmid_ds		shm_buf;
+	boolean_t		force_attach;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+
+	assert(INVALID_SHMID != shm_id);
+	instfilename = replpool_id->instfilename;
+	assert((JNLPOOL_SEGMENT == replpool_id->pool_type) || (RECVPOOL_SEGMENT == replpool_id->pool_type));
+	force_attach = (jgbl.onlnrlbk || (!jgbl.mur_rollback && !argumentless_rundown && INST_FREEZE_ON_ERROR_POLICY));
+	if (-1 == shmctl(shm_id, IPC_STAT, &shm_buf))
+	{
+		save_errno = errno;
+		ISSUE_REPLPOOLINST(save_errno, shm_id, instfilename, "shmctl()");
+		return -1;
+	}
+	nattch = shm_buf.shm_nattch;
+	if ((0 != nattch) && !force_attach)
+	{
+		util_out_print("Replpool segment (id = !UL) for replication instance !AD is in use by another process.",
+				TRUE, shm_id, LEN_AND_STR(instfilename));
+		return -1;
+	}
+	if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(shm_id, 0, 0)))
+	{
+		save_errno = errno;
+		ISSUE_REPLPOOLINST(save_errno, shm_id, instfilename, "shmat()");
+		return -1;
+	}
+	ESTABLISH_RET(mu_rndwn_replpool_ch, -1);
+	status = mu_rndwn_replpool2(replpool_id, repl_inst_filehdr, shm_id, ipc_rmvd, instfilename, start_addr, nattch);
+	REVERT;
+	return status;
 }
 
 CONDITION_HANDLER(mu_rndwn_replpool_ch)

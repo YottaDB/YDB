@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2013 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +23,9 @@
 #include <sys/mman.h>
 #include <sys/stat.h>			/* BYPASSOK -- see above */
 #include <sys/types.h>
-
 #include <gpgme.h>			/* gpgme functions */
 #include <gpg-error.h>			/* gcry*_err_t */
+#include <libconfig.h>
 
 #include "gtmxc_types.h"		/* xc_string, xc_status_t and other callin interfaces xc_fileid */
 
@@ -53,9 +53,7 @@ void gc_pk_scrub_passwd()
  * is obtained from the ENVIRONMENT VARIABLE - $gtm_passwd or by invoking the mumps engine during the "gtmcrypt_init()".
  * In either ways, it's guaranteed that when this function is called, the passphrase is already set in the global variable.
  */
-int gc_pk_crypt_passphrase_callback(void *opaque, const char *uid_hint,
-			const char *passphrase_info, int last_was_bad,
-			int fd)
+int gc_pk_crypt_passphrase_callback(void *opaque, const char *uid_hint, const char *passphrase_info, int last_was_bad, int fd)
 {
 	int 	write_ret, len;
 
@@ -118,9 +116,9 @@ gpgme_error_t gc_pk_get_decrypted_key(const char *cipher_file, unsigned char *pl
 	assert(NULL != pk_crypt_ctx);
 	assert(0 != STRLEN(cipher_file));
 
-	/* Convert the cipher content in the cipher file into
-	 * in-memory content. This in-memory content is stored
-	 * in gpgme_data_t structure. */
+	/* Convert the cipher content in the cipher file into in-memory content.
+	 * This in-memory content is stored in gpgme_data_t structure.
+	 */
 	err = gpgme_data_new_from_file(&cipher_data, cipher_file, 1);
 	if (!err)
 	{
@@ -138,23 +136,35 @@ gpgme_error_t gc_pk_get_decrypted_key(const char *cipher_file, unsigned char *pl
 	ecode = gpgme_err_code(err);
 	if (0 != ecode)
 	{
-		switch(ecode)
+		switch (ecode)
 		{
 			case GPG_ERR_BAD_PASSPHRASE:
 				UPDATE_ERROR_STRING("Incorrect password or error while obtaining password");
 				break;
 			case GPG_ERR_ENOENT:
-				UPDATE_ERROR_STRING("Encryption key file %s not found", cipher_file);
+				UPDATE_ERROR_STRING("Encryption key file " STR_ARG " not found", ELLIPSIZE(cipher_file));
+				break;
+			case GPG_ERR_EACCES:
+				UPDATE_ERROR_STRING("Encryption key file " STR_ARG " not accessible", ELLIPSIZE(cipher_file));
+				break;
+			case GPG_ERR_ENAMETOOLONG:
+				UPDATE_ERROR_STRING("Path, or a component of the path, to encryption key file " STR_ARG
+					" is too long", ELLIPSIZE(cipher_file));
 				break;
 			default:
-				UPDATE_ERROR_STRING("%s", gpgme_strerror(err));
+				UPDATE_ERROR_STRING("Error while accessing key file " STR_ARG ": %s", ELLIPSIZE(cipher_file),
+					gpgme_strerror(err));
 				break;
 		}
+	} else
+	{
+		assert((0 == plain_text_length) || (NULL != plain_data));
 	}
 	if (NULL != plain_data)
-	{	/* scrub plaintext data before releasing it */
+	{	/* Scrub plaintext data before releasing it */
 		assert(SYMMETRIC_KEY_MAX == SIZEOF(null_buffer));
 		memset(null_buffer, 0, SYMMETRIC_KEY_MAX);
+		assert((0 != ecode) || (0 != plain_text_length) || memcmp(plain_text, null_buffer, SYMMETRIC_KEY_MAX));
 		gpgme_data_write(plain_data, null_buffer, SYMMETRIC_KEY_MAX);
 		gpgme_data_release(plain_data);
 	}
@@ -175,16 +185,21 @@ int gc_pk_gpghome_has_permissions()
 		if (!(ptr = getenv(HOME)))
 		{
 			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, HOME);
-			return GC_FAILURE;
+			return -1;
 		}
 		SNPRINTF(pathname, GTM_PATH_MAX, "%s/%s", ptr, DOT_GNUPG);
 	} else
 	{
+		if (0 == strlen(ptr))
+		{
+			UPDATE_ERROR_STRING(ENV_EMPTY_ERROR, GNUPGHOME);
+			return -1;
+		}
 		gnupghome_set = TRUE;
 		strcpy(pathname, ptr);
 	}
 	if (-1 != (perms = access(pathname, R_OK | X_OK)))
-		return GC_SUCCESS;
+		return 0;
 	else if (EACCES == errno)
 	{
 		if (gnupghome_set)
@@ -192,7 +207,7 @@ int gc_pk_gpghome_has_permissions()
 			UPDATE_ERROR_STRING("No read permissions on $%s", GNUPGHOME);
 		} else
 			UPDATE_ERROR_STRING("No read permissions on $%s/%s", HOME, DOT_GNUPG);
-	} else	/* some other error */
-		UPDATE_ERROR_STRING("Cannot stat on %s - %d", pathname, errno);
-	return GC_FAILURE;
+	} else	/* Some other error */
+		UPDATE_ERROR_STRING("Cannot stat on " STR_ARG " - %d", ELLIPSIZE(pathname), errno);
+	return -1;
 }

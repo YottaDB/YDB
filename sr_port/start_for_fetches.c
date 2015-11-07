@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,27 +13,33 @@
 #include "compiler.h"
 #include "opcode.h"
 
-GBLREF triple	*curr_fetch_trip, *curr_fetch_opr;
 GBLREF int4	curr_fetch_count;
-GBLREF mvax *mvaxtab,*mvaxtab_end;
+GBLREF mvax	*mvaxtab;
+GBLREF triple	*curr_fetch_opr, *curr_fetch_trip;
 
-void start_for_fetches (void)
+/* When in the body of a FOR loop, we need to maintain the binding for the control variable.
+ * If the action of a command (or function) can alter the symbol table, e.g. BREAK or NEW,
+ * it should call this routine in preference to start_fetches when it detects that it's in the
+ * body of a FOR. While start_fetches just starts a new fetch, this copies the arguments of the prior
+ * fetch to the new fetch because there's no good way to tell which one is for the control variable
+ */
+void start_for_fetches(void)
 {
-	triple	*ref1, *ref2, *fetch_trip;
-	int	fetch_count, index, idiff;
+	triple	*fetch_trip, *ref1, *ref2;
+	int	fetch_count, idiff, index;
 	mvax	*idx;
 
 	fetch_trip = curr_fetch_trip;
 	fetch_count = curr_fetch_count;
-	start_fetches (OC_FETCH);
+	start_fetches(OC_FETCH);
 	ref1 = fetch_trip;
 	ref2 = curr_fetch_trip;
 	idx = mvaxtab;
 	while (ref1->operand[1].oprclass)
 	{
-		assert (ref1->operand[1].oprclass == TRIP_REF);
+		assert(ref1->operand[1].oprclass == TRIP_REF);
 		ref1 = ref1->operand[1].oprval.tref;
-		assert (ref1->opcode == OC_PARAMETER);
+		assert(ref1->opcode == OC_PARAMETER);
 		ref2->operand[1] = put_tref (newtriple (OC_PARAMETER));
 		ref2 = ref2->operand[1].oprval.tref;
 		ref2->operand[0] = ref1->operand[0];
@@ -45,18 +51,17 @@ void start_for_fetches (void)
 		{
 			if (idiff < 0)
 			{
-				assert (idx->last);
+				assert(idx->last);
 				idx = idx->last;
 				idiff++;
-			}
-			else
+			} else
 			{
-				assert (idx->next);
+				assert(idx->next);
 				idx = idx->next;
 				idiff--;
 			}
 		}
-		assert (idx->mvidx == index);
+		assert(idx->mvidx == index);
 		idx->var->last_fetch = curr_fetch_trip;
 	}
 	curr_fetch_count = fetch_count;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -124,7 +124,7 @@ error_def(ERR_TPRETRY);
 error_def(ERR_TRESTLOC);
 error_def(ERR_TRESTNOT);
 
-#define	GVNAME_UNKNOWN		"*UNKNOWN"
+#define	GVNAME_UNKNOWN		"*BITMAP"
 
 static readonly char		gvname_unknown[] = GVNAME_UNKNOWN;
 static readonly int4		gvname_unknown_len = STR_LIT_LEN(GVNAME_UNKNOWN);
@@ -148,6 +148,15 @@ CONDITION_HANDLER(tp_restart_ch)
 #	endif
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart_ch: ERROR!! unwinding C frame to return. Error is %d, tprestart_state is %d\n",
 			       arg, tprestart_state)));
+	/* It is possible that dollar_tlevel at the time of the ESTABLISH_RET was higher than the current dollar_tlevel.
+	 * This is because tp_unwind could have decreased dollar_tlevel. Even though dollar_tlevel before the UNWIND done
+	 * below is not the same as that at ESTABLISH_RET time, the flow of control happens correctly so tp_restart eventually
+	 * bubbles back to the op_tstart at $tlevel=1 and resumes execution. So treat this as an exception and adjust
+	 * active_ch->dollar_tlevel so it is in sync with the current dollar_tlevel. This prevents an assert failure in UNWIND.
+	 * START_CH would have done a active_ch-- so we need a active_ch[1] to get at the desired active_ch.
+	 */
+	UNIX_ONLY(assert(active_ch[1].dollar_tlevel >= dollar_tlevel);)
+	UNIX_ONLY(DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;))
 	UNWIND(NULL, NULL);
 }
 
@@ -670,7 +679,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	assert((void *)mvc < (void *)frame_pointer);
 	assert(mvc == tf->mvc);
 	assert(mvc->mv_st_cont.mvs_tp_holder.tphold_tlevel == (dollar_tlevel - 1));
-	DBGEHND((stderr, "tp_restart: Resetting msp from 0x"lvaddr", to 0x"lvaddr" (diff=%d)\n",
+	DBGEHND((stderr, "tp_restart: Resetting msp from 0x"lvaddr" to 0x"lvaddr" (diff=%d)\n",
 		 msp, mvc, INTCAST((unsigned char *)mvc - msp)));
 	mv_chain = mvc;
 	msp = (unsigned char *)mvc;

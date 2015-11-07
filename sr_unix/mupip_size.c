@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "gdsblk.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
+#include "copy.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gdskill.h"
@@ -32,8 +33,9 @@
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
+#include "t_qread.h"
 #include "tp.h"
-
+#include "mupint.h"
 /* Prototypes */
 #include "mupip_size.h"
 #include "targ_alloc.h"
@@ -43,15 +45,21 @@
 #include "gtmmsg.h"
 #include "mu_getlst.h"
 
-error_def(ERR_NOSELECT);
-error_def(ERR_MUNOFINISH);
 error_def(ERR_MUNOACTION);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_MUPCLIERR);
 error_def(ERR_MUSIZEINVARG);
+error_def(ERR_NOSELECT);
 
-GBLREF tp_region	*grlist;
-GBLREF bool		error_mupip;
-GBLREF bool		mu_ctrlc_occurred;
-GBLREF bool		mu_ctrly_occurred;
+GBLREF block_id			mu_int_adj_prev[MAX_BT_DEPTH + 1];
+GBLREF bool			error_mupip;
+GBLREF bool			mu_ctrlc_occurred;
+GBLREF bool			mu_ctrly_occurred;
+GBLREF int			muint_adj;
+GBLREF int4			mu_int_adj[MAX_BT_DEPTH + 1];
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF tp_region		*grlist;
+GBLREF	unsigned char		rdfail_detail;
 
 typedef struct {
 	enum {arsample, scan, impsample}	heuristic;
@@ -70,24 +78,21 @@ STATICFNDCL void mupip_size_check_error(void);
  */
 void mupip_size(void)
 {
-	uint4			status = EXIT_NRM;
-	glist			gl_head, exclude_gl_head, *gl_ptr;
-	/* configuration default values */
-	mupip_size_cfg_t	mupip_size_cfg = { impsample, 1000, 1, 0 };
-	char			cli_buff[MAX_LINE];
-	int4			reg_max_rec, reg_max_key, reg_max_blk;
-	unsigned short		n_len;
-	char 			buff[MAX_LINE];
-	unsigned short		BUFF_LEN = SIZEOF(buff);
-	char 			*p_end;						/* used for strtol validation */
 	boolean_t		restrict_reg = FALSE;
-
+	char 			buff[MAX_LINE], cli_buff[MAX_LINE];
+	char 			*p_end;						/* used for strtol validation */
+	glist			exclude_gl_head, gl_head, *gl_ptr;
+	int4			reg_max_rec, reg_max_key, reg_max_blk;
+	mupip_size_cfg_t	mupip_size_cfg = { impsample, 1000, 1, 0 };	/* configuration default values */
+	uint4			status = EXIT_NRM;
+	unsigned short		BUFF_LEN = SIZEOF(buff), n_len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	mu_outofband_setup();
 	error_mupip = FALSE;
-
+	memset(mu_int_adj, 0, ARRAYSIZE(mu_int_adj));
+	memset(mu_int_adj_prev, 0, ARRAYSIZE(mu_int_adj_prev));
 	/* Region qualifier */
 	grlist = NULL;
 	if (CLI_PRESENT == cli_present("REGION"))
@@ -97,7 +102,6 @@ void mupip_size(void)
 		mu_getlst("REGION", SIZEOF(tp_region));	/* get the parameter corresponding to REGION qualifier */
 	}
 	mupip_size_check_error();
-
 	/* SELECT qualifier */
 	memset(cli_buff, 0, SIZEOF(cli_buff));
 	n_len = SIZEOF(cli_buff);
@@ -119,7 +123,16 @@ void mupip_size(void)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSELECT);
 	}
 	mupip_size_check_error();
-
+	if (CLI_PRESENT == cli_present("ADJACENCY"))
+	{
+		assert(SIZEOF(muint_adj) == SIZEOF(int4));
+		if (0 == cli_get_int("ADJACENCY", (int4 *)&muint_adj))
+		{
+			error_mupip = TRUE;
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+		}
+	} else
+		muint_adj = DEFAULT_ADJACENCY;
 	/* HEURISTIC qualifier */
 	if (cli_present("HEURISTIC.SCAN") == CLI_PRESENT)
 	{
@@ -168,7 +181,6 @@ void mupip_size(void)
 		/* else seed will be based on the time */
 	}
 	mupip_size_check_error();
-
 	/* run mupip size on each global */
 	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
 	{
@@ -180,7 +192,7 @@ void mupip_size(void)
 			status |= mu_size_scan(gl_ptr, mupip_size_cfg.level);
 			break;
 		case arsample:
-			status |= mu_size_arsample(gl_ptr, mupip_size_cfg.samples, TRUE, mupip_size_cfg.seed);
+			status |= mu_size_arsample(gl_ptr, mupip_size_cfg.samples, mupip_size_cfg.seed);
 			break;
 		case impsample:
 			status |= mu_size_impsample(gl_ptr, mupip_size_cfg.samples, mupip_size_cfg.seed);
@@ -192,10 +204,8 @@ void mupip_size(void)
 		if (mu_ctrlc_occurred || mu_ctrly_occurred)
 			mupip_exit(ERR_MUNOFINISH);
 	}
-
 	mupip_exit(status ==  EXIT_NRM ? SS_NORMAL : ERR_MUNOFINISH);
 }
-
 
 STATICDEF void mupip_size_check_error(void)
 {
@@ -204,4 +214,94 @@ STATICDEF void mupip_size_check_error(void)
 		util_out_print("!/MUPIP SIZE cannot proceed with above errors!/", FLUSH);
 		mupip_exit(ERR_MUNOACTION);
 	}
+}
+
+ /* Performs a random traversal for the sampling methods */
+enum cdb_sc mu_size_rand_traverse(double *r, double *a)
+{
+	sm_uc_ptr_t			pVal, pTop, pRec, pBlkBase;
+	block_id			nBlkId;
+	block_id			valBlk[MAX_RECS_PER_BLK];	/* valBlk[j] := value in j-th record of current block */
+	boolean_t			is_mm;
+	cache_rec_ptr_t			cr;
+	enum cdb_sc			status;
+	int				cycle;
+	int4				random;
+	int4				rCnt;				/* number of entries in valBlk */
+	register gv_namehead		*pTarg;
+	register srch_blk_status	*pCurr;
+	register srch_hist		*pTargHist;
+	trans_num			tn;
+	unsigned char			nLevl;
+	unsigned short			nRecLen;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	is_mm = (dba_mm == cs_data->acc_meth);
+	pTarg = gv_target;
+	pTargHist = &gv_target->hist;
+	/* The following largely mimics gvcst_search/gvcst_search_blk */
+	nBlkId = pTarg->root;
+	tn = cs_addrs->ti->curr_tn;
+	if (NULL == (pBlkBase = t_qread(nBlkId, (sm_int_ptr_t)&cycle, &cr)))
+		return (enum cdb_sc)rdfail_detail;
+	nLevl = ((blk_hdr_ptr_t)pBlkBase)->levl;
+	if (MAX_BT_DEPTH < (int)nLevl)
+	{
+		assert(CDB_STAGNATE > t_tries);
+		return cdb_sc_maxlvl;
+	}
+	if (0 == (int)nLevl)
+	{
+		assert(CDB_STAGNATE > t_tries);
+		return cdb_sc_badlvl;
+	}
+	pTargHist->depth = (int)nLevl;
+	pCurr = &pTargHist->h[nLevl];
+	(pCurr + 1)->blk_num = 0;
+	pCurr->tn = tn;
+	pCurr->cycle = cycle;
+	pCurr->cr = cr;
+	for (;;)
+	{
+		assert(pCurr->level == nLevl);
+		pCurr->cse = NULL;
+		pCurr->blk_num = nBlkId;
+		pCurr->buffaddr = pBlkBase;
+		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen)
+		{	/* enumerate records in block */
+			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
+			if (cdb_sc_normal != status)
+			{
+				assert(CDB_STAGNATE > t_tries);
+				return status;
+			}
+			valBlk[rCnt] = nBlkId;
+			CHECK_ADJACENCY(nBlkId, nLevl, a[nLevl]);
+		}
+		r[nLevl] = rCnt;
+		/* randomly select next block */
+		random = (int4)(rCnt * drand48());
+		random = random & 0x7fffffff; /* to make sure that the sign bit(msb) is off */
+		nBlkId = valBlk[random];
+		if (is_mm && (nBlkId > cs_addrs->total_blks))
+		{
+			if (cs_addrs->total_blks < cs_addrs->ti->total_blks)
+				return cdb_sc_helpedout;
+			else
+				return cdb_sc_blknumerr;
+		}
+		--pCurr; --nLevl;
+		if (nLevl < 1)
+			break;
+		pCurr->tn = cs_addrs->ti->curr_tn;
+		if (NULL == (pBlkBase = t_qread(nBlkId, (sm_int_ptr_t)&pCurr->cycle, &pCurr->cr)))
+			return (enum cdb_sc)rdfail_detail;
+		if (((blk_hdr_ptr_t)pBlkBase)->levl != nLevl)
+		{
+			assert(CDB_STAGNATE > t_tries);
+			return cdb_sc_badlvl;
+		}
+	}
+	return cdb_sc_normal;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,17 +92,17 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	gv_cur_region = temp_region;
 	if (SS_NORMAL != status)
 	{
-		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
                 return FALSE;
 	}
 	LSEEKREAD(udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
 	csa->hdr = csd;			/* needed for DB_LSEEKWRITE when instance is frozen */
 	if (0 != status)
 	{
-		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 		CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
 		if (0 != status)
-			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 		return FALSE;
 	}
 	assert((udi->semid == csd->semid) || (INVALID_SEMID == csd->semid));
@@ -116,14 +116,14 @@ boolean_t db_ipcs_reset(gd_region *reg)
 		{
 			if (0 != (save_errno = do_semop(udi->semid, DB_COUNTER_SEM, -1, SEM_UNDO)))
 			{
-				gtm_putmsg(VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
 						RTS_ERROR_TEXT("db_ipcs_reset - write semaphore release"), save_errno);
 				return FALSE;
 			}
 			assert(1 == (semval = semctl(udi->semid, DB_CONTROL_SEM, GETVAL)));
 			if (0 != (save_errno = do_semop(udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO)))
 			{
-				gtm_putmsg(VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
 						RTS_ERROR_TEXT("db_ipcs_reset - access control semaphore release"), save_errno);
 				return FALSE;
 			}
@@ -147,10 +147,10 @@ boolean_t db_ipcs_reset(gd_region *reg)
 			DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
 			if (0 != status)
 			{
-				gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 				CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
 				if (0 != status)
-					gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 				return FALSE;
 			}
 		} else
@@ -162,24 +162,28 @@ boolean_t db_ipcs_reset(gd_region *reg)
 			if (!get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, (unsigned int *)&db_ipcs.fn_len,
 					   GTM_PATH_MAX, &ustatus))
 			{
-				gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, DB_LEN_STR(reg), ustatus);
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEPARSE, 2, DB_LEN_STR(reg), ustatus);
 				return FALSE;
 			}
 			db_ipcs.fn[db_ipcs.fn_len] = 0;
 			WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-			if (0 != (status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0)))
+			if (!csa->read_only_fs)
 			{
-				gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
-				CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
+				status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
 				if (0 != status)
-					gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
-				return FALSE;
+				{
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+					CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
+					if (0 != status)
+						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+					return FALSE;
+				}
 			}
 		}
 		if (0 != sem_rmid(udi->semid))
 		{
 			save_errno = errno;
-			gtm_putmsg(VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
 					RTS_ERROR_TEXT("db_ipcs_reset - sem_rmid"), save_errno);
 			return FALSE;
 		}
@@ -188,7 +192,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	udi->counter_acc_incremented = FALSE;
 	CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
 	if (0 != status)
-		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	/* Since we created the ftok semaphore in mu_rndwn_file, we release/remove it now. But, since we are exiting, we
 	 * do not WAIT for the ftok semaphore if we did not get it in one shot (IPC_NOWAIT). The process that holds the
 	 * ftok will eventually release it and so we are guaranteed that when the last process leaves the database, it will

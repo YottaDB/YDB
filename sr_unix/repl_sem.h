@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,8 @@ typedef enum
 {
 	JNL_POOL_ACCESS_SEM,	/* For Startup / Shutdown / Options-change */
 	SRC_SERV_COUNT_SEM,	/* Source sever holds it while alive */
+	RECV_SERV_STARTUP_SEM,	/* records the # of MUPIP REPLIC -RECEIV -START commands in progress at any point in time */
 	DUMMY_SEM1,		/* added just to make the number of semaphores same as in recvpool */
-	DUMMY_SEM2,		/* added just to make the number of semaphores same as in recvpool */
 	SOURCE_ID_SEM,
 	NUM_SRC_SEMS
 } source_sem_type;

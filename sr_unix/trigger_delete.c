@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,25 +46,30 @@
 #include "util.h"
 #include "zshow.h"			/* for format2zwr() prototype */
 #include "hashtab_mname.h"
+#include "t_begin.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
 
-GBLREF	gd_region		*gv_cur_region;
-GBLREF	sgm_info		*sgm_info_ptr;
-GBLREF	gv_key			*gv_currkey;
-GBLREF	gd_addr			*gd_header;
-GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		dollar_ztrigger_invoked;
+GBLREF	gd_addr			*gd_header;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_key			*gv_currkey;
+GBLREF	gv_namehead		*gv_target;
 GBLREF	gv_namehead		*gv_target_list;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	trans_num		local_tn;
+GBLREF	uint4			dollar_tlevel;
 
 LITREF	mval			literal_hasht;
 LITREF	char 			*trigger_subs[];
 
 error_def(ERR_TEXT);
 error_def(ERR_TRIGDEFBAD);
+error_def(ERR_TRIGLOADFAIL);
 error_def(ERR_TRIGMODINTP);
-error_def(ERR_TRIGNAMBAD);
 error_def(ERR_TRIGMODREGNOTRW);
+error_def(ERR_TRIGNAMBAD);
 
 #define MAX_CMD_LEN		20	/* Plenty of room for S,K,ZK,ZTK */
 
@@ -338,7 +343,6 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	char			curr_name[MAX_MIDENT_LEN + 1];
 	uint4			curr_name_len, orig_name_len;
 	mname_entry		gvname;
-	int			len;
 	mval			mv_curr_nam;
 	boolean_t		name_found;
 	char			*ptr;
@@ -357,10 +361,15 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	int			badpos;
 	boolean_t		wildcard;
 	gvnh_reg_t		*gvnh_reg;
+	mval			trigjrec;
+	boolean_t		jnl_format_done;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	badpos = 0;
+	trigjrec.mvtype = MV_STR;
+	trigjrec.str.len = trigger_name_len--;
+	trigjrec.str.addr = trigger_name++;
 	orig_name_len = trigger_name_len;
 	if ((0 == trigger_name_len) || (trigger_name_len !=
 			(badpos = validate_input_trigger_name(trigger_name, trigger_name_len, &wildcard))))
@@ -381,7 +390,25 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	if (0 == gv_target->root)
 	{
 		util_out_print_gtmio("Trigger named !AD does not exist", FLUSH, orig_name_len, trigger_name);
-		return TRIG_FAILURE;
+		trig_stats[STATS_UNCHANGED]++;
+		return TRIG_SUCCESS;
+	}
+	/* To write the LGTRIG logical jnl record, choose the first region that has journaling enabled */
+	jnl_format_done = FALSE;
+	csa = cs_addrs;
+	if (JNL_WRITE_LOGICAL_RECS(csa))
+	{
+		assert(!gv_cur_region->read_only);
+		/* Attach to jnlpool. Normally SET or KILL of the ^#t records take care of this but in case this is a NO-OP
+		 * trigger operation that wont happen and we still want to write a TLGTRIG/ULGTRIG journal record. Hence
+		 * the need to do this.
+		 */
+		JNLPOOL_INIT_IF_NEEDED(csa, csa->hdr, csa->nl);
+		assert(dollar_tlevel);
+		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL);	/* needed to set update_trans TRUE on this region
+									 * even if NO db updates happen to ^#t nodes. */
+		jnl_format(JNL_LGTRIG, NULL, &trigjrec, 0);
+		jnl_format_done = TRUE;
 	}
 	name_found = FALSE;
 	assert(trigger_name_len < MAX_MIDENT_LEN);
@@ -411,11 +438,21 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 			csa = cs_addrs;
 			if (gv_cur_region->read_only)
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
+			/* To write the LGTRIG logical jnl record, choose the first region that has journaling enabled */
+			if (!jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
+			{
+				assert(!gv_cur_region->read_only);
+				JNLPOOL_INIT_IF_NEEDED(csa, csa->hdr, csa->nl); /* see previous usage for why it is needed */
+				assert(dollar_tlevel);
+				T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL); /* needed to set update_trans TRUE on this region
+										  * even if NO db updates happen to ^#t nodes. */
+				jnl_format(JNL_LGTRIG, NULL, &trigjrec, 0);
+				jnl_format_done = TRUE;
+			}
 			SET_GVTARGET_TO_HASHT_GBL(csa);
 			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 			/* $get(^#t(GVN,"COUNT") */
 			BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
-			/* if it does not exist, return false */
 			if (!gvcst_get(&trigger_count))
 			{
 				util_out_print_gtmio("Trigger named !AD exists in the lookup table, "
@@ -446,14 +483,6 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 			}
 			RESTORE_TRIGGER_REGION_INFO(save_currkey);
 			name_found = TRUE;
-		} else
-		{ /* no names match, if !wildcard report an error */
-			if (!wildcard)
-			{
-				util_out_print_gtmio("Trigger named !AD does not exist",
-						FLUSH, orig_name_len, trigger_name);
-				return TRIG_FAILURE;
-			}
 		}
 		if (!wildcard)
 			/* not a wild card, don't $order for the next match */
@@ -468,10 +497,18 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 			/* stop when gv_order returns a string that no longer starts save_name */
 			break;
 	} while (wildcard);
-	if (name_found)
+	if (!name_found)
+	{
+		util_out_print_gtmio("Trigger named !AD does not exist", FLUSH, orig_name_len, trigger_name);
+		if (wildcard)
+			return TRIG_FAILURE;
+		else
+		{
+			trig_stats[STATS_UNCHANGED]++;
+			return TRIG_SUCCESS;
+		}
+	} else
 		return TRIG_SUCCESS;
-	util_out_print_gtmio("Trigger named !AD does not exist", FLUSH, orig_name_len, trigger_name);
-	return TRIG_FAILURE;
 }
 
 int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index)
@@ -684,7 +721,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	return PUT_SUCCESS;
 }
 
-void trigger_delete_all(void)
+void trigger_delete_all(char *trigger_rec, uint4 len)
 {
 	int			count;
 	char			count_str[MAX_DIGITS_IN_INT + 1];
@@ -705,6 +742,8 @@ void trigger_delete_all(void)
 	mval			trigger_cycle;
 	mval			trigger_count;
 	mval			val;
+	mval			trigjrec;
+	boolean_t		jnl_format_done;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -722,14 +761,31 @@ void trigger_delete_all(void)
 	if (gv_cur_region->read_only)
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(gv_cur_region));
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
+	jnl_format_done = FALSE;
+	trigjrec.mvtype = MV_STR;
+	trigjrec.str.len = len;
+	trigjrec.str.addr = trigger_rec;
 	if (0 != gv_target->root)
 	{
+		csa = cs_addrs;
+		/* To write the LGTRIG logical jnl record, choose the first region that has journaling enabled */
+		if (!jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
+		{
+			JNLPOOL_INIT_IF_NEEDED(csa, csa->hdr, csa->nl);	/* see previous usage for comment on why it is needed */
+			assert(dollar_tlevel);
+			T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL);	/* needed to set update_trans TRUE on this region
+										 * even if NO db updates happen to ^#t nodes. */
+			jnl_format(JNL_LGTRIG, NULL, &trigjrec, 0);
+			jnl_format_done = TRUE;
+		}
 		/* kill ^#t("#TRHASH") */
 		BUILD_HASHT_SUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH));
-		gvcst_kill(TRUE);
+		if (0 != gvcst_data())
+			gvcst_kill(TRUE);
 		/* kill ^#t("#TNAME") */
 		BUILD_HASHT_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME));
-		gvcst_kill(TRUE);
+		if (0 != gvcst_data())
+			gvcst_kill(TRUE);
 	}
 	for (reg_indx = 0, reg = gd_header->regions; reg_indx < gd_header->n_regions; reg_indx++, reg++)
 	{
@@ -738,6 +794,16 @@ void trigger_delete_all(void)
 		gv_cur_region = reg;
 		change_reg();
 		csa = cs_addrs;
+		/* To write the LGTRIG logical jnl record, choose the first region that has journaling enabled */
+		if (!reg->read_only && !jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
+		{
+			JNLPOOL_INIT_IF_NEEDED(csa, csa->hdr, csa->nl);	/* see previous usage for comment on why it is needed */
+			assert(dollar_tlevel);
+			T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL);	/* needed to set update_trans TRUE on this region
+										 * even if NO db updates happen to ^#t nodes. */
+			jnl_format(JNL_LGTRIG, NULL, &trigjrec, 0);
+			jnl_format_done = TRUE;
+		}
 		SET_GVTARGET_TO_HASHT_GBL(csa);
 		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 		/* There might not be any ^#t in this region, so check */

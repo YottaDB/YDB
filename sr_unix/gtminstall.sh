@@ -1,13 +1,13 @@
 #!/bin/sh -
 #################################################################
-#								#
-#	Copyright 2011, 2012 Fidelity Information Services, Inc       #
-#								#
-#	This source code contains the intellectual property	#
-#	of its copyright holder(s), and is made available	#
-#	under a license.  If you do not know the terms of	#
-#	the license, please stop and do not read further.	#
-#								#
+#                                                               #
+#       Copyright 2014 Fidelity Information Services, Inc       #
+#                                                               #
+#       This source code contains the intellectual property     #
+#       of its copyright holder(s), and is made available       #
+#       under a license.  If you do not know the terms of       #
+#       the license, please stop and do not read further.       #
+#                                                               #
 #################################################################
 
 # This script automates the installation of GT.M as much as possible,
@@ -15,11 +15,10 @@
 # Current limitation is GNU/Linux on x86 (32- & 64-bit) architectures
 # and root installation, but it is intended to relax this in the future.
 
-# NOTE: This script requires the GNU Wget program to download
+# NOTE: This script requires the GNU wget program to download
 # distribution files that are not on the local file system.
 
-# CAUTION - this script is still experimental and unstable.
-# z/OS, HP-UX on PA-RISC and Tru64 UNIX are not supported.
+# CAUTION - this script is still experimental.
 
 # Revision history
 #
@@ -32,6 +31,7 @@
 # 2011-03-10  0.10 K.S. Bhaskar - Incorporate review comments to bundle with V5.4-002 distribution
 # 2011-05-03  0.11 K.S. Bhaskar - Allow for letter suffix releases
 # 2011-10-25  0.12 K.S. Bhaskar - Support option to delete .o files on shared library platforms
+# 2014-08-13  0.13 K.S. Bhaskar - Add verbosity around getting latest version and tarball, if requested
 
 # Turn on debugging if set
 if [ "Y" = "$gtm_debug" ] ; then set -x ; fi
@@ -127,11 +127,11 @@ err_exit()
 mktmpdir()
 {
     case `uname -s` in
-	AIX | SunOS) tmpdirname="/tmp/${USER}_$$_${timestamp}"
-	    ( umask 077 ; mkdir $tmpdirname ) ;;
-	HP-UX) tmpdirname=`mktemp`
-	    ( umask 077 ; mkdir $tmpdirname ) ;;
-	*) tmpdirname=`mktemp -d` ;;
+        AIX | SunOS) tmpdirname="/tmp/${USER}_$$_${timestamp}"
+            ( umask 077 ; mkdir $tmpdirname ) ;;
+        HP-UX) tmpdirname=`mktemp`
+            ( umask 077 ; mkdir $tmpdirname ) ;;
+        *) tmpdirname=`mktemp -d` ;;
     esac
     echo $tmpdirname
 }
@@ -152,91 +152,91 @@ gtm_group_already="N"
 # Process command line
 while [ $# -gt 0 ] ; do
     case "$1" in
-	--build-type*) tmp=`echo $1 | cut -s -d = -f 2-`
-	    if [ -n "$tmp" ] ; then gtm_buildtype=$tmp
-	    else if [ 1 -lt "$#" ] ; then gtm_buildtype=$2 ; shift
-    	        else echo "--buildtype needs a value" ; err_exit
-    	        fi
-	    fi ;;
-	--copyenv*) tmp=`echo $1 | cut -s -d = -f 2-`
-	    if [ -n "$tmp" ] ; then gtm_copyenv=$tmp
-	    else if [ 1 -lt "$#" ] ; then gtm_copyenv=$2 ; shift
-    	        else echo "--copyenv needs a value" ; err_exit
-    	        fi
-	    fi
-	    unset gtm_linkenv
-	    shift ;;
-	--copyexec*) tmp=`echo $1 | cut -s -d = -f 2-`
-	    if [ -n "$tmp" ] ; then gtm_copyexec=$tmp
-	    else if [ 1 -lt "$#" ] ; then gtm_copyexec=$2 ; shift
-    	        else echo "--copyexec needs a value" ; err_exit
-    	        fi
-	    fi
-	    unset gtm_linkexec
-	    shift ;;
-	--debug) gtm_debug="Y" ; set -x ; shift ;;
-	--distrib*) tmp=`echo $1 | cut -s -d = -f 2-`
-	    if [ -n "$tmp" ] ; then gtm_distrib=$tmp
-	    else if [ 1 -lt "$#" ] ; then gtm_distrib=$2 ; shift
-    	        else echo "--distrib needs a value" ; err_exit
-    	        fi
-	    fi
-	    shift ;;
-	--dry-run) gtm_dryrun="Y" ; shift ;;
-	--group-restriction) gtm_group_restriction="Y" ; shift ;; # must come before group*
-	--group*) tmp=`echo $1 | cut -s -d = -f 2-`
-	    if [ -n "$tmp" ] ; then gtm_group=$tmp
-	    else if [ 1 -lt "$#" ] ; then gtm_group=$2 ; shift
-    	        else echo "--group needs a value" ; err_exit
-    	        fi
-	    fi
-	    shift ;;
-	--help) err_exit ;;
-	--installdir*) tmp=`echo $1 | cut -s -d = -f 2-`
-	    if [ -n "$tmp" ] ; then gtm_installdir=$tmp
-	    else if [ 1 -lt "$#" ] ; then gtm_installdir=$2 ; shift
-    	        else echo "--installdir needs a value" ; err_exit
-    	        fi
-	    fi
-	    shift ;;
-	--keep-obj) gtm_keep_obj="Y" ; shift ;;
-	--linkenv*) tmp=`echo $1 | cut -s -d = -f 2-`
-	    if [ -n "$tmp" ] ; then gtm_linkenv=$tmp
-	    else if [ 1 -lt "$#" ] ; then gtm_linkenv=$2 ; shift
-    	        else echo "--linkenv needs a value" ; err_exit
-    	        fi
-	    fi
-	    unset gtm_copyenv
-	    shift ;;
-	--linkexec*) tmp=`echo $1 | cut -s -d = -f 2-`
-	    if [ -n "$tmp" ] ; then gtm_linkexec=$tmp
-	    else if [ 1 -lt "$#" ] ; then gtm_linkexec=$2 ; shift
-    	        else echo "--linkexec needs a value" ; err_exit
-    	        fi
-	    fi
-	    unset gtm_copyexec
-	    shift ;;
-	--overwrite-existing) gtm_overwrite_existing="Y" ; shift ;;
-	--prompt-for-group) gtm_prompt_for_group="Y" ; shift ;;
-	--ucaseonly-utils) gtm_lcase_utils="N" ; shift ;;
-	--user*) tmp=`echo $1 | cut -s -d = -f 2-`
-	    if [ -n "$tmp" ] ; then gtm_user=$tmp
-	    else if [ 1 -lt "$#" ] ; then gtm_user=$2 ; shift
-    	        else echo "--user needs a value" ; err_exit
-    	        fi
-	    fi
-	    shift ;;
-	--utf8*) tmp=`echo $1 | cut -s -d = -f 2- | tr DEFAULT default`
-	    if [ -n "$tmp" ] ; then gtm_icu_version=$tmp
-	    else if [ 1 -lt "$#" ] ; then gtm_icu_version=`echo $2 | tr DEFAULT default`; shift
-    	        else echo "--utf8 needs a value" ; err_exit
-    	        fi
-	    fi
-	    shift ;;
-	--verbose) gtm_verbose="Y" ; shift ;;
-	-*) echo Unrecognized option "$1" ; err_exit ;;
-	*) if [ -n "$gtm_version" ] ; then echo Nothing must follow the GT.M version ; err_exit
-	    else gtm_version=$1 ; shift ; fi
+        --build-type*) tmp=`echo $1 | cut -s -d = -f 2-`
+            if [ -n "$tmp" ] ; then gtm_buildtype=$tmp
+            else if [ 1 -lt "$#" ] ; then gtm_buildtype=$2 ; shift
+                else echo "--buildtype needs a value" ; err_exit
+                fi
+            fi ;;
+        --copyenv*) tmp=`echo $1 | cut -s -d = -f 2-`
+            if [ -n "$tmp" ] ; then gtm_copyenv=$tmp
+            else if [ 1 -lt "$#" ] ; then gtm_copyenv=$2 ; shift
+                else echo "--copyenv needs a value" ; err_exit
+                fi
+            fi
+            unset gtm_linkenv
+            shift ;;
+        --copyexec*) tmp=`echo $1 | cut -s -d = -f 2-`
+            if [ -n "$tmp" ] ; then gtm_copyexec=$tmp
+            else if [ 1 -lt "$#" ] ; then gtm_copyexec=$2 ; shift
+                else echo "--copyexec needs a value" ; err_exit
+                fi
+            fi
+            unset gtm_linkexec
+            shift ;;
+        --debug) gtm_debug="Y" ; set -x ; shift ;;
+        --distrib*) tmp=`echo $1 | cut -s -d = -f 2-`
+            if [ -n "$tmp" ] ; then gtm_distrib=$tmp
+            else if [ 1 -lt "$#" ] ; then gtm_distrib=$2 ; shift
+                else echo "--distrib needs a value" ; err_exit
+                fi
+            fi
+            shift ;;
+        --dry-run) gtm_dryrun="Y" ; shift ;;
+        --group-restriction) gtm_group_restriction="Y" ; shift ;; # must come before group*
+        --group*) tmp=`echo $1 | cut -s -d = -f 2-`
+            if [ -n "$tmp" ] ; then gtm_group=$tmp
+            else if [ 1 -lt "$#" ] ; then gtm_group=$2 ; shift
+                else echo "--group needs a value" ; err_exit
+                fi
+            fi
+            shift ;;
+        --help) err_exit ;;
+        --installdir*) tmp=`echo $1 | cut -s -d = -f 2-`
+            if [ -n "$tmp" ] ; then gtm_installdir=$tmp
+            else if [ 1 -lt "$#" ] ; then gtm_installdir=$2 ; shift
+                else echo "--installdir needs a value" ; err_exit
+                fi
+            fi
+            shift ;;
+        --keep-obj) gtm_keep_obj="Y" ; shift ;;
+        --linkenv*) tmp=`echo $1 | cut -s -d = -f 2-`
+            if [ -n "$tmp" ] ; then gtm_linkenv=$tmp
+            else if [ 1 -lt "$#" ] ; then gtm_linkenv=$2 ; shift
+                else echo "--linkenv needs a value" ; err_exit
+                fi
+            fi
+            unset gtm_copyenv
+            shift ;;
+        --linkexec*) tmp=`echo $1 | cut -s -d = -f 2-`
+            if [ -n "$tmp" ] ; then gtm_linkexec=$tmp
+            else if [ 1 -lt "$#" ] ; then gtm_linkexec=$2 ; shift
+                else echo "--linkexec needs a value" ; err_exit
+                fi
+            fi
+            unset gtm_copyexec
+            shift ;;
+        --overwrite-existing) gtm_overwrite_existing="Y" ; shift ;;
+        --prompt-for-group) gtm_prompt_for_group="Y" ; shift ;;
+        --ucaseonly-utils) gtm_lcase_utils="N" ; shift ;;
+        --user*) tmp=`echo $1 | cut -s -d = -f 2-`
+            if [ -n "$tmp" ] ; then gtm_user=$tmp
+            else if [ 1 -lt "$#" ] ; then gtm_user=$2 ; shift
+                else echo "--user needs a value" ; err_exit
+                fi
+            fi
+            shift ;;
+        --utf8*) tmp=`echo $1 | cut -s -d = -f 2- | tr DEFAULT default`
+            if [ -n "$tmp" ] ; then gtm_icu_version=$tmp
+            else if [ 1 -lt "$#" ] ; then gtm_icu_version=`echo $2 | tr DEFAULT default`; shift
+                else echo "--utf8 needs a value" ; err_exit
+                fi
+            fi
+            shift ;;
+        --verbose) gtm_verbose="Y" ; shift ;;
+        -*) echo Unrecognized option "$1" ; err_exit ;;
+        *) if [ -n "$gtm_version" ] ; then echo Nothing must follow the GT.M version ; err_exit
+            else gtm_version=$1 ; shift ; fi
     esac
 done
 if [ "Y" = "$gtm_verbose" ] ; then echo Processed command line ; dump_info ; fi
@@ -255,35 +255,35 @@ esac
 gtm_shlib_support="Y"
 case ${gtm_hostos}_${gtm_arch} in
     aix*) # no Source Forge dirname
-	gtm_arch="rs6000" # uname -m is not useful on AIX
-	gtm_ftp_dirname="aix"
-	gtm_flavor="rs6000"
-	gtm_install_flavor="RS6000" ;;
+        gtm_arch="rs6000" # uname -m is not useful on AIX
+        gtm_ftp_dirname="aix"
+        gtm_flavor="rs6000"
+        gtm_install_flavor="RS6000" ;;
     hpux_ia64) # no Source Forge dirname
-	gtm_ftp_dirname="hpux_ia64"
-	gtm_flavor="ia64"
-	gtm_install_flavor="IA64" ;;
+        gtm_ftp_dirname="hpux_ia64"
+        gtm_flavor="ia64"
+        gtm_install_flavor="IA64" ;;
     linux_i686) gtm_sf_dirname="GT.M-x86-Linux"
-	gtm_ftp_dirname="linux"
-	gtm_flavor="i686"
-	gtm_install_flavor="x86"
-	gtm_shlib_support="N" ;;
+        gtm_ftp_dirname="linux"
+        gtm_flavor="i686"
+        gtm_install_flavor="x86"
+        gtm_shlib_support="N" ;;
     linux_ia64) # no Source Forge dirname
-	gtm_ftp_dirname="linux_ia64"
-	gtm_flavor="ia64"
-	gtm_install_flavor="IA" ;;
+        gtm_ftp_dirname="linux_ia64"
+        gtm_flavor="ia64"
+        gtm_install_flavor="IA" ;;
     linux_s390x) # no Source Forge dirname
-	gtm_ftp_dirname="linux_s390x"
-	gtm_flavor="s390x"
-	gtm_install_flavor="S390X" ;;
+        gtm_ftp_dirname="linux_s390x"
+        gtm_flavor="s390x"
+        gtm_install_flavor="S390X" ;;
     linux_x8664) gtm_sf_dirname="GT.M-amd64-Linux"
-	gtm_ftp_dirname="linux_x8664"
-	gtm_flavor="x8664"
-	gtm_install_flavor="x86_64" ;;
+        gtm_ftp_dirname="linux_x8664"
+        gtm_flavor="x8664"
+        gtm_install_flavor="x86_64" ;;
     solaris_sparc) # no Source Forge dirname
-	gtm_ftp_dirname="sun"
-	gtm_flavor="sparc"
-	gtm_install_flavor="SPARC" ;;
+        gtm_ftp_dirname="sun"
+        gtm_flavor="sparc"
+        gtm_install_flavor="SPARC" ;;
     default) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
 esac
 
@@ -291,16 +291,20 @@ esac
 if [ -z "$gtm_version" ] ; then
     tmp=`dirname $0`
     if [ -e "$tmp/mumps" -a -e "$tmp/_XCMD.m" ] ; then
-	gtm_distrib=$tmp
-	gtm_dist=$tmp ; export gtm_dist
-	chmod +x $gtm_dist/mumps
-	tmp=`mktmpdir`
-	gtmroutines="$tmp($gtm_dist)" ; export gtmroutines
-	gtm_version=`$gtm_dist/mumps -run %XCMD 'write $piece($zversion," ",2)'`
-	rm -rf $tmp
+        gtm_distrib=$tmp
+        gtm_dist=$tmp ; export gtm_dist
+        chmod +x $gtm_dist/mumps
+        tmp=`mktmpdir`
+        gtmroutines="$tmp($gtm_dist)" ; export gtmroutines
+        gtm_version=`$gtm_dist/mumps -run %XCMD 'write $piece($zversion," ",2)'`
+        rm -rf $tmp
     fi
 fi
-if [ "Y" = "$gtm_verbose" ] ; then echo Determined architecture, OS and GT.M version ; dump_info ; fi
+if [ "Y" = "$gtm_verbose" ] ; then
+    echo Determined architecture, OS and GT.M version ; dump_info
+    wget_flags="-P"
+else wget_flags="-qP"
+fi
 
 # See if GT.M version can be determined from meta data
 if [ -z "$gtm_distrib" ] ; then
@@ -310,19 +314,30 @@ gtm_tmp=`mktmpdir`
 mkdir $gtm_tmp/tmp
 if [ -z "$gtm_version" -o "latest" = "`echo "$gtm_version" | tr LATES lates`" ] ; then
     case $gtm_distrib in
-	http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
-	    if { wget -qP $gtm_tmp ${gtm_distrib}/files/${gtm_sf_dirname}/latest 2>&1 1>${gtm_tmp}/wget_latest.log ; } ; then
-		gtm_version=`cat ${gtm_tmp}/latest`
-	    else echo Unable to determine GT.M version ; err_exit
-	    fi ;;
-	ftp://*)
-	    if { wget -qP $gtm_tmp ${gtm_distrib}/${gtm_ftp_dirname}/latest 2>&1 1>${gtm_tmp}/wget_latest.log ; } ; then
-		gtm_version=`cat ${gtm_tmp}/latest`
-	    else echo Unable to determine GT.M version ; err_exit
-	    fi ;;
-	*) if [ -f ${gtm_distrib}/latest ] ; then gtm_version=`cat ${gtm_distrib}/latest`
-	    else echo Unable to determine GT.M version ; err_exit
-	    fi ;;
+        http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
+            if [ "Y" = "$gtm_verbose" ] ; then
+		echo wget ${gtm_distrib}/files/${gtm_sf_dirname}/latest to determine latest version
+		echo Check proxy settings if wget hangs
+            fi
+            if { wget $wget_flags $gtm_tmp ${gtm_distrib}/files/${gtm_sf_dirname}/latest 2>&1 1>${gtm_tmp}/wget_latest.log ; } ; then
+                gtm_version=`cat ${gtm_tmp}/latest`
+            else echo Unable to determine GT.M version ; err_exit
+            fi ;;
+        ftp://*)
+            if [ "Y" = "$gtm_verbose" ] ; then
+		echo wget $gtm_tmp ${gtm_distrib}/${gtm_ftp_dirname}/latest to determine latest version
+		echo Check proxy settings if wget hangs
+            fi
+            if { wget $wget_flags $gtm_tmp ${gtm_distrib}/${gtm_ftp_dirname}/latest 2>&1 1>${gtm_tmp}/wget_latest.log ; } ; then
+                gtm_version=`cat ${gtm_tmp}/latest`
+            else echo Unable to determine GT.M version ; err_exit
+            fi ;;
+        *)
+            if [ -f ${gtm_distrib}/latest ] ; then
+                gtm_version=`cat ${gtm_distrib}/latest`
+                if [ "Y" = "$gtm_verbose" ] ; then echo Version is $gtm_version ; fi
+            else echo Unable to determine GT.M version ; err_exit
+            fi ;;
     esac
 fi
 if [ -z "$gtm_version" ] ; then
@@ -335,19 +350,30 @@ else
     tmp=`echo $gtm_version | tr -d .-`
     gtm_filename=gtm_${tmp}_${gtm_hostos}_${gtm_flavor}_${gtm_buildtype}.tar.gz
     case $gtm_distrib in
-	http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
-	    if { ! wget -qP $gtm_tmp ${gtm_distrib}/files/${gtm_sf_dirname}/${gtm_version}/${gtm_filename} \
-	        2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
-		echo Unable to download GT.M distribution $gtm_filename ; err_exit
-	    fi ;;
-	ftp://*)
-	    if { ! wget -qP $gtm_tmp ${gtm_distrib}/${gtm_ftp_dirname}/${tmp}/${gtm_filename} \
-	        2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
-		echo Unable to download GT.M distribution $gtm_filename ; err_exit
-	    fi ;;
-	*) if [ -f ${gtm_distrib}/${gtm_filename} ] ; then ln -s ${gtm_distrib}/${gtm_filename} $gtm_tmp
-	    else echo Unable to locate GT.M distribution file ${gtm_distrib}/${gtm_filename} ; err_exit
-	    fi ;;
+        http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
+            if [ "Y" = "$gtm_verbose" ] ; then
+		echo wget ${gtm_distrib}/files/${gtm_sf_dirname}/${gtm_version}/${gtm_filename} to download tarball
+		echo Check proxy settings if wget hangs
+            fi
+            if { ! wget $wget_flags $gtm_tmp ${gtm_distrib}/files/${gtm_sf_dirname}/${gtm_version}/${gtm_filename} \
+                2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
+                echo Unable to download GT.M distribution $gtm_filename ; err_exit
+            fi ;;
+        ftp://*)
+            if [ "Y" = "$gtm_verbose" ] ; then
+		echo wget ${gtm_distrib}/${gtm_ftp_dirname}/${tmp}/${gtm_filename} to download tarball
+		echo Check proxy settings if wget hangs
+            fi
+            if { ! wget $wget_flags $gtm_tmp ${gtm_distrib}/${gtm_ftp_dirname}/${tmp}/${gtm_filename} \
+                2>&1 1>${gtm_tmp}/wget_dist.log ; } ; then
+                echo Unable to download GT.M distribution $gtm_filename ; err_exit
+            fi ;;
+        *)
+            if [ -f ${gtm_distrib}/${gtm_filename} ] ; then
+                if [ "Y" = "$gtm_verbose" ] ; then echo tarball is ${gtm_distrib}/${gtm_filename} ; fi
+                ln -s ${gtm_distrib}/${gtm_filename} $gtm_tmp
+            else echo Unable to locate GT.M distribution file ${gtm_distrib}/${gtm_filename} ; err_exit
+            fi ;;
     esac
     ( cd $gtm_tmp/tmp ; gzip -d < ${gtm_tmp}/${gtm_filename} | tar xf - 2>&1 1>${gtm_tmp}/tar.log )
 fi
@@ -363,7 +389,7 @@ fi
 if [ "root" = $tmp ] ; then
     if [ -z "$gtm_group" ] ; then gtm_group=`$gtm_id -gn`
     else if [ "root" != "$gtm_user" -a "$gtm_group" != "`$gtm_id -Gn $gtm_user | xargs -n 1 | $gtm_grep $gtm_group`" ] ; then
-	echo $gtm_user is not a member of $gtm_group ; err_exit
+        echo $gtm_user is not a member of $gtm_group ; err_exit
         fi
     fi
  else
@@ -382,10 +408,10 @@ if [ "Y" = "$gtm_verbose" ] ; then echo Finished checking options and assigning 
 gtm_configure_in=${gtm_tmp}/configure_${timestamp}.in
 if { ! $gtm_id -gn bin 2>/dev/null 1>/dev/null ; } then
     if [ "N" = "$gtm_prompt_for_group" -o 54002 -gt `echo $gtm_version | cut -s -d V -f 2- | tr -d A-Za-z.-` ] ; then
-	echo y >>$gtm_configure_in
-	echo root >>$gtm_configure_in
-	echo $gtm_group_restriction >>$gtm_configure_in
-	gtm_group_already="Y"
+        echo y >>$gtm_configure_in
+        echo root >>$gtm_configure_in
+        echo $gtm_group_restriction >>$gtm_configure_in
+        gtm_group_already="Y"
     fi
 fi
 echo $gtm_user >>$gtm_configure_in
@@ -402,7 +428,7 @@ if [ -z "$gtm_icu_version" ] ; then echo n  >>$gtm_configure_in
 else echo y  >>$gtm_configure_in
     if [ "default" = $gtm_icu_version ] ; then echo n  >>$gtm_configure_in
     else echo y >>$gtm_configure_in
-	echo $gtm_icu_version >>$gtm_configure_in
+        echo $gtm_icu_version >>$gtm_configure_in
     fi
 fi
 echo $gtm_lcase_utils >>$gtm_configure_in
@@ -419,10 +445,8 @@ fi
 tmp=`head -1 configure | cut -f 1`
 if [ "#!/bin/sh" != "$tmp" ] ; then
     echo "#!/bin/sh" >configure.sh
-    cat configure >>configure.sh
-else
-    cp configure configure.sh
 fi
+cat configure >>configure.sh
 chmod +x configure.sh
 
 # Stop here if this is a dry run
@@ -437,7 +461,7 @@ if [ -d "$gtm_linkenv" ] ; then
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked env ; ls -l $gtm_linkenv ; fi
 else if [ -d "$gtm_copyenv" ] ; then
         ( cd $gtm_linkenv ; cp $gtm_installdir/gtmprofile $gtm_installdir/gtmcshrc ./ )
-	if [ "Y" = "$gtm_verbose" ] ; then echo Copied env ; ls -l $gtm_copyenv ; fi
+        if [ "Y" = "$gtm_verbose" ] ; then echo Copied env ; ls -l $gtm_copyenv ; fi
      fi
 fi
 if [ -d "$gtm_linkexec" ] ; then
@@ -445,6 +469,6 @@ if [ -d "$gtm_linkexec" ] ; then
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked exec ; ls -l $gtm_linkexec ; fi
 else if [ -d "$gtm_copyexec" ] ; then
         ( cd $gtm_linkexec ; cp $gtm_installdir/gtm ./ )
-	if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi
+        if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi
      fi
 fi

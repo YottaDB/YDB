@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,6 +103,7 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 	mname_entry	gvname;
 	gvnh_reg_t	*gvnh_reg;
 	gd_region	*dummy_reg;
+	mstr		opstr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -449,7 +450,9 @@ void bin_load(uint4 begin, uint4 end, struct RAB *inrab, struct FAB *infab)
 					} else
 						TREF(transform) = FALSE;
 						/* convert the subscript to string format */
-					end_buff = gvsub2str(src_buff, dest_buff, FALSE);
+					opstr.addr = dest_buff;
+					opstr.len = MAX_ZWR_KEY_SZ;
+					end_buff = gvsub2str(src_buff, &opstr, FALSE);
 						/* transform the string to the current subsc format */
 					TREF(transform) = TRUE;
 					tmp_mval.mvtype = MV_STR;

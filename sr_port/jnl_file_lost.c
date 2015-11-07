@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 		csa = &FILE_INFO(jpc->region)->s_addrs;
 		break;
 	default:
-		GTMASSERT;
+		assertpro(FALSE && jpc->region->dyn.addr->acc_meth);
 	}
 #	ifdef VMS
 	/* The following assert has been removed as it could be FALSE if the caller is "jnl_file_extend"
@@ -78,14 +78,11 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	assert(csa->now_crit);
 	/* We issue an rts_error (instead of shutting off journaling) in the following cases :					{BYPASSOK}
 	 * 1) $gtm_error_on_jnl_file_lost is set to issue runtime error (if not already issued) in case of journaling issues.
-	 * 2) The process has $gtm_custom_errors set (indicative of anticipatory freeze setup) in which case the goal is to
-	 *    never shut-off journaling
-	 * 3) If $gtm_custom_errors is not set for this process, but the source server was started with $gtm_custom_errors
-	 *    set. This way, as long as the environment is configured for $gtm_custom_errors individual processes never turn
-	 *    off journaling.
+	 * 2) The process has the given message set in $gtm_custom_errors (indicative of instance freeze on error setup)
+	 *    in which case the goal is to never shut-off journaling
 	 */
-	UNIX_ONLY(instfreeze_environ = (ANTICIPATORY_FREEZE_AVAILABLE
-						|| ((NULL != jnlpool_ctl) && jnlpool_ctl->instfreeze_environ_inited)));
+	UNIX_ONLY(assert(jnlpool.jnlpool_ctl == jnlpool_ctl));
+	UNIX_ONLY(instfreeze_environ = INST_FREEZE_ON_MSG_ENABLED(csa, jnl_stat));
 	VMS_ONLY(instfreeze_environ = FALSE);
 	if ((JNL_FILE_LOST_ERRORS == TREF(error_on_jnl_file_lost)) || instfreeze_environ)
 	{
@@ -132,8 +129,7 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	{
 		if (SS$_NORMAL == status)
 			status = gtm_deq(csa->jnl->jnllsb->lockid, NULL, PSL$C_USER, 0);
-		if (SS$_NORMAL != status)
-			GTMASSERT;
+		assertpro(SS$_NORMAL == status);
 	}
 # else
 	jnl_file_close(jpc->region, FALSE, FALSE);

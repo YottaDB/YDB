@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -22,7 +22,7 @@
 #	PAGE	+
 	.DATA
 .extern	ERR_GTMCHECK
-.extern	ERR_LABELUNKNOWN
+.extern	ERR_LABELNOTFND
 .extern	frame_pointer
 
 	.text
@@ -86,7 +86,7 @@ l3:	movl	ERR_GTMCHECK(REG_IP),REG32_ARG1
 	getframe
 	ret
 
-l4:	movl	ERR_LABELUNKNOWN(REG_IP),REG32_ARG1
+l4:	movl	ERR_LABELNOTFND(REG_IP),REG32_ARG1
 	movl	$1,REG32_ARG0
 	movb    $0,REG8_ACCUM             # variable length argument
 	call	rts_error

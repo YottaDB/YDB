@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc.	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -352,6 +352,7 @@ static readonly CLI_ENTRY dse_save_qual[] = {
 
 static readonly CLI_ENTRY dse_shift_qual[] = {
 { "BACKWARD", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "BLOCK",    0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "FORWARD",  0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "OFFSET",   0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { 0 }

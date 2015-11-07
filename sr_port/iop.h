@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -215,4 +215,12 @@ IOP_DESC(197, iop_nofollow, 0, IOP_OPEN_OK|IOP_USE_OK, 0),
 IOP_DESC(198, iop_empterm, 0, IOP_OPEN_OK|IOP_USE_OK, 0),
 IOP_DESC(199, iop_noempterm, 0, IOP_OPEN_OK|IOP_USE_OK, 0),
 IOP_DESC(200, iop_timeout, SIZEOF(int4), IOP_CLOSE_OK, IOP_SRC_INT),
-IOP_DESC(201, n_iops, 0, 0, 0)
+IOP_DESC(201, iop_seek, IOP_VAR_SIZE, IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_STR),
+IOP_DESC(202, iop_key, IOP_VAR_SIZE, IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_STR),
+IOP_DESC(203, iop_input_key, IOP_VAR_SIZE, IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_STR),
+IOP_DESC(204, iop_output_key, IOP_VAR_SIZE, IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_STR),
+IOP_DESC(205, iop_inseek, IOP_VAR_SIZE, IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_STR),
+IOP_DESC(206, iop_outseek, IOP_VAR_SIZE, IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_STR),
+IOP_DESC(207, iop_inrewind, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
+IOP_DESC(208, iop_outrewind, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
+IOP_DESC(209, n_iops, 0, 0, 0)

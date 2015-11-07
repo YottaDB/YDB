@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001,2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001,2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,7 +93,7 @@ const static readonly int error_ansi[] = {
 	   7,	/* GVUNDEF */
 	   0,	/* TRANSNEST */
 	   0,	/* INDEXTRACHARS */
-	   0,	/* UNUSEDMSG260 */
+	   0,	/* CORRUPTNODE */
 	   0,	/* INDRMAXLEN */
 	   0,	/* INSFFBCNT */
 	   0,	/* INTEGERRS */
@@ -642,7 +642,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLRDONLY */
 	   0,	/* ANCOMPTINC */
 	   0,	/* ABNCOMPTINC */
-	   0,	/* UNUSEDMSG809 */
+	   0,	/* RECLOAD */
 	   0,	/* SOCKNOTFND */
 	   0,	/* CURRSOCKOFR */
 	  79,	/* SOCKETEXIST */
@@ -822,16 +822,16 @@ const static readonly int error_ansi[] = {
 	   0,	/* RENAMEFAIL */
 	   0,	/* FILERENAME */
 	   0,	/* JNLBUFINFO */
-	   0,	/* UNUSEDMSG989 */
-	   0,	/* UNUSEDMSG990 */
+	   0,	/* SDSEEKERR */
+	   0,	/* LOCALSOCKREQ */
 	   0,	/* TPNOTACID */
 	   0,	/* JNLSETDATA2LONG */
 	   0,	/* JNLNEWREC */
 	   0,	/* REPLFTOKSEM */
-	   0,	/* UNUSEDMSG995 */
+	   0,	/* SOCKNOTPASSED */
 	   0,	/* EXTRIOERR */
 	   0,	/* EXTRCLOSEERR */
-	   0,	/* UNUSEDMSG998 */
+	   0,	/* CONNSOCKREQ */
 	   0,	/* REPLEXITERR */
 	   0,	/* MUDESTROYSUC */
 	   0,	/* DBRNDWN */
@@ -912,7 +912,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* SYSTEMVALUE */
 	   0,	/* SIZENOTVALID4 */
 	   0,	/* STRNOTVALID */
-	   0,	/* UNUSEDMSG1079 */
+	   0,	/* CREDNOTPASSED */
 	   0,	/* ERRWETRAP */
 	   0,	/* TRACINGON */
 	   0,	/* CITABENV */
@@ -942,7 +942,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MAXBTLEVEL */
 	  35,	/* INVMNEMCSPC */
 	   0,	/* JNLALIGNSZCHG */
-	   0,	/* UNUSEDMSG1109 */
+	   0,	/* SEFCTNEEDSFULLB */
 	   0,	/* GVFAILCORE */
 	   0,	/* DBCDBNOCERTIFY */
 	   0,	/* DBFRZRESETSUC */
@@ -1089,7 +1089,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* REPLINSTSTNDALN */
 	   0,	/* REPLREQROLLBACK */
 	   0,	/* REQROLLBACK */
-	   0,	/* UNUSEDMSG1256 */
+	   0,	/* INVOBJFILE */
 	   0,	/* SRCSRVEXISTS */
 	   0,	/* SRCSRVNOTEXIST */
 	   0,	/* SRCSRVTOOMANY */
@@ -1250,7 +1250,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUUSERECOV */
 	   0,	/* SECNOTSUPPLEMENTARY */
 	   0,	/* SUPRCVRNEEDSSUPSRC */
-	   0,	/* UNUSEDMSG1417 */
+	   0,	/* PEERPIDMISMATCH */
 	   0,	/* SETITIMERFAILED */
 	   0,	/* UPDSYNC2MTINS */
 	   0,	/* UPDSYNCINSTFILE */
@@ -1380,4 +1380,31 @@ const static readonly int error_ansi[] = {
 	   0,	/* TLSIOERROR */
 	   0,	/* TLSRENEGOTIATE */
 	   0,	/* REPLNOTLS */
+	   0,	/* COLTRANSSTR2LONG */
+	   0,	/* SOCKPASS */
+	   0,	/* SOCKACCEPT */
+	   0,	/* NOSOCKHANDLE */
+	   0,	/* TRIGLOADFAIL */
+	   0,	/* SOCKPASSDATAMIX */
+	   0,	/* NOGTCMDB */
+	   0,	/* NOUSERDB */
+	   0,	/* DSENOTOPEN */
+	   0,	/* ZSOCKETATTR */
+	   0,	/* ZSOCKETNOTSOCK */
+	   0,	/* CHSETALREADY */
+	   0,	/* DSEMAXBLKSAV */
+	   0,	/* BLKINVALID */
+	   0,	/* CANTBITMAP */
+	   0,	/* AIMGBLKFAIL */
+	   0,	/* GTMDISTUNVERIF */
+	   0,	/* CRYPTNOAPPEND */
+	   0,	/* CRYPTNOSEEK */
+	   0,	/* CRYPTNOTRUNC */
+	   0,	/* CRYPTNOKEYSPEC */
+	   0,	/* CRYPTNOOVERRIDE */
+	   0,	/* CRYPTKEYTOOBIG */
+	   0,	/* CRYPTBADWRTPOS */
+	  13,	/* LABELNOTFND */
+	   0,	/* RELINKCTLERR */
+	   0,	/* INVLINKTMPDIR */
 	};

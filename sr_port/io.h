@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #endif
 #endif
+#include <stdarg.h>
 
 #include "gt_timer.h"
 #include <rtnhdr.h>
@@ -203,7 +204,7 @@ typedef struct dev_dispatch_struct
 	void	(*wttab)(int4);
 	void	(*flush)(io_desc *);
 	int	(*readfl)(mval *, int4, int4);
-	void	(*iocontrol)(mstr *);
+	void	(*iocontrol)(mstr *, int4, va_list);
 	void	(*dlr_device)(mstr *);
 	void	(*dlr_key)(mstr *);
 	void	(*dlr_zkey)(mstr *);
@@ -211,7 +212,7 @@ typedef struct dev_dispatch_struct
 
 /* io_ prototypes */
 void io_rundown(int rundown_type);
-void io_init(bool term_ctrl);
+void io_init(boolean_t term_ctrl);
 bool io_is_rm(mstr *name);
 bool io_is_sn(mstr *tn);
 struct mv_stent_struct *io_find_mvstent(io_desc *io_ptr, boolean_t clear_mvstent);
@@ -235,7 +236,7 @@ void io_init_name(void);
 #define ioxx_wttab(X)		void io##X##_wttab(int4 x)
 #define ioxx_flush(X)		void io##X##_flush(io_desc *iod)
 #define ioxx_readfl(X)		int io##X##_readfl(mval *v, int4 width, int4 timeout)
-#define xx_iocontrol(X)		void X##_iocontrol(mstr *d)
+#define xx_iocontrol(X)		void X##_iocontrol(mstr *mn, int4 argcnt, va_list args)
 #define xx_dlr_device(X)	void X##_dlr_device(mstr *d)
 #define xx_dlr_key(X)		void X##_dlr_key(mstr *d)
 #define xx_dlr_zkey(X)		void X##_dlr_zkey(mstr *d)
@@ -272,7 +273,7 @@ xxdlrzk(iosocket);
 ioxx_open(ff);
 #ifdef UNIX
 ioxx_open(pi);
-xxdlr(iopi);	/* we need iopi_iocontrol(), iopi_dlr_device() and iopi_dlr_key() */
+xxdlrzk(iopi);	/* we need iopi_iocontrol(), iopi_dlr_device(), iopi_dlr_key() and iopi_dlr_zkey() */
 xxdlr(iott);	/* we need iott_iocontrol(), iott_dlr_device() and iott_dlr_key() */
 #endif
 ioxx_wttab(us);
@@ -306,6 +307,10 @@ void iomt_wtdoslab(io_desc *dv);
 boolean_t iosocket_listen(io_desc *iod, unsigned short len);
 boolean_t iosocket_wait(io_desc *iod, int4 timepar);
 void iosocket_poolinit(void);
+#ifndef VMS
+void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_list args);
+void iosocket_accept_local(io_desc *iod, mval *handlevar, pid_t pid, int4 timeout, int argcnt, va_list args);
+#endif
 
 /* tcp_ prototypes */
 int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive);
@@ -403,16 +408,18 @@ LITREF unsigned char ebcdic_spaces_block[];
 		asc_to_ebc(*(DEST), *(SRC), *(IN_LEN_PTR));	\
 }
 
-#define SET_ENCODING(CHSET, CHSET_MSTR)												\
+/* iosocket_open needs to prevent changing chset sometimes */
+#define SET_ENCODING_VALIDATE(CHSET, CHSET_MSTR, VALIDATE)									\
 {																\
 	int 	chset_idx;													\
 																\
 	chset_idx = verify_chset(CHSET_MSTR);											\
-		;														\
+	VALIDATE;														\
 	if (0 <= chset_idx)													\
 		(CHSET) = (gtm_chset_t)chset_idx;										\
 	else															\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, (CHSET_MSTR)->len, (CHSET_MSTR)->addr);		\
 }
+#define SET_ENCODING(CHSET, CHSET_MSTR)	SET_ENCODING_VALIDATE(CHSET, CHSET_MSTR,)
 
 #endif /* IO_H */

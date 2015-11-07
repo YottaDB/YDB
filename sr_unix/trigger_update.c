@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,10 @@
 #include "t_retry.h"
 #include "gtmimagename.h"
 #include "hashtab_mname.h"
+#include "t_begin.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "zshow.h"
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*first_sgm_info;
@@ -80,6 +84,7 @@ error_def(ERR_TEXT);
 error_def(ERR_TPRETRY);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRIGDEFBAD);
+error_def(ERR_TRIGLOADFAIL);
 error_def(ERR_TRIGMODINTP);
 error_def(ERR_TRIGMODREGNOTRW);
 error_def(ERR_TRIGNOSPANGBL);
@@ -428,7 +433,6 @@ STATICFNDEF boolean_t check_unique_trigger_name(char *trigvn, int trigvn_len, ch
 		RESTORE_TRIGGER_REGION_INFO(save_currkey);
 		return TRUE;
 	}
-	assert((MAX_HASH_INDEX_LEN + 1 + MAX_DIGITS_IN_INT) > gv_cur_region->max_rec_size);
 	/* $get(^#t("#TNAME",trigger_name) */
 	BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trigger_name, trigger_name_len);
 	status = !gvcst_get(&val);
@@ -1097,9 +1101,12 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	uint4			value_len[NUM_SUBS];
 	stringkey		kill_trigger_hash, set_trigger_hash;
 	char			tmp_str[MAX_HASH_INDEX_LEN + 1 + MAX_DIGITS_IN_INT];
-	char			xecute_buffer[MAX_XECUTE_LEN];
+	char			xecute_buffer[MAX_BUFF_SIZE + MAX_XECUTE_LEN];
 	mval			xecute_index, xecute_size;
 	mval			reportname, reportnamealt;
+	mval			trigjrec;
+	char			*trigjrecptr;
+	int			trigjreclen;
 	io_pair			io_save_device;
 	int4			max_xecute_size;
 	boolean_t		no_error;
@@ -1108,13 +1115,26 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(dollar_tlevel);
 	assert(0 > memcmp(LITERAL_HASHLABEL, LITERAL_MAXHASHVAL, MIN(STRLEN(LITERAL_HASHLABEL), STRLEN(LITERAL_MAXHASHVAL))));
 	assert(0 > memcmp(LITERAL_HASHCOUNT, LITERAL_MAXHASHVAL, MIN(STRLEN(LITERAL_HASHCOUNT), STRLEN(LITERAL_MAXHASHVAL))));
 	assert(0 > memcmp(LITERAL_HASHCYCLE, LITERAL_MAXHASHVAL, MIN(STRLEN(LITERAL_HASHCYCLE), STRLEN(LITERAL_MAXHASHVAL))));
 	assert(0 > memcmp(LITERAL_HASHTNAME, LITERAL_MAXHASHVAL, MIN(STRLEN(LITERAL_HASHTNAME), STRLEN(LITERAL_MAXHASHVAL))));
 	assert(0 > memcmp(LITERAL_HASHTNCOUNT, LITERAL_MAXHASHVAL, MIN(STRLEN(LITERAL_HASHTNCOUNT), STRLEN(LITERAL_MAXHASHVAL))));
-	rec_num = (NULL == record_num) ? 0 : *record_num;
+	rec_num = ((NULL == record_num)? 0 : *record_num);
 	gvinit();
+	trigjrec.mvtype = MV_STR;
+	trigjrec.str.len = len;
+	trigjrec.str.addr = trigger_rec;
+	if (NULL == trigfile_device)
+	{	/* Check if this is a multi-line trigger. In that case, use just the first line for the below processing.
+		 * The rest of the lines will later be copied over into values[XECUTE_SUB].
+		 */
+		trigjrecptr = memchr(trigger_rec, '\n', len);
+		if (NULL != trigjrecptr)
+			len = trigjrecptr - trigger_rec;
+	} else
+		assert(NULL == memchr(trigger_rec, '\n', len));
 	if ((0 == len) || (COMMENT_LITERAL == *trigger_rec))
 		return TRIG_SUCCESS;
 	if (('-' != *trigger_rec) && ('+' != *trigger_rec))
@@ -1129,6 +1149,12 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	{
 		if ((1 == len) && ('*' == *trigger_rec))
 		{
+			if ((NULL == trigfile_device) && (NULL != trigjrecptr))
+			{
+				util_out_print_gtmio("Newline not allowed in trigger name for delete operation", FLUSH);
+				trig_stats[STATS_ERROR]++;
+				return TRIG_FAILURE;
+			}
 			if (!noprompt)
 			{
 				util_out_print("This operation will delete all triggers.", FLUSH);
@@ -1140,11 +1166,17 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 					return TRIG_SUCCESS;
 				}
 			}
-			trigger_delete_all();
+			trigger_delete_all(--trigger_rec, len + 1);
 			return TRIG_SUCCESS;
 		} else if ((0 == len) || ('^' != *trigger_rec))
 		{	/* if the length < 0 let trigger_delete_name respond with the error message */
-			if (TRIG_FAILURE == (status = trigger_delete_name(trigger_rec, len, trig_stats)))
+			if ((NULL == trigfile_device) && (NULL != trigjrecptr))
+			{
+				util_out_print_gtmio("Newline not allowed in trigger name for delete operation", FLUSH);
+				trig_stats[STATS_ERROR]++;
+				return TRIG_FAILURE;
+			}
+			if (TRIG_FAILURE == (status = trigger_delete_name(--trigger_rec, len + 1, trig_stats)))
 				trig_stats[STATS_ERROR]++;
 			return status;
 		}
@@ -1174,43 +1206,81 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	COMPUTE_HASH_STR(&kill_trigger_hash);
 	if (multi_line_xecute)
 	{
-		if (NULL == trigfile_device)
+		if (NULL != trigfile_device)
 		{
-			util_out_print_gtmio("Cannot use multi-line xecute in $ztrigger ITEM", FLUSH);
-			return TRIG_FAILURE;
-		}
-		io_save_device = io_curr_device;
-		io_curr_device = *trigfile_device;
-		values[XECUTE_SUB] = xecute_buffer;
-		value_len[XECUTE_SUB] = 0;
-		max_xecute_size = SIZEOF(xecute_buffer);
-		multi_line = multi_line_xecute;
-		while (multi_line && (0 <= (rec_len = file_input_get(&trigger_rec))))
-		{
-			rec_num++;
-			io_curr_device = io_save_device;	/* In case we have to write an error message */
-			no_error &= trigger_parse(trigger_rec, (uint4)rec_len, trigvn, values, value_len, &max_xecute_size,
-				&multi_line);
+			assert(SIZEOF(xecute_buffer) == MAX_BUFF_SIZE + MAX_XECUTE_LEN);
+			/* Leave MAX_BUFF_SIZE to store other (excluding XECUTE) parts of the trigger definition.
+			 * This way we can copy over these once the multi-line XECUTE string is constructed and
+			 * use this to write the TLGTRIG/ULGTRIG journal record in case we do "jnl_format" later.
+			 */
+			values[XECUTE_SUB] = &xecute_buffer[MAX_BUFF_SIZE];
+			trigjreclen = trigjrec.str.len + 1;	/* 1 for newline */
+			assert(trigjreclen < MAX_BUFF_SIZE);
+			trigjrecptr = &xecute_buffer[MAX_BUFF_SIZE - trigjreclen];
+			memcpy(trigjrecptr, trigjrec.str.addr, trigjreclen - 1);
+			trigjrecptr[trigjreclen - 1] = '\n';
+			trigjrec.str.addr = trigjrecptr;
+			value_len[XECUTE_SUB] = 0;
+			max_xecute_size = MAX_XECUTE_LEN;
+			io_save_device = io_curr_device;
 			io_curr_device = *trigfile_device;
-		}
-		if (NULL != record_num)
-			*record_num = rec_num;
-		if (!no_error)
-		{
+			multi_line = multi_line_xecute;
+			while (multi_line && (0 <= (rec_len = file_input_get(&trigger_rec))))
+			{
+				rec_num++;
+				io_curr_device = io_save_device;	/* In case we have to write an error message */
+				no_error &= trigger_parse(trigger_rec, (uint4)rec_len, trigvn, values, value_len,
+									&max_xecute_size, &multi_line);
+				io_curr_device = *trigfile_device;
+			}
+			trigjrec.str.len = trigjreclen + value_len[XECUTE_SUB];
+			if (NULL != record_num)
+				*record_num = rec_num;
+			if (!no_error)
+			{
+				io_curr_device = io_save_device;
+				trig_stats[STATS_ERROR]++;
+				return TRIG_FAILURE;
+			}
+			if (0 > rec_len)
+			{
+				io_curr_device = io_save_device;
+				util_out_print_gtmio("Multi-line trigger -XECUTE is not properly terminated", FLUSH);
+				trig_stats[STATS_ERROR]++;
+				return TRIG_FAILURE;
+			}
 			io_curr_device = io_save_device;
-			trig_stats[STATS_ERROR]++;
-			return TRIG_FAILURE;
-		}
-		if (0 > rec_len)
+		} else
 		{
-			io_curr_device = io_save_device;
-			util_out_print_gtmio("Multi-line trigger -XECUTE is not properly terminated", FLUSH);
-			trig_stats[STATS_ERROR]++;
-			return TRIG_FAILURE;
+			values[XECUTE_SUB] = trigjrecptr + 1;
+			value_len[XECUTE_SUB] = trigjrec.str.addr + trigjrec.str.len - (trigjrecptr + 1);
+			if ('\n' != values[XECUTE_SUB][value_len[XECUTE_SUB] - 1])
+			{
+				util_out_print_gtmio("Multi-line xecute in $ztrigger ITEM must end in newline", FLUSH);
+				trig_stats[STATS_ERROR]++;
+				return TRIG_FAILURE;
+			}
+			if (!process_xecute(values[XECUTE_SUB], &value_len[XECUTE_SUB], TRUE))
+			{
+				CONV_STR_AND_PRINT("Error parsing XECUTE string: ", value_len[XECUTE_SUB], values[XECUTE_SUB]);
+				trig_stats[STATS_ERROR]++;
+				return TRIG_FAILURE;
+			}
+			/* trigjrec is already properly set up */
 		}
 		STR_HASH(values[XECUTE_SUB], value_len[XECUTE_SUB], set_trigger_hash.hash_code, set_trigger_hash.hash_code);
 		STR_HASH(values[XECUTE_SUB], value_len[XECUTE_SUB], kill_trigger_hash.hash_code, kill_trigger_hash.hash_code);
-		io_curr_device = io_save_device;
+	} else if ((NULL == trigfile_device) && (NULL != trigjrecptr))
+	{	/* If this is a not a multi-line xecute string, we dont expect newlines. The only exception is if it is
+		 * the last byte in the string.
+		 */
+		*trigjrecptr++;
+		if (trigjrecptr != (trigjrec.str.addr + trigjrec.str.len))
+		{
+			util_out_print_gtmio("Newline allowed only inside multi-line xecute in $ztrigger ITEM", FLUSH);
+			trig_stats[STATS_ERROR]++;
+			return TRIG_FAILURE;
+		}
 	}
 	gvname.var_name.addr = trigvn;
 	gvname.var_name.len = trigvn_len;
@@ -1241,6 +1311,19 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 		 * gvt->db_dztrigger_cycle
 		 */
 		csa->db_dztrigger_cycle++;
+	}
+	if (JNL_WRITE_LOGICAL_RECS(csa))
+	{
+		assert(!gv_cur_region->read_only);
+		/* Attach to jnlpool. Normally SET or KILL of the ^#t records take care of this but in case this is a NO-OP
+		 * trigger operation that wont happen and we still want to write a TLGTRIG/ULGTRIG journal record. Hence
+		 * the need to do this.
+		 */
+		JNLPOOL_INIT_IF_NEEDED(csa, csa->hdr, csa->nl);
+		assert(dollar_tlevel);
+		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL);	/* needed to set update_trans TRUE on this region
+									 * even if NO db updates happen to ^#t nodes. */
+		jnl_format(JNL_LGTRIG, NULL, &trigjrec, 0);
 	}
 	SET_GVTARGET_TO_HASHT_GBL(csa);
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;

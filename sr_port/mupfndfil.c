@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,8 @@
 
 GBLREF 	jnl_gbls_t	jgbl;
 
+error_def(ERR_NOUSERDB);
+
 /* mupfndfil.c
  * Description:
  *	For a region find if the corresponding database is present.
@@ -43,19 +45,20 @@ GBLREF 	jnl_gbls_t	jgbl;
  */
 boolean_t mupfndfil(gd_region *reg, mstr *filestr)
 {
-	uint4	ustatus;
 	char 	filename[MAX_FN_LEN];
 	mstr 	file, def, ret, *retptr;
+	uint4	ustatus;
 
 	switch(reg->dyn.addr->acc_meth)
 	{
 	case dba_mm:
 	case dba_bg:
 		break;
+#	ifdef VMS
 	case dba_usr:
-		util_out_print("REGION !AD maps to a non-GDS database.  Specified function does not apply to a non-GDS database.",
-			TRUE, REG_LEN_STR(reg));
-		return FALSE;
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOUSERDB, 4, LEN_AND_LIT("specified function"), REG_LEN_STR(reg));
+		return FALSE;		/* This is currently a VMS only possibility and has no corresponding test case */
+#	endif
 	default:
 		util_out_print("REGION !AD has an unrecognized access method.", TRUE, REG_LEN_STR(reg));
 		return FALSE;
@@ -68,8 +71,7 @@ boolean_t mupfndfil(gd_region *reg, mstr *filestr)
 	{
 		def.addr = DEF_NODBEXT;
 		def.len = SIZEOF(DEF_NODBEXT) - 1;
-	}
-	else
+	} else
 	{
 		def.addr = DEF_DBEXT;	/* UNIX need to pass "*.dat" but reg->dyn.addr->defext has "DAT" */
 		def.len = SIZEOF(DEF_DBEXT) - 1;
@@ -91,7 +93,7 @@ boolean_t mupfndfil(gd_region *reg, mstr *filestr)
 		{	/* Do not print error messages in case of call from mur_open_files().
 			 * Currently we use "jgbl.mupip_journal" to identify a call from mupip_recover code */
 			util_out_print("REGION !AD's file !AD cannot be found.", TRUE, REG_LEN_STR(reg), LEN_AND_STR(file.addr));
-			gtm_putmsg(VARLSTCNT(1) ustatus);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ustatus);
 		}
 		return FALSE;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,21 +19,9 @@
 #include "lke.h"
 #include "have_crit.h"
 
-GBLREF VSIG_ATOMIC_T	util_interrupt;
-GBLREF volatile int4 	fast_lock_count;
+GBLREF	VSIG_ATOMIC_T util_interrupt;
 
-/* Only allow the process to be interrupted if we are not in crit and not in the process
-   of obtaining it. Otherwise, we cannot service this interruption at this time and must
-   return (but will set the interruption flag. */
-CONDITION_HANDLER(lke_ctrlc_handler)
+void lke_ctrlc_handler(int sig)
 {
-	int	dummy1, dummy2;
-
-	START_CH(TRUE);				/* Drive top level condition handler if we can */
 	util_interrupt = 1;
-	if (0 == fast_lock_count && 0 == have_crit(CRIT_HAVE_ANY_REG))
-	{
-		UNWIND(dummy1, dummy2);		/* This will do a longjmp and not 'return' here */
-	}
-	CONTINUE;				/* Unconditional return */
 }

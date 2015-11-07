@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -415,7 +415,7 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	/* Find region trigger name is in */
 	if (!trigger_read_name_entry(trigname, &val))
 	{	/* Trigger name not found - nothing we can do */
-		if (!TREF(in_op_fntext))
+		if (!TREF(op_fntext_tlevel))
 		{
 			CLEAR_IMPLICIT_TP_BEFORE_ERROR;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGNAMENF, 2, trigname->len, trigname->addr);

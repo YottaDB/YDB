@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,16 +29,17 @@
  * ------------------------------------------------------------------
  */
 
-GBLREF volatile char 			source_file_name[];
 GBLREF int 				(* volatile xfer_table[])();
-GBLREF volatile bool			ctrlc_on;
+GBLREF volatile boolean_t		ctrlc_on;
+GBLREF volatile char 			source_file_name[];
 GBLREF volatile int4			ctrap_action_is, outofband;
+
+error_def(ERR_LASTFILCMPLD);
 
 ctrlc_set(int4 dummy_param)
 {
 	int4		status;
 	msgtype		message;
-	error_def(ERR_LASTFILCMPLD);
 
 	if (!IS_MCODE_RUNNING)
 	{
@@ -55,8 +56,7 @@ ctrlc_set(int4 dummy_param)
 		{
 			status = sys$setef(efn_outofband);
 			assert(SS$_WASCLR == status);
-			if (status != SS$_WASCLR && status != SS$_WASSET)
-				GTMASSERT;
+			assertpro((SS$_WASCLR == status) || (SS$_WASSET == status));
 			ctrap_action_is = 0;
 			outofband = ctrlc;
 			xfer_table[xf_linefetch] = op_fetchintrrpt;

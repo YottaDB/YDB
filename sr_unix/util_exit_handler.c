@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,7 @@
 #include "secshr_db_clnup.h"
 #include "gtmimagename.h"
 #include "dpgbldir.h"
+#include "gtmcrypt.h"
 
 GBLREF	boolean_t	need_core;
 GBLREF	boolean_t	created_core;
@@ -67,6 +68,7 @@ void util_exit_handler()
 	gv_rundown();
 	print_exit_stats();
 	util_out_close();
+	GTMCRYPT_CLOSE;
 	if (need_core && !created_core)
 		DUMP_CORE;
 }

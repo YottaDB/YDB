@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,10 +98,10 @@ int main (int argc, char **argv, char **envp)
 		return ERR_GTMDISTUNDEF;
 	}
 	dir_len = STRLEN(fptr);
-	if (GTM_PATH_MAX <= dir_len + STR_LIT_LEN(GTMSHR_IMAGE_NAME) + 1)
+	if (GTM_DIST_PATH_MAX <= dir_len)
 	{
-		FPRINTF(stderr, "%%GTM-E-DISTPATHMAX, $gtm_dist path is greater than maximum (%lu)\n",
-			(unsigned long)(GTM_PATH_MAX - STR_LIT_LEN(GTMSHR_IMAGE_NAME) - 2));
+		FPRINTF(stderr, "%%GTM-E-DISTPATHMAX, $gtm_dist path is greater than maximum (%d)\n",
+			GTM_DIST_PATH_MAX);
 		return ERR_DISTPATHMAX;
 	}
 	memcpy(&gtmshr_file[0], fptr, dir_len);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +86,7 @@
 #include "gtm_logicals.h"	/* for DISABLE_ALIGN_STRINGS */
 #include "logical_truth_value.h"
 #include "zwrite.h"
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 
 #define FREE_RTNTBL_SPACE 	17
@@ -135,7 +135,6 @@ GBLREF boolean_t	mstr_native_align;
 GBLREF void             (*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
 GBLREF symval		*curr_symval;
 GBLREF boolean_t	skip_dbtriggers;
-OS_PAGE_SIZE_DECLARE
 
 error_def(ERR_LINKVERSION);
 error_def(ERR_WILLEXPIRE);
@@ -224,10 +223,10 @@ void gtm$startup(struct startup_vector *svec, boolean_t is_dal)
 	op_open_ptr = op_open;
 	unw_prof_frame_ptr = unw_prof_frame;
 	if (SIZEOF(*svec) != svec->argcnt)
-		rts_error(VARLSTCNT(1) ERR_LINKVERSION);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LINKVERSION);
 	if (!init_done)
 	{
-		gtm_imagetype_init(GTM_IMAGE);
+		common_startup_init(GTM_IMAGE);
 		gtm_env_init();	/* read in all environment variables */
 		if ((!is_dal) && NULL != (TREF(mprof_env_gbl_name)).str.addr)
 			turn_tracing_on(TADR(mprof_env_gbl_name), TRUE, (TREF(mprof_env_gbl_name)).str.len > 0);
@@ -242,7 +241,6 @@ void gtm$startup(struct startup_vector *svec, boolean_t is_dal)
 		else
 			status = SS$_NORMAL;
 #		endif
-		get_page_size();
 		/* note: for upward compatibility, missing values in the startup vector can be set to defaults */
 		get_proc_info(0, TADR(login_time), &image_count);
 		gtm_main_address = svec->gtm_main_inaddr;
@@ -301,7 +299,7 @@ void gtm$startup(struct startup_vector *svec, boolean_t is_dal)
 			iott_write_delay[0] = -svec->user_io_timer;
 		rts_stringpool = stringpool;
 		TREF(compile_time) = FALSE;
-		assert(run_time); /* Should have been set by gtm_imagetype_init */
+		assert(run_time); /* Should have been set by common_startup_init */
 		/* Initialize alignment requirement for the runtime stringpool */
 		log_name.addr = DISABLE_ALIGN_STRINGS;
 		log_name.len = STR_LIT_LEN(DISABLE_ALIGN_STRINGS);
@@ -406,7 +404,7 @@ void gtm$startup(struct startup_vector *svec, boolean_t is_dal)
 			if (!TREF(local_collseq))
 			{
 				exi_condition = ERR_COLLATIONUNDEF;
-				gtm_putmsg(VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
 				op_halt();
 			}
 		} else

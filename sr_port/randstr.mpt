@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2011 Fidelity Information Services, Inc	;
+;	Copyright 2011, 2014 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -34,8 +34,8 @@
 	. set patcodes="1."_$select($length($get(patcodes)):$translate(patcodes,$translate(patcodes,a)),1:"AN")
 	. for i=1:1:$length(x) set y=$extract(x,i) set:y?@patcodes charset=$get(charset)_y
 	. quit
-	set n=$length(charset)		   			     			; n has number of characters in alphabet
-	for i=1:1:$select($length($get(strlen)):strlen,1:8) set z=$get(z)_$extract(charset,$random(n)+1) ; generate random string
+	set n=$length(charset),z=""	 				; n has number of characters in alphabet; z is result
+	for i=1:1:$select($length($get(strlen)):strlen,1:8) set z=z_$extract(charset,$random(n)+1) ; generate random string
 	quit:$quit z	; extrinsic
 	write z
 	quit

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,24 +47,17 @@ GBLREF	boolean_t	gtm_utf8_mode;
 #define CLI_ISSPACE(CHAR) ISSPACE_ASCII(CHAR)
 #endif
 
-/* Don't use toupper() because, with Turkish unicode settings, toupper('i') does not have well-defined behavior. On some platforms
- * it returns back 'i' itself. This is because, in Turkish, the actual uppercase version of 'i' is 'I' with a dot on top, which is
- * not an ascii character. Thus cli_strupper would incorrectly convert some qualifiers, resulting in CLIERR errors. For example it
- * would convert "-dynamic_literals" to "-DYNAMiC_LiTERALS" or "-warnings" to "-WARNiNGS".
- */
-#define CLI_TOUPPER(C)	(('a' <= (C) && (C) <= 'z') ? ((C) + ('A' - 'a')) : (C))
-
 static int tok_string_extract(void)
 {
 	int		token_len;
 	boolean_t	have_quote, first_quote;
 	uchar_ptr_t	in_sp, out_sp, in_next, last_in_next,
 			bufend;	/* really one past last byte of buffer */
-#ifdef UNICODE_SUPPORTED
+#	ifdef UNICODE_SUPPORTED
 	wint_t		ch;
-#else
+#	else
 	int		ch;
-#endif
+#	endif
 
 	assert(cli_lex_in_ptr);
 	in_sp = (uchar_ptr_t)cli_lex_in_ptr->tp;
@@ -151,12 +144,12 @@ void	cli_lex_setup (int argc, char **argv)
 {
 	int	parmlen, parmindx;
 	char	**parmptr;
-#ifdef __osf__
-#pragma pointer_size (restore)
-#endif
-#ifdef KEEP_zOS_EBCDIC
+#	ifdef __osf__
+#	pragma pointer_size (restore)
+#	endif
+#	ifdef KEEP_zOS_EBCDIC
 	__argvtoascii_a(argc, argv);
-#endif
+#	endif
 	cmd_cnt = argc;
 	cmd_arg = (char **)argv;
 	/* Quickly run through the parameters to get a ballpark on the
@@ -211,7 +204,7 @@ void cli_strupper(char *sp)
 	int c;
 
 	while (c = *sp)
-		*sp++ = IS_ASCII(c) ? CLI_TOUPPER(c) : c;
+		*sp++ = TOUPPER(c);
 }
 
 /*
@@ -227,12 +220,10 @@ int cli_is_hex(char *p)
 {
 	if (('+' == *p) || ('-' == *p))
 		p++;
-
-	if (('0' == *p) && ('X' == CLI_TOUPPER(*(p + 1))))
+	if (('0' == *p) && ('X' == TOUPPER(*(p + 1))))
         {
                 p = p + 2;
         }
-
 	while (*p && ISXDIGIT_ASCII(*p))
 		p++;
 
@@ -281,14 +272,14 @@ int cli_is_assign(char *p)
 void	skip_white_space(void)
 {
 	uchar_ptr_t	in_sp;
-#ifdef UNICODE_SUPPORTED
+#	ifdef UNICODE_SUPPORTED
 	wint_t	ch;
 	uchar_ptr_t	next_sp, bufend;
-#endif
+#	endif
 
 	assert(cli_lex_in_ptr);
 	in_sp = (uchar_ptr_t)cli_lex_in_ptr->tp;
-#ifdef UNICODE_SUPPORTED
+#	ifdef UNICODE_SUPPORTED
 	if (gtm_utf8_mode)
 	{
 		bufend = (uchar_ptr_t)(cli_lex_in_ptr->in_str + cli_lex_in_ptr->buflen);
@@ -323,11 +314,11 @@ static int	tok_extract (void)
 {
 	int	token_len;
 	uchar_ptr_t	in_sp, in_next, out_sp, bufend;
-#ifdef UNICODE_SUPPORTED
+#	ifdef UNICODE_SUPPORTED
 	wint_t		ch;
-#else
+#	else
 	int		ch;
-#endif
+#	endif
 
 	assert(cli_lex_in_ptr);
 	skip_white_space();	/* Skip leading blanks */
@@ -336,7 +327,6 @@ static int	tok_extract (void)
 
 	out_sp = (uchar_ptr_t)cli_token_buf;
 	token_len = 0;
-
 	in_next = CLI_GET_CHAR(in_sp, bufend, ch);
 	if ('-' == ch || '=' == ch)
 	{
@@ -359,7 +349,6 @@ static int	tok_extract (void)
 	ch = 0;
 	out_sp = CLI_PUT_CHAR(out_sp, ch);
 	cli_lex_in_ptr->tp = (char *)in_sp;
-
 	return(token_len);
 }
 
@@ -379,7 +368,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 {
 	size_t	in_len;
 	char	cli_fgets_buffer[MAX_LINE], *destbuffer, *retptr;
-#ifdef UNICODE_SUPPORTED
+#	ifdef UNICODE_SUPPORTED
 	int		mbc_len, u16_off, destsize;
 	int32_t		mbc_dest_len;
 	UErrorCode	errorcode;
@@ -387,9 +376,9 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 	UChar32		uc32_cp;
 	UChar		cli_fgets_Ubuffer[MAX_LINE];
 	UFILE		*u_fp;
-#endif
+#	endif
 
-#ifdef UNICODE_SUPPORTED
+#	ifdef UNICODE_SUPPORTED
 	if (gtm_utf8_mode)
 	{
 		cli_fgets_Ubuffer[0] = 0;
@@ -457,7 +446,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 			cli_lex_in_ptr->tp = NULL;
 	} else
 	{
-#endif
+#	endif
 		cli_fgets_buffer[0] = '\0';
 		FGETS_FILE(cli_fgets_buffer, SIZEOF(cli_fgets_buffer), fp, retptr);
 		if (NULL != retptr)
@@ -481,10 +470,9 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 				cli_lex_in_ptr->tp = destbuffer;
 		} else if (cli_lex_str)
 			cli_lex_in_ptr->tp = NULL;
-#ifdef UNICODE_SUPPORTED
+#	ifdef UNICODE_SUPPORTED
 	}
-#endif
-
+#	endif
 	return retptr;
 }
 
@@ -524,8 +512,6 @@ int	cli_gettoken (int *eof)
 			strcat(cli_lex_in_ptr->in_str, cli_lex_in_ptr->argv[arg_no++]);
 		}
 	}
-
-
 	if (NULL == cli_lex_in_ptr->tp || strlen(cli_lex_in_ptr->tp) < 1)
 	{
 		cli_token_buf[0] = '\0';
@@ -534,16 +520,14 @@ int	cli_gettoken (int *eof)
 		 * writing to freed memory if the set were done here.
 		 */
 		cli_fgets(cli_lex_in_ptr->in_str, MAX_LINE, stdin, TRUE);
-    		if (NULL != cli_lex_in_ptr->tp)
-      			*eof = 0;
-           	else
-	    	{
-	      		*eof = EOF;
-	      		return (0);
-            	}
-
+		if (NULL != cli_lex_in_ptr->tp)
+			*eof = 0;
+		else
+		{
+			*eof = EOF;
+			return (0);
+		}
 	}
-
 	token_len = tok_extract();
 	*eof = (cli_lex_in_ptr->argc > 1 && token_len == 0);
 	return token_len;
@@ -570,11 +554,9 @@ int cli_look_next_token(int *eof)
 	assert(cli_lex_in_ptr);
 	if (((char *) NULL == cli_lex_in_ptr->tp) || (!strlen(cli_lex_in_ptr->tp)))
 		return(0);
-
 	old_tp = cli_lex_in_ptr->tp;
 	tok_len = cli_gettoken(eof);
 	cli_lex_in_ptr->tp = old_tp;
-
 	return(tok_len);
 }
 
@@ -586,11 +568,9 @@ int cli_look_next_string_token(int *eof)
 	assert(cli_lex_in_ptr);
 	if (!strlen(cli_lex_in_ptr->tp))
 		return(0);
-
 	old_tp = cli_lex_in_ptr->tp;
 	tok_len = cli_get_string_token(eof);
 	cli_lex_in_ptr->tp = old_tp;
-
 	return(tok_len);
 }
 
@@ -630,7 +610,6 @@ int cli_get_string_token(int *eof)
 				strcat(cli_lex_in_ptr->in_str, cli_lex_in_ptr->argv[arg_no++]);
 		}
 	}
-
 	if (NULL == cli_lex_in_ptr->tp || strlen(cli_lex_in_ptr->tp) < 1)
 	{
 		cli_token_buf[0] = '\0';
@@ -639,20 +618,18 @@ int cli_get_string_token(int *eof)
 		 * writing to freed memory if the set were done here.
 		 */
 		cli_fgets(cli_lex_in_ptr->in_str, MAX_LINE, stdin, TRUE);
-    		if (NULL != cli_lex_in_ptr->tp)
-      			*eof = 0;
-           	else
+		if (NULL != cli_lex_in_ptr->tp)
+			*eof = 0;
+		else
 		{
 			*eof = EOF;
 			return (0);
 		}
-        }
-
+	}
 	token_len = tok_string_extract();
 	*eof = (cli_lex_in_ptr->argc > 1 && token_len == 0);
 	return token_len;
 }
-
 
 /*
  * -------------------------------------------------------
@@ -665,7 +642,7 @@ int cli_get_string_token(int *eof)
  */
 int cli_has_space(char *p)
 {
-#ifdef UNICODE_SUPPORTED
+#	ifdef UNICODE_SUPPORTED
 	uchar_ptr_t	local_p, next_p, bufend;
 	wint_t	ch;
 
@@ -683,11 +660,8 @@ int cli_has_space(char *p)
 		p = (char *)local_p;
 	}
 	else
-#endif
+#	endif
 		while (*p && !ISSPACE_ASCII(*p))
 			p++;
-
 	return ((*p) ? (TRUE) : (FALSE));
 }
-
-

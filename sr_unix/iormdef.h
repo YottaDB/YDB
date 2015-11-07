@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,14 +12,16 @@
 #ifndef IORMDEF_H
 #define IORMDEF_H
 
+#include "gtmcrypt.h"		/* For gtmcrypt_key_t below. */
+
 #define DEF_RM_WIDTH		32767
 #define DEF_RM_RECORDSIZE	32767
 #define DEF_RM_LENGTH		66
 #define CHUNK_SIZE		512
 
-#define	ONE_COMMA			"1,"
-#define	ONE_COMMA_UNAVAILABLE		"1,Resource temporarily unavailable"
-#define	ONE_COMMA_DEV_DET_EOF		"1,Device detected EOF"
+#define	ONE_COMMA		"1,"
+#define	ONE_COMMA_UNAVAILABLE	"1,Resource temporarily unavailable"
+#define	ONE_COMMA_DEV_DET_EOF	"1,Device detected EOF"
 
 #define	DEF_RM_PADCHAR		' '	/* SPACE */
 
@@ -58,6 +60,59 @@ int pid;
 #define SET_WIDTH_BYTES	width_bytes = 1;
 #endif
 
+error_def(ERR_CLOSEFAIL);
+error_def(ERR_CRYPTBADWRTPOS);
+
+#define	IORM_FCLOSE(D_RM, FILDES, FILSTR)								\
+{													\
+	int		fclose_res, rc, save_fd;							\
+													\
+	if (NULL != D_RM->FILSTR)									\
+	{	/* Since FCLOSE also closes the fd, reset FILDES (no need to close it separately). */	\
+		LINUX_ONLY(assert(D_RM->FILDES == D_RM->FILSTR->_fileno);)				\
+		FCLOSE(D_RM->FILSTR, fclose_res);							\
+		if (0 != fclose_res)									\
+		{											\
+			save_fd = D_RM->FILDES;								\
+			rc = errno;									\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);	\
+		}											\
+		D_RM->FILSTR = NULL;									\
+		D_RM->FILDES = FD_INVALID;								\
+	} else if (FD_INVALID != D_RM->FILDES)								\
+	{												\
+		save_fd = D_RM->FILDES;									\
+		CLOSEFILE_RESET(D_RM->FILDES, rc);	/* resets "D_RM->FILDES" to FD_INVALID */	\
+		if (0 != rc)										\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);	\
+	}												\
+}
+
+#define READ_ENCRYPTED_DATA(DEVICE, NAME, INBUF, INBUF_LEN, OUTBUF)					\
+{													\
+	int rv;												\
+													\
+	if (INBUF_LEN > 0)										\
+	{												\
+		GTMCRYPT_ENCRYPT_DECRYPT_WITH_IV(NULL, (DEVICE)->input_cipher_handle,			\
+			INBUF, INBUF_LEN, OUTBUF, GTMCRYPT_OP_DECRYPT, GTMCRYPT_IV_CONTINUE, rv);	\
+		if (0 != rv)										\
+			GTMCRYPT_REPORT_ERROR(rv, rts_error, (NAME)->len, (NAME)->dollar_io);		\
+	}												\
+}
+
+#define WRITE_ENCRYPTED_DATA(DEVICE, NAME, INBUF, INBUF_LEN, OUTBUF)					\
+{													\
+	int rv;												\
+													\
+	if (INBUF_LEN > 0)										\
+	{												\
+		GTMCRYPT_ENCRYPT_DECRYPT_WITH_IV(NULL, (DEVICE)->output_cipher_handle,			\
+			INBUF, INBUF_LEN, OUTBUF, GTMCRYPT_OP_ENCRYPT, GTMCRYPT_IV_CONTINUE, rv);	\
+		if (0 != rv)										\
+			GTMCRYPT_REPORT_ERROR(rv, rts_error, (NAME)->len, (NAME)->dollar_io);		\
+	}												\
+}
 
 /* Operations for this device type */
 #define RM_NOOP		0
@@ -92,22 +147,22 @@ typedef	struct dev_pairs {
 
 typedef struct pipe_interrupt_type
 {
-	ABS_TIME			end_time;
+	ABS_TIME		end_time;
 	enum pipe_which		who_saved;
-	int				max_bufflen;
-	int				bytes_read;
-	int				bytes2read;
-	int				char_count;
-	int				bytes_count;
-	int				add_bytes;
-	boolean_t                       end_time_valid;
+	int			max_bufflen;
+	int			bytes_read;
+	int			bytes2read;
+	int			char_count;
+	int			bytes_count;
+	int			add_bytes;
+	boolean_t               end_time_valid;
 	struct d_rm_struct	*newpipe;
 } pipe_interrupt;
 
 typedef struct
 {
 	boolean_t	fixed;		/* Fixed format file */
-	boolean_t	noread;
+	boolean_t	read_only;	/* READONLY specified */
 	boolean_t	write_only;	/* WRITEONLY specified */
 	boolean_t	stream;
 	boolean_t	fifo;
@@ -121,6 +176,8 @@ typedef struct
 	boolean_t	def_recsize;	/* RECORDSIZE has not been changed */
 	boolean_t	bom_read_one_done;	/* If pipe/fifo and UTF8, read one byte to check for bom if not set */
 	boolean_t	follow;	/* True if disk read with follow - similar to tail -f on a file */
+	boolean_t	no_destroy;	/* true if disk and NO_DESTROY on CLOSE and filedes >= 2*/
+	boolean_t	bom_checked;	/* If disk and UTF8 the bom has been read and bom_num_bytes has been set */
 	pipe_interrupt	pipe_save_state;	/* Saved state of interrupted IO */
 	boolean_t	mupintr;	/* We were mupip interrupted */
 	unsigned int	lastop;		/* Last operation done on file */
@@ -142,6 +199,7 @@ typedef struct
 	int		out_bytes;	/* Number of bytes output for this fixed record */
 	uint4		bom_buf_cnt;	/* Count of bytes in BOM buffer */
 	uint4		bom_buf_off;	/* Next available byte in BOM buffer */
+	uint4		bom_num_bytes;	/* number of bom bytes read */
 	unsigned char	bom_buf[4];	/* Buffer area for BOM assembly */
 	unsigned char	*inbuf;		/* Input buffer area */
 	unsigned char	*inbuf_pos;	/* Put next char in inbuf here */
@@ -154,7 +212,17 @@ typedef struct
 	char		utf_tmp_buffer[CHUNK_SIZE];	/* Buffer to store CHUNK bytes */
 	int		utf_tot_bytes_in_buffer;	/* Number of bytes read from device, it refers utf_tmp_buffer buffer */
 	int		utf_start_pos;			/* Current position in utf_tmp_buffer */
-}d_rm_struct;	/*  rms		*/
+	boolean_t	write_occurred;			/* Flag indicating whether a write has occurred on this device. */
+	boolean_t	read_occurred;			/* Flag indicating whether a read has occurred on this device. */
+	boolean_t	input_encrypted;		/* Whether this device's input stream is encrypted or not. */
+	boolean_t	output_encrypted;		/* Whether this device's output stream is encrypted or not. */
+	mstr		input_iv;			/* Input Initialization Vector for this device's encryption. */
+	mstr		output_iv;			/* Output Initialization Vector for this device's encryption. */
+	mstr		input_key;			/* Name that maps to an input encryption key on disk. */
+	mstr		output_key;			/* Name that maps to an output encryption key on disk. */
+	gtmcrypt_key_t	input_cipher_handle;		/* Encryption cipher handle for this device. */
+	gtmcrypt_key_t	output_cipher_handle;		/* Decryption cipher handle for this device. */
+} d_rm_struct;	/*  rms		*/
 
 #ifdef KEEP_zOS_EBCDIC
 #define NATIVE_NL	0x15		/* EBCDIC */
@@ -174,5 +242,7 @@ int iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 int iorm_write_utf_ascii(io_desc *iod, char *string, int len);
 void iorm_write_utf(mstr *v);
 void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr, unsigned char *strend);
+int open_get_bom(io_desc *io_ptr, int bom_size);
+int open_get_bom2(io_desc *io_ptr, int max_bom_size );
 
 #endif

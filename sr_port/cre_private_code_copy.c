@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,17 +39,21 @@ uint4 cre_private_code_copy(rhdtyp *rtn)
 	int		code_size;
 
 #ifdef USHBIN_SUPPORTED
-		assert(NULL != rtn->shlib_handle); /* don't need private copy if not shared */
-		assert(NULL == rtn->shared_ptext_adr); /* if already private, we shouldn't be calling this routine */
+		assert(NULL != rtn->shared_ptext_adr); /* don't need private copy if not shared */
+		assert(rtn->shared_ptext_adr == rtn->ptext_adr); /* if already private, we shouldn't be calling this routine */
+
 		code_size = (int)(rtn->ptext_end_adr - rtn->ptext_adr) ;
 		ESTABLISH_RET(cre_priv_ch, UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY));
 		new_ptext = GTM_TEXT_ALLOC(code_size);
 		REVERT;
 		memcpy(new_ptext, rtn->ptext_adr, code_size);
 		adjust_frames(rtn->ptext_adr, rtn->ptext_end_adr, new_ptext);
-		rtn->shared_ptext_adr = rtn->ptext_adr;
-		rtn->ptext_adr = new_ptext;
-		rtn->ptext_end_adr = new_ptext + code_size;
+		do
+		{
+			rtn->ptext_adr = new_ptext;
+			rtn->ptext_end_adr = new_ptext + code_size;
+			rtn = (rhdtyp *)rtn->old_rhead_adr;
+		} while (NULL != rtn);
 		inst_flush(new_ptext, code_size);
 #endif
 	return SS_NORMAL;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,13 @@
 #include "iottdef.h"
 #include "iosocketdef.h"
 
+#ifndef VMS
+GBLREF	io_pair		io_std_device;
+#endif
+
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_NOSOCKETINDEV);
+error_def(ERR_SOCKPASSDATAMIX);
 
 void	iosocket_wteol(int4 val, io_desc *io_ptr)
 {
@@ -36,7 +41,12 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 	dsocketptr = (d_socket_struct *)io_ptr->dev_sp;
 	if (0 >= dsocketptr->n_socket)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+#		ifndef VMS
+		if (io_ptr == io_std_device.out)
+			ionl_wteol(val, io_ptr);
+		else
+#		endif
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
 		return;
 	}
 	if (dsocketptr->current_socket >= dsocketptr->n_socket)
@@ -45,6 +55,7 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 		return;
 	}
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
+	ENSURE_DATA_SOCKET(socketptr);
 	assert(val);
 	io_ptr->esc_state = START;
 	if (socketptr->n_delimiter > 0)

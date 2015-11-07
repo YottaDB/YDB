@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,7 +99,7 @@ typedef enum {
 	WBTEST_HOLD_CRIT_TILL_LCKALERT,		/* 66 : Grab and hold crit until 15 seconds past what triggers a lock alert message
 						 *      which should invoke a mutex salvage */
 	WBTEST_OPER_LOG_MSG,			/* 67 : send message to operator log */
-	WBTEST_UNUSED_1,			/* 68 :  */
+	WBTEST_FAKE_BIG_EXTRACT,		/* 68 : fake large increase in EXTRACT record count to show it doesn't overflow  */
 	/* Begin ANTIFREEZE related white box test cases */
 	WBTEST_ANTIFREEZE_JNLCLOSE,		/* 69 :  */
 	WBTEST_ANTIFREEZE_DBBMLCORRUPT,		/* 70 :  */
@@ -135,7 +135,11 @@ typedef enum {
 	WBTEST_HOLD_FTOK_UNTIL_BYPASS,		/* 96 : Hold the ftok semaphore until another process comes and bypasses it */
 	WBTEST_SLEEP_IN_WCS_WTSTART,		/* 97 : Sleep in one of the predetermined places inside wcs_wtstart.c */
 	WBTEST_SETITIMER_ERROR,			/* 98 : Simulate an error return from setitimer in gt_timers.c */
-	WBTEST_HOLD_GTMSOURCE_SRV_LATCH		/* 99 : Hold the source server latch until rollback process issues a SIGCONT */
+	WBTEST_HOLD_GTMSOURCE_SRV_LATCH,	/* 99 : Hold the source server latch until rollback process issues a SIGCONT */
+	WBTEST_KILL_ROLLBACK,			/* 100: Kill in the middle of rollback */
+	WBTEST_INFO_HUB_SEND_ZMESS,		/* 101 : Print messages triggered via ZMESSAGE to the syslog */
+	WBTEST_SKIP_CORE_FOR_MEMORY_ERROR,	/* 102 : Do not generate core file in case of GTM-E-MEMORY fatal error */
+	WBTEST_EXTFILTER_INDUCE_ERROR,		/* 103 : Do not assert in case of external filter error (test induces that) */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be levereged.

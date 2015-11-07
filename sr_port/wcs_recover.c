@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -116,6 +116,17 @@ error_def(ERR_GVIS);
 error_def(ERR_STOPTIMEOUT);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
+
+#define	BT_NOT_NULL(BT, CR, CSA, REG)								\
+{												\
+	if (NULL == BT)										\
+	{	/* NULL value is only possible if wcs_get_space in bt_put fails */		\
+		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(REG),	\
+			CR, CR->blk, RTS_ERROR_TEXT("Non-zero bt"), BT, TRUE, CALLFROM);	\
+		assert(FALSE);									\
+		continue;									\
+	}											\
+}
 
 void wcs_recover(gd_region *reg)
 {
@@ -387,8 +398,12 @@ void wcs_recover(gd_region *reg)
 					 * all following cr's.  If r_epid is 0 and also read in progress, we identify
 					 * this as corruption and fixup up this cr and proceed to the next cr.
 					 */
-					assert(FALSE || (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number));
-					assertpro((0 == r_epid) || (epid == r_epid));
+					assert(WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number);
+					if (!((0 == r_epid) || (epid == r_epid)))
+					{
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(reg));
+						assert(FALSE);
+					}
 					/* process still active but not playing fair or cache is corrupted */
 					GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, r_epid, TWICE);
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id, cr->blk, cr, r_epid,
@@ -426,10 +441,14 @@ void wcs_recover(gd_region *reg)
 						epid = cr->epid;
 					else  if (BUF_OWNER_STUCK < lcnt)
 					{
-						assertpro((0 == cr->epid) || (epid == cr->epid));
+						if (!((0 == cr->epid) || (epid == cr->epid)))
+						{
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(reg));
+							assert(FALSE);
+						}
 						if (0 != epid)
 						{	/* process still active, but not playing fair */
-							send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_STOPTIMEOUT, 3, epid,
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_STOPTIMEOUT, 3, cr->epid,
 									DB_LEN_STR(reg));
 							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,
 									LEN_AND_LIT("Buffer forcibly seized"));
@@ -493,13 +512,14 @@ void wcs_recover(gd_region *reg)
 					change_bmm = TRUE;
 				}
 			}	/* end of bitmap processing */
-			if (certify_all_blocks)
-				cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, TRUE);/* assertpro() on error */
+			if (!cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, FALSE))
+			{	/* always check the block and return - no assertpro, so last argument is FALSE */
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid,
+					DB_LEN_STR(reg), cr->blk);
+				assert(gtm_white_box_test_case_enabled);
+			}
 			bt = bt_put(reg, cr->blk);
-			/* NULL value for 'bt' is only possible if wcs_get_space in bt_put fails which is impossible here since we
-			 * have called bt_refresh above. Confrim this in the below assertpro().
-			 */
-			assertpro(NULL != bt);
+			BT_NOT_NULL(bt, cr, csa, reg);
 			bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID != bt->cache_index)
 			{	/* the bt already identifies another cache entry with this block */
@@ -633,7 +653,7 @@ void wcs_recover(gd_region *reg)
 				hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
 				WRITE_LATCH_VAL(cr) = LATCH_SET;
 				bt = bt_put(reg, cr->blk);
-				assertpro(NULL != bt);		/* NULL value is only possible if wcs_get_space in bt_put fails */
+				BT_NOT_NULL(bt, cr, csa, reg);
 				bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 				if (CR_NOTVALID == bt->cache_index)
 				{	/* no previous entry for this block; more recent cache record will twin when processed */
@@ -676,7 +696,7 @@ void wcs_recover(gd_region *reg)
 		if ((LATCH_SET > WRITE_LATCH_VAL(cr)) VMS_ONLY(|| (WRT_STRT_PNDNG == cr->iosb.cond)))
 		{	/* no process has an interest */
 			bt = bt_put(reg, cr->blk);
-			assertpro(NULL != bt);		/* NULL value is only possible if wcs_get_space in bt_put fails */
+			BT_NOT_NULL(bt, cr, csa, reg);
 			bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID == bt->cache_index)
 			{	/* no previous entry for this block */
@@ -737,7 +757,7 @@ void wcs_recover(gd_region *reg)
 		UNIX_ONLY(WRITE_LATCH_VAL(cr) = LATCH_CLEAR;)
 		hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
 		bt = bt_put(reg, cr->blk);
-		assertpro(NULL != bt);		/* NULL value is only possible if wcs_get_space in bt_put fails */
+		BT_NOT_NULL(bt, cr, csa, reg);
 		bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 		if (CR_NOTVALID == bt->cache_index)
 		{	/* no previous entry for this block */

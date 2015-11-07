@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,12 +30,12 @@
 
 #include "mdef.h"
 
-#include "gtm_string.h"
 #include <errno.h>
 #include <libelf.h>
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 
 #include "compiler.h"
 #include <rtnhdr.h>
@@ -52,8 +52,8 @@
 #include <obj_filesp.h>
 #include "release_name.h"
 #include "min_max.h"
-/* The following definitions are reqquired for the new(for ELF files) create/close_obj_file.c functions */
 
+/* The following definitions are required for the new(for ELF files) create/close_obj_file.c functions */
 #ifdef __linux__
 #define ELF64_LINKER_FLAG       0x10
 #else
@@ -61,9 +61,7 @@
 #endif /* __linux__ */
 
 
-/* Platform specific action instructions when routine called from foreign language */
-/* Currently just a return to caller on AIX */
-
+/* Platform specific action instructions when routine called from foreign language. Returns -1 to caller */
 #define MIN_LINK_PSECT_SIZE     0
 LITDEF mach_inst jsb_action[JSB_ACTION_N_INS] = {0x48, 0xc7, 0xc0, 0xff, 0xff, 0xff, 0xff, 0xc3};
 
@@ -117,54 +115,23 @@ error_def(ERR_OBJFILERR);
 /* Open the object file and write out the gtm object. Actual ELF creation happens at later stage during close_object_file */
 void create_object_file(rhdtyp *rhead)
 {
-        int             status, rout_len;
-        char            obj_name[SIZEOF(mident_fixed) + 5];
-        mstr            fstr;
-        parse_blk       pblk;
-
-        error_def(ERR_FILEPARSE);
-
         assert(!run_time);
-
         DEBUG_ONLY(obj_bytes_written = 0);
-        memset(&pblk, 0, SIZEOF(pblk));
-        pblk.buffer = object_file_name;
-        pblk.buff_size = MAX_FBUFF;
+ 	init_object_file_name(); /* inputs: cmd_qlf.object_file, module_name; outputs: object_file_name, object_name_len */
+	object_file_des = mk_tmp_object_file(object_file_name, object_name_len);
+	/* Action instructions and marker are not kept in the same array since the type of the elements of
+	 * the former (uint4) may be different from the type of the elements of the latter (char).
+	 * 'tiz cleaner this way rather than converting one to the other type in order to be accommodated
+	 * in an array
+	 */
+        assert(JSB_ACTION_N_INS * SIZEOF(jsb_action[0]) == SIZEOF(jsb_action));	/* JSB_ACTION_N_INS maintained? */
+        assert(SIZEOF(jsb_action) <= SIZEOF(rhead->jsb));			/* Overflow check */
 
-        /* create the object file */
-        fstr.len = (MV_DEFINED(&cmd_qlf.object_file) ? cmd_qlf.object_file.str.len : 0);
-        fstr.addr = cmd_qlf.object_file.str.addr;
-        rout_len = (int)module_name.len;
-        memcpy(&obj_name[0], module_name.addr, rout_len);
-        memcpy(&obj_name[rout_len], DOTOBJ, SIZEOF(DOTOBJ));    /* includes null terminator */
-        pblk.def1_size = rout_len + SIZEOF(DOTOBJ) - 1;         /* Length does not include null terminator */
-        pblk.def1_buf = obj_name;
-        status = parse_file(&fstr, &pblk);
-        if (0 == (status & 1))
-                rts_error(VARLSTCNT(5) ERR_FILEPARSE, 2, fstr.len, fstr.addr, status);
-
-        object_name_len = pblk.b_esl;
-        object_file_name[object_name_len] = 0;
-
-        OPEN_OBJECT_FILE(object_file_name, O_CREAT | O_RDWR, object_file_des);
-        if (FD_INVALID == object_file_des)
-                rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
-
-/* Action instructions and marker are not kept in the same array since the type of the elements of
- * the former (uint4) may be different from the type of the elements of the latter (char).
- * 'tiz cleaner this way rather than converting one to the other type in order to be accommodated
- * in an array
- * */
-        assert(JSB_ACTION_N_INS * SIZEOF(jsb_action[0]) == SIZEOF(jsb_action)); /* JSB_ACTION_N_INS maintained? */
-        assert(SIZEOF(jsb_action) <= SIZEOF(rhead->jsb));                       /* overflow check */
-
-  	memcpy(rhead->jsb, (char *)jsb_action, SIZEOF(jsb_action)); /* action instructions */
-        memcpy(&rhead->jsb[SIZEOF(jsb_action)], JSB_MARKER,                     /* followed by GTM_CODE marker */
+  	memcpy(rhead->jsb, (char *)jsb_action, SIZEOF(jsb_action)); 		/* Action instructions */
+        memcpy(&rhead->jsb[SIZEOF(jsb_action)], JSB_MARKER,			/* Followed by GTM_CODE marker */
                MIN(STR_LIT_LEN(JSB_MARKER), SIZEOF(rhead->jsb) - SIZEOF(jsb_action)));
-
         emit_immed((char *)rhead, SIZEOF(*rhead));
 }
-
 
 /* At this point, we know only gtm_object has been written onto the file.
  * Read that gtm_object and wrap it up in .text section, add remaining sections to native object(ELF)
@@ -188,135 +155,116 @@ void close_object_file(void)
         actualSize = 0;
         string_tbl = malloc(SPACE_STRING_ALLOC_LEN);
         symIndex = 0;
-
         strEntrySize = SIZEOF(static_string_tbl);
         memcpy((string_tbl + symIndex), static_string_tbl, strEntrySize);
         symIndex += strEntrySize;
-
         strEntrySize = SIZEOF(GTM_LANG);
         memcpy((string_tbl + symIndex), GTM_LANG, strEntrySize);
         symIndex += strEntrySize;
-
         strEntrySize = SIZEOF(GTM_PRODUCT);
         memcpy((string_tbl + symIndex), GTM_PRODUCT, strEntrySize);
         symIndex += strEntrySize;
-
         strEntrySize = SIZEOF(GTM_RELEASE_NAME);
         memcpy((string_tbl + symIndex), GTM_RELEASE_NAME, strEntrySize);
-        symIndex += strEntrySize;
-
+	symIndex += strEntrySize;
         gtm_obj_code = (char *)malloc(bufSize);
         /* At this point, we have only the GTM object written onto the file.
          * We need to read it back and wrap inside the ELF object and
-         * write a native ELF object file. */
+         * write a native ELF object file.
+	 */
         lseek(object_file_des, 0, SEEK_SET);
         DOREADRL(object_file_des, gtm_obj_code, bufSize, actualSize);
         /* Reset the pointer back for writing an ELF object. */
         lseek(object_file_des, 0, SEEK_SET);
-
         /* Generate ELF64 header */
-        if (elf_version(EV_CURRENT) == EV_NONE )
+        if (EV_NONE == elf_version(EV_CURRENT))
         {
-		FPRINTF(stderr, "Elf library out of date!n");
-		GTMASSERT;
+		FPRINTF(stderr, "Elf library out of date!\n");
+		assertpro(FALSE);
         }
-        if ((elf = elf_begin(object_file_des, ELF_C_WRITE, NULL)) == 0)
+        if (0 == (elf = elf_begin(object_file_des, ELF_C_WRITE, NULL)))
         {
 		FPRINTF(stderr, "elf_begin failed!\n");
-		GTMASSERT;
+		assertpro(FALSE);
         }
-        if ( (ehdr = elf64_newehdr(elf)) == NULL )
+        if (NULL == (ehdr = elf64_newehdr(elf)))
         {
 		FPRINTF(stderr, "elf64_newehdr() failed!\n");
-		GTMASSERT;
+		assertpro(FALSE);
         }
-
         ehdr->e_ident[EI_MAG0] = ELFMAG0;
         ehdr->e_ident[EI_MAG1] = ELFMAG1;
         ehdr->e_ident[EI_MAG2] = ELFMAG2;
         ehdr->e_ident[EI_MAG3] = ELFMAG3;
         ehdr->e_ident[EI_CLASS] = ELFCLASS64;
         ehdr->e_ident[EI_VERSION] = EV_CURRENT;
-#ifdef __hpux
+#	ifdef __hpux
         ehdr->e_ident[EI_DATA] = ELFDATA2MSB;
         ehdr->e_ident[EI_OSABI] = ELFOSABI_HPUX;
-#else
+#	else
         ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
         ehdr->e_ident[EI_OSABI] = ELFOSABI_LINUX;
-#endif /* __hpux */
+#	endif /* __hpux */
         ehdr->e_ident[EI_ABIVERSION] = EV_CURRENT;
         ehdr->e_machine = EM_X86_64;
         ehdr->e_type = ET_REL;
         ehdr->e_version = EV_CURRENT;
         ehdr->e_shoff = SIZEOF(Elf64_Ehdr);
         ehdr->e_flags = ELF64_LINKER_FLAG;
-
-        if ((text_scn = elf_newscn(elf)) == NULL)
+        if (NULL == (text_scn = elf_newscn(elf)))
         {
                 FPRINTF(stderr, "elf_newscn() failed for text section!\n");
-                GTMASSERT;
+                assertpro(FALSE);
         }
-
-        if ((text_data = elf_newdata(text_scn)) == NULL)
+        if (NULL == (text_data = elf_newdata(text_scn)))
         {
                 FPRINTF(stderr, "elf_newdata() failed for text section!\n");
-                GTMASSERT;
+                assertpro(FALSE);
         }
-
         text_data->d_align = SECTION_ALIGN_BOUNDARY;
         text_data->d_off  = 0LL;
         text_data->d_buf  = gtm_obj_code;
         text_data->d_type = ELF_T_REL;
         text_data->d_size = gtm_object_size;
         text_data->d_version = EV_CURRENT;
-
-        if ((text_shdr = elf64_getshdr(text_scn)) == NULL)
+        if (NULL == (text_shdr = elf64_getshdr(text_scn)))
         {
                 FPRINTF(stderr, "elf64_getshdr() failed for text section\n");
-                GTMASSERT;
+                assertpro(FALSE);
         }
-
         text_shdr->sh_name = STR_SEC_TEXT_OFFSET;
         text_shdr->sh_type = SHT_PROGBITS;
         text_shdr->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
         text_shdr->sh_entsize = gtm_object_size;
-
         memcpy((string_tbl +  symIndex), module_name.addr, module_name.len);
         string_tbl[symIndex + module_name.len] = '\0';
-
-        if ((strtab_scn = elf_newscn(elf)) == NULL)
+        if (NULL == (strtab_scn = elf_newscn(elf)))
         {
                 FPRINTF(stderr, "elf_newscn() failed for strtab section\n");
-                GTMASSERT;
+                assertpro(FALSE);
         }
-
-        if ((strtab_data = elf_newdata(strtab_scn)) == NULL)
+        if (NULL == (strtab_data = elf_newdata(strtab_scn)))
         {
                 FPRINTF(stderr, "elf_newdata() failed for strtab section!\n");
-                GTMASSERT;
+                assertpro(FALSE);
         }
-
         strtab_data->d_align = NATIVE_WSIZE;
         strtab_data->d_buf = string_tbl;
         strtab_data->d_off = 0LL;
         strtab_data->d_size = SPACE_STRING_ALLOC_LEN;
         strtab_data->d_type = ELF_T_BYTE;
         strtab_data->d_version = EV_CURRENT;
-
-        if ((strtab_shdr = elf64_getshdr(strtab_scn)) == NULL)
+        if (NULL == (strtab_shdr = elf64_getshdr(strtab_scn)))
         {
                 FPRINTF(stderr, "elf_getshdr() failed for strtab section!\n");
-                GTMASSERT;
+                assertpro(FALSE);
         }
-
         strtab_shdr->sh_name = STR_SEC_STRTAB_OFFSET;
         strtab_shdr->sh_type = SHT_STRTAB;
         strtab_shdr->sh_entsize = 0;
         ehdr->e_shstrndx = elf_ndxscn(strtab_scn);
-
         /* Creating .symbtab section */
         i = 0;
-
         /* NULL symbol */
         symEntries[i].st_name = 0;
         symEntries[i].st_info = ELF64_ST_INFO(STB_LOCAL, STT_NOTYPE);
@@ -325,7 +273,6 @@ void close_object_file(void)
         symEntries[i].st_size = 0;
         symEntries[i].st_value = 0;
         i++;
-
         /* Module symbol */
         symEntries[i].st_name = symIndex;
         symEntries[i].st_info = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC);
@@ -334,7 +281,6 @@ void close_object_file(void)
         symEntries[i].st_size = gtm_object_size;
         symEntries[i].st_value = 0;
         i++;
-
         /* symbol for .text section */
         symEntries[i].st_name = STR_SEC_TEXT_OFFSET;
         symEntries[i].st_info = ELF64_ST_INFO(STB_LOCAL, STT_SECTION);
@@ -343,51 +289,42 @@ void close_object_file(void)
         symEntries[i].st_size = 0;
         symEntries[i].st_value = 0;
         i++;
-
-        if ((symtab_scn = elf_newscn(elf)) == NULL)
+        if (NULL == (symtab_scn = elf_newscn(elf)))
         {
                 FPRINTF(stderr, "elf_newscn() failed for symtab section!\n");
-                GTMASSERT;
+                assertpro(FALSE);
         }
-
-        if ((symtab_data = elf_newdata(symtab_scn)) == NULL)
+        if (NULL == (symtab_data = elf_newdata(symtab_scn)))
         {
                 FPRINTF(stderr, "elf_newdata() failed for symtab section!\n");
-                GTMASSERT;
+                assertpro(FALSE);
         }
-
         symtab_data->d_align = NATIVE_WSIZE;
         symtab_data->d_off  = 0LL;
         symtab_data->d_buf  = symEntries;
         symtab_data->d_type = ELF_T_REL;
         symtab_data->d_size = SIZEOF(Elf64_Sym) * i;
         symtab_data->d_version = EV_CURRENT;
-
-        if ((symtab_shdr = elf64_getshdr(symtab_scn)) == NULL)
+        if (NULL == (symtab_shdr = elf64_getshdr(symtab_scn)))
         {
                 FPRINTF(stderr, "elf_getshdr() failed for symtab section!\n");
-                GTMASSERT;
+                assertpro(FALSE);
         }
-
         symtab_shdr->sh_name = STR_SEC_SYMTAB_OFFSET;
         symtab_shdr->sh_type = SHT_SYMTAB;
         symtab_shdr->sh_entsize = SIZEOF(Elf64_Sym) ;
         symtab_shdr->sh_link = SEC_STRTAB_INDX;
-
         elf_flagehdr(elf, ELF_C_SET, ELF_F_DIRTY);
-        if (elf_update(elf, ELF_C_WRITE) < 0)
+        if (0 > elf_update(elf, ELF_C_WRITE))
         {
                 FPRINTF(stderr, "elf_update() failed!\n");
-                GTMASSERT;
+                assertpro(FALSE);
         }
-
         elf_end(elf);
-
         /* Free the memory malloc'ed above */
         free(string_tbl);
         free(gtm_obj_code);
-
 	if ((off_t)-1 == lseek(object_file_des, (off_t)0, SEEK_SET))
-		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 }
 

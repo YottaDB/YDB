@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,14 +104,14 @@ void op_exp(mval *u, mval* v, mval *p)
 			{	/* Base is integer-ish */
                         	if (0 > u1_p->m[1])
 				{	/* Base is negative, invalid exponent expression */
-					rts_error(VARLSTCNT(1) ERR_NEGFRACPWR);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NEGFRACPWR);
 					return;
 				}
 			} else
 			{	/* Base is NOT integer-sh */
 				if (u1_p->sgn)
 				{	/* Base is negative, invalid exponent expression */
-					rts_error(VARLSTCNT(1) ERR_NEGFRACPWR);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NEGFRACPWR);
 					return;
 				}
 			}
@@ -197,7 +197,7 @@ void op_exp(mval *u, mval* v, mval *p)
 		}
 		if (fraction && neg)
 		{	/* Fractional exponent and negative base not valid */
-			rts_error(VARLSTCNT(1) ERR_NEGFRACPWR);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NEGFRACPWR);
 			return;
 		}
 	}
@@ -207,12 +207,11 @@ void op_exp(mval *u, mval* v, mval *p)
 #	ifdef UNIX
 	if (HUGE_VAL == z)		/* Infinity return value check */
 	{
-		rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
 	        return;
 	}
 #	endif
-	assert(!neg);	/* Should be taken care of in one of the op_mul() using sections dealing with whole exponents */
-	p->sgn = 0;	/* Positive numbers only from here on out */
+	p->sgn = (neg && !even);	/* Positive numbers only from here on out */
 	if (0 == z)
 	{
 		*p = literal_zero;
@@ -242,7 +241,7 @@ void op_exp(mval *u, mval* v, mval *p)
 		z2 = (double)n1 / MV_BIAS;
 		if (fabs(z - z2) < accuracy)
 		{	/* We can treat this as a GT.M int */
-			((mval_b *)p)->sgne = 0;
+			p->e = 0;
 			p->mvtype = (MV_NM | MV_INT);
 			p->m[0] = 0;
 			p->m[1] = (p->sgn) ? -n1 : n1;
@@ -283,7 +282,7 @@ void op_exp(mval *u, mval* v, mval *p)
 		 * check. Not expecting it to ever be invoked but is here as a safety net.
 		 */
 		z1_rnd /= ten_pwr[-3-n];
-		((mval_b *)p)->sgne = 0;
+		p->e = 0;
 		p->mvtype = (MV_NM | MV_INT);
 		p->m[1] = z1_rnd;
 		return;
@@ -291,7 +290,7 @@ void op_exp(mval *u, mval* v, mval *p)
 	exponent = MV_XBIAS + n + 9;
 	if (exponent >= EXPHI)
 	{
-		rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
 		return;
 	}
 	if (exponent < EXPLO)

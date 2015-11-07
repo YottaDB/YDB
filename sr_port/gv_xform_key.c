@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,9 +77,8 @@ void gv_xform_key(gv_key *keyp,  boolean_t xback)
 		} else
 		{
 			TREF(transform) = xback;
-			(TREF(gv_sparekey_mval)).str.len
-				= gvsub2str(c0, (unsigned char *)((TREF(gv_sparekey_mval)).str.addr), FALSE)
-				- (unsigned char *)(TREF(gv_sparekey_mval)).str.addr;
+			(TREF(gv_sparekey_mval)).str.len = gvsub2str(c0, &((TREF(gv_sparekey_mval)).str), FALSE)
+								- (unsigned char *)(TREF(gv_sparekey_mval)).str.addr;
 			TREF(transform) = !xback;
 			mval2subsc(TADR(gv_sparekey_mval), keyp, gv_cur_region->std_null_coll);
 			c1 = &keyp->base[keyp->end];

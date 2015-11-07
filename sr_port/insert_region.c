@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,11 +62,15 @@ GBLREF	gd_region	*gv_cur_region;
 GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 
+error_def(ERR_DBFILOPERR);
+
 tp_region	*insert_region(	gd_region	*reg,
 		   		tp_region	**reg_list,
 		   		tp_region	**reg_free_list,
 		   		int4		size)
 {
+	int4		local_fid_index, match;
+	sgmnt_addrs	*csa;
 	tp_region	*tr, *tr_last, *tr_new;
 	unique_file_id	local_id;
 #	ifdef 	VMS
@@ -74,10 +78,9 @@ tp_region	*insert_region(	gd_region	*reg,
 	file_control	*fc;
 	uint4		status;
 	gd_region	*temp_reg;
+#	elif UNIX
+	int		save_errno;
 #	endif
-	int4		local_fid_index;
-	sgmnt_addrs	*csa;
-	int4		match;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -107,7 +110,7 @@ tp_region	*insert_region(	gd_region	*reg,
 			sys$dassgn(FILE_INFO(reg)->fab->fab$l_stv);
 		} else
 		{
-			gtm_putmsg(VARLSTCNT(1) status);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			gv_cur_region = temp_reg;
 			return NULL;
 		}
@@ -119,8 +122,11 @@ tp_region	*insert_region(	gd_region	*reg,
 	{
 		if (!mupfndfil(reg, NULL))
 			return NULL;
-		if (!filename_to_id(&local_id.uid, (char *)reg->dyn.addr->fname))
+		if (SS_NORMAL != (save_errno = filename_to_id(&local_id.uid, (char *)reg->dyn.addr->fname)))
+		{	/* WARNING: assignment above */
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(reg->dyn.addr->fname), save_errno);
 			return NULL;
+		}
 	} else
 		local_fid_index = csa->fid_index;
 #	endif

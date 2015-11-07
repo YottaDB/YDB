@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,46 +22,36 @@
 
 /* Include prototypes */
 #include "t_qread.h"
+#include "gtmmsg.h"
 
+#define MAX_COMMENT_LEN 100
 #define MAX_UTIL_LEN 80
 
 GBLDEF save_strct	patch_save_set[PATCH_SAVE_SIZE];
-GBLDEF unsigned short	patch_save_count = 0;
+GBLDEF uint4		patch_save_count = 0;
 
-GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
-GBLREF block_id		patch_curr_blk;
+GBLREF sgmnt_addrs	*cs_addrs;
 
 error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEMAXBLKSAV);
 
 void dse_save(void)
 {
 	block_id	blk;
-	unsigned	i, j, util_len;
-	unsigned short	buff_len;
-	boolean_t	was_block, was_crit, was_hold_onto_crit;
-	char		buff[100], *ptr, util_buff[MAX_UTIL_LEN];
-	sm_uc_ptr_t	bp;
-	int4		dummy_int, nocrit_present;
+	boolean_t	was_crit, was_hold_onto_crit;
 	cache_rec_ptr_t dummy_cr;
+	char		buff[MAX_COMMENT_LEN], *ptr, util_buff[MAX_UTIL_LEN];
+	int		i, j, util_len;
+	int4		dummy_int, nocrit_present;
+	sm_uc_ptr_t	bp;
+	unsigned short	buff_len;
 
+	assert(PATCH_SAVE_SIZE < MAXUINT4);
 	memset(util_buff, 0, MAX_UTIL_LEN);
-
-	if (was_block = (cli_present("BLOCK") == CLI_PRESENT))
+	if (CLI_PRESENT == cli_present("LIST"))
 	{
-		if (!cli_get_hex("BLOCK", (uint4 *)&blk))
-			return;
-		if (blk < 0 || blk >= cs_addrs->ti->total_blks)
-		{
-			util_out_print("Error: invalid block number.", TRUE);
-			return;
-		}
-		patch_curr_blk = blk;
-	} else
-		blk = patch_curr_blk;
-	if (cli_present("LIST") == CLI_PRESENT)
-	{
-		if (was_block)
+		if (cli_get_hex("BLOCK", (uint4 *)&blk))
 		{
 			util_len = SIZEOF("!/Saved versions of block ");
 			memcpy(util_buff, "!/Saved versions of block ", util_len);
@@ -72,12 +62,10 @@ void dse_save(void)
 				if (patch_save_set[i].blk == blk)
 				{
 					j++;
-
 					if (*patch_save_set[i].comment)
 						util_out_print("Version !UL  Region !AD  Comment: !AD!/", TRUE,
 							patch_save_set[i].ver, REG_LEN_STR(patch_save_set[i].region),
 							LEN_AND_STR(patch_save_set[i].comment));
-
 					else
 						util_out_print("Version !UL  Region !AD!/", TRUE, patch_save_set[i].ver,
 							REG_LEN_STR(patch_save_set[i].region));
@@ -100,7 +88,6 @@ void dse_save(void)
 				util_out_print("Version !UL  Region !AD  Comment: !AD!/", TRUE,
 					patch_save_set[i].ver, REG_LEN_STR(patch_save_set[i].region),
 					LEN_AND_STR(patch_save_set[i].comment));
-
 			} else
 			{
 				util_out_print("Version !UL  Region !AD!/", TRUE, patch_save_set[i].ver,
@@ -109,6 +96,13 @@ void dse_save(void)
 		}
 		if (!j)
 			util_out_print("  None.!/", TRUE);
+		return;
+	}
+	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSEBMLOK, DSEBLKCUR)))		/* WARNING: assignment */
+		return;
+	if (ARRAYSIZE(patch_save_set) <= patch_save_count)
+	{
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DSEMAXBLKSAV, 1, PATCH_SAVE_SIZE);
 		return;
 	}
 	j = 1;
@@ -120,22 +114,23 @@ void dse_save(void)
 	memcpy(util_buff, "!/Saving version !UL of block ", util_len);
 	util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len-1], 8);
 	util_buff[util_len-1] = 0;
+	assert(ARRAYSIZE(util_buff) >= util_len);
 	util_out_print(util_buff, TRUE, j);
 	patch_save_set[patch_save_count].ver = j;
 	patch_save_set[patch_save_count].blk = blk;
 	patch_save_set[patch_save_count].region = gv_cur_region;
 	patch_save_set[patch_save_count].bp = (char *)malloc(cs_addrs->hdr->blk_size);
 	if (blk >= cs_addrs->ti->total_blks)
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (!(bp = t_qread(blk, &dummy_int, &dummy_cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	memcpy(patch_save_set[patch_save_count].bp, bp, cs_addrs->hdr->blk_size);
 	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	buff_len = SIZEOF(buff);
-	if ((cli_present("COMMENT") == CLI_PRESENT) && cli_get_str("COMMENT", buff, &buff_len))
+	if ((CLI_PRESENT == cli_present("COMMENT")) && cli_get_str("COMMENT", buff, &buff_len))
 	{
 		ptr = &buff[buff_len];
 		*ptr = 0;

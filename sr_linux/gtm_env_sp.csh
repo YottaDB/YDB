@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2013 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -139,7 +139,7 @@ if ( $?gtm_version_change == "1" ) then
 	endif
 
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 "
-        setenv  gt_cc_options_common    "$gt_cc_options_common -D_XOPEN_SOURCE=600 -fsigned-char "
+        setenv  gt_cc_options_common    "$gt_cc_options_common -D_XOPEN_SOURCE=600 -fsigned-char -Wreturn-type -Wpointer-sign "
 
         if ( "ia64" != $mach_type ) then
 		if ("$gt_cc_compiler" =~ *icc*) then
@@ -186,7 +186,9 @@ if ( $?gtm_version_change == "1" ) then
 		setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store"
 		if ( "32" == $gt_build_type ) then
 			# applies to 32bit x86_64, ia32 and cygwin
-			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -fno-omit-frame-pointer -march=i686"
+			# Compile 32-bit x86 GT.M using 586 instruction set rather than 686 as the new Intel Quark
+			# low power system-on-a-chip uses the 586 instruction set rather than the 686 instruction set
+			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -fno-omit-frame-pointer -march=i586"
 		endif
 	endif
 	# -g	generate debugging information for dbx (no longer overrides -O)

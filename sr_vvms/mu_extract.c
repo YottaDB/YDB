@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -383,6 +383,6 @@ void mu_extract(void)
 		mupip_exit(ERR_MUNOFINISH);
 	}
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RECORDSTAT, 6, LEN_AND_LIT("TOTAL"),
-		grand_total.recknt, grand_total.keylen, grand_total.datalen, grand_total.reclen);
+		&grand_total.recknt, grand_total.keylen, grand_total.datalen, grand_total.reclen);
 	mupip_exit(success ? SS$_NORMAL : ERR_MUNOFINISH);
 }

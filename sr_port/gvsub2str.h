@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef GVSUB2STR_INCLUDED
 #define GVSUB2STR_INCLUDED
 
-unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat_flg);
+unsigned char *gvsub2str(unsigned char *sub, mstr *targ, boolean_t xlat_flg);
 
 #endif /* GVSUB2STR_INCLUDED */

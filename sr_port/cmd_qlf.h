@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,8 @@ typedef struct
 #define CQ_ALIGN_STRINGS	(1 << 11)	/* 0x0800 */
 #define CQ_UTF8			(1 << 12)	/* 0x1000 */
 #define CQ_NAMEOFRTN		(1 << 13)	/* 0x2000 */
-#define CQ_DYNAMIC_LITERALS	(1 << 14)	/* 0x4000 -- Set via environmental variable gtm_dynamic_literals (gtm_logicals.h) */
+#define CQ_DYNAMIC_LITERALS	(1 << 14)	/* 0x4000 */
+#define CQ_EMBED_SOURCE		(1 << 15)	/* 0x8000 */
 
 /* TODO: add CQ_ALIGN_STRINGS to the default list below when alignment is supported */
 #define CQ_DEFAULT (CQ_WARNINGS | CQ_OBJECT | CQ_IGNORE | CQ_LOWER_LABELS | CQ_LINE_ENTRY | CQ_INLINE_LITERALS)
@@ -66,8 +67,8 @@ typedef struct src_line_type
 	{
 		struct src_line_type *fl,*bl;
 	} que;
-	char	*addr;
-	int4	line;
+	mstr	str;	/* M source string */
+	int4	line;	/* line number */
 } src_line_struct;
 
 void zl_cmd_qlf(mstr *quals, command_qualifier *qualif);

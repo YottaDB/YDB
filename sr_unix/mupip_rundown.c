@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,6 +100,7 @@ void mupip_rundown(void)
 	exit_status = SS_NORMAL;
 	file = (CLI_PRESENT == cli_present("FILE"));
 	region = (CLI_PRESENT == cli_present("REGION"));
+	TREF(skip_file_corrupt_check) = TRUE;	/* rundown the database even if csd->file_corrupt is TRUE */
 	arg_present = (0 != TREF(parms_cnt));
 	if ((file == region) && (TRUE == file))
 		mupip_exit(ERR_MUQUALINCOMP);
@@ -129,7 +130,7 @@ void mupip_rundown(void)
 	if (region || file)
 	{
 		do_jnlpool_detach = FALSE;
-		anticipatory_freeze_available = ANTICIPATORY_FREEZE_AVAILABLE;
+		anticipatory_freeze_available = INST_FREEZE_ON_ERROR_POLICY;
 		if ((jnlpool_rndwn_required = (region && mu_star_specified)) || anticipatory_freeze_available) /* note:assigmnent */
 		{
 			if (DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE) /* sets replpool_id/full_len; note: assignment */

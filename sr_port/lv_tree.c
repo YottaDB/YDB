@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,15 @@
 #include "promodemo.h"	/* for "promote" & "demote" prototype */
 #include "gtmio.h"
 #include "have_crit.h"
+#include "gdsroot.h"
+#include "gdsblk.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include <rtnhdr.h>
+#include "stack_frame.h"
+#include "alias.h"
 
 #define	LV_TREE_INIT_ALLOC	 	 4
 #define	LV_TREENODE_INIT_ALLOC		16
@@ -622,13 +631,13 @@ lvTreeNode *lvAvlTreeNodeCollatedNext(lvTreeNode *node)
 }
 
 /* Function to clone an avl tree (used by the LV_TREE_CLONE macro). Uses recursion to descend the tree. */
-lvTreeNode *lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl_parent)
+lvTreeNode *lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl_parent, boolean_t refCntMaint)
 {
         lvTreeNodeVal	*dupVal;
         lvTreeNode        *cloneNode, *left, *right;
         lvTreeNode        *leftSubTree, *rightSubTree;
 	lvTree		*lvt_child;
-	lv_val		*base_lv;
+	lv_val		*base_lv, *cntnr_lv;
 
 	assert(NULL != node);
 	cloneNode = lvtreenode_getslot(LVT_GET_SYMVAL(lvt));
@@ -654,6 +663,15 @@ lvTreeNode *lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl
 	assert(OFFSETOF(lvTreeNode, avl_right) + SIZEOF(cloneNode->avl_right) == OFFSETOF(lvTreeNode, avl_parent));
 	assert(OFFSETOF(lvTreeNode, avl_parent) + SIZEOF(cloneNode->avl_parent) == SIZEOF(lvTreeNode));
 	cloneNode->v = node->v;
+	/* If refCntMaint is true, when an alias container is copied, we bump the reference counts of whatever it points to. This
+	 * keeps the reference counts correct across TP.
+	 */
+	if (refCntMaint && (MV_ALIASCONT & cloneNode->v.mvtype))
+	{
+		cntnr_lv = (lv_val *)cloneNode->v.str.addr;
+		INCR_TREFCNT(cntnr_lv);
+		INCR_CREFCNT(cntnr_lv);
+	}
 	/* "cloneNode->sbs_child" initialized later */
 	cloneNode->tree_parent = lvt;
 	/* cloneNode->key_mvtype/balance/descent_dir/key_len all initialized in one shot */
@@ -668,14 +686,14 @@ lvTreeNode *lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl
 	base_lv = lvt->base_lv;
 	if (NULL != lvt_child)
 	{
-		LV_TREE_CLONE(lvt_child, cloneNode, base_lv);	/* initializes "cloneNode->sbs_child" */
+		LV_TREE_CLONE(lvt_child, cloneNode, base_lv, refCntMaint);	/* initializes "cloneNode->sbs_child" */
 	} else
 		cloneNode->sbs_child = NULL;
 	left = node->avl_left;
-	leftSubTree = (NULL != left) ? lvAvlTreeCloneSubTree(left, lvt, cloneNode) : NULL;
+	leftSubTree = (NULL != left) ? lvAvlTreeCloneSubTree(left, lvt, cloneNode, refCntMaint) : NULL;
 	cloneNode->avl_left = leftSubTree;
 	right = node->avl_right;
-	rightSubTree = (NULL != right) ? lvAvlTreeCloneSubTree(right, lvt, cloneNode) : NULL;
+	rightSubTree = (NULL != right) ? lvAvlTreeCloneSubTree(right, lvt, cloneNode, refCntMaint) : NULL;
 	cloneNode->avl_right = rightSubTree;
 	return cloneNode;
 }

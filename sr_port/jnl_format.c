@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,6 +86,7 @@ static	const	enum jnl_record_type	jnl_opcode[][5] =
 	{ JRT_ZKILL, JRT_FZKILL, JRT_TZKILL,  JRT_GZKILL, JRT_UZKILL  },	/* ZKILL       record types */
 #	ifdef GTM_TRIGGER
 	{ JRT_BAD,   JRT_BAD,    JRT_TZTWORM, JRT_BAD,    JRT_UZTWORM },	/* ZTWORM      record types */
+	{ JRT_BAD,   JRT_BAD,    JRT_TLGTRIG, JRT_BAD,    JRT_ULGTRIG },	/* LGTRIG      record types */
 	{ JRT_BAD,   JRT_BAD,    JRT_TZTRIG,  JRT_BAD,    JRT_UZTRIG  },	/* ZTRIG       record types */
 #	endif
 };
@@ -214,6 +215,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 			++subcode; /* TP */
 		tmp_jrec_size = FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE;
 		assert(FIXED_UPD_RECLEN == FIXED_ZTWORM_RECLEN);
+		assert(FIXED_UPD_RECLEN == FIXED_LGTRIG_RECLEN);
 		if (!jgbl.forw_phase_recovery)
 			jgbl.tp_ztp_jnl_upd_num++;
 		/* In case of forward phase of journal recovery, this would have already been set to appropriate value.
@@ -228,16 +230,16 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	assert(JA_MAX_TYPES > opcode);
 	rectype = jnl_opcode[opcode][subcode];
 	assert(IS_VALID_JRECTYPE(rectype));
-	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
-	GTMTRIG_ONLY(assert((JNL_ZTWORM != opcode) || (NULL == key));)
-	GTMTRIG_ONLY(assert((JNL_ZTWORM == opcode) || (NULL != key));)
+	assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype));
+	GTMTRIG_ONLY(assert(((JNL_ZTWORM != opcode) && (JNL_LGTRIG != opcode)) || (NULL == key));)
+	GTMTRIG_ONLY(assert((JNL_ZTWORM == opcode) || (JNL_LGTRIG == opcode) || (NULL != key));)
 	/* Compute actual record length */
 	if (NULL != key)
 	{
 		keystrlen = key->end;
 		tmp_jrec_size += keystrlen + SIZEOF(jnl_str_len_t);
 	}
-	GTMTRIG_ONLY(assert((JNL_ZTWORM != opcode) || (NULL != val));)
+	GTMTRIG_ONLY(assert(((JNL_ZTWORM != opcode) && (JNL_LGTRIG != opcode)) || (NULL != val));)
 	assert((JNL_SET != opcode) || (NULL != val));
 	if (NULL != val)
 	{
@@ -269,8 +271,11 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	rec->prefix.jrec_type = rectype;
 	assert(!IS_SET_KILL_ZKILL_ZTRIG(rectype) || (JNL_MAX_SET_KILL_RECLEN(csd) >= jrec_size));
 	GTMTRIG_ONLY(assert(!IS_ZTWORM(rectype) || (MAX_ZTWORM_JREC_LEN >= jrec_size));)
+	GTMTRIG_ONLY(assert(MAX_LGTRIG_JREC_LEN <= (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));)
+	GTMTRIG_ONLY(assert(!IS_LGTRIG(rectype) || (MAX_LGTRIG_JREC_LEN >= jrec_size));)
 	rec->prefix.forwptr = jrec_size;
 	assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
+	assert(&rec->jrec_set_kill.update_num == &rec->jrec_lgtrig.update_num);
 	rec->jrec_set_kill.update_num = jgbl.tp_ztp_jnl_upd_num;
 	rec->jrec_set_kill.num_participants = 0;
 	local_buffer = (char *)rec + FIXED_UPD_RECLEN;

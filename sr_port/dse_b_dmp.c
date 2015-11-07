@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,13 +35,11 @@
 #define CORRUPT_CHAR	"?"
 #define MAX_UTIL_LEN	80
 
-GBLREF VSIG_ATOMIC_T	util_interrupt;
-GBLREF block_id		patch_curr_blk;
-GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
-GBLREF int		patch_is_fdmp;
-GBLREF int		patch_fdmp_recs;
-GBLREF int		patch_rec_counter;
+GBLREF int		patch_is_fdmp, patch_rec_counter;
+GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF VSIG_ATOMIC_T	util_interrupt;
+
 LITREF char		*gtm_dbversion_table[];
 
 error_def(ERR_BITMAPSBAD);
@@ -50,27 +48,17 @@ error_def(ERR_DSEBLKRDFAIL);
 
 boolean_t dse_b_dmp(void)
 {
-	int4		util_len, head, lmap_num, iter1, iter2, mapsize, bplmap, nocrit_present, dummy_int, len, count;
-	unsigned char	util_buff[MAX_UTIL_LEN], mask;
-	boolean_t	free, was_crit, was_hold_onto_crit, invalid_bitmap = FALSE, is_mm;
-	block_id	blk;
-	sm_uc_ptr_t	bp, b_top, rp, mb, dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_t b_top);
 	cache_rec_ptr_t cr;
+	block_id	blk;
+	boolean_t	free, invalid_bitmap = FALSE, is_mm, was_crit, was_hold_onto_crit;
 	enum db_ver	ondsk_blkver;
+	int4		bplmap, count, dummy_int, head, iter1, iter2, len, lmap_num, mapsize, nocrit_present, util_len;
+	sm_uc_ptr_t	bp, b_top, mb, rp;
+	unsigned char	mask, util_buff[MAX_UTIL_LEN];
 
 	head = cli_present("HEADER");
-	if (CLI_PRESENT == cli_present("BLOCK"))
-	{
-		if (!cli_get_hex("BLOCK", (uint4 *)&blk))
-			return FALSE;
-		if (blk < 0 || blk >= cs_addrs->ti->total_blks)
-		{
-			util_out_print("Error: invalid block number.", TRUE);
-			return FALSE;
-		}
-		patch_curr_blk = blk;
-	} else
-		blk = patch_curr_blk;
+	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSEBMLOK, DSEBLKCUR)))		/* WARNING: assignment */
+		return FALSE;
 	if (CLI_PRESENT == cli_present("COUNT"))
 	{
 		if (!cli_get_hex("COUNT", (uint4 *)&count))
@@ -79,7 +67,6 @@ boolean_t dse_b_dmp(void)
 			return FALSE;
 	} else
 		count = 1;
-
 	util_out_print(0, TRUE);
 	bplmap = cs_addrs->hdr->bplmap;
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
@@ -95,7 +82,7 @@ boolean_t dse_b_dmp(void)
 			if (!(bp = t_qread(blk, &dummy_int, &cr)))
 			{
 				DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 			}
 			if (((blk_hdr_ptr_t) bp)->levl && patch_is_fdmp)
 			{
@@ -139,7 +126,7 @@ boolean_t dse_b_dmp(void)
 			if (util_interrupt)
 			{
 				DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-				rts_error(VARLSTCNT(1) ERR_CTRLC);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 				break;
 			}
 			if (CLI_NEGATED == head)
@@ -149,12 +136,11 @@ boolean_t dse_b_dmp(void)
 			if (!(bp = t_qread(blk, &dummy_int, &cr)))
 			{
 				DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 			}
 			if (CLI_NEGATED != head)
 			{
-
-				if (bplmap == 0)
+				if (0 == bplmap)
 				{
 					memcpy(util_buff, "Block ", 6);
 					util_len = 6;
@@ -199,7 +185,6 @@ boolean_t dse_b_dmp(void)
 			if (CLI_PRESENT != head)
 			{
 				util_out_print("           !_Low order                         High order", TRUE);
-
 				lmap_num = 0;
 				while (lmap_num < bplmap)
 				{	memcpy(util_buff, "Block ", 6);
@@ -237,7 +222,7 @@ boolean_t dse_b_dmp(void)
 					{
 						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs,
 										gv_cur_region);
-						rts_error(VARLSTCNT(1) ERR_CTRLC);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 					}
 				}
 				util_out_print("!/'!AD' == BUSY  '!AD' == FREE  '!AD' == REUSABLE  '!AD' == CORRUPT!/",
@@ -246,7 +231,7 @@ boolean_t dse_b_dmp(void)
 				{
 					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs,
 									gv_cur_region);
-					rts_error(VARLSTCNT(1) ERR_BITMAPSBAD);
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_BITMAPSBAD);
 				}
 			}
 		}
@@ -257,7 +242,6 @@ boolean_t dse_b_dmp(void)
 		if (blk >= cs_addrs->ti->total_blks)
 			blk = 0;
 	}
-	patch_curr_blk = blk;
 	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	return TRUE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,6 @@ bool 		is_gdid_gdid_identical(gd_id_ptr_t fid_1, gd_id_ptr_t fid_2);
 bool		is_gdid_identical(gd_id_ptr_t fid1, gd_id_ptr_t fid2);
 bool 		is_gdid_stat_identical(gd_id_ptr_t fid, struct stat *stat_buf);
 void		set_gdid_from_stat(gd_id_ptr_t fid, struct stat *stat_buf);
-boolean_t 	filename_to_id(gd_id_ptr_t fid, char *filename);
+uint4	 	filename_to_id(gd_id_ptr_t fid, char *filename);
 #endif
 #endif

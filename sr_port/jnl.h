@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,8 @@ error_def(ERR_JNLENDIANLITTLE);
  * 	1) Update JNL_VER_THIS
  * 	2) Add REPL_JNL_Vxx enum to repl_jnl_t typedef AND Vxx_JNL_VER #define in repl_filter.h
  * 	3) Add an entry each to repl_filter_old2cur & repl_filter_cur2old arrays in repl_filter.c.
+ *	4) Bump JNL_EXTR_LABEL and JNL_DET_EXTR_LABEL as appropriate in muprec.h.
+ *		This is not needed if for example the newly added jnl record types dont get extracted at all.
  * If the FILTER format is also changing, then do the following as well
  * 	4) Add REPL_FILTER_Vxx enum to repl_filter_t typedef in repl_filter.h
  * 	5) Add/Edit IF_xTOy macros in repl_filter.h to transform from/to the NEW jnl format version only.
@@ -52,8 +54,8 @@ error_def(ERR_JNLENDIANLITTLE);
  * 		which needs to change to say IF_curTO17 if the earliest supported version changes to V17 or so).
  *
  */
-#define JNL_LABEL_TEXT		"GDSJNL23"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		23
+#define JNL_LABEL_TEXT		"GDSJNL24"	/* see above comment paragraph for todos whenever this is changed */
+#define JNL_VER_THIS		24
 #define JNL_VER_EARLIEST_REPL	17		/* Replication filter support starts here GDSJNL17 = GT.M V5.1-000.
 						 * (even though it should be V5.0-000, since that is pre-multisite,
 						 * the replication connection with V55000 will error out at handshake
@@ -69,7 +71,7 @@ error_def(ERR_JNLENDIANLITTLE);
 						 * Actually JRT_HISTREC is a higher record type than JRT_UZTRIG but it is only
 						 * sent through the replication pipe and never seen by filter routines.
 						 */
-#define	ALIGN_KEY		0xdeadbeef
+#define JRT_MAX_V24		JRT_ULGTRIG	/* Max jnlrec type in GDSJNL22/GDSJNL23 that can be input to replication filter */
 
 #ifdef UNIX
 #  define JNL_ALLOC_DEF		2048
@@ -145,14 +147,24 @@ error_def(ERR_JNLENDIANLITTLE);
 
 #ifdef GTM_TRIGGER
 /* Define maximum size that $ZTWORMHOLE can be. Since $ZTWORMHOLE should be able to fit in a journal record and the
- * minimum alignsize is 128K, we do not want it to go more than 128K (that way irrespective of whatever alignsize the user
- * specifies for the journal file, $ZTWORMHOLE will fit in the journal record). Leaving a max of 512 bytes for the
- * journal record prefix/suffix (32-byte overhead) and MIN_ALIGN_RECLEN (see comment in JNL_MAX_RECLEN macro for why
- * this is needed) we allow for a max of 128K-512 bytes in $ZTWORMHOLE.
+ * minimum alignsize used to be 128K (until V55000), we did not want it to go more than 128K (that way irrespective
+ * of whatever alignsize the user specifies for the journal file, $ZTWORMHOLE will fit in the journal record). Leaving
+ * a max of 512 bytes for the journal record prefix/suffix (32-byte overhead) and MIN_ALIGN_RECLEN (see comment in
+ * JNL_MAX_RECLEN macro for why this is needed) we had allowed for a max of 128K-512 bytes in $ZTWORMHOLE. The minimum
+ * alignsize (JNL_MIN_ALIGNSIZE) has changed to 2Mb (since V60000) and so we can potentially increase the maximum
+ * $ZTWORMHOLE length to be 1Mb but we defer doing this until there is a need for this bigger length.
  */
 #define	MAX_ZTWORMHOLE_LEN	(128 * 1024)
 #define	MAX_ZTWORMHOLE_SIZE	(MAX_ZTWORMHOLE_LEN - 512)
 #define	MAX_ZTWORM_JREC_LEN	(MAX_ZTWORMHOLE_LEN - MIN_ALIGN_RECLEN)
+
+/* Define maximum size that a LGTRIG jnl record can get to. Cannot exceed minimum align size for sure */
+#define	MAX_LGTRIG_LEN		((1 << 20) + (1 << 15))	/* 1Mb for XECUTE string part of the trigger,
+							 * 32K for rest of trigger definition. Together this should
+							 * still be less than 2Mb which is the JNL_MIN_ALIGNSIZE
+							 */
+#define	MAX_LGTRIG_JREC_LEN	(MAX_LGTRIG_LEN + DISK_BLOCK_SIZE)	/* Give 512 more bytes for journal record related
+									 * overhead (jrec_prefix etc.) */
 #endif
 
 #define MIN_YIELD_LIMIT		0
@@ -283,42 +295,42 @@ error_def(ERR_JNLENDIANLITTLE);
  */
 #define	JNL_HDR_ENDIAN_OFFSET	8
 
-#define	CHECK_JNL_FILE_IS_USABLE(JFH, STATUS, DO_GTMPUTMSG, JNL_FN_LEN, JNL_FN)		\
-{											\
-	boolean_t	check_failed = FALSE;						\
-	uint4		lcl_status;							\
-											\
-	assert(JNL_HDR_ENDIAN_OFFSET == OFFSETOF(jnl_file_header, is_little_endian));	\
-	if (0 != MEMCMP_LIT((JFH)->label, JNL_LABEL_TEXT))				\
-	{										\
-		lcl_status = ERR_JNLBADLABEL;						\
-		check_failed = TRUE;							\
-	}										\
-	BIGENDIAN_ONLY(									\
-	else if ((JFH)->is_little_endian)						\
-	{										\
-		lcl_status = ERR_JNLENDIANLITTLE;					\
-		check_failed = TRUE;							\
-	}										\
-	)										\
-	LITTLEENDIAN_ONLY(								\
-	else if (!(JFH)->is_little_endian)						\
-	{										\
-		lcl_status = ERR_JNLENDIANBIG;						\
-		check_failed = TRUE;							\
-	}										\
-	)										\
-	/* Currently, we can do one gtm_putmsg for any of the above 3 error messages	\
-	 * because all of them have a fao count of 2 and expect jnl_fn_len and jnl_fn	\
-	 * as arguments. If a new error gets added and has a different fao format,	\
-	 * then the below gtm_putmsg has to be done differently based on that error.	\
-	 */										\
-	if (check_failed)								\
-	{										\
-		STATUS = lcl_status;							\
-		if (DO_GTMPUTMSG)							\
-			gtm_putmsg(VARLSTCNT(4) lcl_status, 2, JNL_FN_LEN, JNL_FN);	\
-	}										\
+#define	CHECK_JNL_FILE_IS_USABLE(JFH, STATUS, DO_GTMPUTMSG, JNL_FN_LEN, JNL_FN)				\
+{													\
+	boolean_t	check_failed = FALSE;								\
+	uint4		lcl_status;									\
+													\
+	assert(JNL_HDR_ENDIAN_OFFSET == OFFSETOF(jnl_file_header, is_little_endian));			\
+	if (0 != MEMCMP_LIT((JFH)->label, JNL_LABEL_TEXT))						\
+	{												\
+		lcl_status = ERR_JNLBADLABEL;								\
+		check_failed = TRUE;									\
+	}												\
+	BIGENDIAN_ONLY(											\
+	else if ((JFH)->is_little_endian)								\
+	{												\
+		lcl_status = ERR_JNLENDIANLITTLE;							\
+		check_failed = TRUE;									\
+	}												\
+	)												\
+	LITTLEENDIAN_ONLY(										\
+	else if (!(JFH)->is_little_endian)								\
+	{												\
+		lcl_status = ERR_JNLENDIANBIG;								\
+		check_failed = TRUE;									\
+	}												\
+	)												\
+	/* Currently, we can do one gtm_putmsg for any of the above 3 error messages			\
+	 * because all of them have a fao count of 2 and expect jnl_fn_len and jnl_fn			\
+	 * as arguments. If a new error gets added and has a different fao format,			\
+	 * then the below gtm_putmsg has to be done differently based on that error.			\
+	 */												\
+	if (check_failed)										\
+	{												\
+		STATUS = lcl_status;									\
+		if (DO_GTMPUTMSG)									\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) lcl_status, 2, JNL_FN_LEN, JNL_FN);	\
+	}												\
 }
 
 /* Token generation used in non-replicated journaled environment. Note the assumption here
@@ -456,9 +468,9 @@ typedef struct
 				bytcnt,			/* Number of bytes written */
 				errcnt,			/* Number of errors during writing */
 				reccnt[JRT_RECTYPES];	/* Number of records written per opcode */
-	int			filler_align[35 - JRT_RECTYPES];	/* So buff below starts on even (QW) keel */
-	/* Note the above filler will fail if JRT_RECTYPES grows beyond 31 elements and give compiler warning in VMS
-	 * if JRT_RECTYPES equals 31. In that case, change the start num to the next odd number above MAX(31,JRT_RECTYPES).
+	int			filler_align[37 - JRT_RECTYPES];	/* So buff below starts on even (QW) keel */
+	/* Note the above filler will fail if JRT_RECTYPES grows beyond 37 elements and give compiler warning in VMS
+	 * if JRT_RECTYPES equals 37. In that case, change the start num to the next odd number above MAX(37,JRT_RECTYPES).
 	 */
 	volatile jnl_tm_t	prev_jrec_time;		/* to ensure that time never decreases across successive jnl records */
 	volatile int4		free_update_pid;	/* pid that is updating jb->free and jb->freeaddr */
@@ -471,6 +483,8 @@ typedef struct
 	uint4			max_jrec_len;		/* copy of max_jrec_len from journal file header */
 	uint4			fs_block_size;		/* underlying journal file system block size;
 							 * primarily used in Unix, 512 in VMS */
+	volatile uint4		post_epoch_freeaddr;	/* virtual on-disk address after last epoch */
+	boolean_t		last_eof_written;	/* No more records may be written to the file due to autoswitch */
 	/* CACHELINE_PAD macros provide spacing between the following latches so that they do
 	   not interfere with each other which can happen if they fall in the same data cacheline
 	   of a processor.
@@ -559,6 +573,7 @@ typedef enum
 	JNL_ZKILL,
 #	ifdef GTM_TRIGGER
 	JNL_ZTWORM,
+	JNL_LGTRIG,
 	JNL_ZTRIG,
 #	endif
 	JA_MAX_TYPES
@@ -669,8 +684,9 @@ typedef struct
 	/* The below two arrays are unused in VMS but defined there to keep the layout similar between Unix & VMS */
 	seq_num			strm_start_seqno[MAX_SUPPL_STRMS];
 	seq_num			strm_end_seqno[MAX_SUPPL_STRMS];
+	boolean_t		last_eof_written;	/* No more records may be written to the file due to autoswitch */
 	/* filler remaining */
-	char			filler[440];
+	char			filler[436];
 } jnl_file_header;
 
 typedef struct
@@ -737,9 +753,9 @@ typedef struct
 					  */
 #define	JS_MAX_MASK		(1 << 8) /* max of 8 bits we have for mask */
 
-/* Note that even though mumps_node, ztworm_str, ztrig_str and align_str are members defined as type "jnl_string" below,
+/* Note that even though mumps_node, ztworm_str, lgtrig_str, align_str are members defined as type "jnl_string" below,
  * the "nodeflags" field is initialized to non-zero values ONLY in the case of the mumps_node member.
- * For ztworm_str and align_str, nodeflags is guaranteed to be zero so the 24-bit "length" member
+ * For ztworm_str, lgtrig_str and align_str, nodeflags is guaranteed to be zero so the 24-bit "length" member
  * can even be used as a 32-bit length (if necessary) without issues. This is why nodeflags is
  * defined in a different order (BEFORE or AFTER the "length" member) based on big-endian or little-endian.
  */
@@ -795,8 +811,8 @@ typedef struct	/* variable length */
 						 */
 	unsigned short		filler_short;
 	unsigned short		num_participants;	/* # of regions that wrote a TCOM record in their jnl files.
-							 * Currently written only for TSET/TKILL/TZTWORM records.
-							 * Uninitialized for all other types of SET/KILL/ZTWORM records.
+							 * Currently written only for TSET/TKILL/TZTWORM/TLGTRIG/TZTRIG records.
+							 * Uninitialized for USET/UKILL/UZTWORM/ULGTRIG/UZTRIG records.
 							 */
 	jnl_string		mumps_node;	/* For set/kill/zkill 	: {jnl_str_len_t key_len, char key[key_len]} */
 	 					/* For set additionally : {mstr_len_t data_len, char data[data_len]} */
@@ -815,11 +831,30 @@ typedef struct	/* variable length */
 						 */
 	unsigned short		filler_short;
 	unsigned short		num_participants;	/* # of regions that wrote a TCOM record in their jnl files.
-							 * Currently written only for TSET/TKILL/TZTWORM records.
-							 * Uninitialized for all other types of SET/KILL/ZTWORM records.
+							 * Currently written only for TSET/TKILL/TZTWORM/TLGTRIG/TZTRIG records.
+							 * Uninitialized for USET/UKILL/UZTWORM/ULGTRIG/UZTRIG records.
 							 */
 	jnl_string		ztworm_str;	/* jnl_str_len_t ztworm_str_len, char ztworm_str[ztworm_str_len]} */
 } struct_jrec_ztworm;
+
+/* logical trigger jnl record (TLGTRIG or ULGTRIG record) */
+typedef struct	/* variable length */
+{
+	jrec_prefix		prefix;
+	token_seq_t		token_seq;	/* must start at 8-byte boundary */
+	seq_num			strm_seqno;	/* see "struct_jrec_upd" for comment on the purpose of this field */
+	uint4			update_num;	/* 'n' where this is the nth journaled update (across all regions) in this TP
+						 * transaction. n=1 for the first update inside TP, 2 for the second update
+						 * inside TP and so on. Needed so journal recovery and update process can play
+						 * all the updates inside of one TP transaction in the exact same order as GT.M.
+						 */
+	unsigned short		filler_short;
+	unsigned short		num_participants;	/* # of regions that wrote a TCOM record in their jnl files.
+							 * Currently written only for TSET/TKILL/TZTWORM/TLGTRIG/TZTRIG records.
+							 * Uninitialized for USET/UKILL/UZTWORM/ULGTRIG/UZTRIG records.
+							 */
+	jnl_string		lgtrig_str;	/* jnl_str_len_t lgtrig_str_len, char lgtrig_str[lgtrig_str_len]} */
+} struct_jrec_lgtrig;
 
 #define	INVALID_UPDATE_NUM	(uint4)-1
 
@@ -967,6 +1002,7 @@ typedef union
 	jrec_prefix			prefix;
 	struct_jrec_upd			jrec_set_kill;	/* JRT_SET or JRT_KILL or JRT_ZTRIG record will use this format */
 	struct_jrec_ztworm		jrec_ztworm;
+	struct_jrec_lgtrig		jrec_lgtrig;
 	struct_jrec_blk			jrec_pblk,
 					jrec_aimg;
 	struct_jrec_align		jrec_align;
@@ -995,6 +1031,7 @@ typedef union
 #define TRUNC_RECLEN		SIZEOF(struct_jrec_trunc)
 /* Macro to access variable size record's fixed part's size */
 #define FIXED_ZTWORM_RECLEN	OFFSETOF(struct_jrec_ztworm, ztworm_str)
+#define FIXED_LGTRIG_RECLEN	OFFSETOF(struct_jrec_lgtrig, lgtrig_str)
 #define FIXED_UPD_RECLEN	OFFSETOF(struct_jrec_upd, mumps_node)
 #define MIN_ALIGN_RECLEN	(OFFSETOF(struct_jrec_align, align_str.text[0]) + JREC_SUFFIX_SIZE)
 #define FIXED_ALIGN_RECLEN	OFFSETOF(struct_jrec_align, align_str.text[0])
@@ -1347,13 +1384,15 @@ typedef struct
 
 /* The below macro now relies on MAX_STRLEN value rather than on CSD->blk_size used previously because
  * with nodes spanning blocks journal records might be comprised of several blocks, with the limit of
- * MAX_STRLEN for the actual database record.
+ * MAX_STRLEN for the actual database record. But that only takes care of the value part of the record.
+ * The key can still be MAX_KEY_SZ long. So take that into account as well.
  */
 #ifdef UNIX
-#  define	JNL_MAX_SET_KILL_RECLEN(CSD)	(uint4)ROUND_UP2((FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE) + MAX_STRLEN +	\
-						SIZEOF(jnl_str_len_t) + SIZEOF(mstr_len_t), JNL_REC_START_BNDRY)
+#  define	JNL_MAX_SET_KILL_RECLEN(CSD)	(uint4)ROUND_UP2((FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE)			\
+						+ MAX_KEY_SZ + MAX_STRLEN						\
+						+ SIZEOF(jnl_str_len_t) + SIZEOF(mstr_len_t), JNL_REC_START_BNDRY)
 #else
-#  define	JNL_MAX_SET_KILL_RECLEN(CSD)	(uint4)ROUND_UP2(FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE				\
+#  define	JNL_MAX_SET_KILL_RECLEN(CSD)	(uint4)ROUND_UP2(FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE			\
 						+ ((CSD)->blk_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr))			\
 						+ SIZEOF(jnl_str_len_t) + SIZEOF(mstr_len_t), JNL_REC_START_BNDRY)	\
 		/* fixed size part of update record + MAX possible (key + data) len + keylen-len + datalen-len */
@@ -1395,6 +1434,7 @@ typedef struct
 													\
 	RC = 0;												\
 	assert(FIXED_UPD_RECLEN == FIXED_ZTWORM_RECLEN);						\
+	assert(FIXED_UPD_RECLEN == FIXED_LGTRIG_RECLEN);						\
 	fixed_prefix = FIXED_UPD_RECLEN;								\
 	ASSERT_ENCRYPTION_INITIALIZED;									\
 	span_length = REC_SIZE - fixed_prefix - JREC_SUFFIX_SIZE;					\
@@ -1454,6 +1494,7 @@ void	jnl_prc_vector(jnl_process_vector *pv);
 void	jnl_send_oper(jnl_private_control *jpc, uint4 status);
 uint4	cre_jnl_file(jnl_create_info *info);
 uint4 	cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_len);
+void	cre_jnl_file_intrpt_rename(sgmnt_addrs *csa);
 void	jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header);
 uint4	jnl_ensure_open(void);
 void	set_jnl_info(gd_region *reg, jnl_create_info *set_jnl_info);
@@ -1487,9 +1528,10 @@ void	mupip_set_journal_fname(jnl_create_info *jnl_info);
 uint4	mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname);
 void	jnl_extr_init(void);
 int 	exttime(uint4 time, char *buffer, int extract_len);
-char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved_strm_seqno);
+unsigned char *ext2jnlcvt(char *ext_buff, int4 ext_len, unsigned char **tr, int *tr_bufsiz,
+					seq_num saved_jnl_seqno, seq_num saved_strm_seqno);
 char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved_strm_seqno);
-char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char *ext_buff);
+char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char **ext_buff, int *extract_bufsiz);
 char	*jnl2ext(char *jnl_buff, char *ext_buff);
 
 #endif /* JNL_H_INCLUDED */

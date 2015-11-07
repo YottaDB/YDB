@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,10 +44,11 @@ short ioff_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		d_rm->recordsize = DEF_RM_RECORDSIZE;
 		d_rm->def_width = d_rm->def_recsize = TRUE;
                 d_rm->fixed = FALSE;
-                d_rm->noread = FALSE;
+                d_rm->read_only = FALSE;
 		d_rm->padchar = DEF_RM_PADCHAR;
 		d_rm->inbuf = NULL;
 		d_rm->outbuf = NULL;
+		d_rm->read_fildes = FD_INVALID;
 	}
 	d_rm->fifo = TRUE;
 	iod->type = rm;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2014 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,9 +79,13 @@
 #endif
 
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>			/* for rtn_tabent in gv_trigger.h */
+#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "tp_set_sgm.h"
+#endif
+
+#ifdef DEBUG
+#include "repl_filter.h"	/* needed by an assert in UPD_GV_BIND_NAME_APPROPRIATE macro */
 #endif
 
 #define MAX_LCNT 100

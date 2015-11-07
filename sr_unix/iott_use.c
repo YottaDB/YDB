@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@
 #include "error.h"
 #include "gtm_tputs.h"
 #include "gtm_tparm.h"
+#include "outofband.h"
 
 LITDEF nametabent filter_names[] =
 {
@@ -50,13 +51,12 @@ LITDEF unsigned char filter_index[27] =
 	,4, 4, 4
 };
 
-GBLREF bool		ctrlc_on;
-GBLREF char		*CURSOR_ADDRESS, *CLR_EOL, *CLR_EOS;
-GBLREF io_pair		io_std_device;
-GBLREF io_pair		io_curr_device;
-GBLREF bool		prin_out_dev_failure;
-GBLREF void 		(*ctrlc_handler_ptr)();
-GBLREF	boolean_t	dollar_zininterrupt;
+GBLREF boolean_t		ctrlc_on, dollar_zininterrupt;
+GBLREF bool			prin_out_dev_failure;
+GBLREF char			*CURSOR_ADDRESS, *CLR_EOL, *CLR_EOS;
+GBLREF io_pair			io_std_device;
+GBLREF io_pair			io_curr_device;
+GBLREF void 			(*ctrlc_handler_ptr)();
 
 LITREF unsigned char	io_params_size[];
 
@@ -71,20 +71,17 @@ error_def(ERR_ZINTRECURSEIO);
 
 void iott_use(io_desc *iod, mval *pp)
 {
-	boolean_t	flush_input;
-	char		dc1;
-	int		fil_type;
-	unsigned char	ch, len;
-	int4		length, width;
-	uint4		mask_in;
-	d_tt_struct	*temp_ptr, *tt_ptr;
-	io_desc		*d_in, *d_out;
-	io_termmask	mask_term;
-	char		*ttab;
-	struct termios	t;
-	int		status;
-	int		save_errno;
-	int		p_offset;
+	boolean_t		flush_input;
+	char			dc1, *ttab;
+	d_tt_struct		*temp_ptr, *tt_ptr;
+	int			p_offset, fil_type, save_errno, status;
+	int4			length, width;
+	io_desc			*d_in, *d_out;
+	io_termmask		mask_term;
+	struct sigaction	act;
+	struct termios		t;
+	uint4			mask_in;
+	unsigned char		ch, len;
 
 	p_offset = 0;
 	assert(iod->state == dev_open);
@@ -106,16 +103,16 @@ void iott_use(io_desc *iod, mval *pp)
 		{
 			save_errno = errno;
 			if (io_curr_device.out == io_std_device.out)
-                        {
-                                if (!prin_out_dev_failure)
-                                        prin_out_dev_failure = TRUE;
-                                else
-                                {
-                                        send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
-                                        stop_image_no_core();
-                                }
-                        }
-                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
+			{
+				if (!prin_out_dev_failure)
+					prin_out_dev_failure = TRUE;
+				else
+				{
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
+					stop_image_no_core();
+				}
+			}
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		flush_input = FALSE;
 		d_in = iod->pair.in;
@@ -142,33 +139,39 @@ void iott_use(io_desc *iod, mval *pp)
 					tt_ptr->ext_cap &= ~TT_EMPTERM;
 					break;
 				case iop_cenable:
-					temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
-					if (tt_ptr->fildes == temp_ptr->fildes && !ctrlc_on)
-					{
-						struct sigaction act;
-
-						sigemptyset(&act.sa_mask);
-						act.sa_flags = 0;
-						act.sa_handler = ctrlc_handler_ptr;
-						sigaction(SIGINT, &act, 0);
-						ctrlc_on = TRUE;
+					if (!ctrlc_on)
+					{	/* if it's already cenable, no need to change */
+						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
+						if (tt_ptr->fildes == temp_ptr->fildes)
+						{	/* if this is $PRINCIPAL make sure the ctrlc_handler is enabled */
+							sigemptyset(&act.sa_mask);
+							act.sa_flags = 0;
+							act.sa_handler = ctrlc_handler_ptr;
+							sigaction(SIGINT, &act, 0);
+							ctrlc_on = TRUE;
+						}
 					}
 					break;
 				case iop_nocenable:
-					temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
-					if (tt_ptr->fildes == temp_ptr->fildes && ctrlc_on)
-					{
-						struct sigaction act;
-
-						sigemptyset(&act.sa_mask);
-						act.sa_flags = 0;
-						act.sa_handler = SIG_IGN;
-						sigaction(SIGINT, &act, 0);
-						ctrlc_on = FALSE;
+					if (ctrlc_on)
+					{	/* if it's already nocenable, no need to change */
+						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
+						if (tt_ptr->fildes == temp_ptr->fildes)
+						{	/* if this is $PRINCIPAL may disable the ctrlc_handler */
+							if (0 == (CTRLC_MSK & tt_ptr->enbld_outofbands.mask))
+							{	/* but only if ctrap=$c(3) is not active */
+								sigemptyset(&act.sa_mask);
+								act.sa_flags = 0;
+								act.sa_handler = SIG_IGN;
+								sigaction(SIGINT, &act, 0);
+							}
+							ctrlc_on = FALSE;
+						}
 					}
 					break;
 				case iop_clearscreen:
-					gtm_tputs(CLR_EOS, 1, outc);
+					if (NULL != CLR_EOS)
+						gtm_tputs(CLR_EOS, 1, outc);
 					break;
 				case iop_convert:
 					mask_in |= TRM_CONVERT;
@@ -178,12 +181,22 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				case iop_ctrap:
 					GET_LONG(tt_ptr->enbld_outofbands.mask, pp->str.addr + p_offset);
+					if (!ctrlc_on)
+					{	/* if cenable, ctrlc_handler active anyway, otherwise, depends on ctrap=$c(3) */
+						sigemptyset(&act.sa_mask);
+						act.sa_flags = 0;
+						act.sa_handler = (CTRLC_MSK & tt_ptr->enbld_outofbands.mask)
+							? ctrlc_handler_ptr : SIG_IGN;
+						sigaction(SIGINT, &act, 0);
+					}
 					break;
 				case iop_downscroll:
 					if (d_out->dollar.y > 0)
 					{
 						d_out->dollar.y--;
-						gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
+						if (NULL != CURSOR_ADDRESS)
+							gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1,
+								  outc);
 					}
 					break;
 				case iop_echo:
@@ -217,7 +230,8 @@ void iott_use(io_desc *iod, mval *pp)
 					default:
 					break;
 				case iop_eraseline:
-					gtm_tputs(CLR_EOL, 1, outc);
+					if (NULL != CLR_EOL)
+						gtm_tputs(CLR_EOL, 1, outc);
 					break;
 				case iop_exception:
 					iod->error_handler.len = *(pp->str.addr + p_offset);
@@ -334,7 +348,8 @@ void iott_use(io_desc *iod, mval *pp)
 					d_out->dollar.y++;
 					if (d_out->length)
 						d_out->dollar.y %= d_out->length;
-					gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
+					if (NULL != CURSOR_ADDRESS)
+						gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
 					break;
 				case iop_width:
 					GET_LONG(width, pp->str.addr + p_offset);
@@ -370,7 +385,8 @@ void iott_use(io_desc *iod, mval *pp)
 							d_out->dollar.y %= d_out->length;
 						d_out->dollar.x	%= d_out->width;
 					}
-					gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
+					if (NULL != CURSOR_ADDRESS)
+						gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
 					break;
 				case iop_y:
 					GET_LONG(d_out->dollar.y, pp->str.addr + p_offset);
@@ -378,11 +394,12 @@ void iott_use(io_desc *iod, mval *pp)
 						d_out->dollar.y = 0;
 					if (d_out->length)
 						d_out->dollar.y %= d_out->length;
-					gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
+					if (NULL != CURSOR_ADDRESS)
+						gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
 					break;
 				case iop_ipchset:
 					{
-#ifdef KEEP_zOS_EBCDIC
+#						ifdef KEEP_zOS_EBCDIC
 						if ( (iconv_t)0 != iod->input_conv_cd )
 						{
 							ICONV_CLOSE_CD(iod->input_conv_cd);
@@ -391,12 +408,12 @@ void iott_use(io_desc *iod, mval *pp)
 						if (DEFAULT_CODE_SET != iod->in_code_set)
 							ICONV_OPEN_CD(iod->input_conv_cd,
 								(char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
-#endif
-                                        	break;
+#						endif
+						break;
 					}
-                                case iop_opchset:
+				case iop_opchset:
 					{
-#ifdef KEEP_zOS_EBCDIC
+#						ifdef KEEP_zOS_EBCDIC
 						if ( (iconv_t)0 != iod->output_conv_cd)
 						{
 							ICONV_CLOSE_CD(iod->output_conv_cd);
@@ -405,8 +422,8 @@ void iott_use(io_desc *iod, mval *pp)
 						if (DEFAULT_CODE_SET != iod->out_code_set)
 							ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET,
 								(char *)(pp->str.addr + p_offset + 1));
-#endif
-                                        	break;
+#						endif
+						break;
 					}
 			}
 			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?

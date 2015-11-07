@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -252,6 +252,7 @@ static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, se
 	buflen = send_msgp->len - REPL_MSG_HDRLEN;
 	remaining_len = send_tr_len;
 	/* QWASSIGN(good_seqno, seq_num_zero); */
+	status = 0;
 	while (0 < remaining_len)
 	{
 		jlen = buflen;
@@ -273,7 +274,7 @@ static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, se
 				break;
 			}
 			assert(!IS_ZTP(rectype));
-			assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype) || (JRT_TCOM == rectype) || (JRT_NULL == rectype));
+			assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype) || (JRT_TCOM == rectype) || (JRT_NULL == rectype));
 			/* endian convert the suffix fields. Only backptr needs endian conversion as the other field - suffix_code
 			 * is 8 bit.
 			 */
@@ -288,11 +289,13 @@ static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, se
 			assert(&rec->jrec_null.strm_seqno == &rec->jrec_set_kill.strm_seqno);
 			assert(&rec->jrec_null.strm_seqno == &rec->jrec_tcom.strm_seqno);
 			rec->jrec_null.strm_seqno = GTM_BYTESWAP_64(rec->jrec_null.strm_seqno);
-			if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
+			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
 			{
 				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 				assert(keystr == (jnl_string *)&rec->jrec_ztworm.ztworm_str);
+				assert(keystr == (jnl_string *)&rec->jrec_lgtrig.lgtrig_str);
 				assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
+				assert(&rec->jrec_set_kill.update_num == &rec->jrec_lgtrig.update_num);
 				rec->jrec_set_kill.update_num = GTM_BYTESWAP_32(rec->jrec_set_kill.update_num);
 				/* From V19 onwards, the 'length' field is divided into 8 bit 'nodeflags' and 24 bit 'length'
 				 * fields.
@@ -300,13 +303,13 @@ static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, se
 				keylen = keystr->length;
 				nodeflags_keylen = *(jnl_str_len_t *)keystr;
 				*(jnl_str_len_t *)keystr = GTM_BYTESWAP_32(nodeflags_keylen);
-				if (IS_SET(rectype) || IS_ZTWORM(rectype))
-				{ 	/* SET and ZTWORM records have a 'value' part which needs to be endian converted */
+				if (IS_SET(rectype) || IS_ZTWORM(rectype) || IS_LGTRIG(rectype))
+				{ 	/* SET/ZTWORM/LGTRIG records have a 'key/value' part whose length needs endian conversion */
 					vallen_ptr = (mstr_len_t *)&keystr->text[keylen];
 					GET_MSTR_LEN(temp_val, vallen_ptr);
 					temp_val = GTM_BYTESWAP_32(temp_val);
 					PUT_MSTR_LEN(vallen_ptr, temp_val);
-					/* The actual 'value' itself is a character array and hence needs no endian conversion */
+					/* The 'key/value' itself is a character array and hence needs no endian conversion */
 				}
 			} else if (JRT_TCOM == rectype)
 			{
@@ -1481,11 +1484,11 @@ int gtmsource_process(void)
 					if (gtmsource_filter & INTERNAL_FILTER)
 					{
 						in_buff = gtmsource_msgp->msg;
-						in_buflen = data_len; /* size of the first journal record in the converted buffer */
+						in_buflen = data_len; /* jrec size of the FIRST SEQNO in the converted buffer */
 						out_buffmsg = repl_filter_buff;
 						out_buff = out_buffmsg + REPL_MSG_HDRLEN;
 						out_bufsiz = repl_filter_bufsiz - REPL_MSG_HDRLEN;
-						remaining_len = tot_tr_len;
+						remaining_len = tot_tr_len;	/* jrec size of ALL SEQNOs ( >= 1) in buffer */
 						while (JREC_PREFIX_SIZE <= remaining_len)
 						{
 							filter_seqno = ((struct_jrec_null *)(in_buff))->jnl_seqno;

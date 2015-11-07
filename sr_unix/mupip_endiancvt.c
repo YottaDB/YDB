@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -404,7 +404,7 @@ void mupip_endiancvt(void)
 	{	/* Database is encrypted. Initialize encryption and setup the keys to be used in later encryption/decryption */
 		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
 		if (0 == gtmcrypt_errno)
-			GTMCRYPT_GETKEY(NULL, old_data->encryption_hash, encr_key_handle, gtmcrypt_errno);
+			GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, old_data->encryption_hash, encr_key_handle, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, n_len, db_name);

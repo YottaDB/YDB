@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,43 +61,17 @@ static struct rel_table *text_rel, *text_rel_end;
 DEBUG_ONLY(static uint4 		txtrel_cnt_in_hdr;)
 
 error_def(ERR_OBJFILERR);
+error_def(ERR_STRINGOFLOW);
 
 void create_object_file(rhdtyp *rhead)
 {
-	int status;
-	unsigned char rout_len;
-	uint4 stat;
-	char		obj_name[SIZEOF(mident_fixed) + 5];
-	mstr		fstr;
-	parse_blk	pblk;
 	struct exec	hdr;
-	error_def(ERR_FILEPARSE);
 
 	assert(!run_time);
 
-	memset(&pblk, 0, SIZEOF(pblk));
-	pblk.buffer = object_file_name;
-	pblk.buff_size = MAX_FBUFF;
-	/* create the object file */
-	fstr.len = (MV_DEFINED(&cmd_qlf.object_file) ? cmd_qlf.object_file.str.len : 0);
-	fstr.addr = cmd_qlf.object_file.str.addr;
-	rout_len = module_name.len;
-	memcpy(&obj_name[0], module_name.addr, rout_len);
-	obj_name[rout_len] = '.';
-	obj_name[rout_len + 1] = 'o';
-	obj_name[rout_len + 2] = 0;
-	pblk.def1_size = rout_len + 2;
-	pblk.def1_buf = obj_name;
-	status = parse_file(&fstr, &pblk);
-	if (!(status & 1))
-		rts_error(VARLSTCNT(5) ERR_FILEPARSE, 2, fstr.len, fstr.addr, status);
+	init_object_file_name(); /* inputs: cmd_qlf.object_file, module_name; outputs: object_file_name, object_name_len */
+	object_file_des = mk_tmp_object_file(object_file_name, object_name_len);
 
-	object_name_len = pblk.b_esl;
-	object_file_name[object_name_len] = 0;
-
-	OPEN_OBJECT_FILE(object_file_name, O_CREAT | O_RDWR, object_file_des);
-	if (FD_INVALID == object_file_des)
-		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 	memcpy(&rhead->jsb[0], "GTM_CODE", SIZEOF(rhead->jsb));
 	emit_addr((char *)&rhead->src_full_name.addr - (char *)rhead,
 		(int4)rhead->src_full_name.addr, (int4 *)&rhead->src_full_name.addr);
@@ -131,7 +105,7 @@ void close_object_file(void)
 	if (emit_buff_used)
 		buff_emit();
 	if ((off_t)-1 == lseek(object_file_des, (off_t)0, SEEK_SET))
-		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 }
 
 
@@ -245,15 +219,14 @@ void emit_reference(uint4 refaddr, mstr *name, uint4 *result)
  *	Args:  buffer of executable code, and byte count to be output.
  */
 
-error_def(ERR_STRINGOFLOW);
 void emit_immed(char *source, uint4 size)
 {
 	short int write;
 
 	if (run_time)
 	{
-		if (stringpool.free + size > stringpool.top)
-			rts_error(VARLSTCNT(1) ERR_STRINGOFLOW);
+		if (!IS_STP_SPACE_AVAILABLE(size))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STRINGOFLOW);
 		memcpy(stringpool.free, source, size);
 		stringpool.free += size;
 	} else
@@ -284,7 +257,7 @@ void buff_emit(void)
 	uint4 stat;
 
 	if (-1 == write(object_file_des, emit_buff, emit_buff_used))
-		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 	emit_buff_used = 0;
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -214,6 +214,8 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		assert(0 == create_fn[create_fn_len]);
 	} else
 	{
+		if (NULL != info->csa)
+			cre_jnl_file_intrpt_rename(info->csa);	/* deal with *_new.mjl files */
 		create_fn = &fn_buff[0];
 		if (SS_NORMAL != (info->status = prepare_unique_name((char *)info->jnl, (int)info->jnl_len, "", EXT_NEW,
 								     (char *)create_fn, &create_fn_len, 0, &info->status2)))
@@ -350,6 +352,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	/* We have already saved previous journal file name in info */
 	jfh_from_jnl_info(info, header);
 	header->recover_interrupted = mupip_jnl_recover;
+	header->last_eof_written = FALSE;
 	assert(ROUND_UP2(JNL_HDR_LEN, jnl_fs_block_size) == JNL_HDR_LEN);
 	assert((unsigned char *)header + JNL_HDR_LEN <= ARRAYTOP(hdr_base));
 	/* Although the real journal file header is REAL_JNL_HDR_LEN, we write the entire journal file header
@@ -473,6 +476,10 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	F_CLOSE(channel, status);	/* resets "channel" to FD_INVALID */
 	free(jrecbuf_base);
 	jrecbuf_base = NULL;
+#	ifdef DEBUG
+	if (WBTEST_ENABLED(WBTEST_JNL_CREATE_FAIL))
+		return EXIT_ERR;
+#	endif
 	if (info->no_rename)
 		return EXIT_NRM;
 	/* Say, info->jnl = a.mjl

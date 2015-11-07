@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,16 +41,14 @@
 #include "io.h"
 #include "source_file.h"
 #include "lmdef.h"
-#include "getjobnum.h"
 #include "ast_init.h"
 #include "comp_esc.h"
-#include "get_page_size.h"
 #include "init_secshr_addrs.h"
 #include "print_exit_stats.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_threadgbl_init.h"
 #include "gtmimagename.h"
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 
 GBLREF int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF boolean_t		run_time;
@@ -61,8 +59,6 @@ GBLREF spdesc			rts_stringpool, stringpool;
 
 error_def	(LP_NOCNFDB);
 error_def	(ERR_WILLEXPIRE);
-
-OS_PAGE_SIZE_DECLARE
 
 LITREF char	gtm_product[PROD];
 LITREF int4	gtm_product_len;
@@ -92,7 +88,7 @@ int gtm$compile(void)
 
 	GTM_THREADGBL_INIT;			/* This is the first C routine in the VMS compiler so do init here */
 	gtm_env_init();	/* read in all environment variables before any function call (particularly malloc) */
-	gtm_imagetype_init(GTM_IMAGE);		/* While compile-only, pretending GTM_IMAGE is sufficient */
+	common_startup_init(GTM_IMAGE);		/* While compile-only, pretending GTM_IMAGE is sufficient */
 	op_open_ptr = op_open;
 	licensed = TRUE;
 #	ifdef	NOLICENSE
@@ -113,8 +109,6 @@ int gtm$compile(void)
 		status = lp_licensed(h, &dprd, &dver, mdl, nid, &lid, &lic_x, &days, pak);
 	}
 #	endif
-	get_page_size();
-	getjobnum();
 	INVOKE_INIT_SECSHR_ADDRS;
 	if (1 == (status & 1))				/* licensing: license units  */
 		status = LP_ACQUIRE(pak, lic_x, lid, &lkid);
@@ -136,7 +130,7 @@ int gtm$compile(void)
 	} else
 	{
 		licensed = FALSE;
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(VARLSTCNT(1) status);
 	}
 #	endif
 	glb_cmd_qlf.object_file.str.addr = obj_file;

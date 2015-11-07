@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,14 +10,15 @@
  ****************************************************************/
 
 /* Any time a new function gets added to the GT.M encryption interface, add the corresponding entry here. This file is included in
- * `gtmcrypt_entry', by appropriately, defining GTMCRYPT_DEF, to generate necessary string literals and function pointers which
- * is used to `dlsym' symbols from the GT.M encryption shared library.
+ * 'gtmcrypt_entry' by appropriately defining GTMCRYPT_DEF, to generate necessary string literals and function pointers which are
+ * used to 'dlsym' symbols from the GT.M encryption shared library.
  */
-GTMCRYPT_DEF(gtmcrypt_strerror)
 GTMCRYPT_DEF(gtmcrypt_init)
-GTMCRYPT_DEF(gtmcrypt_hash_gen)
-GTMCRYPT_DEF(gtmcrypt_encrypt)
-GTMCRYPT_DEF(gtmcrypt_decrypt)
-GTMCRYPT_DEF(gtmcrypt_getkey_by_name)
-GTMCRYPT_DEF(gtmcrypt_getkey_by_hash)
+GTMCRYPT_DEF(gtmcrypt_strerror)
+GTMCRYPT_DEF(gtmcrypt_init_db_cipher_context_by_hash)
+GTMCRYPT_DEF(gtmcrypt_init_device_cipher_context_by_keyname)
+GTMCRYPT_DEF(gtmcrypt_obtain_db_key_hash_by_keyname)
+GTMCRYPT_DEF(gtmcrypt_release_key)
+GTMCRYPT_DEF(gtmcrypt_encrypt_decrypt)
+GTMCRYPT_DEF(gtmcrypt_same_key)
 GTMCRYPT_DEF(gtmcrypt_close)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "gtmio.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -21,8 +22,9 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include <rtnhdr.h>
+#include "stack_frame.h"
 
-GBLREF lv_val		*active_lv;
 GBLREF uint4		dollar_tlevel;
 
 void	lv_kill(lv_val *lv, boolean_t dotpsave, boolean_t do_subtree)
@@ -32,8 +34,7 @@ void	lv_kill(lv_val *lv, boolean_t dotpsave, boolean_t do_subtree)
 	boolean_t	is_base_var;
 	symval		*sym;
 
-	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
-					   cleanup problems */
+	SET_ACTIVE_LV(NULL, FALSE, actlv_lv_kill); /* Clear active_lv to avoid later cleanup problems */
 	if (lv)
 	{
 		is_base_var = LV_IS_BASE_VAR(lv);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,6 +92,45 @@
 	(RP)->cmpc = (unsigned char)(VAL);								\
 }
 #endif
+
+/* The following macro picks up a record from a block using PREC as the pointer to the record and validates
+ * that the record length, NRECLEN, meets base criteria (is not 0 and does not exceed the top of the
+ * block as identified by PTOP) and return NBLKID on the assumption the block is an index block
+ */
+#define GET_AND_CHECK_RECLEN(STATUS, NRECLEN, PREC, PTOP, NBLKID)	\
+{									\
+	sm_uc_ptr_t	PVAL;						\
+									\
+	STATUS = cdb_sc_normal;						\
+	GET_USHORT(NRECLEN, &((rec_hdr_ptr_t)PREC)->rsiz);		\
+	if (NRECLEN == 0)						\
+		STATUS = cdb_sc_badoffset;				\
+	else if (PREC + NRECLEN > PTOP)					\
+		STATUS = cdb_sc_blklenerr;				\
+	else								\
+	{								\
+		PVAL = PREC + NRECLEN - SIZEOF(block_id);		\
+		GET_LONG(NBLKID, PVAL);					\
+	}								\
+}
+
+/* The following macro picks up a the level from a block using PBLKBASE as the pointer to the header and validates
+ * that the block level, NLEVL, meets base criteria (is not greater than MAX_BT_DEPTH and matches the expected
+ * level as identified by DESIREDLVL)
+ */
+#define GET_AND_CHECK_LEVL(STATUS, NLEVL, DESIREDLVL, PBLKBASE)	\
+{									\
+	STATUS = cdb_sc_normal;						\
+	NLEVL = ((blk_hdr_ptr_t)PBLKBASE)->levl;			\
+	if (MAX_BT_DEPTH < (int)NLEVL)					\
+		STATUS = cdb_sc_maxlvl;					\
+	else if (ANY_ROOT_LEVL == DESIREDLVL)				\
+	{								\
+		if (0 == (int)NLEVL)					\
+			STATUS = cdb_sc_badlvl;				\
+	} else if (DESIREDLVL !=(int)NLEVL)				\
+		STATUS = cdb_sc_badlvl;					\
+}
 
 #if defined(__alpha) && defined(__vms)
 # pragma member_alignment save

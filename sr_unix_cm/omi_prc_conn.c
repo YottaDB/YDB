@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -177,21 +177,20 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 #if !(defined(SCO) || defined(__linux__) || defined(__CYGWIN__) || defined(__MVS__))
     if (authenticate)  /* verify password and user name */
     {
-#ifdef SHADOWPW
-	    struct spwd *spass, *getspnam();
-	    struct stat buf;
-#endif
-	    struct passwd *pass;
-	    char *pw, *syspw;
+#	ifdef SHADOWPW
+	struct spwd *spass, *getspnam();
+	struct stat buf;
+#		endif
+	struct passwd *pass;
+	char *pw, *syspw;
 
-	    /* lowercase agent name */
-	    for(s = ag_name; *s; s++)
-		    if (ISUPPER_ASCII(*s))
-			    *s = TOLOWER(*s);
+	/* lowercase agent name */
+	for(s = ag_name; *s; s++)
+		*s = TOLOWER(*s);
 
 #ifdef SHADOWPW
-	    if (!Stat("/etc/shadow", &buf))
-	    {
+	if (!Stat("/etc/shadow", &buf))
+	{
 		if ((spass = getspnam(ag_name)) == NULL)
 		{
 		    if (errno)
@@ -206,38 +205,31 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 		    return -OMI_ER_DB_USERNOAUTH;
 		}
 		syspw = spass->sp_pwdp;
-	    } else if ((pass = getpwnam(ag_name)) == NULL)
-	    {
+	} else if ((pass = getpwnam(ag_name)) == NULL)
+	{
+		OMI_DBG((omi_debug, "%s:  user %s not found in /etc/passwd\n",
+			SRVR_NAME, ag_name));
+		return -OMI_ER_DB_USERNOAUTH;
+	} else
+		syspw = pass->pw_passwd;
+#	else    /* ndef SHADOWPW */
+	if ((pass = getpwnam(ag_name)) == NULL)
+	{
 		    OMI_DBG((omi_debug, "%s:  user %s not found in /etc/passwd\n",
 			     SRVR_NAME, ag_name));
 		    return -OMI_ER_DB_USERNOAUTH;
 	    } else
 		syspw = pass->pw_passwd;
-
-
-
-#else    /* ndef SHADOWPW */
-	    if ((pass = getpwnam(ag_name)) == NULL)
-	    {
-		    OMI_DBG((omi_debug, "%s:  user %s not found in /etc/passwd\n",
-			     SRVR_NAME, ag_name));
-		    return -OMI_ER_DB_USERNOAUTH;
-	    } else
-		syspw = pass->pw_passwd;
-
-#endif   /* SHADOWPW */
-
-	    pw = (char *) crypt(ag_pass, syspw);
-
-	    if (strcmp(pw, syspw) != 0)
-	    {
-		    OMI_DBG((omi_debug, "%s:  login attempt for user %s failed.\n",
-			     SRVR_NAME, ag_name));
-		    return -OMI_ER_DB_USERNOAUTH;
-	    }
+#	endif   /* SHADOWPW */
+	pw = (char *) crypt(ag_pass, syspw);
+	if (strcmp(pw, syspw) != 0)
+	{
+		OMI_DBG((omi_debug, "%s:  login attempt for user %s failed.\n",
+			SRVR_NAME, ag_name));
+		return -OMI_ER_DB_USERNOAUTH;
+	}
     }
 #endif  /* SCO or linux or cygwin or z/OS */
-
 
 /*  Server name (in) */
     OMI_SI_READ(&ss_len,   cptr->xptr);
@@ -252,11 +244,9 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     OMI_SI_WRIT(0, bptr);
 /*  Server password (out) */
     OMI_SI_WRIT(0, bptr);
-
 /*  Bounds checking */
     if (cptr->xptr > xend || bptr >= bend)
 	return -OMI_ER_PR_INVMSGFMT;
-
 /*  Extensions (in) -- count through them */
     OMI_SI_READ(&ext_cnt, cptr->xptr);
     for (i = 0; i < ext_cnt.value; i++)
@@ -264,17 +254,16 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 	OMI_LI_READ(&ext, cptr->xptr);
 	cptr->exts |= (1 << (ext.value - 1));
     }
-
 /*  Mask off extensions we don't support */
     cptr->exts &= OMI_EXTENSIONS;
 
 /*  Negotiate extension combinations */
     if (cptr->exts & OMI_XTF_RC && cptr->exts & OMI_XTF_BUNCH)
 	cptr->exts &= ~OMI_XTF_BUNCH;
-#ifdef GTCM_RC
+#   ifdef GTCM_RC
     if (cptr->exts & OMI_XTF_RC)
 	cptr->of = rc_oflow_alc();
-#endif /* defined(GTCM_RC) */
+#   endif /* defined(GTCM_RC) */
 
 /*  Extensions (out) */
     eptr  = bptr;
@@ -302,14 +291,11 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     }
 /*  Number of extensions */
     OMI_SI_WRIT(i, eptr);
-
 /*  Bounds checking */
     if (cptr->xptr > xend || bptr >= bend)
 	return -OMI_ER_PR_INVMSGFMT;
-
 /*  Change the state of the connection */
     cptr->state = OMI_ST_CONN;
 
     return (int)(bptr - buff);
-
 }

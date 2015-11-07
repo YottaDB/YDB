@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,9 @@
 #include "iotimer.h"
 #include "io_params.h"
 #include "iosocketdef.h"
+#ifndef VMS
+#include "iormdef.h"
+#endif
 #include "gtm_caseconv.h"
 #include "stringpool.h"
 #include "gtm_conv.h"
@@ -39,11 +42,13 @@ GBLREF	io_pair			io_std_device;	/* standard device */
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	int4			gtm_max_sockets;
 GBLREF	boolean_t		dollar_zininterrupt;
+GBLREF	UConverter		*chset_desc[];
 LITREF 	unsigned char		io_params_size[];
 LITREF	mstr			chset_names[];
 
 error_def(ERR_ABNCOMPTINC);
 error_def(ERR_ADDRTOOLONG);
+error_def(ERR_CHSETALREADY);
 error_def(ERR_DELIMSIZNA);
 error_def(ERR_DELIMWIDTH);
 error_def(ERR_DEVPARINAP);
@@ -58,6 +63,17 @@ error_def(ERR_ZFF2MANY);
 error_def(ERR_ZINTRECURSEIO);
 
 #define ESTABLISHED		"ESTABLISHED"
+
+#ifdef UNICODE_SUPPORTED
+#define CHECK_CHSETALREADY(CURRCHSET)						\
+	if ((0 < newdsocket->n_socket) && (chset_idx != CURRCHSET))		\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CHSETALREADY, 2,	\
+			chset_names[CURRCHSET].len, chset_names[CURRCHSET].addr);
+#define CHECK_CHSETALREADY2(CURRCHSET,NEWCHSET)						\
+	if ((0 < newdsocket->n_socket) && (NEWCHSET != CURRCHSET))		\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CHSETALREADY, 2,	\
+			chset_names[CURRCHSET].len, chset_names[CURRCHSET].addr);
+#endif
 
 short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 timepar)
 {
@@ -78,6 +94,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	boolean_t		zint_conn_restart = FALSE;
 	socket_interrupt	*sockintr;
 	mstr			chset_mstr;
+	gtm_chset_t		default_chset;
 	boolean_t		attach_specified = FALSE,
 		                listen_specified = FALSE,
 		                connect_specified = FALSE,
@@ -91,7 +108,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		                ichset_specified,
 		                ochset_specified;
 	unsigned char 		delimiter_buffer[MAX_N_DELIMITER * (MAX_DELIM_LEN + 1)], zff_buffer[MAX_ZFF_LEN];
-	char			ioerror, ip[3], tcp[4],
+	char			ioerror,
  		                sock_handle[MAX_HANDLE_LEN], delimiter[MAX_DELIM_LEN + 1];
 	int			socketptr_delim_len;
 	char			ipaddr[SA_MAXLEN];
@@ -196,7 +213,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					        {	/* Only change ipchset if in UTF8 mode */
 							chset_mstr.addr = (char *)(pp->str.addr + p_offset + 1);
 							chset_mstr.len = *(pp->str.addr + p_offset);
-							SET_ENCODING(ioptr->ichset, &chset_mstr);
+							SET_ENCODING_VALIDATE(ioptr->ichset, &chset_mstr,
+								CHECK_CHSETALREADY(ioptr->ichset));
 							ichset_specified = TRUE;
 						}
 					);
@@ -207,7 +225,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		 				{       /* Only change ipchset if in UTF8 mode */
 							chset_mstr.addr = (char *)(pp->str.addr + p_offset + 1);
 							chset_mstr.len = *(pp->str.addr + p_offset);
-							SET_ENCODING(ioptr->ochset, &chset_mstr);
+							SET_ENCODING_VALIDATE(ioptr->ochset, &chset_mstr,
+								CHECK_CHSETALREADY(ioptr->ochset));
 							ochset_specified = TRUE;
 						}
 					);
@@ -218,7 +237,9 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 						{       /* Only change ipchset/opchset if in UTF8 mode */
 							chset_mstr.addr = (char *)(pp->str.addr + p_offset + 1);
 							chset_mstr.len = *(pp->str.addr + p_offset);
-							SET_ENCODING(ioptr->ichset, &chset_mstr);
+							SET_ENCODING_VALIDATE(ioptr->ichset, &chset_mstr,
+								CHECK_CHSETALREADY(ioptr->ichset));
+							CHECK_CHSETALREADY2(ioptr->ochset, ioptr->ichset);
 							ioptr->ochset = ioptr->ichset;
 							ichset_specified = ochset_specified = TRUE;
                                         	}
@@ -229,6 +250,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			*/
 				case iop_m:
 					UNICODE_ONLY(
+						CHECK_CHSETALREADY2(ioptr->ichset, CHSET_M);
+						CHECK_CHSETALREADY2(ioptr->ochset, CHSET_M);
 						ioptr->ichset = ioptr->ochset = CHSET_M;
 						ichset_specified = ochset_specified = TRUE;
 					);
@@ -237,6 +260,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					UNICODE_ONLY(
 						if (gtm_utf8_mode)
 						{       /* Only change chset if in UTF8 mode */
+							CHECK_CHSETALREADY2(ioptr->ichset, CHSET_UTF16);
+							CHECK_CHSETALREADY2(ioptr->ochset, CHSET_UTF16);
 							ioptr->ichset = ioptr->ochset = CHSET_UTF16;
 							ichset_specified = ochset_specified = TRUE;
 						}
@@ -246,6 +271,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					UNICODE_ONLY(
 						if (gtm_utf8_mode)
 						{       /* Only change chset if in UTF8 mode */
+							CHECK_CHSETALREADY2(ioptr->ichset, CHSET_UTF16BE);
+							CHECK_CHSETALREADY2(ioptr->ochset, CHSET_UTF16BE);
 							ioptr->ichset = ioptr->ochset = CHSET_UTF16BE;
 							ichset_specified = ochset_specified = TRUE;
 						}
@@ -255,6 +282,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					UNICODE_ONLY(
 						if (gtm_utf8_mode)
 						{       /* Only change chset if in UTF8 mode */
+							CHECK_CHSETALREADY2(ioptr->ichset, CHSET_UTF16LE);
+							CHECK_CHSETALREADY2(ioptr->ochset, CHSET_UTF16LE);
 							ioptr->ichset = ioptr->ochset = CHSET_UTF16LE;
 							ichset_specified = ochset_specified = TRUE;
 						}
@@ -308,7 +337,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					ioerror = *(pp->str.addr + p_offset + 1);	/* the first char decides */
 					break;
 				case iop_exception:
-					ioptr->error_handler.len = *(pp->str.addr + p_offset);
+					ioptr->error_handler.len = (int)(*(pp->str.addr + p_offset));
 					ioptr->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
 					s2pool(&ioptr->error_handler);
 					break;
@@ -392,14 +421,6 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
 				     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 		}
-		if (!ichset_specified)
-			ioptr->ichset = (gtm_utf8_mode) ? CHSET_UTF8 : CHSET_M;
-		if (!ochset_specified)
-			ioptr->ochset = (gtm_utf8_mode) ? CHSET_UTF8 : CHSET_M;
-		if (CHSET_M != ioptr->ichset && CHSET_UTF16 != ioptr->ichset)
-			get_chset_desc(&chset_names[ioptr->ichset]);
-		if (CHSET_M != ioptr->ochset && CHSET_UTF16 != ioptr->ochset)
-			get_chset_desc(&chset_names[ioptr->ochset]);
 		if (listen_specified && connect_specified)
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("CONNECT"),
@@ -488,7 +509,13 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			}
 			if (NULL == socketptr->zff.addr) /* we rely on socketptr->zff.addr being set to 0 in iosocket_create() */
 				socketptr->zff.addr = (char *)malloc(MAX_ZFF_LEN);
+			else if (socketptr->zff.addr != socketptr->ozff.addr)
+			{
+				assert(NULL != socketptr->ozff.addr);
+				free(socketptr->ozff.addr);	/* prevent leak of prior converted form */
+			}
 			memcpy(socketptr->zff.addr, zff_buffer, zff_len);
+			socketptr->ozff = socketptr->zff;	/* will contain converted UTF-16 form if needed */
 		}
 	}
 	/* action */
@@ -501,36 +528,53 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		SOCKET_FREE(socketptr);
 		return FALSE;
 	} else if (is_principal)
-	{	/* fill in what bind or connect would */
-		ai_ptr = &(socketptr->local.ai);
-		remote_ai_ptr = &(socketptr->remote.ai);
-		/* translate internal address to numeric ip address */
-		GETNAMEINFO(SOCKET_LOCAL_ADDR(socketptr), ai_ptr->ai_addrlen, ipaddr, SIZEOF(ipaddr), NULL, 0, NI_NUMERICHOST,
-				errcode);
-		if (0 != errcode)
-		{
-			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
-			return FALSE;
-		}
-		STRNDUP(ipaddr, SIZEOF(ipaddr), socketptr->local.saddr_ip);
-		GETNAMEINFO(SOCKET_REMOTE_ADDR(socketptr), remote_ai_ptr->ai_addrlen, ipaddr, SIZEOF(ipaddr), NULL, 0,
-				NI_NUMERICHOST, errcode);
-		if (0 != errcode)
-		{
-			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
-			return FALSE;
-		}
-		STRNDUP(ipaddr, SIZEOF(ipaddr), socketptr->remote.saddr_ip);
+	{
 		len = SIZEOF(ESTABLISHED) - 1;
 		memcpy(&ioptr->dollar.key[0], ESTABLISHED, len);
 		ioptr->dollar.key[len++] = '|';
 		memcpy(&ioptr->dollar.key[len], socketptr->handle, socketptr->handle_len);
 		len += socketptr->handle_len;
 		ioptr->dollar.key[len++] = '|';
-		strncpy(&ioptr->dollar.key[len], socketptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
+		if (socket_tcpip == socketptr->protocol)
+			strncpy(&ioptr->dollar.key[len], socketptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
+#		ifndef VMS
+		else if (socket_local == socketptr->protocol)
+		{
+			if ((NULL != socketptr->local.sa)
+				    && (NULL != ((struct sockaddr_un *)(socketptr->local.sa))->sun_path))
+				strncpy(&ioptr->dollar.key[len], ((struct sockaddr_un *)(socketptr->local.sa))->sun_path,
+					DD_BUFLEN - 1 - len);
+			else if ((NULL != socketptr->remote.sa)
+				    && (NULL != ((struct sockaddr_un *)(socketptr->remote.sa))->sun_path))
+				strncpy(&ioptr->dollar.key[len], ((struct sockaddr_un *)(socketptr->remote.sa))->sun_path,
+					DD_BUFLEN - 1 - len);
+			/* set default delimiter on principal local sockets to resemble rm device */
+			delimiter_buffer[0] = NATIVE_NL;
+			delimiter_len = 1;
+			iosocket_delimiter(delimiter_buffer, delimiter_len, socketptr, FALSE);
+		}
+#		endif
+		else
+			ioptr->dollar.key[len] = '\0';
 		ioptr->dollar.key[DD_BUFLEN-1] = '\0';			/* In case we fill the buffer */
 	}
 	/* commit the changes to the list */
+	if (0 >= dsocketptr->n_socket)		/* before any new socket added */
+	{	/* don't change chset if this is not the first socket */
+		default_chset = (gtm_utf8_mode) ? CHSET_UTF8 : CHSET_M;
+		if (!ichset_specified && !IS_UTF16_CHSET(ioptr->ichset))
+			ioptr->ichset = default_chset;
+		if (!ochset_specified && !IS_UTF16_CHSET(ioptr->ochset))
+			ioptr->ochset = default_chset;
+		if (CHSET_M != ioptr->ichset && CHSET_UTF16 != ioptr->ichset)
+			get_chset_desc(&chset_names[ioptr->ichset]);
+		if (CHSET_M != ioptr->ochset && CHSET_UTF16 != ioptr->ochset)
+			get_chset_desc(&chset_names[ioptr->ochset]);
+		if (ichset_specified)
+			newdsocket->ichset_specified = TRUE;
+		if (ochset_specified)
+			newdsocket->ochset_specified = TRUE;
+	}
 	if (listen_specified || connect_specified || is_principal)
 	{
 		socketptr->dev = dsocketptr;

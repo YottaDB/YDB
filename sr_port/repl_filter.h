@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,12 +19,18 @@
 #define FILTERSTART_ERR			-1
 #define FILTER_CMD_ARG_DELIM_TOKENS	" \t"
 
+/* Define the maximum jnl extract byte length of ONE line of journal extract.
+ * Note that for a TP transaction that has N updates, the journal extract length needed at most is N times this value.
+ */
 #ifdef UNIX
-#  define MAX_EXTRACT_BUFSIZ		10 * MAX_LOGI_JNL_REC_SIZE	/* Since we might need up to 9X + 11
-									 * of MAX_LOGI_JNL_REC_SIZE */
+#  define MAX_ONE_JREC_EXTRACT_BUFSIZ		10 * MAX_LOGI_JNL_REC_SIZE	/* Since we might need up to 9X + 11
+										 * of MAX_LOGI_JNL_REC_SIZE */
 #else
-#  define MAX_EXTRACT_BUFSIZ		1 * 1024 * 1024
+#  define MAX_ONE_JREC_EXTRACT_BUFSIZ		1 * 1024 * 1024
 #endif
+
+#define	JNL2EXTCVT_EXPAND_FACTOR	2  /* # of max-sized journal records by which jnl2extcvt expands buffer if not enough */
+#define	EXT2JNLCVT_EXPAND_FACTOR	8  /* # of max-sized journal records by which ext2jnlcvt expands buffer if not enough */
 
 #define NO_FILTER			0
 #define INTERNAL_FILTER			0x00000001
@@ -62,6 +68,7 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  *	V21	V21	GT.M V5.4-002	Added replicated ZTRIGGER jnl record type
  *	V22	V22	GT.M V5.5-000	strm_seqno added to all logical records (supplementary instances)
  *	V22	V23	GT.M V6.0-000	Various journaling-related limits have changed, allowing for much larger journal records
+ *	V24	V24	GT.M V6.2-000	New logical trigger journal record (TLGTRIG and ULGTRIG jnl records)
  */
 
 typedef enum
@@ -71,6 +78,7 @@ typedef enum
 	REPL_FILTER_V19,	/* filter version corresponding to journal format V19 */
 	REPL_FILTER_V21,	/* filter version corresponding to journal format V21 */
 	REPL_FILTER_V22,	/* filter version corresponding to journal format V22 */
+	REPL_FILTER_V24,	/* filter version corresponding to journal format V24 */
 	REPL_FILTER_MAX
 } repl_filter_t;
 
@@ -83,26 +91,31 @@ typedef enum
 	REPL_JNL_V21,		/* enum corresponding to journal format V21 */
 	REPL_JNL_V22,		/* enum corresponding to journal format V22 */
 	REPL_JNL_V23,		/* enum corresponding to journal format V23 */
+	REPL_JNL_V24,		/* enum corresponding to journal format V24 */
 	REPL_JNL_MAX
 } repl_jnl_t;
 
 #define IF_INVALID	((intlfltr_t)0L)
 #define IF_NONE		((intlfltr_t)(-1L))
-#define IF_22TO17	(intlfltr_t)jnl_v22TOv17
-#define IF_22TO19	(intlfltr_t)jnl_v22TOv19
-#define IF_22TO21	(intlfltr_t)jnl_v22TOv21
-#define IF_17TO22	(intlfltr_t)jnl_v17TOv22
-#define IF_19TO22	(intlfltr_t)jnl_v19TOv22
-#define IF_21TO22	(intlfltr_t)jnl_v21TOv22
-#define IF_22TO22	(intlfltr_t)jnl_v22TOv22
+#define IF_24TO17	(intlfltr_t)jnl_v24TOv17
+#define IF_24TO19	(intlfltr_t)jnl_v24TOv19
+#define IF_24TO21	(intlfltr_t)jnl_v24TOv21
+#define IF_24TO22	(intlfltr_t)jnl_v24TOv22
+#define IF_17TO24	(intlfltr_t)jnl_v17TOv24
+#define IF_19TO24	(intlfltr_t)jnl_v19TOv24
+#define IF_21TO24	(intlfltr_t)jnl_v21TOv24
+#define IF_22TO24	(intlfltr_t)jnl_v22TOv24
+#define IF_24TO24	(intlfltr_t)jnl_v24TOv24
 
-extern int jnl_v22TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v17TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v22TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v19TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v22TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v21TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v22TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v24TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v17TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v19TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v24TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v21TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v24TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v22TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v24TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
 
 extern void repl_check_jnlver_compat(UNIX_ONLY(boolean_t same_endianness));
 
@@ -142,18 +155,20 @@ GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 #define V21_JNL_VER		21
 #define V22_JNL_VER		22
 #define V23_JNL_VER		23
+#define V24_JNL_VER		24
 
 #define	V17_NULL_RECLEN		40	/* size of a JRT_NULL record in V17/V18 jnl format */
 #define	V19_NULL_RECLEN		40	/* size of a JRT_NULL record in V19/V20 jnl format */
 #define	V21_NULL_RECLEN		40	/* size of a JRT_NULL record in V21	jnl format */
 #define	V22_NULL_RECLEN		48	/* size of a JRT_NULL record in V22/V23	jnl format */
+#define	V24_NULL_RECLEN		48	/* size of a JRT_NULL record in V24	jnl format */
 
 #define	V19_UPDATE_NUM_OFFSET		32	/* offset of "update_num" member in struct_jrec_upd structure in V19 jnl format */
 #define	V19_MUMPS_NODE_OFFSET		40	/* offset of "mumps_node" member in struct_jrec_upd structure in V19 jnl format */
 #define	V19_TCOM_FILLER_SHORT_OFFSET	32	/* offset of "filler_short" in struct_jrec_tcom structure in V19 jnl format */
 #define	V19_NULL_FILLER_OFFSET		32	/* offset of "filler" in struct_jrec_nullstructure in V19 jnl format */
 
-#define	V22_MUMPS_NODE_OFFSET		48	/* offset of "mumps_node" member in struct_jrec_upd struct in V22/V23 jnl format */
+#define	V24_MUMPS_NODE_OFFSET		48	/* offset of "mumps_node" member in struct_jrec_upd struct in V24 jnl format */
 
 typedef struct
 {
@@ -165,7 +180,9 @@ typedef struct
 } v15_jrec_prefix;	/* 16-byte */
 
 int repl_filter_init(char *filter_cmd);
-int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize);
+int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize);
+STATICFNDCL int repl_filter_recv(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize, boolean_t send_done);
+STATICFNDCL int repl_filter_recv_line(char *line, int *line_len, int max_line_len, boolean_t send_done);
 int repl_stop_filter(void);
 void repl_filter_error(seq_num filter_seqno, int why);
 
@@ -191,6 +208,7 @@ void repl_filter_error(seq_num filter_seqno, int why);
 #define APPLY_EXT_FILTER_IF_NEEDED(GTMSOURCE_FILTER, GTMSOURCE_MSGP, DATA_LEN, TOT_TR_LEN)					\
 {																\
 	seq_num		filter_seqno;												\
+	unsigned char	*tr;													\
 																\
 	if (GTMSOURCE_FILTER & EXTERNAL_FILTER)											\
 	{															\
@@ -202,13 +220,14 @@ void repl_filter_error(seq_num filter_seqno, int why);
 		 * according to the update_num. V19 is the first journal filter format which introduced the notion of		\
 		 * update_num.													\
 		 */														\
+		tr = GTMSOURCE_MSGP->msg;											\
 		if (V19_JNL_VER <= LOCAL_JNL_VER)										\
 		{														\
-			repl_sort_tr_buff(GTMSOURCE_MSGP->msg, DATA_LEN);							\
-			DBG_VERIFY_TR_BUFF_SORTED(GTMSOURCE_MSGP->msg, DATA_LEN);						\
+			repl_sort_tr_buff(tr, DATA_LEN);									\
+			DBG_VERIFY_TR_BUFF_SORTED(tr, DATA_LEN);								\
 		}														\
-		filter_seqno = ((struct_jrec_null *)(GTMSOURCE_MSGP->msg))->jnl_seqno;						\
-		if (SS_NORMAL != (status = repl_filter(filter_seqno, GTMSOURCE_MSGP->msg, &DATA_LEN, gtmsource_msgbufsiz)))	\
+		filter_seqno = ((struct_jrec_null *)tr)->jnl_seqno;								\
+		if (SS_NORMAL != (status = repl_filter(filter_seqno, &tr, &DATA_LEN, &gtmsource_msgbufsiz)))			\
 			repl_filter_error(filter_seqno, status);								\
 		TOT_TR_LEN = DATA_LEN + REPL_MSG_HDRLEN;									\
 	}															\
@@ -234,28 +253,28 @@ void repl_filter_error(seq_num filter_seqno, int why);
 }
 
 #ifdef UNIX
-# define INT_FILTER_RTS_ERROR(FILTER_SEQNO)							\
-{												\
-	if (EREPL_INTLFILTER_BADREC == repl_errno)						\
-		rts_error(VARLSTCNT(1) ERR_REPLRECFMT);						\
-	else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)					\
-		rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);					\
-	else if (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)				\
-		rts_error(VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1, &FILTER_SEQNO);			\
-	else if (EREPL_INTLFILTER_MULTILINEXECUTE == repl_errno)				\
-		rts_error(VARLSTCNT(3) ERR_REPLNOMULTILINETRG, 1, &FILTER_SEQNO);		\
-	else	/* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */				\
-		assertpro(FALSE);								\
+# define INT_FILTER_RTS_ERROR(FILTER_SEQNO)								\
+{													\
+	if (EREPL_INTLFILTER_BADREC == repl_errno)							\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLRECFMT);				\
+	else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)						\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLGBL2LONG);				\
+	else if (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)					\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1, &FILTER_SEQNO);	\
+	else if (EREPL_INTLFILTER_MULTILINEXECUTE == repl_errno)					\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLNOMULTILINETRG, 1, &FILTER_SEQNO);	\
+	else	/* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */					\
+		assertpro(FALSE);									\
 }
 #else
-# define INT_FILTER_RTS_ERROR(FILTER_SEQNO)							\
-{												\
-	if (EREPL_INTLFILTER_BADREC == repl_errno)						\
-		rts_error(VARLSTCNT(1) ERR_REPLRECFMT);						\
-	else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)					\
-		rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);					\
-	else	/* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */				\
-		assertpro(FALSE);								\
+# define INT_FILTER_RTS_ERROR(FILTER_SEQNO)					\
+{										\
+	if (EREPL_INTLFILTER_BADREC == repl_errno)				\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLRECFMT);	\
+	else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)			\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLGBL2LONG);	\
+	else	/* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */		\
+		assertpro(FALSE);						\
 }
 #endif
 #endif

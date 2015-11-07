@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,8 @@
 #include "gtm_ipc.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
-#include <sys/un.h>
+#include "gtm_un.h"
+
 #include <sys/time.h>
 #include <errno.h>
 #include "gtm_fcntl.h"
@@ -70,6 +71,23 @@
 /* Get journal end of data, adjusted if file not virtually truncated by recover/rollback */
 #define REAL_END_OF_DATA(FC)	(FC->jfh->prev_recov_end_of_data ? FC->jfh->end_of_data : FC->jfh->end_of_data + EOF_RECLEN)
 
+#define	DO_EOF_ADDR_CHECK		FALSE
+#define	SKIP_EOF_ADDR_CHECK		TRUE
+
+/* Callers of this macro ensure that the maximum seqno which can be found until offset MAX_SEQNO_EOF_ADDR is MAX_SEQNO. */
+#define	CTL_SET_MAX_SEQNO(CTL, MAX_SEQNO, MAX_SEQNO_ADDR, MAX_SEQNO_EOF_ADDR, SKIP_EOF_ADDR_CHECK)		\
+{														\
+	assert(MAX_SEQNO_ADDR <= MAX_SEQNO_EOF_ADDR);								\
+	assert(SKIP_EOF_ADDR_CHECK || (MAX_SEQNO_EOF_ADDR <= CTL->repl_buff->fc->eof_addr));			\
+	assert(ctl->max_seqno <= MAX_SEQNO);									\
+	ctl->max_seqno = MAX_SEQNO;										\
+	assert(ctl->max_seqno_dskaddr <= MAX_SEQNO_ADDR);							\
+	ctl->max_seqno_dskaddr = MAX_SEQNO_ADDR;								\
+	assert(MAX_SEQNO_EOF_ADDR >= MAX_SEQNO_ADDR);								\
+	assert(ctl->max_seqno_eof_addr <= MAX_SEQNO_EOF_ADDR);							\
+	ctl->max_seqno_eof_addr = MAX_SEQNO_EOF_ADDR;								\
+}
+
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	repl_ctl_element	*repl_ctl_list;
@@ -81,6 +99,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	uint4			process_id;
+GBLREF	uint4			heartbeat_counter;
 
 LITREF char *jnl_file_state_lit[];
 
@@ -251,8 +270,8 @@ static	int repl_next(repl_buff_t *rb)
 				MEMCPY_LIT(err_string, READ_ERR_STR);
 			else
 				MEMCPY_LIT(err_string, UNKNOWN_ERR_STR);
-			rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, backctl->jnl_fn_len, backctl->jnl_fn,
-			  	  ERR_TEXT, 2, LEN_AND_STR(err_string), status);
+			rts_error_csa(CSA_ARG(&FILE_INFO(backctl->reg)->s_addrs) VARLSTCNT(9) ERR_REPLFILIOERR, 2,
+				backctl->jnl_fn_len, backctl->jnl_fn, ERR_TEXT, 2, LEN_AND_STR(err_string), status);
 		}
 	}
 	maxreclen = (uint4)(((b->base + REPL_BLKSIZE(rb)) - b->recbuff) - b->buffremaining);
@@ -266,12 +285,13 @@ static	int repl_next(repl_buff_t *rb)
 		{
 			rec = ((jnl_record *)(b->recbuff));
 			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
-			if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
+			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
 			{
 				assert(!IS_ZTP(rectype));
 				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
-				/* Assert that ZTWORMHOLE type record too has same layout as KILL/SET */
+				/* Assert that ZTWORMHOLE and LGTRIG type record too has same layout as KILL/SET */
 				assert((sm_uc_ptr_t)keystr == (sm_uc_ptr_t)&rec->jrec_ztworm.ztworm_str);
+				assert((sm_uc_ptr_t)keystr == (sm_uc_ptr_t)&rec->jrec_lgtrig.lgtrig_str);
 				MUR_DECRYPT_LOGICAL_RECS(keystr, rec->prefix.forwptr, backctl->encr_key_handle, gtmcrypt_errno);
 				if (0 != gtmcrypt_errno)
 					GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, backctl->jnl_fn_len, backctl->jnl_fn);
@@ -293,7 +313,6 @@ static	int repl_next(repl_buff_t *rb)
 
 static int open_prev_gener(repl_ctl_element **old_ctl, repl_ctl_element *ctl, seq_num read_seqno)
 {
-
 	if (0 == ctl->repl_buff->fc->jfh->prev_jnl_file_name_length ||
 		 QWLE(ctl->repl_buff->fc->jfh->start_seqno, read_seqno))
 	{
@@ -310,16 +329,16 @@ static int open_prev_gener(repl_ctl_element **old_ctl, repl_ctl_element *ctl, se
 	(*old_ctl)->prev->next = *old_ctl;
 	(*old_ctl)->next->prev = *old_ctl;
 	first_read(*old_ctl);
-	if ((*old_ctl)->file_state == JNL_FILE_OPEN)
+	assertpro((JNL_FILE_OPEN == (*old_ctl)->file_state) || (JNL_FILE_UNREAD == (*old_ctl)->file_state));
+	if (JNL_FILE_OPEN == (*old_ctl)->file_state)
 	{
 		(*old_ctl)->file_state = JNL_FILE_CLOSED;
 		REPL_DPRINT2("open_prev_gener : %s jnl file marked closed\n", (*old_ctl)->jnl_fn);
-	} else if ((*old_ctl)->file_state == JNL_FILE_UNREAD)
+	} else if (JNL_FILE_UNREAD == (*old_ctl)->file_state)
 	{
 		(*old_ctl)->file_state = JNL_FILE_EMPTY;
 		REPL_DPRINT2("open_prev_gener :  %s jnl file marked empty\n", (*old_ctl)->jnl_fn);
-	} else
-		GTMASSERT;
+	}
 	return (1);
 }
 
@@ -374,7 +393,7 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 		jnl_fn[jnl_fn_len] = '\0';
 		if ('\0' == jnl_fn[0])
 		{ /* prev link has been cut, can't follow path back from latest generation jnlfile to the latest we had opened */
-			rts_error(VARLSTCNT(4) ERR_NOPREVLINK, 2, new_ctl->jnl_fn_len, new_ctl->jnl_fn);
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_NOPREVLINK, 2, new_ctl->jnl_fn_len, new_ctl->jnl_fn);
 		}
 		if (is_gdid_file_identical(reg_ctl_end_id, jnl_fn, jnl_fn_len))
 			break;
@@ -393,9 +412,11 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 	}
 	/* Except the latest generation, mark the newly opened future generations CLOSED, or EMPTY.
 	 * We assume that when a new file is opened, the previous generation has been flushed to disk fully.
-	C9M06-999999 */
+	 * C9M06-999999.
+	 */
 	for (ctl = reg_ctl_end, n = nopen; n; n--, ctl = ctl->next)
 	{
+		assertpro((JNL_FILE_UNREAD == ctl->file_state) || (JNL_FILE_OPEN == ctl->file_state));
 		if (ctl->file_state == JNL_FILE_UNREAD)
 			first_read(ctl);
 		else if (ctl->file_state == JNL_FILE_OPEN)
@@ -403,10 +424,9 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 			if (update_max_seqno_info(ctl) != SS_NORMAL)
 			{
 				assert(repl_errno == EREPL_JNLEARLYEOF);
-				GTMASSERT; /* Program bug */
+				assertpro(FALSE); /* Program bug */
 			}
-		} else
-			GTMASSERT;
+		}
 		if (ctl->file_state == JNL_FILE_UNREAD)
 		{
 			ctl->file_state = JNL_FILE_EMPTY;
@@ -449,7 +469,7 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 		{
 			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, REAL_JNL_HDR_LEN, status);
 			if (SS_NORMAL != status)
-				rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, ctl->jnl_fn_len, ctl->jnl_fn,
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_REPLFILIOERR, 2, ctl->jnl_fn_len, ctl->jnl_fn,
 						ERR_TEXT, 2, LEN_AND_LIT("Error in reading jfh in update_eof_addr"), status);
 			REPL_DPRINT2("Update EOF : Jnl file hdr refreshed from file for %s\n", ctl->jnl_fn);
 			ctl->eof_addr_final = TRUE; /* No more updates to fc->eof_addr for this journal file */
@@ -516,8 +536,8 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	repl_buff_t		*rb;
 	repl_buff_desc		*b;
 	repl_file_control_t	*fc;
-	uint4			dskread, stop_at;
-	boolean_t		max_seqno_found;
+	uint4			dskread, max_seqno_eof_addr, stop_at;
+	boolean_t		eof_addr_final, max_seqno_found;
 	uint4			max_seqno_addr;
 	seq_num			max_seqno, reg_seqno;
 	int			status;
@@ -542,8 +562,16 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 		return (SS_NORMAL);
 	}
 #	endif
-	if (JNL_FILE_FIRST_RECORD == fc->eof_addr)
-	{	/* Journal file only has the journal header, no journal records.  That case should have been cought earlier
+	/* Store/cache fc->eof_addr in local variable. It is possible the "repl_next" calls done below invoke "repl_read_file"
+	 * which in turn invokes "update_eof_addr" and modify fc->eof_addr. But we limit our max_seqno search to
+	 * the stored value of fc->eof_addr. Any changes to fc->eof_addr inside this function cause corresponding
+	 * changes to ctl->max_seqno_eof_addr in subsequent calls to "update_max_seqno_info". Store copy of ctl->eof_eof_addr_final
+	 * at the same time since ctl->eof_addr_final and ctl->eof_addr are maintained in sync.
+	 */
+	max_seqno_eof_addr = fc->eof_addr;
+	eof_addr_final = ctl->eof_addr_final;
+	if (JNL_FILE_FIRST_RECORD == max_seqno_eof_addr)
+	{	/* Journal file only has the journal header, no journal records.  That case should have been caught earlier
 		* when the journal file was first open.
 		*/
 		assert(FALSE);
@@ -552,8 +580,9 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	}
 	QWASSIGN(reg_seqno, csa->hdr->reg_seqno);
 	QWDECRBYDW(reg_seqno, 1);
-	assert(!ctl->max_seqno_final || ctl->eof_addr_final);
- 	if (QWGE(ctl->max_seqno, reg_seqno) || (ctl->max_seqno_final && ctl->first_read_done))
+	assert(!ctl->max_seqno_final || eof_addr_final);
+ 	if ((ctl->max_seqno >= reg_seqno) || (ctl->max_seqno_eof_addr == max_seqno_eof_addr)
+		|| (ctl->max_seqno_final && ctl->first_read_done))
  	{	/* have searched already */
  		REPL_DPRINT4("UPDATE MAX SEQNO INFO : not reading file %s; max_seqno = "INT8_FMT", reg_seqno = "INT8_FMT"\n",
  			     ctl->jnl_fn, INT8_PRINT(ctl->max_seqno), INT8_PRINT(reg_seqno));
@@ -561,10 +590,10 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
  	}
 	rb->buffindex = REPL_SCRATCHBUFF;	/* temporarily set to scratch buffer */
 	b = &rb->buff[rb->buffindex];
-	dskread = ROUND_DOWN(fc->eof_addr, REPL_BLKSIZE(rb));
-	if (dskread == fc->eof_addr)
+	dskread = ROUND_DOWN(max_seqno_eof_addr, REPL_BLKSIZE(rb));
+	if (dskread == max_seqno_eof_addr)
 		dskread -= REPL_BLKSIZE(rb);
-	QWASSIGN(max_seqno, seq_num_zero);
+	max_seqno = 0;
 	max_seqno_addr = 0;
 	max_seqno_found = FALSE;
 	do
@@ -577,9 +606,9 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 		if (JNL_FILE_FIRST_RECORD == b->readaddr && SS_NORMAL != adjust_buff_leaving_hdr(rb))
 		{
 			assert(repl_errno == EREPL_BUFFNOTFRESH);
-			GTMASSERT; /* Program bug */
+			assertpro(FALSE); /* Program bug */
 		}
-		stop_at = dskread + MIN(REPL_BLKSIZE(rb), fc->eof_addr - dskread); /* Limit search to this block */
+		stop_at = dskread + MIN(REPL_BLKSIZE(rb), max_seqno_eof_addr - dskread); /* Limit search to this block */
 		/* If we don't limit the search, we may end up re-reading blocks that follow this block. The consequence of
 		 * limiting the search is that we may not find the maximum close to the current state, but some time in the past
 		 * for a file that is growing. We can live with that as we will redo the max search if necessary */
@@ -591,7 +620,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 				rectype = (enum jnl_record_type)((jrec_prefix *)b->recbuff)->jrec_type;
 				if (IS_REPLICATED(rectype))
 				{
-					QWASSIGN(max_seqno, GET_JNL_SEQNO(b->recbuff));
+					max_seqno = GET_JNL_SEQNO(b->recbuff);
 					max_seqno_addr = b->recaddr;
 				} else if (JRT_EOF == rectype)
 					break;
@@ -614,8 +643,8 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 					{
 						assert(FALSE);
 						gtm_fork_n_core();
-						rts_error(VARLSTCNT(6) ERR_JNLRECINCMPL, 4, b->recaddr, ctl->jnl_fn_len,
-							ctl->jnl_fn, &ctl->seqno);
+						rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLRECINCMPL, 4,
+							b->recaddr, ctl->jnl_fn_len, ctl->jnl_fn, &ctl->seqno);
 					}
 					break;
 				}
@@ -631,10 +660,9 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 				}
 			} else
 			{
-				if (EREPL_JNLRECFMT == status)
-					rts_error(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
-				else
-					GTMASSERT;
+				assertpro(EREPL_JNLRECFMT == status);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLBADRECFMT, 3,
+					ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 			}
 		}
 		if ((max_seqno_found = (0 != max_seqno)) || (0 == dskread))
@@ -644,11 +672,17 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	} while (TRUE);
 	rb->buffindex = REPL_MAINBUFF;	/* reset back to the main buffer */
 	if (max_seqno_found)
-	{
-		QWASSIGN(ctl->max_seqno, max_seqno);
-		ctl->max_seqno_dskaddr = max_seqno_addr;
-		if (ctl->eof_addr_final)
+	{	/* Assert that there is some progress in this call to "update_max_seqno_info" compared to the previous call */
+		assert((max_seqno_eof_addr > ctl->max_seqno_eof_addr) || (max_seqno_addr > ctl->max_seqno_dskaddr)
+			|| (max_seqno > ctl->max_seqno));
+		CTL_SET_MAX_SEQNO(ctl, max_seqno, max_seqno_addr, max_seqno_eof_addr, DO_EOF_ADDR_CHECK);
+		if (eof_addr_final)
+		{	/* Do not use ctl->eof_addr_final in the check above since it could have changed inside this function.
+			 * We want to set all max_seqno* fields based on fc->eof_addr after update_eof_addr
+			 * done at beginning of this function. This keeps all of them in sync with each other.
+			 */
 			ctl->max_seqno_final = TRUE; /* No more max_seqno updates as this journal file has switched */
+		}
 		return (SS_NORMAL);
 	}
 	/* Two possibilities to get here :
@@ -708,9 +742,11 @@ static	int first_read(repl_ctl_element *ctl)
 	if (adjust_buff_leaving_hdr(rb) != SS_NORMAL)
 	{
 		assert(repl_errno == EREPL_BUFFNOTFRESH);
-		GTMASSERT; /* Program bug */
+		assertpro(FALSE); /* Program bug */
 	}
 	min_seqno_found = FALSE;
+	/* Since this is first time we are reading from this journal file, initialize fields cared for in CTL_SET_MAX_SEQNO macro */
+	DEBUG_ONLY(ctl->max_seqno = ctl->max_seqno_dskaddr = ctl->max_seqno_eof_addr = 0;)
 	while (!min_seqno_found)
 	{
 		if ((status = repl_next(rb)) == SS_NORMAL)
@@ -718,11 +754,14 @@ static	int first_read(repl_ctl_element *ctl)
 			rectype = (enum jnl_record_type)((jrec_prefix *)b->recbuff)->jrec_type;
 			if (IS_REPLICATED(rectype))
 			{
-				QWASSIGN(ctl->min_seqno, GET_JNL_SEQNO(b->recbuff));
-				QWASSIGN(ctl->seqno, ctl->min_seqno);
+				ctl->min_seqno = GET_JNL_SEQNO(b->recbuff);
+				ctl->min_seqno_dskaddr = b->recaddr;
+				ctl->seqno = ctl->min_seqno;
 				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
-				QWASSIGN(ctl->max_seqno, ctl->min_seqno);
-				ctl->min_seqno_dskaddr = ctl->max_seqno_dskaddr = b->recaddr;
+				/* Since update_eof_addr has not yet been called (will be done as part of "update_max_seqno_info"
+				 * at the end of this function), skip the fc->eof_addr check inside the below macro.
+				 */
+				CTL_SET_MAX_SEQNO(ctl, ctl->min_seqno, b->recaddr, b->recaddr, SKIP_EOF_ADDR_CHECK);
 				ctl->file_state = JNL_FILE_OPEN;
 				min_seqno_found = TRUE;
 			} else if (rectype == JRT_EOF)
@@ -740,7 +779,8 @@ static	int first_read(repl_ctl_element *ctl)
 		} else
 		{
 			if (status == EREPL_JNLRECFMT)
-				rts_error(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
+				rts_error_csa(CSA_ARG(&FILE_INFO(ctl->reg)->s_addrs) VARLSTCNT(5)
+					ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 		}
 	}
 	REPL_DPRINT5("FIRST READ of %s - Min seqno "INT8_FMT" min_seqno_dskaddr %u EOF addr %u\n",
@@ -748,7 +788,7 @@ static	int first_read(repl_ctl_element *ctl)
 	if (update_max_seqno_info(ctl) != SS_NORMAL)
 	{
 		assert(repl_errno == EREPL_JNLEARLYEOF);
-		GTMASSERT; /* Program bug */
+		assertpro(FALSE); /* Program bug */
 	}
 	REPL_DPRINT5("FIRST READ of %s - Max seqno "INT8_FMT" max_seqno_dskaddr %u EOF addr %d\n",
 			ctl->jnl_fn, INT8_PRINT(ctl->max_seqno), ctl->max_seqno_dskaddr, ctl->repl_buff->fc->eof_addr);
@@ -758,19 +798,20 @@ static	int first_read(repl_ctl_element *ctl)
 
 static void increase_buffer(unsigned char **buff, int *buflen, int buffer_needed)
 {
-	int 		newbuffsize, alloc_status;
+	int 		alloc_status, expandsize, newbuffsize;
 	unsigned char	*old_msgp;
 
 	/* The tr size is not known apriori. Hence, a good guess of 1.5 times the current buffer space is used */
-	newbuffsize = gtmsource_msgbufsiz + (gtmsource_msgbufsiz >> 1);
-	if (buffer_needed > newbuffsize)
-		newbuffsize = buffer_needed;
+	expandsize = (gtmsource_msgbufsiz >> 1);
+	if (expandsize < buffer_needed)
+		expandsize = buffer_needed;
+	newbuffsize = gtmsource_msgbufsiz + expandsize;
 	REPL_DPRINT3("Buff space shortage. Attempting to increase buff space. Curr buff space %d. Attempt increase to atleast %d\n",
 		     gtmsource_msgbufsiz, newbuffsize);
 	old_msgp = (unsigned char *)gtmsource_msgp;
 	if ((alloc_status = gtmsource_alloc_msgbuff(newbuffsize, FALSE)) != SS_NORMAL)
 	{
-		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			  LEN_AND_LIT("Error extending buffer space while reading files. Malloc error"), alloc_status);
 	}
 	REPL_DPRINT3("Old gtmsource_msgp = 0x%llx; New gtmsource_msgp = 0x%llx\n", (long long)old_msgp, (long long)gtmsource_msgp);
@@ -818,11 +859,8 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	assert(IS_REPLICATED(rectype));
 	rec_jnl_seqno = GET_REPL_JNL_SEQNO(b->recbuff);
 	assert(QWEQ(rec_jnl_seqno, ctl->seqno));
-	if (QWGT(rec_jnl_seqno, ctl->max_seqno))
-	{
-		QWASSIGN(ctl->max_seqno, rec_jnl_seqno);
-		ctl->max_seqno_dskaddr = b->recaddr;
-	}
+	if (rec_jnl_seqno > ctl->max_seqno)
+		CTL_SET_MAX_SEQNO(ctl, rec_jnl_seqno, b->recaddr, b->recaddr, DO_EOF_ADDR_CHECK);
 	ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 	if (!IS_FENCED(rectype) || JRT_NULL == rectype)
 	{	/* Entire transaction done */
@@ -852,6 +890,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 					*buff += b->reclen;
 					readlen += b->reclen;
 					assert(readlen % JNL_WRT_END_MODULUS == 0);
+					*bufsiz -= b->reclen;
 				} else
 				{
 					memcpy(tcombuffp, b->recbuff, b->reclen);
@@ -865,19 +904,15 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 					if (num_tcom == 0) /* Read the whole trans */
 						trans_read = TRUE;
 				}
-				*bufsiz -= b->reclen;
-				QWASSIGN(rec_jnl_seqno, GET_JNL_SEQNO(b->recbuff));
-				assert(QWEQ(rec_jnl_seqno, ctl->seqno));
-				if (QWGT(rec_jnl_seqno, ctl->max_seqno))
-				{
-					QWASSIGN(ctl->max_seqno, rec_jnl_seqno);
-					ctl->max_seqno_dskaddr = b->recaddr;
-				}
+				rec_jnl_seqno = GET_JNL_SEQNO(b->recbuff);
+				assert(rec_jnl_seqno == ctl->seqno);
+				if (rec_jnl_seqno > ctl->max_seqno)
+					CTL_SET_MAX_SEQNO(ctl, rec_jnl_seqno, b->recaddr, b->recaddr, DO_EOF_ADDR_CHECK);
 				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 			} else if (rectype == JRT_EOF)
 			{
 				assert(FALSE);
-				rts_error(VARLSTCNT(7) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno,
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno,
 						ERR_TEXT, 2, LEN_AND_LIT("Early EOF found"));
 			}
 		} else if (status == EREPL_JNLRECINCMPL)
@@ -891,7 +926,8 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 			{
 				assert(FALSE);
 				gtm_fork_n_core();
-				rts_error(VARLSTCNT(6) ERR_JNLRECINCMPL, 4, b->recaddr, ctl->jnl_fn_len, ctl->jnl_fn, &ctl->seqno);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLRECINCMPL, 4,
+					b->recaddr, ctl->jnl_fn_len, ctl->jnl_fn, &ctl->seqno);
 			}
 			gtmsource_poll_actions(TRUE);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
@@ -905,10 +941,8 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 			}
 		} else
 		{
-			if (status == EREPL_JNLRECFMT)
-				rts_error(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
-			else
-				GTMASSERT;
+			assertpro(status == EREPL_JNLRECFMT);
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 		}
 	}
 	/* Try positioning next read to the next seqno. Leave it as is if operation blocks (has to wait for records) */
@@ -943,11 +977,11 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 		if (b->readaddr == JNL_FILE_FIRST_RECORD && adjust_buff_leaving_hdr(rb) != SS_NORMAL)
 		{
 			assert(repl_errno == EREPL_BUFFNOTFRESH);
-			GTMASSERT;	/* Program bug */
+			assertpro(FALSE);	/* Program bug */
 		}
 		REPL_DPRINT1("do_linear_search: initiating fresh read\n");
 	} else
-	{ /* use what has been read already */
+	{	/* use what has been read already */
 		assert(read_seqno != ctl->seqno); /* if not, we'll skip to the next transaction and declare read_seqno not found */
 	}
 	found = TR_NOT_FOUND;
@@ -965,11 +999,8 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 					srch_status->prev_seqno = srch_status->seqno;
 					srch_status->seqno = rec_jnl_seqno;
 				}
-				if (QWLT(ctl->max_seqno, rec_jnl_seqno))
-				{
-					QWASSIGN(ctl->max_seqno, rec_jnl_seqno);
-					ctl->max_seqno_dskaddr = b->recaddr;
-				}
+				if (ctl->max_seqno < rec_jnl_seqno)
+					CTL_SET_MAX_SEQNO(ctl, rec_jnl_seqno, b->recaddr, b->recaddr, DO_EOF_ADDR_CHECK);
 				QWASSIGN(ctl->seqno, rec_jnl_seqno);
 				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 				if (QWEQ(rec_jnl_seqno, read_seqno))
@@ -981,7 +1012,8 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 		} else if (status == EREPL_JNLRECINCMPL)
 			found = TR_FIND_WOULD_BLOCK;
 		else if (status == EREPL_JNLRECFMT)
-			rts_error(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
+			rts_error_csa(CSA_ARG(&FILE_INFO(ctl->reg)->s_addrs) VARLSTCNT(5)
+					ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 	}
 	REPL_DPRINT2("do_linear_search: returning %s\n", (found == TR_NOT_FOUND) ? "TR_NOT_FOUND" :
 							 (found == TR_FOUND) ? "TR_FOUND" :
@@ -1142,7 +1174,7 @@ static	tr_search_state_t do_binary_search(repl_ctl_element *ctl, uint4 lo_addr, 
 				break;
 
 			default: /* Why didn't we cover all cases? */
-				GTMASSERT;
+				assertpro(FALSE);
 		} /* end switch */
 		if (!search_complete && low < high)
 		{
@@ -1357,19 +1389,22 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 				if (TREF(gtm_environment_init)
 					DEBUG_ONLY(&& (WBTEST_CLOSE_JNLFILE != gtm_white_box_test_case_number)))
 						gtm_fork_n_core();
-				rts_error(VARLSTCNT(4) ERR_SEQNUMSEARCHTIMEOUT, 2, &read_jnl_seqno, &read_jnl_seqno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SEQNUMSEARCHTIMEOUT, 2,
+					&read_jnl_seqno, &read_jnl_seqno);
 			    }
 			}
 		}
 		read_len = read_regions(&buff, &buff_avail, pass > 1, &brkn_trans, read_jnl_seqno);
 		if (brkn_trans)
-			rts_error(VARLSTCNT(3) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno);
 		total_read += read_len;
 		assert(total_read % JNL_WRT_END_MODULUS == 0);
 	}
 	if (tot_tcom_len > 0)
 	{	/* Copy all the TCOM records to the end of the buffer */
-		assert(tot_tcom_len <= ((unsigned char *)gtmsource_msgp + gtmsource_msgbufsiz - buff));
+		if (tot_tcom_len > buff_avail)
+			increase_buffer(&buff, &buff_avail, tot_tcom_len);
+		assert(buff + tot_tcom_len <= ((unsigned char *)gtmsource_msgp + gtmsource_msgbufsiz));
 		memcpy(buff, gtmsource_tcombuff_start, tot_tcom_len);
 		total_read += tot_tcom_len;
 		assert(total_read % JNL_WRT_END_MODULUS == 0);
@@ -1411,9 +1446,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 		while (found == TR_NOT_FOUND)
 		{	/* Find the generation of the journal file which has read_jnl_seqno */
 			for ( ; ctl != NULL && ctl->reg == region &&
-				((ctl->file_state == JNL_FILE_CLOSED && QWGT(read_jnl_seqno, ctl->max_seqno))
-					|| (ctl->file_state == JNL_FILE_EMPTY
-						&& QWGE(read_jnl_seqno, ctl->repl_buff->fc->jfh->start_seqno)));
+				((JNL_FILE_CLOSED == ctl->file_state) && (read_jnl_seqno > ctl->max_seqno)
+					|| (JNL_FILE_EMPTY == ctl->file_state)
+						&& (read_jnl_seqno >= ctl->repl_buff->fc->jfh->start_seqno));
 					prev_ctl = ctl, ctl = ctl->next)
 				;
 			if (ctl == NULL || ctl->reg != region)
@@ -1538,9 +1573,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 							ctl->prev->jnl_fn, INT8_PRINT(ctl->prev->max_seqno));
 					REPL_DPRINT3(") and %s (min seqno "INT8_FMT, ctl->jnl_fn, INT8_PRINT(ctl->min_seqno));
 					REPL_DPRINT2(") found while looking for "INT8_FMT"\n", INT8_PRINT(read_jnl_seqno));
-					assert(ctl->prev->file_state == JNL_FILE_CLOSED &&
-						QWLT(ctl->prev->max_seqno, read_jnl_seqno) ||
-						ctl->prev->file_state == JNL_FILE_EMPTY);
+					assert((JNL_FILE_CLOSED == ctl->prev->file_state)
+						&& (ctl->prev->max_seqno < read_jnl_seqno)
+							|| (JNL_FILE_EMPTY == ctl->prev->file_state));
 					found = TR_WILL_NOT_BE_FOUND;
 					continue;
 				}
@@ -1585,7 +1620,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 			} else
 			{
 				assert((ctl->file_state == JNL_FILE_OPEN || read_jnl_seqno <= ctl->max_seqno)
-				       && ctl->min_seqno <= read_jnl_seqno);
+					&& (ctl->min_seqno <= read_jnl_seqno));
 				if (ctl->lookback)
 				{
 					assert(QWLE(read_jnl_seqno, ctl->seqno));
@@ -1606,7 +1641,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 						assert(cumul_read % JNL_WRT_END_MODULUS == 0);
 					}
 					found = TR_FOUND;
-				} else if (QWLT(read_jnl_seqno, ctl->seqno))
+				} else if (read_jnl_seqno < ctl->seqno)
 				{	/* This region is not involved in transaction read_jnl_seqno */
 					found = TR_WILL_NOT_BE_FOUND;
 				} else	/* QWGT(read_jnl_seqno, ctl->seqno) */
@@ -1622,9 +1657,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 						if (update_max_seqno_info(ctl) != SS_NORMAL)
 						{
 							assert(repl_errno == EREPL_JNLEARLYEOF);
-							GTMASSERT; /* Program bug */
+							assertpro(FALSE); /* Program bug */
 						}
-						if (QWLE(read_jnl_seqno, ctl->max_seqno))
+						if (read_jnl_seqno <= ctl->max_seqno)
 						{	/* May be found in this journal file,
 							 * attempt to position next read to read_jnl_seqno
 							 */
@@ -1639,8 +1674,8 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					{	/* May be found in this jnl file, attempt to position next read to read_jnl_seqno */
 						position_read(ctl, read_jnl_seqno);
 					} else
-					{ /* Program bug - ctl->seqno should never be greater than ctl->max_seqno */
-						GTMASSERT;
+					{	/* Program bug - ctl->seqno should never be greater than ctl->max_seqno */
+						assertpro(FALSE);
 					}
 				}
 			}
@@ -1657,15 +1692,14 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, boolean_t read_multiple)
 {
 	int4			read_size, read_state, first_tr_len, tot_tr_len, loopcnt;
-	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
+	unsigned char		*orig_msgp, seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
 	jnlpool_ctl_ptr_t	jctl;
 	gtmsource_local_ptr_t	gtmsource_local;
 	seq_num			read_jnl_seqno, max_read_seqno;
 	qw_num			read_addr;
 	uint4			jnlpool_size;
-	static int4		max_tr_size = MAX_TR_BUFFSIZE; /* Will generally be less than initial gtmsource_msgbufsiz;
-								* allows for space to accommodate the last transaction */
 	boolean_t		file2pool;
+	unsigned int		start_heartbeat;
 
 	jctl = jnlpool.jnlpool_ctl;
 	gtmsource_local = jnlpool.gtmsource_local;
@@ -1682,7 +1716,6 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	DEBUG_ONLY(loopcnt = 0;)
 	do
 	{
-		assert(buff == (unsigned char *)gtmsource_msgp + REPL_MSG_HDRLEN); /* else increasing buffer space will not work */
 		assert(maxbufflen == gtmsource_msgbufsiz - REPL_MSG_HDRLEN);
 		DEBUG_ONLY(loopcnt++);
 		file2pool = FALSE;
@@ -1697,10 +1730,10 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 			REPL_DPRINT1("REPL_HISTREC message first needs to be sent before any more seqnos can be sent across\n");
 			return 0;
 		}
+		start_heartbeat = heartbeat_counter;
 		read_addr = gtmsource_local->read_addr;
 		first_tr_len = read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
 		tot_tr_len = 0;
-		max_tr_size = MAX(max_tr_size, read_size);
 		do
 		{
 			tot_tr_len += read_size;
@@ -1728,26 +1761,35 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 				REPL_DPRINT3("Readfiles : after sync with pool read_seqno: %llu read_addr: %llu\n",
 					read_jnl_seqno, read_addr);
 			}
+			/* If reading multiple transactions in one shot, make sure we stop the bunching if at least 8 seconds
+			 * (a heartbeat period) has elapsed during the bunching. This way we send whatever we have now rather
+			 * than accumulating transactions in our huge internal buffer and avoid risking the user perception
+			 * of no-progress. In the worst case we could be unresponsive for 8 seconds (1 heartbeat period)
+			 * with this approach.
+			 */
+			read_multiple = read_multiple && (start_heartbeat == heartbeat_counter);
 			if (read_multiple)
-			{
-				if ((tot_tr_len < max_tr_size) && (read_jnl_seqno < max_read_seqno))
-				{	/* Limit the read by the buffer length, or until there is no more to be read. If not
-					 * limited by the buffer length, the buffer will keep growing due to logic that expands
-					 * the buffer when needed. Recompute buff and maxbufflen as buffer may have expanded
-					 * during read_and_merge
-					 */
-					buff = (unsigned char *)gtmsource_msgp + tot_tr_len + REPL_MSG_HDRLEN;
-					maxbufflen = gtmsource_msgbufsiz - tot_tr_len - REPL_MSG_HDRLEN;
+			{	/* Ok to read multiple transactions. Limit the multiple reads until there is no more to be read
+				 * OR total read size reaches a fixed value MAX_TR_BUFFSIZE. This strikes a fine balance between
+				 * reducing the # of "send()" system calls done by the source server versus being responsive to
+				 * the user (in case of shutdown requests). Time spent reading multiple transactions is where
+				 * the source server is not responsive to outside requests and is hence better minimized.
+				 */
+				/* Note: Recompute buff and maxbufflen below buffer may have expanded during read_and_merge */
+				buff = (unsigned char *)gtmsource_msgp + tot_tr_len + REPL_MSG_HDRLEN;
+				maxbufflen = gtmsource_msgbufsiz - tot_tr_len - REPL_MSG_HDRLEN;
+				if ((tot_tr_len < MAX_TR_BUFFSIZE) && (read_jnl_seqno < max_read_seqno))
+				{
+					assert(0 < maxbufflen);
 					read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
-					max_tr_size = MAX(max_tr_size, read_size);
 					/* Don't use buff to assign type and len as buffer may have expanded.
 					 * Use gtmsource_msgp instead */
 					((repl_msg_ptr_t)((unsigned char *)gtmsource_msgp + tot_tr_len))->type = REPL_TR_JNL_RECS;
-					((repl_msg_ptr_t)((unsigned char *)gtmsource_msgp + tot_tr_len))->len  = read_size;
+					((repl_msg_ptr_t)((unsigned char *)gtmsource_msgp + tot_tr_len))->len = read_size;
 					continue;
 				}
-				REPL_DPRINT6("Readfiles : tot_tr_len %d max_tr_size %d read_jnl_seqno %llu max_read_seqno %llu "
-					"gtmsource_msgbufsize : %d; stop multiple reads\n", tot_tr_len, max_tr_size,
+				REPL_DPRINT5("Readfiles : tot_tr_len %d read_jnl_seqno %llu max_read_seqno %llu "
+					"gtmsource_msgbufsize : %d; stop multiple reads\n", tot_tr_len,
 					read_jnl_seqno, max_read_seqno, gtmsource_msgbufsiz);
 			}
 			break;
@@ -1823,7 +1865,7 @@ static	int scavenge_closed_jnl_files(seq_num ack_seqno)
 				if (update_max_seqno_info(ctl) != SS_NORMAL)
 				{
 					assert(repl_errno == EREPL_JNLEARLYEOF);
-					GTMASSERT; /* Program bug */
+					assertpro(FALSE); /* Program bug */
 				}
 				break;
 			case JNL_FILE_UNREAD :
@@ -1900,7 +1942,8 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 				break;
 			if (0 == open_prev_gener(&old_ctl, ctl, resync_seqno))	/* this automatically does a "first_read" */
 			{	/* Previous journal file link was NULL. Issue error. */
-				rts_error(VARLSTCNT(4) ERR_NOPREVLINK, 2, ctl->jnl_fn_len, ctl->jnl_fn);
+				rts_error_csa(CSA_ARG(&FILE_INFO(ctl->reg)->s_addrs)
+					VARLSTCNT(4) ERR_NOPREVLINK, 2, ctl->jnl_fn_len, ctl->jnl_fn);
 			}
 			assert(old_ctl->next == ctl);
 			assert(ctl->prev == old_ctl);

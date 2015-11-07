@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,6 +66,7 @@ zshow_rec,
 zshow_shar,
 zshow_shell,
 zshow_stderr,
+zshow_stream,
 zshow_term,
 zshow_ttsy,
 zshow_type,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,50 +36,40 @@
 #include "gvcst_blk_build.h"
 #include "util.h"
 #include "t_abort.h"
+#include "gtmmsg.h"
 
 GBLREF char		*update_array, *update_array_ptr;
-GBLREF gd_region        *gv_cur_region;
-GBLREF uint4		update_array_size;
-GBLREF srch_hist	dummy_hist;
-GBLREF block_id		patch_curr_blk;
-GBLREF unsigned short	patch_comp_count;
+GBLREF cw_set_element	cw_set[];
+GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t cs_data;
-GBLREF cw_set_element   cw_set[];
+GBLREF sgmnt_data_ptr_t	cs_data;
+GBLREF srch_hist	dummy_hist;
+GBLREF unsigned short	patch_comp_count;
+GBLREF uint4		update_array_size;
 
+error_def(ERR_AIMGBLKFAIL);
 error_def(ERR_DBRDONLY);
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEFAIL);
 
 void dse_chng_rhead(void)
 {
-	block_id	blk;
-	sm_uc_ptr_t	bp, b_top, cp, rp;
-	boolean_t	chng_rec;
-	rec_hdr		new_rec;
-	uint4		x;
 	blk_segment	*bs1, *bs_ptr;
+	block_id	blk;
+	boolean_t	chng_rec;
 	int4		blk_seg_cnt, blk_size;
-	int		tmp_cmpc;
+	rec_hdr		new_rec;
+	sm_uc_ptr_t	bp, b_top, cp, rp;
 	srch_blk_status	blkhist;
+	uint4		x;
 
         if (gv_cur_region->read_only)
                 rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
-	if (cli_present("BLOCK") == CLI_PRESENT)
-	{
-		if(!cli_get_hex("BLOCK", (uint4 *)&blk))
-			return;
-		patch_curr_blk = blk;
-	}
-	if (patch_curr_blk < 0 || patch_curr_blk >= cs_addrs->ti->total_blks || !(patch_curr_blk % cs_addrs->hdr->bplmap))
-	{
-		util_out_print("Error: invalid block number.", TRUE);
+	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
 		return;
-	}
-
 	t_begin_crit(ERR_DSEFAIL);
-	blkhist.blk_num = patch_curr_blk;
+	blkhist.blk_num = blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	bp = blkhist.buffaddr;
@@ -88,7 +78,7 @@ void dse_chng_rhead(void)
 	b_top = bp + ((blk_hdr_ptr_t)bp)->bsiz;
 	if (((blk_hdr_ptr_t)bp)->bsiz > blk_size || ((blk_hdr_ptr_t)bp)->bsiz < SIZEOF(blk_hdr))
 		chng_rec = TRUE;	/* force rewrite to correct size */
-	if (cli_present("RECORD") == CLI_PRESENT)
+	if (CLI_PRESENT == cli_present("RECORD"))
 	{
 		if (!(rp = skan_rnum(bp, FALSE)))
 		{
@@ -102,7 +92,7 @@ void dse_chng_rhead(void)
 	}
 	GET_SHORT(new_rec.rsiz, &((rec_hdr_ptr_t)rp)->rsiz);
 	SET_CMPC(&new_rec, EVAL_CMPC((rec_hdr_ptr_t)rp));
-	if (cli_present("CMPC") == CLI_PRESENT)
+	if (CLI_PRESENT == cli_present("CMPC"))
 	{
 		if (!cli_get_hex("CMPC", &x))
 		{
@@ -120,7 +110,7 @@ void dse_chng_rhead(void)
 		SET_CMPC(&new_rec, x);
 		chng_rec = TRUE;
 	}
-	if (cli_present("RSIZ") == CLI_PRESENT)
+	if (CLI_PRESENT == cli_present("RSIZ"))
 	{
 		if (!cli_get_hex("RSIZ", &x))
 		{
@@ -151,7 +141,7 @@ void dse_chng_rhead(void)
 			BLK_SEG(bs_ptr, cp, b_top - cp);
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
-			util_out_print("Error: bad blk build.", TRUE);
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_AIMGBLKFAIL, 3, blk, DB_LEN_STR(gv_cur_region));
 			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1096,6 +1096,7 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 {																\
 	GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;										\
 	GBLREF	boolean_t		is_updproc;										\
+	GBLREF	jnlpool_addrs		jnlpool;										\
 																\
 	unsigned char			instfilename_copy[MAX_FN_LEN + 1];							\
 	sm_uc_ptr_t			jnlpool_instfilename;									\
@@ -1112,11 +1113,12 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 		if (!(SCNDDBNOUPD_CHECK_DONE & jnlpool_validate_check) && SCNDDBNOUPD_CHECK_NEEDED)				\
 		{														\
 			if (jnlpool_ctl->upd_disabled && !is_updproc)								\
-			{	/* Updates are disabled in this journal pool. Detach from journal pool and issue error. */	\
-				assert(NULL != jnlpool.jnlpool_ctl);								\
-				jnlpool_detach();										\
-				assert(NULL == jnlpool.jnlpool_ctl);								\
-				assert(FALSE == pool_init);									\
+			{	/* Updates are disabled in this journal pool. Issue error. Do NOT detach from journal pool	\
+				 * as that would cause us not to honor instance freeze (in case gtm_custom_errors env var is	\
+				 * non-null) for database reads that this process later does (for example reading a block	\
+				 * might require us to flush a dirty buffer to disk which should pause if the instance is	\
+				 * frozen).					 						\
+				 */												\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SCNDDBNOUPD);					\
 			}													\
 			CSA->jnlpool_validate_check |= SCNDDBNOUPD_CHECK_DONE;							\
@@ -1543,6 +1545,8 @@ enum tp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] */
 #define	DONOTCOMMIT_GVCST_SEARCH_LEAF_BUFFADR_NOTSYNC	(1 << 6) /* Restartable situation encountered in gvcst_search */
 #define	DONOTCOMMIT_GVCST_SEARCH_BLKTARGET_MISMATCH	(1 << 7) /* Restartable situation encountered in gvcst_search */
 #define DONOTCOMMIT_REALLOCATE_BITMAP_BMLMOD		(1 << 8) /* Restartable situation encountered in reallocate_bitmap */
+#define DONOTCOMMIT_T_WRITE_CSE_DONE			(1 << 9) /* Restartable situation encountered in t_write */
+#define DONOTCOMMIT_T_WRITE_CSE_MODE			(1 << 10) /* Restartable situation encountered in t_write */
 
 #define TAB_BG_TRC_REC(A,B)	B,
 enum bg_trc_rec_type
@@ -2238,6 +2242,7 @@ typedef struct	sgmnt_addrs_struct
 	uint4		onln_rlbk_cycle;	/* local copy of cnl->onln_rlbk_cycle */
 	uint4		db_onln_rlbkd_cycle;	/* local copy of cnl->db_onln_rlbkd_cycle */
 	boolean_t	dbinit_shm_created;	/* TRUE if shared memory for this region was created by this process */
+	boolean_t	read_only_fs;		/* TRUE if the region is read_only and the header was not updated due to EROFS */
 #	endif
 } sgmnt_addrs;
 
@@ -2965,6 +2970,7 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 	mval			temp;										\
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;							\
 	int			len;										\
+	mstr			opstr;										\
 														\
 	was_null |= is_null;											\
 	if (mvarg->mvtype & MV_SUBLIT)										\
@@ -2976,7 +2982,9 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 			/* collation transformation should be done at the server's end for CM regions */	\
 			assert(dba_cm != REG_ACC_METH(reg));							\
 			TREF(transform) = FALSE;								\
-			end = gvsub2str((uchar_ptr_t)mvarg->str.addr, buff, FALSE);				\
+			opstr.addr = (char *)buff;								\
+			opstr.len = MAX_ZWR_KEY_SZ;								\
+			end = gvsub2str((uchar_ptr_t)mvarg->str.addr, &opstr, FALSE);				\
 			TREF(transform) = TRUE;									\
 			temp.mvtype = MV_STR;									\
 			temp.str.addr = (char *)buff;								\

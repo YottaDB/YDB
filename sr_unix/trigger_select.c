@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -200,7 +200,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 	mval			data_val;
 	char			out_rec[MAX_BUFF_SIZE];
 	char			*out_rec_ptr;
-	char			*ptr1, *ptr2;
+	char			*ptr1, *ptr2, *ptrtop;
 	mval			mi, trigger_count, trigger_value;
 	mval			*mv_trig_cnt_ptr;
 	boolean_t		multi_line;
@@ -368,16 +368,20 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 			if (multi_line)
 			{
 				ptr1 = xecute_buff;
+				ptrtop = xecute_buff + xecute_len;
 				do
 				{
+					xecute_len = ptrtop - ptr1;
 					ptr2 = memchr(ptr1, '\n', xecute_len);
+					if (NULL == ptr2)
+						ptr2 = ptrtop; /* if last line is not terminated by newline, make it so */
 					out_rec_ptr = out_rec;
 					COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, ptr1, UINTCAST(ptr2 - ptr1));
 					STR2MVAL((*op_val), out_rec, (unsigned int)(out_rec_ptr - out_rec));
 					op_write(op_val);
 					op_wteol(1);
 					ptr1 = ptr2 + 1;
-				} while (ptr1 < (xecute_buff + xecute_len));
+				} while (ptr1 < ptrtop);
 				out_rec_ptr = out_rec;
 				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, XTENDED_STOP, XTENDED_STOP_LEN);
 				STR2MVAL((*op_val), out_rec, (unsigned int)(out_rec_ptr - out_rec));

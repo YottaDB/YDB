@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,7 @@ GBLREF	uint4					process_id;
 GBLREF	gd_region				*gv_cur_region;
 GBLREF	jnlpool_ctl_ptr_t			temp_jnlpool_ctl;
 GBLREF	gtmsource_options_t			gtmsource_options;
+GBLREF	gtmrecv_options_t			gtmrecv_options;
 GBLREF	boolean_t				pool_init;
 GBLREF	seq_num					seq_num_zero;
 GBLREF	enum gtmImageTypes			image_type;
@@ -114,24 +115,34 @@ error_def(ERR_TEXT);
 	}													\
 }
 
+#define	DETACH_FROM_JNLPOOL_IF_NEEDED(RTS_ERROR_OR_GTM_PUTMSG)						\
+{													\
+	int		status, save_errno;								\
+													\
+	if (NULL != jnlpool.jnlpool_ctl)								\
+	{												\
+ 		JNLPOOL_SHMDT(status, save_errno);							\
+ 		if (0 > status)										\
+ 			RTS_ERROR_OR_GTM_PUTMSG(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLWARN, 2,		\
+				RTS_ERROR_LITERAL("Could not detach from journal pool"), save_errno);	\
+		jnlpool_ctl = NULL;									\
+		jnlpool.jnlpool_ctl = NULL;								\
+		jnlpool.repl_inst_filehdr = NULL;							\
+		jnlpool.gtmsrc_lcl_array = NULL;							\
+		jnlpool.gtmsource_local_array = NULL;							\
+		jnlpool.jnldata_base = NULL;								\
+		jnlpool.jnlpool_dummy_reg->open = FALSE;						\
+		pool_init = FALSE;									\
+	}												\
+}
+
 #define	DETACH_AND_REMOVE_SHM_AND_SEM										\
 {														\
 	if (new_ipc)												\
 	{													\
 		assert(!IS_GTM_IMAGE);	/* Since "gtm_putmsg" is done below ensure it is never GT.M */		\
-		if (NULL != jnlpool.jnlpool_ctl)								\
-		{												\
-			if (-1 == shmdt((caddr_t)jnlpool.jnlpool_ctl))						\
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLWARN, 2,			\
-					RTS_ERROR_LITERAL("Could not detach from journal pool"), errno);	\
-			jnlpool_ctl = NULL;									\
-			jnlpool.jnlpool_ctl = NULL;								\
-			jnlpool.repl_inst_filehdr = NULL;							\
-			jnlpool.gtmsrc_lcl_array = NULL;							\
-			jnlpool.gtmsource_local_array = NULL;							\
-			jnlpool.jnldata_base = NULL;								\
-			pool_init = FALSE;									\
-		}												\
+		assert(NULL != jnlpool.jnlpool_ctl);								\
+		DETACH_FROM_JNLPOOL_IF_NEEDED(gtm_putmsg_csa);							\
 		assert(INVALID_SHMID != udi->shmid);								\
 		if (0 != shm_rmid(udi->shmid))									\
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,		\
@@ -154,7 +165,7 @@ error_def(ERR_TEXT);
 void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t *jnlpool_creator)
 {
 	boolean_t		new_ipc, is_src_srvr, slot_needs_init, reset_gtmsrclcl_info, hold_onto_ftok_sem, srv_alive;
-	boolean_t		skip_locks;
+	boolean_t		cannot_activate, skip_locks;
 	char			machine_name[MAX_MCNAMELEN], instfilename[MAX_FN_LEN + 1], scndry_msg[OUT_BUFF_SIZE];
 	gd_region		*r_save, *reg;
 	int			status, save_errno;
@@ -479,7 +490,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	if (new_ipc)
 	{
 		jnlpool_ctl->instfreeze_environ_inited = FALSE;
-		if (ANTICIPATORY_FREEZE_AVAILABLE && !init_anticipatory_freeze_errors())
+		if (CUSTOM_ERRORS_AVAILABLE && !init_anticipatory_freeze_errors())
 		{
 			DETACH_AND_REMOVE_SHM_AND_SEM;	/* remove any sem/shm we had created */
 			udi->grabbed_access_sem = FALSE;
@@ -775,15 +786,32 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PRIMARYNOTROOT, 2,
 						LEN_AND_STR((char *)repl_instance.inst_info.this_instname));
 				} else
-				{	/* ACTIVATE was specified. Check if there is only one process attached to the journal
-					 * pool. If yes, we are guaranteed that it is indeed the passive source server process
-					 * that we are trying to activate (we can assert this because we know for sure the source
-					 * server corresponding to this slot "gtmsourcelocal_ptr" is alive and running or else we
-					 * would have issued a SRCSRVNOTEXIST error earlier). and that this is a case of a
-					 * transition from propagating primary to root primary. If not, issue ACTIVATEFAIL error.
+				{	/* ACTIVATE was specified. Check if there is a receiver server OR update process
+					 * attached to the journal pool. If so we cannot allow the ACTIVATE (issue ACTIVATEFAIL
+					 * error). Those have to be shut down before the instance can be activated. In addition,
+					 * disallow an in-progress receiver server startup command. This is because we dont want
+					 * the activate to sneak in between the jnlpool_init and recvpool_init calls done by the
+					 * receiver server startup command creating a confusing situation (because the receiver
+					 * will be ready to play updates as if this is a secondary but an active source server
+					 * will be ready to transmit updates as if this is a primary at the same time).
 					 */
-					assert(NULL != gtmsourcelocal_ptr);
-					if (1 != shmstat.shm_nattch)
+					cannot_activate = FALSE;
+					if (INVALID_SEMID != repl_instance.recvpool_semid)
+					{	/* Receive pool semaphore is available from instance file header. Use it
+						 * to check whether receiver server and/or update process are alive. The easiest
+						 * way is to check if the counter semaphore is non-zero.
+						 */
+						if (semctl(repl_instance.recvpool_semid, RECV_SERV_COUNT_SEM, GETVAL)
+								|| semctl(repl_instance.recvpool_semid, UPD_PROC_COUNT_SEM, GETVAL))
+							cannot_activate = TRUE;
+					} else
+					{	/* No receiver server or update process running. But check if a receiver server
+						 * startup command is in progress and has already done a jnlpool_init.
+						 */
+						if (semctl(repl_instance.jnlpool_semid, RECV_SERV_STARTUP_SEM, GETVAL))
+							cannot_activate = TRUE;
+					}
+					if (cannot_activate)
 					{
 						rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
 						udi->grabbed_access_sem = FALSE;
@@ -794,6 +822,23 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 					} else
 						hold_onto_ftok_sem = TRUE;
 				}
+			}
+		} else if ((GTMRECEIVE == pool_user) && gtmrecv_options.start)
+		{	/* This is a receiver server startup command. Increment RECV_SERV_STARTUP_SEM semaphore for
+			 * a later source server activate command to know this command is in progress. We dont do
+			 * a corresponding decr_sem later but rely on the OS doing it when the receiver startup command
+			 * exits (due to the SEM_UNDO done inside incr_sem).
+			 */
+			status = incr_sem(SOURCE, RECV_SERV_STARTUP_SEM);
+			if (0 != status)
+			{
+				save_errno = errno;
+				rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
+				udi->grabbed_access_sem = FALSE;
+				udi->counter_acc_incremented = FALSE;
+				ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Receiver startup counter semaphore increment failure"), save_errno);
 			}
 		}
 	}
@@ -1004,30 +1049,25 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	}
 	if (!hold_onto_ftok_sem && !ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, FALSE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
-	pool_init = TRUE;
-	ENABLE_FREEZE_ON_ERROR;
+	/* Set up pool_init if jnlpool is still attached (e.g. we could have detached if GTMRELAXED and upd_disabled) */
+	if (NULL != jnlpool.jnlpool_ctl)
+	{
+		pool_init = TRUE;
+		ENABLE_FREEZE_ON_ERROR;
+	}
 	return;
 }
 
 void jnlpool_detach(void)
 {
-	int		status, save_errno;
-
 	if (TRUE == pool_init)
 	{
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 		mutex_cleanup(jnlpool.jnlpool_dummy_reg);
 		if (jnlpool.gtmsource_local && (process_id == jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid))
  			rel_gtmsource_srv_latch(&jnlpool.gtmsource_local->gtmsource_srv_latch);
- 		JNLPOOL_SHMDT(status, save_errno);
- 		if (0 > status)
- 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLWARN, 2,
-					RTS_ERROR_LITERAL("Could not detach from journal pool"), save_errno);
-		jnlpool.repl_inst_filehdr = NULL;
-		jnlpool.gtmsrc_lcl_array = NULL;
-		jnlpool.gtmsource_local_array = NULL;
-		jnlpool.jnldata_base = NULL;
-		pool_init = FALSE;
+		DETACH_FROM_JNLPOOL_IF_NEEDED(rts_error_csa);
+		assert(!pool_init);	/* would have been reset by the above macro invocation */
 	}
 }
 

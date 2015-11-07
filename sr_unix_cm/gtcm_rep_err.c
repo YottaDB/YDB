@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,14 +43,17 @@ static char rcsid[] = "$Header:$";
 #endif
 
 #define GTCM_SERV_LOG "/log/gtcm_server.erlg"
-#define GTM_DIST_PATH "$gtm_dist"
 
 GBLREF char		*omi_service;
+GBLREF char		gtm_dist[GTM_PATH_MAX];
+GBLREF boolean_t	gtm_dist_ok_to_use;
 STATICDEF boolean_t 	first_error = TRUE;
 STATICDEF char 		fileName[GTM_PATH_MAX];
 
 error_def(ERR_TEXT);
 error_def(ERR_DISTPATHMAX);
+error_def(ERR_GTMDISTUNDEF);
+error_def(ERR_GTMDISTUNVERIF);
 ZOS_ONLY(error_def(ERR_BADTAG);)
 
 void gtcm_rep_err(char *msg, int errcode)
@@ -58,10 +61,9 @@ void gtcm_rep_err(char *msg, int errcode)
 	FILE	*fp;
 	char	outbuf[OUT_BUFF_SIZE];
 	time_t	now;
-	int	status, retval;
-	char 	*gtm_dist, *filebuf, *tag_emsg, *tmp_time;
+	int	status, retval, gtm_dist_len;
+	char 	*filebuf, *tag_emsg, *tmp_time;
 	mstr	tn;
-	MSTR_DEF(val, strlen(GTM_DIST_PATH), GTM_DIST_PATH);		/* BYPASSOK */
 
 	if ('\0' == msg[0])
 		sgtm_putmsg(outbuf, VARLSTCNT(2) errcode, 0);
@@ -70,18 +72,21 @@ void gtcm_rep_err(char *msg, int errcode)
 	if (first_error)
 	{
 		first_error = FALSE;
-		filebuf = fileName;
-		status = TRANS_LOG_NAME(&val, &tn, fileName, GTM_PATH_MAX, dont_sendmsg_on_log2long);
-		if ((SS_LOG2LONG == status) || (tn.len + strlen(GTCM_SERV_LOG) >= GTM_PATH_MAX))
-		{
-			send_msg(VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_PATH_MAX - strlen(GTCM_SERV_LOG));
-			exit(ERR_DISTPATHMAX);
-		} else if (SS_NORMAL == status)
-			filebuf = strcat(fileName, GTCM_SERV_LOG);
+		if (gtm_dist_ok_to_use)
+			SNPRINTF(fileName, GTM_PATH_MAX, "%s%s", gtm_dist, GTCM_SERV_LOG);
 		else
 		{
-			assert(SS_NOLOGNAM == status);
-			SPRINTF(fileName, "%s%s", P_tmpdir, GTCM_SERV_LOG);
+			STRNLEN(gtm_dist, GTM_PATH_MAX, gtm_dist_len);
+			if (gtm_dist_len)
+			{
+				if (GTM_DIST_PATH_MAX <= gtm_dist_len)
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_DIST_PATH_MAX);
+				else
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4,
+							LEN_AND_STR(gtm_dist), LEN_AND_LIT("gtcm"));
+			} else
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
+			SNPRINTF(fileName, GTM_PATH_MAX, "%s%s", P_tmpdir, GTCM_SERV_LOG);
 		}
 	}
 #	ifdef __MVS__

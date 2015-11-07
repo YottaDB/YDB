@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,17 +34,15 @@
 #include "gtm_caseconv.h"
 #include "mupip_exit.h"
 
-GBLREF 	mstr		directory;
-GBLREF 	bool		is_directory;
-GBLREF	bool            error_mupip;
 GBLREF	backup_reg_list	*mu_repl_inst_reg_list;
+GBLREF 	boolean_t	is_directory;
+GBLREF 	mstr		directory;
 
-bool mubgetfil(backup_reg_list *list, char *name, unsigned short len)
+boolean_t mubgetfil(backup_reg_list *list, char *name, unsigned short len)
 {
-	struct stat	stat_buf;
+	char		tcp[5], temp;
 	int		stat_res;
-	char		temp;
-	char 		tcp[5];
+	struct stat	stat_buf;
 
 	if (0 == len)
 		return FALSE;

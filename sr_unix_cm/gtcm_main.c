@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,6 @@
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"		/* for exit() */
 #include "gtm_time.h"		/* for time() */
-#include "gt_timer.h"		/* for set_blocksig() */
 
 #include <sys/types.h>
 #include <signal.h>
@@ -30,10 +29,10 @@
 
 #include "gtcm.h"
 #include "error.h"
-#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_threadgbl_init.h"
 #include "gtmimagename.h"
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
+#include "gtm_startup_chk.h"
 #include "send_msg.h"
 #include "wbox_test_init.h"
 
@@ -87,9 +86,7 @@ int main(int argc, char_ptr_t argv[])
 
 	GTM_THREADGBL_INIT;
 	ctxt = NULL;
-	set_blocksig();
-	gtm_imagetype_init(GTCM_SERVER_IMAGE);
-	gtm_env_init(); /* read in all environment variables before calling any function particularly malloc (from err_init below)*/
+	common_startup_init(GTCM_SERVER_IMAGE);
 	SPRINTF(image_id,"%s=gtcm_server", image_id);
 #	ifdef SEQUOIA
 	if (!set_pset())
@@ -97,6 +94,7 @@ int main(int argc, char_ptr_t argv[])
 #	endif
 	/*  Initialize everything but the network */
 	err_init(gtcm_exit_ch);
+	gtm_chk_dist(argv[0]);
 	omi_errno = OMI_ER_NO_ERROR;
 	ctxt = ctxt;
 	ESTABLISH_RET(omi_dbms_ch, -1);	/* any return value to signify error return */

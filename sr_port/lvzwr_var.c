@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -124,6 +124,7 @@ GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF int4		outofband;
 GBLREF zshow_out	*zwr_output;
 GBLREF int		merge_args;
+GBLREF bool		undef_inhibit;
 GBLREF zwr_hash_table	*zwrhtab;			/* How we track aliases during zwrites */
 
 LITREF	mval		literal_null;
@@ -177,8 +178,11 @@ void lvzwr_var(lv_val *lv, int4 n)
 		return;
 	if (outofband)
 	{
+		assert(TREF(in_zwrite));
+		TREF(in_zwrite) = FALSE;
 		lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
 		outofband_action(FALSE);
+		TREF(in_zwrite) = TRUE;
 	}
 	lvzwrite_block->curr_subsc = n;
 	zwr_sub = (zwr_sub_lst *)lvzwrite_block->sub;
@@ -270,7 +274,8 @@ void lvzwr_var(lv_val *lv, int4 n)
 				end = lvzwr_key(buff, SIZEOF(buff));
 				zwr_sub->subsc_list[n].actual = (mval *)NULL;
 				lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
-				rts_error(VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
+				if (!undef_inhibit)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
 			}
 		}
 	} else  if (lvt = LV_GET_CHILD(lv))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gvzwrite_datablk	*gvzwrite_block;
 GBLREF gd_addr		*gd_header;
+GBLREF bool		undef_inhibit;
 
 error_def(ERR_GVNAKED);
 
@@ -75,8 +76,10 @@ void gvzwr_fini(zshow_out *out, int pat)
 			op_gvname(VARLSTCNT(1) &local);
  			op_gvdata(&data);
 			if (!(MV_FORCE_INTD(&data)))
-				sgnl_gvundef();
-			else
+			{
+				if (!undef_inhibit)
+					sgnl_gvundef();
+			} else
 			{
 				gvzwrite_block->fixed = (gvzwrite_block->fixed ? TRUE : FALSE);
 				gvzwr_var(MV_FORCE_INTD(&data), 0);
@@ -95,8 +98,10 @@ void gvzwr_fini(zshow_out *out, int pat)
 			GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey);
 			op_gvdata(&data);
 			if (!(MV_FORCE_INTD(&data)))
-				sgnl_gvundef();
-			else
+			{
+				if (!undef_inhibit)
+					sgnl_gvundef();
+			} else
 			{
 				gvzwrite_block->fixed = (gvzwrite_block->fixed ? TRUE : FALSE);
 				gvzwr_var((int4)MV_FORCE_INTD(&data), 0);

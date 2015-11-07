@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,16 +12,24 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_stdio.h"
 
+#include "lv_val.h"
+#include "gtmio.h"
 #include <rtnhdr.h>
 #include "mv_stent.h"		/* this includes lv_val.h which also includes hashtab_mname.h and hashtab.h */
 #include "stack_frame.h"
 #include "mdq.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "alias.h"
 
 #define MVST_STAB_SIZE (SIZEOF(*mv_chain) - SIZEOF(mv_chain->mv_st_cont) + SIZEOF(mv_chain->mv_st_cont.mvs_stab))
 
 GBLREF symval		*curr_symval;
-
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF stack_frame	*frame_pointer;
@@ -31,13 +39,12 @@ error_def(ERR_STACKCRIT);
 
 int4 symbinit(void)
 {
-	unsigned char	*msp_save;
-	mv_stent	*mv_st_ent, *mvst_tmp, *mvst_prev;
-	stack_frame	*fp,*fp_prev,*fp_fix;
-	symval		*ptr;
+	int		size;
 	int4		shift_size, ls_size, temp_size;
-        int		size;
-	unsigned char	*old_sp, *top, *l_syms;
+	mv_stent	*mv_st_ent, *mvst_tmp, *mvst_prev;
+	stack_frame	*fp, *fp_prev, *fp_fix;
+	symval		*ptr;
+	unsigned char	*l_syms, *msp_save, *old_sp, *top;
 
 	if (frame_pointer->type & SFT_COUNT)
 	{
@@ -53,9 +60,9 @@ int4 symbinit(void)
 				if (msp <= stacktop)
 		   		{
 					msp = msp_save;
-					rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
 		   		} else
-		   			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
+		   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
 		   	}
 			frame_pointer->l_symtab = (ht_ent_mname **)msp;
 		}
@@ -88,9 +95,9 @@ int4 symbinit(void)
 			if (msp <= stacktop)
 	   		{
 				msp = old_sp;
-				rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
 	   		} else
-	   			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
+	   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
 	   	}
 		memmove(msp, old_sp, top - (unsigned char *)old_sp);	/* Shift stack w/possible overlapping range */
 		if (shift_size > MVST_STAB_SIZE)
@@ -137,7 +144,6 @@ int4 symbinit(void)
 		}
 	}
 	mv_st_ent->mv_st_cont.mvs_stab = (symval *)NULL;	/* special case this so failed initialization can be detected */
-
 	memset(l_syms, 0, ls_size);
 	size++;
 	ptr = (symval *)malloc(SIZEOF(symval));
@@ -163,6 +169,8 @@ int4 symbinit(void)
 		ptr->symvlvl = 1;
 	GTMTRIG_ONLY(ptr->trigr_symval = FALSE);
 	ptr->alias_activity = FALSE;
+	DBGRFCT((stderr,"symbinit: Allocated new symbol table at 0x"lvaddr" pushing old symbol table on M stack (0x"lvaddr")\n",
+		 ptr, curr_symval));
 	curr_symval = ptr;
 	mv_st_ent->mv_st_cont.mvs_stab = ptr;
 	return shift_size;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include "io.h"
 
-void nil_iocontrol(mstr *d)
+void nil_iocontrol(mstr *mn, int4 argcnt, va_list args)
 {
 	/**** SHOULD BE 'NOT SUPPORTED FOR THIS DEVICE TYPE ****/
 	return;

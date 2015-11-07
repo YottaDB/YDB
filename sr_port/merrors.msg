@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2013 Fidelity Information Services, Inc	!
+!	Copyright 2001, 2014 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -204,8 +204,8 @@ DBOPNERR	<Error opening database file !AD>/error/fao=2!/ansi=0
 DBRDERR		<Cannot read database file !AD after opening>/error/fao=2!/ansi=0
 CCEDUMPNOW	<>/fatal/fao=0!/ansi=0
 DEVPARINAP	<Device parameter inappropriate to this command>/error/fao=0!/ansi=0
-RECORDSTAT	<!AD:!_  Key cnt: !UL  max subsc len: !UL  max rec len: !UL  max node len: !UL>/info/fao=6!/ansi=0
-NOTGBL		<!_!AD!/!_!_!_"^" Expected>/error/fao=2!/ansi=0
+RECORDSTAT	<!AD:!_  Key cnt: !@ZQ  max subsc len: !UL  max rec len: !UL  max node len: !UL>/info/fao=6!/ansi=0
+NOTGBL		<Expected a global variable name starting with an up-arrow (^): !AD>/error/fao=2!/ansi=0
 DEVPARPROT	<The protection specification is invalid>/error/fao=0!/ansi=0
 PREMATEOF	<Premature end of file detected>/error/fao=0!/ansi=0
 GVINVALID	<!_!AD!/!_!_!_Invalid global name>/error/fao=2!/ansi=0
@@ -257,7 +257,7 @@ GVSUBOFLOW	<Maximum combined length of subscripts exceeded>/error/fao=0!/ansi=0
 GVUNDEF		<Global variable undefined: !AD>/error/fao=2!/ansi=7
 TRANSNEST	<Maximum transaction nesting levels exceeded>/error/fao=0!/ansi=0
 INDEXTRACHARS	<Indirection string contains extra trailing characters>/error/fao=0!/ansi=0
-UNUSEDMSG260	<INDMAXNEST Last used in V6.0-000>/error/fao=0!/ansi=0
+CORRUPTNODE	<Corrupt input in Record # !UL, Key #!UL; resuming with next global node>/error/fao=2!/ansi=0
 INDRMAXLEN	<Maximum length !UL of an indirection argument was exceeded>/error/fao=1!/ansi=0
 INSFFBCNT	<Insufficient byte count quota left for requested operation>/error/fao=0!/ansi=0
 INTEGERRS	<Database integrity errors>/error/fao=0!/ansi=0
@@ -806,7 +806,7 @@ MUKILLIP	<Kill in progress indicator is set for file !AD - this !AD operation is
 JNLRDONLY	<Journal file !AD read only>/error/fao=2!/ansi=0
 ANCOMPTINC	<Deviceparameter !AD is not compatible with any other deviceparameters in the !AD command>/error/fao=4!/ansi=0
 ABNCOMPTINC	<Deviceparameter !AD and deviceparameter !AD are not compatible in the !AD command>/error/fao=6!/ansi=0
-UNUSEDMSG809	<GTMSECSHRLOGF last used in V5.5-000>/error/fao=0!/ansi=0
+RECLOAD		<Error loading record number: !UL!/>/error/fao=1!/ansi=0
 SOCKNOTFND	<Socket !AD not found>/error/fao=2!/ansi=0
 CURRSOCKOFR	<Current socket of index !UL is out of range.  There are only !UL sockets.>/error/fao=2!/ansi=0
 SOCKETEXIST	<Socket !AD already exists>/error/fao=2!/ansi=79
@@ -830,7 +830,7 @@ TOOMANYCLIENTS	<GT.CM is serving the maximum number of clients.  Try again later
 NOEXCLUDE	<None of the excluded variables exist>/info/fao=0!/ansi=0
 GVINCRISOLATION	<$INCREMENT cannot be performed on global ^!AD as it has NOISOLATION turned ON>/error/fao=2!/ansi=0
 EXCLUDEREORG	<Global: !AD is present in the EXCLUDE option.  REORG will skip the global.>/warning/fao=2!/ansi=0
-REORGINC	<Reorg was incomplete.  Not all globals were reorged.>/error/fao=0!/ansi=0
+REORGINC	<Reorg was incomplete.  Not all globals were reorged.>/warning/fao=0!/ansi=0
 ASC2EBCDICCONV	<ASCII/EBCDIC conversion failed when calling !AD>/error/fao=2!/ansi=0
 GTMSECSHRSTART	<!AD - !UL : gtmsecshr failed to startup>/error/fao=3!/ansi=0
 DBVERPERFWARN1	<Performance warning: Database !AD is running in compatibility mode which degrades performance. Run MUPIP REORG UPGRADE for best overall performance>/warning/fao=2!/ansi=0
@@ -986,16 +986,16 @@ REPLJNLCLOSED	<Replication in jeopardy as journaling got closed for database fil
 RENAMEFAIL	<Rename of file !AD to !AD failed>/warning/fao=4!/ansi=0
 FILERENAME	<File !AD is renamed to !AD>/info/fao=4!/ansi=0
 JNLBUFINFO	<Pid 0x!XL!/     dsk 0x!XL     free 0x!XL  bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL!/ dskaddr 0x!XL freeaddr 0x!XL  qiocnt 0x!XL now_writer 0x!XL     fsync_pid 0x!XL!/filesize 0x!XL    cycle 0x!XL  errcnt 0x!XL    wrtsize 0x!XL fsync_dskaddr 0x!XL>/info/fao=16!/ansi=0
-UNUSEDMSG989	<JNLQIOLOCKED : Last used in V4.4-000>/error/fao=0!/ansi=0
-UNUSEDMSG990	<JNLEOFPREZERO : Last used in V4.4-000>/error/fao=0!/ansi=0
+SDSEEKERR	<Sequential device seek error - !AD>/error/fao=2!/ansi=0
+LOCALSOCKREQ	<LOCAL socket required>/error/fao=0!/ansi=0
 TPNOTACID	<!AD at !AD in a final TP retry violates ACID properties of a TRANSACTION; indefinite RESTARTs may occur !AD !AD>/info/fao=8!/ansi=0
 JNLSETDATA2LONG	<SET journal record has data of length !UL.  Target system cannot handle data more than !UL bytes.>/error/fao=2!/ansi=0
 JNLNEWREC	<Target system cannot recognize journal record of type !UL, last recognized type is !UL>/error/fao=2!/ansi=0
 REPLFTOKSEM	<Error with replication semaphores for instance file !AD>/error/fao=2!/ansi=0
-UNUSEDMSG995	<GETCWD : Last used before V4.0-001E>/error/fao=0!/ansi=0
+SOCKNOTPASSED	<Socket message contained no passed socket descriptors>/error/fao=0!/ansi=0
 EXTRIOERR	<Error writing extract file !AD>/error/fao=2!/ansi=0
 EXTRCLOSEERR	<Error closing extract file !AD>/error/fao=2!/ansi=0
-UNUSEDMSG998	<TRUNCATE : Last used in V4.3-001F>/error/fao=0!/ansi=0
+CONNSOCKREQ	<Socket not connected>/error/fao=0!/ansi=0
 REPLEXITERR	<Replication process encountered an error while exiting>/error/fao=0!/ansi=0
 MUDESTROYSUC	<Global section (!AD) corresponding to file !AD successfully destroyed>/info/fao=4!/ansi=0
 DBRNDWN		<Error during global database rundown for region !AD.!/Notify those responsible for proper database operation.>/error/fao=2!/ansi=0
@@ -1034,7 +1034,7 @@ LKENOFINISH	<LKE unable to finish all requested actions>/error/fao=0!/ansi=0
 NOCHLEFT	<Unhandled condition exception (all handlers exhausted) - process terminating>/fatal/fao=0!/ansi=0
 MULOGNAMEDEF	<Logical name !AD, needed to start replication server is already defined for this job.  !/Check for an existing or improperly terminated server.>/error/fao=2!/ansi=0
 BUFOWNERSTUCK	<Pid !UL waiting for Pid !UL to finish disk-read of block !UL [0x!XL].!/Been waiting for !UL minutes.  read_in_progress=!UL : rip_latch = !UL.>/error/fao=7!/ansi=0
-ACTIVATEFAIL	<Failed to activate passive source server for secondary instance !AD>/error/fao=2!/ansi=0
+ACTIVATEFAIL	<Cannot activate passive source server on instance !AD while a receiver server and/or update process is running>/error/fao=2!/ansi=0
 DBRNDWNWRN	<Global section of database file !AD not rundown successfully by pid !UL [0x!XL].  Global section was not removed.>/warning/fao=4!/ansi=0
 DLLNOOPEN	<Failed to load external dynamic library !AD>/error/fao=2!/ansi=0
 DLLNORTN	<Failed to look up the location of the symbol !AD>/error/fao=2!/ansi=0
@@ -1076,7 +1076,7 @@ NOSUBSCRIPT	<No such subscript found (!SL)>/error/fao=1!/ansi=0
 SYSTEMVALUE	<Invalid value for $SYSTEM (!AD)>/error/fao=2!/ansi=0
 SIZENOTVALID4	<Size (in bytes) must be either 1, 2, or 4>/error/fao=0!/ansi=0
 STRNOTVALID	<Error: cannot convert !AD value to valid value>/error/fao=2!/ansi=0
-UNUSEDMSG1079	<RECNOCREJNL : Last used in V4.3-001F>/error/fao=0!/ansi=0
+CREDNOTPASSED	<Socket message contained no passed credentials>/error/fao=0!/ansi=0
 ERRWETRAP	<Error while processing $ETRAP>/error/fao=0!/ansi=0
 TRACINGON	<Tracing already turned on>/info/fao=0!/ansi=0
 CITABENV	<Environment variable for call-in table !AD not set>/error/fao=2!/ansi=0
@@ -1103,10 +1103,10 @@ PATNOTFOUND	<Current pattern table has no characters with pattern code !AD>/erro
 INVZDIRFORM	<Invalid value (!UL) specified for ZDIR_FORM>/error/fao=1!/ansi=0
 ZDIROUTOFSYNC	<$ZDIRECTORY !AD is not the same as its cached value !AD>/warning/fao=4!/ansi=0
 GBLNOEXIST	<Global !AD no longer exists>/info/fao=2!/ansi=0
-MAXBTLEVEL	<Global !AD reached maximum level>/error/fao=2!/ansi=0
+MAXBTLEVEL	<Global ^!AD in region !AD reached maximum level>/error/fao=4!/ansi=0
 INVMNEMCSPC	<Unsupported mnemonicspace !AD>/error/fao=2!/ansi=35
 JNLALIGNSZCHG	<Journal ALIGNSIZE is rounded up to !UL blocks (closest next higher power of two)>/info/fao=1!/ansi=0
-UNUSEDMSG1109	<MAXTRACELEVEL : last used in V5.4-002B>/error/fao=0!/ansi=0
+SEFCTNEEDSFULLB	<Current side effect setting does not permit full Boolean to be turned off>/error/fao=0!/ansi=0
 GVFAILCORE	<A core file is being created for later analysis if necessary>/error/fao=0!/ansi=0
 DBCDBNOCERTIFY	<Database !AD HAS NOT been certified due to the preceding errors - rerun DBCERTIFY SCAN>/error/fao=2!/ansi=0
 DBFRZRESETSUC	<Freeze released successfully on database file !AD>/info/fao=2!/ansi=0
@@ -1253,7 +1253,7 @@ REPLINSTSEQORD	<!AD has seqno [0x!16@XQ] which is less than last record seqno [0
 REPLINSTSTNDALN	<Could not get exclusive access to replication instance file !AD>/error/fao=2!/ansi=0
 REPLREQROLLBACK	<Replication instance file !AD indicates abnormal shutdown or an incomplete ROLLBACK. Run MUPIP JOURNAL ROLLBACK first>/error/fao=2!/ansi=0
 REQROLLBACK	<Error accessing database !AD.  Run MUPIP JOURNAL ROLLBACK on cluster node !AD.>/error/fao=4!/ansi=0
-UNUSEDMSG1256	<REPLUPGRADESEC : Last used in V5.4-002B>/error/fao=0!/ansi=0
+INVOBJFILE	<Cannot ZLINK object file !AD due to unexpected format>/error/fao=2!/ansi=0
 SRCSRVEXISTS	<Source server for secondary instance !AD is already running with pid !UL>/error/fao=3!/ansi=0
 SRCSRVNOTEXIST	<Source server for secondary instance !AD is not alive>/error/fao=2!/ansi=0
 SRCSRVTOOMANY	<Cannot start more than !UL source servers in replication instance !AD>/error/fao=3!/ansi=0
@@ -1293,7 +1293,7 @@ OPCOMMISSED	<!UL errors and !UL MBFULLs sending prior operator messages>/info/fa
 COMMITWAITSTUCK	<Pid !UL timed out after waiting !UL minute(s) for !UL concurrent GT.M process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
 COMMITWAITPID	<Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!XL in database file !AD>/error/fao=6!/ansi=0
 UPDREPLSTATEOFF	<Error replicating global ^!AD as it maps to database !AD which has replication turned OFF>/error/fao=4!/ansi=0
-LITNONGRAPH	<M standard requires graphics in string literals>/warning/fao=0!/ansi=0
+LITNONGRAPH	<M standard requires graphics in string literals; found non-printable: $ZCHAR(!AD)>/warning/fao=2!/ansi=0
 DBFHEADERR8	<Database file !AD: control problem: !AD was 0x!16@XQ expecting 0x!16@XQ> /info /fao=6!/ansi=0
 MMBEFOREJNL	<BEFORE image journaling cannot be set with MM access method in database file !AD>/warning/fao=2!/ansi=0
 MMNOBFORRPL	<Replication cannot be used in database file !AD which uses MM access method and NOBEFORE image journaling>/warning/fao=2!/ansi=0
@@ -1414,7 +1414,7 @@ EXTRFILEXISTS	<Error opening output file: !AD -- File exists>/error/fao=2!/ansi=
 MUUSERECOV	<Abnormal shutdown of journaled database !AD detected>/error/fao=2!/ansi=0
 SECNOTSUPPLEMENTARY	<!AD is a Supplementary Instance and so cannot act as a source to non-Supplementary Instance !AD >/error/fao=4!/ansi=0
 SUPRCVRNEEDSSUPSRC	<Instance !AD is not configured to perform local updates so it cannot act as a receiver for non-Supplementary Instance !AD>/error/fao=4!/ansi=0
-UNUSEDMSG1417	<SYNCTOSAMETYPE: Never used before so slot free for reuse>/info/fao=0!/ansi=0
+PEERPIDMISMATCH	<Local socket peer with PID=!UL does not match specified PID=!UL>/error/fao=2!/ansi=0
 SETITIMERFAILED	<A setitimer() call returned an error status of !UL>/fatal/fao=1!/ansi=0
 UPDSYNC2MTINS	<Can only UPDATERESYNC with an empty instance file>/error/fao=0!/ansi=0
 UPDSYNCINSTFILE	<Error with instance file name specified in UPDATERESYNC qualifier>/error/fao=0!/ansi=0
@@ -1486,7 +1486,7 @@ JNLBUFFREGUPD	<Journal file buffer size for region !AD has been adjusted from !U
 JNLBUFFDBUPD	<Journal file buffer size for database file !AD has been adjusted from !UL to !UL.>/warning/fao=4!/ansi=0
 LOCKINCR2HIGH	<Attempt to increment a LOCK more than !UL times>/error/fao=1!/ansi=0
 LOCKIS		<!_!_Resource name: !AD>/info/fao=2!/ansi=0
-LDSPANGLOINCMP	<Incomplete spanning node found during load>/error/fao=0!/ansi=0
+LDSPANGLOINCMP	<Incomplete spanning node found during load!/!_!_at File offset : [0x!16@XQ]>/error/fao=1!/ansi=0
 MUFILRNDWNFL2	<Database section (id = !UL) belonging to database file !AD rundown failed>/error/fao=3!/ansi=0
 MUINSTFROZEN	<!AD : Instance !AZ is frozen. Waiting for instance to be unfrozen before proceeding with writes to database file !AD>/info/fao=5!/ansi=0
 MUINSTUNFROZEN	<!AD : Instance !AZ is now Unfrozen. Continuing with writes to database file !AD>/info/fao=5!/ansi=0
@@ -1527,7 +1527,7 @@ SOCKBIND	<Error in binding socket>/error/fao=0!/ansi=0
 INSTFRZDEFER	<Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict>/info/fao=4!/ansi=0
 REGOPENRETRY	<Attempt to open region !AD (!AD) using startup shortcut failed due to conflicting database shutdown. Retrying...>/info/fao=4!/ansi=0
 REGOPENFAIL	<Failed to open region !AD (!AD) due to conflicting database shutdown activity>/error/fao=4!/ansi=0
-REPLINSTNOSHM	<Database !AD has no active connection to a replication journal pool; please verify that the database is listed in your instance file>/error/fao=2!/ansi=0
+REPLINSTNOSHM	<Database !AD has no active connection to a replication journal pool>/error/fao=2!/ansi=0
 DEVPARMTOOSMALL	<Deviceparameter must be greater than zero (0)>/error/fao=0!/ansi=0
 REMOTEDBNOSPGBL	<Database region !AD contains portion of a spanning global and so cannot point to a remote file>/error/fao=2!/ansi=0
 NCTCOLLSPGBL	<Database region !AD contains portion of spanning global ^!AD and so cannot support non-zero numeric collation type>/error/fao=4!/ansi=0
@@ -1546,6 +1546,33 @@ TLSCONNINFO	<Failed to obtain information on the TLS/SSL connection>/warning/fao
 TLSIOERROR	<Error during TLS/SSL !AD operation>/error/fao=2!/ansi=0
 TLSRENEGOTIATE	<Failed to renegotiate TLS/SSL connection>/error/fao=0!/ansi=0
 REPLNOTLS	<!AD requested TLS/SSL communication but the !AD was either not started with TLSID qualifier or does not support TLS/SSL protocol>/error/fao=4!/ansi=0
+COLTRANSSTR2LONG	<Output string after collation transformation is too long>/error/fao=0!/ansi=0
+SOCKPASS	<Socket pass failed>/error/fao=0!/ansi=0
+SOCKACCEPT	<Socket accept failed>/error/fao=0!/ansi=0
+NOSOCKHANDLE	<No socket handle specified in WRITE /PASS>/error/fao=0!/ansi=0
+TRIGLOADFAIL	<MUPIP TRIGGER or $ZTRIGGER operation failed. Failure code: !AD.>/error/fao=2!/ansi=0
+SOCKPASSDATAMIX	<Attempt to use a LOCAL socket for both READ/WRITE and PASS/ACCEPT>/error/fao=0!/ansi=0
+NOGTCMDB	<!AD does not support operation on GT.CM database region: !AD>/error/fao=4!/ansi=0
+NOUSERDB	<!AD does not support operation on non-GDS format region: !AD>/error/fao=4!/ansi=0
+DSENOTOPEN	<DSE could not open region !AD - see DSE startup error message for cause>/error/fao=2!/ansi=0
+ZSOCKETATTR	<Attribute "!AD" invalid for $ZSOCKET function>/error/fao=2!/ansi=0
+ZSOCKETNOTSOCK	<$ZSOCKET function called but device is not a socket>/error/fao=0!/ansi=0
+CHSETALREADY	<CHSET !AD already specified for socket device>/error/fao=2!/ansi=0
+DSEMAXBLKSAV	<DSE cannot SAVE another block as it already has the maximum of !UL>/error/fao=1!/ansi=0
+BLKINVALID	<!XL is not a valid block as database file !AD has !XL total blocks>/error/fao=4!/ansi=0
+CANTBITMAP	<Can't perform this operation on a bit map (block at a 200 hexadecimal boundary)>/error/fao=0!/ansi=0
+AIMGBLKFAIL	<After image build for block !XL in region !AD failed in DSE or MUPIP>/error/fao=3!/ansi=0
+GTMDISTUNVERIF	<Environment variable $gtm_dist (!AD) could not be verified against the executables path (!AD)>/error/fao=4!/ansi=0
+CRYPTNOAPPEND	<APPEND disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
+CRYPTNOSEEK	<SEEK disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
+CRYPTNOTRUNC	<Not positioned at file start or EOF. TRUNCATE disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
+CRYPTNOKEYSPEC	<Key name needs to be specified with KEY, IKEY, or OKEY device parameter for encrypted I/O>/error/fao=0!/ansi=0
+CRYPTNOOVERRIDE	<Cannot override IVEC and/or key without compromising integrity>/error/fao=0!/ansi=0
+CRYPTKEYTOOBIG	<Specified key has length !UL, which is greater than the maximum allowed key length !UL>/error/fao=2!/ansi=0
+CRYPTBADWRTPOS	<Encrypted WRITE disallowed from a position different than where the last WRITE completed>/error/fao=0!/ansi=0
+LABELNOTFND	<GOTO referenced a label that does not exist>/error/fao=0!/ansi=13
+RELINKCTLERR	<Error with relink control structure for $ZROUTINES directory !AD>/error/fao=2!/ansi=0
+INVLINKTMPDIR	<Value for $gtm_linktmpdir is either not found or not a directory: !AD>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -146,8 +146,7 @@ static int getmon(char *month)
 	    	        "jul", "aug", "sep", "oct", "nov", "dec" };
 
 	for (p = month; *p; p++)
-		if (ISUPPER_ASCII(*p))
-			*p = TOLOWER(*p);
+		*p = TOLOWER(*p);
 	for (i = 0; i < 12; i++)
 		if (!strcmp(month,m[i]))
 			return i;

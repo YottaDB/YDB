@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@ int validate_input_trigger_name(char *trigger_name, uint4 trigger_name_len, bool
 {
 	char		*ptr, *tail;
 	uint4		len, name_len, num_len, max_len;
-	boolean_t	wild, poundtail;
+	boolean_t	wild, poundtail, firstdigit;
 
 	if (0 == trigger_name_len)
 		/* reject zero lengths, use -1 because returning 0 for 0 won't signal an error */
@@ -65,12 +65,12 @@ int validate_input_trigger_name(char *trigger_name, uint4 trigger_name_len, bool
 	if (!ISALPHA_ASCII(*ptr) && ('%' != *ptr))
 		/* first char must be alpha or '%' sign */
 		return INTCAST(ptr - trigger_name);
+	name_len++;	/* to record first alpha byte that has already been processed */
 	if ('*' == *tail)
-	{ /* strip the wild card to skip checking it */
+	{	/* strip the wild card to skip checking it */
 		wild = TRUE;
 		tail--;
 		len--;
-		name_len++;
 	} else
 		wild = FALSE;
 	if (wildcard_ptr)
@@ -79,11 +79,12 @@ int validate_input_trigger_name(char *trigger_name, uint4 trigger_name_len, bool
 		/* special case to return sooner for a single character name */
 		return INTCAST(ptr - trigger_name) + 1 + ((wild) ? 1 : 0);
 	if (trigger_user_name(trigger_name, trigger_name_len))
-		/* user defined name, use MAX_USER_TRIGNAME_LEN as max_len */
+	{	/* user defined name, use MAX_USER_TRIGNAME_LEN as max_len */
 		max_len = MAX_USER_TRIGNAME_LEN;
-	else
-		/* auto generated name, use MAX_AUTO_TRIGNAME_LEN as max_len */
-		max_len = MAX_AUTO_TRIGNAME_LEN;
+		if (wild)
+			name_len++;
+	} else
+		max_len = MAX_AUTO_TRIGNAME_LEN; /* auto generated name, use MAX_AUTO_TRIGNAME_LEN as max_len */
 	poundtail = (TRIGNAME_SEQ_DELIM == *tail);
 	if (MAX_USER_TRIGNAME_LEN + ((poundtail) ? 1 : 0) < trigger_name_len)
 		/* name, must be under 28 chars (MAX_USER_TRIGNAME_LEN), but increment
@@ -104,8 +105,16 @@ int validate_input_trigger_name(char *trigger_name, uint4 trigger_name_len, bool
 	if (wild)
 		/* reject anything between the first # sign and wild card */
 		return INTCAST(ptr - trigger_name);
-	while (++ptr <= tail && TRIGNAME_SEQ_DELIM != *ptr)
+	firstdigit = TRUE;
+	while ((++ptr <= tail) && (TRIGNAME_SEQ_DELIM != *ptr))
 	{ /* validate the numeric portion of the auto generated name */
+		if (firstdigit)
+		{
+			/* reject number starting with 0 as that is not possible in auto generated name */
+			if ('0' == *ptr)
+				return INTCAST(ptr - trigger_name);
+			firstdigit = FALSE;
+		}
 		if ((!ISDIGIT_ASCII(*ptr)) || (NUM_TRIGNAME_SEQ_CHARS < ++num_len))
 			/* reject non-numeric or reject aaa#1234567 */
 			return INTCAST(ptr - trigger_name);

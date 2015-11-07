@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,13 +31,13 @@ void urx_remove(rhdtyp *rtnhdr)
 	urx_rtnref	*rtn, *rtnprev;
 	urx_labref	*lab, *labprev;
 	urx_addr	*addr, *addrprev, *savaddr;
-	char		*regstart, *regend;
+	unsigned char	*regstart, *regend;
 	int		deletes;
 
 	DEBUG_ONLY(deletes = 0);
 #ifdef USHBIN_SUPPORTED
 	/* All unresolved addresses will point into the linkage section */
-	regstart = (char *)rtnhdr->linkage_adr;
+	regstart = (unsigned char *)rtnhdr->linkage_adr;
 	regend = regstart + (SIZEOF(lnk_tabent) * rtnhdr->linkage_len);
 #else
 	/* All unresolved addresses will point into the code section */

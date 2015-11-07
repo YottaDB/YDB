@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1508,14 +1508,15 @@ boolean_t	tp_tend()
 			assert(0 != jnl_fence_ctl.token);
 			jfb = si->jnl_head;
 			assert(NULL != jfb);
-			/* Fill in "num_participants" field in TSET/TKILL/TZKILL/TZTRIG/TZTWORM record.
-			 * The rest of the records (USET/UKILL/UZKILL/UZTRIG/UZTWORM) dont have this initialized.
+			/* Fill in "num_participants" field in TSET/TKILL/TZKILL/TZTRIG/TZTWORM/TLGTRIG record.
+			 * The rest of the records (USET/UKILL/UZKILL/UZTRIG/UZTWORM/ULGTRIG) dont have this initialized.
 			 * Recovery looks at this field only in the T* records.
 			 */
 			rec = (jnl_record *)jfb->buff;
 			assert(IS_TUPD(jfb->rectype));
-			assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(jfb->rectype));
+			assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(jfb->rectype));
 			assert(&rec->jrec_set_kill.num_participants == &rec->jrec_ztworm.num_participants);
+			assert(&rec->jrec_set_kill.num_participants == &rec->jrec_lgtrig.num_participants);
 			rec->jrec_set_kill.num_participants = replay_jnl_participants;
 			DEBUG_ONLY(++tmp_jnl_participants;)
 			do

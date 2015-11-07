@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -485,6 +485,16 @@ typedef struct
 		--(TREF(for_stack_ptr));									\
 }
 
+/* The following macro should be used when doing an OC_FETCH other than at the start of a line because
+ * it deals with the possibility that there is a preceding FOR, in which case, we use start_for_fetches to
+ * be sure the new fetch includes any FOR loop control variable
+ */
+#define MID_LINE_REFETCH											\
+	if (TREF(for_stack_ptr) == TADR(for_stack))								\
+		start_fetches(OC_FETCH);									\
+	else	/* if in the body of a FOR loop we need to ensure the control variable is refetched */		\
+		start_for_fetches();
+
 /* $TEXT(+n^rtn) fetches from the most recently ZLINK'd version of rtn. $TEXT(+n) fetches from the currently executing version.
  * The compiler converts $TEXT(+n) to $TEXT(+n^!), indicating at runtime $TEXT should fetch from the current executing routine.
  * '!' is not a legal routine name character.
@@ -497,6 +507,12 @@ typedef struct
 #define WANT_CURRENT_RTN_MSTR(S)	((STR_LIT_LEN(CURRENT_RTN_STRING) == (S)->len)	\
 						&& (0 == MEMCMP_LIT((S)->addr, CURRENT_RTN_STRING)))
 #define WANT_CURRENT_RTN(R)		WANT_CURRENT_RTN_MSTR(&(R)->str)
+
+#define NEWLINE_TO_NULL(C)		\
+{					\
+	if ('\n' == (char)(C))		\
+		C = '\0';		\
+}
 
 int		actuallist(oprtype *opr);
 int		bool_expr(boolean_t op, oprtype *addr);
@@ -567,8 +583,10 @@ int		f_zparse(oprtype *a, opctype op);
 int		f_zpeek(oprtype *a, opctype op);
 int		f_zprevious(oprtype *a, opctype op);
 int		f_zqgblmod(oprtype *a, opctype op);
+int		f_zrupdate(oprtype *a, opctype op);
 int		f_zsearch(oprtype *a, opctype op);
 int		f_zsigproc(oprtype *a, opctype op);
+int		f_zsocket(oprtype *a, opctype op);
 int		f_zsqlexpr (oprtype *a, opctype op);
 int		f_zsqlfield (oprtype *a, opctype op);
 int		f_zsubstr(oprtype *a, opctype op);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,10 +77,11 @@ cw_set_element *t_write (
 	sgmnt_addrs		*csa;
 	blk_hdr_ptr_t		old_block;
 	unsigned int		bsiz;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
 	horiz_growth = FALSE;
-
 	/* When the following two asserts trip, we should change the data types of prev_first_off
 	 * and prev_next_off, so they satisfy the assert.
 	 */
@@ -127,7 +128,15 @@ cw_set_element *t_write (
 		} else
 		{
 			new_cse = FALSE;
-			assert(cse->done);
+#			ifdef DEBUG
+			if (!cse->done)
+			{	/* This is a restartable situation. Since this routine does not return
+				 * a failure code, we continue and expect tp_tend to detect this.
+				 */
+				assert(CDB_STAGNATE > t_tries);
+				TREF(donot_commit) |= DONOTCOMMIT_T_WRITE_CSE_DONE;
+			}
+#			endif
 			assert(dollar_tlevel >= cse->t_level);
 			if (cse->t_level != dollar_tlevel)
 			{
@@ -163,14 +172,16 @@ cw_set_element *t_write (
 			{
 				case kill_t_create:
 					assert(CDB_STAGNATE > t_tries);
+					DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_T_WRITE_CSE_MODE;)
 					cse->mode = gds_t_create;
 					break;
 				case kill_t_write:
 					assert(CDB_STAGNATE > t_tries);
+					DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_T_WRITE_CSE_MODE;)
 					cse->mode = gds_t_write;
 					break;
 				default:
-					;
+					break;
 			}
 		}
 		tp_cse = cse;

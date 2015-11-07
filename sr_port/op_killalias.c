@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "gtmio.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"
@@ -28,13 +29,10 @@
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
 GBLREF uint4		dollar_tlevel;
-GBLREF lv_val		*active_lv;
 
 /* Operation - Kill an alias (unsubscripted variable)
  *
- * Look it up in the hash table and remove the pointer to the lv_val to destroy the
- * alias association. Will need to do this in any previous symtabs this var is in
- * as well.
+ * Look it up in the hash table and remove the pointer to the lv_val to destroy the alias association.
  */
 void op_killalias(int srcindx)
 {
@@ -43,9 +41,8 @@ void op_killalias(int srcindx)
 	lv_val		*lv;
 	int4		symvlvl;
 
-	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
-					 * cleanup problems.
-					 */
+	SET_ACTIVE_LV(NULL, TRUE, actlv_op_killalias); /* If we get here, subscript set was successful.
+							* Clear active_lv to avoid later cleanup issues */
 	varname = &(((mname_entry *)frame_pointer->vartab_ptr)[srcindx]);
 	tabent = lookup_hashtab_mname(&curr_symval->h_symtab, varname);		/* Retrieve hash tab entry this var */
 	if (tabent)

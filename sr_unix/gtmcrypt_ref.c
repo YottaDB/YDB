@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2013 Fidelity Information Services, Inc *
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,7 @@
 #include <gpg-error.h>			/* gcry*_err_t */
 
 #include <openssl/err.h>
+#include <libconfig.h>
 
 #include "gtmxc_types.h"		/* gtm_string, gtm_status_t and other callin interfaces gtm_fileid */
 
@@ -40,203 +41,359 @@
 #define GTMSHR_IMAGENAME	"libgtmshr.dll"
 #endif
 
-#define MESSAGE1		"Verify encrypted key file and your GNUPGHOME settings"
-#define MESSAGE2_DBKEYS		"Verify encryption key in configuration file pointed to by $gtm_dbkeys"
-#define MESSAGE2_LIBCONFIG	"Verify encryption key in configuration file pointed to by $gtmcrypt_config"
+#define CHECK_IV_LENGTH(IV)									\
+{												\
+	if (IV.length > GTMCRYPT_IV_LEN)							\
+	{											\
+		UPDATE_ERROR_STRING("Specified IVEC has length %ld, which is greater than "	\
+			"the maximum allowed IVEC length %d", iv.length, GTMCRYPT_IV_LEN);	\
+		return -1;									\
+	}											\
+}
 
-GBLDEF	int		gtmcrypt_inited;
-GBLDEF	int		gtmcrypt_init_flags;
+GBLDEF	int			gtmcrypt_inited;
+GBLDEF	int			gtmcrypt_init_flags;
 
-GBLREF	int		gc_dbk_file_format;
-GBLREF	passwd_entry_t	*gtmcrypt_pwent;
+GBLREF	passwd_entry_t		*gtmcrypt_pwent;
 
-_GTM_APIDEF char* gtmcrypt_strerror()
+/*
+ * Return the error string.
+ *
+ * Returns:	The error string constructed so far.
+ */
+char* gtmcrypt_strerror()
 {
 	return gtmcrypt_err_string;
 }
 
-_GTM_APIDEF gtm_status_t gtmcrypt_init(int flags)
+/*
+ * Initialize encryption if not yet initialized.
+ *
+ * Arguments:	flags	Encryption flags to use.
+ *
+ * Returns:	0 if encryption was initialized successfully; -1 otherwise.
+ */
+gtm_status_t gtmcrypt_init(gtm_int_t flags)
 {
-	int		fips_requested, fips_enabled, rv;
+	int fips_requested, fips_enabled, rv;
 
 	if (gtmcrypt_inited)
-		return GC_SUCCESS;
+		return 0;
 	if (0 != gc_load_gtmshr_symbols())
-		return GC_FAILURE;
-#	ifndef USE_OPENSSL
+		return -1;
+#	ifdef USE_GCRYPT
 	gcry_set_log_handler(gtm_gcry_log_handler, NULL);
 #	endif
 	IS_FIPS_MODE_REQUESTED(fips_requested);
 	if (fips_requested)
 	{
-#		ifndef USE_OPENSSL
+#		ifdef USE_GCRYPT
 #		ifndef GCRYPT_NO_FIPS
 		if (0 != (rv = gcry_control(GCRYCTL_FORCE_FIPS_MODE)))
 		{
 			GC_APPEND_GCRY_ERROR(rv, "Failed to initialize FIPS mode.");
-			return GC_FAILURE;
+			return -1;
 		}
 #		endif
 #		else
 		ENABLE_FIPS_MODE(rv, fips_enabled);
+		/* Relevant error detail populated in the above macro. */
 		if (-1 == rv)
-			return GC_FAILURE; /* Relevant error detail populated in the above macro. */
+			return -1;
 #		endif
 	}
-#	ifndef USE_OPENSSL
+#	ifdef USE_GCRYPT
 	if (0 != gc_sym_init())
-		return GC_FAILURE;
+		return -1;
 #	endif
 	GC_PK_INIT;
 	/* Update $gtm_passwd for future invocation */
 	if (0 != gc_update_passwd(GTM_PASSWD_ENV, &gtmcrypt_pwent, GTMCRYPT_DEFAULT_PASSWD_PROMPT,
 					GTMCRYPT_OP_INTERACTIVE_MODE & flags))
 	{
-		return GC_FAILURE;
+		return -1;
 	}
 	gtmcrypt_inited = TRUE;
 	gtmcrypt_init_flags = flags;
-	return GC_SUCCESS;
+	gtmcrypt_err_string[0] = '\0';
+	return 0;
 }
 
-_GTM_APIDEF gtm_status_t gtmcrypt_getkey_by_name(gtm_string_t *filename, gtmcrypt_key_t *handle)
+/*
+ * Find the key by hash and set up database encryption and decryption state objects, if not created yet.
+ *
+ * Arguments:	handle	Pointer which should get pointed to the database encryption state object.
+ * 		hash	Hash of the key.
+ * 		iv	Initialization vector to use for encryption or decryption.
+ *
+ * Returns:	0 if the key was found and database encryption and decryption state objects were initialized or existed already; -1
+ * 		otherwise.
+ */
+gtm_status_t gtmcrypt_init_db_cipher_context_by_hash(gtmcrypt_key_t *handle, gtm_string_t hash, gtm_string_t iv)
 {
-	gtm_fileid_ptr_t	fileid = NULL;
-	gtm_dbkeys_tbl		*entry;
-	gtm_status_t		status = 0;
+	gtm_keystore_t		*entry;
+	gtm_cipher_ctx_t	**ctx;
 
 	GC_VERIFY_INITED;
-	*handle = GTMCRYPT_INVALID_KEY_HANDLE;
-	gtmcrypt_err_string[0] = '\0';	/* discard any previously recorded error messages */
-	if (!GTM_FILENAME_TO_ID(filename, &fileid))
+	/* Discard any previously recorded error messages. */
+	gtmcrypt_err_string[0] = '\0';
+	CHECK_IV_LENGTH(iv);
+	if (hash.length != GTMCRYPT_HASH_LEN)
 	{
-		UPDATE_ERROR_STRING("Database file %s not found", filename->address);
-		return GC_FAILURE;
+		UPDATE_ERROR_STRING("Specified symmetric key hash has length %ld, which is different from "
+			"the expected hash length %d", hash.length, GTMCRYPT_HASH_LEN);
+		return -1;
 	}
-	if (NULL == (entry = gc_dbk_get_entry_by_fileid(fileid)))
-	{	/* Try re-loading the configuration/db-keys file before giving up. */
-		if (0 != gc_dbk_init_dbkeys_tbl())
-			return GC_FAILURE;	/* No point continuing. */
-		status = gc_dbk_fill_symkey_hash(fileid, NULL);
-	}
-	if (0 == status)
+	ctx = (gtm_cipher_ctx_t **)handle;
+	if (0 != gtmcrypt_getkey_by_hash((unsigned char *)hash.address, &entry))
+		return -1;
+	assert(NULL != entry);
+	if (NULL == entry->db_cipher_entry)
 	{
-		entry = gc_dbk_get_entry_by_fileid(fileid);
-		if (NULL == entry)
-		{
-			UPDATE_ERROR_STRING("Database file %s missing in DB keys file or does not exist", filename->address);
-			return GC_FAILURE;
-		}
-		*handle = entry->index;
+		/* This cipher context is for decryption; iv is a static global. */
+		if (0 != keystore_new_cipher_ctx(entry, iv.address, iv.length, GTMCRYPT_OP_DECRYPT))
+			return -1;
+		/* And this cipher context (inserted ahead of the first one) is for encryption. */
+		if (0 != keystore_new_cipher_ctx(entry, iv.address, iv.length, GTMCRYPT_OP_ENCRYPT))
+			return -1;
+		entry->db_cipher_entry = entry->cipher_head;
 	}
-	return status;
+	*ctx = entry->db_cipher_entry;
+	assert(NULL != (*ctx)->next);
+	return 0;
 }
 
-_GTM_APIDEF gtm_status_t gtmcrypt_getkey_by_hash(gtm_string_t *hash, gtmcrypt_key_t *handle)
+/*
+ * Find the key by keyname and set up device encryption or decryption state object.
+ *
+ * Arguments:	handle		Pointer which should get pointed to the device encryption or decryption state object.
+ * 		keyname		Name of the key.
+ * 		iv		Initialization vector to use for encryption or decryption.
+ * 		operation	Flag indicating whether encryption or decryption is desired; use GTMCRYPT_OP_ENCRYPT or
+ * 				GTMCRYPT_OP_DECRYPT, respectively.
+ *
+ * Returns:	0 if the key was found and device encryption or decryption state object was initialized; -1 otherwise.
+ */
+gtm_status_t gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *handle, gtm_string_t keyname,
+									 gtm_string_t iv, gtm_int_t operation)
 {
-	gtm_dbkeys_tbl	*entry;
-	gtm_status_t	status = 0;
-	int		err_caused_by_gpg;
-	char		save_err[MAX_GTMCRYPT_ERR_STRLEN], hex_buff[GTMCRYPT_HASH_HEX_LEN + 1];
-	char		*alert_msg;
+	gtm_keystore_t		*entry;
+	gtm_cipher_ctx_t	**ctx;
 
-	*handle = GTMCRYPT_INVALID_KEY_HANDLE;
 	GC_VERIFY_INITED;
-	gtmcrypt_err_string[0] = '\0';	/* discard any previously recorded error messages */
-	if (NULL == (entry = gc_dbk_get_entry_by_hash(hash)))
-	{	/* Try re-loading the configuration/db-keys file before giving up. */
-		if (0 != gc_dbk_init_dbkeys_tbl())
-			return GC_FAILURE;	/* No point continuing. */
-		status = gc_dbk_fill_symkey_hash(NULL, hash->address);
-	}
-	if (0 == status)
-	{
-		entry = gc_dbk_get_entry_by_hash(hash);
-		if (NULL == entry)
-		{	/* Lookup still failed. Verify if we have right permissions on GNUPGHOME or $HOME/.gnupg
-			 * (if GNUPGHOME is unset). If not, then the below function will store the appropriate
-			 * error message in err_string and so return GC_FAILURE.
-			 */
-			if (GC_SUCCESS != gc_pk_gpghome_has_permissions())
-				return GC_FAILURE;
-			err_caused_by_gpg = ('\0' != gtmcrypt_err_string[0]);
-			if (err_caused_by_gpg)
-				alert_msg = MESSAGE1;
-			else
-			{
-				assert((DBKEYS_FILE_FORMAT == gc_dbk_file_format) || (LIBCONFIG_FILE_FORMAT == gc_dbk_file_format));
-				alert_msg = (DBKEYS_FILE_FORMAT == gc_dbk_file_format ? MESSAGE2_DBKEYS : MESSAGE2_LIBCONFIG);
-			}
-			GC_HEX(hash->address, hex_buff, GTMCRYPT_HASH_HEX_LEN);
-			if (err_caused_by_gpg)
-			{
-				strcpy(save_err, gtmcrypt_err_string);
-				UPDATE_ERROR_STRING("Expected hash - %s - %s. %s", hex_buff, save_err, alert_msg);
-			} else
-				UPDATE_ERROR_STRING("Expected hash - %s. %s", hex_buff, alert_msg);
-			return GC_FAILURE;
-		}
-		*handle = entry->index;
-	}
-	return status;
+	/* Discard any previously recorded error messages. */
+	gtmcrypt_err_string[0] = '\0';
+	CHECK_IV_LENGTH(iv);
+	ctx = (gtm_cipher_ctx_t **)handle;
+	if (0 != gtmcrypt_getkey_by_keyname(keyname.address, keyname.length, &entry, FALSE, FALSE))
+		return -1;
+	assert(NULL != entry);
+	if (0 != keystore_new_cipher_ctx(entry, iv.address, iv.length, operation))
+		return -1;
+	*ctx = entry->cipher_head;
+	return 0;
 }
 
-_GTM_APIDEF gtm_status_t gtmcrypt_hash_gen(gtmcrypt_key_t handle, gtm_string_t *hash)
+/*
+ * Find the key by keyname and obtain its hash.
+ *
+ * Arguments:	keyname		Name of the key.
+ * 		hash_dest	Pointer to the location where the key's hash is to be copied.
+ *
+ * Returns:	0 if the key was found and key's hash was copied to the specified location; -1 otherwise.
+ */
+gtm_status_t gtmcrypt_obtain_db_key_hash_by_keyname(gtm_string_t keyname, gtm_string_t *hash_dest)
 {
-	gtm_dbkeys_tbl	*entry;
+	gtm_keystore_t	*entry;
+	char		real_filename[GTM_PATH_MAX];
+	int		length;
 
 	GC_VERIFY_INITED;
-	RETURN_IF_INVALID_HANDLE(handle);
-	gtmcrypt_err_string[0] = '\0';	/* discard any previously recorded error messages */
-	entry = (gtm_dbkeys_tbl *)fast_lookup_entry[(int)handle];
-	gc_dbk_get_hash(entry, hash);
-	return GC_SUCCESS;
-}
-
-_GTM_APIDEF gtm_status_t gtmcrypt_encrypt(gtmcrypt_key_t handle, gtm_string_t *unencrypted_block, gtm_string_t *encrypted_block)
-{
-	gtm_dbkeys_tbl	*entry;
-	crypt_key_t	key;
-
-	GC_VERIFY_INITED;
-	RETURN_IF_INVALID_HANDLE(handle);
-	gtmcrypt_err_string[0] = '\0';	/* discard any previously recorded error messages */
-	entry = (gtm_dbkeys_tbl *)fast_lookup_entry[(int)handle];
-	/* NOTE: The below assignment, while seemingly innocuous, is important. `entry->encr_key_handle' is a scalar type in
-	 * OpenSSL (EVP_CIPHER_CTX). The below assignments does a "deep copy" of `entry->encr_key_handle' into `key'. This way,
-	 * we *always* use a fresh copy of the key before encrypting. By doing so, we implicitly reset the encryption state
-	 * engine.
+	/* Discard any previously recorded error messages. */
+	gtmcrypt_err_string[0] = '\0';
+	/* Since this is a database-specific operation, the keyname parameter happens to be the database's path, which needs to be
+	 * fully resolved before we can reliably use it, hence realpath-ing.
 	 */
-	key = entry->encr_key_handle;
-	GC_SYM_ENCRYPT(&key, unencrypted_block, encrypted_block);
-	return GC_SUCCESS;
+	if (NULL == realpath(keyname.address, real_filename))
+	{
+		UPDATE_ERROR_STRING("Could not obtain the real path of the database " STR_ARG, ELLIPSIZE(keyname.address));
+		return -1;
+	}
+	length = strlen(real_filename);
+	if (0 != gtmcrypt_getkey_by_keyname(real_filename, length + 1, &entry, TRUE, TRUE))
+		return -1;
+	assert(NULL != entry);
+	hash_dest->length = GTMCRYPT_HASH_LEN;
+	hash_dest->address = (char *)entry->key_hash;
+	return 0;
 }
 
-_GTM_APIDEF gtm_status_t gtmcrypt_decrypt(gtmcrypt_key_t handle, gtm_string_t *encrypted_block, gtm_string_t *unencrypted_block)
+/*
+ * Release the specified encryption or decryption state object, also releasing the decryption state if database encryption state is
+ * specified.
+ *
+ * Arguments:	handle	Encryption or decryption state object to release.
+ *
+ * Returns:	0 if the operation was successful; -1 otherwise.
+ */
+gtm_status_t gtmcrypt_release_key(gtmcrypt_key_t handle)
 {
-	gtm_dbkeys_tbl		*entry;
+	gtm_cipher_ctx_t *ctx;
+
+	GC_VERIFY_INITED;
+	assert(GTMCRYPT_INVALID_KEY_HANDLE != handle);
+	/* Discard any previously recorded error messages. */
+	gtmcrypt_err_string[0] = '\0';
+	ctx = (gtm_cipher_ctx_t *)handle;
+	/* In case a database encryption state object is specified, we want to make sure that the respective database decryption
+	 * state object is also removed.
+	 */
+	if (ctx->store->db_cipher_entry == ctx)
+	{
+		assert(NULL != ctx->next);
+		keystore_remove_cipher_ctx(ctx->next);
+	}
+	keystore_remove_cipher_ctx(ctx);
+	return 0;
+}
+
+/*
+ * Perform encryption or decryption of the provided data based on the specified encryption / decryption state. If the target buffer
+ * pointer is NULL, the operation is done in-place.
+ *
+ * It is also possible to set the initialization vector (IV) to a particular value, or reset it to the original value, before
+ * attempting the operation. The results of mixing different IV modes on the *same* encryption / decryption state object are
+ * different between OpenSSL and Gcrypt, though. The difference is that modifying the IV (iv_mode != GTMCRYPT_IV_CONTINUE) with
+ * OpenSSL does not affect the actual encryption / decryption state, and subsequent IV-non-modifying encryptions / decryptions
+ * (iv_mode == GTMCRYPT_IV_CONTINUE) are performed on whatever state the prior IV-non-modifying encryptions / decryptions arrived
+ * at. With Gcrypt, on the other hand, modifying the IV (iv_mode != GTMCRYPT_IV_CONTINUE) before an operation influences the
+ * subsequent IV-non-modifying (iv_mode == GTMCRYPT_IV_CONTINUE) operations.
+ *
+ * Arguments:	handle			Encryption state object to use.
+ * 		unencr_block		Block where unencrypted data is read from.
+ * 		unencr_block_len	Length of the unencrypted (and encrypted) data block.
+ * 		encr_block		Block where encrypted data is put into.
+ * 		operation		Flag indicating whether encryption or decryption is desired; use GTMCRYPT_OP_ENCRYPT or
+ * 					GTMCRYPT_OP_DECRYPT, respectively.
+ * 		iv_mode			Flag indicating whether the initialization vector (IV) should be changed prior to the
+ * 					operation; use GTMCRYPT_IV_CONTINUE to proceed without changing the IV, GTMCRYPT_IV_SET to
+ * 					set the IV the value supplied in the iv argument, and GTMCRYPT_IV_RESET to reset the IV to
+ * 					the value specified at initialization.
+ * 		iv			Initialization vector to set the encryption state to when iv_mode is GTMCRYPT_IV_SET.
+ *
+ * Returns:	0 if the operation succeeded; -1 otherwise.
+ */
+gtm_status_t gtmcrypt_encrypt_decrypt(gtmcrypt_key_t handle, gtm_char_t *src_block, gtm_int_t src_block_len,
+					  gtm_char_t *dest_block, gtm_int_t operation, gtm_int_t iv_mode, gtm_string_t iv)
+{
+	gtm_cipher_ctx_t	*ctx;
+	crypt_key_t		*key_ptr;
+#	ifdef USE_OPENSSL
 	crypt_key_t		key;
+#	endif
+	char			iv_array[GTMCRYPT_IV_LEN];
 
 	GC_VERIFY_INITED;
-	RETURN_IF_INVALID_HANDLE(handle);
-	gtmcrypt_err_string[0] = '\0';	/* discard any previously recorded error messages */
-	entry = (gtm_dbkeys_tbl *)fast_lookup_entry[(int)handle];
-	/* NOTE: The below assignment, while seemingly innocuous, is important. `entry->decr_key_handle' is a scalar type in
-	 * OpenSSL (EVP_CIPHER_CTX). The below assignments does a "deep copy" of `entry->decr_key_handle' into `key'. This way,
-	 * we *always* use a fresh copy of the key before decrypting. By doing so, we implicitly reset the encryption state
-	 * engine.
-	 */
-	key = entry->decr_key_handle;
-	GC_SYM_DECRYPT(&key, encrypted_block, unencrypted_block);
-	return GC_SUCCESS;
+	assert(GTMCRYPT_INVALID_KEY_HANDLE != handle);
+	/* Discard any previously recorded error messages. */
+	gtmcrypt_err_string[0] = '\0';
+	ctx = (gtm_cipher_ctx_t *)handle;
+	assert(NULL != ctx);
+	if (GTMCRYPT_IV_SET == iv_mode)
+	{
+		CHECK_IV_LENGTH(iv);
+		memset(iv_array, 0, GTMCRYPT_IV_LEN);
+		memcpy(iv_array, iv.address, iv.length);
+		if (GTMCRYPT_OP_DECRYPT == operation)
+		{	/* We expect the IV to be set on a particular operation only for databases, which is why we obtain the
+			 * correct crypt_key_t object in case of decryption.
+			 */
+			ctx = ctx->next;
+			assert(NULL != ctx);
+		}
+#		ifdef USE_OPENSSL
+		/* NOTE: The below assignment, while seemingly innocuous, is important because the encryption / decryption state
+		 * object is of a scalar type in OpenSSL (EVP_CIPHER_CTX), and so we only affect its copy when updating the IV and
+		 * performing the encryption / decryption operation.
+		 */
+		key = ctx->handle;
+		key_ptr = &key;
+		if (!EVP_CipherInit(key_ptr, ALGO, ctx->store->key, (unsigned char *)iv.address, operation))
+		{
+			GC_APPEND_OPENSSL_ERROR("Failed to initialize encryption key handle.");
+			return -1;
+		}
+#		endif
+#		ifdef USE_GCRYPT
+		gcry_cipher_setiv(ctx->handle, iv.address, GTMCRYPT_IV_LEN);
+		key_ptr = &ctx->handle;
+#		endif
+	} else if (GTMCRYPT_IV_RESET == iv_mode)
+	{
+		if (GTMCRYPT_OP_DECRYPT == operation)
+		{	/* We expect the IV to be reset on a particular operation only for databases, which is why we obtain the
+			 * correct crypt_key_t object in case of decryption.
+			 */
+			ctx = ctx->next;
+			assert(NULL != ctx);
+		}
+#		ifdef USE_OPENSSL
+		/* NOTE: The below assignment, while seemingly innocuous, is important because the encryption / decryption state
+		 * object is of a scalar type in OpenSSL (EVP_CIPHER_CTX), and so we only affect its copy when performing the
+		 * encryption / decryption operation.
+		 */
+		key = ctx->handle;
+		key_ptr = &key;
+#		endif
+#		ifdef USE_GCRYPT
+		gcry_cipher_setiv(ctx->handle, ctx->iv, GTMCRYPT_IV_LEN);
+		key_ptr = &ctx->handle;
+#		endif
+	} else
+	{	/* For devices, encryption and decryption state should be maintained right from the first byte, and for this purpose
+		 * the IV should not be reset as that causes a fresh state initialization.
+		 */
+		key_ptr = &ctx->handle;
+	}
+	if (0 != gc_sym_encrypt_decrypt(key_ptr, (unsigned char *)src_block, src_block_len, (unsigned char *)dest_block, operation))
+		return -1;
+	return 0;
 }
 
-_GTM_APIDEF gtm_status_t gtmcrypt_close()
+/*
+ * Compare the keys associated with two encryption or decryption state objects.
+ *
+ * Arguments:	handle1		First ecryption or decryption state object to use.
+ * 		handle2		Second ecryption or decryption state object to use.
+ *
+ * Returns:	1 if both encryption or decryption state objects use the same key; 0 otherwise.
+ */
+gtm_int_t gtmcrypt_same_key(gtmcrypt_key_t handle1, gtmcrypt_key_t handle2)
+{
+	gtm_cipher_ctx_t *ctx1, *ctx2;
+
+	assert((GTMCRYPT_INVALID_KEY_HANDLE != handle1) && (GTMCRYPT_INVALID_KEY_HANDLE != handle2));
+	ctx1 = (gtm_cipher_ctx_t *)handle1;
+	ctx2 = (gtm_cipher_ctx_t *)handle2;
+	if (ctx1 == NULL)
+		return (ctx2 == NULL);
+	if (ctx2 == NULL)
+		return 0;
+	return (ctx1->store == ctx2->store);
+}
+
+/*
+ * Disable encryption and discard any sensitive data in memory.
+ *
+ * Returns:	0 if the operation succeeded; -1 otherwise.
+ */
+gtm_status_t gtmcrypt_close()
 {
 	GC_VERIFY_INITED;
-	gtmcrypt_err_string[0] = '\0';	/* discard any previously recorded error messages */
+	/* Discard any previously recorded error messages. */
+	gtmcrypt_err_string[0] = '\0';
 	gc_pk_scrub_passwd();
-	gc_dbk_scrub_entries();
+	gtm_keystore_cleanup_all();
 	gtmcrypt_inited = FALSE;
-	return GC_SUCCESS;
+	return 0;
 }

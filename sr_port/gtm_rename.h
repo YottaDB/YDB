@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,5 @@ uint4 	gtm_rename(char *org_fn, int org_fn_len, char *rename_fn, int rename_len,
 uint4 	prepare_unique_name(char *org_fn, int org_fn_len, char *prefix, char *suffix, char *rename_fn, int *rename_fn_len,
 				jnl_tm_t now, uint4 *ustatus);
 uint4 	append_time_stamp(char *fn, int *fn_len, jnl_tm_t now);
-void 	cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn);
 
 #endif

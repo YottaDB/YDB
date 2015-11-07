@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,17 +34,21 @@
 #include "zshow_params.h"
 #include "mvalconv.h"
 
-typedef struct
-{
-	unsigned short mem;
-	unsigned short grp;
-} uic_struct;
+GBLREF boolean_t	ctrlc_on;
+GBLREF io_log_name	*io_root_log_name;
+GBLREF io_pair		*io_std_device;
 
 LITREF nametabent dev_param_names[];
 LITREF uint4 dev_param_index[];
 LITREF zshow_index zshow_param_index[];
 
 static readonly char space_text[] = {' '};
+
+typedef struct
+{
+	unsigned short mem;
+	unsigned short grp;
+} uic_struct;
 
 #define ZS_ONE_OUT(V, TEXT) ((V)->str.len = 1, (V)->str.addr = (TEXT), zshow_output(output, &(V)->str))
 #define ZS_STR_OUT(V, TEXT) ((V)->str.len = SIZEOF((TEXT)) - 1, (V)->str.addr = (TEXT), zshow_output(output, &(V)->str))
@@ -56,10 +60,6 @@ static readonly char space_text[] = {' '};
 			zshow_param_index[(TEXT)].offset ].len, \
 			(V)->str.addr = dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
 			zshow_param_index[(TEXT)].offset ].name, zshow_output(output, &(V)->str), ZS_ONE_OUT((V), equal_text))
-
-GBLREF bool ctrlc_on;
-GBLREF io_log_name *io_root_log_name;
-GBLREF io_pair *io_std_device;
 
 void zshow_devices(zshow_out *output)
 {
@@ -125,7 +125,9 @@ void zshow_devices(zshow_out *output)
 						,"BOUND"
 						,"CREATED"
 					};
-	static readonly char morereadtime_text[] = "MOREREADTIME=";
+	static readonly	char morereadtime_text[] = "MOREREADTIME=";
+	struct XABPRO	*xabpro;
+	uic_struct	uic;
 
 	v.mvtype = MV_STR;
 	for (l = io_root_log_name;  l != 0;  l = l->next)
@@ -346,9 +348,6 @@ void zshow_devices(zshow_out *output)
 					if (f->fab$l_xab)
 					{
 /* smw need to handle other XABs and uic as octal */
-						struct XABPRO	*xabpro;
-						uic_struct uic;
-
 						ZS_PARM_EQU(&v, zshow_uic);
 						ZS_ONE_OUT(&v, quote_text);
 						xabpro = f->fab$l_xab;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,65 +40,59 @@
 #include "mupipbckup.h"
 #include "gtm_caseconv.h"
 
-GBLDEF mstr directory;
-GBLDEF bool is_directory;
+GBLDEF mstr		directory;
+GBLDEF boolean_t	is_directory;
 
-bool mubgetfil(backup_reg_list *list, char *name, unsigned short len)
+boolean_t mubgetfil(backup_reg_list *list, char *name, unsigned short len)
 {
+	char            tcp[5];
 	mstr 		*mubchkfs(), *temp, file;
 	uint4 		status;
-	char            tcp[5];
 
-        if (0 == len)
-                return FALSE;
-
-        if ('|' == *name)
-        {
-                len -= 1;
-                list->backup_to = backup_to_exec;
-                list->backup_file.len = len;
-                list->backup_file.addr = (char *)malloc(len + 1);
-                memcpy(list->backup_file.addr, name + 1, len);
-                return TRUE;
-        }
-
-        if (len > 5)
-        {
-                lower_to_upper(tcp, name, 5);
-                if (0 == memcmp(tcp, "TCP:/", 5))
-                {
-                        list->backup_to = backup_to_tcp;
-                        len -= 5;
-                        name += 5;
-                        while ('/' == *name)
-                        {
-                                len--;
-                                name++;
-                        }
-                        list->backup_file.len = len;
-                        list->backup_file.addr = (char *)malloc(len + 1);
-                        memcpy(list->backup_file.addr, name, len);
-                        *(list->backup_file.addr + len) = 0;
-                        return TRUE;
-                }
-        }
-
+	if (0 == len)
+		return FALSE;
+	if ('|' == *name)
+	{
+		len -= 1;
+		list->backup_to = backup_to_exec;
+		list->backup_file.len = len;
+		list->backup_file.addr = (char *)malloc(len + 1);
+		memcpy(list->backup_file.addr, name + 1, len);
+		return TRUE;
+	}
+	if (len > 5)
+	{
+		lower_to_upper(tcp, name, 5);
+		if (0 == memcmp(tcp, "TCP:/", 5))
+		{
+			list->backup_to = backup_to_tcp;
+			len -= 5;
+			name += 5;
+			while ('/' == *name)
+			{
+				len--;
+				name++;
+			}
+			list->backup_file.len = len;
+			list->backup_file.addr = (char *)malloc(len + 1);
+			memcpy(list->backup_file.addr, name, len);
+			*(list->backup_file.addr + len) = 0;
+			return TRUE;
+		}
+	}
 	file.addr = name;
 	file.len = len;
 	if (NULL == (temp = mubchkfs(&file))) /* mubchkfs is responsible for error message if NULL, and allocate space otherwise */
 		return FALSE;
-
 	if (']' == *(temp->addr + temp->len - 1))
 	{
 		is_directory = TRUE;
 		directory = *temp;
 		mubexpfilnam(list);
-	}
-	else
+	} else
 	{
 		is_directory = FALSE;
 		list->backup_file = *temp;
 	}
-
 	return TRUE;
 }

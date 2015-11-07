@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -52,7 +52,6 @@ if ( $?gtm_version_change == "1" ) then
 
 	setenv	gt_ar_archiver		"ar"		# name of archiver utility
 
-	setenv	gt_ar_gtmrpc_name	""		# set to "gtmrpc" to create libgtmrpc.a from libgtmrpc.list
 	setenv	gt_ar_option_create	"qlv"		# quick, use local directory for temp files, verbose
 	setenv	gt_ar_option_update	"rlv"		# replace, use local directory for temp files, verbose
 	setenv	gt_ar_option_delete	"dlv"		# delete, use local directory for temp files, verbose

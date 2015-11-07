@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,30 +22,23 @@ typedef EVP_CIPHER_CTX		crypt_key_t;
 typedef gcry_cipher_hd_t	crypt_key_t;
 #endif
 
-#define GC_ENCRYPT			1
-#define GC_DECRYPT			0
-#define GC_FAILURE			1
-#define GC_SUCCESS			0
-#define DOT_GTM_DBKEYS			".gtm_dbkeys"
 #define DOT_GNUPG			".gnupg"
 #define SYMMETRIC_KEY_MAX		32
+#define GTMCRYPT_IV_LEN			16
 
 #define GC_MIN_STATIC_BLOCK_SIZE	4096			/* Have a good size block, so that we dont keep reallocating */
 
 /* Some environment variables that encryption plugin cares about */
 #define GNUPGHOME			"GNUPGHOME"
-#define GTM_DBKEYS			"gtm_dbkeys"
 #define HOME				"HOME"
 
-/* Following makes sure that at no point we are in the encryption library without gtmcrypt_init getting called
- * prior to the current call
- */
+/* Following makes sure that at no point we are in the encryption library without a prior call to gtmcrypt_init. */
 #define GC_VERIFY_INITED													\
 {																\
 	if (!gtmcrypt_inited)													\
 	{															\
 		UPDATE_ERROR_STRING("Encryption library has not been initialized");						\
-		return GC_FAILURE;												\
+		return -1;												\
 	}															\
 }
 

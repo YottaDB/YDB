@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2013 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -161,9 +161,6 @@ lke lke
 lke_cmd lke
 geteuid geteuid
 gtm mumps
-gtm_svc gtm_svc
-gtm_dal_svc gtm_svc
-gtm_rpc_init gtm_svc
 gtmsecshr gtmsecshr
 gtmsecshr_wrapper gtmsecshr
 gtm_main mumps
@@ -491,11 +488,6 @@ if (! -z ${TMP_DIR}_src_files) then
 			set library=`grep " $file " ${TMP_DIR}_list | awk '{print $1}'`
 			if ("$library" == "") then
 				set library="libmumps.a"
-			else
-				set retain=`grep "^$file" $gtm_tools/retain_list.txt`
-				if ("$retain" != "") then
-					echo $objfile >> ${TMP_DIR}_lib_.libmumps.a
-				endif
 			endif
 			echo $objfile >> ${TMP_DIR}_lib_.$library
 		else
@@ -518,20 +510,12 @@ if (! -z ${TMP_DIR}_src_files) then
 
 	(ls -1 ${TMP_DIR}_lib_.* > ${TMP_DIR}_Lib_list) >& /dev/null
 
-	set retainlist = ""
 	foreach lib_ (`cat ${TMP_DIR}_Lib_list`)
 		set libext = $lib_:e
 		set library = $lib_:r
 		set library = $library:e
 		set library = $library.$libext
-		# Note down if any files in retain_list.txt are being compiled. If so we need to make sure we dont remove
-		# those .o files after including them in libgtmrpc.a as they also needed to be included in libmumps.a
-		if ("libgtmrpc.a" != $library) then
-			set dstlib = "$gtm_obj/$library"
-		else
-			set dstlib = "$gtm_exe/$library"
-			set retainlist = `cat $lib_ | egrep -f $gtm_tools/retain_list.txt`
-		endif
+		set dstlib = "$gtm_obj/$library"
 		# remove pre-existing object files from object library to ensure an older working version of the module does
 		# not get used in case the current version of the module did not compile and failed to produce an object file.
 		gt_ar $gt_ar_option_delete $dstlib `cat $lib_` >& /dev/null
@@ -543,11 +527,7 @@ if (! -z ${TMP_DIR}_src_files) then
 			if (0 != $status) @ runall_status = $status
 		endif
 		if (0 != $status) @ runall_status = $status
-		if (("" != "$retainlist") && ("libgtmrpc.a" == $library)) then
-			rm -f `cat $lib_ | egrep -v -f $gtm_tools/retain_list.txt`
-		else
-			rm -f `cat $lib_`
-		endif
+		cat $lib_ | xargs rm -f
 		echo ""
 	end
 	if (0 != $runall_status) then

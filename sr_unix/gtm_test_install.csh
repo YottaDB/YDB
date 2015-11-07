@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2011, 2013 Fidelity Information Services, Inc       #
+#	Copyright 2011, 2014 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -220,11 +220,17 @@ EOF
 	setenv gtmdir $save_gtm_dist/test_gtm_utf8
 	# make gtm set the utf locale
 	unsetenv LC_CTYPE
+	# unset gtm_icu_version to test gtmprofile.gtc setting it using icu-config
+	setenv save_icu $gtm_icu_version
+	unsetenv gtm_icu_version
+	# NOTE: this is not the alias gtm, but the script sr_unix/gtm.gtc
 	../gtm -r sim >& gtm.out
 
 	# get $ZCHSET
 	echo ""						>>&! $save_gtm_dist/gtm_test_install.out
 	grep ZCHSET gtm.out				>>&! $save_gtm_dist/gtm_test_install.out
+	# restore saved gtm_icu_version
+	setenv gtm_icu_version $save_icu
 	# test gtmsecshr with an alternate user
 	set XCMD='do ^GTMHELP("",$ztrnlnm("gtm_dist")_"/gtmhelp.gld")'
 	su - gtmtest -c "env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL gtm_chset=UTF-8 gtm_dist=$gtm_dist gtmroutines='$gtmroutines' $gtm_dist/mumps -run %XCMD '${XCMD:q}' < /dev/null" > gtmtest.out   #BYPASSOK line length

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -197,7 +197,10 @@ void op_svput(int varnum, mval *v)
 			{
 				ztrap_explicit_null = FALSE;
 				if (dollar_etrap.str.len > 0)
+				{
 					gtm_newintrinsic(&dollar_etrap);
+					NULLIFY_TRAP(dollar_etrap);
+				}
 			}
 			if (ztrap_form & ZTRAP_POP)
 				ztrap_save_ctxt();
@@ -289,10 +292,7 @@ void op_svput(int varnum, mval *v)
 				dollar_ztrap.mvtype = MV_STR;
 				dollar_ztrap.str = v->str;
 			} else if (dollar_ztrap.str.len > 0)
-			{	/* Ensure that $ETRAP and $ZTRAP are not both active at the same time */
-				assert(FALSE == ztrap_explicit_null);
-				gtm_newintrinsic(&dollar_ztrap);
-			}
+				NULLIFY_TRAP(dollar_ztrap)
 			ztrap_explicit_null = FALSE;
 			break;
 		case SV_ZERROR:

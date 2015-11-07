@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,9 @@ GBLDEF	int			repl_filter_bufsiz = 0;
 GBLDEF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
 GBLDEF	unsigned char		jnl_source_rectype, jnl_dest_maxrectype;
 GBLDEF	char			*ext_stop;
+#ifdef DEBUG
 GBLDEF	char			*jb_stop;
+#endif
 GBLDEF	seq_num			lastlog_seqno;
 GBLDEF	qw_num			trans_sent_cnt, last_log_tr_sent_cnt, trans_recvd_cnt, last_log_tr_recvd_cnt;
 GBLDEF	upd_helper_entry_ptr_t	helper_entry;

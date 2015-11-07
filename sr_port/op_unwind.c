@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,11 @@
 #include "parm_pool.h"
 #include "opcode.h"
 #include "glvn_pool.h"
+#include "gdsroot.h"
+#include "gdsblk.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "alias.h"
 #ifdef GTM_TRIGGER
 # include "gtm_trigger_trc.h"
 #endif
@@ -61,13 +66,13 @@ void op_unwind(void)
 	SETUP_THREADGBL_ACCESS;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	if (frame_pointer->type & SFT_COUNT)
-	{	/* If unwinding a counted frame, make sure we don't have an alias return argument in flight */
-		assert(NULL == alias_retarg);
-		alias_retarg = NULL;
+	{	/* If unwinding a counted frame, make sure we clean up any alias return argument in flight */
+		if (NULL != alias_retarg)
+			CLEAR_ALIAS_RETARG;
 	}
 	DBGEHND_ONLY(prevfp = frame_pointer);
 	if (tp_pointer && tp_pointer->fp <= frame_pointer)
-		rts_error(VARLSTCNT(1) ERR_TPQUIT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPQUIT);
 	/* Note that error_ret() should be invoked only after the rts_error() of TPQUIT.
 	 * This is so the TPQUIT error gets noted down in $ECODE (which will not happen if error_ret() is called before).
 	 */
@@ -103,7 +108,7 @@ void op_unwind(void)
 	mv_chain = mvc;
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	if (msp > stackbase)
-		rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
 #	ifdef GTM_TRIGGER
 	if (SFF_IMPLTSTART_CALLD & frame_pointer->type)
 		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SFF_IMPLTSTART_CALLD turned on\n",
@@ -118,9 +123,9 @@ void op_unwind(void)
 		zyerr_frame = NULL;	/* If we have unwound past zyerr_frame, clear it */
 	if (frame_pointer)
 	{
-		if ((frame_pointer < (stack_frame *)msp) || (frame_pointer > (stack_frame *)stackbase)
-		    || (frame_pointer < (stack_frame *)stacktop))
-			rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
+		if ((frame_pointer < (stack_frame *)msp)
+				|| (frame_pointer > (stack_frame *)stackbase) || (frame_pointer < (stack_frame *)stacktop))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
 		assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	}
 	/* We just unwound a frame. May have been either a zintrupt frame and/or may have unwound a NEW'd ZTRAP or even cleared

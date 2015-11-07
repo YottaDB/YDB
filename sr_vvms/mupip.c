@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,15 +40,13 @@
 #include "util.h"
 #include "mupip_exit.h"
 #include "lmdef.h"
-#include "getjobnum.h"
 #include "patcode.h"
 #include "generic_exit_handler.h"
 #include "ast_init.h"
-#include "get_page_size.h"
 #include "init_secshr_addrs.h"
 #include "mupip_getcmd.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 
 GBLREF desblk		exi_blk;
@@ -61,8 +59,6 @@ GBLREF spdesc		rts_stringpool, stringpool;
 error_def	(ERR_WILLEXPIRE);
 error_def	(LP_NOCNFDB);
 error_def	(LP_INVCSM);
-
-OS_PAGE_SIZE_DECLARE
 
 LITREF char		gtm_product[PROD];
 LITREF int4		gtm_product_len;
@@ -84,7 +80,7 @@ mupip()
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	gtm_imagetype_init(MUPIP_IMAGE);
+	common_startup_init(MUPIP_IMAGE);
 	gtm_env_init();	/* read in all environment variables */
 	licensed = TRUE;
 	TREF(transform) = TRUE;
@@ -92,8 +88,6 @@ mupip()
 	util_out_open(0);
 	SET_EXIT_HANDLER(exi_blk, generic_exit_handler, exi_condition);	/* Establish exit handler */
 	ESTABLISH(util_base_ch);
-	get_page_size();
-	getjobnum();
 	INVOKE_INIT_SECSHR_ADDRS;
 #	ifdef	NOLICENSE
 	status = SS$_NORMAL;

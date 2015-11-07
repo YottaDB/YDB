@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -136,6 +136,13 @@ static CLI_ENTRY mup_load_fmt_qual[] = {
 	{ 0 }
 };
 
+static CLI_ENTRY mup_load_onerror_qual[] = {
+	{ "INTERACTIVE", 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "PROCEED",	 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "STOP",	 0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ 0 }
+};
+
 static CLI_ENTRY mup_jnl_fences_qual[] = {
 	{ "ALWAYS",	0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	0 },
 	{ "NONE",	0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	0 },
@@ -228,8 +235,9 @@ static	CLI_ENTRY	mup_extend_qual[] = {
 };
 
 static	CLI_PARM	mup_extract_parm[] = {
-	{ "FILE", "Output File: ", PARM_REQ},
-	{ "", "",                  PARM_REQ}
+	{ "FILE",   "Output File: ", PARM_REQ},
+	{ "REGION", "Region(s): "  , PARM_REQ},
+	{ "", "",                    PARM_REQ}
 };
 
 static readonly CLI_PARM mup_extr_label_parm[] = {
@@ -241,6 +249,7 @@ static	CLI_ENTRY	mup_extract_qual[] = {
 	{ "FREEZE", mu_extract, 0, 0,                   0,                       0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ "LABEL",  mu_extract, 0, mup_extr_label_parm, 0,                       0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
 	{ "LOG",    mu_extract, 0, 0,                   0,                       0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
+	{ "REGION", mu_extract, 0, 0,                   0,                       0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_N_A, 0 },
 	{ "SELECT", mu_extract, 0, 0,                   0,                       0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 	{ "STDOUT", mu_extract, 0, 0,                   0,                       0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ "OCHSET", mu_extract, 0, 0,                   0,                       0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
@@ -392,13 +401,18 @@ static readonly CLI_PARM mup_load_fmt_parm[] = {
 	{ "FORMAT", "GO", PARM_REQ}
 };
 
+static readonly CLI_PARM mup_load_onerror_parm[] = {
+	{ "ONERROR", "PROCEED", PARM_REQ}
+};
+
 static	CLI_ENTRY	mup_load_qual[] = {
-	{ "BEGIN",         mupip_cvtgbl, 0, 0,                 0,                 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
-	{ "BLOCK_DENSITY", mupip_cvtgbl, 0, 0,                 0,                 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
-	{ "END",           mupip_cvtgbl, 0, 0,                 0,                 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
-	{ "FILL_FACTOR",   mupip_cvtgbl, 0, mup_load_ff_parm,  0,                 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
-	{ "FORMAT",        mupip_cvtgbl, 0, mup_load_fmt_parm, mup_load_fmt_qual, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
-	{ "STDIN",         mupip_cvtgbl, 0, 0,                 0,                 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+	{ "BEGIN",         mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
+	{ "BLOCK_DENSITY", mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
+	{ "END",           mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
+	{ "FILL_FACTOR",   mupip_cvtgbl, 0, mup_load_ff_parm,      0,                     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
+	{ "FORMAT",        mupip_cvtgbl, 0, mup_load_fmt_parm,     mup_load_fmt_qual,     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
+	{ "ONERROR",       mupip_cvtgbl, 0, mup_load_onerror_parm, mup_load_onerror_qual, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
+	{ "STDIN",         mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ 0 }
 };
 
@@ -437,6 +451,7 @@ static CLI_ENTRY mup_size_heuristic_qual[] = {
 	{ 0 }
 };
 static  CLI_ENTRY	mup_size_qual[] = {
+	{ "ADJACENCY",	0, 0, 0, 0,				0, 0, VAL_REQ,	1, NON_NEG, VAL_NUM, 0	},
 	{ "HEURISTIC",	0, 0, 0, mup_size_heuristic_qual,	0, 0, VAL_REQ,	1, NON_NEG, VAL_STR, 0	},
 	{ "REGION",	0, 0, 0, 0,				0, 0, VAL_REQ,	1, NON_NEG, VAL_STR, 0	},
 	{ "SELECT",	0, 0, 0, 0,				0, 0, VAL_REQ,	1, NON_NEG, VAL_STR, 0	},

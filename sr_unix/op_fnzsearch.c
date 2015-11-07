@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include "op_fnzsearch.h"
 
 GBLREF	symval		*curr_symval;
 GBLREF	boolean_t	gtm_utf8_mode;
@@ -44,11 +45,10 @@ GBLREF	spdesc		stringpool;
 
 LITREF mval	literal_null;
 
-STATICFNDCL		CONDITION_HANDLER(fnzsrch_ch);
-STATICFNDCL		CONDITION_HANDLER(dir_ch);
-STATICFNDCL int		pop_top(lv_val *src, mval *res);
-
-void		dir_srch(parse_blk *pfil);
+STATICFNDCL	CONDITION_HANDLER(fnzsrch_ch);
+STATICFNDCL	CONDITION_HANDLER(dir_ch);
+STATICFNDCL int	pop_top(lv_val *src, mval *res);
+STATICFNDCL void dir_srch(parse_blk *pfil);
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
@@ -57,8 +57,9 @@ error_def(ERR_GTMCHECK);
 error_def(ERR_INVSTRLEN);
 error_def(ERR_MEMORY);
 error_def(ERR_STACKOFLOW);
+error_def(ERR_ZSRCHSTRMCT);
 
-int op_fnzsearch(mval *file, mint indx, mval *ret)
+int op_fnzsearch(mval *file, mint indx, mint mfunc, mval *ret)
 {
 	struct stat	statbuf;
 	int		stat_res;
@@ -71,6 +72,8 @@ int op_fnzsearch(mval *file, mint indx, mval *ret)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (mfunc && ((MAX_STRM_CT < indx) || ( 0 > indx)))	/* Allow out-of-range stream if internal call */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSRCHSTRMCT);
 	ESTABLISH_RET(fnzsrch_ch, -1);
 	TREF(fnzsearch_nullsubs_sav) = TREF(lv_null_subs);
 	TREF(lv_null_subs) = LVNULLSUBS_OK;	/* $ZSearch processing depends on this */
@@ -162,7 +165,7 @@ int op_fnzsearch(mval *file, mint indx, mval *ret)
 	return pret.p.pint;
 }
 
-void dir_srch(parse_blk *pfil)
+STATICFNDEF void dir_srch(parse_blk *pfil)
 {
 	struct stat	statbuf;
 	int		stat_res;

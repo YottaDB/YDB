@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -199,6 +199,9 @@ enum cdb_sc	op_tcommit(void)
 	boolean_t		before_image_needed;
 	boolean_t		skip_invoke_restart;
 	uint4			update_trans;
+#	ifdef DEBUG
+	boolean_t		forw_recov_lgtrig_only;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -245,7 +248,21 @@ enum cdb_sc	op_tcommit(void)
 			}
 		)
 		save_cur_region = gv_cur_region;
-		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+#		ifdef DEBUG
+		if ((NULL != gv_currkey) && (0 != gv_currkey->base[0]) && ((NULL == gv_target) || !gv_target->gvname.var_name.len))
+		{	/* This is a case where forward recovery is playing a TLGTRIG/ULGTRIG only transaction,
+			 * no other global references. In that case, no gv_bind_name would have happened and so
+			 * gv_target could be NULL (because of a MUR_CHANGE_REG done at the start of this transaction)
+			 * or gv_target could be equal to csa->dir_tree (done in mur_forward). Assert accordingly.
+			 */
+			assert(jgbl.forw_phase_recovery);
+			forw_recov_lgtrig_only = TRUE;
+		} else
+		{
+			DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+			forw_recov_lgtrig_only = FALSE;
+		}
+#		endif
 		if (NULL != first_sgm_info)	/* if (database work in the transaction) */
 		{
 			for (temp_si = si = first_sgm_info; (cdb_sc_normal == status) && (NULL != si); si = si->next_sgm_info)
@@ -268,6 +285,20 @@ enum cdb_sc	op_tcommit(void)
 				assert(!is_mm || (0 == si->cr_array_size && NULL == si->cr_array));
 				/* whenever si->first_cw_set is non-NULL, ensure that si->update_trans is non-zero */
 				assert((NULL == si->first_cw_set) || si->update_trans);
+				/* If LGTRIG only TP transaction by forward recovery, assert no db blocks */
+#				ifdef DEBUG
+				if (forw_recov_lgtrig_only)
+				{
+					jnl_format_buffer       *jfb;
+
+					assert(NULL == si->first_cw_set);
+					if (JNL_ENABLED(csa))
+					{
+						for (jfb = si->jnl_head; (NULL != jfb); jfb = jfb->next)
+							GTMTRIG_ONLY(assert(JNL_LGTRIG == jfb->ja.operation));
+					}
+				}
+#				endif
 				/* Whenever si->first_cw_set is NULL, ensure that si->update_trans is FALSE
 				 * except (1) when there are duplicate sets in which case also ensure that if the database
 				 * is journaled, at least one journal record is being written or
@@ -493,7 +524,10 @@ enum cdb_sc	op_tcommit(void)
 		tp_clean_up(FALSE);	/* Not the rollback type of cleanup */
 		gv_cur_region = save_cur_region;
 		TP_CHANGE_REG(gv_cur_region);
-		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+#		ifdef DEBUG
+		if (!forw_recov_lgtrig_only)
+			DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+#		endif
 		/* Cancel or clear any pending TP timeout only if real commit (i.e. outermost commit) */
 		(*tp_timeout_clear_ptr)();
 	} else		/* an intermediate commit */

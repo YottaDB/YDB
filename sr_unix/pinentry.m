@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2010, 2013 Fidelity Information Services, Inc	;
+;	Copyright 2010, 2014 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -13,18 +13,19 @@ pinentry	; Substitute pinentry that returns an unobfuscated password
 		; if $gtm_passwd is defined in the environment.  If the command
 		; received is not GETPIN, this runs /usr/bin/pinentry
 		;
-	Set $ETrap="Write $ZStatus,!,$Stack($Stack,""MCODE""),! Halt"
-	Set obfpwd=$ZTRNLNM("gtm_passwd"),obfpwdlen=$Length(obfpwd)
-	Write "OK Your orders please",!
-	Set done=0
-	For  Quit:done  Read in Quit:'$Length(in)  Do
-	. If "GETPIN"=$Translate($Piece(in," ",1),"abcdefghijklmnopqrstuvwxyz","ABCDEFGHIJKLMNOPQRSTUVWXYZ") Do
-	. . Set obfpwds=""
-	. . For i=1:2:$Length(obfpwd) Do
-	. . . Set msb=$Find("0123456789ABCDEF",$Extract(obfpwd,i))-2
-	. . . Set lsb=$Find("0123456789ABCDEF",$Extract(obfpwd,i+1))-2
-	. . . Set obfpwds=obfpwds_$ZCHar(16*msb+lsb)
-	. . Write:'$&gpgagent.unmaskpwd(obfpwds,.clrpwds) "D ",clrpwds,!
-	. . Set done=1
-	. Write "OK",!
-	Quit
+	set $etrap="write $zstatus,!,$stack($stack,""MCODE""),! halt"
+	set obfpwd=$ztrnlnm("gtm_passwd"),obfpwdlen=$length(obfpwd)
+	set obfpwd=$zconvert(obfpwd,"U")
+	write "OK Your orders please",!
+	set done=0
+	for  quit:done  read in quit:'$length(in)  do
+	. if "GETPIN"=$zconvert($piece(in," ",1),"U") do
+	. . set obfpwds=""
+	. . for i=1:2:$length(obfpwd) do
+	. . . set msb=$find("0123456789ABCDEF",$extract(obfpwd,i))-2
+	. . . set lsb=$find("0123456789ABCDEF",$extract(obfpwd,i+1))-2
+	. . . set obfpwds=obfpwds_$zchar(16*msb+lsb)
+	. . write:'$&gpgagent.unmaskpwd(obfpwds,.clrpwds) "D ",clrpwds,!
+	. . set done=1
+	. write "OK",!
+	quit

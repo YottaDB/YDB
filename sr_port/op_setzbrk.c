@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 		zr_init(&zbrk_recs, INIT_NUM_ZBREAKS);
 	}
 	if (CANCEL_ALL == cnt)
-		zr_remove(NULL, NOBREAKMSG);
+		zr_remove_zbrks(NULL, NOBREAKMSG);
 	else
 	{
 		GTMTRIG_ONLY(IS_TRIGGER_RTN(&rtn->str, is_trigger));
@@ -145,7 +145,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			if (NULL == (z_ptr = zr_find(&zbrk_recs, addr)))
 			{
 #				ifdef USHBIN_SUPPORTED
-				if (NULL != routine->shlib_handle && NULL == routine->shared_ptext_adr)
+				if ((NULL != routine->shared_ptext_adr) && (routine->shared_ptext_adr == routine->ptext_adr))
 				{	/* setting a breakpoint in a shared routine, need to make a private copy */
 					addr_off = (unsigned char *)addr - routine->ptext_adr;
 					if (SS_NORMAL == (status = cre_private_code_copy(routine)))

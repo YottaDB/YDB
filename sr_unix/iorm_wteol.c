@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,24 +26,30 @@
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #endif
+#include "gtmcrypt.h"
 
 #ifdef UNICODE_SUPPORTED
 LITREF	mstr		chset_names[];
 GBLREF	UConverter	*chset_desc[];
 #endif
-error_def(ERR_NOTTOEOFONPUT);
+
+error_def(ERR_CRYPTBADWRTPOS);
 error_def(ERR_DEVICEREADONLY);
+error_def(ERR_NOTTOEOFONPUT);
+error_def(ERR_SYSCALL);
 
 void iorm_wteol(int4 x,io_desc *iod)
 {
 	int		i, fixed_pad, fixed_pad_bytes, bytes_per_char, avail_bytes, pad_size, res_size;
 	int		status, outbytes;
-	char		*outstr, temppad, temppadarray[2];
+	char		*outstr, temppad, temppadarray[2], *out_ptr;
 	d_rm_struct	*rm_ptr;
 	unsigned int	*dollarx_ptr;
 	unsigned int	*dollary_ptr;
+	struct stat	statbuf;
+	int		fstat_res, save_errno;
 
-#ifdef __MVS__
+#	ifdef __MVS__
 	/* on zos if it is a fifo device then point to the pair.out for $X and $Y */
 	if (((d_rm_struct *)iod->dev_sp)->fifo)
 	{
@@ -52,34 +58,67 @@ void iorm_wteol(int4 x,io_desc *iod)
 		rm_ptr = (d_rm_struct *) (iod->pair.out)->dev_sp;
 		iod = iod->pair.out;
 	} else
-#endif
+#	endif
 	{
 		dollarx_ptr = &(iod->dollar.x);
 		dollary_ptr = &(iod->dollar.y);
 		rm_ptr = (d_rm_struct *)iod->dev_sp;
 	}
-	if (rm_ptr->noread)
+	if (rm_ptr->read_only)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEREADONLY);
-	if (!iod->dollar.zeof && !rm_ptr->fifo && !rm_ptr->pipe)
+	if ((!rm_ptr->fifo) && (!rm_ptr->pipe) && rm_ptr->output_encrypted)
 	{
-		iod->dollar.za = 9;
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTTOEOFONPUT);
+		if (!iod->dollar.zeof)
+		{
+	 		iod->dollar.za = 9;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTTOEOFONPUT);
+		} else
+		{	/* If there have not been any writes, and input encryption attributes are different from those for output,
+			 * and the file is not empty, disallow the write.
+			 */
+			if ((!rm_ptr->write_occurred)
+			    && ((!rm_ptr->input_encrypted)
+				|| (rm_ptr->input_iv.len != rm_ptr->output_iv.len)
+				|| memcmp(rm_ptr->input_iv.addr, rm_ptr->output_iv.addr, rm_ptr->input_iv.len)
+				|| (((rm_ptr->input_key.len != rm_ptr->output_key.len)
+				    || memcmp(rm_ptr->input_key.addr, rm_ptr->output_key.addr, rm_ptr->input_key.len))
+					&& (!GTMCRYPT_SAME_KEY(rm_ptr->input_cipher_handle, rm_ptr->output_cipher_handle)))))
+			{
+				FSTAT_FILE(rm_ptr->fildes, &statbuf, fstat_res);
+				if (-1 == fstat_res)
+				{
+					save_errno = errno;
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
+						CALLFROM, save_errno);
+				}
+				if (0 != statbuf.st_size)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTBADWRTPOS);
+			}
+		}
 	}
 	rm_ptr->lastop = RM_WRITE;
-#ifdef __MVS__
+#	ifdef __MVS__
 	if (CHSET_BINARY != iod->process_chset)
 	{
-#endif
-	for (i = 0; i < x ; i++)
+#	endif
+	for (i = 0; i < x; i++)
 	{
-#ifdef UNICODE_SUPPORTED
+#		ifdef UNICODE_SUPPORTED
 		if (IS_UTF_CHSET(iod->ochset))
 		{
 			if (!rm_ptr->done_1st_write)
 			{
 				if (CHSET_UTF16 == iod->ochset)
 				{	/* write BE BOM this is in raw bytes */
-					DOWRITERL(rm_ptr->fildes, UTF16BE_BOM, UTF16BE_BOM_LEN, res_size);
+					out_ptr = UTF16BE_BOM;
+					if (rm_ptr->output_encrypted)
+					{
+						REALLOC_CRYPTBUF_IF_NEEDED(UTF16BE_BOM_LEN);
+						WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, out_ptr, UTF16BE_BOM_LEN,
+							pvt_crypt_buf.addr);
+						out_ptr = pvt_crypt_buf.addr;
+					}
+					DOWRITERL(rm_ptr->fildes, out_ptr, UTF16BE_BOM_LEN, res_size);
 					if (-1 == res_size)
 					{
 						int real_errno = errno;
@@ -87,6 +126,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 						iod->dollar.za = 9;
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
 					}
+					rm_ptr->write_occurred = TRUE;
 					iod->ochset = CHSET_UTF16BE;
 					get_chset_desc(&chset_names[iod->ochset]);
 				}
@@ -127,29 +167,45 @@ void iorm_wteol(int4 x,io_desc *iod)
 					}
 					for ( ; rm_ptr->out_bytes < rm_ptr->recordsize; rm_ptr->out_bytes += bytes_per_char)
 					{
-						DOWRITERC(rm_ptr->fildes, temppadarray, bytes_per_char, status);
+						out_ptr = temppadarray;
+						if (rm_ptr->output_encrypted)
+						{
+							REALLOC_CRYPTBUF_IF_NEEDED(bytes_per_char);
+							WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, out_ptr, bytes_per_char,
+								pvt_crypt_buf.addr);
+							out_ptr = pvt_crypt_buf.addr;
+						}
+						DOWRITERC(rm_ptr->fildes, out_ptr, bytes_per_char, status);
 						if (0 != status)
 						{
 							DOLLAR_DEVICE_WRITE(iod, status);
 							iod->dollar.za = 9;
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 						}
+						rm_ptr->write_occurred = TRUE;
 					}
 					assert(rm_ptr->out_bytes == rm_ptr->recordsize);
 				}
 			} else
 			{
-				iorm_write_utf_ascii(iod, RMEOL,STRLEN(RMEOL));
+				iorm_write_utf_ascii(iod, RMEOL, STRLEN(RMEOL));
 			}
 			rm_ptr->out_bytes = 0;
 		} else
-#endif
+#		endif
 		if (rm_ptr->fixed)
 		{
 			for (fixed_pad = iod->width - *dollarx_ptr; fixed_pad > 0; fixed_pad -= res_size)
 			{
 				pad_size = (fixed_pad > TAB_BUF_SZ) ? TAB_BUF_SZ : fixed_pad;
-				DOWRITERL(rm_ptr->fildes, RM_SPACES_BLOCK, pad_size, res_size);
+				out_ptr = (char *)(RM_SPACES_BLOCK);
+				if (rm_ptr->output_encrypted)
+				{
+					REALLOC_CRYPTBUF_IF_NEEDED(pad_size);
+					WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, out_ptr, pad_size, pvt_crypt_buf.addr);
+					out_ptr = pvt_crypt_buf.addr;
+				}
+				DOWRITERL(rm_ptr->fildes, out_ptr, pad_size, res_size);
 				if (-1 == res_size)
 				{
 					int real_errno = errno;
@@ -157,24 +213,33 @@ void iorm_wteol(int4 x,io_desc *iod)
 					iod->dollar.za = 9;
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
 				}
+				rm_ptr->write_occurred = TRUE;
 				assert(res_size == pad_size);
 			}
 		} else
 		{
-			DOWRITERC(rm_ptr->fildes, RMEOL, STRLEN(RMEOL), status);
+			out_ptr = RMEOL;
+			if (rm_ptr->output_encrypted)
+			{
+				REALLOC_CRYPTBUF_IF_NEEDED(RMEOL_LEN);
+				WRITE_ENCRYPTED_DATA(rm_ptr, iod->trans_name, out_ptr, RMEOL_LEN, pvt_crypt_buf.addr);
+				out_ptr = pvt_crypt_buf.addr;
+			}
+			DOWRITERC(rm_ptr->fildes, out_ptr, RMEOL_LEN, status);
 			if (0 != status)
 			{
 				DOLLAR_DEVICE_WRITE(iod, status);
 				iod->dollar.za = 9;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			}
+			rm_ptr->write_occurred = TRUE;
 		}
 		*dollarx_ptr = 0;
 	}
-#ifdef __MVS__
+#	ifdef __MVS__
 	} else
 		*dollarx_ptr = 0;	/* just reset $X for BINARY */
-#endif
+#	endif
 	iod->dollar.za = 0;
 	*dollary_ptr += x;
 	if (iod->length)

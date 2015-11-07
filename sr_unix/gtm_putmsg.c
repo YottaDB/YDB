@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ void gtm_putmsg(int argcnt, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = (ANTICIPATORY_FREEZE_AVAILABLE && jnlpool.jnlpool_ctl) ? REG2CSA(gv_cur_region) : NULL;
+	csa = CUSTOM_ERRORS_LOADED ? REG2CSA(gv_cur_region) : NULL;
 	VAR_START(var, argcnt);
 	gtm_putmsg_list(csa, argcnt, var);
 	va_end(var);
@@ -63,7 +63,7 @@ void gtm_putmsg_noflush(int argcnt, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = (ANTICIPATORY_FREEZE_AVAILABLE && jnlpool.jnlpool_ctl) ? REG2CSA(gv_cur_region) : NULL;
+	csa = CUSTOM_ERRORS_LOADED ? REG2CSA(gv_cur_region) : NULL;
 	VAR_START(var, argcnt);
 	gtm_putmsg_list(csa, argcnt, var);
 	va_end(var);

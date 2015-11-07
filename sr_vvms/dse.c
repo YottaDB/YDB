@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,17 +46,15 @@
 #include "desblk.h"		/* for desblk structure */
 #include "util.h"
 #include "dse.h"
-#include "getjobnum.h"
 #include "patcode.h"
 #include "generic_exit_handler.h"
 #include "dfntmpmbx.h"
 #include "ladef.h"
 #include "ast_init.h"
-#include "get_page_size.h"
 #include "init_secshr_addrs.h"
 #include "dse_exit.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 
 GBLDEF block_id		patch_curr_blk;
@@ -77,8 +75,6 @@ GBLREF spdesc		rts_stringpool, stringpool;
 GBLREF boolean_t        	write_after_image;
 
 error_def(ERR_CTRLC);
-
-OS_PAGE_SIZE_DECLARE
 
 extern int		DSE_CMD();
 extern int		CLI$DCL_PARSE();
@@ -101,7 +97,7 @@ void dse(void)
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	gtm_imagetype_init(DSE_IMAGE);
+	common_startup_init(DSE_IMAGE);
 	gtm_env_init();	/* read in all environment variables */
 	TREF(transform) = TRUE;
 	TREF(no_spangbls) = TRUE;	/* dse operates on a per-region basis irrespective of global mapping in gld */
@@ -111,8 +107,6 @@ void dse(void)
 	status =lp_id(&lkid);
 	if (SS$_NORMAL != status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-	get_page_size();
-	getjobnum();
 	INVOKE_INIT_SECSHR_ADDRS;
 	dfntmpmbx(lnm$group.len, lnm$group.addr);
 	ast_init();

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,8 +15,10 @@
 #include "gtm_unistd.h"
 
 #include "io.h"
+#include "gtm_limits.h"
 #include "iormdef.h"
 #include "gtmio.h"
+#include "gtmcrypt.h"
 
 GBLREF	io_log_name	*io_root_log_name;
 
@@ -43,6 +45,10 @@ void remove_rms (io_desc *ciod)
 		CLOSEFILE_RESET(rm_ptr->read_fildes, rc);	/* resets "rm_ptr->read_fildes" to FD_INVALID */
 	if (rm_ptr && (rm_ptr->read_filstr != NULL))
 		FCLOSE(rm_ptr->read_filstr, fclose_res);
+	if (rm_ptr && rm_ptr->input_encrypted && (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->input_cipher_handle))
+		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->input_cipher_handle);
+	if (rm_ptr && rm_ptr->output_encrypted && (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->output_cipher_handle))
+		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->output_cipher_handle);
 	if (ciod->newly_created && rm_ptr && !rm_ptr->pipe)
 	{
 		UNLINK(ciod->trans_name->dollar_io);

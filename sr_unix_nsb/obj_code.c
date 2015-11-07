@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +48,7 @@ GBLREF spdesc			stringpool;
 GBLREF char			cg_phase;	/* code generation phase */
 GBLREF char			cg_phase_last;	/* previous code generation phase */
 GBLREF int4			curr_addr, code_size;
+GBLREF char			object_file_name[];
 
 error_def(ERR_TEXT);
 
@@ -88,7 +89,9 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 	mline		*mlx, *mly;
 	var_tabent	*vptr;
 	int4		lnr_pad_len;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(!run_time);
 	obj_init();
 	/* Define the routine name global symbol. */
@@ -122,6 +125,11 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 	rhead.lnrtab_ptr = code_size;
 	rhead.lnrtab_len = src_lines;
 	rhead.compiler_qlf = cmd_qlf.qlf;
+	if (cmd_qlf.qlf & CQ_EMBED_SOURCE)
+	{
+                rhead.routine_source_offset = TREF(routine_source_offset);
+                rhead.routine_source_length = (uint4)(stringpool.free - stringpool.base) - TREF(routine_source_offset);
+	}
 	rhead.temp_mvals = sa_temps[TVAL_REF];
 	rhead.temp_size = sa_temps_offset[TCAD_REF];
 	code_size += src_lines * SIZEOF(int4);
@@ -168,6 +176,8 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 #endif
 	emit_literals();
 	close_object_file();
+	/* Ready to make object visible. Rename from tmp name to real routine name */
+	rename_tmp_object_file(object_file_name);
 }
 
 void	cg_lab (mlabel *l, int4 base)

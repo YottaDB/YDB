@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -183,7 +183,7 @@ int gtmsource()
 	/* Set "child_server_running" to FALSE before forking off child. Wait for it to be set to TRUE by the child. */
 	gtmsource_local = jnlpool.gtmsource_local;
 	gtmsource_local->child_server_running = FALSE;
-	FORK_CLEAN(pid);
+	FORK(pid);
 	if (0 > pid)
 	{
 		save_errno = errno;
@@ -439,10 +439,7 @@ int gtmsource()
 			if (SS_NORMAL == (status = repl_filter_init(gtmsource_local->filter_cmd)))
 				gtmsource_filter |= EXTERNAL_FILTER;
 			else
-			{
-				if (EREPL_FILTERSTART_EXEC == repl_errno)
-					gtmsource_exit(ABNORMAL_SHUTDOWN);
-			}
+				gtmsource_exit(ABNORMAL_SHUTDOWN);
 		}
 		gtmsource_process();
 		/* gtmsource_process returns only when mode needs to be changed to PASSIVE */

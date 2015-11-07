@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,6 @@
 #include "gtmsource.h"
 #include "gtmimagename.h"
 #include "trans_log_name.h"
-#include "get_page_size.h"
 #include "filestruct.h"
 #include "jnl.h"
 #include "gdskill.h"
@@ -76,9 +75,9 @@
 #include "gtcm_gnp_pktdmp.h"
 #include "util.h"
 #include "getzdir.h"
-#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "suspsigs_handler.h"
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
+#include "gtm_startup_chk.h"
 #include "gtm_threadgbl_init.h"
 #include "fork_init.h"
 #include "gt_timers_add_safe_hndlrs.h"
@@ -131,8 +130,6 @@ GBLDEF gd_region		*action_que_dummy_reg;
 GBLDEF char			gtcm_gnp_server_log[MAX_FN_LEN + 1];
 /* the length is the orignal length */
 GBLDEF int			gtcm_gnp_log_path_len;
-
-OS_PAGE_SIZE_DECLARE
 
 static uint4			closewait;
 
@@ -189,7 +186,7 @@ static void gtcm_gnp_server_actions(void)
 		gtcm_remove_from_action_queue();
 		CMI_MUTEX_RESTORE;
 		if ((connection_struct *)INTERLOCK_FAIL == curr_entry)
-			rts_error(VARLSTCNT(1) CMERR_CMINTQUE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) CMERR_CMINTQUE);
 		if ((connection_struct *)EMPTY_QUEUE != curr_entry)
 		{
 			if (1 == (curr_entry->int_cancel.laflag & 1))
@@ -294,7 +291,7 @@ static void gtcm_gnp_server_actions(void)
 					if (SS_NORMAL == status)
 					{
 						GET_LONG(status, curr_entry->clb_ptr->mbf);
-                                                rts_error(VARLSTCNT(3) ERR_BADGTMNETMSG, 1, status);
+                                                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_BADGTMNETMSG, 1, status);
 					}
 					break;
 			}
@@ -378,17 +375,14 @@ int main(int argc, char **argv, char **envp)
         static boolean_t no_fork = FALSE;
 
 	GTM_THREADGBL_INIT;
-	set_blocksig();
-	gtm_imagetype_init(GTCM_GNP_SERVER_IMAGE);
-	gtm_wcswidth_fnptr = gtm_wcswidth;
-	gtm_env_init();	/* read in all environment variables */
+	common_startup_init(GTCM_GNP_SERVER_IMAGE);
 	gtmenvp = envp;
-	getjobnum();
 	err_init(stop_image_conditional_core);
 	assert(0 == offsetof(gv_key, top)); /* for integrity of CM_GET_GVCURRKEY */
 	assert(2 == offsetof(gv_key, end)); /* for integrity of CM_GET_GVCURRKEY */
 	assert(4 == offsetof(gv_key, prev)); /* for integrity of CM_GET_GVCURRKEY */
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
+	gtm_chk_dist(argv[0]);
 	/* read comments in gtm.c for cli magic below */
 	cli_lex_setup(argc, argv);
 	if (1 < argc)
@@ -400,7 +394,7 @@ int main(int argc, char **argv, char **envp)
 	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
 	parse_ret = parse_cmd();
 	if (parse_ret && (EOF != parse_ret))
-		rts_error(VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
 	service_len = (unsigned short)SIZEOF(service);
 	CMI_DESC_SET_POINTER(&service_descr, service);
 	service[0] = '\0';
@@ -424,7 +418,6 @@ int main(int argc, char **argv, char **envp)
 	gtcm_gnp_server_log[log_path_len] = '\0';
 	gtcm_open_cmerrlog();
         assert(0 == EMPTY_QUEUE);
-	get_page_size();
 	licensed = TRUE;
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
@@ -447,10 +440,11 @@ int main(int argc, char **argv, char **envp)
 	gtcm_connection = FALSE;
         if (!no_fork)
         {
-		FORK_CLEAN(pid);
+		FORK(pid);
                 if (0 > pid)
                 {
-			rts_error(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Error forking gnp server into the background"), errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
+					LEN_AND_LIT("Error forking gnp server into the background"), errno);
                         exit(-1);
                 }
                 else if (0 < pid)
@@ -472,8 +466,8 @@ int main(int argc, char **argv, char **envp)
 			  SIZEOF(connection_struct), CM_MSG_BUF_SIZE + CM_BUFFER_OVERHEAD);
 	if (CMI_ERROR(status))
 	{
-		gtm_putmsg(VARLSTCNT(7) ERR_NETFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Network interface initialization failed"),
-				status);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_NETFAIL, 0,
+				ERR_TEXT, 2, LEN_AND_LIT("Network interface initialization failed"), status);
 		exit(status);
 	}
 	atexit(gtcm_exi_handler);

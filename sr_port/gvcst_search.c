@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,6 +78,9 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	sm_uc_ptr_t		buffaddr;
 	trans_num		blkhdrtn, oldest_hist_tn;
 	int			hist_size;
+#	ifdef DEBUG
+	boolean_t		save_donot_commit;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -116,6 +119,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 		assert(!mu_reorg_process UNIX_ONLY(|| (pTarg->gd_csa->dir_tree == pTarg)));
 		INCR_DB_CSH_COUNTER(cs_addrs, n_gvcst_srch_clues, 1);
 		status = cdb_sc_normal;	/* clue is usable unless proved otherwise */
+		DEBUG_ONLY(save_donot_commit = TREF(donot_commit);)
 		if (NULL != pHist)
 		{	/* Copy the full srch_hist and set loop terminator flag in unused srch_blk_status entry.
 			 * If in TP and if leaf block in history has cse, we are guaranteed that it is built by the
@@ -238,17 +242,19 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 						leaf_blk_hist->cycle = CYCLE_PVT_COPY;
 						leaf_blk_hist->buffaddr = cse->new_buff;
 					} else
-					{	/* Keep leaf_blk_hist->buffaddr and cse->new_buff in sync. If a TP transaction
-						 * updates two different globals and the second update invoked t_qread for a leaf
-						 * block corresponding to the first global and ended up constructing a private block
-						 * then leaf_blk_hist->buffaddr of the first global will be out-of-sync with the
-						 * cse->new_buff. However, the transaction validation done in tp_hist/tp_tend
-						 * should detect this and restart. Set donot_commit to verify that a restart happens
+					{	/* Keep leaf_blk_hist->buffaddr and cse->new_buff in sync if they are not already.
+						 * They will be mostly in sync except for two cases.
+						 * a) If a TP transaction updates two different globals and the second update
+						 *	invoked t_qread (invoked from outside gvcst_search) for a leaf block
+						 *	corresponding to the first global and ended up constructing a private
+						 *	block. However, the transaction validation done in tp_hist/tp_tend
+						 *	should detect this and restart.
+						 * b) If a gvcst_kill happens in a TP transaction and it does a gvcst_search
+						 *	call without going through tp_hist (GTM-8120). In this case there is no
+						 *	restartable situation.
+						 * Since it is hard to distinguish (a) from (b), we do not set the donot_commit
+						 * variable to indicate this is a restartable situation in case of just (a).
 						 */
-#						ifdef DEBUG
-						if (leaf_blk_hist->buffaddr != cse->new_buff)
-							TREF(donot_commit) |= DONOTCOMMIT_GVCST_SEARCH_LEAF_BUFFADR_NOTSYNC;
-#						endif
 						leaf_blk_hist->buffaddr = cse->new_buff; /* sync the buffers in pro, just in case */
 					}
 				}
@@ -360,6 +366,13 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				return cdb_sc_normal;
 			}
 		}
+#		ifdef DEBUG
+		/* If we are not going to use this clue (i.e. going to read the entire GVT afresh),
+		 * restore global variable donot_commit in case it got set to a non-zero value above.
+		 * This is needed because we are no longer relying on the out-of-date (and restart causing) clue.
+		 */
+		TREF(donot_commit) = save_donot_commit;
+#		endif
 	}
 	nBlkId = pTarg->root;
 	tn = cs_addrs->ti->curr_tn;

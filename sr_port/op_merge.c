@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,9 @@
  */
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+
+#include "gtmio.h"
 #include "min_max.h"
 #include "lv_val.h"
 #include <rtnhdr.h>
@@ -66,16 +69,6 @@
 #include "alias.h"
 #include "gtmimagename.h"
 
-#define UNDO_ACTIVE_LV								\
-{										\
-	if (NULL != active_lv)							\
-	{									\
-		if (!LV_IS_VAL_DEFINED(active_lv) && !LV_HAS_CHILD(active_lv))	\
-			op_kill(active_lv);					\
-		active_lv = (lv_val *)NULL;					\
-	}									\
-}
-
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
@@ -88,7 +81,9 @@ GBLREF int              merge_args;
 GBLREF merge_glvn_ptr	mglvnp;
 GBLREF gv_namehead      *gv_target;
 GBLREF lvzwrite_datablk *lvzwrite_block;
+#ifdef DEBUG
 GBLREF lv_val		*active_lv;
+#endif
 
 error_def(ERR_MAXNRSUBSCRIPTS);
 error_def(ERR_MERGEINCOMPL);
@@ -114,6 +109,10 @@ void op_merge(void)
 	gv_namehead		*gvt1, *gvt2;
 	gvnh_reg_t		*gvnh_reg1, *gvnh_reg2;
 	gvname_info		*gblp1, *gblp2;
+	mstr			opstr;
+#	ifdef DEBUG
+	lv_val			*orig_active_lv;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -129,6 +128,7 @@ void op_merge(void)
 	value->mvtype = 0; /* initialize mval in the M-stack in case stp_gcol gets called before value gets initialized below */
 	gblp1 = mglvnp->gblp[IND1];
 	gblp2 = mglvnp->gblp[IND2];
+	DEBUG_ONLY(orig_active_lv = active_lv;)
 	if (MARG2_IS_GBL(merge_args))
 	{	/* Need to protect mkey returned from gvcst_queryget from stpgcol */
 		PUSH_MV_STENT(MVST_MVAL);
@@ -138,10 +138,11 @@ void op_merge(void)
 		gbl2_gd_addr = TREF(gd_targ_addr);
 		/* now $DATA will be done for gvn2. op_gvdata input parameters are set in the form of some GBLREF */
 		op_gvdata(value);
-		dollardata_src = MV_FORCE_INT(value);
+		dollardata_src = MV_FORCE_INTD(value);
 		if (0 == dollardata_src)
 		{	/* nothing in source global */
-			UNDO_ACTIVE_LV;
+			assert(orig_active_lv == active_lv);
+			UNDO_ACTIVE_LV(actlv_op_merge1); /* kill "dst" and parents as applicable if $data(dst)=0 */
 			POP_MV_STENT();	/* value */
 			POP_MV_STENT(); /* mkey */
 			if (MARG1_IS_GBL(merge_args))
@@ -284,7 +285,9 @@ void op_merge(void)
 					{
 						assert(gv_target == gvt1);
 						gv_target = gvt2;	/* switch gv_target for "mval2subsc" */
-						ptr2 = gvsub2str(ptr, buff, FALSE);
+						opstr.addr = (char *)buff;
+						opstr.len = MAX_ZWR_KEY_SZ;
+						ptr2 = gvsub2str(ptr, &opstr, FALSE);
 						gv_target = gvt1;	/* restore "gv_target" */
 						tmp_mval.mvtype = MV_STR;
 						tmp_mval.str.addr = (char *)buff;
@@ -420,7 +423,9 @@ void op_merge(void)
 					LV_SBS_DEPTH(dst_lv, is_base_var, sbs_depth);
 					if (MAX_LVSUBSCRIPTS <= sbs_depth)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
-					ptr2 = gvsub2str(ptr, buff, FALSE);
+					opstr.addr = (char *)buff;
+					opstr.len = MAX_ZWR_KEY_SZ;
+					ptr2 = gvsub2str(ptr, &opstr, FALSE);
 					subsc->mvtype = MV_STR;
 					subsc->str.addr = (char *)buff;
 					subsc->str.len = INTCAST(ptr2 - buff);
@@ -438,22 +443,15 @@ void op_merge(void)
 				dst_lv->v = *value;
 			}
 			gvname_env_restore(gblp2);	 /* naked indicator is restored into gv_currkey */
+			/* If it so happens $data(^gvn2) was non-zero at start of op_merge but after the check it became zero,
+			 * $data(dst_lv) will be 0 so needs active_lv clearing.
+			 */
+			UNDO_ACTIVE_LV(actlv_op_merge2); /* kill "dst" and parents as applicable if $data(dst)=0 */
 			POP_MV_STENT();     /* subsc */
 		}
 		POP_MV_STENT();     /* mkey */
 	} else
 	{	/* source is local */
-		op_fndata(mglvnp->lclp[IND2], value);
-		dollardata_src = MV_FORCE_INT(value);
-		if (0 == dollardata_src)
-		{
-			UNDO_ACTIVE_LV;
-			POP_MV_STENT();	/* value */
-			if (MARG1_IS_GBL(merge_args))
-				gvname_env_restore(gblp1);	 /* store destination as naked indicator in gv_currkey */
-			merge_args = 0;	/* Must reset to zero to reuse the Global */
-			return;
-		}
 		/* not memsetting output to 0 here can cause garbage value of output.out_var.lv.child which in turn can
 		 * cause a premature return from lvzwr_var resulting in op_merge() returning without having done the merge.
 		 */
@@ -462,39 +460,43 @@ void op_merge(void)
 		{	/*==================== MERGE lvn1=lvn2 =====================*/
 			assert(mglvnp->lclp[IND1]);
 			/* if self merge then NOOP */
-			if (!merge_desc_check()) /* will not proceed if one is descendant of another */
+			if (merge_desc_check()) /* will not proceed if one is descendant of another */
 			{
-				POP_MV_STENT();	/* value */
-				merge_args = 0;	/* Must reset to zero to reuse the Global */
-				return;
+				output.buff = (char *)buff;
+				output.ptr = output.buff;
+				output.out_var.lv.lvar = mglvnp->lclp[IND1];
+				zwr_output = &output;
+				lvzwr_init(zwr_patrn_mident, &mglvnp->lclp[IND2]->v);
+				lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
+				lvzwr_var(mglvnp->lclp[IND2], 0);
+#				ifdef DEBUG
+				/* assert that destination got all data of the source and its descendants */
+				op_fndata(mglvnp->lclp[IND2], value);
+				dollardata_src = MV_FORCE_INT(value);
+				op_fndata(mglvnp->lclp[IND1], value);
+				dollardata_dst = MV_FORCE_INT(value);
+				assert((dollardata_src & dollardata_dst) == dollardata_src);
+#				endif
 			}
-			output.buff = (char *)buff;
-			output.ptr = output.buff;
-			output.out_var.lv.lvar = mglvnp->lclp[IND1];
-			zwr_output = &output;
-			lvzwr_init(zwr_patrn_mident, &mglvnp->lclp[IND2]->v);
-			lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
-			lvzwr_var(mglvnp->lclp[IND2], 0);
-			/* assert that destination got all data of the source and its descendants */
-			DEBUG_ONLY(op_fndata(mglvnp->lclp[IND1], value));
-			DEBUG_ONLY(dollardata_dst = MV_FORCE_INT(value));
-			assert((dollardata_src & dollardata_dst) == dollardata_src);
 		} else
 		{	/*==================== MERGE ^gvn1=lvn2 =====================*/
 			assert(MARG1_IS_GBL(merge_args) && MARG2_IS_LCL(merge_args));
-			gvname_env_save(gblp1);
-			key = gblp1->s_gv_currkey;
-			GET_NSUBS_IN_GVKEY(key->base, key->end - 1, gvn1subs);	/* sets "gvn1subs" */
-			gblp1->gvkey_nsubs = gvn1subs;	/* used later in lvzwr_out */
-			output.buff = (char *)buff;
-			output.ptr = output.buff;
-			output.out_var.gv.end = gv_currkey->end;
-			output.out_var.gv.prev = gv_currkey->prev;
-			zwr_output = &output;
-			lvzwr_init(zwr_patrn_mident, &mglvnp->lclp[IND2]->v);
-			lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
-			lvzwr_var(mglvnp->lclp[IND2], 0);
-			gvname_env_restore(gblp1);	 /* store destination as naked indicator in gv_currkey */
+			if (NULL != mglvnp->lclp[IND2])
+			{	/* source is defined */
+				gvname_env_save(gblp1);
+				key = gblp1->s_gv_currkey;
+				GET_NSUBS_IN_GVKEY(key->base, key->end - 1, gvn1subs);	/* sets "gvn1subs" */
+				gblp1->gvkey_nsubs = gvn1subs;	/* used later in lvzwr_out */
+				output.buff = (char *)buff;
+				output.ptr = output.buff;
+				output.out_var.gv.end = gv_currkey->end;
+				output.out_var.gv.prev = gv_currkey->prev;
+				zwr_output = &output;
+				lvzwr_init(zwr_patrn_mident, &mglvnp->lclp[IND2]->v);
+				lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
+				lvzwr_var(mglvnp->lclp[IND2], 0);
+				gvname_env_restore(gblp1);	 /* store destination as naked indicator in gv_currkey */
+			}
 		}
 	}
 	POP_MV_STENT();	/* value */

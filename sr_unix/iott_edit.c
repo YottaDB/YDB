@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -245,20 +245,15 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 	number_of_chars_left = cur_x - start_x;
 	if (!move)
 	{
-		ret = write_loop(fildes, (unsigned char *)CURSOR_UP, number_of_lines_up);
+		ret = (NULL != CURSOR_UP) ? write_loop(fildes, (unsigned char *)CURSOR_UP, number_of_lines_up) : 0;
 		if (0 > ret)
 			return -1;
 		if (number_of_chars_left > 0)
-		{
-			ret = write_loop(fildes, (unsigned char *)CURSOR_LEFT, number_of_chars_left);
-			if (0 > ret)
-				return -1;
-		} else
-		{
-			ret = write_loop(fildes, (unsigned char *)CURSOR_RIGHT, -number_of_chars_left);
-			if (0 > ret)
-				return -1;
-		}
+			ret = (NULL != CURSOR_LEFT) ? write_loop(fildes, (unsigned char *)CURSOR_LEFT, number_of_chars_left) : 0;
+		else
+			ret = (NULL != CURSOR_RIGHT) ? write_loop(fildes, (unsigned char *)CURSOR_RIGHT, -number_of_chars_left) : 0;
+		if (0 > ret)
+			return -1;
 	}
 	return 0;
 }
@@ -303,21 +298,29 @@ int 	move_cursor_left(int col, int num_cols)
 		ret = move_cursor_right(col, -num_cols);
 	else if (0 < col)
 	{
-		ret = write_loop(fildes, (unsigned char *)CURSOR_LEFT, MIN(col, num_cols));
+		ret = (NULL != CURSOR_LEFT) ? write_loop(fildes, (unsigned char *)CURSOR_LEFT, MIN(col, num_cols)) : 0;
 		num_cols -= MIN(col, num_cols);
 		if (num_cols)
+		{
+			if (NULL != CURSOR_UP)
+			{
+				DOWRITERC(fildes, CURSOR_UP, strlen(CURSOR_UP), ret);
+				if (0 > ret)
+					return -1;
+			}
+			ret = (NULL != CURSOR_RIGHT)
+				? write_loop(fildes, (unsigned char *)CURSOR_RIGHT, io_curr_device.in->width - num_cols) : 0;
+		}
+	} else
+	{
+		if (NULL != CURSOR_UP)
 		{
 			DOWRITERC(fildes, CURSOR_UP, strlen(CURSOR_UP), ret);
 			if (0 > ret)
 				return -1;
-			ret = write_loop(fildes, (unsigned char *)CURSOR_RIGHT, io_curr_device.in->width - num_cols);
 		}
-	} else
-	{
-		DOWRITERC(fildes, CURSOR_UP, strlen(CURSOR_UP), ret);
-		if (0 > ret)
-			return -1;
-		ret = write_loop(fildes, (unsigned char *)CURSOR_RIGHT, io_curr_device.in->width - num_cols);
+		ret = (NULL != CURSOR_RIGHT)
+			? write_loop(fildes, (unsigned char *)CURSOR_RIGHT, io_curr_device.in->width - num_cols) : 0;
 	}
 	return ret;
 }
@@ -339,7 +342,7 @@ int 	move_cursor_right(int col, int num_cols)
 	else if (0 > num_cols)
 		ret = move_cursor_left(col, -num_cols);
 	else if ((io_curr_device.in->width - num_cols) > col)
-		ret = write_loop(fildes, (unsigned char *)CURSOR_RIGHT, num_cols);
+		ret = (NULL != CURSOR_RIGHT) ? write_loop(fildes, (unsigned char *)CURSOR_RIGHT, num_cols) : 0;
 	else
 	{
 		DOWRITERC(fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL), ret);
@@ -347,7 +350,7 @@ int 	move_cursor_right(int col, int num_cols)
 			return -1;
 		num_cols -= (io_curr_device.in->width - col);
 		if (num_cols)
-			ret = write_loop(fildes, (unsigned char *)CURSOR_RIGHT, num_cols);
+			ret = (NULL != CURSOR_RIGHT) ? write_loop(fildes, (unsigned char *)CURSOR_RIGHT, num_cols) : 0;
 	}
 	return ret;
 }
@@ -386,29 +389,21 @@ int	move_cursor(int fildes, int num_up, int num_left)
 {
 	int	ret;
 
-	if (num_up < 0)
-	{
+	ret = 0;
+	if ((num_up < 0) && (NULL != CURSOR_DOWN))
 		ret = write_loop (fildes, (unsigned char *)CURSOR_DOWN, -num_up);
-		if (0 > ret)
-			return -1;
-	} else if (num_up > 0)
-	{
+	else if ((num_up > 0) && (NULL != CURSOR_UP))
 		ret = write_loop (fildes, (unsigned char *)CURSOR_UP, num_up);
-		if (0 > ret)
-			return -1;
-	}
+	if (0 > ret)
+		return -1;
 
-	if (num_left < 0)
-	{
+	ret = 0;
+	if ((num_left < 0) && (NULL != CURSOR_RIGHT))
 		ret = write_loop(fildes, (unsigned char *)CURSOR_RIGHT, -num_left);
-		if (0 > ret)
-			return -1;
-	} else if (num_left > 0)
-	{
+	else if ((num_left > 0) && (NULL != CURSOR_LEFT))
 		ret = write_loop(fildes, (unsigned char *)CURSOR_LEFT, num_left);
-		if (0 > ret)
-			return -1;
-	}
+	if (0 > ret)
+		return -1;
 	return 0;
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,10 @@ typedef	float		gtm_float_t;
 typedef	double		gtm_double_t;
 typedef	char		gtm_char_t;
 typedef int		(*gtm_pointertofunc_t)();
+/* Structure for passing (non-NULL-terminated) character arrays whose length corresponds to the value of the
+ * 'length' field. Note that for output-only gtm_string_t * arguments the 'length' field is set to the
+ * preallocation size of the buffer pointed to by 'address', while the first character of the buffer is '\0'.
+ */
 typedef struct
 {
 	gtm_long_t	length;

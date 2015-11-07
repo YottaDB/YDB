@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	jb = jpc->jnl_buff;
 	assert(0 <= new_blocks);
 	DEBUG_ONLY(count = 0);
-	for (need_extend = (0 != new_blocks); need_extend; )
+	for (need_extend = (jb->last_eof_written || (0 != new_blocks)); need_extend; )
 	{
 		DEBUG_ONLY(count++);
 		/* usually we will do the loop just once where we do the file extension.
@@ -151,7 +151,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 		if (csd->autoswitchlimit < (jb->filesize + (EXTEND_WARNING_FACTOR * new_blocks)))	/* close to max */
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLSPACELOW, 3, JNL_LEN_STR(csd),
 					csd->autoswitchlimit - jb->filesize);
-		if (csd->autoswitchlimit < new_alq)
+		if (jb->last_eof_written || (csd->autoswitchlimit < new_alq))
 		{	/* Reached max, need to autoswitch */
 			/* Ensure new journal file can hold the entire current transaction's journal record requirements */
 			assert(csd->autoswitchlimit >= MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size));
@@ -160,8 +160,19 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			set_jnl_info(gv_cur_region, &jnl_info);
 			assert(JNL_ENABLED(csa) && (NOJNL != jpc->channel) && !(JNL_FILE_SWITCHED(jpc)));
 			jnl_status = jnl_ensure_open();
-			if (0 == jnl_status)
-			{	/* flush the cache and jnl-buffer-contents to current journal file before
+			if (0 != jnl_status)
+			{
+				if (SS_NORMAL != jpc->status)
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
+							DB_LEN_STR(gv_cur_region), jpc->status);
+				else
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
+							DB_LEN_STR(gv_cur_region));
+				return EXIT_ERR;
+			}
+			if (!jb->last_eof_written)
+			{
+				/* flush the cache and jnl-buffer-contents to current journal file before
 				 * switching to a new journal. Set a global variable in_jnl_file_autoswitch
 				 * so jnl_write can know not to do the padding check. But because this is a global
 				 * variable, we also need to make sure it is reset in case of errors during the
@@ -182,36 +193,30 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				 * temporarily been modified in case of errors inside wcs_flu/jnl_file_close.
 				 */
 				ESTABLISH_RET(jnl_file_autoswitch_ch, EXIT_ERR);
-				/* It is possible we still have not written a PINI record in this journal file
-				 * (e.g. mupip extend saw the need to do jnl_file_extend inside jnl_write while
-				 * trying to write a PINI record). Write a PINI record in that case before closing
-				 * the journal file that way the EOF record will have a non-zero pini_addr.
-				 */
-				if (0 == jpc->pini_addr)
-					jnl_put_jrt_pini(csa);
-				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SPEEDUP_NOBEFORE);
+				if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SPEEDUP_NOBEFORE))
+				{
+					if (SS_NORMAL != jpc->status)
+						rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jpc->status, 4, JNL_LEN_STR(csd),
+								DB_LEN_STR(gv_cur_region));
+				}
+				assert(in_jnl_file_autoswitch);
 				jnl_file_close(gv_cur_region, TRUE, TRUE);
+				assert(in_jnl_file_autoswitch);
 				REVERT;
 				in_jnl_file_autoswitch = FALSE;
 				jgbl.dont_reset_gbl_jrec_time = jgbl.save_dont_reset_gbl_jrec_time;
 				DEBUG_ONLY(jgbl.save_dont_reset_gbl_jrec_time = FALSE);
-				assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
-				csd = cs_data;	/* In MM, wcs_flu() can remap an extended DB, so reset csd to be sure */
 			} else
-			{
-				if (SS_NORMAL != jpc->status)
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
-							DB_LEN_STR(gv_cur_region), jpc->status);
-				else
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
-							DB_LEN_STR(gv_cur_region));
-			}
+				jnl_file_close(gv_cur_region, TRUE, TRUE);	/* for jb->last_eof_written, just close */
+			assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+			csd = cs_data;	/* In MM, wcs_flu() can remap an extended DB, so reset csd to be sure */
 			assert(!jgbl.forw_phase_recovery || (NULL != jgbl.mur_pini_addr_reset_fnptr));
 			assert(jgbl.forw_phase_recovery || (NULL == jgbl.mur_pini_addr_reset_fnptr));
 			if (NULL != jgbl.mur_pini_addr_reset_fnptr)
 				(*jgbl.mur_pini_addr_reset_fnptr)(csa);
 			assert(!jnl_info.no_rename);
 			assert(!jnl_info.no_prev_link);
+			assert(!in_jnl_file_autoswitch);
 			if (EXIT_NRM == cre_jnl_file(&jnl_info))
 			{
 				assert(0 == memcmp(csd->jnl_file_name, jnl_info.jnl, jnl_info.jnl_len));
@@ -245,6 +250,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 								DB_LEN_STR(gv_cur_region));
 				}
 				assert(jb->filesize == csd->jnl_alq);
+				assert(!jb->last_eof_written);
 				if (csd->jnl_alq + csd->jnl_deq <= csd->autoswitchlimit)
 				{
 					aligned_tot_jrec_size = ALIGNED_ROUND_UP(MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size),
@@ -280,7 +286,6 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLRDERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
 			assert((header->virtual_size + new_blocks) == new_alq);
-			jb->filesize = new_alq;	/* Actually this is virtual file size blocks */
 			header->virtual_size = new_alq;
 			JNL_DO_FILE_WRITE(csa, csd->jnl_file_name, jpc->channel, 0,
 					header, read_write_size, jpc->status, jpc->status2);
@@ -289,6 +294,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				assert(WBTEST_RECOVER_ENOSPC == gtm_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
+			jb->filesize = new_alq;	/* Actually this is virtual file size blocks */
 		}
 		if (0 >= new_blocks)
 			break;
@@ -298,7 +304,8 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 		INCR_GVSTATS_COUNTER(csa, csa->nl, n_jnl_extends, 1);
 		return EXIT_NRM;
 	}
-	jpc->status = ERR_JNLREADEOF;
+	if (SS_NORMAL == jpc->status)
+		jpc->status = ERR_JNLREADEOF;
 	jnl_file_lost(jpc, ERR_JNLEXTEND);
        	return EXIT_ERR;
 }

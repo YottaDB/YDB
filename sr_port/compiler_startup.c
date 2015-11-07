@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,16 +54,17 @@ boolean_t compiler_startup(void)
 #ifdef DEBUG
 	void			dumpall();
 #endif
-	boolean_t		compile_w_err;
+	boolean_t		compile_w_err, need_source_lines, use_src_queue, creating_list_file;
 	unsigned char		err_buf[45];
 	unsigned char 		*cp, *cp2;
 	int			errknt;
 	int4			n;
-	uint4			line_count;
+	uint4			line_count, total_source_len;
 	mlabel			*null_lab;
 	src_line_struct		*sl;
 	mident			null_mident;
 	gtm_rtn_src_chksum_ctx	checksum_ctx;
+	mstr			str;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -95,11 +96,15 @@ boolean_t compiler_startup(void)
 	}
 	rtn_src_chksum_init(&checksum_ctx);
 	cg_phase = CGP_PARSE;
-	if (cmd_qlf.qlf & CQ_LIST || cmd_qlf.qlf & CQ_CROSS_REFERENCE)
+	creating_list_file = (cmd_qlf.qlf & CQ_LIST) || (cmd_qlf.qlf & CQ_CROSS_REFERENCE);
+	need_source_lines = (cmd_qlf.qlf & CQ_EMBED_SOURCE) || creating_list_file;
+	use_src_queue = (cmd_qlf.qlf & CQ_EMBED_SOURCE) || (creating_list_file && (cmd_qlf.qlf & CQ_MACHINE_CODE));
+	if (need_source_lines)
 	{
-		if (cmd_qlf.qlf &  CQ_MACHINE_CODE)
+		if (use_src_queue)
 			dqinit(&src_head, que);
-		open_list_file();
+		if (creating_list_file)
+			open_list_file();
 	}
 	if (cmd_qlf.qlf & CQ_CE_PREPROCESS)
 		open_ceprep_file();
@@ -111,28 +116,32 @@ boolean_t compiler_startup(void)
 	curr_fetch_count = 0;
 	TREF(code_generated) = FALSE;
 	line_count = 1;
+	total_source_len = 0;
 	for (source_line = 1;  errknt <= HOPELESS_COMPILE;  source_line++)
 	{
 		if (-1 == (n = read_source_file()))
 			break;
 		rtn_src_chksum_line(&checksum_ctx, source_buffer, n);
-		if ('\n' == source_buffer[n - 1])
-			source_buffer[n - 1] = '\0'; /* compiler doesn't like trailing newlines (gives SPOREOL errors) */
-		if (cmd_qlf.qlf & CQ_LIST || cmd_qlf.qlf & CQ_CROSS_REFERENCE)
+		if (need_source_lines)
 		{
-			if (cmd_qlf.qlf & CQ_MACHINE_CODE)
-			{
+			if (use_src_queue)
+			{	/* Accumulate list of M source lines */
 				sl = (src_line_struct *)mcalloc(SIZEOF(src_line_struct));
-				dqins(&src_head, que, sl);
-				sl->addr = mcalloc(n + 1);	/* +1 for zero termination */
+				dqrins(&src_head, que, sl);
+				sl->str.addr = mcalloc(n + 1);	/* +1 for zero termination */
+				sl->str.len = n;
 				sl->line = source_line;
-				memcpy(sl->addr, source_buffer, n + 1);
-			} else
-			{
+				memcpy(sl->str.addr, source_buffer, n + 1);
+				total_source_len += n;
+			}
+			if (creating_list_file && !(cmd_qlf.qlf & CQ_MACHINE_CODE))
+			{	/* list now. for machine_code we intersperse machine code and M code, thus can't list M code yet */
+				NEWLINE_TO_NULL(source_buffer[n - 1]);
 				list_line_number();
 				list_line((char *)source_buffer);
 			}
 		}
+		NEWLINE_TO_NULL(source_buffer[n - 1]); /* compiler doesn't like trailing newlines (gives SPOREOL errors) */
 		TREF(source_error_found) = 0;
 		lb_init();
 		if (cmd_qlf.qlf & CQ_CE_PREPROCESS)
@@ -160,6 +169,18 @@ boolean_t compiler_startup(void)
 	 * use for conversions or whatever are eliminated. Note the path is different in stp_gcol for
 	 * the indirect stringpool which is only used during compilations.
 	 */
+	if (cmd_qlf.qlf & CQ_EMBED_SOURCE)
+	{	/* Append source text to text pool */
+		ENSURE_STP_FREE_SPACE(total_source_len);
+		DBG_MARK_STRINGPOOL_UNEXPANDABLE;
+		TREF(routine_source_offset) = (uint4)(stringpool.free - stringpool.base);
+		dqloop(&src_head, que, sl)
+		{
+			str = sl->str;
+			s2pool(&str); /* changes str.addr, points it into stringpool */
+		}
+		DBG_MARK_STRINGPOOL_EXPANDABLE;
+	}
 	start_fetches(OC_NOOP);
 	resolve_blocks();
 	errknt = resolve_ref(errknt);

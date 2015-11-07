@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,12 +51,12 @@ static readonly unsigned char apos_ok[] =
 
 void advancewindow(void)
 {
-	unsigned char	*cp1, *cp2, *cp3, x;
+	unsigned char	*cp1, *cp2, *cp3, *cptr;
+	unsigned char	*error, errtxt[(3 + 1) UNICODE_ONLY(* GTM_MB_LEN_MAX)], x;	/* up to 3 digits/byte & a comma */
 	char		*tmp;
 	int		y, charlen;
 #	ifdef UNICODE_SUPPORTED
 	uint4		ch;
-	unsigned char	*cptr;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -97,7 +97,22 @@ void advancewindow(void)
 				if (!run_time)
 				{
 					show_source_line(TRUE);
-					dec_err(VARLSTCNT(1) ERR_LITNONGRAPH);
+					if (!gtm_utf8_mode)
+						charlen = 1;			/* always one character in M mode */
+#					ifdef UNICODE_SUPPORTED
+					else
+					{
+						charlen = cptr - cp1 + 1;	/* get the number of bytes in the utf8 character */
+						assert(GTM_MB_LEN_MAX >= charlen);
+					}
+#					endif
+					for (cptr = cp1 - 1; charlen--;)	/* stop when all bytes are done */
+					{	/* cptr winds up back where it started due to the increments in the loop */
+						error = (unsigned char*)i2asc((uchar_ptr_t)errtxt, (unsigned int)*cptr++);
+						*error++ = ',';
+					}
+					error--;				/* do not include the last comma */
+					dec_err(VARLSTCNT(4) ERR_LITNONGRAPH, 2, (error - errtxt), errtxt);
 				}
 			}
 			if ('\"' == x)

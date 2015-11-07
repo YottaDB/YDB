@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2013 Fidelity Infromation Services, Inc #
+#	Copyright 2001, 2014 Fidelity Infromation Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -231,7 +231,8 @@ else
 endif
 
 #	Remove old error log.
-rm $gtm_log/error.`basename $gtm_exe`.log
+set errorlog = "$gtm_log/error.`basename $gtm_exe`.log"
+rm $errorlog
 
 
 echo ""
@@ -380,8 +381,7 @@ if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
 	$gtm_root/$gtm_curpro/pro/mumps -run msg $i Unix
 
 	if ( ! -f ${j}_ctl.c ) then
-		echo "comlist-E-MSGfail, MSG.m failed to produce output file ${j}_ctl.c" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+		echo "comlist-E-MSGfail, MSG.m failed to produce output file ${j}_ctl.c" >> $errorlog
 	endif
 	if ( -f ${j}_ansi.h ) then
 		mv -f ${j}_ansi.h $gtm_inc
@@ -397,8 +397,7 @@ if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
     unset real_gtm_dist
     popd
 else
-    echo "comlist-E-NoMUMPS, unable to regenerate merrors.c and ttt.c due to missing $gtm_curpro/pro/mumps" \
-		    >> $gtm_log/error.`basename $gtm_exe`.log
+    echo "comlist-E-NoMUMPS, unable to regenerate merrors.c and ttt.c due to missing $gtm_curpro/pro/mumps" >> $errorlog
 endif
 
 #############################################################
@@ -555,19 +554,6 @@ foreach i ( $comlist_liblist )
 	echo "" >> ar$i.log
 
 	switch ( $i )
-	case "gtmrpc":
-		# Note: libgtmrpc.a must be built in $gtm_exe because it must also be shipped with the release.
-		gt_ar $gt_ar_option_create $gtm_exe/lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
-		if ( 0 != $status ) then
-			@ comlist_status = $status
-			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
-				>> $gtm_log/error.`basename $gtm_exe`.log
-		endif
-		# retain_list.txt contains modules listed in *.list that also need to be
-		# included in libmumps.a (eg. getmaxfds, gtm_mumps_call_xdr)
-		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list |egrep -v -f $gtm_tools/retain_list.txt`
-		breaksw
-
 	case "mumps":
 		# (Almost) everything else goes into libmumps.a, but the list is too long for a single command line so use xargs.
 		# This case must be executed last in the switch statement (because it picks up "everything else") and, hence,
@@ -580,8 +566,7 @@ foreach i ( $comlist_liblist )
 
 		# Exclude files that define the same externals
 		# (e.g., "main" and the VMS CLI [command line interpreter] emulator arrays):
-		set exclude = "^gtm\.o|^gtm_main\.o|^gtm_svc\.o|^gtm_dal_svc\.o|^gtm_rpc_init\.o"
-		set exclude = "$exclude|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o|^dbcertify\.o"
+		set exclude = "^gtm\.o|^gtm_main\.o|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o|^dbcertify\.o"
 		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^gtmsecshr\.o|^gtmsecshr_wrapper\.o|^geteuid\.o|^dtgbldir\.o"
 		set exclude = "$exclude|^semstat2\.o|^ftok\.o|^msg\.o|^gtcm_main\.o|^gtcm_play\.o|^gtcm_pkdisp\.o|^gtcm_shmclean\.o"
 		set exclude = "$exclude|^omi_srvc_xct\.o|^omi_sx_play\.o"
@@ -589,23 +574,21 @@ foreach i ( $comlist_liblist )
 		set exclude = "$exclude|^dummy_gtmci\.o"
 		/bin/ls | egrep '\.o$' | egrep -v "$exclude" | \
 			xargs -n50 $shell $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
-		if ( 0 != $status ) then
-			@ comlist_status = $status
+		if ( $status ) then
+			@ comlist_status++
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
-				>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $errorlog
 		endif
 		breaksw
 
 	default:
 		gt_ar $gt_ar_option_create lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
-		if ( 0 != $status ) then
-			@ comlist_status = $status
+		if ( $status ) then
+			@ comlist_status++
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
-				>> $gtm_log/error.`basename $gtm_exe`.log
+			>> $errorlog
 		endif
-		# retain_list.txt contains modules listed in *.list that also need to be
-		# included in libmumps.a (eg. getmaxfds, gtm_mumps_call_xdr)
-		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list |egrep -v -f $gtm_tools/retain_list.txt`
+		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list`
 		breaksw
 
 	endsw
@@ -632,38 +615,31 @@ switch ( $3 )
 case "gtm_bta":
 	set bldtype = "Bta"
 	$shell $gtm_tools/buildbta.csh $p4
-	if (0 != $status) @ comlist_status = $status	# done before each breaksw instead of after endsw
-	breaksw						# as $status seems to be get reset in between
+	if ($status) @ comlist_status++	# done before each breaksw instead of after endsw
+	breaksw				# as $status seems to be get reset in between
 
 case "gtm_dbg":
 	set bldtype = "Dbg"
 	$shell $gtm_tools/builddbg.csh $p4
-	if (0 != $status) @ comlist_status = $status
+	if ($status) @ comlist_status++
 	breaksw
 
 case "gtm_pro":
 	set bldtype = "Pro"
 	$shell $gtm_tools/buildpro.csh $p4
-	if (0 != $status) @ comlist_status = $status
+	if ($status) @ comlist_status++
 	breaksw
 endsw
 
 if ( ! -x $gtm_dist/mumps ) then
-	echo "comlist-E-nomumps, ${dollar_sign}gtm_dist/mumps is not executable" >> $gtm_log/error.`basename $gtm_exe`.log
-	echo "comlist-W-nomsgverify, unable to verify error message definition files" >> $gtm_log/error.`basename $gtm_exe`.log
-	echo "comlist-W-noonlinehelp, unable to generate on-line help files" >> $gtm_log/error.`basename $gtm_exe`.log
+	echo "comlist-E-nomumps, ${dollar_sign}gtm_dist/mumps is not executable" >> $errorlog
+	echo "comlist-W-nomsgverify, unable to verify error message definition files" >> $errorlog
+	echo "comlist-W-noonlinehelp, unable to generate on-line help files" >> $errorlog
 	goto comlist.END
 endif
 
 set mupip_size = `ls -l $gtm_exe/mupip |awk '{print $5}'`
 set gtmshr_size = `ls -l $gtm_exe/libgtmshr$gt_ld_shl_suffix |awk '{print $5}'`
-
-if ( "$HOSTOS" != "SunOS" ) then
- 	if ($mupip_size > $gtmshr_size) then
-	echo "comlist-E-mupip_size, ${dollar_sign}gtm_dist/mupip is larger than ${dollar_sign}gtm_dist/libgtmshr$gt_ld_shl_suffix" \
-		>> $gtm_log/error.`basename $gtm_exe`.log
-	endif
-endif
 
 cd $p3
 
@@ -694,12 +670,12 @@ if ((0 != $savestatus) || (! -e GTMDefinedTypesInit.m)) then
 	set errmsg = "COMLIST-E-FAIL gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m "
 	set errmsg = "$errmsg - see log in $gtm_obj/gengtmdeftypes.log"
 	if (`expr $gtm_verno \< V900`) then
-		@ comlist_status = $savestatus  # No errors for development - this fails the build
+		@ comlist_status++	# No errors for development - this fails the build
 	else
 		echo "Warning: Build of $gtm_verno on $HOST, $errmsg" | \
 			mailx -s "${HOST}: Build for $gtm_verno failed to create GTMDefinedTypes.m" $USER
 	endif
-	echo $errmsg >> $gtm_log/error.`basename $gtm_exe`.log
+	echo $errmsg >> $errorlog
 endif
 if (-e GTMDefinedTypesInit.m) then
 	# Need a different name for each build type as they can be different
@@ -707,16 +683,15 @@ if (-e GTMDefinedTypesInit.m) then
 	setenv LC_CTYPE C
 	setenv gtm_chset M
 	./mumps GTMDefinedTypesInit.m
-	@ savestatus = $status
-	if (0 != $savestatus) then
+	if ($status) then
 		set errmsg = "COMLIST-E-FAIL Failed to compile generated $gtm_exe/GTMDefinedTypes.m"
 		if (`expr $gtm_verno \< V900`) then
-			@ comlist_status = $savestatus
+			@ comlist_status++
 		else
 			echo "Warning: During build of $gtm_verno on $HOST, ${errmsg}" | \
 				mailx -s "${HOST}: Compile for GTMDefinedTypes.m failed during build of $gtm_verno" $USER
 		endif
-		echo "${errmsg}" >> $gtm_log/error.`basename $gtm_exe`.log
+		echo "${errmsg}" >> $errorlog
 	endif
 	# If we have a utf8 dir (created by buildaux.csh called from buildbdp.csh above), add a link to it for
 	# GTMDefinedTypesInit.m and compile it in UTF8 mode
@@ -734,17 +709,16 @@ if (-e GTMDefinedTypesInit.m) then
 		setenv gtm_chset UTF-8  # switch to "UTF-8" mode
 		# mumps executable not yet linked to utf8 dir so access it in parent directory
 		../mumps GTMDefinedTypesInit.m
-		@ savestatus = $status
-		if (0 != $savestatus) then
+		if ($status) then
 			set errmsg = "COMLIST_E-FAIL Failed to compile generated $gtm_exe/utf8/GTMDefinedTypes.m"
 			if (`expr $gtm_verno \< V900`) then
-				@ comlist_status = $savestatus
+				@ comlist_status++
 			else
 				echo "Warning: During build of $gtm_verno on $HOST, ${errmsg}" | \
 					mailx -s "${HOST}: Compile for utf8/GTMDefinedTypes.m failed during build of $gtm_verno" \
 					$USER
 			endif
-			echo "${errmsg}" >> $gtm_log/error.`basename $gtm_exe`.log
+			echo "${errmsg}" >> $errorlog
 		endif
 		popd
 		setenv LC_CTYPE C
@@ -758,10 +732,15 @@ setenv gtmgbldir ./mumps.gld
 gde <<GDE_in1
 exit
 GDE_in1
-if (0 != $status) @ comlist_status = $status
+
+if ($status) then
+	@ comlist_status++
+	echo "comlist-E-gde, creating $gtmgbldir failed"	>> $errorlog
+endif
 
 # Create the GT.M/GDE/MUPIP/DSE/LKE help databases
 foreach hlp (*.hlp)
+	set hlp_status = 0
 	set prefix=${hlp:r}
 	if ("${prefix}" == "mumps") set prefix="gtm"
 	setenv gtmgbldir $gtm_dist/${prefix}help.gld
@@ -769,26 +748,25 @@ foreach hlp (*.hlp)
 Change -segment DEFAULT	-block=2048	-file=\$gtm_dist/${prefix}help.dat
 Change -region DEFAULT	-record=1020	-key=255
 GDE_in_help
-	if (0 != $status) @ comlist_status = $status
 
+	if ($status) @ hlp_status++
 	mupip create
-	if (0 != $status) @ comlist_status = $status
-
+	if ($status) @ hlp_status++
 	gtm <<GTM_in_gtmhelp
 Do ^GTMHLPLD
 $gtm_dist/${hlp}
 Halt
 GTM_in_gtmhelp
-	if (0 != $status) @ comlist_status = $status
+
+	if ($status) @ hlp_status++
+	if ($hlp_status) then
+		@ comlist_status = $comlist_status + $hlp_status
+		echo "comlist-E-hlp, Error processing $hlp file" >> $errorlog
+	endif
+
 end
 
 chmod 775 *	# do not check $status here because we know it will be 1 since "gtmsecshr" permissions cannot be changed.
-
-# Create the dump file for ZHELP.
-touch $gtm_dist/gtmhelp.dmp
-if (0 != $status) @ comlist_status = $status
-chmod a+rw $gtm_dist/gtmhelp.dmp
-if (0 != $status) @ comlist_status = $status
 
 # Create a mirror image (using soft links) of $gtm_dist under $gtm_dist/utf8 if it exists.
 if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while building GDE
@@ -806,12 +784,31 @@ if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while build
 		# Soft link everything else
 		if (-e utf8/$file) then
 			rm -rf utf8/$file
-			if (0 != $status) @ comlist_status = $status
+			if ($status) then
+				@ comlist_status++
+				echo "comlist-E-rm, Error deleting utf8/$file" >> $errorlog
+			endif
 		endif
 		ln -s ../$file utf8/$file
-		if (0 != $status) @ comlist_status = $status
+		if ($status) then
+			@ comlist_status++
+			echo "comlist-E-ln, Error linking $file" >> $errorlog
+		endif
 	end
 	popd
+endif
+# To check the length of path of files even insdie gtmsecshr directory, relax permissions first
+$gtm_com/IGS $gtm_dist/gtmsecshr UNHIDE
+set distfiles_log = "dist_files.`basename $gtm_exe`.log"
+find $gtm_dist -type f >&! $gtm_log/$distfiles_log
+$gtm_com/IGS $gtm_dist/gtmsecshr CHOWN
+awk 'BEGIN {dlen=length(ENVIRON["gtm_dist"]);stat=0} {if ((length($0)-dlen)>50) {stat=1}} END {exit stat}' $gtm_log/$distfiles_log
+if ($status) then
+	@ comlist_status++
+	echo "comlist-E-pathlength, the longest path beyond \$gtm_dist exceeds 50 bytes" >> $errorlog
+	awk 'BEGIN {dlen=length(ENVIRON["gtm_dist"]);stat=0} \
+		{if ((length($0)-dlen)>50) {print $0,"- length :",length($0)-dlen ; stat=1}} \
+		END {exit stat}' $gtm_log/$distfiles_log >>&! $errorlog
 endif
 
 if ( $comlist_chmod_protect == 1 ) then
@@ -824,10 +821,10 @@ comlist.END:
 
 echo ""
 echo ""
-if ( -f $gtm_log/error.`basename $gtm_exe`.log ) then
+if ( -f $errorlog ) then
 	echo "Error summary:"
 	echo ""
-	cat $gtm_log/error.`basename $gtm_exe`.log
+	cat $errorlog
 else
 	echo "No errors were detected by comlist.csh"
 endif

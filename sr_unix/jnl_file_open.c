@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,7 +81,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 	{
 		assert(csd->jnl_file_len < JNL_NAME_SIZE);
 		nameptr[csd->jnl_file_len] = 0;
-		cre_jnl_file_intrpt_rename(((int)csd->jnl_file_len), csd->jnl_file_name);
+		cre_jnl_file_intrpt_rename(csa);
 		/* although jnl_file_close() would have reset jnl_file.u.inode and device to 0 and incremented cycle, it
 		 * might have got shot in the middle of executing those instructions. we redo it here just to be safe.
 		 */
@@ -193,10 +193,8 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 						jpc->cycle = jb->cycle;	/* make private cycle and shared cycle in sync */
 					GTM_FD_TRACE_ONLY(
 						gtm_dbjnl_dupfd_check(); /* Check if db or jnl fds collide (D9I11-002714) */
-						if (NOJNL == jpc->channel)
-						{	/* The dupfd check above has reset our channel. No idea why. */
-							GTMASSERT;
-						}
+						/* The dupfd check above should not reset our channel. */
+						assertpro(NOJNL != jpc->channel);
 					)
 				}  /* if jnl_state */
 			} else
@@ -204,7 +202,8 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 				jpc->status = ERR_JNLMOVED;
 				sts = ERR_JNLOPNERR;
 				assert(gtm_white_box_test_case_enabled
-					&& (WBTEST_JNLOPNERR_EXPECTED == gtm_white_box_test_case_number));
+					&& ((WBTEST_JNLOPNERR_EXPECTED == gtm_white_box_test_case_number)
+						|| (WBTEST_JNL_CREATE_FAIL == gtm_white_box_test_case_number)));
 			}
 		} else
 		{	/* stat failed */

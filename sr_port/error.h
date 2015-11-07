@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,9 @@ typedef struct err_ctl_struct
 	int		msg_cnt;
 } err_ctl;
 
+#ifdef UNIX
+#include "wbox_test_init.h"	/* needed for DUMPABLE macro which uses WBTEST_ENABLED */
+#endif
 #include "errorsp.h"
 
 #define ERROR_RETURN		error_return
@@ -44,6 +47,18 @@ typedef struct err_ctl_struct
 
 /* to change default severity of msg to type */
 #define MAKE_MSG_TYPE(msg, type)  ((msg) & ~SEV_MSK | (type))
+
+/* Define SET_ERROR_CONDITION macro to set global variables "error_condition" as well as "severity" at the same time.
+ * If the two are not kept in sync, it is possible "severity" reflects INFO (from an older error) whereas
+ * "error_condition" is set to TPRETRY which means we would handle it as a TPRETRY INFO type error and that means the
+ * caller that issues rts_error of TPRETRY will see control being returned to it which goes into an out-of-design situation
+ * and could cause SIG-11 (GTM-8083).
+ */
+#define	SET_ERROR_CONDITION(MSGID)							\
+{											\
+	error_condition = MSGID;							\
+	UNIX_ONLY(severity = (NULL == err_check(MSGID)) ? ERROR : SEVMASK(MSGID);)	\
+}
 
 /* Macro used intermittently to trace various error handling invocations */
 /* #define DEBUG_ERRHND */

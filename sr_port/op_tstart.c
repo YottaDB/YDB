@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
+#include "gtmio.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -45,6 +46,8 @@
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
 #include "alias.h"
+#include "stp_parms.h"
+#include "stringpool.h"
 #ifdef GTM_TRIGGER
 #include "gtm_trigger_trc.h"
 #endif
@@ -93,6 +96,7 @@ GBLREF	uint4			tstartcycle;
 GBLREF	char			*update_array_ptr;
 GBLREF	ua_list			*curr_ua, *first_ua;
 GBLREF	mstr			extnam_str;
+GBLREF	lv_val			*active_lv;
 #ifdef GTM_TRIGGER
 GBLREF	mval			dollar_ztwormhole;
 GBLREF	int4			gtm_trigger_depth;
@@ -139,6 +143,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	sgmnt_addrs		*csa;
 	int4			shift_size;
 	boolean_t		tphold_noshift = FALSE, implicit_tstart;
+	lv_val			**lvarraycur = NULL, **lvarray = NULL, **lvarraytop, **lvptr;
 	GTMTRIG_ONLY(boolean_t	implicit_trigger;)
 	DCL_THREADGBL_ACCESS;
 
@@ -146,8 +151,10 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	implicit_tstart = 0 != (implicit_flag & IMPLICIT_TSTART);
 	GTMTRIG_ONLY(implicit_trigger = 0 != (implicit_flag & IMPLICIT_TRIGGER_TSTART));
 	GTMTRIG_ONLY(assert(!implicit_trigger || (implicit_trigger && implicit_tstart)));
-	GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tstart: Entered - dollar_tlevel: %d, implicit_flag: %d\n",
-			       dollar_tlevel, implicit_flag)));
+#	if ((defined(GTM_TRIGGER) && defined(DEBUG_TRIGR)) || defined(DEBUG_REFCNT))
+	DBGFPF((stderr, "\n\nop_tstart: Entered - dollar_tlevel: %d, implicit_flag: %d, mpc: 0x"lvaddr"\n", dollar_tlevel,
+		implicit_flag, frame_pointer->mpc));
+#	endif
 	if (implicit_tstart)
 		/* An implicit op_tstart is being done. In this case, even if we are in direct mode, we want to do
 		 * regular TPHOLD processing (no setting of tphold in the parent frame and shifting of all mv_stents).
@@ -156,9 +163,9 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		 */
 		tphold_noshift = TRUE;
 	/* If we haven't done any TP until now, turn the flag on to tell gvcst_init to
-	   initialize it in any regions it opens from now on and initialize it in any
-	   regions that are already open.
-	*/
+	 * initialize it in any regions it opens from now on and initialize it in any
+	 * regions that are already open.
+	 */
 	if (!tp_in_use)
 	{
 		tp_in_use = TRUE;
@@ -169,8 +176,8 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 				if (r_local->open && !r_local->was_open &&
 				    (dba_bg == REG_ACC_METH(r_local) || dba_mm == REG_ACC_METH(r_local)))
 				{	/* Let's initialize those regions but only if it came through gvcst_init_sysops
-					   (being a bg or mm region)
-					*/
+					 * (being a bg or mm region).
+					 */
 					gvcst_tp_init(r_local);
 				}
 			}
@@ -241,6 +248,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			tp_reg_free_list = tr; 			/* Place on free queue */
 		}
 		++local_tn;					/* Begin new local transaction */
+		INCR_TSTARTCYCLE;				/* All local var save/restores operate under this cycle */
 		tstart_local_tn = local_tn;
 		/* In journal recovery forward phase, we set jgbl.tp_ztp_jnl_upd_num to whatever update_num the journal record
 		 * has so it is ok for the global variable to be a non-zero value at the start of a TP transaction (possible if
@@ -248,7 +256,6 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		 * (in GT.M runtime) we expect it to be 0 at beginning of each TP or ZTP.
 		 */
 		assert((0 == jgbl.tp_ztp_jnl_upd_num) || jgbl.forw_phase_recovery);
-		INCR_TSTARTCYCLE;
 		jgbl.wait_for_jnl_hard = TRUE;
 		GTMTRIG_ONLY(
 			assert(NULL == jgbl.prev_ztworm_ptr);	/* should have been cleared by tp_clean_up of previous TP */
@@ -292,7 +299,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		VMS_ONLY(tp_has_kill_t_cse = FALSE;)
 		assert(!TREF(donot_commit));
 	}
-	/* either cw_stagnate has not been initialized at all or previous-non-TP or tp_hist should have done CWS_RESET */
+	/* Either cw_stagnate has not been initialized at all or previous-non-TP or tp_hist should have done CWS_RESET */
 	assert((0 == cw_stagnate.size) || cw_stagnate_reinitialized);
 	if (prescnt > 0)
 	{
@@ -385,7 +392,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	}
 
 	/* Add a new tp_frame in the TP stack */
-	DBGRFCT((stderr, "\n*** op_tstart: *** Entering $TLEVEL = %d\n", dollar_tlevel + 1));
+	DBGRFCT((stderr, "\n\n********* op_tstart: *** Entering $TLEVEL = %d\n", dollar_tlevel + 1));
 	tf = (tp_frame *)(tp_sp -= SIZEOF(tp_frame));
 	assert((unsigned char *)tf > tpstacktop);	/* Block should lie entirely within tp stack area */
 	tf->restart_pc = fp->mpc;
@@ -410,7 +417,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			TREF(gv_tporigkey_ptr) = (gv_orig_key_array *)malloc(SIZEOF(gv_orig_key_array));
 			memset(TREF(gv_tporigkey_ptr), 0, SIZEOF(gv_orig_key_array));
 		}
-		tf->orig_key = (gv_key *)&((TREF(gv_tporigkey_ptr))->gv_orig_key[0]);
+		tf->orig_key = &((TREF(gv_tporigkey_ptr))->gv_orig_key[0]);
 		assert(NULL != gv_currkey);
 		MEMCPY_KEY(tf->orig_key, gv_currkey);
 		tf->gd_header = gd_header;
@@ -433,6 +440,18 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			memcpy(ptr, extnam_str.addr, len);
 			tf->extnam_str.addr = ptr;
 		}
+		tf->active_lv = active_lv;
+		if (implicit_tstart && (NULL != active_lv))
+		{	/* If active_lv is non-NULL at the start of an implicit TP (possible for example if implicit TP was
+			 * started from an op_gvdata call made inside op_merge.c) we should not tamper with this active_lv
+			 * as part of the tp_unwind processing of the implicit TP. That active_lv is only for the caller
+			 * (op_merge in this case) to play with. So save this active_lv in the TP frame (to be restored
+			 * later at commit or rollback time) and set active_lv to NULL for the duration of this TP.
+			 * Note: We cannot do this save/restore of active_lv for explicit transactions as those might actually
+			 * tamper with active_lv by freeing that memory (e.g. kill * operations).
+			 */
+			SET_ACTIVE_LV(NULL, implicit_tstart ? FALSE : TRUE, actlv_op_tstart);
+		}
 	}
 #	ifdef DEBUG
 	else
@@ -448,6 +467,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		 */
 		tf->zgbldir.mvtype = 0;	/* impossible value */
 		tf->extnam_str.len = -1; /* impossible value */
+		tf->active_lv = NULL;
 	}
 #	endif
 	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
@@ -469,24 +489,27 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	tp_pointer = tf;
 	if (prescnt > 0)
 	{
+		DBGRFCT((stderr, "\nop_tstart: Beginning processing of varname parameters\n"));
 		VAR_COPY(lvname, varlst);
 		for (pres = 0;  pres < prescnt;  ++pres)
 		{
 			preserve = va_arg(lvname, mval *);
 			/* Note: the assumption (according to the comment below) is that this mval points into the literal table
-			   and thus could not possibly be undefined. In that case, I do not understand why the earlier loop to
-			   do MV_FORCE_STR on these variables. Future todo -- verify if that loop is needed. On the assumption
-			   that it is not, the below assert will verify that the mval is defined to catch any NOUNDEF case.
-			*/
+			 * and thus could not possibly be undefined. In that case, I do not understand why the earlier loop to
+			 * do MV_FORCE_STR on these variables. Future todo -- verify if that loop is needed. On the assumption
+			 * that it is not, the below assert will verify that the mval is defined to catch any NOUNDEF case.
+			 */
 			assert(MV_DEFINED(preserve));
 			/* The incoming 'preserve' is the pointer to a literal mval table entry. For the indirect code
 			 * (eg. Direct Mode), since the literal table is no longer on the M stack, we should not shift
-			 * the incoming va_arg pointer (C9D01-002205) */
+			 * the incoming va_arg pointer (C9D01-002205).
+			 */
 			mvname = preserve;
 			if (0 != mvname->str.len)
 			{	/* Convert mval to mident and see if it's in the symbol table */
 				tpvent.var_name.len = mvname->str.len;
 				tpvent.var_name.addr = mvname->str.addr;
+				DBGRFCT((stderr, "\nop_tstart: Processing var %.*s\n", tpvent.var_name.len, tpvent.var_name.addr));
 				COMPUTE_HASH_MNAME(&tpvent);
 				tpvent.marked = FALSE;
 				if (add_hashtab_mname_symval(&curr_symval->h_symtab, &tpvent, NULL, &tabent))
@@ -497,25 +520,23 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 				assert(0 < lv->stats.trefcnt);
 				assert(lv->stats.crefcnt <= lv->stats.trefcnt);
 				/* In order to allow restart of a sub-transaction, this should chain rather than back stop,
-				   with appropriate changes to lv_var_clone and tp_unwind */
+				 * with appropriate changes to lv_var_clone and tp_unwind.
+				 */
 				if (NULL == lv->tp_var)
 				{
 					TP_SAVE_RESTART_VAR(lv, tf, &tabent->key);
 					if (LV_HAS_CHILD(lv))
-						TPSAV_CNTNRS_IN_TREE(lv);
-				} else
-				{	/* We have saved this var previously. But check if it got saved via a container var
-					   and therefore has no name associated with it. If so, update the key in the tp_var
-					   structure so it gets its name restored properly if necessary.
-					*/
-					if (0 == lv->tp_var->key.var_name.len)
-						lv->tp_var->key = tabent->key;
+					{
+						ADD_TO_STPARRAY(lv, lvarray, lvarraycur, lvarraytop, lv_val);
+					}
 				}
 			}
 		}
 		va_end(lvname);
+		DBGRFCT((stderr, "\nop_tstart: Completed processing of varname parameters\n"));
 	} else if (ALLLOCAL == prescnt)
 	{	/* Preserve all variables */
+		DBGRFCT((stderr, "\nop_tstart: Beginning processing of all vars due to TSTART *\n"));
 		tf->tp_save_all_flg = TRUE;
 		++curr_symval->tp_save_all;
 		for (curent = curr_symval->h_symtab.base, topent = curr_symval->h_symtab.top;  curent < topent;  curent++)
@@ -528,21 +549,25 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 				assert(lv->stats.crefcnt <= lv->stats.trefcnt);
 				if (NULL == lv->tp_var)
 				{
+					DBGRFCT((stderr, "\nop_tstart: Creating save point for var '%.*s' at lv_val 0x"lvaddr
+						 " and processing any alias containers found in it\n", curent->key.var_name.len,
+						 curent->key.var_name.addr, lv));
 					TP_SAVE_RESTART_VAR(lv, tf, &curent->key);
 					if (LV_HAS_CHILD(lv))
-						TPSAV_CNTNRS_IN_TREE(lv);
-				} else
-				{	/* We have saved this var previously. But check if it got saved via a container var
-					   and therefore has no name associated with it. If so, update the key in the tp_var
-					   structure so it gets its name restored properly if necessary.
-					*/
-					if (0 == lv->tp_var->key.var_name.len)
-						lv->tp_var->key = curent->key;
+					{
+						ADD_TO_STPARRAY(lv, lvarray, lvarraycur, lvarraytop, lv_val);
+					}
 				}
 			}
 		}
 	}
 	va_end(varlst);
+	/* Need to go through list of saved lvs to do tpsav processing for containers in their lv trees */
+	for (lvptr = lvarray; lvptr < lvarraycur; ++lvptr)
+	{	/* save *lvptr in local variable before passing to macro to avoid multiple *lvptr references inside macro */
+		lv = *lvptr;
+		TPSAV_CNTNRS_IN_TREE(lv);
+	}
 	/* Store existing state of locks */
 	for (pre_lock = mlk_pvt_root;  NULL != pre_lock;  pre_lock = pre_lock->next)
 	{

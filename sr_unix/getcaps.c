@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,24 +69,24 @@ GBLDEF  int	GTM_LINES;		/* number of rows */
 #pragma convlit(suspend)
 #endif
 static	int	gtm_auto_right_margin = 0;
-static	char	gtm_clr_eos[] = "[J";
-static	char	gtm_clr_eol[] = "[K";
+static	char	gtm_clr_eos[] = "\033[J";
+static	char	gtm_clr_eol[] = "\033[K";
 static	int	gtm_columns = 80;
-static	char	gtm_cursor_address[] = "[%i%p1%d;%p2%dH";
-static	char	gtm_cursor_down[] = "\015";	/* <Ctrl-M> */
-static	char	gtm_cursor_left[] = "";
-static	char	gtm_cursor_right[] = "OC";
-static	char	gtm_cursor_up[] = "OA";
+static	char	gtm_cursor_address[] = "\033[%i%p1%d;%p2%dH";
+static	char	gtm_cursor_down[] = "\012";	/* <Ctrl-J> */
+static	char	gtm_cursor_left[] = "\010";
+static	char	gtm_cursor_right[] = "\033[C";
+static	char	gtm_cursor_up[] = "\033[A";
 static	int	gtm_eat_newline_glitch = 1;
-static	char	gtm_key_backspace[] = "";
-static	char	gtm_key_dc[] = "";
-static	char	gtm_key_down[] = "OB";
-static	char	gtm_key_left[] = "OD";
-static	char	gtm_key_right[] = "OC";
-static	char	gtm_key_up[] = "OA";
+static	char	gtm_key_backspace[] = "\010";
+static	char	gtm_key_dc[] = "\033[3~";
+static	char	gtm_key_down[] = "\033OB";
+static	char	gtm_key_left[] = "\033OD";
+static	char	gtm_key_right[] = "\033OC";
+static	char	gtm_key_up[] = "\033OA";
 static	char	gtm_key_insert[] = "";
-static	char	gtm_keypad_local[] = "[?1l";
-static	char	gtm_keypad_xmit[] = "[?1h";
+static	char	gtm_keypad_local[] = "\033[?1l";
+static	char	gtm_keypad_xmit[] = "\033[?1h";
 static	int	gtm_lines = 24;
 
 #if defined(__MVS__) && __CHARSET_LIB==1	/* -qascii */
@@ -118,12 +118,12 @@ static	char	gtm_cap_ascii[16 * 16];	/* ESC_LEN from io.h times number of tigetst
 
 int	getcaps(int fildes)
 {
-	char	*cap;
+	char		*cap;
 #if defined(__MVS__) && __CHARSET_LIB==1	/* -qascii */
-	char	cap_ebcdic[128];	/* more than enough for terminal name */
-	int	ebc_len, gtm_cap_index = 0;
+	char		cap_ebcdic[128];	/* more than enough for terminal name */
+	int		ebc_len, gtm_cap_index = 0;
 #endif
-	int	status;
+	int		status;
 
 	cap = GETENV("TERM");
 	if (!cap)
@@ -177,96 +177,41 @@ int	getcaps(int fildes)
 #ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
-
 		assert(-1 != AUTO_RIGHT_MARGIN);
-		if (0 == AUTO_RIGHT_MARGIN)
-			AUTO_RIGHT_MARGIN = gtm_auto_right_margin;
 		assert((char *)-1 != CLR_EOS);
-		if (NULL == CLR_EOS || (char *)-1 == CLR_EOS)
-			CLR_EOS = gtm_clr_eos;
-		else
-			CAP2ASCII(CLR_EOS);
+		CAP2ASCII(CLR_EOS);
 		assert((char *)-1 != CLR_EOL);
-		if (NULL == CLR_EOL || (char *)-1 == CLR_EOL)
-			CLR_EOL = gtm_clr_eol;
-		else
-			CAP2ASCII(CLR_EOL);
+		CAP2ASCII(CLR_EOL);
 		assert(-2 != COLUMNS);
-		if (-1 == COLUMNS)
-			COLUMNS = gtm_columns;
 		assert((char *)-1 != CURSOR_ADDRESS);
-		if (NULL == CURSOR_ADDRESS || (char *)-1 == CURSOR_ADDRESS)
-			CURSOR_ADDRESS = gtm_cursor_address;
-		else
-			CAP2ASCII(CURSOR_ADDRESS);
+		CAP2ASCII(CURSOR_ADDRESS);
 		assert((char *)-1 != CURSOR_DOWN);
-		if (NULL == CURSOR_DOWN || (char *)-1 == CURSOR_DOWN)
-			CURSOR_DOWN = gtm_cursor_down;
-		else
-			CAP2ASCII(CURSOR_DOWN);
+		CAP2ASCII(CURSOR_DOWN);
 		assert((char *)-1 != CURSOR_LEFT);
-		if (NULL == CURSOR_LEFT || (char *)-1 == CURSOR_LEFT)
-			CURSOR_LEFT = gtm_cursor_left;
-		else
-			CAP2ASCII(CURSOR_LEFT);
+		CAP2ASCII(CURSOR_LEFT);
 		assert((char *)-1 != CURSOR_RIGHT);
-		if (NULL == CURSOR_RIGHT || (char *)-1 == CURSOR_RIGHT)
-			CURSOR_RIGHT = gtm_cursor_right;
-		else
-			CAP2ASCII(CURSOR_RIGHT);
+		CAP2ASCII(CURSOR_RIGHT);
 		assert((char *)-1 != CURSOR_UP);
-		if (NULL == CURSOR_UP || (char *)-1 == CURSOR_UP)
-			CURSOR_UP = gtm_cursor_up;
-		else
-			CAP2ASCII(CURSOR_UP);
+		CAP2ASCII(CURSOR_UP);
 		assert((char *)-1 != KEY_BACKSPACE);
-		if (NULL == KEY_BACKSPACE || (char *)-1 == KEY_BACKSPACE)
-			KEY_BACKSPACE = gtm_key_backspace;
-		else
-			CAP2ASCII(KEY_BACKSPACE);
+		CAP2ASCII(KEY_BACKSPACE);
 		assert((char *)-1 != KEY_DC);
-		if (NULL == KEY_DC || (char *)-1 == KEY_DC)
-			KEY_DC = gtm_key_dc;
-		else
-			CAP2ASCII(KEY_DC);
+		CAP2ASCII(KEY_DC);
 		assert((char *)-1 != KEY_DOWN);
-		if (NULL == KEY_DOWN || (char *)-1 == KEY_DOWN)
-			KEY_DOWN = gtm_key_down;
-		else
-			CAP2ASCII(KEY_DOWN);
+		CAP2ASCII(KEY_DOWN);
 		assert((char *)-1 != KEY_LEFT);
-		if (NULL == KEY_LEFT || (char *)-1 == KEY_LEFT)
-			KEY_LEFT = gtm_key_left;
-		else
-			CAP2ASCII(KEY_LEFT);
+		CAP2ASCII(KEY_LEFT);
 		assert((char *)-1 != KEY_RIGHT);
-		if (NULL == KEY_RIGHT || (char *)-1 == KEY_RIGHT)
-			KEY_RIGHT = gtm_key_right;
-		else
-			CAP2ASCII(KEY_RIGHT);
+		CAP2ASCII(KEY_RIGHT);
 		assert((char *)-1 != KEY_UP);
-		if (NULL == KEY_UP || (char *)-1 == KEY_UP)
-			KEY_UP = gtm_key_up;
-		else
-			CAP2ASCII(KEY_UP);
+		CAP2ASCII(KEY_UP);
 		assert((char *)-1 != KEY_INSERT);
-		if (NULL == KEY_INSERT || (char *)-1 == KEY_INSERT)
-			KEY_INSERT = gtm_key_insert;
-		else
-			CAP2ASCII(KEY_INSERT);
+		CAP2ASCII(KEY_INSERT);
 		assert((char *)-1 != KEYPAD_LOCAL);
-		if (NULL == KEYPAD_LOCAL || (char *)-1 == KEYPAD_LOCAL)
-			KEYPAD_LOCAL = gtm_keypad_local;
-		else
-			CAP2ASCII(KEYPAD_LOCAL);
+		CAP2ASCII(KEYPAD_LOCAL);
 		assert((char *)-1 != KEYPAD_XMIT);
-		if (NULL == KEYPAD_XMIT || (char *)-1 == KEYPAD_XMIT)
-			KEYPAD_XMIT = gtm_keypad_xmit;
-		else
-			CAP2ASCII(KEYPAD_XMIT);
+		CAP2ASCII(KEYPAD_XMIT);
 		assert(-2 != GTM_LINES);
-		if (-1 == GTM_LINES)
-			GTM_LINES = gtm_lines;
 	}
 	else
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,11 +32,12 @@
 #include "eintr_wrappers.h"
 #include "copy.h"
 #include "is_file_identical.h"
+#include "iosp.h"		/* for SS_NORMAL */
 
 bool is_gdid_file_identical(gd_id_ptr_t fid, char *filename, int4 filelen)
 {
-        struct stat	stat_buf;
 	int		stat_res;
+	struct stat	stat_buf;
 
 	assert(0 == filename[filelen]);
 	STAT_FILE(filename, &stat_buf, stat_res);
@@ -44,25 +45,25 @@ bool is_gdid_file_identical(gd_id_ptr_t fid, char *filename, int4 filelen)
 }
 bool is_file_identical(char *filename1, char *filename2)
 {
-        struct stat	st1, st2;
-	int		stat_res;
 	int		rv = FALSE;
+	int		stat_res;
+	struct stat	st1, st2;
 
 	STAT_FILE(filename1, &st1, stat_res);
 	if (0 == stat_res)
 	{
 	        STAT_FILE(filename2, &st2, stat_res);
-	        if (0 == stat_res)
+		if (0 == stat_res)
 #if defined(__osf__) || defined(_AIX)
 		        if ((st1.st_dev == st2.st_dev) && (st1.st_ino == st2.st_ino) && (
 #ifdef _AIX
-				 (FS_REMOTE == st1.st_flag || FS_REMOTE == st2.st_flag) ? TRUE :
+				(FS_REMOTE == st1.st_flag || FS_REMOTE == st2.st_flag) ? TRUE :
 #endif
-				    st1.st_gen == st2.st_gen))
+				st1.st_gen == st2.st_gen))
 #else
-		        if ((st1.st_dev == st2.st_dev) && (st1.st_ino == st2.st_ino))
+			if ((st1.st_dev == st2.st_dev) && (st1.st_ino == st2.st_ino))
 #endif
-			        rv = TRUE;
+				rv = TRUE;
 	}
 	return rv;
 }
@@ -70,6 +71,7 @@ bool is_file_identical(char *filename1, char *filename2)
 bool  is_gdid_identical(gd_id_ptr_t fid1, gd_id_ptr_t fid2)
 {
 	bool rv = FALSE;
+
 #if defined(__osf__) || defined(_AIX)
 	if ((fid1->inode == fid2->inode) && (fid1->device == fid2->device) && (fid1->st_gen == fid2->st_gen))
 		rv = TRUE;
@@ -80,11 +82,9 @@ bool  is_gdid_identical(gd_id_ptr_t fid1, gd_id_ptr_t fid2)
 	return rv;
 }
 
-
 bool is_gdid_stat_identical(gd_id_ptr_t fid, struct stat *stat_buf)
 {
 #if defined(__osf__) || defined(_AIX)
-
 	assert(SIZEOF(fid->st_gen) >= SIZEOF(stat_buf->st_gen));
 	if (fid->device == stat_buf->st_dev && fid->inode == stat_buf->st_ino &&  (
 #ifdef _AIX
@@ -117,14 +117,14 @@ void set_gdid_from_stat(gd_id_ptr_t fid, struct stat *stat_buf)
 /*
  * Here we create a unique_id for a file.
  */
-boolean_t filename_to_id(gd_id_ptr_t fid, char *filename)
+uint4 filename_to_id(gd_id_ptr_t fid, char *filename)
 {
-        struct stat	filestat;
 	int		stat_res;
+	struct stat	filestat;
 
 	STAT_FILE(filename, &filestat, stat_res);
-	if (stat_res)
-		return FALSE;
+	if (-1 == stat_res)
+		return errno;
 	set_gdid_from_stat(fid, &filestat);
-	return TRUE;
+	return SS_NORMAL;
 }

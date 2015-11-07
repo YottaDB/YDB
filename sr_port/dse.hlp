@@ -1165,7 +1165,8 @@
    the CACHE command is:
 
    CA[CHE] -ALL
-   -RE[COVER
+   -RE[COVER]
+   -SH[OW]
    -VE[RIFY]
 
 3 Qualifiers
@@ -1179,6 +1180,13 @@
        directory for cache recovery.
      o Attempt DSE -RECOVER only if a DSE CACHE -VERIFY commands reports the
        cache is "NOT clean".
+
+   -SH[OW]
+
+   Displays the cache data structure information. All values are in 8-byte
+   hexadecimal form. If the database has encryption turned on, SHOW
+   additionally displays an element that gives information about the
+   encrypted global buffer section in shared memory.
 
    -VE[RIFY] [-ALL]
 
@@ -1219,6 +1227,29 @@
 
    This command reinitializes the cache data structures of the current region
    and reverts the cache of a database having BG access to "clean" state.
+
+   Example:
+
+   DSE> CACHE -SHOW
+   File    /home/jdoe/node1/areg.dat
+   Region  AREG
+
+   Region AREG : Shared_memory       = 0x00002B6845040000
+   Region AREG :  node_local         = 0x0000000000000000
+   Region AREG :  critical           = 0x0000000000010000
+   Region AREG :  shmpool_buffer     = 0x0000000000023000
+   Region AREG :  lock_space         = 0x0000000000125000
+   Region AREG :  cache_queues_state = 0x000000000012A000
+   Region AREG :  cache_que_header   = 0x000000000012A030 : Numelems = 0x00000407 : Elemsize = 0x00000098
+   Region AREG :  cache_record       = 0x0000000000150458 : Numelems = 0x00000400 : Elemsize = 0x00000098
+   Region AREG :  global_buffer      = 0x0000000000177000 : Numelems = 0x00000400 : Elemsize = 0x00000400
+   Region AREG :  db_file_header     = 0x0000000000277000
+   Region AREG :  bt_que_header      = 0x00000000002B7000 : Numelems = 0x00000407 : Elemsize = 0x00000040
+   Region AREG :  th_base            = 0x00000000002C71D0
+   Region AREG :  bt_record          = 0x00000000002C7200 : Numelems = 0x00000400 : Elemsize = 0x00000040
+   Region AREG :  shared_memory_size = 0x00000000002D8000
+
+   DSE>
 
 2 CLose
    CLose
@@ -1466,15 +1497,17 @@
 
    This command displays an output like the following:
 
-   File            /home/gtmuser1/mumps.dat
-   Region          DEFAULT
+   File    /home/jdoe/.fis-gtm/V6.1-000_x86_64/g/gtm.dat
+   Region  DEFAULT
 
-   Date/Time       27-OCT-2009 04:25:12 [$H = 61661,15912]
+   File            /home/jdoe/.fis-gtm/V6.1-000_x86_64/g/gtm.dat
+   Region          DEFAULT
+   Date/Time       27-JAN-2014 03:13:40 [$H = 63214,11620]
      Access method                          BG  Global Buffers                1024
      Reserved Bytes                          0  Block size (in bytes)         1024
-     Maximum record size                   256  Starting VBN                   129
-     Maximum key size                       64  Total blocks            0x00000191
-     Null subscripts                     NEVER  Free blocks             0x0000002A
+     Maximum record size                   256  Starting VBN                   513
+     Maximum key size                       64  Total blocks            0x000000C9
+     Null subscripts                     NEVER  Free blocks             0x00000056
      Standard Null Collation             FALSE  Free space              0x00000000
      Last Record Backup     0x0000000000000001  Extension Count                100
      Last Database Backup   0x0000000000000001  Number of local maps             1
@@ -1482,27 +1515,28 @@
      In critical section            0x00000000  Timers pending                   0
      Cache freeze id                0x00000000  Flush timer            00:00:01:00
      Freeze match                   0x00000000  Flush trigger                  960
-     Current transaction    0x0000000000007539  No. of writes/flush              7
-     Maximum TN             0xFFFFFFFFE3FFFFFF  Certified for Upgrade to        V5
-     Maximum TN Warn        0xFFFFFFFF73FFFFFF  Desired DB Format               V5
-     Master Bitmap Size                    112  Blocks to Upgrade       0x00000000
+     Current transaction    0x0000000000002712  No. of writes/flush              7
+     Maximum TN             0xFFFFFFFF83FFFFFF  Certified for Upgrade to        V6
+     Maximum TN Warn        0xFFFFFFFD93FFFFFF  Desired DB Format               V6
+     Master Bitmap Size                    496  Blocks to Upgrade       0x00000000
      Create in progress                  FALSE  Modified cache blocks            0
      Reference count                         1  Wait Disk                        0
      Journal State               [inactive] ON  Journal Before imaging        TRUE
-     Journal Allocation                    100  Journal Extension              100
-     Journal Buffer Size                   128  Journal Alignsize              128
-     Journal AutoSwitchLimit           8388600  Journal Epoch Interval          30
-     Journal Yield Limit                     8  Journal Sync IO               TRUE
-     Journal File: /home/gtmuser1/mumps.mjl
+     Journal Allocation                   2048  Journal Extension             2048
+     Journal Buffer Size                  2308  Journal Alignsize             4096
+     Journal AutoSwitchLimit           8386560  Journal Epoch Interval          30
+     Journal Yield Limit                     8  Journal Sync IO              FALSE
+     Journal File: /home/jdoe/.fis-gtm/V6.1-000_x86_64/g/gtm.mjl
      Mutex Hard Spin Count                 128  Mutex Sleep Spin Count         128
-     Mutex Spin Sleep Time                2048  KILLs in progress                0
+     Mutex Queue Slots                    1024  KILLs in progress                0
      Replication State                     OFF  Region Seqno    0x0000000000000001
      Zqgblmod Seqno         0x0000000000000000  Zqgblmod Trans  0x0000000000000000
-     Endian Format                      LITTLE  Commit Wait Spin Count          17
-     Database file encrypted             FALSE
+     Endian Format                      LITTLE  Commit Wait Spin Count          16
+     Database file encrypted             FALSE  Inst Freeze on Error         FALSE
+     Spanning Node Absent                 TRUE  Maximum Key Size Assured      TRUE
 
    Note that the certain fileheader elements appear depending on the current
-   state of database. For example, as Journaling is not enabled in the
+   state of database. For example, if Journaling is not enabled in the
    database, DSE does not display Journal data element fields.
 
    Example:
@@ -1645,7 +1679,8 @@
 
    -F[REEBLOCK]
 
-   Finds the nearest free block to the block specified by -HINT.
+   Finds the nearest free block to the block specified by -HINT. FREEBLOCK
+   accepts bit maps as starting or ending points.
 
      o The -FREEBLOCK qualifier is incompatible with all other qualifiers
        except -BLOCK and -HINT.
@@ -1850,7 +1885,7 @@
    -BU[SY]
 
    Marks the current block as busy in the block's local map and appropriately
-   updates the master bitmap.
+   updates the master bitmap. BUSY accepts bit map blocks.
 
    Compatible only with: -BLOCK
 
@@ -1864,7 +1899,8 @@
    -M[ASTER]
 
    Sets the bit in the master bitmap associated with the current block's
-   local map according to whether or not that local map is full.
+   local map according to whether or not that local map is full. MASTER
+   accepts bit map blocks.
 
    Use only with: -BLOCK.
 
@@ -2064,14 +2100,16 @@
 
    -F[ROM]=block_number
 
-   Specifies a starting block number for the range search.
+   Specifies a starting block number for the range search. DSE RANGE accept
+   bit maps as starting or ending points.
 
    By default, RANGE starts processing at the beginning of the file.
 
    -T[O]=block-number
 
-   Specifies an ending block number for the range search. By default, RANGE
-   stops processing at the end of the file.
+   Specifies an ending block number for the range search. DSE RANGE accept
+   bit maps as starting or ending points. By default, RANGE stops processing
+   at the end of the file.
 
    -I[NDEX]
 
@@ -2177,6 +2215,11 @@
    a DSE operation. When no block has been accessed, that is, on the first
    block-oriented command, DSE uses block one (1).
 
+   BLOCK accepts blocks higher than the current database size because they
+   deal with set of saved block copies rather than the database and there are
+   situations where a saved block may be outside the current database size
+   (for example, due to a concurrent MUPIP REORG -TRUNCATE).
+
    -C[OUNT]=count
 
    Specifies the number of records to remove.
@@ -2207,6 +2250,9 @@
    -VERSION is required to REMOVE a SAVE buffer. -VERSION is incompatible
    with all qualifiers except -BLOCK.
 
+   If there is only one version of the specified -BLOCK= block in the current
+   region, DSE REMOVE defaults to that version.
+
    Use only with: -BLOCK; decimal
 
 2 REStore
@@ -2214,10 +2260,10 @@
 
    The RESTORE command restores saved versions of blocks.
 
-   RES[TORE]   B[LOCK]=block-number
-   F[ROM]=from
-   R[EGION]=region
-   V[ERSION]=version-number
+   RES[TORE]   -B[LOCK]=block-number
+   -F[ROM]=from
+   -R[EGION]=region
+   -V[ERSION]=version-number
 
    The version number is specified in decimal.
 
@@ -2232,12 +2278,19 @@
    a DSE operation. When no block has been accessed, (i.e., on the first
    block-oriented command), DSE uses block one (1).
 
+   BLOCK accepts blocks higher than the current database size because it deal
+   with set of saved block copies rather than the database and there are
+   situations where a saved block may be outside the current database size
+   (for example, due to a concurrent MUPIP REORG -TRUNCATE).
+
    -F[ROM]=block_number
 
    Specifies the block number of the SAVE buffer to restore.
 
    DSE restores the block specified with -BLOCK qualifier with the block
-   specified by the -FROM qualifier.
+   specified by the -FROM qualifier. If there is only one version of the
+   specified -FROM= block, DSE RESTORE defaults to that version and it always
+   restores the original block transaction number.
 
    By default, RESTORE uses the target block number as the -FROM block
    number.
@@ -2296,6 +2349,11 @@
 
    By default, SAVE -LIST provides a directory of all SAVEd blocks.
 
+   LIST displays blocks higher than the current database size because it
+   deals with set of saved block copies rather than the database and there
+   are situations where a saved block may be outside the current database
+   size (for example, due to a concurrent MUPIP REORG -TRUNCATE);
+
    Incompatible with: -COMMENT
 
    -[NO]C[RIT]
@@ -2311,6 +2369,7 @@
    zeros, or shortening the block. The format of the SHIFT command is:
 
    SH[IFT]  -B[ACKWARD]=b_shift
+   -BL[OCK]=block_number
    -F[ORWARD]=f_shift
    -O[FFSET]=offset
 
@@ -2328,6 +2387,10 @@
    header.
 
    Incompatible with: -FORWARD
+
+   -BL[OCK]=block_number
+
+   Specifies the block number to perform the DSE SHIFT.
 
    -F[ORWARD]=shift
 
@@ -2780,7 +2843,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2013
+   Copyright 2014
 
    Fidelity Information Services, Inc. All rights reserved.
 
@@ -2801,7 +2864,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.1-000 of the
+   This help file is a concise representation of revision V6.2-000 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

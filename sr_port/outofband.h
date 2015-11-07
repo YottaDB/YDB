@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,12 +31,7 @@ enum outofbands
 
 #define OUTOFBAND_RESTARTABLE(event)	(jobinterrupt == (event))
 
-/* ------------------------------------------------------------------
- *  Old-style declarations (and uses) of this function abound.
- * Be sure to change all declarations at once!
- * ------------------------------------------------------------------
- */
-void outofband_action(bool);
+void outofband_action(boolean_t line_fetch_or_start);
 
 void outofband_clear(void);
 

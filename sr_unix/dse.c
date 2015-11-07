@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,6 @@
 #include "compiler.h"
 #include "patcode.h"
 #include "lke.h"
-#include "get_page_size.h"
 #include "gtm_startup_chk.h"
 #include "generic_signal_handler.h"
 #include "init_secshr_addrs.h"
@@ -57,12 +56,10 @@
 #include "getzdir.h"
 #include "dse_exit.h"
 #include "getjobname.h"
-#include "getjobnum.h"
 #include "sig_init.h"
 #include "gtmmsg.h"
 #include "suspsigs_handler.h"
-#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
-#include "gtm_imagetype_init.h"
+#include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 #include "wbox_test_init.h"
 #include "gtmio.h"
@@ -105,13 +102,11 @@ int main(int argc, char *argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	set_blocksig();
-	gtm_imagetype_init(DSE_IMAGE);
-	gtm_wcswidth_fnptr = gtm_wcswidth;
-	gtm_env_init();	/* read in all environment variables */
+	common_startup_init(DSE_IMAGE);
 	licensed = TRUE;
 	TREF(transform) = TRUE;
 	TREF(no_spangbls) = TRUE;	/* dse operates on a per-region basis irrespective of global mapping in gld */
+	TREF(skip_file_corrupt_check) = TRUE;	/* do not let csd->file_corrupt flag cause errors in dse */
 	op_open_ptr = op_open;
 	patch_curr_blk = get_dir_root();
 	err_init(util_base_ch);
@@ -120,7 +115,6 @@ int main(int argc, char *argv[])
 	sig_init(generic_signal_handler, dse_ctrlc_handler, suspsigs_handler, continue_handler);
 	atexit(util_exit_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
-	get_page_size();
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
 	getjobname();
@@ -132,7 +126,6 @@ int main(int argc, char *argv[])
 	initialize_pattern_table();
 	gvinit();
 	region_init(FALSE);
-	getjobnum();
 	util_out_print("!/File  !_!AD", TRUE, DB_LEN_STR(gv_cur_region));
 	util_out_print("Region!_!AD!/", TRUE, REG_LEN_STR(gv_cur_region));
 	cli_lex_setup(argc, argv);
@@ -166,6 +159,7 @@ int main(int argc, char *argv[])
 	}
 	dse_exit();
 	REVERT;
+	return 0;
 }
 
 static void display_prompt(void)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 
 GBLREF io_pair		io_curr_device;
 
-void	iott_iocontrol(mstr *d)
+void	iott_iocontrol(mstr *mn, int4 argcnt, va_list args)
 {
 	return;
 }
@@ -29,7 +29,7 @@ void	iott_dlr_device(mstr *d)
 	io_desc		*iod;
 	int		len;
 
-	iod = io_curr_device.out;
+	iod = io_curr_device.in;
 	len = STRLEN(iod->dollar.device);
 	/* verify internal buffer has enough space for $DEVICE string value */
 	assert((int)d->len > len);
@@ -43,7 +43,7 @@ void	iott_dlr_key(mstr *d)
 	io_desc		*iod;
 	int		len;
 
-	iod = io_curr_device.out;
+	iod = io_curr_device.in;
     	len = STRLEN(iod->dollar.key);
 	/* verify internal buffer has enough space for $KEY string value */
 	assert((int)d->len > len);

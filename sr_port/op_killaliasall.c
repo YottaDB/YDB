@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2009, 2011 Fidelity Information Services, Inc *
+ *      Copyright 2009, 2014 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -14,6 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "gtmio.h"
 #include "lv_val.h"
 #include "op.h"
 #include "gdsroot.h"
@@ -24,12 +25,11 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include <rtnhdr.h>
+#include "stack_frame.h"
 
 GBLREF symval           *curr_symval;
-GBLREF lv_val		*active_lv;
 GBLREF uint4		dollar_tlevel;
-GBLREF mstr             **stp_array;
-GBLREF int              stp_array_size;
 
 /* Delete all aliases and the data they point to.
  *
@@ -50,19 +50,15 @@ GBLREF int              stp_array_size;
  */
 void op_killaliasall(void)
 {
-	ht_ent_mname    *tabent, *tabent_top, **htearray, **htearraytop, **htep;
+	ht_ent_mname    *tabent, *tabent_top;
 	lv_val		*lvp, *lvp_top, *lvrefp;
 	symval		*symv;
 	int		lowest_symvlvl;
+	ht_ent_mname	**htearraycur = NULL, **htearray = NULL, **htearraytop;
 
-	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
-					 * cleanup problems */
+	SET_ACTIVE_LV(NULL, TRUE, actlv_op_killaliasall);	/* If we get here, subscript set was successful.
+								 * Clear active_lv to avoid later cleanup issues */
 	lowest_symvlvl = MAXPOSINT4;
-        if (NULL == stp_array)
-                /* Same initialization as is in stp_gcol_src.h */
-                stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
-	htearray = htep = (ht_ent_mname **)stp_array;
-	htearraytop = htearray + stp_array_size;
 
 	/* First pass through hash table we record HTEs that have > 1 trefcnt. We will delete these in a later
 	 * loop but don't want to delete any until all are found.
@@ -72,13 +68,7 @@ void op_killaliasall(void)
 		if (HTENT_VALID_MNAME(tabent, lv_val, lvp) && lvp && (1 < lvp->stats.trefcnt))
 		{	/* Verify room in the table, expand if necessary */
 			assert(LV_IS_BASE_VAR(lvp));
-			if (htep >= htearraytop)
-			{	/* No room and the inn .. expand */
-				stp_expand_array();
-				htearray = htep = (ht_ent_mname **)stp_array;
-				htearraytop = htearray + stp_array_size;
-			}
-			*htep++ = tabent;
+			ADD_TO_STPARRAY(tabent, htearray, htearraycur, htearraytop, ht_ent_mname);
 			/* Need to find the lowest level symval that is affected by this kill * so we can mark all necessary
 			 * symvals as having had alias activity.
 			 */
@@ -99,15 +89,14 @@ void op_killaliasall(void)
 			 * that likewise need to be processed (and de-container-ized).
 			 */
 			assert(LV_IS_BASE_VAR(lvp));
-			if (LV_HAS_CHILD(lvp))
-				KILL_CNTNRS_IN_TREE(lvp);
+			KILL_CNTNRS_IN_TREE(lvp);			/* Note macro has LV_GET_CHILD() check in it */
 		}
 	}
 	/* Now we can go through the hash table entries we identified in the first step and delete them.  */
-	for (htearraytop = htep, htep = htearray; htep < htearraytop; ++htep)
+	for (htearraytop = htearraycur, htearraycur = htearray; htearraycur < htearraytop; ++htearraycur)
 	{
-		assert(htep);
-		tabent = *htep;
+		assert(htearraycur);
+		tabent = *htearraycur;
 		lvp = (lv_val *)tabent->value;
 		assert(lvp);
 		assert(LV_IS_BASE_VAR(lvp));

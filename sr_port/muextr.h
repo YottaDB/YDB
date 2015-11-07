@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#include "wbox_test_init.h"
 
 typedef	struct glist_struct
 {
@@ -47,7 +49,7 @@ typedef	struct glist_struct
 		gbl_name_buff[gbl_buff_index++] = ')';							\
 	}												\
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RECORDSTAT, 6, gbl_buff_index, gbl_name_buff,	\
-		GBLSTAT.recknt, GBLSTAT.keylen, GBLSTAT.datalen, GBLSTAT.reclen);			\
+		&GBLSTAT.recknt, GBLSTAT.keylen, GBLSTAT.datalen, GBLSTAT.reclen);			\
 }
 
 #define	DO_OP_GVNAME(GL_PTR)								\
@@ -65,10 +67,10 @@ typedef	struct glist_struct
 
 typedef struct
 {
-	int recknt;
-	int reclen;
-	int keylen;
-	int datalen;
+	gtm_uint64_t	recknt;
+	uint4		reclen;
+	uint4		keylen;
+	uint4		datalen;
 } mu_extr_stats;
 
 #define	MU_EXTR_STATS_INIT(TOT)					\
@@ -76,15 +78,17 @@ typedef struct
 	TOT.recknt = TOT.reclen = TOT.keylen = TOT.datalen = 0;	\
 }
 
-#define	MU_EXTR_STATS_ADD(DST, SRC)		\
-{						\
-	DST.recknt += SRC.recknt;		\
-	if (DST.reclen < SRC.reclen)		\
-		DST.reclen = SRC.reclen;	\
-	if (DST.keylen < SRC.keylen)		\
-		DST.keylen = SRC.keylen;	\
-	if (DST.datalen < SRC.datalen)		\
-		DST.datalen = SRC.datalen;	\
+#define	MU_EXTR_STATS_ADD(DST, SRC)							\
+{											\
+	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_EXTRACT, SRC.recknt, (SRC.recknt << 31));	\
+	assert((DST.recknt + SRC.recknt) >= DST.recknt);	/* overflow check */	\
+	DST.recknt += SRC.recknt;							\
+	if (DST.reclen < SRC.reclen)							\
+		DST.reclen = SRC.reclen;						\
+	if (DST.keylen < SRC.keylen)							\
+		DST.keylen = SRC.keylen;						\
+	if (DST.datalen < SRC.datalen)							\
+		DST.datalen = SRC.datalen;						\
 }
 
 typedef struct coll_hdr_struct
@@ -143,6 +147,7 @@ typedef struct coll_hdr_struct
 char *mu_extr_ident(mstr *a);
 void  mu_extract(void);
 int mu_extr_getblk(unsigned char *ptr, unsigned char *encrypted_buff_ptr);
+int find_reg_hash_idx(gd_region *reg);
 #if defined(GTM_CRYPT)
 boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t is_any_file_encrypted);
 #elif defined(UNIX)
@@ -225,4 +230,3 @@ boolean_t mu_extr_gblout(glist *gl_ptr, struct RAB *outrab, mu_extr_stats *st, i
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);	\
 }
 #endif
-

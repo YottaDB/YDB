@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Inforformation Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Inforformation Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,9 +24,7 @@ int m_break(void)
 		if (!m_xecute())
 			return FALSE;
 	newtriple(OC_BREAK);
-	if (TREF(for_stack_ptr) == TADR(for_stack))
-		start_fetches (OC_FETCH);
-	else
-		start_for_fetches ();
+	/* Because the activity in direct mode brought on by the BREAK can alter the environment, start a new fetch */
+	MID_LINE_REFETCH;
 	return TRUE;
 }

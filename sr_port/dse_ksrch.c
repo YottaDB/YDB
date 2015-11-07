@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,12 +26,13 @@
 #include "t_qread.h"
 #include "mmemory.h"
 
+GBLDEF block_id		ksrch_root;
+
+GBLREF boolean_t	patch_find_root_search;
+GBLREF char		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF short int	patch_path_count;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF char		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF unsigned short	patch_comp_count;
-GBLREF bool		patch_find_root_search;
-GBLDEF block_id		ksrch_root;
 
 error_def(ERR_DSEBLKRDFAIL);
 
@@ -41,15 +42,12 @@ int dse_ksrch(block_id srch,
 	      char *targ_key,
 	      int targ_len)
 {
-	sm_uc_ptr_t	bp, b_top, rp, r_top, key_top, blk_id;
-	unsigned short	cc;
-	int		tmp_cmpc;
-	int	    	rsize;
-	ssize_t		size;
-	int4		cmp;
-	unsigned short	dummy_short;
-	int4		dummy_int;
 	cache_rec_ptr_t dummy_cr;
+	int		rsize, tmp_cmpc;
+	int4		cmp, dummy_int;
+	ssize_t		size;
+	sm_uc_ptr_t	blk_id, bp, b_top, key_top, rp, r_top;
+	unsigned short	cc, dummy_short;
 
 	if(!(bp = t_qread(srch, &dummy_int, &dummy_cr)))
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
@@ -73,8 +71,6 @@ int dse_ksrch(block_id srch,
 			r_top = rp + rsize;
 		if (r_top > b_top)
 			r_top = b_top;
-
-
 		if (r_top - rp < (((blk_hdr_ptr_t)bp)->levl ? SIZEOF(block_id) : MIN_DATA_SIZE) + SIZEOF(rec_hdr))
 		{
 			*pp = 0;
@@ -83,7 +79,6 @@ int dse_ksrch(block_id srch,
 		for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top ; )
 			if (!*key_top++ && !*key_top++)
 				break;
-
 		if (((blk_hdr_ptr_t)bp)->levl && key_top > (blk_id = r_top - SIZEOF(block_id)))
 			key_top = blk_id;
 		if (EVAL_CMPC((rec_hdr_ptr_t)rp) > patch_comp_count)

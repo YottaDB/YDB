@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 /* iosocket_iocontrol.c */
 
 #include "mdef.h"
+#include "mvalconv.h"
 
 #include "gtm_socket.h"
 #include "gtm_inet.h"
@@ -29,6 +30,7 @@
 GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
 
+error_def(ERR_EXPR);
 error_def(ERR_INVCTLMNE);
 
 /* for iosocket_dlr_zkey */
@@ -37,40 +39,100 @@ error_def(ERR_INVCTLMNE);
 #define MAXEVENTLITLEN	(SIZEOF(LISTENING)-1)
 #define MAXZKEYITEMLEN	(MAX_HANDLE_LEN + SA_MAXLITLEN + MAXEVENTLITLEN + 2)	/* 1 pipe and a semicolon */
 
-void	iosocket_iocontrol(mstr *d)
+void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 {
-	char 		action[MAX_DEVCTL_LENGTH];
-	unsigned short 	depth; /* serve as depth for LISTEN and timeout for WAIT */
+	char		action[MAX_DEVCTL_LENGTH];
+	unsigned short 	depth;
 	int		length, n, timeout;
+	pid_t		pid;
+	mval		*arg, *handlesvar = NULL;
 
-	if (0 == d->len)
+	if (0 == mn->len)
 		return;
-	/* The contents of d->addr are passed to us from op_iocontrol. That routine sets up these parms
-	 * but does not zero terminate the string we are passing to SSCANF. If this is not a complex parm
-	 * with parens (as is the case with WRITE /WAIT type statements), SSCANF() will get into trouble
-	 * if the stringpool contains extra junk. For that reason, we now add a null terminator and make
-	 * sure the argument is not too big to parse into our buffer above.
-	 */
-	assert(d->addr == (char *)stringpool.free); 	/* Verify string is where we think it is so we don't corrupt something */
-	assert(MAX_DEVCTL_LENGTH > d->len);
-	assert(IS_IN_STRINGPOOL(d->addr, d->len));
-	*(d->addr + d->len) = '\0';
-	if (0 == (n = SSCANF(d->addr, "%[^(](%hu)", &action[0], &depth)))
-		memcpy(&action[0], d->addr, d->len);
-	if (0 == (length = STRLEN(&action[0])))
-		return;
-	lower_to_upper((uchar_ptr_t)&action[0], (uchar_ptr_t)&action[0], length);
-	if (0 == memcmp(&action[0], "LISTEN", length))
+	assert(MAX_DEVCTL_LENGTH > mn->len);
+	lower_to_upper((uchar_ptr_t)action, (uchar_ptr_t)mn->addr, mn->len);
+	length = mn->len;
+	if (0 == memcmp(action, "LISTEN", length))
 	{
-		if (2 > n)
+		if (1 > argcnt)
 			depth = DEFAULT_LISTEN_DEPTH;
-		iosocket_listen(io_curr_device.out, depth);
-	} else if (0 == memcmp(&action[0], "WAIT", length))
+		else
+		{
+			arg = va_arg(args, mval *);
+			if ((NULL == arg) || !MV_DEFINED(arg))
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_EXPR, 0);
+				return;
+			}
+			depth = MV_FORCE_INTD(arg);
+		}
+		iosocket_listen(io_curr_device.in, depth);
+	} else if (0 == memcmp(action, "WAIT", length))
 	{
-		timeout = depth;
-		if (2 > n)
+		if (1 > argcnt)
 			timeout = NO_M_TIMEOUT;
-		iosocket_wait(io_curr_device.out, timeout); /* depth really means timeout here. */
+		else
+		{
+			arg = va_arg(args, mval *);
+			if ((NULL == arg) || !MV_DEFINED(arg))
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_EXPR, 0);
+				return;
+			}
+			timeout = MV_FORCE_INTD(arg);
+		}
+		iosocket_wait(io_curr_device.in, timeout);
+#	ifndef VMS
+	} else if (0 == memcmp(action, "PASS", length))
+	{
+		n = argcnt;
+		if (1 <= argcnt)
+		{
+			arg = va_arg(args, mval *);
+			n--;
+			if ((NULL != arg) && MV_DEFINED(arg))
+				pid = MV_FORCE_INTD(arg);
+			else
+				pid = -1;
+		}
+		if (2 <= argcnt)
+		{
+			arg = va_arg(args, mval *);
+			n--;
+			if ((NULL != arg) && MV_DEFINED(arg))
+				timeout = MV_FORCE_INTD(arg);
+			else
+				timeout = NO_M_TIMEOUT;
+		}
+		iosocket_pass_local(io_curr_device.out, pid, timeout, n, args);
+	} else if (0 == memcmp(action, "ACCEPT", length))
+	{
+		n = argcnt;
+		if (1 <= argcnt)
+		{
+			handlesvar = va_arg(args, mval *);
+			n--;
+		}
+		if (2 <= argcnt)
+		{
+			arg = va_arg(args, mval *);
+			n--;
+			if ((NULL != arg) && MV_DEFINED(arg))
+				pid = MV_FORCE_INTD(arg);
+			else
+				pid = -1;
+		}
+		if (3 <= argcnt)
+		{
+			arg = va_arg(args, mval *);
+			n--;
+			if ((NULL != arg) && MV_DEFINED(arg))
+				timeout = MV_FORCE_INTD(arg);
+			else
+				timeout = NO_M_TIMEOUT;
+		}
+		iosocket_accept_local(io_curr_device.in, handlesvar, pid, timeout, n, args);
+#	endif
 	} else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVCTLMNE);
 
@@ -82,7 +144,7 @@ void	iosocket_dlr_device(mstr *d)
 	io_desc		*iod;
 	int		len;
 
-	iod = io_curr_device.out;
+	iod = io_curr_device.in;
  	len = STRLEN(iod->dollar.device);
 	/* verify internal buffer has enough space for $DEVICE string value */
 	assert((int)d->len > len);
@@ -93,17 +155,17 @@ void	iosocket_dlr_device(mstr *d)
 
 void	iosocket_dlr_key(mstr *d)
 {
-	io_desc         *iod;
-        int             len;
+	io_desc		*iod;
+	int		len;
 
-        iod = io_curr_device.out;
-        len = STRLEN(iod->dollar.key);
-        /* verify internal buffer has enough space for $DEVICE string value */
-        assert((int)d->len > len);
+	iod = io_curr_device.in;
+	len = STRLEN(iod->dollar.key);
+	/* verify internal buffer has enough space for $DEVICE string value */
+	assert((int)d->len > len);
 	if (len > 0)
-	        memcpy(d->addr, iod->dollar.key, len);
-        d->len = len;
-        return;
+		memcpy(d->addr, iod->dollar.key, len);
+	d->len = len;
+	return;
 }
 
 void iosocket_dlr_zkey(mstr *d)
@@ -115,9 +177,7 @@ void iosocket_dlr_zkey(mstr *d)
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
 
-	iod = io_curr_device.out;
-	if (gtmsocket != iod->type)
-		iod = io_curr_device.in;
+	iod = io_curr_device.in;
 	assertpro(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	zkeyptr = (char *)stringpool.free;

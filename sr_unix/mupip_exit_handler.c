@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,6 +62,8 @@
 #include "op.h"
 #include "io.h"
 #include "gtmsource_srv_latch.h"
+#include "gtmcrypt.h"
+#include "relinkctl.h"
 
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	boolean_t		need_core;
@@ -122,6 +124,7 @@ void mupip_exit_handler(void)
 		recvpool.recvpool_ctl = NULL;
 	}
 	gv_rundown(); /* also takes care of detaching from the journal pool */
+	relinkctl_rundown(TRUE);
 	/* Log the exit of replication servers. In case they are exiting abnormally, their log file pointers
 	 * might not be set up. In that case, use "stderr" for logging.
 	 */
@@ -148,6 +151,7 @@ void mupip_exit_handler(void)
 	close_repl_logfiles();
 	print_exit_stats();
 	io_rundown(RUNDOWN_EXCEPT_STD);
+	GTMCRYPT_CLOSE;
 	if (need_core && !created_core)
 	{
 		++core_in_progress;

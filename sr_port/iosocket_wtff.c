@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,9 +19,13 @@
 #include "iosocketdef.h"
 
 GBLREF io_pair		io_curr_device;
+#ifndef VMS
+GBLREF io_pair		io_std_device;
+#endif
 
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_NOSOCKETINDEV);
+error_def(ERR_SOCKPASSDATAMIX);
 
 void iosocket_wtff(void)
 {
@@ -35,7 +39,12 @@ void iosocket_wtff(void)
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	if (0 >= dsocketptr->n_socket)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+#		ifndef VMS
+		if (iod == io_std_device.out)
+			ionl_wtff();
+		else
+#		endif
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
 		return;
 	}
 	if (dsocketptr->current_socket >= dsocketptr->n_socket)
@@ -44,8 +53,9 @@ void iosocket_wtff(void)
 		return;
 	}
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
-	if (socketptr->zff.len)
-		iosocket_write_real(&socketptr->zff, FALSE);
+	ENSURE_DATA_SOCKET(socketptr);
+	if (socketptr->ozff.len)
+		iosocket_write_real(&socketptr->ozff, FALSE);
 	iosocket_flush(iod);
 	iod->dollar.x = 0;
 	iod->dollar.y = 0;

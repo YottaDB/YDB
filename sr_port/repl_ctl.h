@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,7 +93,14 @@ typedef struct repl_ctl_struct
 	seq_num			min_seqno;	/* least JNL_SEQNO in this file */
 	seq_num			max_seqno;	/* largest JNL_SEQNO in this file */
 	uint4			min_seqno_dskaddr;
-	uint4			max_seqno_dskaddr;
+	uint4			max_seqno_dskaddr;	/* offset in jnl file where max_seqno was found */
+#	ifdef UNIX
+	uint4			max_seqno_eof_addr;	/* eof_addr of jnl file WHEN max_seqno/max_seqno_dskaddr was found.
+							 * Used in "update_max_seqno_info" to ascertain if nothing changed
+							 * since the last call to this function and if so return right away
+							 */
+	uint4			filler_4byte;
+#	endif
 	seq_num			seqno;		/* Next read positioned at first
 						 * jnl rec with JNL_SEQNO seqno */
 	trans_num		tn; 		/* tn corresponding to seqno */

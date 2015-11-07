@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-#       Copyright 2010 Fidelity Information Services, Inc #
+#       Copyright 2010, 2014 Fidelity Information Services, Inc #
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -77,5 +77,9 @@ comment="$*" ; if [ -z "$comment" ] ; then comment="Key in $output_file created 
 
 dir_path=`dirname $0` ; if [ -z "$dir_path" ] ; then dir_path=$PWD ; fi
 
+# If $gtm_encrypt_notty is defined, we want to use it.
+notty=$gtm_encrypt_notty
+
 # Generate random key and save the output encrypted and signed
-$gpg --gen-random $random_strength $SYM_KEY_LEN | $gpg --armor --encrypt --default-recipient-self --comment "$comment" --output $output_file
+$gpg $notty --gen-random $random_strength $SYM_KEY_LEN | \
+	$gpg --armor --encrypt --default-recipient-self --comment "$comment" --output $output_file $notty

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,6 +69,8 @@ GBLREF	void			(*call_on_signal)();
 GBLREF	uint4			process_id;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int			recvpool_shmid;
+GBLREF	char			gtm_dist[GTM_PATH_MAX];
+GBLREF	boolean_t		gtm_dist_ok_to_use;
 GBLREF	gtmrecv_options_t	gtmrecv_options;
 GBLREF	int			gtmrecv_log_fd;
 GBLREF	FILE			*gtmrecv_log_fp;
@@ -79,7 +81,9 @@ GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
+LITREF	gtmImageName		gtmImageNames[];
 
+error_def(ERR_GTMDISTUNVERIF);
 error_def(ERR_INITORRESUME);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_NORESYNCSUPPLONLY);
@@ -118,6 +122,9 @@ int gtmrecv(void)
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool));
 	if (-1 == gtmrecv_get_opt())
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+	if (!gtm_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	if (gtmrecv_options.start || gtmrecv_options.shut_down)
 	{
 		jnlpool_init(GTMRECEIVE, (boolean_t)FALSE, (boolean_t *)NULL);
@@ -336,7 +343,7 @@ int gtmrecv(void)
 			}
 		}
 #		ifndef REPL_DEBUG_NOBACKGROUND
-		FORK_CLEAN(pid);
+		FORK(pid);
 		if (0 < pid)
 		{
 			REPL_DPRINT2("Waiting for receiver child process %d to startup\n", pid);
@@ -559,10 +566,7 @@ int gtmrecv(void)
 		if (SS_NORMAL == (status = repl_filter_init(gtmrecv_local->filter_cmd)))
 			gtmrecv_filter |= EXTERNAL_FILTER;
 		else
-		{
-			if (EREPL_FILTERSTART_EXEC == repl_errno)
-				gtmrecv_exit(ABNORMAL_SHUTDOWN);
-		}
+			gtmrecv_exit(ABNORMAL_SHUTDOWN);
 	}
 	gtmrecv_process(!recvpool_ctl->fresh_start);
 	return (SS_NORMAL);
