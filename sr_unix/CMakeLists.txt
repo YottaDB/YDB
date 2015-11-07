@@ -422,7 +422,9 @@ endforeach()
 # TODO: find_package or find_library for system libs?
 include_directories (/usr/local/include)
 target_link_libraries(libmumps		${libmumpslibs})
-add_dependencies(libmumps		gen_gtm_threadgbl_deftypes)
+if(gen_xfer_desc)
+  add_dependencies(libmumps gen_xfer_desc)
+endif()
 
 add_executable(mumps			${mumps_SOURCES})
 target_link_libraries(mumps		libmumps)

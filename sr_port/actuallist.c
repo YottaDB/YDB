@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,7 +107,7 @@ error_def(ERR_SIDEEFFECTEVAL);
 		if ((1 < parmcount) && (TREF(side_effect_base))[TREF(expr_depth)])
 		{	/* at least two arguments and at least one side effect - look for lvns needing protection */
 			assert(OLD_SE != TREF(side_effect_handling));
-			se_warn = (!run_time && (SE_WARN == TREF(side_effect_handling)));
+			se_warn = SE_WARN_ON;
 			for (i = 0, j = parmcount, ref0 = counttrip->operand[1].oprval.tref; --j;
 				ref0 = ref0->operand[1].oprval.tref)
 			{	/* no need to do the last argument - can't have a side effect after it */

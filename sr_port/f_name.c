@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +77,7 @@ int f_name(oprtype *a, opctype op)
 		column = source_column;
 		if (EXPR_FAIL == expr(depth, MUMPS_STR))
 			return FALSE;
-		if (!run_time && (OC_INDFNNAME2 == r->opcode) && (SE_WARN == TREF(side_effect_handling)))
+		if (SE_WARN_ON && (OC_INDFNNAME2 == r->opcode))
 			ISSUE_SIDEEFFECTEVAL_WARNING(column - 1);
 	}
 	coerce(depth, OCT_MVAL);

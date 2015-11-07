@@ -243,6 +243,7 @@ typedef struct
  * PostConditionals can cause this path to be avoided in which case we do not want to issue an error at compile time.
  * Therefore issue only a warning at compile-time and proceed with compilation as if this codepath will not be reached at runtime.
  */
+error_def(ERR_BOOLSIDEFFECT);
 error_def(ERR_DEVPARINAP);
 error_def(ERR_DEVPARUNK);
 error_def(ERR_DEVPARVALREQ);
@@ -353,9 +354,8 @@ typedef struct
 	newtriple(OC_GVRECTARG)->operand[0] = put_tref(TREF(expr_start));	\
 }
 
-/* note assignment below and that it always occurs */
-#define SHIFT_SIDE_EFFECTS	((TREF(saw_side_effect) = TREF(shift_side_effects)) \
-	&& (NULL != TREF(expr_start)) && (GTM_BOOL == TREF(gtm_fullbool)))
+/* note assignment below */
+#define SHIFT_SIDE_EFFECTS	((TREF(saw_side_effect) = TREF(shift_side_effects)) && (GTM_BOOL == TREF(gtm_fullbool)))
 
 #define INITIAL_SIDE_EFFECT_DEPTH 33	/* initial allocation for expression nesting to track side effects */
 

@@ -27,7 +27,6 @@
 GBLREF	bool		devctlexp;
 GBLREF	boolean_t	run_time;
 
-error_def(ERR_BOOLSIDEFFECT);
 error_def(ERR_EXPR);
 error_def(ERR_FCNSVNEXPECTED);
 error_def(ERR_FNOTONSYS);
@@ -705,7 +704,7 @@ int expritem(oprtype *a)
 		if (!saw_se)						/* might have lucked out on ordering */
 			saw_local = FALSE;				/* just clear the backptrs - shut off other processing */
 		saw_se = FALSE;
-		se_warn = (!run_time && (SE_WARN == TREF(side_effect_handling)));
+		se_warn = SE_WARN_ON;
 		dqloop(funcbp, que, tripbp)
 		{	/* work chained arguments which are in reverse order */
 			argtrip = tripbp->bpt;

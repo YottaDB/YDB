@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +48,7 @@ int eval_expr(oprtype *a)
 		return EXPR_FAIL;
 	}
 	se_handling = TREF(side_effect_handling);
-	se_warn = (!run_time && (SE_WARN == se_handling));
+	se_warn = SE_WARN_ON;
 	while (bin_opcode = tokentable[TREF(window_token)].bo_type)	/* NOTE assignment NOT condition */
 	{
 		type = tokentable[TREF(window_token)].opr_type;

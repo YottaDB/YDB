@@ -35,11 +35,11 @@ To build GT.M for Linux, do the following steps:
    from http://sourceforge.net/projects/fis-gtm/ Unpack the tar file and run
    the configure script as root. Note: the tar file unpacks everything into
    your current working directory, not a new subdirectory. The Linux Standard
-   Base (LSB) install path for GT.M V6.2-002 is /opt/fis-gtm/V6.2-002_i586 or
-   /opt/fis-gtm/V6.2-002_x8664. These instructions are written using x8664, please
+   Base (LSB) install path for GT.M V6.2-002A is /opt/fis-gtm/V6.2-002A_i586 or
+   /opt/fis-gtm/V6.2-002A_x8664. These instructions are written using x8664, please
    use i586 as necessary.
 
-   $ tar xfz gtm_V62002_linux_x8664_pro.tar.gz
+   $ tar xfz gtm_V62002A_linux_x8664_pro.tar.gz
 
    # Note down the installation path for use with cmake below
 
@@ -47,16 +47,16 @@ To build GT.M for Linux, do the following steps:
 
 2. Unpack the GT.M sources
    The GT.M source tarball extracts to a directory with the version number in
-   the name, fis-gtm-V6.2-002
-   $ tar xfz fis-gtm-V6.2-002.tar.gz
-   $ cd fis-gtm-V6.2-002
+   the name, fis-gtm-V6.2-002A
+   $ tar xfz fis-gtm-V6.2-002A.tar.gz
+   $ cd fis-gtm-V6.2-002A
 
    You should find this README, LICENSE, COPYING and CMakeLists.txt file and
    sr_* source directories.
 
 3. Building GT.M -
    <fis-gtm-build> can be a sub directory of the source directory,
-   fis-gtm-V6.2-002, or any other valid path.
+   fis-gtm-V6.2-002A, or any other valid path.
 
    $ mkdir <fis-gtm-build>
    $ cd <fis-gtm-build>
@@ -75,16 +75,16 @@ To build GT.M for Linux, do the following steps:
    #
    #     -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package
    #
-   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.2-002
+   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.2-002A
 
    $ make
 
    $ make install
 
-   $ cd package/lib/fis-gtm/V6.2-002_x86_64
+   $ cd package/lib/fis-gtm/V6.2-002A_x86_64
 
    # Now you are ready to install GT.M. Answer a few questions and install it.
-   # The recommended installation path is /opt/fis-gtm/V6.2-002_x86_64
+   # The recommended installation path is /opt/fis-gtm/V6.2-002A_x86_64
 
    $ sudo ./configure
 

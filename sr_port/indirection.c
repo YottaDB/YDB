@@ -27,7 +27,6 @@ GBLREF	spdesc		stringpool;
 GBLREF	unsigned char	*source_buffer;
 GBLREF	int		source_column;
 
-error_def(ERR_BOOLSIDEFFECT);
 error_def(ERR_EXPR);
 error_def(ERR_LPARENMISSING);
 error_def(ERR_MAXNRSUBSCRIPTS);

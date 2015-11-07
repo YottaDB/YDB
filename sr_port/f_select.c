@@ -35,7 +35,7 @@ LITREF octabstruct oc_tab[];
 
 int f_select(oprtype *a, opctype op)
 {
-	boolean_t	first_time, save_saw_side, *save_se_base, save_shift, shifting, we_saw_side_effect = FALSE;
+	boolean_t	first_time, save_saw_side, saw_se_in_select, *save_se_base, save_shift, shifting, gvn_or_indir_in_select;
 	opctype		old_op;
 	oprtype		*cnd, endtrip, target, tmparg;
 	triple		*oldchain, *r, *ref, *save_start, *save_start_orig, tmpchain, *triptr;
@@ -60,7 +60,8 @@ int f_select(oprtype *a, opctype op)
 	{
 		dqinit(&tmpchain, exorder);
 		oldchain = setcurtchain(&tmpchain);
-		INCREMENT_EXPR_DEPTH;	/* Don't want to hit botton with each expression, so start at 1 rather than 0 */
+		INCREMENT_EXPR_DEPTH;	/* Don't want to hit bottom with each expression, so start at 1 rather than 0 */
+		TREF(expr_start) = TREF(expr_start_orig) = &tmpchain;
 		TREF(shift_side_effects) = TRUE;
 	} else
 		TREF(shift_side_effects) = FALSE;
@@ -130,44 +131,38 @@ int f_select(oprtype *a, opctype op)
 	ref->operand[0] = tmparg;
 	ref->operand[1] = put_ilit(FALSE);	/* Not a subroutine reference */
 	ins_triple(r);
+	saw_se_in_select = TREF(saw_side_effect);	/* note this down before it gets reset by DECREMENT_EXPR_DEPTH */
 	if (shifting)
-	{
-		assert(1 == TREF(expr_depth));
-		we_saw_side_effect = TREF(saw_side_effect);
-		save_se_base[save_expr_depth] |= (TREF(side_effect_base))[1];
 		DECREMENT_EXPR_DEPTH;		/* Clean up */
-	}
 	assert(!TREF(expr_depth));
+	gvn_or_indir_in_select = (TREF(expr_start) != TREF(expr_start_orig));
 	TREF(expr_start) = save_start;
 	TREF(expr_start_orig) = save_start_orig;
-	TREF(saw_side_effect) = save_saw_side;
 	TREF(shift_side_effects) = save_shift;
-	SELECT_CLEANUP;
-	TREF(expr_depth) = save_expr_depth;
+	save_se_base[save_expr_depth] |= (TREF(side_effect_base))[TREF(expr_depth)];
+	TREF(saw_side_effect) = saw_se_in_select | save_saw_side;
+	SELECT_CLEANUP;	/* restores TREF(expr_depth), TREF(side_effect_base) and TREF(side_effect_depth) */
 	if (shifting)
-	{	/* We have built a separate chain so decide what to do with it */
-		if (we_saw_side_effect || (GTM_BOOL != TREF(gtm_fullbool))
-			|| ((save_start != save_start_orig) && (OC_NOOP != save_start->opcode)))
-		{	/* Only play this game if a side effect requires it */
-			newtriple(OC_GVSAVTARG);	/* Need 1 of these at expr_start */
-			setcurtchain(oldchain);
-			TREF(saw_side_effect) |= we_saw_side_effect;
-			if (NULL == save_start)
-			{	/* If this chain is new, look back for a pre-boolean place to put it */
-				for (ref = (TREF(curtchain))->exorder.bl;
-				     (ref != TREF(curtchain)) && oc_tab[ref->opcode].octype & OCT_BOOL; ref = ref->exorder.bl)
-						;
-				TREF(expr_start) = TREF(expr_start_orig) = ref;
-			}
-			dqadd(TREF(expr_start), &tmpchain, exorder);
-			TREF(expr_start) = tmpchain.exorder.bl;
-			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(TREF(expr_start));
-		} else
-		{	/* Just put it where it would "naturally" go */
+	{
+		if (!gvn_or_indir_in_select && ((GTM_BOOL == TREF(gtm_fullbool)) || !saw_se_in_select))
+		{
 			setcurtchain(oldchain);
 			triptr = (TREF(curtchain))->exorder.bl;
-			dqadd(triptr, &tmpchain, exorder);
+			dqadd(triptr, &tmpchain, exorder);	/* this is a violation of info hiding */
+		} else
+		{
+			shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode));
+			newtriple(shifting ? OC_GVSAVTARG : OC_NOOP);	/* must have one of these two at expr_start */
+			setcurtchain(oldchain);
+			assert(NULL != TREF(expr_start));
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
+			if (shifting)
+			{	/* only play this game if something else started it */
+				assert(OC_GVSAVTARG == (TREF(expr_start))->opcode);
+				triptr = newtriple(OC_GVRECTARG);
+				triptr->operand[0] = put_tref(TREF(expr_start));
+			}
 		}
 	}
 	*a = put_tref(r);
