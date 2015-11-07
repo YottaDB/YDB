@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +63,7 @@ boolean_t grab_crit_immediate(gd_region *reg)
 		crit_count++;	/* prevent interrupts */
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csd->mutex_spin_parms;
-		status = mutex_lockwim(reg, mutex_spin_parms, crash_count);
+		status = gtm_mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_LOCK_WRITE_IMMEDIATE);
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{

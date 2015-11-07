@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,12 +68,12 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	 * gv_namehead structure are defined using MAX_BT_DEPTH macros and we want to guard against changes to this macro
 	 * that cause unintended changes to the layout/size of the gv_namehead structure.
 	 */
-	assert(OFFSETOF(gv_namehead, filler_8byte_align2[0]) + SIZEOF(gvt->filler_8byte_align2)
+	assert(OFFSETOF(gv_namehead, filler_8byte_align1[0]) + SIZEOF(gvt->filler_8byte_align1)
 			== OFFSETOF(gv_namehead, last_split_blk_num[0]));
 #	ifdef GTM_TRIGGER
 	assert(OFFSETOF(gv_namehead, last_split_blk_num[0]) + SIZEOF(gvt->last_split_blk_num)
 			== OFFSETOF(gv_namehead, gvt_trigger));
-	GTM64_ONLY(assert(OFFSETOF(gv_namehead, filler_8byte_align3) + SIZEOF(gvt->filler_8byte_align3)
+	GTM64_ONLY(assert(OFFSETOF(gv_namehead, filler_8byte_align2) + SIZEOF(gvt->filler_8byte_align2)
 			== OFFSETOF(gv_namehead, clue));)
 	NON_GTM64_ONLY(assert(OFFSETOF(gv_namehead, trig_mismatch_test_done) + SIZEOF(gvt->trig_mismatch_test_done)
 			== OFFSETOF(gv_namehead, clue));)
@@ -117,6 +118,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	assert(0 == (OFFSETOF(gv_namehead, clue) % SIZEOF(gvt->clue)));
 	gvt->first_rec = (gv_key *)((char *)&gvt->clue + SIZEOF(gv_key) + keysize);
 	gvt->last_rec = (gv_key *)((char *)gvt->first_rec + SIZEOF(gv_key) + keysize);
+	gvt->prev_key = NULL;
 	assert((UINTPTR_T)gvt->first_rec % SIZEOF(gvt->first_rec->top) == 0);
 	assert((UINTPTR_T)gvt->last_rec % SIZEOF(gvt->last_rec->top) == 0);
 	assert((UINTPTR_T)gvt->first_rec % SIZEOF(gvt->first_rec->end) == 0);
@@ -236,5 +238,7 @@ void	targ_free(gv_namehead *gvt)
 		next_gvnh->prev_gvnh = prev_gvnh;
 	if (NULL != gvt->alt_hist)	/* can be NULL for GT.CM GNP or DDP client */
 		free(gvt->alt_hist);
+	if (NULL != gvt->prev_key)
+		free(gvt->prev_key);
 	free(gvt);
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,11 +10,12 @@
  *								*
  ****************************************************************/
 
-#ifndef   	CREATE_FATAL_ERROR_ZSHOW_DMP_H_
-# define   	CREATE_FATAL_ERROR_ZSHOW_DMP_H_
+#ifndef CREATE_FATAL_ERROR_ZSHOW_DMP_H_
+#define	CREATE_FATAL_ERROR_ZSHOW_DMP_H_
 
-#define GTMFATAL_ERROR_DUMP_FILENAME	"GTM_FATAL_ERROR"
+#define GTMFATAL_ERROR_DUMP_FILENAME	"GTM_FATAL_ERROR.ZSHOW_DMP_"
+#define GTMFATAL_ERROR_DUMP_FILETYPE 	".txt"
 
-void create_fatal_error_zshow_dmp(int4 signal, boolean_t repeat_error);
+void create_fatal_error_zshow_dmp(int4 signal);
 
 #endif

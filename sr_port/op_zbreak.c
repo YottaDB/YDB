@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +29,7 @@ int op_zbreak(stack_frame *fp)
 	line_addr = find_line_start(fp->mpc, fp->rvector);
 	assert(NULL != line_addr);
 	line_addr = (unsigned char *)find_line_call(line_addr) - SIZEOF_LA;
-	z_ptr = zr_find(&zbrk_recs, (zb_code *)line_addr);
+	z_ptr = zr_find(&zbrk_recs, (zb_code *)line_addr, RETURN_CLOSEST_MATCH_FALSE);
 	assert(NULL != z_ptr);
 
 	if (0 < z_ptr->count && 0 < --z_ptr->count)

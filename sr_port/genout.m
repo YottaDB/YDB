@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2007 Fidelity Information Services, Inc	;
+; Copyright (c) 2001, 2015 Fidelity National Information	;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -9,18 +10,25 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 genout	;output the results
-	o outfile:newv u outfile
+	o outfile:newv
 	n knt
 	s knt=0
-	w "/****************************************************************",!
-	w " *",$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),"*",!
-	w " *",$c(9),"Copyright 2001, ",$Zdate($H,"YEAR")," Fidelity Information Services, Inc",$c(9),"*",!
-	w " *",$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),"*",!
-	w " *",$c(9),"This source code contains the intellectual property",$c(9),"*",!
-	w " *",$c(9),"of its copyright holder(s), and is made available",$c(9),"*",!
-	w " *",$c(9),"under a license.  If you do not know the terms of",$c(9),"*",!
-	w " *",$c(9),"the license, please stop and do not read further.",$c(9),"*",!
-	w " *",$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),"*",!
+	s vms=$zversion["VMS"
+	i vms s cfile=$ztrnlnm("gtm$src")_"copyright.txt"
+	i 'vms s cfile=$ztrnlnm("gtm_tools")_"/copyright.txt"
+	s xxxx="2001"
+	s yyyy=$zdate($H,"YYYY")
+	o cfile:read
+	u outfile w "/****************************************************************",!
+	f i=1:1 u cfile r line q:$zeof  d
+	. i (1<$zl(line,"XXXX")) d
+	. . s str=$zpiece(line,"XXXX",1)_xxxx_$zpiece(line,"XXXX",2)
+	. . s str=$zpiece(str,"YYYY",1)_yyyy_$zpiece(str,"YYYY",2)
+	. e  d
+	. . s str=line
+	. u outfile w " *"_str_"*",!
+	c cfile
+	u outfile
 	w " ****************************************************************/",!!
 	f i="mdef.h","vxi.h","vxt.h","xfer_enum.h" w "#include """,i,"""",!
 	w "LITDEF short ttt[",ttt,"] = {",!

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +53,6 @@ LITDEF unsigned char filter_index[27] =
 };
 
 GBLREF boolean_t		ctrlc_on, dollar_zininterrupt;
-GBLREF bool			prin_out_dev_failure;
 GBLREF char			*CURSOR_ADDRESS, *CLR_EOL, *CLR_EOS;
 GBLREF io_pair			io_std_device;
 GBLREF io_pair			io_curr_device;
@@ -82,9 +82,11 @@ void iott_use(io_desc *iod, mval *pp)
 	struct termios		t;
 	uint4			mask_in;
 	unsigned char		ch, len;
+	boolean_t		ch_set;
 
 	p_offset = 0;
 	assert(iod->state == dev_open);
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	iott_flush(iod);
 	tt_ptr = (d_tt_struct *)iod->dev_sp;
 	if (*(pp->str.addr + p_offset) != iop_eol)
@@ -102,16 +104,7 @@ void iott_use(io_desc *iod, mval *pp)
 		if (0 != status)
 		{
 			save_errno = errno;
-			if (io_curr_device.out == io_std_device.out)
-			{
-				if (!prin_out_dev_failure)
-					prin_out_dev_failure = TRUE;
-				else
-				{
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
-					stop_image_no_core();
-				}
-			}
+			ISSUE_NOPRINCIO_IF_NEEDED_TT(io_curr_device.out);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		flush_input = FALSE;
@@ -448,6 +441,7 @@ void iott_use(io_desc *iod, mval *pp)
 		tt_ptr->tt_state_save.who_saved = ttwhichinvalid;
 		io_find_mvstent(iod, TRUE);	/* clear mv stack entry */
 	}
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }
 

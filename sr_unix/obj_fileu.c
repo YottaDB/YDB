@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,7 +76,7 @@ int mk_tmp_object_file(const char *object_fname, int object_fname_len)
 		/* Note memcpy() below purposely includes null terminator */
 		memcpy(TADR(tmp_object_file_name) + object_fname_len, MKSTEMP_MASK, SIZEOF(MKSTEMP_MASK));
 		fdesc = mkstemp(TADR(tmp_object_file_name));
-	} while ((-1 == fdesc) && (EEXIST == errno) && (0 < --retry));
+	} while ((FD_INVALID == fdesc) && (EEXIST == errno) && (0 < --retry));
 	if (FD_INVALID == fdesc)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_fname_len, object_fname, errno);
 	umask_orig = umask(000);	/* Determine umask (destructive) */

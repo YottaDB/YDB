@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,12 +32,22 @@
 #include "gtmsource.h"
 #include "repl_comm.h"
 
+GBLREF	boolean_t		is_src_server;
+GBLREF	gtmsource_options_t	gtmsource_options;
+
+#ifdef VMS
+error_def(ERR_REPLEXITERR);
+#endif
+error_def(ERR_REPLSRCEXITERR);
+
 void gtmsource_exit(int exit_status)
 {
-	error_def(ERR_REPLEXITERR);
-#ifdef VMS
+	if ((0 != exit_status) && is_src_server)
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLSRCEXITERR, 2, gtmsource_options.secondary_instname,
+				gtmsource_options.log_file);
+#	ifdef VMS
 	sys$exit((0 == exit_status) ? SS$_NORMAL : ERR_REPLEXITERR);
-#else
+#	else
 	exit(exit_status);
-#endif
+#	endif
 }

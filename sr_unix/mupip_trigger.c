@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +51,6 @@ void mupip_trigger(void)
 {
 	char		trigger_file_name[MAX_FN_LEN + 1], select_list[MAX_LINE], select_file_name[MAX_FN_LEN + 1];
 	unsigned short	trigger_file_len = MAX_FN_LEN + 1, select_list_len = MAX_LINE;
-	int		reg_max_rec, reg_max_key, reg_max_blk;
 	unsigned short	sf_name_len;
 	int		local_errno;
 	struct stat	statbuf;

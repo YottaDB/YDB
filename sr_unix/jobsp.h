@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +20,7 @@
 #define MAX_PRCNAM_LEN		15
 #define MAX_STDIOE_LEN		1024
 #define MAX_JOBPARM_LEN		1024
+#define MAX_JOB_LEN		8192	/* The length of the buffer used for storing each argument of the job command */
 
 #define TIMEOUT_ERROR		(MAX_SYSERR + 1)	/* a special value to differentiate it from the rest of errno's */
 
@@ -160,7 +162,7 @@ typedef size_t job_arg_count_msg;
 typedef struct
 {
 	ssize_t			len;				/* negative len indicates null arg */
-	char			data[MAX_JOBPARM_LEN];
+	char			data[MAX_JOB_LEN];
 } job_arg_msg;
 
 typedef size_t job_buffer_size_msg;

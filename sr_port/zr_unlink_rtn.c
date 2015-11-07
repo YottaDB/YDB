@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +28,8 @@
 #include "zroutines.h"
 #include "incr_link.h"
 #ifdef UNIX
-#include "rtnobj.h"
+# include "rtnobj.h"
+# include "arlinkdbg.h"
 #endif
 
 /* Routine to unlink given old flavor of routine (as much of it as we are able).
@@ -46,7 +48,13 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 {
 	textElem        *telem;
 	rhdtyp		*rhdr, *next_rhdr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	ifdef UNIX
+	DBGARLNK((stderr, "zr_unlink_rtn: Cleaning requested for routine %.*s (rtnhdr 0x"lvaddr")\n",
+		  old_rhead->routine_name.len, old_rhead->routine_name.addr, old_rhead));
+#	endif
 	zr_remove_zbrks(old_rhead, NOBREAKMSG);	/* Remove breakpoints (now inactive) */
 	/* If source has been read in for old routine, free space. On VMS, source is associated with a routine name
 	 * table entry. On UNIX, source is associated with a routine header, and we may have different sources for
@@ -68,7 +76,11 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 			 (char *)(old_rhead->literal_text_adr + old_rhead->literal_text_len));
 	if (NULL == old_rhead->shlib_handle)
         {	/* Object is not resident in a shared library */
-		if (!free_all)
+		if (!free_all && !old_rhead->rtn_relinked)
+			/* If recursively relinked, then this need not be done as it entirely disappears when it unwinds.
+			 * But the zlmov_lnames() for the original version of this routine was taken care of during the
+			 * recursive-relink in handle_active_old_versions().
+			 */
 			zlmov_lnames(old_rhead); 	/* Copy the label names from literal pool to malloc'd area */
 #		ifdef AUTORELINK_SUPPORTED
 		if (old_rhead->shared_object)
@@ -91,10 +103,17 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 	free(old_rhead->linkage_adr);		/* Release the old linkage section */
 	old_rhead->linkage_adr = NULL;
 #	ifdef AUTORELINK_SUPPORTED
+	if (old_rhead->shared_object)		/* If this is a shared object (not shared library), release rtn name/path text */
+	{	/* After freeing, these names should be reset by incr_link() but in case not - set them to NULL */
+		free(old_rhead->src_full_name.addr);
+		old_rhead->src_full_name.addr = old_rhead->routine_name.addr = NULL;
+	}
 	if (NULL != old_rhead->zhist)
 	{	/* Free history used for autorelink if present */
 		free(old_rhead->zhist);
 		old_rhead->zhist = NULL;
+		assert(0 < TREF(arlink_loaded));
+		(TREF(arlink_loaded))--;	/* Reduce count when arlinked routine unloaded */
 	}
 #	endif /* AUTORELINK_SUPPORTED */
 #	else  /* (now) !USHBIN_SUPPORTED */
@@ -107,20 +126,18 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 	if (free_all)
 	{	/* We are not keeping any parts of this routine (generally used for triggers and for gtm_unlink_all()) */
 #		ifdef USHBIN_SUPPORTED
-		free(old_rhead->labtab_adr);	/* Usually non-releasable but not in this case */
+		free(old_rhead->labtab_adr);			/* Usually non-releasable but not in this case */
 		if (old_rhead->lbltext_ptr)
-			free(old_rhead->lbltext_ptr);	/* Get rid of any label text hangers-on */
-		if (old_rhead->shared_object)		/* If this is a shared object (not library), drop rtn name/path text */
-			free(old_rhead->src_full_name.addr);
+			free(old_rhead->lbltext_ptr);		/* Get rid of any label text hangers-on */
+		assert(NULL == old_rhead->active_rhead_adr);	/* Should be no copies of rtnhdrs at this point */
 		/* Run the chain of old (replaced) versions freeing them also if they exist*/
 		for (rhdr = OLD_RHEAD_ADR(old_rhead); NULL != rhdr; rhdr = next_rhdr)
 		{
 			next_rhdr = rhdr->old_rhead_adr;
 			if (rhdr->lbltext_ptr)
 				free(rhdr->lbltext_ptr);	/* Get rid of any label text hangers-on */
-			if (rhdr->shared_object)		/* If this is a shared object, drop rtn name/path text */
-				free(rhdr->src_full_name.addr);
 			free(rhdr->labtab_adr);			/* Free dangling label table */
+			assert(NULL == rhdr->active_rhead_adr);	/* Should be no copies of rtnhdrs at this point */
 			free(rhdr);
 		}
 		free(old_rhead);

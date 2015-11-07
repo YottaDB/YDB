@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,13 +46,13 @@
  * in addition to the other handlers for each trigger frame, the maximums may need to be re-visited.
  */
 #ifdef DEBUG
-#  define CONDSTK_INITIAL_INCR	2	/* Low initial limit for DEBUG to exercise extensions */
+#  define CONDSTK_INITIAL_INCR	3	/* Low initial limit for DEBUG to exercise extensions */
 #else
 #  define CONDSTK_INITIAL_INCR	8	/* Initial increment value used when expanding condition handler stack */
 #endif
 #define CONDSTK_MAX_INCR	128	/* Increment doubles each time expanded till hits this level */
 #define CONDSTK_MAX_STACK	512	/* Actual max is approx 504 due to arithmetic progression */
-#define CONDSTK_RESERVE		3	/* Reserve 2 frames for when process_exiting */
+#define CONDSTK_RESERVE		4	/* Reserve 4 frames for when process_exiting */
 
 #define CONDITION_HANDLER(name)	ch_ret_type name(int arg)
 
@@ -142,6 +143,11 @@ void ch_trace_point() {return;}
  * With the introduction of call-ins, there could be multiple mdb_condition_handlers stacked up in chnd stack.
  * The active context should be reset to the youngest mdb_condition_handler created by the current gtm/call-in invocation. We have
  * two flavors depending on if triggers are enabled or not.
+ *
+ * Note, like the UNWIND macro below, these MUM_TSTART macros cannot disable interrupts across the longjmp() because the
+ * assembler version ESTABLISH macro does not support re-enabling interrupts at this time. When that support is added, the
+ * ENABLE_INTERRUPTS macro can be removed from these MUM_TSTART macros and handled instead in the longjmp() return of the
+ * setjmp() call there.
  */
 #ifdef GTM_TRIGGER
 /* Note the 3rd assert makes sure we are NOT returning to a trigger-invoking frame which does not have a valid msp to
@@ -155,6 +161,7 @@ void ch_trace_point() {return;}
 																\
 					assert(!process_exiting);								\
 					CHTRACEPOINT;										\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);							\
 					for ( ;(ctxt > &chnd[0]) && (ctxt->ch != &mdb_condition_handler); ctxt--);		\
 					CHECKLOWBOUND(ctxt);									\
 					assert((ctxt->ch == &mdb_condition_handler)						\
@@ -166,6 +173,7 @@ void ch_trace_point() {return;}
 					ctxt->ch_active = FALSE; 								\
 					restart = mum_tstart;									\
 					active_ch = ctxt;									\
+					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);							\
 					longjmp(ctxt->jmp, 1);									\
 				}
 #else
@@ -174,6 +182,7 @@ void ch_trace_point() {return;}
 																\
 					assert(!process_exiting);								\
 					CHTRACEPOINT;										\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);							\
 					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--); 			\
 					CHECKLOWBOUND(ctxt);									\
 					assert((ctxt->ch == &mdb_condition_handler)						\
@@ -182,12 +191,17 @@ void ch_trace_point() {return;}
 					ctxt->ch_active = FALSE; 								\
 					restart = mum_tstart;									\
 					active_ch = ctxt;									\
+					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);							\
 					longjmp(ctxt->jmp, 1);									\
 				}
 #endif
 
+/* Assumed that when this macro is used, interrupts are disabled. One case where that is not done exists which is in
+ * sr_unix/gtm_asm_establish.c (called by assembler routines). Once the assembler ESTABLISH macros support doing the
+ * disable/enable of interrupts this routine can add an assert that interrupts are disabled.
+ */
 #define GTM_ASM_ESTABLISH	{	/* So named because gtm_asm_establish does exactly this */		\
-					GBLREF     uint4           dollar_tlevel;				\
+					GBLREF uint4 dollar_tlevel;						\
 														\
 					CHTRACEPOINT;								\
 					ctxt++;									\
@@ -199,6 +213,9 @@ void ch_trace_point() {return;}
 					DEBUG_ONLY(ctxt->dollar_tlevel = dollar_tlevel;)			\
 					active_ch = ctxt;							\
 				}
+/* Currently the ESTABLISH_NOJMP macro is only used internal to this header file - if ever used outside this header file, it
+ * needs to be protected with DEFER/ENABLE_INTERRUPTS macros.
+ */
 #define ESTABLISH_NOJMP(x)	{										\
 					GTM_ASM_ESTABLISH;							\
 					ctxt->ch = x;								\
@@ -206,48 +223,59 @@ void ch_trace_point() {return;}
 
 #define ESTABLISH_NOUNWIND(x)	ESTABLISH_NOJMP(x)
 #define ESTABLISH_RET(x, ret)	{										\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);					\
 					ESTABLISH_NOJMP(x);							\
-					if (setjmp(ctxt->jmp) == -1)						\
+					if (0 != setjmp(ctxt->jmp))						\
 					{									\
 						REVERT;								\
 						return ret;							\
-					}									\
+					} else									\
+						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);				\
 				}
 
 #ifdef __cplusplus  /* must specify return value (if any) for C++ */
 # define ESTABLISH(x, ret)	ESTABLISH_RET(x, ret)
 #else
 # define ESTABLISH(x)		{										\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);					\
 					ESTABLISH_NOJMP(x);							\
-					if (setjmp(ctxt->jmp) == -1)						\
+					if (0 != setjmp(ctxt->jmp))						\
 					{									\
 						REVERT;								\
 						return;								\
-					}									\
+					} else									\
+						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);				\
 				}
 # define ESTABLISH_NORET(x, did_long_jump)									\
 				{										\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);					\
 					did_long_jump = FALSE;							\
 					ESTABLISH_NOJMP(x);							\
-					if (setjmp(ctxt->jmp) == -1)						\
+					if (0 != setjmp(ctxt->jmp))						\
 						did_long_jump = TRUE;						\
+					else									\
+						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);				\
 				}
 #endif
 
 #define REVERT			{										\
 					CHTRACEPOINT;								\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);					\
 					active_ch = ctxt->save_active_ch;					\
 					CHECKHIGHBOUND(active_ch);						\
 					CHECKLOWBOUND(active_ch);						\
 					ctxt--;									\
 					CHECKLOWBOUND(ctxt);							\
+					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);					\
 				}
 
 #define CONTINUE		{									\
 					CHTRACEPOINT;							\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);				\
 					active_ch++;							\
 					CHECKHIGHBOUND(active_ch);					\
 					chnd[current_ch].ch_active = FALSE;				\
+					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);				\
 					return;								\
 				}
 
@@ -258,12 +286,14 @@ void ch_trace_point() {return;}
 						ch_cond_core();						\
 					if (NULL != active_ch)						\
 					{								\
+						DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);			\
 						while (active_ch >= &chnd[0])				\
 						{							\
 							if (!active_ch->ch_active)			\
 							       break;					\
 							active_ch--;					\
 						}							\
+						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);			\
 						if (active_ch >= &chnd[0] && *active_ch->ch)		\
 							(*active_ch->ch)(x);				\
 						else							\
@@ -298,6 +328,10 @@ void ch_trace_point() {return;}
 
 /* Should never unwind a condition handler established with ESTABLISH_NOUNWIND. Currently t_ch and dbinit_ch are the only ones. */
 #define UNWINDABLE(unw_ch)	((&t_ch != unw_ch->ch) && (&dbinit_ch != unw_ch->ch))
+/* Note, since we are not initially changing the assembler ESTABLISH version to also include deferring/enabling of interrupts,
+ * we cannot leave the interrupt block in effect during the longjmp(). But once that support is in place, we can do away with
+ * re-enabling interrupts and let the longjmp() return from setjmp() take care of it.
+ */
 #define UNWIND(dummy1, dummy2)	{												\
 					GBLREF	int			process_exiting;					\
 					GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;				\
@@ -310,10 +344,12 @@ void ch_trace_point() {return;}
 					 */											\
 					assert((0 == have_crit(CRIT_IN_COMMIT)) || in_wcs_recover);				\
 					CHTRACEPOINT;										\
+					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);							\
 					chnd[current_ch].ch_active = FALSE;							\
 					active_ch++;										\
 					CHECKHIGHBOUND(active_ch);								\
 					ctxt = active_ch;									\
+					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);							\
 					assert(UNWINDABLE(active_ch));								\
 					assert(active_ch->dollar_tlevel == dollar_tlevel);					\
 					longjmp(active_ch->jmp, -1);								\
@@ -336,10 +372,12 @@ void ch_trace_point() {return;}
 													\
 	SETUP_THREADGBL_ACCESS;										\
 	CHTRACEPOINT;											\
+	DEFER_INTERRUPTS(INTRPT_IN_CONDSTK);								\
 	current_ch = (active_ch - chnd);								\
 	active_ch->ch_active = TRUE;									\
 	active_ch--;											\
 	CHECKLOWBOUND(active_ch);									\
+	ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK);								\
 	DBGEHND((stderr, "%s: Condition handler entered at line %d - arg: %d  SIGNAL: %d\n",		\
 		 __FILE__, __LINE__, arg, SIGNAL));							\
 	if ((continue_on_success) && ((SUCCESS == SEVERITY) || (INFO == SEVERITY)			\

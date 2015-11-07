@@ -1,7 +1,8 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2011, 2014 Fidelity Information Services, Inc       #
+# Copyright (c) 2011-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -117,7 +118,7 @@ foreach libpath ($library_path)
 		# Find the actual version'ed library to which libicuio.{so,sl,a} points to
 		set icu_versioned_lib = `ls -l $libpath/libicuio$icu_ext | awk '{print $NF}'`
 		# Find out vital parameters
-		if ( "$arch" == "ibm" || "$arch" == "zos" ) then
+		if ( "$arch" == "ibm" ) then
 			# From the version'ed library(eg. libicuio36.0.a) extract out
 			# 36.0.a
 			set full_icu_ver_string = `echo $icu_versioned_lib | sed 's/libicuio//g'`
@@ -147,9 +148,6 @@ foreach libpath ($library_path)
 		else if ( "ibm" == "$arch" ) then
 			set icu_full_ver_lib = `sh -c "ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null" | awk '{print $NF}'`
 			set is64bit_icu = `sh -c "nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -n 1 | wc -l"`
-		else if ( "zos" == "$arch" ) then
-			set icu_full_ver_lib = `sh -c "ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null" | awk '{print $NF}'`
-			set is64bit_icu = `sh -c "file $libpath/$icu_full_ver_lib 2>/dev/null | grep "amode=64" | wc -l"`
 		endif
 		# Make sure both GTM and ICU are in sync with object mode compatibility (eg both are 32 bit/64 bit)
 		if ( ( "$is64bit_gtm" == 1 ) && ( "$is64bit_icu" != 0 ) ) then
@@ -198,12 +196,8 @@ if ( -d utf8) then
 	setenv LD_LIBRARY_PATH $libpath
 	setenv LIBPATH $libpath
 	setenv gtm_chset utf-8
-	set utflocale = `locale -a | grep -i en_us | grep -i utf | sed 's/.lp64$//' | grep '8$' | head -n 1`
-	if ( "OS/390" == `uname` ) then
-		setenv gtm_chset_locale $utflocale
-	else
-		setenv LC_ALL $utflocale
-	endif
+	set utflocale = `locale -a | grep -iE '\.utf.?8$' | head -n1`
+	setenv LC_ALL $utflocale
 
 gtm << EOF						>>&! gtm_test_install.out
 write \$zchset

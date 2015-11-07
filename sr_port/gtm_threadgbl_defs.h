@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +78,7 @@ THREADGBLDEF(side_effect_handling,		int)				/* side effect handling in actuallis
 THREADGBLDEF(source_error_found,		int4)				/* flag to partially defer compiler error */
 THREADGBLDEF(temp_subs,				boolean_t)			/* flag temp storing of subscripts to preserve
 										 * current evaluation */
-THREADGBLDEF(trigger_compile,			boolean_t)			/* A trigger compilation is active */
+THREADGBLDEF(trigger_compile_and_link,		boolean_t)			/* A trigger compilation/link is active */
 THREADGBLDEF(window_ident,			mstr)				/* current scanner mident from advancewindow */
 THREADGBLDEF(window_mval,			mval)				/* current scanner mval from advancewindow */
 THREADGBLDEF(window_token,			char)				/* current scanner token from advancewindow */
@@ -201,6 +202,7 @@ THREADGBLDEF(tqread_nowait,			boolean_t)			/* avoid sleeping in t_qread if TRUE 
 /* Miscellaneous */
 THREADGBLDEF(arlink_enabled,			boolean_t)			/* TRUE if any zroutines segment is autorelink
 										 * enabled. */
+THREADGBLDEF(arlink_loaded,			uint4)				/* Count of auto-relink enabled routines linked */
 THREADGBLDEF(collseq_list,			collseq *)			/* list of pointers to currently mapped collation
 										 * algorithms - since this seems only used in
 										 * collseq.c -seems more like a STATICDEF */
@@ -218,9 +220,10 @@ THREADGBLDEF(error_on_jnl_file_lost,		unsigned int)			/* controls error handling
 										 * VMS does not supports this and requires it to
 										 * be 0. */
 #ifdef UNIX
-THREADGBLDEF(fnzsearch_lv_vars,			lv_val *)			/* UNIX op_fnzsearch lv tree anchor */
-THREADGBLDEF(fnzsearch_sub_mval,		mval)				/* UNIX op_fnzsearch subscript constuctor */
-THREADGBLDEF(fnzsearch_nullsubs_sav,		int)				/* UNIX op_fnzsearch temp for null subs control */
+THREADGBLDEF(fnzsearch_lv_vars,			lv_val *)			/* op_fnzsearch lv tree anchor */
+THREADGBLDEF(fnzsearch_sub_mval,		mval)				/* op_fnzsearch subscript constuctor */
+THREADGBLDEF(fnzsearch_nullsubs_sav,		int)				/* op_fnzsearch temp for null subs control */
+THREADGBLDEF(fnzsearch_globbuf_ptr,		glob_t *)			/* op_fnzsearch temp for pointing to glob results */
 #endif
 THREADGBLDEF(glvn_pool_ptr,			glvn_pool *)			/* Pointer to the glvn pool */
 #if defined(UNIX) && defined(GTMDBGFLAGS_ENABLED)
@@ -247,9 +250,15 @@ THREADGBLDEF(in_zwrite,				boolean_t)			/* ZWrite is active */
 THREADGBLDEF(lab_lnr,				lnr_tabent **)			/* Passes address from op_rhd_ext to op_extcall etc.
 										 * Points into either lab_proxy or linkage table
 										 */
+THREADGBLDEF(jobexam_counter,			unsigned int)			/* How many times invoked $ZJOBEXAM() this proc */
+#ifdef AUTORELINK_SUPPORTED
+THREADGBLDEF(lnk_proxy,				lnk_tabent_proxy)		/* Proxy linkage table for rtnhdr/labtab args for
+										 * indirect calls */
+#else
 THREADGBLDEF(lab_proxy,				lab_tabent_proxy)		/* Placeholder storing lab_ln_ptr offset / lnr_adr
 										 * pointer and has_parms value, so they are
 										 * contiguous in memory */
+#endif
 #ifdef VMS
 THREADGBLDEF(lbl_tbl_entry_index,		int)				/* Index of currently compiled label table entry */
 THREADGBLAR1DEF(login_time,			int4,		2)		/* */
@@ -292,6 +301,10 @@ THREADGBLDEF(pipefifo_interrupt,		int)				/* count of number of times a pipe or 
 #endif
 THREADGBLDEF(prof_fp,				mprof_stack_frame *)		/* Stack frame that mprof currently operates on */
 THREADGBLDEF(relink_allowed,			int)				/* Non-zero if recursive relink permitted */
+#ifdef AUTORELINK_SUPPORTED
+THREADGBLDEF(save_zhist,			zro_hist *)			/* Temp storage for zro_hist blk so condition hndler
+										 * can get a hold of it if necessary to free it */
+#endif
 THREADGBLDEF(set_zroutines_cycle,		uint4)				/* Informs us if we changed $ZROUTINES between
 										 * linking a routine and invoking it
 										 */
@@ -303,8 +316,6 @@ THREADGBLAR1DEF(zintcmd_active,			zintcmd_active_info,	ZINTCMD_LAST)	/* Interrup
 THREADGBLDEF(zro_root,				zro_ent *)			/* Anchor for zroutines structure entry array */
 #ifdef UNIX
 THREADGBLDEF(zsearch_var,			lv_val *)			/* UNIX $zsearch() lookup variable */
-THREADGBLDEF(zsearch_dir1,			lv_val *)			/* UNIX $zsearch() directory 1 */
-THREADGBLDEF(zsearch_dir2,			lv_val *)			/* UNIX $zsearch() directory 2 */
 #endif
 THREADGBLDEF(poll_fds_buffer,			char *)				/* Buffer for poll() argument */
 THREADGBLDEF(poll_fds_buffer_size,		size_t)				/* Current allocated size of poll_fds_buffer */
@@ -336,9 +347,6 @@ THREADGBLAR1DEF(prombuf,			char,	(MAX_MIDENT_LEN + 1))	/* The prompt buffer size
 THREADGBLDEF(rt_name_tbl,			hash_table_mname)		/* Routine hash table for finding $TEXT() info */
 #endif
 THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
-#ifdef UNIX
-THREADGBLDEF(user_id,				uint4)				/* USERID number */
-#endif
 THREADGBLAR1DEF(window_string,			char,	SIZEOF(mident_fixed))	/* Buffer for window_ident */
 THREADGBLAR1DEF(tmp_object_file_name,		char,	GTM_PATH_MAX)		/* Hold temporary object name across routines */
 
@@ -407,6 +415,11 @@ THREADGBLDEF(no_spangbls,			boolean_t)	/* This process does not need to worry ab
 								 */
 THREADGBLDEF(max_fid_index,			int)		/* maximum value of csa->fid_index across all open csa's */
 THREADGBLDEF(is_mu_rndwn_rlnkctl,		int)		/* this process is MUPIP RUNDOWN -RELINKCTL */
+THREADGBLDEF(expand_prev_key,			boolean_t)	/* Want gvcst_search_blk/gvcst_search_tail to expand prev_key
+								 * as they do the search. This avoids a later call to
+								 * "gvcst_expand_key" to determine prev_key after the search.
+								 */
+THREADGBLDEF(gtm_autorelink_ctlmax,		uint4)		/* Maximum number of routines allowed for auterelink */
 #ifdef GTM_TRIGGER
 THREADGBLDEF(gvt_triggers_read_this_tn,		boolean_t)			/* if non-zero, indicates triggers were read for
 										 * at least one gv_target in this transaction.

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +40,8 @@
 
 #define DOTOBJEXT	".o"
 #define OBJEXT 		'o'
-#define WILDCARD	'*'
+#define ASTERISK	'*'
+#define QUESTION	'?'
 
 LITREF	mval	literal_null;
 
@@ -55,17 +57,14 @@ void op_zrupdate(int argcnt, ...)
 }
 #else
 /* The ZRUPDATE command drives this routine once through for each argument (object file path and object file - potentially
- * containing wildcards). Each file specified, or found in a wildcard search, is separated into its path and its routine
- * name, the path is looked up and the appropriate relinkctl file opened where we lookup the routine name and bump its cycle.
+ * containing wildcards). Each file specified, or found in a wildcard search, is separated into its path and its routine name;
+ * the path is then looked up and the appropriate relinkctl file opened, where we find the routine name and bump its cycle.
  *
- * Although this routine is setup to handle a variable argument list, more than 1 argument is not currently supported. The
- * ZRUPDATE command itself does support a commented list of filespecs but the compiler turns each argument into a separate
- * call to this routine. The purpose of the variable argument list is to support a future proposed enhancement which would
- * allow a ZRUPDATE argument to be a parenthesized list of filespecs with the intention all of them are simultaneously
- * updated. Such a list, when supported would be passed as a list of files to this routine - hence the multi-arg support.
- *
- * To get a consistent view of each directory, the directory is run through realpath() to resolve soft links and normalize the
- * directory name consistently.
+ * Although this routine is set up to handle a variable argument list, more than 1 argument is not currently supported. The
+ * ZRUPDATE command itself does support a commented list of filespecs, but the compiler turns each argument into a separate
+ * call to this routine. The purpose of the variable argument list is to support a future proposed enhancement, which would
+ * allow a ZRUPDATE argument to be a parenthesized list of filespecs with the intention that all of them be simultaneously
+ * updated. Such a list, when supported, would be passed as a list of files to this routine - hence the multi-arg support.
  *
  * Parameters:
  *   argcnt        - currently always 1 (see note above).
@@ -73,185 +72,203 @@ void op_zrupdate(int argcnt, ...)
  *
  * No return value.
  */
-
 void op_zrupdate(int argcnt, ...)
 {
-	mval			*objfilespec;
-	va_list			var;
-	mval			objpath;
-	char			tranbuf[MAX_FBUFF + 1], *chptr, chr;
-	open_relinkctl_sgm 	*linkctl;
-	relinkrec_t		*rec;
-	plength			plen;
-	int			status, fextlen, fnamlen, fcnt;
-	parse_blk		pblk;
-	struct stat		outbuf;
-        int			stat_res;
-	boolean_t		seenfext, fileexists;
+	boolean_t		wildcarded, noresult, seenfext, invalid;
+	char			pblkbuf[MAX_FBUFF + 1], statbuf[MAX_FBUFF + 1], namebuf[MAX_FBUFF + 1];
+	char			*chptr, chr;
+	int			status, fextlen, fnamlen, object_count;
 	mstr			objdir, rtnname;
+	mval			*objfilespec, objpath;
+	open_relinkctl_sgm 	*linkctl;
+	parse_blk		pblk;
+	plength			plen;
+	relinkrec_t		*rec;
+	struct stat		outbuf;
 	uint4			hash, prev_hash_index;
+	va_list			var;
 
-	/* Currently only expecting one value per invocation right now. That will change in phase 2 hence the stdarg setup */
+	/* Currently only expecting one value per invocation right now. That will change in phase 2, hence the stdarg setup. */
 	va_start(var, argcnt);
 	assert(1 == argcnt);
 	objfilespec = va_arg(var, mval *);
 	va_end(var);
 	MV_FORCE_STR(objfilespec);
-	/* First some pre-processing to determine if an explicit file name or type was specified. If so, it must be ".o" for
-	 * this phase of implementation. Later phases may allow ".m" to be specified but not initially. Use parse_file() to
-	 * parse everything out and isolate any extention.
-	 */
+	/* Initialize pblk with information about the pattern in the argument to ZRUPDATE. */
 	memset(&pblk, 0, SIZEOF(pblk));
-        pblk.buffer = tranbuf;
-	pblk.buff_size = (unsigned char)(MAX_FBUFF);	/* Pass size of buffer - 1 (standard protocol for parse_file) */
-	pblk.def1_buf = DOTOBJEXT;			/* Default .o file type if not specified */
+        pblk.buffer = pblkbuf;
+	pblk.buff_size = (unsigned char)(MAX_FBUFF);	/* Pass size of buffer - 1 (standard protocol for parse_file). */
+	pblk.def1_buf = DOTOBJEXT;			/* Default .o file type if not specified. */
 	pblk.def1_size = SIZEOF(DOTOBJEXT) - 1;
-	pblk.fop = F_SYNTAXO;				/* Syntax check only - bypass directory existence check */
+	pblk.fop = F_SYNTAXO;				/* Syntax check only - bypass directory / file existence check. */
 	status = parse_file(&objfilespec->str, &pblk);
 	if (ERR_PARNORMAL != status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, objfilespec->str.len, objfilespec->str.addr, status);
-	tranbuf[pblk.b_esl] = '\0';			/* Needed for subsequent STAT_FILE */
-	seenfext = FALSE;
-	if (0 != pblk.b_ext)
-	{	/* If a file extension was specified - get the extension sans any potential wildcard character */
-		for (chptr = pblk.l_ext + 1, fextlen = pblk.b_ext - 1; 0 < fextlen; chptr++, fextlen--)
-		{	/* Check each character in the extension except first which is the dot if ext exists at all */
-			if (WILDCARD != *chptr)
-			{	/* We see a char that isn't a wildcard character. If we've already seen our "o" file extension,
-				 * this char makes our requirement filetype impossible so raise an error.
-				 */
-				if (seenfext || (OBJEXT != *chptr))
-					/* No return from this error */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_FILEPARSE,
-						      2, objfilespec->str.len, objfilespec->str.addr,
-						      ERR_TEXT, 2, RTS_ERROR_TEXT("Unsupported filetype specified"));
-				seenfext = TRUE;
-			}
-		}
-	}
-	/* Do a simlar check for the file type */
+	wildcarded = (pblk.fnb & F_WILD);		/* Our error logic is different depending on the presence of wildcards. */
+	invalid = FALSE;
 	if (0 != pblk.b_name)
-	{	/* A file name was specified (if not, tiz probably hard to find the file but that can be dealt with later).
-		 * Like in the above, the name must be comprised of valid chars for routine names.
+	{	/* A file name was specified (if not, it is probably hard to find the file name, but that can be dealt with later).
+		 * Like above, the string must be comprised of valid chars for routine names.
 		 */
 		for (chptr = pblk.l_name, fnamlen = pblk.b_name; 0 < fnamlen; chptr++, fnamlen--)
 		{
-			if (WILDCARD != *chptr)
-			{	/* Substitute '%' for '_'. While this substitution is really only valid on the first char, only the
-				 * first char check allows "%" so a 2nd or later char check would fail the '%' substitution anyway.
+			if ((ASTERISK != *chptr) && (QUESTION != *chptr))
+			{	/* Substitute '%' for '_'. While this substitution is valid just for the first char, only the first
+				 * char can be '%', so a check of the second or later char would fail the '%' substitution anyway.
 				 */
 				chr = ('_' == *chptr) ? '%' : *chptr;
 				/* We see a char that isn't a wildcard character. If this is the first character, it can be
 				 * alpha or percent. If the second or later character, it can be alphanumeric.
 				 */
-				if (((fnamlen != pblk.b_name) && !VALID_MNAME_NFCHAR(chr))	/* 2nd char or later check */
-				    || ((fnamlen == pblk.b_name) && !VALID_MNAME_FCHAR(chr)))	/* 1st char check */
+				if (((fnamlen == pblk.b_name) && (!VALID_MNAME_FCHAR(chr) || ('%' == *chptr)))	/* If 1st char */
+					|| ((fnamlen != pblk.b_name) && !VALID_MNAME_NFCHAR(chr)))		/* If 2nd+ char */
 				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_FILEPARSE,
-						      2, objfilespec->str.len, objfilespec->str.addr,
-						      ERR_TEXT, 2, RTS_ERROR_TEXT("Filename is not a valid routine name"));
+					invalid = TRUE;
+					break;
 				}
 			}
 		}
-	}
-	/* When specifying a non-wildcarded object file, it is possible for the file to have been removed, in which case we still
-	 * need to update its relinkctl entry (if exists) to notify other processes about the object's deletion.
-	 */
-	if (!(pblk.fnb & F_WILD) & seenfext)
-	{	/* If no wildcards in path and saw the extension we want - no need to wash through zsearch() */
-		objdir.addr = pblk.l_dir;
-		objdir.len = pblk.b_dir;
-		linkctl = relinkctl_attach(&objdir);		/* Create/attach/open relinkctl file */
-		if (NULL == linkctl)				/* Non-existant path and no associated relinkctl file */
-			/* Note this reference to errno depends on nothing in relinkctl_attach() doing anything to modify
-			 * errno after the realpath() call. No return from this error.
-			 */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, objfilespec->str.len, objfilespec->str.addr,
-				      errno);
-		/* What we do at this point depends on the following conditions:
-		 *
-		 * 1) If the specified file exists, we can add it to relinkctl file and/or update its cycle.
-		 * 2) If the file doesn't exist on disk but the routine is found in the relinkctl file, update cycle.
-		 * 3) If no file and no entry, just ignore it and do nothing (info error removed by request).
-		 */
-		STAT_FILE(tranbuf, &outbuf, stat_res);
-		if (-1 == stat_res)
-		{
-			if (ENOENT != errno)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, objfilespec->str.len,
-					      objfilespec->str.addr, errno);
-			fileexists = FALSE;
-		} else
-			fileexists = TRUE;
-		rtnname.len = pblk.b_name;
-		rtnname.addr = pblk.l_name;
-		CONVERT_FILENAME_TO_RTNNAME(rtnname);	/* Set rtnname right before searching in relinkctl file */
-		assert(valid_mname(&rtnname));
-		COMPUTE_RELINKCTL_HASH(&rtnname, hash);
-		rec = relinkctl_find_record(linkctl, &rtnname, hash, &prev_hash_index);
-		if ((NULL == rec) && !fileexists)
-			return;					/* No file and no entry - ignore */
-		/* Either the file exists or the entry exists so add or update it */
-		rec = relinkctl_insert_record(linkctl, &rtnname);
-		RELINKCTL_CYCLE_INCR(rec, linkctl); 		/* Increment cycle indicating change to world */
-		return;
-	}
-	/* If we have a wildcarded request or one without the object filetype, reprocess the string with $ZSEARCH using our
-	 * defined stream to resolve wildcards. Then loop through processing each file returned. In this loop, we just ignore
-	 * any file that doesn't have a ".o" extension.
-	 */
-	op_fnzsearch((mval *)&literal_null, STRM_ZRUPDATE, 0, &objpath);	/* Clear any existing cache */
-	for (fcnt = 0; ; fcnt++)
-	{
-		plen.p.pint = op_fnzsearch(objfilespec, STRM_ZRUPDATE, 0, &objpath);
-		if (0 == objpath.str.len)
-		{	/* End of file list */
-			if (0 == fcnt)
-				/* Still looking to process our first file - give no objects found message as a "soft" message
-				 * (INFO level message - supressed in other than direct mode)
+	} else if (!wildcarded)
+		invalid = TRUE;
+	if (invalid)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_FILEPARSE, 2, objfilespec->str.len, objfilespec->str.addr,
+			      ERR_TEXT, 2, RTS_ERROR_TEXT("Filename is not a valid routine name"));
+	/* Do a simlar check for the file type */
+	seenfext = FALSE;
+	if (0 != pblk.b_ext)
+	{	/* If a file extension was specified - get the extension sans any potential wildcard character. */
+		for (chptr = pblk.l_ext + 1, fextlen = pblk.b_ext - 1; 0 < fextlen; chptr++, fextlen--)
+		{	/* Check each character in the extension except the first, which is the dot if extension exists at all. */
+			if (ASTERISK != *chptr)
+			{	/* We see a char that is not a '*' wildcard character. If we have already seen our "o" file
+				 * extension or a '?' wildcard character (which we assume is "o"), this char makes our requirement
+				 * filetype impossible, so raise an error.
 				 */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_INFO(ERR_FILEPARSE), 2, objfilespec->str.len,
-					      objfilespec->str.addr, ERR_TEXT, 2, RTS_ERROR_TEXT("No object files found"));
-			break;
+				if (seenfext || ((OBJEXT != *chptr) && (QUESTION != *chptr)))
+				{
+					invalid = TRUE;
+					break;
+				}
+				seenfext = TRUE;
+			}
 		}
-		/* The extension contains the extension-start character ('.') so we are looking for the extension '.o' hence
-		 * the length must be 2 and the 2nd char must be OBJEXT.
+	} else if (!wildcarded)
+		invalid = TRUE;
+	if (invalid)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_FILEPARSE, 2, objfilespec->str.len, objfilespec->str.addr,
+				ERR_TEXT, 2, RTS_ERROR_TEXT("Unsupported filetype specified"));
+	zsrch_clr(STRM_ZRUPDATE);	/* Clear any existing search cache */
+	object_count = 0;
+	do
+	{	/* The DO-WHILE form is to do one iteration even if not wildcarded. */
+		plen.p.pint = op_fnzsearch(objfilespec, STRM_ZRUPDATE, 0, &objpath);
+		if (TRUE == (noresult = (0 == objpath.str.len)))	/* Note: assignment! */
+		{	/* No (more) matches. In wildcarded case we are simply done with this loop. */
+			if (wildcarded)
+				break;
+			else
+			{	/* In a non-wildcarded case we want to verify whether the user is referring to a previously existent
+				 * file that got removed or the one that op_fnzsearch() silently skipped due to access issues. So,
+				 * set the objpath to the user-provided string after processing by parse_file() and adjust the
+				 * length fields accordingly.
+				 */
+				objpath.str.addr = pblk.buffer;
+				objpath.str.len = pblk.b_esl;
+				SET_LENGTHS(&plen, objpath.str.addr, objpath.str.len, FALSE);
+			}
+		}
+		/* Verify the extension and filename on wildcarded patterns; the non-wildcarded ones have been checked earlier.
+		 * Start with the extension.
 		 */
-		if ((2 == plen.p.pblk.b_ext) && (OBJEXT == *(objpath.str.addr + plen.p.pblk.b_dir + plen.p.pblk.b_name + 1)))
-		{			/* This is (probably) an object file. Double check file is a file and not a directory */
-			memcpy(tranbuf, objpath.str.addr, objpath.str.len);	/* Need null terminated version for STAT */
-			tranbuf[objpath.str.len] = '\0';		/* Not guaranteed null termination from op_fnzsearch */
-			STAT_FILE(tranbuf, &outbuf, stat_res);
-			/* If either something happened to the file since op_fnzsearch() saw it or the file is not a file, then
-			 * ignore it.
+		if (wildcarded && ((SIZEOF(DOTOBJEXT) - 1 != plen.p.pblk.b_ext)
+				|| (OBJEXT != objpath.str.addr[plen.p.pblk.b_dir + plen.p.pblk.b_name + 1])))
+			continue;
+		/* Before opening the relinkctl file, verify that a valid routine name can be derived, thus almost definitely
+		 * telling us that the object name is also correct. The only exception is when the object name starts with a '%',
+		 * so we want to note down that fact. Note that we cannot operate on the objpath memory because we would be
+		 * affecting the object name, so we have to make a copy first.
+		 */
+		if (wildcarded && ((0 == plen.p.pblk.b_name) || ('%' == objpath.str.addr[plen.p.pblk.b_dir])))
+			continue;
+		memcpy(namebuf, objpath.str.addr + plen.p.pblk.b_dir, plen.p.pblk.b_name);
+		rtnname.len = plen.p.pblk.b_name;
+		rtnname.addr = namebuf;
+		CONVERT_FILENAME_TO_RTNNAME(rtnname);	/* Get rtnname before searching in relinkctl file */
+		if (wildcarded && !valid_mname(&rtnname))
+			continue;
+		assert(!noresult || !wildcarded);	/* We should have left the loop early on no results with a wildcard. */
+		/* The reasons for doing the below STAT depend on the situation. If we do have at least one result, we need to make
+		 * sure it is legitimate. If we have no results, we do the STAT because op_fnzsearch() on non-wildcarded requests
+		 * may cleanly return an empty list even in the face of access errors, whereas we want to notify the user about
+		 * potential access issues on a single file.
+		 */
+		memcpy(statbuf, objpath.str.addr, objpath.str.len);
+		statbuf[objpath.str.len] = '\0';
+		LSTAT_FILE(statbuf, &outbuf, status);	/* We use lstat to detect and eliminate soft links. */
+		if (-1 == status)
+		{	/* In the wildcarded case we just skip missing files. Any access error (but not the case of a missing file)
+			 * gets reported on non-wildcarded patterns. If we did not find this file initially, it does not matter if
+			 * exists now. We simply want to determine whether the reason that we could not find it had to do with
+			 * access errors.
 			 */
-			if ((-1 == stat_res) || !S_ISREG(outbuf.st_mode))
-			{
-				fcnt--;					/* Don't count files not found for whatever reason */
+			if (wildcarded)
 				continue;
-			}
-			/* Before opening the relinkctl file, verify we actually do have a valid routine name */
-			rtnname.len = plen.p.pblk.b_name;
-			rtnname.addr = objpath.str.addr + plen.p.pblk.b_dir;
-			CONVERT_FILENAME_TO_RTNNAME(rtnname);		/* Set rtnname right before searching in relinkctl file */
-			if (!valid_mname(&rtnname))
-			{
-				fcnt--;
-				continue;				/* Ignore files that are invalid wildcard matches */
-			}
+			else if (ENOENT != errno)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2,
+						objfilespec->str.len, objfilespec->str.addr, errno);
+		} else if (!S_ISREG(outbuf.st_mode))
+		{	/* We are only interested in regular files. */
+			continue;
+		}
+		/* Extraction of object directory is different depending on whether a match was found or not. If we have a match,
+		 * then objpath already contains the full path to the object, including the directory. If not, then we cannot use
+		 * objpath because it was populated with user's argument to ZRUPDATE, which might not have a directory name in it.
+		 * So, in that case we derive the directory name from the original parsing results populated by parse_file().
+		 */
+		if (noresult)
+		{
+			objdir.addr = pblk.l_dir;
+			objdir.len = pblk.b_dir;
+		} else
+		{
 			objdir.addr = objpath.str.addr;
 			objdir.len = plen.p.pblk.b_dir;
-			linkctl = relinkctl_attach(&objdir);		/* Create/attach/open relinkctl file */
-			if (NULL == linkctl)
-			{
-				fcnt--;					/* Path disappeared - don't count it */
+		}
+		linkctl = relinkctl_attach(&objdir, &objpath.str, 0);	/* Create/attach/open relinkctl file. */
+		if (NULL == linkctl)
+		{
+			if (wildcarded)
 				continue;
+			else
+			{	/* Note that the below errno value should come from the realpath() call in relinkctl_attach()
+				 * invoked above, so we need to make sure nothing gets called in between.
+				 */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2,
+						objfilespec->str.len, objfilespec->str.addr, errno);
 			}
-			rec = relinkctl_insert_record(linkctl, &rtnname);
-			RELINKCTL_CYCLE_INCR(rec, linkctl); 		/* Increment cycle indicating change to world */
-		} else
-			fcnt--;						/* Don't count ignored files */
-
-	}
+		}
+		if (!wildcarded)
+		{	/* In the non-wildcarded case we decide whether to proceed with the cycle bump thusly:
+			 *  1. If the specified file exists, it may or may not be accounted for in the relinkctl file, meaning that
+			 *     we need to either add it there or simply update its cycle.
+			 *  2. If the file does not exist on disk, but the routine is found in the relinkctl file, update its cycle.
+			 *  3. If there is no file and no entry for it in the relinkctl file, do nothing (info error removed by
+			 *     request).
+			 */
+			COMPUTE_RELINKCTL_HASH(&rtnname, hash, linkctl->hdr->relinkctl_hash_buckets);
+			rec = relinkctl_find_record(linkctl, &rtnname, hash, &prev_hash_index);
+			if ((NULL == rec) && noresult)
+				return;
+		}
+		rec = relinkctl_insert_record(linkctl, &rtnname);
+		RELINKCTL_CYCLE_INCR(rec, linkctl); 		/* Increment cycle indicating change to world */
+		object_count++;					/* Update the count of valid objects encountered. */
+	} while (wildcarded);
+	/* For a wildcarded request that did not return any suitable object files give a no objects found error as a "soft" INFO
+	 * level message, which gets supressed in except in direct mode.
+	 */
+	if (wildcarded && (0 == object_count))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_INFO(ERR_FILEPARSE), 2, objfilespec->str.len,
+			      objfilespec->str.addr, ERR_TEXT, 2, RTS_ERROR_TEXT("No object files found"));
 }
 #endif /* AUTORELINK_SUPPORTED */

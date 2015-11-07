@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +14,7 @@
 #define RELINKCTL_H_INCLUDED
 
 # include "gtm_limits.h"
+# include "parse_file.h"	/* for MAX_FBUFF */
 
 /* Input RTNNAME is derived from an object file name and we need to convert it to a proper routine name.
  * a) It is possible we got a '_' as the first character in case of a % routine. But the actual routine name stored in
@@ -27,34 +29,26 @@
 		RTNNAME.len = MAX_MIDENT_LEN;		\
 }
 
-#define	COMPUTE_RELINKCTL_HASH(RTNNAME, RTNHASH)		\
-{								\
-	STR_HASH((RTNNAME)->addr, (RTNNAME)->len, RTNHASH, 0);	\
-	RTNHASH = RTNHASH % RELINKCTL_HASH_BUCKETS;		\
+#define	COMPUTE_RELINKCTL_HASH(RTNNAME, RTNHASH, RELINKCTL_HASH_BUCKETS)	\
+{										\
+	STR_HASH((RTNNAME)->addr, (RTNNAME)->len, RTNHASH, 0);			\
+	RTNHASH = RTNHASH % RELINKCTL_HASH_BUCKETS;				\
 }
 
 /* One relinkctl file can contain at most this many # of routines */
-#ifdef DEBUG
-#  define	RELINKCTL_MAX_ENTRIES	(WBTEST_ENABLED(WBTEST_RELINKCTL_MAX_ENTRIES) ? 100 : 1000000)
-#else
-#  define	RELINKCTL_MAX_ENTRIES	1000000
-#endif
-
-/* The first prime # above RELINKCTL_MAX_ENTRIES */
-#ifdef DEBUG
-#  define	RELINKCTL_HASH_BUCKETS	(WBTEST_ENABLED(WBTEST_RELINKCTL_MAX_ENTRIES) ? 101 : 1000003)
-#else
-#  define	RELINKCTL_HASH_BUCKETS	1000003
-#endif
+#  define	RELINKCTL_MAX_ENTRIES		16000000
+#  define	RELINKCTL_MIN_ENTRIES		(WBTEST_ENABLED(WBTEST_RELINKCTL_MAX_ENTRIES) ? 1 : 1000)
+#  define	RELINKCTL_DEFAULT_ENTRIES	(WBTEST_ENABLED(WBTEST_RELINKCTL_MAX_ENTRIES) ? 100 : 50000)
 
 #define	RELINKCTL_MMAP_SZ	((size_t)SIZEOF(relinkctl_data))
 #define	RELINKSHM_HDR_SIZE	((size_t)SIZEOF(relinkshm_hdr_t))
-/* We are guaranteed RELINKCTL_HASH_BUCKETS is an odd prime number and since we want at least 8-byte alignment between different
- * sections of shared memory, we add a 4-byte filler to the RELINKSHM_RTNHASH_SIZE macro computation.
+/* We are guaranteed relinkctl_hash_buckets is an odd prime number and since we want at least 8-byte alignment between different
+ * sections of shared memory, we add a 4-byte filler to the RELINKSHM_RTNHASH_SIZE macro computation (that's why we are adding + 1).
  */
-#define	RELINKSHM_RTNHASH_SIZE	(((size_t)RELINKCTL_HASH_BUCKETS + 1) * SIZEOF(uint4))	/* see above comment for why "+ 1" */
-#define	RELINKSHM_RECARRAY_SIZE	((size_t)RELINKCTL_MAX_ENTRIES * SIZEOF(relinkrec_t))
-#define	RELINKCTL_SHM_SIZE	(RELINKSHM_HDR_SIZE + RELINKSHM_RTNHASH_SIZE + RELINKSHM_RECARRAY_SIZE)
+#define	RELINKSHM_RTNHASH_SIZE(RELINKCTL_HASH_BUCKETS)	(((size_t)RELINKCTL_HASH_BUCKETS + 1) * SIZEOF(uint4))
+#define	RELINKSHM_RECARRAY_SIZE(RELINKCTL_MAX_RTN_ENTRIES)	(((size_t)RELINKCTL_MAX_RTN_ENTRIES) * SIZEOF(relinkrec_t))
+#define	RELINKCTL_SHM_SIZE(RELINKCTL_HASH_BUCKETS, RELINKCTL_MAX_RTN_ENTRIES)	(RELINKSHM_HDR_SIZE	\
+	+ RELINKSHM_RTNHASH_SIZE(RELINKCTL_HASH_BUCKETS) + RELINKSHM_RECARRAY_SIZE(RELINKCTL_MAX_RTN_ENTRIES))
 
 #define	GET_RELINK_SHM_HDR(LINKCTL)	(relinkshm_hdr_t *)((sm_uc_ptr_t)LINKCTL->shm_hashbase - SIZEOF(relinkshm_hdr_t))
 
@@ -98,8 +92,11 @@ error_def(ERR_RLNKRECLATCH);	/* needed for the RELINKCTL_CYCLE_INCR macro */
 #define	RTNOBJ_GET_SHM_OFFSET(SHM_OFF)	(SHM_OFF & 0x03FFFFFFFFFFFFFFULL)
 #define	RTNOBJ_SET_SHM_INDEX_OFF(SHM_INDEX, SHM_OFF)	(((rtnobj_sm_off_t)SHM_INDEX << MAX_RTNOBJ_SHM_INDEX) | (SHM_OFF))
 
-#define	RLNKSHM_LATCH_TIMEOUT_SEC	60	/* Want to wait 60 seconds max */
-#define	RLNKREC_LATCH_TIMEOUT_SEC	60	/* Want to wait 60 seconds max */
+/* For the latch timeouts below, we believe most are likely done within 1 minute but since IO can be done and a failure in one
+ * of these locks is a hard-error, the max is set to 4 mins.
+ */
+#define	RLNKSHM_LATCH_TIMEOUT_SEC	(4 * 60)	/* 4 min */
+#define	RLNKREC_LATCH_TIMEOUT_SEC	(4 * 60)	/* 4 min */
 
 #define	MIN_RTNOBJ_SIZE_BITS	8		      /* Minimum object file size (including SIZEOF(rtnobj_hdr_t)) is 2**8 = 256 */
 #define	MAX_RTNOBJ_SIZE_BITS	MAX_RTNOBJ_SHM_INDEX  /* Maximum object file size (including SIZEOF(rtnobj_hdr_t)) is 2**32
@@ -111,6 +108,10 @@ error_def(ERR_RLNKRECLATCH);	/* needed for the RELINKCTL_CYCLE_INCR macro */
 
 #define	IS_INSERT		0
 #define	IS_DELETE		1
+
+#define ISSUE_REQRLNKCTLRNDWN_SYSCALL(ZRO_ENTRY_NAME, ERRSTR, ERRNO)						\
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_REQRLNKCTLRNDWN, 2, RTS_ERROR_MSTR(ZRO_ENTRY_NAME),	\
+		      ERR_SYSCALL, 5, LEN_AND_STR(ERRSTR), CALLFROM, DEBUG_ONLY(saved_errno = )ERRNO)
 
 #define ISSUE_RELINKCTLERR_SYSCALL(ZRO_ENTRY_NAME, ERRSTR, ERRNO)						\
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(ZRO_ENTRY_NAME),		\
@@ -149,7 +150,7 @@ typedef struct relinkrec_struct
 					 */
 } relinkrec_t;
 
-#define	ZRO_DIR_PATH_MAX	255
+#define	ZRO_DIR_PATH_MAX	MAX_FBUFF	/* since "zro_load" which parses $zroutines uses MAX_FBUFF */
 
 /* Shared structure - relinkctl file header */
 typedef struct relinkctl_data_struct
@@ -176,6 +177,8 @@ typedef struct relinkctl_data_struct
 								 * use this to find the corresponding directory.
 								 */
 	int		zro_entry_name_len;	/* strlen of the null-terminated "zro_entry_name" */
+	int		relinkctl_max_rtn_entries;	/* One relinkctl file can contain at most this many of routines */
+	int		relinkctl_hash_buckets;		/* The first prime # above relinkctl_max_rtn_entries */
 } relinkctl_data;
 
 /* Process private structure - describes a relinkctl file. Process private so can be linked into a list in $ZROUTINES order */
@@ -192,11 +195,6 @@ typedef struct open_relinkctl_struct
 	sm_uc_ptr_t			rtnobj_shm_base[NUM_RTNOBJ_SHM_INDEX];
 	int				rtnobj_shmid[NUM_RTNOBJ_SHM_INDEX];
 	int				fd;
-	int				rtnobj_shmid_cycle;	/* copied over from relinkshm_hdr->shmid_cycle after
-								 * ensuring all relinkshm_hdr->shmid[NUM_RTNOBJ_SHM_INDEX] is
-								 * copied over and all those shmids have been successfully
-								 * shmat()ed.
-								 */
 	int				rtnobj_min_shm_index;	/* Copied over from relinkshm_hdr->rtnobj_min_shm_index */
 	int				rtnobj_max_shm_index;	/* Copied over from relinkshm_hdr->rtnobj_max_shm_index */
 } open_relinkctl_sgm;
@@ -225,11 +223,8 @@ typedef struct relinkshm_hdr
 	int		rtnobj_max_shm_index;		/* Maximum 'i' where rtnobj_shmhdr[i-1].rtnobj_shmid is a valid shmid.
 							 * If no rtnobj_shmhdr[i] has valid shmid, this will be set to 0.
 							 */
-	int		rtnobj_shmid_cycle;		/* bumped when rtnobj_shmhdr[i].rtnobj_shmid gets created for some 'i' */
 	boolean_t	rndwn_adjusted_nattch;		/* MUPIP RUNDOWN -RELINKCTL did adjust nattached */
-#	ifdef DEBUG
 	boolean_t	skip_rundown_check;		/* TRUE if at least one process with gtm_autorelink_keeprtn=1 opened this */
-#	endif
 	rtnobjshm_hdr_t	rtnobj_shmhdr[NUM_RTNOBJ_SHM_INDEX];
 	/* CACHELINE_PAD macro usages surrounding the actual latch below provides spacing so updates to the latch do not interfere
 	 * with updates to adjoining fields which can happen if they fall in the same data cacheline of a processor. No
@@ -288,14 +283,14 @@ typedef struct rtnobj_hdr_struct
 /*
  * Prototypes
  */
-open_relinkctl_sgm *relinkctl_attach(mstr *obj_container_name);
-void	relinkctl_incr_nattached(void);
-int relinkctl_get_key(char key[GTM_PATH_MAX], mstr *zro_entry_name);
-relinkrec_t *relinkctl_find_record(open_relinkctl_sgm *linkctl, mstr *rtnname, uint4 hash, uint4 *prev_hash_index);
-relinkrec_t *relinkctl_insert_record(open_relinkctl_sgm *linkctl, mstr *rtnname);
-void relinkctl_open(open_relinkctl_sgm *linkctl);
-void relinkctl_lock_exclu(open_relinkctl_sgm *linkctl);
-void relinkctl_unlock_exclu(open_relinkctl_sgm *linkctl);
-void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free);
+open_relinkctl_sgm	*relinkctl_attach(mstr *obj_container_name, mstr *objpath, int objpath_alloc_len);
+void			relinkctl_incr_nattached(void);
+int			relinkctl_get_key(char key[GTM_PATH_MAX], mstr *zro_entry_name);
+relinkrec_t		*relinkctl_find_record(open_relinkctl_sgm *linkctl, mstr *rtnname, uint4 hash, uint4 *prev_hash_index);
+relinkrec_t		*relinkctl_insert_record(open_relinkctl_sgm *linkctl, mstr *rtnname);
+int			relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t obj_file_missing);
+void			relinkctl_lock_exclu(open_relinkctl_sgm *linkctl);
+void			relinkctl_unlock_exclu(open_relinkctl_sgm *linkctl);
+void			relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free);
 
 #endif /* RELINKCTL_H_INCLUDED */

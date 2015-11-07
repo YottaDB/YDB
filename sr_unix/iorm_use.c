@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +36,7 @@
 #include "gtm_utf8.h"
 #endif
 #include "gtmcrypt.h"
+#include "error.h"
 
 /* Only want to do fstat() once on this file, not on every use. */
 #define FSTAT_CHECK(GETMODE)										\
@@ -190,17 +192,19 @@ void	iorm_use(io_desc *iod, mval *pp)
 	char		seek_str[LIMIT_SEEK_STR];
 	char		*seek_ptr;
 	int		seek_type;
-	long		seek_value;
-	long		new_position;
-	long		current_offset;
+	off_t		seek_value;
+	off_t		new_position;
+	off_t		current_offset;
 	char		*endptr;
 	off_t		cur_position;
 	int		bom_size_toread;
 	io_log_name	*dev_name;
 	mstr		input_iv, output_iv, input_key, output_key;
 	char		error_str[MAX_ERROR_SIZE];
+	boolean_t	ch_set;
 
 	p_offset = 0;
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
 	input_key_not_empty = output_key_not_empty = FALSE;
 	input_key_entry_present = output_key_entry_present = FALSE;
@@ -319,30 +323,31 @@ void	iorm_use(io_desc *iod, mval *pp)
 				break;
 			if (iod->state == dev_open && !rm_ptr->fifo && !rm_ptr->pipe)
 			{
-				if (-1 == lseek(rm_ptr->fildes, (off_t)0, SEEK_SET))
+				if ((off_t)-1 == lseek(rm_ptr->fildes, 0, SEEK_SET))
 				{
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
 						      RTS_ERROR_LITERAL("REWIND"), CALLFROM, errno);
 				}
 
-				/* do fseek if non-fixed streaming and iod doesn't point to io_std_device.out */
+				/* do fseeko if non-fixed streaming and iod doesn't point to io_std_device.out */
 				/* Only necessary for the non-utf input which uses buffered reads */
 				if (!rm_ptr->fixed && !IS_UTF_CHSET(iod->ichset) && (iod != io_std_device.out))
 				{
 					/* if streaming non-utf move to end of file first to force flush of any
 					   buffered read io */
-					if (-1 == fseek(rm_ptr->filstr, (long)0, SEEK_END))
+					if ((off_t)-1 == fseeko(rm_ptr->filstr, 0, SEEK_END))
 					{
 						save_errno = errno;
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-							      RTS_ERROR_LITERAL("fseek"),
+							      RTS_ERROR_LITERAL("fseeko"),
 							      RTS_ERROR_LITERAL("REWIND"), CALLFROM, save_errno);
 					}
 
 
-					if (-1 == fseek(rm_ptr->filstr, (long)0, SEEK_SET))	/* Rewind the input stream */
+					if ((off_t)-1 == fseeko(rm_ptr->filstr, 0, SEEK_SET))	/* Rewind the input stream */
 					{
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("fseek"),
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
+							      RTS_ERROR_LITERAL("fseeko"),
 							      RTS_ERROR_LITERAL("REWIND"), CALLFROM, errno);
 					}
 				}
@@ -425,7 +430,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 					if (RM_WRITE == rm_ptr->lastop)
 					{
 						/* need to do an lseek to get current location in file */
-						cur_position = lseek(rm_ptr->fildes, (off_t)0, SEEK_CUR);
+						cur_position = lseek(rm_ptr->fildes, 0, SEEK_CUR);
 						if ((off_t)-1 == cur_position)
 						{
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
@@ -434,7 +439,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 						} else
 							rm_ptr->file_pos = cur_position;
 					}
-					FTRUNCATE(rm_ptr->fildes, (off_t)rm_ptr->file_pos, ftruncate_res);
+					FTRUNCATE(rm_ptr->fildes, rm_ptr->file_pos, ftruncate_res);
 					if (0 != ftruncate_res)
 					{
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
@@ -472,14 +477,14 @@ void	iorm_use(io_desc *iod, mval *pp)
 				/* the following it only necessary for a non-split device */
 				if (iod->pair.in == iod->pair.out)
 				{
-					if (-1 == fseek(rm_ptr->filstr, (long)rm_ptr->file_pos, SEEK_SET))
+					if ((off_t)-1 == fseeko(rm_ptr->filstr, rm_ptr->file_pos, SEEK_SET))
 					{
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-							      RTS_ERROR_LITERAL("fseek"),
+							      RTS_ERROR_LITERAL("fseeko"),
 							      RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
 					}
 				}
-				if (-1 == lseek(rm_ptr->fildes, (off_t)rm_ptr->file_pos, SEEK_SET))
+				if ((off_t)-1 == lseek(rm_ptr->fildes, rm_ptr->file_pos, SEEK_SET))
 				{
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
 						      RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
@@ -487,7 +492,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 				/* if not open then do the truncate here */
 				if (dev_open != iod->state)
 				{
-					FTRUNCATE(rm_ptr->fildes, (off_t)rm_ptr->file_pos, ftruncate_res);
+					FTRUNCATE(rm_ptr->fildes, rm_ptr->file_pos, ftruncate_res);
 					if (0 != ftruncate_res)
 					{
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
@@ -566,7 +571,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			if ((1 == width) && gtm_utf8_mode && ((IS_UTF_CHSET(iod->ochset)) || (IS_UTF_CHSET(iod->ichset))))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_WIDTHTOOSMALL);
 			if (IS_UTF_CHSET(iod->ochset) && rm_ptr->fixed)
-				iorm_flush(iod);	/* need to flush current record first */
+				iorm_cond_wteol(iod);	/* Need to insert a newline if $X is non-zero. */
 			rm_ptr->def_width = FALSE;
 			if (0 == width)
 			{
@@ -716,7 +721,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 					if (RM_WRITE == rm_ptr->lastop)
 					{
 						/* need to do an lseek to get current location in file */
-						cur_position = lseek(rm_ptr->fildes, (off_t)0, SEEK_CUR);
+						cur_position = lseek(rm_ptr->fildes, 0, SEEK_CUR);
 						if ((off_t)-1 == cur_position)
 						{
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
@@ -746,14 +751,14 @@ void	iorm_use(io_desc *iod, mval *pp)
 							bom_size_toread = 0;
 						if (0 < bom_size_toread)
 						{
-							if ((off_t)-1 == lseek(rm_ptr->fildes, (off_t)0, SEEK_SET))
+							if ((off_t)-1 == lseek(rm_ptr->fildes, 0, SEEK_SET))
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
 									      RTS_ERROR_LITERAL("lseek"),
 									      RTS_ERROR_LITERAL("SEEK"), CALLFROM, errno);
 							rm_ptr->bom_num_bytes = open_get_bom(iod, bom_size_toread);
 
 							/* move back to previous file position */
-							if ((off_t)-1 == lseek(rm_ptr->fildes, (off_t)rm_ptr->file_pos, SEEK_SET))
+							if ((off_t)-1 == lseek(rm_ptr->fildes, rm_ptr->file_pos, SEEK_SET))
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
 									      RTS_ERROR_LITERAL("lseek"),
 									      RTS_ERROR_LITERAL("SEEK"), CALLFROM, errno);
@@ -779,7 +784,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 					if (!ISDIGIT_ASCII(*seek_ptr))
 						OUTPUT_SDSEEKERR(seek_str);
 					errno = 0; /* not reset if previous failure */
-					seek_value = STRTOL(seek_ptr, &endptr, 10);
+					seek_value = STRTOLL(seek_ptr, &endptr, 10);
 					if (ERANGE == errno)
 						OUTPUT_SDSEEKERR(seek_str);
 					if ('\0' != *endptr)
@@ -846,34 +851,34 @@ void	iorm_use(io_desc *iod, mval *pp)
 						new_position = 0;
 					else if (statbuf.st_size < new_position)
 						new_position = statbuf.st_size;
-					if (-1 == lseek(rm_ptr->fildes, (off_t)new_position, SEEK_SET))
+					if (-1 == lseek(rm_ptr->fildes, new_position, SEEK_SET))
 					{
 						save_errno = errno;
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
 							      RTS_ERROR_LITERAL("lseek"),
 							      RTS_ERROR_LITERAL("SEEK"), CALLFROM, save_errno);
 					}
-					/* do fseek if non-fixed streaming and iod doesn't point to io_std_device.out */
+					/* do fseeko if non-fixed streaming and iod doesn't point to io_std_device.out */
 					/* Only necessary for the non-utf input which uses buffered reads */
 					if (!rm_ptr->fixed && !IS_UTF_CHSET(iod->ichset) && (iod != io_std_device.out))
 					{
 						/* if open then move to end of file first to force flush of any buffered read io */
 						if (iod->state == dev_open)
 						{
-							if (-1 == fseek(rm_ptr->filstr, (long)0, SEEK_END))
+							if ((off_t)-1 == fseeko(rm_ptr->filstr, 0, SEEK_END))
 							{
 								save_errno = errno;
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-									      RTS_ERROR_LITERAL("fseek"),
+									      RTS_ERROR_LITERAL("fseeko"),
 									      RTS_ERROR_LITERAL("SEEK"), CALLFROM, save_errno);
 							}
 						}
 						/* move input stream */
-						if (-1 == fseek(rm_ptr->filstr, (long)new_position, SEEK_SET))
+						if ((off_t)-1 == fseeko(rm_ptr->filstr, new_position, SEEK_SET))
 						{
 							save_errno = errno;
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-								      RTS_ERROR_LITERAL("fseek"),
+								      RTS_ERROR_LITERAL("fseeko"),
 								      RTS_ERROR_LITERAL("SEEK"), CALLFROM, save_errno);
 						}
 					}
@@ -1100,5 +1105,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 		if (-1 == CHMOD(iod->trans_name->dollar_io, mode))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 	}
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

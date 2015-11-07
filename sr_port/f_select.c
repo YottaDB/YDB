@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +35,7 @@ LITREF octabstruct oc_tab[];
 
 int f_select(oprtype *a, opctype op)
 {
-	boolean_t	first_time, save_saw_side, *save_se_base, save_shift, shifting;
+	boolean_t	first_time, save_saw_side, *save_se_base, save_shift, shifting, we_saw_side_effect = FALSE;
 	opctype		old_op;
 	oprtype		*cnd, endtrip, target, tmparg;
 	triple		*oldchain, *r, *ref, *save_start, *save_start_orig, tmpchain, *triptr;
@@ -52,7 +53,6 @@ int f_select(oprtype *a, opctype op)
 	TREF(expr_depth) = 0;
 	TREF(expr_start) = TREF(expr_start_orig) = NULL;
 	TREF(saw_side_effect) = FALSE;
-	TREF(shift_side_effects) = FALSE;
 	TREF(side_effect_depth) = INITIAL_SIDE_EFFECT_DEPTH;
 	TREF(side_effect_base) = malloc(SIZEOF(boolean_t) * TREF(side_effect_depth));
 	memset((char *)(TREF(side_effect_base)), 0, SIZEOF(boolean_t) * TREF(side_effect_depth));
@@ -60,7 +60,10 @@ int f_select(oprtype *a, opctype op)
 	{
 		dqinit(&tmpchain, exorder);
 		oldchain = setcurtchain(&tmpchain);
-	}
+		INCREMENT_EXPR_DEPTH;	/* Don't want to hit botton with each expression, so start at 1 rather than 0 */
+		TREF(shift_side_effects) = TRUE;
+	} else
+		TREF(shift_side_effects) = FALSE;
 	r = maketriple(op);
 	first_time = TRUE;
 	endtrip = put_tjmp(r);
@@ -107,7 +110,7 @@ int f_select(oprtype *a, opctype op)
 			ref = newtriple(OC_STO);
 			ref->operand[0] = target;
 			ref->operand[1] = tmparg;
-			if (OC_PASSTHRU == tmparg.oprval.tref->opcode)
+			if (OC_PASSTHRU == old_op)
 			{
 				assert(TRIP_REF == tmparg.oprval.tref->operand[0].oprclass);
 				ref = newtriple(OC_STO);
@@ -127,6 +130,13 @@ int f_select(oprtype *a, opctype op)
 	ref->operand[0] = tmparg;
 	ref->operand[1] = put_ilit(FALSE);	/* Not a subroutine reference */
 	ins_triple(r);
+	if (shifting)
+	{
+		assert(1 == TREF(expr_depth));
+		we_saw_side_effect = TREF(saw_side_effect);
+		save_se_base[save_expr_depth] |= (TREF(side_effect_base))[1];
+		DECREMENT_EXPR_DEPTH;		/* Clean up */
+	}
 	assert(!TREF(expr_depth));
 	TREF(expr_start) = save_start;
 	TREF(expr_start_orig) = save_start_orig;
@@ -135,17 +145,29 @@ int f_select(oprtype *a, opctype op)
 	SELECT_CLEANUP;
 	TREF(expr_depth) = save_expr_depth;
 	if (shifting)
-	{
-		shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode));
-		newtriple(shifting ? OC_GVSAVTARG : OC_NOOP);	/* must have one of these two at expr_start */
-		setcurtchain(oldchain);
-		dqadd(TREF(expr_start), &tmpchain, exorder);
-		TREF(expr_start) = tmpchain.exorder.bl;
-		if (shifting)
-		{	/* only play this game if something else started it */
-			assert(OC_GVSAVTARG == (TREF(expr_start))->opcode);
+	{	/* We have built a separate chain so decide what to do with it */
+		if (we_saw_side_effect || (GTM_BOOL != TREF(gtm_fullbool))
+			|| ((save_start != save_start_orig) && (OC_NOOP != save_start->opcode)))
+		{	/* Only play this game if a side effect requires it */
+			newtriple(OC_GVSAVTARG);	/* Need 1 of these at expr_start */
+			setcurtchain(oldchain);
+			TREF(saw_side_effect) |= we_saw_side_effect;
+			if (NULL == save_start)
+			{	/* If this chain is new, look back for a pre-boolean place to put it */
+				for (ref = (TREF(curtchain))->exorder.bl;
+				     (ref != TREF(curtchain)) && oc_tab[ref->opcode].octype & OCT_BOOL; ref = ref->exorder.bl)
+						;
+				TREF(expr_start) = TREF(expr_start_orig) = ref;
+			}
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
 			triptr = newtriple(OC_GVRECTARG);
 			triptr->operand[0] = put_tref(TREF(expr_start));
+		} else
+		{	/* Just put it where it would "naturally" go */
+			setcurtchain(oldchain);
+			triptr = (TREF(curtchain))->exorder.bl;
+			dqadd(triptr, &tmpchain, exorder);
 		}
 	}
 	*a = put_tref(r);

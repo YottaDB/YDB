@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,7 +122,6 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	sbufh_p = csa->shmpool_buffer;
-
 	for (attempts = 1; ; ++attempts)	/* Start at 1 so we don't wcs_sleep() at bottom of loop on 1st iteration */
 	{
 		/* Try a bunch of times but release lock each time to give access to queues to processes that
@@ -130,7 +130,7 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 		if (FALSE == shmpool_lock_hdr(reg))
 		{
 			assert(FALSE);
-			rts_error(VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(reg), ERR_ERRCALL, 3, CALLFROM);
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(reg), ERR_ERRCALL, 3, CALLFROM);
 		}
 		/* Can only verify queue *AFTER* get the lock */
 		VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_free);
@@ -178,7 +178,7 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 			} else
 				limit_hit = FALSE;
 		} else
-			GTMASSERT;
+			assertpro(FALSE);
 		if (!limit_hit)
 #elif defined UNIX
 		assert(SHMBLK_BACKUP == blktype);
@@ -187,10 +187,10 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 			shmpool_unlock_hdr(reg);
 			return (shmpool_blk_hdr_ptr_t)-1L;
 		}
-DEBUG_ONLY (
+#		ifdef DEBUG
 		if ((MAX_BACKUP_FLUSH_TRY / 2) == attempts)
 			GET_C_STACK_FROM_SCRIPT("BCKUPBUFLUSH", process_id, sbufh_p->shmpool_crit_latch.u.parts.latch_pid, ONCE);
-	   )
+#		endif
 		if (MAX_BACKUP_FLUSH_TRY < attempts)
 		{	/* We have tried too long .. backup errors out */
 #ifdef DEBUG
@@ -237,7 +237,6 @@ DEBUG_ONLY (
 				return sblkh_p;
 			}
 		}
-
 		/* Block buffer is not available -- call requisite reclaimation routine depending on blk type needed.
 		  The availability of backup blocks is largely under our control (we can flush to get some) so sleeping
 		  at this level won't free these up. However for reformat buffers, a short sleep to allow IO to (1) be
@@ -318,7 +317,7 @@ void shmpool_blk_free(gd_region *reg, shmpool_blk_hdr_ptr_t sblkh_p)
 	}
 #endif
 	else
-		GTMASSERT;
+		assertpro(FALSE);
 	sblkh_p->blktype = SHMBLK_FREE;
 	++sbufh_p->free_cnt;
 	insqt(&sblkh_p->sm_que, &sbufh_p->que_free);
@@ -342,7 +341,7 @@ void shmpool_harvest_reformatq(gd_region *reg)
 	if (FALSE == shmpool_lock_hdr(reg))
 	{
 		assert(FALSE);
-		rts_error(VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(reg), ERR_ERRCALL, 3, CALLFROM);
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(reg), ERR_ERRCALL, 3, CALLFROM);
 	}
 	if (0 < sbufh_p->reformat_cnt)
 	{	/* Only if there are some entries */
@@ -400,7 +399,6 @@ void shmpool_harvest_reformatq(gd_region *reg)
 					BG_TRACE_ANY(csa, refmt_hvst_blk_kept);
 				}
 			}
-
 		}
 	} else
 		/* Shouldn't be any queue elements either */
@@ -482,16 +480,15 @@ void shmpool_abandoned_blk_chk(gd_region *reg, boolean_t force)
 				++sbufh_p->reformat_cnt;
 			} else
 #endif
-				GTMASSERT;
+				assertpro(FALSE);
 		}
 	}
 	VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_free);
 	VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_backup);
 	VMS_ONLY(VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_reformat));
 	assert((sbufh_p->free_cnt + sbufh_p->backup_cnt VMS_ONLY(+ sbufh_p->reformat_cnt)) == sbufh_p->total_blks);
-
 	sbufh_p->shmpool_blocked = FALSE;
-	send_msg(VARLSTCNT(4) ERR_SHMPLRECOV, 2, REG_LEN_STR(reg));
+	send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_SHMPLRECOV, 2, REG_LEN_STR(reg));
 }
 
 
@@ -537,11 +534,8 @@ boolean_t shmpool_lock_hdr(gd_region *reg)
 		{
 			/* On every 4th pass, we bide for awhile */
 			wcs_sleep(LOCK_SLEEP);
-			/* assert(0 == (LOCK_TRIES % 4));  assures there are 3 rel_quants prior to first wcs_sleep()
-			   but not needed as LOCK_TRIES is multiplied by 4 above.
-			*/
-			/* If near end of loop segment (LOCK_TRIES iters), see if target is dead and/or wake it up */
-			if (RETRY_CASLATCH_CUTOFF == (retries % LOCK_TRIES))
+			/* Check if we're due to check for lock abandonment check or holder wakeup */
+			if (0 == (retries & (LOCK_CASLATCH_CHKINTVL - 1)))
 				performCASLatchCheck(latch, TRUE);
 		}
 	}
@@ -596,7 +590,6 @@ void shmpool_unlock_hdr(gd_region *reg)
 	sbufh_p = csa->shmpool_buffer;
 	latch = &sbufh_p->shmpool_crit_latch;
 	assert(process_id == latch->u.parts.latch_pid VMS_ONLY(&& image_count == latch->u.parts.latch_image_count));
-
 	/* Quickly check if our counters are as we expect them to be. If not see if we need to run
 	   our recovery procedure (shmpool_blk_abandoned_chk()).
 	*/

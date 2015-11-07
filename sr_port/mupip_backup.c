@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -225,9 +226,7 @@ void mupip_backup_call_on_signal(void)
  */
 #define UPDATE_GBL_JREC_TIME												\
 {															\
-	if (JNL_ENABLED(cs_data)											\
-		UNIX_ONLY( && (0 != cs_addrs->nl->jnl_file.u.inode))							\
-		VMS_ONLY( && (0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid)))))	\
+	if (JNL_ENABLED(cs_data))											\
 	{														\
 		jpc = cs_addrs->jnl;											\
 		jbp = jpc->jnl_buff;											\
@@ -285,7 +284,6 @@ void mupip_backup(void)
 	int			user_id;
 	int			group_id;
 	int			perm;
-	struct perm_diag_data	pdd;
 	pid_t			*kip_pids_arr_ptr;
 #	elif defined(VMS)
 	struct FAB		temp_fab;
@@ -700,26 +698,13 @@ void mupip_backup(void)
 			/* give temporary files the group and permissions as other shared resources - like journal files */
 			FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 			if (-1 != fstat_res)
-				if (gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE, &pdd) < 0)
-				{
-					send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
-						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
-						RTS_ERROR_STRING(
-							((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
-						PERMGENDIAG_ARGS(pdd));
-					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
-						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
-						RTS_ERROR_STRING(
-							((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
-						PERMGENDIAG_ARGS(pdd));
-					mubclnup(rptr, need_to_del_tempfile);
-					mupip_exit(EPERM);
-				}
-			/* setup new group and permissions if indicated by the security rules.  Use
+				gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE);
+			/* Setup new group and permissions if indicated by the security rules.  Use
 			 * 0770 anded with current mode for the new mode if masked permission selected.
 			 */
 			if ((-1 == fstat_res) || (-1 == FCHMOD(rptr->backup_fd, perm))
-				|| (((-1 != user_id) || (-1 != group_id)) && (-1 == fchown(rptr->backup_fd, user_id, group_id))))
+				|| (((INVALID_UID != user_id) || (INVALID_GID != group_id))
+					&& (-1 == fchown(rptr->backup_fd, user_id, group_id))))
 			{
 				status = errno;
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) status);
@@ -1322,10 +1307,7 @@ repl_inst_bkup_done2:
 							assert(jnl_info.fn_len == gds_info->fab->fab$b_fns);
 							assert(0 == memcmp(jnl_info.fn, gds_info->fab->fab$l_fna, jnl_info.fn_len));
 						)
-						if (JNL_ENABLED(cs_data) &&
-							UNIX_ONLY((0 != cs_addrs->nl->jnl_file.u.inode))
-							VMS_ONLY((0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid,
-									zero_fid, SIZEOF(zero_fid)))))
+						if (JNL_ENABLED(cs_data) && (0 != cs_addrs->nl->jnl_file.u.inode))
 						{	/* Note: following will again call wcs_flu() */
 							if (SS_NORMAL != (status = set_jnl_file_close(SET_JNL_FILE_CLOSE_BACKUP)))
 							{

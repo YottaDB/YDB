@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +22,12 @@
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 #include "gtm_time.h"
+#include "gtm_caseconv.h"
+#include "gtm_conv.h"
+#include "gtm_utf8.h"
+#include "gtm_netdb.h"
+#include "gtm_unistd.h"
+
 #include "copy.h"
 #include "gt_timer.h"
 #include "io.h"
@@ -30,12 +37,8 @@
 #ifndef VMS
 #include "iormdef.h"
 #endif
-#include "gtm_caseconv.h"
 #include "stringpool.h"
-#include "gtm_conv.h"
-#include "gtm_utf8.h"
-#include "gtm_netdb.h"
-#include "gtm_unistd.h"
+#include "error.h"
 
 GBLREF	d_socket_struct		*socket_pool, *newdsocket;
 GBLREF	io_pair			io_std_device;	/* standard device */
@@ -120,8 +123,10 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	uint			filemode_mask;
 	unsigned long		uicvalue;
 #endif
+	boolean_t		ch_set;
 
 	ioptr = dev->iod;
+	ESTABLISH_RET_GTMIO_CH(&ioptr->pair, -1, ch_set);
 	assert((params) *(pp->str.addr + p_offset) < (unsigned char)n_iops);
 	assert(ioptr != 0);
 	assert(ioptr->state >= 0 && ioptr->state < n_io_dev_states);
@@ -425,7 +430,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("CONNECT"),
 					LEN_AND_LIT("ZLISTEN"), LEN_AND_LIT("OPEN"));
-		return FALSE;
+			return FALSE;
 		}
 		if (delay_specified && nodelay_specified)
 		{
@@ -436,7 +441,10 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		if (listen_specified || connect_specified || is_principal)
 		{
 			if (NULL == (socketptr = iosocket_create(sockaddr, bfsize, is_principal ? file_des : -1, listen_specified)))
+			{
+				REVERT_GTMIO_CH(&ioptr->pair, ch_set);
 				return FALSE;
+			}
 			assert(listen_specified == socketptr->passive);
 			if (ioerror_specified)
 				socketptr->ioerror = ('T' == ioerror || 't' == ioerror);
@@ -526,6 +534,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		if (socketptr->sd > 0)
 			(void)close(socketptr->sd);
 		SOCKET_FREE(socketptr);
+		REVERT_GTMIO_CH(&ioptr->pair, ch_set);
 		return FALSE;
 	} else if (is_principal)
 	{
@@ -582,5 +591,6 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	}
 	ioptr->newly_created = FALSE;
 	ioptr->state = dev_open;
+	REVERT_GTMIO_CH(&ioptr->pair, ch_set);
 	return TRUE;
 }

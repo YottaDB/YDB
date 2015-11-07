@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -837,31 +838,35 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 		 * op_unwind() is going to unlink that version of the routine. We will eventually come here (as stp_move)
 		 * with a zeroed frame pointer so the test below needs to deal with a NULL frame_pointer value.
 		 */
-		for (sf = frame_pointer; (NULL != sf) && (sf < (stack_frame *)stackbase); sf = sf->old_frame_pointer)
-		{	/* Cover temp mvals in use */
-			if (NULL == sf->old_frame_pointer)
-			{	/* If trigger enabled, may need to jump over a base frame */
-				/* TODO - fix this to jump over call-ins base frames as well */
-#				ifdef GTM_TRIGGER
-				if (SFT_TRIGR & sf->type)
-				{	/* We have a trigger base frame, back up over it */
-					sf = *(stack_frame **)(sf + 1);
-					assert(sf);
-					assert(sf->old_frame_pointer);
-				} else
-#				endif
-					break;
-			}
-			assert(sf->temps_ptr);
-			if (sf->temps_ptr >= (unsigned char *)sf)
-				continue;
-			m = (mval *)sf->temps_ptr;
-			for (mtop = m + sf->temp_mvals; m < mtop; m++)
-			{	/* DM frames should not normally have temps. If they do then it better have mvtype 0
-				 * thereby guaranteeing it will not need stp_gcol protection by the MVAL_STPG_ADD macro below.
-				 */
-				assert(!(sf->type & SFT_DM) || !MV_DEFINED(m));
-				MVAL_STPG_ADD(m);
+		if (NULL != frame_pointer)
+		{
+			for (sf = frame_pointer; sf < (stack_frame *)stackbase; sf = sf->old_frame_pointer)
+			{	/* Cover temp mvals in use */
+				if (NULL == sf->old_frame_pointer)
+				{	/* If trigger enabled, may need to jump over a base frame */
+					/* TODO - fix this to jump over call-ins base frames as well */
+#					ifdef GTM_TRIGGER
+					if (SFT_TRIGR & sf->type)
+					{	/* We have a trigger base frame, back up over it */
+						sf = *(stack_frame **)(sf + 1);
+						assert(sf);
+						assert(sf->old_frame_pointer);
+					} else
+#					endif
+						break;
+				}
+				assert(sf->temps_ptr);
+				if (sf->temps_ptr >= (unsigned char *)sf)
+					continue;
+				m = (mval *)sf->temps_ptr;
+				for (mtop = m + sf->temp_mvals; m < mtop; m++)
+				{	/* DM frames should not normally have temps. If they do then it better have mvtype 0
+					 * thereby guaranteeing it will not need stp_gcol protection by the MVAL_STPG_ADD macro
+					 * below.
+					 */
+					assert(!(sf->type & SFT_DM) || !MV_DEFINED(m));
+					MVAL_STPG_ADD(m);
+				}
 			}
 		}
 		if (NULL != TREF(glvn_pool_ptr))

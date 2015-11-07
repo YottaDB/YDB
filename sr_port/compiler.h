@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +12,7 @@
 #ifndef COMPILER_H_INCLUDED
 #define COMPILER_H_INCLUDED
 
-/* Values for oprclass */
+/* Values for oprclass - Changes made here need to be reflected in cdbg_dump opr_type_names table */
 typedef enum
 {
 	NO_REF,		/* 0 */
@@ -33,7 +34,8 @@ typedef enum
 	MFUN_REF,	/* 16 */
 	MNXL_REF,	/* 17 refer to internalentry of child line */
 	TSIZ_REF,	/* 18 ilit refering to size of given triple codegen */
-	OCNT_REF	/* 19 Offset from Call to Next Triple */
+	OCNT_REF,	/* 19 Offset from Call to Next Triple */
+	CDIDX_REF	/* 20 Denotes index into a table containing a code address */
 } operclass;
 #define VALUED_REF_TYPES 6	/* Types 0-6 are specific types used by alloc_reg() in array references
 				 * **** WARNING **** Do NOT reorder
@@ -107,6 +109,7 @@ typedef struct	oprtypestruct
 		mline			*mlin;
 		mliteral		*mlit;
 		mstr			*cdlt;
+		mstr			*cdidx;
 		mvar			*vref;
 		int4			temp;
 		int4			ilit;
@@ -263,11 +266,11 @@ error_def(ERR_SVNOSET);
 #ifdef GTM_TRIGGER
 #	define	STX_ERROR_WARN(errcode)					\
 {									\
-	if (!TREF(trigger_compile))					\
+	if (!TREF(trigger_compile_and_link))				\
 		parse_warn = TRUE;					\
 	assert(IS_STX_WARN(errcode));					\
 	stx_error(errcode);						\
-	if (TREF(trigger_compile))					\
+	if (TREF(trigger_compile_and_link))				\
 		return FALSE;						\
 }
 #else
@@ -350,8 +353,9 @@ typedef struct
 	newtriple(OC_GVRECTARG)->operand[0] = put_tref(TREF(expr_start));	\
 }
 
-/* note assignment below */
-#define SHIFT_SIDE_EFFECTS	((TREF(saw_side_effect) = TREF(shift_side_effects)) && (GTM_BOOL == TREF(gtm_fullbool)))
+/* note assignment below and that it always occurs */
+#define SHIFT_SIDE_EFFECTS	((TREF(saw_side_effect) = TREF(shift_side_effects)) \
+	&& (NULL != TREF(expr_start)) && (GTM_BOOL == TREF(gtm_fullbool)))
 
 #define INITIAL_SIDE_EFFECT_DEPTH 33	/* initial allocation for expression nesting to track side effects */
 
@@ -514,6 +518,30 @@ typedef struct
 		C = '\0';		\
 }
 
+/* Macro to clear parts of given compiler mval which could end up in an object file (if they are literals). These bits may not
+ * be (re)set by the s2n/n2s calls we do. If not, the mval could have random bits in it which, as far as the mval is concerned
+ * is not a problem but interferes with getting a consistent object hash value when the same source is (re)compiled.
+ */
+#define CLEAR_MVAL_BITS(mvalptr) 		\
+{						\
+	((mval_b *)(mvalptr))->sgne = 0;	\
+	(mvalptr)->fnpc_indx = 0xff;		\
+}
+
+/* Autorelink enabled platforms pass a different argument to glue code when calling a non-local M
+ * routine. Use put_cdlt() to pass addresses of the items and use put_cdidx() when passing an ofset
+ * into the linkage table where the items reside. Also macroize the opcode to use.
+ */
+#ifdef AUTORELINK_SUPPORTED
+# define PUT_CDREF put_cdidx
+# define OC_CDREF OC_CDIDX
+# define CDREF_REF CDIDX_REF
+#else
+# define PUT_CDREF put_cdlt
+# define OC_CDREF OC_CDLIT
+# define CDREF_REF CDLT_REF
+#endif
+
 int		actuallist(oprtype *opr);
 int		bool_expr(boolean_t op, oprtype *addr);
 void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);
@@ -620,6 +648,7 @@ int		parse_until_rparen_or_space(void);
 oprtype		put_ocnt(void);
 oprtype		put_tsiz(void);
 oprtype		put_cdlt(mstr *x);
+oprtype		put_cdidx(mstr *x);
 oprtype		put_ilit(mint x);
 oprtype		put_indr(oprtype *x);
 oprtype		put_lit(mval *x);

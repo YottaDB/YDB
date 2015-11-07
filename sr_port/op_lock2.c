@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +57,8 @@
 #include "change_reg.h"
 #include "setterm.h"
 #include "getzposition.h"
+#include "lockdefs.h"
+#include "is_proc_alive.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
@@ -92,7 +95,7 @@ STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr)
 	MAXSTR_BUFF_DECL(buff);
 	MAXSTR_BUFF_INIT;
 	lock_str_to_buff(pvt_ptr, buff, MAX_STRBUFF_INIT);
-	rts_error(VARLSTCNT(7) ERR_LOCKINCR2HIGH, 1, pvt_ptr->level, ERR_LOCKIS, 2, LEN_AND_STR(buff));
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_LOCKINCR2HIGH, 1, pvt_ptr->level, ERR_LOCKIS, 2, LEN_AND_STR(buff));
 }
 
 /*
@@ -116,14 +119,18 @@ STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr)
  */
 int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 {
-	boolean_t	blocked, timer_on;
-	signed char	gotit;
-	unsigned short	locks_bckout, locks_done;
-	int4		msec_timeout;	/* timeout in milliseconds */
-	mlk_pvtblk	*pvt_ptr1, *pvt_ptr2, **prior, *already_locked;
-	unsigned char	action;
-	ABS_TIME	cur_time, end_time, remain_time;
-	mv_stent	*mv_zintcmd;
+	boolean_t		blocked, timer_on;
+	signed char		gotit;
+	unsigned short		locks_bckout, locks_done;
+	int4			msec_timeout;	/* timeout in milliseconds */
+	mlk_pvtblk		*pvt_ptr1, *pvt_ptr2, **prior, *already_locked;
+	unsigned char		action;
+	ABS_TIME		cur_time, end_time, remain_time;
+	mv_stent		*mv_zintcmd;
+#	ifdef VMS
+	int4			status;			/* needed for BLOCKING_PROC_DEAD macro in VMS */
+	int4			icount, time[2];	/* needed for BLOCKING_PROC_DEAD macro in VMS */
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -150,12 +157,16 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 			timer_on = FALSE;
 		} else
 		{
+			sys_get_curr_time(&cur_time);
 			mv_zintcmd = find_mvstent_cmd(ZINTCMD_LOCK, restart_pc, restart_ctxt, FALSE);
 			if (mv_zintcmd)
 			{
-				remain_time = mv_zintcmd->mv_st_cont.mvs_zintcmd.end_or_remain;
+				end_time = mv_zintcmd->mv_st_cont.mvs_zintcmd.end_or_remain;
+				remain_time = sub_abs_time(&end_time, &cur_time);	/* get remaing time to sleep */
 				if (0 <= remain_time.at_sec)
-					msec_timeout = (int4)(remain_time.at_sec * 1000 + remain_time.at_usec / 1000);
+					msec_timeout = (int4)(remain_time.at_sec * MILLISECS_IN_SEC +
+							      /* Round up in order to prevent premautre timeouts */
+							      DIVIDE_ROUND_UP(remain_time.at_usec, MICROSECS_IN_MSEC));
 				else
 					msec_timeout = 0;
 				TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last
@@ -171,13 +182,11 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 					mv_zintcmd->mv_st_cont.mvs_zintcmd.command = ZINTCMD_NOOP;
 					mv_zintcmd->mv_st_cont.mvs_zintcmd.restart_pc_check = NULL;
 				}
-			}
-			if (0 < msec_timeout)
-			{
-				sys_get_curr_time(&cur_time);
-				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
-				start_timer((TID)&timer_on, msec_timeout, wake_alarm, 0, NULL);
 			} else
+				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+			if (0 < msec_timeout)
+				start_timer((TID)&timer_on, msec_timeout, wake_alarm, 0, NULL);
+			else
 			{
 				out_of_time = TRUE;
 				timer_on = FALSE;
@@ -227,7 +236,7 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 					pvt_ptr1->zalloc = TRUE;
 					break;
 				default:
-					GTMASSERT;
+					assertpro(FALSE && laflag);
 					break;
 				}
 			} else
@@ -252,7 +261,7 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 			action = cm_action;
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && cm_action);
 			break;
 		}
 		for (pvt_ptr2 = mlk_pvt_root, locks_bckout = 0;  locks_bckout < locks_done;
@@ -309,7 +318,7 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 							if ((tptimeout != outofband) && (ctrlc != outofband))
 							{
 								PUSH_MV_STENT(MVST_ZINTCMD);
-								mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = remain_time;
+								mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = end_time;
 								mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = restart_ctxt;
 								mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = restart_pc;
 								/* save current information from zintcmd_active */
@@ -335,6 +344,20 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 			 * same lock resource, "mlk_shrblk_find" assumes a sleep has happened in between two locking attempts.
 			 */
 			hiber_start_wait_any(LOCK_SELF_WAKE);
+			/* Every reattempt at a blocking lock needs crit which could be a bottleneck. So minimize reattempts.
+			 * The "blk_sequence" check below serves that purpose. If the sequence number is different between
+			 * the shared and private copies, it means the lock state in shared memory has changed since last we
+			 * did our blocking mlk_lock and so it is time to reattempt. But if the sequence numbers are the same,
+			 * we dont need to reattempt. That said, we still need to check if the blocking pid is still alive
+			 * and if so we continue to sleep. If not, we reattempt the lock in case the holder pid was kill -9ed.
+			 * If pvt_ptr1->blocked is NULL, it implies there is not enough space in lock shm so mlk_shrblk_find
+			 * returned blocked = TRUE. In this case, there is no "pvt_ptr1->blocked" to do the sequence number
+			 * check so keep reattempting the lock.
+			 */
+			if ((NULL != pvt_ptr1->blocked)
+					&& (pvt_ptr1->blk_sequence == pvt_ptr1->blocked->sequence)
+					&& (!BLOCKING_PROC_DEAD(pvt_ptr1, time, icount, status)))
+				continue;
 			/* Note that "TREF(mlk_yield_pid)" is not initialized here as we want to use any value inherited
 			 * from previous calls to mlk_lock for this lock.
 			 */

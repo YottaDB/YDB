@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,14 +28,25 @@
 #include "gtm_ipv6.h"
 #include "iosocketdef.h"
 #include "op.h"
+#include "mmemory.h"
 #include "mvalconv.h"
 #include "trans_log_name.h"
 #include "zsocket.h"
+#ifdef GTM_TLS
+#include "gtm_caseconv.h"
+#include "min_max.h"
+#include "gtm_tls.h"
+#endif
 
 GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF d_socket_struct	*socket_pool;
+GBLREF io_pair		*io_std_device;
+GBLREF io_log_name	*dollar_principal;
+GBLREF mstr		dollar_prin_log;
+GBLREF mstr		dollar_zpin;			/* contains "< /" */
+GBLREF mstr		dollar_zpout;			/* contains "> /" */
 
 error_def(ERR_ZSOCKETATTR);
 error_def(ERR_ZSOCKETNOTSOCK);
@@ -44,6 +56,17 @@ LITREF	mval		literal_zero;
 LITREF	mval		literal_one;
 LITREF	mval		literal_null;
 LITREF	mval		skiparg;
+
+#ifdef	GTM_TLS
+#define	TLSCLIENTSTR	"CLIENT"
+#define	TLSSERVERSTR	"SERVER"
+#define TLSOPTIONLIT	"TLS option: "		/* for error message */
+LITDEF char *zsocket_tls_options[] = {"CIPHER", "OPTIONS", NULL};
+#define	OPTIONEND		','
+#define	OPTIONENDSTR		","
+#define	TLS_OPTIONS_CIPHER	1
+#define	TLS_OPTIONS_OPTIONS	2
+#endif
 
 #define ZSOCKETITEM(A,B,C,D) {(SIZEOF(A) - 1), A}
 const nametabent zsocket_names[] =
@@ -55,7 +78,7 @@ const unsigned char zsocket_indextab[] =
 { /*	A  B  C  D  E  F  G  H  I  J  K  L  M  N */
 	0, 0, 0, 1, 3, 3, 3, 3, 4, 6, 6, 6, 8, 9,
   /*	O   P   Q   R   S   T   U   V   W   X   Y   Z  end */
-	10, 10, 12, 12, 14, 16, 16, 16, 16, 16, 16, 16, 20
+	10, 10, 12, 12, 14, 16, 17, 17, 17, 17, 17, 17, 21
 };
 #define ZSOCKETITEM(A,B,C,D) C
 static const int zsocket_types[] =
@@ -88,7 +111,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 {
 	VMS_ONLY(int	numarg;)
 	int		zsocket_item, zsocket_type, tmpnum, numret, index, index2;
-	int4		stat;
+	int4		stat, len, len2;
 	mval		*arg1, *arg2, tmpmval;
 	mval		*keyword;
 	mval		*devicename;
@@ -96,8 +119,18 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	io_desc		*iod;
 	io_log_name	*nl, *tl;
 	char		buf1[MAX_TRANS_NAME_LEN];	/* buffer to hold translated name */
-	d_socket_struct	*dsocketptr;
-	socket_struct	*socketptr;
+	char		*c1;		/* used to compare $P name */
+	int		nlen;		/* len of $P name */
+	io_log_name	*tlp;		/* logical record for translated name for $principal */
+	int		nldone;		/* 0 if not $ZPIN or $ZPOUT, 1 if $ZPIN and 2 if $ZPOUT */
+	d_socket_struct		*dsocketptr;
+	socket_struct		*socketptr;
+#ifdef	GTM_TLS
+	int			tls_options_mask, optionoffset, optionlen;
+	gtm_tls_socket_t	*tls_sock;
+	gtm_tls_conn_info	conn_info;
+	char			*charptr, *optionend;
+#endif
 	va_list		var;
 	DCL_THREADGBL_ACCESS;
 
@@ -130,6 +163,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	}
 	assert(!numarg);
 	va_end(var);
+	nldone = 0;
 	if (NULL == devicename)
 	{
 		if ((NULL == socket_pool) || (NULL == socket_pool->iod))
@@ -142,8 +176,32 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	else if (0 == devicename->str.len)
 		iod = io_curr_device.in;
 	else
-	{	/* get information from provided device name */
-		nl = get_log_name(&devicename->str, NO_INSERT);
+	{
+		if ((io_std_device->in != io_std_device->out))
+		{
+			tlp = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;
+			nlen = tlp->len;
+			assert(dollar_zpout.len == dollar_zpin.len);
+			if ((nlen + dollar_zpout.len) == devicename->str.len)
+			{	/* passed the length test now compare the 2 pieces, the first one the length of
+				   $P and the second $ZPIN or $ZPOUT
+				*/
+				c1 = (char *)tlp->dollar_io;
+				if (!memvcmp(c1, nlen, &(devicename->str.addr[0]), nlen))
+				{
+					if (!memvcmp(dollar_zpin.addr, dollar_zpin.len,
+						     &(devicename->str.addr[nlen]), dollar_zpin.len))
+						nldone = 1;
+					else if (!memvcmp(dollar_zpout.addr, dollar_zpout.len,
+							  &(devicename->str.addr[nlen]), dollar_zpout.len))
+						nldone = 2;
+				}
+			}
+		}
+		if (0 == nldone)
+			nl = get_log_name(&devicename->str, NO_INSERT);
+		else
+			nl = get_log_name(&dollar_prin_log, NO_INSERT);
 		if (NULL == nl)
 		{
 			stat = TRANS_LOG_NAME(&devicename->str, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
@@ -160,6 +218,9 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IONOTOPEN);
 		iod = nl->iod;
 	}
+	/* if iod is standard in device and it is a split device and it is $ZPOUT set iod to output device */
+	if ((2 == nldone) && (io_std_device->in == iod))
+		iod = io_std_device->out;
 	if (gtmsocket != iod->type)
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSOCKETNOTSOCK);
@@ -371,6 +432,113 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			UNICODE_ONLY(dst->str.char_len = 0);
 			s2pool(&dst->str);
 			break;
+		case zsocket_tls:
+#			ifdef	GTM_TLS
+			if (socketptr->tlsenabled)
+			{
+				tls_sock = (gtm_tls_socket_t *)socketptr->tlssocket;
+				if (NULL == tls_sock)
+				{
+					*dst = literal_null;	/* something is wrong */
+					break;
+				}
+				len = SIZEOF(ONE_COMMA) - 1 + SIZEOF(TLSCLIENTSTR) - 1 + 1; /* remove nulls, add trailing comma */
+				len += STRLEN(tls_sock->tlsid);		/* trailing comma above not needed if no tlsid but OK */
+				if ((NULL != arg2) && (0 < arg2->str.len))
+				{
+					len2 = MIN((MAX_TRANS_NAME_LEN - 1), arg2->str.len);
+					lower_to_upper((uchar_ptr_t)buf1, (uchar_ptr_t)arg2->str.addr, len2);
+					buf1[len2] = '\0';
+					tls_options_mask = 0;
+					for (charptr = buf1; (&buf1[len2] > charptr); charptr = optionend)
+					{
+						if (buf1 < charptr)
+							if ('\0' == *++charptr)
+								break;
+						optionend = strstr((const char *)charptr, OPTIONENDSTR);
+						if (NULL == optionend)
+							optionend = charptr + STRLEN(charptr);
+						*optionend = '\0';
+						for (index2 = 0; NULL != zsocket_tls_options[index2]; index2++)
+							if (0 == STRCMP(charptr, zsocket_tls_options[index2]))
+							{
+								tls_options_mask |= 1 << index2;
+								break;
+							}
+						if (NULL == zsocket_tls_options[index2])
+						{	/* not found */
+							len2 = SIZEOF(TLSOPTIONLIT) - 1;
+							optionoffset = charptr - buf1;
+							optionlen = MIN((MAX_TRANS_NAME_LEN - 1 - len2), (optionend - charptr));
+							charptr = arg2->str.addr;
+							memcpy(buf1, TLSOPTIONLIT, len2);
+							memcpy(&buf1[len2], &charptr[optionoffset], optionlen);
+							buf1[len2 + optionlen] = '\0';
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZSOCKETATTR, 2,
+								(len2 + optionlen), buf1);
+							return;		/* make compiler happy */
+						}
+					}
+					if (0 == gtm_tls_get_conn_info(tls_sock, &conn_info))
+					{
+						if (TLS_OPTIONS_CIPHER & tls_options_mask)
+						{
+							len += STRLEN(conn_info.protocol) + 3;		/* |P: */
+							len += STRLEN(conn_info.session_algo) + 3;	/* |C: */
+						}
+						if (TLS_OPTIONS_OPTIONS & tls_options_mask)
+							len += (3 + 16);	/* |O: hex digits in long */
+					}
+				} else
+					len2 = 0;	/* flag no extras */
+				ENSURE_STP_FREE_SPACE(len);
+				charptr = (char *)stringpool.free;
+				len = SIZEOF(ONE_COMMA) - 1;
+				memcpy(charptr, ONE_COMMA, len);
+				charptr += len;
+				len = SIZEOF(TLSCLIENTSTR) - 1;
+				STRNCPY_STR(charptr, (GTMTLS_OP_CLIENT_MODE & tls_sock->flags) ? TLSCLIENTSTR : TLSSERVERSTR, len);
+				charptr += len;
+				len = STRLEN(tls_sock->tlsid);
+				if (0 < len)
+				{
+					*charptr++ = ',';
+					STRNCPY_STR(charptr, tls_sock->tlsid, len);
+					charptr += len;
+				}
+				if (0 < len2)
+				{
+					if (TLS_OPTIONS_CIPHER & tls_options_mask)
+					{
+						STRCPY(charptr, "|P:");
+						charptr += 3;
+						len2 = STRLEN(conn_info.protocol);
+						STRNCPY_STR(charptr, conn_info.protocol, len2);
+						charptr += len2;
+						STRCPY(charptr, "|C:");
+						charptr += 3;
+						len2 = STRLEN(conn_info.session_algo);
+						STRNCPY_STR(charptr, conn_info.session_algo, len2);
+						charptr += len2;
+					}
+					if (TLS_OPTIONS_OPTIONS & tls_options_mask)
+					{
+						STRCPY(charptr, "|O:");
+						charptr += 3;
+						len2 = STRLEN(conn_info.protocol);
+						i2hexl((qw_num)conn_info.options, (uchar_ptr_t)charptr, 16);
+						len2 = 16;
+						charptr += len2;
+					}
+				}
+				len = charptr - (char *)stringpool.free;
+				dst->str.addr = (char *)stringpool.free;
+				dst->str.len = len;
+				stringpool.free += len;
+			} else
+#			endif
+				*dst = literal_null;
+			break;
 		case zsocket_zbfsize:
 			numret = socketptr->buffer_size;
 			break;
@@ -397,4 +565,5 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	dst->mvtype = zsocket_type;
 	if (MV_NM == dst->mvtype)
 		MV_FORCE_MVAL(dst, numret);
+	return;
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,15 +27,18 @@
 #include "gtm_utf8.h"
 #endif
 #include "gtmcrypt.h"
+#include "send_msg.h"
+#include "error.h"
 
 GBLREF io_pair		io_curr_device;
 #ifdef UNICODE_SUPPORTED
-LITREF	mstr		chset_names[];
+LITREF mstr		chset_names[];
 #endif
 
 error_def(ERR_CRYPTBADWRTPOS);
 error_def(ERR_DEVICEREADONLY);
 error_def(ERR_IOERROR);
+error_def(ERR_NOPRINCIO);
 error_def(ERR_NOTTOEOFONPUT);
 error_def(ERR_SYSCALL);
 
@@ -48,7 +52,9 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 	unsigned char	*outstart, *out, *top, *outptr, *nextoutptr, *outptrtop, *nextmb;
 	char		*out_ptr;
 	d_rm_struct	*rm_ptr;
+	boolean_t	ch_set;
 
+	ESTABLISH_RET_GTMIO_CH(&iod->pair, -1, ch_set);
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
 	assert(NULL != rm_ptr);
 	if (CHSET_UTF8 != iod->ochset)
@@ -94,15 +100,11 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 		} else
 			out_ptr = (char *)outstart;
 		DOWRITERC(rm_ptr->fildes, out_ptr, outlen, status);
-		if (0 != status)
-		{
-			DOLLAR_DEVICE_WRITE(iod, status);
-			iod->dollar.za = 9;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-		}
+		ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 		rm_ptr->write_occurred = TRUE;
 		rm_ptr->out_bytes += outlen;
 	}
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return outlen;
 }
 
@@ -120,9 +122,10 @@ void iorm_write_utf(mstr *v)
 	boolean_t	utf8_active = TRUE;		/* needed by GTM_IO_WCWIDTH macro */
 	boolean_t	stream, wrap;
 	struct stat	statbuf;
-
+	boolean_t	ch_set;
 
 	iod = io_curr_device.out;
+	ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
 	assert(NULL != rm_ptr);
 	inptr = (unsigned char *)v->addr;
@@ -132,7 +135,10 @@ void iorm_write_utf(mstr *v)
 		rm_ptr->out_bytes = 0;			/* user reset $X */
 	inchars = UTF8_LEN_STRICT(v->addr, v->len);	/* validate and get good char count */
 	if (0 >= inchars)
+	{
+		REVERT_GTMIO_CH(&io_curr_device, ch_set);
 		return;
+	}
 	usedwidth = 0;
 	stream = rm_ptr->stream;
 	wrap = iod->wrap;
@@ -172,12 +178,7 @@ void iorm_write_utf(mstr *v)
 					} else
 						out_ptr = (char *)outstart;
 					DOWRITERC(rm_ptr->fildes, out_ptr, outbytes, status);
-					if (0 != status)
-					{
-						DOLLAR_DEVICE_WRITE(iod, status);
-						iod->dollar.za = 9;
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-					}
+					ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 					rm_ptr->write_occurred = TRUE;
 					outptr = outstart;
 					rm_ptr->out_bytes = outbytes = 0;
@@ -247,12 +248,7 @@ void iorm_write_utf(mstr *v)
 				{
 					DOWRITERC(rm_ptr->fildes, out_ptr, outbytes, status);
 				}
-				if (0 != status)
-				{
-					DOLLAR_DEVICE_WRITE(iod, status);
-					iod->dollar.za = 9;
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-				}
+				ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 				rm_ptr->write_occurred = TRUE;
 			}
 			iod->dollar.x += usedwidth;
@@ -296,12 +292,7 @@ void iorm_write_utf(mstr *v)
 						} else
 							out_ptr = (char *)temppadarray;
 						DOWRITERC(rm_ptr->fildes, out_ptr, padsize, status);
-						if (0 != status)
-						{
-							DOLLAR_DEVICE_WRITE(iod, status);
-							iod->dollar.za = 9;
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-						}
+						ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 						rm_ptr->write_occurred = TRUE;
 					}
 					assert(rm_ptr->out_bytes == rm_ptr->recordsize);
@@ -343,6 +334,7 @@ void iorm_write_utf(mstr *v)
 		assert(usedwidth <= availwidth);	/* there is room in display WIDTH to write at least one character */
 	}
 	iod->dollar.za = 0;
+	REVERT_GTMIO_CH(&io_curr_device, ch_set);
 	return;
 }
 
@@ -357,8 +349,10 @@ void iorm_write(mstr *v)
 	boolean_t	stream, wrap;
 	struct stat	statbuf;
 	int		fstat_res, save_errno;
+	boolean_t	ch_set;
 
 	iod = io_curr_device.out;
+	ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);
 #ifdef __MVS__
 	if (NULL == iod->dev_sp)
 		rm_ptr = (d_rm_struct *)(iod->pair.in)->dev_sp;
@@ -421,7 +415,7 @@ void iorm_write(mstr *v)
 	if (!rm_ptr->fifo && !rm_ptr->pipe && !rm_ptr->fixed && (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
 	{
 		/* need to do an lseek to set current location in file */
-		if (-1 == (lseek(rm_ptr->fildes, (off_t)rm_ptr->file_pos, SEEK_SET)))
+		if ((off_t)-1 == (lseek(rm_ptr->fildes, rm_ptr->file_pos, SEEK_SET)))
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
 				      RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, errno);
@@ -435,7 +429,7 @@ void iorm_write(mstr *v)
 	    (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
 	{
 		/* need to do lseek to skip the BOM before writing*/
-		if (-1 == (lseek(rm_ptr->fildes, (off_t)rm_ptr->bom_num_bytes, SEEK_SET)))
+		if ((off_t)-1 == (lseek(rm_ptr->fildes, (off_t)rm_ptr->bom_num_bytes, SEEK_SET)))
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
 				      RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, errno);
@@ -447,11 +441,15 @@ void iorm_write(mstr *v)
 	if (IS_UTF_CHSET(iod->ochset))
 	{
 		iorm_write_utf(v);
+		REVERT_GTMIO_CH(&io_curr_device, ch_set);
 		return;
 	}
 	inlen = v->len;
 	if (!inlen)
+	{
+		REVERT_GTMIO_CH(&io_curr_device, ch_set);
 		return;
+	}
 	stream = rm_ptr->stream;
 	wrap = iod->wrap;
 	if (stream && !wrap)
@@ -479,12 +477,7 @@ void iorm_write(mstr *v)
 		{
 			DOWRITERC(rm_ptr->fildes, out_ptr, len, status);
 		}
-		if (0 != status)
-		{
-			DOLLAR_DEVICE_WRITE(iod, status);
-			iod->dollar.za = 9;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-		}
+		ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 		rm_ptr->write_occurred = TRUE;
 		iod->dollar.x += len;
 		if (0 >= (inlen -= len))
@@ -501,12 +494,7 @@ void iorm_write(mstr *v)
 					out_ptr = pvt_crypt_buf.addr;
 				}
 				DOWRITERC(rm_ptr->fildes, out_ptr, RMEOL_LEN, status);
-				if (0 != status)
-				{
-					DOLLAR_DEVICE_WRITE(iod, status);
-					iod->dollar.za = 9;
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-				}
+				ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 				rm_ptr->write_occurred = TRUE;
 			}
 			iod->dollar.x = 0;	/* don't use wteol to terminate wrapped records for fixed. */
@@ -517,5 +505,6 @@ void iorm_write(mstr *v)
 		}
 	}
 	iod->dollar.za = 0;
+	REVERT_GTMIO_CH(&io_curr_device, ch_set);
         return;
 }

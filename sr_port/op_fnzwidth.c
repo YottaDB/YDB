@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +46,7 @@ void op_fnzwidth(mval* src, mval* dst)
 		}
 #ifdef	UNICODE_SUPPORTED
 	} else
-		width = gtm_wcswidth(srcptr, src->str.len, TRUE, 0);	/* TRUE => strict checking of BADCHARs */
+		width = gtm_wcswidth(srcptr, src->str.len, !badchar_inhibit, 0);
 #endif
 	MV_FORCE_MVAL(dst, width);
 }

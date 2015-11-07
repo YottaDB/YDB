@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,12 +98,54 @@ error_def(ERR_DBFILEXT);
 error_def(ERR_DSKSPACEFLOW);
 error_def(ERR_JNLFLUSH);
 error_def(ERR_NOSPACEEXT);
+error_def(ERR_PREALLOCATEFAIL);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_TOTALBLKMAX);
 error_def(ERR_WAITDSKSPACE);
 
 OS_PAGE_SIZE_DECLARE
+
+#if !defined(__sun) && !defined(__hpux)
+STATICFNDCL int extend_wait_for_fallocate(unix_db_info *udi, uint4 new_total);
+STATICFNDEF int extend_wait_for_fallocate(unix_db_info *udi, uint4 new_total)
+{
+	int to_wait, to_msg, wait_period, save_errno;
+
+	/* Attempt to fallocate every second, and send message to operator every 1/20 of cs_data->wait_disk_space */
+	wait_period = to_wait = DIVIDE_ROUND_UP(cs_data->wait_disk_space, CDB_STAGNATE + 1);
+	to_msg = (to_wait / 8) ? (to_wait / 8) : 1;		/* send around 8 messages during 1 wait_period */
+	do
+	{
+		if ((to_wait == cs_data->wait_disk_space) || (to_wait % to_msg == 0))
+			ISSUE_WAITDSKSPACE(to_wait, wait_period, send_msg_csa);
+		hiber_start(1000);
+		to_wait--;
+		save_errno = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data) + (off_t)new_total * cs_data->blk_size +
+					     DISK_BLOCK_SIZE);
+	} while ((to_wait > 0) && (ENOSPC == save_errno));
+	return save_errno;
+}
+#endif
+
+STATICFNDCL int extend_wait_for_write(unix_db_info *udi, off_t new_eof, char *buff);
+STATICFNDEF int extend_wait_for_write(unix_db_info *udi, off_t new_eof, char *buff)
+{
+	int to_wait, to_msg, wait_period, save_errno;
+
+	/* Attempt to write every second, and send message to operator every 1/20 of cs_data->wait_disk_space */
+	wait_period = to_wait = DIVIDE_ROUND_UP(cs_data->wait_disk_space, CDB_STAGNATE + 1);
+	to_msg = (to_wait / 8) ? (to_wait / 8) : 1;		/* send around 8 messages during 1 wait_period */
+	do
+	{
+		if ((to_wait == cs_data->wait_disk_space) || (to_wait % to_msg == 0))
+			ISSUE_WAITDSKSPACE(to_wait, wait_period, send_msg_csa);
+		hiber_start(1000);
+		to_wait--;
+		LSEEKWRITE(udi->fd, new_eof, buff, DISK_BLOCK_SIZE, save_errno);
+	} while ((to_wait > 0) && (ENOSPC == save_errno));
+	return save_errno;
+}
 
 uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 {
@@ -111,7 +154,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	char			buff[DISK_BLOCK_SIZE];
 	int			result, save_errno, status;
 	uint4			new_bit_maps, bplmap, map, new_blocks, new_total, max_tot_blks, old_total;
-	uint4			jnl_status, to_wait, to_msg, wait_period;
+	uint4			jnl_status;
 	gtm_uint64_t		avail_blocks, mmap_sz;
 	off_t			new_eof;
 	trans_num		curr_tn;
@@ -138,7 +181,10 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	   overflow and end up doing silly things.
 	*/
 	assert((blocks <= (MAXTOTALBLKS(cs_data) - cs_data->trans_hist.total_blks)) || WBTEST_ENABLED(WBTEST_FILE_EXTEND_ERROR));
-	if (!blocks)
+#	if defined(__sun) || defined(__hpux)
+	cs_data->defer_allocate = TRUE;
+#	endif
+	if (!blocks && (cs_data->defer_allocate || (TRANS_IN_PROG_TRUE == trans_in_prog)))
 		return (uint4)(NO_FREE_SPACE); /* should this be changed to show extension not enabled ? */
 	bplmap = cs_data->bplmap;
 	/* New total of non-bitmap blocks will be number of current, non-bitmap blocks, plus new blocks desired
@@ -152,7 +198,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 			- DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, bplmap) + blocks, bplmap - 1)
 			- DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, bplmap);
 	new_blocks = blocks + new_bit_maps;
-	assert(0 < (int)new_blocks);
+	assert((0 < (int)new_blocks) || (!cs_data->defer_allocate && (0 == new_blocks)));
 	if (new_blocks + cs_data->trans_hist.total_blks > MAXTOTALBLKS(cs_data))
 	{
 		assert(FALSE);
@@ -318,22 +364,27 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	}
 	CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 	new_total = old_total + new_blocks;
-	new_eof = ((off_t)(cs_data->start_vbn - 1) * DISK_BLOCK_SIZE) + ((off_t)new_total * cs_data->blk_size);
-	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd, new_eof, buff, DISK_BLOCK_SIZE, save_errno);
-	if ((ENOSPC == save_errno) && IS_GTM_IMAGE)
+	new_eof = BLK_ZERO_OFF(cs_data) + ((off_t)new_total * cs_data->blk_size);
+#	if !defined(__sun) && !defined(__hpux)
+	if (!cs_data->defer_allocate)
 	{
-		/* Attempt to write every second, and send message to operator every 1/20 of cs_data->wait_disk_space */
-		wait_period = to_wait = DIVIDE_ROUND_UP(cs_data->wait_disk_space, CDB_STAGNATE + 1);
-		to_msg = (to_wait / 8) ? (to_wait / 8) : 1;		/* send around 8 messages during 1 wait_period */
-		while ((to_wait > 0) && (ENOSPC == save_errno))
+		save_errno = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data) + (off_t)new_total * cs_data->blk_size +
+					     DISK_BLOCK_SIZE);
+		if ((ENOSPC == save_errno) && IS_GTM_IMAGE)
+			save_errno = extend_wait_for_fallocate(udi, new_total);
+		if (0 != save_errno)
 		{
-			if ((to_wait == cs_data->wait_disk_space) || (to_wait % to_msg == 0))
-				ISSUE_WAITDSKSPACE(to_wait, wait_period, send_msg_csa);
-			hiber_start(1000);
-			to_wait--;
-			LSEEKWRITE(udi->fd, new_eof, buff, DISK_BLOCK_SIZE, save_errno);
+			GDSFILEXT_CLNUP;
+			if (ENOSPC != save_errno)
+				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_PREALLOCATEFAIL, 2, DB_LEN_STR(gv_cur_region),
+					     save_errno);
+			return (uint4)(NO_FREE_SPACE);
 		}
 	}
+#	endif
+	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd, new_eof, buff, DISK_BLOCK_SIZE, save_errno);
+	if ((ENOSPC == save_errno) && IS_GTM_IMAGE)
+		save_errno = extend_wait_for_write(udi, new_eof, buff);
 	if (0 != save_errno)
 	{
 		GDSFILEXT_CLNUP;
@@ -429,7 +480,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		assert(FALSE); /* Should be killed before that */
 	}
 	assert(cs_data->blks_to_upgrd == (inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta + prev_extend_blks_to_upgrd));
-	assert(0 < (int)blocks);
+	assert(0 < (int)blocks || (!cs_data->defer_allocate && (0 == new_blocks)));
 	assert(0 < (int)(cs_addrs->ti->free_blocks + blocks));
 	cs_addrs->ti->free_blocks += blocks;
 	cs_addrs->total_blks = cs_addrs->ti->total_blks = new_total;

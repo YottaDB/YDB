@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,12 +92,16 @@ void mupip_set(void)
 	    cli_present("LOCK_SPACE")      	== CLI_PRESENT  ||
 	    cli_present("MUTEX_SLOTS")      	== CLI_PRESENT  ||
 	    cli_present("DEFER_TIME")      	== CLI_PRESENT  ||
+	    cli_present("DEFER_ALLOCATE")	== CLI_PRESENT  ||
+	    cli_present("DEFER_ALLOCATE")	== CLI_NEGATED  ||
 	    cli_present("WAIT_DISK")		== CLI_PRESENT  ||
 	    cli_present("PARTIAL_RECOV_BYPASS")	== CLI_PRESENT  ||
 #	    ifdef UNIX
 	    cli_present("KEY_SIZE")		== CLI_PRESENT  ||
 	    cli_present("QDBRUNDOWN")		== CLI_PRESENT  ||
 	    cli_present("QDBRUNDOWN")		== CLI_NEGATED  ||
+	    cli_present("EPOCHTAPER")		== CLI_PRESENT  ||
+	    cli_present("EPOCHTAPER")		== CLI_NEGATED  ||
 	    cli_present("RECORD_SIZE")		== CLI_PRESENT  ||
 #	    endif
 	    cli_present("VERSION")		== CLI_PRESENT)

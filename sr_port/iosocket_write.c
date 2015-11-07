@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -378,9 +379,11 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	int		flags;
 	d_socket_struct *dsocketptr;
 	socket_struct	*socketptr;
+	boolean_t	ch_set;
 
 	DBGSOCK2((stdout, "socwrite: ************************** Top of iosocket_write\n"));
 	iod = io_curr_device.out;
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	assert(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	if (0 >= dsocketptr->n_socket)
@@ -391,6 +394,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 		else
 #		endif
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
@@ -424,6 +428,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			if (0 != status)
 			{
 				SOCKERROR(iod, socketptr, ERR_SOCKWRITE, status);
+				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
 			}
 #ifdef UNIX
@@ -519,6 +524,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 						if (0 != status)
 						{
 							SOCKERROR(iod, socketptr, ERR_SOCKWRITE, status);
+							REVERT_GTMIO_CH(&iod->pair, ch_set);
 							return;
 						}
 #ifdef UNIX
@@ -559,6 +565,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			if (0 != status)
 			{
 				SOCKERROR(iod, socketptr, ERR_SOCKWRITE, status);
+				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
 			}
 #ifdef UNIX
@@ -575,5 +582,6 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 		iod->dollar.za = 0;
 	}
 	DBGSOCK2((stdout, "socwrite: <--------- Leaving iosocket_write\n"));
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

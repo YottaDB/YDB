@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -452,7 +453,7 @@ int db_init(gd_region *reg)
 {
 	boolean_t       	is_bg, read_only, sem_created = FALSE, need_stacktrace, have_standalone_access;
 	boolean_t		shm_setup_ok = FALSE, vermismatch = FALSE, vermismatch_already_printed = FALSE;
-	boolean_t		new_shm_ipc, do_crypt_init = FALSE, replinst_mismatch;
+	boolean_t		new_shm_ipc, do_crypt_init = FALSE, replinst_mismatch, need_shmctl, need_semctl;
 	char            	machine_name[MAX_MCNAMELEN];
 	int			gethostname_res, stat_res, user_id, group_id, perm, save_udi_semid;
 	int4            	status, semval, dblksize, fbwsize, save_errno, wait_time, loopcnt, sem_pid;
@@ -472,7 +473,6 @@ int db_init(gd_region *reg)
 	int			init_status;
 	gtm_uint64_t 		sec_size, mmap_sz;
 	semwait_status_t	retstat;
-	struct perm_diag_data	pdd;
 	boolean_t		bypassed_ftok = FALSE, bypassed_access = FALSE;
 	int			jnl_buffer_size;
 	char			s[JNLBUFFUPDAPNDX_SIZE];	/* JNLBUFFUPDAPNDX_SIZE is defined in jnl.h */
@@ -507,15 +507,7 @@ int db_init(gd_region *reg)
 	if (-1 == stat_res)
 		RTS_ERROR(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 	/* Setup new group and permissions if indicated by the security rules. */
-	if (gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_IPC, &pdd) < 0)
-	{
-		SEND_MSG(VARLSTCNT(6 + PERMGENDIAG_ARG_COUNT)
-			ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("ipc resources"), RTS_ERROR_STRING(udi->fn),
-			PERMGENDIAG_ARGS(pdd));
-		RTS_ERROR(VARLSTCNT(6 + PERMGENDIAG_ARG_COUNT)
-			ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("ipc resources"), RTS_ERROR_STRING(udi->fn),
-			PERMGENDIAG_ARGS(pdd));
-	}
+	gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_IPC);
 	/* if the process has standalone access, it will have udi->grabbed_access_sem set to TRUE at
 	 * this point. Note that down in a local variable as the udi->grabbed_access_sem will be set
 	 * to TRUE even for non-standalone access below and hence we can't rely on that later to determine if the process had
@@ -603,12 +595,22 @@ int db_init(gd_region *reg)
 				if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, IPC_STAT, semarg))
 					RTS_ERROR(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 						  ERR_TEXT, 2, LEN_AND_LIT("Error with database control semctl IPC_STAT1"), errno);
-				if ((-1 != user_id) && (user_id != semstat.sem_perm.uid))
+				if ((INVALID_UID != user_id) && (user_id != semstat.sem_perm.uid))
+				{
 					semstat.sem_perm.uid = user_id;
-				if ((-1 != group_id) && (group_id != semstat.sem_perm.gid))
+					need_semctl = TRUE;
+				}
+				if ((INVALID_GID != group_id) && (group_id != semstat.sem_perm.gid))
+				{
 					semstat.sem_perm.gid = group_id;
-				semstat.sem_perm.mode = perm;
-				if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, IPC_SET, semarg))
+					need_semctl = TRUE;
+				}
+				if (semstat.sem_perm.mode != perm)
+				{
+					semstat.sem_perm.mode = perm;
+					need_semctl = TRUE;
+				}
+				if (need_semctl && (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, IPC_SET, semarg)))
 					RTS_ERROR(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 						  ERR_TEXT, 2, LEN_AND_LIT("Error with database control semctl IPC_SET"), errno);
 				SET_GTM_ID_SEM(udi->semid, status);
@@ -844,13 +846,24 @@ int db_init(gd_region *reg)
 		if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
 			RTS_ERROR(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl IPC_STAT1"), errno);
-		/* change group and permissions */
-		if ((-1 != user_id) && (user_id != shmstat.shm_perm.uid))
+		/* change uid, group-id and permissions if needed */
+		need_shmctl = FALSE;
+		if ((INVALID_UID != user_id) && (user_id != shmstat.shm_perm.uid))
+		{
 			shmstat.shm_perm.uid = user_id;
-		if ((-1 != group_id) && (group_id != shmstat.shm_perm.gid))
+			need_shmctl = TRUE;
+		}
+		if ((INVALID_GID != group_id) && (group_id != shmstat.shm_perm.gid))
+		{
 			shmstat.shm_perm.gid = group_id;
-		shmstat.shm_perm.mode = perm;
-		if (-1 == shmctl(udi->shmid, IPC_SET, &shmstat))
+			need_shmctl = TRUE;
+		}
+		if (shmstat.shm_perm.mode != perm)
+		{
+			shmstat.shm_perm.mode = perm;
+			need_shmctl = TRUE;
+		}
+		if (need_shmctl && (-1 == shmctl(udi->shmid, IPC_SET, &shmstat)))
 			RTS_ERROR(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				  ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl IPC_SET"), errno);
 		/* Warning: We must read the shm_ctime using IPC_STAT after IPC_SET, which changes it.
@@ -1093,7 +1106,6 @@ int db_init(gd_region *reg)
 		 */
 		if (csa->nl->donotflush_dbjnl && !jgbl.onlnrlbk)
 		{
-			assert(FALSE);
 			PRINT_CRASH_MESSAGE(0, csa->nl, ERR_TEXT, 2,
 				LEN_AND_LIT("mupip recover/rollback created shared memory. Needs MUPIP RUNDOWN"));
 		}

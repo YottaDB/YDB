@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,11 +20,20 @@
 
 #define CHOWN		chown
 
-#define GETUID	getuid
-#define GETEUID	geteuid
+#define	INVALID_UID	(uid_t)-1
+#define	INVALID_GID	(gid_t)-1
 
-#define GETGID	getgid
-#define GETEGID	getegid
+GBLREF	uid_t	user_id, effective_user_id;
+GBLREF	gid_t	group_id, effective_group_id;
+
+#define GETUID()	user_id
+#define GETEUID()	((INVALID_UID == effective_user_id)							\
+				? (effective_user_id = geteuid()) : effective_user_id)
+
+#define GETGID()	((INVALID_GID == group_id) ? (group_id = getgid()) : group_id)
+
+#define GETEGID()	((INVALID_GID == effective_group_id)							\
+				? (effective_group_id = getegid()) : effective_group_id)
 
 #if defined(VMS)
 

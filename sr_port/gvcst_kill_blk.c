@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,6 +82,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	off_chain			chain1, curr_chain, prev_chain;
 	block_id			blk;
 	sm_uc_ptr_t			buffer;
+	srch_blk_status			*t1;
 
 	*cseptr = NULL;
 	if (low.offset == high.offset)
@@ -133,7 +135,20 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			if (!gv_target->hist.h[level + 1].blk_num)
 				kill_root = TRUE;
 			else
+			{	/* We are about to free up the contents of this entire block. If this block corresponded to
+				 * a global that has NOISOLATION turned on and has a non-zero recompute list (i.e. some SETs
+				 * already happened in this same TP transaction), make sure we disable the NOISOLATION
+				 * optimization in this case as that is applicable only if one or more SETs happened in this
+				 * data block and NOT if a KILL happens. Usually this is done by a t_write(GDS_WRITE_KILLTN)
+				 * call but since in this case the entire block is being freed, "t_write" wont be invoked
+				 * so we need to explicitly set GDS_WRITE_KILLTN like t_write would have (GTM-8269).
+				 */
+				t1 = blkhist->first_tp_srch_status ? blkhist->first_tp_srch_status : blkhist;
+				cse = t1->cse;
+				if ((NULL != cse) && cse->recompute_list_head)
+					cse->write_type |= GDS_WRITE_KILLTN;
 				return cdb_sc_delete_parent;
+			}
 		}
 		del_ptr = first_in_blk;
 	} else

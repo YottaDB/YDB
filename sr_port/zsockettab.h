@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +26,7 @@ ZSOCKETITEM("REMOTEADDRESS", zsocket_remoteaddress, MV_STR, level_socket),
 ZSOCKETITEM("REMOTEPORT", zsocket_remoteport, MV_NM, level_socket),
 ZSOCKETITEM("SOCKETHANDLE", zsocket_sockethandle, MV_STR, level_socket),
 ZSOCKETITEM("STATE", zsocket_state, MV_STR, level_socket),
+ZSOCKETITEM("TLS", zsocket_tls, MV_STR, level_socket),
 ZSOCKETITEM("ZBFSIZE", zsocket_zbfsize, MV_NM, level_socket),
 ZSOCKETITEM("ZDELAY", zsocket_zdelay, MV_STR, level_socket),
 ZSOCKETITEM("ZFF", zsocket_zff, MV_STR, level_socket),

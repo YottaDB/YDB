@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +32,7 @@
 #include "srcline.h"
 #include "compiler.h"
 #include "min_max.h"
+#include "dm_setup.h"
 #ifdef GTM_TRIGGER
 # include "trigger_source_read_andor_verify.h"
 # include "gtm_trigger_trc.h"
@@ -46,6 +48,7 @@ GBLREF stack_frame		*frame_pointer;
 GBLREF unsigned short		proc_act_type;
 
 error_def(ERR_COMMENT);
+error_def(ERR_INVZBREAK);
 error_def(ERR_MEMORY);
 error_def(ERR_NOPLACE);
 error_def(ERR_NOZBRK);
@@ -126,7 +129,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 		{
 			addr = (zb_code *)LINE_NUMBER_ADDR(CURRENT_RHEAD_ADR(routine), line_offset_addr);
 			addr = find_line_call(addr);
-			if (NULL != (z_ptr = zr_find(&zbrk_recs, addr)))
+			if (NULL != (z_ptr = zr_find(&zbrk_recs, addr, RETURN_CLOSEST_MATCH_FALSE)))
 				zr_remove_zbreak(&zbrk_recs, z_ptr);
 			else
 				dec_err(VARLSTCNT(1) ERR_NOZBRK);
@@ -141,6 +144,9 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 				assert(lab_name == dummy);
 			}
 #			endif
+			MEMVCMP(GTM_DMOD, (SIZEOF(GTM_DMOD) - 1), routine->routine_name.addr, routine->routine_name.len, sstatus);
+			if (!sstatus)				/* sstatus == 0 meaning this is the GTM$DMOD routine - error out */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVZBREAK);
 			op_commarg(act, indir_linetail); 	/* This puts entry in stack and also increments refcnt field */
 			indir_src.str = act->str;
 			indir_src.code = indir_linetail;
@@ -156,7 +162,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			 * itself (in our case bundle as we are using a bundle for every instruction in the generated code.
 			 */
 			addr = find_line_call(addr);
-			if (NULL == (z_ptr = zr_find(&zbrk_recs, addr)))
+			if (NULL == (z_ptr = zr_find(&zbrk_recs, addr, RETURN_CLOSEST_MATCH_FALSE)))
 			{
 #				ifdef USHBIN_SUPPORTED
 				if ((NULL != routine->shared_ptext_adr) && (routine->shared_ptext_adr == routine->ptext_adr))

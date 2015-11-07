@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +21,7 @@
 # define DBGARLNK_ONLY(x) x
 # include "gtm_stdio.h"
 # include "gtmio.h"
+# include "io.h"
 #else
 # define DBGARLNK(x)
 # define DBGARLNK_ONLY(x)

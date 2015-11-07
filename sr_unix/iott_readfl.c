@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -172,10 +173,12 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	fd_set		input_fd;
 	struct timeval	input_timeval;
 	struct timeval	save_input_timeval;
+	boolean_t	ch_set;
 
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	io_ptr = io_curr_device.in;
+	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	tt_ptr = (d_tt_struct *)(io_ptr->dev_sp);
 	assert(dev_open == io_ptr->state);
 	iott_flush(io_curr_device.out);
@@ -380,6 +383,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				if (!msec_timeout)
 					iott_rterm(io_ptr);
 			}
+			REVERT_GTMIO_CH(&io_curr_device, ch_set);
 			outofband_action(FALSE);
 			break;
 		}
@@ -1135,6 +1139,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	{
 		v->str.len = 0;
 		io_ptr->dollar.za = 9;
+		REVERT_GTMIO_CH(&io_curr_device, ch_set);
 		return(FALSE);
 	}
 #ifdef UNICODE_SUPPORTED
@@ -1175,6 +1180,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, STRLEN(NATIVE_TTEOL));
 		}
 	}
+	REVERT_GTMIO_CH(&io_curr_device, ch_set);
 	return ((short)ret);
 
 term_error:

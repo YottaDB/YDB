@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2013, 2014 Fidelity Information Services, Inc	#
+# Copyright (c) 2013-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -211,7 +212,7 @@ uninstall:
 
 clean:
 	@echo ; echo "Removing generated files..."
-	rm -f *.so
+	rm -f *.so *.o
 ifeq ($(NOT_IN_GTMCRYPTDIR),1)
 	rm -f maskpass
 endif

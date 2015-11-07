@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +41,7 @@
 #ifdef GTM_TLS
 #include "gtm_tls.h"
 #endif
+#include "error.h"
 
 GBLREF	io_desc		*active_device;
 GBLREF	int		process_exiting;
@@ -68,9 +70,11 @@ void iosocket_close(io_desc *iod, mval *pp)
 	int		p_offset = 0;
 	boolean_t	socket_destroy = FALSE;
 	boolean_t	socket_delete = FALSE;
+	boolean_t	ch_set;
 
 	assert(iod->type == gtmsocket);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 
 	while (iop_eol != (ch = *(pp->str.addr + p_offset++)))
 	{
@@ -150,6 +154,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 			iosocket_destroy(iod);
 		}
 	}
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 }
 
 void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boolean_t socket_delete, boolean_t socket_specified)

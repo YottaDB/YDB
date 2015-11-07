@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc.*
+ * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -3379,22 +3380,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					/* Assert that endianness_known and cross_endian have already been initialized.
 					 * This ensures that remote_side->cross_endian is reliable */
 					assert(remote_side->endianness_known);
-					if (jnlpool.repl_inst_filehdr->was_rootprimary)
-					{	/* This is the first time an instance that was formerly a root primary
-						 * is brought up as an immediate secondary of the new root primary. Once
-						 * fetchresync rollback has happened and the receiver and source server
-						 * have communicated successfully, the instance file header field that
-						 * indicates this was a root primary can be reset to FALSE as the zero
-						 * or non-zeroness of the "zqgblmod_seqno" field in the respective
-						 * database file headers henceforth controls whether this instance can
-						 * be brought up as a tertiary or not. Flush changes to file on disk.
-						 */
-						grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
-						GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
-						jnlpool.repl_inst_filehdr->was_rootprimary = FALSE;
-						repl_inst_flush_filehdr();
-						rel_lock(jnlpool.jnlpool_dummy_reg);
-					}
 					assert(REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver);
 					assert(msg_len == MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
 					start_msg = (repl_start_reply_msg_ptr_t)(buffp - msg_len - REPL_MSG_HDRLEN);
@@ -3458,6 +3443,22 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						break;
 					}
 					/* Handle REPL_WILL_RESTART_WITH_INFO case now */
+					if (jnlpool.repl_inst_filehdr->was_rootprimary && jnlpool.jnlpool_ctl->upd_disabled)
+					{	/* This is the first time an instance that was formerly a root primary
+						 * is brought up as an immediate secondary of the new root primary. Once
+						 * fetchresync rollback has happened and the receiver and source server
+						 * have communicated successfully, the instance file header field that
+						 * indicates this was a root primary can be reset to FALSE as the zero
+						 * or non-zeroness of the "zqgblmod_seqno" field in the respective
+						 * database file headers henceforth controls whether this instance can
+						 * be brought up as a tertiary or not. Flush changes to file on disk.
+						 */
+						grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+						GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
+						jnlpool.repl_inst_filehdr->was_rootprimary = FALSE;
+						repl_inst_flush_filehdr();
+						rel_lock(jnlpool.jnlpool_dummy_reg);
+					}
 					assert(REPL_WILL_RESTART_WITH_INFO == msg_type);
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_WILL_RESTART_WITH_INFO message"
 							" with seqno "INT8_FMT" "INT8_FMTX"\n", recvd_jnl_seqno, recvd_jnl_seqno);

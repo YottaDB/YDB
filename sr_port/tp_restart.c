@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -280,20 +281,30 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				reg_mstr.len = 0;
 				reg_mstr.addr = NULL;
 			}
+			if (IS_GTM_IMAGE)
+				getzposition(TADR(tp_restart_entryref));
+			else
+			{
+				(TREF(tp_restart_entryref)).mvtype = MV_STR;
+				(TREF(tp_restart_entryref)).str.addr = NULL;
+				(TREF(tp_restart_entryref)).str.len = 0;
+			}
 			if (cdb_sc_blkmod != status)
 			{
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(16) ERR_TPRESTART, 14, reg_mstr.len, reg_mstr.addr,
-					 t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
-					 0, 0, 0, tp_blkmod_nomod,
-					 (NULL != sgm_info_ptr) ? sgm_info_ptr->num_of_blks : 0,
-					 (NULL != sgm_info_ptr) ? sgm_info_ptr->cw_set_depth : 0, &local_tn);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(18) ERR_TPRESTART, 16, reg_mstr.len, reg_mstr.addr,
+					t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
+					0, 0, 0, tp_blkmod_nomod,
+					(NULL != sgm_info_ptr) ? sgm_info_ptr->num_of_blks : 0,
+					(NULL != sgm_info_ptr) ? sgm_info_ptr->cw_set_depth : 0, &local_tn,
+					(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
 			} else
 			{
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(16) ERR_TPRESTART, 14, reg_mstr.len, reg_mstr.addr,
-					 t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
-					 n_pvtmods, n_blkmods, tp_fail_level, tp_fail_n,
-					 sgm_info_ptr->num_of_blks,
-					 sgm_info_ptr->cw_set_depth, &local_tn);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(18) ERR_TPRESTART, 16, reg_mstr.len, reg_mstr.addr,
+					t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
+					n_pvtmods, n_blkmods, tp_fail_level, tp_fail_n,
+					sgm_info_ptr->num_of_blks,
+					sgm_info_ptr->cw_set_depth, &local_tn,
+					(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
 			}
 			tp_fail_hist_reg[t_tries] = NULL;
 			tp_fail_hist[t_tries] = NULL;
@@ -765,6 +776,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	)
 	if (handle_errors_internally)
 		REVERT;
+	TREF(expand_prev_key) = FALSE;	/* in case we did a "t_retry" in the middle of "gvcst_zprevious2" */
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart: completed\n")));
 	return 0;
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +56,7 @@ GBLREF spdesc 		stringpool;
 GBLREF unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF volatile int4	outofband;
 GBLREF	boolean_t	dmterm_default;
+GBLREF	volatile boolean_t	timer_in_handler;
 
 LITREF unsigned char	lower_to_upper_table[];
 #ifdef UNICODE_SUPPORTED
@@ -150,6 +152,7 @@ void	dm_read (mval *v)
 #	endif
 	char		*argv[3];
 	char		temp_str[MAX_RECALL_NUMBER_LENGTH + 1];
+	char		*strtokptr;
 	const char	delimiter_string[] = " \t";
 	d_tt_struct 	*tt_ptr;
 	enum RECALL_ERR_CODE	err_recall = NO_ERROR;
@@ -532,8 +535,8 @@ void	dm_read (mval *v)
 					if (((strlen(REC) == match_length) || (strlen(RECALL) == match_length))
 						&& (0 == strncmp((const char *)buffer_start, RECALL, match_length)))
 					{
-						strtok((char *)buffer_start, delimiter_string);
-						argv[1] = strtok(NULL, "");
+						STRTOK_R((char *)buffer_start, delimiter_string, &strtokptr);
+						argv[1] = STRTOK_R(NULL, "", &strtokptr);
 					} else
 						break;		/* not RECALL so end of line */
 #				ifdef UNICODE_SUPPORTED

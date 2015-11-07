@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,9 +75,9 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 		/* This assumes that mutex_spin_parms_t is located immediately after the crit structures */
 		/* As of 10/07/98, crashcnt field in mutex_struct is not changed by any function for the dummy  region */
 		if (is_blocking_wait)
-			status = mutex_lockw(reg, mutex_spin_parms, 0);
+			status = gtm_mutex_lock(reg, mutex_spin_parms, 0, MUTEX_LOCK_WRITE);
 		else
-			status = mutex_lockwim(reg, mutex_spin_parms, 0);
+			status = gtm_mutex_lock(reg, mutex_spin_parms, 0, MUTEX_LOCK_WRITE_IMMEDIATE);
 		DEBUG_ONLY(locknl = NULL);	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{

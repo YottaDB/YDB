@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -248,7 +249,7 @@ LITREF	char 			*trigger_subs[];
 
 #define	OPTION_BITMAP_TO_STR(OPTIONS, BITMAP, LEN)								\
 {														\
-	int		count, optiontype, lcl_len;								\
+	int		count, lcl_len;										\
 	char		*lcl_ptr;										\
 														\
 	count = 0;												\
@@ -289,13 +290,13 @@ LITREF	char 			*trigger_subs[];
 			FLUSH, disp_trigvn_len, disp_trigvn);						\
 }
 
-#define IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(RESULT)						\
-{														\
-	if (PUT_SUCCESS != RESULT)										\
-	{													\
-		TOO_LONG_REC_KEY_ERROR_MSG;									\
-		return STATS_ERROR_TRIGFILE;									\
-	}													\
+#define IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(RESULT)					\
+{													\
+	if (PUT_SUCCESS != RESULT)									\
+	{												\
+		TOO_LONG_REC_KEY_ERROR_MSG;								\
+		RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);						\
+	}												\
 }
 
 #define TRIGGER_SAME_NAME_EXISTS_ERROR(OPNAME, DISP_TRIGVN_LEN, DISP_TRIGVN)						\
@@ -314,21 +315,21 @@ LITREF	char 			*trigger_subs[];
 	util_out_print_gtmio("Error : !AZ trigger on ^!AD not added as another trigger named !AD already exists",	\
 			FLUSH, OPNAME, DISP_TRIGVN_LEN, DISP_TRIGVN,							\
 			value_len[TRIGNAME_SUB], values[TRIGNAME_SUB]);							\
-	return STATS_ERROR_TRIGFILE;											\
+	RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);									\
 }
 
 /* This error macro is used for all definition errors where the target is ^#t(GVN,<#LABEL|#COUNT|#CYCLE>) */
-#define HASHT_DEFINITION_RETRY_OR_ERROR(SUBSCRIPT,MOREINFO,CSA)	\
-{								\
-	if (CDB_STAGNATE > t_tries)				\
-		t_retry(cdb_sc_triggermod);			\
-	else							\
-	{							\
-		HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO,CSA);	\
-	}							\
+#define HASHT_DEFINITION_RETRY_OR_ERROR(SUBSCRIPT, MOREINFO, CSA)	\
+{									\
+	if (CDB_STAGNATE > t_tries)					\
+		t_retry(cdb_sc_triggermod);				\
+	else								\
+	{								\
+		HASHT_DEFINITION_ERROR(SUBSCRIPT, MOREINFO, CSA);	\
+	}								\
 }
 
-#define HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO,CSA)						\
+#define HASHT_DEFINITION_ERROR(SUBSCRIPT, MOREINFO, CSA)					\
 {												\
 	assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);			\
 	rts_error_csa(CSA_ARG(CSA) VARLSTCNT(12) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,		\
@@ -428,7 +429,7 @@ boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *
 	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gv_namehead	*save_gv_target;
 	gvnh_reg_t	*gvnh_reg;
-	int		index, len;
+	int		len;
 	mname_entry	gvname;
 	sgm_info	*save_sgm_info_ptr;
 
@@ -471,7 +472,7 @@ boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *
 		/* gv_target now points to ^#t in region "reg" */
 		if (0 == gv_target->root)
 			continue;
-		/* $get(^#t("#TNAME",trigger_name) */
+		/* $get(^#t("#TNAME",trigger_name)) */
 		BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trigger_name, trigger_name_len);
 		if (!gvcst_get(val))
 			continue;
@@ -487,8 +488,6 @@ boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *
 		}
 		len = ptr2 - ptr;
 		assert(('\0' == *ptr2) && (val->str.len > len));
-		ptr2++;
-		A2I(ptr2, val->str.addr + val->str.len, index);
 		gvname.var_name.addr = val->str.addr;
 		gvname.var_name.len = len;
 		/* Check if global name is indeed mapped to this region by the gld.
@@ -646,11 +645,9 @@ STATICFNDEF boolean_t trigger_already_exists(char *trigvn, int trigvn_len, char 
 	sgmnt_addrs		*csa;
 	boolean_t		db_has_K;
 	boolean_t		db_has_S;
-	char			*ptr;
 	int			hash_indx;
 	boolean_t		kill_cmp, kill_found;
 	int			kill_indx;
-	boolean_t		name_match;
 	boolean_t		set_cmp, set_found, set_name_match, kill_name_match;
 	int			set_indx;
 	mval			trigindx;
@@ -878,7 +875,6 @@ STATICFNDEF boolean_t subtract_trigger_cmd_attributes(char *trigvn, int trigvn_l
 {
 	char			cmd_str[MAX_COMMANDS_LEN];
 	int			cmd_str_len;
-	uint4			len;
 	uint4			restore_set = 0;
 	DCL_THREADGBL_ACCESS;
 
@@ -921,6 +917,9 @@ STATICFNDEF int4 modify_record(char *trigvn, int trigvn_len, char add_delete, in
 	char			trig_options[MAX_OPTIONS_LEN + 1];
 	unsigned char		util_buff[MAX_TRIG_UTIL_LEN];
 	int4			util_len;
+	int			trig_cmds_len;
+	int			trig_name_len;
+	int			trig_options_len;
 	mval			val;
 	uint4			db_cmd_bm, tf_cmd_bm;
 	DCL_THREADGBL_ACCESS;
@@ -931,8 +930,9 @@ STATICFNDEF int4 modify_record(char *trigvn, int trigvn_len, char add_delete, in
 	BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigindx, trigger_subs[CMD_SUB], STRLEN(trigger_subs[CMD_SUB]));
 	if (!gvcst_get(&val)) /* There has to be a command string */
 		HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigger_index, ",\"CMD\"", REG2CSA(gv_cur_region));
-	memcpy(trig_cmds, val.str.addr, val.str.len);
-	trig_cmds[val.str.len] = '\0';
+	trig_cmds_len = MIN(val.str.len, MAX_COMMANDS_LEN);
+	memcpy(trig_cmds, val.str.addr, trig_cmds_len);
+	trig_cmds[trig_cmds_len] = '\0';
 	BUILD_COMMAND_BITMAP(db_cmd_bm, trig_cmds);
 	BUILD_COMMAND_BITMAP(tf_cmd_bm, values[CMD_SUB]);
 	/* If trigger file has specified SET and/or KILL triggers and each of them matched to different triggers in database,
@@ -946,18 +946,22 @@ STATICFNDEF int4 modify_record(char *trigvn, int trigvn_len, char add_delete, in
 	BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigindx, trigger_subs[OPTIONS_SUB],
 		STRLEN(trigger_subs[OPTIONS_SUB]));
 	if (gvcst_get(&val))
-		memcpy(trig_options, val.str.addr, val.str.len);
-	else
-		val.str.len = 0;
-	trig_options[val.str.len] = '\0';
+	{
+		trig_options_len = MIN(val.str.len, MAX_OPTIONS_LEN);
+		memcpy(trig_options, val.str.addr, trig_options_len);
+	} else
+		trig_options_len = 0;
+	trig_options[trig_options_len] = '\0';
 	/* get(^#t(GVN,trigindx,"TRIGNAME") */
 	BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigindx, trigger_subs[TRIGNAME_SUB],
 		STRLEN(trigger_subs[TRIGNAME_SUB]));
 	if (gvcst_get(&val))
-		memcpy(trig_name, val.str.addr, val.str.len);
-	else
-		val.str.len = 0;
-	trig_name[val.str.len] = '\0';
+	{
+		trig_name_len = MIN(val.str.len, ARRAYSIZE(trig_name));
+		memcpy(trig_name, val.str.addr, trig_name_len);
+	} else
+		trig_name_len = 0;
+	trig_name[trig_name_len] = '\0';
 	if ('+' == add_delete)
 	{
 		/* Process -OPTIONS */
@@ -1037,7 +1041,6 @@ STATICFNDEF int4 gen_trigname_sequence(char *trigvn, int trigvn_len, mval *trigg
 {
 	char			name_and_index[MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT];
 	char			*ptr1;
-	int			rndm_int;
 	int			seq_num;
 	int4			result;
 	char			*seq_ptr, *uniq_ptr;
@@ -1045,9 +1048,7 @@ STATICFNDEF int4 gen_trigname_sequence(char *trigvn, int trigvn_len, mval *trigg
 	uint4			trigname_len, uniq_ptr_len;
 	char			unique_seq_str[NUM_TRIGNAME_SEQ_CHARS + 1];
 	mval			val, *val_ptr;
-	char			val_str[MAX_DIGITS_IN_INT + 1];
 	int			var_count, max_seq_num;
-	mval			label, *label_mv;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1071,13 +1072,7 @@ STATICFNDEF int4 gen_trigname_sequence(char *trigvn, int trigvn_len, mval *trigg
 			if (max_seq_num < seq_num)
 				return TOO_MANY_TRIGGERS;
 		} else
-		{
-			/* Set ^#t("#LABEL")=3 */
-			label_mv = &label;
-			MV_FORCE_MVAL(label_mv, 3);
-			SET_TRIGGER_GLOBAL_SUB_MVAL(LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL), label, result);
 			seq_num = 1;
-		}
 		uniq_ptr = unique_seq_str;
 		INT2STR(seq_num, uniq_ptr);
 		uniq_ptr_len = STRLEN(uniq_ptr);
@@ -1124,7 +1119,6 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 {
 	char			add_delete;
 	char			ans[2];
-	char			db_trig_name[MAX_USER_TRIGNAME_LEN + 1];
 	boolean_t		multiline_parse_fail;
 	mname_entry		gvname;
 	int4			max_len;
@@ -1132,10 +1126,7 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	int4			rec_len;
 	int4			rec_num;
 	boolean_t		status;
-	char			tcount[MAX_DIGITS_IN_INT];
 	char			tfile_rec_val[MAX_BUFF_SIZE];
-	char			trig_cmds[MAX_COMMANDS_LEN + 1];
-	char			trig_options[MAX_OPTIONS_LEN + 1];
 	char			trigvn[MAX_MIDENT_LEN + 1];
 	char			disp_trigvn[MAX_MIDENT_LEN + SPANREG_REGION_LITLEN + MAX_RN_LEN + 1 + 1];
 					/* SPANREG_REGION_LITLEN for " (region ", MAX_RN_LEN for region name,
@@ -1148,8 +1139,6 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	stringkey		kill_trigger_hash, set_trigger_hash;
 	char			tmp_str[MAX_HASH_LEN + 1];
 	char			xecute_buffer[MAX_BUFF_SIZE + MAX_XECUTE_LEN], dispbuff[MAX_TRIG_DISPLEN];
-	mval			xecute_index, xecute_size;
-	mval			reportname, reportnamealt;
 	mval			trigjrec;
 	char			*trigjrecptr;
 	int			trigjreclen;
@@ -1503,12 +1492,12 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 	stringkey *kill_trigger_hash, stringkey *set_trigger_hash, char *disp_trigvn, int disp_trigvn_len, uint4 *trig_stats,
 	boolean_t *first_gtmio, char *utilprefix, int *utilprefixlen)
 {
-	mval			trigname[NUM_OPRS]; /* names of matching kill and/or set trigger */
+	mval			*trigname[NUM_OPRS]; /* names of matching kill and/or set trigger */
 	boolean_t		new_name;
 	sgmnt_addrs		*csa;
 	mval			dummymval;
 	boolean_t		skip_set_trigger, trigger_exists;
-	mval			trigger_count;
+	mval			*trigger_count;
 	boolean_t		newtrigger;
 	int			set_index, kill_index, tmp_index;
 	boolean_t		db_matched_kill, db_matched_set, tmp_matched_kill, tmp_matched_set;
@@ -1523,7 +1512,6 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 	char			*opname;
 	int4			updates;
 	uint4			trigload_status;
-	mval			*trig_cnt_ptr;
 	int			num;
 	boolean_t		result;
 	int			sub_indx;
@@ -1533,6 +1521,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 	char			*ptr1;
 	mval			mv_hash;
 	char			trig_name[MAX_USER_TRIGNAME_LEN + 2];	/* One spot for '#' delimiter and one for trailing '\0' */
+	int			trig_protected_mval_push_count;
 
 	csa = cs_addrs;
 	if (NULL == csa)	/* Remote region */
@@ -1586,17 +1575,22 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 	} else
 		new_name = *new_name_ptr;
 	skip_set_trigger = FALSE;
+	trig_protected_mval_push_count = 0;
+	/* Protect MVALs from garabage collection - NOTE: trigger_count is done last as that needs to be popped in one case below */
+	INCR_AND_PUSH_MV_STENT(trigname[OPR_SET]);
+	INCR_AND_PUSH_MV_STENT(trigname[OPR_KILL]);
+	INCR_AND_PUSH_MV_STENT(trigger_count);
 	assert(('+' == add_delete) || ('-' == add_delete));	/* Has to be + or - */
 	if (gv_target->root)
 	{
 		BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
-		if (gvcst_get(&trigger_count))
+		if (gvcst_get(trigger_count))
 		{
 			trigger_exists = trigger_already_exists(trigvn, trigvn_len, values, value_len,
 							set_trigger_hash, kill_trigger_hash,
 							&set_index, &kill_index,
 							&db_matched_set, &db_matched_kill, &full_match,
-							&trigname[OPR_SET], &trigname[OPR_KILL]);
+							trigname[OPR_SET], trigname[OPR_KILL]);
 			newtrigger = FALSE;
 		} else
 		{
@@ -1626,15 +1620,15 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 				       " cannot match two different triggers named !AD and !AD at the same time",
 				       FLUSH, disp_trigvn_len, disp_trigvn,
 				       value_len[TRIGNAME_SUB], values[TRIGNAME_SUB],
-				       trigname[OPR_KILL].str.len, trigname[OPR_KILL].str.addr,
-				       trigname[OPR_SET].str.len, trigname[OPR_SET].str.addr);
+				       trigname[OPR_KILL]->str.len, trigname[OPR_KILL]->str.addr,
+				       trigname[OPR_SET]->str.len, trigname[OPR_SET]->str.addr);
 			else
 				util_out_print_gtmio("Error : Input trigger on ^!AD with trigger name !AD"	\
 				       " cannot match a trigger named !AD and a to-be-created SET trigger"	\
 				       " at the same time", FLUSH, disp_trigvn_len, disp_trigvn,
 				       value_len[TRIGNAME_SUB], values[TRIGNAME_SUB],
-				       trigname[OPR_KILL].str.len, trigname[OPR_KILL].str.addr);
-			return STATS_ERROR_TRIGFILE;
+				       trigname[OPR_KILL]->str.len, trigname[OPR_KILL]->str.addr);
+			RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);
 		}
 		assert(new_name || !new_match || full_match);
 		if (!new_name && ('+' == add_delete) && !full_match)
@@ -1678,7 +1672,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 				opname = oprname[OPR_SET];
 			}
 			updates = modify_record(trigvn, trigvn_len, add_delete, tmp_index, values, value_len,
-					&trigger_count, tmp_matched_set, tmp_matched_kill,
+					trigger_count, tmp_matched_set, tmp_matched_kill,
 					kill_trigger_hash, set_trigger_hash, set_kill_bitmask);
 			if (0 > updates)
 			{
@@ -1688,32 +1682,32 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 					UTIL_PRINT_PREFIX_IF_NEEDED(*first_gtmio, utilprefix, utilprefixlen);
 					util_out_print_gtmio("Error : Current trigger format not compatible to update " \
 					       "the trigger on ^!AD named !AD", FLUSH, disp_trigvn_len, disp_trigvn,
-					       trigname[oprtype].str.len, trigname[oprtype].str.addr);
-					return STATS_ERROR_TRIGFILE;
+					       trigname[oprtype]->str.len, trigname[oprtype]->str.addr);
+					RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);
 				case KEY_TOO_LONG:
 					UTIL_PRINT_PREFIX_IF_NEEDED(*first_gtmio, utilprefix, utilprefixlen);
 					util_out_print_gtmio("Error : ^!AD trigger - key larger than max key size", FLUSH,
 						disp_trigvn_len, disp_trigvn);
-					return STATS_ERROR_TRIGFILE;
+					RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);
 				case VAL_TOO_LONG:
 					UTIL_PRINT_PREFIX_IF_NEEDED(*first_gtmio, utilprefix, utilprefixlen);
 					util_out_print_gtmio("Error : ^!AD trigger - value larger than record size", FLUSH,
 						disp_trigvn_len, disp_trigvn);
-					return STATS_ERROR_TRIGFILE;
+					RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);
 				case K_ZTK_CONFLICT:
 					UTIL_PRINT_PREFIX_IF_NEEDED(*first_gtmio, utilprefix, utilprefixlen);
 					util_out_print_gtmio("Error : Command options !AD incompatible with trigger on " \
 						"^!AD named !AD", FLUSH, value_len[CMD_SUB], values[CMD_SUB],
 						disp_trigvn_len, disp_trigvn,
-						trigname[oprtype].str.len, trigname[oprtype].str.addr);
-					return STATS_ERROR_TRIGFILE;
+						trigname[oprtype]->str.len, trigname[oprtype]->str.addr);
+					RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);
 				case ADD_SET_NOCHNG_KILL_TRIG:
 					assert(!is_set);
 					UTIL_PRINT_PREFIX_IF_NEEDED(*first_gtmio, utilprefix, utilprefixlen);
 					util_out_print_gtmio("!AZ trigger on ^!AD already present in trigger named !AD" \
 								" - no action taken", FLUSH, opname,
 								disp_trigvn_len, disp_trigvn,
-								trigname[oprtype].str.len, trigname[oprtype].str.addr);
+								trigname[oprtype]->str.len, trigname[oprtype]->str.addr);
 					/* kill trigger is unchanged but set trigger (if present in a different trigger)
 					 * needs to be processed separately.
 					 */
@@ -1723,7 +1717,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 					UTIL_PRINT_PREFIX_IF_NEEDED(*first_gtmio, utilprefix, utilprefixlen);
 					util_out_print_gtmio("Modified !AZ trigger on ^!AD named !AD",
 							FLUSH, opname, disp_trigvn_len, disp_trigvn,
-							trigname[oprtype].str.len, trigname[oprtype].str.addr);
+							trigname[oprtype]->str.len, trigname[oprtype]->str.addr);
 					trig_stats[STATS_MODIFIED]++;
 					trigload_status = STATS_NOERROR_TRIGFILE;
 					break;
@@ -1731,16 +1725,16 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 					UTIL_PRINT_PREFIX_IF_NEEDED(*first_gtmio, utilprefix, utilprefixlen);
 					util_out_print_gtmio("Error : Specified options and commands cannot both be different" \
 						" from those in trigger on ^!AD named !AD", FLUSH, disp_trigvn_len, disp_trigvn,
-							trigname[oprtype].str.len, trigname[oprtype].str.addr);
-					return STATS_ERROR_TRIGFILE;
+							trigname[oprtype]->str.len, trigname[oprtype]->str.addr);
+					RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);
 				case NAME_CMDS_CONFLICT:
 					UTIL_PRINT_PREFIX_IF_NEEDED(*first_gtmio, utilprefix, utilprefixlen);
 					util_out_print_gtmio("Error : Specified name !AD different from that of trigger" \
 						" on ^!AD named !AD but specified commands do not contain those in trigger",
 							FLUSH, value_len[TRIGNAME_SUB], values[TRIGNAME_SUB],
 							disp_trigvn_len, disp_trigvn,
-							trigname[oprtype].str.len, trigname[oprtype].str.addr);
-					return STATS_ERROR_TRIGFILE;
+							trigname[oprtype]->str.len, trigname[oprtype]->str.addr);
+					RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);
 				default:
 					assertpro(FALSE && updates);
 					break;
@@ -1761,7 +1755,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 						UTIL_PRINT_PREFIX_IF_NEEDED(*first_gtmio, utilprefix, utilprefixlen);
 						util_out_print_gtmio("Modified !AZ trigger on ^!AD named !AD", FLUSH,
 									opname, disp_trigvn_len, disp_trigvn,
-									trigname[oprtype].str.len, trigname[oprtype].str.addr);
+									trigname[oprtype]->str.len, trigname[oprtype]->str.addr);
 					}
 				} else if (updates & DELETE_REC)
 				{
@@ -1775,14 +1769,14 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 						UTIL_PRINT_PREFIX_IF_NEEDED(*first_gtmio, utilprefix, utilprefixlen);
 						util_out_print_gtmio("Deleted !AZ trigger on ^!AD named !AD",
 									FLUSH, opname, disp_trigvn_len, disp_trigvn,
-									trigname[oprtype].str.len, trigname[oprtype].str.addr);
+									trigname[oprtype]->str.len, trigname[oprtype]->str.addr);
 					}
 					/* if KILL trigger deleted, search for possible new SET trigger index */
 					if (!is_set && (kill_index < set_index)
 						&& !(trigger_already_exists(trigvn, trigvn_len, values, value_len,
 								set_trigger_hash, kill_trigger_hash, &set_index,
 								&tmp_index, &db_matched_set, &db_matched_kill,
-								&full_match, &trigname[oprtype], &trigname[oprtype])))
+								&full_match, trigname[oprtype], trigname[oprtype])))
 					{	/* SET trigger found previously is not found again */
 						if (CDB_STAGNATE > t_tries)
 							t_retry(cdb_sc_triggermod);
@@ -1790,8 +1784,8 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 						util_out_print_gtmio("Error : Previously found SET trigger " \
 							"on ^!AD, named !AD but cannot find it again",
 							FLUSH, disp_trigvn_len, disp_trigvn,
-							trigname[oprtype].str.len, trigname[oprtype].str.addr);
-						return STATS_ERROR_TRIGFILE;
+							trigname[oprtype]->str.len, trigname[oprtype]->str.addr);
+						RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);
 					}
 				} else if ('+' == add_delete)
 				{
@@ -1805,7 +1799,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 						util_out_print_gtmio("!AZ trigger on ^!AD already present " \
 							"in trigger named !AD - no action taken",
 							FLUSH, opname, disp_trigvn_len, disp_trigvn,
-							trigname[oprtype].str.len, trigname[oprtype].str.addr);
+							trigname[oprtype]->str.len, trigname[oprtype]->str.addr);
 					}
 				} else
 				{
@@ -1817,8 +1811,8 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 									: (!kill_cmp ? oprname[OPR_SET] : oprname[OPR_SETKILL]));
 						UTIL_PRINT_PREFIX_IF_NEEDED(*first_gtmio, utilprefix, utilprefixlen);
 						if (!value_len[TRIGNAME_SUB]
-							|| ((trigname[oprtype].str.len == value_len[TRIGNAME_SUB])
-								&& !memcmp(values[TRIGNAME_SUB], trigname[oprtype].str.addr,
+							|| ((trigname[oprtype]->str.len == value_len[TRIGNAME_SUB])
+								&& !memcmp(values[TRIGNAME_SUB], trigname[oprtype]->str.addr,
 									value_len[TRIGNAME_SUB])))
 						{	/* Trigger name matches input name or name was not specified (in which
 							 * case name is considered to match). So the command specified
@@ -1827,14 +1821,14 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 							util_out_print_gtmio("!AZ trigger on ^!AD not present in trigger "	\
 								"named !AD - no action taken", FLUSH, opname,
 								disp_trigvn_len, disp_trigvn,
-								trigname[oprtype].str.len, trigname[oprtype].str.addr);
+								trigname[oprtype]->str.len, trigname[oprtype]->str.addr);
 						} else
 						{
 							util_out_print_gtmio("!AZ trigger on ^!AD matches trigger "	\
 								"named !AD but not with specified name !AD "		\
 								"- no action taken", FLUSH, opname,
 								disp_trigvn_len, disp_trigvn,
-								trigname[oprtype].str.len, trigname[oprtype].str.addr,
+								trigname[oprtype]->str.len, trigname[oprtype]->str.addr,
 								value_len[TRIGNAME_SUB], values[TRIGNAME_SUB]);
 						}
 					}
@@ -1882,16 +1876,17 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 			}
 			if (newtrigger)
 			{
-				trigger_count = literal_one;
+				POP_MV_STENT();
+				trig_protected_mval_push_count--;
+				trigger_count = (mval *)&literal_one;
 				set_index = 1;
 			} else
 			{
 				assert(!trigger_exists);
 				assert(0 == set_index);
-				trig_cnt_ptr = &trigger_count;
-				num = mval2i(trig_cnt_ptr);
+				num = mval2i(trigger_count);
 				set_index = ++num;
-				i2mval(&trigger_count, num);
+				i2mval(trigger_count, num);
 			}
 		}
 	}
@@ -1900,7 +1895,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 	{
 		memcpy(trig_name, values[TRIGNAME_SUB], value_len[TRIGNAME_SUB] + 1);
 		values[TRIGNAME_SUB] = trig_name;
-		result = gen_trigname_sequence(trigvn, trigvn_len, &trigger_count, values[TRIGNAME_SUB], value_len[TRIGNAME_SUB]);
+		result = gen_trigname_sequence(trigvn, trigvn_len, trigger_count, values[TRIGNAME_SUB], value_len[TRIGNAME_SUB]);
 		if (SEQ_SUCCESS != result)
 		{
 			if (TOO_MANY_TRIGGERS == result)
@@ -1912,7 +1907,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 			{
 				TOO_LONG_REC_KEY_ERROR_MSG;
 			}
-			return STATS_ERROR_TRIGFILE;
+			RETURN_AND_POP_MVALS(STATS_ERROR_TRIGFILE);
 		}
 	}
 	if (trig_stats[STATS_ERROR_TRIGFILE])
@@ -1935,13 +1930,13 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 		value_len[TRIGNAME_SUB] = STRLEN(values[TRIGNAME_SUB]);
 		values[CHSET_SUB] = (gtm_utf8_mode) ? UTF8_NAME : LITERAL_M;
 		value_len[CHSET_SUB] = STRLEN(values[CHSET_SUB]);
-		/* set ^#t(GVN,"#LABEL") = "3" */
+		/* set ^#t(GVN,"#LABEL") = HASHT_GBL_CURLABEL */
 		SET_TRIGGER_GLOBAL_SUB_SUB_STR(trigvn, trigvn_len, LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL),
 					       HASHT_GBL_CURLABEL, STRLEN(HASHT_GBL_CURLABEL), result);
 		IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(result);
 		/* set ^#t(GVN,"#COUNT") = trigger_count */
 		SET_TRIGGER_GLOBAL_SUB_SUB_MVAL(trigvn, trigvn_len, LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT),
-						trigger_count, result);
+						*trigger_count, result);
 		IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(result);
 		/* Assert that BHASH and LHASH are not part of NUM_SUBS calculation (confirms the -2 done in #define of NUM_SUBS) */
 		assert(BHASH_SUB == NUM_SUBS);
@@ -1951,7 +1946,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 			if (0 >= value_len[sub_indx])	/* subscript index length is zero (no longer used), skip it */
 				continue;
 			/* set ^#t(GVN,trigger_count,values[sub_indx]) = xecute string */
-			SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_STR(trigvn, trigvn_len, trigger_count,
+			SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_STR(trigvn, trigvn_len, *trigger_count,
 				trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), values[sub_indx],
 				value_len[sub_indx], result);
 			if (XECUTE_SUB != sub_indx)
@@ -1968,20 +1963,20 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 					ptr1 = values[XECUTE_SUB];
 					i2mval(&xecute_index, num);
 					/* set ^#t(GVN,trigger_count,"XECUTE",0) = xecute string length */
-					BUILD_HASHT_SUB_MSUB_SUB_MSUB_CURRKEY(trigvn, trigvn_len, trigger_count,
+					BUILD_HASHT_SUB_MSUB_SUB_MSUB_CURRKEY(trigvn, trigvn_len, *trigger_count,
 						trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), xecute_index);
-					SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MSUB_MVAL(trigvn, trigvn_len, trigger_count,
+					SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MSUB_MVAL(trigvn, trigvn_len, *trigger_count,
 						trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), xecute_index,
 						xecute_size, result);
 					IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(result);
 					while (0 < max_len)
 					{
 						i2mval(&xecute_index, ++num);
-						BUILD_HASHT_SUB_MSUB_SUB_MSUB_CURRKEY(trigvn, trigvn_len, trigger_count,
+						BUILD_HASHT_SUB_MSUB_SUB_MSUB_CURRKEY(trigvn, trigvn_len, *trigger_count,
 							trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), xecute_index);
 						offset = MIN(gv_cur_region->max_rec_size, max_len);
 						/* set ^#t(GVN,trigger_count,"XECUTE",num) = xecute string[offset] */
-						SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MSUB_STR(trigvn, trigvn_len, trigger_count,
+						SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MSUB_STR(trigvn, trigvn_len, *trigger_count,
 							trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), xecute_index,
 							ptr1, offset, result);
 						IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(result);
@@ -1995,11 +1990,11 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 				set_trigger_hash);
 		IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(result);
 		MV_FORCE_UMVAL(&mv_hash, kill_trigger_hash->hash_code);
-		SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MVAL(trigvn, trigvn_len, trigger_count,
+		SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MVAL(trigvn, trigvn_len, *trigger_count,
 			trigger_subs[LHASH_SUB], STRLEN(trigger_subs[LHASH_SUB]), mv_hash, result);
 		IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(result);
 		MV_FORCE_UMVAL(&mv_hash, set_trigger_hash->hash_code);
-		SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MVAL(trigvn, trigvn_len, trigger_count, trigger_subs[BHASH_SUB],
+		SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MVAL(trigvn, trigvn_len, *trigger_count, trigger_subs[BHASH_SUB],
 			STRLEN(trigger_subs[BHASH_SUB]), mv_hash, result);
 		IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(result);
 		trigload_status = STATS_NOERROR_TRIGFILE;
@@ -2015,7 +2010,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 	assert((STATS_UNCHANGED_TRIGFILE == trigload_status) || (STATS_NOERROR_TRIGFILE == trigload_status));
 	if ((0 == trig_stats[STATS_ERROR_TRIGFILE]) && (STATS_NOERROR_TRIGFILE == trigload_status))
 		trigger_incr_cycle(trigvn, trigvn_len);	/* ^#t records changed in this function, increment cycle */
-	return trigload_status;
+	RETURN_AND_POP_MVALS(trigload_status);
 }
 
 STATICFNDEF boolean_t trigger_update_rec_helper(char *trigger_rec, uint4 len, boolean_t noprompt, uint4 *trig_stats)

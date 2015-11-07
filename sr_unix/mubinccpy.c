@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -164,7 +165,6 @@ bool	mubinccpy (backup_reg_list *list)
 	int			user_id;
 	int			group_id;
 	int			perm;
-	struct perm_diag_data	pdd;
 	DEBUG_INCBKUP_ONLY(int	blks_this_lmap;)
 	DEBUG_INCBKUP_ONLY(gtm_uint64_t backup_write_offset = 0;)
 
@@ -210,23 +210,11 @@ bool	mubinccpy (backup_reg_list *list)
 			{
 				FSTAT_FILE(db_fd, &stat_buf, fstat_res);
 				if (-1 != fstat_res)
-					if (gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE, &pdd) < 0)
-					{
-						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
-							ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
-							RTS_ERROR_STRING(((unix_db_info *)
-								(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
-							PERMGENDIAG_ARGS(pdd));
-						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
-							ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
-							RTS_ERROR_STRING(((unix_db_info *)
-								(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
-							PERMGENDIAG_ARGS(pdd));
-						CLEANUP_AND_RETURN_FALSE;
-					}
+					gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE);
 				/* setup new group and permissions if indicated by the security rules. */
 				if ((-1 == fstat_res) || (-1 == FCHMOD(backup->fd, perm))
-					|| (((-1 != user_id) || (-1 != group_id)) && (-1 == fchown(backup->fd, user_id, group_id))))
+					|| (((INVALID_UID != user_id) || (INVALID_GID != group_id))
+						&& (-1 == fchown(backup->fd, user_id, group_id))))
 				{
 					PERROR("fchmod/fchown error: ");
 					util_out_print("ERROR: Cannot access incremental backup file !AD.",

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,20 +36,22 @@
 #include "cws_insert.h"
 #include "gvcst_protos.h"	/* for gvcst_search_blk,gvcst_search_tail,gvcst_search prototype */
 #include "min_max.h"
+#include "gvcst_expand_key.h"
 
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	boolean_t		tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
+GBLREF	char			gvcst_search_clue;
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	gv_key			*gv_altkey;
 GBLREF	gv_namehead		*gv_target;
-GBLREF	uint4			dollar_tlevel;
-GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	unsigned char		rdfail_detail;
 GBLREF	sgm_info		*sgm_info_ptr;
-GBLREF	unsigned int		t_tries;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	srch_blk_status		*first_tp_srch_status;	/* overriding value of srch_blk_status given by t_qread in case of TP */
 GBLREF	trans_num		local_tn;		/* transaction number for THIS PROCESS */
-GBLREF	boolean_t		tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
-GBLREF	boolean_t		mu_reorg_process;
-GBLREF	char			gvcst_search_clue;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	unsigned char		rdfail_detail;
+GBLREF	unsigned int		t_tries;
 
 #define	SET_GVCST_SEARCH_CLUE(X)	gvcst_search_clue = X;
 
@@ -93,7 +96,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	assert(!dollar_tlevel || ((NULL != sgm_info_ptr) && (cs_addrs->sgm_info_ptr == sgm_info_ptr)));
 	SET_GVCST_SEARCH_CLUE(0);
 	INCR_DB_CSH_COUNTER(cs_addrs, n_gvcst_srches, 1);
-	pTargHist = (NULL == pHist ? &pTarg->hist : pHist);
+	pTargHist = ((NULL == pHist) ? &pTarg->hist : pHist);
 	/* If FINAL RETRY and TP then we can safely use clues of gv_targets that have been referenced in this
 	 * TP transaction (read_local_tn == local_tn). While that is guaranteed to be true for all updates, it
 	 * does not hold good for READs since we allow a lot more reads to be done inside a transaction compared
@@ -330,16 +333,20 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				{
 					SET_GVCST_SEARCH_CLUE(1);
 					status = gvcst_search_tail(pKey, pTargHist->h, &pTarg->clue);
-					if (NULL == pHist)
-					{	/* Implies the search history is being filled in pTarg->hist so we can
-						 * safely update pTarg->clue to reflect the new search key. It is important
-						 * that this clue update be done AFTER the gvcst_search_tail invocation
-						 * (as that needs to pass the previous clue key).
-						 */
-						COPY_CURRKEY_TO_GVTARGET_CLUE(pTarg, pKey);
+					if (cdb_sc_normal == status)
+					{
+						if (NULL == pHist)
+						{	/* Implies the search history is being filled in pTarg->hist so we can
+							 * safely update pTarg->clue to reflect the new search key. It is important
+							 * that this clue update be done AFTER the gvcst_search_tail invocation
+							 * (as that needs to pass the previous clue key).
+							 */
+							COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(pTarg, pKey, TREF(expand_prev_key));
+						}
+						INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_tail, 1);
+						return cdb_sc_normal;
 					}
-					INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_tail, 1);
-					return status;
+					/* Else clue is not usable. Fall through to do full traversal. */
 				}
 			} else if (0 > n1)
 			{
@@ -347,23 +354,52 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				{
 					SET_GVCST_SEARCH_CLUE(3);
 					status = gvcst_search_blk(pKey, pTargHist->h);
-					if (NULL == pHist)
-					{	/* Implies the search history is being filled in pTarg->hist so we can
-						 * safely update pTarg->clue to reflect the new search key. It does not
-						 * matter if we update the clue BEFORE or AFTER the gvcst_search_blk
-						 * invocation but for consistency with the gvcst_search_tail invocation
-						 * we keep it AFTER.
-						 */
-						COPY_CURRKEY_TO_GVTARGET_CLUE(pTarg, pKey);
+					if (cdb_sc_normal == status)
+					{
+						if (NULL == pHist)
+						{	/* Implies the search history is being filled in pTarg->hist so we can
+							 * safely update pTarg->clue to reflect the new search key. It does not
+							 * matter if we update the clue BEFORE or AFTER the gvcst_search_blk
+							 * invocation but for consistency with the gvcst_search_tail invocation
+							 * we keep it AFTER.
+							 */
+							COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(pTarg, pKey, TREF(expand_prev_key));
+						}
+						INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_head, 1);
+						return cdb_sc_normal;
 					}
-					INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_head, 1);
-					return status;
+					/* Else clue is not usable. Fall through to do full traversal. */
 				}
 			} else
 			{
 				SET_GVCST_SEARCH_CLUE(2);
-				INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_same, 1);
-				return cdb_sc_normal;
+				/* If $zprevious is the current operation, and we have a clue based on a prior search but
+				 * dont have a prev_key computed as part of that search (because it was not a $zprevious
+				 * operation as well), we cannot use the clue. Instead we need to fall through.
+				 */
+				if (!TREF(expand_prev_key))
+				{
+					INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_same, 1);
+					return cdb_sc_normal;
+				}
+				if ((NULL != pTarg->prev_key) && (PREV_KEY_NOT_COMPUTED != pTarg->prev_key->end))
+				{
+					COPY_KEY(gv_altkey, pTarg->prev_key);
+					INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_same, 1);
+					return cdb_sc_normal;
+				}
+				leaf_blk_hist = &pTarg->hist.h[0];
+				status = gvcst_expand_prev_key(leaf_blk_hist, &pTarg->clue, gv_altkey);
+				if (cdb_sc_normal == status)
+				{
+					COPY_PREV_KEY_TO_GVT_CLUE(pTarg, TRUE);
+					/* gv_altkey already contains the prev_key so no need to do the following.
+					 *	COPY_KEY(gv_altkey, pTarg->prev_key);
+					 */
+					INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_same, 1);
+					return cdb_sc_normal;
+				}
+				/* Else clue is not usable. Fall through to do full traversal. */
 			}
 		}
 #		ifdef DEBUG
@@ -537,7 +573,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			*c2 = *c1;
 			DEBUG_ONLY(pTarg->last_rec->end = c2 - pTarg->last_rec->base;)
 		}
-		COPY_CURRKEY_TO_GVTARGET_CLUE(pTarg, pKey);
+		COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(pTarg, pKey, TREF(expand_prev_key));
 	}
 	return cdb_sc_normal;
 }

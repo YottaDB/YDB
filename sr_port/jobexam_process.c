@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +17,7 @@
 #include "gtm_unistd.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
+#include "gtm_limits.h"
 
 #include "error.h"
 #include "io_params.h"
@@ -34,6 +36,8 @@
 #include "mv_stent.h"
 
 #define DEFAULT_DUMP_FILENAME "GTM_JOBEXAM.ZSHOW_DMP"
+/* + 3 below is for for 2 intervening '_' chars and 1 extra */
+#define DEFAULT_DUMP_FILE_TOTSIZE (SIZEOF(DEFAULT_DUMP_FILENAME) + (MAX_DIGITS_IN_INT * 2) + 3)
 #define NOCONCEAL_OPTION "NO_CONCEAL"
 
 static readonly mval empty_str_mval = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, 0, 0, 0);
@@ -41,8 +45,8 @@ static readonly mval no_conceal_op  = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(N
 							 NOCONCEAL_OPTION, 0, 0);
 static unsigned char dumpable_error_dump_file_parms[2] = {iop_newversion, iop_eol};
 static unsigned char dumpable_error_dump_file_noparms[1] = {iop_eol};
-static unsigned int  jobexam_counter;
 
+GBLREF int		process_exiting;
 GBLREF uint4		process_id;
 GBLREF io_pair		io_std_device, io_curr_device;
 GBLREF mv_stent		*mv_chain;
@@ -70,6 +74,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	boolean_t		saved_mv_stent;
 	char			saved_util_outbuff[OUT_BUFF_SIZE];
 	int			saved_util_outbuff_len;
+	char			save_dump_file_name_buff[GTM_PATH_MAX];
 #	ifdef UNIX
 	struct sigaction	new_action, prev_action;
 	sigset_t		savemask;
@@ -95,14 +100,12 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 		input_dump_file_name = dump_file_name;
 		saved_mv_stent = FALSE;
 	}
-
 #	ifdef UNIX
 	/* Block out timer calls that might trigger processing that could fail. We especially want to prevent
 	 * nesting of signal handlers since the longjump() function used by the UNWIND macro is undefined on
 	 * Tru64 when signal handlers are nested.
 	 */
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
-
 	/* Setup new signal handler to just drive condition handler which will do the right thing */
 	memset(&new_action, 0, SIZEOF(new_action));
 	sigemptyset(&new_action.sa_mask);
@@ -141,7 +144,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 		assert(saved_util_outbuff_len <= SIZEOF(saved_util_outbuff));
 		memcpy(saved_util_outbuff, TREF(util_outbuff_ptr), saved_util_outbuff_len);
 	}
-	jobexam_dump(input_dump_file_name, dump_file_spec);
+	jobexam_dump(input_dump_file_name, dump_file_spec, save_dump_file_name_buff);
 	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack to this point and return.  */
 	if (0 != saved_util_outbuff_len)
 	{	/* Restore util_outbuff values */
@@ -174,30 +177,43 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 }
 
 /* This routine is broken out as another ep so we can do cleanup processing in jobexam_process if
-   we trigger the condition handler and unwind.
-*/
-void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec)
+ * we trigger the condition handler and unwind.
+ */
+void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_file_name_buff)
 {
-	unsigned char		dump_file_name[50], *dump_file_name_ptr;
+	unsigned char		dump_file_name[DEFAULT_DUMP_FILE_TOTSIZE], *dump_file_name_ptr;
 	mval			def_file_name, parms, zshowall;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(jobexam_dump_ch);
-
-	++jobexam_counter;
+	++(TREF(jobexam_counter));
 	/* Setup default filename/type to use for the parse. Append processid and a counter. */
 	MEMCPY_LIT(dump_file_name, DEFAULT_DUMP_FILENAME);
 	dump_file_name_ptr = dump_file_name + SIZEOF(DEFAULT_DUMP_FILENAME) - 1;
 	*dump_file_name_ptr++ = '_';
 	dump_file_name_ptr = i2asc(dump_file_name_ptr, process_id);
 	*dump_file_name_ptr++ = '_';
-	dump_file_name_ptr = i2asc(dump_file_name_ptr, jobexam_counter);
+	dump_file_name_ptr = i2asc(dump_file_name_ptr, TREF(jobexam_counter));
 	def_file_name.mvtype = MV_STR;
 	def_file_name.str.addr = (char *)dump_file_name;
 	def_file_name.str.len = INTCAST(dump_file_name_ptr - dump_file_name);
+	assert(DEFAULT_DUMP_FILE_TOTSIZE >= def_file_name.str.len);
 	/* Call $ZPARSE processing to fill in any blanks, expand concealed logicals, etc. It is the callers
 	 * responsibility to make sure garbage collection knows about the value in the returned filespec.
 	 */
 	op_fnzparse(dump_filename_arg, &empty_str_mval, &def_file_name, &empty_str_mval, &no_conceal_op, dump_file_spec);
+	/* If this call is for the creation of a fatal error file (which would be the case if process_exiting is set), the
+	 * mval we have for dump_file_spec is not protected from potential stringpool garbage collections. In that case,
+	 * since we won't be returning the filename (as we would for a $ZJOBEXAM() function call), rebuffer the stringpool
+	 * resident dump file name so it is not vulnerable to stringpool garbage collections.
+	 */
+	if (process_exiting)
+	{
+		assert(GTM_PATH_MAX >= dump_file_spec->str.len);
+		memcpy(fatal_file_name_buff, dump_file_spec->str.addr, dump_file_spec->str.len);
+		dump_file_spec->str.addr = fatal_file_name_buff;
+	}
 	/* Parms of file to be created (newversion) */
 	parms.mvtype = MV_STR;
 	parms.str.addr = (char *)dumpable_error_dump_file_parms;
@@ -241,7 +257,6 @@ CONDITION_HANDLER(jobexam_dump_ch)
 	VMS_ONLY(sig->chf$l_sig_args -= 2);
 	VMS_ONLY(callg(send_msg, &sig->chf$l_sig_args));
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBEXAMFAIL, 1, process_id);
-
 	/* Stop the errors here and return to caller */
 	UNIX_ONLY(util_out_print("", RESET));	/* Prevent rts_error from flushing this error later */
 	DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);

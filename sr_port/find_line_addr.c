@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +42,7 @@ int4* find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_na
 	{	/* No label specified. Return the first line */
 		base = LABTAB_ADR(real_routine);
 		/* Get the null label entry and note whether it has a formallist. */
-		(TREF(lab_proxy)).has_parms = base->has_parms;
+		(TABENT_PROXY).has_parms = base->has_parms;
 		assert(0 == base->lab_name.len);
 		if (lent_name)
 			*lent_name = &base->lab_name;
@@ -65,7 +66,7 @@ int4* find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_na
 			MIDENT_CMP(&lname, &ptr->lab_name, stat);
 			if (0 == stat)
 			{	/* Note whether the label has a formallist. */
-				(TREF(lab_proxy)).has_parms = ptr->has_parms;
+				(TABENT_PROXY).has_parms = ptr->has_parms;
 				if (lent_name)
 					*lent_name = &ptr->lab_name;
 				line_table = LABENT_LNR_ENTRY(real_routine, ptr);

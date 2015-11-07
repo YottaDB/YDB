@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2010 Fidelity Information Services, Inc	#
+# Copyright (c) 2010-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,30 +10,20 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	opp_zg1.s
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "linkage.si"
-	.INCLUDE	"g_msf.si"
-
-	.sbttl	opp_zg1
-#	PAGE	+
-	.DATA
-.extern	frame_pointer
+	.data
+	.extern	frame_pointer
 
 	.text
-.extern	op_zg1
+	.extern	op_zg1
 
-# PUBLIC	opp_zg1
 ENTRY	opp_zg1
 	putframe
-	addq	$8,REG_SP	# burn return pc (args in regs)
+	addq	$8, REG_SP		# Burn return pc & 16 byte align stack
+	CHKSTKALIGN			# Verify stack alignment
 	call	op_zg1
 	getframe
 	ret
-# opp_zg1	ENDP
-
-# END

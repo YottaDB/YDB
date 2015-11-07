@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,20 +11,20 @@
  ****************************************************************/
 
 /****************************************************************
-        dbcertify_certify_phase2.c - Database certification phase 2
-
-        - Verify phase 1 input file.
-        - Locate and open database after getting standalong access.
-        - Read the identified blocks in and if they are still too
-          large, split them.
-        - Certify the database as "clean" if no errors encountered.
-
-        Note: Most routines in this utility are self-contained
-              meaning they do not reference GT.M library routines
-              (with some notable exceptions). This is because
-              phase-2 is going to run against V4 format databases
-              but any linked routines would be compiled for V5
-              databases.
+ *      dbcertify_certify_phase2.c - Database certification phase 2
+ *
+ *      - Verify phase 1 input file.
+ *      - Locate and open database after getting standalong access.
+ *      - Read the identified blocks in and if they are still too
+ *        large, split them.
+ *      - Certify the database as "clean" if no errors encountered.
+ *
+ *      Note: Most routines in this utility are self-contained
+ *            meaning they do not reference GT.M library routines
+ *            (with some notable exceptions). This is because
+ *            phase-2 is going to run against V4 format databases
+ *            but any linked routines would be compiled for V5
+ *            databases.
 ****************************************************************/
 
 #include "mdef.h"
@@ -229,19 +230,20 @@ void dbcertify_certify_phase(void)
 	update_array_size = psa->dbc_cs_data->max_update_array_size;
 
 	/* Now to the real work -- Read and split each block the phase 1 file recorded that still needs
-	   to be split (concurrent updates may have "fixed" some blocks).
-	*/
+	 * to be split (concurrent updates may have "fixed" some blocks).
+	 */
 	psa->hint_blk = psa->hint_lcl = 1;
 	restart_transaction = p1rec_read = FALSE;
 	restart_cnt = 0;
 	for (rec_num = 0; rec_num < psa->ofhdr.blk_count || 0 < psa->gvtroot_rchildren_cnt;)
 	{	/* There is the possibility that we are restarting the processing of a given record. In
-		   that case we will not read the next record in but process what is already in the buffer.
-		   This can occur if we have extended the database. */
+		 * that case we will not read the next record in but process what is already in the buffer.
+		 * This can occur if we have extended the database.
+		 */
 		if (!restart_transaction)
-		{	/* First to check is if we have any queued gvtroot_rchildren to process (described elsewhere). If we have
-			   these, we process them now without bumping the record count.
-			*/
+		{	/* First to check is if we have any queued gvtroot_rchildren to process (described elsewhere).
+			 * If we have these, we process them now without bumping the record count.
+			 */
 			p1rec_read = FALSE;	/* Assume we did NOT read from the file */
 			if (0 < psa->gvtroot_rchildren_cnt)
 			{
@@ -293,8 +295,8 @@ void dbcertify_certify_phase(void)
 	} /* for each record in phase-1 output file or each restart or each queued rh child */
 
 	/* Reaching this point, the database has been updated, with no errors. We can now certify
-	   this database as ready for the current version of GT.M
-	*/
+	 * this database as ready for the current version of GT.M
+	 */
 	util_out_print("", FLUSH);	/* New line for below message in case MUPIP extension leaves prompt */
 	if (0 == psa->blk_process_errors)
 	{
@@ -356,70 +358,69 @@ void dbcertify_certify_phase(void)
 }
 
 /* Routine to handle the processing (splitting) of a given database block. If the current block process needs
-   to be restarted, this function returns TRUE. else if processing completed normally, returns FALSE.
-
-   Routine notes:
-
-   This routine implements a "simplistic" mini database engine. It is "simplistic" in the regards to fact that it
-   doesn't need to worry about concurrency issues. It also has one design assumption that we will NEVER add a
-   record to a level 0 block (either DT or GVT). Because of this assumption, many complications from gvcst_put(), on
-   which it is largely based, were non-issues and were removed (e.g. no TP). This routine has its own concepts of
-   "cache", cw_set elements, update arrays, etc. Following is a brief description of how these things are implemented
-   in this routine:
-
-   The primary control block in this scheme is the block_info block which serves as a cache record, change array anchor,
-   gv_target, and so on. In short, everything that is known about a given database block is contained in this one
-   structure. There is an array of these structures with the name "blk_set" which is a global variable array dimensioned
-   at a thoroughly outrageous amount for the worst case scenario.
-
-   There are areas within the blk_set array that are worth describing:
-
-   - The block_depth global variable always holds the top in use index into blk_set.
-   - blk_set[0] describes the block that was fed to us from the phase 1 scan. It is the primary block that needs to
-     be split. If nothing needs to happen to it, we go to the next record and blk_set[0] get a new block in it.
-   - Starting with blk_set[1] through blk_set[bottom_tree_index] are first the directory tree (DT) blocks and then
-     (if primary was a GVT block) the global variable tree (GVT) blocks.
-   - Starting with blk_set[bottom_tree_index + 1] through blk_set[bottom_created_index] are newly created blocks during
-     split processing.
-   - Starting with blk_set[bottom_created_index + 1] through blk_set[block_depth] are local bit map blocks that are being
-     modified for the "transaction".
-
-   This engine has a very simple cache mechanism. If a block we need is somewhere in the blk_set array (a global variable
-   block_depth_hwm maintains a high water mark), the cache version is used rather than forcing a re-read from disk. It is
-   fairly simple but seems to save a lot of reads, especially of the directory tree and the local bit_maps.
-
-   Like gvcst_put(), once we have the blocks from the tree loaded, they are processed in reverse order as a split in one
-   block requires a record to be inserted into the parent block. We start with the primary block (blk_set[0]) and then
-   move to blk_set[bottom_tree_index] and work backwards from there until either we get to a block for which there are
-   no updates or we hit a root block (GVT or DT depending) at which time we are done with the primary update loop.
-
-   After performing the block splits and creating new blocks, we double check that we have room to hold them all. If not,
-   we make a call to MUPIP EXTEND to extend the database for us. Since this means we have to close the file and give up
-   our locks on it, we also restart the transaction and force all blocks to be re-read from disk.
-
-   Once assured we have sufficient free blocks, we start at blk_set[bottom_created_index] and work down to
-   blk_set[bottom_tree_index + 1] allocating and assigning block numbers to the created blocks. Part of this process also
-   puts the block numbers into places where the update arrays will pick them up when the referencing blocks are built.
-
-   Once all the new blocks have been assigned, we loop through blk_set[bottom_tree_index] to blk_set[0] and create the
-   new versions of the blocks (for those blocks marked as being updated). A note here is that this engine does not build
-   update array entries for bitmap blocks, preferring instead to just update the local bitmap block buffers directly.
-
-   The last major loop is to write to disk all the new and changed blocks to disk. There is no processing but simple IO
-   in this loop to minimize the potential of something going wrong. There is no recovery at this point. If this loop fails
-   in mid-stream, the database is toast.
-
-*/
+ * to be restarted, this function returns TRUE. else if processing completed normally, returns FALSE.
+ *
+ * Routine notes:
+ *
+ * This routine implements a "simplistic" mini database engine. It is "simplistic" in the regards to fact that it
+ * doesn't need to worry about concurrency issues. It also has one design assumption that we will NEVER add a
+ * record to a level 0 block (either DT or GVT). Because of this assumption, many complications from gvcst_put(), on
+ * which it is largely based, were non-issues and were removed (e.g. no TP). This routine has its own concepts of
+ * "cache", cw_set elements, update arrays, etc. Following is a brief description of how these things are implemented
+ * in this routine:
+ *
+ * The primary control block in this scheme is the block_info block which serves as a cache record, change array anchor,
+ * gv_target, and so on. In short, everything that is known about a given database block is contained in this one
+ * structure. There is an array of these structures with the name "blk_set" which is a global variable array dimensioned
+ * at a thoroughly outrageous amount for the worst case scenario.
+ *
+ * There are areas within the blk_set array that are worth describing:
+ *
+ * - The block_depth global variable always holds the top in use index into blk_set.
+ * - blk_set[0] describes the block that was fed to us from the phase 1 scan. It is the primary block that needs to
+ *   be split. If nothing needs to happen to it, we go to the next record and blk_set[0] get a new block in it.
+ * - Starting with blk_set[1] through blk_set[bottom_tree_index] are first the directory tree (DT) blocks and then
+ *   (if primary was a GVT block) the global variable tree (GVT) blocks.
+ * - Starting with blk_set[bottom_tree_index + 1] through blk_set[bottom_created_index] are newly created blocks during
+ *   split processing.
+ * - Starting with blk_set[bottom_created_index + 1] through blk_set[block_depth] are local bit map blocks that are being
+ *   modified for the "transaction".
+ *
+ * This engine has a very simple cache mechanism. If a block we need is somewhere in the blk_set array (a global variable
+ * block_depth_hwm maintains a high water mark), the cache version is used rather than forcing a re-read from disk. It is
+ * fairly simple but seems to save a lot of reads, especially of the directory tree and the local bit_maps.
+ *
+ * Like gvcst_put(), once we have the blocks from the tree loaded, they are processed in reverse order as a split in one
+ * block requires a record to be inserted into the parent block. We start with the primary block (blk_set[0]) and then
+ * move to blk_set[bottom_tree_index] and work backwards from there until either we get to a block for which there are
+ * no updates or we hit a root block (GVT or DT depending) at which time we are done with the primary update loop.
+ *
+ * After performing the block splits and creating new blocks, we double check that we have room to hold them all. If not,
+ * we make a call to MUPIP EXTEND to extend the database for us. Since this means we have to close the file and give up
+ * our locks on it, we also restart the transaction and force all blocks to be re-read from disk.
+ *
+ * Once assured we have sufficient free blocks, we start at blk_set[bottom_created_index] and work down to
+ * blk_set[bottom_tree_index + 1] allocating and assigning block numbers to the created blocks. Part of this process also
+ * puts the block numbers into places where the update arrays will pick them up when the referencing blocks are built.
+ *
+ * Once all the new blocks have been assigned, we loop through blk_set[bottom_tree_index] to blk_set[0] and create the
+ * new versions of the blocks (for those blocks marked as being updated). A note here is that this engine does not build
+ * update array entries for bitmap blocks, preferring instead to just update the local bitmap block buffers directly.
+ *
+ * The last major loop is to write to disk all the new and changed blocks to disk. There is no processing but simple IO
+ * in this loop to minimize the potential of something going wrong. There is no recovery at this point. If this loop fails
+ * in mid-stream, the database is toast.
+ */
 boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_type blk_type, v15_trans_num tn, int blk_levl)
 {
-	int		blk_len, blk_size, restart_cnt, save_block_depth;
+	int		blk_len, blk_size, restart_cnt, save_block_depth, tmp_blk_levl;
 	int		gvtblk_index, dtblk_index, blk_index, bottom_tree_index, bottom_created_index;
 	int		curr_blk_len, curr_blk_levl, curr_rec_len, ins_key_len, ins_rec_len;
 	int		curr_rec_shrink, curr_rec_offset, blks_this_lmap;
 	int		prev_rec_offset, new_blk_len, new_rec_len, remain_offset, remain_len, blk_seg_cnt;
 	int		new_lh_blk_len, new_rh_blk_len, created_blocks, extent_size;
-	int		local_map_max, lbm_blk_index, lcl_blk, curr_rec_cmpc, cmpc;
-	int		tmp_cmpc;
+	int		local_map_max, lbm_blk_index, lcl_blk, curr_rec_cmpc;
+	int		bplmap;
 	int4		lclmap_not_full;
 	uint4		total_blks;
 	boolean_t	dummy_bool;
@@ -427,94 +428,108 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 	blk_segment	*bs_ptr, *bs1, *blk_sega_p, *blk_array_top;
 	rec_hdr_ptr_t	ins_rec_hdr, next_rec_hdr, new_star_hdr;
 	dbc_gv_key	*last_rec_key;
-	uchar_ptr_t	rec_p, next_rec_p, mid_point, cp1, lcl_map_p, new_blk_p, blk_p, blk_endp, chr_p;
+	uchar_ptr_t	blk_endp, blk_p, bmp_ptr, chr_p, cp1, lcl_map_p, mid_point, new_blk_p, next_rec_p, rec_p;
 	unsigned short	us_rec_len;
 	v15_trans_num	curr_tn;
 	block_id	blk_ptr;
-	block_id	bitmap_blk_num, *lhs_block_id_p, *rhs_block_id_p, allocated_blk_num;
+	block_id	allocated_blk_num, bitmap_blk_num, bitnum, *lhs_block_id_p, *rhs_block_id_p;
 	block_info	*blk_set_p, *blk_set_new_p, *blk_set_prnt_p, *blk_set_bm_p, *blk_set_rhs_p;
 	block_info	restart_blk_set;
-
+	enum gdsblk_type	tmp_blk_type;
 	DEBUG_ONLY(
 		boolean_t	first_time = FALSE;
 	)
 
-	/* First order of business is to read the required block in */
+	/* First order of business is to read the required block in. Reset block_depth so this read happens in psa->blk_set[0].
+	 * Needed because following code relies on the block-to-be-split being psa->blk_set[0].
+	 */
 	psa->block_depth = -1;
-	blk_size = psa->dbc_cs_data->blk_size;	/* BLK_FINI macro needs a local copy */
 	dbc_read_dbblk(psa, blk_num, blk_type);
-
-	/* Now that we have read the block in, let us see if it is still a "problem" block. If its
-	   TN has changed, that is an indicator that is should NOT be a problem block any longer
-	   with the sole exception of a TN RESET having been done on the DB since phase 1. In that
-	   case, we will still insist on a phase 1 rerun as some of our sanity checks have disappeared.
-	*/
+	blk_size = psa->dbc_cs_data->blk_size;	/* BLK_FINI macro needs a local copy */
 	assert(0 == psa->block_depth);
+	/* Now that we have read the block, is it still "too-full"? If so and it is a data block and the tn has changed since the
+	 * scan, force the user to rerun the scan for the 3 possible reasons explained in the below comment. Defer index blocks
+	 * because, when we insert a record before the first record in the block, we may put the new record into the new (LH)
+	 * sibling and leave the entire existing block unmodified, except for a new transaction number, as the RH side. The net
+	 * result is a too full unsplit index block. This never happens with a created block, Also, gvtroot blocks (a special case
+	 * of an index block) require special processing before we can decide if they are still "too-full" and in need of a split.
+	 */
 	blk_p = psa->blk_set[0].old_buff;
 	assert(blk_p);
 	blk_len = psa->blk_set[0].blk_len;
-
-	/* If the block is still too large, sanity check on TN at phase 1 and now. Note that it is
-	   possible in an index block for the TN to have changed yet the block is otherwise unmodified
-	   if (1) this is an index block and (2) a record is being inserted before the first record in
-	   the block. In this case, the new record is put into the new (LH) sibling and the entire existing
-	   block is put unmodified into the RH side in the existing block. The net result is that only
-	   the TN changes in this block and if the block is too full it is not split. This will never
-	   happen for a created block though. It can only hapen for existing index blocks. Note if the
-	   block is not (still) too full that we cannot yet say this block has nothing to happen to it
-	   because if it is a gvtroot block, we need to record its right side children further down.
-	*/
 	GET_ULONG(curr_tn, &((v15_blk_hdr_ptr_t)blk_p)->tn);
 	if ((UNIX_ONLY(8) VMS_ONLY(9) > blk_size - blk_len) && (curr_tn != tn) && (gdsblk_gvtleaf == blk_type))
 	{
-		/* Block has been modified: Three possible reasons it is not fixed:
-		   1) The user was playing with reserved bytes and set it too low allowing some
-		   large blocks to be created we did not know about (but thankfully just caught).
-		   2) User ran a recover after running phase 1 that re-introduced some too-large
-		   blocks. This is a documented no-no but we have no way to enforce it on V4.
-		   3) There was a TN reset done.
-		   All three of these causes require a rerun of the scan phase.
-		*/
+		/* Leaf block has been modified since the scan: Three possible reasons it is still too-full (i.e. needs split).
+		 * 1) The user was playing with reserved bytes and set it too low allowing some
+		 *		large blocks to be created we did not know about (but thankfully just caught).
+		 * 2) User ran a mupip journal recover -backward after running phase 1 that re-introduced some too-large
+		 *		blocks. This is a documented no-no but we have no way to enforce it on V4.
+		 * 3) There was a TN reset done.
+		 *
+		 * All three of these causes require a rerun of the scan phase.
+		 */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DBCMODBLK2BIG, 1, blk_num);
 	}
-	/* Isolate the full key in the first record of the block */
+	/* Isolate the full key in the first record of the block. If needed, descend down blocks with only *-key */
 	dbc_init_key(psa, &psa->first_rec_key);
-	dbc_find_key(psa, psa->first_rec_key, blk_p + SIZEOF(v15_blk_hdr), psa->blk_set[0].blk_levl);
-	if ((0 < psa->blk_set[0].blk_levl) && (0 == psa->first_rec_key->end))
-	{	/* dbc_find_key found just a star-key in this index block. dbc_find_record/dbc_match_key (invoked later)
-		 * does not know to handle this scenario so we finish this case off right away. No need to do any splits
-		 * anyways since the block is obviously not too full.
+	tmp_blk_levl = psa->blk_set[0].blk_levl;
+	tmp_blk_type = blk_type;
+	new_blk_p = blk_p;
+	do
+	{
+		rec_p = new_blk_p + SIZEOF(v15_blk_hdr);
+		dbc_find_key(psa, psa->first_rec_key, rec_p, tmp_blk_levl);
+		if (!tmp_blk_levl && psa->first_rec_key->end)
+		{	/* Read key and is a leaf level block. Can stop search. If non-leaf block, we cannot stop search
+			 * since it is possible this is a DT index block. Global names stored in DT index blocks are likely
+			 * to not be found when searched for later in "dbc_find_dtblk".
+			 */
+			if (new_blk_p != blk_p)
+			{	/* We read additional blocks in this do/while loop. Since that confuses
+				 * "dbc_find_dtblk" (and maybe others), undo effects of the read by resetting the cache.
+				 */
+				psa->block_depth = 0;
+				psa->block_depth_hwm = 0;
+			}
+			break;	/* Found a non-* key. Proceed with search */
+		}
+		/* Descend down until we find non-* key */
+		assert(tmp_blk_levl);
+		GET_ULONG(blk_ptr, rec_p + ((rec_hdr_ptr_t)rec_p)->rsiz - SIZEOF(block_id));
+		blk_index = dbc_read_dbblk(psa, blk_ptr, tmp_blk_type);
+		/* Note that we cannot do a "tmp_blk_levl--" here but instead should get the child block level from the block
+		 * header. This is because it is possible the block we started out with is no longer marked BUSY in the bitmap
+		 * (because of updates after the "dbcertify scan" but before the "dbcertify certify"). Since we dont check
+		 * a block's bitmap status first (to avoid performance overhead of reading bitmap for every block that is
+		 * processed by certify), we need to add robustness within dbcertify to handle that.
 		 */
-		DBC_DEBUG(("DBC_DEBUG: Block not processed as it now has sufficient room (index block with only *-key)\n"));
-		psa->blks_bypassed++;
-		psa->blks_read++;
-		if (psa->blk_set[0].found_in_cache)
-			psa->blks_cached++;
-		return FALSE;	/* No restart needed */
-	}
+		tmp_blk_levl = psa->blk_set[blk_index].blk_levl;
+		new_blk_p = psa->blk_set[blk_index].old_buff;
+		switch(tmp_blk_type)
+		{
+			case gdsblk_dtindex:
+			case gdsblk_dtleaf:
+			case gdsblk_dtroot:
+				tmp_blk_type = (tmp_blk_levl ? gdsblk_dtindex : gdsblk_dtleaf);
+				break;
+			case gdsblk_gvtindex:
+			case gdsblk_gvtleaf:
+				tmp_blk_type = (tmp_blk_levl ? gdsblk_gvtindex : gdsblk_gvtleaf);
+				break;
+		}
+	} while (TRUE);
+	assert(psa->first_rec_key->end);
 	psa->first_rec_key->gvn_len = USTRLEN((char_ptr_t)psa->first_rec_key->base);	/* The GVN we need to lookup in the DT */
-	if (UNIX_ONLY(8) VMS_ONLY(9) <= blk_size - blk_len)
-	{	/* This block has room now - no longer need to split it */
-		DBC_DEBUG(("DBC_DEBUG: Block not processed as it now has sufficient room\n"));
-		psa->blks_bypassed++;
-		psa->blks_read++;
-		if (psa->blk_set[0].found_in_cache)
-			psa->blks_cached++;
-		return FALSE;	/* No restart needed */
-	}
 	/* Possibilities at this point:
-	   1) We are looking for a DT (directory tree) block.
-	   2) We are looking for a GVT (global variable tree) block.
-
-	   We lookup first_rec_key in the directory tree. If (1) we pass the block level we are searching for
-	   as a parameter. If (2), we pass -1 as the block level we are searching for as we need a complete
-	   search of the leaf level DT in order to find the GVN.
-
-	   If (1) then the lookup is complete and verification and (later) block splitting can begin. If (2), we need to
-	   take the pointer from the found DT record which points to the GVT root block and start our search again
-	   from there using the level from the original block as a stopping point. One special case here is if our
-	   target block was a gvtroot block, we don't need to traverse the GVT tree to find it. We get it from the
-	   directory tree and stop our search there.
+	 * 1) We are looking for a DT (directory tree) block, and pass the block level we are searching for as a parameter
+	 * 2) We are looking for a GVT (global variable tree) block and -1 as the block level as we need a complete search
+	 *     of the leaf level DT in order to find the GVN.
+	 *
+	 * If (1), once we arrive at the block, validation is complete and verification and (later) block splitting can begin
+	 * If (2), we need to take the pointer from the found DT record which points to the GVT root block and start our
+	 * search again from there using the level from the original block as a stopping point. If our target block was a
+	 * gvtroot block, we don't need to traverse the GVT tree to find it, as the directory tree already identified it
 	 */
 	switch(blk_type)
 	{
@@ -542,21 +557,36 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to locate DT leaf (root) block"));
 			}
+			if (0 == dtblk_index)
+			{	/* Located the to-be-split gvtindex/gvtleaf block in the directory tree.
+				 * This is possible only if the gvt block became FREE (due to a KILL and then
+				 * got reused as part of a directory tree update done either by M updates since
+				 * the scan or by this dbcertify certify itself). In either case, this block
+				 * does not need processing anymore as it would not be too-full when it became
+				 * BUSY again.
+				 */
+				DBC_DEBUG(("DBC_DEBUG: Block not processed as it was in GVT but is now in DT\n"));
+				psa->blks_bypassed++;
+				psa->blks_read++;
+				if (psa->blk_set[0].found_in_cache)
+					psa->blks_cached++;
+				return FALSE;	/* No restart needed */
+			}
 			assert(0 == ((v15_blk_hdr_ptr_t)psa->blk_set[dtblk_index].old_buff)->levl);
 			/* Note level 0 directory blocks can have collation data in them but it would be AFTER
-			   the block pointer which is the first thing in the record after the key.
-			*/
+			 * the block pointer which is the first thing in the record after the key.
+			 */
 			GET_ULONG(blk_ptr, (psa->blk_set[dtblk_index].curr_rec + SIZEOF(rec_hdr)
 					    + psa->blk_set[dtblk_index].curr_blk_key->end + 1
 					    - EVAL_CMPC((rec_hdr *)psa->blk_set[dtblk_index].curr_rec)));
 			gvtblk_index = dbc_read_dbblk(psa, blk_ptr, gdsblk_gvtroot);
 			assert(-1 != gvtblk_index);
 			/* If our target block was not the gvtroot block we just read in then we keep scanning for our
-			   target record. Otherwise, the scan stops here.
-			*/
+			 * target record. Otherwise, the scan stops here.
+			 */
 			if (0 != gvtblk_index)
 			{
-				blk_index = dbc_find_record(psa, psa->first_rec_key, gvtblk_index, blk_levl, gdsblk_gvtroot, FALSE);
+				blk_index = dbc_find_record(psa, psa->first_rec_key, gvtblk_index, blk_levl, gdsblk_gvtroot);
 				if (0 > blk_index)
 				{
 					if (-1 == blk_index)
@@ -568,16 +598,15 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 							  RTS_ERROR_LITERAL("Unable to find index record for an existing global"));
 					} else if (-2 == blk_index)
 					{	/* Record was not found. Record has been deleted since we last
-						   found it. Elicits a warning message in DEBUG mode but is otherwise ignored.
-						*/
-						assert(FALSE);
+						 * found it. Elicits a warning message in DEBUG mode but is otherwise ignored.
+						 */
 						DBC_DEBUG(("DBC_DEBUG: Block split of blk 0x%x bypassed because its "
 							   "key could not be located in the GVT\n", blk_num));
 						psa->blks_bypassed++;
 						psa->blks_read += psa->block_depth;
 						/* Only way to properly update the count of cached records is to run the list
-						   and check them.
-						*/
+						 * and check them.
+						 */
 						for (blk_index = psa->block_depth, blk_set_p = &psa->blk_set[blk_index];
 						     0 <= blk_index;
 						     --blk_index, --blk_set_p)
@@ -598,48 +627,60 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		default:
 			assertpro(FALSE);
 	}
-	/* The most recently accessed block (that terminated the search) should be the block
-	   we are looking for (which should have been found in the cache as block 0. If not,
-	   there is an integrity error and we should not continue.
-	*/
+	/* The most recently accessed block (that terminated the search) should be the block we are looking for
+	 * (which should have been found in the cache as block 0. If not, there is an integrity error and we should
+	 * not continue. The only exception though is if this block has been modified since the scan. If so, it is
+	 * more likely the block's status (part-of-GVT OR part-of-DT OR marked-free-in-bitmap) changed since the scan
+	 * than that there is an integrity error. If the block tn has changed and is no longer "too-full", assume db
+	 * is clean in this case and bypass processing this block.
+	 */
 	if (0 != blk_index)
-	{	/* Integrity error encountered. We cannot proceed */
+	{
+		if ((curr_tn != tn) && (8 <= (blk_size - blk_len)))
+		{
+			DBC_DEBUG(("DBC_DEBUG: Block not processed as its GVT/DT/Bitmap status changed since scan\n"));
+			psa->blks_bypassed++;
+			psa->blks_read++;
+			if (psa->blk_set[0].found_in_cache)
+				psa->blks_cached++;
+			return FALSE;	/* No restart needed */
+		}
+		/* Integrity error encountered. We cannot proceed */
 		assert(FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 			  ERR_TEXT, 2,
 			  RTS_ERROR_LITERAL("Did not locate record in same block as we started searching for"));
 	}
-
 	/* If this is a gvtroot type block, we have some extra processing to do. Following is a description of
-	   the issue we are addressing here. If a gvtroot block is "too large" and was too large at the time
-	   the scan was run, it will of course be identified by the scan as too large. Prior to running the scan,
-	   the reserved bytes field was set so no more too-full blocks can be created. But if a gvtroot block is
-	   identified by the scan and subsequently has to be split by normal GTM processing before the certify
-	   can be done, the too-full part of the block can (in totality) end up in the right hand child of the
-	   gvtroot block (not obeying the reserved bytes rule). But the gvtroot block is the only one that was
-	   identified by the scan and certify may now miss the too-full block in the right child. Theoretically,
-	   the entire right child chain of the gvtroot block can be too full. Our purpose here is that when we
-	   have identified a gvtblock as being too full, we pause here to read the right child chain coming off
-	   of that block all the way down to (but not including) block level 0. Each of these blocks will be
-	   processed to check for being too full. The way we do this is to run the chain and build p1rec entries
-	   in the gvtroot_rchildren[] array. When we are at the top of the processing loop, we will take these
-	   array entries over records from the phase one input file. We only load up the array if it is empty.
-	   Otherwise, the assumption is that we are re-processing and the issue has already been handled.
-	*/
+	 * the issue we are addressing here. If a gvtroot block is "too large" and was too large at the time
+	 * the scan was run, it will of course be identified by the scan as too large. Prior to running the scan,
+	 * the reserved bytes field was set so no more too-full blocks can be created. But if a gvtroot block is
+	 * identified by the scan and subsequently has to be split by normal GTM processing before the certify
+	 * can be done, the too-full part of the block can (in totality) end up in the right hand child of the
+	 * gvtroot block (not obeying the reserved bytes rule). But the gvtroot block is the only one that was
+	 * identified by the scan and certify may now miss the too-full block in the right child. Theoretically,
+	 * the entire right child chain of the gvtroot block can be too full. Our purpose here is that when we
+	 * have identified a gvtblock as being too full, we pause here to read the right child chain coming off
+	 * of that block all the way down to (but not including) block level 0. Each of these blocks will be
+	 * processed to check for being too full. The way we do this is to run the chain and build p1rec entries
+	 * in the gvtroot_rchildren[] array. When we are at the top of the processing loop, we will take these
+	 * array entries over records from the phase one input file. We only load up the array if it is empty.
+	 * Otherwise, the assumption is that we are re-processing and the issue has already been handled.
+	 */
 	blk_set_p = &psa->blk_set[0];
-	if (gdsblk_gvtroot == blk_set_p->blk_type && 0 == psa->gvtroot_rchildren_cnt)
+	if ((gdsblk_gvtroot == blk_set_p->blk_type) && (0 == psa->gvtroot_rchildren_cnt))
 	{
 		DBC_DEBUG(("DBC_DEBUG: Encountered gvtroot block (block %d [0x%08x]), finding/queueing children\n",
 			   blk_set_p->blk_num, blk_set_p->blk_num));
 		save_block_depth = psa->block_depth;	/* These reads are temporary and should not remain in cache so
-							   we will restore block_depth after we are done.
-							*/
+							 * we will restore block_depth after we are done.
+							 */
 		/* Attempting to locate the maximum possible key for this database should read the list of right
-		   children into the cache. Pretty much any returncode from dbc_find_record is possible. We usually
-		   aren't going to find the global which may come up as not found or an integrity error or it could
-		   possibly even be found. Just go with what it gives us. Not much verification we can do on it.
-		*/
-		blk_index = dbc_find_record(psa, psa->max_key, 0, 0, gdsblk_gvtroot, TRUE);
+		 * children into the cache. Pretty much any returncode from dbc_find_record is possible. We usually
+		 * aren't going to find the global which may come up as not found or an integrity error or it could
+		 * possibly even be found. Just go with what it gives us. Not much verification we can do on it.
+		 */
+		blk_index = dbc_find_record(psa, psa->max_key, 0, 0, gdsblk_gvtroot);
 		/* Pull children (if any) out of cache and put into queue for later processing */
 		for (blk_index = save_block_depth + 1;
 		     blk_index <= psa->block_depth && gdsblk_gvtleaf != psa->blk_set[blk_index].blk_type;
@@ -671,17 +712,17 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 	}
 
 	/* Beginning of block update/split logic. We need to process the blocks in the reverse order from the
-	   tree path. This means blk_set[0] which is actually the block we want to split must be the first
-	   in our path. We then need to process the block array backwards in case the changes made to those
-	   records cause subsequent splits.
-
-	   First order of business is to find a suitable place to split this block .. Run through
-	   the records in the block until we are "halfway" through the block. Split so that the first record
-	   (after the first) whose end point is in the "second half" of the block will be the first record of
-	   the second half or right hand side block after the split. This makes sure that the left side has at
-	   least one record in it. We already know that this block has at least 2 records in it or it would not
-	   need splitting.
-	*/
+	 * tree path. This means blk_set[0] which is actually the block we want to split must be the first
+	 * in our path. We then need to process the block array backwards in case the changes made to those
+	 * records cause subsequent splits.
+	 *
+	 * First order of business is to find a suitable place to split this block .. Run through
+	 * the records in the block until we are "halfway" through the block. Split so that the first record
+	 * (after the first) whose end point is in the "second half" of the block will be the first record of
+	 * the second half or right hand side block after the split. This makes sure that the left side has at
+	 * least one record in it. We already know that this block has at least 2 records in it or it would not
+	 * need splitting.
+	 */
 	rec_p = blk_p + SIZEOF(v15_blk_hdr);
 	blk_set_p->curr_rec = rec_p;
 	dbc_find_key(psa, blk_set_p->curr_blk_key, rec_p, blk_set_p->blk_levl);
@@ -759,10 +800,10 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			ins_key_len = ins_rec_len = 0;
 		blk_p = blk_set_p->old_buff;
 		/* If ins_rec_len has a non-zero value, then we need to reset the values for prev_match and
-		   key_match. These values were computed using the original scan key as their basis. Now we
-		   are using these fields to insert a new key. The positioning is still correct but the
-		   number of matching characters is potentially different.
-		*/
+		 * key_match. These values were computed using the original scan key as their basis. Now we
+		 * are using these fields to insert a new key. The positioning is still correct but the
+		 * number of matching characters is potentially different.
+		 */
 		if (ins_rec_len)
 		{
 			if (0 != blk_set_p->prev_blk_key->end)
@@ -784,29 +825,30 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		prev_rec_offset = (int)(blk_set_p->prev_rec - blk_set_p->old_buff);
 		got_root = (gdsblk_dtroot == blk_set_p->blk_type) || (gdsblk_gvtroot == blk_set_p->blk_type);
 		/* Decide if this record insert (if an insert exists) will cause a block split or not. If this
-		   is the first block in the tree (the one we got from the phase 1 file), there will be no insert.
-		   If we find a block that does not need to change, we are done and can exit the loop.
-		   This differs from the regular GT.M runtime which must keep checking even the split blocks
-		   but since we never add data to a level 0 block being split, we will never create split-off
-		   blocks that themselves are (still) too full.
-		*/
+		 * is the first block in the tree (the one we got from the phase 1 file), there will be no insert.
+		 * If we find a block that does not need to change, we are done and can exit the loop.
+		 * This differs from the regular GT.M runtime which must keep checking even the split blocks
+		 * but since we never add data to a level 0 block being split, we will never create split-off
+		 * blocks that themselves are (still) too full.
+		 */
 		assert(gdsblk_read == blk_set_p->usage);
 		new_blk_len = (int)(ins_rec_len ? (curr_blk_len + curr_rec_cmpc + SIZEOF(rec_hdr) + ins_rec_len
 					      - blk_set_p->prev_match - blk_set_p->curr_match)
 			       : curr_blk_len);		/* No inserted rec, size does not change */
 		if (new_blk_len <= psa->max_blk_len)
 		{	/* "Simple" case .. we do not need a block split - only (possibly) a record added. Note
-			   that this is the only path where there may not be a "previous" record so we
-			   have to watch for that possibility.
-			*/
+			 * that this is the only path where there may not be a "previous" record so we
+			 * have to watch for that possibility.
+			 */
 			assert(0 != blk_index);		/* Never insert a record into target blk so should never be here */
 			/* In this path we should always have an inserted record length. We should have detected we
-			   were done in an earlier loop iteration.
-			*/
+			 * were done in an earlier loop iteration.
+			 */
 			assert(ins_rec_len);
 			DBC_DEBUG(("DBC_DEBUG: Block index %d is a simple update\n", blk_index));
 			/* We must have an insert at this point and since we only ever insert records into
-			   index blocks, we must be in that situation */
+			 * index blocks, we must be in that situation.
+			 */
 			assert(0 != curr_blk_levl);
 			blk_set_p->usage = gdsblk_update;	/* It's official .. blk is being modified */
 			/* We have a record to insert into this block but no split is needed */
@@ -832,18 +874,17 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			       blk_set_p->ins_rec.ins_key->end + 1 - blk_set_p->prev_match);
 			BLK_SEG(bs_ptr, cp1, blk_set_p->ins_rec.ins_key->end + 1 - blk_set_p->prev_match);
 			/* Setup value (all index records have value of size "block_id". The proper value is
-			   either there already or will be when we go to commit these changes. */
+			 * either there already or will be when we go to commit these changes.
+			 */
 			BLK_SEG(bs_ptr, (sm_uc_ptr_t)&blk_set_p->ins_rec.blk_id, SIZEOF(block_id));
-			/* For index blocks, we know that since a star key is the last record in the block
-			   (which is the last record that can be curr_rec) that there is a trailing portion
-			   of the block we need to output.
-			*/
+			/* For index blocks, we know that since a star key is the last record in the block (which is the
+			 * last record that can be curr_rec) that there is a trailing portion of the block we need to output.
+			 */
 			BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);	/* Replacement rec header */
 			next_rec_hdr->rsiz = curr_rec_len - curr_rec_shrink;
 			SET_CMPC(next_rec_hdr, blk_set_p->curr_match);
 			BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
-			remain_offset = curr_rec_shrink + SIZEOF(rec_hdr);	/* Where rest of record plus any
-										   further records begin */
+			remain_offset = curr_rec_shrink + SIZEOF(rec_hdr); /* Where rest of record + any further records begin */
 			remain_len = curr_blk_len - curr_rec_offset;
 			BLK_SEG(bs_ptr,
 				blk_set_p->curr_rec + remain_offset,
@@ -856,49 +897,49 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			break;
 		} else
 		{	/* The block is either already too large or would be too large when the record is inserted
-			   and so it must be split.
-
-			   There are two different ways a block can be split. It can either be split so that:
-
-			   (1) the inserted record is at the end of the left block or,
-
-			   (2) the record is the first record in the right half.
-
-			   Compute the left/right block sizes for these two options and see which one does not
-			   force a secondary block split (one of them must be true here unlike in GT.M code because
-			   here we are NEVER adding a record to a level 0 block, we only split lvl 0 blocks as
-			   needed). Note that the case where we are splitting a level 0 block with no record insert
-			   is treated as an unremarkable variant of option (1) as described above.
-
-			   Follow the conventions of gvcst_put (LHS to new block, RHS to old block):
-
-			   (1) If we are inserting the record into the lefthand side then a new split-off block will
-			   receive the first part of the block including the record. The remainder of the block is
-			   placed into the current (existing) block.
-
-			   (2) If we are putting the record into the righthand side, then a new split-off block will
-			   receive the first part of the block. The new record plus the remainder of the block is
-			   placed into the current block.
-
-			   The sole exception to the above is if a root block (either DT or GVT) is being split. In
-			   that case, BOTH the LHS and RHS become NEW blocks and the root block is (a) increased in
-			   level and (b) contains only entries for the two created blocks.
-
-			   Note that gvcst_put has several additional checks and balances here that we are forgoing
-			   such as making sure the blocks are as balanced as possible, concurrency concerns, etc. They
-			   add un-needed complications to this one-time code. Any inefficiencies here can be undone
-			   with a pass of MUPIP REORG.
-			*/
+			 * and so it must be split.
+			 *
+			 * There are two different ways a block can be split. It can either be split so that:
+			 *
+			 * (1) the inserted record is at the end of the left block or,
+			 *
+			 * (2) the record is the first record in the right half.
+			 *
+			 * Compute the left/right block sizes for these two options and see which one does not
+			 * force a secondary block split (one of them must be true here unlike in GT.M code because
+			 * here we are NEVER adding a record to a level 0 block, we only split lvl 0 blocks as
+			 * needed). Note that the case where we are splitting a level 0 block with no record insert
+			 * is treated as an unremarkable variant of option (1) as described above.
+			 *
+			 * Follow the conventions of gvcst_put (LHS to new block, RHS to old block):
+			 *
+			 * (1) If we are inserting the record into the lefthand side then a new split-off block will
+			 * receive the first part of the block including the record. The remainder of the block is
+			 * placed into the current (existing) block.
+			 *
+			 * (2) If we are putting the record into the righthand side, then a new split-off block will
+			 * receive the first part of the block. The new record plus the remainder of the block is
+			 * placed into the current block.
+			 *
+			 * The sole exception to the above is if a root block (either DT or GVT) is being split. In
+			 * that case, BOTH the LHS and RHS become NEW blocks and the root block is (a) increased in
+			 * level and (b) contains only entries for the two created blocks.
+			 *
+			 * Note that gvcst_put has several additional checks and balances here that we are forgoing
+			 * such as making sure the blocks are as balanced as possible, concurrency concerns, etc. They
+			 * add un-needed complications to this one-time code. Any inefficiencies here can be undone
+			 * with a pass of MUPIP REORG.
+			 */
 			DBC_DEBUG(("DBC_DEBUG: Block index %d needs to be split\n", blk_index));
 			/*  First up is split so that the inserted record (if any) is the last record in the left
-			    hand block. Note if this is an index block, the last record must be a star key rec as per
-			    option (1) above.
-			*/
+			 *  hand block. Note if this is an index block, the last record must be a star key rec as per
+			 *  option (1) above.
+			 */
 			if (curr_blk_levl)
 				/* Index block. Two cases: (a) We are adding a key to the end in which case it is just
-				   a simple star key rec or (b) No record is being added so the previous record is
-				   changed into a star key rec.
-				*/
+				 * a simple star key rec or (b) No record is being added so the previous record is
+				 * changed into a star key rec.
+				 */
 				new_lh_blk_len = (int)(curr_rec_offset + BSTAR_REC_SIZE
 					- (ins_rec_len ? 0 : (blk_set_p->curr_rec - blk_set_p->prev_rec)));
 			else
@@ -955,9 +996,9 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					}
 				} else
 				{	/* Index block -- may or may not be adding a record.
-					   If adding a record, the inserted record becomes a star key record.
-					   If not adding a record the last record is morphed into a star key record.
-					*/
+					 * If adding a record, the inserted record becomes a star key record.
+					 * If not adding a record the last record is morphed into a star key record.
+					 */
 					BLK_SEG(bs_ptr, blk_set_p->old_buff + SIZEOF(v15_blk_hdr),
 						(ins_rec_len ? curr_rec_offset : prev_rec_offset)
 						- SIZEOF(v15_blk_hdr));
@@ -982,9 +1023,9 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					last_rec_key = blk_set_p->ins_rec.ins_key;
 				if (!got_root)
 				{	/* New block created, insert record to it in parent block. To do this we create
-					   a record with the last key in this LH block to be inserted between curr_rec
-					   and prev_rec of the parent block.
-					*/
+					 * a record with the last key in this LH block to be inserted between curr_rec
+					 * and prev_rec of the parent block.
+					 */
 					if (0 == blk_index)
 						blk_set_prnt_p = &psa->blk_set[bottom_tree_index]; /* Cycle back up to parent */
 					else
@@ -992,15 +1033,15 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					assert(blk_set_prnt_p != &psa->blk_set[0]);
 					assert(NULL != last_rec_key);
 					/* Note: We do not need the "+ 1" on the key length since SIZEOF(dbc_gv_key) contains
-					   the first character of the key so the "+ 1" to get the last byte of the key is
-					   already integrated into the length
-					*/
+					 * the first character of the key so the "+ 1" to get the last byte of the key is
+					 * already integrated into the length
+					 */
 					memcpy(blk_set_prnt_p->ins_rec.ins_key, last_rec_key,
 					       SIZEOF(dbc_gv_key) + last_rec_key->end);
 					/* Setup so that creation of the blk_set_new_p block can then set its block id into
-					   our parent block's insert rec buffer which will be made part of the inserted
-					   record at block build time
-					*/
+					 * our parent block's insert rec buffer which will be made part of the inserted
+					 * record at block build time
+					 */
 					blk_set_new_p->ins_blk_id_p = &blk_set_prnt_p->ins_rec.blk_id;
 					blk_set_rhs_p = blk_set_p;	/* Use original block for rhs */
 					blk_set_rhs_p->usage = gdsblk_update;
@@ -1013,12 +1054,12 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					blk_set_rhs_p = &psa->blk_set[psa->block_depth];
 					dbc_init_blk(psa, blk_set_rhs_p, -1, gdsblk_create, new_rh_blk_len, curr_blk_levl);
 					/* We will put the pointers to both this block and the RHS we build next
-					   into the original root block -- done later when RHS is complete */
-					/* If root, the RHS sub-block is a different type */
+					 * into the original root block -- done later when RHS is complete.
+					 * If root, the RHS sub-block is a different type.
+					 */
 					blk_set_rhs_p->blk_type = (gdsblk_gvtroot == blk_set_p->blk_type)
 						? gdsblk_gvtindex : gdsblk_dtindex;
 				}
-
 				/**** Now build RHS into either current or new block ****/
 				BLK_INIT(bs_ptr, bs1);
 				blk_set_rhs_p->upd_addr = bs1;		/* Block building roadmap.. */
@@ -1026,8 +1067,9 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				next_rec_hdr->rsiz = curr_rec_len + curr_rec_cmpc;
 				SET_CMPC(next_rec_hdr, 0);
 				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
-				/* Copy the previously compressed part of the key out of curr_rec. Note, if this
-				   key is a star rec key, nothing is written because cmpc is zero */
+				/* Copy the previously compressed part of the key out of curr_rec.
+				 * Note, if this key is a star rec key, nothing is written because cmpc is zero.
+				 */
 				if (curr_rec_cmpc)
 				{
 					BLK_ADDR(cp1, curr_rec_cmpc, unsigned char);
@@ -1051,8 +1093,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				/* By definition we *must* have an inserted record in this path */
 				assert(0 != ins_rec_len);
 				/* New block sizes - note because we *must* be inserting a record in this method,
-				   the only case considered here is when we are operating on an index block.
-				*/
+				 * the only case considered here is when we are operating on an index block.
+				 */
 				assert(!level_0);
 				/* Last record turns into star key record */
 				new_lh_blk_len = (int)(curr_rec_offset + BSTAR_REC_SIZE -
@@ -1063,24 +1105,24 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				assert(0 < new_rh_blk_len);
 				if (new_lh_blk_len > psa->max_blk_len || new_rh_blk_len > psa->max_blk_len)
 				{	/* This is possible if we are inserting a record into a block (and thus we are
-					   not picking the insertion point) and the insertion point is either the first or
-					   next-to-last record in the block such that neither method 1 nor 2 can create blocks
-					   of acceptable size. In this case, although this problem block is likely on the
-					   list of blocks to process, we cannot wait and thus must perform the split now.
-					   To do that, we call this same routine recursively with the necessary parms to
-					   process *THIS* block. Since this will destroy all the structures we had built
-					   up, signal a transaction restart which will re-read everything and should allow
-					   the transaction we were processing to proceed.
-					*/
+					 * not picking the insertion point) and the insertion point is either the first or
+					 * next-to-last record in the block such that neither method 1 nor 2 can create blocks
+					 * of acceptable size. In this case, although this problem block is likely on the
+					 * list of blocks to process, we cannot wait and thus must perform the split now.
+					 * To do that, we call this same routine recursively with the necessary parms to
+					 * process *THIS* block. Since this will destroy all the structures we had built
+					 * up, signal a transaction restart which will re-read everything and should allow
+					 * the transaction we were processing to proceed.
+					 */
 					if (curr_blk_len <= psa->max_blk_len)
 						/* Well, that wasn't the problem, something else is wrong */
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBCINTEGERR, 2,
 							  RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 							  ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to split block appropriately"));
 					/* If we do have to restart, we won't be able to reinvoke dbc_split_blk() with the
-					   parms taken from the current blk_set_p as that array will be overwritten by the
-					   recursion. Save the current blk_set_p so we can use it in a restartable context.
-					*/
+					 * parms taken from the current blk_set_p as that array will be overwritten by the
+					 * recursion. Save the current blk_set_p so we can use it in a restartable context.
+					 */
 					restart_blk_set = *blk_set_p;
 					for (restart_cnt = 0, restart_transaction = TRUE;
 					     restart_transaction;
@@ -1099,17 +1141,13 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				}
 				DBC_DEBUG(("DBC_DEBUG: Method 2 block lengths: lh: %d  rh: %d  max_blk_len: %d\n",
 					   new_lh_blk_len, new_rh_blk_len, psa->max_blk_len));
-
 				/* Start building (new) LHS block - for this index record, the record before the split
-				   becomes a new *-key.
-
-				   Note:  If the block split was caused by our appending the new record
-				   to the end of the block, this code causes the record PRIOR to the
-				   current *-key to become the new *-key.
-				*/
-				BLK_SEG(bs_ptr,
-					blk_set_p->old_buff + SIZEOF(v15_blk_hdr),
-					prev_rec_offset - SIZEOF(v15_blk_hdr));
+				 * becomes a new *-key.
+				 * Note:  If the block split was caused by our appending the new record
+				 * to the end of the block, this code causes the record PRIOR to the
+				 * current *-key to become the new *-key.
+				 */
+				BLK_SEG(bs_ptr, blk_set_p->old_buff + SIZEOF(v15_blk_hdr), prev_rec_offset - SIZEOF(v15_blk_hdr));
 				/* Replace last record with star key rec */
 				BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
 				new_star_hdr->rsiz = BSTAR_REC_SIZE;
@@ -1124,9 +1162,9 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				if (!got_root)
 				{
 					/* New block created, insert record to it in parent block. To do this we create
-					   a record with the last key in this LH block to be inserted between curr_rec
-					   and prev_rec of the parent block.
-					*/
+					 * a record with the last key in this LH block to be inserted between curr_rec
+					 * and prev_rec of the parent block.
+					 */
 					if (0 == blk_index)
 						blk_set_prnt_p = &psa->blk_set[bottom_tree_index]; /* Cycle back up to parent */
 					else
@@ -1134,15 +1172,15 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					assert(blk_set_prnt_p != &psa->blk_set[0]);
 					assert(NULL != blk_set_p->prev_blk_key);
 					/* Note: We do not need the "+ 1" on the key length since SIZEOF(dbc_gv_key) contains
-					   the first character of the key so the "+ 1" to get the last byte of the key is
-					   already integrated into the length
-					*/
+					 * the first character of the key so the "+ 1" to get the last byte of the key is
+					 * already integrated into the length
+					 */
 					memcpy(blk_set_prnt_p->ins_rec.ins_key, blk_set_p->prev_blk_key,
 					       SIZEOF(dbc_gv_key) + blk_set_p->prev_blk_key->end);
 					/* Setup so that creation of the blk_set_new_p block can then set its block id into
-					   our parent block's insert rec buffer which will be made part of the inserted
-					   record at block build time
-					*/
+					 * our parent block's insert rec buffer which will be made part of the inserted
+					 * record at block build time
+					 */
 					blk_set_new_p->ins_blk_id_p = &blk_set_prnt_p->ins_rec.blk_id;
 					blk_set_rhs_p = blk_set_p;	/* Use original block for rhs */
 					blk_set_rhs_p->usage = gdsblk_update;
@@ -1157,18 +1195,16 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					last_rec_key = blk_set_p->curr_blk_key;
 					dbc_init_blk(psa, blk_set_rhs_p, -1, gdsblk_create, new_rh_blk_len, curr_blk_levl);
 					/* We will put the pointers to both this block and the RHS we build next
-					   into the original root block -- done later when RHS is complete */
-					/* If root, the RHS sub-block is a different type */
+					 * into the original root block -- done later when RHS is complete.
+					 * If root, the RHS sub-block is a different type.
+					 */
 					blk_set_rhs_p->blk_type = (gdsblk_gvtroot == blk_set_p->blk_type)
 						? gdsblk_gvtindex : gdsblk_dtindex;
 				}
-
 				/**** Now build RHS into current block ****/
 				BLK_INIT(bs_ptr, bs1);
 				blk_set_rhs_p->upd_addr = bs1;		/* Block building roadmap.. */
-				/* Build record header for inserted record. Inserted record is always for index
-				   type blocks
-				*/
+				/* Build record header for inserted record. Inserted record is always for index type blocks */
 				BLK_ADDR(ins_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				ins_rec_hdr->rsiz = SIZEOF(rec_hdr) + blk_set_p->ins_rec.ins_key->end + 1
 					+ SIZEOF(block_id);
@@ -1178,17 +1214,18 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				BLK_SEG(bs_ptr,
 					blk_set_p->ins_rec.ins_key->base,
 					blk_set_p->ins_rec.ins_key->end + 1);
-				/* Finally the inserted record value always comes from the block_id field. It is
-				   not filled in now but will be when the block it refers to is created. */
+				/* Finally the inserted record value always comes from the block_id field.
+				 * It is not filled in now but will be when the block it refers to is created.
+				 */
 				BLK_SEG(bs_ptr,	(uchar_ptr_t)&blk_set_p->ins_rec.blk_id, SIZEOF(block_id));
 				/* Record that was first in RH side now needs its cmpc (and length) reset since
-				   it is now the second record in the new block. */
+				 * it is now the second record in the new block.
+				 */
 				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				next_rec_hdr->rsiz = curr_rec_len - curr_rec_shrink;
 				SET_CMPC(next_rec_hdr, blk_set_p->curr_match);
 				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
-				remain_offset = curr_rec_shrink + SIZEOF(rec_hdr);	/* Where rest of record plus any
-											   further records begin */
+				remain_offset = curr_rec_shrink + SIZEOF(rec_hdr);/* Where rest of record + anymore records begin */
 				remain_len = curr_blk_len - curr_rec_offset;
 				BLK_SEG(bs_ptr,
 					blk_set_p->curr_rec + remain_offset,
@@ -1199,18 +1236,17 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			} /* else method (2) */
 			if (got_root)
 			{	/* If we have split a root block, we need to now set the pointers to the new LHS
-				   and RHS blocks into the root block as the only records. Note this requires a
-				   level increase of the tree. Hopefully we will not come across a database that is
-				   already at maximum level. If so, the only way to reduce the level is to run
-				   MUPIP REORG with a fairly recent vintage of GT.M
-				*/
+				 * and RHS blocks into the root block as the only records. Note this requires a
+				 * level increase of the tree. Hopefully we will not come across a database that is
+				 * already at maximum level. If so, the only way to reduce the level is to run
+				 * MUPIP REORG with a fairly recent vintage of GT.M
+				 */
 				BLK_INIT(bs_ptr, bs1);
 				blk_set_p->usage = gdsblk_update;	/* It's official .. blk is being modified */
 				blk_set_p->upd_addr = bs1;		/* Block building roadmap.. */
 				blk_set_p->blk_levl++;			/* Needs to be at a new level */
 				if (MAX_BT_DEPTH <= blk_set_p->blk_levl)
-					/* Tree is too high */
-					assertpro(FALSE);
+					assertpro(FALSE);	/* Tree is too high */
 				/* First record will have last key in LHS block */
 				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				next_rec_hdr->rsiz = SIZEOF(rec_hdr) + last_rec_key->end + 1 + SIZEOF(block_id);
@@ -1248,10 +1284,10 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 	created_blocks = psa->block_depth - bottom_tree_index;
 	if (created_blocks > psa->dbc_cs_data->trans_hist.free_blocks)
 	{	/* We have a slight problem in that this transaction requires more free blocks than are
-		   available. Our recourse is to flush the current file-header preserving any changes we
-		   have already made, close the file and execute a mupip command to perform an extension before
-		   re-opening the db for further processing.
-		*/
+		 * available. Our recourse is to flush the current file-header preserving any changes we
+		 * have already made, close the file and execute a mupip command to perform an extension before
+		 * re-opening the db for further processing.
+		 */
 		DBC_DEBUG(("DBC_DEBUG: Insufficient free blocks for this transaction - calling MUPIP EXTEND\n"));
 		dbc_flush_fhead(psa);
 		dbc_close_db(psa);
@@ -1270,30 +1306,30 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		dbc_close_command_file(psa);
 		dbc_run_command_file(psa, "MUPIP", (char_ptr_t)psa->util_cmd_buff, FALSE);
 		/* Seeing as how it is very difficult to (in portable code) get a coherent error code back from
-		   an executed command, we will just assume it worked, open the database back in and see if in
-		   fact it did actually extend sufficiently. If not, this is a perm error and we stop here.
-		*/
+		 * an executed command, we will just assume it worked, open the database back in and see if in
+		 * fact it did actually extend sufficiently. If not, this is a perm error and we stop here.
+		 */
 		dbc_init_db(psa);
 		if (created_blocks > psa->dbc_cs_data->trans_hist.free_blocks)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBCNOEXTND, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
 		/* Database is now extended -- safest bet is to restart this particular update so that it is certain
-		   nothing else got in besides the extention.
-		*/
+		 * nothing else got in besides the extention.
+		 */
 		DBC_DEBUG(("DBC_DEBUG: Restarting processing of this p1rec due to DB extension\n"));
 		return TRUE;
-
 	}
 	/* The update arrarys are complete, we know there are sufficient free blocks in the database to accomodate
-	   the splitting we have to do.
-	*/
+	 * the splitting we have to do.
+	 */
 	bottom_created_index = psa->block_depth;	/* From here on out are bit map blocks */
+	bplmap = psa->dbc_cs_data->bplmap;
 	if (0 != created_blocks)
 	{	/* Run through the created blocks assigning block numbers and filling the numbers into the buffers
-		   that need them. If we didn't create any blocks, we know we didn't split any and there is nothing
-		   to do for this p1 record.
-		*/
+		 * that need them. If we didn't create any blocks, we know we didn't split any and there is nothing
+		 * to do for this p1 record.
+		 */
 		total_blks = psa->dbc_cs_data->trans_hist.total_blks;
-		local_map_max = DIVIDE_ROUND_UP(total_blks, psa->dbc_cs_data->bplmap);
+		local_map_max = DIVIDE_ROUND_UP(total_blks, bplmap);
 		DBC_DEBUG(("DBC_DEBUG: Assigning block numbers to created DB blocks\n"));
 		for (blk_index = psa->block_depth, blk_set_p = &psa->blk_set[blk_index];
 		     bottom_tree_index < blk_index; --blk_index, --blk_set_p)
@@ -1303,7 +1339,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			/* Find and allocate a database block for this created block */
 			assert(NULL != blk_set_p->ins_blk_id_p);	/* Must be a place to put the block id */
 			/* First find local bit map with some room in it */
-			lclmap_not_full = bmm_find_free(psa->hint_blk / psa->dbc_cs_data->bplmap,
+			lclmap_not_full = bmm_find_free(psa->hint_blk / bplmap,
 							(sm_uc_ptr_t)psa->dbc_cs_data->master_map,
 							local_map_max);
 			if (NO_FREE_SPACE == lclmap_not_full)
@@ -1312,20 +1348,20 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
 					ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn), ERR_BITMAPSBAD);
 			}
-			if (ROUND_DOWN2(psa->hint_blk, psa->dbc_cs_data->bplmap) != lclmap_not_full)
+			if (ROUND_DOWN2(psa->hint_blk, bplmap) != lclmap_not_full)
 				psa->hint_lcl = 1;
-			bitmap_blk_num = lclmap_not_full * psa->dbc_cs_data->bplmap;
+			bitmap_blk_num = lclmap_not_full * bplmap;
 			/* Read this bitmap in. Note it may already exist in the cache (likely for multiple creates) */
 			lbm_blk_index = dbc_read_dbblk(psa, bitmap_blk_num, gdsblk_bitmap);
 			blk_set_bm_p = &psa->blk_set[lbm_blk_index];
 			assert(IS_BML(blk_set_bm_p->old_buff));	/* Verify we have a bit map block */
-			assert(ROUND_DOWN2(blk_set_bm_p->blk_num, psa->dbc_cs_data->bplmap) == blk_set_bm_p->blk_num);
-			if (ROUND_DOWN2(psa->dbc_cs_data->trans_hist.total_blks, psa->dbc_cs_data->bplmap) == bitmap_blk_num)
+			assert(ROUND_DOWN2(blk_set_bm_p->blk_num, bplmap) == blk_set_bm_p->blk_num);
+			if (ROUND_DOWN2(psa->dbc_cs_data->trans_hist.total_blks, bplmap) == bitmap_blk_num)
 				/* This bitmap is the last one .. compute total blks in partial this bitmap */
 				blks_this_lmap = (psa->dbc_cs_data->trans_hist.total_blks - bitmap_blk_num);
 			else
 				/* Regular bitmap (not last one) */
-				blks_this_lmap = psa->dbc_cs_data->bplmap;
+				blks_this_lmap = bplmap;
 			lcl_map_p = blk_set_bm_p->old_buff + SIZEOF(v15_blk_hdr);
 			lcl_blk = psa->hint_lcl = bm_find_blk(psa->hint_lcl, lcl_map_p, blks_this_lmap, &dummy_bool);
 			if (NO_FREE_SPACE == lcl_blk)
@@ -1335,9 +1371,9 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn), ERR_BITMAPSBAD);
 			}
 			/* Found a free block, mark it busy. Note that bitmap blocks are treated somewhat differently
-			   than other blocks. We do not create an update array for them but just change the copy in
-			   old_buff as appropriate.
-			*/
+			 * than other blocks. We do not create an update array for them but just change the copy in
+			 * old_buff as appropriate.
+			 */
 			bml_busy(lcl_blk, lcl_map_p);
 			blk_set_bm_p->usage = gdsblk_update;
 			/* See if entire block is full - if yes, we need to mark master map too */
@@ -1345,7 +1381,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			if (NO_FREE_SPACE == psa->hint_lcl)
 			{	/* Local map was filled .. clear appropriate master map bit */
 				DBC_DEBUG(("DBC_DEBUG: -- Local map now full - marking master map\n"));
-				bit_clear(bitmap_blk_num / psa->dbc_cs_data->bplmap, psa->dbc_cs_data->master_map);
+				bit_clear(bitmap_blk_num / bplmap, psa->dbc_cs_data->master_map);
 			}
 			assert(lcl_blk);	/* Shouldn't be zero as that is for the lcl bitmap itself */
 			allocated_blk_num = psa->hint_blk = bitmap_blk_num + lcl_blk;
@@ -1360,8 +1396,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			psa->dbc_fhdr_dirty = TRUE;
 		}
 		/* Now that all the block insertions have been filled in, run the entire chain looking for
-		   both created and updated blocks. Build the new versions of their blocks in new_buff.
-		*/
+		 * both created and updated blocks. Build the new versions of their blocks in new_buff.
+		 */
 		DBC_DEBUG(("DBC_DEBUG: Create new and changed blocks via their update arrays\n"));
 		for (blk_index = psa->block_depth, blk_set_p = &psa->blk_set[blk_index]; 0 <= blk_index; --blk_index, --blk_set_p)
 		{	/* Run through the update array for this block */
@@ -1411,9 +1447,9 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			}
 			if (gdsblk_bitmap == blk_set_p->blk_type)
 			{	/* Bitmap blocks are built in old_buff, swap with new_buff. This also lets the
-				   buffer be reused correctly (by dbc_read_dbblk) if we read this block into
-				   the same place later.
-				*/
+				 * buffer be reused correctly (by dbc_read_dbblk) if we read this block into
+				 * the same place later.
+				 */
 				blk_p = blk_set_p->new_buff;
 				blk_set_p->new_buff = blk_set_p->old_buff;
 				blk_set_p->old_buff = blk_p;
@@ -1435,7 +1471,6 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			UNIX_ONLY(dbcertify_deferred_signal_handler());
 			VMS_ONLY(sys$exit(exi_condition));
 		}
-
 		/* Update the transaction number in the fileheader for the next transaction */
 		psa->dbc_cs_data->trans_hist.curr_tn++;
 		psa->dbc_fhdr_dirty = TRUE;
@@ -1443,7 +1478,6 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		assertpro(FALSE);	/* If we got this far we should have split a block which would create a block */
 	DBC_DEBUG(("DBC_DEBUG: Block processing completed\n"));
 	psa->blks_processed++;
-
 	return FALSE;	/* No transaction restart necessary */
 }
 

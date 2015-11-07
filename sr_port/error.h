@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,11 +85,15 @@ CONDITION_HANDLER(dse_f_blk_ch);
 CONDITION_HANDLER(exi_ch);
 CONDITION_HANDLER(fgncal_ch);
 CONDITION_HANDLER(fntext_ch);
+#ifdef UNIX
+CONDITION_HANDLER(fnzsrch_ch);
+#endif
 CONDITION_HANDLER(gds_rundown_ch);
 CONDITION_HANDLER(gtcm_ch);
 CONDITION_HANDLER(gtcm_exi_ch);
 CONDITION_HANDLER(gtm_env_xlate_ch);
 CONDITION_HANDLER(gtm_maxstr_ch);
+CONDITION_HANDLER(gtmio_ch);
 CONDITION_HANDLER(gtmrecv_ch);
 CONDITION_HANDLER(gtmrecv_fetchresync_ch);
 CONDITION_HANDLER(gtmsource_ch);
@@ -127,6 +132,9 @@ CONDITION_HANDLER(trans_code_ch);
 CONDITION_HANDLER(updproc_ch);
 CONDITION_HANDLER(util_base_ch);
 CONDITION_HANDLER(util_ch);
+#ifdef UNIX
+CONDITION_HANDLER(zro_ins_rec_fail_ch);
+#endif
 CONDITION_HANDLER(zshow_ch);
 CONDITION_HANDLER(zyerr_ch);
 

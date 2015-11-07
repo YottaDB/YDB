@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -119,7 +120,9 @@ error_def(ERR_ASSERT);
 /* Need to set a flag to 0 or 1 depending on whether AUTORELINK_SUPPORTED is set or not. This is needed by gtmpcat so it can
  * tell if autorelink is supported on the platform or not. While this could be done by always setting AUTORELINK_SUPPORTED
  * which a value of 0 or 1, that's not how the code that uses it is structured so create this new variable with a value
- * depending on whether AUTORELINK_SUPPORTED is defined or not.
+ * depending on whether AUTORELINK_SUPPORTED is defined or not. Specifically, this variable is used with a $DEFINE stmt in
+ * gtmpcat_field_defs.txt which gtmpcatfldbld.m uses to create the gtmpcat initialization file. This allows us to capture the
+ * values of #define constants and put them into gtmpcat initialization files for use by gtmpcat.
  */
 #ifdef AUTORELINK_SUPPORTED
 # define ARLINK_ENABLED 1
@@ -1396,6 +1399,10 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define ONEDAY			86400	/* seconds in a day */
 #define MILLISECS_IN_SEC	1000	/* millseconds in a second */
 #define MICROSEC_IN_SEC		1000000 /* microseconds in a second */
+#define MICROSECS_IN_MSEC	1000	/* microseconds in a millisecond */
+#define E_6			1000000
+#define E_9			1000000000
+#define E_18			1000000000000000000LL
 
 #define ASSERT_IN_RANGE(low, x, high)	assert((low <= x) && (x <= high))
 
@@ -1797,9 +1804,14 @@ enum
 #define MAX_INDSUBSCRIPTS 32
 #define MAX_FOR_STACK 32
 
-#define	MAX_ACTUALS	32	/* Maximum number of arguments allowed in an actuallist. This value also determines
-				 * how many parameters are allowed to be passed between M and C.
-				 */
+#define PUSH_PARM_OVERHEAD	4	/* This extra space in the array is needed because push_parm() is capable of handling 32
+					 * arguments, but callg needs to accomidate space for 4 items, namely argument count
+					 * (repeated twice), return value, and the truth value. As of this writing ojchildparms.c is
+					 * the only module that relies on the extra space.
+					 */
+#define	MAX_ACTUALS		32	/* Maximum number of arguments allowed in an actuallist. This value also determines
+					 * how many parameters are allowed to be passed between M and C.
+					 */
 #if defined(DEBUG) && defined(UNIX)
 #define OPERATOR_LOG_MSG												\
 {															\

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +58,7 @@
 #endif
 #include "wcs_phase2_commit_wait.h"
 #include "gtm_c_stack_trace.h"
+#include "gtm_time.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
@@ -134,6 +136,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 #	ifdef GTM_CRYPT
 	gd_segment		*seg;
 #	endif
+	uint4		buffs_per_flush, flush_target;
+
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -335,8 +339,17 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					assert(clustered);
 					wait_for_block_flush(bt, blk);	/* try for no other node currently writing the block */
 				}
-				if ((csd->flush_trigger <= cnl->wcs_active_lvl) && (FALSE == gv_cur_region->read_only))
-					JNL_ENSURE_OPEN_WCS_WTSTART(csa, gv_cur_region, 0, dummy_errno);
+				/* assume defaults for flush_target and buffs_per_flush */
+				flush_target = csd->flush_trigger;
+				buffs_per_flush = 0;
+				if ((0 != csd->epoch_taper) && (FALSE == gv_cur_region->read_only) && JNL_ENABLED(csd) &&
+						(0 != cnl->wcs_active_lvl) && (NOJNL != csa->jnl->channel) &&
+						(0 != cnl->jnl_file.u.inode) && csd->jnl_before_image)
+				{
+					EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, (gd_region *) 0, FALSE, buffs_per_flush, flush_target);
+				}
+				if ((flush_target <= cnl->wcs_active_lvl) && (FALSE == gv_cur_region->read_only))
+					JNL_ENSURE_OPEN_WCS_WTSTART(csa, gv_cur_region, buffs_per_flush, dummy_errno);
 						/* a macro that dclast's "wcs_wtstart" and checks for errors etc. */
 				grab_crit(gv_cur_region);
 				cr = db_csh_get(blk);			/* in case blk arrived before crit */

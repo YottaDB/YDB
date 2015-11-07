@@ -1,7 +1,8 @@
 
 /****************************************************************
  *								*
- *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -154,7 +155,8 @@ typedef enum {
 	WBTEST_MAXGTMDIST_HELPER_PROCESS,	/* 115 : Make gtm_dist too big for helper process */
 	WBTEST_MAX_TRIGNAME_SEQ_NUM,		/* 116 : Induce "too many triggers" error sooner (MAX_TRIGNAME_SEQ_NUM) */
 	WBTEST_RELINKCTL_MAX_ENTRIES,		/* 117 : Bring down the maximum number of relink control entries in one file */
-	WBTEST_FAKE_BIG_KEY_COUNT		/* 118 : fake large increase in mupip load key count to show it doesn't overflow */
+	WBTEST_FAKE_BIG_KEY_COUNT,		/* 118 : fake large increase in mupip load key count to show it doesn't overflow */
+	WBTEST_TEND_GBLJRECTIME_SLEEP		/* 119 : sleep in t_end after SET_GBL_JREC_TIME to induce GTM-8332 */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

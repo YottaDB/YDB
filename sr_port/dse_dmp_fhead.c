@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -259,6 +260,7 @@ void dse_dmp_fhead (void)
 		UNIX_ONLY(
 		util_out_print("  Maximum Key Size Assured     !AD", TRUE, 5, csd->maxkeysz_assured ? " TRUE" : "FALSE");
 		)
+		util_out_print("  Defer allocation                    !AD", TRUE, 5, csd->defer_allocate ? " TRUE" : "FALSE");
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */
@@ -286,6 +288,7 @@ void dse_dmp_fhead (void)
 		util_out_print("  Quick database rundown is active    !AD", TRUE, 5, (csd->mumps_can_bypass ? " TRUE" : "FALSE"));
 		util_out_print("  Access control rundown bypasses !9UL", FALSE, cnl->dbrndwn_access_skip);
 		util_out_print("  FTOK rundown bypasses   !10UL", TRUE, cnl->dbrndwn_ftok_skip);
+		util_out_print("  Epoch taper    !AD", TRUE, 5, (csd->epoch_taper ? " TRUE" : "FALSE"));
 #		endif
 		new_line = FALSE;
 		for (index = 0; MAX_WTSTART_PID_SLOTS > index; index++)

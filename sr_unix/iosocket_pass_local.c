@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +29,7 @@
 #include "eintr_wrappers.h"
 #include "stringpool.h"
 #include "outofband.h"
+#include "error.h"
 
 #define MAX_PASS_FDS			256
 #define PID_CHECKING_SUPPORTED		defined(__linux__) || defined(__sun) || defined(_AIX)
@@ -132,6 +134,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 	char			complete_buf[STR_LIT_LEN(ACCEPT_COMPLETE)];
 	char			*errptr;
 	int4			errlen;
+	boolean_t		ch_set;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -166,6 +169,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_CONNSOCKREQ, 0);
 		return;
 	}
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	ENSURE_PASS_SOCKET(socketptr);
 	out_of_time = FALSE;
 #	if PID_CHECKING_SUPPORTED
@@ -188,7 +192,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 	/* pass fds */
 	fds = (int *)CMSG_DATA((struct cmsghdr *)cmsg_buffer);
 
-	for (argn=0; argn < argcnt; argn++)
+	for (argn = 0; argn < argcnt; argn++)
 	{
 		handle = va_arg(args, mval *);
 		if ((NULL == handle) || !MV_DEFINED(handle))
@@ -245,7 +249,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 		goto ioerr;
 	assert(rval == iov.iov_len);
 
-	for (argn=0; argn < argcnt; argn++)
+	for (argn = 0; argn < argcnt; argn++)
 	{
 		if (0 > (index = iosocket_handle(handles[argn].addr, &handles[argn].len, FALSE, socket_pool)))
 		{
@@ -297,13 +301,14 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 		memcpy(&iod->dollar.device[STR_LIT_LEN(DOLLAR_DEVICE_PREFIX)], errptr, errlen + 1);	/* we want the null */
 		if (socketptr->ioerror)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKPASS, 0, ERR_TEXT, 2, errlen, errptr);
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
 
 	if ((NO_M_TIMEOUT != timeout) && !out_of_time)
 		cancel_timer(timer_id);
 
-	for (argn=0; argn < argcnt; argn++)
+	for (argn = 0; argn < argcnt; argn++)
 	{
 		handlestr = handles[argn];
 		if (-1 != (index = iosocket_handle(handlestr.addr, &handlestr.len, FALSE, socket_pool)))
@@ -312,6 +317,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_l
 
 	if (NO_M_TIMEOUT != timeout)
 		dollar_truth = TRUE;
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 
 ioerr:
@@ -319,6 +325,7 @@ ioerr:
 	if (out_of_time && (EINTR == save_errno))
 	{
 		dollar_truth = FALSE;
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
 	if ((NO_M_TIMEOUT != timeout) && !out_of_time)
@@ -330,6 +337,7 @@ ioerr:
 	memcpy(&iod->dollar.device[STR_LIT_LEN(DOLLAR_DEVICE_PREFIX)], errptr, errlen + 1);	/* we want the null */
 	if (socketptr->ioerror)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKPASS, 0, save_errno, 0);
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }
 
@@ -357,6 +365,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 	char			complete_buf[STR_LIT_LEN(PASS_COMPLETE)];
 	char			*errptr;
 	int4			errlen;
+	boolean_t		ch_set;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -386,6 +395,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_CONNSOCKREQ, 0);
 		return;
 	}
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	ENSURE_PASS_SOCKET(socketptr);
 	out_of_time = FALSE;
 
@@ -410,7 +420,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 	if (NULL == socket_pool)
 		iosocket_poolinit();
 
-	for (argn=0; argn < argcnt; argn++)
+	for (argn = 0; argn < argcnt; argn++)
 	{
 		handle = va_arg(args, mval *);
 		if ((NULL != handle) && MV_DEFINED(handle))
@@ -592,6 +602,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 timeo
 		memcpy(&iod->dollar.device[STR_LIT_LEN(DOLLAR_DEVICE_PREFIX)], errptr, errlen + 1);	/* we want the null */
 		if (socketptr->ioerror)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKACCEPT, 0, ERR_TEXT, 2, errlen, errptr);
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
 	SENDALL(socketptr->sd, ACCEPT_COMPLETE, STR_LIT_LEN(ACCEPT_COMPLETE), rval);
@@ -654,6 +665,7 @@ ioerr:
 		if (socketptr->ioerror)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKACCEPT, 0, save_errno, 0);
 	}
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }
 

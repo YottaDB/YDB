@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -330,10 +331,6 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	}
 	if (gmap_ptr_base != &gmap[0])
 		free(gmap_ptr_base);
-#	ifdef EXTRACT_HASHT_GLOBAL
-	if (NULL != hashgbl_gvnh_reg)
-		free(hashgbl_gvnh_reg);
-#	endif
 }
 
 /* Assumes "gv_target" and "gv_cur_region" are properly setup at function entry */

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +32,7 @@ error_def(ERR_SIDEEFFECTEVAL);
 
 int gvn(void)
 {
-	boolean_t	parse_status, shifting, vbar;
+	boolean_t	in_select = FALSE, parse_status, shifting, vbar;
 	char		x;
 	int		hash_code;
 	opctype		ox;
@@ -44,7 +45,7 @@ int gvn(void)
 	advancewindow();
 	sb1 = sb2 = subscripts;
 	ox = 0;
-	if (shifting = (TREF(shift_side_effects) && (!TREF(saw_side_effect) || (GTM_BOOL == TREF(gtm_fullbool)
+	if (shifting = (TREF(shift_side_effects) && (!TREF(saw_side_effect) || ((GTM_BOOL == TREF(gtm_fullbool))
 		&& (OLD_SE == TREF(side_effect_handling))))))
 	{	/* NOTE assignment above */
 		dqinit(&tmpchain, exorder);
@@ -53,7 +54,7 @@ int gvn(void)
 	if ((TK_LBRACKET == TREF(window_token)) || (TK_VBAR == TREF(window_token)))
 	{
 		assert(sb2 == sb1);
-		/* set "hash_code" as the first operand so OC_GVEXTNAM has it passed in at same spot as op_gvname */
+		/* Set "hash_code" as the first operand so OC_GVEXTNAM has it passed in at same spot as op_gvname */
 		sb1++;
 		vbar = (TK_VBAR == TREF(window_token));
 		advancewindow();
@@ -101,7 +102,7 @@ int gvn(void)
 			ox = OC_GVNAME;
 			*sb1++ = put_ilit((mint)hash_code);
 		} else
-			*sb2 = put_ilit((mint)hash_code);	/* fill in hash_code in the space previously set aside */
+			*sb2 = put_ilit((mint)hash_code);	/* Fill in hash_code in the space previously set aside */
 		*sb1++ = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
 		advancewindow();
 	} else
@@ -120,7 +121,7 @@ int gvn(void)
 			return FALSE;
 		}
 		ox = OC_GVNAKED;
-		/* pass in a dummy hash_code in case of OC_GVNAKED. We need this so op_gvname_fast, op_gvextnam_fast and
+		/* Pass in a dummy hash_code in case of OC_GVNAKED. We need this so op_gvname_fast, op_gvextnam_fast and
 		 * op_gvnaked_fast have the same call interface. op_savgvn.c relies on this to replace OC_GVNAME, OC_GVEXTNAM
 		 * or OC_GVNAKED opcodes with a OC_SAVGVN opcode.
 		 */
@@ -168,8 +169,11 @@ int gvn(void)
 	SUBS_ARRAY_2_TRIPLES(ref, sb1, sb2, subscripts, 0);
 	if (shifting)
 	{
-		if (TREF(saw_side_effect) && ((GTM_BOOL != TREF(gtm_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
-		{	/* saw a side effect in a subscript - time to stop shifting */
+		if (NULL == TREF(expr_start))
+			TREF(saw_side_effect) = in_select = TRUE;	/* Special case relied on by f_select */
+		if (in_select
+			|| (TREF(saw_side_effect) && ((GTM_BOOL != TREF(gtm_fullbool)) || (OLD_SE != TREF(side_effect_handling)))))
+		{	/* Saw a side effect in a subscript - time to stop shifting */
 			setcurtchain(oldchain);
 			triptr = (TREF(curtchain))->exorder.bl;
 			dqadd(triptr, &tmpchain, exorder);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +30,7 @@ triple *setcurtchain(triple *x)
 		 * insert a OC_RTERROR triple then. Now that curtchain is back in the same chain as pos_in_chain, reissue
 		 * the ins_errtriple call.
 		 */
-		 assert(!IS_STX_WARN(pending_errtriplecode) GTMTRIG_ONLY( || TREF(trigger_compile)));
+		 assert(!IS_STX_WARN(pending_errtriplecode) GTMTRIG_ONLY( || TREF(trigger_compile_and_link)));
 		 ins_errtriple(pending_errtriplecode);
 		 pending_errtriplecode = 0;
 	}

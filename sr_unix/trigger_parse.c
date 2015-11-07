@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +36,7 @@
 GBLREF CLI_ENTRY                *cmd_ary;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF CLI_ENTRY                trigger_cmd_ary[];
+GBLREF	volatile boolean_t	timer_in_handler;
 
 #define BITS_PER_INT		(SIZEOF(uint4) * 8)	/* Number of bits in an integer */
 #define MAX_PIECE_VALUE		(BITS_PER_INT * 1024)	/* Largest value allowed in -pieces string */
@@ -552,7 +554,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 			       boolean_t *consistency, boolean_t *noconsistency)
 {
 	char		local_options[MAX_OPTIONS_LEN];
-	char		*ptr;
+	char		*ptr, *strtokptr;
 
 	if (MAX_OPTIONS_LEN < option_len)
 	{
@@ -564,7 +566,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 	ptr = local_options;
 	for ( ; 0 < option_len; ptr++, option_len--)
 		*ptr = TOUPPER(*ptr);
-	ptr = strtok(local_options, ",");
+	ptr = STRTOK_R(local_options, ",", &strtokptr);
 	do
 	{
 		switch (*ptr)
@@ -604,7 +606,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 				assert(FALSE);	/* Parsing should have found invalid command */
 				break;
 		}
-	} while (ptr = strtok(NULL, ","));
+	} while (ptr = STRTOK_R(NULL, ",", &strtokptr));
 	return !((*isolation && *noisolation) || (*consistency && *noconsistency));
 }
 

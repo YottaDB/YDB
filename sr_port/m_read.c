@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +61,7 @@ int m_read(void)
 			s1 = (TREF(curtchain))->exorder.bl;
 			if (!gvn())
 				return FALSE;
+			assert(OC_GVRECTARG != (TREF(curtchain))->opcode);	/* we count on gvn not having been shifted */
 			for (sub = (TREF(curtchain))->exorder.bl;  sub != s1;  sub = sub->exorder.bl)
 			{
 				put_oc = sub->opcode;
@@ -119,6 +121,7 @@ int m_read(void)
 		s1 = (TREF(curtchain))->exorder.bl;
 		if (!gvn())
 			return FALSE;
+		assert(OC_GVRECTARG != (TREF(curtchain))->opcode);	/* we count on gvn not having been shifted */
 		for (sub = (TREF(curtchain))->exorder.bl;  sub != s1;  sub = sub->exorder.bl)
 		{
 			put_oc = sub->opcode;

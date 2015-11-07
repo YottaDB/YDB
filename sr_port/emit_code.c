@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,26 +92,24 @@ GBLDEF int4 generated_count, calculated_count;
 GBLDEF int		calculated_code_size, generated_code_size;
 GBLDEF int		jmp_offset;	/* Offset to jump target */
 GBLDEF int		code_reference;	/* Offset from pgm start to current loc */
-
-DEBUG_ONLY(static boolean_t	opcode_emitted;)
-
-static int		stack_depth = 0;
-
 /* On x86_64, the smaller offsets are encoded in 1 byte (4 bytes otherwise). But for some cases,
-  the offsets may be different during APPROX_ADDR and MACHINE phases, hence generating different size instruction.
-  to solve this  even the smaller offsets need to be encoded in 4 bytes so that same size instructions are generated
-  in both APPROX_ADDR and MACHINE phase. the variable  force_32 is used for this purpose*/
+ * the offsets may be different during APPROX_ADDR and MACHINE phases, hence generating different size instruction.
+ * to solve this  even the smaller offsets need to be encoded in 4 bytes so that same size instructions are generated
+ * in both APPROX_ADDR and MACHINE phase. the variable  force_32 is used for this purpose.
+ */
 X86_64_ONLY(GBLDEF boolean_t force_32 = FALSE;)
 
 GBLREF int		curr_addr;
 GBLREF char		cg_phase;	/* code generation phase */
 GBLREF char		cg_phase_last;	/* the previous code generation phase */
 
+DEBUG_ONLY(static boolean_t	opcode_emitted;)
+static int		stack_depth = 0;
 
-/*variables for counting the arguments*/
+/* Variables for counting the arguments */
 static int	vax_pushes_seen, vax_number_of_arguments;
 
-static struct	push_list
+static struct push_list
 {
 	struct push_list	*next;
 	unsigned char		value[PUSH_LIST_SIZE];
@@ -125,7 +124,7 @@ error_def(ERR_MAXARGCNT);
 error_def(ERR_SRCNAM);
 error_def(ERR_UNIMPLOP);
 
-void trip_gen (triple *ct)
+void trip_gen(triple *ct)
 {
 	oprtype		**sopr, *opr;	/* triple operand */
 	oprtype		*saved_opr[MAX_ARGS];
@@ -147,6 +146,7 @@ void trip_gen (triple *ct)
 	tp = ttt[ct->opcode];
 	if (tp <= 0)
 	{
+		assert(FALSE);
 		stx_error(ERR_UNIMPLOP);
 		return;
 	}
@@ -338,7 +338,7 @@ void emit_asmlist(triple *ct)
 	format_machine_inst();
 }
 
-void	emit_eoi (void)
+void emit_eoi (void)
 {
 	IA64_ONLY(if (asm_mode == 0) {)
 		*obpt++ = '\0';
@@ -349,8 +349,7 @@ void	emit_eoi (void)
 }
 #endif
 
-
-short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
+short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 {
 	static short	last_vax_inst = 0;
 	short		sav_in, save_inst;
@@ -413,14 +412,16 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					GTM64_ONLY(  GEN_LOAD_WORD_4(reg, gtm_reg(*inst++), 0);)
 #					else
 					/* For platforms, where the $TRUTH value is not carried in a register and
-						must be fetched from a global variable by subroutine call. */
+					 * must be fetched from a global variable by subroutine call.
+					 */
 					assert(*inst == 0x5a);		/* VAX r10 or $TEST register */
 					inst++;
 					emit_call_xfer(SIZEOF(intszofptr_t) * xf_dt_get);
 					reg = GTM_REG_R0;	/* function return value */
 #					endif
 					/* Generate a cmp instruction using the return value of the previous call,
-						which will be in EAX */
+					 * which will be in EAX.
+					 */
 					X86_64_ONLY(GEN_CMP_EAX_IMM32(0);)
 
 					if (sav_in == VXI_BLBC)
@@ -480,8 +481,8 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							opr = &ct->destination;
 #						ifdef __vms
 						/* This is a case where VMS puts the argument count in a special register so
-							handle that differently here.
-						*/
+						 * handle that differently here.
+						 */
 						if (opr->oprclass == TRIP_REF)
 						{
 							assert(ct->opcode == OC_ILIT);
@@ -502,8 +503,8 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						}
 #						else
 						/* All other platforms put argument counts in normal parameter
-							registers and go through this path instead.
-						*/
+						 * registers and go through this path instead.
+						 */
 						if (opr->oprclass == TRIP_REF)
 						{
 							assert(ct->opcode == OC_ILIT);
@@ -533,10 +534,10 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							emit_pop(cnt);
 					} else
 					{	/* During the commonization of emit_code.c I discovered that TINT_REF is
-							not currently used in the compiler so this may be dead code but I'm
-							leaving this path in here anyway because I don't want to put it back
-							in if we find we need it. (4/2003 SE)
-						*/
+						 * not currently used in the compiler so this may be dead code but I'm
+						 * leaving this path in here anyway because I don't want to put it back
+						 * in if we find we need it. (4/2003 SE)
+						 */
 						emit_trip(opr, TRUE, GENERIC_OPCODE_LOAD, CALLS_TINT_TEMP_REG);
 						emit_pop(1);
 					}
@@ -608,14 +609,14 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					break;
 				case VXI_MOVC3:
 					/* The MOVC3 instruction is only used to copy an mval from one place to another
-						so that is the expansion we will generate. The most efficient expansion is to
-						generate a series of load and store instructions. Do the loads first then the
-						stores to keep the pipelines flowing and not stall waiting for any given load
-						or store to complete. Because some platforms (notably HPPA) do not have enough
-						argument registers to contain an entire MVAL and because an mval may grow from
-						its present size and affect other platforms some day, We put the whole code gen
-						thing in a loop so we can do this regardless of how big it gets.
-					*/
+					 * so that is the expansion we will generate. The most efficient expansion is to
+					 * generate a series of load and store instructions. Do the loads first then the
+					 * stores to keep the pipelines flowing and not stall waiting for any given load
+					 * or store to complete. Because some platforms (notably HPPA) do not have enough
+					 * argument registers to contain an entire MVAL and because an mval may grow from
+					 * its present size and affect other platforms some day, We put the whole code gen
+					 * thing in a loop so we can do this regardless of how big it gets.
+					 */
 					assert(*inst == VXT_LIT);
 					inst += 2;
 					assert(*inst == VXT_VAL);
@@ -837,7 +838,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 }
 
 #ifndef __x86_64__ /* For x86_64, this is defined in emit_code_sp.c */
-void	emit_jmp (uint4 branchop, short **instp, int reg)
+void emit_jmp(uint4 branchop, short **instp, int reg)
 {
 	uint4 	branchop_opposite;
 	int	src_reg;
@@ -880,7 +881,8 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 			(*instp)++;
 			if (0 == branch_offset)
 			{	/* This is a jump to the immediately following instruction. Nullify the jump
-					and don't generate any instruction (not even a NOP) */
+				 * and don't generate any instruction (not even a NOP)
+				 */
 				/* code_buf[code_idx++] = GENERIC_OPCODE_NOP; */
 			} else if (EMIT_JMP_SHORT_CODE_CHECK)
 			{	/* Short jump immediate operand - some platforms also do a compare */
@@ -890,9 +892,9 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 				skip_idx = -1;
 				if (EMIT_JMP_OPPOSITE_BR_CHECK)
 				{	/* This jump sequence is longer and is not conditional so if we need a conditional
-						jump, create the opposite conditional jump to jump around the longer jump to
-						the target thereby preserving the original semantics.
-					*/
+					 * jump, create the opposite conditional jump to jump around the longer jump to
+					 * the target thereby preserving the original semantics.
+					 */
 					EMIT_JMP_GEN_COMPARE;
 					switch (branchop)
 					{
@@ -942,10 +944,11 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 #					endif
 				}
 				if (EMIT_JMP_LONG_CODE_CHECK)
-				{ /* This is more common unconditional branch generation and should be mutually
-					exclusive to EMIT_JMP_OPPOSITE_BR_CHECK. Some platforms will have the "short"
-					branch generation up top be more common but that form does not cover unconditional
-					jumps (Examples: AIX and HP-UX) */
+				{	/* This is more common unconditional branch generation and should be mutually
+					 * exclusive to EMIT_JMP_OPPOSITE_BR_CHECK. Some platforms will have the "short"
+					 * branch generation up top be more common but that form does not cover unconditional
+					 * jumps (Examples: AIX and HP-UX)
+					 */
 					assert(!(EMIT_JMP_OPPOSITE_BR_CHECK));
 					NON_RISC_ONLY(IGEN_UCOND_BRANCH_REG_OFFSET(branchop, branch_offset))
 					RISC_ONLY(
@@ -957,9 +960,10 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 				} else
 				{
 					if (EMIT_JMP_OPPOSITE_BR_CHECK)
-					{  /* VAX conditional long jump generates two native branch instructions -
-						one conditional branch (above) and one PC relative branch (below).
-						The second branch instruction also needs adjustment of the origin. */
+					{	/* VAX conditional long jump generates two native branch instructions -
+						 * one conditional branch (above) and one PC relative branch (below).
+						 * The second branch instruction also needs adjustment of the origin.
+						 */
 						EMIT_JMP_ADJUST_BRANCH_OFFSET;
 					}
 					GEN_PCREL;
@@ -970,8 +974,8 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 				}
 				if (skip_idx != -1)
 				{	/* Fill in the offset from our opposite jump instruction to here .. the
-						place to bypass the jump.
-					*/
+					 * place to bypass the jump.
+					 */
 					branch_offset = BRANCH_OFFSET_FROM_IDX(skip_idx, code_idx);
 					RISC_ONLY(code_buf[skip_idx] |= IGEN_COND_BRANCH_OFFSET(branch_offset);)
 
@@ -989,13 +993,12 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 			break;
 	}
 }
-
 #endif /* !__x86_64__ */
 
 /* Emit code that generates a relative pc based jump target. The last instruction is not
-	complete so the caller may finish it with whatever instruction is necessary.
-*/
-void	emit_pcrel(void)
+ * complete so the caller may finish it with whatever instruction is necessary.
+ */
+void emit_pcrel(void)
 {
 	int branch_offset;
 
@@ -1027,9 +1030,8 @@ void	emit_pcrel(void)
 	}
 }
 
-
 /* Emit the code for a given triple */
-void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_reg)
+void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_reg)
 {
 	boolean_t	inst_emitted;
 	unsigned char	reg, op_mod, op_reg;
@@ -1063,14 +1065,12 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 								reg = GTM_REG_PV;
 							else
 								reg = GTM_REG_LITERAL_BASE;
-
 							if (CGP_ADDR_OPT == cg_phase)
-							{
-							/* We want the expansion to be proper sized this time. Note
-								that this won't be true so much on the initial CGP_ADDR_OPT
-								pass but will be true on the shrink_trips() pass after the
-								literals are compiled.
-							*/
+							{	/* We want the expansion to be proper sized this time. Note
+								 * that this won't be true so much on the initial CGP_ADDR_OPT
+								 * pass but will be true on the shrink_trips() pass after the
+								 * literals are compiled.
+								 */
 								offset = literal_offset(ct->operand[0].oprval.mlit->rt_addr);
 								/* Need non-zero base reg for AIX */
 								X86_64_ONLY(force_32 = TRUE;)
@@ -1108,6 +1108,13 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 								emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 							}
 							break;
+						case OC_CDIDX:
+							assert(GENERIC_OPCODE_LOAD == generic_inst);
+							/* Fetch linkage table offset for symbol and convert to index */
+							immediate = find_linkage(ct->operand[0].oprval.cdidx) / SIZEOF(lnk_tabent);
+							EMIT_TRIP_ILIT_GEN;
+							inst_emitted = TRUE;
+							break;
 						case OC_ILIT:
 							assert(GENERIC_OPCODE_LOAD == generic_inst);
 							immediate = ct->operand[0].oprval.ilit;
@@ -1116,14 +1123,14 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							break;
 						case OC_TRIPSIZE:
 							/* This tiples value is calculated in the shrink_jmp/shrink_trips
-								phase. It is a parameter to (currently only) op_exfun and is the
-								length of the generated jump instruction. op_exfun needs this
-								length to adjust the return address in the created stackframe
-								so it does not have to parse instructions at the return address
-								to see what return signature was created. We will add asserts to
-								this generation in later phases after the true value has been
-								calculated. At this point, it is zero.
-							*/
+							 * phase. It is a parameter to (currently only) op_exfun and is the
+							 * length of the generated jump instruction. op_exfun needs this
+							 * length to adjust the return address in the created stackframe
+							 * so it does not have to parse instructions at the return address
+							 * to see what return signature was created. We will add asserts to
+							 * this generation in later phases after the true value has been
+							 * calculated. At this point, it is zero.
+							 */
 							immediate = ct->operand[0].oprval.tsize->size;
 							EMIT_TRIP_ILIT_GEN;
 							inst_emitted = TRUE;
@@ -1191,22 +1198,22 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					break;
 				case OCNT_REF:
 					/* This ref's value is calculated in emit_call_xfer(). This value is related to TSIZ_REF
-					   in that it is used for the same reason to different calls (op_call, op_callsp,
-					   op_forlcldo, and their mprof counterparts). It is the offset needed to be
-					   added to the return address from the calls to these routines to bypass a
-					   generated jump sequence. In this case however, the jump sequence is being
-					   generated as part of the OC_CALL, OC_CALLSP or OC_FORLCLDO triple itself.
-					   There is no separate jump triple so the TSIZ_REF triple cannot be used.
-					   So this operand is the OFFSET from the CALL to the NEXT TRIPLE. The operation
-					   is that when this routine sees this type of reference, it will set a flag
-					   and record the operand address and go ahead and generate the value that it has. The
-					   next transfer table generation that occurs will see the set flag and will compute
-					   the address from the return address of that transfer table call to the next triple
-					   and update this triple's value. Since our originating triple has a JUMP type,
-					   it will be updated in shrink_jmp/shirnk_trips() until all necessary shrinkage
-					   is done so the final phase will have the correct value and we only have to
-					   generate an immediate value.
-					*/
+					 * in that it is used for the same reason to different calls (op_call, op_callsp,
+					 * op_forlcldo, and their mprof counterparts). It is the offset needed to be
+					 * added to the return address from the calls to these routines to bypass a
+					 * generated jump sequence. In this case however, the jump sequence is being
+					 * generated as part of the OC_CALL, OC_CALLSP or OC_FORLCLDO triple itself.
+					 * There is no separate jump triple so the TSIZ_REF triple cannot be used.
+					 * So this operand is the OFFSET from the CALL to the NEXT TRIPLE. The operation
+					 * is that when this routine sees this type of reference, it will set a flag
+					 * and record the operand address and go ahead and generate the value that it has. The
+					 * next transfer table generation that occurs will see the set flag and will compute
+					 * the address from the return address of that transfer table call to the next triple
+					 * and update this triple's value. Since our originating triple has a JUMP type,
+					 * it will be updated in shrink_jmp/shirnk_trips() until all necessary shrinkage
+					 * is done so the final phase will have the correct value and we only have to
+					 * generate an immediate value.
+					 */
 					immediate = opr->oprval.offset;
 					EMIT_TRIP_ILIT_GEN;
 					inst_emitted = TRUE;
@@ -1258,7 +1265,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 								obpt += VDAT_GR_SIZE;
 							}
 							memcpy(obpt, ct->operand[0].oprval.cdlt->addr,
-								ct->operand[0].oprval.cdlt->len);
+							       ct->operand[0].oprval.cdlt->len);
 							obpt += ct->operand[0].oprval.cdlt->len;
 							emit_base_offset(GTM_REG_PV, find_linkage(ct->operand[0].oprval.cdlt));
 							if (GENERIC_OPCODE_LDA == generic_inst)
@@ -1274,12 +1281,22 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 								emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 							}
 							break;
+						case OC_CDIDX:
+							assert(GENERIC_OPCODE_LOAD == generic_inst);
+							/* Fetch linkage table offset for symbol and convert to index */
+							immediate = find_linkage(ct->operand[0].oprval.cdidx) / SIZEOF(lnk_tabent);
+							memcpy(obpt, &vdat_immed[0], VDAT_IMMED_SIZE);
+							obpt += VDAT_IMMED_SIZE;
+							obpt = i2asc((uchar_ptr_t)obpt, immediate);
+							EMIT_TRIP_ILIT_GEN;
+							inst_emitted = TRUE;
+							break;
 						case OC_ILIT:
 							assert(GENERIC_OPCODE_LOAD == generic_inst);
 							immediate = ct->operand[0].oprval.ilit;
 							memcpy(obpt, &vdat_immed[0], VDAT_IMMED_SIZE);
 							obpt += VDAT_IMMED_SIZE;
-							obpt = i2asc((uchar_ptr_t)obpt, ct->operand[0].oprval.ilit);
+							obpt = i2asc((uchar_ptr_t)obpt, immediate);
 							EMIT_TRIP_ILIT_GEN;
 							inst_emitted = TRUE;
 							break;
@@ -1452,6 +1469,13 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 								emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 							}
 							break;
+						case OC_CDIDX:
+							assert(GENERIC_OPCODE_LOAD == generic_inst);
+							/* Fetch linkage table offset for symbol and convert to index */
+							immediate = find_linkage(ct->operand[0].oprval.cdidx) / SIZEOF(lnk_tabent);
+							EMIT_TRIP_ILIT_GEN;
+							inst_emitted = TRUE;
+							break;
 						case OC_ILIT:
 							assert(GENERIC_OPCODE_LOAD == generic_inst);
 							immediate = ct->operand[0].oprval.ilit;
@@ -1556,7 +1580,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 	}
 }
 
-
 /*	get_arg_reg
  *
  *	Determines the argument position of the current argument and returns the number of the register to use for the
@@ -1589,8 +1612,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
  *	data on this platform, this difference should be benign (the subsequent xfer table call should be synchronized
  *	with respect to code_reference address across all phases).
  */
-
-int	get_arg_reg(void)
+int get_arg_reg(void)
 {
 	int	arg_reg_i;
 
@@ -1619,9 +1641,8 @@ int	get_arg_reg(void)
 	return arg_reg_i;
 }
 
-
 /* VAX reg to local machine reg */
-int	gtm_reg(int vax_reg)
+int gtm_reg(int vax_reg)
 {
 	int	reg;
 
@@ -1663,8 +1684,7 @@ int	gtm_reg(int vax_reg)
 	return reg;
 }
 
-
-void	emit_push(int reg)
+void emit_push(int reg)
 {
 	int	arg_reg_i;
 	int	stack_offset;
@@ -1708,8 +1728,7 @@ void	emit_push(int reg)
 	return;
 }
 
-
-void	emit_pop(int count)
+void emit_pop(int count)
 {
 	int	stack_adjust;
 
@@ -1721,8 +1740,7 @@ void	emit_pop(int count)
 	return;
 }
 
-
-void	add_to_vax_push_list(int pushes_seen)
+void add_to_vax_push_list(int pushes_seen)
 {	/* Make sure there's enough room */
 	if (pushes_seen > MAX_ARGS)	/* user-visible max args is MAX_ARGS - 3 */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS - 3);
@@ -1740,8 +1758,7 @@ void	add_to_vax_push_list(int pushes_seen)
 	current_push_list_ptr->value[push_list_index] = pushes_seen;
 }
 
-
-int	next_vax_push_list(void)
+int next_vax_push_list(void)
 {
 	push_list_index++;
 	if (push_list_index >= PUSH_LIST_SIZE)
@@ -1753,8 +1770,7 @@ int	next_vax_push_list(void)
 	return (current_push_list_ptr->value[push_list_index]);
 }
 
-
-void	push_list_init(void)
+void push_list_init(void)
 {
 	push_list_index = -1;
 	if (push_list_start_ptr == 0)
@@ -1765,15 +1781,13 @@ void	push_list_init(void)
 	current_push_list_ptr = push_list_start_ptr;
 }
 
-
 void reset_push_list_ptr(void)
 {
 	push_list_index = -1;
 	current_push_list_ptr = push_list_start_ptr;
 }
 
-
-void	emit_call_xfer(int xfer)
+void emit_call_xfer(int xfer)
 {
 	int		offset;
 	unsigned char	*c;
@@ -1829,27 +1843,27 @@ void	emit_call_xfer(int xfer)
 	if (!ocnt_ref_seen)
 		return;		/* fast test for return .. we hope */
 	/* If ocnt_ref_seen is set, then we need to compute the value to be used by a recent
-		OCNT_REF parameter. This parameter is (currently as of 6/2003) used by op_call, op_callsp,
-		op_forlcldo, and their mprof counterparts and is the number of bytes those entry points
-		should add to the return address that they will store as the return point in the new stack
-		frame that they create. This parameter is basically the size of the generated code for the
-		jump that follows the call to the above routines that is generates by the associated
-		triples OC_CALL, OC_CALLSP, and OC_FORLCLDO respectively. Since this jump can be variable in
-		size and the only other way for these routines to know what form the jump takes is to parse
-		the instructions at run time, this routine in the compiler will calculate that information and
-		allow it to be passed in as a parameter. The OCNT_REF handler in emit_trip() has set the
-		ocnt_ref_seen flag to bring us here. We now calculate the current PC address and subtract it
-		from the PC address of the next triple.
-	*/
+	 * OCNT_REF parameter. This parameter is (currently as of 6/2003) used by op_call, op_callsp,
+	 * op_forlcldo, and their mprof counterparts and is the number of bytes those entry points
+	 * should add to the return address that they will store as the return point in the new stack
+	 * frame that they create. This parameter is basically the size of the generated code for the
+	 * jump that follows the call to the above routines that is generates by the associated
+	 * triples OC_CALL, OC_CALLSP, and OC_FORLCLDO respectively. Since this jump can be variable in
+	 * size and the only other way for these routines to know what form the jump takes is to parse
+	 * the instructions at run time, this routine in the compiler will calculate that information and
+	 * allow it to be passed in as a parameter. The OCNT_REF handler in emit_trip() has set the
+	 * ocnt_ref_seen flag to bring us here. We now calculate the current PC address and subtract it
+	 * from the PC address of the next triple.
+	 */
 	assert(OC_CALL == current_triple->opcode || OC_CALLSP == current_triple->opcode ||
 		OC_FORLCLDO == current_triple->opcode);
 	offset = current_triple->exorder.fl->rtaddr - (code_reference + (code_idx * INST_SIZE));
 	/* If in assembly or machine (final) phases, make sure have reasonable offset. The offset may be
-		negative in the early phases so don't check during them. For other phases, put a govenor on
-		the values so we don't affect the codegen sizes which can mess up shrink_trips. During the
-		triple shrink phase, the triple distances can vary widely and cause the codegen to change
-		sizes. Note this still allows an assert fail for 0 if a negative number was being produced.
-	*/
+	 * negative in the early phases so don't check during them. For other phases, put a govenor on
+	 * the values so we don't affect the codegen sizes which can mess up shrink_trips. During the
+	 * triple shrink phase, the triple distances can vary widely and cause the codegen to change
+	 * sizes. Note this still allows an assert fail for 0 if a negative number was being produced.
+	 */
 	if (CGP_MACHINE == cg_phase || CGP_ASSEMBLY == cg_phase)
 	{
 		assert(0 <= offset && MAX_BRANCH_CODEGEN_SIZE > offset);

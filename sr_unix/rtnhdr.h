@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,17 +40,10 @@ typedef struct
 	GTM64_ONLY(int4		filler;)
 } lab_tabent;
 
-/* Label table entry proxy for run-time linking */
-typedef struct
-{
-	lnr_tabent		*lnr_adr;	/* Pointer to lnrtab entry offset into code for this label */
-	boolean_t		has_parms;	/* Flag to indicate whether the callee has a formallist */
-} lab_tabent_proxy;
-
 /* Linkage table entry */
 typedef struct
 {
-	char_ptr_t	ext_ref;	/* Address (quadword on alpha) this linkage entry resolves to or NULL */
+	char_ptr_t		ext_ref;	/* Address (quadword on alpha) this linkage entry resolves to or NULL */
 } lnk_tabent;
 
 #ifdef AUTORELINK_SUPPORTED
@@ -143,7 +137,8 @@ typedef struct	rhead_struct
 	void_ptr_t		filler1;
 #	endif
 	unsigned char		checksum_128[16];	/* 16-byte MurmurHash3 checksum of routine source code */
-	struct rhead_struct	*active_rhead_adr;	/* Chain of active old versions, fully reserved for continued use */
+	struct rhead_struct	*active_rhead_adr;	/* addr of copy of this (original) header when that new version replaced
+							 * this routine and was on M-Stack. See handle_active_versions() rtn. */
 	routine_source		*source_code;		/* Source code used by $TEXT */
 	ARLINK_ONLY(zro_hist	*zhist;)		/* If shared object -> validation list/array */
 	gtm_uint64_t		objhash;		/* When object file is created, contains hash of object file */
@@ -159,9 +154,24 @@ typedef struct	rhead_struct
 /* Routine table entry */
 typedef struct
 {
-	mident		rt_name;	/* The name of the routine (in the literal text pool) */
-	rhdtyp		*rt_adr;	/* Pointer to its routine header */
+	mident			rt_name;		/* The name of the routine (in the literal text pool) */
+	rhdtyp			*rt_adr;		/* Pointer to its routine header */
 } rtn_tabent;
+
+/* Linkage table proxy for run-time linking of indirects. This struct has some overloaded meanings:
+ *   1. The group of fields rtnhdr_adr/lnr_adr act as a proxy/surrogate linkage table holding those
+ *      two values. They are defined in code with the indexes 0 and 1 respectively.
+ *   2. The group of fields lnr_adr/has_parms pretend they are the proxy part of a label table
+ *   	entry. Assembler code expects has_parms to be in the location following lnr_adr.
+ */
+typedef struct
+{
+	rhdtyp			*rtnhdr_adr;		/* Pointer to routine header for called routine */
+	lnr_tabent		*lnr_adr;		/* Pointer to lnrtab entry offset into code for this label */
+	boolean_t		has_parms;		/* Flag to indicate whether the callee has a formallist */
+	int			filler1;		/* 64 bit alignment */
+} lnk_tabent_proxy;
+#define TABENT_PROXY TREF(lnk_proxy)
 
 /* Byte offset of the routine_name field in the routine headers of pre-V5 releases */
 #define PRE_V5_RTNHDR_RTNOFF		24
@@ -201,6 +211,7 @@ typedef struct
 
 #define DYNAMIC_LITERALS_ENABLED(rtnhdr) ((rtnhdr)->compiler_qlf & CQ_DYNAMIC_LITERALS)
 #define RW_REL_START_ADR(rtnhdr) (((DYNAMIC_LITERALS_ENABLED(rtnhdr)) ? (char *)VARTAB_ADR(rtnhdr) : (char *)LITERAL_ADR(rtnhdr)))
+#define PTEXT_OFFSET SIZEOF(rhdtyp)
 
 /* Macro to determine if given address is inside code segment. Note that even though
  * the PTEXT_END_ADR macro is the address of end_of_code + 1, we still want a <= check
@@ -282,9 +293,8 @@ bool zlput_rname(rhdtyp *hdr);
 void zlmov_lnames(rhdtyp *hdr);
 rhdtyp *make_dmode(void);
 void comp_lits(rhdtyp *rhead);
-rhdtyp  *op_rhdaddr(mval *name, rhdtyp *rhd);
-rhdtyp	*op_rhdaddr1(mval *name);
-lnr_tabent **op_labaddr(rhdtyp *routine, mval *label, int4 offset);
+int op_rhdaddr(mval *name, int rtnidx);
+int op_labaddr(int rtnidx, mval *label, int4 offset);
 void urx_resolve(rhdtyp *rtn, lab_tabent *lbl_tab, lab_tabent *lbl_top);
 char *rtnlaboff2entryref(char *entryref_buff, mident *rtn, mident *lab, int offset);
 boolean_t on_stack(rhdtyp *rtnhdr, boolean_t *need_duplicate);

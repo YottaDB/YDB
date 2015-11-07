@@ -1,0 +1,46 @@
+#################################################################
+#								#
+# Copyright (c) 2015 Fidelity National Information 		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+#
+# Any debugging macros should be defined here
+#
+
+#
+# Define debugging macro that verifies 16 byte stack alignment. Note this macro should be called after any initial
+# stack adjustment. For example, when a routine is called via CALL, it automatically is no longer aligned due to
+# the 8 byte return address on the stack. Since many routines need at least 8 bytes of save area, this is not an
+# issue but for those short routines that need no saving, the 8 byte difference should be addressed before calling
+# this macro.
+#
+.macro	CHKSTKALIGN
+	.ifdef	DEBUG
+	.data
+	.extern ERR_GTMCHECK
+	.text
+	.extern rts_error
+	subq	$16, %rsp		# Create save area plus maintain 16 byte alignment
+	movq	%rax, 0(%rsp)		# Save %rax - potential arg reg used in some asm rtns
+	movq	%rsp, %rax		# Copy stack pointer
+	andl	$15, %eax		# Check for 16 byte alignment
+	jz	stkok\@			# Branch around if stack ok
+	#
+	# Stack is not aligned - raise error
+	#
+	movl	ERR_GTMCHECK(REG_IP), REG32_ARG1
+	movl	$1, REG32_ARG0
+	movb    $0, REG8_ACCUM		# Variable length argument
+	call	rts_error
+stkok\@:
+	movq	0(%rsp), %rax		# Restore %rax
+	addq	$16, %rsp		# Remove save area
+	.endif
+.endm

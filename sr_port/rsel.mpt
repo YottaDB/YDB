@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987, 2006 Fidelity Information Services, Inc	;
+; Copyright (c) 1987, 2015 Fidelity National Information	;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -72,7 +73,7 @@ init
 	i '$l($zro) s d=1,d(1)="" q
         s d=0
 	f k=1:1:$l($zro,delim) d  i $l(r) s d=d+1,d(d)=$p(r,"*")
-	. s r=$p($zro,delim,k)
+	. s r=$tr($p($zro,delim,k),"*")
 	. i delim=" " d  s:$l(r) r=$zparse(r_"/","","*") q                        ; UNIX conventions
 	. . i r'["(" q                                                            ; no source info - it does both
 	. . i %ZE[".o" d  q                                                       ; only want objects

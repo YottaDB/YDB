@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -564,8 +565,15 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 		 */
 		if (JRT_EPOCH == rectype)
 		{
-			if (!mur_options.forward && first_epoch && !rctl->recov_interrupted &&
-				(NULL != rctl->csd) && (rec_tn > rctl->csd->trans_hist.curr_tn))
+			/* If this is the first EPOCH in backward processing, check that the epoch-tn is <= db curr_tn.
+			 * One exception though is if a rollback/recover takes the db back in time (using say -resync_seqno)
+			 * in backward processing and applies a few transactions in the forward phase but gets killed
+			 * abruptly leaving the db curr_tn potentially < earliest_epoch_tn from before the interrupted recovery.
+			 * In this case we would have applied PBLKs from the interrupted recovery first before coming here
+			 * hence the check for a NULL rctl->jctl_apply_pblk in which case we skip the tn check.
+			 */
+			if (!mur_options.forward && first_epoch && !rctl->recov_interrupted && (NULL == rctl->jctl_apply_pblk)
+				&& (NULL != rctl->csd) && (rec_tn > rctl->csd->trans_hist.curr_tn))
 			{
 				assert(FALSE);
 				gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(7) ERR_EPOCHTNHI, 5, jctl->rec_offset,

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,3 +29,5 @@ TLS_DEF(gtm_tls_cachedbytes)
 TLS_DEF(gtm_tls_socket_close)
 TLS_DEF(gtm_tls_session_close)
 TLS_DEF(gtm_tls_fini)
+TLS_DEF(gtm_tls_store_passwd)
+TLS_DEF(gtm_tls_add_config)

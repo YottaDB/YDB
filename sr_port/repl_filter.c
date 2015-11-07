@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -452,6 +453,8 @@ GBLREF boolean_t		heartbeat_started;
 #endif
 #endif
 GBLREF	uint4			process_id;
+GBLREF	boolean_t		err_same_as_out;
+GBLREF	volatile boolean_t	timer_in_handler;
 
 LITREF	char			*trigger_subs[];
 
@@ -511,7 +514,7 @@ static void repl_filter_close_all_pipes(void)
 int repl_filter_init(char *filter_cmd)
 {
 	int		fcntl_res, status, argc, delim_count, close_res;
-	char		cmd[4096], *delim_p;
+	char		cmd[4096], *delim_p, *strtokptr;
 	char_ptr_t	arg_ptr, argv[MAX_FILTER_ARGS];
 
 	REPL_DPRINT1("Initializing FILTER\n");
@@ -527,6 +530,10 @@ int repl_filter_init(char *filter_cmd)
 		repl_errno = EREPL_FILTERSTART_PIPE;
 		return(FILTERSTART_ERR);
 	}
+	/* Our stdout is to the filter now, so if stderr and stdout were previously conjoined, they no longer are;
+	 * note that the child will inherit this variable until exec is done.
+	 */
+	err_same_as_out = FALSE;
 	/* For Filter -> Server */
 	OPEN_PIPE(repl_filter_srv_fd, status);
 	if (0 > status)
@@ -540,7 +547,7 @@ int repl_filter_init(char *filter_cmd)
 	/* Parse the filter_cmd */
 	repl_log(stdout, FALSE, TRUE, "Filter command is %s\n", filter_cmd);
 	strcpy(cmd, filter_cmd);
-	if (NULL == (arg_ptr = strtok(cmd, FILTER_CMD_ARG_DELIM_TOKENS)))
+	if (NULL == (arg_ptr = STRTOK_R(cmd, FILTER_CMD_ARG_DELIM_TOKENS, &strtokptr)))
 	{
 		repl_filter_close_all_pipes();
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLFILTER, 0, ERR_TEXT, 2,
@@ -549,7 +556,7 @@ int repl_filter_init(char *filter_cmd)
 		return(FILTERSTART_ERR);
 	}
 	argv[0] = arg_ptr;
-	for (argc = 1; NULL != (arg_ptr = strtok(NULL, FILTER_CMD_ARG_DELIM_TOKENS)); argc++)
+	for (argc = 1; NULL != (arg_ptr = STRTOK_R(NULL, FILTER_CMD_ARG_DELIM_TOKENS, &strtokptr)); argc++)
 		argv[argc] = arg_ptr;
 	argv[argc] = NULL;
 	REPL_DPRINT2("Arg %d is NULL\n", argc);

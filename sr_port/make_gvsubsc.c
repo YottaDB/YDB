@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +37,7 @@ oprtype make_gvsubsc(mval *v)
 	gp->top = MAX_SRCLINE;
 	gp->end = gp->prev = 0;
 	mval2subsc(v, gp, STD_NULL_COLL_FALSE);
+	memset(&w, 0, SIZEOF(mval));	/* Clear mval so ununsed fields don't cause objhash differences */
 	w.mvtype = MV_STR | MV_SUBLIT;
 	w.str.addr = (char *) gp->base;
 	w.str.len = gp->end + 1;

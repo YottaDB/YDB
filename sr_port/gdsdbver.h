@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +71,7 @@ enum mdb_ver
 	GDSMV60001,
 	GDSMV60002,	/* New field mutex_spin_parms.mutex_que_entry_space_size for configurable mutex queue size */
 	GDSMV62001,	/* New field hasht_upgrade_needed for ^#t upgrade */
+	GDSMV62002,	/* New field defer_allocate needed for database file preallocation and ^#t upgrade */
 	GDSMVLAST
 };
 #define GDSMVCURR ((enum mdb_ver)(GDSMVLAST - 1))

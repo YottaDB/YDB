@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -273,9 +274,10 @@ gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 }
 #endif
 
-/* If reallocating gv_currkey/gv_altkey, preserve pre-existing values */
 #define	GVKEY_INIT(GVKEY, KEYSIZE)						\
 {										\
+	GBLREF gv_key	*gv_altkey;						\
+	GBLREF gv_key	*gv_currkey;						\
 	gv_key		*new_KEY, *old_KEY;					\
 	int4		keySZ;							\
 										\
@@ -286,7 +288,8 @@ gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 	 */									\
 	assert(ROUND_UP2(keySZ, 4) == keySZ);					\
 	new_KEY = (gv_key *)malloc(SIZEOF(gv_key) - 1 + keySZ);			\
-	assert(DBKEYSIZE(MAX_KEY_SZ) == KEYSIZE);				\
+	assert((DBKEYSIZE(MAX_KEY_SZ) == KEYSIZE)				\
+		|| ((GVKEY != gv_currkey) && (GVKEY != gv_altkey)));		\
 	if (NULL != old_KEY)							\
 	{									\
 		assert(FALSE);	/* dont call GVKEY_INIT twice for same key */	\
@@ -1736,11 +1739,14 @@ typedef struct sgmnt_data_struct
 						 *	>0 => defer_time * flush_time[0] is actual defer time
 						 * default value = 1 => a write-timer every csd->flush_time[0] seconds
 						 */
-        volatile boolean_t filler_wc_blocked;	/* Now moved to node_local */
+	volatile boolean_t filler_wc_blocked;	/* Now moved to node_local */
 	boolean_t	mumps_can_bypass;	/* Allow mumps processes to bypass flushing, access control, and ftok semaphore
 						 * in gds_rundown(). This was done to improve shutdown performance.
 						 */
-	char		filler_512[16];
+	boolean_t	epoch_taper;		/* Should GT.M try to reduce dirty buffers as epoch approach */
+	uint4		epoch_taper_time_pct;	/* in the last pct we start tapering for time */
+	uint4		epoch_taper_jnl_pct;	/* in the last pct we start tapering for jnl */
+	char		filler_512[4];
 	/************* FIELDS Used for update process performance improvement. Some may go away in later releases ********/
 	uint4		reserved_for_upd;	/* Percentage (%) of blocks reserved for update process disk read */
 	uint4		avg_blks_per_100gbl;	/* Number of blocks read on average for 100 global key read */
@@ -1903,7 +1909,8 @@ typedef struct sgmnt_data_struct
 	boolean_t	span_node_absent;	/* Database does not contain the spanning node */
 	boolean_t	maxkeysz_assured;	/* All the keys in the database are less than MAX_KEY_SIZE */
 	boolean_t	hasht_upgrade_needed;	/* ^#t global needs to be upgraded from V62000 to post-V62000 format */
-	char		filler_7k[720];
+	boolean_t	defer_allocate;		/* If FALSE: Use fallocate() preallocate space from the disk */
+	char		filler_7k[716];
 	char		filler_8k[1024];
 	/********************************************************/
 	/* Master bitmap immediately follows. Tells whether the local bitmaps have any free blocks or not. */
@@ -2078,6 +2085,7 @@ typedef struct	gd_segment_struct
 	uint4			global_buffers;	/* Was passed in FAB */
 	uint4			reserved_bytes;	/* number of bytes to be left in every database block */
 	uint4			mutex_slots;	/* copied over to NUM_CRIT_ENTRY(CSD) */
+	boolean_t		defer_allocate; /* If FALSE: Use fallocate() preallocate space from the disk */
 	enum db_acc_method	acc_meth;
 	file_control		*file_cntl;
 	struct gd_region_struct	*repl_list;
@@ -2143,7 +2151,8 @@ typedef struct	gd_region_struct
 	int4			node;
 	int4			sec_size;
 	uint4			is_spanned;	/* this is one of the regions that some spanning global maps to */
-	char			filler[12];	/* filler to store runtime structures without changing gdeget/gdeput.m */
+	bool			epoch_taper;
+	char			filler[11];	/* filler to store runtime structures without changing gdeget/gdeput.m */
 } gd_region;
 
 typedef struct	sgmnt_addrs_struct
@@ -2556,10 +2565,12 @@ typedef struct	gv_namehead_struct
 	trans_num	read_local_tn;			/* local_tn of last reference for this global */
 	GTMTRIG_ONLY(trans_num trig_local_tn;)		/* local_tn of last trigger driven for this global */
 	GTMTRIG_ONLY(trans_num trig_read_tn;)		/* local_tn when triggers for this global (^#t records) were read from db */
+	gv_key		*prev_key;			/* Points to fully expanded previous key. Used by $zprevious.
+							 * Valid only if clue->end is non-zero.
+							 */
 	boolean_t	noisolation;     		/* whether isolation is turned on or off for this global */
 	block_id	root;				/* Root of global variable tree */
 	mname_entry	gvname;				/* the name of the global */
-	NON_GTM64_ONLY(uint4	filler_8byte_align1;)	/* for 8-byte alignment of "hist" member */
 	srch_hist	hist;				/* block history array */
 	int4		regcnt;				/* number of global directories whose hash-tables point to this gv_target.
 							 * 1 by default. > 1 if the same name in TWO DIFFERENT global directories
@@ -2577,7 +2588,7 @@ typedef struct	gv_namehead_struct
 							 */
 	boolean_t	split_cleanup_needed;
 	char		last_split_direction[MAX_BT_DEPTH - 1];	/* maintain last split direction for each level in the GVT */
-	char		filler_8byte_align2[6];
+	char		filler_8byte_align1[6];
 	block_id	last_split_blk_num[MAX_BT_DEPTH - 1];
 #	ifdef GTM_TRIGGER
 	struct gvt_trigger_struct *gvt_trigger;		/* pointer to trigger info for this global
@@ -2588,7 +2599,7 @@ typedef struct	gv_namehead_struct
 							 * last read/initialized from ^#t global (in gvtr_init) */
 	boolean_t	trig_mismatch_test_done;	/* whether update process has checked once if there is a mismatch
 							 * in trigger definitions between originating and replicating instance */
-	GTM64_ONLY(uint4 filler_8byte_align3;)		/* for 8-byte alignment of "clue" member. (targ_alloc relies on this) */
+	GTM64_ONLY(uint4 filler_8byte_align2;)		/* for 8-byte alignment of "clue" member. (targ_alloc relies on this) */
 #	endif
 	gv_key		clue;				/* Clue key, must be last in namehead struct because of hung buffer. */
 } gv_namehead;
@@ -2956,11 +2967,33 @@ GBLREF	gv_namehead	*gvt_tp_list;
 	assert(GVT->clue.top == GVT->first_rec->top);										\
 	assert(GVT->clue.top == GVT->last_rec->top);										\
 }
+
+/* Do checks on the integrity of GVKEY */
+#	define	DBG_CHECK_GVKEY_VALID(GVKEY)					\
+{										\
+	unsigned char	ch, prevch, *ptr, *pend;				\
+										\
+	assert(GVKEY->end < GVKEY->top);					\
+	ptr = &GVKEY->base[0];							\
+	pend = ptr + GVKEY->end;						\
+	assert(KEY_DELIMITER == *pend);						\
+	assert((ptr == pend) || (KEY_DELIMITER == *(pend - 1)));		\
+	prevch = KEY_DELIMITER;							\
+	while (ptr < pend)							\
+	{									\
+		ch = *ptr++;							\
+		assert((KEY_DELIMITER != prevch) || (KEY_DELIMITER != ch));	\
+		prevch = ch;							\
+	}									\
+	/* Do not check GVKEY->prev as it is usually not set. */		\
+}
+
 #else
 #	define	DBG_CHECK_IN_GVT_TP_LIST(gvt, present)
 #	define	DBG_CHECK_GVT_IN_GVTARGETLIST(gvt)
 #	define	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSADDRS)
 #	define	DBG_CHECK_GVTARGET_INTEGRITY(GVT)
+#	define	DBG_CHECK_GVKEY_VALID(GVKEY)
 #endif
 
 /* The below GBLREFs are for the following macro */
@@ -3056,38 +3089,69 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 	}													\
 }
 
+#define	EXPAND_PREV_KEY_FALSE	FALSE
+#define	EXPAND_PREV_KEY_TRUE	TRUE
+
+/* Need a special value to indicate the prev_key was not computed in the last gvcst_search in a clue.
+ * Store an impossible keysize value as the key->end there. The below macro computes such a value.
+ */
+#define	PREV_KEY_NOT_COMPUTED	DBKEYSIZE(MAX_KEY_SZ)
+
+#define	COPY_PREV_KEY_TO_GVT_CLUE(GVT, EXPAND_PREV_KEY)							\
+{													\
+	GBLREF gv_key	*gv_altkey;									\
+													\
+	if (EXPAND_PREV_KEY)										\
+	{	/* gv_altkey has the previous key. Store it in clue for future clue-based searches */	\
+		if (NULL == GVT->prev_key)								\
+			GVKEY_INIT(GVT->prev_key, GVT->clue.top);					\
+		if (gv_altkey->end >= GVT->prev_key->top)						\
+		{											\
+			assert(FALSE);	/* this means we have GVSUBOFLOW integ error */			\
+			GVKEY_INIT(GVT->prev_key, DBKEYSIZE(gv_altkey->end));				\
+		}											\
+		COPY_KEY(GVT->prev_key, gv_altkey);							\
+	} else if (NULL != GVT->prev_key)								\
+	{												\
+		assert(PREV_KEY_NOT_COMPUTED < (1 << (SIZEOF(gv_altkey->end) * 8)));			\
+		GVT->prev_key->end = PREV_KEY_NOT_COMPUTED;						\
+	}												\
+}
+
 /* Copy GVKEY to GVT->CLUE. Take care NOT to copy cluekey->top to GVKEY->top as they correspond
  * to the allocation sizes of two different memory locations and should stay untouched.
  */
-#define	COPY_CURRKEY_TO_GVTARGET_CLUE(GVT, GVKEY)					\
-{											\
-	int	keyend;									\
-	DCL_THREADGBL_ACCESS;								\
-											\
-	SETUP_THREADGBL_ACCESS;								\
-	keyend = GVKEY->end;								\
-	if (GVT->clue.top <= keyend)							\
-	{	/* Possible only if GVT corresponds to a global that spans multiple	\
-		 * regions. For example, a gvcst_spr_* function could construct a	\
-		 * gv_currkey starting at one spanned region and might have to do a	\
-		 * gvcst_* operation on another spanned region with a max-key-size	\
-		 * that is smaller than gv_currkey->end. In that case, copy only the	\
-		 * portion of gv_currkey that will fit in the gvt of the target region.	\
-		 */									\
-		assert(TREF(spangbl_seen));						\
-		keyend = GVT->clue.top - 1;						\
-		memcpy(GVT->clue.base, GVKEY->base, keyend - 1);			\
-		GVT->clue.base[keyend - 1] = KEY_DELIMITER;				\
-		GVT->clue.base[keyend] = KEY_DELIMITER;					\
-	} else										\
-	{										\
-		assert(KEY_DELIMITER == GVKEY->base[keyend]);				\
-		assert(KEY_DELIMITER == GVKEY->base[keyend - 1]);			\
-		memcpy(GVT->clue.base, GVKEY->base, keyend + 1);			\
-	}										\
-	GVT->clue.end = keyend;								\
-	/* No need to maintain unused GVT->clue.prev */					\
-	DBG_CHECK_GVTARGET_INTEGRITY(GVT);						\
+#define	COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(GVT, GVKEY, EXPAND_PREV_KEY)				\
+{													\
+	GBLREF gv_key	*gv_altkey;									\
+	int		keyend;										\
+	DCL_THREADGBL_ACCESS;										\
+													\
+	SETUP_THREADGBL_ACCESS;										\
+	keyend = GVKEY->end;										\
+	if (GVT->clue.top <= keyend)									\
+	{	/* Possible only if GVT corresponds to a global that spans multiple			\
+		 * regions. For example, a gvcst_spr_* function could construct a			\
+		 * gv_currkey starting at one spanned region and might have to do a			\
+		 * gvcst_* operation on another spanned region with a max-key-size			\
+		 * that is smaller than gv_currkey->end. In that case, copy only the			\
+		 * portion of gv_currkey that will fit in the gvt of the target region.			\
+		 */											\
+		assert(TREF(spangbl_seen));								\
+		keyend = GVT->clue.top - 1;								\
+		memcpy(GVT->clue.base, GVKEY->base, keyend - 1);					\
+		GVT->clue.base[keyend - 1] = KEY_DELIMITER;						\
+		GVT->clue.base[keyend] = KEY_DELIMITER;							\
+	} else												\
+	{												\
+		assert(KEY_DELIMITER == GVKEY->base[keyend]);						\
+		assert(KEY_DELIMITER == GVKEY->base[keyend - 1]);					\
+		memcpy(GVT->clue.base, GVKEY->base, keyend + 1);					\
+	}												\
+	GVT->clue.end = keyend;										\
+	/* No need to maintain unused GVT->clue.prev */							\
+	COPY_PREV_KEY_TO_GVT_CLUE(GVT, EXPAND_PREV_KEY);						\
+	DBG_CHECK_GVTARGET_INTEGRITY(GVT);								\
 }
 
 /* If SRC_KEY->end == 0, make sure to copy the first byte of SRC_KEY->base */

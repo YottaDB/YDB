@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,6 +97,10 @@ GBLREF size_t		totalUsedGta;
 GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
 GBLREF boolean_t	dollar_zquit_anyway;
+GBLREF io_pair		*io_std_device;
+GBLREF mstr		dollar_zpin;
+GBLREF mstr		dollar_zpout;
+GBLREF int		process_exiting;
 #ifdef GTM_TRIGGER
 GBLREF	mstr		*dollar_ztname;
 GBLREF	mval		*dollar_ztdata;
@@ -110,6 +115,7 @@ GBLREF	int4		gtm_trigger_depth;
 GBLREF	boolean_t	ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
 #endif
 
+error_def(ERR_INVSVN);
 error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_ZDIROUTOFSYNC);
@@ -157,10 +163,52 @@ void op_svget(int varnum, mval *v)
 		case SV_HOROLOG:
 			op_horolog(v);
 			break;
+		case SV_ZHOROLOG:
+			op_zhorolog(v);
+			break;
+		case SV_ZUT:
+			op_zut(v);
+			break;
 		case SV_ZGBLDIR:
 			v->mvtype = MV_STR;
 			v->str = dollar_zgbldir.str;
 			break;
+		case SV_ZPIN:
+			/* if not a split device then ZPIN and ZPOUT will fall through to ZPRINCIPAL */
+			if (io_std_device->in != io_std_device->out)
+			{
+				tl = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;
+				/* will define zpin as $p contents followed by "< /", for instance: /dev/tty4< / */
+				ENSURE_STP_FREE_SPACE(tl->len + dollar_zpin.len);
+				v->mvtype = MV_STR;
+				v->str.addr = (char *)stringpool.free;
+				/* first transfer $p */
+				memcpy(stringpool.free, (char *)tl->dollar_io, tl->len);
+				stringpool.free += tl->len;
+				/* then transfer "< /" */
+				memcpy(stringpool.free, dollar_zpin.addr, dollar_zpin.len);
+				stringpool.free += dollar_zpin.len;
+				v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
+				break;
+			}
+		case SV_ZPOUT:
+			/* if not a split device then ZPOUT will fall through to ZPRINCIPAL */
+			if (io_std_device->in != io_std_device->out)
+			{
+				tl = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;
+				/* will define zpout as $p contents followed by "> /", for instance: /dev/tty4> / */
+				ENSURE_STP_FREE_SPACE(tl->len + dollar_zpout.len);
+				v->mvtype = MV_STR;
+				v->str.addr = (char *)stringpool.free;
+				/* first transfer $p */
+				memcpy(stringpool.free, (char *)tl->dollar_io, tl->len);
+				stringpool.free += tl->len;
+				/* then transfer "< /" */
+				memcpy(stringpool.free, dollar_zpout.addr, dollar_zpout.len);
+				stringpool.free += dollar_zpout.len;
+				v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
+				break;
+			}
 		case SV_PRINCIPAL:
 			tl = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;
 			v->str.addr = tl->dollar_io;
@@ -240,9 +288,6 @@ void op_svget(int varnum, mval *v)
 				*stringpool.free++ = *c1++;
 			v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
 			break;
-		case SV_ZC:	/****THESE ARE DUMMY VALUES ONLY!!!!!!!!!!!!!!!!!****/
-			MV_FORCE_MVAL(v, 0);
-			break;
 		case SV_ZCMDLINE:
 			get_command_line(v, TRUE);	/* TRUE to indicate we want $ZCMDLINE
 							   (i.e. processed not actual command line) */
@@ -321,7 +366,12 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_MVAL(v, count);
 			break;
 		case SV_ZROUTINES:
-			if (!TREF(zro_root))
+			/* If we are in the process of exiting and come here (e.g. to do ZSHOW dump as part of creating
+			 * the fatal zshow dump file due to a fatal GTM-F-MEMORY error), do not invoke zro_init() as that
+			 * might in turn require more memory (e.g. attach to relinkctl shared memory etc.) and we dont
+			 * want to get a nested GTM-F-MEMORY error.
+			 */
+			if (!TREF(zro_root) && !process_exiting)
 				zro_init();
 			v->mvtype = MV_STR;
 			v->str = TREF(dollar_zroutines);
@@ -355,6 +405,7 @@ void op_svget(int varnum, mval *v)
 		case SV_ZSYSTEM:
 			MV_FORCE_MVAL(v, dollar_zsystem);
 			break;
+		case SV_ZC:
 		case SV_ZCSTATUS:
 			/* Maintain the external $ZCSTATUS == 1 for SUCCESS on UNIX while internal good is 0 */
 			MV_FORCE_MVAL(v, UNIX_ONLY((0 == TREF(dollar_zcstatus)) ? 1 : ) TREF(dollar_zcstatus));
@@ -561,6 +612,6 @@ void op_svget(int varnum, mval *v)
 			get_dlr_zkey(v);
 			break;
 		default:
-			assertpro(FALSE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSVN);
 	}
 }

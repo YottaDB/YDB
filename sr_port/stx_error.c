@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +73,7 @@ void stx_error(int in_error, ...)
 	 *	b) shift_side_effects
 	 *	c) source_error_found
 	 */
-	is_stx_warn = (CGP_PARSE == cg_phase) && IS_STX_WARN(in_error) GTMTRIG_ONLY( && !TREF(trigger_compile));
+	is_stx_warn = (CGP_PARSE == cg_phase) && IS_STX_WARN(in_error) GTMTRIG_ONLY( && !TREF(trigger_compile_and_link));
 	if (!is_stx_warn)
 		TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;
 	if (run_time)

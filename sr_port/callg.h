@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +15,7 @@
 typedef struct gparam_list_struct
 {
 	intszofptr_t	n;
-	void    	*arg[MAX_ACTUALS];
+	void    	*arg[MAX_ACTUALS + PUSH_PARM_OVERHEAD];
 } gparam_list;
 
 typedef	INTPTR_T (*callgfnptr)(intszofptr_t cnt, ...);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -102,6 +103,13 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	jnl_fs_block_size = get_fs_block_size(jpc->channel);
 	/* check that the filesystem block size is a power of 2 as we do a lot of calculations below assuming this is the case */
 	assert(!(jnl_fs_block_size & (jnl_fs_block_size - 1)));
+	/* Ensure filesystem-block-size alignment except in case the filesystem-block-size is higher than os-page-size (not
+	 * currently seen on the popular filesystems but seen in NFS filesystems). In that case only ensure os-page-size-alignment
+	 * since processes that attach to database shared memory attach at os-page-size-aligned virtual addresses. So treat
+	 * filesystem-block-size as the os-page-size in that case.
+	 */
+	if (OS_PAGE_SIZE < jnl_fs_block_size)
+		jnl_fs_block_size = OS_PAGE_SIZE;
 	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_buff, jnl_fs_block_size));
 	eof_rec_buffer = (unsigned char *)(ROUND_UP2((uintszofptr_t)eof_rec, jnl_fs_block_size));
 	/* Read the journal file header */
@@ -263,13 +271,8 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 		assert(WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC));
 		return ERR_JNLWRERR;
 	}
-	if (!jb->prev_jrec_time || !header->prev_jnl_file_name_length)
-	{	/* This is the first time a journal file for this database is being opened OR the previous link is NULL.
-		 * In both these cases, we dont know or care about the timestamp of the last written journal record.
-		 * Set it to the current time as we know it.
-		 */
-		jb->prev_jrec_time = jgbl.gbl_jrec_time;
-	}
+	SET_JNLBUFF_PREV_JREC_TIME(jb, eof_record.prefix.time, DO_GBL_JREC_TIME_CHECK_FALSE);
+		/* Sets jb->prev_jrec_time to time of to-be-overwritten EOF rec */
 	jb->end_of_data = 0;
 	jb->eov_tn = 0;
 	jb->eov_timestamp = 0;

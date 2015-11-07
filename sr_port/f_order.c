@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +58,6 @@ int f_order(oprtype *a, opctype op)
 	SETUP_THREADGBL_ACCESS;
 	oldchain = sav_dirref = NULL;			/* default to no direction and no shifting indirection */
 	used_glvn_slot = FALSE;
-	sav_gv1 = TREF(curtchain);
 	r = maketriple(OC_NOOP);			/* We'll fill in the opcode later, when we figure out what it is */
 	switch (TREF(window_token))
 	{
@@ -77,8 +77,16 @@ int f_order(oprtype *a, opctype op)
 		break;
 	case TK_CIRCUMFLEX:
 		object = GLOBAL;
+		sav_gv1 = TREF(curtchain);
 		ok = gvn();
 		sav_gvn = (TREF(curtchain))->exorder.bl;
+		if (OC_GVRECTARG == sav_gvn->opcode)
+		{	/* because of shifting if we need to find it, look in the expr_start chain */
+			assert(TREF(shift_side_effects));
+			assert(((sav_gvn->operand[0].oprval.tref) == TREF(expr_start)) && (NULL != TREF(expr_start_orig)));
+			sav_gv1 = TREF(expr_start_orig);
+			sav_gvn = TREF(expr_start);
+		}
 		next_oprptr = &r->operand[0];
 		break;
 	case TK_ATSIGN:

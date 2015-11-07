@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,7 +119,7 @@ int resolve_ref(int errknt)
 				}
 			}
 		}
-		COMPDBG(PRINTF(" ************************************* Begin resolve_ref scan ******************************\n"););
+		COMPDBG(PRINTF("\n\n\n********************* New Compilation -- Begin resolve_ref scan **********************\n"););
 		dqloop(&t_orig, exorder, curtrip)
 		{
 			COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););

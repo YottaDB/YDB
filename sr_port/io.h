@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -345,6 +346,7 @@ void get_dlr_zkey(mval *v);
 
 
 void flush_pio(void);
+void write_text_newline_and_flush_pio(mstr *text);
 
 void remove_rms(io_desc *ciod);
 void iosocket_destroy(io_desc *ciod);
@@ -421,5 +423,52 @@ LITREF unsigned char ebcdic_spaces_block[];
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, (CHSET_MSTR)->len, (CHSET_MSTR)->addr);		\
 }
 #define SET_ENCODING(CHSET, CHSET_MSTR)	SET_ENCODING_VALIDATE(CHSET, CHSET_MSTR,)
+
+/* Establish a GT.M I/O condition handler if one is not already active and the principal device is the current one. */
+#define ESTABLISH_GTMIO_CH(IOD, SET_CH)												\
+{																\
+	GBLREF io_pair		io_std_device;											\
+	GBLREF boolean_t	in_prin_gtmio;											\
+																\
+	if ((&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)								\
+			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out))					\
+	{															\
+		ESTABLISH(gtmio_ch);												\
+		SET_CH = TRUE;													\
+		in_prin_gtmio = TRUE;												\
+	} else															\
+		SET_CH = FALSE;													\
+}
+
+/* Establish a GT.M I/O condition handler with return if one is not already active and the principal device is the current one. */
+#define ESTABLISH_RET_GTMIO_CH(IOD, VALUE, SET_CH)										\
+{																\
+	GBLREF io_pair		io_std_device;											\
+	GBLREF boolean_t	in_prin_gtmio;											\
+																\
+	if ((&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)								\
+			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out))					\
+	{															\
+		ESTABLISH_RET(gtmio_ch, VALUE);											\
+		SET_CH = TRUE;													\
+		in_prin_gtmio = TRUE;												\
+	} else															\
+		SET_CH = FALSE;													\
+}
+
+/* Revert a GT.M I/O condition handler if one was set (based on the passed argument). */
+#define REVERT_GTMIO_CH(IOD, SET_CH)												\
+{																\
+	GBLREF boolean_t		in_prin_gtmio;										\
+	DEBUG_ONLY(GBLREF io_pair	io_std_device;)										\
+																\
+	if (SET_CH)														\
+	{															\
+		assert((&gtmio_ch == active_ch->ch) && (NULL != (IOD)->out)							\
+			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out));					\
+		in_prin_gtmio = FALSE;												\
+		REVERT;														\
+	}															\
+}
 
 #endif /* IO_H */

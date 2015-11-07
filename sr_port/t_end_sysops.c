@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2007-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1374,6 +1375,8 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	jnl_private_control	*jpc;
 #	endif
 
+	uint4		buffs_per_flush, flush_target;
+
 	assert(reg->open); /* there is no reason we know of why a region should be closed at this point */
 	if (!reg->open)    /* in pro, be safe though and dont touch an already closed region */
 		return;
@@ -1453,10 +1456,19 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	/* If we are getting too full, do some i/o to clear some out.
 	 * This should happen only as we are getting near the saturation point.
 	 */
-	if (csd->flush_trigger <= cnl->wcs_active_lvl)
+	/* assume defaults for flush_target and buffs_per_flush */
+	flush_target = csd->flush_trigger;
+	buffs_per_flush = 0;
+	if ((0 != csd->epoch_taper) && (0 != cnl->wcs_active_lvl) &&
+			JNL_ENABLED(csd) && (0 != cnl->jnl_file.u.inode) && csd->jnl_before_image)
+	{
+		EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, reg, TRUE, buffs_per_flush, flush_target);
+	}
+	if (flush_target  <= cnl->wcs_active_lvl)
 	{	/* Already in need of a good flush */
 		BG_TRACE_PRO_ANY(csa, active_lvl_trigger);
-		DCLAST_WCS_WTSTART(reg, 0, wtstart_errno); /* a macro that dclast's wcs_wtstart and checks for errors etc. */
+		DCLAST_WCS_WTSTART(reg, buffs_per_flush, wtstart_errno);
+		/* a macro that dclast's wcs_wtstart and checks for errors etc. */
 		/* DCLAST_WCS_WTSTART macro does not set the wtstart_errno variable in VMS. But in any case, we do not
 		 * support database file extensions with MM on VMS. So we could never get a ERR_GBLOFLOW error there.
 		 * Therefore the file extension check below is done only in Unix.
@@ -1506,6 +1518,11 @@ void	wcs_stale(gd_region *reg)
 		UNIX_ONLY(|| ((dba_mm == acc_meth) && (csa->total_blks != csa->ti->total_blks))) /* csd == NULL <=> csa == NULL */
 		)
 	{	/* don't write if region has been closed, or in UNIX if acc meth is MM and file extended */
+		/* We aren't creating a new timer so decrement the count for this one that is now done */
+		DECR_CNT(&csa->nl->wcs_timers, &csa->nl->wc_var_lock);
+		VMS_ONLY(++astq_dyn_avail;)
+		csa->timer = FALSE;		/* No timer set for this region by this process anymore */
+		/* Restore region */
 		if (save_region != gv_cur_region)
 		{
 			gv_cur_region = save_region;

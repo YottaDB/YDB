@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
+; Copyright (c) 2001-2015 Fidelity National Information 	;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -91,7 +92,7 @@ GDEINIT
 	;	SIZEOF("gd_segment")		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
 	;
 	i (gtm64=FALSE) d
-	. s SIZEOF("am_offset")=328		; --> offset of "acc_meth" field in the "gd_segment" structure
+	. s SIZEOF("am_offset")=332		; --> offset of "acc_meth" field in the "gd_segment" structure
 	. s SIZEOF("file_spec")=256		; --> maximum size (in bytes) of a file name specified in gde command line
 	. s SIZEOF("gd_header")=16		; --> 16-byte header structure at offset 0 of .gld (12 byte label, 4-byte filesize)
 	. s SIZEOF("gd_contents")=76		; --> size of the "gd_addr" structure (defined in gdsfhead.h)
@@ -99,13 +100,13 @@ GDEINIT
 	. if ver'="VMS" d
 	. . s SIZEOF("gd_region")=372		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
 	. . s SIZEOF("gd_region_padding")=0	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
-	. . s SIZEOF("gd_segment")=360		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
+	. . s SIZEOF("gd_segment")=364		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
 	. e  d
 	. . s SIZEOF("gd_region")=348		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
 	. . ; SIZEOF("gd_region_padding")	 is not used in VMS
 	. . s SIZEOF("gd_segment")=356		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
 	e  d
-	. s SIZEOF("am_offset")=336		; --> offset of "acc_meth" field in the "gd_segment" structure
+	. s SIZEOF("am_offset")=340		; --> offset of "acc_meth" field in the "gd_segment" structure
 	. s SIZEOF("file_spec")=256		; --> maximum size (in bytes) of a file name specified in gde command line
 	. s SIZEOF("gd_header")=16		; --> 16-byte header structure at offset 0 of .gld (12 byte label, 4-byte filesize)
 	. s SIZEOF("gd_contents")=112		; --> size of the "gd_addr" structure (defined in gdsfhead.h)
@@ -172,6 +173,7 @@ GDEINIT
 	. s minreg("INST_FREEZE_ON_ERROR")=0
 	. s minreg("BUFFER_SIZE")=2307
 	. s minreg("QDBRUNDOWN")=0
+	. s minreg("EPOCHTAPER")=0
 	. s minreg("RECORD_SIZE")=0
 	e  d
 	. s minreg("RECORD_SIZE")=SIZEOF("rec_hdr")+4
@@ -192,6 +194,7 @@ GDEINIT
 	. s maxreg("INST_FREEZE_ON_ERROR")=1
 	. s maxreg("BUFFER_SIZE")=32768
 	. s maxreg("QDBRUNDOWN")=1
+	. s maxreg("EPOCHTAPER")=1
 	. s maxreg("KEY_SIZE")=1019	; = max value of KEY->end that returns TRUE for CAN_APPEND_HIDDEN_SUBS(KEY) in gdsfhead.h
 	s maxreg("JOURNAL")=1,maxreg("NULL_SUBSCRIPTS")=2
 	s maxreg("RECORD_SIZE")=SIZEOF("max_str")
@@ -231,6 +234,7 @@ GDEINIT
 	s defseg("ALLOCATION")=100
 	s defseg("BLOCK_SIZE")=1024
 	s defseg("BUCKET_SIZE")=""
+	s defseg("DEFER_ALLOCATE")=1
 	s defseg("EXTENSION_COUNT")=100
 	s defseg("FILE_TYPE")="DYNAMIC"
 	s defseg("MUTEX_SLOTS")=1024 ; keep this in sync with DEFAULT_NUM_CRIT_ENTRY in gdsbt.h
@@ -256,6 +260,7 @@ syntabi:
 	s syntab("ADD","REGION","STDNULLCOLL")="NEGATABLE"
 	s syntab("ADD","REGION","DYNAMIC_SEGMENT")="REQUIRED"
 	s syntab("ADD","REGION","DYNAMIC_SEGMENT","TYPE")="TSEGMENT"
+	i ver'="VMS" s syntab("ADD","REGION","EPOCHTAPER")="NEGATABLE"
 	i ver'="VMS" s syntab("ADD","REGION","INST_FREEZE_ON_ERROR")="NEGATABLE"
 	s syntab("ADD","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("ADD","REGION","JOURNAL","ALLOCATION")="REQUIRED"
@@ -286,6 +291,7 @@ syntabi:
 	s syntab("ADD","SEGMENT","BUCKET_SIZE")="REQUIRED"
 	s syntab("ADD","SEGMENT","BUCKET_SIZE","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","DEFER")="NEGATABLE"
+	s syntab("ADD","SEGMENT","DEFER_ALLOCATE")="NEGATABLE"
  	i ver'="VMS" s syntab("ADD","SEGMENT","ENCRYPTION_FLAG")="NEGATABLE"
 	s syntab("ADD","SEGMENT","EXTENSION_COUNT")="REQUIRED"
 	s syntab("ADD","SEGMENT","EXTENSION_COUNT","TYPE")="TNUMBER"
@@ -313,6 +319,7 @@ syntabi:
 	s syntab("CHANGE","REGION","STDNULLCOLL")="NEGATABLE"
 	s syntab("CHANGE","REGION","DYNAMIC_SEGMENT")="REQUIRED"
 	s syntab("CHANGE","REGION","DYNAMIC_SEGMENT","TYPE")="TSEGMENT"
+	i ver'="VMS" s syntab("CHANGE","REGION","EPOCHTAPER")="NEGATABLE"
 	i ver'="VMS" s syntab("CHANGE","REGION","INST_FREEZE_ON_ERROR")="NEGATABLE"
 	s syntab("CHANGE","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("CHANGE","REGION","JOURNAL","ALLOCATION")="REQUIRED"
@@ -343,6 +350,7 @@ syntabi:
 	s syntab("CHANGE","SEGMENT","BUCKET_SIZE")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","BUCKET_SIZE","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","DEFER")="NEGATABLE"
+	s syntab("CHANGE","SEGMENT","DEFER_ALLOCATE")="NEGATABLE"
 	i ver'="VMS" s syntab("CHANGE","SEGMENT","ENCRYPTION_FLAG")="NEGATABLE"
 	s syntab("CHANGE","SEGMENT","EXTENSION_COUNT")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","EXTENSION_COUNT","TYPE")="TNUMBER"
@@ -374,6 +382,7 @@ syntabi:
 	s syntab("TEMPLATE","REGION","JOURNAL","BUFFER_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","BUFFER_SIZE","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","JOURNAL","BEFORE_IMAGE")="NEGATABLE"
+	i ver'="VMS" s syntab("TEMPLATE","REGION","EPOCHTAPER")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","JOURNAL","EXTENSION")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","EXTENSION","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","JOURNAL","FILE_NAME")="REQUIRED"
@@ -395,6 +404,7 @@ syntabi:
 	s syntab("TEMPLATE","SEGMENT","BUCKET_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","BUCKET_SIZE","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","DEFER")="NEGATABLE"
+	s syntab("TEMPLATE","SEGMENT","DEFER_ALLOCATE")="NEGATABLE"
 	i ver'="VMS" s syntab("TEMPLATE","SEGMENT","ENCRYPTION_FLAG")="NEGATABLE"
 	s syntab("TEMPLATE","SEGMENT","EXTENSION_COUNT")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","EXTENSION_COUNT","TYPE")="TNUMBER"
@@ -468,8 +478,8 @@ VMS
 	q
 
 UNIX:
-	s hdrlab="GTCGBDUNX009"         ; must be concurrently maintained in gbldirnam.h!!!
-	i (gtm64=TRUE) s hdrlab="GTCGBDUNX109" ; the high order digit is a 64-bit flag
+	s hdrlab="GTCGBDUNX010"         ; must be concurrently maintained in gbldirnam.h!!!
+	i (gtm64=TRUE) s hdrlab="GTCGBDUNX110" ; the high order digit is a 64-bit flag
 	s tfile="$gtmgbldir"
 	s accmeth="\BG\MM"
 	s helpfile="$gtm_dist/gdehelp.gld"

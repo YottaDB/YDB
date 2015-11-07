@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -187,8 +188,6 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op, 
 	gd_region		*reg;
 	int			src_fetch_status;
 	mstr			regname;
-	rtn_tabent		*rttabent;
-	uint4			cycle;
 	DEBUG_ONLY(unsigned int	lcl_t_tries;)
 	DCL_THREADGBL_ACCESS;
 
@@ -334,13 +333,13 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, g
 	int			index;
 	mident			rtn_name;
 	mstr			gbl, xecute_buff;
-	mval			trig_index, val;
+	mval			trig_index;
 	rhdtyp			*rtn_vector;
 	rtn_tabent		*rttabent;
 	sgm_info		*save_sgm_info_ptr;
 	sgmnt_addrs		*csa, *regcsa;
 	sgmnt_data_ptr_t	csd;
-	boolean_t		db_trigger_cycle_mismatch, ztrig_cycle_mismatch, needs_reload, needs_restart;
+	boolean_t		db_trigger_cycle_mismatch, ztrig_cycle_mismatch, needs_reload;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -348,7 +347,9 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, g
 	DBGTRIGR((stderr, "trigger_source_raov: Entered with trigger action %d\n", trigger_op));
 	/* Before we try to save anything, see if there is something to save and initialize stuff if not */
 	SAVE_TRIGGER_REGION_INFO(save_currkey);
-	if (find_rtn_tabent(&rttabent, trigname))
+	if (NULL != *rtn_vec)
+		rtn_vector = *rtn_vec;
+	else if (find_rtn_tabent(&rttabent, trigname))
 		rtn_vector = rttabent->rt_adr;
 	else
 		rtn_vector = NULL;
@@ -539,7 +540,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op, g
 /* Routine called when need triggers loaded for a given global */
 STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t **ret_trigdsc, gd_region *reg)
 {
-	mval			val;
+	mval			*val;
 	char			*ptr;
 	int			len;
 	sgmnt_addrs		*csa;
@@ -548,28 +549,46 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	gvt_trigger_t		*gvt_trigger;
 	mstr			xecute_buff;
 	mname_entry		gvname;
-	int			index, n;
+	int			index;
 	mval			trig_index;
 	gv_trigger_t		*trigdsc;
 	uint4			cycle_start;
 	gvnh_reg_t		*gvnh_reg;
 	boolean_t		name_not_found;
+	int			trig_protected_mval_push_count;
 
+
+	trig_protected_mval_push_count = 0;
+	INCR_AND_PUSH_MV_STENT(val); /* Protect val from garbage collection */
 	assert(dollar_tlevel);
 	DBGTRIGR((stderr, "trigger_source_raov_trigload: entry for %s\n", trigname->addr));
 	/* Find region trigger name is in. If "region-name" has been specified, find only in that region. */
-	name_not_found = !trigger_name_search(trigname->addr, trigname->len, &val, &reg);
+	name_not_found = !trigger_name_search(trigname->addr, trigname->len, val, &reg);
 	if (name_not_found)
-		return TRIG_FAILURE;	/* Trigger name not found - nothing we can do */
+		RETURN_AND_POP_MVALS(TRIG_FAILURE);	/* Trigger name not found - nothing we can do */
 	/* Extract region name and trigger index number from result */
 	assert(NULL != reg);
-	ptr = val.str.addr;
-	len = STRLEN(ptr);	/* Do it this way since "val" has multiple fields null separated */
+	ptr = val->str.addr;
+	len = MIN(val->str.len, MAX_MIDENT_LEN);	/* Look for NULL within the MIN */
+	STRNLEN(ptr, len, len);
 	ptr += len;
-	assert(('\0' == *ptr) && (val.str.len > len));
+	if ((val->str.len == len) || ('\0' != *ptr))
+	{
+		if (CDB_STAGNATE > t_tries)
+			t_retry(cdb_sc_triggermod);
+		/* Return an error instead of TRIGDEFBAD. The caller will throw the error */
+		RETURN_AND_POP_MVALS(TRIG_FAILURE);
+	}
 	ptr++;
-	A2I(ptr, val.str.addr + val.str.len, index);
-	gvname.var_name.addr = val.str.addr;
+	A2I(ptr, val->str.addr + val->str.len, index);
+	if (1 > index)
+	{ /* trigger indexes cannot be less than 1 */
+		if (CDB_STAGNATE > t_tries)
+			t_retry(cdb_sc_triggermod);
+		/* Return an error instead of TRIGDEFBAD. The caller will throw the error */
+		RETURN_AND_POP_MVALS(TRIG_FAILURE);
+	}
+	gvname.var_name.addr = val->str.addr;
 	gvname.var_name.len = len;
 	COMPUTE_HASH_MNAME(&gvname);
 	GV_BIND_NAME_ONLY(gd_header, &gvname, gvnh_reg);	/* does tp_set_sgm() */
@@ -594,7 +613,8 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	{
 		if (CDB_STAGNATE > t_tries)
 			t_retry(cdb_sc_triggermod);
-		return TRIG_FAILURE; /* Return an error instead of TRIGDEFBAD */
+		/* Return an error instead of TRIGDEFBAD. The caller will throw the error */
+		RETURN_AND_POP_MVALS(TRIG_FAILURE);
 	}
 	gvt->db_trigger_cycle = cycle_start;
 	gvt->db_dztrigger_cycle = csa->db_dztrigger_cycle;
@@ -609,7 +629,7 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 								&trig_index, NULL, (int4 *)&xecute_buff.len);
 	trigdsc->xecute_str.str = xecute_buff;
 	*ret_trigdsc = trigdsc;
-	return TRIG_SUCCESS;
+	RETURN_AND_POP_MVALS(TRIG_SUCCESS);
 }
 
 #endif /* GTM_TRIGGER */

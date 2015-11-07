@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +63,11 @@ static	enum rundown_state	attempting;
 GBLREF	int			process_exiting;
 #endif
 
-/* Note: This macro uses local variables "attempting", "error_seen" and "actual_exi_condition" */
+/* This macro is a framework to help perform ONE type of rundown (e.g. db or lock or io rundown etc.).
+ * "gtm_exit_handler" invokes this macro for each type of rundown that is needed and passes appropriate
+ * parameters to indicate the detail needed for each rundown.
+ * Note: This macro uses local variables "attempting", "error_seen" and "actual_exi_condition".
+ */
 #define	RUNDOWN_STEP(THISSTATE, NEXTSTATE, ERRCODE, STMT)			\
 {										\
 	if (THISSTATE == attempting)						\
@@ -141,6 +146,12 @@ enum rundown_state
 	rundown_state_last
 };
 
+/* Function that is invoked at process exit time to do cleanup.
+ * The general flow here is to do various types of rundowns (e.g. db rundown, lock rundown, io rundown etc.).
+ * If one type of rundown encounters an error midway, we want to just move on to the next type of rundown.
+ * This way we do as much cleanup as possible before the process exists. Towards this, we use "exi_ch" as a
+ * condition handler and the RUNDOWN_STEP macro to take care of each type of rundown.
+ */
 void gtm_exit_handler(void)
 {
 	struct sigaction		act;
@@ -155,7 +166,7 @@ void gtm_exit_handler(void)
 	exit_handler_active = TRUE;
 	attempting = rundown_state_mprof;
 	actual_exi_condition = 0;
-	ESTABLISH_NORET(exi_ch, error_seen);
+	ESTABLISH_NORET(exi_ch, error_seen);	/* "error_seen" is initialized inside this macro */
 	RUNDOWN_STEP(rundown_state_mprof, rundown_state_lock, ERR_MPROFRUNDOWN, MPROF_RUNDOWN_MACRO);
 	RUNDOWN_STEP(rundown_state_lock, rundown_state_db, ERR_LKRUNDOWN, LOCK_RUNDOWN_MACRO);
 	RUNDOWN_STEP(rundown_state_db, rundown_state_io, ERR_GVRUNDOWN, gv_rundown());

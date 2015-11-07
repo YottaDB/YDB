@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +27,8 @@ typedef struct gtmtls_passwd_list_struct
 	struct gtmtls_passwd_list_struct *next;
 	passwd_entry_t			 *pwent;
 } gtmtls_passwd_list_t;
+
+STATICFNDEF gtmtls_passwd_list_t *gtm_tls_find_pwent(const char *input_env_name);
 
 #define GET_SOCKFD(TLS)			SSL_get_fd((SSL *)TLS)
 #define VERIFY_PEER(FLAGS)		(FLAGS & GTMTLS_OP_VERIFY_PEER)

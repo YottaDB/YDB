@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2014 Fidelity Information Services, Inc.	*
+ * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -170,10 +171,10 @@ boolean_t updproc_preread(void)
 	gtmrecv_local_ptr_t	gtmrecv_local;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 	gvnh_reg_t		*gvnh_reg;
-#ifdef REPL_DEBUG
+#	ifdef REPL_DEBUG
 	unsigned char 		buff[MAX_ZWR_KEY_SZ], *end;
 	uint4			write, write_wrap;
-#endif
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -215,7 +216,8 @@ boolean_t updproc_preread(void)
 						return FALSE;
 					/* On every 4th pass, we bide for awhile */
 					wcs_sleep(LOCK_SLEEP);
-					if (RETRY_CASLATCH_CUTOFF == retries)
+					/* Check if we're due to check for lock abandonment check or holder wakeup */
+					if (0 == (retries & (LOCK_CASLATCH_CHKINTVL - 1)))
 						performCASLatchCheck(&upd_helper_ctl->pre_read_lock, TRUE);
 				}
 			}
@@ -228,10 +230,10 @@ boolean_t updproc_preread(void)
 					ERR_ERRCALL, 3, CALLFROM);
 			return FALSE;
 		}
-#ifdef REPL_DEBUG
+#		ifdef REPL_DEBUG
 		write_wrap = recvpool_ctl->write_wrap;
 		write = recvpool_ctl->write;
-#endif
+#		endif
 		if (pre_read_offset >= recvpool_ctl->write_wrap)
 		{
 			REPL_DPRINT4("Wrapped: pre_read_offset = %x write_wrap = %x write = %x\n",
@@ -402,7 +404,7 @@ boolean_t updproc_preread(void)
 							}
 							if (disk_blk_read)
 								csa->nl->n_pre_read--;
-#ifdef REPL_DEBUG
+#							ifdef REPL_DEBUG
 							if (NULL == (end = format_targ_key(buff,
 											   MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 								end = &buff[MAX_ZWR_KEY_SZ - 1];
@@ -414,7 +416,7 @@ boolean_t updproc_preread(void)
 								" Seqno = 0x!16@XQ Rectype = !SL gv_currkey = !AD status = !SL",
 								TRUE, &recvpool.recvpool_ctl->jnl_seqno,
 								rectype, end - buff, buff, status);
-#endif
+#							endif
 						} else
 						{
 							REPL_DPRINT1("Unexpected bad record\n");
@@ -428,12 +430,12 @@ boolean_t updproc_preread(void)
 		}
 		if (!good_record)
 		{
-#ifdef REPL_DEBUG
+#			ifdef REPL_DEBUG
 			REPL_DPRINT5("Skipping record: pre_read_offset = %x read = %x write_wrap = %x write = %x\n",
 				pre_read_offset, upd_proc_local->read, write_wrap, write);
 			REPL_DPRINT3("New values: write_wrap = %x write = %x\n",
 					recvpool_ctl->write_wrap, recvpool_ctl->write);
-#endif
+#			endif
 			return TRUE;
 		}
 	} /* end while */

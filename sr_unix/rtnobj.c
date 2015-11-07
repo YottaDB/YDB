@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,43 +44,44 @@
 #	define RTNOBJ_DBG(X)
 #endif
 
-#define	CONTINUE_IF_INDEX_INVALID(MIN_INDEX, MAX_INDEX, HAS_RELINKCTL_LOCK)			\
-{												\
-	if (!HAS_RELINKCTL_LOCK)								\
-	{	/* If we dont have a lock, and MIN_INDEX/MAX_INDEX are invalid, redo loop	\
-		 * until we find valid values. After a few redos, get a lock before the search.	\
-		 */										\
-		if ((0 > MIN_INDEX) || (NUM_RTNOBJ_SHM_INDEX < MIN_INDEX)			\
-			|| (0 > MAX_INDEX) || (NUM_RTNOBJ_SHM_INDEX < MAX_INDEX))		\
-		{										\
-			continue;								\
-		}										\
-	} else											\
-	{											\
-		assert(0 <= MIN_INDEX);								\
-		assert(NUM_RTNOBJ_SHM_INDEX >= MIN_INDEX);					\
-		assert(0 <= MAX_INDEX);								\
-		assert(NUM_RTNOBJ_SHM_INDEX >= MAX_INDEX);					\
-	}											\
+#define	DBG_ASSERT_INDEX_VALID(MIN_INDEX, MAX_INDEX)		\
+{								\
+	assert(0 <= MIN_INDEX);					\
+	assert(NUM_RTNOBJ_SHM_INDEX >= MIN_INDEX);		\
+	assert(0 <= MAX_INDEX);					\
+	assert(NUM_RTNOBJ_SHM_INDEX >= MAX_INDEX);		\
 }
 
+/* Macro to make sure this process has attached to ALL rtnobj shared memory segments that currently exist for the
+ * relinkctl shared memory corresponding to LINKCTL. Need to execute this macro before checking if a given routine object
+ * does exist in one of the rtnobj shared memory segments.
+ */
 #define	SYNC_RTNOBJ_SHMID_CYCLE_IF_NEEDED(LINKCTL, MIN_INDEX, MAX_INDEX, SHM_HDR, HAS_RELINKCTL_LOCK, RELINKREC)		\
 {																\
-	int		cycle, i, pvt_shmid, shr_shmid;										\
+	int		pvt_max_index, i, pvt_shmid, shr_shmid;									\
 	int		save_errno;												\
 	size_t		shm_size;												\
 	sm_uc_ptr_t	shm_base;												\
 	char		errstr[256];												\
 																\
-	cycle = SHM_HDR->rtnobj_shmid_cycle;											\
-	/* NARSTODO: Need memory barrier? Since cycle/MIN_INDEX/MAX_INDEX could be read out-of-order */				\
-	if (LINKCTL->rtnobj_shmid_cycle != cycle)										\
+	MAX_INDEX = SHM_HDR->rtnobj_max_shm_index;										\
+	SHM_READ_MEMORY_BARRIER;	/* Read "rtnobj_max_shm_index" BEFORE read memory barrier and everything else		\
+					 * else associated with this index AFTER the memory barrier.				\
+					 */											\
+	pvt_max_index = LINKCTL->rtnobj_max_shm_index;										\
+	DEBUG_ONLY(														\
+		for (i = LINKCTL->rtnobj_min_shm_index; i < pvt_max_index; i++)							\
+		{														\
+			pvt_shmid = LINKCTL->rtnobj_shmid[i];									\
+			shr_shmid = SHM_HDR->rtnobj_shmhdr[i].rtnobj_shmid;							\
+			assert(pvt_shmid == shr_shmid);										\
+		}														\
+	)															\
+	if (pvt_max_index != MAX_INDEX)												\
 	{															\
 		MIN_INDEX = SHM_HDR->rtnobj_min_shm_index;									\
-		MAX_INDEX = SHM_HDR->rtnobj_max_shm_index;									\
-		/* Check integrity of min_index/max_index */									\
-		CONTINUE_IF_INDEX_INVALID(MIN_INDEX, MAX_INDEX, HAS_RELINKCTL_LOCK);						\
-		for (i = MIN_INDEX; i < MAX_INDEX; i++)										\
+		DBG_ASSERT_INDEX_VALID(MIN_INDEX, MAX_INDEX); /* assert validity of min_index/max_index */			\
+		for (i = pvt_max_index; i < MAX_INDEX; i++)									\
 		{														\
 			pvt_shmid = LINKCTL->rtnobj_shmid[i];									\
 			shr_shmid = SHM_HDR->rtnobj_shmhdr[i].rtnobj_shmid;							\
@@ -95,21 +97,23 @@
 					rel_latch(&RELINKREC->rtnobj_latch);							\
 					SNPRINTF(errstr, SIZEOF(errstr), "rtnobj2 shmat() failed for shmid=%d shmsize=0x%llx",	\
 						shr_shmid, shm_size);								\
-					ISSUE_RELINKCTLERR_SYSCALL(&LINKCTL->zro_entry_name, errstr, save_errno);		\
+					if (!SHM_REMOVED(save_errno))								\
+						ISSUE_RELINKCTLERR_SYSCALL(&LINKCTL->zro_entry_name, errstr, save_errno);	\
+					else											\
+						ISSUE_REQRLNKCTLRNDWN_SYSCALL(&LINKCTL->zro_entry_name, errstr, save_errno);	\
 				}												\
 				assert(0 == ((UINTPTR_T)shm_base % 8));								\
 				LINKCTL->rtnobj_shmid[i] = shr_shmid;								\
 				LINKCTL->rtnobj_shm_base[i] = shm_base;								\
 			}													\
 		}														\
-		LINKCTL->rtnobj_min_shm_index = min_index;									\
-		LINKCTL->rtnobj_max_shm_index = max_index;									\
-		LINKCTL->rtnobj_shmid_cycle = cycle;										\
+		LINKCTL->rtnobj_min_shm_index = MIN_INDEX;									\
+		LINKCTL->rtnobj_max_shm_index = MAX_INDEX;									\
 	} else															\
 	{															\
-		MIN_INDEX = linkctl->rtnobj_min_shm_index;									\
-		MAX_INDEX = linkctl->rtnobj_max_shm_index;									\
-		CONTINUE_IF_INDEX_INVALID(MIN_INDEX, MAX_INDEX, HAS_RELINKCTL_LOCK);						\
+		MIN_INDEX = LINKCTL->rtnobj_min_shm_index;									\
+		MAX_INDEX = pvt_max_index;											\
+		DBG_ASSERT_INDEX_VALID(MIN_INDEX, MAX_INDEX);									\
 	}															\
 }
 
@@ -117,13 +121,16 @@
 
 error_def(ERR_PERMGENFAIL);
 error_def(ERR_RELINKCTLERR);
+error_def(ERR_REQRLNKCTLRNDWN);
 error_def(ERR_RLNKRECLATCH);
 error_def(ERR_RLNKSHMLATCH);
 error_def(ERR_SYSCALL);
 
 DEBUG_ONLY(GBLREF int	saved_errno;)
+DEBUG_ONLY(GBLREF int	process_exiting;)
 
 #ifdef DEBUG
+/* Routine to verify the doubly-linked (fl/bl) freelists for each rtnobj size (various 2-powers) are in good shape */
 void	rtnobj_verify_freelist_fl_bl(rtnobjshm_hdr_t *rtnobj_shm_hdr, sm_uc_ptr_t shm_base)
 {
 	int		min_index, max_index, i;
@@ -172,6 +179,7 @@ void	rtnobj_verify_freelist_fl_bl(rtnobjshm_hdr_t *rtnobj_shm_hdr, sm_uc_ptr_t s
 	}
 }
 
+/* Routine to verify the correctness of derived fields, rtnobj_shm_hdr->rtnobj_min_free_index & rtnobj->rtnobj_max_free_index */
 void	rtnobj_verify_min_max_free_index(rtnobjshm_hdr_t *rtnobj_shm_hdr)
 {
 	int		min_index, max_index, i;
@@ -195,13 +203,17 @@ void	rtnobj_verify_min_max_free_index(rtnobjshm_hdr_t *rtnobj_shm_hdr)
 }
 #endif
 
-/* Insert an element at the tail of the queue */
+/* Insert "new_tail" at tail of the doubly-linked relative-queue starting from "que_base".
+ * Note "que_base" is a pointer to relinkctl shared memory whereas "new_tail" is a pointer to rtnobj shared memory.
+ * Hence the need for NULL_RTNOBJ_SM_OFF_T to indicate a link from rtnobj shm to relinkctl shm.
+ * "shm_base" is pointer to the start of rtnobj shared memory. Used to calculate relative offsets.
+ */
 void	insqt_rtnobj(que_ent_ptr_t new_tail, que_ent_ptr_t que_base, sm_uc_ptr_t shm_base)
 {
 	que_ent_ptr_t old_tail;
 
 	RTNOBJ_DBG(fprintf(stderr, "insqt_rtnobj : que_base = 0x%llx : shm_base = 0x%llx : elem = 0x%llx\n",		\
-		(long long unsigned int)que_base, (long long unsigned int)shm_base, (long long unsigned int)new_tail);)
+		(UINTPTR_T)que_base, (UINTPTR_T)shm_base, (UINTPTR_T)new_tail);)
 	if (NULL_RTNOBJ_SM_OFF_T == que_base->bl)
 	{	/* Queue has nothing */
 		assert(NULL_RTNOBJ_SM_OFF_T == que_base->fl);
@@ -223,7 +235,11 @@ void	insqt_rtnobj(que_ent_ptr_t new_tail, que_ent_ptr_t que_base, sm_uc_ptr_t sh
 	return;
 }
 
-/* Remove an element from the head of the queue */
+/* Remove an element from the head of the doubly-linked relative-queue starting from "que_base" and return a pointer to it.
+ * Note "que_base" is a pointer to relinkctl shared memory whereas the returned value is a pointer to rtnobj shared memory.
+ * Hence the need for NULL_RTNOBJ_SM_OFF_T to indicate a link from rtnobj shm to relinkctl shm.
+ * "shm_base" is pointer to the start of rtnobj shared memory. Used to calculate relative offsets.
+ */
 rtnobj_hdr_t *remqh_rtnobj(que_ent_ptr_t que_base, sm_uc_ptr_t shm_base)
 {
 	que_ent_ptr_t	ret, new_head;
@@ -232,7 +248,7 @@ rtnobj_hdr_t *remqh_rtnobj(que_ent_ptr_t que_base, sm_uc_ptr_t shm_base)
 	assert(NULL_RTNOBJ_SM_OFF_T != que_base->fl);
 	ret = (que_ent_ptr_t)(shm_base + que_base->fl);
 	RTNOBJ_DBG(fprintf(stderr, "remqh_rtnobj : que_base = 0x%llx : shm_base = 0x%llx : elem = 0x%llx\n",		\
-		(long long unsigned int)que_base, (long long unsigned int)shm_base, (long long unsigned int)ret);)
+		(UINTPTR_T)que_base, (UINTPTR_T)shm_base, (UINTPTR_T)ret);)
 	assert(0 == (sm_off_t)ret % 8);
 	assert(NULL_RTNOBJ_SM_OFF_T == ret->bl);
 	if (NULL_RTNOBJ_SM_OFF_T == ret->fl)
@@ -251,7 +267,11 @@ rtnobj_hdr_t *remqh_rtnobj(que_ent_ptr_t que_base, sm_uc_ptr_t shm_base)
 	return rtnobj;
 }
 
-/* Remove a specific element "rtnobj" from wherever it is in the queue */
+/* Remove a specific element "rtnobj" from wherever it is in the doubly-linked relative-queue starting from "que_base".
+ * Note "que_base" is a pointer to relinkctl shared memory whereas "rtnobj" is a pointer to rtnobj shared memory.
+ * Hence the need for NULL_RTNOBJ_SM_OFF_T to indicate a link from rtnobj shm to relinkctl shm.
+ * "shm_base" is pointer to the start of rtnobj shared memory. Used to calculate relative offsets.
+ */
 void	remq_rtnobj_specific(que_ent_ptr_t que_base, sm_uc_ptr_t shm_base, rtnobj_hdr_t *rtnobj)
 {
 	que_ent_ptr_t	elem, new_head, rtnque;
@@ -259,7 +279,7 @@ void	remq_rtnobj_specific(que_ent_ptr_t que_base, sm_uc_ptr_t shm_base, rtnobj_h
 	assert(NULL_RTNOBJ_SM_OFF_T != que_base->fl);
 	rtnque = (que_ent_ptr_t)((sm_uc_ptr_t)rtnobj + OFFSETOF(rtnobj_hdr_t, userStorage));
 	RTNOBJ_DBG(fprintf(stderr, "remqh_rtnobj_specific : que_base = 0x%llx : shm_base = 0x%llx : elem = 0x%llx\n",	\
-		(long long unsigned int)que_base, (long long unsigned int)shm_base, (long long unsigned int)rtnque);)
+		(UINTPTR_T)que_base, (UINTPTR_T)shm_base, (UINTPTR_T)rtnque);)
 #	ifdef DEBUG
 	/* Verify that "rtnobj" is actually in the queue first */
 	elem = (que_ent_ptr_t)(shm_base + que_base->fl);
@@ -308,10 +328,17 @@ void	remq_rtnobj_specific(que_ent_ptr_t que_base, sm_uc_ptr_t shm_base, rtnobj_h
 	}
 }
 
+/* Function to allocate "objSize" bytes of space, for the object file that "fd" points to and has a hash value "objhash",
+ * in rtnobj shared memory for the relinkctl file/shared-memory derived from "zhist". If such an object already exists, return
+ * a pointer to that location in rtnobj shared memory after incrementing reference-counts (to indicate how many processes
+ * have linked in to this shared object). In this fast-path case, we hold a lock only on the relink record corresponding
+ * to this object's routine-name. In the other case (where space has to be allocated), we also hold a lock on the entire
+ * relinkctl shared memory (and effectively all rtnobj shared memory segments).
+ */
 sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64_t objhash)
 {
 	boolean_t		has_relinkctl_lock, has_rtnobj_lock;
-	boolean_t		initialized, return_NULL;
+	boolean_t		initialized, return_NULL, need_shmctl;
 	char			errstr[256];
 	gtm_uint64_t		src_cksum_8byte;
 	int			min_index, max_index, min_free_index, max_free_index, shm_index;
@@ -332,14 +359,12 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 	rhdtyp			tmprhd, *rhdr;
 	gtm_uint64_t		elemSize;
 	zro_validation_entry	*zhent;
-	char			zro_entry_str[ZRO_DIR_PATH_MAX + 1];
 	struct stat		dir_stat_buf;
 	int			stat_res;
 	int			user_id;
 	int			group_id;
 	int			perm;
 	int			maxvers, curvers;
-	struct perm_diag_data	pdd;
 	struct shmid_ds		shmstat;
 #	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
@@ -352,10 +377,6 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 	/* Assert certain design assumptions */
 	assert((MAX_RTNOBJ_SHM_INDEX + RTNOBJ_SHMID_INDEX_MAXBITS) <= (8 * SIZEOF(rtnobj_sm_off_t)));
 	assert(((size_t)1 << RTNOBJ_SHMID_INDEX_MAXBITS) >= MAX_RTNOBJ_SHM_INDEX);
-	/* Check if we are in sync with shared memory. If not attach to requisite shmids first.
-	 * Note that the below logic tries to do search outside of any locks (for performance reasons)
-	 * but that means we need to be extra careful in validating things read outside of a lock.
-	 */
 	shm_hdr = GET_RELINK_SHM_HDR(linkctl);
 	loopcnt = 0;
 	has_relinkctl_lock = FALSE;
@@ -367,8 +388,6 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
 				ERR_RLNKRECLATCH, 3, relinkrec->rtnname_fixed.c, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
 	}
-	memcpy(zro_entry_str, linkctl->zro_entry_name.addr, linkctl->zro_entry_name.len);
-	zro_entry_str[linkctl->zro_entry_name.len] = '\0';
 	do
 	{
 		if (CDB_STAGNATE <= loopcnt++)
@@ -386,8 +405,10 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 			}
 			has_relinkctl_lock = TRUE;
 		}
+		/* Check if we are in sync with the rtnobj shared memory segments corresponding to this relinkctl shared memory.
+		 * If not attach to those rtnobj shmids first.
+		 */
 		SYNC_RTNOBJ_SHMID_CYCLE_IF_NEEDED(linkctl, min_index, max_index, shm_hdr, has_relinkctl_lock, relinkrec);
-			/* note: the above macro could do a "continue" if "has_relinkctl_lock" is FALSE */
 		/* Now that we have attached to the necessary routine buffer shmids, search within shared memory for the
 		 * routine buffer whose <objhash,objLen> matches ours.
 		 */
@@ -428,9 +449,9 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				rel_latch(&shm_hdr->relinkctl_latch);
 			RTNOBJ_DBG(fprintf(stderr, "rtnobj_shm_malloc : rtnname = %s : objhash = 0x%llx : "		\
 				"linkctl = 0x%llx : Found : refcnt = %d : elem = 0x%llx\n",				\
-				relinkrec->rtnname_fixed.c, (long long unsigned int)objhash,				\
-				(long long unsigned int)linkctl, rtnobj->refcnt,					\
-				(long long unsigned int)&rtnobj->userStorage.userStart);)
+				relinkrec->rtnname_fixed.c, (UINTPTR_T)objhash,				\
+				(UINTPTR_T)linkctl, rtnobj->refcnt,					\
+				(UINTPTR_T)&rtnobj->userStorage.userStart);)
 			zhent->cycle = relinkrec->cycle;	/* Update private cycle to be in sync with shared copy */
 			rel_latch(&relinkrec->rtnobj_latch);
 			objBuff = (sm_uc_ptr_t)&rtnobj->userStorage.userStart;
@@ -463,7 +484,6 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 		}
 		/* Sync up with rtnobj shmids one final time if needed now that we have the relinkctl file lock */
 		SYNC_RTNOBJ_SHMID_CYCLE_IF_NEEDED(linkctl, min_index, max_index, shm_hdr, has_relinkctl_lock, relinkrec);
-			/* note: the above macro is guaranteed not to do a "continue" since "has_relinkctl_lock" is TRUE */
 		/* Find a shared memory buffer to hold the routine object */
 		rtnobj = NULL;
 		for ( ; shm_index < max_index; shm_index++)
@@ -527,27 +547,17 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj shmget() failed for shmsize=0x%llx", shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
-			STAT_FILE(zro_entry_str, &dir_stat_buf, stat_res);
+			STAT_FILE(linkctl->zro_entry_name.addr, &dir_stat_buf, stat_res);
 			if (-1 == stat_res)
 			{
 				save_errno = errno;
 				rel_latch(&shm_hdr->relinkctl_latch);
 				rel_latch(&relinkrec->rtnobj_latch);
 				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
-				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj stat() of file %s failed", zro_entry_str);
+				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj stat() of file %s failed", linkctl->zro_entry_name.addr);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
-			if (gtm_permissions(&dir_stat_buf, &user_id, &group_id, &perm, PERM_IPC|PERM_EXEC, &pdd) < 0)
-			{
-				save_errno = errno;
-				rel_latch(&shm_hdr->relinkctl_latch);
-				rel_latch(&relinkrec->rtnobj_latch);
-				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10)
-						ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(&linkctl->zro_entry_name),
-						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("rtnobj"),
-						RTS_ERROR_MSTR(&linkctl->zro_entry_name));
-			}
+			gtm_permissions(&dir_stat_buf, &user_id, &group_id, &perm, PERM_IPC|PERM_EXEC);
 			if (-1 == shmctl(shmid, IPC_STAT, &shmstat))
 			{
 				save_errno = errno;
@@ -558,13 +568,24 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 					shmid, shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
-			/* change group and permissions */
-			if ((-1 != user_id) && (user_id != shmstat.shm_perm.uid))
+			/* change uid, group-id and permissions if needed */
+			need_shmctl = FALSE;
+			if ((INVALID_UID != user_id) && (user_id != shmstat.shm_perm.uid))
+			{
 				shmstat.shm_perm.uid = user_id;
-			if ((-1 != group_id) && (group_id != shmstat.shm_perm.gid))
+				need_shmctl = TRUE;
+			}
+			if ((INVALID_GID != group_id) && (group_id != shmstat.shm_perm.gid))
+			{
 				shmstat.shm_perm.gid = group_id;
-			shmstat.shm_perm.mode = perm;
-			if (-1 == shmctl(shmid, IPC_SET, &shmstat))
+				need_shmctl = TRUE;
+			}
+			if (shmstat.shm_perm.mode != perm)
+			{
+				shmstat.shm_perm.mode = perm;
+				need_shmctl = TRUE;
+			}
+			if (need_shmctl && (-1 == shmctl(shmid, IPC_SET, &shmstat)))
 			{
 				save_errno = errno;
 				rel_latch(&shm_hdr->relinkctl_latch);
@@ -614,15 +635,14 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 			rtnobj_shm_hdr->shm_len = shm_size;
 			if (shm_hdr->rtnobj_min_shm_index > shm_index)
 			{
-				assert(0 == shm_hdr->rtnobj_shmid_cycle); /* our shm expansion logic must not reach this codepath */
+				assert(NUM_RTNOBJ_SHM_INDEX == shm_hdr->rtnobj_min_shm_index);
 				shm_hdr->rtnobj_min_shm_index = shm_index;
 			}
-			if (shm_hdr->rtnobj_max_shm_index < (shm_index + 1))
-				shm_hdr->rtnobj_max_shm_index = (shm_index + 1);
+			assert(linkctl->rtnobj_max_shm_index == shm_hdr->rtnobj_max_shm_index);
+			assert(shm_hdr->rtnobj_max_shm_index < (shm_index + 1));
+			SHM_WRITE_MEMORY_BARRIER; /* Update everything except "rtnobj_max_shm_index" BEFORE write memory barrier */
+			shm_hdr->rtnobj_max_shm_index = (shm_index + 1);
 			/* Sync shared memory with private contents for this process to avoid duplicate shmget/shmat */
-			assert(linkctl->rtnobj_shmid_cycle == shm_hdr->rtnobj_shmid_cycle);	/* due to SYNC_* done above */
-			shm_hdr->rtnobj_shmid_cycle++;
-			linkctl->rtnobj_shmid_cycle = shm_hdr->rtnobj_shmid_cycle;
 			linkctl->rtnobj_min_shm_index = shm_hdr->rtnobj_min_shm_index;
 			linkctl->rtnobj_max_shm_index = shm_hdr->rtnobj_max_shm_index;
 			linkctl->rtnobj_shm_base[shm_index] = shm_base;
@@ -651,12 +671,14 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				rtnobj2->queueIndex = objIndex;
 				DEBUG_ONLY(shm_off = (sm_uc_ptr_t)rtnobj2 - shm_base);
 				assert(0 == (shm_off % ((sm_off_t)1 << (objIndex + MIN_RTNOBJ_SIZE_BITS))));
-				/* rtnobj2->initialized            needs initialization only when state becomes STATE_ALLOCATED */
-				/* rtnobj2->refcnt                 needs initialization only when state becomes STATE_ALLOCATED */
-				/* rtnobj2->src_cksum_8byte        needs initialization only when state becomes STATE_ALLOCATED */
-				/* rtnobj2->next_rtnobj_shm_offset needs initialization only when state becomes STATE_ALLOCATED */
-				/* rtnobj2->relinkctl_index        needs initialization only when state becomes STATE_ALLOCATED */
-				/* rtnobj2->objLen                 needs initialization only when state becomes STATE_ALLOCATED */
+				/* The following fields need initialization only when state becomes STATE_ALLOCATED.
+				 *	rtnobj2->initialized
+				 *	rtnobj2->refcnt
+				 *	rtnobj2->src_cksum_8byte
+				 *	rtnobj2->next_rtnobj_shm_offset
+				 *	rtnobj2->relinkctl_index
+				 *	rtnobj2->objLen
+				 */
 				insqt_rtnobj(&rtnobj2->userStorage.freePtr, freeList, shm_base);
 			} while (objIndex > sizeIndex);
 			if (NUM_RTNOBJ_SIZE_BITS == min_free_index)
@@ -773,9 +795,9 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 		cacheflush(codeadr, codelen, BCACHE);			/* Cacheflush executable part from instruction cache */
 		RTNOBJ_DBG(fprintf(stderr, "rtnobj_shm_malloc : rtnname = %s : objhash = 0x%llx : "		\
 			"linkctl = 0x%llx : Inserted : refcnt = %d : elem = 0x%llx : numvers = %d\n",		\
-			relinkrec->rtnname_fixed.c, (long long unsigned int)objhash,				\
-			(long long unsigned int)linkctl, rtnobj->refcnt,					\
-			(long long unsigned int)objBuff, relinkrec->numvers);)
+			relinkrec->rtnname_fixed.c, (UINTPTR_T)objhash,				\
+			(UINTPTR_T)linkctl, rtnobj->refcnt,					\
+			(UINTPTR_T)objBuff, relinkrec->numvers);)
 		relinkrec->objhash = objhash;
 		++relinkrec->cycle;	/* cycle bump is because of the implicit ZRUPDATE that linking a routine does */
 		if (0 == relinkrec->cycle)
@@ -786,6 +808,12 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 	} while (TRUE);
 }
 
+/* Function to free the object file in rtnobj shared memory whose routine header is "rhead". If this object file is used
+ * by more than one process (i.e. reference count is > 1), then decrement the reference count and return. This fast path
+ * only holds lock on the relink record corresponding to this object's routine-name. If, however, the reference count is 1,
+ * space for this object file will be freed up and that requires holding a lock on the entire relinkctl shared memory (and
+ * effectively all rtnobj shared memory segments).
+ */
 void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 {
 	relinkrec_t		*relinkrec;
@@ -810,14 +838,17 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 
 	SETUP_THREADGBL_ACCESS;
 #	endif
+	/* Note that if breakpoints are in effect, rhead->shared_ptext_adr will not be equal to rhead->ptext_adr.
+	 * This is because we would have taken a private copy of the code (for breakpoints) into ptext_adr and kept
+	 * shared_ptext_adr untouched. In that case, it is still possible this function is called as part of process
+	 * exit (when breakpoints on a shared routine object are still active). We will still need to free-up/decrement-refcnt
+	 * the shared copy (shared_ptext_adr). So look at shared_ptext_adr below instead of ptext_adr;
+	 */
 	assert(rhead->shared_object);
 	assert(NULL != rhead->shared_ptext_adr);
 	if (NULL == rhead->shared_ptext_adr)
 		return;	/* in pro, be safe */
-	/* Note that if breakpoints are in effect, rhead->shared_ptext_adr will not be equal to rhead->ptext_adr.
-	 * This is because we would have taken a private copy of the code (for breakpoints) into ptext_adr and kept
-	 * shared_ptext_adr untouched. We will still need to free-up/decrement-refcnt the shared copy (shared_ptext_adr).
-	 */
+	assert(process_exiting || (rhead->shared_ptext_adr == rhead->ptext_adr));
 	objBuff = rhead->shared_ptext_adr - SIZEOF(rhdtyp);
 	rtnobj = (rtnobj_hdr_t *)(objBuff - OFFSETOF(rtnobj_hdr_t, userStorage));
 	assert(STATE_ALLOCATED == rtnobj->state);
@@ -864,8 +895,8 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	{	/* The loaded object cannot be freed until refcnt becomes 0. But caller's job done. Return. */
 		RTNOBJ_DBG(fprintf(stderr,											\
 			"rtnobj_shm_free : rtnname = %s : objhash = 0x%llx : Decremented : refcnt = %d : elem = 0x%llx\n",	\
-			relinkrec->rtnname_fixed.c, (long long unsigned int)rtnobj->objhash, rtnobj->refcnt,			\
-			(long long unsigned int)objBuff);)
+			relinkrec->rtnname_fixed.c, (UINTPTR_T)rtnobj->objhash, rtnobj->refcnt,			\
+			(UINTPTR_T)objBuff);)
 		rel_latch(&relinkrec->rtnobj_latch);
 		return;
 	}
@@ -875,8 +906,7 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	 * But since additions to the linked list happen only at the end, we are guaranteed that the element of
 	 * interest (rtnobj which we want to free and have already located in rtnobj_shm_malloc) would be found
 	 * without reaching the tail portion of that linked list (which would require attaching to the new shmid).
-	 * So no concurrency issues to worry about like we had to in rtnobj_shm_malloc (see use of
-	 * SYNC_RTNOBJ_SHMID_CYCLE_IF_NEEDED macro and how it could do a "continue").
+	 * So no need to invoke the SYNC_RTNOBJ_SHMID_CYCLE_IF_NEEDED macro like we needed to in "rtnobj_shm_malloc".
 	 */
 	shm_index_off = relinkrec->rtnobj_shm_offset;
 	prev_rtnobj = NULL;
@@ -989,8 +1019,8 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	relinkrec->numvers--;
 	RTNOBJ_DBG(fprintf(stderr,												\
 		"rtnobj_shm_free : rtnname = %s : objhash = 0x%llx : Freed : refcnt = %d : elem = 0x%llx : numvers = %d\n",	\
-		relinkrec->rtnname_fixed.c, (long long unsigned int)rtnobj->objhash, rtnobj->refcnt,				\
-		(long long unsigned int)objBuff, relinkrec->numvers);)
+		relinkrec->rtnname_fixed.c, (UINTPTR_T)rtnobj->objhash, rtnobj->refcnt,						\
+		(UINTPTR_T)objBuff, relinkrec->numvers);)
 	rel_latch(&relinkrec->rtnobj_latch);
 	return;
 }

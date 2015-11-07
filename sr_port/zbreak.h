@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +50,10 @@ typedef struct
 
 #define SIZEOF_LA	0
 
-zbrk_struct *zr_find(z_records *zrecs, zb_code *addr);
+#define	RETURN_CLOSEST_MATCH_FALSE	FALSE
+#define	RETURN_CLOSEST_MATCH_TRUE	TRUE
+
+zbrk_struct *zr_find(z_records *zrecs, zb_code *addr, boolean_t return_closest_match);
 zbrk_struct *zr_add_zbreak(z_records *zrecs, zb_code *addr);
 void zr_init(z_records *zrecs, int4 count);
 void zr_remove_zbreak(z_records *zrecs, zbrk_struct *z_ptr);

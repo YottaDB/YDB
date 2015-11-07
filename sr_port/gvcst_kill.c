@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -287,10 +288,20 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 		/* No trigger ^#t reads needed if skip_dbtriggers is TRUE (e.g. mupip load etc.) */
 		if (!skip_dbtriggers)
 		{
+			gvt_root = gv_target->root;	/* store root before macro call to later compare */
 			GVTR_INIT_AND_TPWRAP_IF_NEEDED(csa, csd, gv_target, gvt_trigger, lcl_implicit_tstart, is_tpwrap,
 							ERR_GVKILLFAIL);
 			assert(gvt_trigger == gv_target->gvt_trigger);
+			if (gvt_root && (0 == gv_target->root))
+			{	/* gv_target->root was non-zero BEFORE call to "gvtr_init" (as part of GVTR_INIT_... macro above)
+				 * but zero AFTER the call. This is possible only if it restarted internally due to a concurrent
+				 * online rollback or reorg truncate that moved GVT root blocks. Refetch gv_target->root.
+				 */
+				assert(dollar_tlevel && t_tries && lcl_implicit_tstart);
+				want_root_search = TRUE;
+			}
 		}
+		assert((0 != gv_target->root) || want_root_search || gv_play_duplicate_kills);
 		/* finish off any pending root search from previous retry */
 		REDO_ROOT_SEARCH_IF_NEEDED(want_root_search, cdb_status);
 		if (cdb_sc_normal != cdb_status)
@@ -797,7 +808,8 @@ research:
 			 * the "left hand" key, and therefore, the original curr.offset should be left untouched.
 			 */
 			gvt_hist->h[0].curr_rec.match = alt_hist->h[0].curr_rec.match;
-			COPY_CURRKEY_TO_GVTARGET_CLUE(gv_target, gv_altkey);
+			assert(!TREF(expand_prev_key));	/* this ensures it is safe to use EXPAND_PREV_KEY_FALSE below */
+			COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(gv_target, gv_altkey, EXPAND_PREV_KEY_FALSE);
 		}
 		NON_GTMTRIG_ONLY(assert(lcl_dollar_tlevel == dollar_tlevel));
 		if (!lcl_dollar_tlevel)

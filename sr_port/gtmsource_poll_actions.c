@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc.*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +54,7 @@ GBLREF	int			gtmsource_log_fd;
 GBLREF 	FILE			*gtmsource_log_fp;
 GBLREF	int			gtmsource_filter;
 GBLREF	volatile time_t		gtmsource_now;
+GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	uint4			log_interval;
 #ifdef UNIX
 GBLREF	boolean_t		last_seen_freeze_flag;
@@ -175,6 +177,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 #else
 #error unsupported platform
 #endif
+			STRCPY(gtmsource_options.log_file, jnlpool.gtmsource_local->log_file);
 		}
 	        if ( log_switched == TRUE )
         	        repl_log(gtmsource_log_fp, TRUE, TRUE, "Change log to %s successful\n", gtmsource_local->log_file);

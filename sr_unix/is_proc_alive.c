@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,10 +39,7 @@ bool is_proc_alive(int4 pid, int4 imagecnt)
 	bool		ret;
 
 	if (0 == pid)
-	{
-		assert(FALSE);
 		return FALSE;
-	}
 #	ifdef __MVS__
 	errno = 0;	/* it is possible getpriority returns -1 even in case of success */
 	status = getpriority(PRIO_PROCESS, (id_t)pid);

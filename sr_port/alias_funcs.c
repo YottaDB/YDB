@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -975,9 +976,8 @@ ht_ent_mname *als_lookup_base_lvval(lv_val *lvp)
  *
  * 1)  Run lv_blks which contain all lv_val structures in use for this symbol table.
  * 2)  Record each base lv_val in our version of the array used by stp_gcol. Base lv_vals can be identified
- *     by having a non-zero parent.sym field pointing to a block with type MV_SYM. There are 3 exceptions to
- *     this: In UNIX, the zsearch_var, zsearch_dir1, and zsearch_dir2 fields contain lv_vals that should not be
- *     released. Check for and avoid them.
+ *     by having a non-zero parent.sym field pointing to a block with type MV_SYM. There is one exception to this:
+ *     In UNIX, the zsearch_var fields contains an lv_val that should not be released. Check for and avoid it.
  * 3)  Increment lvtaskcycle with which we will mark lv_vals as having been marked accessible as we discover them.
  * 4)  Go through the hashtable. Set the lvtaskcycle field to mark the lv_val "reachable".
  * 5)  If the lv_val has descendants, run the decendant chain to look for container vars.
@@ -1019,8 +1019,7 @@ int als_lvval_gc(void)
 		{
 			sym = LV_SYMVAL(lvp);
 			assert((NULL == sym) || SYM_IS_SYMVAL(sym));
-			if ((NULL != sym) UNIX_ONLY(&& (TREF(zsearch_var) != lvp))
-				UNIX_ONLY(&& (TREF(zsearch_dir1) != lvp) && (TREF(zsearch_dir2) != lvp)))
+			if ((NULL != sym) UNIX_ONLY(&& (TREF(zsearch_var) != lvp)))
 			{	/* Put it in the list */
 				assert(0 < lvp->stats.trefcnt);
 				ADD_TO_STPARRAY(lvp, lvarray, lvarraycur, lvarraytop, lv_val);

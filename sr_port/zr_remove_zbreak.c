@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +24,7 @@
 void zr_remove_zbreak(z_records *zrecs, zbrk_struct *z_ptr)
 {
 	mstr		rtn_str;
-	rhdtyp		*routine, *rtncopy;
+	rhdtyp		*routine;
 	boolean_t	deleted;
 
 	assert(zrecs->beg  <= zrecs->free);
@@ -46,7 +47,7 @@ void zr_remove_zbreak(z_records *zrecs, zbrk_struct *z_ptr)
 	inst_flush(z_ptr->mpc, SIZEOF(INST_TYPE));
 #	ifdef USHBIN_SUPPORTED
 	if (((z_ptr == zrecs->beg) || ((z_ptr - 1)->rtnhdr != z_ptr->rtnhdr))
-	    && (((z_ptr + 1) == zrecs->free) || ((z_ptr + 1)->rtnhdr != z_ptr->rtnhdr)))
+		&& (((z_ptr + 1) == zrecs->free) || ((z_ptr + 1)->rtnhdr != z_ptr->rtnhdr)))
 	{	/* No more breakpoints in the routine we just removed a ZBREAK from. Note that since zrecs is sorted based
 		 * on mpc, all breakpoints in a given routine are bunched together. Hence, it is possible to determine
 		 * if all breakpoints are deleted from a routine by checking the preceding and succeeding entries of the
@@ -55,21 +56,13 @@ void zr_remove_zbreak(z_records *zrecs, zbrk_struct *z_ptr)
 		assert(0 != z_ptr->rtn->len);
 		rtn_str.len = z_ptr->rtn->len;
 		rtn_str.addr = z_ptr->rtn->addr;
-		routine = rtncopy = z_ptr->rtnhdr;
+		routine = z_ptr->rtnhdr;
 		assert(NULL != routine);
-		/* We now have the routine header associated with this ZBREAK. But if this routine was recursively relinked
-		 * AND shared, then the address we need to check about releasing is associated with the copy of the routine
-		 * header/code we made for the recursive link (see handle_active_old_versions() for description).
-		 */
-		if (NULL != routine->active_rhead_adr)
+		assert(NULL == routine->active_rhead_adr);
+		if (NULL != routine->shared_ptext_adr) 		/* Revert back to shared copy of routine */
 		{
-			rtncopy = routine->active_rhead_adr;
-			rtncopy->has_ZBREAK = FALSE;
-		}
-		if (NULL != rtncopy->shared_ptext_adr) 		/* Revert back to shared copy of routine */
-		{
-			assert(rtncopy->shared_ptext_adr != rtncopy->ptext_adr);
-			release_private_code_copy(rtncopy);
+			assert(routine->shared_ptext_adr != routine->ptext_adr);
+			release_private_code_copy(routine);
 		}
 		routine->has_ZBREAK = FALSE;	/* Indicate no more ZBREAKs in this routine */
 	}

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +61,7 @@
 #include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 #include "continue_handler.h"
+#include "gtmio.h"
 
 #ifdef UNICODE_SUPPORTED
 # include "gtm_icu_api.h"
@@ -128,4 +130,5 @@ int main (int argc, char **argv)
 void display_prompt(void)
 {
 	PRINTF("MUPIP> ");
+	FFLUSH(stdout);
 }

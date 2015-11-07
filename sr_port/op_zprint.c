@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,19 +55,20 @@ void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label,
 	mstr			*src1, *src2;
 	uint4			stat1, stat2;
 	rhdtyp			*rtn_vector, *rtn_vector2;
-	GTMTRIG_ONLY(boolean_t	is_trigger;)
+	DBGTRIGR_ONLY(boolean_t	is_trigger;)
 
 	MV_FORCE_STR(start_label);
 	MV_FORCE_STR(end_label);
 	MV_FORCE_STR(rtn);
-	GTMTRIG_ONLY(IS_TRIGGER_RTN(&rtn->str, is_trigger));
+	DBGTRIGR_ONLY(IS_TRIGGER_RTN(&rtn->str, is_trigger));
 	DBGIFTRIGR((stderr, "op_zprint: Performing zprint of a trigger $tlevel=%d $trestart=%d\n", dollar_tlevel, t_tries));
 	stat1 = get_src_line(rtn, start_label, start_int_exp, &src1, &rtn_vector);
-	DBGIFTRIGR((stderr, "op_zprint: get_src_line returned %d\n", stat1));
+	DBGTRIGR_ONLY(is_trigger=((NULL != rtn_vector) && (NULL != rtn_vector->trigr_handle)));
+	DBGIFTRIGR((stderr, "op_zprint: get_src_line returned %d for %lx\n", stat1, rtn_vector));
 	if (OBJMODMISS == stat1)
 	{
 #		ifdef GTM_TRIGGER
-		if (is_trigger)
+		if ((NULL != rtn_vector) && (NULL != rtn_vector->trigr_handle))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGNAMENF, 2, rtn->str.len, rtn->str.addr);
 #		endif
 		/* get_src_line did not find the object file to load */

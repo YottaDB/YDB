@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +21,7 @@
 GBLREF	volatile int4	fast_lock_count;		/* Stop interrupts while we have our parts exposed */
 GBLREF	uint4		process_id;
 
-/* Grab a latch. If cannot get it, return FALSE, else TRUE. */
+/* Release latch specified by argument */
 void	rel_latch(sm_global_latch_ptr_t latch)
 {
 	++fast_lock_count;	/* Disable interrupts (i.e. wcs_stale) for duration to avoid potential deadlocks */

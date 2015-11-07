@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,6 +81,7 @@ error_def(ERR_OLDBINEXTRACT);
 error_def(ERR_LOADINVCHSET);
 error_def(ERR_LDSPANGLOINCMP);
 error_def(ERR_RECLOAD);
+error_def(ERR_GVFAILCORE);
 
 #define	BIN_PUT		0
 #define BIN_BIND	1
@@ -228,8 +230,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1], sn_key_str[MAX_KEY_SZ + 1], *sn_key_str_end;
 	unsigned char		*end_buff;
 	unsigned short		rec_len, next_cmpc, numsubs;
-	int			len;
-	int			current, last, length, max_blk_siz, max_key, status;
+	int			len, current, last, length, max_blk_siz, max_key, status;
 	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size;
 	uint4			max_data_len, max_subsc_len, gblsize;
 	ssize_t			subsc_len, extr_std_null_coll;
@@ -252,6 +253,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr;
 	int4			index;
 	gtmcrypt_key_t		*encr_key_handles;
+	boolean_t		encrypted_version, mixed_encryption;
+	char			index_err_buf[1024];
 #	endif
 	gvnh_reg_t		*gvnh_reg;
 	gd_region		*dummy_reg;
@@ -274,10 +277,9 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		mupip_exit(ERR_LDBINFMT);
 	}
 	hdr_lvl = EXTR_HEADER_LEVEL(ptr);
-	if (!(((('4' == hdr_lvl) || ('5' == hdr_lvl)) && (V5_BIN_HEADER_SZ == len)) ||
-			(('6' == hdr_lvl) && (BIN_HEADER_SZ == len)) ||
-			(('7' == hdr_lvl) && (BIN_HEADER_SZ == len)) ||
-			(('4' > hdr_lvl) && (V3_BIN_HEADER_SZ == len))))
+	if (!(	((('4' == hdr_lvl) || ('5' == hdr_lvl)) && (V5_BIN_HEADER_SZ == len)) ||
+		((('6' == hdr_lvl) || ('7' == hdr_lvl) || ('8' == hdr_lvl)) && (BIN_HEADER_SZ == len)) ||
+		(('4' > hdr_lvl) && (V3_BIN_HEADER_SZ == len))))
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
@@ -285,7 +287,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	/* expecting the level in a single character */
 	assert(' ' == *(ptr + SIZEOF(BIN_HEADER_LABEL) - 3));
 	if (0 != memcmp(ptr, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || ('2' > hdr_lvl) ||
-			*(BIN_HEADER_VERSION_ENCR) < hdr_lvl)
+			*(BIN_HEADER_VERSION_ENCR_INDEX) < hdr_lvl)
 	{	/* ignore the level check */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
@@ -334,7 +336,9 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	} else
 		extr_std_null_coll = 0;
 #	ifdef GTM_CRYPT
-	if ('7' <= hdr_lvl)
+	/* Encrypted versions to date. */
+	encrypted_version = ('8' == hdr_lvl) || ('7' == hdr_lvl) || ('5' == hdr_lvl);
+	if (encrypted_version)
 	{
 		encrypted_hash_array_len = file_input_bin_get((char **)&ptr, &file_offset_base,
 								(char **)&ptr_base, DO_RTS_ERROR_TRUE);
@@ -345,11 +349,15 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		memset(encr_key_handles, 0, SIZEOF(gtmcrypt_key_t) * n_index);
 		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
 		GC_BIN_LOAD_ERR(gtmcrypt_errno);
+		mixed_encryption = FALSE;
 		for (index = 0; index < n_index; index++)
 		{
 			curr_hash_ptr = encrypted_hash_array_ptr + index * GTMCRYPT_HASH_LEN;
 			if (0 == memcmp(curr_hash_ptr, EMPTY_GTMCRYPT_HASH, GTMCRYPT_HASH_LEN))
+			{
+				mixed_encryption = TRUE;
 				continue;
+			}
 			GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, curr_hash_ptr, encr_key_handles[index], gtmcrypt_errno);
 			GC_BIN_LOAD_ERR(gtmcrypt_errno);
 		}
@@ -432,27 +440,70 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			rec_count--;	/* Decrement as this record does not count as a record for loading purposes */
 			continue;
 		}
-		rp = (rec_hdr*)(ptr);
+		rp = (rec_hdr *)(ptr);
 #		ifdef GTM_CRYPT
-		if ('7' <= hdr_lvl)
+		if (encrypted_version)
 		{	/* Getting index value from the extracted file. It indicates which database file this record belongs to */
 			GET_LONG(index, ptr);
-			if (-1 != index) /* Indicates that the record is encrypted. */
+			if ('7' != hdr_lvl)
 			{
-				in_len = len - SIZEOF(int4);
-				inbuf = (char *)(ptr + SIZEOF(int4));
-				GTMCRYPT_DECRYPT(NULL, encr_key_handles[index], inbuf, in_len, NULL, gtmcrypt_errno);
-				GC_BIN_LOAD_ERR(gtmcrypt_errno);
+				if (-1 != index)
+				{	/* Record is encrypted; ensure legitimate encryption handle index. */
+					if ((n_index <= index) || (0 > index))
+					{
+						SNPRINTF(index_err_buf, SIZEOF(index_err_buf),
+								"Encryption handle expected in the range [0; %d) but found %d",
+								n_index, index);
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_SEVERE(ERR_RECLOAD),
+								1, &rec_count, ERR_TEXT, 2, RTS_ERROR_TEXT(index_err_buf),
+								ERR_GVFAILCORE);
+						gtm_fork_n_core();
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) MAKE_MSG_SEVERE(ERR_RECLOAD),
+								1, &rec_count, ERR_TEXT, 2, RTS_ERROR_TEXT(index_err_buf));
+						return;
+					}
+					in_len = len - SIZEOF(int4);
+					inbuf = (char *)(ptr + SIZEOF(int4));
+					GTMCRYPT_DECRYPT(NULL, encr_key_handles[index], inbuf, in_len, NULL, gtmcrypt_errno);
+					GC_BIN_LOAD_ERR(gtmcrypt_errno);
+				}
+				rp = (rec_hdr *)(ptr + SIZEOF(int4));
+			} else
+			{	/* In version the extract logic did not properly distinguish non-encrypted records from encrypted
+				 * ones in case both kinds were present. Specifically, extracts did not precede unencrypted records
+				 * with a '-1' to signify that no decryption is required. Here we make the best attempt to recognize
+				 * that situation and process the record so long as the index appears legitimate.
+				 */
+				if (-1 != index)
+				{	/* Record is probably encrypted; however, there is a slight chance that the encryption
+					 * handle index is incorrect, although in a legitimate range. In that case we will
+					 * additionally check if the corresponding hash is non-zero---which would only be the case
+					 * if the region was encrypted---but only when dealing with a mix of encrypted and
+					 * unencrypted data.
+					 */
+					if ((n_index > index) && (0 <= index)
+						&& (!mixed_encryption
+							|| (0 != memcmp(encrypted_hash_array_ptr + index * GTMCRYPT_HASH_LEN,
+								EMPTY_GTMCRYPT_HASH, GTMCRYPT_HASH_LEN))))
+					{
+						in_len = len - SIZEOF(int4);
+						inbuf = (char *)(ptr + SIZEOF(int4));
+						GTMCRYPT_DECRYPT(NULL, encr_key_handles[index], inbuf, in_len,
+								NULL, gtmcrypt_errno);
+						GC_BIN_LOAD_ERR(gtmcrypt_errno);
+						rp = (rec_hdr *)(ptr + SIZEOF(int4));
+					}
+				} else
+					rp = (rec_hdr *)(ptr + SIZEOF(int4));
 			}
-			rp = (rec_hdr*)(ptr + SIZEOF(int4));
 		}
 #		endif
 		btop = ptr + len;
 		cp1 = (unsigned char*)(rp + 1);
-		gvname.var_name.addr = (char*)cp1;
+		gvname.var_name.addr = (char *)cp1;
 		while (*cp1++)
 			;
-		gvname.var_name.len =INTCAST((char*)cp1 - gvname.var_name.addr - 1);
+		gvname.var_name.len = INTCAST((char *)cp1 - gvname.var_name.addr - 1);
 		if (('2' >= hdr_lvl) || new_gvn)
 		{
 			if ((HASHT_GBLNAME_LEN == gvname.var_name.len)
@@ -761,10 +812,12 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					{
 						DISPLAY_INCMP_SN_MSG;
 						if ((sn_hold_buff_pos + v.str.len) <= gblsize)
-							util_out_print("!_!_Expected chunk number : !UL but found chunk number : !UL", /*BYPASSOK*/
+							util_out_print("!_!_Expected chunk number : "
+								"!UL but found chunk number : !UL",
 								TRUE, expected_sn_chunk_number + 1, sn_chunk_number + 1);
 						else
-							util_out_print("!_!_Global value too large:  expected size : !UL actual size : !UL chunk number : !UL", TRUE, /*BYPASSOK*/
+							util_out_print("!_!_Global value too large:  expected size : "
+								"!UL actual size : !UL chunk number : !UL", TRUE,
 								gblsize, sn_hold_buff_pos + v.str.len, sn_chunk_number + 1);
 						if (sn_hold_buff_pos)
 							DISPLAY_PARTIAL_SN_HOLD_BUFF;

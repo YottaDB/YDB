@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,14 +28,17 @@
 #include "gtm_utf8.h"
 #endif
 #include "gtmcrypt.h"
+#include "send_msg.h"
+#include "error.h"
 
 #ifdef UNICODE_SUPPORTED
-LITREF	mstr		chset_names[];
-GBLREF	UConverter	*chset_desc[];
+LITREF mstr		chset_names[];
+GBLREF UConverter	*chset_desc[];
 #endif
 
 error_def(ERR_CRYPTBADWRTPOS);
 error_def(ERR_DEVICEREADONLY);
+error_def(ERR_NOPRINCIO);
 error_def(ERR_NOTTOEOFONPUT);
 error_def(ERR_SYSCALL);
 
@@ -48,7 +52,9 @@ void iorm_wteol(int4 x,io_desc *iod)
 	unsigned int	*dollary_ptr;
 	struct stat	statbuf;
 	int		fstat_res, save_errno;
+	boolean_t	ch_set;
 
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 #	ifdef __MVS__
 	/* on zos if it is a fifo device then point to the pair.out for $X and $Y */
 	if (((d_rm_struct *)iod->dev_sp)->fifo)
@@ -119,13 +125,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 						out_ptr = pvt_crypt_buf.addr;
 					}
 					DOWRITERL(rm_ptr->fildes, out_ptr, UTF16BE_BOM_LEN, res_size);
-					if (-1 == res_size)
-					{
-						int real_errno = errno;
-						DOLLAR_DEVICE_WRITE(iod, real_errno);
-						iod->dollar.za = 9;
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
-					}
+					ISSUE_NOPRINCIO_IF_NEEDED_RM(res_size, <=, iod);
 					rm_ptr->write_occurred = TRUE;
 					iod->ochset = CHSET_UTF16BE;
 					get_chset_desc(&chset_names[iod->ochset]);
@@ -176,12 +176,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 							out_ptr = pvt_crypt_buf.addr;
 						}
 						DOWRITERC(rm_ptr->fildes, out_ptr, bytes_per_char, status);
-						if (0 != status)
-						{
-							DOLLAR_DEVICE_WRITE(iod, status);
-							iod->dollar.za = 9;
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-						}
+						ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 						rm_ptr->write_occurred = TRUE;
 					}
 					assert(rm_ptr->out_bytes == rm_ptr->recordsize);
@@ -206,13 +201,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 					out_ptr = pvt_crypt_buf.addr;
 				}
 				DOWRITERL(rm_ptr->fildes, out_ptr, pad_size, res_size);
-				if (-1 == res_size)
-				{
-					int real_errno = errno;
-					DOLLAR_DEVICE_WRITE(iod, real_errno);
-					iod->dollar.za = 9;
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
-				}
+				ISSUE_NOPRINCIO_IF_NEEDED_RM(res_size, <=, iod);
 				rm_ptr->write_occurred = TRUE;
 				assert(res_size == pad_size);
 			}
@@ -226,12 +215,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 				out_ptr = pvt_crypt_buf.addr;
 			}
 			DOWRITERC(rm_ptr->fildes, out_ptr, RMEOL_LEN, status);
-			if (0 != status)
-			{
-				DOLLAR_DEVICE_WRITE(iod, status);
-				iod->dollar.za = 9;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-			}
+			ISSUE_NOPRINCIO_IF_NEEDED_RM(status, ==, iod);
 			rm_ptr->write_occurred = TRUE;
 		}
 		*dollarx_ptr = 0;
@@ -244,5 +228,6 @@ void iorm_wteol(int4 x,io_desc *iod)
 	*dollary_ptr += x;
 	if (iod->length)
 		*dollary_ptr %= iod->length;
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

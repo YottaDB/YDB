@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,13 +64,15 @@ void exfun_frame (void)
 	sf->ret_value = NULL;
 	sf->dollar_test = -1;
 	sf->old_frame_pointer = frame_pointer;
+	sf->flags = 0;			/* Don't propagate special flags */
 	sf->type &= SFT_ZINTR_OFF;	/* Don't propagate special type - normally can't propagate but if $ZINTERRUPT frame is
 					 * rewritten by ZGOTO to a "regular" frame, this frame type *can* propagate.
 					 */
 	frame_pointer = sf;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
-	DBGEHND((stderr, "exfun_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr"\n",
-		 sf, msp_save, msp));
+	DBGEHND((stderr, "exfun_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr" for routine "
+		 "%.*s (rtnhdr 0x"lvaddr")\n", sf, msp_save, msp, sf->rvector->routine_name.len, sf->rvector->routine_name.addr,
+		 sf->rvector));
 	return;
 }
 

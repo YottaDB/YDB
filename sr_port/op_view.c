@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +45,7 @@
 #include "gvcmz.h"
 #include "testpt.h"
 #include "mvalconv.h"
-#include "dpgbldir.h"	/* for get_next_gdr() prototype */
+#include "dpgbldir.h"		/* For get_next_gdr() prototype */
 #include "ast.h"
 #include "wcs_flu.h"
 #include "stringpool.h"
@@ -57,7 +58,7 @@
 #include "targ_alloc.h"
 #include "gvcst_protos.h"
 #ifdef GTM_TRIGGER
-# include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
+# include "rtnhdr.h"		/* For rtn_tabent in gv_trigger.h */
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
 #endif
@@ -73,6 +74,7 @@
 # include "relinkctl.h"
 #endif
 #include "gtmimagename.h"
+#include "cache.h"
 
 STATICFNDCL void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
 
@@ -91,9 +93,9 @@ GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	symval			*curr_symval;
-GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
+GBLREF	trans_num		local_tn;	/* Transaction number for THIS PROCESS */
 GBLREF	int4			zdir_form;
-GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF	boolean_t		gvdupsetnoop;	/* If TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF	boolean_t		badchar_inhibit;
 GBLREF	int			gv_fillfactor;
 GBLREF	symval			*curr_symval;
@@ -130,7 +132,7 @@ error_def(ERR_ZDEFACTIVE);
 
 #define WRITE_LITERAL(x) (outval.str.len = SIZEOF(x) - 1, outval.str.addr = (x), op_write(&outval))
 
-/* if changing noisolation status within TP and already referenced the global, then error */
+/* If changing noisolation status within TP and already referenced the global, then error */
 #define SET_GVNH_NOISOLATION_STATUS(gvnh, status)								\
 {														\
 	GBLREF	uint4			dollar_tlevel;								\
@@ -144,7 +146,7 @@ error_def(ERR_ZDEFACTIVE);
 
 void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 {
-	boolean_t		dbgdmpenabled, was_crit, was_skip_gtm_putmsg;
+	boolean_t		dbgdmpenabled, old_bool, was_crit, was_skip_gtm_putmsg;
 	char			*chptr;
 	collseq			*new_lcl_collseq;
 	gd_addr			*addr_ptr;
@@ -172,7 +174,6 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 #	ifdef AUTORELINK_SUPPORTED
 	open_relinkctl_sgm	*linkctl;
 	relinkrec_t		*linkrec;
-	int			recnum;
 #	endif
 	VMS_ONLY(int		numarg;)
 	static readonly char msg1[] = "Caution: Database Block Certification Has Been ";
@@ -190,7 +191,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	jnl_status = 0;
 	assertpro(1 <= numarg);
 	MV_FORCE_STR(keyword);
-	numarg--;	/* remove keyword from count */
+	numarg--;	/* Remove keyword from count */
 	if (0 < numarg)
 	{
 		arg = va_arg(var, mval *);
@@ -235,8 +236,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 		case VTK_GVSRESET:
 		case VTK_JNLFLUSH:
 		case VTK_POOLLIMIT:
-			arg = (numarg > 1) ? va_arg(var, mval *) : NULL;
-			view_dbop(vtp->keycode, &parmblk, arg);
+			view_dbop(vtp->keycode, &parmblk, (numarg > 1) ? va_arg(var, mval *) : (mval *)NULL);
 			break;
 #		ifdef UNIX
 		case VTK_DMTERM:
@@ -247,16 +247,16 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			break;
 #		endif
 		case VTK_FULLBOOL:
-			TREF(gtm_fullbool) = FULL_BOOL;
-			break;
 		case VTK_FULLBOOLWARN:
-			TREF(gtm_fullbool) = FULL_BOOL_WARN;
-			break;
 		case VTK_NOFULLBOOL:
-			if (OLD_SE == TREF(side_effect_handling))
-				TREF(gtm_fullbool) = GTM_BOOL;
-			else
+
+			if ((VTK_NOFULLBOOL == vtp->keycode) && (OLD_SE != TREF(side_effect_handling)))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SEFCTNEEDSFULLB);
+			old_bool = TREF(gtm_fullbool);
+			TREF(gtm_fullbool) = (VTK_FULLBOOL == vtp->keycode) ? FULL_BOOL
+				: (VTK_FULLBOOLWARN == vtp->keycode) ? FULL_BOOL_WARN : GTM_BOOL;
+			if (old_bool != TREF(gtm_fullbool))
+				cache_table_rebuild();
 			break;
 		case VTK_GDSCERT0:
 			outval.mvtype = MV_STR;
@@ -315,39 +315,13 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				TREF(error_on_jnl_file_lost) = MV_FORCE_INT(parmblk.value);
 				if (MAX_JNL_FILE_LOST_OPT < TREF(error_on_jnl_file_lost))
 					TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_TURN_OFF;
-				if (NULL == gd_header)		/* open gbldir */
-					gvinit();
-				save_reg = gv_cur_region;
-				/* change all regions */
-				reg = gd_header->regions;
-				r_top = reg + gd_header->n_regions - 1;
-				for (;  reg <= r_top;  reg++)
-				{
-					if (!reg->open)
-						gv_init_reg(reg);
-					if (!reg->read_only)
-					{
-						gv_cur_region = reg;
-						change_reg();
-						csa = cs_addrs;
-						csd = csa->hdr;
-						if (JNL_ENABLED(csd))
-						{
-							was_crit = csa->now_crit;
-							if (!was_crit)
-								grab_crit(reg);
-							if (JNL_ENABLED(csd))
-								csa->jnl->error_reported = FALSE;
-							if (!was_crit)
-								rel_crit(reg);
-						}
-					}
-				}
+				parmblk.gv_ptr = NULL;
+				view_dbop(vtp->keycode, &parmblk, (mval *)NULL);
 			}
 			break;
 #		endif
 		case VTK_JNLWAIT:
-			/* go through all regions that could have possibly been open across all global directories */
+			/* Go through all regions that could have possibly been open across all global directories */
 			if (!dollar_tlevel)
 			{	/* Only if we're not in a TP transaction */
 				for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
@@ -440,7 +414,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
 			}
 			was_skip_gtm_putmsg = TREF(skip_gtm_putmsg);
-			TREF(skip_gtm_putmsg) = TRUE;	/* to avoid ready_collseq from doing gtm_putmsg in case of errors.
+			TREF(skip_gtm_putmsg) = TRUE;	/* To avoid ready_collseq from doing gtm_putmsg in case of errors.
 							 * not doing so will cause GDECHECK errors in caller (GDE).
 							 */
 			new_lcl_collseq = ready_collseq(lct);
@@ -486,7 +460,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				view_arg_convert(vtp, VTP_DBREGION, arg, &parmblk2, IS_DOLLAR_VIEW_FALSE);
 				reg = parmblk2.gv_ptr;
 				/* Determine if "reg" is mapped to by global name. If not issue error */
-				gvnh_reg = TREF(gd_targ_gvnh_reg);	/* set up by op_gvname */
+				gvnh_reg = TREF(gd_targ_gvnh_reg);	/* Set up by op_gvname */
 				gvspan = (NULL == gvnh_reg) ? NULL : gvnh_reg->gvspan;
 				if (((NULL != gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg))
 					|| ((NULL == gvspan) && (reg != gv_cur_region)))
@@ -545,7 +519,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
 				}
 			}
-			/* at this point, verify that there is no local data with subscripts */
+			/* At this point, verify that there is no local data with subscripts */
 			for (cstab = curr_symval; cstab; cstab = cstab->last_tab)
 			{
 				assert(cstab->h_symtab.top == cstab->h_symtab.base + cstab->h_symtab.size);
@@ -674,7 +648,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			gv_fillfactor = testvalue;
 			break;
 		case VTK_STPGCOL:
-			INVOKE_STP_GCOL(INTCAST(stringpool.top - stringpool.free) + 1);/* computation to avoid assert in stp_gcol */
+			INVOKE_STP_GCOL(INTCAST(stringpool.top - stringpool.free) + 1);/* Computation to avoid assert in stp_gcol */
 			break;
 		case VTK_LVGCOL:
 			als_lvval_gc();
@@ -825,26 +799,25 @@ void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 	uint4			jnl_status, dummy_errno;
 	UNIX_ONLY(unix_db_info	*udi;)
 
-	if (NULL == gd_header)		/* open gbldir */
+	if (NULL == gd_header)		/* Open gbldir */
 		gvinit();
 	save_reg = gv_cur_region;
 	if (NULL == parmblkptr->gv_ptr)
-	{	/* operate on all regions */
+	{	/* Operate on all regions */
 		reg = gd_header->regions;
 		r_top = reg + gd_header->n_regions - 1;
-	} else	/* operate on selected region */
+	} else	/* Operate on selected region */
 		r_top = reg = parmblkptr->gv_ptr;
 	for (; reg <= r_top; reg++)
 	{
 		if (!reg->open)
 			gv_init_reg(reg);
-		gv_cur_region = reg;
+		TP_CHANGE_REG(reg);
 		switch(keycode)
 		{
 			case VTK_DBFLUSH:
 				if (!reg->read_only)
 				{
-					change_reg(); /* for jnl_ensure_open */
 					nbuffs = (NULL != thirdarg) ? MV_FORCE_INT(thirdarg) : cs_addrs->nl->wcs_active_lvl;
 					JNL_ENSURE_OPEN_WCS_WTSTART(cs_addrs, reg, nbuffs, dummy_errno);
 				}
@@ -853,7 +826,6 @@ void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 #				ifdef UNIX
 				if (!reg->read_only)
 				{
-					change_reg();
 					csa = cs_addrs;
 					udi = FILE_INFO(reg);
 					DB_FSYNC(reg, udi, csa, db_fsync_in_prog, save_errno);
@@ -870,7 +842,6 @@ void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 			case VTK_FLUSH:
 				if (!reg->read_only)
 				{
-					change_reg(); /* for jnl_ensure_open */
 					ENSURE_JNL_OPEN(cs_addrs, gv_cur_region);
 					/* We should NOT invoke wcs_recover here because it's possible we are in the final retry
 					 * of a TP transaction. In this case, we likely have pointers to non-dirty global buffers
@@ -886,10 +857,28 @@ void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 				change_reg();
 				if (!reg->read_only)
 					CLRGVSTATS(cs_addrs);
-				memset((char *)&cs_addrs->gvstats_rec, 0, SIZEOF(gvstats_rec_t));	/* always process-private */
+				memset((char *)&cs_addrs->gvstats_rec, 0, SIZEOF(gvstats_rec_t));	/* Always process-private */
 				break;
+#			ifndef VMS
+			case VTK_JNLERROR:
+				if (!reg->read_only)
+				{
+					csa = cs_addrs;
+					csd = csa->hdr;
+					if (JNL_ENABLED(csd))
+					{
+						was_crit = csa->now_crit;
+						if (!was_crit)
+							grab_crit(reg);
+						if (JNL_ENABLED(csd))
+							csa->jnl->error_reported = FALSE;
+						if (!was_crit)
+							rel_crit(reg);
+					}
+				}
+				break;
+#				endif
 			case VTK_JNLFLUSH:
-				change_reg();
 				csa = cs_addrs;
 				csd = csa->hdr;
 				if (JNL_ENABLED(csd))
@@ -925,14 +914,13 @@ void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 				}
 				break;
 			case VTK_POOLLIMIT:
-				change_reg();
 				csa = cs_addrs;
 				csd = csa->hdr;
-				nbuffs = MV_FORCE_INT(thirdarg);
-				if ((MV_STR & thirdarg->mvtype) && ('%' == thirdarg->str.addr[thirdarg->str.len - 1]))
-					nbuffs = (100 == nbuffs) ? 0 : (csd->n_bts * nbuffs) / 100;		/* percentage */
+				nbuffs = ((dba_bg == csd->acc_meth) && (NULL != thirdarg)) ? MV_FORCE_INT(thirdarg) : 0;
+				if (nbuffs && (MV_STR & thirdarg->mvtype) && ('%' == thirdarg->str.addr[thirdarg->str.len - 1]))
+					nbuffs = (100 == nbuffs) ? 0 : (csd->n_bts * nbuffs) / 100;		/* Percentage */
 				csa->gbuff_limit = (0 == nbuffs) ? 0 : MAX(MIN(nbuffs, csd->n_bts * .5), MIN_GBUFF_LIMIT);
-				/* to pick the current "hand" as a pseudo-random spot for our area see dbg code in gvcst_init
+				/* To pick the current "hand" as a pseudo-random spot for our area see dbg code in gvcst_init
 				 * but for the first release of this always pick the end of the buffer
 				 */
 				csa->our_midnite = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets + csd->n_bts;

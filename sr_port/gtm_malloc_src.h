@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -178,7 +179,8 @@
 #  define GMR_ONLY(statement)
 #  define NON_GMR_ONLY(statement) statement
 #endif
-#define MAXTWO 2048
+#define MAXBACKFILL (16 * 1024)			/* Maximum backfill of large structures */
+#define MAXTWO 2048				/* Maximum size we allocate from queues */
 /* How many "MAXTWO" elements to allocate at one time. This minimizes the waste since our subblocks must
  * be aligned on a suitable power of two boundary for the buddy-system to work properly.
  */
@@ -1257,6 +1259,7 @@ void backfill(unsigned char *ptr, gtm_msize_t len)
 
 	if (0 != len)
 	{
+		len = MIN(len, MAXBACKFILL);			/* Restrict backfill for performance */
 		/* Process unaligned portion first */
 		unalgnLen = (gtm_msize_t)ptr & AddrMask;	/* Past an alignment point */
 		if (unalgnLen)
@@ -1308,6 +1311,7 @@ boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len)
 
 	if (0 != len)
 	{
+		len = MIN(len, MAXBACKFILL);			/* Restrict backfill check for performance */
 		/* Process unaligned portion first */
 		unalgnLen = (gtm_msize_t)ptr & AddrMask;	/* Past an alignment point */
 		if (unalgnLen)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,10 +16,10 @@
 #include "min_max.h"
 
 /* Note: GT.M code *MUST*NOT* make use of the sleep() function because use of the sleep() function	(BYPASSOK - sleep())
-   causes problems with GT.M's timers on some platforms. Specifically, the sleep() function
-   causes the SIGARLM handler to be silently deleted on Solaris systems (through Solaris 9 at least).
-   This leads to lost timer pops and has the potential for system hangs. The proper long sleep mechanism
-   is hiber_start which can be accessed through the LONG_SLEEP macro defined in mdef.h.
+ * causes problems with GT.M's timers on some platforms. Specifically, the sleep() function
+ * causes the SIGARLM handler to be silently deleted on Solaris systems (through Solaris 9 at least).
+ * This leads to lost timer pops and has the potential for system hangs. The proper long sleep mechanism
+ * is hiber_start which can be accessed through the LONG_SLEEP macro defined in mdef.h.
  */
 
 /* It has been found that on some platforms wcs_sleep(1msec) takes a lot longer than 1 msec to return. We think
@@ -58,21 +59,26 @@
 #define	SLEEP_WRTLATCHWAIT	1		/* 1-msec wait */
 #define	MAXWRTLATCHWAIT		1000		/* 1sec = 1000 * 1-msec time waits to see if write-latch value of a
 						 * 	cache-record becomes free (i.e. LATCH_CLEAR) in db_csh_getn() */
-#define RETRY_CASLATCH_CUTOFF	16		/* retry loop index cutoff to try performCASLatchCheck() */
 #define MAXWAIT2KILL		(2 * SLEEP_ONE_MIN) /* KILLs wait for MAXWAIT2KILL minute(s) for inhibit_kills
 						     * to become zero */
 
 /*  For use by spin locks, SLEEP is ms, total should be under a minute */
-#define LOCK_TRIES		(50 * 4 * 1000) /* outer loop: 50 secs, 1 loop in 4 is sleep of 1 ms */
-#define LOCK_SPINS		1024		/* inner spin loop base */
+#define LOCK_TRIES_PER_SEC	(4 * 1000)	/* In outer loop: 1 loop in 4 is sleep of 1ms */
+#define LOCK_TRIES		(50 * LOCK_TRIES_PER_SEC)	/* Approximately 50 seconds for non-IO locks */
+#define LOCK_SPINS		1024		/* Inner spin loop base */
 #define LOCK_SPINS_PER_4PROC	256		/* Additional lock spins for every 4 processors past first 8 */
-#define LOCK_SLEEP		1		/* very short sleep before repoll lock */
+#define LOCK_SLEEP		1		/* Very short sleep before repoll lock */
+#define LOCK_CASLATCH_CHKINTVL	16384		/* Check CASLatch for abandonment/wakeup interval. This interval
+						 * is currently ~4 seconds but checking for 16384 (power of 2) rather
+						 * than (4 * LOCK_TRIES_PER_SEC) allows a faster remainder using AND
+						 * so use that instead.
+						 */
 
 /* To compute the maximum duration of an inner spinloop, the following macro can be
-   used. The theory behind this macro is that the basic definition of LOCK_SPINS is
-   good for approximately 8 processors but needs to be appropriately increased for
-   each additional 4 processors.
-*/
+ * used. The theory behind this macro is that the basic definition of LOCK_SPINS is
+ * good for approximately 8 processors but needs to be appropriately increased for
+ * each additional 4 processors.
+ */
 #define MAX_LOCK_SPINS(base, proc) (base + MAX(0, ((((proc - 7) * LOCK_SPINS_PER_4PROC) / 4))))
 
 /* Maximum duration (in minutes) that a process waits for the completion of read-in-progress after which

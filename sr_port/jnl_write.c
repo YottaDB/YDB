@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -359,9 +360,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		jpc->new_freeaddr = lcl_freeaddr + align_rec_len;
 		INCR_GVSTATS_COUNTER(csa, cnl, n_jrec_other, 1);
 		INCR_GVSTATS_COUNTER(csa, cnl, n_jbuff_bytes, align_rec_len);
-		assert(jgbl.gbl_jrec_time >= align_rec.prefix.time);
-		assert(align_rec.prefix.time >= jb->prev_jrec_time);
-		jb->prev_jrec_time = align_rec.prefix.time;
+		SET_JNLBUFF_PREV_JREC_TIME(jb, align_rec.prefix.time, DO_GBL_JREC_TIME_CHECK_TRUE);
+			/* Keep jb->prev_jrec_time up to date */
 		jpc->temp_free = lcl_free; /* set jpc->temp_free BEFORE setting free_update_pid (secshr_db_clnup relies on this) */
 		assert(lcl_free == jpc->new_freeaddr % lcl_size);
 		/* Note that freeaddr should be updated ahead of free since jnl_output_sp.c does computation of wrtsize
@@ -570,9 +570,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		if (temp_jnlpool_ctl->write >= jnlpool_size)
 			temp_jnlpool_ctl->write -= jnlpool_size;
 	}
-	assert(jgbl.gbl_jrec_time >= jnl_rec->prefix.time);
-	assert(jnl_rec->prefix.time >= jb->prev_jrec_time);
-	jb->prev_jrec_time = jnl_rec->prefix.time;
+	SET_JNLBUFF_PREV_JREC_TIME(jb, jnl_rec->prefix.time, DO_GBL_JREC_TIME_CHECK_TRUE); /* Keep jb->prev_jrec_time up to date */
 	jpc->temp_free = lcl_free; /* set jpc->temp_free BEFORE setting free_update_pid (secshr_db_clnup relies on this) */
 	/* Note that freeaddr should be updated ahead of free since jnl_output_sp.c does computation of wrtsize
 	 * based on free and asserts follow later there which use freeaddr.

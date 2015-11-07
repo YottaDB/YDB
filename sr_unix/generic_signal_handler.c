@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -326,7 +327,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		if (!dont_want_core && IS_MCODE_RUNNING && (NULL != (signal_routine = RFPTR(create_fatal_error_zshow_dmp_fptr))))
 		{	/* note assignment of signal_routine above */
 			SFPTR(create_fatal_error_zshow_dmp_fptr, NULL);
-			(*signal_routine)(exi_condition, FALSE);
+			(*signal_routine)(exi_condition);
 		}
 		/* Some mupip functions define an entry point to drive on signals. Make sure to do this AFTER we create the
 		 * dump file above as it may detach things (like the recvpool) we need to create the above dump.

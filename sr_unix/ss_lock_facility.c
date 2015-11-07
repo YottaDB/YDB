@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,8 +85,8 @@ boolean_t ss_get_lock(gd_region *reg)
 		{
 			/* On every 4th pass, we bide for awhile */
 			wcs_sleep(LOCK_SLEEP);
-			/* If near end of loop segment (LOCK_TRIES iters), see if target is dead and/or wake it up */
-			if (RETRY_CASLATCH_CUTOFF == (retries % LOCK_TRIES))
+			/* Check if we're due to check for lock abandonment check or holder wakeup */
+			if (0 == (retries & (LOCK_CASLATCH_CHKINTVL - 1)))
 				performCASLatchCheck(latch, TRUE);
 		}
 	}

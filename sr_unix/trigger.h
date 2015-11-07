@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +61,6 @@ typedef enum
 #define LITERAL_HASHSEQNUM	"#SEQNUM"
 #define	LITERAL_HASHTNAME	"#TNAME"
 #define	LITERAL_HASHTNCOUNT	"#TNCOUNT"
-#define	LITERAL_HASHTRHASH	"#TRHASH"
 
 #define	TRSBS_IN_NONE		0
 #define	TRSBS_IN_BHASH		1

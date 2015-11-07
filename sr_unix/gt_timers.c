@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,6 +128,7 @@ STATICDEF boolean_t		in_setitimer_error;
 #endif
 
 #define DUMMY_SIG_NUM		0		/* following can be used to see why timer_handler was called */
+#define SAFE_FOR_ANY_TIMER	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (FALSE == process_exiting) && !(fast_lock_count))
 
 STATICDEF volatile GT_TIMER *timeroot = NULL;	/* chain of pending timer requests in time order */
 STATICDEF boolean_t first_timeset = TRUE;
@@ -174,6 +176,7 @@ GBLREF	boolean_t	blocksig_initialized;			/* Set to TRUE when blockalrm, block_tt
 GBLREF	sigset_t	blockalrm;
 GBLREF	sigset_t	block_ttinout;
 GBLREF	sigset_t	block_sigsent;
+GBLREF 	volatile int4	fast_lock_count;
 GBLREF	boolean_t	heartbeat_started;
 GBLREF	void		(*heartbeat_timer_ptr)(void);		/* Initialized only in gtm_startup(). */
 GBLREF	int4		error_condition;
@@ -422,7 +425,7 @@ void start_timer(TID tid,
                         }
 		}
 	}
-	if (!safe_to_add && (process_exiting || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state)))
+	if (!safe_to_add && !(SAFE_FOR_ANY_TIMER))
 	{
 		assert(FALSE);
 		return;
@@ -556,7 +559,7 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 		deferred_timers_check_needed = FALSE;
 		return;
 	}
-	if ((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && !process_exiting)
+	if (SAFE_FOR_ANY_TIMER)
 	{	/* Check if some timer expired while this function was getting invoked. */
 		while (timeroot)
 		{
@@ -647,7 +650,7 @@ STATICFNDEF void timer_handler(int why)
 		/* A timer might pop while we are in the non-zero intrpt_ok_state zone, which could cause collisions. Instead,
 		 * we will defer timer events and drive them once the deferral is removed, unless the timer is safe.
 		 */
-		if (((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (FALSE == process_exiting)) || (tpop->safe))
+		if (SAFE_FOR_ANY_TIMER || (tpop->safe))
 		{
 			if (NULL != tpop_prev)
 				tpop_prev->next = tpop->next;
@@ -731,7 +734,7 @@ STATICFNDEF void timer_handler(int why)
 		}
 	}
 	RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
-	if (((FALSE == process_exiting) && (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state)) || (0 < safe_timer_cnt))
+	if (SAFE_FOR_ANY_TIMER || (0 < safe_timer_cnt))
 		start_first_timer(&at);
 	else if ((NULL != timeroot) || (0 < timer_defer_cnt))
 		deferred_timers_check_needed = TRUE;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +31,9 @@
 # include <ssdef.h>
 # include <fab.h>
 # include "desblk.h"
+#endif
+#ifdef UNIX
+# include <glob.h>
 #endif
 #include "cache.h"
 #include "hashtab_addr.h"

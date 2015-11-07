@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,43 +10,44 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_fnget.s
+	.include "g_msf.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "g_msf.si"
-.include "linkage.si"
-	.INCLUDE	"mval_def.si"
-
-	.sbttl	op_fnget
-#	PAGE	+
-# ------------------------------------
+#
 # op_fnget.s
 #
 # Mumps $Get function
-# ------------------------------------
-
-#	edx->REG64_RET1 - src. mval
-#	eax->REG64_RET0 - dest. mval
+#
+#
+#	r10->REG64_RET1 - src. mval
+#	rax->REG64_RET0 - dest. mval
+#
+# Note there is no stack padding for alignment and no check in this routine because it is a leaf routine
+# so never calls anything else. The stack is unaligned by 8 bytes due to the return register but that is
+# not an issue unless this routine calls something in the future in which case it needs changes to pad
+# the stack for alignment and should then also use the CHKSTKALIGN macro to verify it.
+#
 
 	.text
-# PUBLIC	op_fnget
-ENTRY op_fnget
-	cmpq	$0,REG64_RET1
-	je	l5			# if arg = 0, set type and len
-	mv_if_notdefined REG64_RET1, l5
-	movl	$mval_byte_len,REG32_ARG3	#Size of mval
-	movq	REG64_RET1,REG64_ARG1		#Set source
-	movq	REG64_RET0,REG64_ARG0		#Set destination
-	REP					#Repeat until count is zero
+
+ENTRY	op_fnget
+	cmpq	$0, REG64_RET1
+	je	l5				# Source mval does not exist
+	mv_if_notdefined REG64_RET1, l5		# Branch if source mval is not defined
+	movl	$mval_byte_len, REG32_ARG3	# Size of mval
+	movq	REG64_RET1, REG64_ARG1		# Set source
+	movq	REG64_RET0, REG64_ARG0		# Set destination
+	REP					# Repeat until count is zero
 	movsb
 	andw	$~mval_m_aliascont, mval_w_mvtype(REG64_RET0)	# Don't propagate alias container flag
 	ret
-l5:	movw	$mval_m_str,mval_w_mvtype(REG64_RET0)
-	movl	$0,mval_l_strlen(REG64_RET0)
-	ret
-# op_fnget ENDP
 
-# END
+	#
+	# Source mval either non-existent or undefined. Set return mval to null string and return it
+	#
+l5:
+	movw	$mval_m_str, mval_w_mvtype(REG64_RET0)
+	movl	$0, mval_l_strlen(REG64_RET0)
+	ret

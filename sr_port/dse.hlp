@@ -243,7 +243,7 @@
    applicable to level 0 blocks only. The interpreted output as a result of
    the above command looks like the following:
 
-   Block 3   Size 4B   Level 0   TN 6 V5
+   Block 3   Size 4B   Level 0   TN 4 V6
    Rec:1  Blk 3  Off 10  Size 14  Cmpc 0  Key ^Fruits(1)
          10 : | 14  0  0  0 46 72 75 69 74 73  0 BF 11  0  0 41 70 70 6C 65|
               |  .  .  .  .  F  r  u  i  t  s  .  .  .  .  .  A  p  p  l  e|
@@ -254,7 +254,7 @@
          31 : |  D  0  8  0 31  0  0 43 68 65 72 72 79                     |
               |  .  .  .  .  1  .  .  C  h  e  r  r  y                     |
    Rec:4  Blk 3  Off 3E  Size D  Cmpc 8  Key ^Fruits(4)
-         3E : |  D  0  8  8 41  0  0 47 72 61 70 65 73                     |
+         3E : |  D  0  8  0 41  0  0 47 72 61 70 65 73                     |
               |  .  .  .  .  A  .  .  G  r  a  p  e  s                     |
 
    Example:
@@ -559,7 +559,6 @@
    -REG[_SEQNO]=sequence-number
    -RESERVED_BYTES=reserved-bytes
    -SLEEP_SPIN_COUNT=mutex-sleep-spin-count
-   -SPIN_SLEEP_TIME=mutex-sleep-time
    -STRM_NUM=stream-number STRM_REG_SEQNO=hexa
    -TIM[ERS_PENDING]=integer
    -TO[TAL_BLKS]=total-blocks
@@ -819,6 +818,11 @@
    An incorrect hash renders the database useless.
 
    Use only with: -FILEHEADER
+
+   -[NO]EPOCHTAPER
+
+   Sets a flag that indicates whether or not epoch tapering should be done.
+   The default value is -EPOCHTAPER.
 
    -FL[USH_TIME][=delta_time]
 
@@ -1261,7 +1265,8 @@
    Displays and/or modifies the status and contents of the critical section
    for the current region. The format of the CRITICAL command is:
 
-   CR[ITICAL] -I[NIT]
+   CR[ITICAL] -A[LL]
+   -I[NIT]
    -O[WNER]
    -REL[EASE]
    -REM[OVE]
@@ -1279,6 +1284,12 @@
 
 3 Qualifiers
    Qualifiers
+
+   -A[LL]
+
+   Display all ids of processes owning critical section from all regions. If
+   there are no processes owning critical section in a region, ALL displays
+   "the CRIT is currently unowned" message for each region.
 
    -I[NIT]
 
@@ -1400,7 +1411,7 @@
 
    Specifies the starting block of the dump. For commands without an object
    qualifier, DSE uses the last block handled by a DSE operation. When no
-   block has been accessed, (thatis, on the first block-oriented command),
+   block has been accessed, (that is, on the first block-oriented command),
    DSE uses block one (1).
 
    Incompatible with: -ALL, -FILEHEADER and -UPDPROC.
@@ -1424,7 +1435,8 @@
    Dumps the specified record or blocks into the current output file in
    Global Output (GO) format. FIS strongly suggests using -ZWR rather than
    -GLO as the ZWR format handles all possible content values, including some
-   that are problematic with -GLO.
+   that are problematic with -GLO.[The GLO format is not supported for UTF-8
+   mode - use the ZWR format with UTF-8 mode.
 
    Incompatible with: -ALL, -FILEHEADER, -UPDPROC and -ZWR.
 
@@ -1710,6 +1722,7 @@
        may well be, the same; however, remind yourself to search for,
        understand and take into account all information describing any
        current database integrity issues.
+     o DSE accepts ^#t as a valid global name when specifying a key.
 
    Compatible only with [NO]CRIT.
 
@@ -2227,9 +2240,10 @@
 
    -V[ERSION]=version_number
 
-   Specifies the version number, in decimal, of the save buffer to remove.
-   -VERSION is required to REMOVE a SAVE buffer. -VERSION is incompatible
-   with all qualifiers except -BLOCK.
+   Specifies the version number, in decimal, of the save buffer to remove. If
+   there are more than one version of a block, -VERSION is required;
+   otherwise REMOVE works on that sole version. -VERSION is incompatible with
+   all qualifiers except -BLOCK.
 
    If there is only one version of the specified -BLOCK= block in the current
    region, DSE REMOVE defaults to that version.
@@ -2291,8 +2305,8 @@
    SAve
 
    The SAVE command preserves versions of blocks, or displays a listing of
-   saved versions for the current DSE session. Saved information is lost when
-   DSE EXITs.
+   saved versions for the current DSE session. SAVE can preserve 128
+   versions. Saved information is lost when DSE EXITs.
 
    Use with the RESTORE command to move SAVEd blocks to a permanent location,
    and as a safety feature use SAVE to retain copies of database blocks
@@ -2330,7 +2344,7 @@
 
    By default, SAVE -LIST provides a directory of all SAVEd blocks.
 
-   LIST displays blocks higher than the current database size because it
+   LIST may display blocks higher than the current database size because it
    deals with set of saved block copies rather than the database and there
    are situations where a saved block may be outside the current database
    size (for example, due to a concurrent MUPIP REORG -TRUNCATE);
@@ -2505,6 +2519,15 @@
    |-------------+-----------------------------------+----------------------|
    | B[UFFER     | -                                 | -                    |
    | _FLUSH]     |                                   |                      |
+   |-------------+-----------------------------------+----------------------|
+   | CA[CHE]     | -ALL                              | Used with -RECOVER,  |
+   |             |                                   | -SHOW, and -VERIFY   |
+   |-------------+-----------------------------------+----------------------|
+   | -           | -RE[COVER]                        | Use only with -ALL.  |
+   |-------------+-----------------------------------+----------------------|
+   | -           | -SH[OW]                           | Use only with -ALL.  |
+   |-------------+-----------------------------------+----------------------|
+   | -           | -VE[RIFY]                         | Use only with -ALL.  |
    |-------------+-----------------------------------+----------------------|
    |             |                                   | Incompatible with    |
    | CH[ANGE]    | -BL[OCK]=block number             | -FILEHEADER and      |
@@ -2824,7 +2847,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2014
+   Copyright 2015
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -2846,7 +2869,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.2-001 of the
+   This help file is a concise representation of revision V6.2-002 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

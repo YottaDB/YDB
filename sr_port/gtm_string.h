@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +27,8 @@
 /* Make sure that SIZEOF(SOURCE) > 0 or SOURCE != NULL before running. */
 #define	STRNCMP_LIT_FULL(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, SIZEOF(LITERAL))	/* BYPASSOK */
 #define	STRNCMP_STR(SOURCE, STRING, LEN) strncmp(SOURCE, STRING, LEN)
+/* Ensure that our uses of STRTOK and STRTOK_R are not called inside a timer handler */
+#define STRTOK_R(STR, DELIM, SAVE)	(DBG_ASSERT(FALSE == timer_in_handler) strtok_r(STR, DELIM, SAVE))
 /* We need to catch any memcpy() that is used when the source and target strings overlap in any fashion so we can change
  * them to a memmove. So in debug builds, assert fail if this is the case.
  */

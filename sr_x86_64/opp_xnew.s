@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,31 +10,21 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	opp_xnew.s
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "linkage.si"
-	.INCLUDE	"g_msf.si"
-
-	.sbttl	opp_xnew
-#	PAGE	+
-	.DATA
-.extern	frame_pointer
+	.data
+	.extern	frame_pointer
 
 	.text
-.extern	op_xnew
+	.extern	op_xnew
 
-# PUBLIC	opp_xnew
-ENTRY opp_xnew
+ENTRY	opp_xnew
 	putframe
-	addq	$8,REG_SP                 # burn return PC
-	movb    $0,REG8_ACCUM             # variable length argument
+	addq	$8, REG_SP		# Burn return PC & 16 byte align stack
+	CHKSTKALIGN			# Verify stack alignment
+	movb    $0, REG8_ACCUM		# Variable length argument
 	call	op_xnew
 	getframe
 	ret
-# opp_xnew ENDP
-
-# END

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -2020,7 +2021,11 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 	blk_hdr_ptr_t		old_block;
 	gv_namehead		*gvt;
 	srch_blk_status		*t1;
+#	ifdef DEBUG
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	csa = cs_addrs;
 	BG_TRACE_PRO_ANY(csa, recompute_upd_array_calls);
 	assert(csa->now_crit && dollar_tlevel && sgm_info_ptr);
@@ -2193,7 +2198,8 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 		 * anyways and the clue would be reset to 0).
 		 */
 		assert(NULL != pKey);
-		COPY_CURRKEY_TO_GVTARGET_CLUE(gvt, pKey);
+		assert(!TREF(expand_prev_key));	/* this ensures it is safe to use EXPAND_PREV_KEY_FALSE below */
+		COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(gvt, pKey, EXPAND_PREV_KEY_FALSE);
 		if (new_rec)
 			t1->curr_rec.match = gvt->clue.end + 1;	/* Keep srch_hist and clue in sync for NEXT gvcst_search */
 		/* Now that the clue is known to be non-zero, we have the potential for the first_rec part of it to be

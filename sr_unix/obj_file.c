@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,8 +53,6 @@ static char			emit_buff[OBJ_EMIT_BUF_SIZE];	/* buffer for emit output */
 static int			emit_buff_used;			/* number of chars in emit_buff */
 static int			symcnt;
 static struct rel_table		*link_rel, *link_rel_end;	/* Linkage relocation entries.  */
-
-static int tmpcnt;
 
 error_def(ERR_OBJFILERR);
 error_def(ERR_STRINGOFLOW);
@@ -114,8 +113,6 @@ void emit_immed(char *source, uint4 size)
 {
 	int4 	write;
 
-	if (0 == size)
-		return;			/* Not sure why but this does happen */
 	if (run_time)
 	{
 		if (!IS_STP_SPACE_AVAILABLE_PRO(size))
@@ -151,7 +148,6 @@ void buff_emit(void)
 
 	SETUP_THREADGBL_ACCESS;
 	/* Accumulate object code piece in the object hash with progressive murmurhash call */
-	tmpcnt++;
 	gtmmrhash_128_ingest(TADR(objhash_state), emit_buff, emit_buff_used);
 	DOWRITERC(object_file_des, emit_buff, emit_buff_used, stat);
 	if (0 != stat)
@@ -359,7 +355,6 @@ void obj_init(void)
 	TREF(linkage_last) = NULL;
 	sym_table_size = 0;
 	linkage_size = MIN_LINK_PSECT_SIZE;	/* Minimum size of linkage Psect, assuming no references from generated code */
-   tmpcnt = 0;
 	return;
 }
 

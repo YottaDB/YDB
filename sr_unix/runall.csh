@@ -1,7 +1,8 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -220,6 +221,11 @@ if ($?RUNALL_BYPASS_GEN_THREADGBL == 0) then
 	if (0 != $runall_status) then
 		echo "Failed to build gtm_threadgbl_deftypes.h - aborting build"
 		exit $runall_status
+	endif
+	# Setup link from $gtm_obj to the proper assembler include file
+	if (! -e ${gtm_obj}/gtm_threadgbl_deftypes_asm.si) then
+	    set asmtgbltype = $gtm_exe:t
+	    \ln -s ${gtm_inc}/gtm_threadgbl_deftypes_asm_${asmtgbltype}.si ${gtm_obj}/gtm_threadgbl_deftypes_asm.si
 	endif
 endif
 

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +18,7 @@
 #include "io.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
+#include "error.h"
 
 GBLREF io_pair		io_curr_device;
 #ifndef VMS
@@ -32,8 +34,10 @@ void iosocket_wtff(void)
 	io_desc		*iod;
 	socket_struct	*socketptr;
 	d_socket_struct	*dsocketptr;
+	boolean_t	ch_set;
 
 	iod = io_curr_device.out;
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	assert(gtmsocket == iod->type);
 	iod->esc_state = START;
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
@@ -45,6 +49,7 @@ void iosocket_wtff(void)
 		else
 #		endif
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
 	if (dsocketptr->current_socket >= dsocketptr->n_socket)
@@ -59,5 +64,6 @@ void iosocket_wtff(void)
 	iosocket_flush(iod);
 	iod->dollar.x = 0;
 	iod->dollar.y = 0;
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

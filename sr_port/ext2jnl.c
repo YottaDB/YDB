@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +44,7 @@ GBLREF	gv_key		*gv_currkey;
 GBLREF	boolean_t	is_src_server;
 GBLREF	repl_msg_ptr_t	gtmsource_msgp;
 GBLREF	int		gtmsource_msgbufsiz;
+GBLREF	volatile boolean_t	timer_in_handler;
 
 static	boolean_t	in_tp;
 static	int4		num_records;
@@ -115,7 +117,7 @@ unsigned char *ext2jnlcvt(char *ext_buff, int4 ext_len, unsigned char **tr, int 
 char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved_strm_seqno)
 {
 	unsigned char	*pool_save, ch, chtmp;
-	char 		*val_off;
+	char 		*val_off, *strtokptr;
 	int		keylength, keystate, len, i, reclen, temp_reclen, val_len;
 	bool		keepgoing;
 	mstr		src, des;
@@ -237,23 +239,23 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 		break;
 	}
 	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
-	ptr = strtok(ptr, "\\");		/* get the rec-type field */
+	ptr = STRTOK_R(ptr, "\\", &strtokptr);		/* get the rec-type field */
 	assert(NULL != ptr);
-	ptr = strtok(NULL, "\\");		/* get the time field */
+	ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the time field */
 	assert(NULL != ptr);
-	ptr = strtok(NULL, "\\");		/* get the tn field */
+	ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the tn field */
 	assert(NULL != ptr);
 	rec->prefix.tn = asc2i((uchar_ptr_t)ptr, STRLEN(ptr));
-	ptr = strtok(NULL, "\\");		/* get the pid field */
+	ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the pid field */
 	assert(NULL != ptr);
-	ptr = strtok(NULL, "\\");		/* get the client pid field */
+	ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the client pid field */
 	assert(NULL != ptr);
-	ptr = strtok(NULL, "\\");		/* get the token/jnl_seqno field */
+	ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the token/jnl_seqno field */
 	assert(NULL != ptr);
 	rec->jrec_null.jnl_seqno = saved_jnl_seqno;
-	ptr = strtok(NULL, "\\");		/* get the strm_num field */
+	ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the strm_num field */
 	assert(NULL != ptr);
-	ptr = strtok(NULL, "\\");		/* get the strm_seqno field */
+	ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the strm_seqno field */
 	assert(NULL != ptr);
 	rec->jrec_null.strm_seqno = saved_strm_seqno;
 	switch(exttype)
@@ -263,8 +265,8 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 			rec->jrec_null.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 			return ((char_ptr_t)rec) + NULL_RECLEN;
 		case MUEXT_TCOMMIT:
-			ptr = strtok(NULL, "\\");		/* get the participants */
-			ptr = strtok(NULL, "\\");		/* get the jnl_tid */
+			ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the participants */
+			ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the jnl_tid */
 			rec->jrec_tcom.jnl_tid[0] = 0;
 			if (NULL != ptr)
 				strcpy(rec->jrec_tcom.jnl_tid, ptr);
@@ -274,13 +276,13 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 			return ((char_ptr_t)rec) + TCOM_RECLEN;
 	}
 	assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype));
-	ptr = strtok(NULL, "\\");	/* get the update_num field */
+	ptr = STRTOK_R(NULL, "\\", &strtokptr);	/* get the update_num field */
 	assert(NULL != ptr);
 	assert(OFFSETOF(struct_jrec_upd, update_num) == OFFSETOF(struct_jrec_ztworm, update_num));
 	rec->jrec_set_kill.update_num = num_records;
 	if ((MUEXT_ZTWORM != exttype) && (MUEXT_LGTRIG != exttype))
 	{
-		ptr = strtok(NULL, "\\");		/* get the nodeflags field */
+		ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the nodeflags field */
 		assert(NULL != ptr);
 		rec->jrec_set_kill.mumps_node.nodeflags = asc2i((uchar_ptr_t)ptr, STRLEN(ptr));
 	}

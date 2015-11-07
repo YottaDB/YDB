@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +15,6 @@
  *  Please add new entries only at the end of this table
  *  (and, please, avoid deleting any lines).
  */
-
 XFER(xf_sto, op_sto),
 XFER(xf_cat, op_cat),
 XFER(xf_linefetch, op_linefetch),
@@ -315,6 +315,5 @@ XFER(xf_zrupdate, op_zrupdate)
 #endif
 #ifdef AUTORELINK_SUPPORTED
 ,
-XFER(xf_rhd_ext, op_rhd_ext),
-XFER(xf_lab_ext, op_lab_ext)
+XFER(xf_currhd, op_currhd)
 #endif

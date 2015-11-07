@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,5 +19,9 @@
 
 #define STRM_ZRUPDATE   -1	/* Stream used by ZRUPDATE command when processing wildcards */
 #define STRM_COMP_SRC	-2	/* Stream used by compile_source_file() */
+
+#ifdef UNIX
+void zsrch_clr(int indx);
+#endif
 
 #endif

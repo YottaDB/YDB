@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +32,7 @@
 #include "gtm_utf8.h"
 #endif
 #include "gtmcrypt.h"
+#include "error.h"
 
 GBLREF io_pair		io_curr_device;
 GBLREF	boolean_t	gtm_utf8_mode;
@@ -42,8 +44,6 @@ error_def(ERR_CRYPTNOAPPEND);
 error_def(ERR_DEVOPENFAIL);
 error_def(ERR_TEXT);
 error_def(ERR_IOERROR);
-
-
 
 LITREF	mstr		chset_names[];
 LITREF unsigned char	io_params_size[];
@@ -66,15 +66,17 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	boolean_t	closed_nodestroy;
 	boolean_t	append;
 	gtm_chset_t	width_chset, dummy_chset;
-	long		new_position;
+	off_t		new_position;
 	long		pipe_buff_size;
 #	ifdef __MVS__
 	int		file_tag, obtained_tag, realfiletag;
 	char		*errmsg;
 #	endif
+	boolean_t	ch_set;
 
 	newversion = closed_nodestroy = append = FALSE;
 	iod = dev_name->iod;
+	ESTABLISH_RET_GTMIO_CH(&iod->pair, -1, ch_set);
 	size = 0;
 	p_offset = 0;
 	assert((params) *(pp->str.addr + p_offset) < (unsigned char)n_iops);
@@ -146,7 +148,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			if (iop_append == (ch = *(pp->str.addr + p_offset++)))
 			{
-				if (!d_rm->fifo && !d_rm->pipe && (off_t)-1 == (size = lseek(fd, (off_t)0, SEEK_END)))
+				if (!d_rm->fifo && !d_rm->pipe && (off_t)-1 == (size = lseek(fd, 0, SEEK_END)))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
 						      dev_name->dollar_io,
 						      ERR_TEXT, 2, LEN_AND_LIT("Error setting file pointer to end of file"), errno);
@@ -184,13 +186,13 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				}
 
 				/* lseek to file position for nodestroy */
-				if ((off_t)-1 == (size =lseek (fd, (off_t)new_position, SEEK_SET)))
+				if ((off_t)-1 == (size =lseek (fd, new_position, SEEK_SET)))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
 						      dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
 						      LEN_AND_LIT("Error setting file pointer to the current position"), errno);
 			} else
 			{
-				if ((off_t)-1 == (size = lseek(fd, (off_t)0, SEEK_CUR)))
+				if ((off_t)-1 == (size = lseek(fd, 0, SEEK_CUR)))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
 						      dev_name->dollar_io, ERR_TEXT, 2,
 						      LEN_AND_LIT("Error setting file pointer to the current position"), errno);
@@ -235,12 +237,12 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 						      dev_name->dollar_io, ERR_TEXT, 2,
 						      LEN_AND_LIT("Error in stream open"), errno);
 			}
-			/* now fseek required for nodestroy if non-fixed M streaming */
+			/* now fseeko required for nodestroy if non-fixed M streaming */
 			if (d_rm->no_destroy && !d_rm->fixed && !IS_UTF_CHSET(iod->ichset))
 			{
-				if (-1 == fseek(d_rm->filstr, (long)d_rm->file_pos, SEEK_SET))	/* move input stream */
+				if ((off_t)-1 == fseeko(d_rm->filstr, d_rm->file_pos, SEEK_SET))	/* move input stream */
 				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("fseek"),
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("fseeko"),
 						      RTS_ERROR_LITERAL("REWIND"), CALLFROM, errno);
 				}
 			}
@@ -411,14 +413,14 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 					bom_size_toread = 0;
 				if (0 < bom_size_toread)
 				{
-					if ((off_t)-1 == lseek(fd, (off_t)0, SEEK_SET))
+					if ((off_t)-1 == lseek(fd, 0, SEEK_SET))
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
 							      dev_name->dollar_io, ERR_TEXT, 2,
 							      LEN_AND_LIT("Error setting file pointer to beginning of file"),
 							      errno);
 					d_rm->bom_num_bytes = open_get_bom(iod, bom_size_toread);
 					/* move back to previous file position */
-					if ((off_t)-1 == lseek(fd, (off_t)d_rm->file_pos, SEEK_SET))
+					if ((off_t)-1 == lseek(fd, d_rm->file_pos, SEEK_SET))
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
 							      dev_name->dollar_io, ERR_TEXT, 2,
 							      LEN_AND_LIT("Error setting file pointer to previous file position"),
@@ -434,6 +436,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	if (d_rm->no_destroy)
 		d_rm->no_destroy = FALSE;
 	iod->state = dev_open;
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return TRUE;
 }
 
@@ -444,7 +447,9 @@ int	open_get_bom(io_desc *io_ptr, int bom_size)
 	d_rm_struct	*rm_ptr;
 	gtm_chset_t	chset;
 	int 		num_bom_bytes;
+	boolean_t	ch_set;
 
+	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	assert(UTF16BE_BOM_LEN == UTF16LE_BOM_LEN);
 	assert(!rm_ptr->input_encrypted);
@@ -470,5 +475,6 @@ int	open_get_bom(io_desc *io_ptr, int bom_size)
 			get_chset_desc(&chset_names[chset]);
 		}
 	}
+	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 	return (num_bom_bytes);
 }

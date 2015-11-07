@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +29,7 @@ void	op_break(void);
 void	op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...);
 void	op_close(mval *v, mval *p);
 void	op_commarg(mval *v, unsigned char argcode);
+int	op_currhd(void);
 void	op_cvtparm(int iocode, mval *src, mval *dst);
 int	op_decrlock(int timeout);
 void	op_div(mval *u, mval *v, mval *q);
@@ -305,6 +307,7 @@ void	op_ztrigger(void);
 #	endif
 void	op_zhalt(mval *returncode);
 void	op_zhelp_xfr(mval *subject, mval *lib);
+void	op_zhorolog(mval *s);
 void	op_zlink(mval *v, mval *quals);
 void	op_zmess(UNIX_ONLY(unsigned int cnt) VMS_ONLY(int4 errnum), ...);
 void	op_zprevious(mval *v);
@@ -329,5 +332,6 @@ int	opp_zst_over_ret();
 int	opp_zst_over_retarg();
 int	opp_zstepret();
 int	opp_zstepretarg();
+void	op_zut(mval *s);
 void	op_zwritesvn(int svn);
 #endif

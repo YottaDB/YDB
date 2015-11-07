@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,8 +27,11 @@
 /* Length of the key name (which for databases is an absolute path to the file). */
 #define GTMCRYPT_MAX_KEYNAME_LEN	GTM_PATH_MAX
 
+/* Definitions must match those in gtm_tls_interface.h */
 /* Flag to be used whenever password can be obtained interactively. */
 #define GTMCRYPT_OP_INTERACTIVE_MODE	0x00000001
+/* No environment variable for password - used by gc_update_passwd so must be same in gtmcrypt_interface.h */
+#define	GTMCRYPT_OP_NOPWDENVVAR		0x00000800
 
 /* Special value that indicates invalid / uninitialized encryption state object. */
 #define GTMCRYPT_INVALID_KEY_HANDLE	NULL

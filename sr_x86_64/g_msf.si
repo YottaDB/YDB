@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007, 2012 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,11 +10,9 @@
 #								#
 #################################################################
 
-	.sbttl	g_msf.si
-#	PAGE	+
 #-----------------------------------------------
 # Mumps stack frame manipulation macros
-#  for the GNU gas i386 assembler version
+#  for the GNU gas x86-64 assembler version
 #-----------------------------------------------
 
 /* Register definitions */
@@ -49,7 +48,7 @@ REG64_ARG2		=	%rdx
 REG64_ARG3		=	%rcx
 REG64_ARG4		=	%r8
 REG64_ARG5		=	%r9
-#REG64_SCRATCH0		=	%r10     # Note asme as REG64_RET1
+#REG64_SCRATCH0		=	%r10     # Note same as REG64_RET1
 REG64_SCRATCH1		=	%r11
 
 REG64_OUT_ARG0		=	%rdi
@@ -143,67 +142,60 @@ REG_XFER_TABLE_SAVE_OFF    =   REG_FRAME_POINTER_SAVE_OFF - 8
 ARG_SAVE_OFFSET            =   REG_XFER_TABLE_SAVE_OFF - 8
 ARG_COUNT_OFFSET	   =   ARG_SAVE_OFFSET - (8*NO_REG_SAVED)
 
-
-        .sbttl  g_msf.si        save_callee_saved
 .macro save_callee_saved
-        movq    %r12,ARG_SAVE_OFFSET(REG_SP)
-        movq    %r13,ARG_SAVE_OFFSET-8(REG_SP)
-        movq    %r14,ARG_SAVE_OFFSET-16(REG_SP)
-        movq    %r15,ARG_SAVE_OFFSET-24(REG_SP)
-        movq    %rbx,ARG_SAVE_OFFSET-32(REG_SP)
+        movq    %r12, ARG_SAVE_OFFSET(REG_SP)
+        movq    %r13, ARG_SAVE_OFFSET-8(REG_SP)
+        movq    %r14, ARG_SAVE_OFFSET-16(REG_SP)
+        movq    %r15, ARG_SAVE_OFFSET-24(REG_SP)
+        movq    %rbx, ARG_SAVE_OFFSET-32(REG_SP)
 .endm
 
-        .sbttl  g_msf.si        restore_callee_saved
 .macro restore_callee_saved
-        movq    ARG_SAVE_OFFSET-32(REG_SP),%rbx
-        movq    ARG_SAVE_OFFSET-24(REG_SP),%r15
-        movq    ARG_SAVE_OFFSET-16(REG_SP),%r14
-        movq    ARG_SAVE_OFFSET-8(REG_SP),%r13
-        movq    ARG_SAVE_OFFSET(REG_SP),%r12
+        movq    ARG_SAVE_OFFSET-32(REG_SP), %rbx
+        movq    ARG_SAVE_OFFSET-24(REG_SP), %r15
+        movq    ARG_SAVE_OFFSET-16(REG_SP), %r14
+        movq    ARG_SAVE_OFFSET-8(REG_SP), %r13
+        movq    ARG_SAVE_OFFSET(REG_SP), %r12
 .endm
 
-
-	.sbttl	g_msf.si	putframe
 .macro putframe
-	movq	frame_pointer(%rip),REG_FRAME_POINTER
-	movq	REG_FRAME_TMP_PTR,msf_temps_ptr_off(REG_FRAME_POINTER)
-	movq	REG_FRAME_VAR_PTR,msf_l_symtab_off(REG_FRAME_POINTER)
-	movq	REG_LITERAL_BASE,msf_literal_ptr_off(REG_FRAME_POINTER)
-	movq	REG_PV,msf_ctxt_off(REG_FRAME_POINTER)
-	movq	(%rsp),REG64_SCRATCH1
-	movq	REG64_SCRATCH1,msf_mpc_off(REG_FRAME_POINTER)
+	movq	frame_pointer(%rip), REG_FRAME_POINTER
+	movq	REG_FRAME_TMP_PTR, msf_temps_ptr_off(REG_FRAME_POINTER)
+	movq	REG_FRAME_VAR_PTR, msf_l_symtab_off(REG_FRAME_POINTER)
+	movq	REG_LITERAL_BASE, msf_literal_ptr_off(REG_FRAME_POINTER)
+	movq	REG_PV, msf_ctxt_off(REG_FRAME_POINTER)
+	movq	(%rsp), REG64_SCRATCH1
+	movq	REG64_SCRATCH1, msf_mpc_off(REG_FRAME_POINTER)
 .endm
 
 .extern	error_return
 
-	.sbttl	g_msf.si	getframe
-
 .macro getframe
-	movq	frame_pointer(%rip),REG_FRAME_POINTER
-	movb	msf_flags_off(REG_FRAME_POINTER),REG8_SCRATCH1
-	andb	$SFF_ETRAP_ERR,REG8_SCRATCH1
+	movq	frame_pointer(%rip), REG_FRAME_POINTER
+	movb	msf_flags_off(REG_FRAME_POINTER), REG8_SCRATCH1
+	andb	$SFF_ETRAP_ERR, REG8_SCRATCH1
 	jz	lab1\@
 	call	error_return
-	movq	frame_pointer(%rip),REG_FRAME_POINTER
+	movq	frame_pointer(%rip), REG_FRAME_POINTER
 lab1\@:
-	movq	msf_temps_ptr_off(REG_FRAME_POINTER),REG_FRAME_TMP_PTR
-	movq	msf_l_symtab_off(REG_FRAME_POINTER),REG_FRAME_VAR_PTR
-	movq	msf_literal_ptr_off(REG_FRAME_POINTER),REG_LITERAL_BASE
-	movq	msf_ctxt_off(REG_FRAME_POINTER),REG_PV
+	movq	msf_temps_ptr_off(REG_FRAME_POINTER), REG_FRAME_TMP_PTR
+	movq	msf_l_symtab_off(REG_FRAME_POINTER), REG_FRAME_VAR_PTR
+	movq	msf_literal_ptr_off(REG_FRAME_POINTER), REG_LITERAL_BASE
+	movq	msf_ctxt_off(REG_FRAME_POINTER), REG_PV
 	pushq	msf_mpc_off(REG_FRAME_POINTER)
 .endm
 
-	.sbttl	g_msf.si	pullstack
-
 .macro	pullstack size=8
-	addq	$\size,REG_SP
+	addq	$\size, REG_SP
 .endm
 
 .macro	resetstack size=8
-	subq	$\size,REG_SP
+	subq	$\size, REG_SP
 .endm
 
-	.sbttl	g_msf.si
+#
+# Field for routine header - offsets must match rtnhdr.h
+#
 mrt_jsb			=	0
 mrt_shlib_handle	=	16
 mrt_src_len		=	28
@@ -221,9 +213,8 @@ mrt_lnr_len		=	104
 mrt_lit_ptr		=	128
 mrt_lnk_ptr		=	144
 mrt_ptext_adr		=	176
-mrt_checksum		=	192
 mrt_tmp_mv		=	196
 mrt_tmp_sz		=	200
 mrt_curr_ptr		=	208
 mrt_oldr_ptr		=	216
-
+mrt_zhist		=	264

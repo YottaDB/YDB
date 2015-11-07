@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,28 +17,23 @@
 #include "lv_val.h"	/* needed for "callg.h" */
 #include "callg.h"
 
-#define VAR_ARGS32(ar)	ar[0], ar[1], ar[2], ar[3], ar[4], ar[5], ar[6], ar[7], ar[8], ar[9], ar[10], ar[11], ar[12],	\
-			ar[13], ar[14], ar[15], ar[16], ar[17], ar[18], ar[19], ar[20], ar[21], ar[22], ar[23], ar[24],	\
-			ar[25], ar[26], ar[27], ar[28], ar[29], ar[30], ar[31]
-
-#define VAR_ARGS28(ar)	ar[0], ar[1], ar[2], ar[3], ar[4], ar[5], ar[6], ar[7], ar[8], ar[9], ar[10], ar[11], ar[12],	\
-			ar[13], ar[14], ar[15], ar[16], ar[17], ar[18], ar[19], ar[20], ar[21], ar[22], ar[23], ar[24],	\
-			ar[25], ar[26], ar[27]
-
-#define VAR_ARGS24(ar)	ar[0], ar[1], ar[2], ar[3], ar[4], ar[5], ar[6], ar[7], ar[8], ar[9], ar[10], ar[11], ar[12],	\
-			ar[13], ar[14], ar[15], ar[16], ar[17], ar[18], ar[19], ar[20], ar[21], ar[22], ar[23]
-
-#define VAR_ARGS20(ar)	ar[0], ar[1], ar[2], ar[3], ar[4], ar[5], ar[6], ar[7], ar[8], ar[9], ar[10], ar[11], ar[12],	\
-			ar[13], ar[14], ar[15], ar[16], ar[17], ar[18], ar[19]
-
-#define VAR_ARGS16(ar)	ar[0], ar[1], ar[2], ar[3], ar[4], ar[5], ar[6], ar[7], ar[8], ar[9], ar[10], ar[11], ar[12],	\
-			ar[13], ar[14], ar[15]
-
-#define VAR_ARGS12(ar)	ar[0], ar[1], ar[2], ar[3], ar[4], ar[5], ar[6], ar[7], ar[8], ar[9], ar[10], ar[11]
-
-#define VAR_ARGS8(ar)	ar[0], ar[1], ar[2], ar[3], ar[4], ar[5], ar[6], ar[7]
-
 #define VAR_ARGS4(ar)	ar[0], ar[1], ar[2], ar[3]
+
+#define VAR_ARGS8(ar)	VAR_ARGS4(ar), ar[4], ar[5], ar[6], ar[7]
+
+#define VAR_ARGS12(ar)	VAR_ARGS8(ar), ar[8], ar[9], ar[10], ar[11]
+
+#define VAR_ARGS16(ar)	VAR_ARGS12(ar), ar[12], ar[13], ar[14], ar[15]
+
+#define VAR_ARGS20(ar)	VAR_ARGS16(ar), ar[16], ar[17], ar[18], ar[19]
+
+#define VAR_ARGS24(ar)	VAR_ARGS20(ar), ar[20], ar[21], ar[22], ar[23]
+
+#define VAR_ARGS28(ar)	VAR_ARGS24(ar), ar[24], ar[25], ar[26], ar[27]
+
+#define VAR_ARGS32(ar)	VAR_ARGS28(ar), ar[28], ar[29], ar[30], ar[31]
+
+#define VAR_ARGS36(ar)	VAR_ARGS32(ar), ar[32], ar[33], ar[34], ar[35]
 
 /* Note selection of doing 4 parms per case block is based on the fact that Itanium can do at most 4 parm loads
    at one time due to instruction bundle restrictions and the fact that most calls made are 4 or fewer parms.
@@ -48,7 +44,7 @@
 
 INTPTR_T callg(callgfnptr fnptr, gparam_list *paramlist)
 {
-	assert(32 == (SIZEOF(paramlist->arg) / SIZEOF(void *)));
+	assert(36 == (SIZEOF(paramlist->arg) / SIZEOF(void *)));
 	switch(paramlist->n)
 	{
 		case 0:
@@ -93,8 +89,14 @@ INTPTR_T callg(callgfnptr fnptr, gparam_list *paramlist)
 		case 31:
 		case 32:
 			return (fnptr)(paramlist->n, VAR_ARGS32(paramlist->arg));
+		case 33:
+		case 34:
+		case 35:
+		case 36:
+			assert(fnptr == (callgfnptr)push_parm); /* Only push_parm is aware of this extra space */
+			return (fnptr)(paramlist->n, VAR_ARGS36(paramlist->arg));
 		default:
-			GTMASSERT;
+			assertpro(paramlist->n <= 36);
 	}
 	return 0;
 }

@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2007 Fidelity Information Services, Inc	;
+; Copyright (c) 2001-2015 Fidelity National Information 	;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -86,6 +87,7 @@ argval	d scan i tok'="." s em="period (.) expected" d err s z=1 q
 	s z=0
 	q
 arglit	s ttt(ttt)="VXT_LIT",ttt=ttt+1 d scan s ttt(ttt)=tok,ttt=ttt+1
+	if tok="-" d scan set ttt(ttt-1)=ttt(ttt-1)_tok
 	d scan
 	s z=0
 	q

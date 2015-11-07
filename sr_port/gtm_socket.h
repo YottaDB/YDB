@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +35,17 @@ typedef struct sockaddr	*sockaddr_ptr;
 #define GTM_SOCKLEN_TYPE socklen_t
 #endif
 
+/* define macro on platforms to determine if it is an AF_UNIX domain socket problem with getsockname() */
+#if defined(__linux__) || defined(VMS)
+#  define IS_SOCKNAME_UNIXERROR(ERR)	(FALSE)
+#elif defined(AIX)
+#  define IS_SOCKNAME_UNIXERROR(ERR) 	((EOPNOTSUPP == ERR) || (ENOTCONN == ERR))
+#elif defined(__sun) || defined(__hpux)
+#  define IS_SOCKNAME_UNIXERROR(ERR) 	((EOPNOTSUPP == ERR) || (EINVAL == ERR))
+#else
+#  define IS_SOCKNAME_UNIXERROR(ERR) 	(EOPNOTSUPP == ERR)
+#endif
+
 #ifdef GTM_FD_TRACE
 /* Just like open and close were noted down in gtm_fcntl.h, note down all macros which we are redefining here and could
  * potentially have been conflictingly defined by the system header file "socket.h". The system define will be used
@@ -45,7 +57,7 @@ typedef struct sockaddr	*sockaddr_ptr;
 #endif
 
 int gtm_socket(int domain, int type, int protocol);
-int gtm_connect(int socket, struct sockaddr *address, size_t address_len);
+int gtm_connect(int socket, struct sockaddr *address, size_t address_len); /* BYPASSOK(connect) */
 
 #if defined(VMS) && !defined(_SS_PAD2SIZE)
 /* No sockaddr_storage on OpenVMS 7.2-1, but we only support AF_INET on VMS, so use sockaddr_in. */

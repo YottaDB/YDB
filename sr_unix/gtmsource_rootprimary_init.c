@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,11 +26,17 @@
 #include "gtmsource.h"
 #include "repl_instance.h"
 #include "jnl.h"
+#include "change_reg.h"
 
-GBLREF	jnlpool_addrs	jnlpool;
-GBLREF	uint4		process_id;
-GBLREF	jnl_gbls_t	jgbl;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	uint4			process_id;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	gd_addr			*gd_header;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 
+error_def(ERR_JNLEXTEND);
 
 /* This function is called primarily to append a new histinfo record to the replication instance file by one of the following
  *	1) MUPIP REPLIC -SOURCE -START -ROOTPRIMARY command (after forking the child source server) if it created the journal pool.
@@ -39,9 +46,13 @@ GBLREF	jnl_gbls_t	jgbl;
  */
 void	gtmsource_rootprimary_init(seq_num start_seqno)
 {
-	unix_db_info	*udi;
-	repl_histinfo	histinfo;
-	boolean_t	was_crit;
+	unix_db_info		*udi;
+	repl_histinfo		histinfo;
+	boolean_t		was_crit, switch_jnl;
+	gd_region		*reg, *region_top;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
+	uint4			jnl_status;
 
 	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
 	assert(NULL != jnlpool.repl_inst_filehdr);
@@ -51,6 +62,11 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 	if (!was_crit)
 		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 	jnlpool.repl_inst_filehdr->root_primary_cycle++;
+	/* If this instance is transitioning from a non-rootprimary to rootprimary, switch journal files.
+	 * This helps with maintaining accurate value of csd->zqgblmod_tn when the former primary connects
+	 * to the current primary through a fetchresync-rollback or receiver-server-autorollback..
+	 */
+	switch_jnl = (!jnlpool.repl_inst_filehdr->was_rootprimary && (0 < jnlpool.repl_inst_filehdr->num_histinfo));
 	jnlpool.repl_inst_filehdr->was_rootprimary = TRUE;
 	assert(start_seqno >= jnlpool.jnlpool_ctl->start_jnl_seqno);
 	assert(start_seqno == jnlpool.jnlpool_ctl->jnl_seqno);
@@ -98,4 +114,38 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 	repl_inst_histinfo_add(&histinfo);
 	if (!was_crit)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
+	if (switch_jnl)
+	{
+		SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_file_extend and its callees assume jgbl.gbl_jrec_time is set */
+		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
+		{
+			gv_cur_region = reg;
+			change_reg();		/* sets cs_addrs/cs_data (needed by jnl_ensure_open) */
+			if (!JNL_ENABLED(cs_addrs))
+				continue;
+			grab_crit(gv_cur_region);
+			jpc = cs_addrs->jnl;
+			/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl
+			 * records. This needs to be done BEFORE the jnl_ensure_open as that could write journal records
+			 * (if it decides to switch to a new journal file)
+			 */
+			jbp = jpc->jnl_buff;
+			ADJUST_GBL_JREC_TIME(jgbl, jbp);
+			jnl_status = jnl_ensure_open();
+			if (0 == jnl_status)
+			{
+				if (EXIT_ERR == jnl_file_extend(jpc, 0))	/* Force jnl switch by passing in a 0 jrec_len */
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLEXTEND, 2, JNL_LEN_STR(cs_data));
+			} else
+			{
+				if (SS_NORMAL != jpc->status)
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(cs_data),
+							DB_LEN_STR(gv_cur_region), jpc->status);
+				else
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data),
+							DB_LEN_STR(gv_cur_region));
+			}
+			rel_crit(gv_cur_region);
+		}
+	}
 }

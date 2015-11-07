@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +33,7 @@
 #ifdef __MVS__
 # include "gtm_zos_io.h"
 #endif
+#include "arlinkdbg.h"
 
 typedef enum
 {
@@ -68,19 +70,20 @@ typedef enum
 #define CLOSE_OBJECT_FD(FD, STATUS)												\
 {																\
 	CLOSE_OBJECT_FILE(FD, STATUS);	/* Resets "object_file_des" to FD_INVALID */						\
-	if (-1 == status)													\
+	if (-1 == (STATUS))													\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, errno);	\
 }
 
 #ifdef AUTORELINK_SUPPORTED
 #  define CHECK_OBJECT_HISTORY(OBJPATH, OBJDIR, RECENT_ZHIST_PARM)								\
 {																\
-	if (TREF(arlink_enabled) && !TREF(trigger_compile))									\
+	if (TREF(arlink_enabled) && !TREF(trigger_compile_and_link))								\
 	{	/* Autorelink is enabled, this is not a trigger and we need a search history for the object file to pass	\
 		 * to incr_link(). We had to wait till this point to discover the search history since at the time of the	\
 		 * call to zro_search(), there may not have been an object file to find or, given where we found the source,	\
 		 * the object file we are linking now may be different from one found before so create the history array given  \
-		 * the supplied object file path and our $ZROUTINES directory array.						\
+		 * the supplied object file path and our $ZROUTINES directory array. See GTM-8311 for potential improvements	\
+		 * in this area.												\
 		 *														\
 		 * Note we cannot assert RECENT_ZHIST_PARM is null here as we may be about to link a recompiled module after	\
 		 * a failed ZLINK but incr_link() took care of releasing the old history in its error path.			\
@@ -114,8 +117,8 @@ ZOS_ONLY(error_def(ERR_BADTAG);)
  * 1. Link into process private - Executable code becomes part of the process private space.
  * 2. Link from a shared library - M routines linked into a shared library can be linked into a process allowing much of the
  *    object file to be shared.
- * 3. Link from a shared object - Current mechanism is to mmap() the object file and link it similar to how shared library links
- *    are done.
+ * 3. Link from a shared object - Shared objects are loaded into shared memory by GT.M (rtnobj.c is the manager) and linked
+ *    much like objects linked from a shared library.
  *
  * Parameters:
  *   - v     - mval containing the name/path of the object file.
@@ -147,6 +150,7 @@ void op_zlink (mval *v, mval *quals)
 	if (MAX_FBUFF < v->str.len)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
 			      RTS_ERROR_LITERAL("Filename/path exceeds max length"));
+	DBGARLNK((stderr, "op_zlink: Call to (re)link routine %.*s\n", v->str.len, v->str.addr));
 	object_file_des = FD_INVALID;
 	srcdir = objdir = NULL;
 	expdir = FALSE;
@@ -293,9 +297,8 @@ void op_zlink (mval *v, mval *quals)
 				      errno);
 		/* Note - if explicit ZLINK, objdir can be NULL if link is from a directory not mentioned in $ZROUTINES */
 		CHECK_OBJECT_HISTORY(objnamebuf, objdir, RECENT_ZHIST);
-		if (IL_RECOMPILE == INCR_LINK(object_file_des, objdir, RECENT_ZHIST, objnamelen, objnamebuf))
+		if (IL_RECOMPILE == INCR_LINK(&object_file_des, objdir, RECENT_ZHIST, objnamelen, objnamebuf))
 		{
-			CLOSE_OBJECT_FILE(object_file_des, status);	/* Priority error is version issue so ignore any on close */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr,
 				      ERR_VERSION);
 		}
@@ -335,7 +338,7 @@ void op_zlink (mval *v, mval *quals)
 				/* The incr_link() routine should drive errors for any issue found with linking from a shared
 				 * library so IL_DONE is the only valid return code we *ever* expect back.
 				 */
-				assertpro(IL_DONE == INCR_LINK(0, objdir, NULL, objnamelen, objnamebuf));
+				assertpro(IL_DONE == INCR_LINK(NULL, objdir, NULL, objnamelen, objnamebuf));
 				return;
 			}
 			if (objdir->str.len + objnamelen > SIZEOF(objnamebuf) - 1)
@@ -367,7 +370,10 @@ void op_zlink (mval *v, mval *quals)
 			} else
 				obj_found = TRUE;
 		} else	/* If source file extension specified, force re-compile */
+		{
 			compile = TRUE;
+			assert(FD_INVALID == object_file_des);	/* Shouldn't be an object file open yet */
+		}
 		STAT_FILE(srcnamebuf, &src_stat, status);	/* Check if source file exists */
 		if (-1 == status)
 		{
@@ -409,11 +415,14 @@ void op_zlink (mval *v, mval *quals)
 				} else
 				{
 					compile = TRUE;
-					assert(FD_INVALID == object_file_des);	/* Make sure closed */
+					assert(FD_INVALID == object_file_des);	/* Make sure no object file open */
 				}
 			} else if (!obj_found)
+			{
+				assert(FD_INVALID == object_file_des);	/* Make sure closed */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
 					      ERR_FILENOTFND, 2, objnamelen, objnamebuf);
+			}
 		}
 		if (compile)
 		{	/* (Re)Compile source file */
@@ -428,6 +437,7 @@ void op_zlink (mval *v, mval *quals)
 			if (!(qlf & CQ_OBJECT) && (SRC != type))
 			{
 				cmd_qlf.qlf = glb_cmd_qlf.qlf;
+				assert(FD_INVALID == object_file_des);	/* Make sure no object file open */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_ZLNOOBJECT);
 			}
 			zlcompile(srcnamelen, (uchar_ptr_t)srcnamebuf);
@@ -438,10 +448,9 @@ void op_zlink (mval *v, mval *quals)
 		}
 		assert(FD_INVALID != object_file_des);		/* Object file should be open at this point */
 		CHECK_OBJECT_HISTORY(objnamebuf, objdir, RECENT_ZHIST);
-		status = INCR_LINK(object_file_des, objdir, RECENT_ZHIST, objnamelen, objnamebuf);
+		status = INCR_LINK(&object_file_des, objdir, RECENT_ZHIST, objnamelen, objnamebuf);
 		if (IL_RECOMPILE == status)
 		{	/* Failure due only to version mismatch, so recompile */
-			CLOSE_OBJECT_FD(object_file_des, status);
 			assertpro(!compile);
 			if (!src_found)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_VERSION);
@@ -466,7 +475,7 @@ void op_zlink (mval *v, mval *quals)
 			 * created object file could conceivably cause an IL_RECOMPILE code here (incr_link handles all
 			 * the other errors itself). Not at this time considered worthy of special coding.
 			 */
-			assertpro(IL_DONE == INCR_LINK(object_file_des, objdir, RECENT_ZHIST, objnamelen, objnamebuf));
+			assertpro(IL_DONE == INCR_LINK(&object_file_des, objdir, RECENT_ZHIST, objnamelen, objnamebuf));
 		}
 		CLOSE_OBJECT_FD(object_file_des, status);
 	}

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -561,7 +562,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		 */
 		assert(!jgbl.forw_phase_recovery || jgbl.dont_reset_gbl_jrec_time);
 		if (!jgbl.dont_reset_gbl_jrec_time)
+		{
 			SET_GBL_JREC_TIME;	/* initializes jgbl.gbl_jrec_time */
+			if (WBTEST_ENABLED(WBTEST_TEND_GBLJRECTIME_SLEEP))
+				LONG_SLEEP(2);	/* needed by white-box test case v62002/gtm8332 */
+		}
 		assert(jgbl.gbl_jrec_time);
 	}
 	block_saved = FALSE;
@@ -903,7 +908,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 #	ifdef DEBUG
 	/* If clue is non-zero, validate it (BEFORE this could be used in a future transaction). The only exception is reorg
 	 * where we could have an invalid clue (e.g. last_rec < first_rec etc.). This is because reorg shuffles records around
-	 * heavily and therefore it is hard to maintain an uptodate clue. reorg therefore handles this situation by actually
+	 * heavily and therefore it is hard to maintain an up to date clue. reorg therefore handles this situation by actually
 	 * resetting the clue just before doing the next gvcst_search. The mu_reorg* routines already take care of this reset
 	 * (in fact, this is asserted in gvcst_search too). So we can allow invalid clues here in that special case.
 	 */

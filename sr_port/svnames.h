@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,6 +83,10 @@ enum
 	SV_ZCLOSE,		/* 68 */
 	SV_ZKEY,		/* 69 */
 	SV_ZTDELIM,		/* 70 */
+	SV_ZPIN,		/* 71 */
+	SV_ZPOUT,		/* 72 */
+	SV_ZHOROLOG,		/* 73 */
+	SV_ZUT,			/* 74 */
 	SV_NUM_SV,		/* count - should be next to last SV entry just prior to dummy entry below */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

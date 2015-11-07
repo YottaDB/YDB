@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +53,6 @@
 #include "tp_frame.h"
 #include "gvname_info.h"
 #include "op_merge.h"
-#include <auto_zlink.h>
 #include "golevel.h"
 #include "flush_jmp.h"
 #include "dollar_zlevel.h"
@@ -106,11 +106,6 @@ GBLREF  uint4			dollar_tlevel;
 GBLREF	symval			*trigr_symval_list;
 GBLREF	trans_num		local_tn;
 GBLREF	int			merge_args;
-GBLREF	uint4			zwrtacindx;
-GBLREF	merge_glvn_ptr		mglvnp;
-GBLREF	gvzwrite_datablk	*gvzwrite_block;
-GBLREF	lvzwrite_datablk	*lvzwrite_block;
-GBLREF	zshow_out		*zwr_output;
 GBLREF	zwr_hash_table		*zwrhtab;
 #ifdef DEBUG
 GBLREF	ch_ret_type		(*ch_at_trigger_init)();
@@ -233,10 +228,10 @@ STATICFNDEF int gtm_trigger_invoke(void);
 CONDITION_HANDLER(gtm_trigger_complink_ch)
 {	/* Condition handler for trigger compilation and link - be noisy but don't error out. Note that compilations do
 	 * have their own handler but other errors are still possible. The primary use of this handler is (1) to remove
-	 * the mv_stent we created and (2) most importantly to turn off the trigger_compile flag.
+	 * the mv_stent we created and (2) most importantly to turn off the trigger_compile_and_link flag.
 	 */
 	START_CH(TRUE);
-	TREF(trigger_compile) = FALSE;
+	TREF(trigger_compile_and_link) = FALSE;
 	run_time = gtm_trigger_comp_prev_run_time;
 	if (((unsigned char *)mv_chain == msp) && (MVST_MSAV == mv_chain->mv_st_type)
 	    && (&dollar_zsource == mv_chain->mv_st_cont.mvs_msav.addr))
@@ -450,14 +445,14 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	PUSH_MV_STENT(MVST_MSAV);
 	mv_chain->mv_st_cont.mvs_msav.v = dollar_zsource;
 	mv_chain->mv_st_cont.mvs_msav.addr = &dollar_zsource;
-	TREF(trigger_compile) = TRUE;	/* Set flag so compiler knows this is a special trigger compile */
-	op_zcompile(&zcompprm, TRUE);	/* Compile but don't use $ZCOMPILE qualifiers */
-	TREF(trigger_compile) = FALSE;	/* compile_source_file() establishes handler so always returns */
+	TREF(trigger_compile_and_link) = TRUE;	/* Set flag so compiler knows this is a special trigger compile */
+	op_zcompile(&zcompprm, TRUE);		/* Compile but don't use $ZCOMPILE qualifiers */
+	TREF(trigger_compile_and_link) = FALSE;	/* compile_source_file() establishes handler so always returns */
 	if (0 != TREF(dollar_zcstatus))
 	{	/* Someone err'd.. */
 		run_time = gtm_trigger_comp_prev_run_time;
 		REVERT;
-		UNLINK(objname);	/* Remove files before return error */
+		UNLINK(objname);		/* Remove files before return error */
 		UNLINK(rtnname);
 		return ERR_TRIGCOMPFAIL;
 	}
@@ -471,11 +466,11 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		 * recompilation and is non-null in an explicit zlink which we need to emulate.
 		 */
 #		ifdef GEN_TRIGLINKFAIL_ERROR
-		UNLINK(objname);				/* delete object before it can be used */
+		UNLINK(objname);				/* Delete object before it can be used */
 #		endif
-		TREF(trigger_compile) = TRUE;			/* Overload flag so we know it is a trigger link */
-		op_zlink(&zlfile, (mval *)&literal_null);	/* need cast due to "extern const" attributes */
-		TREF(trigger_compile) = FALSE;			/* If doesn't return, condition handler will clear */
+		TREF(trigger_compile_and_link) = TRUE;		/* Overload flag so we know it is a trigger link */
+		op_zlink(&zlfile, (mval *)&literal_null);	/* Need cast due to "extern const" attributes */
+		TREF(trigger_compile_and_link) = FALSE;		/* If doesn't return, condition handler will clear */
 		/* No return here if link fails for some reason */
 		trigdsc->rtn_desc.rt_adr = find_rtn_hdr(&trigdsc->rtn_desc.rt_name);
 		/* Verify can find routine we just put there. Catastrophic if not */
@@ -515,9 +510,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	symval		*new_symval;
 	uint4		dollar_tlevel_start;
 	stack_frame	*fp;
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
 	assert(!skip_dbtriggers);	/* should not come here if triggers are not supposed to be invoked */
 	assert(trigdsc);
 	assert(trigprm);
@@ -652,8 +645,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		mv_st_ent->mv_st_cont.mvs_trigr.run_time_save = run_time;
 		/* See if a MERGE launched the trigger. If yes, save some state so ZWRITE, ZSHOW and/or MERGE can be
 		 * run in the trigger we dispatch. */
-		if ((0 != merge_args) || TREF(in_zwrite))
-			PUSH_MVST_MRGZWRSV;
+		PUSH_MVST_MRGZWRSV_IF_NEEDED;
 		mumps_status = 0;
 		run_time = TRUE;	/* Previous value saved just above restored when frame pops */
 	} else
@@ -838,6 +830,12 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 		if (tstart_trigger_depth == gtm_trigger_depth) /* Unwinding gvcst_put() so get rid of flag it potentially set */
 			donot_INVOKE_MUMTSTART = FALSE;
 #		endif
+		/* Now that op_unwind has been done, it is possible "lvzwrite_block" got restored to pre-trigger state
+		 * (if it was saved off in PUSH_MVST_MRGZWRSV call done at triggerland entry). If so, given this is a
+		 * forced unwind of triggerland, clear any context corresponding to MERGE/ZSHOW that caused us to enter
+		 * triggerland in the first place.
+		 */
+		NULLIFY_MERGE_ZWRITE_CONTEXT;
 		if (tp_pointer)
 		{	/* This TP transaction can never be allowed to commit if this is the first trigger
 			 * (see comment in tp_frame.h against "cannot_commit" field for details).
@@ -877,9 +875,7 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	rhdtyp		*rtnhdr;
 	int		size;
 	stack_frame	*fp;
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
 	/* First thing to do is release trigger source field if it exists */
 	if (0 < trigdsc->xecute_str.str.len)
 	{

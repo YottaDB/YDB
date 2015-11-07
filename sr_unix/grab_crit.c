@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,7 +100,7 @@ void	grab_crit(gd_region *reg)
 		TREF(grabbing_crit) = reg;
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csd->mutex_spin_parms;
-		status = mutex_lockw(reg, mutex_spin_parms, crash_count);
+		status = gtm_mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_LOCK_WRITE);
 #		ifdef DEBUG
 		if (gtm_white_box_test_case_enabled
 			&& (WBTEST_SENDTO_EPERM == gtm_white_box_test_case_number)
@@ -120,11 +121,11 @@ void	grab_crit(gd_region *reg)
 			switch(status)
 			{
 				case cdb_sc_critreset:
-					rts_error(VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
 				case cdb_sc_dbccerr:
-					rts_error(VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
 				default:
-					GTMASSERT;
+					assertpro((cdb_sc_critreset == status) || (cdb_sc_dbccerr == status));
 			}
 			return;
 		}
@@ -143,7 +144,7 @@ void	grab_crit(gd_region *reg)
 	 * NOT issue DBFLCORRP. Use skip_file_corrupt_check global variable for this purpose
 	 */
 	if (csd->file_corrupt && !TREF(skip_file_corrupt_check))
-		rts_error(VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
 	if (cnl->wc_blocked)
 		wcs_recover(reg);
 	return;

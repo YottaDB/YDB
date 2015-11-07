@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,35 +10,29 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_forintrrpt.s
-	.sbttl	op_forintrrpt
+	.include "g_msf.si"
+	.include "linkage.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "g_msf.si"
-.include "linkage.si"
-
-	.DATA
-.extern	neterr_pending
-.extern	restart_pc
+	.data
+	.extern	neterr_pending
+	.extern	restart_pc
 
 	.text
-.extern	gvcmz_neterr
-.extern	async_action
-.extern	outofband_clear
+	.extern	gvcmz_neterr
+	.extern	async_action
+	.extern	outofband_clear
 
-# PUBLIC	op_forintrrpt
-ENTRY op_forintrrpt
-	cmpb	$0,neterr_pending(REG_IP)
+ENTRY	op_forintrrpt
+	subq	$8, REG_SP			# Allocate save area and align stack to 16 bytes
+	CHKSTKALIGN				# Verify stack alignment
+	cmpb	$0, neterr_pending(REG_IP)
 	je	l1
 	call	outofband_clear
-	movq	$0,REG64_ARG0
+	movq	$0, REG64_ARG0
 	call	gvcmz_neterr
-l1:	movl	$0,REG32_ARG0
+l1:
+	movl	$0, REG32_ARG0
 	call	async_action
+	addq	$8, REG_SP			# Remove alignment stack bump
 	ret
-# op_forintrrpt ENDP
-
-# END

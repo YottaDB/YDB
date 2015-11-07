@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,6 +84,7 @@ int f_char(oprtype *a, opctype op)
 		MV_INIT_STRING(&v, outptr - base, base);
 		v.str.char_len = char_len;
 		v.mvtype |= MV_UTF_LEN;
+		CLEAR_MVAL_BITS(&v);
 		s2n(&v);
 		*a = put_lit(&v);
 		return TRUE;

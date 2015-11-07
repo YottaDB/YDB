@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -338,8 +339,7 @@ void dbc_init_key(phase_static_area *psa, dbc_gv_key **key);
 void dbc_find_key(phase_static_area *psa, dbc_gv_key *key, uchar_ptr_t rec_p, int blk_levl);
 boolean_t dbc_match_key(dbc_gv_key *key1, int blk_levl1, dbc_gv_key *key2, unsigned int *matchc);
 int dbc_find_dtblk(phase_static_area *psa, dbc_gv_key *key, int min_levl);
-int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int min_levl, enum gdsblk_type newblk_type,
-		    boolean_t fail_ok);
+int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int min_levl, enum gdsblk_type newblk_type);
 void dbc_init_blk(phase_static_area *psa, block_info *blk_set_p, int blk_num, enum gdsblk_usage blk_usage, int blk_len,
 		  int blk_levl);
 void dbc_init_db(phase_static_area *psa);

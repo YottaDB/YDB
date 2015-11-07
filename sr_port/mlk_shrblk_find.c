@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +41,7 @@ boolean_t	mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, UI
 		 */
 		if (d->owner && (d->owner != process_id || d->auxowner != auxown))
 		{	/* If owned and not owned by us check if owner is alive */
-			if (is_proc_alive(d->owner, d->image_count))
+			if (is_proc_alive(d->owner, IMAGECNT(d->image_count)))
 			{	/* Signal that this lock request is blocked by this node */
 				p->blocked = d;
 				p->blk_sequence = d->sequence;
@@ -98,7 +99,7 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 					{
 						if (d->owner != process_id || d->auxowner != auxown)
 						{	/* If owned and not owned by us check if owner is alive */
-							if (is_proc_alive(d->owner, d->image_count))
+							if (is_proc_alive(d->owner, IMAGECNT(d->image_count)))
 							{	/* Signal that this lock request is blocked by this node */
 								p->blocked = d;
 								p->blk_sequence = d->sequence;

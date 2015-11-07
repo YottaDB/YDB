@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +34,7 @@
 #include "min_max.h"
 #include "cli.h"
 #include "have_crit.h"
+#include "util.h"
 #include "op_fnzsearch.h"
 
 GBLREF unsigned short	source_name_len;
@@ -41,11 +43,12 @@ GBLREF char		rev_time_buf[];
 GBLREF mident		routine_name, module_name, int_module_name;
 GBLREF unsigned char	*source_buffer;
 GBLREF int4		dollar_zcstatus;
-GBLREF io_pair          io_curr_device;
+GBLREF io_pair          io_curr_device, io_std_device;
 GBLREF char		object_file_name[];
 GBLREF short		object_name_len;
 GBLREF int		object_file_des;
 GBLREF command_qualifier cmd_qlf;
+GBLREF stack_frame	*frame_pointer;
 
 LITREF mval		literal_null;
 
@@ -77,9 +80,9 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 {
 	plength		plen;
 	mval		fstr, ret;
-	int		i;
+	int		i, rc;
 	unsigned char	*p;
-	int		rc;
+	boolean_t	wildcarded, dm_action;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -95,8 +98,8 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 		fstr.str.len = flen;
 		ESTABLISH(source_ch);
 		tt_so_do_once = FALSE;
-		op_fnzsearch((mval *)&literal_null, STRM_COMP_SRC, 0, &ret);	/* Clear any remaining stream cache */
-		for (i = 0 ;  ; i++)
+		zsrch_clr(STRM_COMP_SRC);	/* Clear any existing search cache */
+		for (i = 0; ; i++)
 		{
 			plen.p.pint = op_fnzsearch(&fstr, STRM_COMP_SRC, 0, &ret);
 			if (!ret.str.len)
@@ -138,7 +141,6 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 		REVERT;
 	}
 }
-
 
 CONDITION_HANDLER(source_ch)
 {

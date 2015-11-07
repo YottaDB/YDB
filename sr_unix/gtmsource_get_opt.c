@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc.*
+ * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +59,7 @@ GBLREF	gtmsource_options_t	gtmsource_options;
 #ifdef GTM_TLS
 GBLREF	repl_tls_info_t		repl_tls;
 #endif
+GBLREF	volatile boolean_t	timer_in_handler;
 
 error_def(ERR_GETADDRINFO);
 error_def(ERR_LOGTOOLONG);
@@ -67,7 +69,7 @@ error_def(ERR_TEXT);
 
 int gtmsource_get_opt(void)
 {
-	char		*connect_parm_token_str, *connect_parm;
+	char		*connect_parm_token_str, *connect_parm, *strtokptr;
 	char		*connect_parms_str, tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
 	char		secondary_sys[MAX_SECONDARY_LEN], *c, inst_name[MAX_FN_LEN + 1];
 	char		statslog_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
@@ -232,9 +234,7 @@ int gtmsource_get_opt(void)
 			     connect_parm_token_str = connect_parms_str;
 			     !connect_parms_badval &&
 			     connect_parms_index < GTMSOURCE_CONN_PARMS_COUNT &&
-			     (connect_parm = strtok(connect_parm_token_str,
-						    GTMSOURCE_CONN_PARMS_DELIM))
-			     		   != NULL;
+			     (connect_parm = STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)) != NULL;
 			     connect_parms_index++,
 			     connect_parm_token_str = NULL)
 

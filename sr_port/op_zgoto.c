@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +24,7 @@
 #include <auto_zlink.h>
 #include "error.h"
 #include "gtmimagename.h"
+#include "linktrc.h"
 #ifdef UNIX
 #include "gtm_unlink_all.h"
 #endif
@@ -59,7 +61,9 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	void		(*frame_func)();
 	char		rtnname_buff[SIZEOF(mident_fixed)], lblname_buff[SIZEOF(mident_fixed)];
 	DEBUG_ONLY(int4	dlevel;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Validate level parm */
 	curlvl = dollar_zlevel();
         if (0 > level)
@@ -82,7 +86,7 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	rtnname.str.addr = rtnname_buff;
 	memcpy(lblname_buff, lblname.str.addr, lblname.str.len);
 	lblname.str.addr = lblname_buff;
-	DBGEHND((stdout, "op_zgoto: rtnname: %.*s  lblname: %.*s  offset: %d  level: %d\n",
+	DBGEHND((stderr, "op_zgoto: rtnname: %.*s  lblname: %.*s  offset: %d  level: %d\n",
 		 rtnname.str.len, rtnname.str.addr, lblname.str.len, lblname.str.addr, offset, level));
 	/* Validate entryref before do any unwinding */
 	if (0 == rtnname.str.len)
@@ -93,6 +97,8 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		if (0 == lblname.str.len)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RTNNAME);
 		rtnhdr = frame_pointer->rvector;
+		ARLINK_ONLY(TADR(lnk_proxy)->rtnhdr_adr = rtnhdr);
+		DBGINDCOMP((stderr, "op_zgoto: routine resolved to 0x"lvaddr" (1)\n", rtnhdr));
 		if (0 == level)
 		{	/* If doing unlink, recall name of routine as well as will need it later */
 			memcpy(rtnname_buff, rtnhdr->routine_name.addr, rtnhdr->routine_name.len);
@@ -101,7 +107,13 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		}
 	} else
 	{
+#		ifdef AUTORELINK_SUPPORTED
+		op_rhdaddr(&rtnname, -1);		/* Does an autozlink if necessary */
+		rtnhdr = TADR(lnk_proxy)->rtnhdr_adr;
+		DBGINDCOMP((stderr, "op_zgoto: routine resolved to 0x"lvaddr" (2)\n", rtnhdr));
+#		else
 		rtnhdr = op_rhdaddr(&rtnname, NULL);	/* Does an autozlink if necessary */
+#		endif
 #		ifdef VMS
 		if (PDSC_FLAGS == ((proc_desc *)rtnhdr)->flags) /* it's a procedure descriptor, not a routine header */
 		{
@@ -112,7 +124,12 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 #		endif
 	}
 	assert(NULL != rtnhdr);
+#	ifdef AUTORELINK_SUPPORTED
+	op_labaddr(0, &lblname, offset);
+	lnrptr = &TADR(lnk_proxy)->lnr_adr;
+#	else
 	lnrptr = op_labaddr(rtnhdr, &lblname, offset);
+#	endif
 	assert(NULL != lnrptr);
 #	ifdef VMS
 	/* VMS does not support unlink so any level 0 request that passes earlier checks just generates an error
@@ -162,10 +179,20 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		 * that the level 1 stack frame routine has so it needs to also be rewritten once we link our new "1st routine".
 		 */
 		assert((NULL != frame_pointer) && (NULL == frame_pointer->old_frame_pointer));
+#		ifdef AUTORELINK_SUPPORTED
+		op_rhdaddr(&rtnname, -1);
+		rtnhdr = TADR(lnk_proxy)->rtnhdr_adr;
+#		else
 		rtnhdr = op_rhdaddr(&rtnname, NULL);
+#		endif
 		assert(NULL != rtnhdr);
 		frame_pointer->rvector = rtnhdr;
+#		ifdef AUTORELINK_SUPPORTED
+		op_labaddr(0, &lblname, offset);
+		lnrptr = &TADR(lnk_proxy)->lnr_adr;
+#		else
 		lnrptr = op_labaddr(rtnhdr, &lblname, offset);
+#		endif
 		assert(NULL != lnrptr);
 	} else
 #	endif	/* UNIX */

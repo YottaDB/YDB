@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +67,9 @@ void preemptive_db_clnup(int preemptive_severe)
 	sgm_info	*si;
 	gd_region	*r_top, *reg;
 	gd_addr		*addr_ptr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (!dollar_tlevel && update_trans)
 	{	/* It's possible we hit an error in the middle of an update, at which point we have
 		 * a valid clue and non-NULL cse. However, this causes problems for subsequent
@@ -106,6 +109,7 @@ void preemptive_db_clnup(int preemptive_severe)
 	need_kip_incr = FALSE;	/* in case we got an error in t_end (e.g. GBLOFLOW), dont want this global variable to get
 				 * carried over to the next non-TP transaction that this process does (e.g. inside an error trap).
 				 */
+	TREF(expand_prev_key) = FALSE;	/* reset global (in case it is TRUE) so it does not get carried over to future operations */
 	if (dollar_tlevel)
 	{
 		for (si = first_sgm_info;  si != NULL; si = si->next_sgm_info)

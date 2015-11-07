@@ -134,10 +134,10 @@
 
                          *** TEMPLATES ***
                                                                              Std      Inst
-                                                Def     Rec   Key Null       Null     Freeze   Qdb
-    Region                                     Coll    Size  Size Subs       Coll Jnl on Error Rndwn
-    ----------------------------------------------------------------------------------------------------
-    <default>                                     0    4080   255 NEVER      Y    Y   DISABLED DISABLED
+                                                Def     Rec   Key Null       Null     Freeze   Qdb      Epoch
+    Region                                     Coll    Size  Size Subs       Coll Jnl on Error Rndwn    Taper
+    -----------------------------------------------------------------------------------------------------------
+    <default>                                     0    4080   255 NEVER      Y    Y   DISABLED DISABLED ENABLED
                      Jnl File (def ext: .mjl)  Before  Buff      Alloc      Exten   AutoSwitch
     ------------------------------------------------------------------------------------------
     <default>        <based on DB file-spec>   Y       2308       2048       2048      8386560
@@ -157,10 +157,10 @@
     *                                  DEFAULT
                                    *** REGIONS ***
                                                                                                    Std      Inst
-                                    Dynamic                          Def      Rec   Key Null       Null     Freeze   Qdb
-    Region                          Segment                         Coll     Size  Size Subs       Coll Jnl on Error Rndwn
-    --------------------------------------------------------------------------------------------------------------------------
-    DEFAULT                         DEFAULT                            0     4080   255 NEVER      Y    Y   DISABLED DISABLED
+                                    Dynamic                          Def      Rec   Key Null       Null     Freeze   Qdb      Epoch
+    Region                          Segment                         Coll     Size  Size Subs       Coll Jnl on Error Rndwn    Taper
+    ---------------------------------------------------------------------------------------------------------------------------------
+    DEFAULT                         DEFAULT                            0     4080   255 NEVER      Y    Y   DISABLED DISABLED ENABLED
                              *** JOURNALING INFORMATION ***
     Region                          Jnl File (def ext: .mjl)  Before Buff      Alloc      Exten   AutoSwitch
     --------------------------------------------------------------------------------------------------------
@@ -333,6 +333,11 @@
 
    If this does not work, contact your system manager to investigate setup
    and file access issues.
+
+   **Note**
+
+   Even when invoked from within GT.M, GDE always uses the gtmgbldir
+   environment variable to identify its target
 
    To leave GDE:
 
@@ -1053,98 +1058,6 @@
    command file with the SHOW -COMMAND -FILE=gde-command-file and run it in
    the target environment.
 
-   Example:
-
-   GDE>show -template
-                                  *** TEMPLATES ***
-                                                                             Std      Inst
-                                                Def     Rec   Key Null       Null     Freeze   Qdb
-    Region                                     Coll    Size  Size Subs       Coll Jnl on Error Rndwn
-    ----------------------------------------------------------------------------------------------------
-    <default>                                     0    4080   255 NEVER      Y    Y   DISABLED DISABLED
-                     Jnl File (def ext: .mjl)  Before  Buff      Alloc      Exten   AutoSwitch
-    ------------------------------------------------------------------------------------------
-    <default>        <based on DB file-spec>   Y       2308       2048       2048      8386560
-    Segment          Active              Acc Typ Block      Alloc Exten Options
-    ------------------------------------------------------------------------------
-    <default>          *                 BG  DYN  4096       5000 10000 GLOB =1000
-                                                                        LOCK = 40
-                                                                        RES  =   0
-                                                                        ENCR = OFF
-                                                                        MSLT =1024
-    <default>                            MM  DYN  4096       5000 10000 DEFER
-                                                                        LOCK = 40
-                                                                        MSLT =1024
-
-   This displays only the TEMPLATES section of the Global Directory.
-
-   GDE>SHOW -command
-   TEMPLATE -REGION -COLLATION_DEFAULT=0
-   TEMPLATE -REGION -NOINST_FREEZE_ON_ERROR
-   TEMPLATE -REGION -JOURNAL=(ALLOCATION=2048,AUTOSWITCHLIMIT=8386560,BEFORE_IMAGE,BUFFER_SIZE=2308,EXTENSION=2048)
-   TEMPLATE -REGION -KEY_SIZE=64
-   TEMPLATE -REGION -NULL_SUBSCRIPTS=NEVER
-   TEMPLATE -REGION -NOQDBRUNDOWN
-   TEMPLATE -REGION -RECORD_SIZE=256
-   TEMPLATE -REGION -STDNULLCOLL
-   !
-   TEMPLATE -REGION -NOJOURNAL
-   !
-   TEMPLATE -SEGMENT -ACCESS_METHOD=BG
-   TEMPLATE -SEGMENT -ALLOCATION=100
-   TEMPLATE -SEGMENT -BLOCK_SIZE=1024
-   TEMPLATE -SEGMENT -NOENCRYPTION_FLAG
-   TEMPLATE -SEGMENT -EXTENSION_COUNT=100
-   TEMPLATE -SEGMENT -GLOBAL_BUFFER_COUNT=1024
-   TEMPLATE -SEGMENT -LOCK_SPACE=40
-   TEMPLATE -SEGMENT -MUTEX_SLOTS=1024
-   TEMPLATE -SEGMENT -RESERVED_BYTES=0
-   !
-   TEMPLATE -SEGMENT -ACCESS_METHOD=MM
-   TEMPLATE -SEGMENT -ALLOCATION=100
-   TEMPLATE -SEGMENT -BLOCK_SIZE=1024
-   TEMPLATE -SEGMENT -DEFER
-   TEMPLATE -SEGMENT -NOENCRYPTION_FLAG
-   TEMPLATE -SEGMENT -EXTENSION_COUNT=100
-   TEMPLATE -SEGMENT -GLOBAL_BUFFER_COUNT=1024
-   TEMPLATE -SEGMENT -LOCK_SPACE=40
-   TEMPLATE -SEGMENT -MUTEX_SLOTS=1024
-   TEMPLATE -SEGMENT -RESERVED_BYTES=0
-   !
-   TEMPLATE -SEGMENT -ACCESS_METHOD=BG
-   !
-   DELETE -REGION DEFAULT
-   DELETE -SEGMENT DEFAULT
-   ADD -REGION AUSREG -DYNAMIC_SEGMENT=AUSSEG
-   ADD -REGION DEFAULT -DYNAMIC_SEGMENT=DEFAULT
-   ADD -REGION FRREG -DYNAMIC_SEGMENT=FRSEG
-   ADD -REGION POREG -DYNAMIC_SEGMENT=POSEG
-   ADD -REGION UKREG -DYNAMIC_SEGMENT=UKSEG
-   ADD -REGION USSALREG -DYNAMIC_SEGMENT=USSALSEG
-   ADD -REGION USSMZREG -DYNAMIC_SEGMENT=USSMZSEG
-   !
-   ADD -SEGMENT AUSSEG -FILE_NAME="AUS.dat"
-   ADD -SEGMENT DEFAULT -FILE_NAME="gtm.dat"
-   ADD -SEGMENT FRSEG -FILE_NAME="France.dat"
-   ADD -SEGMENT POSEG -FILE_NAME="Poland.dat"
-   ADD -SEGMENT UKSEG -FILE_NAME="UK.dat"
-   ADD -SEGMENT USSALSEG -FILE_NAME="USSAL.dat"
-   ADD -SEGMENT USSMZSEG -FILE_NAME="USSMZ.dat"
-   !
-   ADD -GBLNAME EURCentral -COLLATION=1
-   !
-   LOCKS -REGION=DEFAULT
-   ADD -NAME Australia -REGION=AUSREG
-   ADD -NAME EURCentral("Poland") -REGION=POREG
-   ADD -NAME EURWest("France") -REGION=FRREG
-   ADD -NAME EURWest("UK") -REGION=UKREG
-   ADD -NAME US("South","a":"m") -REGION=USSALREG
-   ADD -NAME US("South","m":"{") -REGION=USSMZREG
-   !
-
-   This command displays the GDE commands to recreate the spanning region
-   example described in the Introduction section.
-
 2 Template
    Template
 
@@ -1290,6 +1203,13 @@
    The minimum length is one alphabetic character.
 
    The maximum length is 31 alphanumeric characters.
+
+   -[NO]EPOCHTAPER
+
+   Tries to minimize epoch duration by reducing the number of buffers to
+   flush by GT.M and the file system (via an fsync()) as the epoch
+   (time-based or due to a journal file auto-switch) approaches. By default,
+   EPOCHTAPER is enabled.
 
    -K[EY_SIZE]=size in bytes
 
@@ -1529,11 +1449,9 @@
 
           * MM supports NOBEFORE_IMAGE journaling only. GT.M issues an error
             if you use MM with BEFORE_IMAGE Journaling. MM also supports
-            MUPIP FORWARD -RECOVER and MUPIP JOURNAL -ROLLBACK with the
-            -RESYNC or -FETCHRESYNC qualifiers to generate lost and broken
-            transaction files. For more information, see the Journaling and
-            Replication chapters.
-          * MM does not support backward recovery/rollback.
+            MUPIP FORWARD RECOVER. MM does not support MUPIP JOURNAL RECOVER
+            -BACKWARD and only supports MUPIP JOURNAL ROLLBACK to generate
+            lost and broken transaction files.
           * Depending on your file system, MM may be an option when you need
             performance advantage in situations where the above restrictions
             are acceptable.
@@ -1561,9 +1479,6 @@
      * The maximum ALLOCATION is 1,040,187,392 blocks.
      * By default, GDE uses an ALLOCATION of 100 blocks.
      * The maximum size of a database file is 1,040,187,392(992Mi) blocks.
-     * Out of the requested allocation, GT.M always reserves 32 global
-       buffers for BG access method for read-only use to ensure that
-       non-dirty global buffers are always available.
      * The default ALLOCATION was chosen for initial development and
        experimentation with GT.M. Because file fragmentation impairs
        performance, make the initial allocation for production files and
@@ -1575,8 +1490,8 @@
 
    Specifies the size, in bytes, of each database block in the file system.
    The BLOCK_SIZE must be a multiple of 512. If the BLOCK_SIZE is not a
-   multiple of 512, GDE rounds off the BLOCK_SIZE to the next highest
-   multiple of 512 and issues a warning message.
+   multiple of 512, GDE rounds up the BLOCK_SIZE to the next highest multiple
+   of 512 and issues a warning message.
 
    If the specified BLOCK_SIZE is less than the minimum, GDE uses the minimum
    BLOCK_SIZE. If the specified BLOCK_SIZE is greater than the maximum, GDE
@@ -1617,6 +1532,20 @@
    variables. 4KiB and 8KiB are popular database block sizes.
 
    By default, GDE uses a BLOCK_SIZE of 1024 bytes.
+
+   --[NO]DEFER_ALLOCATE
+
+   Determines whether MUPIP CREATE preallocates blocks on database creation,
+   and determines whether subsequent extensions also preallocate. The default
+   is DEFER_ALLOCATE. This provides an option to preallocate blocks from the
+   file system when creating or extending a database file; by default UNIX
+   file systems, and GT.M, use sparse (or lazy) allocation, which defers
+   actual allocation until blocks are first written. Failures to preallocate
+   space produce a PREALLOCATEFAIL error. On platforms where GT.M does not
+   support preallocation (HP-UX and Solaris), although GDE accepts
+   -NODEFER_ALLOCATE, MUPIP CREATE ignores it and sets the database file to
+   DEFER_ALLOCATE. On those platforms, any attempt to change this flag with
+   MUPIP SET produces a NODFRALLOCSUPP error.
 
    -[NO]ENcryption
 
@@ -1697,8 +1626,8 @@
 
    Because transaction processing can be involved in an update and a
    transaction is limited to half the GLOBAL_BUFFER_COUNT, the value for
-   GLOBAL_BUFFER_COUNT should therefore be at least twenty-six plus twice the
-   number of the blocks required by the largest global variable node in your
+   GLOBAL_BUFFER_COUNT should therefore be at least 32 plus twice the number
+   of the blocks required by the largest global variable node in your
    application.
 
    Generally, you should increase the number of GLOBAL_BUFFERs for production
@@ -1719,6 +1648,10 @@
    If global buffers are "paged out," improvements in system performance
    resulting from more global buffers will be more than offset by the
    dramatic slowdown that results from globals buffers that are "paged out."
+
+   Out of the requested allocation, GT.M always reserves 32 global buffers
+   for BG access method for read-only use to ensure that non-dirty global
+   buffers are always available.
 
    -L[OCK_SPACE]=integer
 
@@ -1760,8 +1693,7 @@
    slots to cover the maximum number of processes you expect to concurrently
    access the database file, as an insufficient number of slots can lead to
    much steeper and more severe degradation of performance under heavy loads.
-   The minimum is 1Ki and the maximum is 32Ki. The default of 1Ki should be
-   appropriate for most situations.
+   The minimum is 1Ki and the maximum is 32Ki.
 
    -R[ESERVED_BYTES]=size
 
@@ -2037,7 +1969,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2014
+   Copyright 2015
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -2059,7 +1991,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.2-001 of the
+   This help file is a concise representation of revision V6.2-002 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +29,7 @@
 #include "jnl.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
+#include "stringpool.h"
 #include "svnames.h"
 #include "mlkdef.h"
 #include "zshow.h"
@@ -54,6 +56,9 @@
 #define ZS_ONE_OUT(V,TEXT) 	((V)->len = 1, (V)->addr = (TEXT), zshow_output(output,V))
 #define ZS_VAR_EQU(V,TEXT) 	((V)->len = SIZEOF(TEXT) - 1, (V)->addr = TEXT, \
 				 zshow_output(output,(V)), ZS_ONE_OUT((V),equal_text))
+				/* PATH_MAX + "->" + GTM-W-ZDIROUTOFSYNC, <text of ZDIROUTOFSYNC> */
+#define ZDIR_ERR_LEN		((3 * GTM_MAX_DIR_LEN) + 128)
+
 
 static readonly char equal_text[] = {'='};
 static readonly char device_text[] = "$DEVICE";
@@ -61,10 +66,14 @@ static readonly char ecode_text[] = "$ECODE";
 static readonly char estack_text[] = "$ESTACK";
 static readonly char etrap_text[] = "$ETRAP";
 static readonly char horolog_text[] = "$HOROLOG";
+static readonly char zhorolog_text[] = "$ZHOROLOG";
+static readonly char zut_text[] = "$ZUT";
 static readonly char io_text[] = "$IO";
 static readonly char job_text[] = "$JOB";
 static readonly char key_text[] = "$KEY";
 static readonly char principal_text[] = "$PRINCIPAL";
+static readonly char principalin_text[] = "$ZPIN";
+static readonly char principalout_text[] = "$ZPOUT";
 static readonly char quit_text[] = "$QUIT";
 static readonly char reference_text[] = "$REFERENCE";
 static readonly char stack_text[] = "$STACK";
@@ -136,6 +145,7 @@ GBLREF mval		dollar_zdir;
 GBLREF mval		dollar_zproc;
 GBLREF stack_frame	*frame_pointer;
 GBLREF io_pair		io_curr_device;
+GBLREF io_pair		*io_std_device;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF io_log_name	*dollar_principal;
 GBLREF mval		dollar_ztrap;
@@ -171,22 +181,69 @@ GBLREF mval		*dollar_ztvalue;
 GBLREF mval		dollar_ztwormhole;
 GBLREF int4		gtm_trigger_depth;
 #endif
+GBLREF spdesc		stringpool;
+GBLREF mstr		dollar_zpin;
+GBLREF mstr		dollar_zpout;
 
 LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
 
+#define ZWRITE_DOLLAR_PRINCIPAL(MVAL, X, TEXT, OUTPUT)					\
+{											\
+	io_log_name	*tl;								\
+											\
+	tl = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;	\
+	MVAL.mvtype = MV_STR;								\
+	MVAL.str.addr = tl->dollar_io;							\
+	MVAL.str.len = tl->len;								\
+	/*** The following should be in the I/O code ***/				\
+	if (ESC == *MVAL.str.addr)							\
+	{										\
+		if (5 > MVAL.str.len)							\
+			MVAL.str.len = 0;						\
+		else									\
+		{									\
+			MVAL.str.addr += ESC_OFFSET;					\
+			MVAL.str.len -= ESC_OFFSET;					\
+		}									\
+	}										\
+	ZS_VAR_EQU(&X, TEXT);								\
+	mval_write(OUTPUT, &MVAL, TRUE);						\
+}
+
+#define ZWRITE_SPLIT_DOLLAR_P(MVAL, BUFFER, BUFF_LEN, X, DOLLARZ, TEXT, OUTPUT)		\
+{											\
+	io_log_name	*tl;								\
+	char		*ptr;								\
+											\
+	tl = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;	\
+	assert(BUFF_LEN > (tl->len + DOLLARZ.len));					\
+	MVAL.mvtype = MV_STR;								\
+	MVAL.str.addr = BUFFER;								\
+	ptr = MVAL.str.addr;								\
+	/* Transfer $p to mval */							\
+	memcpy(ptr, (char *)tl->dollar_io, tl->len);					\
+	ptr += tl->len;									\
+	MVAL.str.len = tl->len;								\
+	/* then transfer "< /" */							\
+	memcpy(ptr, DOLLARZ.addr, DOLLARZ.len);						\
+	MVAL.str.len += DOLLARZ.len;							\
+	ZS_VAR_EQU(&X, TEXT);								\
+	mval_write(OUTPUT, &MVAL, TRUE);						\
+}
+
 error_def(ERR_ZDIROUTOFSYNC);
+error_def(ERR_INVSVN);
 
 void zshow_svn(zshow_out *output, int one_sv)
 {
 	mstr		x;
 	mval		var, zdir;
-	io_log_name	*tl;
        	stack_frame	*fp;
 	int 		count, save_dollar_zlevel;
 	char		*c1, *c2;
-	char		zdir_error[3 * GTM_MAX_DIR_LEN + 128]; /* PATH_MAX + "->" + GTM-W-ZDIROUTOFSYNC, <text of ZDIROUTOFSYNC> */
+	char		zdir_error[ZDIR_ERR_LEN];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -265,26 +322,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_PRINCIPAL:
-			if (dollar_principal)
-				tl = dollar_principal;
-			else
-				tl = io_root_log_name->iod->trans_name;
-			var.str.addr = tl->dollar_io;
-			var.str.len = tl->len;
-			/*** The following should be in the I/O code ***/
-			if (ESC == *var.str.addr)
-			{
-				if (5 > var.str.len)
-					var.str.len = 0;
-				else
-				{
-					var.str.addr += ESC_OFFSET;
-					var.str.len -= ESC_OFFSET;
-				}
-			}
-			var.mvtype = MV_STR;
-			ZS_VAR_EQU(&x, principal_text);
-			mval_write(output, &var, TRUE);
+			ZWRITE_DOLLAR_PRINCIPAL(var, x, principal_text, output);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -429,6 +467,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
+		case SV_ZC:
 		case SV_ZCSTATUS:
 			MV_FORCE_MVAL(&var, TREF(dollar_zcstatus));
 			ZS_VAR_EQU(&x, zcstatus_text);
@@ -484,6 +523,13 @@ void zshow_svn(zshow_out *output, int one_sv)
 		case SV_ZGBLDIR:
 			ZS_VAR_EQU(&x, zgbldir_text);
 			mval_write(output, &dollar_zgbldir, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZHOROLOG:
+			op_zhorolog(&var);
+			ZS_VAR_EQU(&x, zhorolog_text);
+			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -577,10 +623,34 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
+		case SV_ZPIN:
+			if (io_std_device->in != io_std_device->out)
+			{	/* ZPIN != ZPOUT print it */
+				ZWRITE_SPLIT_DOLLAR_P(var, zdir_error, ZDIR_ERR_LEN, x, dollar_zpin, principalin_text, output);
+			} else if (SV_ALL != one_sv)
+			{	/* Print $principal for a ZWRite request if ZPIN == ZPOUT */
+				ZWRITE_DOLLAR_PRINCIPAL(var, x, principalin_text, output);
+			}	/* Else, ignore this for zshow when ZPIN == ZPOUT */
+			var.mvtype = 0;
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
 		case SV_ZPOS:
 			getzposition(&var);
 			ZS_VAR_EQU(&x, zpos_text);
 			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZPOUT:
+			if (io_std_device->in != io_std_device->out)
+			{	/* ZPOUT != ZPIN print it */
+				ZWRITE_SPLIT_DOLLAR_P(var, zdir_error, ZDIR_ERR_LEN, x, dollar_zpout, principalout_text, output);
+			} else if (SV_ALL != one_sv)
+			{	/* Print $principal for a ZWRite request if ZPOUT == ZPIN */
+				ZWRITE_DOLLAR_PRINCIPAL(var, x, principalout_text, output);
+			}	/* Else, ignore this for zshow when ZPOUT == ZPIN */
+			var.mvtype = 0;
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -789,6 +859,13 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
+		case SV_ZUT:
+			op_zut(&var);
+			ZS_VAR_EQU(&x, zut_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
 		case SV_ZVERSION:
 			var.mvtype = MV_STR;
 			var.str.addr = (char *)gtm_release_name;
@@ -797,14 +874,15 @@ void zshow_svn(zshow_out *output, int one_sv)
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
+		/* CAUTION: fall through */
 		case SV_ZYERROR:
 			var.mvtype = MV_STR;
 			var.str = dollar_zyerror.str;
 			ZS_VAR_EQU(&x, zyerror_text);
 			mval_write(output, &var, TRUE);
 			break;
+		/* NOTE: fall through ended */
 		default:
-			assertpro(FALSE);
-
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSVN);
 	}
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,9 +87,8 @@ int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 		{
 			/* On every 4th pass, we bide for awhile */
 			wcs_sleep(LOCK_SLEEP);
-			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
-			/* If near end of loop, see if target is dead and/or wake it up */
-			if (RETRY_CASLATCH_CUTOFF == retries)
+			/* Check if we're due to check for lock abandonment check or holder wakeup */
+			if (0 == (retries & (LOCK_CASLATCH_CHKINTVL - 1)))
 				performCASLatchCheck(&base->latch, TRUE);
 		}
 	}
@@ -133,9 +133,8 @@ int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 		{
 			/* On every 4th pass, we bide for awhile */
 			wcs_sleep(LOCK_SLEEP);
-			/* If near end of loop, see if target is dead and/or wake it up */
-			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
-			if (RETRY_CASLATCH_CUTOFF == retries)
+			/* Check if we're due to check for lock abandonment check or holder wakeup */
+			if (0 == (retries & (LOCK_CASLATCH_CHKINTVL - 1)))
 				performCASLatchCheck(&base->latch, TRUE);
 		}
 	}
@@ -188,9 +187,8 @@ void_ptr_t remqhi1(que_head_ptr_t base)
 		{
 			/* On every 4th pass, we bide for awhile */
 			wcs_sleep(LOCK_SLEEP);
-			/* If near end of loop, see if target is dead and/or wake it up */
-			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
-			if (RETRY_CASLATCH_CUTOFF == retries)
+			/* Check if we're due to check for lock abandonment check or holder wakeup */
+			if (0 == (retries & (LOCK_CASLATCH_CHKINTVL - 1)))
 				performCASLatchCheck(&base->latch, TRUE);
 		}
 	}
@@ -243,9 +241,8 @@ void_ptr_t remqti1(que_head_ptr_t base)
 		{
 			/* On every 4th pass, we bide for awhile */
 			wcs_sleep(LOCK_SLEEP);
-			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
-			/* If near end of loop, see if target is dead and/or wake it up */
-			if (RETRY_CASLATCH_CUTOFF == retries)
+			/* Check if we're due to check for lock abandonment check or holder wakeup */
+			if (0 == (retries & (LOCK_CASLATCH_CHKINTVL - 1)))
 				performCASLatchCheck(&base->latch, TRUE);
 		}
 	}

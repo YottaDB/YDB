@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -192,14 +193,15 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	int			group_id;
 	struct stat		sb;
 	int			perm;
-	struct perm_diag_data	pdd;
 #	endif
 	int			idx;
 	trans_num		db_tn;
 	uint4			temp_offset, temp_checksum, pfin_offset, eof_offset;
 	uint4			jnl_fs_block_size;
+	sgmnt_addrs		*csa;
 
 	jrecbuf = NULL;
+	csa = info->csa;
 	if (info->no_rename)
 	{	/* The only cases where no-renaming is possible are as follows
     		 * (i) MUPIP SET JOURNAL where the new journal file name is different from the current journal file name
@@ -214,8 +216,8 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		assert(0 == create_fn[create_fn_len]);
 	} else
 	{
-		if (NULL != info->csa)
-			cre_jnl_file_intrpt_rename(info->csa);	/* deal with *_new.mjl files */
+		if (NULL != csa)
+			cre_jnl_file_intrpt_rename(csa);	/* deal with *_new.mjl files */
 		create_fn = &fn_buff[0];
 		if (SS_NORMAL != (info->status = prepare_unique_name((char *)info->jnl, (int)info->jnl_len, "", EXT_NEW,
 								     (char *)create_fn, &create_fn_len, 0, &info->status2)))
@@ -253,26 +255,11 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		F_CLOSE(channel, status);
 		return EXIT_ERR;
 	}
-	/* setup new group and permissions if indicated by the security rules.
-	 */
-	if (gtm_permissions(&sb, &user_id, &group_id, &perm, PERM_FILE, &pdd) < 0)
-	{
-		send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
-			ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
-			PERMGENDIAG_ARGS(pdd));
-		if (IS_GTM_IMAGE)
-			rts_error_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
-				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
-				PERMGENDIAG_ARGS(pdd));
-		else
-			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
-				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("journal file"), RTS_ERROR_STRING(info->fn),
-				PERMGENDIAG_ARGS(pdd));
-		F_CLOSE(channel, status);
-		return EXIT_ERR;
-	}
+	/* Setup new group and permissions if indicated by the security rules */
+	gtm_permissions(&sb, &user_id, &group_id, &perm, PERM_FILE);
 	/* if group not the same then change group of temporary file */
-	if ((((-1 != user_id) && (user_id != stat_buf.st_uid)) || ((-1 != group_id) && (group_id != stat_buf.st_gid)))
+	if ((((INVALID_UID != user_id) && (user_id != stat_buf.st_uid))
+			|| ((INVALID_GID != group_id) && (group_id != stat_buf.st_gid)))
 		&& (-1 == fchown(channel, user_id, group_id)))
 	{
 		info->status = errno;
@@ -362,7 +349,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	 * write is not so much since it is only once per journal file at creation time. All future writes of the
 	 * file header write only the real file header and not the 0-padding.
 	 */
-	JNL_DO_FILE_WRITE(info->csa, create_fn, channel, 0, header, JNL_HDR_LEN, info->status, info->status2);
+	JNL_DO_FILE_WRITE(csa, create_fn, channel, 0, header, JNL_HDR_LEN, info->status, info->status2);
 	STATUS_MSG(info);
 	RETURN_ON_ERROR(info);
 	assert(DISK_BLOCK_SIZE >= EPOCH_RECLEN + EOF_RECLEN + PFIN_RECLEN + PINI_RECLEN);
@@ -469,11 +456,20 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	 */
 	assert(ROUND_UP2(header->virtual_size, jnl_fs_block_size/DISK_BLOCK_SIZE)
 			> DIVIDE_ROUND_UP(JNL_HDR_LEN + write_size, DISK_BLOCK_SIZE));
-	JNL_DO_FILE_WRITE(info->csa, create_fn, channel, JNL_HDR_LEN, jrecbuf, write_size, info->status, info->status2);
+	JNL_DO_FILE_WRITE(csa, create_fn, channel, JNL_HDR_LEN, jrecbuf, write_size, info->status, info->status2);
 	STATUS_MSG(info);
 	RETURN_ON_ERROR(info);
-	UNIX_ONLY(GTM_JNL_FSYNC(info->csa, channel, status);)
+	UNIX_ONLY(GTM_JNL_FSYNC(csa, channel, status);)
 	F_CLOSE(channel, status);	/* resets "channel" to FD_INVALID */
+	/* Now that EOF record has been written, keep csa->jnl->jnl_buff->prev_jrec_time up to date.
+	 * One exception is if journaling is not yet turned on but is being turned on by the current caller.
+	 * In that case, dont worry about maintaining jb->prev_jrec_time. It will be maintained when this newly
+	 * created journal file is first opened.
+	 */
+	if ((NULL != csa) && (NULL != csa->nl))	/* this means database shared memory is accessible (i.e. region is open) */
+	{	/* Keep jb->prev_jrec_time up to date */
+		SET_JNLBUFF_PREV_JREC_TIME(csa->jnl->jnl_buff, eof_record->prefix.time, DO_GBL_JREC_TIME_CHECK_TRUE);
+	}
 	free(jrecbuf_base);
 	jrecbuf_base = NULL;
 #	ifdef DEBUG
@@ -487,15 +483,15 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	 * Following does rename of a.mjl to a.mjl_timestamp.
 	 * So system will have a.mjl_timestamp and a.mjl_new for a crash after this call
 	 */
-	WAIT_FOR_REPL_INST_UNFREEZE_SAFE(info->csa);	/* wait for instance freeze before journal file renames */
+	WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);	/* wait for instance freeze before journal file renames */
 	if (SS_NORMAL != (info->status = gtm_rename((char *)info->jnl, (int)info->jnl_len,
 						    (char *)rename_fn, rename_fn_len, &info->status2)))
 	{
 		if (IS_GTM_IMAGE)
-			send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
 					rename_fn);
 		else
-			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
 					rename_fn);
 		STATUS_MSG(info);
 		return EXIT_ERR;
@@ -503,24 +499,24 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	/* Following does rename of a.mjl_new to a.mjl.
 	 * So system will have a.mjl_timestamp as previous generation and a.mjl as new/current journal file
 	 */
-	WAIT_FOR_REPL_INST_UNFREEZE_SAFE(info->csa);	/* wait for instance freeze before journal file renames */
+	WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);	/* wait for instance freeze before journal file renames */
 	if (SS_NORMAL !=  (info->status = gtm_rename((char *)create_fn, create_fn_len,
 						     (char *)info->jnl, (int)info->jnl_len, &info->status2)))
 	{
 		if (IS_GTM_IMAGE)
-			send_msg_csa(CSA_ARG(info->csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
 					rename_fn);
 		else
-			gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len,
 					rename_fn);
 		STATUS_MSG(info);
 		return EXIT_ERR;
 	}
 	if (IS_GTM_IMAGE)
-		send_msg_csa(CSA_ARG(info->csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len,
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len,
 				rename_fn);
 	else
-		gtm_putmsg_csa(CSA_ARG(info->csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len,
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len,
 				rename_fn);
 #		ifdef DEBUG
 		if (gtm_white_box_test_case_enabled && (WBTEST_JNL_CREATE_INTERRUPT == gtm_white_box_test_case_number))

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,23 +21,25 @@
 #include "gtmio.h"
 #include "stringpool.h"
 #include "setterm.h"
+#include "error.h"
 
 GBLREF io_pair		io_std_device;
 LITREF unsigned char	io_params_size[];
 
+error_def(ERR_SYSCALL);
+
 void iott_close(io_desc *v, mval *pp)
 {
-	/* only exception allowed */
-	error_def(ERR_SYSCALL);
-
 	d_tt_struct	*ttptr;
 	params		ch;
 	int		status;
 	int		p_offset;
+	boolean_t	ch_set;
 
 	assert(v->type == tt);
 	if (v->state != dev_open)
 		return;
+	ESTABLISH_GTMIO_CH(&v->pair, ch_set);
 	iott_flush(v);
 	if (v->pair.in != v)
 		assert(v->pair.out == v);
@@ -59,18 +62,23 @@ void iott_close(io_desc *v, mval *pp)
 			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 	}
 	if (v == io_std_device.in || (v == io_std_device.out))
+	{
+		REVERT_GTMIO_CH(&v->pair, ch_set);
 		return;
+	}
 
 	CLOSEFILE_RESET(ttptr->fildes, status);	/* resets "ttptr->fildes" to FD_INVALID */
 	if (0 != status)
 	{
 		assert(status == errno);
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("iott_close(CLOSEFILE)"), CALLFROM, status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				RTS_ERROR_LITERAL("iott_close(CLOSEFILE)"), CALLFROM, status);
 	}
 	if (ttptr->recall_buff.addr)
 	{
 		free(ttptr->recall_buff.addr);
 		ttptr->recall_buff.addr = NULL;
 	}
+	REVERT_GTMIO_CH(&v->pair, ch_set);
 	return;
 }

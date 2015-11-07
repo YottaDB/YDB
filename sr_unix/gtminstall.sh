@@ -1,7 +1,8 @@
 #!/bin/sh -
 #################################################################
 #                                                               #
-#       Copyright 2014 Fidelity Information Services, Inc       #
+# Copyright (c) 2014-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -458,6 +459,7 @@ chmod +x configure.sh
 if [ "Y" = "$gtm_dryrun" ] ; then echo Installation prepared in $gtm_tmp ; exit ; fi
 
 ./configure.sh <$gtm_configure_in 1> $gtm_tmp/configure_${timestamp}.out 2>$gtm_tmp/configure_${timestamp}.err
+if [ $? -gt 0 ] ; then cat $gtm_tmp/configure_${timestamp}.out $gtm_tmp/configure_${timestamp}.err ; fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Installation complete ; ls -l $gtm_installdir ; fi
 
 # Create copies of environment scripts and gtm executable

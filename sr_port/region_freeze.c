@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +53,7 @@ GBLREF	bool		in_mupip_freeze;
 GBLREF	uint4		process_id;
 GBLREF	boolean_t	debug_mupip;
 #ifdef UNIX
-# define FREEZE_ID	(0 == TREF(user_id) ? FROZEN_BY_ROOT : TREF(user_id))
+# define FREEZE_ID	((0 == user_id) ? FROZEN_BY_ROOT : user_id)
 # define FREEZE_MATCH	process_id
 # define OWNERSHIP	(in_mupip_freeze ? (csd->freeze == freeze_id) : (csd->image_count == FREEZE_MATCH))
 #elif defined VMS
@@ -64,13 +65,13 @@ GBLREF	uint4		image_count;
 # error Unsupported Platform
 #endif
 
-#define SEND_FREEZEID(state)							\
-{										\
-	caller_id_flag = FALSE;							\
-	send_msg(VARLSTCNT(9) ERR_FREEZEID, 7, LEN_AND_STR(state),		\
-			DB_LEN_STR(region),					\
-			freeze_id, FREEZE_MATCH, caller_id());			\
-	caller_id_flag = TRUE;							\
+#define SEND_FREEZEID(STATE, CSA)							\
+{											\
+	caller_id_flag = FALSE;								\
+	send_msg_csa(CSA_ARG(CSA) VARLSTCNT(9) ERR_FREEZEID, 7, LEN_AND_STR(STATE),	\
+			DB_LEN_STR(region),						\
+			freeze_id, FREEZE_MATCH, caller_id());				\
+	caller_id_flag = TRUE;								\
 }
 
 error_def(ERR_FREEZEID);
@@ -163,7 +164,7 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 		}
 #		endif
 #		ifdef DEBUG_FREEZE
-		SEND_FREEZEID("FREEZE");
+		SEND_FREEZEID("FREEZE", csa);
 #		endif
 		return REG_FREEZE_SUCCESS;
 	}
@@ -192,7 +193,7 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 		}
 #		endif
 #		ifdef DEBUG_FREEZE
-		SEND_FREEZEID("UNFREEZE");
+		SEND_FREEZEID("UNFREEZE", csa);
 #		endif
 		return REG_FREEZE_SUCCESS;
 	}

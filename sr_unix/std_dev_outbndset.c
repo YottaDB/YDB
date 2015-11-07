@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,8 +37,8 @@ void std_dev_outbndset(int4 ob_char)
 	d_tt_struct	*tt_ptr;
 
 	assertpro(MAXOUTOFBAND >= ob_char);
-	if (tt == io_std_device.in->type)
-	{
+	if ((NULL != io_std_device.in) && (tt == io_std_device.in->type))
+	{	/* The NULL check above protects against a <CTRL-C> hitting while we're initializing the terminal */
 		tt_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 		std_dev_outbnd = TRUE;
 		mask = SHFT_MSK << ob_char;

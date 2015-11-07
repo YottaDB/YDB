@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +45,7 @@
 #include "gtm_netdb.h"
 #include "gtm_stdlib.h"
 #include "eintr_wrappers.h"
+#include "error.h"
 
 #define	CONNECTED	"CONNECT"
 #define READ	"READ"
@@ -95,6 +97,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	boolean_t		zint_restart, retry_accept = FALSE;
 	mv_stent		*mv_zintdev;
 	int			errcode;
+	boolean_t		ch_set;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -102,6 +105,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	assert(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	sockintr = &dsocketptr->sock_save_state;
+	ESTABLISH_RET_GTMIO_CH(&iod->pair, FALSE, ch_set);
 
 	/* Check for restart */
 	if (!dsocketptr->mupintr)
@@ -229,7 +233,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 						utimeout.tv_usec = 0;
 					} else
 					{
-						msec_timeout = (int4)(cur_time.at_sec * 1000 + cur_time.at_usec / 1000);
+						msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+								      DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
 						utimeout.tv_sec = cur_time.at_sec;
 						utimeout.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
 					}
@@ -244,7 +249,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 				else if (NO_M_TIMEOUT == timepar)
 					poll_timeout = -1;
 				else
-					poll_timeout = (utimeout.tv_sec * 1000) + (utimeout.tv_usec / 1000);
+					poll_timeout = (utimeout.tv_sec * MILLISECS_IN_SEC) +
+						DIVIDE_ROUND_UP(utimeout.tv_usec, MICROSECS_IN_MSEC);
 				poll_fd = -1;
 				rv = poll(poll_fds, poll_nfds, poll_timeout);
 #endif
@@ -280,6 +286,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 								"  interrupts: %d\n", end_time.at_sec, end_time.at_usec,
 								socketus_interruptus));
 						}
+						REVERT_GTMIO_CH(&iod->pair, ch_set);
 						outofband_action(FALSE);
 						assertpro(FALSE);      /* Should *never* return from outofband_action */
 						return FALSE;   /* For the compiler.. */
@@ -305,6 +312,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 				if (NO_M_TIMEOUT != timepar)
 				{
 					dollar_truth = FALSE;
+					REVERT_GTMIO_CH(&iod->pair, ch_set);
 					return FALSE;
 				} else
 					continue;
@@ -321,6 +329,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 			if (NO_M_TIMEOUT != timepar)
 			{
 				dollar_truth = FALSE;
+				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return FALSE;
 			} else
 				continue;
@@ -396,6 +405,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 			if (NO_M_TIMEOUT != timepar)
 			{
 				dollar_truth = FALSE;
+				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return FALSE;
 			} else
 				continue;
@@ -410,7 +420,10 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 				retry_accept = TRUE;
 				continue;	/* pending connection gone so redo */
 			} else if (-1 == rv)
+			{
+				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return FALSE;	/* error handled in iosocket_accept */
+			}
 		} else
 		{
 			assert(socket_connected == socketptr->state);
@@ -443,6 +456,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	}
 	if (NO_M_TIMEOUT != timepar)
 		dollar_truth = TRUE;
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return TRUE;
 }
 

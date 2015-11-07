@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +61,7 @@ boolean_t	lk_check_own(mlk_pvtblk *x)
 			   we are no longer blocked on it and can pretend that the process
 			   holding the lock went away */
 			ret_val = TRUE;
-		} else if (BLOCKING_PROC_ALIVE(x, time, icount, status))
+		} else if (BLOCKING_PROC_DEAD(x, time, icount, status))
 		{	/* process that owned lock has died, free lock. */
 			x->blocked->owner = 0;
 			csa->hdr->trans_hist.lock_sequence++;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,8 +31,6 @@
 #include "filestruct.h"
 #include "anticipatory_freeze.h"	/* for SET_ANTICIPATORY_FREEZE_IF_NEEDED */
 
-GBLREF	boolean_t	donot_fflush_NULL;
-
 /*
  * ----------------------------------------------------------------------------------------
  *  WARNING:	For chained error messages, all messages MUST be followed by an fao count;
@@ -50,17 +49,9 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Before starting to write to stderr, make sure all other buffered streams are flushed.
-	 * This way we avoid out-of-order logging issues with multiple streams mapping to the same file
-	 * e.g. stdout/stderr could both end up in the same file. We do this now only for the utilities
-	 * (and not mumps) since the implications of that change (is it safe or not) are not yet clear.
-	 */
 	if (!IS_GTMSECSHR_IMAGE)
 	{	/* Note gtmsecshr does no stdout/stderr IO - everything goes to operator log so this doesn't apply */
-		if (!IS_GTM_IMAGE && !donot_fflush_NULL)
-			FFLUSH(NULL);
 		util_out_print(NULL, RESET);
-		flush_pio();
 	}
 	assert(0 < arg_count);
 	for (; ; )

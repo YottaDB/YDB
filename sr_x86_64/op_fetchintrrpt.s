@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,44 +10,35 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_fetchintrrpt.s
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "linkage.si"
-	.INCLUDE	"g_msf.si"
-
-	.sbttl	op_fetchintrrpt
-#	PAGE	+
-	.DATA
-.extern	frame_pointer
-.extern	neterr_pending
+	.data
+	.extern	frame_pointer
+	.extern	neterr_pending
 
 	.text
-.extern	gtm_fetch
-.extern	gvcmz_neterr
-.extern	outofband_clear
-.extern	async_action
+	.extern	gtm_fetch
+	.extern	gvcmz_neterr
+	.extern	outofband_clear
+	.extern	async_action
 
-# PUBLIC	op_fetchintrrpt
-ENTRY op_fetchintrrpt
-	movq	frame_pointer(REG_IP),REG64_SCRATCH1
-	popq	msf_mpc_off(REG64_SCRATCH1)
+ENTRY	op_fetchintrrpt
+	movq	frame_pointer(REG_IP), REG64_SCRATCH1
+	popq	msf_mpc_off(REG64_SCRATCH1)		# Save return addr in M frame, also aligns stack to 16 bytes
+	CHKSTKALIGN					# Verify stack alignment
 	movq    REG_PV, msf_ctxt_off(REG64_SCRATCH1)
-	movb    $0,REG8_ACCUM             # variable length argument
+	movb    $0, REG8_ACCUM             		# Variable length argument
 	call	gtm_fetch
-	cmpb	$0,neterr_pending(REG_IP)
+	cmpb	$0, neterr_pending(REG_IP)
 	je	l1
 	call	outofband_clear
-	movq 	$0,REG64_ARG0
+	movq 	$0, REG64_ARG0
 	call	gvcmz_neterr
-l1:	movl	$1,REG32_ARG0
+l1:
+	movl	$1, REG32_ARG0
 	call	async_action
-	movq	frame_pointer(REG_IP),REG64_SCRATCH1
-	pushq	msf_mpc_off(REG64_SCRATCH1)
+	movq	frame_pointer(REG_IP), REG64_SCRATCH1
+	pushq	msf_mpc_off(REG64_SCRATCH1)		# Push return address for current frame back on stack
 	ret
-# op_fetchintrrpt ENDP
-
-# END

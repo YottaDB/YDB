@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +21,7 @@
 #include "gtm_stdio.h"
 
 #include <rtnhdr.h>
+#include <auto_zlink.h>
 #include "zroutines.h"
 #include "compiler.h"
 #include "srcline.h"
@@ -45,6 +47,7 @@
 #include "stack_frame.h"
 #include "rtn_src_chksum.h"
 #include "cmd_qlf.h"
+#include "arlinkdbg.h"
 
 #define RT_TBL_SZ 20
 
@@ -88,8 +91,8 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 	SETUP_THREADGBL_ACCESS;
 	srcstat = 0;
 	*srcret = NULL;
+	rtn_vector = NULL;
 	assert (routine->mvtype & MV_STR);
-
 	/* The source to be loaded can be of two types:
 	 *
 	 *   1. Normal routine source to be looked up on disk
@@ -100,11 +103,15 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 	GTMTRIG_ONLY(IS_TRIGGER_RTN(&routine->str, is_trigger));
 	DBGIFTRIGR((stderr, "get_src_line: entered $tlevel=%d and $t_tries=%d\n", dollar_tlevel, t_tries));
 	if (WANT_CURRENT_RTN(routine))
-	{	/* we want $TEXT for the routine currently executing. */
+	{	/* We want $TEXT for the routine currently executing - may be a recursively relinked routine copy */
 		rtn_vector = CURRENT_RHEAD_ADR(frame_pointer->rvector);
-	} else
+		DBGARLNK((stderr, "get_src_line: Fetching source from current routine (rtnhdr 0x"lvaddr")\n", rtn_vector));
+		assert(rtn_vector);
+		GTMTRIG_ONLY(is_trigger=(NULL != rtn_vector->trigr_handle));
+		DBGIFTRIGR((stderr, "get_src_line: entered $tlevel=%d and $t_tries=%d\n", dollar_tlevel, t_tries));
+	}
 #	ifdef GTM_TRIGGER
-	if (is_trigger)
+	if ((is_trigger) && ((NULL == rtn_vector) || (NULL == rtn_vector->source_code)))
 	{	/* Need source on a trigger. Get trigger source loaded and/or verified which may involve
 		 * creating a TP fence and dealing with TP restarts.
 		 */
@@ -113,8 +120,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 		 * avoid modification to routine->str as it affects the caller which relies on this variable being
 		 * untouched.
 		 */
-		tmprtnname = routine->str;
-		DEBUG_ONLY(rtn_vector = NULL;)
+		tmprtnname = (NULL == rtn_vector) ? routine->str : rtn_vector->routine_name;
 		DBGTRIGR((stderr, "get_src_line: fetch source for %s\n", tmprtnname.addr));
 		rc = trigger_source_read_andor_verify(&tmprtnname, TRIGGER_SRC_LOAD, &rtn_vector);
 		if (0 != rc)
@@ -129,10 +135,12 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 				*rtn_vec = NULL;
 			return OBJMODMISS;
 		}
-		DBGTRIGR((stderr, "get_src_line: source found @0x%lx(%d)\n", rtn_vector->trigr_handle,
-					((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len));
+		DBGTRIGR((stderr, "get_src_line: source found @0x%lx(%d) for %lx\n", rtn_vector->trigr_handle,
+					((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len, rtn_vector));
+		DBGARLNK((stderr, "get_src_line: Fetch trigger source from rtnhdr 0x"lvaddr"\n", rtn_vector));
 	} else
 #	endif
+	if (NULL == rtn_vector)
 	{
 		if (NULL == (rtn_vector = find_rtn_hdr(&routine->str)))		/* Note assignment */
 		{
@@ -145,14 +153,24 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 				return OBJMODMISS;
 			}
 		}
-		ARLINK_ONLY(rtn_vector = op_rhd_ext(routine, (mval *)&literal_null, rtn_vector, NULL));
+#		ifdef AUTORELINK_SUPPORTED
+		/* We have the routine now but double check if we need to load a newer one */
+		explicit_relink_check(rtn_vector, TRUE);
+		rtn_vector = (TABENT_PROXY).rtnhdr_adr;
+		assert(NULL != rtn_vector);
+		DBGARLNK((stderr, "get_src_line: Fetching routine source for rtnhdr 0x"lvaddr"\n", rtn_vector));
+#		endif
 	}
 	if (NULL != rtn_vec)
 		*rtn_vec = rtn_vector;
 	if (!rtn_vector->src_full_name.len)
+	{
+		DBGARLNK((stderr, "get_src_line: Source not available\n"));
 		return SRCNOTAVAIL;
+	}
 	src_tbl = rtn_vector->source_code;
-	DBGIFTRIGR((stderr, "get_src_line: routine has source_code 0x%lx (%d)\n", src_tbl, (src_tbl)? src_tbl->srcrecs : 0));
+	DBGIFTRIGR((stderr, "get_src_line: routine %lx has source_code 0x%lx (%d)\n",
+				rtn_vector, src_tbl, (src_tbl)? src_tbl->srcrecs : 0));
 	if (NULL == src_tbl)
 	{
 #		ifdef GTM_TRIGGER
@@ -160,9 +178,9 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 		{
 			srcstart = (unsigned char *)((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.addr;
 			srcsize = ((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len;
+			DBGTRIGR((stderr, "get_src_line: %lx source is %d bytes\n%s\n", rtn_vector, srcsize, srcstart));
 			assert(0 < srcsize);
 			assert(NULL != srcstart);
-			DBGTRIGR((stderr, "get_src_line: source is %d bytes\n%s\n", srcsize, srcstart));
 			/* Calculate source checksum */
 			if (NULL == memchr(srcstart, '\n', srcsize))
 			{	/* In this case, gtm_trigger_complink() would have written an extra newline character to the
@@ -227,8 +245,10 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 	DBGIFTRIGR((stderr, " get_src_line: $tlevel %d\t", dollar_tlevel));
 	lt_ptr = (int *)find_line_addr(rtn_vector, &label->str, 0, NULL);
 	if (!lt_ptr)
+	{
+		DBGARLNK((stderr, "get_src_line: label not found\n"));
 		srcstat |= LABELNOTFOUND;
-	else if (!(srcstat & (SRCNOTFND | SRCNOTAVAIL)))
+	} else if (!(srcstat & (SRCNOTFND | SRCNOTAVAIL)))
 	{
 		line_indx = (int)(lt_ptr - (int *)LNRTAB_ADR(rtn_vector));
 		line_indx += offset;
@@ -245,7 +265,9 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 			/* DBGFPF((stderr, "get_src_line: returning string %.*s\n", (*srcret)->len, (*srcret)->addr)); */
 		}
 	}
-	DBGIFTRIGR((stderr, "get_src_line: exiting with srcstat %d\n", srcstat));
+#	if defined(DEBUG_TRIGR) || defined(DEBUG_ARLINK)
+	DBGFPF((stderr, "get_src_line: exiting with srcstat %d\n", srcstat));
+#	endif
 	return srcstat;
 }
 
@@ -309,7 +331,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_litpool(routine_source **src_tbl_result, 
 	}
 	/* NOTE: no need to verify source checksum. no chance of mismatch */
 	*src_tbl_result = src_tbl;
-	return 0;
+	return FALSE;
 }
 
 STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rhdtyp *rtn_vector)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -263,6 +264,19 @@ error_def(ERR_JNLENDIANLITTLE);
 	JNL_SHORT_TIME(jgbl.gbl_jrec_time);		\
 }
 
+#define	DO_GBL_JREC_TIME_CHECK_FALSE	FALSE
+#define	DO_GBL_JREC_TIME_CHECK_TRUE	TRUE
+
+#define	SET_JNLBUFF_PREV_JREC_TIME(JB, CUR_JREC_TIME, DO_GBL_JREC_TIME_CHECK)					\
+{														\
+	GBLREF	jnl_gbls_t		jgbl;									\
+														\
+	/* In case of journal rollback, time is set back to turnaround point etc. so assert accordingly */	\
+	assert(!DO_GBL_JREC_TIME_CHECK || (jgbl.gbl_jrec_time >= CUR_JREC_TIME));				\
+	assert(jgbl.onlnrlbk || (JB->prev_jrec_time <= CUR_JREC_TIME));						\
+	JB->prev_jrec_time = CUR_JREC_TIME;									\
+}
+
 /* This macro ensures that journal records are written in non-decreasing time order in each journal file.
  * It is passed the time field to adjust and a pointer to the journal buffer of the region.
  * The journal buffer holds the timestamp of the most recently written journal record.
@@ -418,7 +432,7 @@ typedef struct
  	trans_num		eov_tn;		/* curr_tn is saved as eov_tn by jnl_write_epoch. Used by recover/rollback */
 	volatile trans_num	epoch_tn;	/* Transaction number for current epoch */
 	seq_num			end_seqno;		/* reg_seqno saved by jnl_write_epoch. Used by recover/rollback */
-	seq_num			strm_end_seqno[MAX_SUPPL_STRMS]; /* used to keep jfh->strm_end_seqno uptodate with each epoch.
+	seq_num			strm_end_seqno[MAX_SUPPL_STRMS]; /* used to keep jfh->strm_end_seqno up to date with each epoch.
 						 * Unused in VMS but defined so shared memory layout is similar in Unix & VMS.
 						 */
 	int4			min_write_size,	/* if unwritten data gets to this size, write it */

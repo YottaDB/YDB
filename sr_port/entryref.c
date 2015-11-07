@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +41,7 @@ STATICFNDCL triple *insert_extref_fast(opctype op1, opctype op2, mident *rtnname
 								\
 	rte1 = put_str((RTNNAME)->addr, (RTNNAME)->len);	\
 	CONVERT_MUTIL_NAME_PERCENT_TO_UNDERSCORE((RTNNAME));	\
-	routine = put_cdlt((RTNNAME));				\
+	routine = PUT_CDREF((RTNNAME));				\
 	ref = newtriple(OC_RHDADDR);				\
 	ref->operand[0] = rte1;					\
 	ref->operand[1] = routine;				\
@@ -66,7 +67,7 @@ error_def(ERR_RTNNAME);
  *   commargcode - What type of command this is for (code from indir_* enum in indir.h)
  *   can_commarg - Indicates whether or not routine is allowed to call commarg to deal with indirects. Currently the only
  *		   routine to set this to false is m_zgoto.c since it already deals with indirects its own way.
- *   labref	 - Only TRUE for calls frome exfunc. When TRUE, label offsets are not allowed.
+ *   labref	 - Only TRUE for calls from exfunc(). When TRUE, label offsets are not allowed.
  *   textname	 - Only TRUE for ZGOTO related calls where the routine/label names are passed as text instead of resolved to
  *		   linkage table entries.
  */
@@ -239,16 +240,15 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 }
 
 #ifdef AUTORELINK_SUPPORTED
-/* Routine used in a USHBIN build (UNIX Shared BInary) to generate the triples to reference (call, extrinsic or goto)
- * an external routine. This version calls additional opcodes to dynamically autorelink routines if the routine has been
- * changed since it was last linked if autorelinking is enabled. This requires that all such M-calls with a routine specified
- * as part of the call (i.e. DO label^routine instead of just DO label) be invoked as external routines so this routine
- * creates an external reference to the given routine/label. Note indirects do not come through here.
+/* Routine used in an autorelink-enabled USHBIN build (UNIX Shared BInary) to generate the triples to reference (call, extrinsic
+ * or goto) an external routine. This version of this routine generates calls slightly different than its counterpart below for
+ * non-USHBIN or platforms not supported for autorelink in that any call where the routine name is specified, even if the
+ * routine name is for the current routine, are treated as external calls with an autorelink-needed check. Note indirects do not
+ * come through here.
  *
  * Parameters:
  *
- *   op1     - Opcode to use for local routine (only passed into this flavor for compatibility with the NON-USHBIN version
- *             that follows below. This routine does not use it.
+ *   op1     - Opcode to use for local routine (used by this routine only for local-only [colon-suffixed] labels).
  *   op2     - Opcode to use for external call.
  *   rtnname - Text name of routine being referenced.
  *   labname - Text label being referenced in given routine (may be NULL string)
@@ -258,36 +258,29 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
  */
 STATICFNDEF triple *insert_extref_fast(opctype op1, opctype op2, mident *rtnname, mident *labname)
 {
-	triple 		*intermed1, *intermed2, *rettrip, *next, *ref;
+	triple 		*rettrip;
 	mstr		lbl_str;
+	mlabel		*mlab;
 
-	intermed1 = maketriple(OC_RHD_EXT);
-	ref = intermed1;
-	ref->operand[0] = put_str(rtnname->addr, rtnname->len);	/* arg 1 */
-	next = newtriple(OC_PARAMETER);
-	ref->operand[1] = put_tref(next);
-	ref = next;
-	ref->operand[0] = put_str(labname->addr, labname->len);	/* arg 2 */
-	next = newtriple(OC_PARAMETER);
-	ref->operand[1] = put_tref(next);
-	ref = next;
-	ref->operand[0] = put_cdlt(rtnname);			/* arg 3 */
-	next = newtriple(OC_PARAMETER);
-	ref->operand[1] = put_tref(next);
-	ref = next;
+	/* Do LABEL^RTN comes here (LABEL is *not* indirect) */
+	if (IS_SAME_RTN(rtnname, &routine_name))
+	{       /* If same routine as current routine, see if this label is a local-only label (colon-suffixed). If so,
+		 * treat this as a local call.
+		 */
+		mlab = get_mladdr(labname);
+		if (!mlab->gbl)
+		{	/* Is a local label - generate local call */
+			rettrip = newtriple(op1);
+			rettrip->operand[0] = put_mlab(labname);
+			return rettrip;
+		}
+	} /* Else create external call reference so routine can be checked for auto-relink at call */
+	rettrip = maketriple(op2);
 	CONVERT_MUTIL_NAME_PERCENT_TO_UNDERSCORE(rtnname);
+	rettrip->operand[0] = PUT_CDREF(rtnname);
 	mlabel2xtern(&lbl_str, rtnname, labname);
-	ref->operand[0] = put_cdlt(&lbl_str);			/* arg 4 */
-	ins_triple(intermed1);
-	/* op_rhd_ext needs to return two pointers: one to a rtn hdr, and one to
-	 * a line number entry (label). op_rhd_ext directly returns the rtn hdr
-	 * and sets lab_proxy, which op_lab_ext fetches and feeds into the opcode
-	 * doing the reference (DO, extrinsics, and ZBREAK).
-	 */
-	intermed2 = newtriple(OC_LAB_EXT); /* extracts, returns global variable */
-	rettrip = newtriple(op2);
-	rettrip->operand[0] = put_tref(intermed1);
-	rettrip->operand[1] = put_tref(intermed2);
+	rettrip->operand[1] = PUT_CDREF(&lbl_str);
+	ins_triple(rettrip);
 	return rettrip;
 }
 
@@ -303,6 +296,7 @@ STATICFNDEF oprtype insert_extref(mident *rtnname)
 }
 
 #else
+
 /* Routine used in a NON_USHBIN build to generate triples for a label reference (call, function invocation or goto) a routine.
  * At this point, it could be an internal or external routine. Note indirects do not come here.
  *
@@ -326,9 +320,9 @@ STATICFNDEF triple *insert_extref_fast(opctype op1, opctype op2, mident *rtnname
 	{       /* Create an external reference to LABEL^RTN */
 		rettrip = maketriple(op2);
 		CONVERT_MUTIL_NAME_PERCENT_TO_UNDERSCORE(rtnname);
-		rettrip->operand[0] = put_cdlt(rtnname);
+		rettrip->operand[0] = PUT_CDREF(rtnname);
 		mlabel2xtern(&lbl_str, rtnname, labname);
-		rettrip->operand[1] = put_cdlt(&lbl_str);
+		rettrip->operand[1] = PUT_CDREF(&lbl_str);
 		ins_triple(rettrip);
 	}
 	return rettrip;

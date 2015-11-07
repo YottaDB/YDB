@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -158,12 +159,12 @@ boolean_t	is_anticipatory_freeze_needed(sgmnt_addrs *csa, int msg_id)
 	 * 2. DSKSPCAVAILABLE : To ensure we don't set anticipatory freeze if the disk space becomes available after an initial
 	 *			lack of space.
 	 * These messages have csa == NULL so they are guarranteed to not trigger a freeze.
+	 * However, ENOSPCQIODEFER is returned and later passed to rts_error with a non-NULL csa, so return FALSE in that case.
 	 */
 
-	assert(((ERR_ENOSPCQIODEFER != msg_id) && (ERR_DSKSPCAVAILABLE != msg_id) && (ERR_INSTFRZDEFER != msg_id))
-	       || (NULL == csa));
-	if (!csa || !csa->nl || !csa->hdr || !csa->hdr->freeze_on_fail)
+	if (!csa || !csa->nl || !csa->hdr || !csa->hdr->freeze_on_fail || (ERR_ENOSPCQIODEFER == msg_id))
 		return FALSE;
+	assert((ERR_DSKSPCAVAILABLE != msg_id) && (ERR_INSTFRZDEFER != msg_id));
 	ctl = err_check(msg_id);
 	if (NULL != ctl)
 	{

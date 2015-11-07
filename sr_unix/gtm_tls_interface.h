@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,7 @@
 #ifndef GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
 #define GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
 
-#define GTM_TLS_API_VERSION		0x00000002
+#define GTM_TLS_API_VERSION		0x00000003
 #define GTM_TLS_API_VERSION_SOCK	0x00000002	/* when TLS sockets added */
 
 #define MAX_X509_LEN			256
@@ -48,6 +49,7 @@
 
 /* Note these flags may be in either the ctx or ssl structures but not all
  * may have meaning in both. */
+/* GTMTLS_OP_INTERACTIVE_MODE and GTMTLS_OP_NOPWDENVVAR must match definition in gtmcrypt_interface,h */
 /* Whether the library is loaded in an interactive environment so that password prompting can happen if needed. */
 #define GTMTLS_OP_INTERACTIVE_MODE	0x00000001
 /* Turn-on compression for SSL/TLS protocol. */
@@ -68,6 +70,10 @@
 #define GTMTLS_OP_ABSENT_VERIFYMODE	0x00000100
 /* Server requested renegotiation without waiting for handshake */
 #define GTMTLS_OP_RENEGOTIATE_REQUESTED	0x00000200
+/* No gtmcrypt_config needed for client only use */
+#define GTMTLS_OP_ABSENT_CONFIG		0x00000400
+/* No environment variable for password - used by gc_update_passwd so must be same in gtmcrypt_interface.h */
+#define GTMTLS_OP_NOPWDENVVAR		0x00000800
 
 #define GTMTLS_IS_FIPS_MODE(CTX)	(TRUE == CTX->fips_mode)
 #define GTMTLS_RUNTIME_LIB_VERSION(CTX)	(CTX->runtime_version)
@@ -115,8 +121,8 @@ typedef struct gtm_tls_session_struct
 
 #endif	/* GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED */
 
-/* Note: The below function prototypes should be kept in sync with the corresponding declarations/definitions in sr_unix/gtm_tls.h
- * and sr_unix/gtm_tls_funclist.h.
+/* Note: The below function prototypes should be kept in sync with the corresponding declarations/definitions in sr_unix/gtm_tls.h,
+ * sr_unix/gtm_tls.c, and sr_unix/gtm_tls_funclist.h.
  */
 
 /* Returns the most recent error (null-terminated) related to the workings of the SSL/TLS reference implementation. */
@@ -141,6 +147,35 @@ int		gtm_tls_errno(void);
  * case gtm_tls_get_error() provides the necessary error detail.
  */
 gtm_tls_ctx_t	*gtm_tls_init(int version, int flags);
+
+/* Stores a M program provided password for later use.
+ *
+ * Arguments:
+ *    `tls_ctx'  : The SSL/TLS context corresponding to this process.
+ *    `tlsid'    : identifier of config file section to select the private key corresponding to this password.
+ *    `obs_passwd' : obfuscated password in the same format as a gtmtls_passwd_
+ environment variable's value.
+ *
+ * Returns:
+ *     1          Success
+ *     0          Not an interactive context
+ *    -1          Failure - use gtm_tls_get_error() to get reason
+ */
+
+int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *obs_passwd);
+
+/* Provides additional information to merge with config file
+ *
+ * Arguments:
+ *    `tls_ctx'  : The SSL/TLS context corresponding to this process.
+ *    `configstr': to be used by config_read_str.
+ *
+ * Returns:
+ * 	0	Success
+ * 	-1	Failure - use gtm_tls_get_error() to get reason
+ */
+
+int gtm_tls_add_config(gtm_tls_ctx_t *tls_ctx, const char *idstr, const char *configstr);
 
 /* Prefetches the password corresponding to a private key.
  *

@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+# Copyright (c) 2001-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,27 +10,22 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_callsp.s
+	.include "linkage.si"
+	.include "g_msf.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "linkage.si"
-	.INCLUDE	"g_msf.si"
-
-	.sbttl	op_callsp
-#	PAGE	+
-	.DATA
-.extern	dollar_truth
-.extern	frame_pointer
+	.data
+	.extern	dollar_truth
+	.extern	frame_pointer
 
 	.text
-.extern	exfun_frame
-.extern	push_tval
+	.extern	exfun_frame
+	.extern	push_tval
 
-	.sbttl	op_callspb
-# PUBLIC	op_callspb
+	#
+	# Note this routine calls exfun_frame() instead of copy_stack_frame() because this routine needs to provide a
+	# separate set of compiler temps for use by the new frame. Particularly when it called on same line with FOR.
+	#
+
 ENTRY op_callspb
 	movl	frame_pointer,%edx
 	movl	(%esp),%eax
@@ -42,10 +38,7 @@ doit:	call	exfun_frame
 	movl	frame_pointer,%edx
 	movl	msf_temps_ptr_off(%edx),%edi
 	ret
-# op_callspb ENDP
 
-	.sbttl	op_callspw, op_callspl
-# PUBLIC	op_callspw, op_callspl
 ENTRY op_callspw
 ENTRY op_callspl
 	movl	frame_pointer,%edx
@@ -53,6 +46,3 @@ ENTRY op_callspl
 	movl	%eax,msf_mpc_off(%edx)
 	addl	$5,msf_mpc_off(%edx)	# store pc in MUMPS stack frame
 	jmp	doit
-# op_callspw ENDP
-
-# END

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +27,7 @@
 #include "gtm_caseconv.h"
 #include "stringpool.h"
 #include "min_max.h"
+#include "error.h"
 
 GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
@@ -179,10 +181,10 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				tlsid = NULL;
 		} else
 			tlsid = NULL;
-		if ((4 <= argcnt) && (NULL != tlsid))
+		if (4 <= argcnt)
 		{	/* password only valid if tlsid provided */
-			password = va_arg(args, mval *);
-			if ((NULL != password) && !M_ARG_SKIPPED(password) && MV_DEFINED(password))
+			password = va_arg(args, mval *);	/* need to do va_arg in case 5th arg */
+			if ((NULL != tlsid) && (NULL != password) && !M_ARG_SKIPPED(password) && MV_DEFINED(password))
 				MV_FORCE_STRD(password);
 			else
 				password = NULL;
@@ -210,13 +212,16 @@ void	iosocket_dlr_device(mstr *d)
 {
 	io_desc		*iod;
 	int		len;
+	boolean_t	ch_set;
 
 	iod = io_curr_device.in;
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
  	len = STRLEN(iod->dollar.device);
 	/* verify internal buffer has enough space for $DEVICE string value */
 	assert((int)d->len > len);
 	memcpy(d->addr, iod->dollar.device, len);
 	d->len = len;
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }
 
@@ -224,14 +229,17 @@ void	iosocket_dlr_key(mstr *d)
 {
 	io_desc		*iod;
 	int		len;
+	boolean_t	ch_set;
 
 	iod = io_curr_device.in;
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	len = STRLEN(iod->dollar.key);
 	/* verify internal buffer has enough space for $DEVICE string value */
 	assert((int)d->len > len);
 	if (len > 0)
 		memcpy(d->addr, iod->dollar.key, len);
 	d->len = len;
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }
 
@@ -243,8 +251,10 @@ void iosocket_dlr_zkey(mstr *d)
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
+	boolean_t	ch_set;
 
 	iod = io_curr_device.in;
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	assertpro(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	zkeyptr = (char *)stringpool.free;
@@ -342,5 +352,6 @@ void iosocket_dlr_zkey(mstr *d)
 	d->addr = (char *)stringpool.free;
 	d->len = totlen;
 	stringpool.free += totlen;
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

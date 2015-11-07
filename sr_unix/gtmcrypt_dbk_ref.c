@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc *
+ * Copyright (c) 2009-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +33,10 @@
 #include "gtmcrypt_sym_ref.h"
 #include "gtmcrypt_pk_ref.h"
 
+#define	UNRES_KEY_FILE				0	/* Key is for device encryption. */
+#define	UNRES_KEY_UNRES_DB			1	/* Key is for a database that does not yet exist. */
+#define	UNRES_KEY_RES_DB			2	/* Key is for a database that already exists. */
+
 #define CONFIG_FILE_UNREAD			('\0' == gc_config_filename[0])
 #define GPG_MESSAGE				"Verify encrypted key file and your GNUPGHOME settings"
 #define NON_GPG_MESSAGE				"Verify encryption key in configuration file pointed to by $gtmcrypt_config"
@@ -50,18 +55,115 @@
 #  define st_nmtime				st_nmtime
 #endif
 
+/* Allocate a gtm_keystore_t element. */
+#define GC_ALLOCATE_KEYSTORE_ENTRY(X)						\
+{										\
+	X = MALLOC(SIZEOF(gtm_keystore_t));					\
+	(X)->cipher_head = NULL;						\
+	(X)->db_cipher_entry = NULL;						\
+}
+
+/* Allocate a gtm_keystore_xxx_link_t element. */
+#define GC_ALLOCATE_KEYSTORE_LINK(X, TYPE)					\
+{										\
+	X = (TYPE *)MALLOC(SIZEOF(TYPE));					\
+	(X)->left = (X)->right = NULL;						\
+}
+
+/* Insert a new gtm_keystore_xxx_link_t element in a respective tree. It assumes
+ * (and asserts) that there is no existing matching node.
+ */
+#define INSERT_KEY_LINK(ROOT, LINK, TYPE, FIELD, VALUE, LENGTH, FILL_LEN)	\
+{										\
+	int	diff;								\
+	TYPE	*cur_node, **target_node;					\
+										\
+	target_node = &ROOT;							\
+	while (cur_node = *target_node)	/* NOTE: Assignment!!! */		\
+	{									\
+		diff = memcmp(cur_node->FIELD, VALUE, LENGTH);			\
+		assert(0 != diff);						\
+		if (diff < 0)							\
+			target_node = &cur_node->left;				\
+		else								\
+			target_node = &cur_node->right;				\
+	}									\
+	GC_ALLOCATE_KEYSTORE_LINK(*target_node, TYPE);				\
+	(*target_node)->link = LINK;						\
+	memset((*target_node)->FIELD, 0, FILL_LEN);				\
+	memcpy((*target_node)->FIELD, VALUE, LENGTH);				\
+}
+
+/* Find a particular key based on a binary tree with a specific search criterion, such
+ * as the key's name or hash. The macro causes the caller to return the found node.
+ */
+#define LOOKUP_KEY(ROOT, TYPE, FIELD, VALUE, LENGTH, CHECK_NULL)		\
+{										\
+	int	diff;								\
+	TYPE	*cur_node;							\
+										\
+	cur_node = ROOT;							\
+	while (cur_node)							\
+	{									\
+		diff = memcmp(cur_node->FIELD, VALUE, LENGTH);			\
+		if (0 < diff)							\
+			cur_node = cur_node->right;				\
+		else if ((0 == diff) &&						\
+			(CHECK_NULL						\
+			 ? '\0' == *(((char *)cur_node->FIELD) + LENGTH)	\
+			 : TRUE))						\
+			return cur_node->link;					\
+		else								\
+			cur_node = cur_node->left;				\
+	}									\
+	return NULL;								\
+}
+
+/* Insert a new gtm_keystore_unres_key_link_t element in the unresolved keys list. */
+#define INSERT_UNRESOLVED_KEY_LINK(KEYNAME, KEYPATH, INDEX, STATUS)				\
+{												\
+	gtm_keystore_unres_key_link_t *node;							\
+												\
+	node = (gtm_keystore_unres_key_link_t *)MALLOC(	SIZEOF(gtm_keystore_unres_key_link_t));	\
+	memset(node->key_name, 0, GTM_PATH_MAX);						\
+	strncpy(node->key_name, KEYNAME, GTM_PATH_MAX);						\
+	memset(node->key_path, 0, GTM_PATH_MAX);						\
+	strncpy(node->key_path, KEYPATH, GTM_PATH_MAX);						\
+	node->next = keystore_by_unres_key_head;						\
+	node->index = INDEX;									\
+	node->status = STATUS;									\
+	keystore_by_unres_key_head = node;							\
+}
+
+/* Remove all elements from the unresolved keys tree. */
+#define REMOVE_UNRESOLVED_KEY_LINKS						\
+{										\
+	gtm_keystore_unres_key_link_t *curr, *temp;				\
+										\
+	curr = keystore_by_unres_key_head;					\
+	while (curr)								\
+	{									\
+		temp = curr->next;						\
+		FREE(curr);							\
+		curr = temp;							\
+	}									\
+	keystore_by_unres_key_head = NULL;					\
+}
+
 STATICDEF int					n_keys;					/* Count of how many keys were loaded. */
 STATICDEF char					gc_config_filename[GTM_PATH_MAX];	/* Path to the configuration file. */
-STATICDEF gtm_keystore_hash_link_t		*keystore_by_hash_head;			/* Root of the binary search tree to look
+STATICDEF gtm_keystore_hash_link_t		*keystore_by_hash_head = NULL;		/* Root of the binary search tree to look
 											 * keys up by hash. */
-STATICDEF gtm_keystore_keyname_link_t		*keystore_by_keyname_head;		/* Root of the binary search tree to look
+STATICDEF gtm_keystore_keyname_link_t		*keystore_by_keyname_head = NULL;	/* Root of the binary search tree to look
 											 * keys up by name. */
-STATICDEF gtm_keystore_unres_keyname_link_t	*keystore_by_unres_keyname_head;	/* Head of the linked list holding keys of
+STATICDEF gtm_keystore_keypath_link_t		*keystore_by_keypath_head = NULL;	/* Root of the binary search tree to look
+											 * keys up by path. */
+STATICDEF gtm_keystore_unres_key_link_t		*keystore_by_unres_key_head = NULL;	/* Head of the linked list holding keys of
 											 * DBs with presently unresolved paths. */
 STATICDEF config_t				gtmcrypt_cfg;				/* Encryption configuration. */
-STATICDEF char					db_real_path[GTM_PATH_MAX];		/* Array for temporary storage of DBs' real
+STATICDEF char					key_name_array[GTM_PATH_MAX];		/* Array for temporary storage of DBs' real
 											 * path information. */
-STATICDEF unsigned char				key_hash[GTMCRYPT_HASH_LEN];		/* Array for temporary storage of keys'
+STATICDEF unsigned char				key_hash_array[GTMCRYPT_HASH_LEN];	/* Array for temporary storage of keys'
 											 * hashes. */
 
 GBLREF	passwd_entry_t				*gtmcrypt_pwent;
@@ -74,39 +176,26 @@ GBLREF	int					gtmcrypt_init_flags;
  * 		length		Length of the key name.
  * 		entry		Address where to place the pointer to the found key.
  * 		database	Flag indicating whether a database (or device) key is being searched.
- * 		nulled		Flag indicating whether keyname is null-terminated.
  *
  * Returns:	0 if the key with the specified name is found; -1 otherwise.
  */
-int gtmcrypt_getkey_by_keyname(char *keyname, int length, gtm_keystore_t **entry, int database, int nulled)
+int gtmcrypt_getkey_by_keyname(char *keyname, int length, gtm_keystore_t **entry, int database)
 {
-	int new_db_keynames, new_dev_keynames, new_hashes, new_keynames, error;
+	int error;
 
-	if (NULL == (*entry = keystore_lookup_by_keyname(keyname, length, nulled)))
-	{	/* Lookup still failed. Verify if we have right permissions on GNUPGHOME or $HOME/.gnupg (if GNUPGHOME is unset).
-		 * If not, then the below function will store the appropriate error message in err_string and so return -1.
-		 */
-		if (0 != gc_pk_gpghome_has_permissions())
-			return -1;
-		/* Hashes are irrelevant, so using the same variable for number of both device and DB hashes. */
-		if (0 != keystore_refresh(&new_db_keynames, &new_hashes, &new_dev_keynames, &new_hashes))
+	if (NULL == (*entry = keystore_lookup_by_keyname(keyname, length)))
+	{	/* No matches in the binary tree; trying the unresolved key list. */
+		if (0 != keystore_refresh())
 			return -1;
 		error = 0;
-		new_keynames = database ? new_db_keynames : new_dev_keynames;
-		if ((0 >= new_keynames) || ((0 < new_keynames)
-				&& (NULL == (*entry = keystore_lookup_by_keyname(keyname, length, nulled)))))
-		{	/* If either no keynames have been loaded, or the key is not found among those that were loaded, try the
-			 * unresolved keys list.
-			 */
-			if (NULL == (*entry = keystore_lookup_by_unres_keyname(keyname, &error)))
+		if (NULL == (*entry = keystore_lookup_by_unres_key(keyname, length, FALSE, database, &error)))
+		{
+			if (!error)
 			{
-				if (!error)
-				{
-					UPDATE_ERROR_STRING("%s " STR_ARG " missing in configuration file or does not exist",
-						(database ? "Database file" : "Keyname"), ELLIPSIZE(keyname));
-				}
-				return -1;
+				UPDATE_ERROR_STRING("%s " STR_ARG " missing in configuration file or does not exist",
+					(database ? "Database file" : "Keyname"), ELLIPSIZE(keyname));
 			}
+			return -1;
 		}
 	}
 	assert(NULL != *entry);
@@ -123,26 +212,18 @@ int gtmcrypt_getkey_by_keyname(char *keyname, int length, gtm_keystore_t **entry
  */
 int gtmcrypt_getkey_by_hash(unsigned char *hash, gtm_keystore_t **entry)
 {
-	int		err_caused_by_gpg;
+	int		err_caused_by_gpg, error;
 	char		save_err[MAX_GTMCRYPT_ERR_STRLEN], hex_buff[GTMCRYPT_HASH_HEX_LEN + 1];
 	char		*alert_msg;
-	int		new_db_hashes, new_dev_hashes, new_keynames, new_hashes;
 
 	if (NULL == (*entry = keystore_lookup_by_hash(hash)))
-	{	/* Lookup still failed. Verify if we have right permissions on GNUPGHOME or $HOME/.gnupg (if GNUPGHOME is unset).
-		 * If not, then the below function will store the appropriate error message in err_string and so return -1.
-		 */
-		if (0 != gc_pk_gpghome_has_permissions())
+	{	/* No matches in the binary tree; trying the unresolved key list. */
+		if (0 != keystore_refresh())
 			return -1;
-		/* Keynames are irrelevant, so using the same variable for number of both device and DB keynames. */
-		if (0 != keystore_refresh(&new_keynames, &new_db_hashes, &new_keynames, &new_dev_hashes))
-			return -1;
-		new_hashes = new_db_hashes + new_dev_hashes;
-		if ((0 >= new_hashes) || ((0 < new_hashes) && (NULL == (*entry = keystore_lookup_by_hash(hash)))))
-		{	/* If either no hashes have been loaded, or the key is not found among those that were loaded, try the
-			 * unresolved keys list.
-			 */
-			if (NULL == (*entry = keystore_lookup_by_unres_keyname_hash(hash)))
+		error = 0;
+		if (NULL == (*entry = keystore_lookup_by_unres_key((char *)hash, GTMCRYPT_HASH_LEN, TRUE, TRUE, &error)))
+		{
+			if (!error)
 			{	/* Be specific in the error as to what hash we were trying to find. */
 				err_caused_by_gpg = ('\0' != gtmcrypt_err_string[0]);
 				alert_msg = err_caused_by_gpg ? GPG_MESSAGE : NON_GPG_MESSAGE;
@@ -154,8 +235,8 @@ int gtmcrypt_getkey_by_hash(unsigned char *hash, gtm_keystore_t **entry)
 						ELLIPSIZE(hex_buff), save_err, alert_msg);
 				} else
 					UPDATE_ERROR_STRING("Expected hash - " STR_ARG ". %s", ELLIPSIZE(hex_buff), alert_msg);
-				return -1;
 			}
+			return -1;
 		}
 	}
 	assert(NULL != *entry);
@@ -179,159 +260,240 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_hash(unsigned char *hash)
  *
  * Arguments:	keyname		Name of the key.
  * 		length		Length of the key.
- * 		nulled		Indicates whether keyname is null-terminated.
  *
  * Returns:	Pointer to the key, if found; NULL otherwise.
  */
-STATICFNDEF gtm_keystore_t *keystore_lookup_by_keyname(char *keyname, int length, int nulled)
+STATICFNDEF gtm_keystore_t *keystore_lookup_by_keyname(char *keyname, int length)
 {
-	LOOKUP_KEY(keystore_by_keyname_head, gtm_keystore_keyname_link_t, key_name, keyname, length, !nulled);
+	LOOKUP_KEY(keystore_by_keyname_head, gtm_keystore_keyname_link_t, key_name, keyname, length, TRUE);
 }
 
 /*
- * Helper function to perform a linear search of the key by its name in the unresolved keys list. It attempts to resolve the real
- * path of every node's keyname, assuming that it corresponds to a previously unresolved database name. If the path is resolved, the
- * node's entry is used to create (as needed) new key node as well as hash- and keyname-based links to it, and the unresolved entry
- * is removed from the list.
+ * Helper function to perform the actual binary search of the key by its path.
  *
- * Arguments:	keyname		Name of the key.
+ * Arguments:	keypath		Path to the key.
+ * 		length		Length of the path.
+ *
+ * Returns:	Pointer to the key, if found; NULL otherwise.
+ */
+STATICFNDEF gtm_keystore_t *keystore_lookup_by_keypath(char *keypath, int length)
+{
+	LOOKUP_KEY(keystore_by_keypath_head, gtm_keystore_keypath_link_t, link->key_path, keypath, length, TRUE);
+}
+
+/*
+ * Helper function to perform a linear search of the key by its name or hash in the unresolved keys list. It attempts to resolve the
+ * real path of a keyname in case it corresponds to a previously unresolved database name. If the path is resolved, the node's entry
+ * is used to create (as needed) new key node as well as hash-, keyname-, and keypath-based links to it, and the unresolved entry is
+ * removed from the list.
+ *
+ * Arguments:	search_field	Either name or hash of the key to find.
+ *		search_len	Length of the search field.
+ *		hash		Flag indicating whether to search by hash or keyname.
+ *		database	Flag indicating whether the search is for a database or device encryption key.
  * 		error		Address where to set the flag indicating whether an error was encountered.
  *
  * Returns:	Pointer to the key, if found; NULL otherwise.
  */
-STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_keyname(char *keyname, int *error)
+STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field, int search_len, int hash, int database, int *error)
 {
-	gtm_keystore_unres_keyname_link_t	*curr, *prev, *next;
-	gtm_keystore_t				*node, *result;
-	int					length;
+	gtm_keystore_unres_key_link_t	*curr, *prev, *next;
+	gtm_keystore_t			*node;
+	int				name_length, path_length;
 
-	result = NULL;
 	prev = NULL;
-	curr = keystore_by_unres_keyname_head;
+	curr = keystore_by_unres_key_head;
 	while (curr)
-	{
-		next = curr->next;
-		if (NULL != realpath(curr->key_name, db_real_path))
+	{	/* Skip entries whose type does not match the one we are searching for. */
+		if ((database && (UNRES_KEY_FILE == curr->status)) || (!database && (UNRES_KEY_FILE != curr->status)))
+		{
+			prev = curr;
+			curr = curr->next;
+			continue;
+		}
+		/* If the database file has not been resolved yet, try resolving it. */
+		if (UNRES_KEY_UNRES_DB == curr->status)
+		{
+			if (NULL == realpath(curr->key_name, key_name_array))
+			{
+				if (ENAMETOOLONG == errno)
+				{
+					*error = TRUE;
+					UPDATE_ERROR_STRING("Real path, or a component of the path, of the database " STR_ARG
+						" is too long", ELLIPSIZE(curr->key_name));
+					return NULL;
+				} else if (ENOENT != errno)
+				{
+					*error = TRUE;
+					UPDATE_ERROR_STRING("Could not obtain the real path of the database " STR_ARG,
+						ELLIPSIZE(curr->key_name));
+					return NULL;
+				}
+				if (!hash)
+				{	/* If we are looking by a keyname, and the database is missing, skip the entry. Otherwise,
+					 * give a chance to find the key by hash.
+					 */
+					prev = curr;
+					curr = curr->next;
+					continue;
+				}
+			} else
+			{	/* Once the path has been resolved, save it to avoid future realpath()s. */
+				strncpy(curr->key_name, key_name_array, GTM_PATH_MAX);
+				curr->status = UNRES_KEY_RES_DB;
+			}
+		}
+		path_length = strlen(curr->key_path);
+		if (UNRES_KEY_UNRES_DB != curr->status)
 		{	/* It is possible that a newly resolved realpath points to a previously seen database file, in which case we
 			 * should first check whether that database has already been inserted into the tree to avoid inserting a
 			 * duplicate.
 			 */
-			length = strlen(db_real_path);
-			assert(length < GTM_PATH_MAX);
-			if (NULL != (node = keystore_lookup_by_keyname(db_real_path, length + 1, TRUE)))
-			{	/* If we have already loaded a different key for this database, issue an error. */
-				if (memcmp(node->key_hash, curr->key_hash, GTMCRYPT_HASH_LEN))
+			name_length = strlen(curr->key_name);
+			assert(name_length < GTM_PATH_MAX);
+			if (NULL != (node = keystore_lookup_by_keyname(curr->key_name, name_length)))
+			{	/* +1 is to avoid matches of names with common prefixes. */
+				if (strncmp(node->key_path, curr->key_path, path_length + 1))
 				{
 					*error = TRUE;
-					UPDATE_ERROR_STRING("Database file " STR_ARG " resolves to a previously seen file, but "
-						"specifies a different key", ELLIPSIZE(curr->key_name));
+					if (database)
+					{
+						UPDATE_ERROR_STRING("In config file " STR_ARG ", database file in entry #%d "
+							"corresponding to 'database.keys' resolves to a previously seen file but "
+							"specifies a different key", ELLIPSIZE(gc_config_filename), curr->index);
+					} else
+					{
+						UPDATE_ERROR_STRING("In config file " STR_ARG ", keyname in entry #%d "
+							"corresponding to 'files' has already been seen but specifies "
+							"a different key", ELLIPSIZE(gc_config_filename), curr->index);
+					}
 					return NULL;
+				} else
+				{	/* This was already found in our search trees, so remove from the unresolved list. */
+					next = curr->next;
+					if (NULL != prev)
+						prev->next = next;
+					else
+					{
+						assert(curr == keystore_by_unres_key_head);
+						keystore_by_unres_key_head = next;
+					}
+					FREE(curr);
+					curr = next;
+					continue;
 				}
-			} else
-			{	/* It is possible that while no key has been specified for this database, the same key has already
-				 * been loaded for a different database or device, so do a lookup first.
-				 */
-				if (NULL == (node = keystore_lookup_by_hash(curr->key_hash)))
-				{	/* If we have not seen this hash before, create new entries. */
-					GC_ALLOCATE_KEYSTORE_ENTRY(node);
-					memcpy(node->key, curr->key, SYMMETRIC_KEY_MAX);
-					/* This should take care of assigning key_hash to the node itself. */
-					INSERT_KEY_LINK(keystore_by_hash_head, node, gtm_keystore_hash_link_t, link->key_hash,
-							curr->key_hash, GTMCRYPT_HASH_LEN, GTMCRYPT_HASH_LEN);
-				}
-				INSERT_KEY_LINK(keystore_by_keyname_head, node, gtm_keystore_keyname_link_t,
-						key_name, db_real_path, length + 1, GTM_PATH_MAX);
 			}
-			/* If we have not found a suitable node before, and this path matches, set the result to that. Do not break
-			 * the loop, though, as we want to resolve as many previously unresolved paths as possible. And if it
-			 * happens that some other real path matches the one we already found, we will already have it in the
-			 * resolved entries' tree, so it will simply get removed from the unresolved list.
-			 */
-			if ((NULL == result) && (!strcmp(keyname, db_real_path)))
-				result = node;
-			if (NULL != prev)
-				prev->next = next;
-			if (curr == keystore_by_unres_keyname_head)
-				keystore_by_unres_keyname_head = next;
-			FREE(curr);
 		} else
-		{
-			if (ENOENT == errno)
-			{	/* If we still could not resolve the path, move on to the next element. */
-				prev = curr;
-			} else if (ENAMETOOLONG == errno)
+		{	/* Name is unresolved; we better be searching by hash. */
+			assert(hash);
+			name_length = -1;
+		}
+		if (hash || ((name_length == search_len) && !strncmp(search_field, curr->key_name, name_length)))
+		{	/* If either we have a name match or we are searching by hash, go ahead and decrypt the key. */
+			if (NULL == (node = gtmcrypt_decrypt_key(curr->key_path, path_length, curr->key_name, name_length)))
 			{
-				UPDATE_ERROR_STRING("Real path, or a component of the path, of the database " STR_ARG
-					" is too long", ELLIPSIZE(curr->key_name));
+				*error = TRUE;
 				return NULL;
 			} else
 			{
-				UPDATE_ERROR_STRING("Could not obtain the real path of the database " STR_ARG,
-					ELLIPSIZE(curr->key_name));
-				return NULL;
+				next = curr->next;
+				if (NULL != prev)
+					prev->next = next;
+				else
+				{
+					assert(curr == keystore_by_unres_key_head);
+					keystore_by_unres_key_head = next;
+				}
+				FREE(curr);
+				curr = next;
+				/* If the key name or hash (depending on the type of search) matches, return the key. */
+				if (!hash || (!memcmp(node->key_hash, search_field, GTMCRYPT_HASH_LEN)))
+					return node;
+				continue;
 			}
 		}
-		curr = next;
-	}
-	return result;
-}
-
-/*
- * Helper function to perform a linear search of the key by its hash in the unresolved keys list.
- *
- * Arguments:	hash	Hash of the key.
- *
- * Returns:	Pointer to the key, if found; NULL otherwise.
- */
-STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_keyname_hash(unsigned char *hash)
-{
-	gtm_keystore_unres_keyname_link_t	*curr;
-	gtm_keystore_t				*node, *result;
-
-	result = NULL;
-	/* Unlike with unresolved key lookups by the keyname, we will not attempt to resolve the realpath of the keyname (database
-	 * file) in question. All we are interested in is a matching hash, so do a linear search thereof, and, if found, do not
-	 * delete the entry, but simply create a corresponding keystore entry and a pointer from the hash-based lookup tree.
-	 */
-	curr = keystore_by_unres_keyname_head;
-	while (curr)
-	{
-		if (!memcmp(curr->key_hash, hash, GTMCRYPT_HASH_LEN))
-		{	/* Assumption is that a lookup by hash has already been done and not yielded any result. */
-			GC_ALLOCATE_KEYSTORE_ENTRY(node);
-			memcpy(node->key, curr->key, SYMMETRIC_KEY_MAX);
-			/* This should take care of assigning key_hash to the node itself. */
-			INSERT_KEY_LINK(keystore_by_hash_head, node, gtm_keystore_hash_link_t, link->key_hash, curr->key_hash,
-					GTMCRYPT_HASH_LEN, GTMCRYPT_HASH_LEN);
-			result = node;
-			break;
-		}
+		prev = curr;
 		curr = curr->next;
 	}
-	return result;
+	return NULL;
 }
 
 /*
- * Re-read the configuration file, if necessary, and store any previously unseen keys in memory. If the configuration file has not
- * been modified since the last successful read, then it is not processed, and the counts for newly loaded DB and device keyname and
- * hash entries are set to -1.
+ * Helper function to decrypt a symmetric key, produce its hash, and store it for future discovery by key name, path, or hash.
  *
- * Arguments:	new_db_keynames		Address where to place the number of added DB keyname entries.
- * 		new_db_hashes		Address where to place the number of added DB hash entries.
- * 		new_dev_keynames	Address where to place the number of added device keyname entries.
- * 		new_dev_hashes		Address where to place the number of added device hash entries.
+ * Arguments:	key_path	Path to the key.
+ *		path_length	Length of the keypath.
+ *		key_name	Name of the key.
+ *		name_length	Length of the keyname.
  *
- * Returns:	0 if succeeded re-reading the configuration file; -1 otherwise.
+ * Returns:	Pointer to the key, if created; NULL otherwise.
  */
-STATICFNDEF int keystore_refresh(int *new_db_keynames, int *new_db_hashes, int *new_dev_keynames, int *new_dev_hashes)
+STATICFNDEF gtm_keystore_t *gtmcrypt_decrypt_key(char *key_path, int path_length, char *key_name, int name_length)
 {
-	int			n_mappings, just_read;
+	gtm_keystore_t		*node;
+	unsigned char		raw_key[SYMMETRIC_KEY_MAX];
+	int			raw_key_length;
+
+	/* If we have seen a key with the same path, do not re-read it. */
+	if (NULL == (node = keystore_lookup_by_keypath(key_path, path_length)))
+	{	/* Now that we have the name of the symmetric key file, try to decrypt it. If gc_pk_get_decrypted_key returns a
+		 * non-zero status, it should have already populated the error string.
+		 */
+		if (0 != gc_pk_get_decrypted_key(key_path, raw_key, &raw_key_length))
+			return NULL;
+		if (0 == raw_key_length)
+		{
+			UPDATE_ERROR_STRING("Symmetric key " STR_ARG " found to be empty", ELLIPSIZE(key_path));
+			return NULL;
+		}
+		/* We expect a symmetric key within a certain length. */
+		assert(SYMMETRIC_KEY_MAX >= raw_key_length);
+		GC_PK_COMPUTE_HASH(key_hash_array, raw_key);
+		/* It is possible that while no key has been specified under this name, the same key has already been loaded
+		 * for a different database or device, so look up the key by hash to avoid duplicates.
+		 */
+		if (NULL == (node = keystore_lookup_by_hash(key_hash_array)))
+		{
+			GC_ALLOCATE_KEYSTORE_ENTRY(node);
+			/* WARNING: Not doing a memset here because raw_key comes padded with NULLs from gc_pk_get_decrypted_key. */
+			memcpy(node->key, raw_key, SYMMETRIC_KEY_MAX);
+			/* This should take care of assigning key_hash to the node itself. */
+			INSERT_KEY_LINK(keystore_by_hash_head, node, gtm_keystore_hash_link_t, link->key_hash, key_hash_array,
+					GTMCRYPT_HASH_LEN, GTMCRYPT_HASH_LEN);
+		}
+		INSERT_KEY_LINK(keystore_by_keypath_head, node, gtm_keystore_keypath_link_t,
+				link->key_path, key_path, path_length + 1, GTM_PATH_MAX);
+	}
+	if (-1 != name_length)
+	{	/* Only inserting a keyname-based link if the keyname was passed. */
+		INSERT_KEY_LINK(keystore_by_keyname_head, node, gtm_keystore_keyname_link_t,
+				key_name, key_name, name_length + 1, GTM_PATH_MAX);
+	}
+	return node;
+}
+
+/*
+ * Re-read the configuration file, if necessary, and store it in memory.
+ *
+ * Returns: 0 if succeeded re-reading the configuration file; -1 otherwise.
+ */
+STATICFNDEF int keystore_refresh()
+{
+	int			n_mappings, status, just_read;
 	char			*config_env;
 	struct stat		stat_info;
 	static long		last_modified_s, last_modified_ns;
-	gtm_keystore_t		*node;
 
 	just_read = FALSE;
+	/* Check and update the value of gtm_passwd if it has changed since we last checked. This way, if the user had originally
+	 * entered a wrong password, but later changed the value (possible in MUMPS using external call), we read the up-to-date
+	 * value instead of issuing an error.
+	 */
+	if (0 != gc_update_passwd(GTM_PASSWD_ENV, &gtmcrypt_pwent, GTMCRYPT_DEFAULT_PASSWD_PROMPT,
+					GTMCRYPT_OP_INTERACTIVE_MODE & gtmcrypt_init_flags))
+	{
+		return -1;
+	}
 	if (CONFIG_FILE_UNREAD)
 	{	/* First, make sure we have a proper environment varible and a regular configuration file. */
 		if (NULL != (config_env = getenv("gtmcrypt_config")))
@@ -374,7 +536,6 @@ STATICFNDEF int keystore_refresh(int *new_db_keynames, int *new_db_hashes, int *
 		|| ((last_modified_s == (long)stat_info.st_mtime)
 			&& (last_modified_ns >= (long)stat_info.st_nmtime)))
 	{
-		*new_db_keynames = *new_db_hashes = *new_dev_keynames = *new_dev_hashes = -1;
 		return 0;
 	}
 	/* File has been modified, so re-read it. */
@@ -384,37 +545,17 @@ STATICFNDEF int keystore_refresh(int *new_db_keynames, int *new_db_hashes, int *
 					config_error_line(&gtmcrypt_cfg), config_error_text(&gtmcrypt_cfg))
 		return -1;
 	}
-	/* Check and update the value of gtm_passwd if it has changed since we last checked. This way, if the user had originally
-	 * entered a wrong password, but later changed the value (possible in MUMPS using external call), we read the up-to-date
-	 * value instead of issuing an error.
-	 */
-	if (0 != gc_update_passwd(GTM_PASSWD_ENV, &gtmcrypt_pwent, GTMCRYPT_DEFAULT_PASSWD_PROMPT,
-					GTMCRYPT_OP_INTERACTIVE_MODE & gtmcrypt_init_flags))
-	{
-		return -1;
-	}
 	/* Clear the entire unresolved keys list because it will be rebuilt. */
 	REMOVE_UNRESOLVED_KEY_LINKS;
-	/* The configuration file has two sections that we are interested in. The "database" section which contains a mapping of
-	 * the database filenames and their corresponding key files and the "files" section which contains a mapping of regular
-	 * files (read and written by GT.M) and their corresponding key files. Read both the sections to create the key and
-	 * encryption / decryption structures as outlined in gtmcrypt_dbk_ref.h.
-	 */
-	*new_db_keynames = *new_db_hashes = *new_dev_keynames = *new_dev_hashes = 0;
-	if (-1 == read_database_section(&gtmcrypt_cfg, &n_mappings, new_db_keynames, new_db_hashes))
+	n_keys = 0;
+	if (-1 == (status = read_database_section(&gtmcrypt_cfg)))
 		return -1;
-	n_keys += n_mappings;
-	if (-1 == read_files_section(&gtmcrypt_cfg, &n_mappings, new_dev_keynames, new_dev_hashes))
+	n_keys += status;
+	if (-1 == (status = read_files_section(&gtmcrypt_cfg)))
 		return -1;
-	n_keys += n_mappings;
-	/* If we update the modified date before we go through the configuration and validate everything in it, any error might
-	 * cause the unresolved list to not be built and configuration file to not subsequently be reread.
-	 */
+	n_keys += status;
 	last_modified_s = (long)stat_info.st_mtime;
 	last_modified_ns = (long)stat_info.st_nmtime;
-	assert((0 == n_keys) ||
-		((NULL != keystore_by_hash_head) && (NULL != keystore_by_keyname_head)) ||
-		(NULL != keystore_by_unres_keyname_head));
 	if (0 == n_keys)
 	{
 		UPDATE_ERROR_STRING("Configuration file " STR_ARG " contains neither 'database.keys' section nor 'files' section, "
@@ -425,128 +566,91 @@ STATICFNDEF int keystore_refresh(int *new_db_keynames, int *new_db_hashes, int *
 }
 
 /*
- * Process the 'files' section of the configuration file, storing any previously unseen key.
+ * Read the 'files' section of the configuration file, storing any previously unseen key in the unresolved list.
  *
  * Arguments:	cfgp		Pointer to the configuration object as populated by libconfig.
- * 		n_mappings	Pointer to a variable where to place the number of key entries found in the file.
- * 		new_keynames	Pointer to a variable where to place the number of key references by keyname added to storage.
- * 		new_hashes	Pointer to a variable where to place the number of key references by hash added to storage.
  *
  * Returns:	0 if successfully processed the 'files' section; -1 otherwise.
  */
-STATICFNDEF int read_files_section(config_t *cfgp, int *n_mappings, int *new_keynames, int *new_hashes)
+STATICFNDEF int read_files_section(config_t *cfgp)
 {
-	int			i, length, lcl_n_maps, raw_key_length;
+	int			i, name_length, path_length, lcl_n_maps;
 	config_setting_t	*setting, *elem;
 	gtm_keystore_t		*node;
-	char			*name, *key;
-	unsigned char		raw_key[SYMMETRIC_KEY_MAX];
+	char			*key_name, *key_path;
 
-	*new_keynames = *new_hashes = 0;
 	if (NULL == (setting = config_lookup(cfgp, "files")))
-	{
-		*n_mappings = 0;
 		return 0;
-	}
 	lcl_n_maps = config_setting_length(setting);
 	for (i = 0; i < lcl_n_maps; i++)
 	{
 		elem = config_setting_get_elem(setting, i);
 		assert(NULL != elem);
-		assert(CONFIG_TYPE_STRING == config_setting_type(elem));
-		if (NULL == (name = config_setting_name(elem)))
+		if (CONFIG_TYPE_STRING != config_setting_type(elem))
 		{
-			UPDATE_ERROR_STRING("In config file " STR_ARG
-				", entry #%d corresponding to 'files' does not have a key attribute",
-				ELLIPSIZE(gc_config_filename), i + 1);
+			UPDATE_ERROR_STRING("In config file " STR_ARG ", entry #%d corresponding to 'files' is not a string",
+					ELLIPSIZE(gc_config_filename), i + 1);
+			return -1;
+		}
+		if (NULL == (key_name = config_setting_name(elem)))
+		{
+			UPDATE_ERROR_STRING("In config file " STR_ARG ", entry #%d corresponding to 'files' does not have a "
+					"key attribute", ELLIPSIZE(gc_config_filename), i + 1);
 			return -1;
 		}
 		/* Length should be under GTM_PATH_MAX because that is the size of the array where the name of a key is stored. */
-		length = strlen(name);
-		if (GTM_PATH_MAX <= length)
+		name_length = strlen(key_name);
+		if (GTM_PATH_MAX <= name_length)
 		{
-			UPDATE_ERROR_STRING("In config file " STR_ARG ", entry #%d's field length exceeds %d",
+			UPDATE_ERROR_STRING("In config file " STR_ARG ", 'files' entry #%d's field length exceeds %d",
+					ELLIPSIZE(gc_config_filename), i + 1, GTM_PATH_MAX - 1);
+			return -1;
+		}
+		if (NULL == (key_path = (char *)config_setting_get_string(elem)))
+		{
+			UPDATE_ERROR_STRING("In config file " STR_ARG ", cannot find the value corresponding to 'files.%s'",
+						ELLIPSIZE(gc_config_filename), key_name);
+			return -1;
+		}
+		path_length = strlen(key_path);
+		if (GTM_PATH_MAX <= path_length)
+		{
+			UPDATE_ERROR_STRING("In config file " STR_ARG ", 'files' entry #%d's field length exceeds %d",
 						ELLIPSIZE(gc_config_filename), i + 1, GTM_PATH_MAX - 1);
 			return -1;
 		}
-		if (NULL == (key = (char *)config_setting_get_string(elem)))
-		{
-			UPDATE_ERROR_STRING("In config file " STR_ARG ", cannot find the value corresponding to 'files.%s'",
-						ELLIPSIZE(gc_config_filename), name);
-			return -1;
-		}
-		/* Now that we have the name of the symmetric key file, try to decrypt it. If gc_pk_get_decrypted_key returns a
-		 * non-zero status, it should have already populated the error string.
-		 */
-		if (0 != gc_pk_get_decrypted_key(key, raw_key, &raw_key_length))
-			return -1;
-		if (0 == raw_key_length)
-		{
-			UPDATE_ERROR_STRING("Symmetric key " STR_ARG " found to be empty", ELLIPSIZE(key));
-			return -1;
-		}
-		/* We expect a symmetric key within a certain length. */
-		assert(SYMMETRIC_KEY_MAX >= raw_key_length);
-		/* For most key operations we need a hash, so compute it now. */
-		GC_PK_COMPUTE_HASH(key_hash, raw_key);
-		/* Make sure we have not previously specified a different key for the same device. */
-		if (NULL != (node = keystore_lookup_by_keyname(name, length + 1, TRUE)))
-		{
-			if (memcmp(node->key_hash, key_hash, GTMCRYPT_HASH_LEN))
+		if (NULL != (node = keystore_lookup_by_keyname(key_name, name_length)))
+		{	/* +1 is to match the NULL character. */
+			if (strncmp(node->key_path, key_path, path_length + 1))
 			{
-				UPDATE_ERROR_STRING("In config file " STR_ARG ", the key 'files." STR_ARG
-					"' has already been seen, but specifies a different key",
-					ELLIPSIZE(gc_config_filename), ELLIPSIZE(name));
+				UPDATE_ERROR_STRING("In config file " STR_ARG ", keyname in entry #%d corresponding to 'files' "
+					"has already been seen but specifies a different key",
+					ELLIPSIZE(gc_config_filename), i + 1);
 				return -1;
 			} else
 				continue;
 		}
-		/* It is possible that while no key has been specified under this name, the same key has already been loaded
-		 * for a different database or device, so look up the key by hash to avoid duplicates.
-		 */
-		if (NULL == (node = keystore_lookup_by_hash(key_hash)))
-		{
-			GC_ALLOCATE_KEYSTORE_ENTRY(node);
-			/* WARNING: Not doing a memset here because raw_key comes padded with NULLs from gc_pk_get_decrypted_key. */
-			memcpy(node->key, raw_key, SYMMETRIC_KEY_MAX);
-			/* This should take care of assigning key_hash to the node itself. */
-			INSERT_KEY_LINK(keystore_by_hash_head, node, gtm_keystore_hash_link_t, link->key_hash, key_hash,
-					GTMCRYPT_HASH_LEN, GTMCRYPT_HASH_LEN);
-			(*new_hashes)++;
-		}
-		INSERT_KEY_LINK(keystore_by_keyname_head, node, gtm_keystore_keyname_link_t,
-				key_name, name, length + 1, GTM_PATH_MAX);
-		(*new_keynames)++;
+		INSERT_UNRESOLVED_KEY_LINK(key_name, key_path, i + 1, UNRES_KEY_FILE);
 	}
-	*n_mappings = lcl_n_maps;
-	return 0;
+	return lcl_n_maps;
 }
 
 /*
- * Process the 'database' section of the configuration file, storing any previously unseen key.
+ * Process the 'database' section of the configuration file, storing any previously unseen key in the unresolved list.
  *
  * Arguments:	cfgp		Pointer to the configuration object as populated by libconfig.
- * 		n_mappings	Pointer to a variable where to place the number of key entries found in the file.
- * 		new_keynames	Pointer to a variable where to place the number of key references by keyname added to storage.
- * 		new_hashes	Pointer to a variable where to place the number of key references by hash added to storage.
  *
  * Returns:	0 if successfully processed the 'database' section; -1 otherwise.
  */
-STATICFNDEF int read_database_section(config_t *cfgp, int *n_mappings, int *new_keynames, int *new_hashes)
+STATICFNDEF int read_database_section(config_t *cfgp)
 {
-	int			i, length, lcl_n_maps, raw_key_length;
-	int			defer, key_found_by_filename;
+	int			i, name_length, path_length, lcl_n_maps;
 	config_setting_t	*setting, *elem;
 	gtm_keystore_t		*node;
-	char			*name, *key;
-	unsigned char		raw_key[SYMMETRIC_KEY_MAX];
+	char			*key_name, *key_path;
 
-	*new_keynames = *new_hashes = 0;
 	if (NULL == (setting = config_lookup(cfgp, "database.keys")))
-	{
-		*n_mappings = 0;
 		return 0;
-	}
 	lcl_n_maps = config_setting_length(setting);
 	/* The following code makes sure that having an empty last entry in the database section is not required and does not cause
 	 * errors, as GTM-7948's original implementation would have it.
@@ -564,106 +668,47 @@ STATICFNDEF int read_database_section(config_t *cfgp, int *n_mappings, int *new_
 	{
 		elem = config_setting_get_elem(setting, i);
 		assert(NULL != elem);
-		if (!config_setting_lookup_string(elem, "dat", (const char **)&name))
+		if (!config_setting_lookup_string(elem, "dat", (const char **)&key_name))
 		{
 			UPDATE_ERROR_STRING("In config file " STR_ARG ", entry #%d corresponding to "
-				"database.keys does not have a 'dat' item", ELLIPSIZE(gc_config_filename), i + 1);
+				"'database.keys' does not have a 'dat' item", ELLIPSIZE(gc_config_filename), i + 1);
 			return -1;
 		}
 		/* Length should be under GTM_PATH_MAX because that is the size of the array where the name of a key is stored. */
-		if (GTM_PATH_MAX <= strlen(name))
+		name_length = strlen(key_name);
+		if (GTM_PATH_MAX <= name_length)
 		{
-			UPDATE_ERROR_STRING("In config file " STR_ARG ", entry #%d's database file name exceeds %d",
+			UPDATE_ERROR_STRING("In config file " STR_ARG ", in entry #%d corresponding to 'database.keys' "
+					"file name exceeds %d", ELLIPSIZE(gc_config_filename), i + 1, GTM_PATH_MAX - 1);
+			return -1;
+		}
+		if (!config_setting_lookup_string(elem, "key", (const char **)&key_path))
+		{
+			UPDATE_ERROR_STRING("In config file " STR_ARG ", entry #%d corresponding to "
+				"'database.keys' does not have a 'key' item", ELLIPSIZE(gc_config_filename), i + 1);
+			return -1;
+		}
+		path_length = strlen(key_path);
+		if (GTM_PATH_MAX <= path_length)
+		{
+			UPDATE_ERROR_STRING("In config file " STR_ARG ", 'database.keys' entry #%d's field length exceeds %d",
 						ELLIPSIZE(gc_config_filename), i + 1, GTM_PATH_MAX - 1);
 			return -1;
 		}
-		/* Database might not exist yet, in which case set the flag to place the entry in unresolved databases list and not
-		 * error out.
-		 */
-		if (NULL == realpath(name, db_real_path))
-		{
-			if (ENOENT == errno)
-				defer = 1;
-			else if (ENAMETOOLONG == errno)
+		if (NULL != (node = keystore_lookup_by_keyname(key_name, name_length)))
+		{	/* +1 is to match the NULL character. */
+			if (strncmp(node->key_path, key_path, path_length + 1))
 			{
-				UPDATE_ERROR_STRING("In config file " STR_ARG ", the real path, or a component of the path, of the "
-					"database in entry #%d of database.keys section is too long",
+				UPDATE_ERROR_STRING("In config file " STR_ARG ", database file in entry #%d corresponding to "
+					"'database.keys' resolves to a previously seen file but specifies a different key",
 					ELLIPSIZE(gc_config_filename), i + 1);
 				return -1;
 			} else
-			{
-				UPDATE_ERROR_STRING("In config file " STR_ARG ", could not obtain the real path of the database in "
-					"entry #%d of database.keys section", ELLIPSIZE(gc_config_filename), i + 1);
-				return -1;
-			}
-		} else
-			defer = 0;
-		if (!config_setting_lookup_string(elem, "key", (const char **)&key))
-		{
-			UPDATE_ERROR_STRING("In config file " STR_ARG ", entry #%d corresponding to "
-				"database.keys does not have a 'key' item", ELLIPSIZE(gc_config_filename), i + 1);
-			return -1;
+				continue;
 		}
-		/* Now that we have the name of the symmetric key file, try to decrypt it. If gc_pk_get_decrypted_key returns a
-		 * non-zero status, it should have already populated the error string.
-		 */
-		if (0 != gc_pk_get_decrypted_key(key, raw_key, &raw_key_length))
-			return -1;
-		if (0 == raw_key_length)
-		{
-			UPDATE_ERROR_STRING("Symmetric key " STR_ARG " found to be empty", ELLIPSIZE(key));
-			return -1;
-		}
-		/* We expect a symmetric key within a certain length. */
-		assert(SYMMETRIC_KEY_MAX >= raw_key_length);
-		/* For most key operations we need a hash, so compute it now. */
-		GC_PK_COMPUTE_HASH(key_hash, raw_key);
-		/* Depending on whether we are deferring the key storage and error processing, either verify that the key is unique
-		 * and create proper references or place it in the unresolved keys list.
-		 */
-		if (!defer)
-		{
-			length = strlen(db_real_path);
-			assert(length < GTM_PATH_MAX);
-			/* Make sure we have not previously specified a different key for the same database. */
-			if (NULL != (node = keystore_lookup_by_keyname(db_real_path, length + 1, TRUE)))
-			{
-				if (memcmp(node->key_hash, key_hash, GTMCRYPT_HASH_LEN))
-				{
-					UPDATE_ERROR_STRING("In config file " STR_ARG ", the database file in entry #%d resolves "
-						"to a previously seen file, but specifies a different key",
-						ELLIPSIZE(gc_config_filename), i + 1);
-					return -1;
-				} else
-					continue;
-			}
-			/* It is possible that while no key has been specified for this database, the same key has already been
-			 * loaded for a different database or device, so look up the key by hash to avoid duplicates.
-			 */
-			if (NULL == (node = keystore_lookup_by_hash(key_hash)))
-			{
-				GC_ALLOCATE_KEYSTORE_ENTRY(node);
-				/* WARNING: Not doing a memset here because raw_key comes padded with NULLs from
-				 * gc_pk_get_decrypted_key.
-				 */
-				memcpy(node->key, raw_key, SYMMETRIC_KEY_MAX);
-				/* This should take care of assigning key_hash to the node itself. */
-				INSERT_KEY_LINK(keystore_by_hash_head, node, gtm_keystore_hash_link_t, link->key_hash, key_hash,
-						GTMCRYPT_HASH_LEN, GTMCRYPT_HASH_LEN);
-				(*new_hashes)++;
-			}
-			INSERT_KEY_LINK(keystore_by_keyname_head, node, gtm_keystore_keyname_link_t, key_name, db_real_path,
-					length + 1, GTM_PATH_MAX);
-			(*new_keynames)++;
-		} else
-		{	/* WARNING: Not passing the raw key length here because raw_key comes padded with NULLs from
-			 * gc_pk_get_decrypted_key and there is no need to know its length.
-			 */
-			INSERT_UNRESOLVED_KEY_LINK(raw_key, key_hash, name);
-		}
+		INSERT_UNRESOLVED_KEY_LINK(key_name, key_path, i + 1, UNRES_KEY_UNRES_DB);
 	}
-	*n_mappings = lcl_n_maps;
-	return 0;
+	return lcl_n_maps;
 }
 
 /*
@@ -743,10 +788,10 @@ void gtm_keystore_cleanup_all()
 		gtm_keystore_cleanup_keyname_tree(keystore_by_keyname_head);
 		keystore_by_keyname_head = NULL;
 	}
-	if (NULL != keystore_by_unres_keyname_head)
+	if (NULL != keystore_by_unres_key_head)
 	{
-		gtm_keystore_cleanup_unres_keyname_list(keystore_by_unres_keyname_head);
-		keystore_by_unres_keyname_head = NULL;
+		gtm_keystore_cleanup_unres_key_list(keystore_by_unres_key_head);
+		keystore_by_unres_key_head = NULL;
 	}
 }
 
@@ -822,15 +867,13 @@ STATICFNDEF void gtm_keystore_cleanup_keyname_tree(gtm_keystore_keyname_link_t *
  *
  * Arguments:	entry	Pointer to the node from which to continue cleaning.
  */
-STATICFNDEF void gtm_keystore_cleanup_unres_keyname_list(gtm_keystore_unres_keyname_link_t *entry)
+STATICFNDEF void gtm_keystore_cleanup_unres_key_list(gtm_keystore_unres_key_link_t *entry)
 {
-	gtm_keystore_unres_keyname_link_t *curr;
+	gtm_keystore_unres_key_link_t *curr;
 
 	while (NULL != entry)
 	{
 		curr = entry;
-		memset(entry->key, 0, SYMMETRIC_KEY_MAX);
-		memset(entry->key_hash, 0, GTMCRYPT_HASH_LEN);
 		entry = entry->next;
 		FREE(curr);
 	}

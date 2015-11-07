@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,13 +68,12 @@
 
 /* For string hashing, ELF hash was found to be the best during the V5.0-000 longnames project.
  * During V6.2-001, Murmur3 hash was found to be much better than ELF in terms of # of collisions.
- * So we are going with MMR hash for now in Unix. In VMS, we dont yet have mmrhash.c so we continue
- * to use ELF hash there (no point spending time to move mmrhash.c from sr_unix to sr_port).
- * In addition, the 32-bit murmur3 hash gives different values for the same input on different endian
- * machines which would not work at least for triggers since we expect the trigger definition M code to
- * hash to the same value on different endian machines (this is needed so mupip endiancvt does not need
- * to worry about changing ^#t(.*TRHASH.*) nodes. Therefore we came up with a modified 32-bit murmur3 hash
- * implementation that is endian independent (gtmmrhash_32).
+ * So we are going with MMR hash for now. In addition, the 32-bit murmur3 hash reference implementation
+ * we used gives different values for the same input on different endian machines which would not work
+ * at least for triggers since we expect the trigger definition M code to hash to the same value on
+ * different endian machines (this is needed so mupip endiancvt does not need to worry about changing
+ * ^#t(.*TRHASH.*) nodes. Therefore we came up with a modified 32-bit murmur3 hash
+ * implementation that is endian independent (gtmmrhash_32). See mmrhash.c for details.
  */
 #ifdef UNIX
 #include "mmrhash.h"

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -280,21 +281,13 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 		if (-1 == getsockname(socketptr->sd, SOCKET_LOCAL_ADDR(socketptr), &tmp_addrlen))
 		{
 			save_errno = errno;
-#			if !defined(__linux__) && !defined(VMS)
-			if ((EOPNOTSUPP == save_errno)
-#				if defined(_AIX)
-				|| (ENOTCONN == save_errno)
-#				endif
-#				if defined(__sun) || defined(__hpux)
-				|| (EINVAL == save_errno)
-#				endif
-				)
+#			if !defined(VMS)
+			if (IS_SOCKNAME_UNIXERROR(save_errno))
 			{
 				SOCKET_LOCAL_ADDR(socketptr)->sa_family = AF_UNIX;
 				((struct sockaddr_un *)SOCKET_LOCAL_ADDR(socketptr))->sun_path[0] = '\0';
 				tmp_addrlen = SIZEOF(struct sockaddr_un);
-			}
-			else
+			} else
 #			endif
 			{
 				errptr = (char *)STRERROR(save_errno);

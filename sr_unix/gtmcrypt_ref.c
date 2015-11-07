@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc *
+ * Copyright (c) 2009-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -116,6 +117,8 @@ gtm_status_t gtmcrypt_init(gtm_int_t flags)
 	gtmcrypt_inited = TRUE;
 	gtmcrypt_init_flags = flags;
 	gtmcrypt_err_string[0] = '\0';
+	if (0 != gc_pk_gpghome_has_permissions())
+		return -1;
 	return 0;
 }
 
@@ -178,6 +181,7 @@ gtm_status_t gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *hand
 									 gtm_string_t iv, gtm_int_t operation)
 {
 	gtm_keystore_t		*entry;
+	char			key_name[GTM_PATH_MAX];
 	gtm_cipher_ctx_t	**ctx;
 
 	GC_VERIFY_INITED;
@@ -185,7 +189,10 @@ gtm_status_t gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *hand
 	gtmcrypt_err_string[0] = '\0';
 	CHECK_IV_LENGTH(iv);
 	ctx = (gtm_cipher_ctx_t **)handle;
-	if (0 != gtmcrypt_getkey_by_keyname(keyname.address, keyname.length, &entry, FALSE, FALSE))
+	/* NULL-terminating to ensure correct lookups. */
+	memset(key_name, 0, GTM_PATH_MAX);
+	memcpy(key_name, keyname.address, keyname.length);
+	if (0 != gtmcrypt_getkey_by_keyname(key_name, keyname.length, &entry, FALSE))
 		return -1;
 	assert(NULL != entry);
 	if (0 != keystore_new_cipher_ctx(entry, iv.address, iv.length, operation))
@@ -220,7 +227,7 @@ gtm_status_t gtmcrypt_obtain_db_key_hash_by_keyname(gtm_string_t keyname, gtm_st
 		return -1;
 	}
 	length = strlen(real_filename);
-	if (0 != gtmcrypt_getkey_by_keyname(real_filename, length + 1, &entry, TRUE, TRUE))
+	if (0 != gtmcrypt_getkey_by_keyname(real_filename, length, &entry, TRUE))
 		return -1;
 	assert(NULL != entry);
 	hash_dest->length = GTMCRYPT_HASH_LEN;

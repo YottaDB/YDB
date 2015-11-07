@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +32,7 @@
 #include "gv_trigger_common.h"	/* for *HASHT* macros used inside GVNH_REG_INIT macro */
 #include "filestruct.h"		/* needed for "jnl.h" */
 #include "jnl.h"		/* needed for "jgbl" */
+#include "zshow.h"		/* needed for format2zwr */
 
 LITREF mval 		literal_one;
 
@@ -38,6 +40,7 @@ GBLREF	gd_addr 	*gd_header;
 GBLREF	buddy_list	*gvt_pending_buddy_list;
 GBLREF	symval		*curr_symval;
 GBLREF	buddy_list	*noisolation_buddy_list;	/* a buddy_list for maintaining the globals that are noisolated */
+GBLREF	volatile boolean_t	timer_in_handler;
 
 error_def(ERR_NOREGION);
 error_def(ERR_NOTGBL);
@@ -49,6 +52,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 {
 	static	int4		first_time = TRUE;
 	char			*cptr;
+	char			*strtokptr;
 	gd_binding		*gd_map;
 	gd_region		*gd_reg_start, *r_ptr, *r_top;
 	gvnh_reg_t		*gvnh_reg;
@@ -82,7 +86,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			parmblk->value = parm;
 			break;
 		case (VTP_NULL | VTP_DBREGION):
-			if ((NULL == parm) || ((1 == parm->str.len) && ('*' == *parm->str.addr)))
+			if (!is_dollar_view && ((NULL == parm) || ((1 == parm->str.len) && ('*' == *parm->str.addr))))
 			{
 				parmblk->gv_ptr = NULL;
 				break;
@@ -101,21 +105,22 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			{
 				for (cptr = parm->str.addr, n = 0; n < parm->str.len; cptr++, n++)
 					lcl_buff.c[n] = TOUPPER(*cptr);		/* Region names are upper-case ASCII */
-				cptr = parm->str.addr;				/* remember the original name */
-				parm->str.addr = (char *)&lcl_buff.c;		/* use the upper case name formed above */
+				namestr.len = n;
+				namestr.addr = &lcl_buff.c[0];
 				for (r_top = r_ptr + gd_header->n_regions; ; r_ptr++)
 				{
 					if (r_ptr >= r_top)
-						rts_error_csa(CSA_ARG(NULL)
-							VARLSTCNT(4) ERR_NOREGION,2, parm->str.len, parm->str.addr);
+					{
+						format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION,2, n, global_names);
+					}
 					tmpstr.len = r_ptr->rname_len;
 					tmpstr.addr = (char *)r_ptr->rname;
-					MSTR_CMP(tmpstr, parm->str, n);
+					MSTR_CMP(tmpstr, namestr, n);
 					if (0 == n)
 						break;
 				}
 				parmblk->gv_ptr = r_ptr;
-				parm->str.addr = cptr;				/* be nice and restore the original name */
 			}
 			break;
 		case VTP_DBKEY:
@@ -138,7 +143,10 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			if (MAX_MIDENT_LEN < parmblk->str.len)
 				parmblk->str.len = MAX_MIDENT_LEN;
 			if (!valid_mname(&parmblk->str))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, parmblk->str.len, parmblk->str.addr);
+			{
+				format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
+			}
 			break;
 		case VTP_RTNAME:
 			if (NULL == parm)
@@ -192,14 +200,16 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						parmblk->ni_list.type = NOISOLATION_NULL;
 						break;
 				}
+				if (!tmpstr.len)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, tmpstr.len, NULL);
 				memcpy(global_names, tmpstr.addr, tmpstr.len);
 				global_names[tmpstr.len] = '\0';
-				src = (unsigned char *)strtok((char *)global_names, ",");
+				src = (unsigned char *)STRTOK_R((char *)global_names, ",", &strtokptr);
 				REINITIALIZE_LIST(noisolation_buddy_list);	/* reinitialize the noisolation buddy_list */
 				parmblk->ni_list.gvnh_list = NULL;
 				for ( ; src < &global_names[tmpstr.len + 1]; src = nextsrc)
 				{
-					nextsrc = (unsigned char *)strtok(NULL, ",");
+					nextsrc = (unsigned char *)STRTOK_R(NULL, ",", &strtokptr);
 					if (NULL == nextsrc)
 						nextsrc = &global_names[tmpstr.len + 1];
 					if (nextsrc - src >= 2 && '^' == *src)
@@ -213,10 +223,17 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 							memcpy(&lcl_buff.c[0], namestr.addr, namestr.len);
 							gvent.var_name.len = namestr.len;
 						} else
-							rts_error_csa(CSA_ARG(NULL)
-								VARLSTCNT(4) ERR_VIEWGVN, 2, nextsrc - src - 1, src);
+						{
+							memcpy(&lcl_buff.c[0], src, nextsrc - src - 1);
+							format2zwr((sm_uc_ptr_t)&lcl_buff.c, nextsrc - src - 1, global_names, &n);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
+						}
 					} else
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, nextsrc - src - 1, src);
+					{
+						memcpy(&lcl_buff.c[0], src, nextsrc - src - 1);
+						format2zwr((sm_uc_ptr_t)&lcl_buff.c, nextsrc - src - 1, global_names, &n);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
+					}
 					tmp_gvt = NULL;
 					gvent.var_name.addr = &lcl_buff.c[0];
 					COMPUTE_HASH_MNAME(&gvent);
@@ -279,7 +296,10 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				if (lvent.var_name.len > MAX_MIDENT_LEN)
 					lvent.var_name.len = MAX_MIDENT_LEN;
 				if (!valid_mname(&lvent.var_name))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
+				{
+					format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, n, global_names);
+				}
 			} else
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
 			/* Now look up the name.. */

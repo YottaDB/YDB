@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001,2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,7 +9,6 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 #include "mdef.h"
 #include "error.h"
 
@@ -512,8 +512,8 @@ LITDEF	err_msg merrors[] = {
 	"NOPRINCIO", "Unable to write to principal device", 0,
 	"INVPORTSPEC", "Invalid port specification", 0,
 	"INVADDRSPEC", "Invalid IP address specification", 0,
-	"UNUSEDMSG677", "SOCKPARMREQ last used in V6.0-002", 0,
-	"UNUSEDMSG678", "IPADDRREQ last used in V6.0-002", 0,
+	"UNUSEDMSG678", "SOCKPARMREQ last used in V6.0-002", 0,
+	"UNUSEDMSG679", "IPADDRREQ last used in V6.0-002", 0,
 	"SOCKWAIT", "Error waiting for socket connection", 0,
 	"SOCKACPT", "Error accepting socket connection", 0,
 	"SOCKINIT", "Error initializing socket: (errno == !UL) !AD", 3,
@@ -542,7 +542,7 @@ LITDEF	err_msg merrors[] = {
 	"MUSTANDALONE", "Could not get exclusive access to !AD", 2,
 	"MUNOACTION", "MUPIP unable to perform requested action", 0,
 	"RMBIGSHARE", "File with BIGRECORD specified may only be shared if READONLY", 0,
-	"TPRESTART", "Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: 0x!16@XQ", 14,
+	"TPRESTART", "Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: 0x!16@XQ, zpos: !AD", 16,
 	"SOCKWRITE", "Write to a socket failed", 0,
 	"DBCNTRLERR", "Database file !AD: control error suspected but not found", 2,
 	"NOTERMENV", "Environment variable TERM not set.  Assuming \"unknown.\"", 0,
@@ -611,7 +611,7 @@ LITDEF	err_msg merrors[] = {
 	"FREEZEID", "Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ", 7,
 	"BLKWRITERR", "Unable to queue disk write for block 0x!XL.  Will keep trying.", 1,
 	"STOPTIMEOUT", "Waited too long for stopped process to release.  Region: !AD.", 2,
-	"UNUSEDMSG776", "TRIGMODINTP last used in V6.2-000", 0,
+	"UNUSEDMSG777", "TRIGMODINTP last used in V6.2-000", 0,
 	"BCKUPBUFLUSH", "Unable to flush buffer for online backup", 0,
 	"NOFORKCORE", "Unable to fork off process to create core.  Core creation postponed.", 0,
 	"JNLREAD", "Error reading from journal file !AD at offset [0x!XL]", 3,
@@ -734,7 +734,7 @@ LITDEF	err_msg merrors[] = {
 	"MUINFOUINT4", "!AD : !UL [0x!XL]", 4,
 	"NLMISMATCHCALC", "Location of !AD expected at 0x!XL, but found at 0x!XL", 4,
 	"RELINKCTLFULL", "Relinkctl file for directory !AD is full (maximum entries !UL)", 3,
-	"UNUSEDMSG899", "GTMSECSHRDEFLOG last used in V5.5-000", 0,
+	"UNUSEDMSG900", "GTMSECSHRDEFLOG last used in V5.5-000", 0,
 	"DBBADNSUB", "!AD Bad numeric subscript", 2,
 	"DBBADKYNM", "!AD Bad key name", 2,
 	"DBBADPNTR", "!AD Bad pointer value in directory", 2,
@@ -785,7 +785,7 @@ LITDEF	err_msg merrors[] = {
 	"DBMBPFRINT", "!AD Master bit map shows this map has space, agreeing with MUPIP INTEG", 2,
 	"DBMAXKEYEXC", "!AD Maximum key size for database exceeds design maximum", 2,
 	"DBMXRSEXCMIN", "!AD Maximum record size for database is less than the design minimum", 2,
-	"UNUSEDMSG950", "DBMAXRSEXBL : Last used in V5.5-000", 0,
+	"UNUSEDMSG951", "DBMAXRSEXBL : Last used in V5.5-000", 0,
 	"DBREADBM", "!AD Read error on bitmap", 2,
 	"DBCOMPTOOLRG", "!AD Record has too large compression count", 2,
 	"DBVERPERFWARN2", "Peformance warning: Database !AD is not fully upgraded. Run MUPIP REORG UPGRADE for best overall performance", 2,
@@ -1154,7 +1154,7 @@ LITDEF	err_msg merrors[] = {
 	"CRYPTKEYFETCHFAILED", "Could not retrieve encryption key corresponding to file !AD. !AD", 4,
 	"CRYPTKEYFETCHFAILEDNF", "Could not retrieve encryption key during !AD operation key. !AD", 4,
 	"CRYPTHASHGENFAILED", "Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD", 4,
-	"UNUSEDMSG1319", "CRYPTNOPSWDINTP : Last used in V6.0-003", 0,
+	"UNUSEDMSG1320", "CRYPTNOPSWDINTP : Last used in V6.0-003", 0,
 	"BADTAG", "Unable to use file !AD (CCSID !UL) with CCSID !UL", 4,
 	"ICUVERLT36", "!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used", 4,
 	"ICUSYMNOTFOUND", "Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified", 2,
@@ -1208,7 +1208,7 @@ LITDEF	err_msg merrors[] = {
 	"MUUSERLBK", "Abnormal shutdown of replication-enabled database !AD detected", 2,
 	"SETINSETTRIGONLY", "ISV !AD can only be modified in a 'SET' type trigger", 2,
 	"DZTRIGINTRIG", "$ZTRIGGER() is not allowed inside trigger context. Trigger name: !AD", 2,
-	"UNUSEDMSG1373", "SECNODZTRIGINTP : Last used in V6.2-000", 0,
+	"UNUSEDMSG1374", "SECNODZTRIGINTP : Last used in V6.2-000", 0,
 	"BOOLSIDEFFECT", "Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression", 0,
 	"DBBADUPGRDSTATE", "Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.", 4,
 	"WRITEWAITPID", "PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD", 6,
@@ -1220,7 +1220,7 @@ LITDEF	err_msg merrors[] = {
 	"JNLORDBFLU", "Error flushing database blocks to !AD. See related messages in the operator log", 2,
 	"ZCCLNUPRTNMISNG", "External call: Cleanup routine name missing. Cannot continue", 0,
 	"ZCINVALIDKEYWORD", "External call: Invalid keyword found. Cannot continue", 0,
-	"UNUSEDMSG1385", "REPLNOMULTILINETRG : Last used in V6.2-000", 0,
+	"UNUSEDMSG1386", "REPLNOMULTILINETRG : Last used in V6.2-000", 0,
 	"DBSHMNAMEDIFF", "Database file !AD points to shared memory (id = !UL) which points to a different database file !AZ", 4,
 	"SHMREMOVED", "Removed Shared Memory id !UL corresponding to file !AD", 3,
 	"DEVICEWRITEONLY", "Cannot read from a write-only device", 0,
@@ -1372,7 +1372,7 @@ LITDEF	err_msg merrors[] = {
 	"ISSPANGBL", "Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory", 2,
 	"TPNOSUPPORT", "Operation cannot be performed while inside of a TP transaction", 0,
 	"GVSUBSERR", "Invalid subscripted global name specification in $VIEW() function", 0,
-	"UNUSEDMSG1539", "TRIGNOSPANBL : Last used in V6.2-000", 0,
+	"UNUSEDMSG1540", "TRIGNOSPANBL : Last used in V6.2-000", 0,
 	"FILTERTIMEDOUT", "Replication server timed out attempting to read seqno !16@XQ from external filter", 1,
 	"TLSDLLNOOPEN", "Failed to load GT.M TLS/SSL library for secure communication", 0,
 	"TLSINIT", "Failed to initialize GT.M TLS/SSL library for secure communication", 0,
@@ -1408,7 +1408,7 @@ LITDEF	err_msg merrors[] = {
 	"CRYPTBADWRTPOS", "Encrypted WRITE disallowed from a position different than where the last WRITE completed", 0,
 	"LABELNOTFND", "GOTO referenced a label that does not exist", 0,
 	"RELINKCTLERR", "Error with relink control structure for $ZROUTINES directory !AD", 2,
-	"INVLINKTMPDIR", "Value for $gtm_linktmpdir is either not found or not a directory: !AD", 2,
+	"INVLINKTMPDIR", "Value for $gtm_linktmpdir is either not found or not a directory(!AD) - Reverting to default value", 2,
 	"NOEDITOR", "Can't find an executable editor: !AD", 2,
 	"UPDPROC", "Update Process error", 0,
 	"HLPPROC", "Helper Process error", 0,
@@ -1423,7 +1423,18 @@ LITDEF	err_msg merrors[] = {
 	"TLSPARAM", "TLS parameter !AD !AD", 4,
 	"RLNKRECLATCH", "Failed to get latch on relinkctl record for routine name !AZ in $ZROUTINES directory !AD", 3,
 	"RLNKSHMLATCH", "Failed to get latch on relinkctl shared memory for $ZROUTINES directory !AD", 2,
-	"JOBLVN2LONG", "The zwrite representation of a local variable transferred to a JOB'd process can not exceed !UL. Encountered size: !UL", 2,
+	"JOBLVN2LONG", "The zwrite representation of a local variable transferred to a JOB'd process is too long. Please check the output of the JOB'd process for more details", 0,
+	"JOBLVNDETAIL", "The zwrite representation of a local variable transferred to a JOB'd process is too long. The zwrite representation cannot exceed !UL. Encountered size: !UL", 2,
+	"PREALLOCATEFAIL", "Disk space reservation for !AD segment has failed", 2,
+	"NODFRALLOCSUPP", "The NODEFER_ALLOCATE qualifier is not allowed on this operating system. Not changing the defer allocation flag", 0,
+	"LASTWRITERBYPAS", "The last writer for database file !AD bypassed the rundown", 2,
+	"TRIGUPBADLABEL", "Trigger upgrade cannot upgrade label !UL to !UL on ^!AD in region !AD", 6,
+	"WEIRDSYSTIME", "Time reported by the system clock is outside the acceptable range.  Please check and correct the system clock", 0,
+	"REPLSRCEXITERR", "Source server for secondary instance !AZ exited abnormally. See log file !AZ for details.", 2,
+	"INVZBREAK", "Cannot set ZBREAK in direct mode routine (GTM$DMOD)", 0,
+	"INVTMPDIR", "Value or default for $gtm_tmp is either not found or not a directory (!AD) - Reverting to default value", 2,
+	"ARCTLMAXHIGH", "The environment variable !AD = !UL is too high. Assuming the maximum acceptable value of !UL", 4,
+	"ARCTLMAXLOW", "The environment variable !AD = !UL is too low. Assuming the minimum acceptable value of !UL", 4,
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -1925,8 +1936,8 @@ LITDEF	int ERR_CCPSIGDMP = 150376323;
 LITDEF	int ERR_NOPRINCIO = 150376332;
 LITDEF	int ERR_INVPORTSPEC = 150376338;
 LITDEF	int ERR_INVADDRSPEC = 150376346;
-LITDEF	int ERR_UNUSEDMSG677 = 150376354;
-LITDEF	int ERR_UNUSEDMSG678 = 150376362;
+LITDEF	int ERR_UNUSEDMSG678 = 150376354;
+LITDEF	int ERR_UNUSEDMSG679 = 150376362;
 LITDEF	int ERR_SOCKWAIT = 150376370;
 LITDEF	int ERR_SOCKACPT = 150376378;
 LITDEF	int ERR_SOCKINIT = 150376386;
@@ -2024,7 +2035,7 @@ LITDEF	int ERR_MEMORYRECURSIVE = 150377116;
 LITDEF	int ERR_FREEZEID = 150377123;
 LITDEF	int ERR_BLKWRITERR = 150377131;
 LITDEF	int ERR_STOPTIMEOUT = 150377138;
-LITDEF	int ERR_UNUSEDMSG776 = 150377146;
+LITDEF	int ERR_UNUSEDMSG777 = 150377146;
 LITDEF	int ERR_BCKUPBUFLUSH = 150377154;
 LITDEF	int ERR_NOFORKCORE = 150377160;
 LITDEF	int ERR_JNLREAD = 150377170;
@@ -2147,7 +2158,7 @@ LITDEF	int ERR_SCNDDBNOUPD = 150378098;
 LITDEF	int ERR_MUINFOUINT4 = 150378107;
 LITDEF	int ERR_NLMISMATCHCALC = 150378114;
 LITDEF	int ERR_RELINKCTLFULL = 150378122;
-LITDEF	int ERR_UNUSEDMSG899 = 150378131;
+LITDEF	int ERR_UNUSEDMSG900 = 150378131;
 LITDEF	int ERR_DBBADNSUB = 150378138;
 LITDEF	int ERR_DBBADKYNM = 150378146;
 LITDEF	int ERR_DBBADPNTR = 150378154;
@@ -2198,7 +2209,7 @@ LITDEF	int ERR_DBMBPFRDLBM = 150378504;
 LITDEF	int ERR_DBMBPFRINT = 150378512;
 LITDEF	int ERR_DBMAXKEYEXC = 150378522;
 LITDEF	int ERR_DBMXRSEXCMIN = 150378530;
-LITDEF	int ERR_UNUSEDMSG950 = 150378538;
+LITDEF	int ERR_UNUSEDMSG951 = 150378538;
 LITDEF	int ERR_DBREADBM = 150378546;
 LITDEF	int ERR_DBCOMPTOOLRG = 150378554;
 LITDEF	int ERR_DBVERPERFWARN2 = 150378560;
@@ -2567,7 +2578,7 @@ LITDEF	int ERR_CRYPTJNLWRONGHASH = 150381458;
 LITDEF	int ERR_CRYPTKEYFETCHFAILED = 150381466;
 LITDEF	int ERR_CRYPTKEYFETCHFAILEDNF = 150381474;
 LITDEF	int ERR_CRYPTHASHGENFAILED = 150381482;
-LITDEF	int ERR_UNUSEDMSG1319 = 150381490;
+LITDEF	int ERR_UNUSEDMSG1320 = 150381490;
 LITDEF	int ERR_BADTAG = 150381498;
 LITDEF	int ERR_ICUVERLT36 = 150381506;
 LITDEF	int ERR_ICUSYMNOTFOUND = 150381514;
@@ -2621,7 +2632,7 @@ LITDEF	int ERR_GVZTRIGFAIL = 150381890;
 LITDEF	int ERR_MUUSERLBK = 150381898;
 LITDEF	int ERR_SETINSETTRIGONLY = 150381906;
 LITDEF	int ERR_DZTRIGINTRIG = 150381914;
-LITDEF	int ERR_UNUSEDMSG1373 = 150381922;
+LITDEF	int ERR_UNUSEDMSG1374 = 150381922;
 LITDEF	int ERR_BOOLSIDEFFECT = 150381928;
 LITDEF	int ERR_DBBADUPGRDSTATE = 150381936;
 LITDEF	int ERR_WRITEWAITPID = 150381946;
@@ -2633,7 +2644,7 @@ LITDEF	int ERR_GTMSECSHRCHDIRF = 150381986;
 LITDEF	int ERR_JNLORDBFLU = 150381994;
 LITDEF	int ERR_ZCCLNUPRTNMISNG = 150382002;
 LITDEF	int ERR_ZCINVALIDKEYWORD = 150382010;
-LITDEF	int ERR_UNUSEDMSG1385 = 150382018;
+LITDEF	int ERR_UNUSEDMSG1386 = 150382018;
 LITDEF	int ERR_DBSHMNAMEDIFF = 150382026;
 LITDEF	int ERR_SHMREMOVED = 150382035;
 LITDEF	int ERR_DEVICEWRITEONLY = 150382042;
@@ -2785,7 +2796,7 @@ LITDEF	int ERR_GBLNOMAPTOREG = 150383202;
 LITDEF	int ERR_ISSPANGBL = 150383210;
 LITDEF	int ERR_TPNOSUPPORT = 150383218;
 LITDEF	int ERR_GVSUBSERR = 150383226;
-LITDEF	int ERR_UNUSEDMSG1539 = 150383234;
+LITDEF	int ERR_UNUSEDMSG1540 = 150383234;
 LITDEF	int ERR_FILTERTIMEDOUT = 150383242;
 LITDEF	int ERR_TLSDLLNOOPEN = 150383250;
 LITDEF	int ERR_TLSINIT = 150383258;
@@ -2837,9 +2848,20 @@ LITDEF	int ERR_TLSPARAM = 150383618;
 LITDEF	int ERR_RLNKRECLATCH = 150383626;
 LITDEF	int ERR_RLNKSHMLATCH = 150383634;
 LITDEF	int ERR_JOBLVN2LONG = 150383642;
+LITDEF	int ERR_JOBLVNDETAIL = 150383650;
+LITDEF	int ERR_PREALLOCATEFAIL = 150383658;
+LITDEF	int ERR_NODFRALLOCSUPP = 150383664;
+LITDEF	int ERR_LASTWRITERBYPAS = 150383672;
+LITDEF	int ERR_TRIGUPBADLABEL = 150383682;
+LITDEF	int ERR_WEIRDSYSTIME = 150383690;
+LITDEF	int ERR_REPLSRCEXITERR = 150383696;
+LITDEF	int ERR_INVZBREAK = 150383706;
+LITDEF	int ERR_INVTMPDIR = 150383714;
+LITDEF	int ERR_ARCTLMAXHIGH = 150383720;
+LITDEF	int ERR_ARCTLMAXLOW = 150383728;
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1411};
+	1422};

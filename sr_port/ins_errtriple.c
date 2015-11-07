@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +26,7 @@ void ins_errtriple(int4 in_error)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (!IS_STX_WARN(in_error) GTMTRIG_ONLY( || TREF(trigger_compile)))
+	if (!IS_STX_WARN(in_error) GTMTRIG_ONLY( || TREF(trigger_compile_and_link)))
 	{	/* Not a warning and not a trigger, we have a real error (warnings become errors in triggers) */
 		if (TREF(curtchain) != &t_orig)
 		{	/* If working with more than 1 chain defer until back to 1 because dqdelchain cannot delete across
@@ -40,7 +41,7 @@ void ins_errtriple(int4 in_error)
 		add_rterror_triple = (OC_RTERROR != x->exorder.fl->opcode);
 		if (!add_rterror_triple)
 		{	/* This is the second error in this line/cmd. Check for triples added after OC_RTERROR and remove them
-			 * as there could be dangling references amongst them which could later cause GTMASSERT in emit_code.
+			 * as there could be dangling references amongst them which could later cause assertpro() in emit_code.
 			 */
 			x = x->exorder.fl;
 			assert(OC_RTERROR == x->opcode);/* corresponds to newtriple(OC_RTERROR) in previous ins_errtriple */

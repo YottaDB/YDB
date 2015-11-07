@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +48,7 @@
 #endif
 
 ZOS_ONLY(GBLREF	char	*gtm_utf8_locale_object;)
+GBLREF	volatile boolean_t	timer_in_handler;
 
 typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
 
@@ -176,6 +178,7 @@ void gtm_icu_init(void)
 	char		tmp_errstr[SIZEOF(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX)]; /* "libicuio.so has version" */
 	char		*major_ver_ptr, *minor_ver_ptr;
 	char		icu_libname[SIZEOF(ICU_LIBNAME) + MAX_ICU_VERSION_STRLEN];
+	char		*strtokptr;
 	const char	*cur_icu_fname;
 	int		icu_final_fname_len, icu_libname_len, len, major_ver_len, minor_ver_len, save_fname_len;
 	void_ptr_t	handle;
@@ -279,13 +282,13 @@ void gtm_icu_init(void)
 		search_path_ptr = dyn_search_paths;
 	}
 	/* At this point we have all the library search paths pointed by search_path_ptr seperated by ":". */
-	each_libpath = strtok(search_path_ptr, DELIM);
+	each_libpath = STRTOK_R(search_path_ptr, DELIM, &strtokptr);
 	while (NULL != each_libpath)
 	{
 		SNPRINTF(temp_path, GTM_PATH_MAX, "%s/%s", each_libpath, libname);
 		if (NULL == realpath(temp_path, real_path) && (0 != Stat(real_path, &real_path_stat)))
 		{
-			each_libpath = strtok(NULL, DELIM);
+			each_libpath = STRTOK_R(NULL, DELIM, &strtokptr);
 			continue;
 		}
 		/* At this point we would have in real_path the fully qualified path to the version'ed libicuio archive.

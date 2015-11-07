@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +105,10 @@ void build_kill_cmp_str(char *trigvn, int trigvn_len, char **values, uint4 *valu
 	*ptr++ = '\0';
 	COPY_VAL_TO_INDEX_STR(GVSUBS_SUB, ptr);
 	if (!multi_line_xecute)
+	{
 		COPY_VAL_TO_INDEX_STR(XECUTE_SUB, ptr);
+	} else
+		*ptr++ = '\0';
 	kill_key->len = INTCAST(ptr - kill_key->addr) - 1;
 }
 
@@ -125,7 +129,10 @@ void build_set_cmp_str(char *trigvn, int trigvn_len, char **values, uint4 *value
 	COPY_VAL_TO_INDEX_STR(DELIM_SUB, ptr);
 	COPY_VAL_TO_INDEX_STR(ZDELIM_SUB, ptr);
 	if (!multi_line_xecute)
+	{
 		COPY_VAL_TO_INDEX_STR(XECUTE_SUB, ptr);
+	} else
+		*ptr++ = '\0';
 	set_key->len = INTCAST(ptr - set_key->addr) - 1;
 }
 
@@ -134,10 +141,10 @@ boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_h
 	mval			collision_indx;
 	mval			*collision_indx_ptr;
 	int			hash_index;
-	mval			data_val, key_val;
+	mval			key_val;
 	int4			len;
 	mval			mv_hash;
-	boolean_t		match, multi_record;
+	boolean_t		match;
 	char			*ptr, *ptr2;
 	int			trig_index;
 	DCL_THREADGBL_ACCESS;
@@ -208,12 +215,8 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 	mval			mv_hash;
 	mval			mv_trig_indx;
 	boolean_t		match, first_match;
-	int4			num;
 	char			*ptr, *ptr2;
-	int4			rec_len;
 	int			sub_indx;
-	mval			sub_val;
-	uint4			trig_hash;
 	int			trig_hash_index;
 	int			trig_index;
 	char			*xecute_buff;
@@ -355,7 +358,8 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 				/* Assume this is the only matching trigger for now. Later match if found will override */
 			} else
 			{
-				assert((first_match_kill_cmp != kill_cmp) || !kill_cmp);
+				assert((first_match_kill_cmp != kill_cmp) || !kill_cmp ||
+						(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number));
 				/* We have TWO matches. Pick the more appropriate one. */
 				if (doing_set != kill_cmp)
 				{	/* Current trigger matches input trigger type. Overwrite first_match */

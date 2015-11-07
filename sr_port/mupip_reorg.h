@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +17,7 @@
 boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			int index_fill_factor, int data_fill_factor, int reorg_op);
 # ifdef UNIX
-boolean_t mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr);
+void	 mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr);
 block_id swap_root_or_directory_block(int parent_blk_lvl, int level, srch_hist *dir_hist_ptr, block_id child_blk_id,
 		sm_uc_ptr_t child_blk_ptr, kill_set *kill_set_list, trans_num curr_tn);
 # endif

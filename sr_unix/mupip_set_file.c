@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,6 +78,7 @@ error_def(ERR_DBRDONLY);
 error_def(ERR_INVACCMETHOD);
 error_def(ERR_MMNODYNDWNGRD);
 error_def(ERR_MUNOACTION);
+error_def(ERR_NODFRALLOCSUPP);
 error_def(ERR_RBWRNNOTCHG);
 error_def(ERR_TEXT);
 error_def(ERR_WCERRNOTCHG);
@@ -111,7 +113,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	int4			status1;
 	int			glbl_buff_status, defer_status, rsrvd_bytes_status,
 				extn_count_status, lock_space_status, disk_wait_status,
-				inst_freeze_on_error_status, qdbrundown_status, mutex_space_status;
+				inst_freeze_on_error_status, qdbrundown_status, defer_allocate_status, mutex_space_status,
+				epoch_taper_status;
 	int4			new_disk_wait, new_cache_size, new_extn_count, new_lock_space, reserved_bytes, defer_time,
 				new_mutex_space;
 	int			key_size_status, rec_size_status;
@@ -297,11 +300,13 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		else  if (0 == memcmp(ver_spec, "V6", ver_spec_len))
 			desired_dbver = GDSV6;
 		else
-			GTMASSERT;		/* CLI should prevent us ever getting here */
+			assertpro(FALSE);		/* CLI should prevent us ever getting here */
 	} else
 		desired_dbver = GDSVLAST;	/* really want to keep version, which has not yet been read */
 	inst_freeze_on_error_status = cli_present("INST_FREEZE_ON_ERROR");
 	qdbrundown_status = cli_present("QDBRUNDOWN");
+	defer_allocate_status = cli_present("DEFER_ALLOCATE");
+	epoch_taper_status = cli_present("EPOCHTAPER");
 	if (region)
 		rptr = grlist;
 	else
@@ -332,7 +337,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			fn_len = db_fn_len;
 		}
 		mu_gv_cur_reg_init();
-		strcpy((char *)gv_cur_region->dyn.addr->fname, fn);
+		memcpy(gv_cur_region->dyn.addr->fname, fn, fn_len);
 		gv_cur_region->dyn.addr->fname_len = fn_len;
 		if (!need_standalone)
 		{
@@ -340,7 +345,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			change_reg();	/* sets cs_addrs and cs_data */
 			if (gv_cur_region->read_only)
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 				exit_stat |= EXIT_ERR;
 				gds_rundown();
 				mu_gv_cur_reg_free();
@@ -361,7 +366,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				else
 				{
 					status1 = ERR_MMNODYNDWNGRD;
-					gtm_putmsg(VARLSTCNT(4) status1, 2, REG_LEN_STR(gv_cur_region));
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) status1, 2, REG_LEN_STR(gv_cur_region));
 				}
 				if (SS_NORMAL != status1)
 				{	/* "desired_db_format_set" would have printed appropriate error messages */
@@ -400,6 +405,23 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("Database file !AD now has quick database rundown flag set to !AD", TRUE,
 						       fn_len, fn, 5, (cs_data->mumps_can_bypass ? " TRUE" : "FALSE"));
 				}
+				if (defer_allocate_status)
+				{
+#					if defined(__sun) || defined(__hpux)
+					if (CLI_NEGATED == defer_allocate_status)
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_NODFRALLOCSUPP);
+#					else
+					cs_data->defer_allocate = CLI_PRESENT == defer_allocate_status;
+					util_out_print("Database file !AD now has defer allocation flag set to !AD", TRUE,
+						       fn_len, fn, 5, (cs_data->defer_allocate ? " TRUE" : "FALSE"));
+#					endif
+				}
+				if (epoch_taper_status)
+				{
+					cs_data->epoch_taper = CLI_PRESENT == epoch_taper_status;
+					util_out_print("Database file !AD now has epoch taper flag set to !AD", TRUE,
+						       fn_len, fn, 5, (cs_data->epoch_taper ? " TRUE" : "FALSE"));
+				}
 			} else
 				exit_stat |= status;
 			rel_crit(gv_cur_region);
@@ -433,9 +455,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				util_out_print("Error reading header of file", TRUE);
 				util_out_print("Database file !AD not changed:  ", TRUE, fn_len, fn);
 				if (-1 != status)
-					rts_error(VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
 				else
-					rts_error(VARLSTCNT(4) ERR_DBPREMATEOF, 2, fn_len, fn);
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBPREMATEOF, 2, fn_len, fn);
 			}
 			if (rsrvd_bytes_status)
 			{
@@ -506,7 +528,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 #				ifdef GTM_CRYPT
 				if (dba_mm == access && (csd->is_encrypted))
 				{
-					gtm_putmsg(VARLSTCNT(4) ERR_CRYPTNOMM, 2, DB_LEN_STR(gv_cur_region));
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOMM, 2, DB_LEN_STR(gv_cur_region));
 					mupip_exit(ERR_RBWRNNOTCHG);
 				}
 #				endif
@@ -542,6 +564,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				util_out_print("Database file !AD now has partial recovery flag set to  !UL(FALSE) ",
 						TRUE, fn_len, fn, csd->file_corrupt);
 			}
+			if (epoch_taper_status)
+				csd->epoch_taper = CLI_PRESENT == epoch_taper_status;
 			if (dba_mm == access_new)
 			{
 				if (CLI_NEGATED == defer_status)
@@ -608,7 +632,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				util_out_print("write : !AZ", TRUE, errptr);
 				util_out_print("Error writing header of file", TRUE);
 				util_out_print("Database file !AD not changed: ", TRUE, fn_len, fn);
-				rts_error(VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
 			}
 			CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 			/* --------------------- report results ------------------------- */
@@ -639,6 +663,9 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (qdbrundown_status)
 				util_out_print("Database file !AD now has quick database rundown flag set to !AD", TRUE,
 					       fn_len, fn, 5, (csd->mumps_can_bypass ? " TRUE" : "FALSE"));
+			if (epoch_taper_status)
+				util_out_print("Database file !AD now has epoch taper flag set to !AD", TRUE,
+					       fn_len, fn, 5, (csd->epoch_taper ? " TRUE" : "FALSE"));
 			if (disk_wait_status)
 				util_out_print("Database file !AD now has wait disk set to !UL seconds",
 						TRUE, fn_len, fn, csd->wait_disk_space);

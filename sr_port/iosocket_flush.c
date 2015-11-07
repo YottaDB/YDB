@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +23,7 @@
 #include "io.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
+#include "error.h"
 
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_NOSOCKETINDEV);
@@ -33,18 +35,19 @@ GBLREF	io_pair	io_std_device;
 
 void iosocket_flush(io_desc *iod)
 {
-
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
 	ssize_t		status;
 	int             on = 1, off = 0;
         char            *errptr;
         int4            errlen;
+	boolean_t	ch_set;
 
 	assert(gtmsocket == iod->type);
 
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 
 	if (0 >= dsocketptr->n_socket)
 	{
@@ -54,6 +57,7 @@ void iosocket_flush(io_desc *iod)
 		else
 #		endif
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
 	if (dsocketptr->current_socket >= dsocketptr->n_socket)
@@ -92,9 +96,11 @@ void iosocket_flush(io_desc *iod)
                 memcpy(&iod->dollar.device[SIZEOF("1,") - 1], errptr, errlen + 1);	/* we want the null */
 		if (socketptr->ioerror)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
         }
 
 #endif
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

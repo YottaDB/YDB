@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,7 +108,6 @@ bool	mubfilcpy (backup_reg_list *list)
 	int			user_id;
 	int			group_id;
 	int			perm;
-	struct perm_diag_data	pdd;
 
 	file = &(list->backup_file);
 	file->addr[file->len] = '\0';
@@ -217,24 +217,10 @@ bool	mubfilcpy (backup_reg_list *list)
 	}
 	FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 	if (-1 != fstat_res)
-		if (gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE, &pdd) < 0)
-		{
-			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
-				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
-				RTS_ERROR_STRING(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
-				PERMGENDIAG_ARGS(pdd));
-			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
-				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("backup file"),
-				RTS_ERROR_STRING(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fn),
-				PERMGENDIAG_ARGS(pdd));
-			if (online)
-				cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
-			CLEANUP_AND_RETURN_FALSE;
-		}
-	/* setup new group and permissions if indicated by the security rules.
-	 */
+		gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_FILE);
+	/* Setup new group and permissions if indicated by the security rules. */
 	if ((-1 == fstat_res) || (-1 == FCHMOD(backup_fd, perm))
-		|| (((-1 != user_id) || (-1 != group_id)) && (-1 == fchown(backup_fd, user_id, group_id))))
+		|| (((INVALID_UID != user_id) || (INVALID_GID != group_id)) && (-1 == fchown(backup_fd, user_id, group_id))))
 	{
 		save_errno = errno;
 		errptr = (char *)STRERROR(save_errno);

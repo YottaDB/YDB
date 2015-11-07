@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -316,9 +317,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			 * jgbl.gbl_jrec_time at the end of this loop will be used to write journal records for ALL
 			 * regions so all regions will have same eov/bov timestamps.
 			 */
-			if (JNL_ENABLED(cs_data)
-				UNIX_ONLY( && (0 != cs_addrs->nl->jnl_file.u.inode))
-				VMS_ONLY( && (0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid)))))
+			if (JNL_ENABLED(cs_data))
 			{
 				jpc = cs_addrs->jnl;
 				jbp = jpc->jnl_buff;
@@ -458,14 +457,14 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 							jnl_info.jnl_len, jnl_info.jnl);
 				exit_status |= EXIT_ERR;
 				break;
-#ifdef UNIX
+#			ifdef UNIX
 			} else if (jnl_info.alloc + jnl_info.extend > jnl_info.autoswitchlimit
 					&& jnl_info.alloc != jnl_info.autoswitchlimit)
 			{
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, jnl_info.alloc,
 						jnl_info.autoswitchlimit, "database file", DB_LEN_STR(gv_cur_region));
 				jnl_info.alloc = jnl_info.autoswitchlimit;
-#endif
+#			endif
 			} else
 			{
 				align_autoswitch = ALIGNED_ROUND_DOWN(jnl_info.autoswitchlimit, jnl_info.alloc, jnl_info.extend);

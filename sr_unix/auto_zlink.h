@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +13,8 @@
 #ifndef AUTO_ZLINK_INCLUDED
 #define AUTO_ZLINK_INCLUDED
 
-#include <auto_zlink_sp.h>
-
-rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line);
+void auto_zlink(int rtnhdridx);
+void auto_relink_check(int rtnhdridx, int lbltblidx);
+void explicit_relink_check(rhdtyp *rhd, boolean_t setproxy);
 
 #endif

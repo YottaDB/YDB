@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +38,7 @@
 	}										\
 }
 
+/* Implements ZSHOW "A". But also called by MUPIP RCTLDUMP ("output" parameter is NULL in this case) to do the same thing. */
 void	zshow_rctldump(zshow_out *output)
 {
 	open_relinkctl_sgm	*linkctl;
@@ -58,7 +60,8 @@ void	zshow_rctldump(zshow_out *output)
 		nbytes = SNPRINTF(buff, SIZEOF(buff), "Relinkctl filename       : %s", linkctl->relinkctl_path);
 		DUMP_ONE_LINE(output, buff, nbytes);
 		n_records = hdr->n_records;
-		nbytes = SNPRINTF(buff, SIZEOF(buff), "# of routines            : %d", n_records);
+		nbytes = SNPRINTF(buff, SIZEOF(buff), "# of routines / max      : %d / %d", n_records,
+				  hdr->relinkctl_max_rtn_entries);
 		DUMP_ONE_LINE(output, buff, nbytes);
 		nbytes = SNPRINTF(buff, SIZEOF(buff), "# of attached processes  : %d", hdr->nattached);
 		DUMP_ONE_LINE(output, buff, nbytes);

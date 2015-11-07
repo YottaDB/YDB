@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +29,7 @@
 #include "gtm_isanlp.h"
 #include "gtm_conv.h"
 #include "gtmimagename.h"
+#include "error.h"
 
 GBLREF int		COLUMNS, GTM_LINES, AUTO_RIGHT_MARGIN;
 GBLREF uint4		gtm_principal_editing_defaults;
@@ -52,8 +54,10 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	int		p_offset;
 	mstr		chset;
 	boolean_t	empt = FALSE;
+	boolean_t	ch_set;
 
 	ioptr = dev_name->iod;
+	ESTABLISH_RET_GTMIO_CH(&ioptr->pair, -1, ch_set);
 	if (ioptr->state == dev_never_opened)
 	{
 		dev_name->iod->dev_sp = (void *)malloc(SIZEOF(d_tt_struct) + SIZEOF(struct termios));
@@ -178,5 +182,6 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			tt_ptr->recall_width = 0;
 		}
 	}
+	REVERT_GTMIO_CH(&ioptr->pair, ch_set);
 	return TRUE;
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,10 +108,36 @@ void db_auto_upgrade(gd_region *reg)
 		{	/* Note that handling for any fields introduced in a version will not go in the "switch-case" block
 			 * of code introduced for the new version but will go in the PREVIOUS "switch-case" block.
 			 */
+			case GDSMV50000:
+			case GDSMV51000ALT:
 			case GDSMV51000:		/* Multi-site replication available */
 			case GDSMV52000:		/* Unicode */
 			case GDSMV53000:		/* M-Itanium release */
 				gvstats_rec_upgrade(csa); /* Move GVSTATS information to new place in file header */
+			case GDSMV53003:		/* ZSHOW "G" release */
+				/* The following two operations are commented out because they cause issues with backup-and-restore
+				 * operations between versions that do not support encryption and encrypted databases created with
+				 * versions that do. Consider the following example.
+				 *
+				 * Say, we first create a database using an old version that does not support encryption and write a
+				 * few updates to it. Then we back up that database and create a new, encrypted database using the
+				 * current version. Next, we restore the backup onto the new database. Because the file header of
+				 * the new database indicates that it is encrypted, MUPIP RESTORE encrypts all blocks that it pulls
+				 * from the backup and ensures that the is_encrypted field remains TRUE even after overwriting it
+				 * with the backup's file header. So, now we have an encrypted database with encrypted data in it,
+				 * which is how it should be.
+				 *
+				 * However, if we now attempt to write some updates, we would come here and, having noticed that the
+				 * minor version predates encryption, unset the is_encrypted field. As a result, we would produce an
+				 * unencrypted database (according to the file header) with encrypted data in it. That is the reason
+				 * the following two lines are commented out.
+				 *
+				 *   csd->is_encrypted = FALSE;
+				 *   memset(csd->encryption_hash, 0, GTMCRYPT_RESERVED_HASH_LEN);
+				 */
+			case GDSMV53004:		/* New encryption fields */
+				csd->db_trigger_cycle = 0;
+			case GDSMV54000:		/* First trigger version */
 			case GDSMV54002:
 				/* GT.M V54002B introduced jnl_eov_tn for backward recovery */
 				csd->jnl_eovtn = csd->trans_hist.curr_tn;
@@ -135,11 +162,23 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV60002:
 				/* GT.M V62001 introduced ^#t upgrade. Record this pending event in filehdr. */
 				UNIX_ONLY(csd->hasht_upgrade_needed = TRUE;)
-				break;
 			case GDSMV62001:
+				/* GT.M V62002 introduced database file preallocation. */
+				csd->defer_allocate = TRUE;
+				/* GT.M V62002 incremented ^#t label. Record this pending event in filehdr. */
+				UNIX_ONLY(csd->hasht_upgrade_needed = TRUE;)
+				/* GT.M V62002 introduced epoch taper */
+				csd->epoch_taper = TRUE;
+		        	csd->epoch_taper_time_pct = EPOCH_TAPER_TIME_PCT_DEFAULT;
+		        	csd->epoch_taper_jnl_pct = EPOCH_TAPER_JNL_PCT_DEFAULT;
+				break;
+			case GDSMV62002:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
+			default:
+				/* Unrecognized version in the header */
+				assertpro(FALSE && csd->minor_dbver);
 		}
 		csd->minor_dbver = GDSMVCURR;
 		if (0 == csd->wcs_phase2_commit_wait_spincnt)

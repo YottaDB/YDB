@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +31,7 @@
 #include "namelook.h"
 #include "stringpool.h"
 #include "gtm_conv.h"
+#include "error.h"
 
 GBLREF 	io_pair          	io_curr_device;
 GBLREF  io_pair			io_std_device;
@@ -98,6 +100,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	char		*tab;
 	int		save_errno;
 	size_t		d_socket_struct_len;
+	boolean_t	ch_set;
 
         assert(iod->state == dev_open);
         assert(iod->type == gtmsocket);
@@ -106,10 +109,11 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	n_specified = 0;
 	zff_len = -1; /* indicates neither ZFF nor ZNOFF specified */
 	delimiter_len = -1; /* indicates neither DELIM nor NODELIM specified */
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 
 	/* A read or wait was interrupted for this device. Allow only parmless use in $zinterrupt code for
-	   and interrupted device.
-	*/
+	 * and interrupted device.
+	 */
 	if (iop_eol != *(pp->str.addr + p_offset))
 	{	/* Parameters were specified */
 		if (dsocketptr->mupintr)
@@ -320,7 +324,10 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	}
 	/* ------ return immediately if no flag, worth a check because it is mostly true ------------ */
 	if (1 == p_offset)
+	{
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
+	}
 	/* ------------------------------ compatibility verification -------------------------------- */
 	if ((socket_specified) && ((n_specified > 2) || ((2 == n_specified) && (0 >= delimiter_len))))
 	{
@@ -363,6 +370,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			io_curr_device.in = io_std_device.in;
 			io_curr_device.out = io_std_device.out;
 		}
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return; /* detach can only be specified by itself */
 	}
 	if (attach_specified)
@@ -383,6 +391,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		}
 		iosocket_switch(handlea, handlea_len, socket_pool, newdsocket);
 		memcpy(dsocketptr, newdsocket, d_socket_struct_len);
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return; /* attach can only be specified by itself */
 	}
 	/* ------------ create/identify the socket to work on and make a local copy ----------------- */
@@ -390,7 +399,10 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	{
 		/* allocate the structure for a new socket */
                 if (NULL == (socketptr = iosocket_create(sockaddr, bfsize, -1, listen_specified)))
+		{
+			REVERT_GTMIO_CH(&iod->pair, ch_set);
                         return;
+		}
 		if (gtm_max_sockets <= newdsocket->n_socket)
 		{
 			if (FD_INVALID != socketptr->temp_sd)
@@ -426,6 +438,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				socketptr->pendingevent = FALSE;
 				iod->dollar.key[0] = '\0';
 				save_errno = iosocket_accept(dsocketptr, socketptr, TRUE);
+				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
 			}
 		} else
@@ -438,6 +451,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				else
 #				endif
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
 			}
      			if (newdsocket->n_socket <= newdsocket->current_socket)
@@ -551,6 +565,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
                 if (socketptr->sd > 0)
                         (void)close(socketptr->sd);
 		SOCKET_FREE(socketptr);
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
                 return;
         }
 	/* ------------------------------------ commit changes -------------------------------------- */
@@ -570,5 +585,6 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	}
 	*socketptr = newsocket;
 	memcpy(dsocketptr, newdsocket, d_socket_struct_len);
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

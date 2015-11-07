@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +26,7 @@
 
 #include "mlkdef.h"
 #include "cmidef.h"
+#include "gtmio.h"
 #include "lke.h"
 
 #define KDIM	64		/* max number of subscripts */
@@ -46,6 +48,7 @@ void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
 		memcpy(temp, dsub->data, dsub->length);
 		temp[dsub->length] = '\0';
 		PRINTF("%s%s : [shrblk] %lx : [shrsub] %lx\n", prefix, temp, (long unsigned int) b, (long unsigned int) dsub);
+		FFLUSH(stdout);
 		if (b->children)
 			lke_show_memory((mlk_shrblk_ptr_t)R2A(b->children), new_prefix);
 		bnext = (mlk_shrblk_ptr_t)R2A(b->rsib);
@@ -121,6 +124,6 @@ bool	lke_showtree(struct CLB 	*lnk,
 			subscript_offset[depth] = name.len;
 		}
 		if (util_interrupt)
-			rts_error(VARLSTCNT(1) ERR_CTRLC);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 	}
 }

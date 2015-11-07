@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,37 +17,13 @@
 
 enum perm_target_types
 {
-    PERM_FILE = 0x01,			/* request permissions for creating a new file */
-    PERM_IPC  = 0x02,			/* request permissions for initializing IPCs (shm/sem) */
-    PERM_EXEC = 0x80			/* request execute permissions, masked with the above */
+    PERM_FILE = 0x01,			/* Request permissions for creating a new file */
+    PERM_IPC  = 0x02,			/* Request permissions for initializing IPCs (shm/sem) */
+    PERM_EXEC = 0x04			/* Request execute permissions, masked with the above. Currently only used with PERM_IPC */
 };
 
-struct perm_diag_data
-{
-	uid_t	process_uid;
-	gid_t	process_gid;
-	uid_t	file_uid;
-	gid_t	file_gid;
-	char	file_perm[12];
-	gid_t	lib_gid;
-	char	lib_perm[12];
-	int	opener_in_file_group;
-	int	owner_in_file_group;
-};
-
-error_def(ERR_PERMGENDIAG);
-
-#define PERMGENDIAG_ARGS(pdd)									\
-		ERR_PERMGENDIAG, 11,								\
-		(pdd).process_uid, (pdd).process_gid,						\
-		(pdd).file_uid, (pdd).file_gid, RTS_ERROR_STRING((pdd).file_perm),		\
-		(pdd).lib_gid, RTS_ERROR_STRING((pdd).lib_perm),				\
-		(pdd).opener_in_file_group, (pdd).owner_in_file_group
-#define PERMGENDIAG_ARG_COUNT	(13)
-
-int gtm_get_group_id(struct stat *stat_buff);
-int gtm_member_group_id(int uid, int gid);
-int gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *perm, enum perm_target_types target_type,
-			struct perm_diag_data *pdd);
+gid_t	gtm_get_group_id(struct stat *stat_buff);
+int	gtm_member_group_id(uid_t uid, gid_t gid);
+void	gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, int *perm, enum perm_target_types target_type);
 
 #endif /* GTM_PERMISSIONS */

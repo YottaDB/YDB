@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -290,7 +291,7 @@ void mu_extract(void)
 		tp_region *rptr;
 		for (rptr = grlist, reg_std_null_coll = -1; NULL != rptr; rptr = rptr->fPtr)
 		{
-			reg=rptr->reg;
+			reg = rptr->reg;
 			if (reg->open)
 			{
 				if (reg_std_null_coll != reg->std_null_coll)
@@ -361,8 +362,8 @@ void mu_extract(void)
 		outptr = outbuf;
 		if (is_any_file_encrypted)
 		{
-			MEMCPY_LIT(outptr, BIN_HEADER_LABEL_ENCR);
-			outptr += STR_LIT_LEN(BIN_HEADER_LABEL_ENCR);
+			MEMCPY_LIT(outptr, BIN_HEADER_LABEL_ENCR_INDEX);
+			outptr += STR_LIT_LEN(BIN_HEADER_LABEL_ENCR_INDEX);
 		} else
 		{
 			MEMCPY_LIT(outptr, BIN_HEADER_LABEL);
@@ -522,7 +523,7 @@ void mu_extract(void)
 		MU_EXTR_STATS_ADD(grand_total, global_total);	/* add global_total to grand_total */
 	}
 	assert((MV_STR == op_val.mvtype) && (MV_STR == op_pars.mvtype));
-	op_val.str.addr = (char *)outfilename;;
+	op_val.str.addr = (char *)outfilename;
 	op_val.str.len = filename_len;
 	op_pars.str.len = SIZEOF(no_param);
 	op_pars.str.addr = (char *)&no_param;

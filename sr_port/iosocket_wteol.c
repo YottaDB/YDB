@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +22,7 @@
 #include "io.h"
 #include "iottdef.h"
 #include "iosocketdef.h"
+#include "error.h"
 
 #ifndef VMS
 GBLREF	io_pair		io_std_device;
@@ -36,9 +38,11 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 	socket_struct	*socketptr;
 	char		*ch, *top;
 	int		eol_cnt;
+	boolean_t	ch_set;
 
 	assert(gtmsocket == io_ptr->type);
 	dsocketptr = (d_socket_struct *)io_ptr->dev_sp;
+	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
 	if (0 >= dsocketptr->n_socket)
 	{
 #		ifndef VMS
@@ -47,6 +51,7 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 		else
 #		endif
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 		return;
 	}
 	if (dsocketptr->current_socket >= dsocketptr->n_socket)
@@ -79,5 +84,6 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 			io_ptr->dollar.y %= io_ptr->length;
 	}
 	iosocket_flush(io_ptr);
+	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 	return;
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -206,7 +207,7 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 			poll_fdlist[0].fd = socketptr->sd;
 			poll_fdlist[0].events = pollread ? POLLIN : POLLOUT;
 			poll_nfds = 1;
-			poll_timeout = time_for_read->at_usec / 1000;	/* convert to millisecs */
+			poll_timeout = DIVIDE_ROUND_UP(time_for_read->at_usec, MICROSECS_IN_MSEC);	/* convert to millisecs */
 			status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 #			endif
 			real_errno = errno;

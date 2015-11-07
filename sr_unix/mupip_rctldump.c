@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +31,7 @@
 error_def(ERR_MUPCLIERR);
 #endif
 
+/* Implements MUPIP RCTLDUMP */
 void mupip_rctldump(void)
 {
 #	ifdef AUTORELINK_SUPPORTED
@@ -48,7 +50,7 @@ void mupip_rctldump(void)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
 		dir.addr = objdir;
 		dir.len = max_len;
-		linkctl = relinkctl_attach(&dir);
+		linkctl = relinkctl_attach(&dir, NULL, 0);
 		assert(linkctl == TREF(open_relinkctl_list));
 		assert((NULL == linkctl) || (NULL == linkctl->next));
 	} else

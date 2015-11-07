@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +26,7 @@
 #include "send_msg.h"
 #include "error.h"
 #include "dollarx.h"
+#include "have_crit.h"
 #include "iott_flush_time.h"
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -35,6 +37,11 @@ GBLREF io_pair		io_curr_device;
 GBLREF io_pair		io_std_device;
 GBLREF bool		prin_out_dev_failure;
 GBLREF boolean_t	gtm_utf8_mode;
+GBLREF int		process_exiting;
+
+error_def(ERR_NOPRINCIO);
+error_def(ERR_TERMWRITE);
+error_def(ERR_ZINTRECURSEIO);
 
 void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen);
 
@@ -42,11 +49,11 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 {
 	d_tt_struct	*tt_ptr;
 	int		buff_left, status;
-	error_def(ERR_NOPRINCIO);
-	error_def(ERR_TERMWRITE);
+	boolean_t	ch_set;
 
 	tt_ptr = io_ptr->dev_sp;
 	assert(tt_ptr->write_active == FALSE);
+	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
 	tt_ptr->write_active = TRUE;
  	buff_left = IOTT_BUFF_LEN - (int)((tt_ptr->tbuffp - tt_ptr->ttybuff));
 	assert(buff_left > IOTT_BUFF_MIN || prin_out_dev_failure);
@@ -81,22 +88,12 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 			}
 		} else 	/* (0 != status) */
 		{
-			if (io_ptr == io_std_device.out)
-			{
-				if (!prin_out_dev_failure)
-					prin_out_dev_failure = TRUE;
-				else
-				{
-					send_msg(VARLSTCNT(1) ERR_NOPRINCIO);
-					/* rts_error(VARLSTCNT(1) ERR_NOPRINCIO); This causes a core dump */
-					stop_image_no_core();
-				}
-			}
-			rts_error(VARLSTCNT(3) ERR_TERMWRITE, 0, status);
+			ISSUE_NOPRINCIO_IF_NEEDED_TT(io_ptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TERMWRITE, 0, status);
 		}
 	}
+	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 }
-
 
 void iott_write(mstr *v)
 {
@@ -109,9 +106,11 @@ void iott_write(mstr *v)
 	d_tt_struct	*tt_ptr;
 	boolean_t	utf8_active = FALSE;
 	wint_t		codepoint;
-	error_def(ERR_TERMWRITE);
-	error_def(ERR_ZINTRECURSEIO);
+	boolean_t	flush_immediately;
+	boolean_t	ch_set;
 
+	/* We cannot be starting unsafe timers during process exiting or in an interrupt-deferred window. */
+	flush_immediately = (process_exiting || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state));
 	str_len = v->len;
 	if (0 != str_len)
 	{
@@ -119,9 +118,10 @@ void iott_write(mstr *v)
 		io_ptr = io_curr_device.out;
 		tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
 		if (tt_ptr->mupintr)
-			rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);
 		UNICODE_ONLY(utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ochset) : FALSE;)
-		for (;  ;)
+		for (; ;)
 		{
 			if (FALSE == io_ptr->wrap)
 				len = str_len;
@@ -158,7 +158,7 @@ void iott_write(mstr *v)
 							io_ptr->dollar.x = io_ptr->width;	/* force wrap */
 							continue;
 						} else
-							rts_error(VARLSTCNT(1) ERR_TERMWRITE);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TERMWRITE);
 					}
 				}
 #endif
@@ -170,15 +170,22 @@ void iott_write(mstr *v)
 			}
 			assert(0 != len);
 			iott_write_buffered_text(io_ptr, str, len);
-
 			dollarx(io_ptr, (uchar_ptr_t)str, (uchar_ptr_t)str + len);
 			str_len -= len;
 			if (0 >= (signed)str_len)
 				break;
 			str += len;
 		}
-
-		if (FALSE == tt_ptr->timer_set)
+		if (flush_immediately)
+		{
+			if (TRUE == tt_ptr->timer_set)
+			{
+				cancel_timer((TID)io_ptr);
+				tt_ptr->timer_set = FALSE;
+			}
+			tt_ptr->write_active = TRUE;
+			iott_flush_buffer(io_ptr, FALSE);
+		} else if (FALSE == tt_ptr->timer_set)
 		{
 			flush_parm = io_ptr;
 			tt_ptr->timer_set = TRUE;
@@ -188,6 +195,6 @@ void iott_write(mstr *v)
 				    SIZEOF(flush_parm),
 				    (char *)&flush_parm);
 		}
-
+		REVERT_GTMIO_CH(&io_curr_device, ch_set);
 	}
 }

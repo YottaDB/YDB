@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +58,9 @@ error_def(ERR_TEXT);
 error_def(ERR_ZINTRECURSEIO);
 
 #define	MAX_TLSOPTION	12
+#define TLSLABEL	"tls: { "
+#define COLONBRACKET	": { "
+#define BRACKETSSEMIS	" }; };"
 
 typedef enum
 {
@@ -67,13 +71,14 @@ typedef enum
 } tls_option;
 
 void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password, mval *extraarg)
-{	/* note extraarg is not currently used */
+{
 	int4			length, flags, timeout, msec_timeout, status, status2, len, errlen, devlen, tls_errno, save_errno;
 	io_desc			*iod;
 	d_socket_struct 	*dsocketptr;
 	socket_struct		*socketptr;
 	char			optionstr[MAX_TLSOPTION], idstr[MAX_TLSID_LEN], passwordstr[GTM_PASSPHRASE_MAX_ASCII + 1];
 	const char		*errp;
+	char			*extrastr, *extraptr;
 	tls_option		option;
 	gtm_tls_socket_t	*tlssocket;
 	ABS_TIME		cur_time, end_time;
@@ -83,6 +88,7 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 	fd_set			fds, *readfds, *writefds;
 	struct timeval		timeout_spec, *timeout_ptr;
 #	endif
+	boolean_t		ch_set;
 
 	iod = io_curr_device.out;
 	assert(gtmsocket == iod->type);
@@ -100,10 +106,11 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 	if (dsocketptr->mupintr)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	ENSURE_DATA_SOCKET(socketptr);
 	if (socket_tcpip != socketptr->protocol)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSPARAM, 4, RTS_ERROR_MVAL(optionmval),
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSPARAM, 4, LEN_AND_LIT("/TLS"),
 			LEN_AND_LIT("but socket is not TCP"));
 		return;
 	}
@@ -125,8 +132,8 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 		idstr[length] = '\0';
 	} else
 		idstr[0] = '\0';
-	if (NULL != password)
-	{
+	if (('\0' != idstr[0]) && (NULL != password))
+	{	/* password only usable if tlsid provided - iosocket_iocontrol checks */
 		length = password->str.len;
 		if (GTM_PASSPHRASE_MAX_ASCII < length)
 		{
@@ -136,10 +143,15 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 		}
 		STRNCPY_STR(passwordstr, password->str.addr, length);
 		passwordstr[length] = '\0';
+	} else if (NULL != password)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSPARAM, 4, LEN_AND_LIT("passphrase"), LEN_AND_LIT("requires TLSID"));
+		return;
 	} else
 		passwordstr[0] = '\0';
-	length = MIN(MAX_TLSOPTION, optionmval->str.len);
+	length = MIN((SIZEOF(optionstr) - 1), optionmval->str.len);
 	lower_to_upper((uchar_ptr_t)optionstr, (uchar_ptr_t)optionmval->str.addr, length);
+	optionstr[length] = '\0';
 	if (0 == memcmp(optionstr, "CLIENT", length))
 		option = tlsopt_client;
 	else if (0 == memcmp(optionstr, "SERVER", length))
@@ -166,7 +178,7 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 		}
 		assertpro((0 >= socketptr->buffered_length) && (0 >= socketptr->obuffer_length));
 		if (NULL == tls_ctx)
-		{	/* first use of TLS */
+		{	/* first use of TLS in process */
 			if (-1 == gtm_tls_loadlibrary())
 			{
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSDLLNOOPEN, 0, ERR_TEXT, 2, LEN_AND_STR(dl_err));
@@ -186,11 +198,74 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, errlen, errp);
 				if (NO_M_TIMEOUT != timeoutarg)
 					dollar_truth = FALSE;
+				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
 			}
 		}
 		socketptr->tlsenabled = TRUE;
 		flags = GTMTLS_OP_SOCKET_DEV | ((tlsopt_client == option) ? GTMTLS_OP_CLIENT_MODE : 0);
+		if (NULL != extraarg)
+		{
+			if ('\0' == idstr[0])
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSPARAM, 4, LEN_AND_STR(optionstr),
+					LEN_AND_LIT("TLSID required for configuration string"));
+				return;
+			}
+			length = extraarg->str.len;
+			extrastr = malloc(length + 1 + SIZEOF(TLSLABEL) - 1 + tlsid->str.len + SIZEOF(COLONBRACKET) - 1
+				+ SIZEOF(BRACKETSSEMIS) - 1);
+			STRNCPY_LIT(extrastr, TLSLABEL);
+			extraptr = extrastr + SIZEOF(TLSLABEL) - 1;
+			memcpy(extraptr, tlsid->str.addr, tlsid->str.len);
+			extraptr += tlsid->str.len;
+			STRNCPY_LIT(extraptr, COLONBRACKET);
+			extraptr = extraptr + SIZEOF(COLONBRACKET) - 1;
+			STRNCPY_STR(extraptr, extraarg->str.addr, length);
+			extraptr += length;
+			STRNCPY_LIT(extraptr, BRACKETSSEMIS);
+			extraptr += SIZEOF(BRACKETSSEMIS) - 1;
+			*extraptr = '\0';
+			if (0 > gtm_tls_add_config(tls_ctx, idstr, extrastr))
+			{	/* error string available */
+				socketptr->tlsenabled = FALSE;
+				free(extrastr);
+				errp = gtm_tls_get_error();
+				len = SIZEOF(ONE_COMMA) - 1;
+				memcpy(iod->dollar.device, ONE_COMMA, len);
+				errlen = STRLEN(errp);
+				devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
+				memcpy(&iod->dollar.device[len], errp, devlen + 1);
+				if (devlen < errlen)
+					iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
+				return;
+			} else
+				free(extrastr);
+		}
+		if ('\0' != passwordstr[0])
+		{
+			if ('\0' == idstr[0])
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSPARAM, 4, LEN_AND_STR(optionstr),
+					LEN_AND_LIT("TLSID required for passphrase"));
+				return;
+			}
+			if (0 > gtm_tls_store_passwd(tls_ctx, idstr, passwordstr))
+			{	/* error string available */
+				socketptr->tlsenabled = FALSE;
+				errp = gtm_tls_get_error();
+				len = SIZEOF(ONE_COMMA) - 1;
+				memcpy(iod->dollar.device, ONE_COMMA, len);
+				errlen = STRLEN(errp);
+				devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
+				memcpy(&iod->dollar.device[len], errp, devlen + 1);
+				if (devlen < errlen)
+					iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
+				return;
+			}
+		}
 		socketptr->tlssocket = gtm_tls_socket(tls_ctx, NULL, socketptr->sd, idstr, flags);
 		if (NULL == socketptr->tlssocket)
 		{
@@ -207,6 +282,7 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
 			if (NO_M_TIMEOUT != timeoutarg)
 				dollar_truth = FALSE;
+			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return;
 		}
 		status = 0;
@@ -215,8 +291,9 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 			timeout_ptr = NULL;
 		else
 		{
-			timeout_spec.tv_sec = msec_timeout / 1000;
-			timeout_spec.tv_usec = (msec_timeout % 1000) * 1000;	/* remainder in millsecs to microsecs */
+			timeout_spec.tv_sec = msec_timeout / MILLISECS_IN_SEC;
+			/* remainder in millsecs to microsecs */
+			timeout_spec.tv_usec = (msec_timeout % MILLISECS_IN_SEC) * MICROSECS_IN_MSEC;
 			timeout_ptr = &timeout_spec;
 		}
 #		endif
@@ -278,6 +355,9 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 				if (socketptr->ioerror)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
 						ERR_TEXT, 2, errlen, errp);
+				if (NO_M_TIMEOUT != timeoutarg)
+					dollar_truth = FALSE;
+				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
 			}
 			if ((0 != status) && (0 <= status2))	/* not accepted/connected and not error */
@@ -291,11 +371,13 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 						gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 						socketptr->tlsenabled = FALSE;
 						dollar_truth = FALSE;
+						REVERT_GTMIO_CH(&iod->pair, ch_set);
 						return;
 					} else
 					{	/* adjust msec_timeout for poll/select */
 #					ifdef	USE_POLL
-						msec_timeout = (cur_time.at_sec * 1000) + (cur_time.at_usec / 1000);
+						msec_timeout = (cur_time.at_sec * MILLISECS_IN_SEC) +
+							DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC);
 #					else
 						timeout_spec.tv_sec = cur_time.at_sec;
 						timeout_spec.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
@@ -306,6 +388,7 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 					gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 					socketptr->tlsenabled = FALSE;
 					dollar_truth = FALSE;
+					REVERT_GTMIO_CH(&iod->pair, ch_set);
 					return;
 				}
 				continue;
@@ -326,7 +409,16 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 				LEN_AND_LIT("but TLS not enabled"));
 			return;		/* make compiler and analyzers happy */
 		}
-		/* TODO: allow verify-mode options in idstr */
+		tlssocket = (gtm_tls_socket_t *)socketptr->tlssocket;
+		if (GTMTLS_OP_CLIENT_MODE & tlssocket->flags)
+		{	/* only server can renegotiate */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSPARAM, 4, LEN_AND_STR(optionstr),
+				RTS_ERROR_LITERAL("not allowed when client"));
+			return;
+		}
+		/* TODO: allow verify-mode options in idstr but only 32 chars */
+		/* TODO: if anything in input buffer or ready to be read then error */
+		/* TODO: should we flush output buffer first */
 		status = gtm_tls_renegotiate((gtm_tls_socket_t *)socketptr->tlssocket);
 		if (0 != status)
 		{
@@ -345,6 +437,9 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 			if (socketptr->ioerror)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
 					ERR_TEXT, 2, errlen, errp);
+			if (NO_M_TIMEOUT != timeoutarg)
+				dollar_truth = FALSE;
+			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return;
 		}
 	} else
@@ -352,6 +447,7 @@ void	iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password
 			LEN_AND_LIT("not a valid option"));
 	if (NO_M_TIMEOUT != timeoutarg)
 		dollar_truth = TRUE;
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }
 #endif

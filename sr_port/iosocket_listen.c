@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +27,7 @@
 #include "io.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
+#include "error.h"
 
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_LISTENPASSBND);
@@ -41,6 +43,7 @@ boolean_t iosocket_listen(io_desc *iod, unsigned short len)
 {
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
+	boolean_t	result, ch_set;
 
 	assert(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
@@ -57,7 +60,10 @@ boolean_t iosocket_listen(io_desc *iod, unsigned short len)
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	assert(socketptr && (socketptr->dev == dsocketptr));
 
-	return iosocket_listen_sock(socketptr, len);
+	ESTABLISH_RET_GTMIO_CH(&iod->pair, FALSE, ch_set);
+	result = iosocket_listen_sock(socketptr, len);
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
+	return result;
 }
 
 boolean_t iosocket_listen_sock(socket_struct *socketptr, unsigned short len)

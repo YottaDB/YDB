@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -436,7 +437,8 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	cw_set_element		*cse, *cse_new, *old_cse;
 	gv_namehead		*save_targ, *split_targ, *dir_tree;
 	enum cdb_sc		status;
-	gv_key			*temp_key;
+	gv_key			*temp_key, *src_key;
+	static gv_key		*gv_altkey2;
 	uchar_ptr_t		subrec_ptr;
 	mstr			value;
 	off_chain		chain1, curr_chain, prev_chain, chain2;
@@ -1111,6 +1113,7 @@ tn_restart:
 						PUSH_MV_STENT(MVST_MVAL);       /* protect "value" mstr from stp gcol */
 						pval = &mv_chain->mv_st_cont.mvs_mval;
 						pval->str = value;
+						pval->mvtype = MV_STR;
 						ENSURE_STP_FREE_SPACE(data_len);
 						value = pval->str;
 						POP_MV_STENT();                 /* pval */
@@ -1564,9 +1567,19 @@ tn_restart:
 				assert(bs1[0].len <= blk_reserved_size); /* Assert that right block has space for reserved bytes */
 				assert(gv_altkey->top == gv_currkey->top);
 				assert(gv_altkey->end < gv_altkey->top);
-				temp_key = gv_altkey;
-				if (cdb_sc_normal != (status = gvcst_expand_key((blk_hdr_ptr_t)buffaddr, prev_rec_offset,
-						temp_key)))
+				if (temp_key != gv_altkey)
+				{
+					assert(temp_key == gv_currkey);
+					src_key = gv_currkey;
+					temp_key = gv_altkey;
+				} else
+				{
+					if (NULL == gv_altkey2)
+						GVKEY_INIT(gv_altkey2, gv_keysize);
+					COPY_KEY(gv_altkey2, temp_key);
+					src_key = gv_altkey2;
+				}
+				if (cdb_sc_normal != (status = gvcst_expand_prev_key(bh, src_key, temp_key)))
 					GOTO_RETRY;
 			} else
 			{	/* Insert in left hand (new) block */
@@ -1714,9 +1727,19 @@ tn_restart:
 				{
 					assert(gv_altkey->top == gv_currkey->top);
 					assert(gv_altkey->end < gv_altkey->top);
-					temp_key = gv_altkey;
-					if (cdb_sc_normal !=
-						(status = gvcst_expand_key((blk_hdr_ptr_t)buffaddr, curr_rec_offset, temp_key)))
+					if (temp_key != gv_altkey)
+					{
+						assert(temp_key == gv_currkey);
+						src_key = gv_currkey;
+						temp_key = gv_altkey;
+					} else
+					{
+						if (NULL == gv_altkey2)
+							GVKEY_INIT(gv_altkey2, gv_keysize);
+						COPY_KEY(gv_altkey2, temp_key);
+						src_key = gv_altkey2;
+					}
+					if (cdb_sc_normal != (status = gvcst_expand_curr_key(bh, src_key, temp_key)))
 						GOTO_RETRY;
 				} else if (temp_key != gv_altkey)
 				{
@@ -2243,7 +2266,12 @@ tn_restart:
 			assert(1 <= temp_key->end);
 			assert(KEY_DELIMITER == temp_key->base[temp_key->end]);
 			assert(KEY_DELIMITER == temp_key->base[temp_key->end - 1]);
-			assert((2 > temp_key->end) || (KEY_DELIMITER != temp_key->base[temp_key->end - 2]));
+			if ((2 <= temp_key->end) && (KEY_DELIMITER == temp_key->base[temp_key->end - 2]))
+			{
+				assert(CDB_STAGNATE > t_tries);
+				status = cdb_sc_mkblk;
+				GOTO_RETRY;
+			}
 			bq = bh + 1;
 			if (HIST_TERMINATOR != bq->blk_num)
 			{	/* Not root;  write blocks and continue */

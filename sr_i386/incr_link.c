@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,9 +50,9 @@ typedef struct res_list_struct
 
 void res_free(res_list *root);
 bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code);
-void zl_error(int4 file, int4 err, int4 len, char *addr, int4 err2, int4 len2, char *addr2);
+void zl_error(int4 *file, int4 err, int4 len, char *addr, int4 err2, int4 len2, char *addr2);
 
-boolean_t incr_link(int file_desc, zro_ent *dummy, uint4 fname_len, char *fname)
+boolean_t incr_link(int *file_desc, zro_ent *dummy, uint4 fname_len, char *fname)
 {
 	rhdtyp		*hdr, *old_rhead;
 	int 		code_size, save_errno, cnt;
@@ -64,20 +65,20 @@ boolean_t incr_link(int file_desc, zro_ent *dummy, uint4 fname_len, char *fname)
 	int		order;
 	struct exec 	file_hdr;
 
-	assert(file_desc);
+	assert(file_desc && (FD_INVALID != *file_desc));
 	urx_lcl_anchor.len = 0;
 	urx_lcl_anchor.addr = 0;
 	urx_lcl_anchor.lab = 0;
 	urx_lcl_anchor.next = 0;
 	code = NULL;
-	DOREADRL(file_desc, &file_hdr, SIZEOF(file_hdr), read_size);
+	DOREADRL(*file_desc, &file_hdr, SIZEOF(file_hdr), read_size);
 	if (read_size != SIZEOF(file_hdr))
 	{
 		if (-1 == read_size)
 		{
 			save_errno = errno;
 			zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT, strlen(STRERROR(save_errno)),
-					STRERROR(save_errno));
+				 STRERROR(save_errno));
 		} else
 			zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT, RTS_ERROR_TEXT("reading file header"));
 	} else if (OMAGIC != file_hdr.a_magic)
@@ -87,7 +88,7 @@ boolean_t incr_link(int file_desc, zro_ent *dummy, uint4 fname_len, char *fname)
 	assert(0 == file_hdr.a_bss);
 	code_size = file_hdr.a_text + file_hdr.a_data;
 	code = GTM_TEXT_ALLOC(code_size);
-	DOREADRL(file_desc, code, code_size, read_size);
+	DOREADRL(*file_desc, code, code_size, read_size);
 	if (read_size != code_size)
 	{
 		if (-1 == read_size)
@@ -117,7 +118,7 @@ boolean_t incr_link(int file_desc, zro_ent *dummy, uint4 fname_len, char *fname)
 	for (cnt = hdr->labtab_len, curlab = LABTAB_ADR(hdr); cnt; --cnt, ++curlab)
 		/* relocate the label table */
 		curlab->lab_name.addr += (uint4)literal_ptr;
-	if (!addr_fix(file_desc, &file_hdr, &urx_lcl_anchor, hdr))
+	if (!addr_fix(*file_desc, &file_hdr, &urx_lcl_anchor, hdr))
 	{
 		urx_free(&urx_lcl_anchor);
 		zl_error(file_desc, ERR_INVOBJFILE, fname_len, fname, ERR_TEXT, RTS_ERROR_TEXT("address fixup failure"));
@@ -409,7 +410,7 @@ void res_free(res_list *root)
  * err - an error code that accepts no arguments and
  * err2 - an error code that accepts two arguments (!AD)
  */
-void zl_error(int4 file, int4 err, int4 len, char *addr, int4 err2, int4 len2, char *addr2)
+void zl_error(int4 *file, int4 err, int4 len, char *addr, int4 err2, int4 len2, char *addr2)
 {
 	int rc;
 
@@ -418,7 +419,11 @@ void zl_error(int4 file, int4 err, int4 len, char *addr, int4 err2, int4 len2, c
 		GTM_TEXT_FREE(code);
 		code = NULL;
 	}
-	CLOSEFILE_RESET(file, rc);	/* resets "file" to FD_INVALID */
+	if (0 < *file)
+	{
+		CLOSEFILE_RESET(*file, rc);	/* resets "*file" to FD_INVALID */
+	} else
+		*file = FD_INVALID;
 	if (0 != err2)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) err, 2, len, addr, err2, 2, len2, addr2);
 	else

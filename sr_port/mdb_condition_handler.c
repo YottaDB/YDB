@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,12 +101,11 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	inctn_opcode_t		inctn_opcode;
-GBLREF	int			mumps_status, merge_args;
+GBLREF	int			mumps_status;
 GBLREF	int4			exi_condition;
 GBLREF	io_desc			*active_device, *gtm_err_dev;
 GBLREF	io_pair			io_std_device, io_curr_device;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	lvzwrite_datablk	*lvzwrite_block;
 GBLREF	mstr			*err_act;
 GBLREF	mval			*alias_retarg, dollar_etrap, dollar_zstatus, dollar_zerror, dollar_ztrap;
 GBLREF	mv_stent		*mv_chain;
@@ -318,18 +318,14 @@ CONDITION_HANDLER(mdb_condition_handler)
 	MDB_START;
 	assert(FALSE == in_gvcst_incr);	/* currently there is no known case where this can be TRUE at this point */
 	in_gvcst_incr = FALSE;	/* reset this just in case gvcst_incr/gvcst_put failed to do a good job of resetting */
-	/* Ideally merge should have a condition handler to reset followings, but generated code can call other routines
-	 * during MERGE command (MERGE command invokes multiple op-codes depending on source vs target). So it is not
-	 * easy to establish a condition handler there. Easy solution is following one line code.
-	 */
-	merge_args = 0;
-	TREF(in_zwrite) = FALSE;
-	inctn_opcode = inctn_invalid_op;
 	if ((SUCCESS != SEVERITY) && (INFO != SEVERITY))
 	{
-		if (lvzwrite_block)
-			/* If lvzwrite_block does not (yet) exist, no harm, no foul */
-			lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
+		inctn_opcode = inctn_invalid_op;
+		/* Ideally merge should have a condition handler to reset followings, but generated code can call other routines
+		 * during MERGE command (MERGE command invokes multiple op-codes depending on source vs target). So it is not
+		 * easy to establish a condition handler there. Easy solution is following one line code.
+		 */
+		NULLIFY_MERGE_ZWRITE_CONTEXT;
 	}
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
@@ -509,7 +505,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			SET_ZSTATUS(NULL);
 		}
 		/* Create the ZSHOW dump file if it can be created */
-		create_fatal_error_zshow_dmp(SIGNAL, repeat_error);
+		create_fatal_error_zshow_dmp(SIGNAL);
 
 		/* If we are about to core/exit on a stack over flow, only do the core part if a debug
 		 * flag requests this behaviour. Otherwise, supress the core and just exit.

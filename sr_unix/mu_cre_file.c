@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,6 +89,7 @@ GBLREF	uint4			gtmDebugLevel;
 error_def(ERR_NOSPACECRE);
 error_def(ERR_LOWSPACECRE);
 error_def(ERR_MUNOSTRMBKUP);
+error_def(ERR_PREALLOCATEFAIL);
 
 unsigned char mu_cre_file(void)
 {
@@ -350,16 +352,29 @@ unsigned char mu_cre_file(void)
 	cc = (char*)malloc(DISK_BLOCK_SIZE);
 	memset(cc, 0, DISK_BLOCK_SIZE);
 	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd,
-		   (cs_data->start_vbn - 1) * DISK_BLOCK_SIZE + ((off_t)(cs_data->trans_hist.total_blks) * cs_data->blk_size),
-		   cc,
-		   DISK_BLOCK_SIZE,
-		   status);
+		      BLK_ZERO_OFF(cs_data) + ((off_t)(cs_data->trans_hist.total_blks) * cs_data->blk_size),
+		      cc,
+		      DISK_BLOCK_SIZE,
+		      status);
 	if (0 != status)
 	{
 		SPRINTF_AND_PERROR("Error writing out end of file %s\n");
 		CLEANUP(EXIT_ERR);
 		return EXIT_ERR;
 	}
+#	if !defined(__sun) && !defined(__hpux)
+	if (!cs_data->defer_allocate)
+	{
+		status = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data) +
+					 ((off_t)(cs_data->trans_hist.total_blks) * cs_data->blk_size) + DISK_BLOCK_SIZE);
+		if (0 != status)
+		{
+			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_PREALLOCATEFAIL, 2, DB_LEN_STR(gv_cur_region), status);
+			CLEANUP(EXIT_ERR);
+			return EXIT_ERR;
+		}
+	}
+#	endif
 	if ((!udi->raw) && (-1 == CHMOD(pblk.l_dir, 0666)))
 	{
 		SPRINTF_AND_PERROR("Error changing file mode on file %s\n");

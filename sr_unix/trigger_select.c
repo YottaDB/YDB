@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -173,8 +174,7 @@ STATICDEF char *triggerfile_quals[] = {
 
 STATICFNDEF void write_subscripts(char *out_rec, char **out_ptr, char **sub_ptr, int *sub_len)
 {
-	char			*out_p, *ptr, *dst_ptr;
-	int			str_len;
+	char			*out_p, *ptr;
 	uint4			len_left, dst_len, len;
 	char			dst[MAX_GVSUBS_LEN];
 
@@ -214,7 +214,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 	char			out_rec[MAX_BUFF_SIZE];
 	char			*out_rec_ptr;
 	char			*ptr1, *ptr2, *ptrtop;
-	mval			mi, trigger_count, trigger_value;
+	mval			mi, trigger_count, trigger_value, *protect_trig_mval;
 	mval			*mv_trig_cnt_ptr;
 	boolean_t		multi_line;
 	boolean_t		have_value, multi_record;
@@ -223,13 +223,13 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 	int4			skip_chars;
 	int			sub_len;
 	char			*sub_ptr;
-	char			*tmp_str_ptr, tmp_string[MAX_SRCLINE];
+	char			*tmp_str_ptr;
 	uint4			tmp_str_len;
 	char			cycle[MAX_DIGITS_IN_INT + 1];
-	unsigned char		util_buff[MAX_TRIG_UTIL_LEN];
-	int4			util_len;
+	int			cycle_len;
 	char			*xecute_buff;
 	int4			xecute_len;
+	int			trig_protected_mval_push_count;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -237,6 +237,8 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 	BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHCOUNT, LITERAL_HASHCOUNT_LEN);
 	if (gvcst_get(&trigger_count))
 	{
+		mv_trig_cnt_ptr = &trigger_count;
+		count = MV_FORCE_INT(mv_trig_cnt_ptr);
 		BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL));
 		if (!gvcst_get(&trigger_value))
 		{	/* There has to be a #LABEL */
@@ -254,8 +256,6 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 				/* 1 == #LABEL - No leading blank in xecute string */
 				skip_chars = 0;
 		}
-		mv_trig_cnt_ptr = &trigger_count;
-		count = MV_FORCE_INT(mv_trig_cnt_ptr);
 		BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHCYCLE, LITERAL_HASHCYCLE_LEN);
 		if (!gvcst_get(&trigger_value))
 		{	/* There has to be a #CYCLE */
@@ -265,10 +265,12 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
 					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#CYCLE\""));
 		}
-		assert(MAX_DIGITS_IN_INT >= trigger_value.str.len);
-		memcpy(cycle, trigger_value.str.addr, trigger_value.str.len);
-		cycle[trigger_value.str.len] = '\0';
+		cycle_len = MIN(trigger_value.str.len, MAX_DIGITS_IN_INT);
+		memcpy(cycle, trigger_value.str.addr, cycle_len);
+		cycle[cycle_len] = '\0';
+		trig_protected_mval_push_count = 0;
 		xecute_buff = NULL;
+		INCR_AND_PUSH_MV_STENT(protect_trig_mval); /* Protect protect_trig_mval from garbage collection */
 		for (indx = 1; indx <= count; indx++)
 		{
 			if ((0 != nam_indx) && (indx != nam_indx))
@@ -325,8 +327,8 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 					continue;
 				BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(gbl_name, gbl_name_len, mi, trigger_subs[sub_indx],
 					STRLEN(trigger_subs[sub_indx]));
-				have_value = gvcst_get(&trigger_value);
-				have_value = have_value && (trigger_value.str.len);
+				have_value = gvcst_get(protect_trig_mval);
+				have_value = have_value && (protect_trig_mval->str.len);
 				multi_record = FALSE;
 				if (!have_value && (XECUTE_SUB == sub_indx))
 				{
@@ -339,9 +341,9 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 					{	/* Output "-name=XYZ" only if it is user defined */
 						BUILD_HASHT_SUB_MSUB_SUB_MSUB_CURRKEY(gbl_name, gbl_name_len, mi,
 							trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), mi);
-						if (!trigger_user_name(trigger_value.str.addr, trigger_value.str.len))
+						if (!trigger_user_name(protect_trig_mval->str.addr, protect_trig_mval->str.len))
 							continue;
-						trigger_value.str.len--;	/* Don't include trailing # */
+						protect_trig_mval->str.len--;	/* Don't include trailing # */
 					}
 					COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, " ", 1);
 					COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, triggerfile_quals[sub_indx],
@@ -350,8 +352,8 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 					{
 						case DELIM_SUB:
 						case ZDELIM_SUB:
-							MAKE_ZWR_STR(trigger_value.str.addr, trigger_value.str.len, out_rec,
-								     out_rec_ptr);
+							MAKE_ZWR_STR(protect_trig_mval->str.addr, protect_trig_mval->str.len,
+									out_rec, out_rec_ptr);
 							break;
 						case XECUTE_SUB:
 							/* After the buffer is malloc-ed by trigger_gbl_fill_xecute_buffer(), the
@@ -362,7 +364,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 							 */
 							assert(NULL == xecute_buff);
 							xecute_buff = trigger_gbl_fill_xecute_buffer(gbl_name, gbl_name_len, &mi,
-								multi_record ? NULL : &trigger_value, &xecute_len);
+								multi_record ? NULL : protect_trig_mval, &xecute_len);
 							multi_line = (NULL != memchr(xecute_buff, '\n', xecute_len));
 							assert(NULL != xecute_buff);
 							if (multi_line)
@@ -378,9 +380,10 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 							break;
 						default:
 							COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr,
-								trigger_value.str.addr,trigger_value.str.len);
+								protect_trig_mval->str.addr,protect_trig_mval->str.len);
 					}
 				}
+				protect_trig_mval->mvtype = 0; /* can now be garbage collected in the next iteration */
 			}
 			/* we had better have an XECUTE STRING, if not it is a restartable situation */
 			DEBUG_ONLY(if (NULL == xecute_buff) TREF(donot_commit) |= DONOTCOMMIT_TRIGGER_SELECT_XECUTE;)
@@ -410,18 +413,19 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 				xecute_buff = NULL;
 			}
 		}
+		DECR_AND_POP_MV_STENT();
 	}
 }
 
 STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean_t trig_name)
 {
-	char			save_name[MAX_MIDENT_LEN], curr_name[MAX_MIDENT_LEN];
+	char			save_name[MAX_MIDENT_LEN], curr_name[MAX_MIDENT_LEN], curr_gbl[MAX_MIDENT_LEN];
 	boolean_t		wildcard;
 	mval			mv_curr_nam;
-        mval                    mi, trig_gbl;
+        mval                    trig_gbl;
         mval                    mv_trigger_val;
-	int			indx, count;
-	char			*ptr, *ptr2;
+	int			indx;
+	char			*ptr;
 	uint4			curr_name_len;
 	int			trigvn_len;
 	DCL_THREADGBL_ACCESS;
@@ -443,6 +447,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 	{
 		if (trig_name)
 		{
+			/* $get(^#t("#TNAME",trigger_name)) */
 			BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME), curr_name, curr_name_len);
 			if (!gvcst_get(&mv_trigger_val))
 			{
@@ -460,9 +465,11 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 				break;
 			}
 			ptr = mv_trigger_val.str.addr;
-			ptr2 = memchr(ptr, '\0', mv_trigger_val.str.len);
-			if (NULL == ptr2)
-			{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
+			trigvn_len = MIN(mv_trigger_val.str.len, MAX_MIDENT_LEN);
+			STRNLEN(ptr, trigvn_len, trigvn_len);
+			ptr += trigvn_len;
+			if ((mv_trigger_val.str.len == trigvn_len) || ('\0' != *ptr))
+			{	/* We expect $c(0) in the middle of addr. If we dont find it, this is a restartable situation */
 				if (CDB_STAGNATE > t_tries)
 					t_retry(cdb_sc_triggermod);
 				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
@@ -470,11 +477,20 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 						LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
 						mv_trigger_val.str.len, mv_trigger_val.str.addr);
 			}
-			trigvn_len = ptr2 - ptr;
-			assert(('\0' == *ptr2) && (mv_trigger_val.str.len > trigvn_len));
-			ptr2++;
-			A2I(ptr2, mv_trigger_val.str.addr + mv_trigger_val.str.len, indx);
-			STR2MVAL(trig_gbl, mv_trigger_val.str.addr, trigvn_len);
+			ptr++;
+			A2I(ptr, mv_trigger_val.str.addr + mv_trigger_val.str.len, indx);
+			if (1 > indx)
+			{	/* We expect a valid index */
+				if (CDB_STAGNATE > t_tries)
+					t_retry(cdb_sc_triggermod);
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
+						LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
+						mv_trigger_val.str.len, mv_trigger_val.str.addr);
+			}
+			/* Use a local buffer to avoid possible garbage collection issues from write_out_trigger below */
+			memcpy(curr_gbl, mv_trigger_val.str.addr, trigvn_len);
+			STR2MVAL(trig_gbl, curr_gbl, trigvn_len);
 		} else
 		{
 			STR2MVAL(trig_gbl, curr_name, curr_name_len);
@@ -508,10 +524,7 @@ STATICFNDEF void dump_all_triggers(void)
 	mval			curr_gbl_name, val;
 	gd_region		*reg;
 	gv_namehead		*save_gvtarget;
-	unsigned char		*key;
-	mval			trigger_value;
 	int			reg_index;
-	mstr			gbl_name;
 	char			global[MAX_MIDENT_LEN];
 	int			gbl_len;
 	DCL_THREADGBL_ACCESS;
@@ -718,7 +731,6 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 	gd_binding		*map, *start_map, *end_map;
 	gd_region		*reg, *reg_start, *reg_top;
 	int			*reg_done, reg_array_size, reg_index;
-	sgmnt_addrs		*csa;
 
 	assert(dollar_tlevel);
 	select_status = TRIG_SUCCESS;

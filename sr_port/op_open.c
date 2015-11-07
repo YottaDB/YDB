@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +36,7 @@
 #include "change_reg.h"
 #include "setterm.h"
 #include "getzposition.h"
+#include "mmemory.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
@@ -43,11 +45,17 @@ GBLREF uint4		dollar_trestart;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF bool		licensed;
 GBLREF int4		lkid, lid;
+GBLREF io_pair		*io_std_device;
+GBLREF io_log_name	*dollar_principal;
+GBLREF mstr		dollar_zpin;			/* contains "< /" */
+GBLREF mstr		dollar_zpout;			/* contains "> /" */
 
 LITREF unsigned char io_params_size[];
 
 error_def(ERR_LOGTOOLONG);
 error_def(LP_NOTACQ);				/* bad license */
+error_def(ERR_DEVOPENFAIL);
+error_def(ERR_TEXT);
 
 #define OPENTIMESTR "OPEN time too long"
 
@@ -57,8 +65,11 @@ int op_open(mval *device, mval *devparms, int timeout, mval *mspace)
 	io_log_name	*naml;				/* logical record for passed name */
 	io_log_name	*tl;				/* logical record for translated name */
 	io_log_name	*prev;				/* logical record for removal search */
+	io_log_name	*tlp;				/* logical record for translated name for $principal */
 	int4		stat;				/* status */
 	mstr		tn;				/* translated name */
+	char		*c1;				/* used to compare $P name */
+	int		nlen;				/* len of $P name */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -71,6 +82,40 @@ int op_open(mval *device, mval *devparms, int timeout, mval *mspace)
 	else if (TREF(tpnotacidtime) < timeout)
 		TPNOTACID_CHECK(OPENTIMESTR);
 	assert((unsigned char)*devparms->str.addr < n_iops);
+
+
+	if (dollar_principal || io_root_log_name->iod)
+	{
+		/* make sure that dollar_principal is defined or iod has been defined for the root */
+		/* log name before attempting to use it.  This is necessary as an attempt to open "0" done */
+		/* during initialization occurs prior to io_root_log_name->iod being initialized. */
+
+		/* if the device name is the value of $P followed by "< /" or "> /" issue an error */
+		/* we have no way of knowing if this is a $P variant without checking this name */
+		/* the device length has to be the length of $P + 3 for the special chars at the end */
+
+		tlp = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;
+		nlen = tlp->len;
+		assert(dollar_zpout.len == dollar_zpin.len);
+		if ((nlen + dollar_zpin.len) == device->str.len)
+		{
+			/* passed the length test now compare the 2 pieces, the first one the length of $P and the second $ZPIN*/
+			c1 = (char *)tlp->dollar_io;
+			if (!memvcmp(c1, nlen, &(device->str.addr[0]), nlen))
+			{
+				if (!memvcmp(dollar_zpin.addr, dollar_zpin.len, &(device->str.addr[nlen]), dollar_zpin.len))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, device->str.len,
+						      device->str.addr, ERR_TEXT, 2,
+						      LEN_AND_LIT("The value of $P followed by \"< /\" is an invalid device name"));
+				else if (!memvcmp(dollar_zpout.addr, dollar_zpout.len, &(device->str.addr[nlen]), dollar_zpout.len))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, device->str.len,
+						      device->str.addr, ERR_TEXT, 2,
+						      LEN_AND_LIT("The value of $P followed by \"> /\" is an invalid device name"));
+
+			}
+		}
+	}
+
 	naml = get_log_name(&device->str, INSERT);
 	if (naml->iod != 0)
 		tl = naml;
@@ -103,10 +148,11 @@ int op_open(mval *device, mval *devparms, int timeout, mval *mspace)
 			}
 #			ifdef UNIX
 			if (SS_LOG2LONG == stat)
-				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, device->str.len, device->str.addr, SIZEOF(buf1) - 1);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, device->str.len,
+					      device->str.addr, SIZEOF(buf1) - 1);
 			else
 #			endif
-				rts_error(VARLSTCNT(1) stat);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) stat);
 		}
 	}
 	stat = io_open_try(naml, tl, devparms, timeout, mspace);

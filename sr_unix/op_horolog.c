@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,23 +19,27 @@
 
 GBLREF spdesc	stringpool;
 
+/* If you update this function, consider updating op_zhorolog() as well */
 void op_horolog(mval *s)
 {
 	uint4		days;
 	time_t		seconds;
 	struct timeval	tv;
+	unsigned char	*strpool_free;
 
-	assert (stringpool.free <= stringpool.top);
-	assert (stringpool.free >= stringpool.base);
+	assert(stringpool.free <= stringpool.top);
+	assert(stringpool.free >= stringpool.base);
 	ENSURE_STP_FREE_SPACE(MAXNUMLEN + 1);
-	gettimeofday(&tv, NULL);
+	strpool_free = stringpool.free;
+	assertpro(-1 != gettimeofday(&tv, NULL));
 	seconds = tv.tv_sec;
 	dollarh(seconds, &days, &seconds);
-	s->str.addr = (char *) stringpool.free;
-	stringpool.free  = i2asc(stringpool.free, days);
-	*stringpool.free++ = ',';
-	stringpool.free = i2asc(stringpool.free, (uint4)seconds);
-	s->str.len = INTCAST((char *)stringpool.free - s->str.addr);
+	s->str.addr = (char *)strpool_free;
+	strpool_free = i2asc(strpool_free, days);
+	*strpool_free++ = ',';
+	strpool_free = i2asc(strpool_free, (uint4)seconds);
+	s->str.len = INTCAST((char *)strpool_free - s->str.addr);
 	s->mvtype = MV_STR;
+	stringpool.free = strpool_free;
 	return;
 }

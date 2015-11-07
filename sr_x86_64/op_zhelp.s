@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,29 +10,20 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_zhelp.s
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "linkage.si"
-	.INCLUDE "g_msf.si"
-
-#	PAGE	+
-	.DATA
-.extern	frame_pointer
+	.data
+	.extern	frame_pointer
 
 	.text
-.extern	op_zhelp_xfr
+	.extern	op_zhelp_xfr
 
-# PUBLIC	op_zhelp
-ENTRY op_zhelp
-	movq	frame_pointer(REG_IP),REG64_RET1
-	popq	msf_mpc_off(REG64_RET1)
+ENTRY	op_zhelp
+	movq	frame_pointer(REG_IP), REG64_RET1
+	popq	msf_mpc_off(REG64_RET1)			# Pop return addr into M frame (16 byte aligns stack)
+	CHKSTKALIGN					# Verify stack alignment
 	call	op_zhelp_xfr
-	getframe
+	getframe					# Pick up new stack frame regs & push return addr
 	ret
-# op_zhelp ENDP
-
-# END

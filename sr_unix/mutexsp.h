@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +42,8 @@
 
 #define BIN_TOGGLE(x) ((x) ? 0 : 1)
 
-#define ONE_MILLION 			1000000
+#define HUNDRED_MSEC 			100000
+#define E_4				10000
 
 typedef struct
 {
@@ -61,14 +63,12 @@ typedef enum
  */
 void		gtm_mutex_init(gd_region *reg, int n, bool crash);
 
-/* mutex_lockw - write access to mutex for region reg */
-enum	cdb_sc	mutex_lockw(gd_region *reg, mutex_spin_parms_ptr_t mutex_spin_parms, int crash_count);
-
-/*
- * mutex_lockwim - write access to mutex for region reg; if cannot lock,
- *                 immediately return cdb_sc_nolock
- */
-enum	cdb_sc	mutex_lockwim(gd_region *reg, mutex_spin_parms_ptr_t mutex_spin_parms, int crash_count);
+/* gtm_mutex_lock - lock access to mutex for region reg */
+/* gtm prefix added because solaris icu has a mutex_lock */
+enum cdb_sc gtm_mutex_lock(gd_region *reg,
+			      mutex_spin_parms_ptr_t mutex_spin_parms,
+			      int crash_count,
+			      mutex_lock_t mutex_lock_type);
 
 /* mutex_unlockw - unlock write access to mutex for region reg */
 enum	cdb_sc	mutex_unlockw(gd_region *reg, int crash_count);

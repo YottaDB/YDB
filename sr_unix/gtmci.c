@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -283,14 +284,14 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	if (!(entry = get_entry(c_rtn_name)))	/* c_rtn_name not found in the table. */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
-	/* The 3rd argument is NULL because we will get lnr_adr via lab_proxy. */
+	/* The 3rd argument is NULL because we will get lnr_adr via TABENT_PROXY. */
 	/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
 	 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
 	 */
 	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL, &need_rtnobj_shm_free))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 	memset(&param_blk, 0, SIZEOF(param_blk));
-	param_blk.rtnaddr = (void *)base_addr;
+	param_blk.rtnaddr = (void *)(ARLINK_ONLY(0) NON_ARLINK_ONLY(base_addr));
 	/* lnr_entry below is a pointer to the code offset for this label from the
 	 * beginning of text base(on USHBIN platforms) or from the beginning of routine
 	 * header (on NON_USHBIN platforms).
@@ -298,7 +299,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	 * On USHBIN -- 2nd argument to EXTCALL is the pointer to this pointer (&lnr_entry)
 	 */
 	/* Assign the address for line number entry storage, so that the adjacent address holds has_parms value. */
-	param_blk.labaddr = &(TREF(lab_proxy)).LABENT_LNR_OFFSET;
+	param_blk.labaddr = (void *)(ARLINK_ONLY(-1) NON_ARLINK_ONLY(&(TABENT_PROXY).LABENT_LNR_OFFSET));
 	if (MAX_ACTUALS < entry->argcnt)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXACTARG);
 	if (entry->argcnt < count)
@@ -600,14 +601,14 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	} else
 		entry = callin_handle;
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
-	/* 3rd argument is NULL because we will get lnr_adr via lab_proxy */
+	/* 3rd argument is NULL because we will get lnr_adr via TABENT_PROXY */
 	/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
 	 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
 	 */
 	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL, &need_rtnobj_shm_free))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 	memset(&param_blk, 0, SIZEOF(param_blk));
-	param_blk.rtnaddr = (void *)base_addr;
+	param_blk.rtnaddr = (void *)(ARLINK_ONLY(0) NON_ARLINK_ONLY(base_addr));
 	/* lnr_entry below is a pointer to the code offset for this label from the
 	 * beginning of text base(on USHBIN platforms) or from the beginning of routine
 	 * header (on NON_USHBIN platforms).
@@ -616,7 +617,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	 *
 	 * Assign the address for line number entry storage, so that the adjacent address holds has_parms value.
 	 */
-	param_blk.labaddr = &(TREF(lab_proxy)).LABENT_LNR_OFFSET;
+	param_blk.labaddr = (void *)(ARLINK_ONLY(-1) NON_ARLINK_ONLY(&(TABENT_PROXY).LABENT_LNR_OFFSET));
 	param_blk.argcnt = entry->argcnt;
 	if (MAX_ACTUALS < param_blk.argcnt)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXACTARG);

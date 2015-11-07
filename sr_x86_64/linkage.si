@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,20 +10,11 @@
 #								#
 #################################################################
 
-#  #define SYMBOL_NAME_STR(X) #X
-#  #define SYMBOL_NAME(X) X
-#  #ifdef __STDC__
-#  #define SYMBOL_NAME_LABEL(X) X##:
-# #else
-# #define SYMBOL_NAME_LABEL(X) X/**/:
-# #endif
-
 .macro SYMBOL_NAME_LABEL X
 \X:
 .endm
 
 .macro ENTRY name
-#	.globl SYMBOL_NAME \name
 	.globl \name
 	.align 16,0x90
 	SYMBOL_NAME_LABEL \name

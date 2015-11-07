@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,13 +133,13 @@ boolean_t	gvcst_query2(void)
 	for (;;)
 	{
 		two_histories = FALSE;
-#if defined(DEBUG) && defined(UNIX)
+#		if defined(DEBUG) && defined(UNIX)
 		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVQUERYFAIL == gtm_white_box_test_case_number))
 		{
 			t_retry(cdb_sc_blknumerr);
 			continue;
 		}
-#endif
+#		endif
 		if (cdb_sc_normal == (status = gvcst_search(gv_currkey, 0)))
 		{
 			found = TRUE;
@@ -174,8 +175,7 @@ boolean_t	gvcst_query2(void)
 			{	/* !found indicates that the end of tree has been reached (see call to
 				 *  gvcst_rtsib).  If there is no more tree, don't bother doing expansion.
 				 */
-				status = gvcst_expand_key((blk_hdr_ptr_t)bh->buffaddr, (int4)((sm_uc_ptr_t)rp - bh->buffaddr),
-						gv_altkey);
+				status = gvcst_expand_curr_key(bh, gv_currkey, gv_altkey);
 				if (cdb_sc_normal != status)
 				{
 					t_retry(status);
@@ -201,15 +201,13 @@ boolean_t	gvcst_query2(void)
 			{
 				c1 = &gv_altkey->base[0];
 				c2 = &gv_currkey->base[0];
-				for (;  *c2;)
+				for ( ; *c2; )
 				{
 					if (*c2++ != *c1++)
 						break;
 				}
 				if (!*c2 && !*c1)
-				{
 					return TRUE;
-				}
 			}
 			return FALSE;
 		}

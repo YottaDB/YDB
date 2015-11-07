@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,11 +31,13 @@
 #include "gt_timer.h"
 #include "wake_alarm.h"
 #include "copy.h"
+#include "error.h"
 
 GBLREF io_pair		io_curr_device;
 GBLREF io_pair		io_std_device;
-GBLREF	boolean_t	gtm_pipe_child;
-GBLREF	volatile bool	out_of_time;
+GBLREF boolean_t	gtm_pipe_child;
+GBLREF volatile bool	out_of_time;
+GBLREF int		process_exiting;
 
 error_def(ERR_SYSCALL);
 error_def(ERR_DEVPARMTOOSMALL);
@@ -70,6 +73,9 @@ void iorm_close(io_desc *iod, mval *pp)
 	TID		timer_id;
 	int4		pipe_timeout = 2;	/* default timeout in sec waiting for waitpid */
 	off_t		cur_position;
+	boolean_t	ch_set;
+	sigset_t	empty_set, old_set;
+	boolean_t	use_timer;
 
 	DCL_THREADGBL_ACCESS;
 
@@ -82,6 +88,7 @@ void iorm_close(io_desc *iod, mval *pp)
 		return;
 	}
 
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
 
 #ifdef __MVS__
@@ -100,7 +107,7 @@ void iorm_close(io_desc *iod, mval *pp)
 	iorm_use(iod,pp);
 	/* We do not want a NEWLINE to be issued by the middle process. */
 	if (!gtm_pipe_child)
-		iorm_flush(iod);
+		iorm_cond_wteol(iod);
 
 	p_offset = 0;
 	while (*(pp->str.addr + p_offset) != iop_eol)
@@ -231,53 +238,69 @@ void iorm_close(io_desc *iod, mval *pp)
 		assert(FD_INVALID == rm_ptr->read_fildes);
 		assert(NULL == rm_ptr->read_filstr);
 	}
-	/* reap the forked shell process if a pipe - it will be a zombie, otherwise*/
+	/* Reap the forked shell process if a pipe - it will be a zombie otherwise. */
 	if (rm_ptr->pipe_pid > 0)
-	{
-		/* Don't reap if in a child process creating a new pipe or if in parent and independent is set */
+	{	/* Do not reap if in a child process creating a new pipe or if in parent and independent is set. */
 		if (FALSE == gtm_pipe_child)
 		{
 			if (!rm_ptr->independent)
 			{
-				/* start timer for pipe_timeout sec to wait for reap of close via waitpid.  If this
-				   times out, set dollar_zclose = -99 */
+				if (!process_exiting)
+				{	/* Find out whether timers are available. If not, instead of scheduling one to interrupt
+					 * waitpid, simply invoke it with WNOHANG flag instead. Note that sigprocmask below is
+					 * operating on an empty signal set and so is not blocking any signals.
+					 */
+					sigemptyset(&empty_set);
+					sigprocmask(SIG_BLOCK, &empty_set, &old_set);
+					use_timer = !sigismember(&old_set, SIGALRM);
+				} else
+					use_timer = FALSE;
 				out_of_time = FALSE;
-				timer_id = (TID)iorm_close;
-				start_timer(timer_id, pipe_timeout * 1000, wake_alarm, 0, NULL);
+				if (use_timer)
+				{	/* Start timer for pipe_timeout seconds to wait for reap of close via waitpid. If this times
+					 * out, set dollar_zclose = -99.
+					 */
+					timer_id = (TID)iorm_close;
+					start_timer(timer_id, pipe_timeout * 1000, wake_alarm, 0, NULL);
+				}
 				do
 				{
-					done_pid = waitpid(rm_ptr->pipe_pid, &status, 0); /* BYPASSOK */
-				} while((pid_t)-1 == done_pid && EINTR == errno && !out_of_time);
-
-				if ((pid_t)-1 == done_pid && !out_of_time)
+					status = 0;
+					done_pid = waitpid(rm_ptr->pipe_pid, &status, use_timer ? 0 : WNOHANG); /* BYPASSOK */
+				} while (((pid_t)-1 == done_pid) && (EINTR == errno) && (!out_of_time));
+				if (((pid_t)-1 == done_pid) && (!out_of_time))
 				{
-					cancel_timer(timer_id);
+					if (use_timer)
+						cancel_timer(timer_id);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 						      RTS_ERROR_LITERAL("waitpid"), CALLFROM, errno);
 				}
-				if (out_of_time)
+				if (out_of_time || (!use_timer && (0 == done_pid)))
 				{
 					TREF(dollar_zclose) = -99;
 				} else
-				{
-					/* not an error and didn't timeout */
-					assert(done_pid == rm_ptr->pipe_pid);
-					/* cancel timer since it didn't timeout */
-					cancel_timer(timer_id);
-#ifdef _BSD
+				{	/* Not an error and did not timeout. */
+					assert(!use_timer || (done_pid == rm_ptr->pipe_pid));
+					/* Cancel timer since it did not timeout. */
+					if (use_timer)
+						cancel_timer(timer_id);
+#					ifdef _BSD
 					assert(SIZEOF(wait_status) == SIZEOF(int4));
+					/* The WIF* macros expect a union wait_stat as an argument on BSD. */
 					wait_status.w_status = status;
-					/* the WIF* macros expect a union wait_stat as an argument on BSD */
-#else
+#					else
 					wait_status = status;
-#endif
+#					endif
 					if (WIFEXITED(wait_status))
-						TREF(dollar_zclose) = WEXITSTATUS(wait_status); /* normal exit */
-					else if (WIFSIGNALED(wait_status))
-						/* change the signal to a negative for distinguishing from normal exit codes */
+					{	/* Normal exit. */
+						TREF(dollar_zclose) = WEXITSTATUS(wait_status);
+					} else if (WIFSIGNALED(wait_status))
+					{	/* Change signal to negative for distinguishing from normal exit codes. */
 						TREF(dollar_zclose) = -WTERMSIG(wait_status);
-					else /* set any other non-normal status to -98 */
+					} else
+					{	/* Set any other non-normal status to -98. */
 						TREF(dollar_zclose) = -98;
+					}
 				}
 			}
 		}
@@ -301,5 +324,6 @@ void iorm_close(io_desc *iod, mval *pp)
 	}
 	if ((rm_destroy || rm_ptr->pipe || rm_ptr->fifo) && !rm_rundown)
 	        remove_rms (iod);
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

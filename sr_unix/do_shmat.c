@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,8 +39,8 @@ void *do_shmat(int4 shmid, const void *shm_base, int4 shmflg)
 }
 
 /* This is do_shmat + capability to execute code from shared memory.
- * Currently (Oct 2014), only newer Linuxes supports SHM_EXEC bit. Other platforms dont seem to have this option.
- * So we use mprotect (additional system call) there to implement this requirement.
+ * On platforms that support the SHM_EXEC bit (as of Oct 2014 this is only Linux) we use it.
+ * On those that dont, we use mprotect (additional system call) on top of shmat.
  * Until SHM_EXEC is not available on all POSIX platforms that GT.M is built/supported on, we need the mprotect code.
  */
 void *do_shmat_exec_perm(int4 shmid, size_t shm_size, int *save_errno)

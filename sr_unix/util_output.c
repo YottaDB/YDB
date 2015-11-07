@@ -1,6 +1,7 @@
  /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +54,6 @@ GBLDEF	boolean_t		first_syslog = TRUE;	/* Global for a process - not thread spec
 GBLDEF	char			facility[MAX_INSTNAME_LEN + 100];
 
 GBLREF	io_pair			io_std_device;
-GBLREF	io_pair			io_curr_device;
 GBLREF	boolean_t		blocksig_initialized;
 GBLREF  sigset_t		block_sigsent;
 GBLREF	boolean_t		err_same_as_out;
@@ -72,20 +72,20 @@ error_def(ERR_TEXT);
 #define	ZTRIGBUFF_INIT_ALLOC		1024	/* start at 1K */
 #define	ZTRIGBUFF_INIT_MAX_GEOM_ALLOC	1048576	/* stop geometric growth at this value */
 
-#define GETFAOVALDEF(faocnt, var, type, result, defval) \
+#define GETFAOVALDEF(faocnt, var, type, result, defval) 				\
 	if (faocnt > 0) {result = (type)va_arg(var, type); faocnt--;} else result = defval;
 
-#define INSERT_MARKER					\
-{							\
-	STRNCPY_STR(offset, "-", STRLEN("-"));		\
-	offset += STRLEN("-");				\
+#define INSERT_MARKER									\
+{											\
+	STRNCPY_STR(offset, "-", STRLEN("-"));						\
+	offset += STRLEN("-");								\
 }
 
-#define BUILD_FACILITY(strptr)				\
-{							\
-	STRNCPY_STR(offset, strptr, STRLEN(strptr));	\
-	offset += STRLEN(strptr);			\
-	INSERT_MARKER; 					\
+#define BUILD_FACILITY(strptr)								\
+{											\
+	STRNCPY_STR(offset, strptr, STRLEN(strptr));					\
+	offset += STRLEN(strptr);							\
+	INSERT_MARKER; 									\
 }
 
 /*
@@ -93,7 +93,7 @@ error_def(ERR_TEXT);
  *
  *		!/	!_	!^	!!
  *
-
+ *
  *		!mAC	!mAD	!mAF	!mAS	!mAZ
  *
  *		!mSB	!mSW	!mSL
@@ -584,7 +584,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 /* 2nd arg: length of system long message (not used in Unix implementation) */
 {
 	sigset_t		savemask;
-	char			*img_type, *offset, *proc_type=NULL, *helper_type=NULL;
+	char			*img_type, *offset, *proc_type, *helper_type;
 	char 			temp_inst_fn[MAX_FN_LEN + 1], fn[MAX_FN_LEN + 1];
 	mstr			log_nam, trans_name;
 	uint4			ustatus;
@@ -596,6 +596,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 	upd_helper_entry_ptr_t	helper, helper_top;
 
+	proc_type = helper_type = NULL;
 	if (first_syslog)
 	{
 		first_syslog = FALSE;
@@ -733,8 +734,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 	char		*fmt_top1, *fmt_top2; /* the top of the buffer after leaving 1 (and 2 bytes respectively) at the end */
 	int		util_avail_len;
 	mstr		flushtxt;
-	boolean_t	use_stdio;
-	io_pair		save_io_curr_device;
+	boolean_t	use_gtmio;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -748,7 +748,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 		if (0 < util_avail_len)
 			TREF(util_outptr) = util_format(message, var, TREF(util_outptr), util_avail_len, faocnt);
 	}
-	use_stdio = (IS_MCODE_RUNNING && (NULL != io_std_device.out) && (tt != io_std_device.out->type) && err_same_as_out);
+	use_gtmio = ((NULL != io_std_device.out) && (!IS_GTMSECSHR_IMAGE) && err_same_as_out);
 	switch (flush)
 	{
 		case NOFLUSH:
@@ -756,7 +756,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 		case RESET:
 			break;
 		case FLUSH:
-			if (!use_stdio)
+			if (!use_gtmio)
 				*(TREF(util_outptr))++ = '\n';
 		case OPER:
 		case SPRINT:
@@ -796,18 +796,23 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 			switch (flush)
 			{
 				case FLUSH:
-					if (use_stdio)
+					if (err_same_as_out)
+					{	/* If err and out are conjoined, make sure that all messages that might have been
+						 * printed using PRINTF (unfortunately, we still have lots of such instances) are
+						 * flushed before we proceed.
+						 */
+						FFLUSH(stdout);
+						FFLUSH(stderr);
+					}
+					if (use_gtmio)
 					{
 						flushtxt.addr = fmt_buff;
 						flushtxt.len = INTCAST(TREF(util_outptr) - TREF(util_outbuff_ptr));
-						save_io_curr_device = io_curr_device;
-						io_curr_device = io_std_device;
-						(io_std_device.out->disp_ptr->write)(&flushtxt);
-						io_curr_device = save_io_curr_device;
-						(io_std_device.out->disp_ptr->wteol)(1, io_std_device.out);
+						write_text_newline_and_flush_pio(&flushtxt);
 					} else
-					{
+					{	/* We should start caring about FPRINTF's return status at some point. */
 						FPRINTF(stderr, "%s", fmt_buff);
+						FFLUSH(stderr);
 					}
 					break;
 				case OPER:
@@ -853,7 +858,7 @@ void	util_out_print(caddr_t message, int flush, ...)
  * If not, the length of the unflushed buffer is stored in dst_len, the actual unflushed buffer
  * is copeid over to "dst", and a TRUE is returned.
  */
-boolean_t	util_out_save(char *dst, int *dstlen_ptr)
+boolean_t util_out_save(char *dst, int *dstlen_ptr)
 {
 	int	srclen, dstlen;
 	DCL_THREADGBL_ACCESS;
@@ -872,31 +877,13 @@ boolean_t	util_out_save(char *dst, int *dstlen_ptr)
 	return TRUE;
 }
 
-/* If $x of the standard output device is non-zero, and we are going to flush a buffer,
- * put out a new line and then do the buffer flush. Called and used only by PRN_ERROR
- * macro.
- */
+/* If there is something in the util_outptr buffer, flush it. Called and used only by PRN_ERROR macro. */
 void util_cond_flush(void)
 {
-	boolean_t	use_stdio, buffer_empty;
-	mval		flushtxt;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	use_stdio = FALSE;
-	buffer_empty = TREF(util_outptr) == TREF(util_outbuff_ptr);
-	if (NULL != io_std_device.out)
-	{
-		use_stdio = IS_MCODE_RUNNING && (tt != io_std_device.out->type) && err_same_as_out;
-		if (0 < io_std_device.out->dollar.x)
-		{
-			if (use_stdio)
-				(io_std_device.out->disp_ptr->wteol)(1, io_std_device.out);
-			else if (!buffer_empty)
-				FPRINTF(stderr, "\n");
-		}
-	}
-	if (!buffer_empty)
+	if (TREF(util_outptr) != TREF(util_outbuff_ptr))
 		util_out_print(NULL, FLUSH);
 }
 

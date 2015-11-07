@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,13 +53,17 @@ boolean_t job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labad
 		lp = find_line_addr(rt_hdr, label, offset, NULL);
 	if (!lp)
 		return (FALSE);
-	/* Set the pointer to address / offset for line number entry storage in lab_proxy. */
-	USHBIN_ONLY((TREF(lab_proxy)).lnr_adr = lp);
+	/* Set the pointer to address / offset for line number entry storage in TABENT_PROXY. */
+#	ifdef USHBIN_SUPPORTED
+	ARLINK_ONLY((TABENT_PROXY).rtnhdr_adr = rt_hdr);
+	(TABENT_PROXY).lnr_adr = lp;
+#	else
 	/* On non-shared-binary, calculcate the offset to the corresponding lnr_tabent record by subtracting
 	 * the base address (routine header) from line number entry's address, and save the result in
-	 * lab_ln_ptr field of lab_tabent structure.
+	 * lab_ln_ptr field of TABENT_PROXY structure.
 	 */
-	NON_USHBIN_ONLY((TREF(lab_proxy)).lab_ln_ptr = ((int4)lp - (int4)rt_hdr));
+	(TABENT_PROXY).lab_ln_ptr = ((int4)lp - (int4)rt_hdr);
+#	endif
 	if (NULL != labaddr)
 		*labaddr = (char *)LINE_NUMBER_ADDR(rt_hdr, lp);
 	*hdr = (char *)rt_hdr;

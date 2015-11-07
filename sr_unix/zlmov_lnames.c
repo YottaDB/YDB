@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +11,11 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
+
 #include <rtnhdr.h>
+#include "arlinkdbg.h"
 
 #ifdef USHBIN_SUPPORTED
 /* Routine to copy label names out of a shared object's literal text pool for a version of an object
@@ -42,16 +46,23 @@ void zlmov_lnames(rhdtyp *hdr)
 		       && (lab_ent->lab_name.addr < (char *)(hdr->literal_text_adr + hdr->literal_text_len)));
 		size += lab_ent->lab_name.len;
 	}
-	lab_ptr = (char *)malloc(size);
-	/* Store address of malloc'd label text block in the routine header so we can find it to release it on an unlink-all
-	 * (ZGOTO 0:entryref).
-	 */
-	hdr->lbltext_ptr = (unsigned char *)lab_ptr;
-	for (lab_ent = lab_bot + 1; lab_ent < lab_top; lab_ent++)
+	if (0 < size)
 	{
-		memcpy(lab_ptr, lab_ent->lab_name.addr, lab_ent->lab_name.len);
-		lab_ent->lab_name.addr = lab_ptr;
-		lab_ptr += lab_ent->lab_name.len;
-	}
+		lab_ptr = (char *)malloc(size);
+		DBGARLNK((stderr, "zlmov_lnames: Label names copied from rtn %.*s (rtnhdr 0x"lvaddr") to malloc'd space at 0x"lvaddr
+			  " len %d\n", hdr->routine_name.len, hdr->routine_name.addr, hdr, lab_ptr, size));
+		/* Store address of malloc'd label text block in the routine header so we can find it to release it on an unlink-all
+		 * (ZGOTO 0:entryref).
+		 */
+		hdr->lbltext_ptr = (unsigned char *)lab_ptr;
+		for (lab_ent = lab_bot + 1; lab_ent < lab_top; lab_ent++)
+		{
+			memcpy(lab_ptr, lab_ent->lab_name.addr, lab_ent->lab_name.len);
+			lab_ent->lab_name.addr = lab_ptr;
+			lab_ptr += lab_ent->lab_name.len;
+		}
+	} else
+		DBGARLNK((stderr, "zlmov_lnames: Label names for rtn %.*s (rtnhdr 0x"lvaddr" not copied (nothing to copy)\n",
+			  hdr->routine_name.len, hdr->routine_name.addr, hdr));
 }
 #endif /* USHBIN_SUPPORTED */

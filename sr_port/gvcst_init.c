@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -655,30 +656,6 @@ void gvcst_init(gd_region *greg)
 			(TREF(gbuff_limit)).str.addr = malloc(SIZEOF(REORG_GBUFF_LIMIT));
 			memcpy((TREF(gbuff_limit)).str.addr, REORG_GBUFF_LIMIT, SIZEOF(REORG_GBUFF_LIMIT));
 		}
-		if ((0 != (TREF(gbuff_limit)).str.len) PRO_ONLY(&& mu_reorg_process))	/* if reorg or dbg apply env var */
-		{
-			reg_nam_mval.str.len = greg->rname_len;
-			reg_nam_mval.str.addr = (char *)&greg->rname;
-			op_view(VARLSTCNT(3) &literal_poollimit, &reg_nam_mval, &(TREF(gbuff_limit)));
-#			ifdef DEBUG
-			if (!mu_reorg_process)		/* in dbg, randomize sizes to get test coverage */
-			{
-				if ((process_id & 1) ^ csa->regnum)
-				{
-					csa->gbuff_limit ^= process_id;
-					csa->gbuff_limit &= ((csd->n_bts / 2) - 1);
-				} else
-					csa->gbuff_limit = 0;
-			}
-			if (process_id & 2)		/* also randomize our_midnite */
-			{
-				csa->our_midnite = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
-				csa->our_midnite += (process_id & (csd->n_bts - 1));
-				assert((csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets + csd->n_bts)
-					> csa->our_midnite);
-			}
-#			endif
-		}
 	}
 	if ((dba_bg == greg_acc_meth) || (dba_mm == greg_acc_meth))
 	{
@@ -735,6 +712,30 @@ void gvcst_init(gd_region *greg)
 			tr->file.fid_index = (&FILE_INFO(tr->reg)->s_addrs)->fid_index;
 		DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 		TREF(max_fid_index) = max_fid_index;
+	}
+	if ((mu_reorg_process DEBUG_ONLY(|| IS_GTM_IMAGE)) && (0 != (TREF(gbuff_limit)).str.len) )
+	{	/* if reorg or dbg apply env var */
+		reg_nam_mval.str.len = greg->rname_len;
+		reg_nam_mval.str.addr = (char *)&greg->rname;
+		op_view(VARLSTCNT(3) &literal_poollimit, &reg_nam_mval, &(TREF(gbuff_limit)));
+#		ifdef DEBUG
+		if (!mu_reorg_process)		/* in dbg, randomize sizes to get test coverage */
+		{
+			if ((process_id & 1) ^ csa->regnum)
+			{
+				csa->gbuff_limit ^= process_id;
+				csa->gbuff_limit &= ((csd->n_bts / 2) - 1);
+			} else
+				csa->gbuff_limit = 0;
+		}
+		if (process_id & 2)		/* also randomize our_midnite */
+		{
+			csa->our_midnite = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
+			csa->our_midnite += (process_id & (csd->n_bts - 1));
+			assert((csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets + csd->n_bts)
+				> csa->our_midnite);
+		}
+#		endif
 	}
 #	ifdef UNIX
 	if (pool_init && REPL_ALLOWED(csd) && jnlpool_init_needed)

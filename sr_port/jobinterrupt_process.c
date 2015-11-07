@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,13 +53,6 @@ GBLREF mstr			extnam_str;
 GBLREF unsigned char		*restart_pc, *restart_ctxt;
 GBLREF dollar_ecode_type	dollar_ecode;
 GBLREF dollar_stack_type	dollar_stack;
-GBLREF int			merge_args;
-GBLREF uint4			zwrtacindx;
-GBLREF merge_glvn_ptr		mglvnp;
-GBLREF gvzwrite_datablk		*gvzwrite_block;
-GBLREF lvzwrite_datablk		*lvzwrite_block;
-GBLREF zshow_out		*zwr_output;
-GBLREF zwr_hash_table		*zwrhtab;
 
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
@@ -66,9 +60,7 @@ error_def(ERR_STACKCRIT);
 void jobinterrupt_process(void)
 {
 	mv_stent	*mv_st_ent;
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
 	assert(dollar_zininterrupt);
 	/* Compile and push new (counted) frame onto the stack to drive the
 	 * $zinterrupt handler.
@@ -118,7 +110,6 @@ void jobinterrupt_process(void)
 	 * op_restartpc or equivalent). In the future this is likely to change, at least for an interrupted Merge, ZWrite
 	 * or ZShow command, so this save/restore is appropriate both now (to let these nest at all) and especially in the future.
 	 */
-	if (TREF(in_zwrite) || (0 != merge_args))
-		PUSH_MVST_MRGZWRSV;
+	PUSH_MVST_MRGZWRSV_IF_NEEDED;
 	return;
 }

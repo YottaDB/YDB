@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,10 +41,10 @@
 
 #ifdef AUTORELINK_SUPPORTED
 # define INCR_LINK(FD, ZRO_ENT, ZRO_HIST, FNLEN, FNAME) incr_link(FD, ZRO_ENT, ZRO_HIST, FNLEN, FNAME)
-boolean_t incr_link(int file_desc, zro_ent *zro_entry, zro_hist *recent_zhist_ptr, uint4 fname_len, char *fname);
+boolean_t incr_link(int *file_desc, zro_ent *zro_entry, zro_hist *recent_zhist_ptr, uint4 fname_len, char *fname);
 #else
 # define INCR_LINK(FD, ZRO_ENT, ZRO_HIST, FNLEN, FNAME) incr_link(FD, ZRO_ENT, FNLEN, FNAME)
-boolean_t incr_link(int file_desc, zro_ent *zro_entry, uint4 fname_len, char *fname);
+boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *fname);
 #endif
 
 #ifdef __MVS__

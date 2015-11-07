@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +104,6 @@ void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **values, uint4 *va
 		stringkey *kill_hash, boolean_t del_kill_hash, int match_index)
 {
 	sgmnt_addrs		*csa;
-	uint4			len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -124,7 +124,6 @@ void cleanup_trigger_name(char *trigvn, int trigvn_len, char *trigger_name, int 
 	uint4			used_trigvn_len;
 	mval			val;
 	mval			*val_ptr;
-	char			val_str[MAX_DIGITS_IN_INT + 1];
 	int			var_count;
 	boolean_t		is_auto_name;
 	DCL_THREADGBL_ACCESS;
@@ -178,9 +177,8 @@ STATICFNDEF int4 update_trigger_name_value(char *trig_name, int trig_name_len, i
 {
 	int			len;
 	char			name_and_index[MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT];
-	char			new_trig_name[MAX_TRIGNAME_LEN + 1];
 	int			num_len;
-	char			*ptr, *ptr2;
+	char			*ptr;
 	int4			result;
 	mval			trig_gbl;
 	DCL_THREADGBL_ACCESS;
@@ -189,7 +187,7 @@ STATICFNDEF int4 update_trigger_name_value(char *trig_name, int trig_name_len, i
 	assert(!gv_cur_region->read_only);		/* caller should have already checked this */
 	assert(cs_addrs->hasht_tree == gv_target);	/* should have been set up by caller */
 	assert(gv_target->root);			/* should have been ensured by caller */
-	/* $get(^#t("#TNAME",^#t(GVN,index,"#TRIGNAME")) */
+	/* $get(^#t("#TNAME",^#t(GVN,index,"#TRIGNAME"))) */
 	BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name, trig_name_len - 1);
 	if (!gvcst_get(&trig_gbl))
 	{	/* There has to be a #TNAME entry */
@@ -200,18 +198,18 @@ STATICFNDEF int4 update_trigger_name_value(char *trig_name, int trig_name_len, i
 			trig_name_len - 1, trig_name);
 	}
 	ptr = trig_gbl.str.addr;
-	ptr2 = memchr(ptr, '\0', trig_gbl.str.len);
-	if (NULL == ptr2)
-	{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
+	len = MIN(trig_gbl.str.len, MAX_MIDENT_LEN);
+	STRNLEN(ptr, len, len);
+	ptr += len;
+	if ((trig_gbl.str.len == len) || ('\0' != *ptr))
+	{
 		if (CDB_STAGNATE > t_tries)
 			t_retry(cdb_sc_triggermod);
 		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
 			trig_name_len - 1, trig_name);
 	}
-	len = (ptr2 - ptr) + 1;
-	assert(MAX_MIDENT_LEN >= len);
-	memcpy(name_and_index, trig_gbl.str.addr, len);
+	memcpy(name_and_index, trig_gbl.str.addr, ++len); /* inline increment intended */
 	ptr = name_and_index + len;
 	num_len = 0;
 	I2A(ptr, num_len, new_trig_index);
@@ -232,7 +230,7 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 	mval			mv_hash;
 	mval			mv_hash_indx;
 	int			num_len;
-	char			*ptr, *ptr2;
+	char			*ptr;
 	int4			result;
 	char			tmp_str[MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT];
 	DCL_THREADGBL_ACCESS;
@@ -258,8 +256,10 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 		}
 		assert((MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT) >= key_val.str.len);
 		ptr = key_val.str.addr;
-		ptr2 = memchr(ptr, '\0', key_val.str.len);
-		if (NULL == ptr2)
+		len = MIN(key_val.str.len, MAX_MIDENT_LEN);
+		STRNLEN(ptr, len, len);
+		ptr += len;
+		if ((key_val.str.len == len) || ('\0' != *ptr))
 		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
 			if (CDB_STAGNATE > t_tries)
 				t_retry(cdb_sc_triggermod);
@@ -267,7 +267,6 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 					LEN_AND_LIT("\"#BHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
-		len = ptr2 - ptr;
 		memcpy(tmp_str, key_val.str.addr, len);
 		ptr = tmp_str + len;
 		*ptr++ = '\0';
@@ -293,8 +292,10 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 	}
 	assert((MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT) >= key_val.str.len);
 	ptr = key_val.str.addr;
-	ptr2 = memchr(ptr, '\0', key_val.str.len);
-	if (NULL == ptr2)
+	len = MIN(key_val.str.len, MAX_MIDENT_LEN);
+	STRNLEN(ptr, len, len);
+	ptr += len;
+	if ((key_val.str.len == len) || ('\0' != *ptr))
 	{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
 		if (CDB_STAGNATE > t_tries)
 			t_retry(cdb_sc_triggermod);
@@ -302,7 +303,6 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 		rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 				LEN_AND_LIT("\"#LHASH\""), mv_hash.str.len, mv_hash.str.addr);
 	}
-	len = ptr2 - ptr;
 	memcpy(tmp_str, key_val.str.addr, len);
 	ptr = tmp_str + len;
 	*ptr++ = '\0';
@@ -320,7 +320,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	char			curr_name[MAX_MIDENT_LEN + 1];
 	uint4			curr_name_len, orig_name_len;
 	mval			mv_curr_nam;
-	char			*ptr, *ptr2;
+	char			*ptr;
 	char			*name_tail_ptr;
 	char			save_name[MAX_MIDENT_LEN + 1];
 	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
@@ -328,8 +328,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
 	mval			trig_gbl;
-	mval			trig_value;
-	mval			trigger_count;
+	mval			*trigger_count;
 	char			trigvn[MAX_MIDENT_LEN + 1];
 	int			trigvn_len;
 	int			trig_indx;
@@ -347,6 +346,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 					 * 1 for ")" and 1 for trailing '\0'.
 					 */
 	int			disp_trigvn_len;
+	int			trig_protected_mval_push_count;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -374,6 +374,8 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	memcpy(save_name, trigger_name, trigger_name_len);
 	save_name[trigger_name_len] = '\0';
 	utilprefixlen = ARRAYSIZE(utilprefix);
+	trig_protected_mval_push_count = 0;
+	INCR_AND_PUSH_MV_STENT(trigger_count); /* Protect trigger_count from garbage collection */
 	for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions; reg < reg_top; reg++)
 	{
 		GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
@@ -389,7 +391,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 		memcpy(curr_name, save_name, trigger_name_len);
 		curr_name_len = trigger_name_len;
 		do {
-			/* GVN = $get(^#t("#TNAME",curr_name) */
+			/* GVN = $get(^#t("#TNAME",curr_name)) */
 			BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), curr_name, curr_name_len);
 			if (gvcst_get(&trig_gbl))
 			{
@@ -397,8 +399,10 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
 				SAVE_TRIGGER_REGION_INFO(save_currkey);
 				ptr = trig_gbl.str.addr;
-				ptr2 = memchr(ptr, '\0', trig_gbl.str.len);
-				if (NULL == ptr2)
+				trigvn_len = MIN(trig_gbl.str.len, MAX_MIDENT_LEN);
+				STRNLEN(ptr, trigvn_len, trigvn_len);
+				ptr += trigvn_len;
+				if ((trig_gbl.str.len == trigvn_len) || ('\0' != *ptr))
 				{	/* We expect $c(0) in the middle of ptr. If not found, this is a restartable situation */
 					if (CDB_STAGNATE > t_tries)
 						t_retry(cdb_sc_triggermod);
@@ -406,23 +410,29 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
 							curr_name_len, curr_name);
 				}
-				trigvn_len = ptr2 - ptr;
-				assert(MAX_MIDENT_LEN >= trigvn_len);
-				memcpy(trigvn, ptr, trigvn_len);
-				ptr += trigvn_len + 1;
+				memcpy(trigvn, trig_gbl.str.addr, trigvn_len);
 				/* the index is just beyond the length of the GVN string */
+				ptr++;
 				A2I(ptr, trig_gbl.str.addr + trig_gbl.str.len, trig_indx);
+				if (1 > trig_indx)
+				{	/* Trigger indexes start from 1 */
+					if (CDB_STAGNATE > t_tries)
+						t_retry(cdb_sc_triggermod);
+					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+							curr_name_len, curr_name);
+				}
 				SET_DISP_TRIGVN(reg, disp_trigvn, disp_trigvn_len, trigvn, trigvn_len);
 				/* $get(^#t(GVN,"COUNT") */
 				BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
-				if (!gvcst_get(&trigger_count))
+				if (!gvcst_get(trigger_count))
 				{
 					UTIL_PRINT_PREFIX_IF_NEEDED(first_gtmio, utilprefix, &utilprefixlen);
 					util_out_print_gtmio("Trigger named !AD exists in the lookup table, "
 							"but global ^!AD has no triggers",
 							FLUSH, curr_name_len, curr_name, disp_trigvn_len, disp_trigvn);
 					trig_stats[STATS_ERROR_TRIGFILE]++;
-					return TRIG_FAILURE;
+					RETURN_AND_POP_MVALS(TRIG_FAILURE);
 				}
 				if (!jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
 				{
@@ -430,14 +440,14 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 					jnl_format_done = TRUE;
 				}
 				/* kill the target trigger for GVN at index trig_indx */
-				if (PUT_SUCCESS != (trigger_delete(trigvn, trigvn_len, &trigger_count, trig_indx)))
+				if (PUT_SUCCESS != (trigger_delete(trigvn, trigvn_len, trigger_count, trig_indx)))
 				{
 					UTIL_PRINT_PREFIX_IF_NEEDED(first_gtmio, utilprefix, &utilprefixlen);
 					util_out_print_gtmio("Trigger named !AD exists in the lookup table for global ^!AD,"	\
 								" but was not deleted!", FLUSH, orig_name_len, trigger_name,
 								disp_trigvn_len, disp_trigvn);
 					trig_stats[STATS_ERROR_TRIGFILE]++;
-					return TRIG_FAILURE;
+					RETURN_AND_POP_MVALS(TRIG_FAILURE);
 				} else
 				{
 					csa->incr_db_trigger_cycle = TRUE;
@@ -458,6 +468,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 								FLUSH, curr_name_len, curr_name, disp_trigvn_len, disp_trigvn);
 					}
 				}
+				trigger_count->mvtype = 0; /* allow stp_gcol to release the current contents if necessary */
 				RESTORE_TRIGGER_REGION_INFO(save_currkey);
 				triggers_deleted++;
 			}
@@ -475,6 +486,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 				break;
 		} while (TRUE);
 	}
+	DECR_AND_POP_MV_STENT();
 	if (!jnl_format_done && (NULL != lgtrig_reg))
 	{	/* There was no journaled region that had a ^#t update, but found at least one journaled region
 		 * so write a LGTRIG logical jnl record there.
@@ -522,10 +534,8 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index)
 {
 	int			count;
-	mval			*mv_cnt_ptr;
 	mval			mv_val;
 	mval			*mv_val_ptr;
-	int			num_len;
 	char			*ptr1;
 	int4			result;
 	int4			retval;
@@ -542,9 +552,6 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	mval			trigger_index;
 	mval			xecute_index;
 	uint4			xecute_idx;
-	uint4			used_trigvn_len;
-	mval			val;
-	char			val_str[MAX_DIGITS_IN_INT + 1];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -584,7 +591,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 		}
 		if (TRIGNAME_SUB == sub_indx)
 		{
-			trig_name_len = trig_len;
+			trig_name_len = MIN(trig_len, MAX_TRIGNAME_LEN);
 			assert(MAX_TRIGNAME_LEN >= trig_len);
 			memcpy(trig_name, trigger_value.str.addr, trig_name_len);
 			tt_val[sub_indx] = NULL;
@@ -653,6 +660,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 			memcpy(ptr1, trigvn, trigvn_len);
 			ptr1 += trigvn_len;
 			*ptr1++ = '\0';
+			tmp_len = trigvn_len + 1;
 			for (sub_indx = 0; sub_indx < NUM_TOTAL_SUBS; sub_indx++)
 			{
 				/* $get(^#t(GVN,trigger_count,sub_indx) */
@@ -699,12 +707,23 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 				{
 					tt_val[sub_indx] = ptr1;
 					tt_val_len[sub_indx] = trig_len;
+					tmp_len += trig_len;
 					if (0 < trig_len)
 					{
+						if (MAX_BUFF_SIZE <= tmp_len)
+						{ /* Exceeding the temporary buffer is impossible, restart*/
+							if (CDB_STAGNATE > t_tries)
+								t_retry(cdb_sc_triggermod);
+							assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+							rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD,
+									6, trigvn_len, trigvn, trigvn_len, trigvn,
+									STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
+						}
 						memcpy(ptr1, trigger_value.str.addr, trig_len);
 						ptr1 += trig_len;
 					}
 					*ptr1++ = '\0';
+					tmp_len++;
 				}
 			}
 			/* $get(^#t(GVN,trigger_count,"LHASH") for update_trigger_hash_value */
@@ -744,20 +763,16 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 {
 	int			count;
-	char			count_str[MAX_DIGITS_IN_INT + 1];
 	sgmnt_addrs		*csa;
 	mval			curr_gbl_name;
 	int			cycle;
 	mval			*mv_count_ptr;
 	mval			*mv_cycle_ptr;
-	mval			mv_indx;
 	gd_region		*reg, *reg_top;
 	int4			result;
 	gd_region		*lgtrig_reg;
-	int			trig_indx;
 	mval			trigger_cycle;
 	mval			trigger_count;
-	mval			val;
 	boolean_t		this_db_updated;
 	uint4			triggers_deleted;
 	mval			trigjrec;

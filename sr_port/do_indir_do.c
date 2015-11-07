@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +12,9 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
 #include "gtm_string.h"
+
 #include "toktyp.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
@@ -21,6 +24,7 @@
 #include "op.h"
 #include "do_indir_do.h"
 #include "valid_mname.h"
+#include "linktrc.h"
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	command_qualifier	cmd_qlf;
@@ -32,7 +36,9 @@ int do_indir_do(mval *v, unsigned char argcode)
 	lnr_tabent	USHBIN_ONLY(*)*addr;
 	mident_fixed	ident;
 	rhdtyp		*current_rhead;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (valid_labname(&v->str))
 	{
 		memcpy(ident.c, v->str.addr, v->str.len);
@@ -41,7 +47,14 @@ int do_indir_do(mval *v, unsigned char argcode)
 		label.mvtype = MV_STR;
 		label.str.len = v->str.len;
 		label.str.addr = &ident.c[0];
+#		ifdef AUTORELINK_SUPPORTED
+		DBGINDCOMP((stderr, "do_indir_do: routine resolved to 0x"lvaddr"\n", frame_pointer->rvector));
+		TADR(lnk_proxy)->rtnhdr_adr = frame_pointer->rvector;	/* So op_labaddr has access to it */
+		op_labaddr(0, &label, 0);
+		addr = &TADR(lnk_proxy)->lnr_adr;
+#		else
 		addr = op_labaddr(frame_pointer->rvector, &label, 0);
+#		endif
 		current_rhead = CURRENT_RHEAD_ADR(frame_pointer->rvector);
 		if (argcode == indir_do)
 		{	/* If we aren't in an indirect, exfun_frame() is the best way to copy the stack frame as it does not

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,6 +113,7 @@ error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
 error_def(ERR_IPCNOTDEL);
 error_def(ERR_JNLFLUSH);
+error_def(ERR_LASTWRITERBYPAS);
 error_def(ERR_MEMORY);
 error_def(ERR_OUTOFSPACE);
 error_def(ERR_RESRCINTRLCKBYPAS);
@@ -125,6 +127,7 @@ int4 gds_rundown(void)
 {
 	boolean_t		cancelled_dbsync_timer, cancelled_timer, have_standalone_access, ipc_deleted, err_caught;
 	boolean_t		is_cur_process_ss_initiator, remove_shm, vermismatch, we_are_last_user, we_are_last_writer, is_mm;
+	boolean_t		unsafe_last_writer;
 	now_t			now;	/* for GET_CUR_TIME macro */
 	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	gd_region		*reg;
@@ -361,7 +364,8 @@ int4 gds_rundown(void)
 			  RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get semval"), CALLFROM, errno);
 	/* There's one writer left and I am it */
 	assert(reg->read_only || semval >= 0);
-	we_are_last_writer = (1 == semval) && (FALSE == reg->read_only) && !vermismatch && !safe_mode;
+	unsafe_last_writer = (1 == semval) && (FALSE == reg->read_only) && !vermismatch;
+	we_are_last_writer = unsafe_last_writer && !safe_mode;
 	assert(!we_are_last_writer || !safe_mode);
 	assert(!we_are_last_user || !safe_mode);
 	/* recover + R/W region => one writer except ONLINE ROLLBACK, or standalone with frozen instance, leading to safe_mode */
@@ -589,6 +593,9 @@ int4 gds_rundown(void)
 						  ERR_TEXT, 2, RTS_ERROR_TEXT("Error during file sync at close"), errno);
 				}
 			}
+		} else if (unsafe_last_writer)
+		{
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_LASTWRITERBYPAS, 2, DB_LEN_STR(reg));
                 }
 	} /* end if (!reg->read_only && !csa->nl->donotflush_dbjnl) */
 	/* We had cancelled all db timers at start of rundown. In case as part of rundown (wcs_flu above), we had started

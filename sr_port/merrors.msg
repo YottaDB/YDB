@@ -1,6 +1,7 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2014 Fidelity Information Services, Inc	!
+! Copyright (c) 2001-2015 Fidelity National Information 	!
+! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -674,8 +675,8 @@ CCPSIGDMP	<CCP non fatal dump, continuing operation. Report to your GT.M Support
 NOPRINCIO	<Unable to write to principal device>/fatal/fao=0!/ansi=0
 INVPORTSPEC	<Invalid port specification>/error/fao=0!/ansi=0
 INVADDRSPEC	<Invalid IP address specification>/error/fao=0!/ansi=0
-UNUSEDMSG677	<SOCKPARMREQ last used in V6.0-002>/error/fao=0!/ansi=78
-UNUSEDMSG678	<IPADDRREQ last used in V6.0-002>/error/fao=0!/ansi=0
+UNUSEDMSG678	<SOCKPARMREQ last used in V6.0-002>/error/fao=0!/ansi=78
+UNUSEDMSG679	<IPADDRREQ last used in V6.0-002>/error/fao=0!/ansi=0
 SOCKWAIT	<Error waiting for socket connection>/error/fao=0!/ansi=80
 SOCKACPT	<Error accepting socket connection>/error/fao=0!/ansi=81
 SOCKINIT	<Error initializing socket: (errno == !UL) !AD>/error/fao=3!/ansi=80
@@ -704,7 +705,7 @@ DBCRERR		<Database file !AD, cr location 0x!XJ blk = 0x!XL error: !AD was 0x!XL,
 MUSTANDALONE	<Could not get exclusive access to !AD> /info /fao=2!/ansi=0
 MUNOACTION	<MUPIP unable to perform requested action> /error /fao=0!/ansi=0
 RMBIGSHARE	<File with BIGRECORD specified may only be shared if READONLY>/error/fao=0!/ansi=0
-TPRESTART	<Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: 0x!16@XQ> /info /fao=14!/ansi=0
+TPRESTART	<Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: 0x!16@XQ, zpos: !AD> /info /fao=16!/ansi=0
 SOCKWRITE	<Write to a socket failed> /error /fao=0!/ansi=0
 DBCNTRLERR	<Database file !AD: control error suspected but not found> /info /fao=2!/ansi=0
 NOTERMENV	<Environment variable TERM not set.  Assuming "unknown."> /info /fao=0!/ansi=0
@@ -773,7 +774,7 @@ MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
 BLKWRITERR	<Unable to queue disk write for block 0x!XL.  Will keep trying.>/info/fao=1!/ansi=0
 STOPTIMEOUT	<Waited too long for stopped process to release.  Region: !AD.>/error/fao=2!/ansi=0
-UNUSEDMSG776	<TRIGMODINTP last used in V6.2-000>/error/fao=0!/ansi=0
+UNUSEDMSG777	<TRIGMODINTP last used in V6.2-000>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
 JNLREAD		<Error reading from journal file !AD at offset [0x!XL]>/error/fao=3!/ansi=0
@@ -896,7 +897,7 @@ SCNDDBNOUPD	<Database Updates not allowed on the secondary>/error/fao=0!/ansi=0
 MUINFOUINT4	<!AD : !UL [0x!XL]>/info/fao=4!/ansi=0
 NLMISMATCHCALC	<Location of !AD expected at 0x!XL, but found at 0x!XL>/error/fao=4!/ansi=0
 RELINKCTLFULL	<Relinkctl file for directory !AD is full (maximum entries !UL)>/error/fao=3!/ansi=0
-UNUSEDMSG899	<GTMSECSHRDEFLOG last used in V5.5-000>/info/fao=0!/ansi=0
+UNUSEDMSG900	<GTMSECSHRDEFLOG last used in V5.5-000>/info/fao=0!/ansi=0
 DBBADNSUB	<!AD Bad numeric subscript>/error/fao=2!/ansi=0
 DBBADKYNM	<!AD Bad key name>/error/fao=2!/ansi=0
 DBBADPNTR	<!AD Bad pointer value in directory>/error/fao=2!/ansi=0
@@ -947,7 +948,7 @@ DBMBPFRDLBM	<!AD Master bit map shows this map has space, agreeing with disk loc
 DBMBPFRINT	<!AD Master bit map shows this map has space, agreeing with MUPIP INTEG>/warning/fao=2!/ansi=0
 DBMAXKEYEXC	<!AD Maximum key size for database exceeds design maximum>/error/fao=2!/ansi=0
 DBMXRSEXCMIN	<!AD Maximum record size for database is less than the design minimum>/error/fao=2!/ansi=0
-UNUSEDMSG950	<DBMAXRSEXBL : Last used in V5.5-000>/error/fao=0!/ansi=0
+UNUSEDMSG951	<DBMAXRSEXBL : Last used in V5.5-000>/error/fao=0!/ansi=0
 DBREADBM	<!AD Read error on bitmap>/error/fao=2!/ansi=0
 DBCOMPTOOLRG	<!AD Record has too large compression count>/error/fao=2!/ansi=0
 DBVERPERFWARN2	<Peformance warning: Database !AD is not fully upgraded. Run MUPIP REORG UPGRADE for best overall performance>/warning/fao=2!/ansi=0
@@ -1316,7 +1317,7 @@ CRYPTJNLWRONGHASH	<Encryption key hash mismatch between journal file !AD and cor
 CRYPTKEYFETCHFAILED	<Could not retrieve encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
 CRYPTKEYFETCHFAILEDNF	<Could not retrieve encryption key during !AD operation key. !AD>/error/fao=4!/ansi=0
 CRYPTHASHGENFAILED	<Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
-UNUSEDMSG1319	<CRYPTNOPSWDINTP : Last used in V6.0-003>/error/fao=0!/ansi=0
+UNUSEDMSG1320	<CRYPTNOPSWDINTP : Last used in V6.0-003>/error/fao=0!/ansi=0
 BADTAG		<Unable to use file !AD (CCSID !UL) with CCSID !UL>/error/fao=4!/ansi=0
 ICUVERLT36	<!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used>/error/fao=4!/ansi=0
 ICUSYMNOTFOUND	<Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified>/error/fao=2!/ansi=0
@@ -1370,7 +1371,7 @@ GVZTRIGFAIL	<ZTRIGGER of a global variable failed.  Failure code: !AD.>/error/fa
 MUUSERLBK	<Abnormal shutdown of replication-enabled database !AD detected>/error/fao=2!/ansi=0
 SETINSETTRIGONLY	<ISV !AD can only be modified in a 'SET' type trigger>/error/fao=2!/ansi=0
 DZTRIGINTRIG	<$ZTRIGGER() is not allowed inside trigger context. Trigger name: !AD>/error/fao=2!/ansi=0
-UNUSEDMSG1373	<SECNODZTRIGINTP : Last used in V6.2-000>/error/fao=0!/ansi=0
+UNUSEDMSG1374	<SECNODZTRIGINTP : Last used in V6.2-000>/error/fao=0!/ansi=0
 BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression>/warning/fao=0!/ansi=0
 DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
 WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
@@ -1382,7 +1383,7 @@ GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/err
 JNLORDBFLU	<Error flushing database blocks to !AD. See related messages in the operator log>/error/fao=2!/ansi=0
 ZCCLNUPRTNMISNG	<External call: Cleanup routine name missing. Cannot continue>/error/fao=0!/ansi=0
 ZCINVALIDKEYWORD	<External call: Invalid keyword found. Cannot continue>/error/fao=0!/ansi=0
-UNUSEDMSG1385	<REPLNOMULTILINETRG : Last used in V6.2-000>/error/fao=0!/ansi=0
+UNUSEDMSG1386	<REPLNOMULTILINETRG : Last used in V6.2-000>/error/fao=0!/ansi=0
 DBSHMNAMEDIFF	<Database file !AD points to shared memory (id = !UL) which points to a different database file !AZ>/error/fao=4!/ansi=0
 SHMREMOVED	<Removed Shared Memory id !UL corresponding to file !AD>/info/fao=3!/ansi=0
 DEVICEWRITEONLY	<Cannot read from a write-only device>/error/fao=0!/ansi=0
@@ -1536,7 +1537,7 @@ GBLNOMAPTOREG	<Global !AD does not map to region !AD in current global directory
 ISSPANGBL	<Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory>/error/fao=2!/ansi=0
 TPNOSUPPORT	<Operation cannot be performed while inside of a TP transaction>/error/fao=0!/ansi=0
 GVSUBSERR	<Invalid subscripted global name specification in $VIEW() function>/error/fao=0!/ansi=0
-UNUSEDMSG1539	<TRIGNOSPANBL : Last used in V6.2-000>/error/fao=0!/ansi=0
+UNUSEDMSG1540	<TRIGNOSPANBL : Last used in V6.2-000>/error/fao=0!/ansi=0
 FILTERTIMEDOUT	<Replication server timed out attempting to read seqno !16@XQ from external filter>/error/fao=1!/ansi=0
 TLSDLLNOOPEN	<Failed to load GT.M TLS/SSL library for secure communication>/error/fao=0!/ansi=0
 TLSINIT		<Failed to initialize GT.M TLS/SSL library for secure communication>/error/fao=0!/ansi=0
@@ -1572,7 +1573,7 @@ CRYPTKEYTOOBIG	<Specified key has length !UL, which is greater than the maximum 
 CRYPTBADWRTPOS	<Encrypted WRITE disallowed from a position different than where the last WRITE completed>/error/fao=0!/ansi=0
 LABELNOTFND	<GOTO referenced a label that does not exist>/error/fao=0!/ansi=13
 RELINKCTLERR	<Error with relink control structure for $ZROUTINES directory !AD>/error/fao=2!/ansi=0
-INVLINKTMPDIR	<Value for $gtm_linktmpdir is either not found or not a directory: !AD>/error/fao=2!/ansi=0
+INVLINKTMPDIR	<Value for $gtm_linktmpdir is either not found or not a directory(!AD) - Reverting to default value>/error/fao=2!/ansi=0
 NOEDITOR	<Can't find an executable editor: !AD>/error/fao=2!/ansi=0
 UPDPROC		<Update Process error>/error/fao=0!/ansi=0
 HLPPROC		<Helper Process error>/error/fao=0!/ansi=0
@@ -1587,7 +1588,18 @@ ZPEEKNOJNLINFO	<$ZPEEK() unable to access requested journal structure - region !
 TLSPARAM	<TLS parameter !AD !AD>/error/fao=4!/ansi=0
 RLNKRECLATCH	<Failed to get latch on relinkctl record for routine name !AZ in $ZROUTINES directory !AD>/error/fao=3!/ansi=0
 RLNKSHMLATCH	<Failed to get latch on relinkctl shared memory for $ZROUTINES directory !AD>/error/fao=2!/ansi=0
-JOBLVN2LONG	<The zwrite representation of a local variable transferred to a JOB'd process can not exceed !UL. Encountered size: !UL>/error/fao=2!/ansi=0
+JOBLVN2LONG	<The zwrite representation of a local variable transferred to a JOB'd process is too long. Please check the output of the JOB'd process for more details>/error/fao=0!/ansi=0
+JOBLVNDETAIL	<The zwrite representation of a local variable transferred to a JOB'd process is too long. The zwrite representation cannot exceed !UL. Encountered size: !UL>/error/fao=2!/ansi=0
+PREALLOCATEFAIL	<Disk space reservation for !AD segment has failed>/error/fao=2!/ansi=0
+NODFRALLOCSUPP	<The NODEFER_ALLOCATE qualifier is not allowed on this operating system. Not changing the defer allocation flag>/warning/fao=0!/ansi=0
+LASTWRITERBYPAS	<The last writer for database file !AD bypassed the rundown>/warning/fao=2!/ansi=0
+TRIGUPBADLABEL	<Trigger upgrade cannot upgrade label !UL to !UL on ^!AD in region !AD>/error/fao=6!/ansi=0
+WEIRDSYSTIME	<Time reported by the system clock is outside the acceptable range.  Please check and correct the system clock>/error/fao=0!/ansi=0
+REPLSRCEXITERR	<Source server for secondary instance !AZ exited abnormally. See log file !AZ for details.>/warning/fao=2!/ansi=0
+INVZBREAK	<Cannot set ZBREAK in direct mode routine (GTM$DMOD)>/error/fao=0!/ansi=0
+INVTMPDIR	<Value or default for $gtm_tmp is either not found or not a directory (!AD) - Reverting to default value>/error/fao=2!/ansi=0
+ARCTLMAXHIGH	<The environment variable !AD = !UL is too high. Assuming the maximum acceptable value of !UL>/warning/fao=4!/ansi=0
+ARCTLMAXLOW	<The environment variable !AD = !UL is too low. Assuming the minimum acceptable value of !UL>/warning/fao=4!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

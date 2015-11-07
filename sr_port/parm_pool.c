@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -131,11 +132,11 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, truth_value);
 	VMS_ONLY(va_count(totalcnt));
-	assert(4 <= totalcnt);
+	assert(PUSH_PARM_OVERHEAD <= totalcnt);
 	ret_value = va_arg(var, mval *);
 	mask = va_arg(var, int);
 	actualcnt = va_arg(var, unsigned int);
-	assert(4 + actualcnt == totalcnt);
+	assert(PUSH_PARM_OVERHEAD + actualcnt == totalcnt);
 	assert(MAX_ACTUALS >= actualcnt);
 	if (!TREF(parm_pool_ptr))
 	{

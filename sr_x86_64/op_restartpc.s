@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,31 +10,27 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_restartpc.s
-	.sbttl	op_restartpc
+	.include "linkage.si"
+	.include "g_msf.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "linkage.si"
-.include "g_msf.si"
-
-	.DATA
-.extern	restart_pc
-.extern restart_ctxt
-.extern frame_pointer
+	.data
+	.extern	restart_pc
+	.extern restart_ctxt
+	.extern frame_pointer
 
 	.text
-# PUBLIC	op_restartpc
+#
+# Routine to save the address of the *start* of this call along with its context as the restart point should this
+# process encounter a restart situation (return from $ZTRAP or outofband call typically).
+#
+# Since this is a leaf routine (makes no calls), the stack frame alignment is not important so is not adjusted
+# or tested. Should that change, the alignment should be fixed and implement use of the CHKSTKALIGN macro made.
+#
 ENTRY op_restartpc
-	movq	(REG_SP),REG64_ACCUM
-	subq	$6,REG64_ACCUM 		# xfer call size is constant
-	movq	REG64_ACCUM,restart_pc(REG_IP)
-	movq	frame_pointer(REG_IP),REG64_ACCUM
-	movq	msf_ctxt_off(REG64_ACCUM),REG64_SCRATCH1
-	movq	REG64_SCRATCH1,restart_ctxt(REG_IP)
+	movq	(REG_SP), REG64_ACCUM
+	subq	$6, REG64_ACCUM 				# XFER call size is constant
+	movq	REG64_ACCUM, restart_pc(REG_IP)
+	movq	frame_pointer(REG_IP), REG64_ACCUM
+	movq	msf_ctxt_off(REG64_ACCUM), REG64_SCRATCH1
+	movq	REG64_SCRATCH1, restart_ctxt(REG_IP)
 	ret
-# op_restartpc ENDP
-
-# END

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,6 +76,7 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 	 * besides it does not hurt that much since only a M-stack entry gets pushed. So we err on the side of caution.
 	 */
 	val = &mv_chain->mv_st_cont.mvs_mval;
+	val->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before mkey gets initialized below */
 	addr = TREF(gd_targ_addr);
 	assert(NULL != addr);
 	gd_reg_start = &addr->regions[0];
@@ -98,7 +100,6 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 	cumul_key_len = 0;
 	DEBUG_ONLY(cumul_key[cumul_key_len] = KEY_DELIMITER;)
 	INCREMENT_GD_TARG_TN(gd_targ_tn); /* takes a copy of incremented "TREF(gd_targ_tn)" into local variable "gd_targ_tn" */
-	val->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before mkey gets initialized below */
 	assert(0 < gvnh_reg->gvspan->end_map_index);
 	assert(gvnh_reg->gvspan->end_map_index < addr->n_maps);
 	end_map = &addr->maps[gvnh_reg->gvspan->end_map_index];

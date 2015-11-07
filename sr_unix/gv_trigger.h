@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -350,6 +351,27 @@ typedef struct gvtr_invoke_parms_struct
 	DEBUG_ONLY(if (cdb_sc_normal == STATUS) donot_INVOKE_MUMTSTART = FALSE;)			\
 }
 
+/* Protect MVALs from garabage collection */
+#define INCR_AND_PUSH_MV_STENT(VAR)				\
+{								\
+	PUSH_MV_STENT(MVST_MVAL);				\
+	VAR = &mv_chain->mv_st_cont.mvs_mval;			\
+	VAR->mvtype = 0;					\
+	trig_protected_mval_push_count++;			\
+}
+
+#define DECR_AND_POP_MV_STENT()					\
+{								\
+	while (0 < trig_protected_mval_push_count--)		\
+		POP_MV_STENT();					\
+}
+
+#define RETURN_AND_POP_MVALS(RET)				\
+{ /* Convenience helper macro to avoid repeated retun & pop */	\
+	DECR_AND_POP_MV_STENT();				\
+	return RET;						\
+}
+
 #define	PUSH_ZTOLDMVAL_ON_M_STACK(ZTOLD_MVAL, SAVE_MSP, SAVE_MV_CHAIN)						\
 {														\
 	GBLREF	mv_stent		*mv_chain;								\
@@ -462,7 +484,6 @@ typedef struct gvtr_invoke_parms_struct
 /* Caller has to check for "NULL" value of "cs_addrs" and act accordingly */
 #define	GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg)							\
 {													\
-	GBLREF	uint4		dollar_tlevel;								\
 	GBLREF	gv_namehead	*gv_target;								\
 	GBLREF	gd_region	*gv_cur_region;								\
 	GBLREF	gv_key		*gv_currkey;								\

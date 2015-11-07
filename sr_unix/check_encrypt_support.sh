@@ -1,7 +1,8 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2009, 2013 Fidelity Information Services, Inc #
+# Copyright (c) 2009, 2015 Fidelity National Information	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -102,12 +103,13 @@ fi
 lib_search_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib /usr/local/ssl/lib /usr/lib/x86_64-linux-gnu"
 lib_search_path="$lib_search_path /usr/lib/i386-linux-gnu /lib/x86_64-linux-gnu /lib/i386-linux-gnu /opt/openssl/0.9.8/lib/hpux64"
 include_search_path="/usr/include /usr/local/include /usr/local/include/gpgme /usr/local/ssl/include /opt/openssl/0.9.8/include"
+include_search_path="$include_search_path /usr/include/x86_64-linux-gnu"
 bin_search_path="/usr/bin /usr/local/bin /bin"
 
 mandate_headers="gpgme.h gpg-error.h"
 mandate_libs="libgpg-error libgpgme"
 mandate_bins="gpg"
-gcrypt_headers="gcrypt.h gcrypt-module.h"
+gcrypt_headers="gcrypt.h"
 gcrypt_libs="libgcrypt"
 openssl_headers="openssl/evp.h openssl/sha.h openssl/blowfish.h openssl/ssl.h openssl/err.h"
 openssl_libs="libcrypto libssl"

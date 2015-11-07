@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -110,7 +111,7 @@ if ( $?gtm_version_change == "1" ) then
 
 	# to avoid naming files with .S
 	# smw 1999/12/04 setenv gt_as_options_common	"-c -x assembler-with-cpp"
-	setenv gt_as_option_DDEBUG	""
+	setenv gt_as_option_DDEBUG	"-defsym DEBUG=1"
 
 	# C definitions:
 

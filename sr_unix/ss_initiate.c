@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -219,7 +220,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	shm_snapshot_ptr_t	ss_shm_ptr;
 	snapshot_context_ptr_t	lcl_ss_ctx;
 	snapshot_filhdr_ptr_t	ss_filhdr_ptr;
-	struct perm_diag_data	pdd;
 	struct stat		stat_buf;
 	uint4			crit_counter, fstat_status, prev_ss_shmsize, tempnamprefix_len, tot_blks;
 	void			*ss_shmaddr;
@@ -384,22 +384,10 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		 * INTEG started by read-only processes to create snapshot files that are writable by processes having write
 		 * permissions on the database file.
 		 */
-		if (gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_IPC, &pdd) < 0)
-		{
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
-				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("snapshot file"),
-				RTS_ERROR_STRING(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fn),
-				PERMGENDIAG_ARGS(pdd));
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6+PERMGENDIAG_ARG_COUNT)
-				ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("snapshot file"),
-				RTS_ERROR_STRING(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fn),
-				PERMGENDIAG_ARGS(pdd));
-			UNFREEZE_REGION_IF_NEEDED(csd, reg);
-			return FALSE;
-		}
+		gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_IPC);
 	}
 	if ((-1 == fstat_res) || (-1 == FCHMOD(shdw_fd, perm))
-		|| (((-1 != user_id) || (-1 != group_id)) && (-1 == fchown(shdw_fd, user_id, group_id))))
+		|| (((INVALID_UID != user_id) || (INVALID_GID != group_id)) && (-1 == fchown(shdw_fd, user_id, group_id))))
 	{
 		status = errno;
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fchmod/fchown"), CALLFROM, status);

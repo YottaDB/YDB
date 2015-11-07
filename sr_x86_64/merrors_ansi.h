@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001,2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,7 +9,6 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 
 const static readonly int error_ansi[] = {
 	   0,	/* ACK */
@@ -510,8 +510,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOPRINCIO */
 	   0,	/* INVPORTSPEC */
 	   0,	/* INVADDRSPEC */
-	  78,	/* UNUSEDMSG677 */
-	   0,	/* UNUSEDMSG678 */
+	  78,	/* UNUSEDMSG678 */
+	   0,	/* UNUSEDMSG679 */
 	  80,	/* SOCKWAIT */
 	  81,	/* SOCKACPT */
 	  80,	/* SOCKINIT */
@@ -609,7 +609,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* FREEZEID */
 	   0,	/* BLKWRITERR */
 	   0,	/* STOPTIMEOUT */
-	   0,	/* UNUSEDMSG776 */
+	   0,	/* UNUSEDMSG777 */
 	   0,	/* BCKUPBUFLUSH */
 	   0,	/* NOFORKCORE */
 	   0,	/* JNLREAD */
@@ -732,7 +732,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUINFOUINT4 */
 	   0,	/* NLMISMATCHCALC */
 	   0,	/* RELINKCTLFULL */
-	   0,	/* UNUSEDMSG899 */
+	   0,	/* UNUSEDMSG900 */
 	   0,	/* DBBADNSUB */
 	   0,	/* DBBADKYNM */
 	   0,	/* DBBADPNTR */
@@ -783,7 +783,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBMBPFRINT */
 	   0,	/* DBMAXKEYEXC */
 	   0,	/* DBMXRSEXCMIN */
-	   0,	/* UNUSEDMSG950 */
+	   0,	/* UNUSEDMSG951 */
 	   0,	/* DBREADBM */
 	   0,	/* DBCOMPTOOLRG */
 	   0,	/* DBVERPERFWARN2 */
@@ -1152,7 +1152,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CRYPTKEYFETCHFAILED */
 	   0,	/* CRYPTKEYFETCHFAILEDNF */
 	   0,	/* CRYPTHASHGENFAILED */
-	   0,	/* UNUSEDMSG1319 */
+	   0,	/* UNUSEDMSG1320 */
 	   0,	/* BADTAG */
 	   0,	/* ICUVERLT36 */
 	   0,	/* ICUSYMNOTFOUND */
@@ -1206,7 +1206,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUUSERLBK */
 	   0,	/* SETINSETTRIGONLY */
 	   0,	/* DZTRIGINTRIG */
-	   0,	/* UNUSEDMSG1373 */
+	   0,	/* UNUSEDMSG1374 */
 	   0,	/* BOOLSIDEFFECT */
 	   0,	/* DBBADUPGRDSTATE */
 	   0,	/* WRITEWAITPID */
@@ -1218,7 +1218,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLORDBFLU */
 	   0,	/* ZCCLNUPRTNMISNG */
 	   0,	/* ZCINVALIDKEYWORD */
-	   0,	/* UNUSEDMSG1385 */
+	   0,	/* UNUSEDMSG1386 */
 	   0,	/* DBSHMNAMEDIFF */
 	   0,	/* SHMREMOVED */
 	   0,	/* DEVICEWRITEONLY */
@@ -1370,7 +1370,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* ISSPANGBL */
 	   0,	/* TPNOSUPPORT */
 	   0,	/* GVSUBSERR */
-	   0,	/* UNUSEDMSG1539 */
+	   0,	/* UNUSEDMSG1540 */
 	   0,	/* FILTERTIMEDOUT */
 	   0,	/* TLSDLLNOOPEN */
 	   0,	/* TLSINIT */
@@ -1422,4 +1422,15 @@ const static readonly int error_ansi[] = {
 	   0,	/* RLNKRECLATCH */
 	   0,	/* RLNKSHMLATCH */
 	   0,	/* JOBLVN2LONG */
+	   0,	/* JOBLVNDETAIL */
+	   0,	/* PREALLOCATEFAIL */
+	   0,	/* NODFRALLOCSUPP */
+	   0,	/* LASTWRITERBYPAS */
+	   0,	/* TRIGUPBADLABEL */
+	   0,	/* WEIRDSYSTIME */
+	   0,	/* REPLSRCEXITERR */
+	   0,	/* INVZBREAK */
+	   0,	/* INVTMPDIR */
+	   0,	/* ARCTLMAXHIGH */
+	   0,	/* ARCTLMAXLOW */
 	};

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -155,5 +156,25 @@ void			intrsafe_gtm_tls_fini(gtm_tls_ctx_t **ctx)
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION);
 	(*gtm_tls_fini_fptr)(ctx);
 	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION);
+}
+
+int			intrsafe_gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *obs_passwd)
+{
+	int		rv;
+
+	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION);
+	rv = (*gtm_tls_store_passwd_fptr)(tls_ctx, tlsid, obs_passwd);
+	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION);
+	return rv;
+}
+
+int			intrsafe_gtm_tls_add_config(gtm_tls_ctx_t *tls_ctx, const char *idstr, const char *configstr)
+{
+	int		rv;
+
+	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION);
+	rv = (*gtm_tls_add_config_fptr)(tls_ctx, idstr, configstr);
+	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION);
+	return rv;
 }
 

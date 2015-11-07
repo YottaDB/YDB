@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -220,9 +221,11 @@ LITDEF mval literal_null	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_
 LITDEF mval literal_batch       = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, TP_BATCH_SHRT, (char *)TP_BATCH_ID, 0, 0);
 
 #ifdef GTM_TRIGGER
-LITDEF mval literal_hashlabel	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHLABEL_LEN, (char *)LITERAL_HASHLABEL, 0, 0);	/* BYPASSOK */
-LITDEF mval literal_hashcycle	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHCYCLE_LEN, (char *)LITERAL_HASHCYCLE, 0, 0);	/* BYPASSOK */
-LITDEF mval literal_hashcount	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHCOUNT_LEN, (char *)LITERAL_HASHCOUNT, 0, 0);	/* BYPASSOK */
+LITDEF mval literal_curlabel	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, HASHT_GBL_CURLABEL_LEN, (char *)HASHT_GBL_CURLABEL, 0, HASHT_GBL_CURLABEL_INT * MV_BIAS);	/* BYPASSOK */
+LITDEF mval literal_hashlabel	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHLABEL_LEN,  (char *)LITERAL_HASHLABEL, 0, 0);	/* BYPASSOK */
+LITDEF mval literal_hashcycle	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHCYCLE_LEN,  (char *)LITERAL_HASHCYCLE, 0, 0);	/* BYPASSOK */
+LITDEF mval literal_hashcount	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHCOUNT_LEN,  (char *)LITERAL_HASHCOUNT, 0, 0);	/* BYPASSOK */
+LITDEF mval literal_hashtrhash	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX,  0, 0, LITERAL_HASHTRHASH_LEN, (char *)LITERAL_HASHTRHASH, 0, 0);/* BYPASSOK */
 
 #define TRIGGER_SUBSDEF(SUBSTYPE, SUBSNAME, LITMVALNAME, TRIGFILEQUAL, PARTOFHASH)	\
 	LITDEF mval LITMVALNAME = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, STR_LIT_LEN(SUBSNAME), (char *)SUBSNAME, 0, 0);

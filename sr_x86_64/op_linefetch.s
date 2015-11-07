@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007, 2009 Fidelity Information Services, Inc       #
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,33 +10,29 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_linefetch.s
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "linkage.si"
-	.INCLUDE	"g_msf.si"
-
-	.sbttl	op_linefetch
-#	PAGE	+
-	.DATA
-.extern	frame_pointer
+	.data
+	.extern	frame_pointer
 
 	.text
-.extern	gtm_fetch
+	.extern	gtm_fetch
 
-# PUBLIC	op_linefetch
-ENTRY op_linefetch
-	movq	frame_pointer(REG_IP),REG64_ACCUM
-	popq	msf_mpc_off(REG64_ACCUM)            # save incoming return PC in frame_pointer->mpc
-	movq	REG_PV, msf_ctxt_off(REG64_ACCUM)   # Save linkage pointer
-	movb    $0,REG8_ACCUM                       # variable length argument
+	#
+	# This routine does local variable fetch for all variables on a given line of code, or alternatively, all
+	# variables in a routine depending on arguments from generated code we pass-thru.
+	#
+	# Since this routine pops its return address off the stack, the stack becomes 16 byte aligned. Verify that.
+	#
+ENTRY	op_linefetch
+	movq	frame_pointer(REG_IP), REG64_ACCUM
+	popq	msf_mpc_off(REG64_ACCUM)		# Save incoming return PC in frame_pointer->mpc
+	movq	REG_PV, msf_ctxt_off(REG64_ACCUM)	# Save linkage pointer
+	CHKSTKALIGN					# Verify stack alignment
+	movb    $0, REG8_ACCUM				# No variable length arguments
 	call	gtm_fetch
-	movq	frame_pointer(REG_IP),REG64_ACCUM
-	pushq	msf_mpc_off(REG64_ACCUM)
+	movq	frame_pointer(REG_IP), REG64_ACCUM
+	pushq	msf_mpc_off(REG64_ACCUM)		# Push return address back on stack for return
 	ret
-# op_linefetch ENDP
-
-# END

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2004-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,6 +80,13 @@
 #endif
 #define MAX_TRANS_NAME_LEN			GTM_PATH_MAX
 
+/* Remove trailing '/' from path (unless only '/') */
+#define	REMOVE_TRAILING_SLASH_FROM_MSTR(TRANS)				\
+{									\
+	while ((1 < TRANS.len) && ('/' == TRANS.addr[TRANS.len - 1]))	\
+		TRANS.len--;						\
+}
+
 GBLREF	uint4			gtm_principal_editing_defaults;	/* ext_cap flags if tt */
 GBLREF	boolean_t		is_gtm_chset_utf8;
 GBLREF	boolean_t		utf8_patnumeric;
@@ -94,6 +102,7 @@ GBLREF	boolean_t		ipv4_only;		/* If TRUE, only use AF_INET. */
 ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
 ZOS_ONLY(GBLREF	boolean_t	gtm_tag_utf8_as_ascii;)
 GTMTRIG_ONLY(GBLREF	mval	gtm_trigger_etrap;)
+GBLREF	volatile boolean_t	timer_in_handler;
 
 #ifdef GTM_TRIGGER
 LITDEF mval default_mupip_trigger_etrap = DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , (SIZEOF(DEFAULT_MUPIP_TRIGGER_ETRAP) - 1),
@@ -119,15 +128,18 @@ static readonly unsigned char editing_index[27] =
 static readonly unsigned char init_break[1] = {'B'};
 
 error_def(ERR_INVLINKTMPDIR);
+error_def(ERR_INVTMPDIR);
+error_def(ERR_ARCTLMAXHIGH);
+error_def(ERR_ARCTLMAXLOW);
 
 void	gtm_env_init_sp(void)
 {	/* Unix only environment initializations */
 	mstr		val, trans;
 	int4		status, index, len, hrtbt_cntr_delta, stat_res;
 	size_t		cwdlen;
-	boolean_t	ret, is_defined;
+	boolean_t	ret, is_defined, novalidate;
 	char		buf[MAX_TRANS_NAME_LEN], *token, cwd[GTM_PATH_MAX];
-	char		*cwdptr, *trigger_etrap, *c, *end;
+	char		*cwdptr, *trigger_etrap, *c, *end, *strtokptr;
 	struct stat	outbuf;
 	int		gtm_autorelink_shm_min;
 	DCL_THREADGBL_ACCESS;
@@ -137,8 +149,9 @@ void	gtm_env_init_sp(void)
 	libhugetlbfs_init();
 #	endif
 #	ifdef __MVS__
-	/* For now OS/390 only. Eventually, this will be added to all UNIX platforms along with the
-	 * capability to specify the desired directory to put a core file in.
+	/* For now OS/390 only. Eventually, this could be added to all UNIX platforms along with the
+	 * capability to specify the desired directory to put a core file in. Needs to be setup before
+	 * much of anything else is.
 	 */
 	if (NULL == gtm_core_file)
 	{
@@ -158,6 +171,25 @@ void	gtm_env_init_sp(void)
 		} /* else gtm_core_file/gtm_core_putenv remain null and we likely cannot generate proper core files */
 	}
 #	endif
+	/* Validate $gtm_tmp if specified, else that default is available */
+	val.addr = GTM_TMP_ENV;
+	val.len = SIZEOF(GTM_TMP_ENV) - 1;
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
+		MEMCPY_LIT(buf, DEFAULT_GTM_TMP);
+		trans.addr = buf;
+		trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
+	}
+	assert(GTM_PATH_MAX > trans.len);
+	REMOVE_TRAILING_SLASH_FROM_MSTR(trans); /* Remove trailing '/' from trans.addr */
+	trans.addr[trans.len] = '\0';
+	STAT_FILE(trans.addr, &outbuf, stat_res);
+	if ((-1 == stat_res) || !S_ISDIR(outbuf.st_mode))
+	{
+		/* Either the directory doesn't exist or the specified or defaulted entity is not a directory */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4)	ERR_INVTMPDIR, 2, trans.len, trans.addr);
+	}
+	/* Check for and and setup gtm_quiet_halt if specified */
 	val.addr = GTM_QUIET_HALT;
 	val.len = SIZEOF(GTM_QUIET_HALT) - 1;
 	ret = logical_truth_value(&val, FALSE, &is_defined);
@@ -195,7 +227,7 @@ void	gtm_env_init_sp(void)
 	{
 		assert(trans.len < SIZEOF(buf));
 		trans.addr[trans.len] = '\0';
-		token = strtok(trans.addr, ":");
+		token = STRTOK_R(trans.addr, ":", &strtokptr);
 		while (NULL != token)
 		{
 			if (ISALPHA_ASCII(token[0]))
@@ -206,33 +238,33 @@ void	gtm_env_init_sp(void)
 			{
 				switch (index)
 				{
-				case 0:	/* EDITING */
-					gtm_principal_editing_defaults |= TT_EDITING;
-					break;
-				case 1:	/* EMPTERM */
-					gtm_principal_editing_defaults |= TT_EMPTERM;
-					break;
-				case 2:	/* INSERT */
-					gtm_principal_editing_defaults &= ~TT_NOINSERT;
-					break;
-				case 3:	/* NOEDITING */
-					gtm_principal_editing_defaults &= ~TT_EDITING;
-					break;
-				case 4:	/* NOEMPTERM */
-					gtm_principal_editing_defaults &= ~TT_EMPTERM;
-					break;
-				case 5:	/* NOINSERT */
-					gtm_principal_editing_defaults |= TT_NOINSERT;
-					break;
+					case 0:	/* EDITING */
+						gtm_principal_editing_defaults |= TT_EDITING;
+						break;
+					case 1:	/* EMPTERM */
+						gtm_principal_editing_defaults |= TT_EMPTERM;
+						break;
+					case 2:	/* INSERT */
+						gtm_principal_editing_defaults &= ~TT_NOINSERT;
+						break;
+					case 3:	/* NOEDITING */
+						gtm_principal_editing_defaults &= ~TT_EDITING;
+						break;
+					case 4:	/* NOEMPTERM */
+						gtm_principal_editing_defaults &= ~TT_EMPTERM;
+						break;
+					case 5:	/* NOINSERT */
+						gtm_principal_editing_defaults |= TT_NOINSERT;
+						break;
 				}
 			}
-			token = strtok(NULL, ":");
+			token = STRTOK_R(NULL, ":", &strtokptr);
 		}
 	}
 	val.addr = GTM_CHSET_ENV;
 	val.len = STR_LIT_LEN(GTM_CHSET_ENV);
 	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))
-		&& STR_LIT_LEN(UTF8_NAME) == trans.len)
+	    && STR_LIT_LEN(UTF8_NAME) == trans.len)
 	{
 		if (!strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
 		{
@@ -241,7 +273,7 @@ void	gtm_env_init_sp(void)
 			val.addr = GTM_CHSET_LOCALE_ENV;
 			val.len = STR_LIT_LEN(GTM_CHSET_LOCALE_ENV);
 			if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))) &&
-				(0 < trans.len))
+			    (0 < trans.len))
 			{	/* full path to 64 bit ASCII UTF-8 locale object */
 				gtm_utf8_locale_object = malloc(trans.len + 1);
 				strcpy(gtm_utf8_locale_object, buf);
@@ -258,8 +290,8 @@ void	gtm_env_init_sp(void)
 			val.addr = GTM_PATNUMERIC_ENV;
 			val.len = STR_LIT_LEN(GTM_PATNUMERIC_ENV);
 			if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))
-				&& STR_LIT_LEN(UTF8_NAME) == trans.len
-				&& !strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
+			    && STR_LIT_LEN(UTF8_NAME) == trans.len
+			    && !strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
 			{
 				utf8_patnumeric = TRUE;
 			}
@@ -345,36 +377,46 @@ void	gtm_env_init_sp(void)
 		init_relink_allowed(&trans); /* set TREF(relink_allowed) */
 	}
 #	ifdef AUTORELINK_SUPPORTED
-	/* Set default or supplied value for $gtm_linktmpdir */
-	val.addr = GTM_LINKTMPDIR;
-	val.len = SIZEOF(GTM_LINKTMPDIR) - 1;
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
-	{	/* Else use default $gtm_tmp value or its default */
-		val.addr = GTM_TMP_ENV;
-		val.len = SIZEOF(GTM_TMP_ENV) - 1;
+	if (!IS_GTMSECSHR_IMAGE)
+	{	/* Set default or supplied value for $gtm_linktmpdir */
+		val.addr = GTM_LINKTMPDIR;
+		val.len = SIZEOF(GTM_LINKTMPDIR) - 1;
 		if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
-		{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
-			trans.addr = DEFAULT_GTM_TMP;
-			trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
+		{	/* Else use default $gtm_tmp value or its default */
+			val.addr = GTM_TMP_ENV;
+			val.len = SIZEOF(GTM_TMP_ENV) - 1;
+			if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+			{	/* Nothing for $gtm_tmp either - use DEFAULT_GTM_TMP which is already a string */
+				trans.addr = DEFAULT_GTM_TMP;
+				trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
+			}
+			novalidate = TRUE;		/* Don't validate gtm_linktmpdir if is defaulting to $gtm_tmp */
+		} else
+			novalidate = FALSE;
+		assert(GTM_PATH_MAX > trans.len);
+		REMOVE_TRAILING_SLASH_FROM_MSTR(trans); /* Remove trailing '/' from trans.addr */
+		(TREF(gtm_linktmpdir)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
+		(TREF(gtm_linktmpdir)).len = trans.len;
+		/* For now, we assume that if the environment variable is defined to NULL, anticipatory freeze is NOT in effect */
+		if (0 < trans.len)
+			memcpy((TREF(gtm_linktmpdir)).addr, trans.addr, trans.len);
+		((TREF(gtm_linktmpdir)).addr)[trans.len] = '\0';
+		if (!novalidate)
+		{	/* $gtm_linktmpdir was specified - validate it (bypass if using $gtm_tmp or its default as that was
+			 * already checked earlier.
+			 */
+			STAT_FILE((TREF(gtm_linktmpdir)).addr, &outbuf, stat_res);
+			if ((-1 == stat_res) || !S_ISDIR(outbuf.st_mode))
+			{	/* Either the directory doesn't exist or the entity is not a directory */
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4)
+					     ERR_INVLINKTMPDIR, 2, (TREF(gtm_linktmpdir)).len, (TREF(gtm_linktmpdir)).addr);
+				free((TREF(gtm_linktmpdir)).addr);
+				trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
+				trans.addr = DEFAULT_GTM_TMP;
+				REMOVE_TRAILING_SLASH_FROM_MSTR(trans); /* Remove trailing '/' from trans.addr */
+				(TREF(gtm_linktmpdir)) = trans;
+			}
 		}
-	}
-	assert(GTM_PATH_MAX > trans.len);
-	/* Remove trailing '/' from path */
-	while ((1 < trans.len) && ('/' == trans.addr[trans.len - 1]))
-		trans.len--;
-	(TREF(gtm_linktmpdir)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
-	(TREF(gtm_linktmpdir)).len = trans.len;
-	/* For now, we assume that if the environment variable is defined to NULL, anticipatory freeze is NOT in effect */
-	if (0 < trans.len)
-		memcpy((TREF(gtm_linktmpdir)).addr, trans.addr, trans.len);
-	((TREF(gtm_linktmpdir)).addr)[trans.len] = '\0';
-	STAT_FILE((TREF(gtm_linktmpdir)).addr, &outbuf, stat_res);
-	if ((-1 == stat_res) || !S_ISDIR(outbuf.st_mode))
-	{	/* Either the directory doesn't exist or the entity is not a directory */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVLINKTMPDIR, 2, (TREF(gtm_linktmpdir)).len,
-			     (TREF(gtm_linktmpdir)).addr);
-		(TREF(gtm_linktmpdir)).len = SIZEOF(DEFAULT_GTM_TMP) - 1;
-		(TREF(gtm_linktmpdir)).addr = DEFAULT_GTM_TMP;
 	}
 	/* See if gtm_autorelink_shm is set */
 	val.addr = GTM_AUTORELINK_SHM;
@@ -393,6 +435,23 @@ void	gtm_env_init_sp(void)
 	TREF(gtm_autorelink_keeprtn) = logical_truth_value(&val, FALSE, &is_defined);
 	if (!is_defined)
 		TREF(gtm_autorelink_keeprtn) = FALSE;
+	/* See if gtm_autorelink_ctlmax is set */
+	val.addr = GTM_AUTORELINK_CTLMAX;
+	val.len = SIZEOF(GTM_AUTORELINK_CTLMAX) - 1;
+	TREF(gtm_autorelink_ctlmax) = trans_numeric(&val, &is_defined, TRUE);
+	if (!is_defined)
+		TREF(gtm_autorelink_ctlmax) = RELINKCTL_DEFAULT_ENTRIES;
+	else if (TREF(gtm_autorelink_ctlmax) > RELINKCTL_MAX_ENTRIES)
+	{
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ARCTLMAXHIGH, 4, LEN_AND_LIT(GTM_AUTORELINK_CTLMAX),
+			     TREF(gtm_autorelink_ctlmax), RELINKCTL_MAX_ENTRIES);
+		TREF(gtm_autorelink_ctlmax) = RELINKCTL_MAX_ENTRIES;
+	} else if (TREF(gtm_autorelink_ctlmax) < RELINKCTL_MIN_ENTRIES)
+	{
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ARCTLMAXLOW, 4, LEN_AND_LIT(GTM_AUTORELINK_CTLMAX),
+			     TREF(gtm_autorelink_ctlmax), RELINKCTL_MIN_ENTRIES);
+		TREF(gtm_autorelink_ctlmax) = RELINKCTL_MIN_ENTRIES;
+	}
 #	endif /* AUTORELINK_SUPPORTED */
 #	ifdef DEBUG
 	/* DEBUG-only option to bypass 'easy' methods of things and always use gtmsecshr for IPC cleanups, wakeups, file removal,

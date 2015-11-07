@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2006 Fidelity Information Services, Inc	;
+; Copyright (c) 2001, 2015 Fidelity National Information	;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -158,18 +159,23 @@
  Write $Char(9),cnt_"};",!
  If ansiopen Use outansi Write $Char(9),"};",! Close outansi
  Quit
-hdr New year
- Set year=$ZDATE($Horolog,"YEAR")
- Write "/****************************************************************",!
- Write " *",$Char(9,9,9,9,9,9,9,9),"*",!
- Write " *",$Char(9),"Copyright 2001"
- Write:year'=2001 ",",year Write " Fidelity Information Services, Inc",$Char(9),"*",!
- Write " *",$Char(9,9,9,9,9,9,9,9),"*",!
- Write " *",$Char(9),"This source code contains the intellectual property",$Char(9),"*",!
- Write " *",$Char(9),"of its copyright holder(s), and is made available",$Char(9),"*",!
- Write " *",$Char(9),"under a license.  If you do not know the terms of",$Char(9),"*",!
- Write " *",$Char(9),"the license, please stop and do not read further.",$Char(9),"*",!
- Write " *",$Char(9,9,9,9,9,9,9,9),"*",!
- Write " ****************************************************************/",!!
+hdr
+ Set prevout=$IO
+ If vms Set cfile=$ztrnlnm("gtm$src")_"copyright.txt"
+ If 'vms Set cfile=$ztrnlnm("gtm_tools")_"/copyright.txt"
+ Set xxxx="2001"
+ Set yyyy=$zdate($H,"YYYY")
+ Open cfile:read
+ Use prevout w "/****************************************************************",!
+ For i=1:1 Use cfile Read line Quit:$zeof  Do
+ . If (1<$zl(line,"XXXX")) Do
+ . . Set str=$zpiece(line,"XXXX",1)_xxxx_$zpiece(line,"XXXX",2)
+ . . Set str=$zpiece(str,"YYYY",1)_yyyy_$zpiece(str,"YYYY",2)
+ . Else  Do
+ . . Set str=line
+ . Use prevout Write " *"_str_"*",!
+ Close cfile
+ Use prevout
+ Write " ****************************************************************/",!
  Quit
  ;

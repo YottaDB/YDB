@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +35,7 @@
 #include "gtm_utf8.h"
 #endif
 #include "gtmcrypt.h"
+#include "error.h"
 
 GBLREF	io_pair		io_curr_device;
 GBLREF	spdesc		stringpool;
@@ -69,9 +71,11 @@ void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned cha
 	unsigned char   *delimend;
 	io_desc         *iod;
 	d_rm_struct	*rm_ptr;
+	boolean_t	ch_set;
 
 	assert(0 <= datalen);
 	iod = io_curr_device.in;
+	ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);
 	rm_ptr = (d_rm_struct *)(iod->dev_sp);
 	assert(NULL != rm_ptr);
 	vmvalptr->str.len = datalen;
@@ -102,6 +106,7 @@ void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned cha
 	len = SIZEOF(ONE_COMMA) - 1;
 	memcpy(iod->dollar.device, ONE_COMMA, len);
 	memcpy(&iod->dollar.device[len], BADCHAR_DEVICE_MSG, SIZEOF(BADCHAR_DEVICE_MSG));
+	REVERT_GTMIO_CH(&io_curr_device, ch_set);
 }
 #endif
 
@@ -149,7 +154,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	int		fstat_res;
 	off_t		cur_position;
 	int		bom_size_toread;
-
+	boolean_t	ch_set;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -161,6 +166,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	assert(stringpool.free <= stringpool.top);
 
 	io_ptr = io_curr_device.in;
+	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	/* don't allow a read from a writeonly fifo */
 	if (((d_rm_struct *)io_ptr->dev_sp)->write_only)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEWRITEONLY);
@@ -229,7 +235,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	if (!rm_ptr->fifo && !rm_ptr->pipe && (2 < rm_ptr->fildes) && (RM_WRITE == rm_ptr->lastop))
 	{
 		/* need to do an lseek to get current location in file */
-		cur_position = lseek(rm_ptr->fildes, (off_t)0, SEEK_CUR);
+		cur_position = lseek(rm_ptr->fildes, 0, SEEK_CUR);
 		if ((off_t)-1 == cur_position)
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
@@ -240,10 +246,10 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		if (!rm_ptr->fixed && !utf_active)
 		{
 			/* move input stream */
-			if (-1 == fseek(rm_ptr->filstr, (long)rm_ptr->file_pos, SEEK_SET))
+			if ((off_t)-1 == fseeko(rm_ptr->filstr, rm_ptr->file_pos, SEEK_SET))
 			{
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
-					      RTS_ERROR_LITERAL("fseek"),
+					      RTS_ERROR_LITERAL("fseeko"),
 					      RTS_ERROR_LITERAL("iorm_readfl()"), CALLFROM, errno);
 			}
 		}
@@ -278,15 +284,14 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					bom_size_toread = 0;
 				if (0 < bom_size_toread)
 				{
-					if ((off_t)-1 == lseek(fildes, (off_t)0, SEEK_SET))
+					if ((off_t)-1 == lseek(fildes, 0, SEEK_SET))
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
 							      RTS_ERROR_LITERAL("lseek"), RTS_ERROR_LITERAL(
 								      "Error setting file pointer to beginning of file"),
 							      CALLFROM, errno);
-
 					rm_ptr->bom_num_bytes = open_get_bom(io_ptr, bom_size_toread);
 					/* move back to previous file position */
-					if ((off_t)-1 == lseek(fildes, (off_t)rm_ptr->file_pos, SEEK_SET))
+					if ((off_t)-1 == lseek(fildes, rm_ptr->file_pos, SEEK_SET))
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
 							      RTS_ERROR_LITERAL("lseek"), RTS_ERROR_LITERAL(
 								      "Error restoring file pointer"), CALLFROM, errno);
@@ -468,7 +473,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					msec_timeout = -1;
                                         out_of_time = TRUE;
                                 } else
-					msec_timeout = (int4)(cur_time.at_sec * 1000 + cur_time.at_usec / 1000);
+					msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+							      DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
 				if (rm_ptr->follow && !out_of_time && !msec_timeout)
 					msec_timeout = 1;
 				PIPE_DEBUG(PRINTF("piperfl: Taking timeout end time from read restart data - "
@@ -520,7 +526,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							msec_timeout = -1;
 							out_of_time = TRUE;
 						} else
-							msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+							msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
+									DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
 						/* make sure it terminates with out_of_time */
 						if (!out_of_time && !msec_timeout)
 							msec_timeout = 1;
@@ -564,8 +571,9 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 								msec_timeout = -1;
 								out_of_time = TRUE;
 							} else
-								msec_timeout = (int4)(time_left.at_sec * 1000 +
-										      time_left.at_usec / 1000);
+								msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
+										      DIVIDE_ROUND_UP(time_left.at_usec,
+												      MICROSECS_IN_MSEC));
 
 							/* make sure it terminates with out_of_time */
 							if (!out_of_time && !msec_timeout)
@@ -597,6 +605,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							stringpool.free += tot_bytes_read; /* Don't step on our parade in
 											      the interrupt */
 							(TREF(pipefifo_interrupt))++;
+							REVERT_GTMIO_CH(&io_curr_device, ch_set);
 							outofband_action(FALSE);
 							assertpro(FALSE);	/* Should *never* return from outofband_action */
 							return FALSE;	/* For the compiler.. */
@@ -667,6 +676,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					rm_ptr->mupintr = TRUE;
 					stringpool.free += tot_bytes_read;	/* Don't step on our parade in the interrupt */
 					(TREF(pipefifo_interrupt))++;
+					REVERT_GTMIO_CH(&io_curr_device, ch_set);
 					outofband_action(FALSE);
 					assertpro(FALSE);	/* Should *never* return from outofband_action */
 					return FALSE;	/* For the compiler.. */
@@ -687,7 +697,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 						msec_timeout = -1;
 						out_of_time = TRUE;
 					} else
-						msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+						msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
+								      DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
 					/* make sure it terminates with out_of_time */
 					if (!out_of_time && !msec_timeout)
 						msec_timeout = 1;
@@ -746,8 +757,9 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 									msec_timeout = -1;
 									out_of_time = TRUE;
 								} else
-									msec_timeout = (int4)(time_left.at_sec * 1000 +
-											      time_left.at_usec / 1000);
+									msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
+											      DIVIDE_ROUND_UP(time_left.at_usec,
+													      MICROSECS_IN_MSEC));
 
 								/* make sure it terminates with out_of_time */
 								if (!out_of_time && !msec_timeout)
@@ -780,6 +792,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 								stringpool.free += tot_bytes_read; /* Don't step on our parade
 												      in the interrupt */
 								(TREF(pipefifo_interrupt))++;
+								REVERT_GTMIO_CH(&io_curr_device, ch_set);
 								outofband_action(FALSE);
 								/* Should *never* return from outofband_action */
 								assertpro(FALSE);
@@ -888,6 +901,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					rm_ptr->mupintr = TRUE;
 					stringpool.free += tot_bytes_read;	/* Don't step on our parade in the interrupt */
 					(TREF(pipefifo_interrupt))++;
+					REVERT_GTMIO_CH(&io_curr_device, ch_set);
 					outofband_action(FALSE);
 					assertpro(FALSE);	/* Should *never* return from outofband_action */
 					return FALSE;	/* For the compiler.. */
@@ -939,6 +953,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					pipeintr->bytes_read = 0;
 					rm_ptr->mupintr = TRUE;
 					(TREF(pipefifo_interrupt))++;
+					REVERT_GTMIO_CH(&io_curr_device, ch_set);
 					outofband_action(FALSE);
 					assertpro(FALSE);	/* Should *never* return from outofband_action */
 					return FALSE;	/* For the compiler.. */
@@ -1080,7 +1095,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							msec_timeout = -1;
 							out_of_time = TRUE;
 						} else
-							msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+							msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
+									DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
 
 						/* make sure it terminates with out_of_time */
 						if (!out_of_time && !msec_timeout)
@@ -1136,6 +1152,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 						rm_ptr->mupintr = TRUE;
 						(TREF(pipefifo_interrupt))++;
 						PIPE_DEBUG(PRINTF(" %d utf1.1 stream outofband\n", pid); DEBUGPIPEFLUSH);
+						REVERT_GTMIO_CH(&io_curr_device, ch_set);
 						outofband_action(FALSE);
 						assertpro(FALSE);	/* Should *never* return from outofband_action */
 						return FALSE;	/* For the compiler.. */
@@ -1211,8 +1228,10 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 										msec_timeout = -1;
 										out_of_time = TRUE;
 									} else
-										msec_timeout = (int4)(time_left.at_sec * 1000 +
-												      time_left.at_usec / 1000);
+										msec_timeout = (int4)(time_left.at_sec *
+												MILLISECS_IN_SEC +
+												DIVIDE_ROUND_UP(time_left.at_usec,
+												MICROSECS_IN_MSEC));
 
 									/* make sure it terminates with out_of_time */
 									if (!out_of_time && !msec_timeout)
@@ -1261,6 +1280,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 									/* Don't step on our parade in the interrupt */
 									stringpool.free += bytes_count;
 									(TREF(pipefifo_interrupt))++;
+									REVERT_GTMIO_CH(&io_curr_device, ch_set);
 									outofband_action(FALSE);
 									assertpro(FALSE);	/* Should *never* return from
 											   outofband_action */
@@ -1328,6 +1348,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							/* Don't step on our parade in the interrupt */
 							stringpool.free += bytes_count;
 							(TREF(pipefifo_interrupt))++;
+							REVERT_GTMIO_CH(&io_curr_device, ch_set);
 							outofband_action(FALSE);
 							assertpro(FALSE);	/* Should *never* return from outofband_action */
 							return FALSE;	/* For the compiler.. */
@@ -1655,6 +1676,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		{
 			if (TRUE == io_ptr->dollar.zeof)
 				io_ptr->dollar.zeof = FALSE; /* no EOF in follow mode */
+			REVERT_GTMIO_CH(&io_curr_device, ch_set);
 			return FALSE;
 		}
 		/* on end of file set $za to 9 */
@@ -1720,5 +1742,6 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	if (follow_timeout)
 		ret = FALSE;
 	assert (FALSE == rm_ptr->mupintr);
+	REVERT_GTMIO_CH(&io_curr_device, ch_set);
 	return (rm_ptr->pipe && out_of_time) ? FALSE : ret;
 }

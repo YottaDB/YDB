@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +33,8 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	unsigned char		*msp_save;
 	unsigned int		x1, x2;
 
+	assert(NULL != rtn_base);
+	assert(NULL != transfer_addr);
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	msp_save = msp;
 	sf = (stack_frame *)(msp -= SIZEOF(stack_frame));
@@ -40,9 +43,9 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 		if (msp <= stacktop)
 		{
 			msp = msp_save;
-			rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
 		} else
-			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
 	}
 	assert((unsigned char *)msp < stackbase);
 	sf->old_frame_pointer = frame_pointer;
@@ -55,9 +58,9 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	SET_GLVN_INDX(sf, GLVN_POOL_UNTOUCHED);
 	sf->ret_value = NULL;
 	sf->dollar_test = -1;
-#ifdef HAS_LITERAL_SECT
+#	ifdef HAS_LITERAL_SECT
 	sf->literal_ptr = (int4 *)LITERAL_ADR(rtn_base);
-#endif
+#	endif
 	sf->temp_mvals = sf->rvector->temp_mvals;
 	msp -= x1 = rtn_base->temp_size;
 	sf->temps_ptr = msp;
@@ -69,16 +72,17 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 		if (msp <= stacktop)
 		{
 			msp = msp_save;
-			rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
 		} else
-			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
 	}
 	assert(msp < stackbase);
 	memset(msp, 0, x1 + x2);
 	frame_pointer = sf;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
-	DBGEHND((stderr, "new_stack_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr"\n",
-		 sf, msp_save, msp));
+	DBGEHND((stderr, "new_stack_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr
+		 " for routine %.*s (rtnhdr 0x"lvaddr")\n", sf, msp_save, msp, rtn_base->routine_name.len,
+		 rtn_base->routine_name.addr, rtn_base));
 	return;
 }
 

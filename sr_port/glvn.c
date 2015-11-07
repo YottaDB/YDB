@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +21,9 @@ error_def(ERR_VAREXPECTED);
 
 int glvn(oprtype *a)
 {
-	triple		*oldchain, *ref;
 	oprtype		x1;
 	save_se		save_state;
+	triple		*oldchain, *ref;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

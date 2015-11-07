@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,7 +92,10 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	assert(csa->jnl_state == csd->jnl_state);
 	assertpro(JNL_ENABLED(csa) && (NOJNL != jpc->channel) && (!JNL_FILE_SWITCHED(jpc)));
 		/* crit and messing with the journal file - how could it have vanished? */
-	if (!csd->jnl_deq || (csd->jnl_alq + csd->jnl_deq > csd->autoswitchlimit))
+	if (!total_jnl_rec_size)
+	{	/* rec_size=0 has special meaning. Caller (source server for now) wants to force an autoswitch. */
+		new_blocks = 0;
+	} else if (!csd->jnl_deq || (csd->jnl_alq + csd->jnl_deq > csd->autoswitchlimit))
 	{
 		assert(DIVIDE_ROUND_UP(total_jnl_rec_size, DISK_BLOCK_SIZE) <= csd->jnl_alq);
 		assert(csd->jnl_alq == csd->autoswitchlimit);
@@ -103,13 +107,14 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	jb = jpc->jnl_buff;
 	assert(0 <= new_blocks);
 	DEBUG_ONLY(count = 0);
-	for (need_extend = (jb->last_eof_written || (0 != new_blocks)); need_extend; )
+	do
 	{
 		DEBUG_ONLY(count++);
-		/* usually we will do the loop just once where we do the file extension.
-		 * rarely we might need to do an autoswitch instead after which again rarely
-		 * 	we might need to do an extension on the new journal to fit in the transaction's	journal requirements.
-		 * therefore we should do this loop a maximum of twice. hence the assert below.
+		/* Usually we will do the loop just once where we do the file extension.
+		 * Rarely we might need to do an autoswitch instead.
+		 * Even more rarely, we might need to do a file extension of the autoswitched journal to fit in the
+		 * transaction's journal requirements (because journal file initial allocation did not fit it).
+		 * Therefore we should do this loop a maximum of twice. Assert it.
 		 */
 		assert(count <= 2);
 		need_extend = FALSE;
@@ -133,8 +138,8 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					{
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_NOSPACEEXT, 4,
 								JNL_LEN_STR(csd), new_blocks, avail_blocks);
-						new_blocks = 0;
-						jpc->status = SS_NORMAL;
+						new_blocks = -1;
+						jpc->status = ERR_NOSPACEEXT;
 						break;
 					} else
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_NOSPACEEXT), 4,
@@ -151,8 +156,8 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 		if (csd->autoswitchlimit < (jb->filesize + (EXTEND_WARNING_FACTOR * new_blocks)))	/* close to max */
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLSPACELOW, 3, JNL_LEN_STR(csd),
 					csd->autoswitchlimit - jb->filesize);
-		if (jb->last_eof_written || (csd->autoswitchlimit < new_alq))
-		{	/* Reached max, need to autoswitch */
+		if (jb->last_eof_written || (csd->autoswitchlimit < new_alq) || !new_blocks)
+		{	/* Reached max OR caller wants to switch unconditionally. Need to autoswitch */
 			/* Ensure new journal file can hold the entire current transaction's journal record requirements */
 			assert(csd->autoswitchlimit >= MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size));
 			memset(&jnl_info, 0, SIZEOF(jnl_info));
@@ -296,10 +301,10 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			}
 			jb->filesize = new_alq;	/* Actually this is virtual file size blocks */
 		}
-		if (0 >= new_blocks)
+		if (0 > new_blocks)
 			break;
-	}
-	if (0 < new_blocks)
+	} while (need_extend);
+	if (0 <= new_blocks)
 	{
 		INCR_GVSTATS_COUNTER(csa, csa->nl, n_jnl_extends, 1);
 		return EXIT_NRM;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,11 +17,14 @@
 #include "min_max.h"
 #include <rtnhdr.h>
 #include "gtmlink.h"
+#include "error.h"
+#include "gtmio.h"
 
 #ifdef AUTORELINK_SUPPORTED /* This entire file */
+GBLREF	int	object_file_des;
 
-/* Routine called from op_rhd_ext() to determine if the routine being called needs to be relinked. To return TRUE,
- * the following conditions must be met:
+/* Routine called from auto_relink_check() and op_rhdadd() to determine if the routine being called needs to be relinked.
+ * To return TRUE, the following conditions must be met:
  *   1. Auto-relinking must be enabled in the directory the routine was located in (which may be different from the
  *      directory of the current routine by the same name).
  *   2. This must be a newer version of the routine than what is currently linked.
@@ -37,20 +41,23 @@ boolean_t need_relink(rhdtyp *rtnhdr, zro_hist *zhist)
 {
 	zro_validation_entry	*iter;
 	uint4			cur_cycle, rtnnmlen;
+	boolean_t		norecurslink;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(NULL != zhist);		/* Shouldn't be called unless relinking is possible */
-	/* TODO: Do this check second, if below logic would return TRUE */
-	if ((LINK_NORECURSIVE == TREF(relink_allowed)) && on_stack(rtnhdr, NULL))
-		return FALSE;	/* can't relink, or else we'll get LOADRUNNING */
 	/* If $ZROUTINES cycle has changed since validation list was created, signal relink but the relink only
 	 * actually happens if the file op_zlink() locates has a different object hashcode than the currently
 	 * linked routine - else it just rebuilds the history and calls it good.
 	 */
 	if (zhist->zroutines_cycle != TREF(set_zroutines_cycle))
+	{	/* Check if we can return TRUE for this routine */
+		if ((LINK_NORECURSIVE == TREF(relink_allowed)) && on_stack(rtnhdr, NULL))
+			return FALSE;	/* can't relink, or else we'll get LOADRUNNING */
 		return TRUE;
+	}
 	/* Traverse list corresponding to zro entries */
+	norecurslink = (LINK_NORECURSIVE == TREF(relink_allowed));
 	for (iter = &zhist->base[0]; iter != zhist->end; iter++)
 	{
 		DEBUG_ONLY(rtnnmlen = mid_len(&iter->relinkrec->rtnname_fixed));
@@ -58,7 +65,11 @@ boolean_t need_relink(rhdtyp *rtnhdr, zro_hist *zhist)
 		       && (0 == memcmp(&iter->relinkrec->rtnname_fixed, rtnhdr->routine_name.addr, rtnnmlen)));
 		cur_cycle = iter->relinkrec->cycle;
 		if (cur_cycle != iter->cycle)
+		{	/* Check if we can return TRUE for this routine */
+			if (norecurslink && on_stack(rtnhdr, NULL))
+				return FALSE;	/* can't relink, or else we'll get LOADRUNNING */
 			return TRUE;
+		}
 	}
 	return FALSE;
 }
@@ -92,9 +103,12 @@ zro_hist *zro_zhist_saverecent(zro_search_hist_ent *zhist_valent_end, zro_search
 	lcl_recent_zhist = (zro_hist *)malloc(SIZEOF(zro_hist) + (SIZEOF(zro_validation_entry) * hist_len));
 	lcl_recent_zhist->zroutines_cycle = TREF(set_zroutines_cycle);
 	lcl_recent_zhist->end = &lcl_recent_zhist->base[0] + hist_len;
+	assert(NULL == TREF(save_zhist));
+	TREF(save_zhist) = lcl_recent_zhist;
+	ESTABLISH_RET(zro_ins_rec_fail_ch, NULL);
 	for (zhist_valent = zhist_valent_base, zhent = &lcl_recent_zhist->base[0];
-		0 < hist_len;
-			zhist_valent++, zhent++, hist_len--)
+	     0 < hist_len;
+	     zhist_valent++, zhent++, hist_len--)
 	{
 		rtnname.addr = zhist_valent->rtnname.c;
 		rtnname.len = zhist_valent->rtnname_len;
@@ -105,7 +119,26 @@ zro_hist *zro_zhist_saverecent(zro_search_hist_ent *zhist_valent_end, zro_search
 		zhist_valent->zro_valent.cycle = rec->cycle;
 		memcpy((char *)zhent, (char *)&zhist_valent->zro_valent, SIZEOF(zro_validation_entry));
 	}
+	REVERT;
+	TREF(save_zhist) = NULL;
 	return lcl_recent_zhist;
+}
+
+/* Condition handler called when relinkctl_insert_record() fails. We specifically need to (1) release the zro_hist structure
+ * we allocated and (2) close the object file before driving the next condition handler.
+ */
+CONDITION_HANDLER(zro_ins_rec_fail_ch)
+{
+	int	rc;
+
+	START_CH(TRUE);
+	if (NULL != TREF(save_zhist))
+	{
+		free(TREF(save_zhist));
+		TREF(save_zhist) = NULL;
+	}
+	CLOSE_OBJECT_FILE(object_file_des, rc);		/* Close object file ignoring error (processing primary error) */
+	NEXTCH;
 }
 
 /* Routine called from zro_search_hist() to add a $ZROUTINES entry to the (local) search history for a given object file.

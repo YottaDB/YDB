@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,8 +68,6 @@ GBLREF spdesc			stringpool;
 GBLREF short			object_name_len;
 GBLREF char			object_file_name[];
 GBLREF int			object_file_des;
-
-#define PTEXT_OFFSET SIZEOF(rhdtyp)
 
 /* The sections of the internal GT.M object (sans native object wrapper) are grouped
  * according to their type (R/O-retain, R/O-release, R/W-retain, R/W-release). The

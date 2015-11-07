@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,8 +50,8 @@
 	return FALSE;												\
 }
 
-#define WRITE_4MORE_BYTES_TRUE		TRUE
-#define WRITE_4MORE_BYTES_FALSE		FALSE
+#define WRITE_ENCR_HANDLE_INDEX_TRUE	TRUE
+#define WRITE_ENCR_HANDLE_INDEX_FALSE	FALSE
 
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
@@ -71,13 +72,11 @@ error_def(ERR_RECORDSTAT);
 boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t is_any_file_encrypted)
 #elif defined(UNIX)
 boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format)
-#elif defined(VMS)
-boolean_t mu_extr_gblout(glist *gl_ptr, struct RAB *outrab, mu_extr_stats *st, int format)
 #endif
 {
 	static gv_key			*beg_gv_currkey; 	/* this is used to check key out of order condition */
 	static int			max_zwr_len = 0, index;
-	static unsigned			char	*private_blk = NULL, *zwr_buffer = NULL, *key_buffer = NULL;
+	static unsigned char		*private_blk = NULL, *zwr_buffer = NULL, *key_buffer = NULL;
 	static uint4			private_blksz = 0;
 	unsigned char			*cp2, current, *keytop, last;
 	unsigned short			out_size, rec_size;
@@ -121,21 +120,29 @@ boolean_t mu_extr_gblout(glist *gl_ptr, struct RAB *outrab, mu_extr_stats *st, i
 	keytop = &gv_currkey->base[gv_currkey->top];
 	st->recknt = st->reclen = st->keylen = st->datalen = 0;
 #	ifdef GTM_CRYPT
-	if (is_any_file_encrypted && (cs_data->is_encrypted) && (format == MU_FMT_BINARY))
+	if (is_any_file_encrypted && (format == MU_FMT_BINARY))
 	{
-		ASSERT_ENCRYPTION_INITIALIZED;	/* due to op_gvname_fast done from gv_select in mu_extract */
-		if (prev_csd != cs_data)
+		if (cs_data->is_encrypted)
 		{
-			prev_csd = cs_data;
-			index = find_reg_hash_idx(gv_cur_region);
+			ASSERT_ENCRYPTION_INITIALIZED;	/* due to op_gvname_fast done from gv_select in mu_extract */
+			if (prev_csd != cs_data)
+			{
+				prev_csd = cs_data;
+				index = find_reg_hash_idx(gv_cur_region);
+			}
+			/* We have to write the encrypted version of the block. Instead of encrypting the plain-text version of the
+			 * block, we just reference the encrypted version of the block that is already maintained in sync with the
+			 * plain-text version by wcs_wtstart and dsk_read (called eventually by mu_extr_getblk below). All we need
+			 * to make sure is that we have a private buffer allocated (of appropriate size) in which mu_extr_getblk can
+			 * return the encrypted version of the block. Do the allocation here.
+			 */
+			REALLOC_CRYPTBUF_IF_NEEDED(cs_data->blk_size);
+		} else
+		{	/* Encryption handle index of -1 indicates in an extract that the block is unencrypted. It is useful when
+			 * the extract contains a mix of encrypted and unencrypted data.
+			 */
+			index = -1;
 		}
-		/* We have to write the encrypted version of the block. Instead of encrypting the plain-text version of the
-		 * block, we just reference the encrypted version of the block that is already maintained in sync with the
-		 * plain-text version by wcs_wtstart and dsk_read (called eventually by mu_extr_getblk below). All we need to
-		 * make sure is that we have a private buffer allocated (of appropriate size) in which mu_extr_getblk can return
-		 * the encrypted version of the block. Do the allocation here.
-		 */
-		REALLOC_CRYPTBUF_IF_NEEDED(cs_data->blk_size);
 	}
 #	endif
 	for ( ; ; )
@@ -163,8 +170,7 @@ boolean_t mu_extr_gblout(glist *gl_ptr, struct RAB *outrab, mu_extr_stats *st, i
 			INTEG_ERROR_RETURN
 		blktop = (sm_uc_ptr_t)bp + bp->bsiz;
 		if (format == MU_FMT_BINARY)
-		{
-			/* At this point, gv_target->hist.h[0].curr_rec.offset points to the offset within the block at which
+		{	/* At this point, gv_target->hist.h[0].curr_rec.offset points to the offset within the block at which
 			 * the desired record exists. If this record is *not* the first record in the block (possible due to
 			 * concurrent updates), the compression count for that record would be non-zero which means we cannot
 			 * initiate a write to the extract file starting from this offset as the 'mupip load' command would
@@ -178,9 +184,7 @@ boolean_t mu_extr_gblout(glist *gl_ptr, struct RAB *outrab, mu_extr_stats *st, i
 			out_size = blktop - (sm_uc_ptr_t)rp;
 			out = (sm_uc_ptr_t)rp;
 #			ifdef GTM_CRYPT
-			if (!is_any_file_encrypted || !cs_data->is_encrypted)
-				index = -1;	/* tells MUPIP LOAD that this block is NOT encrypted */
-			else
+			if (cs_data->is_encrypted)
 			{
 				assert(NULL != encrypted_bp);
 				assert(encrypted_bp->bsiz == bp->bsiz);
@@ -190,10 +194,12 @@ boolean_t mu_extr_gblout(glist *gl_ptr, struct RAB *outrab, mu_extr_stats *st, i
 				out = (sm_uc_ptr_t)encrypted_bp + SIZEOF(blk_hdr);
 				assert(-1 != index);
 			}
+			WRITE_BIN_EXTR_BLK(out, out_size,
+				is_any_file_encrypted ? WRITE_ENCR_HANDLE_INDEX_TRUE : WRITE_ENCR_HANDLE_INDEX_FALSE, index);
 #			else
 			index = -1;
+			WRITE_BIN_EXTR_BLK(out, out_size, WRITE_ENCR_HANDLE_INDEX_FALSE, index);
 #			endif
-			WRITE_BIN_EXTR_BLK(out, out_size, (-1 != index) ? WRITE_4MORE_BYTES_TRUE : WRITE_4MORE_BYTES_FALSE, index);
 		} else
 		{	/* Note that rp may not be the beginning of a block */
 			rp = (rec_hdr_ptr_t)(gv_target->hist.h[0].curr_rec.offset + (sm_uc_ptr_t)bp);

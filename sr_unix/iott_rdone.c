@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,9 +82,11 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	struct timeval	input_timeval;
 	ABS_TIME	cur_time, end_time;
 	mv_stent	*mv_zintdev;
+	boolean_t	ch_set;
 
 	io_ptr = io_curr_device.in;
-	assert (io_ptr->state == dev_open);
+	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
+	assert(io_ptr->state == dev_open);
 	iott_flush(io_curr_device.out);
 	tt_ptr = (d_tt_struct*) io_ptr->dev_sp;
 	timer_id = (TID) iott_rdone;
@@ -203,6 +206,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 				if (timed && (0 == msec_timeout))
 					iott_rterm(io_ptr);
 			}
+			REVERT_GTMIO_CH(&io_curr_device, ch_set);
 			outofband_action(FALSE);
 			break;
 		}
@@ -497,6 +501,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	if (outofband && jobinterrupt != outofband)
 	{
 		io_ptr->dollar.za = 9;
+		REVERT_GTMIO_CH(&io_curr_device, ch_set);
 		return FALSE;
 	}
 	io_ptr->dollar.za = 0;
@@ -550,5 +555,6 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	}
 	memcpy(io_ptr->dollar.key, io_ptr->dollar.zb, (zb_ptr - io_ptr->dollar.zb));
 
+	REVERT_GTMIO_CH(&io_curr_device, ch_set);
 	return ret;
 }

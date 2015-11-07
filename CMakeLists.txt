@@ -26,7 +26,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version V6.2-001)
+set(version V6.2-002)
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -34,6 +34,12 @@ endif()
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+  set(GTM_BUILD_TYPE "pro")
+elseif("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+  set(GTM_BUILD_TYPE "dbg")
 endif()
 
 # Enable GT.M debug options unless directed not to enable them. Added to build without whitebox tests.
@@ -87,6 +93,7 @@ if(GTM_DIST)
 else()
   # Bootstrap using pre-generated bootstrap sources.
   # We generate them again only for comparison.
+  message(STATUS "Bootstraping from pre-generated sources.")
   set(gen_bootstrap 0)
   set(gen_bootstrap_dist "${GTM_BINARY_DIR}")
   set(gen_bootstrap_mumps "$<TARGET_FILE:mumps>")
@@ -120,14 +127,15 @@ list(APPEND gt_src_list
 foreach(d ${gt_src_list})
   set(source_dir_${d} ${GTM_SOURCE_DIR}/${d})
   file(GLOB sources_${d} RELATIVE ${source_dir_${d}}
-	  ${d}/*.c ${d}/*.s ${d}/*.si)
+	  ${d}/*.c ${d}/*.s ${d}/*.si ${d}/*.txt)
 endforeach()
 if(gen_bootstrap)
   # Prefer generated sources over all other locations.
   set(gt_src_list gen ${gt_src_list})
   set(source_dir_gen ${GTM_BINARY_DIR}/gen)
   # Hard-code list since we cannot glob files that do not exist.
-  set(sources_gen cmerrors_ctl.c cmierrors_ctl.c gdeerrors_ctl.c merrors_ctl.c ttt.c)
+  set(sources_gen cmerrors_ctl.c cmierrors_ctl.c gdeerrors_ctl.c merrors_ctl.c ttt.c
+  		  gtmthreadgblasm.m gtm_threadgbl_deftypes.h gtm_threadgbl_deftypes_asm.si)
 endif()
 
 # The C preprocessor include search path consists of every source
@@ -262,6 +270,7 @@ add_custom_command(
   WORKING_DIRECTORY ${GTM_BINARY_DIR}/gen
   COMMAND ${CMAKE_COMMAND}
     -D gtm_dist=${gen_bootstrap_dist}
+    -D gtm_tools=${GTM_SOURCE_DIR}/sr_port
     -D gtmroutines=.
     -D mumps=${gen_bootstrap_mumps}
     -D "args=${mumps_ttt_args}"
@@ -288,6 +297,7 @@ foreach(msg
     WORKING_DIRECTORY ${GTM_BINARY_DIR}/gen
     COMMAND ${CMAKE_COMMAND}
       -D gtm_dist=${gen_bootstrap_dist}
+      -D gtm_tools=${GTM_SOURCE_DIR}/sr_port
       -D gtmroutines=.
       -D mumps=${gen_bootstrap_mumps}
       -D "args=${mumps_msg_args}"
@@ -335,20 +345,56 @@ elseif(gen_bootstrap)
   add_dependencies(gtm_threadgbl_deftypes gen_bootstrap)
 endif()
 
-add_custom_command(
-  OUTPUT gtm_threadgbl_deftypes.h
-  DEPENDS gtm_threadgbl_deftypes
-  COMMAND gtm_threadgbl_deftypes > gtm_threadgbl_deftypes.h.tmp
-  COMMAND ${CMAKE_COMMAND} -E rename gtm_threadgbl_deftypes.h.tmp gtm_threadgbl_deftypes.h
-  )
-add_custom_target(gen_gtm_threadgbl_deftypes DEPENDS gtm_threadgbl_deftypes.h)
+if(gen_bootstrap)
+  add_custom_command(
+    OUTPUT gen/gtm_threadgbl_deftypes.h
+    DEPENDS gtm_threadgbl_deftypes
+    COMMAND gtm_threadgbl_deftypes > gen/gtm_threadgbl_deftypes.h
+    )
+  set(gtmthreadgblasmaccess "${gtmthreadgblasmaccessdir}/gtm_threadgbl_asm_access.txt")
+  select_file(gtmthreadgblasmaccess "gtm_threadgbl_asm_access.txt")
+  add_custom_command(
+    OUTPUT ${GTM_BINARY_DIR}/gen/gtmthreadgblasm.m
+    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/gtmthreadgblasm.m
+    COMMAND ${CMAKE_COMMAND} -E copy ${GTM_SOURCE_DIR}/sr_unix/gtmthreadgblasm.m ${GTM_BINARY_DIR}/gen/gtmthreadgblasm.m
+    )
+  add_custom_command(
+    OUTPUT ${GTM_BINARY_DIR}/gen/gtm_threadgbl_deftypes_asm_${GTM_BUILD_TYPE}.si
+    DEPENDS ${GTM_BINARY_DIR}/gen/gtmthreadgblasm.m gen/gtm_threadgbl_deftypes.h ${gtmthreadgblasmaccess}
+	    ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake ${gen_bootstrap_depend}
+    WORKING_DIRECTORY ${GTM_BINARY_DIR}/gen
+    COMMAND ${CMAKE_COMMAND}
+      -D gtm_dist=${gen_bootstrap_dist}
+      -D gtm_inc=${GTM_BINARY_DIR}/gen
+      -D gtmroutines=.
+      -D mumps=${gen_bootstrap_mumps}
+      -D "args=-r;gtmthreadgblasm;${gtmthreadgblasmaccess};gtm_threadgbl_deftypes.h;gtm_threadgbl_deftypes_asm_${GTM_BUILD_TYPE}.si"
+      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
+    VERBATIM
+    )
+  add_custom_command(
+    OUTPUT gen/gtm_threadgbl_deftypes_asm.si
+    DEPENDS gen/gtm_threadgbl_deftypes_asm_${GTM_BUILD_TYPE}.si
+    COMMAND ${CMAKE_COMMAND} -E copy gen/gtm_threadgbl_deftypes_asm_${GTM_BUILD_TYPE}.si gen/gtm_threadgbl_deftypes_asm.si
+    )
+  add_custom_target(gen_gtm_threadgbl_deftypes
+  	DEPENDS ${GTM_BINARY_DIR}/gen/gtm_threadgbl_deftypes.h ${GTM_BINARY_DIR}/gen/gtm_threadgbl_deftypes_asm.si)
+else()
+  select_file(gtm_threadgbl_deftypes_asm "gtm_threadgbl_deftypes_asm_${GTM_BUILD_TYPE}.si")
+  add_custom_command(
+    OUTPUT gtm_threadgbl_deftypes_asm.si
+    DEPENDS ${gtm_threadgbl_deftypes_asm}
+    COMMAND ${CMAKE_COMMAND} -E copy ${gtm_threadgbl_deftypes_asm} gtm_threadgbl_deftypes_asm.si
+    )
+  add_custom_target(gen_gtm_threadgbl_deftypes DEPENDS gtm_threadgbl_deftypes_asm.si)
+endif()
 
 foreach(exp exe shr)
   set(out gtm${exp}_symbols.export)
   set(in ${GTM_SOURCE_DIR}/sr_unix/gtm${exp}_symbols.exp)
   add_custom_command(
     OUTPUT ${out}
-    DEPENDS ${in}
+    DEPENDS ${in} gen_gtm_threadgbl_deftypes
     COMMAND tcsh -f ${GTM_SOURCE_DIR}/sr_linux/genexport.csh ${in} ${out}
     )
 endforeach()
@@ -376,6 +422,7 @@ endforeach()
 # TODO: find_package or find_library for system libs?
 include_directories (/usr/local/include)
 target_link_libraries(libmumps		${libmumpslibs})
+add_dependencies(libmumps		gen_gtm_threadgbl_deftypes)
 
 add_executable(mumps			${mumps_SOURCES})
 target_link_libraries(mumps		libmumps)
@@ -388,6 +435,8 @@ add_executable(dbcertify		${dbcertify_SOURCES})
 target_link_libraries(dbcertify		libdbcertify libmupip libmumps libstub)
 
 add_executable(geteuid			${geteuid_SOURCES})
+target_link_libraries(geteuid		libmumps)
+add_dependencies(geteuid		gen_gtm_threadgbl_deftypes)
 
 add_executable(gtmsecshr		${gtmsecshr_SOURCES})
 add_dependencies(gtmsecshr		gen_gtm_threadgbl_deftypes)
@@ -428,6 +477,7 @@ add_executable(gtcm_shmclean 		${gtcm_shmclean_SOURCES})
 target_link_libraries(gtcm_shmclean	libgtcm libmumps libstub)
 
 add_executable(semstat2		 	${semstat2_SOURCES})
+add_dependencies(semstat2		gen_gtm_threadgbl_deftypes)
 
 add_executable(ftok 			${ftok_SOURCES})
 target_link_libraries(ftok 		libmumps libstub)
@@ -462,12 +512,14 @@ endforeach()
 # manually creating each target is way easier.
 
 # Library=GCRYPT Algorithm=AES256CFB
+include_directories (/usr/local/ssl/include)
 add_library(libgtmcrypt_gcrypt_AES256CFB.so MODULE ${libgtmcrypt_SOURCES})
 set_target_properties(libgtmcrypt_gcrypt_AES256CFB.so PROPERTIES
   OUTPUT_NAME gtmcrypt_gcrypt_AES256CFB
   COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
+add_dependencies(libgtmcrypt_gcrypt_AES256CFB.so gen_gtm_threadgbl_deftypes)
 target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so ${GPG_LIBRARIES})
 install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
@@ -491,6 +543,7 @@ set_target_properties(libgtmcrypt_openssl_AES256CFB PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
 target_link_libraries(libgtmcrypt_openssl_AES256CFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
+add_dependencies(libgtmcrypt_openssl_AES256CFB gen_gtm_threadgbl_deftypes)
 install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
 # Library=OPENSSL Algorithm=BLOWFISHCFB
@@ -501,6 +554,7 @@ set_target_properties(libgtmcrypt_openssl_BLOWFISHCFB PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
 target_link_libraries(libgtmcrypt_openssl_BLOWFISHCFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
+add_dependencies(libgtmcrypt_openssl_BLOWFISHCFB gen_gtm_threadgbl_deftypes)
 install(TARGETS libgtmcrypt_openssl_BLOWFISHCFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
 add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
@@ -510,6 +564,7 @@ set_target_properties(libgtmtls PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
 target_link_libraries(libgtmtls ${TLS_LIBRARIES})
+add_dependencies(libgtmtls gen_gtm_threadgbl_deftypes)
 install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
 add_executable(maskpass ${maskpass_SOURCES})

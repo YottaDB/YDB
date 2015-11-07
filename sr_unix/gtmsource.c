@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -144,6 +145,25 @@ int gtmsource()
 	{
 		repl_log(stdout, TRUE, TRUE, "Initiating START of source server for secondary instance [%s]\n",
 			gtmsource_options.secondary_instname);
+	}
+	if (gtmsource_options.activate && (ROOTPRIMARY_SPECIFIED == gtmsource_options.rootprimary))
+	{	/* MUPIP REPLIC -SOURCE -ACTIVATE -UPDOK has been specified. We need to open the gld and db regions now
+		 * in case this is a secondary -> primary transition. This is so we can later switch journal files in all
+		 * journaled regions when the transition actually happens inside "gtmsource_rootprimary_init". But since
+		 * we have not yet done a "jnlpool_init", we dont know if updates are disabled in it or not. Although we
+		 * need to do the gld/db open only if updates are currently disabled in the jnlpool, we do this always
+		 * because once we do a jnlpool_init, we will come back with the ftok on the jnlpool held and that has
+		 * issues with later db open since we will try to hold the db ftok as part of db open and the ftok logic
+		 * currently has assumptions that a process holds only one ftok at any point in time.
+		 */
+		assert(NULL == gd_header);
+		gvinit();
+		all_files_open = region_init(FALSE);
+		if (!all_files_open)
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBOPN);
+			gtmsource_exit(ABNORMAL_SHUTDOWN);
+		}
 	}
 	jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator);
 	/* is_jnlpool_creator == TRUE ==> this process created the journal pool

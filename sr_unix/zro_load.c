@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -153,9 +154,25 @@ void zro_load(mstr *str)
 #					endif
 				if (enable_autorelink)
 				{	/* Only setup autorelink struct if it is enabled */
-					transtr.addr = tranbuf;
-					transtr.len = pblk.b_esl;
-					array[oi].relinkctl_sgmaddr = (void_ptr_t)relinkctl_attach(&transtr);
+					if (!TREF(is_mu_rndwn_rlnkctl))
+					{
+						transtr.addr = tranbuf;
+						transtr.len = pblk.b_esl;
+						array[oi].relinkctl_sgmaddr = (void_ptr_t)relinkctl_attach(&transtr, NULL, 0);
+					} else
+					{	/* If zro_load() is called as a part of MUPIP RUNDOWN -RELINKCTL, then we do not
+						 * want to do relinkctl_attach() on all relinkctl files at once because we leave
+						 * the function holding the linkctl lock, which might potentially cause a deadlock
+						 * if multiple processes are run concurrently with different $gtmroutines. However,
+						 * we need a way to tell mu_rndwn_rlnkctl() which object directories are autorelink-
+						 * enabled. For that we set a negative number to the presently unused count field of
+						 * object directory entries in the zro_ent linked list. If we ever decide to make
+						 * that value meaningful, then, perhaps, ensuring that this count remains negative
+						 * in case of MUPIP RUNDOWN -RELINKCTL but has the correct absolute value would do
+						 * the trick.
+						 */
+						array[oi].count = ZRO_DIR_ENABLE_AR;
+					}
 				}
 #				endif
 			}

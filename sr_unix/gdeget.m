@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2013 Fidelity Information Services, Inc	;
+; Copyright (c) 2006-2015 Fidelity National Information 	;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -15,7 +16,7 @@ LOAD
 	e  s $et="g ABORT^GDE:($p($p($zs,"","",3),""-"")'=""%GDE"") u io w !,$p($zs,"","",3,999),! d GETOUT^GDEEXIT h"
 	; if zchset is UTF-8 open in raw mode to avoid BADCHAR errors
 	; For OS390 aka z/OS, use BINARY mode
-	s abs=1,update=0,chset=$SELECT($ZV["OS390":"BINARY",$ZV["VMS":"",$ZCHSET="UTF-8":"M",1:"")
+	s abs=1,update=0,chset=$SELECT($ZV["OS390":"BINARY",$ZCHSET="UTF-8":"M",1:"")
 	o file:(exc="g badfile":rewind:recordsize=SIZEOF("dsk_blk"):readonly:fixed:blocksize=SIZEOF("dsk_blk"):ichset=chset)
 	u file r rec
 	i debug u @useio
@@ -32,6 +33,9 @@ LOAD
 	i gldfmt>6 s reghasv550fields=TRUE
 	s reghasv600fields=FALSE
 	i gldfmt>7 s reghasv600fields=TRUE
+	s v621=0
+	i (label="GTCGBDUNX009")!(label="GTCGBDUNX109") s label=hdrlab,v621=1,update=1  ;autoconvert
+	i (v621=1) n SIZEOF d v621init
 	s v600=0
 	i (label="GTCGBDUNX008")!(label="GTCGBDUNX108") s label=hdrlab,v600=1,update=1	;autoconvert
 	i (v600=1) n SIZEOF d v600init
@@ -149,6 +153,7 @@ LOAD
 	f s="BEFORE_IMAGE","BUFFER_SIZE" d tmpreg(s)
 	i tmpreg("BUFFER_SIZE")<minreg("BUFFER_SIZE")  s tmpreg("BUFFER_SIZE")=minreg("BUFFER_SIZE"),update=1
 	i 'v30 d tmpreg("COLLATION_DEFAULT")
+	i (gldfmt>9) d tmpreg("EPOCHTAPER")
 	i (reghasv550fields=TRUE) d tmpreg("EPOCH_INTERVAL")
 	f s="EXTENSION","FILE_NAME" d tmpreg(s)
 	i (reghasv600fields=TRUE) d tmpreg("INST_FREEZE_ON_ERROR")
@@ -168,6 +173,7 @@ LOAD
 	f i=2:1:$zl(accmeth,"\") s am=$p(accmeth,"\",i) d
 	. i am="MM" d:$zl(rec)-(rel-1)<3 nextrec i +$ze(rec,rel,rel+2)'=2 n tmpsegcommon d tmpmm q
 	. f s="ACCESS_METHOD","ALLOCATION","BLOCK_SIZE","BUCKET_SIZE","DEFER" d tmpseg(am,s)
+	. i (gldfmt>9) d tmpseg(am,"DEFER_ALLOCATE")
 	. i (seghasencrflag=TRUE) d tmpseg(am,"ENCRYPTION_FLAG")
 	. f s="EXTENSION_COUNT","FILE_TYPE","GLOBAL_BUFFER_COUNT","LOCK_SPACE" d tmpseg(am,s)
 	. i (gldfmt>8) d tmpseg(am,"MUTEX_SLOTS")
@@ -317,7 +323,10 @@ region:
 	s regs(s,"FILE_NAME")=$ze(rec,rel,rel+l-1),rel=rel+SIZEOF("file_spec")
 	i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")				; reserved
 	s rel=rel+8											; reserved
-	i (gldfmt>8) s rel=rel+16	; reserved for runtime fillers
+	i (gldfmt>8) s rel=rel+4 ; isSpan not needed by GDE
+	i (gldfmt>9) s regs(s,"EPOCHTAPER")=$$bin2num($ze(rec,rel)),rel=rel+12
+	i (gldfmt'>9) s regs(s,"EPOCHTAPER")=1
+	i (gldfmt=9) s rel=rel+12	; reserved for runtime fillers
 	s rel=rel+SIZEOF("gd_region_padding")								; padding
 	s abs=abs+SIZEOF("gd_region")
 	q
@@ -355,8 +364,10 @@ segment:
 	e  s segs(s,"RESERVED_BYTES")=0
 	i (gldfmt>8) s segs(s,"MUTEX_SLOTS")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	e  s segs(s,"MUTEX_SLOTS")=defseg("MUTEX_SLOTS")
+	i (gldfmt>9) s segs(s,"DEFER_ALLOCATE")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+	e  s segs(s,"DEFER_ALLOCATE")=defseg("DEFER_ALLOCATE")
 	s rel=rel+4										; access method already processed
-	i (gldfmt>8)&(gtm64=TRUE) s rel=rel+4 							; 4-byte filler
+	i (gldfmt=9)&(gtm64=TRUE) s rel=rel+4 							; 4-byte filler
 	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) zm gdeerr("INPINTEG")	; file_cntl pointer
 	s rel=rel+ptrsize
 	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) zm gdeerr("INPINTEG")	; repl_list pointer
@@ -434,6 +445,7 @@ cretmps:
 	s tmpreg("BEFORE_IMAGE")=1
 	s tmpreg("BUFFER_SIZE")=2308
 	s tmpreg("COLLATION_DEFAULT")=0
+	s tmpreg("EPOCHTAPER")=1
 	s tmpreg("EPOCH_INTERVAL")=300
 	s tmpreg("EXTENSION")=2048
 	s tmpreg("FILE_NAME")=""
@@ -488,7 +500,7 @@ v44init:
 	s SIZEOF("reg_jnl_deq")=2
 	s SIZEOF("gd_region_padding")=0
 	s MAXNAMLN=SIZEOF("mident"),MAXREGLN=16,MAXSEGLN=16
-	i ver'="VMS" s SIZEOF("blk_hdr")=8
+	s SIZEOF("blk_hdr")=8
 	e  s SIZEOF("blk_hdr")=7
 	q
 v5ft1init:
@@ -505,7 +517,7 @@ v5ft1init:
 	s SIZEOF("max_str")=32767
 	s SIZEOF("reg_jnl_deq")=2
 	s SIZEOF("gd_region_padding")=0
-	i ver'="VMS" s SIZEOF("blk_hdr")=8
+	s SIZEOF("blk_hdr")=8
 	e  s SIZEOF("blk_hdr")=7
 	q
 v532init:
@@ -525,7 +537,7 @@ v532init:
 	e  s SIZEOF("gd_region_padding")=0
 	;s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32
 	;s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
-	i ver'="VMS" s SIZEOF("blk_hdr")=16
+	s SIZEOF("blk_hdr")=16
 	e  s SIZEOF("blk_hdr")=7
 	q
 v533init:
@@ -545,7 +557,7 @@ v533init:
 	e  s SIZEOF("gd_region_padding")=0
 	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32
 	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
-	i ver'="VMS" s SIZEOF("blk_hdr")=16
+	s SIZEOF("blk_hdr")=16
 	e  s SIZEOF("blk_hdr")=7
 	q
 v534init:
@@ -643,6 +655,35 @@ v600init:
 	. s SIZEOF("gd_region")=368
 	. s SIZEOF("gd_region_padding")=4
 	. s SIZEOF("gd_segment")=360
+	s SIZEOF("mident")=32
+	s SIZEOF("blk_hdr")=16
+	s SIZEOF("rec_hdr")=4
+	s SIZEOF("dsk_blk")=512
+	s SIZEOF("max_str")=1048576
+	s SIZEOF("reg_jnl_deq")=4
+	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32	; maximum name length allowed is 31 characters
+	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
+	q
+v621init:
+	i (olabel="GTCGBDUNX009") d
+	. s SIZEOF("am_offset")=328
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_contents")=76
+	. s SIZEOF("gd_map")=16
+	. s SIZEOF("gd_region")=372
+	. s SIZEOF("gd_region_padding")=0
+	. s SIZEOF("gd_segment")=360
+	e  d
+	. s SIZEOF("am_offset")=336
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_contents")=112
+	. s SIZEOF("gd_map")=24
+	. s SIZEOF("gd_region")=384
+	. s SIZEOF("gd_region_padding")=4
+	. s SIZEOF("gd_segment")=384
+	s SIZEOF("gd_gblname")=40
 	s SIZEOF("mident")=32
 	s SIZEOF("blk_hdr")=16
 	s SIZEOF("rec_hdr")=4

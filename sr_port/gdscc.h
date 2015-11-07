@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +37,7 @@
 
 /* The following defines the write_type for a block that is going to be updated.
  * GDS_WRITE_PLAIN is the default type for most updates.
- * GDS_WRITE_BLOCK_SPLIT is set in case of a block update due to a block split. It is currently not used anywhere in the code.
+ * GDS_WRITE_BLOCK_SPLIT is set in case of a block update due to a block split.
  * GDS_WRITE_KILLTN requires a little more explanation.
  *
  * The TP commit logic ("tp_tend") makes use of an optimization referred to as the "indexmod" optimization.

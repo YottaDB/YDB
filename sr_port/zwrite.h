@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,6 +84,61 @@ typedef struct lvzwrite_datablk_struct
 	zwr_sub_lst			*sub;
 	struct lvzwrite_datablk_struct	*prev;
 } lvzwrite_datablk;
+
+/* PUSH active MERGE or ZSHOW/ZWRITE context */
+#define PUSH_MVST_MRGZWRSV_IF_NEEDED								\
+{												\
+	GBLREF	int			merge_args;						\
+	GBLREF	lvzwrite_datablk	*lvzwrite_block;					\
+	GBLREF	uint4			zwrtacindx;						\
+	GBLREF	merge_glvn_ptr		mglvnp;							\
+	GBLREF	gvzwrite_datablk	*gvzwrite_block;					\
+	GBLREF	lvzwrite_datablk	*lvzwrite_block;					\
+	GBLREF	zshow_out		*zwr_output;						\
+	GBLREF zwr_hash_table		*zwrhtab;						\
+												\
+	DCL_THREADGBL_ACCESS;									\
+												\
+	SETUP_THREADGBL_ACCESS;									\
+	if (TREF(in_zwrite) || (0 != merge_args))						\
+	{											\
+		PUSH_MV_STENT(MVST_MRGZWRSV);							\
+		mv_st_ent = mv_chain;								\
+		mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_merge_args = merge_args;		\
+		merge_args = 0;									\
+		mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrtacindx = zwrtacindx;		\
+		zwrtacindx = 0;									\
+		mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_in_zwrite = TREF(in_zwrite);		\
+		TREF(in_zwrite) = 0;								\
+		mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_mglvnp = mglvnp;			\
+		mglvnp = NULL;									\
+		mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_lvzwrite_block = lvzwrite_block;	\
+		lvzwrite_block = NULL;								\
+		mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_gvzwrite_block = gvzwrite_block;	\
+		gvzwrite_block = NULL;								\
+		mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwr_output = zwr_output;		\
+		zwr_output = NULL;								\
+		mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrhtab = zwrhtab;			\
+		zwrhtab = NULL;									\
+	}											\
+}
+
+/* Note: Corresponding POP of MERGE or ZSHOW/ZWRITE context is done in unw_mv_ent.c (case MVST_MRGZWRSV) */
+
+/* Nullify active MERGE or ZSHOW/ZWRITE context */
+#define	NULLIFY_MERGE_ZWRITE_CONTEXT							\
+{											\
+	GBLREF	int			merge_args;					\
+	GBLREF	lvzwrite_datablk	*lvzwrite_block;				\
+											\
+	DCL_THREADGBL_ACCESS;								\
+											\
+	SETUP_THREADGBL_ACCESS;								\
+	merge_args = 0;									\
+	TREF(in_zwrite) = 0;								\
+	if (lvzwrite_block)								\
+		lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;		\
+}
 
 typedef struct gvzwrite_datablk_struct
 {

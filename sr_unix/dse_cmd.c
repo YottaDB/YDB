@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc.	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -135,6 +136,7 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 { "DEF_COLLATION",             0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "DUALSITE_RESYNC_SEQNO",     0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "ENCRYPTION_HASH",           0, 0, 0,                     0,                   0, 0, VAL_N_A,	    0, NON_NEG, 0,        0       },
+{ "EPOCHTAPER",                0, 0, 0,			    0,                   0, 0, VAL_N_A,     0, NEG,     0,        0       },
 { "FLUSH_TIME",                0, 0, dse_ftime_parm_values, 0,                   0, 0, VAL_NOT_REQ, 0, NON_NEG, VAL_TIME, 0       },
 { "FREEZE",                    0, 0, 0,                     true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
 { "FULLY_UPGRADED",            0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },

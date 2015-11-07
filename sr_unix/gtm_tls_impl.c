@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,12 +37,23 @@
 #include "gtm_tls_impl.h"
 
 GBLDEF	int			tls_errno;
-GBLDEF	config_t		gtm_tls_cfg;
 GBLDEF	gtmtls_passwd_list_t	*gtmtls_passwd_listhead;
 
+STATICDEF	config_t	gtm_tls_cfg;
 STATICDEF DH			*dh512, *dh1024;	/* Diffie-Hellman structures for Ephemeral Diffie-Hellman key exchange. */
 
 #define MAX_CONFIG_LOOKUP_PATHLEN	64
+#define GTMTLS_RENEGOTIATE_NO_HANDSHAKE
+
+/* Older, but still commonly used, OpenSSL versions don't have macros for TLSv1.1 and TLSv1.2 versions.
+ * They are hard coded to 0x0302 and 0x0303 respectively. So, define them here for use in gtm_tls_get_conn_info.
+*/
+#ifndef TLS1_1_VERSION
+#define	TLS1_1_VERSION	0x0302
+#endif
+#ifndef TLS1_2_VERSION
+#define	TLS1_2_VERSION	0x0303
+#endif
 
 /* Below template translates to: Arrange ciphers in increasing order of strength after excluding the following:
  * ADH: Anonymous Diffie-Hellman Key Exchange (Since we want both encryption and authentication and ADH provides only former).
@@ -50,6 +62,7 @@ STATICDEF DH			*dh512, *dh1024;	/* Diffie-Hellman structures for Ephemeral Diffi
  * MD5 : MD5 message digest.
  */
 #define REPL_CIPHER_LIST			"ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH"
+#define GTM_DEFAULT_CIPHER_LIST			"DEFAULT:!SRP"
 
 #define OPTIONEND ':'
 #define OPTIONENDSTR ":"
@@ -178,9 +191,9 @@ STATICDEF struct gtm_ssl_options gtm_ssl_options_list[] =
 	{NULL, 0}
 };
 
-STATICDEF long parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_table_size, const char *options, long current,
+STATICFNDEF char *parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_table_size, const char *options, long *current,
 					long *clear);
-STATICDEF long parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_table_size, const char *options, long current,
+STATICFNDEF char *parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_table_size, const char *options, long *current,
 					long *clear)
 {
 	int		negate;
@@ -191,7 +204,7 @@ STATICDEF long parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_t
 	if (NULL == options)
 		return 0;
 	negate = 0;
-	bitmask = current;
+	bitmask = *current;
 	num_options = opt_table_size/SIZEOF(struct gtm_ssl_options);
 	for (charptr = options; *charptr; charptr = optionend)
 	{
@@ -212,7 +225,8 @@ STATICDEF long parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_t
 		{
 			if (NULL == opt_table[index].opt_str)
 				break;
-			if (0 == strncmp(opt_table[index].opt_str, charptr, optionlen))
+			if ((optionlen == strlen(opt_table[index].opt_str))
+				&& (0 == strncmp(opt_table[index].opt_str, charptr, optionlen)))
 			{
 				if (negate)
 				{
@@ -224,10 +238,11 @@ STATICDEF long parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_t
 				break;
 			}
 		}
-		if (num_options <= index)
-			;	/* option not found - ignore */
+		if ((num_options - 1) <= index)		/* last option is NULL */
+			return (char *)charptr;	/* option not known */
 	}
-	return bitmask;
+	*current = bitmask;
+	return NULL;
 }
 
 #ifdef DEBUG_SSL
@@ -427,18 +442,23 @@ const char *gtm_tls_get_error(void)
 gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 {
 	const char		*CAfile = NULL, *CApath = NULL, *crl, *CAptr, *cipher_list, *options_string, *verify_mode_string;
-	char			*config_env;
-	int			rv, rv1, rv2, fips_requested, fips_enabled, verify_mode;
+	char			*config_env, *parse_ptr, *optionendptr;
+	int			rv, rv1, rv2, fips_requested, fips_enabled, verify_mode, parse_len;
 #	if (((LIBCONFIG_VER_MAJOR == 1) && (LIBCONFIG_VER_MINOR >= 4)) || (LIBCONFIG_VER_MAJOR > 1))
 	int			verify_depth, session_timeout;
 #	else
 	long int		verify_depth, session_timeout;
 #	endif
-	long			options_mask, options_current, options_clear;
+	long			options_mask, options_current, options_clear, verify_long;
 	SSL_CTX			*ctx;
 	X509_STORE		*store;
 	X509_LOOKUP		*lookup;
 	config_t		*cfg;
+#	if OPENSSL_VERSION_NUMBER < 0x009080dfL
+	unsigned int            cfg_line;
+	const char              *cfg_file;
+	config_setting_t        *cfg_setting;
+#	endif
 	gtm_tls_ctx_t		*gtm_tls_ctx;
 
 	assert(GTM_TLS_API_VERSION >= version); /* Make sure the caller is using the right API version */
@@ -469,15 +489,18 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	}
 	SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2);
 	/* Read the configuration file for more configuration parameters. */
-	if (NULL == (config_env = getenv("gtmcrypt_config")))
-	{
-		UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, "gtmcrypt_config");
-		SSL_CTX_free(ctx);
-		return NULL;
-	}
 	cfg = &gtm_tls_cfg;
 	config_init(cfg);
-	if (!config_read_file(cfg, config_env))
+	if (NULL == (config_env = getenv("gtmcrypt_config")))
+	{
+		if (!(GTMTLS_OP_INTERACTIVE_MODE & flags))
+		{	/* allow no config file if interactive for simple client usage */
+			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, "gtmcrypt_config");
+			SSL_CTX_free(ctx);
+			return NULL;
+		} else
+			flags |= GTMTLS_OP_ABSENT_CONFIG;
+	} else if (!config_read_file(cfg, config_env))
 	{
 		UPDATE_ERROR_STRING("Failed to read config file: %s. At line: %d, %s.", config_env, config_error_line(cfg),
 						config_error_text(cfg));
@@ -490,8 +513,22 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		SSL_CTX_set_verify_depth(ctx, verify_depth);
 	if (CONFIG_TRUE == config_lookup_string(cfg, "tls.verify-mode", &verify_mode_string))
 	{
-		verify_mode = (int)parse_SSL_options(&gtm_ssl_verify_mode_list[0], SIZEOF(gtm_ssl_verify_mode_list),
-					verify_mode_string, (long)0, NULL);
+		verify_long = 0;
+		parse_ptr = parse_SSL_options(&gtm_ssl_verify_mode_list[0], SIZEOF(gtm_ssl_verify_mode_list),
+					verify_mode_string, &verify_long, NULL);
+		if (NULL != parse_ptr)
+		{
+			optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+			if (NULL == optionendptr)
+				parse_len = strlen(parse_ptr);
+			else
+				parse_len = optionendptr - parse_ptr;
+			UPDATE_ERROR_STRING("Unknown verify-mode option: %.*s", parse_len, parse_ptr);
+			SSL_CTX_free(ctx);
+			config_destroy(cfg);
+			return NULL;
+		}
+		verify_mode = (int)verify_long;
 		SSL_CTX_set_verify(ctx, verify_mode, NULL);
 	} else
 		flags |= GTMTLS_OP_ABSENT_VERIFYMODE;
@@ -573,14 +610,39 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	}	/* use OpenSSL default */
 	if (CONFIG_TRUE == config_lookup_string(cfg, "tls.ssl-options", &options_string))
 	{
-		options_current = SSL_CTX_get_options(ctx);
+		options_mask = options_current = SSL_CTX_get_options(ctx);
 		options_clear = 0;
-		options_mask = parse_SSL_options(&gtm_ssl_options_list[0], SIZEOF(gtm_ssl_options_list), options_string,
-					options_current, &options_clear);
-		if (0 != options_mask)
+		parse_ptr = parse_SSL_options(&gtm_ssl_options_list[0], SIZEOF(gtm_ssl_options_list), options_string,
+					&options_mask, &options_clear);
+		if (NULL != parse_ptr)
+		{
+			optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+			if (NULL == optionendptr)
+				parse_len = strlen(parse_ptr);
+			else
+				parse_len = optionendptr - parse_ptr;
+			UPDATE_ERROR_STRING("Unknown ssl-options option: %.*s", parse_len, parse_ptr);
+			SSL_CTX_free(ctx);
+			config_destroy(cfg);
+			return NULL;
+		}
+		if (options_current != options_mask)
 			options_mask = SSL_CTX_set_options(ctx, options_mask);
 		if (0 != options_clear)
+#		if OPENSSL_VERSION_NUMBER >= 0x009080dfL
 			options_mask = SSL_CTX_clear_options(ctx, options_clear);
+#		else
+		{	/* clear_options first in OpenSSL 0.9.8m */
+			cfg_setting = config_lookup(cfg, "tls.ssl-options");
+			cfg_file = config_setting_source_file(cfg_setting);
+			cfg_line = config_setting_source_line(cfg_setting);
+			UPDATE_ERROR_STRING("Unable to negate values in %s - need OpenSSL 0.9.8m or newer in %s line %d",
+				"tls.ssl-options", cfg_file, cfg_line, "tls.ssl-options");
+			SSL_CTX_free(ctx);
+			config_destroy(cfg);
+			return NULL;
+		}
+#		endif
 	}
 	gtm_tls_ctx = MALLOC(SIZEOF(gtm_tls_ctx_t));
 	gtm_tls_ctx->ctx = ctx;
@@ -594,6 +656,71 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	gtm_tls_ctx->runtime_version = SSLeay();
 	gtm_tls_ctx->version = version;
 	return gtm_tls_ctx;
+}
+
+STATICFNDEF gtmtls_passwd_list_t *gtm_tls_find_pwent(const char *input_env_name)
+{
+	gtmtls_passwd_list_t	*pwent_node;
+	char			*env_name_ptr;
+	int			len, inputlen;
+
+	inputlen = STRLEN(input_env_name);
+	for (pwent_node = gtmtls_passwd_listhead; NULL != pwent_node; pwent_node = pwent_node->next)
+	{	/* Lookup to see if we already have a password for the tlsid. */
+		env_name_ptr = pwent_node->pwent->env_name;
+		len = STRLEN(env_name_ptr);
+		assert(len < PASSPHRASE_ENVNAME_MAX);
+		assert(len > SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1);
+		if ((len == inputlen) && (0 == strcmp(input_env_name, env_name_ptr)))
+			break;	/* We already have a password for the tlsid. */
+	}
+	return pwent_node;
+}
+
+int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *obs_passwd)
+{
+	char			*env_name_ptr, env_name[PASSPHRASE_ENVNAME_MAX];
+	int			env_name_len, obs_len;
+	gtmtls_passwd_list_t	*pwent_node;
+	passwd_entry_t		*pwent;
+
+	assert(tls_ctx);
+	if (!(GTMTLS_OP_INTERACTIVE_MODE & tls_ctx->flags))
+		return 0;	/* Not running in an interactive mode. */
+	assert(NULL != tlsid);
+	env_name_len = STRLEN(tlsid);
+	assert(0 < env_name_len);
+	assert(PASSPHRASE_ENVNAME_MAX >= ((SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1) + env_name_len));
+	assert(PASSPHRASE_ENVNAME_MAX > env_name_len);
+	env_name_ptr = env_name;
+	strcpy(env_name_ptr, GTMTLS_PASSWD_ENV_PREFIX);
+	env_name_ptr += (SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1);
+	strncpy(env_name_ptr, tlsid, (PASSPHRASE_ENVNAME_MAX - (SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1)));
+	env_name[PASSPHRASE_ENVNAME_MAX - 1] = '\0';
+	obs_len = STRLEN(obs_passwd);
+	pwent_node = gtm_tls_find_pwent(env_name);
+	if (NULL != pwent_node)
+	{
+		pwent = pwent_node->pwent;
+		if ((obs_len == (pwent->passwd_len * 2)) && (0 == strncmp(obs_passwd, pwent->passwd, obs_len)))
+			return 1;	/* already on the list */
+	}
+	/* Either no entry for tlsid or need to replace with new value */
+	pwent = MALLOC(SIZEOF(passwd_entry_t));
+	strcpy(pwent->env_name, env_name);
+	pwent->env_value = MALLOC(obs_len + 1);
+	memcpy(pwent->env_value, obs_passwd, obs_len + 1);	/* include null */
+	pwent->passwd = NULL;
+	pwent->passwd_len = 0;
+	if (0 == gc_update_passwd(pwent->env_name, &pwent, NULL, GTMTLS_OP_NOPWDENVVAR))
+	{
+		pwent_node = MALLOC(SIZEOF(gtmtls_passwd_list_t));
+		pwent_node->next = gtmtls_passwd_listhead;
+		pwent_node->pwent = pwent;
+		gtmtls_passwd_listhead = pwent_node;
+	} else
+		return -1;		/* gc_update_passwd freed pwent */
+	return 1;
 }
 
 void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
@@ -623,10 +750,110 @@ void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 	 */
 }
 
+static int copy_tlsid_elem(const config_t *tmpcfg, config_t *cfg, config_setting_t *tlsid, const char *idstr, const char *elemname,
+				int type);
+static int copy_tlsid_elem(const config_t *tmpcfg, config_t *cfg, config_setting_t *tlsid, const char *idstr, const char *elemname,
+				int type)
+{
+	config_setting_t	*srcelem, *elem;
+	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN];
+
+	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.%s", idstr, elemname);
+	if (srcelem = config_lookup(tmpcfg, cfg_path))
+	{
+		elem = config_lookup(cfg, cfg_path);
+		if (NULL == elem)
+		{	/* option not currently in tls.idstr so create */
+			elem = config_setting_add(tlsid, elemname, type);
+			if (NULL == elem)
+			{
+				UPDATE_ERROR_STRING("Failed to add TLSID: %s item %s to config file: %s", idstr, elemname,
+					config_error_text(cfg));
+				return -1;
+			}
+		}
+		if (CONFIG_TYPE_STRING == type)
+			config_setting_set_string(elem, config_setting_get_string(srcelem));
+		else if (CONFIG_TYPE_INT == type)
+		{
+			config_setting_set_int(elem, config_setting_get_int(srcelem));
+			config_setting_set_format(elem, config_setting_get_format(srcelem));
+		} else
+		if (NULL == elem)
+		{
+			UPDATE_ERROR_STRING("gtm_tls_impl.c/copy_tlsid_elem:  Unexpected CONFIG_TYPE %d for item %s", type,
+				elemname);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+int gtm_tls_add_config(gtm_tls_ctx_t *tls_ctx, const char *idstr, const char *configstr)
+{
+#	ifndef LIBCONFIG_VER_MAJOR
+	UPDATE_ERROR_STRING("TLSID: %s: libconfig 1.4.x is needed to support adding config information", idstr);
+	return -1;
+#	else
+	config_t		*cfg, tmpcfg;
+	config_setting_t	*tlsid, *tlssect;
+	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN];
+
+	config_init(&tmpcfg);
+	if (CONFIG_FALSE == config_read_string(&tmpcfg, configstr))
+	{
+		UPDATE_ERROR_STRING("Failed to add config information: %s in line %d:\n%s", config_error_text(&tmpcfg),
+			config_error_line(&tmpcfg), configstr);
+		return -1;
+	}
+	cfg = &gtm_tls_cfg;
+	strncpy(cfg_path, "tls", SIZEOF("tls"));
+	tlssect = config_lookup(cfg, cfg_path);
+	if (NULL == tlssect)
+	{	/* need to add tls section */
+		tlssect = config_setting_add(config_root_setting(cfg), "tls", CONFIG_TYPE_GROUP);
+		if (NULL == tlssect)
+		{
+			UPDATE_ERROR_STRING("Failed to add tls section to config file: %s", config_error_text(cfg));
+			return -1;
+		}
+	}
+	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s", idstr);
+	tlsid = config_lookup(cfg, cfg_path);
+	if (NULL == tlsid)
+	{	/* add new section named tls.idstr */
+		tlsid = config_setting_add(tlssect, idstr, CONFIG_TYPE_GROUP);
+		if (NULL == tlsid)
+		{
+			UPDATE_ERROR_STRING("Failed to add TLSID: %s section to config file: %s", idstr, config_error_text(cfg));
+			return -1;
+		}
+	}
+	/* add any new gtm_tls_socket level options below */
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "verify-mode", CONFIG_TYPE_STRING))
+		return -1;
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "cipher-list", CONFIG_TYPE_STRING))
+		return -1;
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "cert", CONFIG_TYPE_STRING))
+		return -1;
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "key", CONFIG_TYPE_STRING))
+		return -1;
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "format", CONFIG_TYPE_STRING))
+		return -1;
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "ssl-options", CONFIG_TYPE_STRING))
+		return -1;
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "verify-depth", CONFIG_TYPE_INT))
+		return -1;
+	config_destroy(&tmpcfg);
+	return 0;
+#	endif
+}
+
 gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_socket, int sockfd, char *id, int flags)
 {
-	int			len, verify_mode, verify_mode_set, nocert, nopkey;
-	long			options_mask, options_current, options_clear;
+	int			len, verify_mode, verify_mode_set, nocert, nopkey, parse_len;
+	long			options_mask, options_current, options_clear, verify_long;
+	char			*optionendptr, *parse_ptr;
 #	if (((LIBCONFIG_VER_MAJOR == 1) && (LIBCONFIG_VER_MINOR >= 4)) || (LIBCONFIG_VER_MAJOR > 1))
 	int			verify_depth, session_timeout;
 #	else
@@ -640,6 +867,11 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	SSL_CTX			*ctx;
 	EVP_PKEY		*evp_pkey = NULL;
 	config_t		*cfg;
+	config_setting_t	*cfg_setting;
+#	if OPENSSL_VERSION_NUMBER < 0x009080dfL
+	unsigned int		cfg_line;
+	const char		*cfg_file;
+#	endif
 	gtmtls_passwd_list_t	*pwent_node;
 	passwd_entry_t		*pwent;
 	gtm_tls_socket_t	*socket;
@@ -660,11 +892,32 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 
 	if ('\0' != id[0])
 	{
+		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s", id);
+		cfg_setting = config_lookup(cfg, cfg_path);
+		if (NULL == cfg_setting)
+		{
+			UPDATE_ERROR_STRING("TLSID %s not found in configuration file.", id);
+			SSL_free(ssl);
+			return NULL;
+		}
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.verify-mode", id);
 		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &verify_mode_string))
 		{
-			verify_mode = (int)parse_SSL_options(&gtm_ssl_verify_mode_list[0], SIZEOF(gtm_ssl_verify_mode_list),
-						verify_mode_string, (long)0, NULL);
+			verify_long = 0;
+			parse_ptr = parse_SSL_options(&gtm_ssl_verify_mode_list[0], SIZEOF(gtm_ssl_verify_mode_list),
+						verify_mode_string, &verify_long, NULL);
+			if (NULL != parse_ptr)
+			{
+				optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+				if (NULL == optionendptr)
+					parse_len = strlen(parse_ptr);
+				else
+					parse_len = optionendptr - parse_ptr;
+				UPDATE_ERROR_STRING("In TLSID: %s - unknown verify-mode option: %.*s", id, parse_len, parse_ptr);
+				SSL_free(ssl);
+				return NULL;
+			}
+			verify_mode = (int)verify_long;
 			if (SSL_VERIFY_PEER & verify_mode)
 				flags |= GTMTLS_OP_VERIFY_PEER;
 			verify_mode_set = TRUE;
@@ -678,7 +931,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &cipher_list))
 		{
 			if ('\0' == cipher_list[0]) /* use default instead of tls.cipher-list if empty string */
-				cipher_list = (GTMTLS_OP_SOCKET_DEV & flags) ? SSL_DEFAULT_CIPHER_LIST : REPL_CIPHER_LIST;
+				cipher_list = (GTMTLS_OP_SOCKET_DEV & flags) ? GTM_DEFAULT_CIPHER_LIST : REPL_CIPHER_LIST;
 		} else
 			cipher_list = NULL;
 	} else if (!CLIENT_MODE(flags))
@@ -703,7 +956,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	{	/* no cipher-list in labelled section or no section */
 		if (0 != ((GTMTLS_OP_ABSENT_CIPHER | GTMTLS_OP_DEFAULT_CIPHER) &tls_ctx->flags))
 		{	/* no or default cipher specified top level */
-			cipher_list = (GTMTLS_OP_SOCKET_DEV & flags) ? SSL_DEFAULT_CIPHER_LIST : REPL_CIPHER_LIST;
+			cipher_list = (GTMTLS_OP_SOCKET_DEV & flags) ? GTM_DEFAULT_CIPHER_LIST : REPL_CIPHER_LIST;
 		}
 	}
 	if ((NULL != cipher_list) && (0 >= SSL_set_cipher_list(ssl, cipher_list)))
@@ -720,7 +973,15 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		{
 			if (!CLIENT_MODE(flags))
 			{
-				UPDATE_ERROR_STRING("Certificate corresponding to TLSID: %s not found in configuration file.", id);
+				if (NULL == config_root_setting(cfg))
+				{	/* not sure this is possible */
+					UPDATE_ERROR_STRING("Certificate required for TLSID: %s"
+						" but no configuration information available.", id);
+				} else
+				{
+					UPDATE_ERROR_STRING("Certificate corresponding to TLSID: %s"
+						" not found in configuration file.", id);
+				}
 				SSL_free(ssl);
 				return NULL;
 			} else
@@ -769,19 +1030,8 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			}
 			/* Before setting up the private key, check-up on the password for the private key. */
 			SNPRINTF(input_env_name, PASSPHRASE_ENVNAME_MAX, GTMTLS_PASSWD_ENV_PREFIX "%s", id);
-			if (NULL != (pwent_node = gtmtls_passwd_listhead))
-			{	/* Lookup to see if we have already prefetched the password. */
-				while (NULL != pwent_node)
-				{
-					env_name_ptr = pwent_node->pwent->env_name;
-					len = STRLEN(env_name_ptr);
-					assert(len < PASSPHRASE_ENVNAME_MAX);
-					assert(len > SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1);
-					if ((len == STRLEN(input_env_name)) && (0 == strncmp(input_env_name, env_name_ptr, len)))
-						break;
-					pwent_node = pwent_node->next;
-				}
-			}
+			/* Lookup to see if we have already prefetched the password. */
+			pwent_node = gtm_tls_find_pwent(input_env_name);
 			if (NULL == pwent_node)
 			{	/* Lookup failed. Create a new entry for the given id. */
 				pwent = NULL;
@@ -863,14 +1113,37 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.ssl-options", id);
 		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &options_string))
 		{
-			options_current = SSL_get_options(ssl);
+			options_mask = options_current = SSL_get_options(ssl);
 			options_clear = 0;
-			options_mask = parse_SSL_options(&gtm_ssl_options_list[0], SIZEOF(gtm_ssl_options_list), options_string,
-					options_current, &options_clear);
-			if (0 != options_mask)
+			parse_ptr = parse_SSL_options(&gtm_ssl_options_list[0], SIZEOF(gtm_ssl_options_list), options_string,
+					&options_mask, &options_clear);
+			if (NULL != parse_ptr)
+			{
+				optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+				if (NULL == optionendptr)
+					parse_len = strlen(parse_ptr);
+				else
+					parse_len = optionendptr - parse_ptr;
+				UPDATE_ERROR_STRING("In TLSID: %s - unknown ssl-options option: %.*s", id, parse_len, parse_ptr);
+				SSL_free(ssl);
+				return NULL;
+			}
+			if (options_current != options_mask)
 				options_mask = SSL_set_options(ssl, options_mask);
 			if (0 != options_clear)
+#			if OPENSSL_VERSION_NUMBER >= 0x009080dfL
 				options_mask = SSL_clear_options(ssl, options_clear);
+#			else
+			{       /* clear_options first in OpenSSL 0.9.8m */
+				cfg_setting = config_lookup(cfg, cfg_path);
+				cfg_file = config_setting_source_file(cfg_setting);
+				cfg_line = config_setting_source_line(cfg_setting);
+				UPDATE_ERROR_STRING("Unable to negate values in %s - need OpenSSL 0.9.8m or newer in %s line %d",
+					cfg_path, cfg_file, cfg_line);
+				SSL_free(ssl);
+				return NULL;
+			}
+#			endif
 
 		}
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.verify-depth", id);
@@ -971,7 +1244,7 @@ int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	if (0 >= (rv = SSL_renegotiate(socket->ssl)))
 		return ssl_error(socket->ssl, rv);
-#	ifdef TLS_RENEGOTIATE_NO_HANDSHAKE
+#	ifdef GTMTLS_RENEGOTIATE_NO_HANDSHAKE
 	tls_ctx = socket->gtm_ctx;
 	assert(tls_ctx);
 	if (GTMTLS_OP_INTERACTIVE_MODE & tls_ctx->flags)
@@ -1002,17 +1275,20 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 	const SSL_CIPHER	*cipher;
 	const COMP_METHOD	*compression_method;
 	char			*ssl_version_ptr, *session_id_ptr;
+	gtm_tls_ctx_t		*tls_ctx;
 	X509			*peer;
 	SSL			*ssl;
 	EVP_PKEY		*pubkey;
 	SSL_SESSION		*session;
 
 	ssl = socket->ssl;
-	if (NULL != (peer = SSL_get_peer_certificate(ssl)))
-	{
+	tls_ctx = socket->gtm_ctx;
+	peer = SSL_get_peer_certificate(ssl);
+	if ((NULL != peer) || (GTMTLS_OP_SOCKET_DEV & socket->flags))
+	{	/* if socket device and no certificate from peer still provide info */
 		verify_result = SSL_get_verify_result(ssl);
-		if (X509_V_OK == verify_result)
-		{
+		if ((X509_V_OK == verify_result) || (GTMTLS_OP_ABSENT_CONFIG & tls_ctx->flags))
+		{	/* return information for Socket clients even without a config file */
 			/* SSL-Session Protocol */
 			switch (ssl_version = SSL_version(ssl))
 			{
@@ -1027,13 +1303,10 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 				case TLS1_VERSION:
 					ssl_version_ptr = "TLSv1";
 					break;
-				/* Older, but still commonly used, OpenSSL versions don't have macros for TLSv1.1 and TLSv1.2
-				 * versions. They are hard coded to 0x0302 and 0x0303 respectively. So, use them as-is here.
-				 */
-				case 0x0302:
+				case TLS1_1_VERSION:
 					ssl_version_ptr = "TLSv1.1";
 					break;
-				case 0x0303:
+				case TLS1_2_VERSION:
 					ssl_version_ptr = "TLSv1.2";
 					break;
 				default:
@@ -1045,8 +1318,12 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 			cipher = SSL_get_current_cipher(ssl);
 			SNPRINTF(conn_info->session_algo, SIZEOF(conn_info->session_algo), "%s", SSL_CIPHER_get_name(cipher));
 			/* Remote Certificate Asymmetric Algorithm */
-			pubkey = X509_get_pubkey(peer);
-			SNPRINTF(conn_info->cert_algo, SIZEOF(conn_info->cert_algo), "%s", OBJ_nid2ln(pubkey->type));
+			if (NULL != peer)
+			{
+				pubkey = X509_get_pubkey(peer);
+				SNPRINTF(conn_info->cert_algo, SIZEOF(conn_info->cert_algo), "%s", OBJ_nid2ln(pubkey->type));
+			} else
+				conn_info->cert_algo[0] = '\0';
 			/* Is Secure Renegotiation Supported? */
 #			if OPENSSL_VERSION_NUMBER >= 0x009080dfL
 			/* SSL_get_secure_renegotiation_support function was introduced in OpenSSL version >= "0.9.8m". */
@@ -1082,24 +1359,32 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 #			else
 			conn_info->compression = "NONE";
 #			endif
-			/* Remote Certificate Asymmetric Algorithm Strength */
-			conn_info->cert_nbits = EVP_PKEY_bits(pubkey);
-			/* Remote Certificate Subject */
-			X509_NAME_oneline(X509_get_subject_name(peer), conn_info->subject, MAX_X509_LEN);
-			/* Remote Certificate Issuer */
-			X509_NAME_oneline(X509_get_issuer_name(peer), conn_info->issuer, MAX_X509_LEN);
-			/* Certificate Expiry */
-			if (-1 == format_ASN1_TIME(X509_get_notBefore(peer), conn_info->not_before, MAX_TIME_STRLEN))
-				SNPRINTF(conn_info->not_before, MAX_TIME_STRLEN, "Bad certificate date");
-			if (-1 == format_ASN1_TIME(X509_get_notAfter(peer), conn_info->not_after, MAX_TIME_STRLEN))
-				SNPRINTF(conn_info->not_after, MAX_TIME_STRLEN, "Bad certificate date");
-			X509_free(peer);
+			if (NULL != peer)
+			{
+				/* Remote Certificate Asymmetric Algorithm Strength */
+				conn_info->cert_nbits = EVP_PKEY_bits(pubkey);
+				/* Remote Certificate Subject */
+				X509_NAME_oneline(X509_get_subject_name(peer), conn_info->subject, MAX_X509_LEN);
+				/* Remote Certificate Issuer */
+				X509_NAME_oneline(X509_get_issuer_name(peer), conn_info->issuer, MAX_X509_LEN);
+				/* Certificate Expiry */
+				if (-1 == format_ASN1_TIME(X509_get_notBefore(peer), conn_info->not_before, MAX_TIME_STRLEN))
+					SNPRINTF(conn_info->not_before, MAX_TIME_STRLEN, "Bad certificate date");
+				if (-1 == format_ASN1_TIME(X509_get_notAfter(peer), conn_info->not_after, MAX_TIME_STRLEN))
+					SNPRINTF(conn_info->not_after, MAX_TIME_STRLEN, "Bad certificate date");
+				X509_free(peer);
+			} else
+			{
+				conn_info->cert_nbits = 0;
+				conn_info->subject[0] = conn_info->issuer[0] = '\0';
+				conn_info->not_before[0] = conn_info->not_after[0] = '\0';
+			}
 			if (GTM_TLS_API_VERSION_SOCK <= socket->gtm_ctx->version)
 				conn_info->options = SSL_get_options(ssl);
 			return 0;
 		} else
 		{
-			UPDATE_ERROR_STRING("Peer certificate invalid");
+			UPDATE_ERROR_STRING("Peer certificate invalid: %ld", verify_result);
 			X509_free(peer);
 			return -1;
 		}
@@ -1162,7 +1447,8 @@ void gtm_tls_session_close(gtm_tls_socket_t **socket)
 	gtm_tls_socket_t	*sock;
 
 	sock = *socket;
-	assert(sock);
+	if (NULL == sock)
+		return;
 	if (NULL != sock->ssl)
 		gtm_tls_socket_close(sock);
 	if (NULL != (session = sock->session))

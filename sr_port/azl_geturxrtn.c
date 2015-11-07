@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,7 +10,12 @@
  *								*
  ****************************************************************/
 
+/* This routine is no longer used in $sr_unix for autorelink-enabled platforms. If/when the
+ * last use of this routine disappears (list as of 03/2015 is sr_i386 and sr_ia64) this
+ * routine is eligible for nixing.
+ */
 #include "mdef.h"
+
 #include "urx.h"
 
 GBLREF urx_rtnref urx_anchor;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,8 +58,7 @@ void comp_init(mstr *src, oprtype *dst)
 		indr_stringpool = stringpool;
 	} else
 		stringpool = indr_stringpool;
-	mcfree();
-	tripinit();
+	tripinit();		/* Also does what mcfree() would do */
 	lb_init();
 	assert(TREF(for_stack_ptr) == TADR(for_stack));
 	*TREF(for_stack_ptr) = NULL;

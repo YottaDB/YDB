@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +35,7 @@
 #include "gtm_conv.h"
 #endif
 #include "gtmcrypt.h"
+#include "error.h"
 
 GBLREF	io_pair		io_curr_device;
 GBLREF	spdesc		stringpool;
@@ -52,8 +54,10 @@ error_def(ERR_SYSCALL);
  */
 int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, int len)
 {
-	int	bom_bytes = 0;
+	int		bom_bytes = 0;
+	boolean_t	ch_set;
 
+	ESTABLISH_RET_GTMIO_CH(&iod->pair, -1, ch_set);
 	switch (*chset)
 	{
 		case CHSET_UTF8:
@@ -99,6 +103,7 @@ int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, in
 		default:
 			assertpro(FALSE);
 	}
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return bom_bytes;
 }
 
@@ -111,10 +116,12 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 	int4		bytes2read, bytes_read, reclen, bom_bytes2read, bom_bytes_read;
 	gtm_chset_t	chset;
 	d_rm_struct	*rm_ptr;
-	int4 sleep_left;
-	int4 sleep_time;
+	int4		sleep_left;
+	int4		sleep_time;
 	ABS_TIME	current_time, time_left;
+	boolean_t	ch_set;
 
+	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	status = 0;
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	fildes = rm_ptr->fildes;
@@ -139,7 +146,8 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 				*msec_timeout = -1;
 				*bom_timeout = TRUE;
 			} else
-				*msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+				*msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
+						       DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
 			/* make sure it terminates with bom_timeout */
 			if (!*bom_timeout && !*msec_timeout)
 				*msec_timeout = 1;
@@ -182,7 +190,8 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 					*msec_timeout = -1;
 					*bom_timeout = TRUE;
 				} else
-					*msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+					*msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
+							       DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
 
 				/* make sure it terminates with bom_timeout */
 				if ((!*bom_timeout) && (!*msec_timeout))
@@ -194,7 +203,10 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 			if (0 < sleep_time)
 				SHORT_SLEEP(sleep_time);
 			if (outofband)
+			{
+				REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 				return 0;
+			}
 			continue; /* for now try and read again if eof or no input ready */
 		} else		  /* error returned */
 		{
@@ -224,6 +236,7 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 	/* if outofband is not set then we are done getting the bom */
 	if (!outofband && !*bom_timeout)
 		rm_ptr->done_1st_read = TRUE;
+	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 	return 0;
 }
 
@@ -246,7 +259,9 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 	int4		sleep_time;
 	boolean_t	bom_timeout = FALSE;
 	ABS_TIME	current_time, time_left;
+	boolean_t	ch_set;
 
+	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	fildes = rm_ptr->fildes;
@@ -296,6 +311,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 		if (!rm_ptr->done_1st_read && outofband)
 		{
 			PIPE_DEBUG(PRINTF("return since iorm_get_bom_fol went outofband\n"); DEBUGPIPEFLUSH;);
+			REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 			return 0;
 		}
 		if (TRUE == bom_timeout)
@@ -322,6 +338,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 	{
 		PIPE_DEBUG(PRINTF("iorm_get_fol: bytes2read: %d bytes_already_read: %d, zint_restart: %d\n",
 				  bytes2read,bytes_already_read,zint_restart); DEBUGPIPEFLUSH;);
+		REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 		return 0;
 	}
 	if (0 <= status && 0 < bytes2read)
@@ -340,7 +357,8 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 					*msec_timeout = -1;
 					*follow_timeout = TRUE;
 				} else
-					*msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+					*msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
+							       DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
 				/* make sure it terminates with follow_timeout */
 				if (!*follow_timeout && !*msec_timeout) *msec_timeout = 1;
 				sleep_left = *msec_timeout;
@@ -384,7 +402,8 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 						*msec_timeout = -1;
 						*follow_timeout = TRUE;
 					} else
-						*msec_timeout = (int4)(time_left.at_sec * 1000 + time_left.at_usec / 1000);
+						*msec_timeout = (int4)(time_left.at_sec * MILLISECS_IN_SEC +
+								       DIVIDE_ROUND_UP(time_left.at_usec, MICROSECS_IN_MSEC));
 
 					/* make sure it terminates with follow_timeout */
 					if (!*follow_timeout && !*msec_timeout) *msec_timeout = 1;
@@ -410,13 +429,17 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 		if (0 > status)
 		{
 			rm_ptr->inbuf_top = rm_ptr->inbuf_pos += *tot_bytes_read;
+			REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 			return 0;
 		}
 		else
 		{
 			rm_ptr->inbuf_top = rm_ptr->inbuf_pos += status;
 			if ((rm_ptr->inbuf_pos - rm_ptr->inbuf_off) < rm_ptr->recordsize)
+			{
+				REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 				return 0;
+			}
 		}
 	}
 	/* if some bytes were read prior to timeout then process them as if no timeout occurred */
@@ -499,6 +522,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 		rm_ptr->last_was_timeout = 0;
 	} else
 		rm_ptr->inbuf_off = rm_ptr->inbuf;
+	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 	return (0 <= status ? bytes_read : status);
 }
 
@@ -512,7 +536,9 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 	gtm_chset_t	chset;
 	d_rm_struct	*rm_ptr;
 	boolean_t	pipe_or_fifo = FALSE;
+	boolean_t	ch_set;
 
+	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	if (rm_ptr->pipe || rm_ptr->fifo)
 		pipe_or_fifo = TRUE;
@@ -619,6 +645,7 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 	/* if outofband is not set or its a disk read then we are done with getting the bom */
 	if (!(pipe_or_fifo && outofband))
 		rm_ptr->done_1st_read = TRUE;
+	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 	return 0;
 }
 
@@ -636,7 +663,9 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 	gtm_chset_t	chset;
 	int		fildes;
 	boolean_t	pipe_or_fifo = FALSE;
+	boolean_t	ch_set;
 
+	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	if (rm_ptr->pipe || rm_ptr->fifo)
@@ -681,6 +710,7 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 		if (!rm_ptr->done_1st_read && (pipe_or_fifo && outofband))
 		{
 			PIPE_DEBUG(PRINTF("return since iorm_get_bom went outofband\n"); DEBUGPIPEFLUSH;);
+			REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 			return 0;
 		}
 		chset = io_ptr->ichset;	/* UTF16 will have changed to UTF16BE or UTF16LE */
@@ -704,6 +734,7 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 	{
 		PIPE_DEBUG(PRINTF("pipeget: bytes2read: %d bytes_already_read: %d, zint_restart: %d\n",
 				  bytes2read,bytes_already_read,zint_restart); DEBUGPIPEFLUSH;);
+		REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 		return 0;
 	}
 	if ((0 <= status) && (0 < bytes2read))
@@ -730,13 +761,17 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 		if (0 > status)
 		{
 			rm_ptr->inbuf_top = rm_ptr->inbuf_pos += *tot_bytes_read;
+			REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 			return 0;
 		}
 		else
 		{
 			rm_ptr->inbuf_top = rm_ptr->inbuf_pos += status;
 			if ((rm_ptr->inbuf_pos - rm_ptr->inbuf_off) < rm_ptr->recordsize)
+			{
+				REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 				return 0;
+			}
 		}
 	}
 
@@ -809,5 +844,6 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 	}
 	rm_ptr->inbuf_top = rm_ptr->inbuf_pos = rm_ptr->inbuf + bytes_read;
 	rm_ptr->inbuf_off = rm_ptr->inbuf;
+	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 	return (0 <= status ? bytes_read : status);
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -137,7 +138,8 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 			sp = op + 1;
 			if (ZRO_TYPE_OBJLIB == op->type)
 			{
-				op = sp;				continue;
+				op = sp;
+				continue;
 			}
 			assert(ZRO_TYPE_COUNT == sp->type);
 			srccnt = (sp++)->count;
@@ -218,7 +220,7 @@ zro_hist *zro_search_hist(char *objnamebuf, zro_ent **objdir)
 	assert(NULL != objstr.addr);
 	objstr.len = STRLEN(objstr.addr);
 	assert(0 < objstr.len);
-	DBGARLNK((stderr, "/n/nzro_search_hist: Entered for %s\n", objnamebuf));
+	DBGARLNK((stderr, "\n\nzro_search_hist: Entered for %s\n", objnamebuf));
 	/* First parse our input string to isolate the directory name we will look up */
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buff_size = MAX_FBUFF;

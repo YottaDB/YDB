@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +35,26 @@
 #define TT_EDITING		0x1000
 #define TT_NOINSERT		0x2000
 #define TT_EMPTERM		0x4000
+
+/* Set prin_out_dev_failure if a write failed on the principal device. If it is a recurrence,
+ * issue the NOPRINCIO error.
+ */
+#define ISSUE_NOPRINCIO_IF_NEEDED_TT(IOD)						\
+{											\
+	GBLREF io_pair		io_std_device;						\
+	GBLREF bool		prin_out_dev_failure;					\
+											\
+	if (IOD == io_std_device.out)							\
+	{										\
+		if (!prin_out_dev_failure)						\
+			prin_out_dev_failure = TRUE;					\
+		else									\
+		{									\
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);		\
+			stop_image_no_core();						\
+		}									\
+	}										\
+}
 
 enum	tt_which
 {

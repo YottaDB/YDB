@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,22 +19,23 @@
 #include "io.h"
 #include "iottdef.h"
 
+UNIX_ONLY(error_def(ERR_ZINTRECURSEIO);)
+
 /* essentially the same as ionl_wteol */
 void iott_wteol(int4 val, io_desc *io_ptr)
 {
-	mstr	eol;
-	int	eol_cnt;
+	mstr		eol;
+	int		eol_cnt;
+	boolean_t	ch_set;
 	UNIX_ONLY(d_tt_struct	*tt_ptr;)
 
-	UNIX_ONLY(error_def(ERR_ZINTRECURSEIO);)
-
 	assert(val);
-
 #ifdef UNIX
 	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
 	if (tt_ptr->mupintr)
-		rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 #endif
+	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
 	io_ptr->esc_state = START;
 	eol.len = STRLEN(NATIVE_TTEOL);
 	eol.addr = (char *)NATIVE_TTEOL;
@@ -56,5 +58,6 @@ void iott_wteol(int4 val, io_desc *io_ptr)
 		if (io_ptr->length)
 			io_ptr->dollar.y %= io_ptr->length;
 	}
+	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 	return;
 }

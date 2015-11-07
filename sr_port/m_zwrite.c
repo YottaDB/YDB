@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,108 +78,111 @@ int m_zwrite(void)
 		op = OC_LVZWRITE;
 	switch (TREF(window_token))
 	{
-	case TK_SPACE:
-	case TK_EOL:
-		if (OC_GVZWRITE == op)
-		{
-			stx_error(ERR_VAREXPECTED);
-			return FALSE;
-		}
-		op = OC_LVPATWRITE;
-		head = maketriple(op);
-		head->operand[0] = put_ilit((mint)3);		/* count */
-		ref1 = newtriple(OC_PARAMETER);
-		head->operand[1] = put_tref(ref1);
-		ref1->operand[0] = put_ilit(0);			/* shows not from zshow */
-		ref = newtriple(OC_PARAMETER);
-		ref1->operand[1] = put_tref(ref);
-		ref->operand[0] = put_str((char *)pat_everything, sizeof_pat_everything);
-		MV_FORCE_MVAL(&mv, ZWRITE_ASTERISK) ;
-		ref->operand[1] = put_lit(&mv);
-		ins_triple(head);
-		return TRUE;
-	case TK_IDENT:
-		name = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
-		advancewindow();
-		break;
-	case TK_DOLLAR:
-		advancewindow();
-		if ((TK_IDENT != TREF(window_token)) || (OC_GVZWRITE == op))
-		{
-			stx_error(ERR_SVNEXPECTED);
-			return FALSE;
-		}
-		parse_warn = FALSE;
-		index = namelook(svn_index, svn_names, (TREF(window_ident)).addr, (TREF(window_ident)).len);
-		if (0 > index)
-		{
-			STX_ERROR_WARN(ERR_INVSVN);     /* sets "parse_warn" to TRUE */
-		} else
-		{
-			if (!VALID_SVN(index))
-			{
-				STX_ERROR_WARN(ERR_FNOTONSYS);  /* sets "parse_warn" to TRUE */
-			}
-		}
-		advancewindow();
-		switch (TREF(window_token))
-		{
 		case TK_SPACE:
 		case TK_EOL:
-		case TK_COMMA:
-			if (!parse_warn)
+			if (OC_GVZWRITE == op)
 			{
-				assert(SV_NUM_SV > svn_data[index].opcode);
-				ref = maketriple(OC_ZWRITESVN);
-				ref->operand[0] = put_ilit(svn_data[index].opcode);
-				ins_triple(ref);
-			} else
-			{       /* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
-				 * (invoked by stx_error). No need to do anything else.
-				 */
-				assert(OC_RTERROR == (TREF(curtchain))->exorder.bl->exorder.bl->exorder.bl->opcode);
+				stx_error(ERR_VAREXPECTED);
+				return FALSE;
 			}
+			op = OC_LVPATWRITE;
+			head = maketriple(op);
+			head->operand[0] = put_ilit((mint)3);		/* count */
+			ref1 = newtriple(OC_PARAMETER);
+			head->operand[1] = put_tref(ref1);
+			ref1->operand[0] = put_ilit(0);			/* shows not from zshow */
+			ref = newtriple(OC_PARAMETER);
+			ref1->operand[1] = put_tref(ref);
+			ref->operand[0] = put_str((char *)pat_everything, sizeof_pat_everything);
+			memset(&mv, 0, SIZEOF(mval));			/* Clear mval so unused fields don't cause objhash
+									 * differences
+									 */
+			MV_FORCE_MVAL(&mv, ZWRITE_ASTERISK) ;
+			ref->operand[1] = put_lit(&mv);
+			ins_triple(head);
 			return TRUE;
+		case TK_IDENT:
+			name = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
+			advancewindow();
+			break;
+		case TK_DOLLAR:
+			advancewindow();
+			if ((TK_IDENT != TREF(window_token)) || (OC_GVZWRITE == op))
+			{
+				stx_error(ERR_SVNEXPECTED);
+				return FALSE;
+			}
+			parse_warn = FALSE;
+			index = namelook(svn_index, svn_names, (TREF(window_ident)).addr, (TREF(window_ident)).len);
+			if (0 > index)
+			{
+				STX_ERROR_WARN(ERR_INVSVN);     /* sets "parse_warn" to TRUE */
+			} else
+			{
+				if (!VALID_SVN(index))
+				{
+					STX_ERROR_WARN(ERR_FNOTONSYS);  /* sets "parse_warn" to TRUE */
+				}
+			}
+			advancewindow();
+			switch (TREF(window_token))
+			{
+				case TK_SPACE:
+				case TK_EOL:
+				case TK_COMMA:
+					if (!parse_warn)
+					{
+						assert(SV_NUM_SV > svn_data[index].opcode);
+						ref = maketriple(OC_ZWRITESVN);
+						ref->operand[0] = put_ilit(svn_data[index].opcode);
+						ins_triple(ref);
+					} else
+					{       /* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
+						 * (invoked by stx_error). No need to do anything else.
+						 */
+						assert(OC_RTERROR == (TREF(curtchain))->exorder.bl->exorder.bl->exorder.bl->opcode);
+					}
+					return TRUE;
+				default:
+					stx_error(ERR_SVNEXPECTED);
+					return FALSE;
+			}
+			break;
+		case TK_LPAREN:
+			if (OC_GVZWRITE != op) /* naked reference */
+			{
+				stx_error(ERR_VAREXPECTED);
+				return FALSE;
+			}
+			name = put_str((TREF(window_ident)).addr, 0);
+			break;
+		case TK_ATSIGN:
+			if (!indirection(&name))
+				return FALSE;
+			if ((OC_LVZWRITE == op) && (TK_LPAREN != TREF(window_token)))
+			{
+				ref = maketriple(OC_COMMARG);
+				ref->operand[0] = name;
+				ref->operand[1] = put_ilit(indir_zwrite);
+				ins_triple(ref);
+				return TRUE;
+			}
+			ref = newtriple(OC_INDPAT);
+			ref->operand[0] = name;
+			name = put_tref(ref);
+			break;
+		case TK_QUESTION:
+			advancewindow();
+			source_column = TREF(last_source_column);
+			if (!compile_pattern(&name, FALSE))
+				return FALSE;
+			if (op == OC_LVZWRITE)
+				op = OC_LVPATWRITE;
+			pat = TRUE;
+			break;
 		default:
-			stx_error(ERR_SVNEXPECTED);
-			return FALSE;
-		}
-		break;
-	case TK_LPAREN:
-		if (OC_GVZWRITE != op) /* naked reference */
-		{
 			stx_error(ERR_VAREXPECTED);
 			return FALSE;
-		}
-		name = put_str((TREF(window_ident)).addr, 0);
-		break;
-	case TK_ATSIGN:
-		if (!indirection(&name))
-			return FALSE;
-		if ((OC_LVZWRITE == op) && (TK_LPAREN != TREF(window_token)))
-		{
-			ref = maketriple(OC_COMMARG);
-			ref->operand[0] = name;
-			ref->operand[1] = put_ilit(indir_zwrite);
-			ins_triple(ref);
-			return TRUE;
-		}
-		ref = newtriple(OC_INDPAT);
-		ref->operand[0] = name;
-		name = put_tref(ref);
-		break;
-	case TK_QUESTION:
-		advancewindow();
-		source_column = TREF(last_source_column);
-		if (!compile_pattern(&name, FALSE))
-			return FALSE;
-		if (op == OC_LVZWRITE)
-			op = OC_LVPATWRITE;
-		pat = TRUE;
-		break;
-	default:
-		stx_error(ERR_VAREXPECTED);
-		return FALSE;
 	}
 	head = maketriple(op);
 	last = newtriple(OC_PARAMETER);
@@ -204,6 +208,7 @@ int m_zwrite(void)
 	if (TK_LPAREN != TREF(window_token))
 	{
 		pcount++;
+		memset(&mv, 0, SIZEOF(mval));			/* Clear mval so unused fields don't cause objhash differences */
 		if (pat)
 		{
 			MV_FORCE_MVAL(&mv, ZWRITE_END);
@@ -224,120 +229,121 @@ int m_zwrite(void)
 	{
 		ref = newtriple(OC_PARAMETER);
 		last->operand[1] = put_tref(ref);
+		memset(&mv, 0, SIZEOF(mval));			/* Clear mval so unused fields don't cause objhash differences */
 		switch (TREF(window_token))
 		{
-		case TK_RPAREN:
-			dqdel(ref,exorder);
-			advancewindow();
-			MV_FORCE_MVAL(&mv, ZWRITE_END);
-			last->operand[1] = put_lit(&mv);
-			pcount++;
-			head->operand[0] = put_ilit((mint)pcount);
-			if (count)
-				count->operand[0] = put_ilit(subscount);
-			ins_triple(head);
-			return TRUE;
-		case TK_ASTERISK:
-			dqdel(ref,exorder);
-			advancewindow();
-			if (TK_RPAREN != TREF(window_token))
-			{
-				stx_error(ERR_RPARENMISSING);
-				return FALSE;
-			}
-			advancewindow();
-			MV_FORCE_MVAL(&mv, ZWRITE_ASTERISK);
-			last->operand[1] = put_lit(&mv);
-			pcount++;
-			subscount++;
-			head->operand[0] = put_ilit((mint)pcount);
-			if (count)
-				count->operand[0] = put_ilit(subscount);
-			ins_triple(head);
-			return TRUE;
-		case TK_QUESTION:
-			advancewindow();
-			source_column = TREF(last_source_column);
-			if (!compile_pattern(&limit, FALSE))
-				return FALSE;
-			if ((TK_COMMA != TREF(window_token)) && (TK_RPAREN != TREF(window_token)))
-			{
-				stx_error(ERR_ZWRSPONE);
-				return FALSE;
-			}
-			if (TK_COMMA == TREF(window_token))
-				advancewindow();
-			subscount++;
-			MV_FORCE_MVAL(&mv, ZWRITE_PATTERN);
-			ref->operand[0] = put_lit(&mv);
-			pcount++;
-			ref1 = newtriple(OC_PARAMETER);
-			ref->operand[1] = put_tref(ref1);
-			ref1->operand[0] = limit;
-			last = ref1;
-			pcount++;
-			continue;
-		case TK_COLON:
-			if (TK_RPAREN != (c = TREF(director_token)))	/* NOTE assignment */
-			{
-				if (TK_COMMA != c)
-				{
-					advancewindow();
-					MV_FORCE_MVAL(&mv, ZWRITE_UPPER);
-					ref->operand[0] = put_lit(&mv);
-					pcount++;
-					subscount++;
-					break;
-				}
-				advancewindow();
-			}
-			/* caution: fall through */
-		case TK_COMMA:
-			advancewindow();
-			MV_FORCE_MVAL(&mv, ZWRITE_ALL);
-			ref->operand[0] = put_lit(&mv);
-			pcount++;
-			subscount++;
-			last = ref;
-			continue;
-		default:
-			if (EXPR_FAIL == expr(&limit, MUMPS_EXPR))
-				return FALSE;
-			subscount++;
-			last = newtriple(OC_PARAMETER);
-			ref->operand[1] = put_tref(last);
-			last->operand[0] = limit;
-			pcount++;
-			if (TK_COLON == (c = TREF(window_token)))	/* NOTE assignment */
-			{
-				code = ZWRITE_LOWER;
-				advancewindow();
-				c = TREF(window_token);
-			} else
-				code = ZWRITE_VAL;
-			switch (c)
-			{
-			case TK_COMMA:
-				advancewindow();
-				/* caution: fall through */
 			case TK_RPAREN:
-				MV_FORCE_MVAL(&mv, code) ;
-				ref->operand[0] = put_lit(&mv);
+				dqdel(ref,exorder);
+				advancewindow();
+				MV_FORCE_MVAL(&mv, ZWRITE_END);
+				last->operand[1] = put_lit(&mv);
 				pcount++;
-				continue;
-			default:
-				if (code == ZWRITE_VAL)
+				head->operand[0] = put_ilit((mint)pcount);
+				if (count)
+					count->operand[0] = put_ilit(subscount);
+				ins_triple(head);
+				return TRUE;
+			case TK_ASTERISK:
+				dqdel(ref,exorder);
+				advancewindow();
+				if (TK_RPAREN != TREF(window_token))
 				{
-					stx_error(ERR_COMMA);
+					stx_error(ERR_RPARENMISSING);
 					return FALSE;
 				}
-				MV_FORCE_MVAL(&mv, ZWRITE_BOTH) ;
+				advancewindow();
+				MV_FORCE_MVAL(&mv, ZWRITE_ASTERISK);
+				last->operand[1] = put_lit(&mv);
+				pcount++;
+				subscount++;
+				head->operand[0] = put_ilit((mint)pcount);
+				if (count)
+					count->operand[0] = put_ilit(subscount);
+				ins_triple(head);
+				return TRUE;
+			case TK_QUESTION:
+				advancewindow();
+				source_column = TREF(last_source_column);
+				if (!compile_pattern(&limit, FALSE))
+					return FALSE;
+				if ((TK_COMMA != TREF(window_token)) && (TK_RPAREN != TREF(window_token)))
+				{
+					stx_error(ERR_ZWRSPONE);
+					return FALSE;
+				}
+				if (TK_COMMA == TREF(window_token))
+					advancewindow();
+				subscount++;
+				MV_FORCE_MVAL(&mv, ZWRITE_PATTERN);
 				ref->operand[0] = put_lit(&mv);
 				pcount++;
-				ref = last;
+				ref1 = newtriple(OC_PARAMETER);
+				ref->operand[1] = put_tref(ref1);
+				ref1->operand[0] = limit;
+				last = ref1;
+				pcount++;
+				continue;
+			case TK_COLON:
+				if (TK_RPAREN != (c = TREF(director_token)))	/* NOTE assignment */
+				{
+					if (TK_COMMA != c)
+					{
+						advancewindow();
+						MV_FORCE_MVAL(&mv, ZWRITE_UPPER);
+						ref->operand[0] = put_lit(&mv);
+						pcount++;
+						subscount++;
+						break;
+					}
+					advancewindow();
+				}
+				/* caution: fall through */
+			case TK_COMMA:
+				advancewindow();
+				MV_FORCE_MVAL(&mv, ZWRITE_ALL);
+				ref->operand[0] = put_lit(&mv);
+				pcount++;
+				subscount++;
+				last = ref;
+				continue;
+			default:
+				if (EXPR_FAIL == expr(&limit, MUMPS_EXPR))
+					return FALSE;
+				subscount++;
+				last = newtriple(OC_PARAMETER);
+				ref->operand[1] = put_tref(last);
+				last->operand[0] = limit;
+				pcount++;
+				if (TK_COLON == (c = TREF(window_token)))	/* NOTE assignment */
+				{
+					code = ZWRITE_LOWER;
+					advancewindow();
+					c = TREF(window_token);
+				} else
+					code = ZWRITE_VAL;
+				switch (c)
+				{
+					case TK_COMMA:
+						advancewindow();
+						/* caution: fall through */
+					case TK_RPAREN:
+						MV_FORCE_MVAL(&mv, code) ;
+						ref->operand[0] = put_lit(&mv);
+						pcount++;
+						continue;
+					default:
+						if (code == ZWRITE_VAL)
+						{
+							stx_error(ERR_COMMA);
+							return FALSE;
+						}
+						MV_FORCE_MVAL(&mv, ZWRITE_BOTH) ;
+						ref->operand[0] = put_lit(&mv);
+						pcount++;
+						ref = last;
+						break;
+				}
 				break;
-			}
-			break;
 		}
 		if (EXPR_FAIL == expr(&limit, MUMPS_EXPR))
 			return FALSE;

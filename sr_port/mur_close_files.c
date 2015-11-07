@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,17 +15,10 @@
 #include "gtmio.h"
 #include "gtm_string.h"
 #include "gtm_time.h"
-#if defined(UNIX)
-#include <sys/shm.h>
 #include "gtm_unistd.h"
-#elif defined(VMS)
-#include <rms.h>
-#include <iodef.h>
-#include <psldef.h>
-#include <ssdef.h>
-#include <efndef.h>
-#include "iosb_disk.h"
-#endif
+
+#include <sys/shm.h>
+
 #include "gdsroot.h"
 #include "gtm_rename.h"
 #include "gdsblk.h"
@@ -46,7 +40,6 @@
 #include "file_head_read.h"
 #include "file_head_write.h"
 #include "have_crit.h"
-#if defined(UNIX)
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "gtmrecv.h"
@@ -59,7 +52,6 @@
 #include <signal.h>
 #include "anticipatory_freeze.h"
 #include "ipcrmid.h"
-#endif
 #include "util.h"
 #ifdef DEBUG
 #include "wbox_test_init.h"
@@ -90,12 +82,13 @@ GBLREF	char			*jnl_state_lit[];
 GBLREF	char			*repl_state_lit[];
 GBLREF	boolean_t		mupip_exit_status_displayed;
 GBLREF	boolean_t		mur_close_files_done;
-#ifdef UNIX
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	sgmnt_data		*cs_data;
+#ifdef DEBUG
+GBLREF	boolean_t		exiting_on_dev_out_error;
 #endif
 
 error_def(ERR_FILERENAME);
@@ -115,9 +108,8 @@ error_def(ERR_RENAMEFAIL);
 error_def(ERR_REPLPOOLINST);
 error_def(ERR_REPLSTATE);
 error_def(ERR_NOTALLDBRNDWN);
-UNIX_ONLY(error_def(ERR_REPLFTOKSEM);)
-UNIX_ONLY(error_def(ERR_RLBKSTRMSEQ);)
-VMS_ONLY(error_def(ERR_SETREG2RESYNC);)
+error_def(ERR_REPLFTOKSEM);
+error_def(ERR_RLBKSTRMSEQ);
 
 boolean_t mur_close_files(void)
 {
@@ -131,9 +123,6 @@ boolean_t mur_close_files(void)
 	uint4			ustatus;
 	int4			status;
 	int4			rundown_status = EXIT_NRM;		/* if gds_rundown went smoothly */
-#	if defined(VMS)
-	boolean_t		set_resync_to_region = FALSE;
-#	elif defined(UNIX)
 	int			idx, finish_err_code, save_errno;
 	const char		*fini_str = NULL;
 	const char		*termntd_str;
@@ -149,8 +138,10 @@ boolean_t mur_close_files(void)
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
 	global_latch_t		*latch;
 	seq_num			max_zqgblmod_seqno = 0, last_histinfo_seqno;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jb;
+	uint4			jnl_status;
 	DEBUG_ONLY(int		semval;)
-#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -170,7 +161,6 @@ boolean_t mur_close_files(void)
 	 * instead of simulating GT.M activity. Reset jgbl.dont_reset_gbl_jrec_time to allow for adjustments to gbl_jrec_time.
 	 */
 	jgbl.dont_reset_gbl_jrec_time = FALSE;
-#	ifdef UNIX
 	if (mur_options.rollback)
 		memset(&max_strm_seqno[0], 0, SIZEOF(max_strm_seqno));
 	anticipatory_freeze_available = INST_FREEZE_ON_ERROR_POLICY;
@@ -185,10 +175,10 @@ boolean_t mur_close_files(void)
 	}
 	assert(!murgbl.incr_db_rlbkd_cycle || murgbl.incr_onln_rlbk_cycle);
 	assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
-#if 0
+#	if 0
 	/* disable assertion until we make jnlpool_init conditional on anticipatory freeze available */
 	assert(jgbl.onlnrlbk || (NULL == jnlpool_ctl));
-#endif
+#	endif
 	assert((NULL == jnlpool_ctl) || (TRUE == inst_hdr->crash));
 	assert((NULL == jnlpool_ctl) || jgbl.onlnrlbk || anticipatory_freeze_available);
 	if (NULL != jnlpool_ctl)
@@ -196,13 +186,12 @@ boolean_t mur_close_files(void)
 		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 		ASSERT_VALID_JNLPOOL(csa);
 	}
-#	endif
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total; rctl < rctl_top; rctl++)
 	{
 		/* If online rollback, external signals are blocked the first time we touch the database with a PBLK. So, if ever
 		 * we come here with online rollback and the database was updated, then we better have a clean exit state.
 		 */
-		UNIX_ONLY(assert(!rctl->db_updated || murgbl.clean_exit || !jgbl.onlnrlbk));
+		assert(!rctl->db_updated || murgbl.clean_exit || !jgbl.onlnrlbk);
 		reg = rctl->gd;
 		/* reg could be NULL at this point in some rare cases (e.g. if we come to mur_close_files through
 		 * deferred_signal_handler as part of call_on_signal invocation and run down this region but encounter
@@ -228,34 +217,27 @@ boolean_t mur_close_files(void)
 			 */
 			assert((NULL != rctl->csa) && (rctl->csa == cs_addrs) || (NULL == rctl->csa) && !murgbl.clean_exit);
 			csa = cs_addrs;
-			csd = VMS_ONLY(TRUE || ) mur_options.forward ? &csd_temp : csa->hdr;
+			csd = mur_options.forward ? &csd_temp : csa->hdr;
 			assert(NULL != csa);
 			if (mur_options.update && JNL_ENABLED(rctl))
 				csa->jnl->pini_addr = 0; /* Stop simulation of GTM process journal record writing */
 			if (NULL != rctl->jctl && murgbl.clean_exit && mur_options.rollback && !mur_options.rollback_losttnonly)
 			{	/* to write proper jnl_seqno in epoch record */
 				assert(murgbl.losttn_seqno >= murgbl.consist_jnl_seqno);
-				UNIX_ONLY(assert(murgbl.consist_jnl_seqno);)
-				if (murgbl.consist_jnl_seqno) /* can be zero if this command is a no-operation in VMS */
-					jgbl.mur_jrec_seqno = csa->hdr->reg_seqno = murgbl.consist_jnl_seqno;
-				VMS_ONLY(
-					if (rctl->jctl->jfh->crash && rctl->jctl->jfh->update_disabled)
-						/* Set resync_to_region seqno for a crash and update_disable case */
-						set_resync_to_region = TRUE;
-				)
+				assert(murgbl.consist_jnl_seqno);
+				jgbl.mur_jrec_seqno = csa->hdr->reg_seqno = murgbl.consist_jnl_seqno;
 			}
 			assert(NULL != csa->nl);
 			assert((!(mur_options.update ^ csa->nl->donotflush_dbjnl)) || !murgbl.clean_exit);
 			if (mur_options.update && (murgbl.clean_exit || !rctl->db_updated) && (NULL != csa->nl))
 				csa->nl->donotflush_dbjnl = FALSE;	/* shared memory is now clean for dbjnl flushing */
-			if (UNIX_ONLY(mur_options.forward) VMS_ONLY(TRUE))
-				UNIX_ONLY(rundown_status =) gds_rundown();
+			if (mur_options.forward)
+				rundown_status = gds_rundown();
 			if (EXIT_NRM != rundown_status)
 			{
 				wrn_count++;
 				continue;
 			}
-#			ifdef UNIX
 			assert(!jgbl.onlnrlbk || (csa->now_crit && csa->hold_onto_crit)
 					|| (!murgbl.clean_exit && !rctl->db_updated));
 			if (jgbl.onlnrlbk)
@@ -279,16 +261,15 @@ boolean_t mur_close_files(void)
 					incr_jnlpool_rlbk_cycle = FALSE;
 				}
 			}
-#			endif
 			if (rctl->standalone && (murgbl.clean_exit || !rctl->db_updated) && !reg->read_only)
 			{
 				status = FALSE;
-				if (UNIX_ONLY(mur_options.forward) VMS_ONLY(TRUE))
+				if (mur_options.forward)
 					status = file_head_read((char *)reg->dyn.addr->fname, csd, SIZEOF(csd_temp));
-				if (VMS_ONLY(status) UNIX_ONLY(!mur_options.forward || status))
+				if (!mur_options.forward || status)
 				{
 					assert(mur_options.update);
-					/* For VMS and RECOVER -FORWARD, we are done with gds_rundown at this point and so have
+					/* For MUPIP JOURNAL RECOVER -FORWARD, we are done "gds_rundown" at this point and so have
 					 * a clean database state at this point. For RECOVER/ROLLBACK -BACKWARD, even though we
 					 * haven't done the gds_rundown yet, we still hold the standalone access and so no new
 					 * process can attach to the database. For the -ONLINE version of RECOVER/ROLLBACK
@@ -314,7 +295,6 @@ boolean_t mur_close_files(void)
 							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_JNLSTATE, 6,
 								LEN_AND_LIT(FILE_STR), DB_LEN_STR(reg),
 								LEN_AND_STR(jnl_state_lit[csd->jnl_state]));
-#						ifdef UNIX
 						if ((NULL != rctl->jctl) && !mur_options.rollback_losttnonly)
 						{
 							if (mur_options.rollback)
@@ -323,7 +303,10 @@ boolean_t mur_close_files(void)
 								csd->reg_seqno = murgbl.consist_jnl_seqno;
 								/* Ensure zqgblmod_seqno never goes above the current reg_seqno.
 								 * Also ensure it gets set to non-zero value if instance was former
-								 * root primary and this is a fetchresync rollback.
+								 * root primary and this is a fetchresync rollback (needed not
+								 * for $zqgblmod processing but instead to store the fact that a
+								 * losttn_complete is pending in this instance and until that is
+								 * done, this instance cannot become a tertiary).
 								 */
 								if ((csd->zqgblmod_seqno > murgbl.consist_jnl_seqno)
 									|| (!csd->zqgblmod_seqno
@@ -355,25 +338,6 @@ boolean_t mur_close_files(void)
 							csd->save_strm_reg_seqno[idx] = 0;
 							csd->intrpt_recov_resync_strm_seqno[idx] = 0;
 						}
-#						else
-						if ((NULL != rctl->jctl)
-							&& mur_options.rollback
-							&& !mur_options.rollback_losttnonly
-							&& murgbl.consist_jnl_seqno)
-						{
-							if (set_resync_to_region)
-							{
-								csd->resync_seqno = csd->reg_seqno;
-								if (mur_options.verbose)
-									gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_SETREG2RESYNC,
-										4, &csd->resync_seqno, &csd->reg_seqno,
-										DB_LEN_STR(reg));
-							}
-							csd->reg_seqno = murgbl.consist_jnl_seqno;
-							if (csd->resync_seqno > murgbl.consist_jnl_seqno)
-								csd->resync_seqno = murgbl.consist_jnl_seqno;
-						}
-#						endif
 						csd->intrpt_recov_resync_seqno = 0;
 						csd->intrpt_recov_tp_resolve_time = 0;
 						csd->intrpt_recov_jnl_state = jnl_notallowed;
@@ -420,7 +384,30 @@ boolean_t mur_close_files(void)
 			} /* else do not restore state */
 			if (rctl->standalone && !mur_options.forward && !mur_options.rollback_losttnonly
 				&& murgbl.clean_exit && (NULL != rctl->jctl_turn_around))
-			{	/* some backward processing and possibly forward processing was done. do some cleanup */
+			{	/* Some backward processing and possibly forward processing was done. do some cleanup */
+				/* It is possible forward processing did updates and wrote to newly created journal files.
+				 * If so, make sure those are hardened to disk BEFORE destroying information maintained in
+				 * the journal files to help with interrupted-recovery/rollback (next_jnl_file_name field etc.)
+				 * just in case this rollback/recover gets killed before it completes.
+				 */
+				was_crit = csa->now_crit;
+				if (!was_crit)
+					grab_crit(reg);
+				assert(JNL_ENABLED(csd));
+				jnl_status = jnl_ensure_open();
+				assert(0 == jnl_status);
+				if (0 == jnl_status)
+				{
+					jpc = csa->jnl;
+					assert(NOJNL != jpc->channel);
+					jb = jpc->jnl_buff;
+					jnl_flush(reg);
+					assert(jb->freeaddr == jb->dskaddr);
+					jnl_fsync(reg, jb->dskaddr);
+					assert(jb->fsync_dskaddr == jb->dskaddr);
+				}
+				if (!was_crit)
+					rel_crit(reg);
 				assert(NULL == rctl->jctl_turn_around || NULL != rctl->jctl_head);
 				jctl = rctl->jctl_turn_around;
 				head_jnl_fn_len = jctl->jnl_fn_len;
@@ -522,7 +509,7 @@ boolean_t mur_close_files(void)
 					rename_fn = fn;
 					prepare_unique_name((char *)end_jctl->jnl_fn, end_jctl->jnl_fn_len,
 						PREFIX_ROLLED_BAK, "", rename_fn, &rename_fn_len, 0, &ustatus);
-					UNIX_ONLY(WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa));
+					WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
 						/* wait for instance freeze before journal file renames */
 					if (SS_NORMAL == gtm_rename((char *)end_jctl->jnl_fn, end_jctl->jnl_fn_len,
 									rename_fn, rename_fn_len, &ustatus))
@@ -538,7 +525,6 @@ boolean_t mur_close_files(void)
 				} /* end for */
 			}
 		} /* end if (reg->open) */
-		VMS_ONLY(rctl->csa = NULL;)
 		for (jctl = rctl->jctl_head; NULL != jctl; )
 		{	/* NULL value of jctl_head possible if we errored out in mur_open_files() before constructing jctl list.
 			 * Similarly jctl->reg_ctl could be NULL in such cases. We use murgbl.clean_exit to check for that.
@@ -550,15 +536,7 @@ boolean_t mur_close_files(void)
 				wrn_count++;	/* mur_fclose() would have done the appropriate gtm_putmsg() */
 		}
 		rctl->jctl_head = NULL;	/* So that we do not come to above loop again */
-#		ifdef VMS
-		rctl->gd = NULL;
-		if (NULL != rctl->mur_desc)	  /* mur_desc buffers were allocated at mur_open_files time for this region */
-			mur_rctl_desc_free(rctl); /* free them up now */
-		assert(NULL == rctl->mur_desc);
-#		endif
 	}
-
-#	ifdef UNIX
 	/* If rollback, we better have the standalone lock. The only exception is if we could not get standalone access
 	 * (due to some other process still accessing the instance file and/or db/jnl). In that case "clean_exit" should be FALSE.
 	 */
@@ -710,7 +688,7 @@ boolean_t mur_close_files(void)
 			TP_CHANGE_REG(reg);
 			assert(!jgbl.onlnrlbk || (cs_addrs->now_crit && cs_addrs->hold_onto_crit) || !murgbl.clean_exit);
 			assert(!rctl->standalone || (1 == (semval = semctl(udi->semid, 0, GETVAL))));
-			UNIX_ONLY(rundown_status =) gds_rundown(); /* does the final rel_crit */
+			rundown_status = gds_rundown(); /* does the final rel_crit */
 			if (EXIT_NRM != rundown_status)
 				wrn_count++;
 			assert((EXIT_NRM != rundown_status) || !rctl->standalone
@@ -721,7 +699,7 @@ boolean_t mur_close_files(void)
 		 * successfully for this region. Increment wrn_count in this case
 		 */
 		assert(!mur_options.update || rctl->standalone || !murgbl.clean_exit);
-		if (rctl->standalone UNIX_ONLY(&& EXIT_NRM == rundown_status))
+		if (rctl->standalone && (EXIT_NRM == rundown_status))
 			/* Avoid db_ipcs_reset if gds_rundown did not remove shared memory */
 			if ((NULL != udi) && !udi->new_shm && !db_ipcs_reset(reg))
 				wrn_count++;
@@ -732,7 +710,6 @@ boolean_t mur_close_files(void)
 			mur_rctl_desc_free(rctl); /* free them up now */
 		assert(NULL == rctl->mur_desc);
 	}
-
 	if (mur_options.rollback && murgbl.repl_standalone)
 	{
 		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
@@ -863,7 +840,6 @@ boolean_t mur_close_files(void)
 					LEN_AND_STR(inst_hdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
 		}
 	}
-#	endif
 	mur_close_file_extfmt();
 	mur_free();	/* free up whatever was allocated by "mur_init" */
 	if (wrn_count)
@@ -873,7 +849,8 @@ boolean_t mur_close_files(void)
 		 * The || in the assert below is to take care of a white-box test that primarily tests the
 		 * WBTEST_TP_HIST_CDB_SC_BLKMOD scenario but also induces a secondary WBTEST_MUR_ABNORMAL_EXIT_EXPECTED scenario.
 		 * WBTEST_JNL_FILE_OPEN_FAIL and WBTEST_JNL_CREATE_FAIL are also accepted since the impossibility to create a
-		 * journal file will induce a recovery failure.
+		 * journal file will induce a recovery failure. Another possibility is that we failed to write something (for
+		 * instance, due to a broken pipe) and ended up coming here.
 		 */
 		assert(gtm_white_box_test_case_enabled
 			&& ((WBTEST_MUR_ABNORMAL_EXIT_EXPECTED == gtm_white_box_test_case_number)
@@ -882,7 +859,8 @@ boolean_t mur_close_files(void)
 				|| (WBTEST_JNL_CREATE_FAIL == gtm_white_box_test_case_number)
 				|| (WBTEST_RECOVER_ENOSPC == gtm_white_box_test_case_number)
 				|| (WBTEST_FAIL_ON_SHMGET == gtm_white_box_test_case_number)
-				|| (WBTEST_WCS_FLU_FAIL == gtm_white_box_test_case_number)));
+				|| (WBTEST_WCS_FLU_FAIL == gtm_white_box_test_case_number))
+				|| exiting_on_dev_out_error);
 		assert(!murgbl.clean_exit);
 		if (murgbl.wrn_count)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_JNLACTINCMPLT);
@@ -893,7 +871,7 @@ boolean_t mur_close_files(void)
  	JNL_PUT_MSG_PROGRESS("End processing");
 	mupip_exit_status_displayed = TRUE;
 	mur_close_files_done = TRUE;
-#	if defined(UNIX) && defined(DEBUG)
+#	if defined(DEBUG)
 	if (WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC) && (0 == gtm_white_box_test_case_count))
 		util_out_print("Total number of writes !UL",TRUE, gtm_wbox_input_test_case_count);
 #	endif

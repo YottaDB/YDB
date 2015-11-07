@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -220,7 +221,7 @@ boolean_t wcs_flu(uint4 options)
 		if (jb->last_eof_written)
 		{
 			assert(jb->fsync_dskaddr == jb->freeaddr);
-			assert((dba_bg != csd->acc_meth)
+			assert((dba_bg != csd->acc_meth) || !csd->jnl_before_image
 				|| (!cnl->wcs_active_lvl && !csa->acc_meth.bg.cache_state->cacheq_active.fl));
 			REL_CRIT_BEFORE_RETURN;
 			return TRUE;

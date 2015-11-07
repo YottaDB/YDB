@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,49 +10,39 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_sto.s
+	.include "g_msf.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "g_msf.si"
-.include "linkage.si"
-	.INCLUDE	"mval_def.si"
-
-	.sbttl	op_sto
-#	PAGE	+
-	.DATA
-.extern	literal_null
-.extern	undef_inhibit
+	.data
+	.extern	literal_null
+	.extern	undef_inhibit
 
 	.text
-.extern	underr
+	.extern	underr
 
-# PUBLIC	op_sto
-ENTRY op_sto
-	enter $0, $0  # Align the stack to 16 bytes
-	mv_if_notdefined REG64_RET1, b
-a:	movl	$mval_byte_len,REG32_ARG3
-	movq	REG64_RET1,REG64_ARG1
-	movq	REG64_RET0,REG64_ARG0
+ENTRY	op_sto
+	subq	$8, REG_SP					# Bump stack for 16 byte alignment
+	CHKSTKALIGN						# Verify stack alignment
+	mv_if_notdefined REG64_RET1, notdef
+nowdef:
+	movl	$mval_byte_len, REG32_ARG3
+	movq	REG64_RET1, REG64_ARG1
+	movq	REG64_RET0, REG64_ARG0
 	REP
 	movsb
 	andw	$~mval_m_aliascont, mval_w_mvtype(REG64_RET0)	# Don't propagate alias container flag
-	leave
+done:
+	addq	$8, REG_SP					# Remove stack alignment bump
 	ret
-
-b:	cmpb	$0,undef_inhibit(REG_IP)
+notdef:
+	cmpb	$0, undef_inhibit(REG_IP)
 	je	clab
-	leaq	literal_null(REG_IP),REG_RET1
-	jmp	a
-
-clab:	movq	REG_RET1, REG64_ARG0
-	movb    $0,REG8_ACCUM             # variable length argument
+	leaq	literal_null(REG_IP), REG_RET1
+	jmp	nowdef
+clab:
+	movq	REG_RET1, REG64_ARG0
+	movb    $0, REG8_ACCUM             			# Variable length argument
 	call	underr
-	leave
-	ret
-
-# op_sto	ENDP
-
-# END
+	jmp	done

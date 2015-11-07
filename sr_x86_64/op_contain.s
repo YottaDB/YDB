@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,53 +10,46 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_contain.s
+	.include "g_msf.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
+sav_rax		= -8
+sav_rdx		= -16
+arg5		= -24
+arg6		= -32
+SAVE_SIZE	= 32
 
-.include "g_msf.si"
-.include "linkage.si"
-	.INCLUDE	"mval_def.si"
-
-	.sbttl	op_contain
-#	PAGE	+
 	.text
-sav_rax	=	-8
-sav_rdx	=	-16
+	.extern	matchc
+	.extern	n2s
 
-.extern	matchc
-.extern	n2s
-
-# PUBLIC	op_contain
-ENTRY op_contain
-	enter	$16,$0
-	movq	REG64_RET1,sav_rdx(REG_FRAME_POINTER)
+ENTRY	op_contain
+	pushq	%rbp					# Save %rbp (aka REG_FRAME_POINTER) - aligns stack to 16 bytes
+	movq	REG_SP, %rbp				# Save current stack pointer to %rbp
+	subq	$SAVE_SIZE, REG_SP			# Get 16 byte save area and room for two parms
+	CHKSTKALIGN					# Verify stack alignment
+	movq	REG64_RET1, sav_rdx(%rbp)
 	mv_force_defined REG64_RET0, l1
-	movq	REG64_RET0,sav_rax(REG_FRAME_POINTER)
-	mv_force_str	REG64_RET0, l2
-	movq	sav_rdx(REG_FRAME_POINTER),REG64_RET1
+	movq	REG64_RET0, sav_rax(%rbp)
+	mv_force_str REG64_RET0, l2
+	movq	sav_rdx(%rbp), REG64_RET1
 	mv_force_defined REG64_RET1, l3
-	movq    REG64_RET1,sav_rdx(REG_FRAME_POINTER)
+	movq    REG64_RET1, sav_rdx(%rbp)
 	mv_force_str	REG64_RET1, l4
-	subq	$8,REG_SP
-	movq	REG_SP,REG64_ARG5					# 6th Argument
-	movq	$1,(REG_SP)						# init arg to 1.
-	subq	$8,REG_SP
-	movq	REG_SP,REG64_ARG4					# 5th Argument
-	movq	sav_rax(REG_FRAME_POINTER),REG64_RET0
-	movq	sav_rdx(REG_FRAME_POINTER),REG64_RET1
-	movq 	mval_a_straddr(REG64_RET0),REG64_ARG3			# 4th Argument
-	movl	mval_l_strlen(REG64_RET0),REG32_ARG2			# 3rd Argument
-	movq	mval_a_straddr(REG64_RET1),REG64_ARG1			# 2nd Argument
-	movl	mval_l_strlen(REG64_RET1),REG32_ARG0
+	leaq	arg6(%rbp), REG64_ARG5			# 6th Argument address
+	movq	$1, 0(REG64_ARG5)			# init arg to 1
+	leaq	arg5(%rbp), REG64_ARG4			# 5th Argument address
+	movq	sav_rax(%rbp), REG64_RET0
+	movq	sav_rdx(%rbp), REG64_RET1
+	movq 	mval_a_straddr(REG64_RET0), REG64_ARG3	# 4th Argument
+	movl	mval_l_strlen(REG64_RET0), REG32_ARG2	# 3rd Argument
+	movq	mval_a_straddr(REG64_RET1), REG64_ARG1	# 2nd Argument
+	movl	mval_l_strlen(REG64_RET1), REG32_ARG0
 	call	matchc
-	movl	(REG_SP), REG32_RET0    # The 5th argument is a pointer to a int. So read only 4 bytes
-	addq    $1, REG_SP
-	cmpl	$0,REG32_RET0
-	leave
+	movl	arg5(%rbp), REG32_RET0    		# Return int arg5 value
+	addq	$SAVE_SIZE, REG_SP
+	popq	%rbp
+	cmpl	$0, REG32_RET0
 	ret
-# op_contain ENDP
-
-# END

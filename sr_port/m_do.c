@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +26,7 @@ error_def(ERR_ACTOFFSET);
 
 int m_do(void)
 {
+	int		opcd;
 	oprtype		*cr;
 	triple		*calltrip, *labelref, *obp, *oldchain, *ref0, *ref1, *routineref, tmpchain, *triptr, *tripsize;
 	DCL_THREADGBL_ACCESS;
@@ -68,21 +70,37 @@ int m_do(void)
 			if (OC_EXTCALL == calltrip->opcode)
 			{
 				assert(TRIP_REF == calltrip->operand[1].oprclass);
-				if (OC_CDLIT == calltrip->operand[1].oprval.tref->opcode)
-					assert(CDLT_REF == calltrip->operand[1].oprval.tref->operand[0].oprclass);
-				else ARLINK_ONLY(if (OC_LAB_EXT != calltrip->operand[1].oprval.tref->opcode))
+				opcd = calltrip->operand[1].oprval.tref->opcode;
+				if ((OC_CDLIT == opcd) || (OC_CDIDX == opcd))
+				{
+					DEBUG_ONLY(opcd = calltrip->operand[1].oprval.tref->operand[0].oprclass);
+					assert((CDLT_REF == opcd) || (CDIDX_REF == opcd));
+				} else
 				{
 					assert(OC_LABADDR == calltrip->operand[1].oprval.tref->opcode);
 					assert(TRIP_REF == calltrip->operand[1].oprval.tref->operand[1].oprclass);
 					assert(OC_PARAMETER == calltrip->operand[1].oprval.tref->operand[1].oprval.tref->opcode);
 					assert(TRIP_REF ==
 						calltrip->operand[1].oprval.tref->operand[1].oprval.tref->operand[0].oprclass);
-					assert(OC_ILIT == calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
-						operand[0].oprval.tref->opcode);
-					assert(ILIT_REF == calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
-						operand[0].oprval.tref->operand[0].oprclass);
-					if (0 != calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
-						operand[0].oprval.tref->operand[0].oprval.ilit)
+					DEBUG_ONLY(opcd = calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
+						   operand[0].oprval.tref->opcode);
+					assert((OC_ILIT == opcd) || (OC_COMINT == opcd));
+					DEBUG_ONLY(opcd = calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
+						   operand[0].oprval.tref->operand[0].oprclass);
+					assert((ILIT_REF == opcd) || (TRIP_REF == opcd));
+					/* The opcd references above added to allow an invalid syntax using indirect values for
+					 * offsets while specifying a parm list to get through the above asserts (invalid syntax
+					 * should not trip asserts) but it leads to the conclusion that the below test may not be
+					 * robust enough since it is looking at a literal integer value when there is none so have
+					 * added further checks mirroring the first checks done in the two most recent asserts to
+					 * make the check more robust. [Example bad code: Do @lbl+@n^artn(arg)]
+					 */
+					if ((0 != calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
+					     operand[0].oprval.tref->operand[0].oprval.ilit)
+					    || (OC_ILIT != calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
+						operand[0].oprval.tref->opcode)
+					    || (ILIT_REF != calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
+						operand[0].oprval.tref->operand[0].oprclass))
 					{
 						stx_error(ERR_ACTOFFSET);
 						return FALSE;

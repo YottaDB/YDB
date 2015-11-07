@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,22 +10,22 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	call_dm.s
-	.sbttl	call_dm
-.include "g_msf.si"
-.include "linkage.si"
+	.include "g_msf.si"
+	.include "linkage.si"
+	.include "debug.si"
 
-	.DATA
 	.text
-.extern	op_oldvar
-.extern	opp_dmode
+	.extern	op_oldvar
+	.extern	opp_dmode
 
-# PUBLIC	call_dm
-# call_dm	PROC
-ENTRY call_dm
-l1:	call	opp_dmode
+#
+# Note call_dm is only ever branched to so does not have a return address pushed on the stack throwing off the
+# needed 16 byte alignment of the stack. Verify that first thing on each iteration.
+#
+ENTRY	call_dm
+newcmd:
+	CHKSTKALIGN			# Verify stack alignment
+	call	opp_dmode
 	call	op_oldvar
-	jmp	l1
-	ret
-# END
+	jmp	newcmd
+

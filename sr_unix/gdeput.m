@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2013 Fidelity Information Services, Inc	;
+; Copyright (c) 2006-2015 Fidelity National Information 	;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -11,7 +12,7 @@
 gdeput:	;output the result of the session to the global directory file
 GDEPUT()
 	n rec,gds,cregs,csegs,cregcnt,csegcnt,maxrecsize,mapcnt,map,hasSpanGbls,isSpanned,curMapSpanning,prevMapSpanning
-	n varmapslen,vargblnamelen,tmplen,ptrsize,varmapoff,gnamcnt,gblnamelen,filler16byte,filler12byte
+	n varmapslen,vargblnamelen,tmplen,ptrsize,varmapoff,gnamcnt,gblnamelen,filler16byte,filler12byte,filler11byte
 	d CREATEGLDMAP^GDEMAP
 	s ptrsize=$s((gtm64=TRUE):8,1:4)
 	s s="",gdeputzs="",varmapslen=0,mapcnt=0,hasSpanGbls=0
@@ -37,6 +38,7 @@ GDEPUT()
 	s x=x+(csegcnt*SIZEOF("gd_segment"))
 	s gnamcnt=gnams
 	s rec=""
+	s $p(filler11byte,ZERO,11)=ZERO
 	s $p(filler12byte,ZERO,12)=ZERO
 	s $p(filler16byte,ZERO,16)=ZERO
 ; contents
@@ -61,13 +63,12 @@ GDEPUT()
 	s rec=rec_filler12byte					; for runtime filler
 	s rec=hdrlab_$$num2bin(4,$l(hdrlab)+4+filesize)_rec
 	i create zm gdeerr("GDCREATE"):file
-	e  s:$ZVersion["VMS" $p(file,";",2)=$p(file,";",2)+1  zm gdeerr("GDUPDATE"):file
+	e  zm gdeerr("GDUPDATE"):file
 	s gdexcept="s gdeputzs=$zs  zgoto "_$zl_":writeerr^GDEPUT"
-	i $ZVersion["VMS"  s tempfile=$p(file,";",1)_"inprogress"
-	e  s tempfile=file_"inprogress"
+	s tempfile=file_"inprogress"
 	;if zchset is UTF-8 open in raw mode to avoid BADCHAR errors
 	; For OS390 aka z/OS, use BINARY mode
-	s chset=$SELECT($ZV["OS390":"BINARY",$ZV["VMS":"",$ZCHSET="UTF-8":"M",1:"")
+	s chset=$SELECT($ZV["OS390":"BINARY",$ZCHSET="UTF-8":"M",1:"")
 	o tempfile:(rewind:noreadonly:newversion:recordsize=512:fixed:blocksize=512:exception=gdexcept:ochset=chset)
 ; maps
 	s s="",curMapSpanning=0,prevMapSpanning=0
@@ -96,7 +97,7 @@ GDEPUT()
 	u tempfile
 	f  s record=$ze(rec,1,512),rec=$ze(rec,513,MAXSTRLEN) q:'$zl(record)  w record,!
 	u @useio
-	i $ZV'["VMS" o file:chset="M" c file:delete
+	o file:chset="M" c file:delete
 	c tempfile:rename=file
 	q 1
 
@@ -153,13 +154,14 @@ cregion:
 	s rec=rec_$tr($j("",4)," ",ZERO)							;filler
 	s rec=rec_$$num2bin(1,regs(s,"COLLATION_DEFAULT"))
 	s rec=rec_$$num2bin(1,regs(s,"STDNULLCOLL"))
-	i $ZVersion'["VMS" s rec=rec_$$num2bin(1,regs(s,"INST_FREEZE_ON_ERROR"))
-	i $ZVersion'["VMS" s rec=rec_$$num2bin(1,regs(s,"QDBRUNDOWN"))
+	s rec=rec_$$num2bin(1,regs(s,"INST_FREEZE_ON_ERROR"))
+	s rec=rec_$$num2bin(1,regs(s,"QDBRUNDOWN"))
 	s rec=rec_$$num2bin(1,$zl(regs(s,"FILE_NAME")))
 	s rec=rec_regs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$zl(regs(s,"FILE_NAME")))," ",ZERO)
 	s rec=rec_$tr($j("",8)," ",ZERO)							; reserved
 	s rec=rec_$$num2bin(4,isSpanned(s))							; is_spanned
-	s rec=rec_filler12byte									; runtime filler
+	s rec=rec_$$num2bin(1,regs(s,"EPOCHTAPER"))						; epoch tapering
+	s rec=rec_filler11byte									; runtime filler
 	s rec=rec_$tr($j("",SIZEOF("gd_region_padding"))," ",ZERO)				; padding
 	q
 csegment:
@@ -184,10 +186,10 @@ csegment:
 	s rec=rec_$$num2bin(4,segs(s,"GLOBAL_BUFFER_COUNT"))
 	s rec=rec_$$num2bin(4,segs(s,"RESERVED_BYTES"))
 	s rec=rec_$$num2bin(4,segs(s,"MUTEX_SLOTS"))
+	s rec=rec_$$num2bin(4,segs(s,"DEFER_ALLOCATE"))
 	s x=$s(am="BG":1,am="MM":2,am="USER":4,1:-1)
 	i x=-1 d error1
 	s rec=rec_$$num2bin(4,x)
-	i (gtm64=TRUE) s rec=rec_$$num2bin(4,0) ; 4-byte filler
 	s rec=rec_$$num2bin(ptrsize,0)		; file_cntl ptr
 	s rec=rec_$$num2bin(ptrsize,0)		; repl_list ptr
 	; Only for platforms that support encryption, we write this value. Others it will

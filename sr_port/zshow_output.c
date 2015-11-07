@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +13,8 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_stdio.h"
+#include "min_max.h"
 
 #include "error.h"
 #include "lv_val.h"
@@ -62,6 +65,9 @@ GBLREF	gd_region	*gv_cur_region;
 GBLREF	mv_stent	*mv_chain;
 GBLREF	unsigned char    *msp, *stackwarn, *stacktop;
 GBLREF	int		process_exiting;
+GBLREF	volatile boolean_t	timer_in_handler;
+
+LITREF mval literal_null;
 
 error_def(ERR_ZSHOWGLOSMALL);
 error_def(ERR_STACKOFLOW);
@@ -70,14 +76,15 @@ error_def(ERR_MAXNRSUBSCRIPTS);
 
 void zshow_output(zshow_out *out, const mstr *str)
 {
-	mval		*mv, lmv;
+	mval		*mv, lmv, *mv_child;
 	lv_val		*lv, *lv_child;
 	char		buff, *strptr, *strnext, *strtop, *strbase, *leadptr;
+	char		*tempstr, *piecestr, *strtokptr;
 	int		key_ovrhd, str_processed, sbs_depth, dbg_sbs_depth;
-	ssize_t        	len, outlen, chcnt, char_len, disp_len ;
+	ssize_t        	len, outlen, chcnt, char_len, disp_len;
 	int		buff_len;
 	int		device_width, inchar_width, cumul_width;
-	boolean_t	is_base_var, lvundef, utf8_active;
+	boolean_t	is_base_var, lvundef, utf8_active, zshow_depth;
 	gd_addr		*gbl_gd_addr;
 	gvnh_reg_t	*gvnh_reg;
 #ifdef UNICODE_SUPPORTED
@@ -100,6 +107,23 @@ void zshow_output(zshow_out *out, const mstr *str)
 	} else
 		mv = &lmv;
 	mv->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before value gets initialized below */
+	/* does this zshow "code" use subscripts for output */
+	if ((('C' == out->code) || ('c' == out->code)) && ((ZSHOW_LOCAL == out->type) || (ZSHOW_GLOBAL == out->type)))
+	{
+		zshow_depth = TRUE;
+		/* get a pointer to a garbage collection protected mval */
+		PUSH_MV_STENT(MVST_MVAL);
+		mv_child = &mv_chain->mv_st_cont.mvs_mval;
+		mv_child->mvtype = MV_STR;
+		ENSURE_STP_FREE_SPACE(1);
+		/* create an mval for the "code" subscript */
+		mv_child->str.addr = (char *)stringpool.free;
+		*mv_child->str.addr = out->code;
+		mv_child->str.len = 1;
+		stringpool.free +=1;
+	}
+	else
+		zshow_depth = FALSE;
 	switch (out->type)
 	{
 	case ZSHOW_DEVICE:
@@ -127,7 +151,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 					strptr += outlen;
 					disp_len -= outlen;
 				}
-#ifdef UNICODE_SUPPORTED
+#				ifdef UNICODE_SUPPORTED
 				else
 				{
 					utf8_active = (CHSET_M != io_curr_device.out->ichset); /* needed by GTM_IO_WCWIDTH macro */
@@ -144,7 +168,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 					}
 					outlen = (ssize_t)(strptr - strbase);
 				}
-#endif
+#				endif
 				memcpy(out->ptr, strbase, outlen);
 				out->ptr += outlen;
 				str_processed += (int)outlen;
@@ -163,8 +187,60 @@ void zshow_output(zshow_out *out, const mstr *str)
 			WRITE_ONE_LINE_FROM_BUFFER
 		break;
 	case ZSHOW_LOCAL:
-		if (out->code)
+		if (out->code) /* For locals, code == 0 indicates there is nothing to add (str) nor to flush */
 		{
+			if (zshow_depth)
+			{
+				/* if the subscript "code" already exists, delete it */
+				lv = out->out_var.lv.lvar;
+				if (out->code != out->curr_code)
+				{
+					lv_child = op_srchindx(VARLSTCNT(2) lv, mv_child);
+					if (NULL != lv_child)
+					{
+						lvundef = FALSE;
+						if (!LV_IS_VAL_DEFINED(lv))
+						{
+							lv->v.mvtype = MV_STR;
+							lv->v.str.len = 0;
+							lvundef = TRUE;
+						}
+						op_kill(lv_child);
+						if (lvundef)
+							lv->v.mvtype = 0;
+					}
+				}
+				/* make sure another subscript will fit */
+				is_base_var = LV_IS_BASE_VAR(lv);
+				LV_SBS_DEPTH(lv, is_base_var, sbs_depth);
+				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 1))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+				/* add the subscript for the "code" */
+				lv_child = op_putindx(VARLSTCNT(2) lv, mv_child);
+				lv_child->v.mvtype = 0; /* don't want a node so make it undef'd */
+				for (tempstr = str->addr; piecestr = STRTOK_R(tempstr,".", &strtokptr);
+						tempstr = NULL) /* WARNING assignment in test */
+				{
+					len = MIN(strlen(piecestr), MAX_MIDENT_LEN);
+					/* create the mval for the next subscript */
+					ENSURE_STP_FREE_SPACE(len);
+					mv_child->str.addr = (char *)stringpool.free;
+					stringpool.free +=len;
+					strncpy(mv_child->str.addr, piecestr, len);
+					mv_child->str.len = len;
+					/* make sure the subscript will fit */
+					is_base_var = LV_IS_BASE_VAR(lv_child);
+					LV_SBS_DEPTH(lv_child, is_base_var, sbs_depth);
+					if (MAX_LVSUBSCRIPTS <= (sbs_depth + 1))
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+					/* add the subscript */
+					lv_child = op_putindx(VARLSTCNT(2) lv_child, mv_child);
+					lv_child->v.mvtype = 0; /* if it is not the last one, no node */
+				}
+				lv_child->v = literal_null; /* make a node out of the last one with a value of "" */
+				POP_MV_STENT(); /* we are done with our mval */
+				break;
+			}
 			if (out->code != out->curr_code)
 			{
 				ENSURE_STP_FREE_SPACE(1);
@@ -214,13 +290,13 @@ void zshow_output(zshow_out *out, const mstr *str)
 							break;
 						len = MAX_SRCLINE - (ssize_t)(out->ptr - out->buff);
 						strbase = str->addr + str_processed;
-#ifdef UNICODE_SUPPORTED
+#						ifdef UNICODE_SUPPORTED
 						if (gtm_utf8_mode)
 						{ /* terminate at the proper character boundary within MAX_SRCLINE bytes */
 							UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);
 							len = (ssize_t)(leadptr - strbase);
 						}
-#endif
+#						endif
 						memcpy(out->ptr, strbase, len);
 						strptr += len;
 						out->ptr += len;
@@ -272,6 +348,43 @@ void zshow_output(zshow_out *out, const mstr *str)
 		}
 		break;
 	case ZSHOW_GLOBAL:
+		if (zshow_depth)
+		{
+			gbl_gd_addr = TREF(gd_targ_addr);	/* set by op_gvname/op_gvextnam/op_gvnaked at start of ZSHOW cmd */
+			gvnh_reg = TREF(gd_targ_gvnh_reg);	/* set by op_gvname/op_gvextnam/op_gvnaked at start of ZSHOW cmd */
+			gv_currkey->end = out->out_var.gv.end;
+			gv_currkey->prev = out->out_var.gv.prev;
+			gv_currkey->base[gv_currkey->end] = 0;
+			/* add the "code" subscript */
+			mval2subsc(mv_child, gv_currkey, gv_cur_region->std_null_coll);
+			/* ensure this subscript "code" does not exist by deleting it*/
+			if (out->code && out->code != out->curr_code)
+			{
+				GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
+				if (gv_currkey->end >= gv_cur_region->max_key_size)
+					ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+				op_gvkill();
+			}
+			tempstr=str->addr;
+			/* build the key by adding the rest of the subscripts */
+			for (tempstr = str->addr; piecestr = STRTOK_R(tempstr,".", &strtokptr); /* WARNING assignment in test */
+					tempstr = NULL)
+			{
+				len = MIN(strlen(piecestr), MAX_MIDENT_LEN);
+				ENSURE_STP_FREE_SPACE(len);
+				mv_child->str.addr = (char *)stringpool.free;
+				stringpool.free +=len;
+				strncpy(mv_child->str.addr, piecestr, len);
+				mv_child->str.len = len;
+				mval2subsc(mv_child, gv_currkey, gv_cur_region->std_null_coll);
+				GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
+				if (gv_currkey->end >= gv_cur_region->max_key_size)
+					ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+			}
+			op_gvput((mval *)&literal_null); /* create the global */
+			POP_MV_STENT(); /* we are done with our mval */
+			break;
+		}
 		if (!out->len)
 		{
 			key_ovrhd = gv_currkey->end + 1 + F_SUBSC_LEN + N_SUBSC_LEN;
@@ -315,13 +428,13 @@ void zshow_output(zshow_out *out, const mstr *str)
 					break;
 				len = out->len - (ssize_t)(out->ptr - out->buff);
 				strbase = str->addr + str_processed;
-#ifdef UNICODE_SUPPORTED
+#				ifdef UNICODE_SUPPORTED
 				if (gtm_utf8_mode)
 				{ /* terminate at the proper character boundary within out->len bytes */
 					UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);
 					len = (ssize_t)(leadptr - strbase);
 				}
-#endif
+#				endif
 				memcpy(out->ptr, strbase, len);
 				strptr += len;
 				out->ptr += len;

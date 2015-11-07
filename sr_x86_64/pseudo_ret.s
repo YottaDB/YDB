@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,22 +10,19 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	pseudo_ret.s
-	.sbttl	pseudo_ret
-
-#	.386
-#	.MODEL	FLAT, C
-
-.include "g_msf.si"
-.include "linkage.si"
+	.include "g_msf.si"
+	.include "linkage.si"
+	.include "debug.si"
 
 	.text
-.extern	opp_ret
-
-# PUBLIC	pseudo_ret
-ENTRY pseudo_ret
+	.extern	opp_ret
+#
+# This routine is only ever "returned to" since its address stored into the mpc field of stack frames
+# during certain types of error recovery. Because of that, there is no "return address" on the stack
+# so this routine's call to opp_ret is the equivalent of a goto because opp_ret *will* unwind the caller's
+# address. So this routine has no caller and no return. Nevertheless, we check the stack alignment to
+# verify it before passing control to opp_ret for the unwind.
+#
+ENTRY	pseudo_ret
+	CHKSTKALIGN			# Verify stack alignment
 	call	opp_ret
-# pseudo_ret ENDP
-
-# END

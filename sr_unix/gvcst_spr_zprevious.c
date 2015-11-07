@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,6 +104,12 @@ boolean_t	gvcst_spr_zprevious(void)
 		 */
 		if (gv_target->root)
 			found = gvcst_zprevious();
+		if (gv_target != start_map_gvt)
+		{	/* Restore gv_cur_region/gv_target etc. */
+			gv_target = start_map_gvt;
+			gv_cur_region = start_map->reg.addr;
+			change_reg();
+		}
 		return found;
 	}
 	/* Do any initialization that is independent of retries BEFORE the op_tstart */

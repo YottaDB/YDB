@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,7 +81,7 @@ void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 								lck->sequence = csa->hdr->trans_hist.lock_sequence++;
 							} else if (d->owner)
 							{	/* Blocking struct still has owner. Check if alive */
-								if (PROC_ALIVE(d, time, icount, status))
+								if (PROC_DEAD(d, time, icount, status))
 								{	/* process that owned lock has died, free lock */
 									d->owner = 0;
 									lck->sequence = csa->hdr->trans_hist.lock_sequence++;

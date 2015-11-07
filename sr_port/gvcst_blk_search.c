@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +10,25 @@
  *								*
  ****************************************************************/
 
+#include "mdef.h"
+
+#include "gtm_stdio.h"
+#include "gtm_string.h"
+
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "gdsblk.h"
+#include "copy.h"
+#include "cdb_sc.h"
+#include "gvcst_protos.h"	/* for gvcst_search_tail,gvcst_search_blk prototype */
+#include "min_max.h"
+#include "gvcst_expand_key.h"
+#include "send_msg.h"
+
 /*
- * NOTE:  See also GVCST_BLK_SEARCH.MAR for the VAX platform.
- *
  * -------------------------------------------------------------------
  * Search a single gvcst block
  *
@@ -79,22 +96,6 @@
  * -------------------------------------------------------------------
  */
 
-#include "mdef.h"
-
-#include "gtm_stdio.h"
-#include "gtm_string.h"
-
-#include "gdsroot.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsbt.h"
-#include "gdsfhead.h"
-#include "gdsblk.h"
-#include "copy.h"
-#include "cdb_sc.h"
-#include "gvcst_protos.h"	/* for gvcst_search_tail,gvcst_search_blk prototype */
-#include "send_msg.h"
-
 GBLREF unsigned int	t_tries;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
@@ -146,294 +147,22 @@ static	void	gvcst_search_fail(srch_blk_status *pStat)
 				"csa = 0x%lX : csalock = 0x%lX", regbuff, pStat->blk_num, (long unsigned int) pStat->buffaddr,
 				(long unsigned int) pStat->cr, crbuff, (long unsigned int) cs_addrs,
 				(long unsigned int) cs_addrs->lock_addrs[0]);
-		send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(buff));
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(buff));
 	}
 }
 
-/*
- * --------------------------------------------------
- * Search for a key in the block
- *
- * Return:
- *	cdb_sc_normal	 - success
- *	cdb_sc_badoffset - record with 0 length encountered,
- *			   possibly a corrupt block
- *	cdb_sc_blklenerr - end of block reached without match
- * --------------------------------------------------
- */
+#define GVCST_SEARCH_EXPAND_PREVKEY
+#define GVCST_SEARCH_BLK
+#include "gvcst_blk_search.h" /* for function gvcst_search_blk_expand_prevkey() */ /* BYPASSOK : intentional duplicate include. */
+#undef GVCST_SEARCH_BLK
+#define GVCST_SEARCH_TAIL
+#include "gvcst_blk_search.h" /* for function gvcst_search_tail_expand_prevkey() */ /* BYPASSOK : intentional duplicate include. */
+#undef GVCST_SEARCH_TAIL
 
-enum cdb_sc 	gvcst_search_blk (gv_key *pKey, srch_blk_status *pStat)
-{
-	/* register variables named in perceived order of declining impact */
-	register int		nFlg, nTargLen, nMatchCnt, nTmp;
-	sm_uc_ptr_t		pBlkBase, pRecBase, pTop, pRec, pPrevRec;
-	unsigned char		*pCurrTarg, *pTargKeyBase;
-	unsigned short		nRecLen;
-	int			tmp_cmpc;
-
-	/* the following load code (and code in a few other places) is coded in a "assember" style
-	 * in an attempt to encourage the compiler to get it efficient;
-	 * if instance, memory and non-memory instructions are interlaced to encourge pipelining.
-	 * of course a great compiler doesn't need help, but this is portable code and ...
-	 */
-	DBG_CHECK_SRCH_HIST_AND_CSE_BUFFER_MATCH(pStat);
-	pBlkBase = pStat->buffaddr;
-	pRecBase = pBlkBase;
-	pTop = pBlkBase + ((blk_hdr_ptr_t)pBlkBase)->bsiz;
-	nRecLen = SIZEOF(blk_hdr);
-	pCurrTarg = pKey->base;
-	nMatchCnt = 0;
-	nTargLen = (int)pKey->end;
-	pTargKeyBase = pCurrTarg;
-	nTargLen++;					/* for the terminating NUL on the key */
-
-	for (;;)
-	{
-		pRec = pRecBase + nRecLen;
-
-		if (pRec >= pTop)
-		{	/* Terminated at end of block */
-			if (pRec > pTop)		/* If record goes off the end, then block must be bad */
-			{
-				INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
-				assert(CDB_STAGNATE > t_tries);
-				return cdb_sc_blklenerr;
-			}
-			nTargLen = 0;
-			if (((blk_hdr_ptr_t)pBlkBase)->levl == 0)
-			{	/* data block */
-				pPrevRec = pRecBase;
-				pRecBase = pRec;
-			}
-			else
-				nMatchCnt = 0;	/* star key */
-			break;
-		}
-		GET_USHORT(nRecLen, &((rec_hdr_ptr_t)pRec)->rsiz);
-		if (nRecLen == 0)			/* If record length is 0, then block must be bad */
-		{
-			INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
-			assert(CDB_STAGNATE > t_tries);
-			return cdb_sc_badoffset;
-		}
-		pPrevRec = pRecBase;
-		pRecBase = pRec;
-
-		/* If current compression count > last match, then this record
-		   also matches on 'last match' characters; keep looping */
-		EVAL_CMPC2((rec_hdr_ptr_t)pRec, nTmp)
-		if (nTmp > nMatchCnt)
-			continue;
-
-		if (nTmp < nMatchCnt)
-		{	/* Terminate on compression count < previous match,
-			   this key is after the target */
-			if (nRecLen == BSTAR_REC_SIZE  &&  ((blk_hdr_ptr_t)pBlkBase)->levl != 0)
-				/* Star key has size of SIZEOF(rec_hdr) + SIZEOF(block_id), make match = 0 */
-				nTargLen = 0;
-			else
-				/* Data block, make match = current compression count */
-				nTargLen = nTmp;
-			break;
-		}
-
-		/* Compression count == match count;  Compare current target with current record */
-		pRec += SIZEOF(rec_hdr);
-
-		do
-		{
-			if ((nFlg = *pCurrTarg - *pRec++) != 0)
-				break;
-			pCurrTarg++;
-		} while ( --nTargLen);
-
-		if (nFlg > 0)
-			nMatchCnt =(int)(pCurrTarg - pTargKeyBase);
-		else
-		{	/* Key is after target*/
-			if (nRecLen == BSTAR_REC_SIZE  &&  (((blk_hdr_ptr_t)pBlkBase)->levl != 0))
-				/* Star key has size of SIZEOF(rec_hdr) + SIZEOF(block_id), make match = 0 */
-				nTargLen = 0;
-			else
-				nTargLen = (int)(pCurrTarg - pTargKeyBase);
-			break;
-		}
-	}
-
-	pStat->prev_rec.offset = (short)(pPrevRec - pBlkBase);
-	pStat->prev_rec.match = (short)nMatchCnt;
-	pStat->curr_rec.offset = (short)(pRecBase - pBlkBase);
-	pStat->curr_rec.match = (short)nTargLen;
-
-	return cdb_sc_normal;
-}
-
-
-/* search_tail is the "start anywhere" version of search_blk
-   getting started is a bit awkward, so excuse the gotos */
-enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOldKey)
-{
-	/* register variables named in perceived order of declining impact */
-	register int		nFlg, nTargLen, nMatchCnt, nTmp;
-	sm_uc_ptr_t		pBlkBase, pRecBase, pRec, pTop, pPrevRec;
-	unsigned char		*pCurrTarg, *pTargKeyBase, *pOldKeyBase, *pCurrTargPos;
-	unsigned short		nRecLen;
-	int			tmp_cmpc;
-
-	/* see comment in gvcst_search_blk above on coding style */
-
-	if (pStat->prev_rec.offset == 0)
-		return gvcst_search_blk(pKey, pStat);	/* nice clean start at the begining of a block */
-	DBG_CHECK_SRCH_HIST_AND_CSE_BUFFER_MATCH(pStat);
-	pBlkBase = pStat->buffaddr;
-	pRecBase = pBlkBase + pStat->curr_rec.offset;
-	pRec = pRecBase;
-	pTop = pBlkBase + ((blk_hdr_ptr_t)pBlkBase)->bsiz;
-	nMatchCnt = pStat->prev_rec.match;
-	pCurrTarg = pKey->base;
-	pTargKeyBase = pCurrTarg;
-	pOldKeyBase = pOldKey->base;
-	pPrevRec = pBlkBase + pStat->prev_rec.offset;
-	nTargLen = pKey->end;
-	nTargLen++;		/* for the NUL that terminates the key */
-	if (pRec >= pTop)
-	{	/* Terminated at end of block */
-/* eob_tail: */	if (pRec > pTop)
-		{
-			INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
-			assert(CDB_STAGNATE > t_tries);
-			return cdb_sc_blklenerr;
-		}
-		if ((nTargLen = nMatchCnt) != 0)
-		{
-			do
-			{
-				if (*pCurrTarg++ != *pOldKeyBase++)
-					break;
-			} while (--nTargLen);
-		}
-		if (((blk_hdr_ptr_t)pBlkBase)->levl != 0)
-			nMatchCnt = 0;	/* star key */
-		else
-			nMatchCnt -= nTargLen;
-		nTargLen = 0;
-	} else
-	{
-		GET_USHORT(nRecLen, &((rec_hdr_ptr_t)pRec)->rsiz);
-		EVAL_CMPC2((rec_hdr_ptr_t)pRec, nTmp);
-		nFlg = nTmp;
-		if (nFlg != 0)
-		{
-			do
-			{
-				if ((nFlg = *pCurrTarg - *pOldKeyBase++) != 0)
-					break;
-				pCurrTarg++;
-			} while (--nTmp);
-			if (nFlg > 0)
-			{
-				nMatchCnt = (int)(pCurrTarg - pTargKeyBase);
-				nTargLen -= nMatchCnt;
-			}
-			if (nFlg < 0)
-			{
-				nTargLen += (int)(pTargKeyBase - pCurrTarg);
-				goto match_term;
-			}
-		}
-		if (nFlg == 0)
-		{
-			nTmp = nMatchCnt;
-			nMatchCnt = (int)(pCurrTarg - pTargKeyBase);
-			nTargLen -= nMatchCnt;
-			nTmp -= nMatchCnt;
-
-			if (nTmp > 0)
-			{
-				pCurrTargPos = pCurrTarg;
-
-				do
-				{
-					if (*pCurrTargPos++ != *pOldKeyBase++)
-						break;
-					nMatchCnt++;
-				} while (--nTmp);
-			}
-			goto alt_loop_entry;
-		}
-		for (;;)
-		{
-			pRec = pRecBase + nRecLen;
-
-			if (pRec >= pTop)
-			{	/* Terminated at end of block */
-				if (pRec > pTop)		/* If record goes off the end, then block must be bad */
-				{
-					INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
-					assert(CDB_STAGNATE > t_tries);
-					return cdb_sc_blklenerr;
-				}
-				nTargLen = 0;
-
-				if (((blk_hdr_ptr_t)pBlkBase)->levl == 0)
-				{	/* data block */
-					pPrevRec = pRecBase;
-					pRecBase = pRec;
-				}
-				else
-					nMatchCnt = 0;	/* star key */
-				break;
-			}
-			GET_USHORT(nRecLen, &((rec_hdr_ptr_t)pRec)->rsiz);
-			if (nRecLen == 0)		/* If record length is 0, then block must be bad */
-			{
-				INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
-				assert(CDB_STAGNATE > t_tries);
-				return cdb_sc_badoffset;
-			}
-			pPrevRec = pRecBase;
-			pRecBase = pRec;
-			/* If current compression count > last match, then this record
-			   also matches on 'last match' characters; keep looping */
-			EVAL_CMPC2((rec_hdr_ptr_t)pRec, nTmp);
-			if (nTmp > nMatchCnt)
-				continue;
-			if (nTmp < nMatchCnt)
-/* cc_term: */		{	/* Terminated on compression count < previous match,
-				   this key is after the target */
-				if (nRecLen == BSTAR_REC_SIZE  &&  ((blk_hdr_ptr_t)pBlkBase)->levl != 0)
-					/* Star key has size of SIZEOF(rec_hdr) + SIZEOF(block_id), make match = 0 */
-					nTargLen = 0;
-				else
-					/* Data block, make match = current compression count */
-					nTargLen = nTmp;
-				break;
-			}
-alt_loop_entry:		/* Compression count == match count;  Compare current target with current record */
-			pRec += SIZEOF(rec_hdr);
-			do
-			{
-				if ((nFlg = *pCurrTarg - *pRec++) != 0)
-					break;
-				pCurrTarg++;
-			} while (--nTargLen);
-			if (nFlg > 0)
-				nMatchCnt = (int)(pCurrTarg - pTargKeyBase);
-			else
-match_term:		{	/* Key is after target*/
-				if (nRecLen == BSTAR_REC_SIZE  &&  (((blk_hdr_ptr_t)pBlkBase)->levl != 0))
-					/* Star key has size of SIZEOF(rec_hdr) + SIZEOF(block_id), make match = 0 */
-					nTargLen = 0;
-				else
-					nTargLen = (int)(pCurrTarg - pTargKeyBase);
-				break;
-			}
-		}
-	}
-/* clean_up: */
-	pStat->prev_rec.offset = (short)(pPrevRec - pBlkBase);
-	pStat->prev_rec.match = (short)nMatchCnt;
-	pStat->curr_rec.offset = (short)(pRecBase - pBlkBase);
-	pStat->curr_rec.match = (short)nTargLen;
-	return cdb_sc_normal;
-}
+#undef GVCST_SEARCH_EXPAND_PREVKEY
+#define GVCST_SEARCH_BLK
+#include "gvcst_blk_search.h" /* for function gvcst_search_blk() */	/* BYPASSOK : intentional duplicate include. */
+#undef GVCST_SEARCH_BLK
+#define GVCST_SEARCH_TAIL
+#include "gvcst_blk_search.h" /* for function gvcst_search_tail() */	/* BYPASSOK : intentional duplicate include. */
+#undef GVCST_SEARCH_TAIL

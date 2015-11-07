@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -378,11 +379,6 @@ int dbc_syscmd(char_ptr_t cmdparm)
 	int4		wait_stat;
 #endif
 
-#ifdef VMS
-	/* Verify system() is supported */ /* BYPASSOK: system() used insode the comment, no SYSTEM() needed */
-	if (0 == SYSTEM(NULL))
-		GTMASSERT;
-#endif
 	rc = SYSTEM(cmdparm);
 	if (-1 == rc)
 		rc = errno;
@@ -444,16 +440,14 @@ void dbc_find_database_filename(phase_static_area *psa, uchar_ptr_t regname, uch
 	while(1)
 	{
 		rptr = dbc_read_result_file(psa, ERR_NOREGION, regname);	/* Should have filename */
-		if (0 != MEMCMP_LIT(rptr, FILETAB))
-			GTMASSERT;
+		assertpro(0 == MEMCMP_LIT(rptr, FILETAB));
 		len = STRLEN(((char_ptr_t)rptr + SIZEOF(FILETAB) - 1)) - 1;
 		assert(MAX_FN_LEN >= len);
 		assert(len);
 		memcpy(dbfn, (rptr + SIZEOF(FILETAB) - 1), len);
 		dbfn[len] = 0;
 		rptr = dbc_read_result_file(psa, ERR_NOREGION, regname);
-		if (0 != MEMCMP_LIT(rptr, REGIONTAB))
-			GTMASSERT;
+		assertpro(0 == MEMCMP_LIT(rptr, REGIONTAB));
 		len = STRLEN((char_ptr_t)rptr + SIZEOF(REGIONTAB) - 1) - 1;
 		assert(len);
 		*(rptr + SIZEOF(REGIONTAB) - 1 + len) = 0;	/* Get rid of trailing \n */
@@ -464,8 +458,7 @@ void dbc_find_database_filename(phase_static_area *psa, uchar_ptr_t regname, uch
 		if ('\n' == rptr[len - 1]) --len;	/* Note last record of output file does not have '\n' so test
 							   before adjusting 'len' */
 		if ('\r' == rptr[len - 1]) --len;	/* Same for carriage return (mostly for VMS) */
-		if (0 != len && ((SIZEOF("DSE> ") - 1) != len || 0 != memcmp(rptr, "DSE> ", len)))
-			GTMASSERT;
+		assertpro((0 == len) || (((SIZEOF("DSE> ") - 1) == len) && (0 == memcmp(rptr, "DSE> ", len))));
 	}
 	dbc_close_result_file(psa);
 	return;
@@ -513,8 +506,7 @@ int dbc_read_dbblk(phase_static_area *psa, int blk_num, enum gdsblk_type blk_typ
 	}
 
 	++psa->block_depth;			/* Going to another level of block usage */
-	if (MAX_BLOCK_INFO_DEPTH <= psa->block_depth)
-		GTMASSERT;
+	assertpro(MAX_BLOCK_INFO_DEPTH > psa->block_depth);
 	blk_set_new_p = &psa->blk_set[psa->block_depth];
 
 	/* See if this block already occupies this or another slot in the "inactive cache" which is any block
@@ -573,7 +565,7 @@ int dbc_read_dbblk(phase_static_area *psa, int blk_num, enum gdsblk_type blk_typ
 							   " %d\n", psa->block_depth));
 						break;
 					default:
-						GTMASSERT;
+						assertpro(FALSE);
 				}
 			}
 			VMS_ONLY(GET_ULONG(blk_set_new_p->tn, &((v15_blk_hdr_ptr_t)blk_set_new_p->old_buff)->tn));
@@ -624,7 +616,7 @@ int dbc_read_dbblk(phase_static_area *psa, int blk_num, enum gdsblk_type blk_typ
 				blk_set_new_p->blk_type = gdsblk_dtindex;
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE);
 	}
 	return psa->block_depth;
 }
@@ -679,7 +671,7 @@ int dbc_find_dtblk(phase_static_area *psa, dbc_gv_key *key, int min_levl)
 	memcpy(psa->gvn_key, key, SIZEOF(dbc_gv_key) + key->gvn_len);	/* Make key with GVN only (including trailing null) */
 	psa->gvn_key->end = key->gvn_len;
 	/* Look up GVN in directory tree */
-	blk_index = dbc_find_record(psa, psa->gvn_key, (psa->phase_one ? 0 : 1), min_levl, gdsblk_dtroot, FALSE);
+	blk_index = dbc_find_record(psa, psa->gvn_key, (psa->phase_one ? 0 : 1), min_levl, gdsblk_dtroot);
 	return blk_index;
 }
 
@@ -690,8 +682,7 @@ int dbc_find_dtblk(phase_static_area *psa, dbc_gv_key *key, int min_levl)
    Note since this routine is used in certify phase to lookup all the right hand siblings of a gvtroot block given a
    maximum key, this flag tells us that failure is ok .. we just wanted to populate the cache with siblings.
 */
-int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int min_levl, enum gdsblk_type newblk_type,
-		    boolean_t fail_ok)
+int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int min_levl, enum gdsblk_type newblk_type)
 {
 	uchar_ptr_t	rec_p, blk_p, blk_top, key1, key2;
 	unsigned short	us_rec_len;
@@ -752,7 +743,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 			GET_ULONG(blk_ptr, rec_p + VMS_ONLY(3) UNIX_ONLY(4));
 			blk_index = dbc_read_dbblk(psa, blk_ptr, blk_type);
 			/* Keep looking next level down */
-			return dbc_find_record(psa, key, blk_index, min_levl, blk_type, fail_ok);
+			return dbc_find_record(psa, key, blk_index, min_levl, blk_type);
 		}
 		/* Determine key for this record */
 		dbc_find_key(psa, blk_set_p->curr_blk_key, rec_p, blk_set_p->blk_levl);
@@ -775,7 +766,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 			GET_ULONG(blk_ptr, (rec_p + SIZEOF(rec_hdr) + blk_set_p->curr_blk_key->end
 					   - EVAL_CMPC((rec_hdr *)rec_p) + 1));
 			blk_index = dbc_read_dbblk(psa, blk_ptr, blk_type);
-			return dbc_find_record(psa, key, blk_index, min_levl, blk_type, fail_ok);
+			return dbc_find_record(psa, key, blk_index, min_levl, blk_type);
 		}
 		/* We want to be able to find the previous record */
 		blk_set_p->prev_rec = rec_p;
@@ -784,25 +775,9 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 		rec_p += rec_len;					/* Point to next record in block */
 		blk_set_p->curr_rec = rec_p;
 	}
-	/* If we don't find the record (or one greater), the block with the key we are looking for is no
-	   longer existing in the GVT (assert that the search is for a level 0 GVT block).
-	*/
-	if (gdsblk_gvtleaf == psa->blk_set[0].blk_type)
-	{	/* Key not found */
-		DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Searched for key was not found\n"));
-		return -2;
-	}
-	/* Else we should have found the record or a star key. Globals are NOT removed once created so we
-	   should always be able to find an appropriate record if this is not a GVT leaf block. Exception to this
-	   is when we are just wanting to populate the right siblings of a gvtroot block in the cache.
-	*/
-	if (!fail_ok)
-	{
-		assert(FALSE);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn),
-			  ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to find index record for an existing global"));
-	}
-	return -1;
+	/* Key not found */
+	DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Searched for key was not found\n"));
+	return -2;
 }
 
 /* Compare two keys. If key1 is logically greater than or equal to key2, return TRUE, else FALSE.

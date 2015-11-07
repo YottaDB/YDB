@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007, 2008 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,71 +10,66 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_forcenum.s
+	.include "g_msf.si"
+	.include "linkage.si"
+	.include "mval_def.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "g_msf.si"
-.include "linkage.si"
-	.INCLUDE	"mval_def.si"
-
-	.sbttl	op_forcenum
-#	PAGE	+
 	.text
-.extern	s2n
+	.extern	s2n
+#
+# Routine to force the input source mval to a number if it is not already so.
+#
+#	REG64_RET1 [r10] - source mval
+#	REG64_RET0 [rax] - destination mval
+#
 
-#	r10 - source mval
-#	rax - destination mval
+save_ret0	= 0
+save_ret1	= 8
+FRAME_SIZE	= 24					# This frame size gives us a 16 byte aligned stack
 
-# PUBLIC	op_forcenum
-ENTRY op_forcenum
-	pushq	REG64_RET0
+ENTRY	op_forcenum
+	subq	$FRAME_SIZE, REG_SP			# Allocate save area and align stack
+	CHKSTKALIGN					# Verify stack alignment
+	movq	REG64_RET0, save_ret0(REG_SP)
 	mv_force_defined REG64_RET1, l00
-	pushq	REG64_RET1
+	movq	REG64_RET1, save_ret1(REG_SP)
 	mv_force_num REG64_RET1, l10
-	popq 	REG64_RET1
-	popq	REG64_RET0
+	movq 	save_ret1(REG_SP), REG64_RET1
+	movq	save_ret0(REG_SP), REG64_RET0
+	testw	$mval_m_str, mval_w_mvtype(REG64_RET1)
+	jz	l20
+	testw	$mval_m_num_approx, mval_w_mvtype(REG64_RET1)
+	jz	l40
+l20:
+	testw	$mval_m_int_without_nm, mval_w_mvtype(REG64_RET1)
+	jz	l30
+	movw	$mval_m_int, mval_w_mvtype(REG64_RET0)
+	movl	mval_l_m1(REG64_RET1), REG32_ARG2
+	movl	REG32_ARG2, mval_l_m1(REG64_RET0)
+	jmp	done
 
-	testw	$mval_m_str,mval_w_mvtype(REG64_RET1)
-	je	l20
-	testw	$mval_m_num_approx,mval_w_mvtype(REG64_RET1)
-	je	l40
-l20:	testw	$mval_m_int_without_nm,mval_w_mvtype(REG64_RET1)
-	je	l30
-	movw	$mval_m_int,mval_w_mvtype(REG64_RET0)
-	movl	mval_l_m1(REG64_RET1),REG32_ARG2
-	movl	REG32_ARG2,mval_l_m1(REG64_RET0)
-	ret
-
-l30:	pushq	REG_XFER_TABLE
-	movw	$mval_m_nm,mval_w_mvtype(REG64_RET0)
-	movb	mval_b_exp(REG64_RET1),REG8_ARG2
-	movb	REG8_ARG2,mval_b_exp(REG64_RET0)
-
-#	Copy the only numeric part of Mval from [edx] to [eax].
-
-	movl	mval_l_m0(REG64_RET1),REG32_ARG2
-	movl	REG32_ARG2,mval_l_m0(REG64_RET0)
-	movl	mval_l_m1(REG64_RET1),REG32_ARG2
-	movl	REG32_ARG2,mval_l_m1(REG64_RET0)
-	popq	REG_XFER_TABLE
-	ret
-
+l30:
+	movw	$mval_m_nm, mval_w_mvtype(REG64_RET0)
+	movb	mval_b_exp(REG64_RET1), REG8_ARG2
+	movb	REG8_ARG2, mval_b_exp(REG64_RET0)
+	#
+	# Copy the only numeric part of Mval from [r10] to [rax].
+	#
+	movl	mval_l_m0(REG64_RET1), REG32_ARG2
+	movl	REG32_ARG2, mval_l_m0(REG64_RET0)
+	movl	mval_l_m1(REG64_RET1), REG32_ARG2
+	movl	REG32_ARG2, mval_l_m1(REG64_RET0)
+	jmp	done
 l40:
-#	Copy the Mval from [edx] to [eax].
-
-	pushq	REG64_ARG0
-	pushq	REG64_ARG1
-	movq	REG64_RET0,REG64_ARG0
-	movq	REG64_RET1,REG64_ARG1
-	movl	$mval_byte_len,REG32_ARG3
+	#
+	# Copy the Mval from REG64_RET1 [r10] to REG64_RET0 [rax].
+	#
+	movq	REG64_RET0, REG64_ARG0
+	movq	REG64_RET1, REG64_ARG1
+	movl	$mval_byte_len, REG32_ARG3
 	REP
 	movsb
-	popq	REG64_ARG1
-	popq	REG64_ARG0
+done:
+	addq	$FRAME_SIZE, REG_SP			# Remove save area from C stack
 	ret
-# op_forcenum ENDP
-
-# END

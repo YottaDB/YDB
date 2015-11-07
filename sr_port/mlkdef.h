@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +32,7 @@ typedef struct				/* One of these nodes is required for each process which is bl
 					 * list, then this is a relative pointer to the next free entry. */
 	uint4		process_id;	/* the pid of the blocked process */
 	short		ref_cnt;	/* number of times process references prcblk */
-	unsigned short	unlock;		/* boolean to indicate activity on lock */
+	short		filler_4byte;
 } mlk_prcblk;
 
 typedef struct				/* lock node.  The member descriptions below are correct if the entry
@@ -54,10 +55,12 @@ typedef struct				/* lock node.  The member descriptions below are correct if th
 					 * sequence numbers do not match, then we must assume that the
 					 * lock was stolen from us by LKE or some other abnormal event. */
 	UINTPTR_T	auxowner;	/* For gt.cm, this contains information on the remote owner of the lock.*/
+#	ifdef VMS
 	int4		image_count;	/* the number of image activiations since login */
 	int4		login_time;	/* the low-order 32 bits of the time that the process logged in.  login_time
 					 * and image_count can be used together to determine whether the process has
 					 * abnormally terminated. */
+#	endif
 	int4		auxpid;		/* If non-zero auxowner, this is the pid of the client that is holding the lock */
 	unsigned char	auxnode[16];	/* If non-zero auxowner, this is the nodename of the client that is holding the lock */
 } mlk_shrblk;

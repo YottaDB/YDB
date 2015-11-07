@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007, 2012 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,8 +10,6 @@
 #								#
 #################################################################
 
-	.sbttl	error.si
-#	PAGE	+
 #-----------------------------------------------
 # Mumps error condition handler macros
 #-----------------------------------------------
@@ -21,34 +20,30 @@ chnd_ch		=	16
 chnd_jmp	=	24
 
 	.data
-.extern	ctxt
+	.extern	ctxt
 
-#	.text
-#	setjmp is really __sigsetjmp(env,0)
-#.extern	__sigsetjmp
-.extern gtm_asm_establish
+	.text
+	.extern gtm_asm_establish
 
-	.sbttl	error.si    ESTABLISH
 .macro ESTABLISH label
         call	gtm_asm_establish
-	movq	ctxt(REG_IP),%rax
+	movq	ctxt(REG_IP), REG64_ACCUM
 	leaq	mdb_condition_handler(REG_IP), REG64_SCRATCH1
 	movq    REG64_SCRATCH1, chnd_ch(%rax)		# ctxt->ch = x
-	addq	$chnd_jmp,%rax			# setjmp(ctxt->jmp)
-	movq	$0,%rsi
-	movq	%rax,%rdi
+	addq	$chnd_jmp, REG64_ACCUM			# setjmp(ctxt->jmp)
+	movq	$0, REG64_ARG1
+	movq	REG64_ACCUM, REG64_ARG0
 	call 	__sigsetjmp@PLT
-	incl  	%eax
+	incl  	REG32_RET0
 	jne  	\label
 	REVERT
 	jmp  	return
 \label:
 .endm
 
-	.sbttl	error.si    REVERT
 .macro REVERT
-	movq	ctxt(REG_IP),%rax			# active_ch = ctxt->save_active_c
-	movq	chnd_save_active(%rax),%rax
-	movq	%rax,active_ch(REG_IP)
-	subq  	$chnd_size,ctxt(REG_IP)			# ctxt--
+	movq	ctxt(REG_IP), REG64_ACCUM		# active_ch = ctxt->save_active_c
+	movq	chnd_save_active(REG64_ACCUM), REG64_ACCUM
+	movq	REG64_ACCUM, active_ch(REG_IP)
+	subq  	$chnd_size, ctxt(REG_IP)		# ctxt--
 .endm

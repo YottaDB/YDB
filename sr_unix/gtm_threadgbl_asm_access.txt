@@ -1,0 +1,15 @@
+#################################################################
+#								#
+#  Copyright (c) 2014, 2015 Fidelity National Information	#
+#  Services, Inc. and/or its subsidiaries. All rights reserved.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+#
+# List of threadgbl variables needing access in assembler routines. One routine per line - no white space prefix.
+#
+lnk_proxy		# pseudo-linkage table used by dynamic code when label index is < 0

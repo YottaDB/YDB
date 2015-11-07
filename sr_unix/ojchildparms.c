@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +36,7 @@
 #include "cache.h"
 #include "hashtab_objcode.h"
 #include "gtmio.h"
+#include "gtmmsg.h"		/* for gtm_putmsg prototype */
 
 GBLREF spdesc			stringpool;
 GBLREF io_log_name		*dollar_principal;
@@ -58,8 +60,14 @@ error_def(ERR_CLOSEFAIL);
 error_def(ERR_JOBSETUP);
 error_def(ERR_STRINGOFLOW);
 error_def(ERR_JOBLVN2LONG);
+error_def(ERR_JOBLVNDETAIL);
+error_def(ERR_MAXACTARG);
 
+#ifdef __hpux
+#define MAX_COMM_FRAME	1
+#else
 #define MAX_COMM_FRAME	5
+#endif
 
 /*
  * ------------------------------------------------
@@ -162,11 +170,14 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 			DOREADRC(setup_fd, &arg_count, SIZEOF(arg_count), rc);
 			if (rc < 0)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("argument count"), errno, 0);
-			g_args->callargs = arg_count + 4;
+			if (arg_count > MAX_ACTUALS)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXACTARG);
+			g_args->callargs = arg_count + PUSH_PARM_OVERHEAD;
 			g_args->truth = 1;
 			g_args->retval = 0;
 			g_args->mask = 0;
 			g_args->argcnt = arg_count;
+			ENSURE_STP_FREE_SPACE(arg_count * MAX_JOB_LEN);
 			for (i = 0; i < arg_count; i++)
 			{
 				DOREADRC(setup_fd, &arg_msg, SIZEOF(arg_msg), rc);
@@ -177,8 +188,7 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 					g_args->argval[i] = op_nullexp();	/* negative len indicates null arg */
 				else
 				{
-					if (!IS_STP_SPACE_AVAILABLE_PRO(STRLEN(sp)))
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) (ERR_STRINGOFLOW));
+					assertpro(arg_msg.len <= MAX_JOB_LEN);
 					arglst[i].str.len = arg_msg.len;
 					arglst[i].str.addr = (char *)stringpool.free;
 					memcpy(stringpool.free, arg_msg.data, arg_msg.len);
@@ -224,12 +234,12 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2,
 					      LEN_AND_LIT("receive buffer size"), errno, 0);
 			if (buffer_size > MAX_STRLEN)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBLVN2LONG, 2, MAX_STRLEN, buffer_size);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBLVNDETAIL, 2, MAX_STRLEN, buffer_size);
 			assert(buffer_size > 0);
 			DOREADRC(setup_fd, local_buff, buffer_size, rc);
 			if (rc < 0)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2,
-					      LEN_AND_LIT("local fragment"), errno, 0);;
+					      LEN_AND_LIT("local fragment"), errno, 0);
 			assert((NULL != command_str[comm_arg_count]->str.addr) && (0 != buffer_size));
 			command_str[comm_arg_count]->str.len = buffer_size;
 			s2pool(&command_str[comm_arg_count]->str);

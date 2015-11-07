@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2002-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,24 +25,16 @@ GTMTRIG_ONLY(error_def(ERR_TRIGZBREAKREM);)
 /* Remove all ZBREAKs in given rtn */
 void zr_remove_zbrks(rhdtyp *rtn, boolean_t notify_is_trigger)
 {
-	rhdtyp			*rtn_look;
 	zbrk_struct		*zb_ptr;
 	GTMTRIG_ONLY(boolean_t	msg_done = FALSE;)
 
-	rtn_look = rtn;		/* Initially routine to look for is same */
-#	ifdef USHBIN_SUPPORTED
-	if ((NULL != rtn) && (rtn->rtn_relinked))
-	{	/* For a recursively linked routine, the saved routine header is actually the original, not the
-		 * copy we were supplied by caller.
-		 */
-		rtn_look = rtn->old_rhead_adr;
-	}
-#	endif /* USHBIN_SUPPORTED */
+	/* This function should never be called for an older version of a recursively relinked routine. Assert that. */
+	USHBIN_ONLY(assert((NULL == rtn) || (NULL == rtn->active_rhead_adr));)
 	for (zb_ptr = zbrk_recs.free - 1; NULL != zbrk_recs.beg && zb_ptr >= zbrk_recs.beg; zb_ptr--)
 	{	/* Go in the reverse order to reduce memory movement in zr_put_free() */
-		if ((NULL == rtn_look) || (zb_ptr->rtnhdr == rtn_look))
+		if ((NULL == rtn) || (zb_ptr->rtnhdr == rtn))
 		{
-			assert((NULL == rtn_look) || (ADDR_IN_CODE(((unsigned char *)zb_ptr->mpc), rtn)));
+			assert((NULL == rtn) || (ADDR_IN_CODE(((unsigned char *)zb_ptr->mpc), rtn)));
 #			ifdef GTM_TRIGGER
 			if ((BREAKMSG == notify_is_trigger) && !msg_done && (break_message_mask & TRIGGER_ZBREAK_REMOVED_MASK))
 			{	/* Message is info level */

@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,30 +10,20 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	opp_indlvarg.s
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "linkage.si"
-	.INCLUDE	"g_msf.si"
-
-	.sbttl	opp_indlvarg
-#	PAGE	+
-	.DATA
-.extern	frame_pointer 	# /* :DWORD */
+	.data
+	.extern	frame_pointer
 
 	.text
-.extern	op_indlvarg
+	.extern	op_indlvarg
 
-# PUBLIC	opp_indlvarg
-ENTRY opp_indlvarg  	# /* PROC */
+ENTRY	opp_indlvarg
 	putframe
-	addq	$8,REG_SP   # burn return PC
+	addq	$8, REG_SP		# Burn return PC & 16 byte align stack
+	CHKSTKALIGN			# Verify stack alignment
 	call	op_indlvarg
 	getframe
 	ret
-# opp_indlvarg ENDP
-
-# END

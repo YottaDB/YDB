@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,9 +82,11 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 					 */
 					SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Instance file header has file_corrupt field set to "
 							"TRUE");
-					/* No need to release the latch before rts_error (mupip_exit_handler will do it for us) */
-					rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
-						ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
+					/* No need to release the latch before rts_error_csa (mupip_exit_handler will do it for
+					 * us).
+					 */
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
+						      ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 				}
 				cycle_mismatch = (repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle);
 				assert((ASSERT_NO_ONLINE_ROLLBACK != onln_rlbk_action) || !cycle_mismatch);
@@ -104,14 +107,15 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 		{
 			/* On every 4th pass, we bide for awhile */
 			wcs_sleep(LOCK_SLEEP);
-			if (RETRY_CASLATCH_CUTOFF == (retries % LOCK_TRIES))
+			/* Check if we're due to check for lock abandonment check or holder wakeup */
+			if (0 == (retries & (LOCK_CASLATCH_CHKINTVL - 1)))
 				performCASLatchCheck(latch, TRUE);
 		}
 	}
 	DUMP_LOCKHIST();
 	assert(FALSE);
 	assert(jnlpool.gtmsource_local && jnlpool.gtmsource_local->gtmsource_pid);
-	rts_error(VARLSTCNT(5) ERR_SRVLCKWT2LNG, 2, max_timeout_in_secs, jnlpool.gtmsource_local->gtmsource_pid);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SRVLCKWT2LNG, 2, max_timeout_in_secs, jnlpool.gtmsource_local->gtmsource_pid);
 	return FALSE; /* to keep the compiler happy */
 }
 

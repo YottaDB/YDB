@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -486,6 +487,7 @@ void dse_chng_fhead(void)
 		else
 			util_out_print("Error: SLEEP SPIN COUNT should be a non zero positive number", TRUE);
 	}
+#	ifdef MUTEX_REAL_SLEEP
 	if (((CLI_PRESENT == cli_present("SPIN_SLEEP_TIME")) && cli_get_int("SPIN_SLEEP_TIME", &x))
 	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_SPIN_SLEEP_TIME")) && cli_get_int("MUTEX_SPIN_SLEEP_TIME", &x)))
 	   ) /* Unix should be backward compatible, accept MUTEX_ prefix qualifiers as well */
@@ -508,6 +510,7 @@ void dse_chng_fhead(void)
 				cs_data->mutex_spin_parms.mutex_spin_sleep_mask = x;
 		}
 	}
+#	endif
 	UNIX_ONLY(
 		if ((CLI_PRESENT == cli_present("COMMITWAIT_SPIN_COUNT")) && cli_get_int("COMMITWAIT_SPIN_COUNT", &x))
 		{
@@ -711,6 +714,18 @@ void dse_chng_fhead(void)
 	{
 		cs_data->mumps_can_bypass = FALSE;
 		util_out_print("Database file !AD now has quick database rundown flag set to FALSE", TRUE,
+					DB_LEN_STR(gv_cur_region));
+	}
+	if (CLI_PRESENT == cli_present("EPOCHTAPER"))
+	{
+		cs_data->epoch_taper = TRUE;
+		util_out_print("Database file !AD now has epoch taper flag set to TRUE", TRUE,
+					DB_LEN_STR(gv_cur_region));
+	}
+	else if (CLI_NEGATED == cli_present("EPOCHTAPER"))
+	{
+		cs_data->epoch_taper = FALSE;
+		util_out_print("Database file !AD now has epoch taper flag set to FALSE", TRUE,
 					DB_LEN_STR(gv_cur_region));
 	}
 #	endif

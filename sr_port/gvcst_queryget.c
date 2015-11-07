@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,8 +39,8 @@
 #endif
 
 #include "gvcst_protos.h"	/* for gvcst_queryget,gvcst_search,gvcst_rtsib,gvcst_search_blk prototype */
-#include "gvcst_expand_key.h"
 #include "t_begin.h"
+#include "gvcst_expand_key.h"
 #include "t_retry.h"
 #include "t_end.h"
 
@@ -94,9 +95,12 @@ boolean_t gvcst_queryget(mval *val)
 	} else
 		sn_tpwrapped = FALSE;
 	found = gvcst_query();
-	COPY_KEY(gv_currkey, gv_altkey); /* set gv_currkey to gv_altkey */
-	found = gvcst_get(val);
-	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) -1); /* only counted externally as one get */
+	if (found)
+	{
+		COPY_KEY(gv_currkey, gv_altkey); /* set gv_currkey to gv_altkey */
+		found = gvcst_get(val);
+		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) -1); /* only counted externally as one get */
+	}
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_query, (gtm_uint64_t) -1);
 	if (sn_tpwrapped)
 	{
@@ -127,14 +131,14 @@ boolean_t gvcst_queryget2(mval *val, unsigned char *sn_ptr)
 	for (;;)
 	{
 		two_histories = FALSE;
-#if defined(DEBUG) && defined(UNIX)
-			if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVQUERYGETFAIL == gtm_white_box_test_case_number))
-			{
-				status = cdb_sc_blknumerr;
-				t_retry(status);
-				continue;
-			}
-#endif
+#		if defined(DEBUG) && defined(UNIX)
+		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVQUERYGETFAIL == gtm_white_box_test_case_number))
+		{
+			status = cdb_sc_blknumerr;
+			t_retry(status);
+			continue;
+		}
+#		endif
 		if (cdb_sc_normal == (status = gvcst_search(gv_currkey, 0)))
 		{
 			found = TRUE;
@@ -171,8 +175,7 @@ boolean_t gvcst_queryget2(mval *val, unsigned char *sn_ptr)
 			 */
 			if (found)
 			{
-				status = gvcst_expand_key((blk_hdr_ptr_t)bh->buffaddr, (int4)((sm_uc_ptr_t)rp - bh->buffaddr),
-						gv_altkey);
+				status = gvcst_expand_curr_key(bh, gv_currkey, gv_altkey);
 				if (cdb_sc_normal != status)
 				{
 					t_retry(status);

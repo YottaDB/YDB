@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +54,8 @@ GBLREF	boolean_t	gtm_utf8_mode;
  * 	optimizations to prune the combinatorial search tree) and tries to see for each permutation if a match occurs.
  */
 
+error_def(ERR_PATNOTFOUND);
+
 int do_pattern(mval *str, mval *pat)
 {
 	int4		count, total_min, total_max;
@@ -79,15 +82,13 @@ int do_pattern(mval *str, mval *pat)
 	wint_t		utf8_codepoint;
 	)
 
-	error_def(ERR_PATNOTFOUND);
-
 	/* set up information */
 	MV_FORCE_STR(str);
 	patptr = (uint4 *) pat->str.addr;
 	GET_ULONG(tempuint, patptr);
 	if (tempuint)
 	{	/* tempuint non-zero implies fixed length pattern string. this in turn implies we are not called from op_pattern.s
-		 * but instead called from op_fnzsearch(), gvzwr_fini(), gvzwr_var(), lvzwr_fini(), lvzwr_var() etc.
+		 * but instead called from gvzwr_fini(), gvzwr_var(), lvzwr_fini(), lvzwr_var() etc.
 		 * in this case, call do_patfixed() as the code below and code in do_patsplit() assumes we are dealing with a
 		 * variable length pattern string. changing all the callers to call do_patfixed() directly instead of this extra
 		 * redirection was considered, but not felt worth it since the call to do_pattern() is not easily macroizable
@@ -217,7 +218,7 @@ int do_pattern(mval *str, mval *pat)
 							if ((mbit & code & PATM_LONGFLAGS) && !(mbit & pat_allmaskbits))
 								buf[bytelen++] = codelist[patmaskseq(mbit)];
 						}
-						rts_error(VARLSTCNT(4) ERR_PATNOTFOUND, 2, bytelen, buf);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PATNOTFOUND, 2, bytelen, buf);
 					}
 					if (!gtm_utf8_mode)
 					{

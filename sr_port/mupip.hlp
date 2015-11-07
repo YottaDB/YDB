@@ -861,10 +861,8 @@
        character encoding. Ensure that MUPIP EXTRACT commands and
        corresponding MUPIP LOAD commands execute with the same setting for
        the environment variable gtm_chset.
-
-   **Note**
-
-   Magnetic tapes may have a smaller maximum file size than disks.
+     o The GO format is not supported for UTF-8 mode. Use BINARY or ZWR
+       formats with UTF-8 mode.
 
    The following sections describe the qualifiers of MUPIP EXTRACT command.
 
@@ -893,25 +891,36 @@
        |--------------------------------------------------------------------|
        | CHARACTERS | EXPLANATION                                           |
        |------------+-------------------------------------------------------|
-       | 1-26       | Fixed-length ASCII text: "GDS BINARY EXTRACT LEVEL    |
-       |            | 4".                                                   |
+       | 1-2        | Hexadecimal representation of the length of the label |
+       |            | (by default 64 - decimal 100).                        |
        |------------+-------------------------------------------------------|
-       | 27-40      | Date and time of extract in the $ZDATE() format:      |
-       |            | "YEARMMDD2460SS".                                     |
+       | 3-28       | Fixed-length ASCII text: "GDS BINARY EXTRACT LEVEL    |
+       |            | 6".                                                   |
        |------------+-------------------------------------------------------|
-       | 41-45      | Decimal maximum block size of the union of each       |
-       |            | region from which data was extracted.                 |
+       | 29-41      | Fixed-length ASCII text: Date and time of extract in  |
+       |            | the $ZDATE() format: "YEARMMDD2460SS".                |
        |------------+-------------------------------------------------------|
-       | 46-50      | Decimal maximum record size of the union of each      |
-       |            | region from which data was extracted.                 |
+       |            | Fixed-length ASCII text: Decimal maximum block size   |
+       | 42-48      | of the union of each region from which data was       |
+       |            | extracted.                                            |
        |------------+-------------------------------------------------------|
-       | 51-55      | Decimal maximum key size of the union of each region  |
-       |            | from which data was extracted.                        |
+       |            | Fixed-length ASCII text: Decimal maximum record size  |
+       | 49-55      | of the union of each region from which data was       |
+       |            | extracted.                                            |
        |------------+-------------------------------------------------------|
-       |            | Space-padded label specified by the -LABEL qualifier. |
-       | 56-87      | For extracts in UTF-8 mode, GT.M prefixes UTF-8 and a |
-       |            | space to -LABEL. The default LABEL is "GT.M MUPIP     |
-       |            | EXTRACT"                                              |
+       |            | Fixed-length ASCII text:Decimal maximum key size of   |
+       | 56-62      | the union of each region from which data was          |
+       |            | extracted.                                            |
+       |------------+-------------------------------------------------------|
+       | 63-69      | Fixed-length ASCII text:Boolean indicator of Standard |
+       |            | NULL collation (1) or GT.M legacy collation (0).      |
+       |------------+-------------------------------------------------------|
+       |            | Fixed-length ASCII text: Space-padded label specified |
+       |            | by the -LABEL qualifier; the default LABEL is "GT.M   |
+       | 70-100     | MUPIP EXTRACT"                                        |
+       |            |                                                       |
+       |            | For extracts in UTF-8 mode, GT.M prefixes UTF-8 and a |
+       |            | space to -LABEL.                                      |
        +--------------------------------------------------------------------+
 
     2. GO - Global Output format, used for files to transport or archive.
@@ -1279,13 +1288,13 @@
 
    Always use MUPIP INTEG in the following conditions:
 
-     * Periodically - to ensure ongoing integrity of the database(s); regular
+     o Periodically - to ensure ongoing integrity of the database(s); regular
        INTEGs help detect any integrity problems before they spread and
        extensively damage the database file.
-     * After a crash - to ensure the database was not corrupted. (Note: When
+     o After a crash - to ensure the database was not corrupted. (Note: When
        using before-image journaling, when the database is recovered from the
        journal file after a crash, an integ is not required).
-     * When database errors are reported - to troubleshoot the problem.
+     o When database errors are reported - to troubleshoot the problem.
 
    Improving the logical and physical adjacency of global nodes may result in
    faster disk I/O. A global node is logically adjacent when it is stored
@@ -1320,17 +1329,17 @@
     -[NO]K[EYRANGES]
     -[NO]MAP[=integer]
     -[NO]MAXK[EYSIZE][=integer]
+    -[NO]O[NLINE]
     -S[UBSCRIPT]=subscript]
     -TN[_RESET]
     -[NO]TR[ANSACTION][=integer]
-    -[NO]O[NLINE]
    ]
    {[-FILE] file-name|-REG[ION] region-list}
 
      o MUPIP INTEG requires specification of either file(s) or region(s).
      o Press <CTRL-C> to stop MUPIP INTEG before the process completes.
      o The file-name identifies the database file for a MUPIP INTEG
-       operation.The region-list identifies one or more regions that, in
+       operation. The region-list identifies one or more regions that, in
        turn, identify database files through the current Global Directory.
      o MUPIP INTEG operation keeps track of the number of blocks that do not
        have the current block version during a non-fast integ (default or
@@ -1346,18 +1355,18 @@
    database integrity. If operations continue without fixes to serious
    errors, the following problems may occur:
 
-     * Invalid application operation due to missing or incorrect data.
-     * Process errors, including inappropriate indefinite looping, when a
+     o Invalid application operation due to missing or incorrect data.
+     o Process errors, including inappropriate indefinite looping, when a
        database access encounters an error.
-     * Degrading application level consistency as a result of incomplete
-       update sequences caused by the prior symptoms.
+     o Degrading application level consistency as a result of incomplete
+       update sequences caused by the preexisting database integrity issues.
 
    FIS strongly recommends fixing the following errors as soon as they are
    discovered:
 
-     * Blocks incorrectly marked free - these may cause accelerating damage
+     o Blocks incorrectly marked free - these may cause accelerating damage
        when processes make updates to any part of the database region.
-     * Integrity errors in an index block - these may cause accelerating
+     o Integrity errors in an index block - these may cause accelerating
        damage when processes make updates to that area of the database region
        using the faulty index.
 
@@ -1394,11 +1403,14 @@
 
    Specifies the block for MUPIP INTEG command to start checking a sub-tree
    of the database. MUPIP INTEG -BLOCK cannot detect "incorrectly marked busy
-   errors"
+   errors".
 
    The format of the BLOCK qualifier is:
 
    -BL[OCK]=block-number
+
+     o Block numbers are displayed in an INTEG error report or by using DSE.
+     o Incompatible with: -SUBSCRIPT and -TN_RESET
 
 3 BRief
    BRief
@@ -1424,10 +1436,10 @@
        the majority of blocks in a typical database are data blocks.
      o While INTEG -FAST is not a replacement for a full INTEG, it very
        quickly detects those errors that must be repaired immediately to
-       prevent accelerated database damage.
+       prevent accelerating database damage.
      o By default, INTEG checks all active index and data blocks in the
        database.
-     o -FAST reports adjacency information.
+     o -FAST reports include adjacency information.
      o Incompatible with: -TN_RESET.
 
 3 FIle
@@ -1488,8 +1500,8 @@
 
    **Note**
 
-   MUPIP INTEG reports "incorrectly marked free" errors as they require
-   prompt action. MAP does not restrict them.
+   MUPIP INTEG reports all "incorrectly marked free" errors as they require
+   prompt action. MAP does not restrict their reports.
 
    An error in an index block prevents INTEG from processing potentially
    large areas of the database. A single "primary" error may cause large
@@ -1553,22 +1565,21 @@
        when it completes. Note: a command such as ls -l command shows sparse
        files at their full size, but does not show actual disk usage. Use a
        command such as du -sh to see actual disk usage.
-     o The environment variable GTM_BAKTMPDIR (unlike most GT.M environment
-       variables, this is upper case; it is the same directory used for MUPIP
-       BACKUP -ONLINE) can be used to indicate a directory where MUPIP should
-       place the snapshot files (used by MUPIP INTEG -ONLINE). If
-       GTM_BAKTMPDIR does not exist, MUPIP places the snapshot files in the
-       current directory at the time you issue the INTEG command. MUPIP and
-       GT.M processes automatically cleans up these temporary snapshot files
-       under a wider variety of conditions.
+     o The environment variable gtm_snaptmpdir can be used to indicate a
+       directory where MUPIP should place the snapshot files (used by MUPIP
+       INTEG -ONLINE). If gtm_snaptmpdir does not exist, INTEG uses the
+       location specified by gtm_baktmpdir and if neither of those
+       environment variables is defined, INTEG places the snapshot files in
+       the current directory at the time you issue the INTEG command. MUPIP
+       and GT.M processes automatically cleans up these temporary snapshot
+       files under a wide variety of conditions.
      o Temporary directory security settings must allow write access by the
-       MUPIP process and read access by all processes updating the database.
-       MUPIP creates the temporary file with the same access as the database
-       file so processes updating the database can write to the temporary
-       file. If the database is encrypted, the updating processes write
-       encrypted blocks to the snapshot file and the MUPIP INTEG process must
-       start with access to appropriate key information as it does even
-       -NOONLINE.
+       MUPIP process and by all processes updating the database. MUPIP
+       creates the temporary file with the same access as the database file
+       so processes updating the database can write to the temporary file. If
+       the database is encrypted, the updating processes write encrypted
+       blocks to the snapshot file and the MUPIP INTEG process must start
+       with access to appropriate key information as it does even -NOONLINE.
      o MUPIP INTEG -NOONLINE [-FAST] {-REGION|-FILE} clears the KILLs in
        progress and Abandoned Kills flags if the run includes the entire
        database and there are no incorrectly marked busy blocks.
@@ -1604,16 +1615,13 @@
        specify more than one region of the current global directory in a
        list. Regions are case-insensitive, separated by a comma, and
        wildcards can be used to specify them. Any region-name may include the
-       wildcard characters * and % (remember to escape them to protect them
+       wildcard characters * and ? (remember to escape them to protect them
        from inappropriate expansion by the shell). Any region name expansion
        occurs in M (ASCII) collation order.
-     o MUPIP INTEG -REGION does not require stand alone access to databases.
-       Instead, it freezes updates (but not reads) to the database during the
-       check. The region-list argument may specify more than one region of
-       the current Global Directory in a list separated with commas. INTEG
+     o The region-list argument may specify more than one region of the
+       current Global Directory in a list separated with commas. INTEG
        -REGION requires the environment variable gtmgbldir to specify a valid
-       Global Directory. For more information on defining gtmgbldir, refer to
-       the "Global Directory Editor" chapter.
+       Global Directory.
      o Because a KILL may briefly defer marking the blocks it releases "free"
        in the bit maps, INTEG -REGION may report spurious block incorrectly
        marked busy errors. These errors are benign. If these errors occur in
@@ -1642,7 +1650,7 @@
    TN_reset
 
    Resets block transaction numbers and backup event recorded transaction
-   numbers to (one) 1, and the current transaction number to two (2) which
+   numbers to one (1), and the current transaction number to two (2) which
    makes the backup event recorded transaction numbers more meaningful and
    useful. It also issues an advisory message to perform a backup.
 
@@ -1715,17 +1723,18 @@
    A sample output from the above command follows:
 
    Type           Blocks         Records          % Used      Adjacent
-   Directory           2               5           4.150            NA
-   Index              18            1151          77.018             1
-   Data             1137           94189          97.894          1030
-   Free               43              NA              NA            NA
-   Total            1200           95345              NA          1031
+   Directory           2             110          25.732            NA
+   Index            1170          341639          88.298             6
+   Data           340578          519489          99.268        337888
+   Free             6809              NA              NA            NA
+   Total          348559          861238              NA        337894
+   [Spanning Nodes:3329 ; Blocks:341403]
 
    This example performs a MUPIP INTEG operation assuming that logically
    related data occupies 20 data blocks in the current database. The sample
    output shows that out of 1137 data blocks, 1030 data blocks are adjacent
-   to each other. One can improve the performance of a database if the all
-   blocks are as adjacent as possible.
+   to each other. One may be able to improve the performance of a database if
+   the all blocks are as adjacent as possible.
 
    Example:
 
@@ -1736,11 +1745,12 @@
 
    No errors detected by integ.
    Type           Blocks         Records          % Used      Adjacent
-   Directory           2               2           2.490            NA
-   Index               1               1           2.343             1
-   Data                1               3           6.738             1
-   Free               96              NA              NA            NA
-   Total             100               6              NA             2
+   Directory           2             110          25.732            NA
+   Index            1170          341639          88.298             4
+   Data           340578          519489          99.268        337617
+   Free             6809              NA              NA            NA
+   Total          348559          861238              NA        337621
+   [Spanning Nodes:3329 ; Blocks:341403]
 
    Example:
 
@@ -1753,14 +1763,14 @@
    No errors detected by fast integ.
 
    Type           Blocks         Records          % Used      Adjacent
-   Directory           2               2           2.490            NA
-   Index               1               1           2.343             1
-   Data                1              NA              NA            NA
-   Free               96              NA              NA            NA
-   Total             100              NA              NA             1
+   Directory           2             110          25.732            NA
+   Index            1170          341639          88.298             4
+   Data           340578              NA              NA        337617
+   Free             6809              NA              NA            NA
+   Total          348559              NA              NA        337621
 
-   Note the NA entries (highlighted in bold) for Data type. It means that the
-   MUPIP INTEG -FAST operation checked only index blocks.
+   Note the NA entries for Data type. It means that the MUPIP INTEG -FAST
+   operation checked only index blocks.
 
    $ mupip integ -full mumps.dat
 
@@ -1768,19 +1778,20 @@
 
    Directory tree
    Level          Blocks         Records          % Used      Adjacent
-       1               1               1           2.343           NA
-       0               1               1           2.636           NA
-   Global variable ^Dinosaur
+       1               1               1           0.585           NA
+       0               1             109          50.878           NA
+   Global variable ^#t
    Level          Blocks         Records          % Used      Adjacent
-       1               1               6           8.398             1
-       0               6             500          83.902             6
-   No errors detected by integ.
-   Type           Blocks         Records          % Used      Adjacent
-   Directory           2               2           2.490            NA
-   Index               1               6           8.398             1
-   Data                6             500          83.902             6
-   Free               91              NA              NA            NA
-   Total             100             508              NA             7
+       1               1               1           0.585             0
+       0               1              80          49.609             1
+   Global variable ^versionContent
+   Level          Blocks         Records          % Used      Adjacent
+       1               1               1           0.585             0
+       0               1               1          94.018             0
+   Global variable ^x
+   Level          Blocks         Records          % Used      Adjacent
+       1               1               2           1.464             0
+       0               2             109          52.551             1
 
    Example:
 
@@ -1862,21 +1873,20 @@
    an application is running may result in an inconsistent application state
    for the database.
 
-     * MUPIP LOAD uses the Global Directory to determine which database files
+     o MUPIP LOAD uses the Global Directory to determine which database files
        to use.
-     * LOAD supports user collation routines.
-     * LOAD takes its input from the file defined by the file-name
-     * LOAD may take its input from a UNIX file on any device that supports
-       such files.
-     * MUPIP LOAD command considers a sequential file as encoded in UTF-8 if
+     o LOAD supports user collation routines.
+     o LOAD takes its input from the file defined by the file-name, which may
+       be a UNIX file on any device that supports such files.
+     o MUPIP LOAD command considers a sequential file as encoded in UTF-8 if
        the environment variable gtm_chset is set to UTF-8. Ensure that MUPIP
        EXTRACT commands and corresponding MUPIP LOAD commands execute with
        the same setting for the environment variable gtm_chset.
-     * For information on loading with an M "percent utility," refer to the
+     o For information on loading with an M "percent utility," refer to the
        %GI section of the "M Utility Routines" chapter in GT.M Programmer's
        Guide. LOAD is typically faster, but the %GI utility can be
        customized.
-     * Press <CTRL-C> to produce a status message from LOAD. Entering
+     o Press <CTRL-C> to produce a status message from LOAD. Entering
        <CTRL-C> twice in quick succession stops LOAD. A LOAD that is manually
        stopped or stops because of an internal error is incomplete and may
        lack application level integrity, but will not adversely affect the
@@ -1906,25 +1916,24 @@
    not specified, MUPIP LOAD automatically detects file format
    (BINARY/ZWR/GO) based on the file header of the input file. If format is
    specified, it must match the actual format of the input file for LOAD to
-   operate.
+   proceed.
 
    The format codes are:
 
-   GO - Global Output format
    B[INARY] - Binary format
+   GO - Global Output format
    Z[WR] - ZWRITE format
 
-     * By default, LOAD uses FORMAT=ZWR.
-     * -FORMAT=GO expects the data in record pairs. Each global node requires
-       one record for the key and one for the data.
-     * -FORMAT=ZWR expects the data for each global node in a single record.
-     * -FORMAT=BINARY only applies to Greystone Database Structure (GDS)
+     o MUPIP LOAD detects file format (BINARY/ZWR/GO) based on the file
+       header of extract files from MUPIP EXTRACT, ^%GO and DSE.
+     o -FORMAT=BINARY only applies to Greystone Database Structure (GDS)
        files. A BINARY format file loads significantly faster than a GO or
        ZWR format file. -FORMAT=BINARY works with data in a proprietary
        format. -FORMAT=BINARY has one header record, therefore LOAD
        -FORMAT=BINARY starts active work with record number two (2).
-     * MUPIP LOAD detects file format (BINARY/ZWR/GO) based on the file
-       header of extract files from MUPIP EXTRACT, ^%GO and DSE.
+     o -FORMAT=GO expects the data in record pairs. Each global node requires
+       one record for the key and one for the data.
+     o -FORMAT=ZWR expects the data for each global node in a single record.
 
 3 BEgin
    BEgin
@@ -1940,14 +1949,14 @@
    Always consider the number of header records for choosing a -BEGIN point.
    See FORMAT qualifier for more information.
 
-     * For -FORMAT=GO input, the value is usually an odd number. As
+     o For -FORMAT=GO input, the value is usually an odd number. As
        -FORMAT=BINARY requires important information from the header, this
        type of load requires an intact file header regardless of the -BEGIN
        value.
-     * For -FORMAT = ZWR input, each record contains a complete set of
+     o For -FORMAT = ZWR input, each record contains a complete set of
        reference and data information. The beginning values are not
        restricted, except to allow two records for the header.
-     * By default, LOAD starts at the beginning of the input file.
+     o By default, LOAD starts at the beginning of the input file.
 
 3 End
    End
@@ -1973,14 +1982,14 @@
 
    -FI[LL_FACTOR]=integer
 
-     * Reserves room and avoid unnecessary block split to accommodate the
+     o Reserves room and avoid unnecessary block split to accommodate the
        forecasted growth in a global variable that may experience significant
        rate of additions over a period.
-     * Users having database performance issues or a high rate of database
+     o Users having database performance issues or a high rate of database
        updates must examine the defined FILL_FACTORs. Unless the application
        only uses uniform records, which is not typical for most applications,
        FILL_FACTORs do not work precisely.
-     * By default, LOAD uses -FILL_FACTOR=100 for maximum data density.
+     o By default, LOAD uses -FILL_FACTOR=100 for maximum data density.
 
    **Note**
 
@@ -1997,9 +2006,9 @@
 
    -[O]NERROR={STOP|PROCEED|INTERACTIVE}
 
-     * STOP causes MUPIP LOAD to exit immediately.
-     * PROCEED proceeds to the next record.
-     * PROMPTS prompts to continue or stop.
+     o STOP causes MUPIP LOAD to exit immediately.
+     o PROCEED proceeds to the next record.
+     o PROMPTS prompts to continue or stop.
 
    By default MUPIP LOAD exits on encountering an error.
 
@@ -2085,19 +2094,19 @@
        allocates blocks of memory with sizes rounded-up to an integer power
        of two bytes, shmused is always greater than objlen; for example with
        an objlen of 0x1c0, the shmused is 0x200.
-     o Lines of the form rec#... indicate the record # in the relinkctl file.
-       Each relinkctl file can store a maximum of 1,000,000 records, i.e.,
-       the maximum number of routines in a directory with auto-relink enabled
-       is one million. Each record stores a routine name (rtnname:), the
-       current cycle # for this object file record entry (cycle:) which gets
-       bumped on every ZLINK or ZRUPDATE command, the hash of the object file
-       last loaded for this routine name (objhash:), the # of different
-       versions of object files loaded in the Rtnobj shared memory segments
-       with this routine name (numvers:), the total byte-length of the one or
-       more versions of object files currently loaded with this routine name
-       (objlen:), the total length used up in shared memory for these object
-       files where GT.M allocates each object file a rounded-up perfect
-       2-power block of memory (shmlen:).
+     o Lines of the form rec#... indicate the record number in the relinkctl
+       file. Each relinkctl file can store a maximum of 1,000,000 records,
+       i.e., the maximum number of routines in a directory with auto-relink
+       enabled is one million. Each record stores a routine name (rtnname:),
+       the current cycle for this object file record entry (cycle:) which
+       gets bumped on every ZLINK or ZRUPDATE command, the hash of the object
+       file last loaded for this routine name (objhash:), the number of
+       different versions of object files loaded in the Rtnobj shared memory
+       segments with this routine name (numvers:), the total byte-length of
+       the one or more versions of object files currently loaded with this
+       routine name (objlen:), the total length used up in shared memory for
+       these object files where GT.M allocates each object file a rounded-up
+       perfect 2-power block of memory (shmlen:).
 
    Given a relinkctl file name, one can find the corresponding directory path
    using the Unix "strings" command on the Relinkctl file. For example,
@@ -2108,13 +2117,13 @@
    Example:
 
    $ mupip rctldump .
-   Object Directory         : /obj
-   Relinkctl filename       : /tmp/gtm-relinkctl-f0938d18ab001a7ef09c2bfba946f002
+   Object Directory         : /tmp
+   Relinkctl filename       : /tmp/fis-gtm/V6.2-001_x86_64/gtm-relinkctl-61f9eb418212a24a75327f53106c1656
    # of routines            : 1
    # of attached processes  : 2
-   Relinkctl shared memory  : shmid: 11534344  shmlen: 0x57c6000
-   Rtnobj shared memory # 1 : shmid: 11567113  shmlen: 0x100000  shmused: 0x200  shmfree: 0xffe00  objlen: 0x1c0
-       rec#1: rtnname: abcd  cycle: 1  objhash: 0xedbfac8c7f7ca357  numvers: 1  objlen: 0x1c0  shmlen: 0x200
+   Relinkctl shared memory  : shmid: 11534344 shmlen: 0x57c6000
+   Rtnobj shared memory # 1 : shmid: 11567113 shmlen: 0x100000 shmused: 0x200 shmfree: 0xffe00 objlen: 0x1c0
+    rec#1: rtnname: abcd cycle: 1 objhash: 0xedbfac8c7f7ca357 numvers: 1 objlen: 0x1c0 shmlen: 0x200
 
 2 REORG
    REORG
@@ -2530,7 +2539,7 @@
 
    The format of the MUPIP RUNDOWN command is:
 
-   RU[NDOWN] {-FILE file-name|-REGION region-list]}
+   RU[NDOWN] {-FILE file-name|-REGION region-list|-RELINKCTL [dir]|-OVERRIDE}
 
    MUPIP RUNDOWN clears certain fields in a file that is already closed. This
    facilitates recovery from a system crash or other operational anomaly.
@@ -2541,6 +2550,9 @@
    database that is actively being accessed at the time the RUNDOWN is
    issued.
 
+   A successful MUPIP RUNDOWN of a database region removes any current MUPIP
+   FREEZE.
+
    To ensure database integrity, all system shutdown algorithms should
    include scripts that stop at GT.M processes and perform RUNDOWN on all
    database files.
@@ -2550,6 +2562,7 @@
    -F[ile]
    -R[egion]=region-list
    -RELinkctl [dir1]
+   -Override
 
    If the RUNDOWN command does not specify either -File or -Region, it checks
    all the IPC resources (shared memory) on the system and if they are
@@ -2565,23 +2578,17 @@
 
    Incompatible with: -REGION
 
-3 Relinkctl
-   Relinkctl
+3 Override
+   Override
 
-   Cleans up orphaned Relinkctl files. FIS strongly recommends avoiding
-   actions that tend to make such cleanup necessary - for example, kill -9 of
-   GT.M processes or ipcrm -m of active Relinkctl and/or Rtnobj shared memory
-   segments.
-
-   If the optional dir1 is not specified, MUPIP RUNDOWN -RELINKCTL examines
-   the environment variable $gtmroutines, attempts to verify and correct
-   their attach counts and runs down all its inactive auto-relink-enabled
-   directories (those with with a *-suffix). Alternatively, one can specify a
-   directory path for the parameter dir1 and MUPIP RUNDOWN -RELINKCTL treats
-   it as an auto-relink-enabled directory and runs down the resources
-   associated with this one directory. It prints a RLNKCTLRNDWNSUC message on
-   a successful rundown and a RLNKCTLRNDWNFL message on a failure (usually
-   because live processes are still accessing the Relinkctl file).
+   Overrides the protection that prevents MUPIP RUNDOWN from performing a
+   rundown of a replication-enabled (with BEFORE_IMAGE) database or a
+   non-replicated NOBEFORE-journaled database that was abnormally shutdown.
+   The protection involves issuing the MUUSERLBK error for a previously
+   crashed replication-enabled (with BEFORE IMAGE journaling) database and
+   the MUUSERECOV error for a non-replicated or NOBEFORE-journaled database.
+   Both these errors prevent complications related to data recovery from a
+   journal file or a replication-enabled database.
 
 3 Region
    Region
@@ -2604,17 +2611,23 @@
    list of databases, it does not perform any clean up on regions that have
    no abandoned memory segments but may not have been shutdown in a crash.
 
-3 Override
-   Override
+3 Relinkctl
+   Relinkctl
 
-   Overrides the protection that prevents MUPIP RUNDOWN from performing a
-   rundown of a replication-enabled (with BEFORE_IMAGE) database or a
-   non-replicated NOBEFORE-journaled database that was abnormally shutdown.
-   The protection involves issuing the MUUSERLBK error for a previously
-   crashed replication-enabled (with BEFORE IMAGE journaling) database and
-   the MUUSERECOV error for a non-replicated or NOBEFORE-journaled database.
-   Both these errors prevent complications related to data recovery from a
-   journal file or a replication-enabled database.
+   Cleans up orphaned Relinkctl files. FIS strongly recommends avoiding
+   actions that tend to make such cleanup necessary - for example, kill -9 of
+   GT.M processes or ipcrm -m of active Relinkctl and/or Rtnobj shared memory
+   segments.
+
+   If the optional dir1 is not specified, MUPIP RUNDOWN -RELINKCTL examines
+   the environment variable $gtmroutines, attempts to verify and correct
+   their attach counts and runs down all its inactive auto-relink-enabled
+   directories (those with with a *-suffix). Alternatively, one can specify a
+   directory path for the parameter dir1 and MUPIP RUNDOWN -RELINKCTL treats
+   it as an auto-relink-enabled directory and runs down the resources
+   associated with this one directory. It prints a RLNKCTLRNDWNSUC message on
+   a successful rundown and a RLNKCTLRNDWNFL message on a failure (usually
+   because live processes are still accessing the Relinkctl file).
 
 2 SET
    SET
@@ -2622,42 +2635,87 @@
    Modifies certain database characteristics. MUPIP SET operates on either
    regions or files.
 
-   **Note**
-
-   In regions that have journaling enabled and on, users can switch journal
-   files without either requiring standalone access or freezing updates.
-
    The format of the SET command is:
 
-   SE[T] {-FI[LE] file-name|-REG[ION] region-list}
+   SE[T] {-FI[LE] file-name|-JN[LFILE] journal-file-name|-REG[ION] region-list|-REP[LICATION]={ON|OFF}}
     -A[CCESS_METHOD]={BG|MM}
-    -B[YPASS]
-    -DE[FER_TIME]=seconds
+    -[NO]DE[FER_TIME][=seconds]
+    -[NO]DEFER_ALLOCATE
     -E[XTENSION_COUNT]=integer(no of blocks)
     -F[LUSH_TIME]=integer
-    -G[LOBAL_BUFFERS]=<integer>
-    -JN[LFILE]
-    -JO[URNAL]=journal-option-list
+    -G[LOBAL_BUFFERS]=integer
+    -[NO]INST[_FREEZE_ON_ERROR]
+    -JN[LFILE]journal-file-name
+    -K[EY_SIZE]=bytes
     -L[OCK_SPACE]=integer
     -M[UTEX_SLOTS]=integer
-    -[NO]INST[_FREEZE_ON_ERROR]
     -PA[RTIAL_RECOV_BYPASS]
+    -[NO]Q[DBRUNDOWN]
+    -REC[ORD_SIZE]=bytes
+    -REG[ION] region-list
     -REP[LICATION]={ON|OFF}
     -RES[ERVED_BYTES]=integer]
     -S[TANDALONENOT]
     -V[ERSION]={V4|V6}
     -W[AIT_DISK]=integer
 
-     o The file-name (or region-list) identifies the target of the SET.
-     o The SET command must include one of the following qualifiers which
-       determine whether the argument to the SET is a file-name or a
-       region-list.
      o Exclusive access to the database is required if the MUPIP SET command
        specifies -ACCESS_METHOD, -GLOBAL_BUFFERS, -LOCK_SPACE or -NOJOURNAL,
        or if any of the -JOURNAL options ENABLE, DISABLE, or BUFFER_SIZE are
        specified.
+     o The file-name, journal_file_name, region-list or -REPLICATION
+       qualifier identify the target of the SET.
+     o The SET command must include one of the following target qualifiers
+       which determine whether the argument to the SET is a file-name or a
+       region-list.
 
-   The following section describe the qualifiers of the MUPIP SET command.
+3 File
+   File
+
+   Specifies that the argument is a file-name for a single database file. The
+   format of the FILE qualifier is:
+
+   -F[ILE]
+
+   Incompatible with: -JNLFILE, -REGION and -REPLICATION
+
+3 Jnlfile
+   Jnlfile
+
+   Specifies that the argument is a journal-file-name. The format of the
+   JNLFILE qualifier is:
+
+   -JNLF[ILE] journal-file-name
+
+   Incompatible with: -FILE, -REGION and -REPLICATION
+
+3 Region
+   Region
+
+   Specifies that the argument is a region-list which identifies database
+   file(s) mapped by the current Global Directory. The format of the REGION
+   qualifier is:
+
+   -R[EGION] region-list
+
+   The region-list identifies the target of SET. region-list may specify more
+   than one region of the current global directory in a list. Regions are
+   case-insensitive, separated by a comma, and wild-cards can be used to
+   specify them. Any region-name may include the wild-card characters * and %
+   (remember to escape them to protect them from inappropriate expansion by
+   the shell). Any region name expansion occurs in M (ASCII) collation order.
+
+   Incompatible with: -FILE, -JNLFILE and -REPLICATION
+
+3 REPlication
+   REPlication
+
+   Specifies whether replication is on or off. The format of the REPLICATION
+   qualifier is:
+
+   -REP[LICATION]={ON|OFF}
+
+   Incompatible with: -FILE, -JNLFILE and -REGION
 
 3 Access_method
    Access_method
@@ -2668,49 +2726,54 @@
 
    -A[CCESS_METHOD]=code
 
-3 PArtial_recov_bypass
-   PArtial_recov_bypass
+3 Defer_time
+   Defer_time
 
-   Sets the CORRUPT_FILE flag in the database fileheader to FALSE. The
-   CORRUPT_FILE flag indicates whether a region completed a successful
-   recovery.
-
-3 File
-   File
-
-   Specifies that the argument is a file-name for a single database file. The
-   format of the FILE qualifier is:
-
-   -F[ILE]
-
-   Incompatible with: -REGION
-
-3 Region
-   Region
-
-   Specifies that the argument is a region-list which identifies database
-   file(s) mapped by the current Global Directory. The format of the REGION
+   Specifies, in MM access mode, the multiplying factor applied to the flush
+   time to produce a wait after an update before ensuring a journal buffer
+   write to disk; the default is 1. A value of 2 produces a wait of double
+   the flush time. -NODEFER_TIME or a value of -1 turns off timed journal
+   writing, leaving the journal, under light update conditions, to
+   potentially get as stale as the epoch time. Note that, in MM mode without
+   the sync_io option set, absent a VIEW("JNLFLUSH") from the application,
+   GT.M only fsyncs the journal at the epoch. The format of the DEFER_TIME
    qualifier is:
 
-   -R[EGION]=region-list
+   -[NO]D[efer_time][=seconds]
 
-   The region-list identifies the target of SET. region-list may specify more
-   than one region of the current global directory in a list. Regions are
-   case-insensitive, separated by a comma, and wildcards can be used to
-   specify them. Any region-name may include the wildcard characters * and %
-   (remember to escape them to protect them from inappropriate expansion by
-   the shell). Any region name expansion occurs in M (ASCII) collation order.
+3 DEFER_Allocate
+   DEFER_Allocate
 
-   Incompatible with: -FILE
+   Provides a mechanism to control GT.M behavior when subsequently extending
+   existing database files, whether using MUPIP EXTEND or auto-extend. To
+   switch an existing database file so it immediately preallocates all
+   blocks, first use MUPIP SET -NODEFER_ALLOCATE to set the switch in the
+   database file header, followed by MUPIP EXTEND -BLOCKS=n, where n >= 0.
+   Failures to preallocate space produce a PREALLOCATEFAIL error. On
+   platforms where GT.M does not support preallocation (HP-UX and Solaris),
+   although GDE accepts -NODEFER_ALLOCATE, MUPIP CREATE ignores it and sets
+   the database file to DEFER_ALLOCATE. On those platforms, any attempt to
+   change this flag with MUPIP SET produces a NODFRALLOCSUPP error. The
+   format of the DEFER_ALLOCATE qualifier is:
+
+   -[NO]DEFER_Allocate
+
+3 Epochtaper
+   Epochtaper
+
+   Tries to minimize epoch duration by reducing the number of buffers to
+   flush by GT.M and the file system (via an fsync()) as the epoch
+   (time-based or due to journal file auto-switch) approaches. The format of
+   the QDBRUNDOWN qualifier is:
+
+   -[NO]EPOCHTAPER
 
 3 Extension_count
    Extension_count
 
    Specifies the number of GDS blocks by which an existing database file
    extends. A file or region name is required. This qualifier requires
-   standalone access.
-
-   The format of the EXTENSION_COUNT qualifier is:
+   standalone access. The format of the EXTENSION_COUNT qualifier is:
 
    -E[XTENSION_COUNT]=integer
 
@@ -2735,13 +2798,14 @@
    In general, increasing the number of global buffers improves performance
    by smoothing the peaks of I/O load on the system. However, increasing the
    number of global buffers also increases the memory requirements of the
-   system, and a larger number of global buffers can increase the probability
-   of the buffers getting swapped out. If global buffers are swapped out, any
-   performance gain from increasing the number of global buffers will be more
-   than offset by the performance impact of swapping global buffers. Most
-   applications use from 1,000 to 4,000 global buffers for database regions
-   that are heavily used. FIS does not recommend using fewer than 256 buffers
-   except under special circumstances.
+   system, and a larger number of global buffers on memory constrained
+   systems can increase the probability of the buffers getting swapped out.
+   If global buffers are swapped out, any performance gain from increasing
+   the number of global buffers will be more than offset by the performance
+   impact of swapping global buffers. Most applications use from 1,000 to
+   4,000 global buffers for database regions that are heavily used. FIS does
+   not recommend using fewer than 256 buffers except under special
+   circumstances.
 
    The minimum is 64 buffers and the maximum is 65536 buffers. By default,
    MUPIP CREATE establishes GLOBAL_BUFFERS using information entered in the
@@ -2750,29 +2814,58 @@
    On many UNIX systems, default kernel parameters may be inadequate for GT.M
    global buffers, and may need to be adjusted by a system administrator.
 
+3 INST_freeze_on_error
+   INST_freeze_on_error
+
+   Enables or disables custom errors in a region to automatically cause an
+   Instance Freeze. This flag modifies the "Inst Freeze on Error" file header
+   flag. The format of the INST_FREEZE_ON_ERROR qualifier is:
+
+   -[NO]INST[_FREEZE_ON_ERROR]
+
+3 Journal
+   Journal
+
+   Specifies whether the database allows journaling and, if it does,
+   characteristics for the journal file.:
+
+   **Note**
+
+   In regions that have journaling enabled and on, users can switch journal
+   files without either requiring standalone access or freezing updates.
+
+   The format of the JOURNAL qualifier is:
+
+   -[NO]J[OURNAL][=journal-option-list]
+
+     o -NOJOURNAL specifies that the database does not allow journaling. And
+       also it does not accept an argument assignment.
+     o -JOURNAL specifies journaling is allowed. It takes one or more
+       arguments in a journal-option-list.
+
+3 Key_size
+   Key_size
+
+   Specifies the maximum key size in bytes for storing and retrieving data
+   from the global database file. The maximum supported size is 1019 bytes.
+   The format of the KEY_SIZE qualifier is:
+
+   -K[EY_SIZE=bytes
+
 3 Lock_space
    Lock_space
 
    Specifies the number of pages allocated to the management of M locks
-   associated with the database. The size of a page is always 512 bytes.
-
-   The format of the LOCK_SPACE qualifier is:
+   associated with the database. The size of a page is always 512 bytes. The
+   format of the LOCK_SPACE qualifier is:
 
    -L[OCK]_SPACE=integer
 
      o The maximum LOCK_SPACE is 65,536 pages.
      o The minimum LOCK_SPACE is 10 pages.
      o The default LOCK_SPACE is 40 pages.
-     o A file or region name is required to assign lock space.
      o
      o This qualifier requires standalone access.
-
-3 INST_freeze_on_error
-   INST_freeze_on_error
-
-   Enables or disables custom errors in a region to automatically cause an
-   Instance Freeze. This flag modifies the "Inst Freeze on Error" file header
-   flag.
 
 3 Mutex_slots
    Mutex_slots
@@ -2785,41 +2878,52 @@
    maximum number of concurrent processes you expect to access the database.
 
    The minimum value is 64 and the maximum value is 32768. The default value
-   is 1024.
+   is 1024. The format of the MUTEX_SLOTS qualifier is:
 
-3 Journal
-   Journal
-
-   Specifies whether the database allows journaling and, if it does,
-   characteristics for the journal file. The format of the JOURNAL qualifier
-   is:
-
-   -[NO]J[OURNAL][=journal-option-list]
-
-     o -NOJOURNAL specifies that the database does not allow journaling. And
-       also it does not accept an argument assignment.
-     o -JOURNAL specifies journaling is allowed. It takes one or more
-       arguments in a journal-option-list.
+   -M[UTEX_SLOTS]=integer
 
 3 Qdbrundown
    Qdbrundown
 
    Quickens normal process shutdown where a large number of processes
    accessing a database file are required to shutdown almost simultaneously,
-   for example, in benchmarking scenarios. When a terminating GT.M process
-   observes that a large number of processes are attached to a database file
-   and QDBRUNDOWN is enabled, it bypasses checking whether it is the last
-   process accessing the database. Such a check occurs in a critical section
-   and bypassing it also bypasses the usual RUNDOWN actions which accelerates
-   process shutdown removing a possible impediment to process startup. By
-   default, QDBRUNDOWN is disabled.
+   for example, in benchmarking scenarios. The format of the QDBRUNDOWN
+   qualifier is:
+
+   -[NO]Q[DBRUNDOWN]
+
+   When a terminating GT.M process observes that a large number of processes
+   are attached to a database file and QDBRUNDOWN is enabled, it bypasses
+   checking whether it is the last process accessing the database. Such a
+   check occurs in a critical section and bypassing it also bypasses the
+   usual RUNDOWN actions which accelerates process shutdown removing a
+   possible impediment to process startup. By default, QDBRUNDOWN is
+   disabled.
 
    Note that with QDBRUNDOWN there is a possibility of race condition that
-   might leave the database fileheader and IPC resources in need of cleanup.
+   might leave the database file header and IPC resources in need of cleanup.
    Although QDBRUNDOWN minimizes the probability of such a race condition, it
    cannot eliminate it. When using QDBRUNDOWN, FIS recommends an explicit
    MUPIP RUNDOWN of the database file after the last process exits, to ensure
-   the cleanup of database fileheader and IPC resources.
+   the cleanup of database file header and IPC resources.
+
+3 PArtial_recov_bypass
+   PArtial_recov_bypass
+
+   Sets the CORRUPT_FILE flag in the database file header to FALSE. The
+   CORRUPT_FILE flag indicates whether a region completed a successful
+   recovery. The format of the PARTIAL_RECOV_BYPASS qualifier is:
+
+   -PA[RTIAL_RECOV_BYPASS]
+
+3 RECord_size
+   RECord_size
+
+   Specifies the maximum record size in bytes for storing and retrieving data
+   from the global database file. The maximum supported size is 1MiB bytes.
+   The format of the RECORD_SIZE qualifier is:
+
+   -REC[ORD_SIZE=bytes
 
 3 REServed_bytes
    REServed_bytes
@@ -2854,7 +2958,16 @@
        and longer records (spanning nodes) features of V6 format are
        automatically disabled when used with GT.M V5.* versions.
      o For more information on the upgrading or downgrading your database,
-       refer to the release notes document of your current GT.M version.
+       refer to the release notes document of your current GT.M version(s).
+
+3 Wait_disk
+   Wait_disk
+
+   Specifies the seconds to wait for disk space before giving up on a
+   database block write, where zero (0) means to give an error immediately
+   without waiting. The format of the WAIT_DISK qualifier is:
+
+   -W[AIT_DISK]=seconds
 
 3 Examples
    Examples
@@ -2924,7 +3037,7 @@
 
    estimation-technique is one of the following:
 
-     * scan,level=<lvl>
+     o scan,level=<lvl>
 
        Traverses the global variable tree and counts the actual number of
        records and blocks at levels from the root down to the level specified
@@ -2938,19 +3051,19 @@
        The technique reports the results for levels other than 0 show
        adjacency for the next lower (one less) level.
 
-     * arsample,samples=<smpls>
+     o arsample,samples=<smpls>
 
        Uses acceptance/rejection sampling of random tree traversals to
        estimate the number of blocks at each level. It continues until the
        specified number of samples (default is 1,000) is accepted.
 
-     * impsample,samples=<smpls>
+     o impsample,samples=<smpls>
 
        Uses importance sampling of random tree traversals to weight each
        sample of the specified number of samples (default is 1,000) in order
        to estimate size of the tree at each level.
 
-     * If -HEURISTIC is not specified, MUPIP SIZE uses the
+     o If -HEURISTIC is not specified, MUPIP SIZE uses the
        ARSAMPLE,SAMPLE=1000 estimation technique.
 
    **Important**
@@ -2968,7 +3081,8 @@
    reports the logical adjacency in the "Adjacent" column of the MUPIP SIZE
    report. Note that adjacency is only a proxy for database organization and
    its usefulness may be limited by the technology and configuration of your
-   secondary storage.
+   secondary storage. See the INTEG section of this chapter for additional
+   comments on adjacency.
 
    -Select
 
@@ -2981,12 +3095,12 @@
 
    global-name-list can be:
 
-     * A comma separated list of global variables.
-     * A range of global variables denoted by start:end syntax. For example,
+     o A comma separated list of global variables.
+     o A range of global variables denoted by start:end syntax. For example,
        -select="g1:g4".
-     * A global variable with wildcards, for example, "g*" (the name must be
+     o A global variable with wildcards, for example, "g*" (the name must be
        escaped to avoid shell filename expansion)
-     * "*" to select all global variables.
+     o "*" to select all global variables.
 
    -Region
 
@@ -3073,9 +3187,9 @@
     1. Set the value of the environment variable gtmgbldir: to specify the
        value of a current global directory.
     2. Ensure that the key size, record size, block size of your database is
-       sufficient for storing trigger definition. You may have to set the key
-       and record sizes larger than the database content would otherwise
-       require.
+       sufficient for storing all planned trigger definitions. You may have
+       to set the key and record sizes larger than the database content would
+       otherwise require.
 
    The qualifiers of the MUPIP TRIGGER command are as follows:
 
@@ -3086,19 +3200,20 @@
 
    -TRIG[GERFILE]=<trigger_definitions_file> [-NOPR[OMPT]]
 
-     *
-     * A MUPIP TRIGGER -TRIGGERFILE operation occurs within a transaction
+     o A MUPIP TRIGGER -TRIGGERFILE operation occurs within a transaction
        boundary, therefore, if even one trigger from the trigger definition
        file fails to parse correctly, MUPIP TRIGGER rolls back the entire
-       trigger definition file load. MUPIP TRIGGER operations have an
-       implicit timeout of zero (0), meaning the read must succeed on the
+       trigger definition file load. Trigger maintenance operations reserve
+       their output until the transaction commits at which time they deliver
+       the entire output in a consistent way. MUPIP TRIGGER operations have
+       an implicit timeout of zero (0), meaning the read must succeed on the
        first try or the command will act as if it received no input.
-     * MUPIP TRIGGER -TRIGGERFILE ignores blank lines and extra whitespace
+     o MUPIP TRIGGER -TRIGGERFILE ignores blank lines and extra whitespace
        within lines. It treats lines with a semi-colon in the first position
        as comments and ignores their content.
-     * MUPIP TRIGGER compiles the XECUTE action string and rejects the load
+     o MUPIP TRIGGER compiles the XECUTE action string and rejects the load
        if the compilation has errors.
-     * Always specify the same value for the environment variable gtm_chset
+     o Always specify the same value for the environment variable gtm_chset
        during loading and executing triggers. If you specify different values
        of gtm_chset during loading and executing triggers, MUPIP TRIGGER
        generates a run-time error (TRIGINVCHSET). GT.M does not prevent a
@@ -3108,17 +3223,21 @@
        for all database updates, should be to ensure that you provide the
        same value for gtm_chset during load compilation and run-time
        compilation.
-     * MUPIP TRIGGER replicate trigger definitions as logical actions from an
+     o MUPIP TRIGGER replicate trigger definitions as logical actions from an
        originating/primary instance to a replicating/secondary instance based
        on LGTRIG journal records. This permits the instances to have
        different sets of triggers and differing database layouts (for
        example, different # of regions, different block sizes, different
        maximum-record-size, and so on).
-     * MUPIP TRIGGER limits trigger expression source lines to 80 characters
-       including a trailing ellipsis to indicate there was more text, and
-       they also replace any non-graphic characters with a dot (.)
+     o MUPIP TRIGGER error messages associated with loading triggers limit
+       trigger expression source lines to 80 characters including a trailing
+       ellipsis to indicate there was more text, and they also replace any
+       non-graphic characters with a dot (.)
 
-     * Incompatible with: -SELECT
+     o GT.M triggers apply to spanning regions. When $ZTRIGGER() or MUPIP
+       TRIGGER define triggers that apply to globals spanning multiple
+       regions, each of the spanned regions install a definition.
+     o Incompatible with: -SELECT
 
    **Note**
 
@@ -3135,19 +3254,20 @@
 
    -SELE[CT][=name-list*][ <select-output-file>]
 
-     * Name-list can include global names, delimited with a leading caret
+     o Name-list can include global names, delimited with a leading caret
        (^), and/or trigger names (user-defined or auto-generated) with no
        leading caret. You can specify a trailing asterisk(*) with either.
-     * With no arguments specified, GT.M treats -SELECT as -SELECT="*" and
+     o With no arguments specified, GT.M treats -SELECT as -SELECT="*" and
        extracts a list of all current triggers.
-     * Optionally, you can specify a file name to redirect the output of the
+     o Optionally, you can specify a file name to redirect the output of the
        command. If you do not specify a file name, MUPIP TRIGGER prompts for
        a file name. If you respond with an empty string (RETURN), MUPIP
        TRIGGER directs the output to STDOUT.
-     * MUPIP TRIGGER -SELECT displays all output including errors on STDOUT.
-     * For Trigger definition reporting operations, $ZTRIGGER("SELECT") and
+     o MUPIP TRIGGER -SELECT displays all output including errors on STDOUT.
+     o For Trigger definition reporting operations, $ZTRIGGER("SELECT") and
        MUPIP TRIGGER -SELECT, return a non-zero exit status when their
-       selection criteria encounter an error in the middle of the select.
+       selection criteria encounter an error in the select.
+     o in the Programmers Guide.
 
    **Note**
 
@@ -3157,13 +3277,13 @@
    -SELECT output may not be identical to the -TRIGGERFILE input, it has the
    same meaning. Additionally, MUPIP TRIGGER -SELECT displays a field called
    "Cycle" as part of a comment. Cycle is the number of trigger definition
-   updates (addition, modification, or deletion) performed on a global.
+   updates (addition, modification, or deletion) performed on a global node.
 
    **Important**
 
    MUPIP TRIGGER treats the deletion of a non-existent trigger as a success;
    if that is the only operation, or one of a set of successful operations,
-   it return success 0 to the shell Also, MUPIP TRIGGER returns failure in
+   it returns success 0 to the shell. Also, MUPIP TRIGGER returns failure in
    case of trigger selection using trigger names where the number after the
    pound-sign (#) starts with a 0 (which is an impossible auto-generated
    trigger name).
@@ -3249,8 +3369,7 @@
 
     1. Begin by executing the following command:
 
-       $ mupip trigger -select="^Acct*"
-       Output file:
+       $ mupip trigger -select="^Acct*"Output file:
 
     2. Specify trigger_mod.trg as the output file. This file contains entries
        like the following:
@@ -3292,8 +3411,7 @@
 
     1. Begin by executing the following command:
 
-       $ mupip trigger -select="^Acct*"
-       Output file:
+       $ mupip trigger -select="^Acct*"Output file:
 
     2. Specify trigger_delete.trg as the output file. This file contains
        entries like the following:
@@ -3332,8 +3450,7 @@
     2. Verify that the ValidateAccount trigger exists by executing the
        following command:
 
-       $ mupip trigger -select="^Acct*"
-       Output file:
+       $ mupip trigger -select="^Acct*"Output file:
 
     3. Respond with an empty string (Press Enter). Confirm that the trigger
        summary report contains an entry like the following:
@@ -3405,10 +3522,10 @@
    **Important**
 
    GT.M applies journaling information in the Global Directory to a database
-   file only when it is created. Thereafter use MUPIP, or possibly DSE, to
-   change journaling characteristics in database files. Be sure to use GDE to
-   reflect current journaling needs so that the next time you use MUPIP
-   CREATE you get the desired journaling characteristics.
+   file only when it is created. Thereafter use MUPIP, or under unusual
+   circumstances DSE, to change journaling characteristics in database files.
+   Be sure to use GDE to reflect current journaling needs so that the next
+   time you use MUPIP CREATE you get the desired journaling characteristics.
 
    DSE DUMP -FILEHEADER displays the current values for all established
    journaling characteristics.
@@ -3420,23 +3537,27 @@
    journaling is active for a specific file or region(s). The first run of
    MUPIP SET -JOURNAL on an older database automatically changes the
    maximum/minimum journal settings to match those required by the current
-   GT.M version. MUPIP SET operates on either regions or files.
+   GT.M version. MUPIP SET operates on database files, journal files, regions
+   or replication state.
 
    The format for the MUPIP SET command is:
 
-   MUPIP SE[T] -qualifier... {-F[ILE] file-name|-REG[ION] region-list}
+   MUPIP SE[T] -qualifier... {-F[ILE] file-name|-JN[LFILE journal-file|-REG[ION] region-list}
 
-   The file-specification or region-list identifies the target of the SET.
-   Region-names separated by commas (,) make up a region-list.
+   The file-specification, journal file specification or region-list
+   identifies the target of the SET. Region-names separated by commas (,)
+   make up a region-list.
 
    To establish journaling characteristics, use the MUPIP SET command with
    the -[NO]JOURNAL[=journal-option-list] qualifier and one of the following
    SET object identifying qualifiers:
 
    -F[ILE]
+   -JN[LFILE]
    -R[EGION]
 
-   Together with one or more of the SET action qualifiers:
+   -FILE and -REGION act together with one or more of the SET action
+   qualifiers:
 
    -[NO]JOURNAL[=journal-option-list] -REPLICATION=<replication-option>'
 
@@ -3447,8 +3568,8 @@
 
    -F[ILE]
 
-   Specify that the argument to the SET is a file-specification for a single
-   database file. A Journal file's name can now include characters in
+   Specifies that the argument to the SET is a file-specification for a
+   single database file. A Journal file's name cannclude characters in
    Unicode.
 
    Old journal files stay open for about 10 seconds after a switch to a new
@@ -3456,23 +3577,40 @@
 
    -R[EGION]
 
-   Specify that the argument to the SET is a list of one or more
+   Specifies that the argument to the SET is a list of one or more
    region-names, possibly including wildcards, which, through the mapping of
    the current Global Directory, identifies a set of database files. SET
    -REGION modifies multiple files when the parameter contains more than one
    name.
 
-   The -REGION qualifier is incompatible with the -FILE qualifier.
+   The -REGION qualifier is incompatible with the -FILE and -JNLFILE
+   qualifiers.
 
-   -J[NLFILE]
+   -JN[LFILE]
 
    Specifies that the target for SET is a journal file. The format of the
    JNLFILE qualifier is:
 
-   -jnlfile jnl_file [-[no]prevjnlfile=jnlfilename] [-bypass]
+   -jnlfile jnl_file [-[no]prevjnlfile[=jnlfilename]] [-bypass]
    [-repl_state={on|off}] [-dbfilename=file_name]
 
    jnl_file specifies the name of the target journal file.
+
+   -bypass
+
+   Override the requirement that database files (or their corresponding
+   journal files) affected by the set command be available standalone.
+
+   **Caution**
+
+   Changing the previous generation file link when a rollback operation is in
+   progress or when the Source Server is actively replicating, can damage the
+   journal file and hamper recoverability.
+
+   -dbfilename=file_name
+
+   Associates a journal file with a different database file; this command may
+   be useful in arranging unusual RECOVER or ROLLBACK scenarios.
 
    -prevjnlfile=jnlfilename
 
@@ -3489,26 +3627,10 @@
    Such an operation is appropriate when it is assured that there will never
    be a reason for a rollback to the previous generation journal file.
 
-   -bypass
-
-   Override the requirement that database files (or their corresponding
-   journal files) affected by the set command be available standalone.
-
-   **Caution**
-
-   Changing the previous generation file link when a rollback operation is in
-   progress or when the Source Server is actively replicating, can damage the
-   journal file and hamper recoverability.
-
    -repl_state={on|off}
 
    Change the replication state of a journal file; this command is intended
    for use only under instructions from your GT.M support provider.
-
-   -dbfilename=file_name
-
-   Associates a journal file with a different database file; this command may
-   be useful in arranging unusual RECOVER or ROLLBACK scenarios.
 
 3 Action_Qualifiers
    Action Qualifiers
@@ -3528,49 +3650,6 @@
    enclosed in double quotes "". These double quotes are optional when the
    list contains only one keyword. This option list is a super set of the
    journal-option-list available through GDE.
-
-     o -NOJOURNAL specifies that the database does not allow journaling, or
-       disables journaling for a database that currently has it enabled. It
-       is equivalent to -JOURNAL=DISABLE.
-     o -NOJOURNAL does not accept an argument assignment. It does not create
-       new journal files. When a database has been SET -NOJOURNAL, it appears
-       to have no journaling file name or other characteristics.
-     o -JOURNAL= enables journaling for a database file. -JOURNAL= takes one
-       or more arguments in a journal-option-list. As long as journaling is
-       ENABLED and turned ON at the end of the command, SET -JOURNAL= always
-       creates a new version of the specified journal file(s).
-     o -NOJOURNAL specifies that the database does not allow journaling, or
-       disable journaling for a database where journaling is active.
-     o Enable BEFORE_IMAGE or NOBEFORE_IMAGE journaling for a database file.
-     o As long as journaling is ENABLED and turned ON at the end of the
-       command, SET -JOURNAL= always creates a new version of the specified
-       journal file(s).
-     o Every MUPIP SET -JOURNAL command on a database file that specifies an
-       ON or OFF journal-activation option causes the values of all
-       explicitly specified journal-file-options to be stored in the database
-       overriding any previously established characteristics for those
-       options.
-     o If you specify both -JOURNAL and -NOJOURNAL in the same command line,
-       the latter takes effect.
-     o Whenever MUPIP SET creates a new journal file, it uses all values for
-       journal-file-options that the user explicitly specifies in the command
-       line for the new journal file. If you do not specify a
-       journal-file-option, MUPIP SET takes the characteristics of the
-       existing journal file.
-     o MUPIP SET supports qualifiers (like -ACCESS_METHOD, and so on) to
-       change non-journaling characteristics of database file(s). If you
-       specify these qualifiers -JOURNAL , MUPIP SET modifies the
-       non-journaling characteristics first and then moves on to modify the
-       journaling characteristics. Command execution stops when it encounters
-       an error. If MUPIP SET encounters an error in processing the command
-       line or the non-journaling characteristics, it makes no changes to any
-       characteristics. However, if MUPIP SET encounters an error in
-       processing the journaling characteristics, the non-journaling
-       characteristics have already been successfully changed.
-     o -NOJOURNAL is equivalent to -JOURNAL=DISABLE.
-     o -NOJOURNAL does not accept an argument assignment. It does not create
-       new journal files. When a database has been SET -NOJOURNAL, it appears
-       to have no journaling file name or other characteristics.
 
    -REPLI[CATION]=replication-option
 
@@ -3796,11 +3875,11 @@
        the existing file extension where the string denotes the time of
        creation of the existing journal file in the following format:
 
-       YYYY           4-digit-year                                    such as 2011
-       JJ             3-digit-Julian-day (between 1 and 366)          such as 199
-       HH             2-digit-hour in 24 hr format                    such as 14
-       MM             2-digit minute                                  such as 40
-       SS             2-digit seconds                                 such as 30
+       YYYY      4-digit-year                              such as 2011
+       JJ       3-digit-Julian-day (between 1 and 366)     such as 199
+       HH       2-digit-hour in 24 hr format               such as 14
+       MM       2-digit minute                             such as 40
+       SS       2-digit seconds                            such as 30
 
        Assuming the above example for the string value, GT.M renames a
        journal file mumps.mjl to mumps.mjl_2010199144030 when it switches to
@@ -5198,7 +5277,7 @@
    Extract Formats
 
    Journal EXTRACT files always start with a label. For the current release
-   of GT.M, the label is GDSJEX06 for a simple journal extract file. This
+   of GT.M, the label is GDSJEX07 for a simple journal extract file. This
    label is necessary to identify the format of the file.
 
    If the environment variable gtm_chset is set of UTF-8, then file format
@@ -5221,10 +5300,10 @@
    token_seq as part of the output. It is the sixth field in the output of
    the journal record extract. When replication is in use, token_seq is a
    journal sequence number (jsnum) that uniquely identifies each transaction.
-   When replication is not in use and the transaction is a TP or ZTP
-   transaction, token_seq is an 8-byte token that uniquely identifies the
-   entire TP or ZTP transaction. For non-replicated, non-TP, and non-ZTP
-   journal records, token_seq has a zero (0) value.
+   When replication is not in use and the transaction is a TP transaction,
+   token_seq is an 8-byte token that uniquely identifies the entire TP
+   transaction. For non-replicated, non-TP journal records, token_seq has a
+   zero (0) value.
 
    The format of the plain journal extract is as follows:
 
@@ -5296,43 +5375,43 @@
 
    The format of the detail journal extract is as follows:
 
-   PINI(U) time\tnum\chksum\pid\nnam\unam\term\clntpid\clntnnam\clntunam\clntterm
-   PINI(V) time\tnum\chksum\pid\nnam\unam\term\mode\logintime\image_count\pname\clntpid\clntnnam\clntunam\clntterm\clntmode\clntlogintime\clntimage_count\clntpname
-   PFIN    time\tnum\chksum\pid\clntpid
-   EOF     time\tnum\chksum\pid\clntpid\jsnum
-   SET     time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
-   KILL    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   ZKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   ZTWORM  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
-   ZTRIG   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   TSTART  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq
-   TSET    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
-   TKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   TZKILL  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   TZTWORM time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
-   TZTRIG  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   TLGTRIG time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\trigdefinition
-   USET    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
-   UKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   UZKILL  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   UZTWORM time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
-   UZTRIG  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   ULGTRIG time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\trigdefinition
-   TCOM    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\partners\tid
-   INCTN   time\tnum\chksum\pid\clntpid\opcode\incdetail
-   EPOCH   time\tnum\chksum\pid\clntpid\jsnum\blks_to_upgrd\free_blocks\total_blks\fully_upgraded[\strm_num\strm_seq]...
-   PBLK    time\tnum\chksum\pid\clntpid\blknum\bsiz\blkhdrtn\ondskbver
-   AIMG    time\tnum\chksum\pid\clntpid\blknum\bsiz\blkhdrtn\ondskbver
-   NULL    time\tnum\chksum\pid\clntpid\jsnum\strm_num\strm_seq
-   ZTSTART time\tnum\chksum\pid\clntpid\token
-   FSET    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
-   FKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   FZKILL  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   GSET    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
-   GKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   GZKILL  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
-   ZTCOM   time\tnum\chksum\pid\clntpid\token\partners
-   ALIGN   time\tnum\chksum\pid\clntpid
+   PINI(U)  time\tnum\chksum\pid\nnam\unam\term\clntpid\clntnnam\clntunam\clntterm
+   PINI(V)  time\tnum\chksum\pid\nnam\unam\term\mode\logintime\image_count\pname\clntpid\clntnnam\clntunam\clntterm\clntmode\clntlogintime\clntimage_count\clntpname
+   PFIN     time\tnum\chksum\pid\clntpid
+   EOF      time\tnum\chksum\pid\clntpid\jsnum
+   SET      time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
+   KILL     time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   ZKILL    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   ZTWORM   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
+   ZTRIG    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   TSTART   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq
+   TSET     time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
+   TKILL    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   TZKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   TZTWORM  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
+   TZTRIG   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   TLGTRIG  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\trigdefinition
+   USET     time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
+   UKILL    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   UZKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   UZTWORM  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\ztwormhole
+   UZTRIG   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   ULGTRIG  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\trigdefinition
+   TCOM     time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\partners\tid
+   INCTN    time\tnum\chksum\pid\clntpid\opcode\incdetail
+   EPOCH    time\tnum\chksum\pid\clntpid\jsnum\blks_to_upgrd\free_blocks\total_blks\fully_upgraded[\strm_num\strm_seq]...
+   PBLK     time\tnum\chksum\pid\clntpid\blknum\bsiz\blkhdrtn\ondskbver
+   AIMG     time\tnum\chksum\pid\clntpid\blknum\bsiz\blkhdrtn\ondskbver
+   NULL     time\tnum\chksum\pid\clntpid\jsnum\strm_num\strm_seq
+   ZTSTART  time\tnum\chksum\pid\clntpid\token
+   FSET     time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
+   FKILL    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   FZKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   GSET     time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node=sarg
+   GKILL    time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   GZKILL   time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\nodeflags\node
+   ZTCOM    time\tnum\chksum\pid\clntpid\token\partners
+   ALIGN    time\tnum\chksum\pid\clntpid
 
    where:
 
@@ -5416,7 +5495,7 @@
    | trigdefinition | Trigger definition string corresponding to an LGTRIG  |
    |                | journal record.                                       |
    |----------------+-------------------------------------------------------|
-   |                | =n where this is the nth update in the TP or ZTP      |
+   |                | =n where this is the nth update in the TP             |
    | updnum         | transaction. n=1 for the 1st update etc. 0 for        |
    |                | non-TP.                                               |
    |----------------+-------------------------------------------------------|
@@ -5445,20 +5524,18 @@
    |                | Combinations of the above bits would mean each of the |
    |                | individual bit characteristics. For example, 00011 => |
    |                | update within a trigger context, and to a global with |
-   |                | at least one trigger defined. For example, 00011 =>   |
-   |                | update inside a trigger and to a global with at least |
-   |                | one trigger defined. Certain bit combinations are     |
-   |                | impossible. For example, 01001 since GT.M replicates  |
-   |                | any update that does not invoke triggers.             |
+   |                | at least one trigger defined. Certain bit             |
+   |                | combinations are impossible. For example, 01001 since |
+   |                | GT.M replicates any update that does not invoke       |
+   |                | triggers.                                             |
    |----------------+-------------------------------------------------------|
    | node           | Key that is being updated in a SET or KILL.           |
    |----------------+-------------------------------------------------------|
    | sarg           | Right-hand side argument to the SET (that is, the     |
    |                | value that the key is being SET to).                  |
    |----------------+-------------------------------------------------------|
-   |                | Number of journaled regions participating in this TP  |
-   | partners       | or ZTP transaction (TCOM/ZTCOM record written in this |
-   |                | TP or ZTP) .                                          |
+   | partners       | Number of journaled regions participating in this TP  |
+   |                | (TCOM/ZTCOM record written in this TP) .              |
    |----------------+-------------------------------------------------------|
    | opcode         | Inctn opcode. See gdsfhead.h inctn_opcode_t for all   |
    |                | possible values.                                      |
@@ -5748,21 +5825,21 @@
    Command syntax:
 
    mupip replicate -source -start
-    {-secondary=<hostname:port>|-passive}
-    [-buffsize=<Journal Pool size in bytes>]
-    [-filter=<filter command>]
-    [-freeze[=on|off] -[no]comment[='"<string>"']
-    [-connectparams=<hard tries>,<hard tries period>,
+   {-secondary=<hostname:port>|-passive}
+   [-buffsize=<Journal Pool size in bytes>]
+   [-filter=<filter command>]
+   [-freeze[=on|off] -[no]comment[='"<string>"']
+   [-connectparams=<hard tries>,<hard tries period>,
     <soft tries period>, <alert time>, <heartbeat period>,
     <max heartbeat wait>]
-    -instsecondary=<replicating instance name>
-    [-[no]jnlf[ileonly]]
-    -log=<log file name> [-log_interval=<integer>]
-    {-rootprimary|-propagateprimary} [{-updok|-updnotok}]
-    [-cmplvl=<compression level>]
-    [-tlsid=<label>]
-    [-[no]plaintextfallback]
-    [-renegotiate_interval=<minutes>]
+   -instsecondary=<replicating instance name>
+   [-[no]jnlf[ileonly]]
+   -log=<log file name> [-log_interval=<integer>]
+   {-rootprimary|-propagateprimary} [{-updok|-updnotok}]
+   [-cmplvl=<compression level>]
+   [-tlsid=<label>]
+   [-[no]plaintextfallback]
+   [-renegotiate_interval=<minutes>]
 
    Qualifiers:
 
@@ -5852,8 +5929,7 @@
      set TSTART="08"
      set TCOMMIT="09"
      set EOT="99"
-     set log=$ztrnlnm("filterlog")
-   ; use the environment variable filterlog" (if defined)
+     set log=$ztrnlnm("filterlog")        ; use the environment variable filterlog" (if defined)
      ;to specify which logfile to use
      if logersion="" set log="logcharout"  char
      if $zv["VMS" sechar EOL=$C(13)_$C(10)
@@ -6250,6 +6326,7 @@
    mupip replicate -source -activate
     -secondary=<hostname:port>
     -log=<log file name>
+    [-log_interval=<integer>]
     -connectparams=<hard tries>,<hard tries period>,
     <soft tries period>,<alert time>,<heartbeat period>,
     <max heartbeat wait>]
@@ -6290,6 +6367,14 @@
 
    If neither -rootprimary nor -propagateprimary are specified, this command
    assumes -propagateprimary.
+
+   -log_interval
+
+   Specifies the number of transactions for which the Source Server should
+   wait before writing to the log file. The default logging interval is 1000
+   transactions.
+
+   -log_interval=0 reverts the logging interval to the default value.
 
    Example:
 
@@ -6425,7 +6510,7 @@
    wait before writing to the log file. The default logging interval is 1000
    transactions.
 
-   -log_interval=0 reverts the logging interval to the prior value.
+   -log_interval=0 reverts the logging interval to the default value.
 
 2 Source_Logging
    Source Logging
@@ -6451,7 +6536,7 @@
    wait before writing to the log file. The default logging interval is 1000
    transactions.
 
-   -log_interval=0 reverts the logging interval to the prior value.
+   -log_interval=0 reverts the logging interval to the default value.
 
 2 Stop_Source_Server
    Stop Source Server
@@ -6902,8 +6987,8 @@
    gtmuser1 11951 11943 0 06:42 ? 00:00:00 /usr/library/GTM/mupip replicate -updhelper -writer
    gtmuser1 11952 11943 0 06:42 ? 00:00:00 /usr/library/GTM/mupip replicate -updhelper -writer
 
-2 Stop_Update_Process
-   Stop Update Process
+2 Stop_Update_Process_and/or_the_Receiver_Server
+   Stop Update Process and/or the Receiver Server
 
    Command syntax:
 
@@ -6925,8 +7010,9 @@
 
    -timeout
 
-   Specifies the period of time (in seconds) the Receiver Server should wait
-   before shutting down. If you do not specify -timeout, the default timeout
+   Specifies the period of time (in seconds) the shutdown command should wait
+   before signaling the Receiver Server, Update Process, and/or helper
+   processes to shut down.If you do not specify -timeout, the default timeout
    period is 30 seconds. If you specify -timeout=0, shutdown occurs
    immediately.
 
@@ -7151,10 +7237,10 @@
    |             |                |-FO[RMAT]=GO|B[INARY]|Z[WR]                    |
    |             |                |-FR[EEZE]                                      |
    |             |                |-LA[BEL]=text                                  |
-   |EXTR[ACT]    |-               |                                               |
-   |             |                |-[NO]L[OG]                                     |
+   |EXTR[ACT]    |-               |-[NO]L[OG]                                     |
    |             |                |-S[ELECT]=global-name-list                     |
    |             |                |-O[CHSET]=character-set                        |
+   |             |                |-R[EGION=region-list                           |
    |-------------+----------------+-----------------------------------------------|
    |             |                |-DBG                                           |
    |             |                |-OF[F]                                         |
@@ -7192,10 +7278,10 @@
    |             |                |-BE[GIN]=integer                               |
    |             |                |-BLOCK_DENSITY                                 |
    |             |                |-E[ND]=integer                                 |
-   |L[OAD]       |file-name       |                                               |
-   |             |                |-FI[LLFACTOR]=integer                          |
+   |L[OAD]       |file-name       |-FI[LLFACTOR]=integer                          |
    |             |                |-FO[RMAT]=GO|B[INARY]|Z[WR]                    |
    |             |                |-S[TDIN]                                       |
+   |             |                |-O[NERROR]                                     |
    |-------------+----------------+-----------------------------------------------|
    |             |                |-DOWNGRADE                                     |
    |             |                |-E[XCLUDE]=global-name-list                    |
@@ -7222,9 +7308,11 @@
    |RE[STORE]    |file-name or    |-[NO]E[XTEND]                                  |
    |             |file-list       |                                               |
    |-------------+----------------+-----------------------------------------------|
-   |             |file-name or    |-F[ILE]                                        |
+   |             |                |-F[ILE]                                        |
+   |             |file-name or    |-R[EGION]                                      |
    |RU[NDOWN]    |region-name     |                                               |
-   |             |                |-R[EGION]                                      |
+   |             |                |-RELINKCTL [dir]                               |
+   |             |                |-OVERRIDE                                      |
    |-------------+----------------+-----------------------------------------------|
    |             |                |-A[CCESS_METHOD=BG|MM]                         |
    |             |                |-B[YPASS]                                      |
@@ -7247,6 +7335,12 @@
    |             |                |-S[TANDALONENOT]                               |
    |             |                |-V[ERSION]=V4|V5                               |
    |             |                |-W[AIT_DISK]=integer                           |
+   |-------------+----------------+-----------------------------------------------|
+   |             |                |-TRIG[GERFILE]=<trigger_definitions_file>      |
+   |             |                |-NOPR[OMPT]                                    |
+   |TRIGGER      |-               |                                               |
+   |             |                |-SELE[CT][=name-list|*][<select-output-file>]  |
+   |             |                |-UPGRADE                                       |
    |-------------+----------------+-----------------------------------------------|
    |ST[OP]       |process-id      |process-id                                     |
    |-------------+----------------+-----------------------------------------------|
@@ -7336,12 +7430,12 @@
    |                                      |                          |-[NO]ER[ROR_LIMIT]=integer]               |
    |                                      |                          |-FENCES=fence-option-list                 |
    |                                      |                          |-FULL                                     |
-   |-EXTRACT                              |JOURNAL                   |                                          |
-   |                                      |                          |-GLOBAL=<global_list>                     |
+   |-EXTRACT                              |JOURNAL                   |-GLOBAL=<global_list>                     |
    |                                      |                          |-ID=<pid_list>                            |
    |                                      |                          |-INTERACTIVE                              |
    |                                      |                          |-LOOKBACK_LIMIT=<lookback_limit_options>  |
    |                                      |                          |-LOSTTRANS[=file]                         |
+   |                                      |                          |-REGION                                   |
    |                                      |                          |-SINCE=time                               |
    |                                      |                          |-VERBOSE                                  |
    |                                      |                          |-VERIFY                                   |
@@ -7410,7 +7504,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2014
+   Copyright 2015
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -7432,7 +7526,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.2-001 of the
+   This help file is a concise representation of revision V6.2-002 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

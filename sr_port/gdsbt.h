@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -426,7 +427,10 @@ typedef struct node_local_struct
 	boolean_t	fake_db_enospc;		/* used only by dbg versions to simulate ENOSPC scenarios in the database file */
 	boolean_t	fake_jnl_enospc;	/* used only by dbg versions to simulate ENOSPC scenarios in the journal  file */
 	boolean_t	doing_epoch;		/* set when performing an epoch */
-	NON_GTM64_ONLY(int4 filler_8byte_align1;) /* 8-byte align the stucture on 32-bit platforms; 64s do it implicitly */
+	uint4		epoch_taper_start_dbuffs; /* wcs_active_lvl at start of taper */
+	boolean_t	epoch_taper_need_fsync;
+	/* when needed (un)comment the line below to 8-byte align the structure on 32-bit platforms; 64s do it implicitly */
+	NON_GTM64_ONLY(int4 filler_8byte_align1;)
 #	endif
 } node_local;
 
@@ -615,6 +619,77 @@ typedef struct node_local_struct
 	/* Be safe in PRO and check if we need to initialize crit entries, even for GDSMV60002 and later. */			\
 	if (0 == NUM_CRIT_ENTRY(CSD))												\
 		NUM_CRIT_ENTRY(CSD) = DEFAULT_NUM_CRIT_ENTRY;									\
+}
+
+#define ETGENTLE  2
+#define ETSLOW    8
+#define ETQUICK   16
+#define ETFAST    64
+#define EPOCH_TAPER_TIME_PCT_DEFAULT 32
+#define EPOCH_TAPER_JNL_PCT_DEFAULT 13
+
+#define EPOCH_TAPER_IF_NEEDED(CSA, CSD, CNL, REG, DO_FSYNC, BUFFS_PER_FLUSH, FLUSH_TARGET)					\
+{																\
+	jnl_tm_t		now;												\
+	uint4			epoch_vector, jnl_autoswitchlimit, jnl_space_remaining, jnl_space_taper_interval;		\
+	uint4			next_epoch_time, relative_overall_taper, relative_space_taper, relative_time_taper;		\
+	uint4			time_taper_interval, tmp_epoch_taper_start_dbuffs;						\
+	int4			time_remaining;											\
+	jnl_buffer_ptr_t 	etjb; 												\
+	etjb = CSA->jnl->jnl_buff;												\
+	/* Determine if we are in the time-based epoch taper */									\
+	relative_time_taper = 0;												\
+	JNL_SHORT_TIME(now);													\
+	next_epoch_time = etjb->next_epoch_time;										\
+	if (next_epoch_time > now) /* if no db updates next_epoch_time can be in the past */					\
+	{															\
+		time_remaining = next_epoch_time - now;										\
+		/* taper during last epoch_taper_time_pct of interval */							\
+		time_taper_interval = etjb->epoch_interval * CSD->epoch_taper_time_pct / 128;					\
+		if (time_remaining < time_taper_interval)									\
+			relative_time_taper = MAX(MIN(129 - ((time_remaining * 128) / time_taper_interval), 128), 0);		\
+	}															\
+	/* Determine if we are in the journal autoswitch (space-based) epoch taper) */						\
+	relative_space_taper = 0;												\
+	jnl_autoswitchlimit = CSD->autoswitchlimit;										\
+	jnl_space_remaining = MAX(1,jnl_autoswitchlimit - (etjb->dskaddr / DISK_BLOCK_SIZE));					\
+	jnl_space_taper_interval = (jnl_autoswitchlimit * CSD->epoch_taper_jnl_pct) / 128;					\
+	if (jnl_space_remaining < jnl_space_taper_interval)									\
+		relative_space_taper = MAX(MIN(129 - ((jnl_space_remaining * 128) / jnl_space_taper_interval), 128), 0);	\
+	relative_overall_taper =  MAX(relative_time_taper, relative_space_taper);						\
+	if (relative_overall_taper)												\
+	{															\
+		/* This starting point only needs to be approximate so no locking is needed */					\
+		if (0 == CNL->epoch_taper_start_dbuffs)										\
+			CNL->epoch_taper_start_dbuffs = CNL->wcs_active_lvl;							\
+		tmp_epoch_taper_start_dbuffs = CNL->epoch_taper_start_dbuffs; /* get same value for all calculations */		\
+		if ((relative_overall_taper > 64) && (relative_overall_taper < 96)) 						\
+			CNL->epoch_taper_need_fsync = TRUE;									\
+		if (DO_FSYNC && (relative_overall_taper > 75) && CNL->epoch_taper_need_fsync)					\
+		{														\
+			CNL->epoch_taper_need_fsync = FALSE;									\
+			fsync(FILE_INFO(REG)->fd);										\
+		}														\
+		FLUSH_TARGET = MIN(tmp_epoch_taper_start_dbuffs, MAX(1,(tmp_epoch_taper_start_dbuffs *				\
+				(129 - relative_overall_taper)) / 128));							\
+		if (CNL->wcs_active_lvl > flush_target)										\
+		{														\
+			if (relative_overall_taper > 96)									\
+				epoch_vector =											\
+					(((CNL->wcs_active_lvl - flush_target) * 128 / flush_target) > 64) ? ETFAST : ETQUICK;	\
+			else if (relative_overall_taper > 64)									\
+				epoch_vector =											\
+					(((CNL->wcs_active_lvl - flush_target) * 128 / flush_target) > 64) ? ETQUICK : ETSLOW;	\
+			else													\
+				epoch_vector = (relative_overall_taper > 32) ? ETSLOW : ETGENTLE;				\
+			BUFFS_PER_FLUSH = CSD->n_wrt_per_flu * epoch_vector;							\
+		}														\
+	}															\
+	else															\
+	{															\
+		CNL->epoch_taper_start_dbuffs = 0;										\
+		CNL->epoch_taper_need_fsync = FALSE;										\
+	}															\
 }
 
 /* Define pointer types for above structures that may be in shared memory and need 64

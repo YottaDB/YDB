@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -160,7 +161,9 @@ void op_hang(mval* num)
 			end_time = mv_zintcmd->mv_st_cont.mvs_zintcmd.end_or_remain;
 			cur_time = sub_abs_time(&end_time, &cur_time);	/* get remaing time to sleep */
 			if (0 <= cur_time.at_sec)
-				ms = (int4)(cur_time.at_sec * 1000 + cur_time.at_usec / 1000);
+				ms = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+					    /* Round up in order to prevent premautre timeouts */
+					    DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
 			else
 				ms = 0;		/* all done */
 			/* restore/pop previous zintcmd_active[ZINTCMD_HANG] hints */

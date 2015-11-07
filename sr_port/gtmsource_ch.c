@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +44,9 @@
 #include "ftok_sems.h"
 #endif
 
-GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	boolean_t		is_src_server;
+GBLREF	gtmsource_options_t	gtmsource_options;
 
 error_def(ERR_ASSERT);
 error_def(ERR_CTRLC);
@@ -52,6 +55,7 @@ error_def(ERR_GTMASSERT);
 error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
 error_def(ERR_OUTOFSPACE);
+error_def(ERR_REPLSRCEXITERR);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_MEMORY);
 error_def(ERR_VMSMEMORY);
@@ -84,6 +88,9 @@ CONDITION_HANDLER(gtmsource_ch)
 			if (csa && csa->now_crit)
 				rel_lock(jnlpool.jnlpool_dummy_reg);
 		}
+		if (is_src_server)
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLSRCEXITERR, 2, gtmsource_options.secondary_instname,
+					gtmsource_options.log_file);
        		NEXTCH;
 	}
 	VMS_ONLY (

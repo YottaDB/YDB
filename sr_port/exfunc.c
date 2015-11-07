@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +11,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
@@ -56,9 +58,9 @@ int exfunc(oprtype *a, boolean_t alias_target)
 		calltrip_opr1_tref = calltrip->operand[1].oprval.tref;
 		if (OC_EXTEXFUN == calltrip->opcode)
 		{
-			if (OC_CDLIT == calltrip_opr1_tref->opcode)
-				assert(CDLT_REF == calltrip_opr1_tref->operand[0].oprclass);
-			else ARLINK_ONLY(if (OC_LAB_EXT != calltrip_opr1_tref->opcode))
+			if (OC_CDREF == calltrip_opr1_tref->opcode)
+				assert(CDREF_REF == calltrip_opr1_tref->operand[0].oprclass);
+			else
 			{
 				assert(OC_LABADDR == calltrip_opr1_tref->opcode);
 				assert(TRIP_REF == calltrip_opr1_tref->operand[1].oprclass);

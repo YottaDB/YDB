@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +31,7 @@
 #include "gtm_utf8.h"
 #endif
 #include "min_max.h"
+#include "error.h"
 
 GBLREF io_pair 		io_curr_device;
 
@@ -49,9 +51,11 @@ int	iott_write_raw(int fildes, void *str832, unsigned int len)
 	io_desc		*io_ptr = io_curr_device.in;
 	d_tt_struct	*tt_ptr;
 	boolean_t	utf8_active;
+	boolean_t	ch_set;
 
 	if (0 == len)
 		return 0;
+	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	if (!utf8_active)
@@ -59,7 +63,10 @@ int	iott_write_raw(int fildes, void *str832, unsigned int len)
 		str = (unsigned char *)str832;
 		DOWRITERL_A(fildes, str, len, written);
 		if (0 > written)
+		{
+			REVERT_GTMIO_CH(&io_curr_device, ch_set);
 			return -1;
+		}
 #ifdef UNICODE_SUPPORTED
 	} else
 	{
@@ -77,12 +84,16 @@ int	iott_write_raw(int fildes, void *str832, unsigned int len)
 			{	/* something to write */
 				DOWRITERL_A(fildes, string, outlen, this_write);
 				if (0 > this_write)
+				{
+					REVERT_GTMIO_CH(&io_curr_device, ch_set);
 					return -1;
+				}
 				written += this_write;
 			}
 		}
 #endif
 	}
+	REVERT_GTMIO_CH(&io_curr_device, ch_set);
 	return written;
 }
 
@@ -110,8 +121,10 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 	io_desc		*io_ptr = io_curr_device.in;
 	d_tt_struct	*tt_ptr;
 	boolean_t	utf8_active, writenewline;
+	boolean_t	ch_set;
 
 	assert(width);
+	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	if (utf8_active && !multibyte)
@@ -176,7 +189,10 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 			{	/* something to write */
 				DOWRITERL_A(fildes, strstart, outlen, written);
 				if (0 > written)
+				{
+					REVERT_GTMIO_CH(&io_curr_device, ch_set);
 					return -1;
+				}
 			}
 			if (!writenewline)
 			{
@@ -198,7 +214,10 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 			{
 				DOWRITERC(fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL), ret);
 				if (0 != ret)
+				{
+					REVERT_GTMIO_CH(&io_curr_device, ch_set);
 					return -1;
+				}
 			}
 			number_of_lines_up++;
 			cur_x = line_width = 0;
@@ -216,7 +235,10 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 					cur_width = len;
 				DOWRITERL_A(fildes, str, cur_width, written);
 				if (0 > written)
+				{
+					REVERT_GTMIO_CH(&io_curr_device, ch_set);
 					return -1;
+				}
 				str += written;
 				len -= written;
 				cur_x += cur_width;
@@ -233,7 +255,10 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 			{
 		    		DOWRITERC(fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL), ret);
 				if (0 != ret)
+				{
+					REVERT_GTMIO_CH(&io_curr_device, ch_set);
 					return -1;
+				}
 			}
 			number_of_lines_up++;
 			cur_x = 0;
@@ -247,14 +272,21 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 	{
 		ret = (NULL != CURSOR_UP) ? write_loop(fildes, (unsigned char *)CURSOR_UP, number_of_lines_up) : 0;
 		if (0 > ret)
+		{
+			REVERT_GTMIO_CH(&io_curr_device, ch_set);
 			return -1;
+		}
 		if (number_of_chars_left > 0)
 			ret = (NULL != CURSOR_LEFT) ? write_loop(fildes, (unsigned char *)CURSOR_LEFT, number_of_chars_left) : 0;
 		else
 			ret = (NULL != CURSOR_RIGHT) ? write_loop(fildes, (unsigned char *)CURSOR_RIGHT, -number_of_chars_left) : 0;
 		if (0 > ret)
+		{
+			REVERT_GTMIO_CH(&io_curr_device, ch_set);
 			return -1;
+		}
 	}
+	REVERT_GTMIO_CH(&io_curr_device, ch_set);
 	return 0;
 }
 
@@ -289,9 +321,11 @@ int 	move_cursor_left(int col, int num_cols)
 	 *  returns 0 if success, != 0 if error
 	 * -------------------------------------------------------
 	 */
-	int	fildes = ((d_tt_struct *)((io_curr_device.in)->dev_sp))->fildes;
-	int	ret;
+	int		fildes = ((d_tt_struct *)((io_curr_device.in)->dev_sp))->fildes;
+	int		ret;
+	boolean_t	ch_set;
 
+	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	if (0 == num_cols)
 		ret = 0;
 	else if (0 > num_cols)
@@ -306,7 +340,10 @@ int 	move_cursor_left(int col, int num_cols)
 			{
 				DOWRITERC(fildes, CURSOR_UP, strlen(CURSOR_UP), ret);
 				if (0 > ret)
+				{
+					REVERT_GTMIO_CH(&io_curr_device, ch_set);
 					return -1;
+				}
 			}
 			ret = (NULL != CURSOR_RIGHT)
 				? write_loop(fildes, (unsigned char *)CURSOR_RIGHT, io_curr_device.in->width - num_cols) : 0;
@@ -317,11 +354,15 @@ int 	move_cursor_left(int col, int num_cols)
 		{
 			DOWRITERC(fildes, CURSOR_UP, strlen(CURSOR_UP), ret);
 			if (0 > ret)
+			{
+				REVERT_GTMIO_CH(&io_curr_device, ch_set);
 				return -1;
+			}
 		}
 		ret = (NULL != CURSOR_RIGHT)
 			? write_loop(fildes, (unsigned char *)CURSOR_RIGHT, io_curr_device.in->width - num_cols) : 0;
 	}
+	REVERT_GTMIO_CH(&io_curr_device, ch_set);
 	return ret;
 }
 
@@ -333,10 +374,12 @@ int 	move_cursor_right(int col, int num_cols)
 	 *	returns 0 if success, != 0 if error
 	 * -------------------------------------------------------
 	 */
-	int	fildes = ((d_tt_struct *)((io_curr_device.in)->dev_sp))->fildes;
-	int	ret;
-	io_desc *io_ptr = io_curr_device.in;
+	int		fildes = ((d_tt_struct *)((io_curr_device.in)->dev_sp))->fildes;
+	int		ret;
+	io_desc		*io_ptr = io_curr_device.in;
+	boolean_t	ch_set;
 
+	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	if (0 == num_cols)
 		ret = 0;
 	else if (0 > num_cols)
@@ -347,11 +390,15 @@ int 	move_cursor_right(int col, int num_cols)
 	{
 		DOWRITERC(fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL), ret);
 		if (0 > ret)
+		{
+			REVERT_GTMIO_CH(&io_curr_device, ch_set);
 			return -1;
+		}
 		num_cols -= (io_curr_device.in->width - col);
 		if (num_cols)
 			ret = (NULL != CURSOR_RIGHT) ? write_loop(fildes, (unsigned char *)CURSOR_RIGHT, num_cols) : 0;
 	}
+	REVERT_GTMIO_CH(&io_curr_device, ch_set);
 	return ret;
 }
 
@@ -425,7 +472,9 @@ int 	compute_dx(void *str832, unsigned int index, unsigned int width, unsigned i
 	io_desc		*io_ptr = io_curr_device.in;
 	wint_t		*str32;
 	int		dx_ret, this_width, i;
+	boolean_t	ch_set;
 
+	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	str32 = (wint_t *)str832;
 	if (utf8_active)
@@ -439,8 +488,12 @@ int 	compute_dx(void *str832, unsigned int index, unsigned int width, unsigned i
 				dx_ret = ROUND_UP(dx_ret, width);	/* add $X padding for wide character in last column */
 			dx_ret += this_width;
 		}
+		REVERT_GTMIO_CH(&io_curr_device, ch_set);
 		return dx_ret - dx_start;	/* before returning make sure "dx_ret" is of same dimension as "dx_instr"
 						 * variable in "dm_read" or "iott_readfl" (the callers) */
 	} else
+	{
+		REVERT_GTMIO_CH(&io_curr_device, ch_set);
 		return index;	/* every character is 1-display-column wide so no need to look at "str832" */
+	}
 }

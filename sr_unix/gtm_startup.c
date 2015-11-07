@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -156,6 +157,7 @@ void gtm_startup(struct startup_vector *svec)
 	int		i;
 	static char 	other_mode_buf[] = "OTHER";
 	mstr		log_name;
+	stack_frame 	*frame_pointer_lcl;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -222,22 +224,19 @@ void gtm_startup(struct startup_vector *svec)
 	cmd_qlf.qlf = glb_cmd_qlf.qlf;
 	cache_init();
 	msp -= SIZEOF(stack_frame);
-	frame_pointer = (stack_frame *)msp;
-	memset(frame_pointer,0, SIZEOF(stack_frame));
-	frame_pointer->temps_ptr = (unsigned char *)frame_pointer;
-	frame_pointer->ctxt = GTM_CONTEXT(gtm_ret_code);
-	frame_pointer->mpc = CODE_ADDRESS(gtm_ret_code);
-	frame_pointer->type = SFT_COUNT;
-	frame_pointer->rvector = (rhdtyp*)malloc(SIZEOF(rhdtyp));
-	memset(frame_pointer->rvector, 0, SIZEOF(rhdtyp));
+	frame_pointer_lcl = (stack_frame *)msp;
+	memset(frame_pointer_lcl, 0, SIZEOF(stack_frame));
+	frame_pointer_lcl->temps_ptr = (unsigned char *)frame_pointer_lcl;
+	frame_pointer_lcl->ctxt = GTM_CONTEXT(gtm_ret_code);
+	frame_pointer_lcl->mpc = CODE_ADDRESS(gtm_ret_code);
+	frame_pointer_lcl->type = SFT_COUNT;
+	frame_pointer_lcl->rvector = (rhdtyp *)malloc(SIZEOF(rhdtyp));
+	memset(frame_pointer_lcl->rvector, 0, SIZEOF(rhdtyp));
+	frame_pointer = frame_pointer_lcl;
 	symbinit();
 	/* Variables for supporting $ZSEARCH sorting and wildcard expansion */
 	TREF(zsearch_var) = lv_getslot(curr_symval);
-	TREF(zsearch_dir1) = lv_getslot(curr_symval);
-	TREF(zsearch_dir2) = lv_getslot(curr_symval);
 	LVVAL_INIT((TREF(zsearch_var)), curr_symval);
-	LVVAL_INIT((TREF(zsearch_dir1)), curr_symval);
-	LVVAL_INIT((TREF(zsearch_dir2)), curr_symval);
 	/* Initialize global pointer to control-C handler. Also used in iott_use */
 	ctrlc_handler_ptr = &ctrlc_handler;
 	if (!IS_MUPIP_IMAGE)

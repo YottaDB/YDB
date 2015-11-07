@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -115,6 +116,7 @@
 #define GTM_LINKTMPDIR			"$gtm_linktmpdir"
 #define	GTM_AUTORELINK_SHM 		"$gtm_autorelink_shm"
 #define	GTM_AUTORELINK_KEEPRTN		"$gtm_autorelink_keeprtn"	/* do not let go of objects in rtnobj shm */
+#define	GTM_AUTORELINK_CTLMAX		"$gtm_autorelink_ctlmax"
 
 /* Miscellaneous */
 #define GTM_ERROR_ON_JNL_FILE_LOST	"$gtm_error_on_jnl_file_lost"

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +11,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
@@ -181,6 +185,7 @@ int m_tstart(void)
 	}
 	if (!has_tid)
 	{
+		memset(&dummyid, 0, SIZEOF(mval));	/* Initialize so unused fields don't cause object hash differences */
 		dummyid.mvtype = MV_STR;
 		dummyid.str.len = 0;
 		tid->operand[0] = put_lit(&dummyid);

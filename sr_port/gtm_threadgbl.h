@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +41,10 @@
  * RFPTR		    - Used to reference a function pointer in an expression or conditional.
  * SFPTR		    - Used to set a new value into a function pointer.
  * IVFPTR		    - Used to invoke a function pointer.
+ */
+
+/* Note - access can also be made from assembler code though the mechanism differs. See $gtm_tools/gtmthreadgblasm.m.txt for
+ * details.
  */
 
 /* Declare local thread global anchor */

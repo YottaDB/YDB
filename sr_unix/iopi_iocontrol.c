@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,12 +61,11 @@ void	iopi_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		if (d_rm->read_only)
 			return;
 		if (FD_INVALID != d_rm->fildes)
-		{
-			/* The output will be flushed via iorm_flush() like in iorm_close.c.  After this call returns,
-			 * $X will be zero which will keep iorm_readfl() from attempting an iorm_wteol() in the fix mode
-			 * after the file descriptor has been closed.
+		{	/* A new line will be inserted by iorm_cond_wteol() if $X is non-zero, just like it is done in iorm_close.c.
+			 * After this call returns, * $X will be zero, which will keep iorm_readfl() from attempting an iorm_wteol()
+			 * in the fixed mode after the file descriptor has been closed.
 			 */
-			iorm_flush(io_curr_device.out);
+			iorm_cond_wteol(io_curr_device.out);
 			IORM_FCLOSE(d_rm, fildes, filstr);
 			assert(FD_INVALID == d_rm->fildes);
 			assert(NULL == d_rm->filstr);
@@ -112,7 +112,7 @@ void	iopi_dlr_zkey(mstr *d)
 	int		len;
 	d_rm_struct	*d_rm;
 	char		tname[MAX_FIXED_STRING];
-	uint4		record_num;	/* record offset in fixed record file */
+	gtm_int64_t	record_num;	/* record offset in fixed record file */
 	uint4		record_byte;	/* byte offset in fixed record block */
 	boolean_t	utf_active;
 	off_t		cur_position;
@@ -128,7 +128,7 @@ void	iopi_dlr_zkey(mstr *d)
 		if (RM_WRITE == d_rm->lastop)
 		{
 			/* need to do an lseek to get current location in file */
-			cur_position = lseek(d_rm->fildes, (off_t)0, SEEK_CUR);
+			cur_position = lseek(d_rm->fildes, 0, SEEK_CUR);
 			if ((off_t)-1 == cur_position)
 			{
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
@@ -160,11 +160,11 @@ void	iopi_dlr_zkey(mstr *d)
 					record_num--;
 				}
 			}
-			SNPRINTF(tname, MAX_FIXED_STRING, "%ld,%ld", record_num, record_byte);
+			SNPRINTF(tname, MAX_FIXED_STRING, "%lld,%ld", record_num, record_byte);
 		} else
 		{
 			record_num = d_rm->file_pos;
-			SNPRINTF(tname, MAX_VAR_STRING, "%ld", record_num);
+			SNPRINTF(tname, MAX_VAR_STRING, "%lld", record_num);
 		}
 		len = STRLEN(tname);
 		/* verify internal buffer has enough space for $ZKEY string value */

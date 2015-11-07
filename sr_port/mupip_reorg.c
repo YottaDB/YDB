@@ -1,6 +1,7 @@
 /***************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -244,7 +245,6 @@ void mupip_reorg(void)
 	}
 	TREF(want_empty_gvts) = FALSE;
 
-	root_swap_statistic = 0;
 	mu_reorg_process = TRUE;
 	assert(NULL == gv_currkey_next_reorg);
 	GVKEYSIZE_INIT_IF_NEEDED;	/* sets "gv_keysize", "gv_currkey" and "gv_altkey" (if not already done) */
@@ -273,7 +273,6 @@ void mupip_reorg(void)
 #		ifdef GTM_TRUNCATE
 		if (truncate)
 		{	/* No need to move root blocks unless truncating */
-			cur_success &= mu_swap_root(gl_ptr, &root_swap_statistic);
 			assert(gv_cur_region == gl_ptr->reg);	/* should have been set inside "mu_reorg" call done above */
 			if (cur_success)
 			{	/* add region corresponding to this global to the set (list) of regions to truncate */
@@ -311,13 +310,6 @@ void mupip_reorg(void)
 							cur_success = mu_reorg(&hasht_gl, &exclude_gl_head, &resume,
 										index_fill_factor, data_fill_factor, reorg_op);
 							reorg_success &= cur_success;
-							SET_GV_CURRKEY_FROM_GVT(reorg_gv_target);
-							/* Recompute gv_target->root in case mu_reorg changed things around */
-							gv_target->root = 0;
-							inctn_opcode = inctn_invalid_op;	/* needed for GVCST_ROOT_SEARCH */
-							GVCST_ROOT_SEARCH;	/* set gv_target->root */
-							if (gv_target->root)
-								reorg_success &= mu_swap_root(&hasht_gl, &root_swap_statistic);
 						}
 					}
 #					endif
@@ -339,6 +331,28 @@ void mupip_reorg(void)
 	else if (truncate)
 	{
 #		ifdef GTM_TRUNCATE
+		/* Move GVT ROOT blocks of all global names AFTER doing regular reorg on ALL global names.
+		 * This way we ensure one pass of reorg -truncate is enough to produce an optimally truncated file.
+		 */
+		root_swap_statistic = 0;
+		for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
+			mu_swap_root(gl_ptr, &root_swap_statistic);
+		hasht_gl.next = NULL;
+		for (reg_iter = reg_list; reg_iter; reg_iter = reg_iter->next)
+		{
+			gv_cur_region = reg_iter->reg;
+			tp_change_reg();
+			SET_GVTARGET_TO_HASHT_GBL(cs_addrs);	/* sets gv_target */
+			SET_GV_CURRKEY_FROM_GVT(gv_target);
+			gv_target->root = 0; /* Recompute gv_target->root in case mu_reorg changed things around */
+			inctn_opcode = inctn_invalid_op;	/* needed for GVCST_ROOT_SEARCH */
+			GVCST_ROOT_SEARCH;			/* set gv_target->root */
+			if (0 == gv_target->root)
+				continue;
+			hasht_gl.reg = gv_cur_region;
+			hasht_gl.gvt = gv_target;
+			mu_swap_root(&hasht_gl, &root_swap_statistic);
+		}
 		util_out_print("Total root blocks moved: !UL", FLUSH, root_swap_statistic);
 		mu_reorg_process = FALSE;
 		/* Default threshold is 0 i.e. we attempt to truncate no matter what free_blocks is. */

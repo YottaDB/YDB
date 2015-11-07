@@ -1,6 +1,7 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007, 2012 Fidelity Information Services, Inc *
+ * Copyright (c) 2007-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -159,16 +160,24 @@ int	x86_64_arg_reg(int indx)
 {
 	switch(indx)
 	{
-		case 0: return I386_REG_RDI ;
-		case 1: return I386_REG_RSI ;
-		case 2: return I386_REG_RDX ;
-		case 3: return I386_REG_RCX ;
-		case 4: return I386_REG_R8 ;
-		case 5: return I386_REG_R9 ;
-		default: GTMASSERT ; break ;
+		case 0:
+			return I386_REG_RDI;
+		case 1:
+			return I386_REG_RSI;
+		case 2:
+			return I386_REG_RDX;
+		case 3:
+			return I386_REG_RCX;
+		case 4:
+			return I386_REG_R8;
+		case 5:
+			return I386_REG_R9;
+		default:
+			assertpro(FALSE);
+			break ;
 	}
 	/* Control will never reach here */
-	return - 1 ;
+	return -1 ;
 }
 
 void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' parameter is ignored */
@@ -229,7 +238,7 @@ void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' pa
 						code_buf[code_idx++] = I386_INS_JMP_Jb;
 						break;
 					default:
-						GTMASSERT;
+						assertpro(FALSE);
 						break;
 				}
 				code_buf[code_idx++] = jmp_offset & 0xff;
@@ -265,7 +274,7 @@ void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' pa
 							code_buf[code_idx++] = I386_INS_JNZ_Jv;
 							break;
 						default:
-							GTMASSERT;
+							assertpro(FALSE);
 							break;
 					}
 				}
@@ -351,7 +360,7 @@ void print_source_operand()
 	switch(instruction.source_operand_class)
 	{
 		case undefined_class :
-			GTMASSERT;
+			assertpro(FALSE);
 			break;
 		case register_class :
 			assert(instruction.source_operand_reg != NULL);
@@ -380,7 +389,7 @@ void print_source_operand()
 			SET_OBPT_INT8(instruction.immediate);
 			break;
 		default :
-			GTMASSERT;
+			assertpro(FALSE);
 	}
 }
 
@@ -389,7 +398,7 @@ void print_destination_operand()
 	switch(instruction.destination_operand_class)
 	{
 		case undefined_class :
-			GTMASSERT;
+			assertpro(FALSE);
 			break;
 		case register_class :
 			assert(instruction.destination_operand_reg != NULL);
@@ -418,7 +427,7 @@ void print_destination_operand()
 			SET_OBPT_INT8(instruction.immediate);
 			break;
 		default :
-			GTMASSERT;
+			assertpro(FALSE);
 	}
 }
 
@@ -430,7 +439,7 @@ void print_instruction()
 	obpt = &outbuf[0];
 	memset(obpt, SP, ASM_OUT_BUFF);
 	obpt += 10;
-	i2hex((curr_addr - SIZEOF(rhdtyp)), obpt, 8);
+	i2hex((curr_addr - PTEXT_OFFSET), obpt, 8);
 	curr_addr += (instidx - prev_idx);
 	obpt += 10;
 	for( ;  prev_idx < instidx; prev_idx++)
@@ -468,7 +477,7 @@ void print_instruction()
 			print_destination_operand();
 			break;
 		default :
-		GTMASSERT;
+		assertpro(FALSE);
 	}
 	/*  Now reset the instruction structure  */
 	emit_eoi();
@@ -491,7 +500,7 @@ void set_memory_reg()
 		else if (instruction.destination_operand_class == memory_class)
 			instruction.destination_operand_reg =(char *) register_list[REG_RIP];
 		else
-			GTMASSERT;
+			assertpro(FALSE);
 }
 
 void set_register_reg()
@@ -608,7 +617,7 @@ void format_machine_inst()
 					case I386_INS_Grp2_Eb_CL_Prefix :
 					case I386_INS_Grp2_Ev_CL_Prefix :
 						next_inst_byte_meaning = modrm_sib_bytes;
-						GTMASSERT;  /* Not taking care of this case for now - not used!! */
+						assertpro(FALSE);  /* Not taking care of this case for now - not used!! */
 						break;
 					case I386_INS_Grp3_Eb_Prefix :
 						modrm_byte.byte = code_buf[instidx + 1];
@@ -795,7 +804,7 @@ void format_machine_inst()
 						break;
 
 					default :
-						GTMASSERT;
+						assertpro(FALSE);
 				}
 				break;
 			case two_byte_opcode :
@@ -826,7 +835,7 @@ void format_machine_inst()
 						next_inst_byte_meaning = double_word_offset;
 						break;
 					default :
-						GTMASSERT;
+						assertpro(FALSE);
 				}
 				break;
 			case modrm_sib_bytes :
@@ -912,7 +921,7 @@ void format_machine_inst()
 							next_inst_byte_meaning = double_word_offset;
 							break;
 						default :
-							GTMASSERT;
+							assertpro(FALSE);
 					}
 				} else 		/* No SIB */
 				{
@@ -957,7 +966,7 @@ void format_machine_inst()
 							}
 							break;
 						default :
-							GTMASSERT;
+							assertpro(FALSE);
 					}
 				}
 				break;
@@ -1011,7 +1020,7 @@ void format_machine_inst()
 				}
 				break;
 			default :
-				GTMASSERT;
+				assertpro(FALSE);
 
 		 }
 	}

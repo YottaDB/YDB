@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +30,7 @@
 #define DEFAULT_ID	43
 #define ID_PREFIX	"-id="
 
-GBLDEF   CLI_ENTRY       *cmd_ary = NULL; /* The GTCM server does not have any command tables so initialize command array to NULL */
+GBLDEF   CLI_ENTRY       *cmd_ary = NULL; /* "ftok" utility does not have any command tables so initialize command array to NULL */
 
 #define PrintUsage \
 	{ \

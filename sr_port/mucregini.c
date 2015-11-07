@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,6 +89,9 @@ void mucregini(int4 blk_init_size)
 #ifdef UNIX
 	cs_data->freeze_on_fail = gv_cur_region->freeze_on_fail;
 	cs_data->mumps_can_bypass = gv_cur_region->mumps_can_bypass;
+	cs_data->epoch_taper = gv_cur_region->epoch_taper;
+	cs_data->epoch_taper_time_pct = EPOCH_TAPER_TIME_PCT_DEFAULT;
+	cs_data->epoch_taper_jnl_pct = EPOCH_TAPER_JNL_PCT_DEFAULT;
 #endif
 	cs_data->reserved_bytes = gv_cur_region->dyn.addr->reserved_bytes;
 	cs_data->clustered = FALSE;
@@ -246,6 +250,12 @@ void mucregini(int4 blk_init_size)
 	cs_data->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
 	NUM_CRIT_ENTRY(cs_data) = gv_cur_region->dyn.addr->mutex_slots;
 	cs_data->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
+#	if defined(__sun) || defined(__hpux)
+	/* There is no falloc on those platforms so we silently ignore the gld setting */
+	cs_data->defer_allocate = gv_cur_region->dyn.addr->defer_allocate = TRUE;
+#	else
+	cs_data->defer_allocate = gv_cur_region->dyn.addr->defer_allocate;
+#	endif
 	time(&ctime);
 	assert(SIZEOF(ctime) >= SIZEOF(int4));
 	cs_data->creation_time4 = (int4)ctime;	/* Need only lower order 4-bytes of current time (in case system time is 8-bytes) */

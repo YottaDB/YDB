@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +28,7 @@
 #include "gtm_unistd.h"
 #include "gtm_limits.h"
 #include "gtm_un.h"
+#include "gtm_pwd.h"
 
 #include <signal.h>
 #include <sys/time.h>
@@ -509,6 +511,9 @@ GBLDEF	boolean_t	utf8_patnumeric;	/* Should patcode N match non-ASCII numbers in
 GBLDEF	boolean_t	badchar_inhibit;	/* Suppress malformed UTF-8 characters by default */
 GBLDEF  MSTR_DEF(dollar_zchset, 1, "M");
 GBLDEF  MSTR_DEF(dollar_zpatnumeric, 1, "M");
+GBLDEF  MSTR_DEF(dollar_zpin, 3, "< /");
+GBLDEF  MSTR_DEF(dollar_zpout, 3, "> /");
+GBLDEF  MSTR_DEF(dollar_prin_log, 1, "0");
 /* Standard MUMPS pattern-match table.
  * This table holds the current pattern-matching attributes of each ASCII character.
  * Bits 0..23 of each entry correspond with the pattern-match characters, A..X.
@@ -851,6 +856,10 @@ GBLDEF	boolean_t		dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 GBLDEF	int			socketus_interruptus;	/* How many times socket reads have been interrutped */
 GBLDEF	int4			pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
 GBLDEF	uint4	process_id;
+GBLDEF	uid_t	user_id = INVALID_UID, effective_user_id = INVALID_UID;
+GBLDEF	gid_t	group_id = INVALID_GID, effective_group_id = INVALID_GID;
+GBLDEF	struct	passwd getpwuid_struct = {NULL, NULL, INVALID_UID, INVALID_GID, NULL, NULL, NULL};
+						/* cached copy of "getpwuid" to try avoid future system calls for the same "uid" */
 GBLDEF	uint4	image_count;	/* not used in UNIX but defined to preserve VMS compatibility */
 GBLDEF  size_t  totalRmalloc;                           /* Total storage currently (real) malloc'd (includes extent blocks) */
 GBLDEF  size_t  totalAlloc;                             /* Total allocated (includes allocation overhead but not free space */
@@ -1113,3 +1122,4 @@ GBLDEF	gtm_tls_ctx_t	*tls_ctx;			/* Process private pointer to SSL/TLS context. 
 							 */
 #endif
 GBLDEF lv_val		*active_lv;
+GBLDEF boolean_t	in_prin_gtmio = FALSE;		/* Flag to indicate whether we are processing a GT.M I/O function. */

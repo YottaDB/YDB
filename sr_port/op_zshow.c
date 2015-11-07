@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -202,6 +203,6 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 	/* If ZSHOW was done onto a subscripted lvn but no zshow records got dumped in that lvn, it might have $data = 0.
 	 * Kill it in that case as otherwise it will create an out-of-design situation for $query(lvn).
 	 */
-	if ((type == ZSHOW_LOCAL) && (active_lv == lvn))
+	if ((type == ZSHOW_LOCAL) && (NULL != active_lv) && lcl_arg1_is_desc_of_arg2(active_lv, lvn))
 		UNDO_ACTIVE_LV(actlv_op_zshow);
 }

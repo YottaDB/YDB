@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,11 +89,7 @@ int	gtm_compile (void)
 	symbinit();
 	/* Variables for supporting $ZSEARCH sorting and wildcard expansion */
 	TREF(zsearch_var) = lv_getslot(curr_symval);
-	TREF(zsearch_dir1) = lv_getslot(curr_symval);
-	TREF(zsearch_dir2) = lv_getslot(curr_symval);
 	LVVAL_INIT((TREF(zsearch_var)), curr_symval);
-	LVVAL_INIT((TREF(zsearch_dir1)), curr_symval);
-	LVVAL_INIT((TREF(zsearch_dir2)), curr_symval);
 	/* command qualifier processing stuff */
 	zco_init();
 	assert(cli_lex_in_ptr);

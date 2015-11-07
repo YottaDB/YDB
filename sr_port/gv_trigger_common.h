@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,18 +40,27 @@
 							&& (HASHT_GBL_CHAR1 == ADDR[1])			\
 							&& (HASHT_GBL_CHAR2 == ADDR[2]))
 
-#define	HASHT_GBL_CURLABEL	"3"	/* Currently supported ^#t global format */
+/* Currently supported ^#t global format */
+#define	HASHT_GBL_CURLABEL	"4"	/* V6.2-002 onwards, keep up to date for test/com_u/trigupgrd_test.csh */
+#define	HASHT_GBL_CURLABEL_INT	 4
+#define HASHT_GBL_CURLABEL_LEN	STR_LIT_LEN(HASHT_GBL_CURLABEL)
 
 /* HASHT_GBL_CURLABEL values of prior trigger versions */
-#define V19_HASHT_GBL_LABEL	"1"	/* V5.4-000 to V5.4-001 */
+#define V25_HASHT_GBL_LABEL	"3"	/* V6.2-001 */
+#define V25_HASHT_GBL_LABEL_INT	 3
 #define V21_HASHT_GBL_LABEL	"2"	/* V5.4-002 to V6.2-000 */
+#define V21_HASHT_GBL_LABEL_INT	 2
+#define V19_HASHT_GBL_LABEL	"1"	/* V5.4-000 to V5.4-001 */
+#define V19_HASHT_GBL_LABEL_INT	 1
 
 #define	LITERAL_HASHLABEL	"#LABEL"
 #define	LITERAL_HASHCYCLE	"#CYCLE"
 #define	LITERAL_HASHCOUNT	"#COUNT"
+#define	LITERAL_HASHTRHASH	"#TRHASH"
 
 #define	LITERAL_HASHLABEL_LEN	STR_LIT_LEN(LITERAL_HASHLABEL)
 #define	LITERAL_HASHCYCLE_LEN	STR_LIT_LEN(LITERAL_HASHCYCLE)
 #define	LITERAL_HASHCOUNT_LEN	STR_LIT_LEN(LITERAL_HASHCOUNT)
+#define	LITERAL_HASHTRHASH_LEN	STR_LIT_LEN(LITERAL_HASHTRHASH)
 
 #endif

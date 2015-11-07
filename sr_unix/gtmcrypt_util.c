@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -293,8 +294,10 @@ void gc_freeup_pwent(passwd_entry_t *pwent)
 {
 	assert(NULL != pwent);
 	memset(pwent->passwd, 0, pwent->passwd_len);
-	FREE(pwent->passwd);
-	FREE(pwent->env_value);
+	if (NULL != pwent->passwd)
+		FREE(pwent->passwd);
+	if (NULL != pwent->env_value)
+		FREE(pwent->env_value);
 	FREE(pwent);
 }
 
@@ -305,38 +308,60 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 	gtm_string_t	passwd_str, tmp_passwd_str;
 	passwd_entry_t	*pwent;
 
-	if (!(lpasswd = getenv(name)))
-	{
-		UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, name);
-		return -1;
-	}
 	pwent = *ppwent;
-	if ((NULL != pwent) && (0 == strcmp(pwent->env_value, lpasswd)))
-		return 0;	/* No change in the environment value. Nothing more to do. */
+	if (!(GTMCRYPT_OP_NOPWDENVVAR & interactive))
+	{
+		if (!(lpasswd = getenv(name)))
+		{
+			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, name);
+			return -1;
+		}
+		if ((NULL != pwent) && (0 == strcmp(pwent->env_value, lpasswd)))
+			return 0;	/* No change in the environment value. Nothing more to do. */
+	} else
+	{
+		if ((NULL != pwent) && (NULL != pwent->env_value))
+			lpasswd = pwent->env_value;
+		else
+		{
+			UPDATE_ERROR_STRING("No passphrase provided for %s", name);
+			if (NULL != pwent)
+				gc_freeup_pwent(pwent);
+			return -1;
+		}
+	}
 	len = STRLEN(lpasswd);
-	if (0 != len % 2)
+	if (0 != (len % 2))
 	{
 		UPDATE_ERROR_STRING("Environment variable %s must be a valid hexadecimal string of even length less than %d. "
 			"Length is odd", name, GTM_PASSPHRASE_MAX);
+		if (NULL != pwent)
+			gc_freeup_pwent(pwent);
 		return -1;
 	}
-	if (GTM_PASSPHRASE_MAX * 2 <= len)
+	if ((GTM_PASSPHRASE_MAX * 2) <= len)
 	{
 		UPDATE_ERROR_STRING("Environment variable %s must be a valid hexadecimal string of even length less than %d. "
 			"Length is %d", name, GTM_PASSPHRASE_MAX, len);
+		if (NULL != pwent)
+			gc_freeup_pwent(pwent);
 		return -1;
 	}
-	if (NULL != pwent)
-		gc_freeup_pwent(pwent);
-	pwent = MALLOC(SIZEOF(passwd_entry_t));
-	pwent->env_value = MALLOC(len ? len + 1 : GTM_PASSPHRASE_MAX * 2 + 1);
+	if (!(GTMCRYPT_OP_NOPWDENVVAR & interactive))
+	{
+		if (NULL != pwent)
+			gc_freeup_pwent(pwent);
+		pwent = MALLOC(SIZEOF(passwd_entry_t));
+		pwent->env_value = MALLOC(len ? len + 1 : GTM_PASSPHRASE_MAX * 2 + 1);
+		env_name = pwent->env_name;
+		strncpy(env_name, name, SIZEOF(pwent->env_name));
+		env_name[SIZEOF(pwent->env_name) - 1] = '\0';
+	} else
+		env_name = pwent->env_name;
 	pwent->passwd_len = len ? len / 2 + 1 : GTM_PASSPHRASE_MAX + 1;
 	pwent->passwd = MALLOC(pwent->passwd_len);
-	env_name = pwent->env_name;
 	env_value = pwent->env_value;
 	passwd = pwent->passwd;
-	strncpy(env_name, name, SIZEOF(pwent->env_name));
-	env_name[SIZEOF(pwent->env_name) - 1] = '\0';
 	if (0 < len)
 	{
 		/* First, convert from hexadecimal representation to regular representation */
@@ -345,6 +370,8 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 		{
 			UPDATE_ERROR_STRING("Environment variable %s must be a valid hexadecimal string of even length "
 				"less than %d. '%c' is not a valid digit (0-9, a-f, or A-F)", name, GTM_PASSPHRASE_MAX, passwd[0]);
+			if (NULL != pwent)
+				gc_freeup_pwent(pwent);
 			return -1;
 		}
 		/* Now, unobfuscate to get the real password */
@@ -362,7 +389,7 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 	/* Environment variable is set to an empty string. Prompt for password. But, first check if we are running in interactive
 	 * mode. If not, return with an error.
 	 */
-	if (!interactive)
+	if (!(GTMCRYPT_OP_INTERACTIVE_MODE & interactive))
 	{
 		UPDATE_ERROR_STRING("Environment variable %s set to empty string. "
 					"Cannot prompt for password in this mode of operation.", env_name);

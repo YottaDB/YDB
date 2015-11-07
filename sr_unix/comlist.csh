@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2014 Fidelity Infromation Services, Inc #
+# Copyright (c) 2001-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -107,6 +108,7 @@ case "gtm_bta":
 	version $p4 b
 	@ comlist_status = $status
 	set p3 = $gtm_bta
+	set asmtgbltype = "pro"
 	breaksw
 
 case "gtm_dbg":
@@ -115,6 +117,7 @@ case "gtm_dbg":
 	version $p4 d
 	@ comlist_status = $status
 	set p3 = $gtm_dbg
+	set asmtgbltype = "dbg"
 	breaksw
 
 case "gtm_pro":
@@ -123,6 +126,7 @@ case "gtm_pro":
 	version $p4 p
 	@ comlist_status = $status
 	set p3 = $gtm_pro
+	set asmtgbltype = "pro"
 	breaksw
 
 default:
@@ -432,6 +436,10 @@ $shell $gtm_tools/gen_gtm_threadgbl_deftypes.csh
 if (0 != $status) then
     echo "Failed to generate gtm_threadgbl_deftypes.h -- aborting build"
     exit 1
+endif
+# Setup link from $gtm_obj to the proper assembler include file
+if (! -e ${gtm_obj}/gtm_threadgbl_deftypes_asm.si) then
+    \ln -s ${gtm_inc}/gtm_threadgbl_deftypes_asm_${asmtgbltype}.si ${gtm_obj}/gtm_threadgbl_deftypes_asm.si
 endif
 
 echo ""

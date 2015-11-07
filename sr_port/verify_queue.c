@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,10 +20,7 @@
 
 #include "mdef.h"
 
-
-#ifdef UNIX
-#include "aswp.h"
-#endif
+#include "interlock.h"
 #include "gtm_facility.h"
 #include "gdsroot.h"
 #include "fileinfo.h"
@@ -30,45 +28,30 @@
 #include "gdsbml.h"
 #include "gdsblk.h"
 #include "gdsfhead.h"
-#include "filestruct.h"
-#include "lockconst.h"
-#include "interlock.h"
-#include "wcs_backoff.h"
 
-#ifdef QI_STARVATION
-# undef QI_STARVATION
-# undef QI_RETRY
-#endif
-
-#define QI_STARVATION 1000
-#define QI_RETRY 256
+#define LOCK_TIMEOUT_SECS	(4 * 60)	/* Define timeout as being 4 mins */
 
 GBLREF	volatile int4	fast_lock_count;
-GBLREF	pid_t		process_id;
-VMS_ONLY(GBLREF	uint4	image_count;)	/* Needed for GET/RELEASE_SWAPLOCK */
 
+/* Lock the given queue and verify its elements are well formed before releasing the lock. Returns the count of
+ * queue elements.
+ */
 gtm_uint64_t verify_queue_lock(que_head_ptr_t qhdr)
 {
-	que_ent_ptr_t	qe, last_qe;
-	gtm_uint64_t	i, k;
-	boolean_t	got_lock;
+	gtm_uint64_t	i;
 
-	++fast_lock_count;
-	/* Before running this queue, must lock it to prevent it from being changed during our run */
-	for (got_lock = FALSE, k = 0; k < QI_STARVATION; ++k)
+	++fast_lock_count;	/* grab_latch() doesn't keep fast_lock_count incremented across rel_latch() */
+	if (!grab_latch(&qhdr->latch, LOCK_TIMEOUT_SECS))
 	{
-		for (i = 0; got_lock == FALSE && i < QI_RETRY; ++i)
-			got_lock = GET_SWAPLOCK(&qhdr->latch);
-		if (got_lock)
-			break;
-		if (0 != k)
-			wcs_backoff(k);
+		fast_lock_count--;
+		assert(0 <= fast_lock_count);
+		assertpro(FALSE);
 	}
-	assertpro(got_lock);			/* We gotta have our lock */
 	i = verify_queue(qhdr);
 	/* Release locks */
-	RELEASE_SWAPLOCK(&qhdr->latch);
+	rel_latch(&qhdr->latch);
 	--fast_lock_count;
+	assert(0 <= fast_lock_count);
 	return i;
 }
 

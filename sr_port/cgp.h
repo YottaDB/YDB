@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,11 +10,16 @@
  *								*
  ****************************************************************/
 
-#define CGP_NOSTATE	(0)
-#define CGP_PARSE	(1)
-#define CGP_RESOLVE	(2)
-#define CGP_APPROX_ADDR	(3)
-#define CGP_ADDR_OPT	(4)
-#define CGP_ASSEMBLY	(5)
-#define CGP_MACHINE	(6)
-#define CGP_FINI	(7)
+/* Phases the GT.M compiler can be in */
+enum CGP_PHASE
+{
+	CGP_NOSTATE = 0,	/* 0 - compiler not running */
+	CGP_PARSE,		/* 1 - compiler initialized - parsing into triples */
+	CGP_RESOLVE,		/* 2 - resolve triple references to each other */
+	CGP_APPROX_ADDR,	/* 3 - approximate addresses with pseudo-code-gen */
+	CGP_ADDR_OPT,		/* 4 - address optimization and triple reduction */
+	CGP_ASSEMBLY,		/* 5 - generate assembler listing */
+	CGP_MACHINE,		/* 6 - generate machine code */
+	CGP_FINI,		/* 7 - compile complete - cleanup */
+	CGP_MAXSTATE
+};

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -115,12 +116,13 @@ uint4 mlk_lock(mlk_pvtblk *p,
 		{
 			if (d->owner)
 			{	/* The lock already exists */
-				if (d->owner == process_id && d->auxowner == auxown)
+				if ((d->owner == process_id) && (d->auxowner == auxown))
 				{	/* We are already the owner */
 					p->nodptr = d;
 					retval = 0;
 				} else
 				{	/* Someone else has it. Block on it */
+					assert(blocked);
 					if (new)
 						mlk_prcblk_add(p->region, ctl, d, process_id);
 					p->nodptr = d;
@@ -163,15 +165,15 @@ uint4 mlk_lock(mlk_pvtblk *p,
 			 * LOCK_SPACE_FULL_SYSLOG_THRESHOLD.
 			 */
 			csa->nl->lockspacefull_logged = TRUE;
-			send_msg(VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(p->region));
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(p->region));
 			if (ctl->subtop - ctl->subfree >= siz)
 			{
-				send_msg(VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(p->region),
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(p->region),
 					 (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
 					 (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" not "));
 			} else
 			{
-				send_msg(VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(p->region),
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(p->region),
 					 (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
 					 (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" "));
 			}

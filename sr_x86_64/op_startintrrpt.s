@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,39 +10,31 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_startintrrpt.s
+	.include "linkage.si"
+	.include "g_msf.si"
+	.include "debug.si"
 
-#	.386
-#	.MODEL	FLAT, C
-
-.include "linkage.si"
-	.INCLUDE	"g_msf.si"
-
-	.sbttl	op_startintrrpt
-#	PAGE	+
-	.DATA
-.extern	frame_pointer
-.extern	neterr_pending
+	.data
+	.extern	frame_pointer
+	.extern	neterr_pending
 
 	.text
-.extern	gvcmz_neterr
-.extern	async_action
-.extern	outofband_clear
+	.extern	gvcmz_neterr
+	.extern	async_action
+	.extern	outofband_clear
 
-# PUBLIC	op_startintrrpt
-ENTRY op_startintrrpt
+ENTRY	op_startintrrpt
 	putframe
-	cmpb	$0,neterr_pending(REG_IP)
+	subq	$8, REG_SP			# Allocate save area and align stack to 16 bytes
+	CHKSTKALIGN				# Verify stack alignment
+	cmpb	$0, neterr_pending(REG_IP)
 	je	l1
 	call	outofband_clear
-	movq	$0,REG64_ARG0
+	movq	$0, REG64_ARG0
 	call	gvcmz_neterr
-l1:	movl	$1,REG32_ARG0
+l1:
+	movl	$1, REG32_ARG0
 	call	async_action
-	addq	$8,REG_SP		# 8 bytes to burn return PC
-	getframe
+	addq	$16, REG_SP			# Remove alignment stack bump & burn return addr
+	getframe				# Load regs for possible new frame and push return addr
 	ret
-# op_startintrrpt ENDP
-
-# END

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2004-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,8 +48,10 @@ boolean_t	gvcst_queryget2(mval *val, unsigned char *sn_ptr);
 enum cdb_sc	gvcst_root_search(boolean_t donot_restart);
 enum cdb_sc	gvcst_rtsib(srch_hist *full_hist, int level);
 enum cdb_sc	gvcst_search(gv_key *pKey, srch_hist *pHist);
-enum cdb_sc	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat);
+enum cdb_sc 	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat);
+enum cdb_sc	gvcst_search_blk_expand_prevkey(gv_key *pKey, srch_blk_status *pStat);
 enum cdb_sc	gvcst_search_tail(gv_key *pKey, srch_blk_status *pStat, gv_key *pOldKey);
+enum cdb_sc	gvcst_search_tail_expand_prevkey(gv_key *pKey, srch_blk_status *pStat, gv_key *pOldKey);
 
 #ifdef UNIX
 mint		gvcst_spr_data(void);

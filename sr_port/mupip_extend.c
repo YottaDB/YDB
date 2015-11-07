@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,21 +76,12 @@ void mupip_extend(void)
 	uint4		bplmap, bit_maps, blocks, i, old_total, total, status;
 	int4		tblocks;
 	int		fd;
+	boolean_t	defer_alloc;
 
 	r_len = SIZEOF(regionname);
 	UNIX_ONLY(jnlpool_init_needed = TRUE);
 	if (cli_get_str("REG_NAME", regionname, &r_len) == FALSE)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUNODBNAME);
-	if (cli_get_int("BLOCKS",&tblocks))
-	{
-		if (tblocks < 1)
-		{
-			util_out_print("!/BLOCKS too small, no extension done",TRUE);
-			mupip_exit(ERR_MUNOACTION);
-		}
-		blocks = tblocks;
-	} else
-		blocks = (uint4)-1;
 	gvinit();
 	for (i = 0, gv_cur_region = gd_header->regions; i < gd_header->n_regions; i++, gv_cur_region++)
 	{
@@ -133,8 +125,21 @@ void mupip_extend(void)
 	}
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 	cs_data = cs_addrs->hdr;
-	if ((uint4)-1 == blocks)
+#	if defined(__sun) || defined(__hpux)
+	cs_data->defer_allocate = TRUE;
+#	endif
+	defer_alloc = cs_data->defer_allocate;
+	if (cli_get_int("BLOCKS",&tblocks))
+	{	/* tblocks can be 0 if defer_alloc is FALSE because the goal is to fully allocate an existing database */
+		if ((tblocks < 0) || (defer_alloc && (tblocks == 0)))
+		{
+			util_out_print("!/BLOCKS too small, no extension done",TRUE);
+			mupip_exit(ERR_MUNOACTION);
+		}
+		blocks = tblocks;
+	} else
 	{
+		blocks = (uint4)-1;
 		if (cs_addrs->hdr->extension_size == 0)
 		{
 			util_out_print("The extension size on file !AD is zero, no extension done.",TRUE,
@@ -173,7 +178,7 @@ void mupip_extend(void)
 			rel_crit(gv_cur_region);
 			break;
 		default:
-			GTMASSERT;
+			assertpro(dba_bg == gv_cur_region->dyn.addr->acc_meth || dba_mm == gv_cur_region->dyn.addr->acc_meth);
 	}
 	util_out_print("Extension successful, file !AD extended by !UL blocks.  Total blocks = !UL.",TRUE,
 		DB_LEN_STR(gv_cur_region), total - old_total - bit_maps, total - DIVIDE_ROUND_UP(total, bplmap));

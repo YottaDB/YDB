@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,6 +85,7 @@ LITDEF nametabent svn_names[] =
 	,{ 3, "ZEO*" }
 	,{ 3, "ZER*" }
 	,{ 2, "ZG*" }
+	,{ 2, "ZH" }, { 8 , "ZHOROLOG" }
 	,{ 4, "ZINI*"}
 	,{ 4, "ZINT*"}
 	,{ 3, "ZIO" }
@@ -94,7 +96,9 @@ LITDEF nametabent svn_names[] =
 	,{ 3, "ZMO*" }
 	,{ 5, "ZONLN*"}
 	,{ 5, "ZPATN" }, {8, "ZPATNUME*" }
+	,{ 4, "ZPIN" }
 	,{ 4, "ZPOS*" }
+	,{ 5, "ZPOUT" }
 	,{ 5, "ZPROC*" }
 	,{ 5, "ZPROM*" }
 	,{ 2, "ZQ*" }
@@ -118,6 +122,7 @@ LITDEF nametabent svn_names[] =
 	,{ 4, "ZTWO*"}
 	,{ 2, "ZT*" }
 	,{ 3, "ZUS*" }
+	,{ 3, "ZUT" }
 	,{ 2, "ZV*" }
 	,{ 4, "ZYER*" }
 };
@@ -126,7 +131,7 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 93	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 98	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -167,6 +172,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZEOF, FALSE, ALL_SYS }
 	,{ SV_ZERROR, TRUE, ALL_SYS }
 	,{ SV_ZGBLDIR, TRUE, ALL_SYS }
+	,{ SV_ZHOROLOG, FALSE, ALL_SYS }, { SV_ZHOROLOG, FALSE, ALL_SYS }
 	,{ SV_ZININTERRUPT, FALSE, ALL_SYS}
 	,{ SV_ZINTERRUPT, TRUE, ALL_SYS}
 	,{ SV_ZIO, FALSE, ALL_SYS }
@@ -177,7 +183,9 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZMODE, FALSE, ALL_SYS }
 	,{ SV_ZONLNRLBK, FALSE, UNIX_OS }
 	,{ SV_ZPATNUMERIC, FALSE, ALL_SYS }, { SV_ZPATNUMERIC, FALSE, ALL_SYS }
+	,{ SV_ZPIN, FALSE, ALL_SYS }
 	,{ SV_ZPOS, FALSE, ALL_SYS }
+	,{ SV_ZPOUT, FALSE, ALL_SYS }
 	,{ SV_ZPROC, FALSE, ALL_SYS }
 	,{ SV_PROMPT, TRUE, ALL_SYS }
 	,{ SV_ZQUIT, TRUE, ALL_SYS }
@@ -201,6 +209,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZTWORMHOLE, TRUE, TRIGGER_OS }
 	,{ SV_ZTRAP, TRUE, ALL_SYS }
 	,{ SV_ZUSEDSTOR, FALSE, ALL_SYS }
+	,{ SV_ZUT, FALSE, ALL_SYS }
 	,{ SV_ZVERSION, FALSE, ALL_SYS }
 	,{ SV_ZYERROR, TRUE, ALL_SYS }
 };

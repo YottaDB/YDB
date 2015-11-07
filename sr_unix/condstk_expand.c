@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,12 +20,6 @@
 
 GBLREF	unsigned char	*stackbase;
 
-#ifdef DEBUG_CONDSTK
-#  define DBGCSTK(x) DBGFPF(x)
-#else
-#  define DBGCSTK(x)
-#endif
-
 /* Expands the condition handler stack copying old stack to new expanded stack.
  *
  * Note, chnd_end is always set 2 entries from the actual true top of the stack. Consider what can happen
@@ -37,9 +32,18 @@ void condstk_expand(void)
 	int			new_size, old_len, old_size, cnt;
 	UINTPTR_T		delta;
 	mv_stent		*mvs;
+#	ifdef DEBUG_ERRHND
+	static int		nest_count = 0;
 
-	DBGEHND((stderr, "condstk_expand: old: chnd: "lvaddr"  chnd_end: "lvaddr"  ctxt: "lvaddr"  active_ch: "lvaddr
-		 "  chnd_incr: %d\n", chnd, chnd_end, ctxt, active_ch, chnd_incr));
+	nest_count++;
+	assert(1 <= nest_count);
+	/* Prevent reentrance due to condition handler in one of the I/O functions invoked from flush_pio(). */
+	if (1 == nest_count)
+		DBGEHND((stderr, "condstk_expand: old: chnd: "lvaddr"  chnd_end: "lvaddr"  ctxt: "lvaddr"  active_ch: "lvaddr
+			 "  chnd_incr: %d\n", chnd, chnd_end, ctxt, active_ch, chnd_incr));
+	if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))
+	{
+#	endif
 	/* Make sure we are allowed to expand */
 	old_len = INTCAST((char *)chnd_end - (char *)chnd);
 	old_size = old_len / SIZEOF(condition_handler);
@@ -58,11 +62,16 @@ void condstk_expand(void)
 	{
 		assert(ctxt_ent >= new_chnd);
 		assert(ctxt_ent < new_chnd_end);
-		DBGEHND((stderr, "condstk_expand: cnt: %d, chptr: 0x"lvaddr"  save_active_ch from 0x"lvaddr
-			 " to 0x"lvaddr"\n", cnt, ctxt_ent, ctxt_ent->save_active_ch, ((char *)ctxt_ent->save_active_ch + delta)));
+#		ifdef DEBUG_ERRHND
+		/* Prevent reentrance due to condition handler in one of the I/O functions invoked from flush_pio(). */
+		if (1 == nest_count)
+			DBGEHND((stderr, "condstk_expand: cnt: %d, chptr: 0x"lvaddr"  save_active_ch from 0x"lvaddr
+				 " to 0x"lvaddr"\n", cnt, ctxt_ent, ctxt_ent->save_active_ch,
+				 ((char *)ctxt_ent->save_active_ch + delta)));
+#		endif
 		ctxt_ent->save_active_ch = (condition_handler *)((char *)ctxt_ent->save_active_ch + delta);
-		assert((1 == cnt) || (ctxt_ent->save_active_ch >= new_chnd));
-		assert((1 == cnt) || (ctxt_ent->save_active_ch < new_chnd_end));
+		assert(ctxt_ent->save_active_ch >= new_chnd);
+		assert(ctxt_ent->save_active_ch < new_chnd_end);
 	}
 #	ifdef GTM_TRIGGER
 	/* Trigger type mv_stent (MVST_TRIGR) save/restore the value of ctxt so look through the stack to locate those and
@@ -72,8 +81,12 @@ void condstk_expand(void)
 	{
 		if (MVST_TRIGR != mvs->mv_st_type)
 			continue;
-		DBGEHND((stderr, "condstk_expand: Trigger saved ctxt modified from 0x"lvaddr" to 0x"lvaddr"\n",
-			 mvs->mv_st_cont.mvs_trigr.ctxt_save, (char *)mvs->mv_st_cont.mvs_trigr.ctxt_save + delta));
+#		ifdef DEBUG_ERRHND
+		/* Prevent reentrance due to condition handler in one of the I/O functions invoked from flush_pio(). */
+		if (1 == nest_count)
+			DBGEHND((stderr, "condstk_expand: Trigger saved ctxt modified from 0x"lvaddr" to 0x"lvaddr"\n",
+				mvs->mv_st_cont.mvs_trigr.ctxt_save, (char *)mvs->mv_st_cont.mvs_trigr.ctxt_save + delta));
+#		endif
 		/* Have a trigger mv_stent - appropriately modify the saved ctxt value (high water mark for condition handlers */
 		mvs->mv_st_cont.mvs_trigr.ctxt_save = (condition_handler *)((char *)mvs->mv_st_cont.mvs_trigr.ctxt_save + delta);
 	}
@@ -86,10 +99,17 @@ void condstk_expand(void)
 		chnd_incr = chnd_incr * 2;
 	ctxt = (condition_handler *)((char *)ctxt + delta);
 	active_ch = (condition_handler *)((char *)active_ch + delta);
-	assert(ctxt >= chnd);
-	assert(ctxt < chnd_end);
-	assert(active_ch >= chnd);
-	assert(active_ch < chnd_end);
-	DBGEHND((stderr, "condstk_expand: new: chnd: "lvaddr"  chnd_end: "lvaddr"  ctxt: "lvaddr"  active_ch: "lvaddr
-		 "  chnd_incr: %d  delta: "lvaddr"\n", chnd, chnd_end, ctxt, active_ch, chnd_incr, delta));
+	CHECKLOWBOUND(ctxt);
+	CHECKHIGHBOUND(ctxt);
+	CHECKLOWBOUND(active_ch);
+	CHECKHIGHBOUND(active_ch);
+#	ifdef DEBUG_ERRHND
+	}
+	/* Prevent reentrance due to condition handler in one of the I/O functions invoked from flush_pio(). */
+	if (1 == nest_count)
+		DBGEHND((stderr, "condstk_expand: new: chnd: "lvaddr"  chnd_end: "lvaddr"  ctxt: "lvaddr"  active_ch: "lvaddr
+			"  chnd_incr: %d  delta: "lvaddr"\n", chnd, chnd_end, ctxt, active_ch, chnd_incr, delta));
+	nest_count--;
+	assert(0 <= nest_count);
+#	endif
 }

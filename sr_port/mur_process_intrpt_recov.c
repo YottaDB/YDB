@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -236,7 +237,7 @@ uint4 mur_process_intrpt_recov()
 			 * we are guaranteed that all the updates done in the forward processing will have a timestamp that is
 			 * greater than the turn around timestamp
 			 */
-			jbp->prev_jrec_time = jctl->turn_around_time;
+			SET_JNLBUFF_PREV_JREC_TIME(jbp, jctl->turn_around_time, DO_GBL_JREC_TIME_CHECK_FALSE);
 		} else if (dba_bg == csd->acc_meth)
 		{	/* set earliest bt TN to be the turn-around TN (taken from bt_refresh()) */
 			SET_OLDEST_HIST_TN(cs_addrs, cs_addrs->ti->curr_tn - 1);
@@ -321,7 +322,7 @@ uint4 mur_process_intrpt_recov()
 				 * recoveries got interrupted in this loop) that need to be reset.
 				 */
 				assert(!jctl->turn_around_offset);
-				assert(rctl->recov_interrupted);	/* rctl->jfh_recov_interrupted can fail */
+				assert(rctl->recov_interrupted || rctl->jctl_apply_pblk); /* rctl->jfh_recov_interrupted can fail */
 				jfh->turn_around_offset = 0;
 				jfh->turn_around_time = 0;
 				jfh_changed = TRUE;

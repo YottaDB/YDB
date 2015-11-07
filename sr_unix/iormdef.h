@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,17 +66,26 @@ error_def(ERR_CRYPTBADWRTPOS);
 
 #define	IORM_FCLOSE(D_RM, FILDES, FILSTR)								\
 {													\
+	GBLREF int	process_exiting;								\
+													\
 	int		fclose_res, rc, save_fd;							\
 													\
 	if (NULL != D_RM->FILSTR)									\
 	{	/* Since FCLOSE also closes the fd, reset FILDES (no need to close it separately). */	\
 		LINUX_ONLY(assert(D_RM->FILDES == D_RM->FILSTR->_fileno);)				\
-		FCLOSE(D_RM->FILSTR, fclose_res);							\
-		if (0 != fclose_res)									\
-		{											\
-			save_fd = D_RM->FILDES;								\
-			rc = errno;									\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);	\
+		if (!process_exiting)									\
+		{	/* Only do the actual FCLOSE() if the process is not exiting because a) the OS	\
+			 * takes care of opened file descriptors anyway; and b) we might have received	\
+			 * a deadly signal, such as SIGTERM, while in getc(), which can ultimately lead	\
+			 * to a hang on FCLOSE().							\
+			 */										\
+			FCLOSE(D_RM->FILSTR, fclose_res);						\
+			if (0 != fclose_res)								\
+			{										\
+				save_fd = D_RM->FILDES;							\
+				rc = errno;								\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);\
+			}										\
 		}											\
 		D_RM->FILSTR = NULL;									\
 		D_RM->FILDES = FD_INVALID;								\
@@ -111,6 +121,39 @@ error_def(ERR_CRYPTBADWRTPOS);
 			INBUF, INBUF_LEN, OUTBUF, GTMCRYPT_OP_ENCRYPT, GTMCRYPT_IV_CONTINUE, rv);	\
 		if (0 != rv)										\
 			GTMCRYPT_REPORT_ERROR(rv, rts_error, (NAME)->len, (NAME)->dollar_io);		\
+	}												\
+}
+
+/* Set prin_out_dev_failure if a write failed on the principal device. If it is a recurrence, issue the
+ * NOPRINCIO error.
+ */
+#define ISSUE_NOPRINCIO_IF_NEEDED_RM(VAR, CMP_SIGN, IOD)						\
+{													\
+	GBLREF io_pair		io_std_device;								\
+	GBLREF bool		prin_out_dev_failure;							\
+													\
+	int			write_status;								\
+													\
+	if (0 CMP_SIGN VAR)										\
+	{	/* Set prin_out_dev_failure to FALSE if it was set TRUE earlier but is working now. */	\
+		if (IOD == io_std_device.out)								\
+			prin_out_dev_failure = FALSE;							\
+	} else												\
+	{												\
+		write_status = (-1 == VAR) ? errno : VAR;						\
+		if (IOD == io_std_device.out)								\
+		{											\
+			if (!prin_out_dev_failure)							\
+				prin_out_dev_failure = TRUE;						\
+			else										\
+			{										\
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);			\
+				stop_image_no_core();							\
+			}										\
+		}											\
+		DOLLAR_DEVICE_WRITE(IOD, write_status);							\
+		IOD->dollar.za = 9;									\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) write_status);					\
 	}												\
 }
 
@@ -207,7 +250,7 @@ typedef struct
 	unsigned char	*inbuf_top;	/* Last char (+1) in inbuf */
 	unsigned char	*outbuf;	/* Output buffer area */
 	FILE		*filstr;
-	uint4		file_pos;
+	off_t		file_pos;
 	long		pipe_buff_size;
 	char		utf_tmp_buffer[CHUNK_SIZE];	/* Buffer to store CHUNK bytes */
 	int		utf_tot_bytes_in_buffer;	/* Number of bytes read from device, it refers utf_tmp_buffer buffer */
@@ -231,6 +274,7 @@ typedef struct
 #endif
 
 int gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, int len);
+void iorm_cond_wteol(io_desc *iod);
 int iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4 *tot_bytes_read,
 		 TID timer_id, int4 *msec_timeout, boolean_t colon_zero);
 int iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, boolean_t timed,

@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2014 Fidelity Information Services, Inc	;
+; Copyright (c) 2001-2015 Fidelity National Information 	;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -126,6 +127,7 @@ onereg:
 	w ?x(8),$s(regs(s,"JOURNAL"):"Y",1:"N")
 	i ver'="VMS" w ?x(9),$s(regs(s,"INST_FREEZE_ON_ERROR"):"ENABLED",1:"DISABLED")
 	i ver'="VMS" w ?x(10),$s(regs(s,"QDBRUNDOWN"):"ENABLED",1:"DISABLED")
+	i ver'="VMS" w ?x(11),$s(regs(s,"EPOCHTAPER"):"ENABLED",1:"DISABLED")
 	q
 onejnl:
 	w !,BOL,?x(1),s,?x(2),$s($zl(regs(s,"FILE_NAME")):$$namedisp(regs(s,"FILE_NAME"),1),1:"<based on DB file-spec>")
@@ -215,12 +217,14 @@ BG	w ?x(8),"GLOB=",$j(segs(s,"GLOBAL_BUFFER_COUNT"),4)
 	; For non-encryption platforms, always show FLAG as OFF. For VMS dont even display this line
 	i $ZVersion'["VMS" w !,BOL,?x(8),"ENCR=",$S((encsupportedplat=TRUE&segs(s,"ENCRYPTION_FLAG")):"ON",1:"OFF")
 	w !,BOL,?x(8),"MSLT=",$j(segs(s,"MUTEX_SLOTS"),4)
+	w !,BOL,?x(8),"DALL=",$s(segs(s,"DEFER_ALLOCATE"):"YES",1:"NO")
 	q
 MM	w ?x(8),$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
 	w !,BOL,?x(8),"LOCK=",$j(segs(s,"LOCK_SPACE"),4)
 	w !,BOL,?x(8),"RES =",$j(segs(s,"RESERVED_BYTES"),4)
 	i $ZVersion'["VMS" w !,BOL,?x(8),"ENCR=OFF"
 	w !,BOL,?x(8),"MSLT=",$j(segs(s,"MUTEX_SLOTS"),4)
+	w !,BOL,?x(8),"DALL=",$s(segs(s,"DEFER_ALLOCATE"):"YES",1:"NO")
 	q
 segmentc:
 	n s,q,val,synval,tmpval,type,am
@@ -286,6 +290,7 @@ t1:	d tmpreghd
 	w ?x(8),$s(tmpreg("JOURNAL"):"Y",1:"N")
 	i ver'="VMS" w ?x(9),$s(tmpreg("INST_FREEZE_ON_ERROR"):"ENABLED",1:"DISABLED")
 	i ver'="VMS" w ?x(10),$s(tmpreg("QDBRUNDOWN"):"ENABLED",1:"DISABLED")
+	i ver'="VMS" w ?x(11),$s(tmpreg("EPOCHTAPER"):"ENABLED",1:"DISABLED")
 	i tmpreg("JOURNAL") d tmpjnlhd,tmpjnlbd
 	d tmpseghd
 	w !,BOL,?x(1),"<default>",?x(2),$s(tmpacc="BG":"  *",1:""),?x(3),"BG"
@@ -296,12 +301,14 @@ t1:	d tmpreghd
 	w !,BOL,?x(8),"RES  =",$j(tmpseg("BG","RESERVED_BYTES"),4)
 	i $ZVersion'["VMS" w !,BOL,?x(8),"ENCR = ",$s((encsupportedplat=TRUE&tmpseg("BG","ENCRYPTION_FLAG")):"ON",1:"OFF")
 	w !,BOL,?x(8),"MSLT =",$j(tmpseg("BG","MUTEX_SLOTS"),4)
+	w !,BOL,?x(8),"DALL=",$s(tmpseg("BG","DEFER_ALLOCATE"):"YES",1:"NO")
 	w !,BOL,?x(1),"<default>",?x(2),$s(tmpacc="MM":"   *",1:""),?x(3),"MM"
 	w ?x(4),$s(tmpseg("MM","FILE_TYPE")="DYNAMIC":"DYN",1:"STA"),?x(5),$j(tmpseg("MM","BLOCK_SIZE"),5)
 	w ?x(6),$j(tmpseg("MM","ALLOCATION"),10),?x(7),$j(tmpseg("MM","EXTENSION_COUNT"),5)
 	w ?x(8),$s(tmpseg("MM","DEFER"):"DEFER",1:"NODEFER")
 	w !,BOL,?x(8),"LOCK =",$j(tmpseg("MM","LOCK_SPACE"),3)
 	w !,BOL,?x(8),"MSLT =",$j(tmpseg("MM","MUTEX_SLOTS"),3)
+	w !,BOL,?x(8),"DALL=",$s(tmpseg("MM","DEFER_ALLOCATE"):"YES",1:"NO")
 	q
 tmpjnlbd:
 	w !,BOL,?x(1),"<default>",?x(2),$s($zl(tmpreg("FILE_NAME")):$$namedisp(tmpreg("FILE_NAME"),1),1:"<based on DB file-spec>")
@@ -416,7 +423,7 @@ gblnamehd:
 	q
 regionhd:
 	s x(0)=32,x(1)=1,x(2)=33,x(3)=65,x(4)=71
-	i ver'="VMS" s x(5)=79,x(6)=85,x(7)=96,x(8)=101,x(9)=105,x(10)=114
+	i ver'="VMS" s x(5)=79,x(6)=85,x(7)=96,x(8)=101,x(9)=105,x(10)=114,x(11)=123
 	e  s x(5)=77,x(6)=83,x(7)=94,x(8)=104
 	w !,BOL,!,BOL,?x(0),"*** REGIONS ***"
 	w !,BOL,?x(7),"Std"
@@ -427,6 +434,7 @@ regionhd:
 	w ?x(5),$j("Key",5),?x(6),"Null",?x(7),"Null"
 	i ver'="VMS" w ?x(9),"Freeze"
 	i ver'="VMS" w ?x(10),"Qdb"
+	i ver'="VMS" w ?x(11),"Epoch"
 	w !,BOL,?x(1),"Region",?x(2),"Segment",?x(3),$j("Coll",4)
 	if ver'="VMS" w ?x(4),$j("Size",7)
 	e  w ?x(4),$j("Size",5)
@@ -434,7 +442,8 @@ regionhd:
 	w ?x(6),"Subs",?x(7),"Coll",?x(8),"Jnl"
 	i ver'="VMS" w ?x(9),"on Error"
 	i ver'="VMS" w ?x(10),"Rndwn"
-	i ver'="VMS" w !,BOL,?x(1),$tr($j("",122)," ","-")
+	i ver'="VMS" w ?x(11),"Taper"
+	i ver'="VMS" w !,BOL,?x(1),$tr($j("",130)," ","-")
 	e  w !,BOL,?x(1),$tr($j("",107)," ","-")
 	q
 jnlhd:
@@ -464,7 +473,7 @@ maphd:
 	q
 tmpreghd:
 	s x(0)=31,x(1)=1,x(2)=19,x(3)=44,x(4)=49
-	i ver'="VMS" s x(5)=57,x(6)=63,x(7)=74,x(8)=79,x(9)=83,x(10)=92
+	i ver'="VMS" s x(5)=57,x(6)=63,x(7)=74,x(8)=79,x(9)=83,x(10)=92,x(11)=101
 	e  s x(5)=55,x(6)=61,x(7)=72,x(8)=82
 	w !,BOL,!,BOL,?x(0),"*** TEMPLATES ***"
 	w !,BOL,?x(7),"Std"
@@ -475,6 +484,7 @@ tmpreghd:
 	w ?x(5),$j("Key",5),?x(6),"Null",?x(7),"Null"
 	i ver'="VMS" w ?x(9),"Freeze"
 	i ver'="VMS" w ?x(10),"Qdb"
+	i ver'="VMS" w ?x(11),"Epoch"
 	w !,BOL,?x(1),"Region",?x(3),$j("Coll",4)
 	i ver'="VMS" w ?x(4),$j("Size",7)
 	e  w ?x(4),$j("Size",5)
@@ -482,7 +492,8 @@ tmpreghd:
 	w ?x(6),"Subs",?x(7),"Coll",?x(8),"Jnl"
 	i ver'="VMS" w ?x(9),"on Error"
 	i ver'="VMS" w ?x(10),"Rndwn"
-	i ver'="VMS" w !,BOL,?x(1),$tr($j("",100)," ","-")
+	i ver'="VMS" w ?x(11),"Taper"
+	i ver'="VMS" w !,BOL,?x(1),$tr($j("",107)," ","-")
 	e  w !,BOL,?x(1),$tr($j("",85)," ","-")
 	q
 tmpjnlhd:

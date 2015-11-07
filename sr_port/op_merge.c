@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -374,6 +375,7 @@ void op_merge(void)
 			/* Need to protect subsc created from global variable subscripts from stpgcol */
 			PUSH_MV_STENT(MVST_MVAL);
 			subsc = &mv_chain->mv_st_cont.mvs_mval;
+			subsc->mvtype = 0; /* initialize mval in the M-stack in case stp_gcol gets called before it is set below */
 			/* At this time gv_currkey already points to gblp2 */
 			if (1 == dollardata_src || 11 == dollardata_src)
 			{	/* SET lvn1=^gvn2 */

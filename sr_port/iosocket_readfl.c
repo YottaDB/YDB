@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -144,12 +145,15 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	gtm_chset_t	ichset;
 	mv_stent	*mv_zintdev;
 	socket_interrupt *sockintr;
+	boolean_t	result;
+	boolean_t	ch_set;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	iod = io_curr_device.in;
+	ESTABLISH_RET_GTMIO_CH(&iod->pair, -1, ch_set);
 	TRCTBL_ENTRY(SOCKRFL_ENTRY, width, iod, (INTPTR_T)socketus_interruptus, NULL);
 	ichset = iod->ichset;
 	assert(dev_open == iod->state);
@@ -159,8 +163,11 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	{
 #		ifndef VMS
 		if (iod == io_std_device.in)
-			return ionl_readfl(v, width, timeout);
-		else
+		{
+			result = ionl_readfl(v, width, timeout);
+			REVERT_GTMIO_CH(&iod->pair, ch_set);
+			return result;
+		} else
 		{
 #		endif
 			iod->dollar.za = 9;
@@ -386,7 +393,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 					msec_timeout = -1;
 					out_of_time = TRUE;
 				} else
-					msec_timeout = (int4)(cur_time.at_sec * 1000 + cur_time.at_usec / 1000);
+					msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+							      DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
 				DBGSOCK((stdout, "socrfl: Taking timeout end time from read restart data - "
 					 "computed msec_timeout: %d\n", msec_timeout));
 			}
@@ -844,6 +852,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 								    "msec_timeout: %d\n", end_time.at_sec, end_time.at_usec,
 								    timeout, msec_timeout)));
 		TRCTBL_ENTRY(SOCKRFL_OUTOFBAND, bytes_read, (INTPTR_T)chars_read, stringpool.free, NULL);	/* BYPASSOK */
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		outofband_action(FALSE);
 		assertpro(FALSE);	/* Should *never* return from outofband_action */
 		return FALSE;	/* For the compiler.. */
@@ -932,5 +941,6 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			DBGSOCK((stdout, "socrfl: Returning from read with success indicator set to %d\n", ret));
 		}
 	);
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return (ret);
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -270,28 +271,6 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #endif
 
 #define	IS_PTR_INSIDE_M_STACK(PTR)	(((unsigned char *)PTR < (sm_uc_ptr_t)stackbase) && ((unsigned char *)PTR > stacktop))
-
-#define PUSH_MVST_MRGZWRSV								\
-{											\
-	PUSH_MV_STENT(MVST_MRGZWRSV);							\
-	mv_st_ent = mv_chain;								\
-	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_merge_args = merge_args;		\
-	merge_args = 0;									\
-	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrtacindx = zwrtacindx;		\
-	zwrtacindx = 0;									\
-	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_in_zwrite = TREF(in_zwrite);		\
-	TREF(in_zwrite) = 0;								\
-	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_mglvnp = mglvnp;			\
-	mglvnp = NULL;									\
-	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_lvzwrite_block = lvzwrite_block;	\
-	lvzwrite_block = NULL;								\
-	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_gvzwrite_block = gvzwrite_block;	\
-	gvzwrite_block = NULL;								\
-	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwr_output = zwr_output;		\
-	zwr_output = NULL;								\
-	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrhtab = zwrhtab;			\
-	zwrhtab = NULL;									\
-}
 
 /* Declare those global variables and error messages that are used by the PUSH_MV_STENT and POP_MV_STENT macros */
 LITREF	unsigned char	mvs_size[];

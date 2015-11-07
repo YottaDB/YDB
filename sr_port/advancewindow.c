@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,6 +141,7 @@ void advancewindow(void)
 		(TREF(director_mval)).mvtype = MV_STR;
 		(TREF(director_mval)).str.addr = (char *)cp3;
 		(TREF(director_mval)).str.len = INTCAST(cp2 - cp3);
+		CLEAR_MVAL_BITS(TADR(director_mval));
 		stringpool.free = cp2;
 		s2n(&(TREF(director_mval)));
 #		ifdef UNICODE_SUPPORTED
@@ -181,6 +183,7 @@ void advancewindow(void)
 		(TREF(director_mval)).str.addr = lexical_ptr;
 		(TREF(director_mval)).str.len = TREF(max_advancewindow_line);
 		(TREF(director_mval)).mvtype = MV_STR;
+		CLEAR_MVAL_BITS(TADR(director_mval));
 		lexical_ptr = (char *)s2n(&(TREF(director_mval)));
 		if (!((TREF(director_mval)).mvtype &= MV_NUM_MASK))
 		{
@@ -301,7 +304,7 @@ void advancewindow(void)
 void advwindw_hash_in_mname_allowed(void)
 {
 	unsigned char	*cp2, *cp3, x;
-	unsigned char	ident_buffer[SIZEOF(mident_fixed)];
+	unsigned char	ident_buffer[(MAX_MIDENT_LEN * 2) + 1];
 	int		ident_len, ch;
 	DCL_THREADGBL_ACCESS;
 
@@ -312,7 +315,9 @@ void advwindw_hash_in_mname_allowed(void)
 	memcpy(ident_buffer, (TREF(window_ident)).addr, (TREF(window_ident)).len);
 	/* Now parse further until we run out of [m]ident */
 	cp2 = ident_buffer + (TREF(window_ident)).len;
-	cp3 = ident_buffer + MAX_MIDENT_LEN;
+	cp3 = ident_buffer + ARRAYSIZE(ident_buffer);
+	if (MAX_MIDENT_LEN == (TREF(window_ident)).len)
+		cp2--;
 	*cp2++ = '#';	/* We are only called if director token is '#' so put that char in buffer now */
 	/* Start processing with the token following the '#'. Allow '#' and/or '/' in addition to usual stuff. */
 	for (x = *lexical_ptr, ch = ctypetab[x];

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2007-2015 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,8 +110,6 @@ GBLREF mident		module_name;
 GBLREF int4		mlmax, mvmax;
 GBLREF int4		code_size, lit_addrs, lits_size;
 GBLREF int4		psect_use_tab[];	/* bytes of each psect in this module */
-
-error_def(ERR_OBJFILERR);
 
 /* Open the object file and write out the gtm object. Actual ELF creation happens at later stage during close_object_file */
 void create_object_file(rhdtyp *rhead)
@@ -326,4 +325,3 @@ void finish_object_file(void)
         free(string_tbl);
         free(gtm_obj_code);
 }
-

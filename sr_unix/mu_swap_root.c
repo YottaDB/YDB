@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012, 2015 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,7 +86,7 @@ error_def(ERR_MUTRUNCNOTBG);
 #define RETRY_SWAP		(0)
 #define ABORT_SWAP		(1)
 
-boolean_t mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
+void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 {
 	sgmnt_data_ptr_t	csd;
 	sgmnt_addrs		*csa;
@@ -105,8 +106,10 @@ boolean_t mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 
 	SETUP_THREADGBL_ACCESS;
 	assert(mu_reorg_process);
-	gv_target->root = 0;
-	gv_target->clue.end = 0;
+	gv_target = gl_ptr->gvt;
+	gv_target->root = 0;		/* reset root so we recompute it in DO_OP_GVNAME below */
+	gv_target->clue.end = 0;	/* reset clue since reorg action on later globals might have invalidated it */
+	reorg_gv_target->gvname.var_name = gv_target->gvname.var_name;	/* needed by SAVE_ROOTSRCH_ENTRY_STATE */
 	dir_hist_ptr = gv_target->alt_hist;
 	gvt_hist_ptr = &(gv_target->hist);
 	inctn_opcode = inctn_invalid_op;
@@ -117,16 +120,18 @@ boolean_t mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 	csd = cs_data;	/* Be careful to keep csd up to date. With MM, cs_data can change, and
 			 * dereferencing an older copy can result in a SIG-11.
 			 */
+	if (gv_cur_region->read_only)
+		return;	/* Cannot proceed for read-only data files */
 	if (0 == gv_target->root)
 	{	/* Global does not exist (online rollback). No problem. */
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
-		return TRUE;
+		return;
 	}
 	if (dba_mm == csd->acc_meth)
 		/* return for now without doing any swapping operation because later mu_truncate
 		 * is going to issue the MUTRUNCNOTBG message.
 		 */
-		return TRUE;
+		return;
 	SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;		/* set up gv_altkey to be just the gblname */
 	/* ------------ Swap root block of global variable tree --------- */
 	t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
@@ -185,7 +190,7 @@ boolean_t mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 			if (tn_aborted)
 			{	/* It is not an error if the global (that once existed) doesn't exist anymore (due to ROLLBACK) */
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GNAME(gl_ptr).len, GNAME(gl_ptr).addr);
-				return TRUE;
+				return;
 			}
 			continue;
 		}
@@ -223,7 +228,7 @@ boolean_t mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 			if (level >= dir_hist_ptr->depth)
 			{	/* done */
 				t_abort(gv_cur_region, csa);
-				return TRUE;
+				return;
 			}
 			child_blk_ptr = dir_hist_ptr->h[level].buffaddr;
 			child_blk_id = dir_hist_ptr->h[level].blk_num;
@@ -265,7 +270,7 @@ boolean_t mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr)
 			break;
 		}
 	}
-	return TRUE;
+	return;
 }
 
 /* Finds a free block and adds information to update array and cw_set */

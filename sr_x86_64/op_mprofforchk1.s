@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2011 Fidelity Information Services, Inc	#
+# Copyright (c) 2011-2015 Fidelity National Information 	#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,24 +10,20 @@
 #								#
 #################################################################
 
-#	PAGE	,132
-	.title	op_mprofforchk1.s
-	.sbttl	op_mprofforchk1
-
-#	.386
-#	.MODEL	FLAT, C
-
-.include "g_msf.si"
-.include "linkage.si"
+	.include "g_msf.si"
+	.include "linkage.si"
+	.include "debug.si"
 
 	.text
-.extern forchkhandler
+	.extern forchkhandler
 
-# PUBLIC	op_mprofforchk1
-ENTRY op_mprofforchk1
-	movq    (REG_SP),REG64_ARG0	# Send return address to forchkhandler
+#
+# This is the M profiling version which calls different routine(s) for M profiling purposes.
+#
+ENTRY	op_mprofforchk1
+	movq    (REG_SP), REG64_ARG0		# Send return address to forchkhandler
+	subq	$8, REG_SP			# Bump stack for 16 byte alignment
+	CHKSTKALIGN				# Verify stack alignment
 	call	forchkhandler
+	addq	$8, REG_SP			# Remove stack alignment bump
 	ret
-# op_mprofforchk1 ENDP
-
-# END
