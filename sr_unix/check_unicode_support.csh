@@ -19,10 +19,10 @@
 ###########################################################################################
 
 set found_icu = 0
-set utflocale = `locale -a | grep -i en_us | grep -i utf | grep '8$'`
+set utflocale = `locale -a | grep -i en_us | grep -i utf | grep '8$' | head -n 1`
 if ("OS/390" == $HOSTOS) then
 #	z/OS has both en_US.UTF-8 and En_US.UTF-8 with both .xplink and .lp64 suffixes - we need .lp64
-	set utflocale = `locale -a | grep En_US.UTF-8.lp64 | sed 's/.lp64$//'`
+	set utflocale = `locale -a | grep En_US.UTF-8.lp64 | sed 's/.lp64$//' | head -n 1`
 endif
 
 # This _could_ not work on new platforms or newly installed supported platforms.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,6 @@
 #include "ccpact.h"
 #include "error.h"
 #include "filestruct.h"
-#include "tp_grab_crit.h"
 #include "wcs_recover.h"
 
 error_def(ERR_CRITRESET);
@@ -33,10 +32,11 @@ GBLREF volatile int4		crit_count;
 GBLREF int4			exi_condition;
 GBLREF VSIG_ATOMIC_T		forced_exit;
 GBLREF uint4			process_id;
+GBLREF sgmnt_addrs		*vms_mutex_check_csa;
 
 /* One try to grab crit; no waiting because of possible deadlock.  Used by TP */
 
-bool	tp_grab_crit(gd_region *reg)
+boolean_t grab_crit_immediate(gd_region *reg)
 {
 	unsigned short		cycle_count, cycle;
 	ccp_action_aux_value	msg;
@@ -45,6 +45,7 @@ bool	tp_grab_crit(gd_region *reg)
 	node_local_ptr_t	cnl;
 
 	csa = &FILE_INFO(reg)->s_addrs;
+	vms_mutex_check_csa = csa;
 	cnl = csa->nl;
 	if (!csa->now_crit)
 	{
@@ -66,9 +67,9 @@ bool	tp_grab_crit(gd_region *reg)
 			case cdb_sc_nolock:
 				return FALSE;
 			case cdb_sc_critreset:
-				rts_error(ERR_CRITRESET, 2, REG_LEN_STR(reg));
+				rts_error_csa(CSA_ARG(NULL) ERR_CRITRESET, 2, REG_LEN_STR(reg));
 			case cdb_sc_dbccerr:
-				rts_error(ERR_DBCCERR, 2, REG_LEN_STR(reg));
+				rts_error_csa(CSA_ARG(NULL) ERR_DBCCERR, 2, REG_LEN_STR(reg));
 			default:
 				if (forced_exit)
 					EXIT(exi_condition);

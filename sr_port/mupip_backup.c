@@ -1104,7 +1104,8 @@ repl_inst_bkup_done1:
 			memcpy(cmdptr, mu_repl_inst_reg_list->backup_file.addr, mu_repl_inst_reg_list->backup_file.len);
 			cmdptr += mu_repl_inst_reg_list->backup_file.len;
 			*cmdptr = '\0';
-			if (0 != (rv = SYSTEM((char *)command)))
+			rv = SYSTEM(((char *)command));
+			if (0 != rv)
 			{
 				if (-1 == rv)
 				{
@@ -1182,7 +1183,7 @@ repl_inst_bkup_done1:
 						mutex_per_process_init();
 					UNIX_ONLY(START_HEARTBEAT_IF_NEEDED;)
 				} /* else journal pool already initialized in gvcst_init */
-				grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+				grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 				jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
 				assert(0 != jnl_seqno);
 				/* All the cleanup we want is exactly done by the "repl_inst_histinfo_truncate" function. But

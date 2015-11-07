@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,8 @@
 #include <ssdef.h>
 #include "ccp_writedb2.h"
 
-GBLREF	uint4	process_id;
+GBLREF	uint4		process_id;
+GBLREF sgmnt_addrs	*vms_mutex_check_csa;
 
 
 static	int4		delta_100_msec[2] = { -100000, -1 };
@@ -45,7 +46,7 @@ void ccp_reqwm_interrupt(ccp_db_header **pdb)
 	csa = db->segment;
 	if (csa == NULL  ||  csa->nl->ccp_state == CCST_CLOSED)
 		return;
-
+	vms_mutex_check_csa = csa;
 	switch (db->wm_iosb.cond)
 	{
 	case SS$_DEADLOCK:

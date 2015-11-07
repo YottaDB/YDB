@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,7 @@ void op_zsystem(mval *v)
 	MV_FORCE_STR(v);
 #ifdef UNIX
 	if (v->str.len > (MAXZSYSSTRLEN - 32 - 1)) /* 32 char for shell name, remaining for ZSYSTEM command */
-		rts_error(VARLSTCNT(4) ERR_INVSTRLEN, 2, v->str.len, (MAXZSYSSTRLEN - 32 - 1));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, v->str.len, (MAXZSYSSTRLEN - 32 - 1));
 	/* get SHELL environment */
 	sh = GETENV("SHELL");
 	/* use bourn shell as default */
@@ -104,7 +104,7 @@ void op_zsystem(mval *v)
 #ifdef UNIX
 	dollar_zsystem = SYSTEM(cmd);
 	if (-1 == dollar_zsystem)
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("system"), CALLFROM, errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("system"), CALLFROM, errno);
 #ifdef _BSD
 	assert(SIZEOF(wait_stat) == SIZEOF(int4));
 	wait_stat.w_status = dollar_zsystem;
@@ -120,7 +120,7 @@ void op_zsystem(mval *v)
 		setterm(io_std_device.in);
 #ifdef VMS
 	if (status != SS$_NORMAL)
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 #endif
 	return;
 }

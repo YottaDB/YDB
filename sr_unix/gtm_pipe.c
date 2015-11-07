@@ -35,6 +35,7 @@
 #include "gtm_pipe.h"
 #include "eintr_wrappers.h"
 #include "gtmio.h"
+#include "fork_init.h"
 
 GBLDEF	uint4	pipe_child;
 
@@ -46,13 +47,13 @@ int gtm_pipe(char *command, pipe_type pt)
 
 	parent = (int)pt;
 	child  = 1 - parent;
-
 	if (0 > pipe(pfd))
 	{
 		PERROR("pipe : ");
 		return -2;
 	}
-	if (-1 == (child_pid = fork()))	/* BYPASSOK: we exit immediately, no FORK_CLEAN needed */
+	FORK(child_pid);	/* BYPASSOK: we exit immediately, no FORK_CLEAN needed */
+	if (-1 == child_pid)
 	{
 		PERROR("fork : ");
 		return -1;
@@ -66,7 +67,7 @@ int gtm_pipe(char *command, pipe_type pt)
 		 * semaphores, which we should not release until parent exists. So we just call _exit(EXIT_SUCCESS).  Add the do
 		 * nothing if to keep compiler happy since exiting anyway.
 		 */
-		if (-1 == SYSTEM(command));
+		rc = SYSTEM(command);
 		_exit(EXIT_SUCCESS); /* just exit from here */
 	} else
 	{	/* parent process */
@@ -74,8 +75,4 @@ int gtm_pipe(char *command, pipe_type pt)
 		CLOSEFILE_RESET(pfd[child], rc);	/* resets "pfd[child]" to FD_INVALID */
    		return pfd[parent];
 	}
-
-	assert(FALSE);
-	/* It should never get here, just to keep compiler happy. */
-	return -3;
 }

@@ -42,6 +42,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "dpgbldir.h"
+#include "fork_init.h"
 
 GBLREF boolean_t	created_core;		/* core file was created */
 GBLREF unsigned int	core_in_progress;
@@ -150,8 +151,8 @@ DEBUG_ONLY( struct rlimit rlim;)
 	{
 		if (1 == core_in_progress)
 		{	/* only report once */
-			send_msg(VARLSTCNT(1) ERR_COREINPROGRESS, 0);
-			gtm_putmsg(VARLSTCNT(1) ERR_COREINPROGRESS, 0);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_COREINPROGRESS, 0);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_COREINPROGRESS, 0);
 		}
 		return;
 	}
@@ -165,14 +166,14 @@ DEBUG_ONLY( struct rlimit rlim;)
 	/* block SIGALRM signal */
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
 
-	childid = fork();	/* BYPASSOK: we exit immediately, no FORK_CLEAN needed */
+	FORK(childid);	/* BYPASSOK: we exit immediately, no FORK_CLEAN needed */
 	if (childid)
 	{
 		if (-1 == childid)
 		{	/* restore interrupt handler */
 			sigaction(SIGINT, &intr, 0);
 			sigprocmask(SIG_SETMASK, &savemask, NULL);
-			gtm_putmsg(VARLSTCNT(3) ERR_NOFORKCORE, 0, errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NOFORKCORE, 0, errno);
 			return;		/* Fork failed, no core done */
 		}
 		WAITPID(childid, &status, 0, waitrc);

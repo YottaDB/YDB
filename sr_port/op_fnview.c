@@ -38,6 +38,7 @@
 #include "alias.h"
 #include "gtmimagename.h"
 #include "fullbool.h"
+#include "wbox_test_init.h"
 
 GBLREF spdesc		stringpool;
 GBLREF int4		cache_hits, cache_fails;
@@ -276,6 +277,18 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			s2pool(&tmpstr);
 			dst->str = tmpstr;
 			break;
+#ifdef		DEBUG
+		case VTK_PROBECRIT:
+			if (!gd_header)		/* IF GD_HEADER ==0 THEN OPEN GBLDIR */
+				gvinit();
+			if (!parmblk.gv_ptr->open)
+				gv_init_reg(parmblk.gv_ptr);
+			reg = parmblk.gv_ptr;
+			grab_crit(reg);
+			if (!WBTEST_ENABLED(WBTEST_HOLD_CRIT_ENABLED))
+				rel_crit(reg);
+			break;
+#endif
 		case VTK_REGION:
 			/* if gd_header is null then get the current one, and update the gd_map */
 			if (!gd_header)

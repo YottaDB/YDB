@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2012 Fidelity Information Services, Inc.*
+ *	Copyright 2008, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,6 @@
 
 GBLREF	repl_msg_ptr_t		gtmrecv_msgp;
 GBLREF	int			gtmrecv_max_repl_msglen;
-GBLREF  struct timeval          gtmrecv_poll_interval, gtmrecv_poll_immediate;
 GBLREF	int			gtmrecv_listen_sock_fd;
 GBLREF	int			gtmrecv_sock_fd;
 GBLREF	boolean_t		repl_connection_reset;
@@ -166,7 +165,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		xoff_msg.type = REPL_XOFF_ACK_ME;
 		memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, SIZEOF(seq_num));
 		xoff_msg.len = MIN_REPL_MSGLEN;
-		REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, xoff_msg.len, FALSE, &gtmrecv_poll_immediate)
+		REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, xoff_msg.len, REPL_POLL_NOWAIT)
 			; /* Empty Body */
 		if (SS_NORMAL != status)
 		{
@@ -180,11 +179,11 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				send_badtrans = FALSE;
 			} else if (EREPL_SEND == repl_errno)
 				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
+					LEN_AND_LIT("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
 							"Error in send"), status);
 			else if (EREPL_SELECT == repl_errno)
 				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
+					LEN_AND_LIT("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
 							"Error in select"), status);
 		} else
 		{
@@ -240,7 +239,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		{
 			/* Receive the header of a message */
 			REPL_RECV_LOOP(gtmrecv_sock_fd, ((unsigned char *)gtmrecv_msgp) + *buff_unprocessed,
-				       (REPL_MSG_HDRLEN - *buff_unprocessed), FALSE, &gtmrecv_poll_interval)
+				       (REPL_MSG_HDRLEN - *buff_unprocessed), REPL_POLL_WAIT)
 				; /* Empty Body */
 
 			REPL_DPRINT3("gtmrecv_poll_actions : Received %d type of message of length %d while draining\n",
@@ -250,8 +249,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				(0 != *buff_unprocessed || 0 == *pending_data_len) && REPL_XOFF_ACK == gtmrecv_msgp->type)
 		{
 			/* The rest of the XOFF_ACK msg */
-			REPL_RECV_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, (MIN_REPL_MSGLEN - REPL_MSG_HDRLEN), FALSE,
-					&gtmrecv_poll_interval)
+			REPL_RECV_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, (MIN_REPL_MSGLEN - REPL_MSG_HDRLEN), REPL_POLL_WAIT)
 				; /* Empty Body */
 			if (SS_NORMAL == status)
 			{
@@ -270,7 +268,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			     pending_msg_size -= gtmrecv_max_repl_msglen)
 			{
 				temp_len = (pending_msg_size < gtmrecv_max_repl_msglen)? pending_msg_size : gtmrecv_max_repl_msglen;
-				REPL_RECV_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, temp_len, FALSE, &gtmrecv_poll_interval)
+				REPL_RECV_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, temp_len, REPL_POLL_WAIT)
 					; /* Empty Body */
 			}
 			*buff_unprocessed = 0; *pending_data_len = 0;
@@ -297,11 +295,11 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 					return_status = STOP_POLL;
 				} else
 					rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						RTS_ERROR_LITERAL("Error while draining replication pipe. Error in recv"), status);
+						LEN_AND_LIT("Error while draining replication pipe. Error in recv"), status);
 			} else if (EREPL_SELECT == repl_errno)
 			{
 				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Error while draining replication pipe. Error in select"), status);
+					LEN_AND_LIT("Error while draining replication pipe. Error in select"), status);
 			}
 		}
 	} else
@@ -313,7 +311,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		bad_trans_msg.type = REPL_BADTRANS;
 		memcpy((uchar_ptr_t)&bad_trans_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, SIZEOF(seq_num));
 		bad_trans_msg.len = MIN_REPL_MSGLEN;
-		REPL_SEND_LOOP(gtmrecv_sock_fd, &bad_trans_msg, bad_trans_msg.len, FALSE, &gtmrecv_poll_immediate)
+		REPL_SEND_LOOP(gtmrecv_sock_fd, &bad_trans_msg, bad_trans_msg.len, REPL_POLL_NOWAIT)
 			; /* Empty Body */
 		if (SS_NORMAL == status)
 		{
@@ -330,10 +328,10 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				return_status = STOP_POLL;
 			} else if (EREPL_SEND == repl_errno)
 				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						RTS_ERROR_LITERAL("Error sending BAD_TRANS. Error in send"), status);
+						LEN_AND_LIT("Error sending BAD_TRANS. Error in send"), status);
 			else if (EREPL_SELECT == repl_errno)
 				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						RTS_ERROR_LITERAL("Error sending BAD_TRANS. Error in select"), status);
+						LEN_AND_LIT("Error sending BAD_TRANS. Error in select"), status);
 		}
 		send_badtrans = FALSE;
 	}

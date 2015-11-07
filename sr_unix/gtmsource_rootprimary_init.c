@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 	assert(!udi->s_addrs.hold_onto_crit || jgbl.onlnrlbk);
 	was_crit = udi->s_addrs.now_crit;
 	if (!was_crit)
-		grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 	jnlpool.repl_inst_filehdr->root_primary_cycle++;
 	jnlpool.repl_inst_filehdr->was_rootprimary = TRUE;
 	assert(start_seqno >= jnlpool.jnlpool_ctl->start_jnl_seqno);

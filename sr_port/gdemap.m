@@ -217,5 +217,5 @@ findStartMap:(key)
 	n startMap
 	s startMap=$o(list(key))
 	s startMapLen=$zl(startMap)
-	i $ze(startMap,startMapLen)=")" s startMap=$o(list(startMap))
+	i ($ze(startMap,startMapLen)=")")&($ze(startMap,1,startMapLen-1)=key) s startMap=$o(list(startMap))
 	q startMap

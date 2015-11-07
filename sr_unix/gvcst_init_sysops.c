@@ -303,6 +303,7 @@ error_def(ERR_PERMGENFAIL);
 error_def(ERR_REQROLLBACK);
 error_def(ERR_REQRECOV);
 error_def(ERR_REQRUNDOWN);
+error_def(ERR_REGOPENRETRY);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_VERMISMATCH);
@@ -453,7 +454,7 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size)
 	return;
 }
 
-void db_init(gd_region *reg)
+int db_init(gd_region *reg)
 {
 	boolean_t       	is_bg, read_only, sem_created = FALSE, need_stacktrace, have_standalone_access;
 	boolean_t		shm_setup_ok = FALSE, vermismatch = FALSE, vermismatch_already_printed = FALSE;
@@ -484,7 +485,7 @@ void db_init(gd_region *reg)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-        ESTABLISH(dbinit_ch);
+	ESTABLISH_NOUNWIND(dbinit_ch);
 	assert(INTRPT_IN_GVCST_INIT == intrpt_ok_state); /* we better be called from gvcst_init */
 	wcs_clean_dbsync_fptr = &wcs_clean_dbsync;
 	tsd = &tsdbuff;
@@ -492,12 +493,13 @@ void db_init(gd_region *reg)
 	udi = FILE_INFO(reg);
 	memset(machine_name, 0, SIZEOF(machine_name));
 	csa = &udi->s_addrs;
+	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
+	if (!mutex_per_process_init_pid)
+		mutex_per_process_init();
 	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, gethostname_res))
 		RTS_ERROR(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Unable to get the hostname"), errno);
-#	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_TAMPER_HOSTNAME))
 		STRCPY(machine_name, "s_i_l_l_y");
-#	endif
 	assert(strlen(machine_name) < MAX_MCNAMELEN);
 	assert(NULL == csa->hdr);	/* dbinit_ch relies on this to unmap the db (if mm) */
 	assert((NULL == csa->db_addrs[0]) && (NULL == csa->db_addrs[1]));
@@ -562,14 +564,12 @@ void db_init(gd_region *reg)
 			   */
 		}
 		INIT_DB_ENCRYPTION_IF_NEEDED(do_crypt_init, init_status, reg, csa, tsd);
-#		ifdef DEBUG
 		if (WBTEST_ENABLED(WBTEST_HOLD_ONTO_FTOKSEM_IN_DBINIT))
 		{
 			DBGFPF((stderr, "Holding the ftok semaphore.. Sleeping for 30 seconds\n"));
 			LONG_SLEEP(30);
 			DBGFPF((stderr, "30 second sleep exhausted.. continuing with rest of db_init..\n"));
 		}
-#		endif
 		for (loopcnt = 0; MAX_ACCESS_SEM_RETRIES > loopcnt; loopcnt++)
 		{
 			CSD2UDI(tsd, udi); /* sets udi->semid/shmid/sem_ctime/shm_ctime from file header */
@@ -621,10 +621,26 @@ void db_init(gd_region *reg)
 			{	/* "semid" already exists. Need to lock it. Before that do sanity check on "semid" and "shmid" */
 				if (INVALID_SHMID != udi->shmid)
 				{
+					if (WBTEST_ENABLED(WBTEST_HOLD_FTOK_UNTIL_BYPASS))
+					{
+						if (4 == semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))
+						{	/* We are bypasser */
+							DBGFPF((stderr, "Waiting for all processes to quit.\n"));
+							while (1 < semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))
+								LONG_SLEEP(1);
+						}
+					}
 					if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
 					{
+						if (bypassed_ftok)
+						{
+							gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_REGOPENRETRY, 4,
+								       REG_LEN_STR(reg), DB_LEN_STR(reg));
+							REVERT;
+							return -1; /* Retry calling db_init. Cleanup in gvcst_init() */
+						}
 						PRINT_CRASH_MESSAGE(1, tsd, ERR_TEXT, 2,
-							LEN_AND_LIT("Error with database control shmctl"), errno);
+								    LEN_AND_LIT("Error with database control shmctl"), errno);
 					} else if (shmstat.shm_ctime != tsd->gt_shm_ctime.ctime)
 					{
 						GTM_ATTACH_SHM_AND_CHECK_VERS(vermismatch, shm_setup_ok);
@@ -764,14 +780,21 @@ void db_init(gd_region *reg)
 	}
 	assert(udi->grabbed_access_sem || bypassed_access);
 	DO_DB_HDR_CHECK(reg, tsd); /* Basic sanity check on the file header fields */
-#	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_HOLD_ONTO_ACCSEM_IN_DBINIT))
 	{
 		DBGFPF((stderr, "Holding the access control semaphore.. Sleeping for 30 seconds\n"));
 		LONG_SLEEP(30);
 		DBGFPF((stderr, "30 second sleep exhausted.. continuing with rest of db_init..\n"));
 	}
-#	endif
+	if (WBTEST_ENABLED(WBTEST_HOLD_FTOK_UNTIL_BYPASS))
+	{
+		if (3 == semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))
+		{	/* We are ftok semaphore holder */
+			DBGFPF((stderr, "Holding the ftok semaphore until a new process comes along.\n"));
+			while (3 == semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))
+				LONG_SLEEP(1);
+		}
+	}
 	/* Now that the access control lock is obtained and file header passed all sanity checks, update the acc_meth of the
 	 * region from the one in the file header (in case they are different). This way, any later code that relies on the
 	 * acc_meth dereferenced from the region will work correctly. Instead of checking if they are different, do the assignment
@@ -782,9 +805,11 @@ void db_init(gd_region *reg)
 	if (new_shm_ipc)
 	{	/* Bypassers are not allowed to create shared memory so we don't end up with conflicting shared memories */
 		if (bypassed_ftok || bypassed_access)
-			PRINT_CRASH_MESSAGE(0, tsd, ERR_TEXT, 2,
-				LEN_AND_LIT("DSE/LKE database initialization attempt tried a startup short cut that "
-						"failed due to a conflict with a database shutdown - please retry"));
+		{
+			gtm_putmsg_csa(CSA_ARG(csa) ERR_REGOPENRETRY, 2, REG_LEN_STR(reg), DB_LEN_STR(reg));
+			REVERT;
+			return -1; /* Retry calling db_init. Cleanup in gvcst_init() */
+		}
 		/* Since we are about to allocate new shared memory, if necessary, adjust the journal buffer size right now.
 		 * Note that if the process setting up shared memory is a read-only process, then we might not flush updated
 		 * jnl_buffer_size to the file header, which is fine because the value in shared memory is what all processes
@@ -1205,8 +1230,7 @@ void db_init(gd_region *reg)
 	++csa->nl->ref_cnt;	/* This value is changed under control of the init/rundown semaphore only */
 	assert(!csa->ref_cnt);	/* Increment shared ref_cnt before private ref_cnt increment. */
 	csa->ref_cnt++;		/* Currently journaling logic in gds_rundown() in VMS relies on this order to detect last writer */
-#	ifdef DEBUG
-	if (!IS_GTM_IMAGE && WBTEST_ENABLED(WBTEST_HOLD_SEM_BYPASS))
+	if (WBTEST_ENABLED(WBTEST_HOLD_SEM_BYPASS) && !IS_GTM_IMAGE)
 	{
 		if (0 == csa->nl->wbox_test_seq_num)
 		{
@@ -1216,7 +1240,6 @@ void db_init(gd_region *reg)
 				LONG_SLEEP(1);
 		}
 	}
-#	endif
 	if (!have_standalone_access && !jgbl.onlnrlbk && !bypassed_access)
 	{
 		/* Release control lockout now that it is init'd */
@@ -1228,7 +1251,6 @@ void db_init(gd_region *reg)
 		}
 		udi->grabbed_access_sem = FALSE;
 	}
-#	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_SEMTOOLONG_STACK_TRACE) && (1 == csa->nl->wbox_test_seq_num))
 	{
 		csa->nl->wbox_test_seq_num = 2;
@@ -1236,7 +1258,6 @@ void db_init(gd_region *reg)
 		while (csa->nl->wbox_test_seq_num != 3)
 			LONG_SLEEP(10);
 	}
-#	endif
 	if (!have_standalone_access && !bypassed_ftok)
 	{	/* Release ftok semaphore lock so that any other ftok conflicted database can continue now */
 		if (!ftok_sem_release(reg, FALSE, FALSE))
@@ -1244,10 +1265,6 @@ void db_init(gd_region *reg)
 		FTOK_TRACE(csa, csd->trans_hist.curr_tn, ftok_ops_release, process_id);
 		udi->grabbed_ftok_sem = FALSE;
 	}
-	/* Do the per process initialization of mutex stuff */
-	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
-	if (!mutex_per_process_init_pid)
-		mutex_per_process_init();
 	REVERT;
-	return;
+	return 0;
 }

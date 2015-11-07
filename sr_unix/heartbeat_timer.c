@@ -140,12 +140,10 @@ void set_enospc_flags(gd_addr *addr_ptr, char enospc_enable_list[], boolean_t ok
 	for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions, i = 0;
 	     r_local < r_top; r_local++, i++)
 	{
-		if (!r_local->open || r_local->was_open)
-			continue;
 		if ((dba_bg != r_local->dyn.addr->acc_meth) && (dba_mm != r_local->dyn.addr->acc_meth))
 			continue;
-		csa = &FILE_INFO(r_local)->s_addrs;
-		if (ANTICIPATORY_FREEZE_ENABLED(csa))
+		csa = REG2CSA(r_local);
+		if ((NULL != csa) && (NULL != csa->nl) && ANTICIPATORY_FREEZE_ENABLED(csa))
 		{
 			switch(enospc_enable_list[i])
 			{
@@ -214,7 +212,7 @@ void heartbeat_timer(void)
 					continue;
 				if ((dba_bg != r_local->dyn.addr->acc_meth) && (dba_mm != r_local->dyn.addr->acc_meth))
 					continue;
-				csa = &FILE_INFO(r_local)->s_addrs;
+				csa = REG2CSA(r_local);
 				if (csa->now_crit)
 					continue;
 				jpc = csa->jnl;

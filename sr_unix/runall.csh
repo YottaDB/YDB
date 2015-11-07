@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2013 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -47,39 +47,6 @@ while (0 < $#)
 	endsw
 	shift
 end
-#set temp=(`getopt nchl $argv:q`)
-#if ($? == 0) then
-#	eval set argv=\($temp:q\)
-#	while (1)
-#		switch ($1:q)
-#			case -n :
-#				set listonly = 1
-#				shift
-#				breaksw
-#
-#			case -c :
-#				set compileonly = 1
-#				shift
-#				breaksw
-#
-#			case -l :
-#				set linkonly = 1
-#				shift
-#				breaksw
-#
-#			case -h :
-#				set helponly = 1
-#				shift
-#				breaksw
-#
-#			case -- :
-#				shift
-#				break
-#		endsw
-#	end
-#else
-#	set helponly = 1
-#endif
 
 if ($helponly) then
 	echo "Usage : `basename $0` [-n|-c|-h] [file...]"
@@ -161,6 +128,7 @@ echo "     RUNALL_VERSION         ---->  [ $RUNALL_VERSION ]"
 echo "     RUNALL_IMAGE           ---->  [ $RUNALL_IMAGE ]"
 echo "     RUNALL_EXTRA_CC_FLAGS  ---->  [ $RUNALL_EXTRA_CC_FLAGS ]"
 echo "     RUNALL_EXTRA_AS_FLAGS  ---->  [ $RUNALL_EXTRA_AS_FLAGS ]"
+echo "     gtmroutines            ---->  [ $gtmroutines ]"
 echo ""
 
 if (`uname` == "SunOS") then
@@ -498,12 +466,14 @@ if (! -z ${TMP_DIR}_src_files) then
 				# gtm_startup_chk requires gtm_dist setup
 				rm -f ${file}_ctl.c ${file}_ansi.h	# in case an old version is lying around
 				set real_gtm_dist = "$gtm_dist"
+				if ($?gtmroutines) set save_gtmroutines = "$gtmroutines"
 				setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
 				setenv gtmroutines "$gtm_obj($gtm_pct)"
 				$gtm_root/$gtm_curpro/pro/mumps -run msg $gtm_src/$file.msg Unix
 				if (0 != $status) @ runall_status = $status
 				setenv gtm_dist "$real_gtm_dist"
 				unset real_gtm_dist
+				if ($?save_gtmroutines) setenv gtmroutines "$save_gtmroutines"
 				\mv -f ${file}_ctl.c $gtm_src/${file}_ctl.c
 				if ( -f ${file}_ansi.h ) then
 					\mv -f ${file}_ansi.h $gtm_inc

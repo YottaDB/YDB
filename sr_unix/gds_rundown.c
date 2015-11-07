@@ -70,7 +70,6 @@
 #include "is_proc_alive.h"
 #include "shmpool.h"
 #include "db_snapshot.h"
-#include "tp_grab_crit.h"
 #include "ss_lock_facility.h"
 #include "anticipatory_freeze.h"
 #include "wcs_clean_dbsync.h"

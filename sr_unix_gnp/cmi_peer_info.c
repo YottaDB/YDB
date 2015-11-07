@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,35 +13,48 @@
 #define _ISOC99_SOURCE
 #endif
 
+#include <errno.h>	/* for errno, used by RTS_ERROR_ADDRINFO */
+
 #include "mdef.h"
 #include "cmidef.h"
 #include "gtm_netdb.h"
 #include "gtm_socket.h"
 #include "gtm_stdio.h"
+#include "iotcpdef.h"
+#include "gtm_string.h"	/* for rts_error */
 
 /* return in a the char * the ASCII representation of a network address.
    Returned as:
    "hostid (nn.nn.nn.nn)" or "nn.nn.nn.nn" depending on whether or not
    the host is listed in /etc/hosts.
  */
+error_def(ERR_GETNAMEINFO);
+error_def(ERR_TEXT);
+
 void cmi_peer_info(struct CLB *lnk, char *buf, size_t sz)
 {
-    struct sockaddr_in *sin = &lnk->peer;
-#ifndef SUNOSwhysmw
-    struct hostent	*he;
+	struct addrinfo *ai_ptr;
+	char 		hostname[SA_MAXLITLEN];
+	char 		ipname[SA_MAXLEN];
+	char		port_str[NI_MAXSERV];
+	int		errcode;
 
-    if ((he = gethostbyaddr((char *)&sin->sin_addr.s_addr,
-			    SIZEOF(struct in_addr), AF_INET)))
-	snprintf(buf, sz, "%s (%d.%d.%d.%d:%d)",he->h_name,
-		   sin->sin_addr.s_addr >> 24,
-		   sin->sin_addr.s_addr >> 16 & 0xFF,
-		   sin->sin_addr.s_addr >> 8 & 0xFF,
-		   sin->sin_addr.s_addr & 0xFF, (int)sin->sin_port);
-    else
-#endif
-	snprintf(buf, sz, "%d.%d.%d.%d:%d",
-		   sin->sin_addr.s_addr >> 24,
-		   sin->sin_addr.s_addr >> 16 & 0xFF,
-		   sin->sin_addr.s_addr >> 8 & 0xFF,
-		   sin->sin_addr.s_addr & 0xFF, (int)sin->sin_port);
+	ai_ptr = &lnk->peer_ai;
+	if (0 != (errcode = getnameinfo(ai_ptr->ai_addr, ai_ptr->ai_addrlen,
+					 ipname, SA_MAXLEN,
+					 port_str, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV)))
+	{
+		assert(0);
+		RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+		return;
+	}
+	if (0 != (errcode = getnameinfo(ai_ptr->ai_addr, ai_ptr->ai_addrlen,
+					 hostname, SA_MAXLITLEN,
+					 NULL, 0, 0)))
+	{
+		assert(0);
+		RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+		return;
+	}
+	SNPRINTF(buf, sz, "%s (%s:%s)", hostname, ipname, port_str);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,7 +83,7 @@ enum cdb_sc gvcst_expand_any_key (sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_top, sm_
 		GET_RSIZ(*rec_size, curptr);
 		if (0 == cur_level || BSTAR_REC_SIZE != *rec_size)
 		{
-			READ_RECORD(cur_level, curptr, *keycmpc, *rec_size, expanded_key, *keylen, status);
+			READ_RECORD(status, rec_size, keycmpc, keylen, expanded_key, cur_level, blk_base, curptr);
 			if (cdb_sc_normal != status)
 			{
 				assert(t_tries < CDB_STAGNATE);
@@ -140,7 +140,7 @@ enum cdb_sc gvcst_expand_any_key (sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_top, sm_
 				return status;
 			if (*keylen + *keycmpc) /* Previous key exists */
 			{
-				GET_CMPC(*keycmpc, expanded_key, &expanded_star_key[0]);
+				GET_CMPC(*keycmpc, expanded_key, expanded_star_key);
 			}
 			memcpy(expanded_key, expanded_star_key, star_keylen + star_keycmpc);
 			*keylen = star_keylen + star_keycmpc - *keycmpc;

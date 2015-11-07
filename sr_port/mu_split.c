@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -137,8 +137,9 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		return cdb_sc_oprnotneeded;
 	old_right_piece_len = old_blk1_sz - new_leftblk_top_off;
 	new_blk2_frec_base = old_blk1_base + new_leftblk_top_off;
-	BLK_ADDR(newblk2_first_key, gv_cur_region->max_rec_size + 1, unsigned char);
-	READ_RECORD(level, new_blk2_frec_base, tkeycmpc, rec_size, newblk2_first_key, newblk2_first_keylen, status);
+	BLK_ADDR(newblk2_first_key, MAX_KEY_SZ + 1, unsigned char);
+	READ_RECORD(status, &rec_size, &tkeycmpc, &newblk2_first_keylen, newblk2_first_key,
+			level, old_blk1_base, new_blk2_frec_base);
 	if (cdb_sc_normal != status) /* restart for cdb_sc_starrecord too, because we eliminated the possibility already */
 	{
 		assert(t_tries < CDB_STAGNATE);
@@ -243,7 +244,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		}
 		else
 		{
-			BLK_ADDR(ances_currkey, gv_cur_region->max_rec_size + 1, unsigned char);
+			BLK_ADDR(ances_currkey, MAX_KEY_SZ + 1, unsigned char);
 			key_base = rec_base +  SIZEOF(rec_hdr);
 		}
 		new_ances_currkeysz = old_ances_currkeycmpc + old_ances_currkeylen;
@@ -268,7 +269,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		if (SIZEOF(blk_hdr) != gv_target->hist.h[level].curr_rec.offset)
 		{
 			/* new_ins_key will be inseted after curr_prev_key */
-			GET_CMPC(new_ins_keycmpc, &curr_prev_key[0], new_ins_key);
+			GET_CMPC(new_ins_keycmpc, curr_prev_key, new_ins_key);
 		}
 		else
 			new_ins_keycmpc = 0; /* new_ins_key will be the 1st key */
@@ -314,9 +315,9 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			else
 				/* process 1st record of new right block */
 			{
-				BLK_ADDR(newblk2_first_key, gv_cur_region->max_rec_size + 1, unsigned char);
-				READ_RECORD(level, new_blk2_frec_base, tkeycmpc, rec_size,
-						newblk2_first_key, newblk2_first_keylen, status);
+				BLK_ADDR(newblk2_first_key, MAX_KEY_SZ + 1, unsigned char);
+				READ_RECORD(status, &rec_size, &tkeycmpc, &newblk2_first_keylen, newblk2_first_key,
+						level, old_blk1_base, new_blk2_frec_base);
 				if (cdb_sc_normal == status)
 				{
 					memcpy(newblk2_first_key, &new_blk1_last_key[0], tkeycmpc); /* compressed piece */
@@ -666,7 +667,8 @@ int *last_rec_size, unsigned char last_key[], int *last_keysz, int *top_off)
 	rec_base = blk_base + SIZEOF(blk_hdr);
 	while (*top_off < max_fill)
 	{
-		READ_RECORD(level, rec_base, tkeycmpc, rec_size, &last_key[0], *last_keysz, status);
+		READ_RECORD(status, &rec_size, &tkeycmpc, last_keysz, last_key,
+				level, blk_base, rec_base);
 		*top_off += rec_size;
 		*last_keysz += tkeycmpc;
 		rec_base += rec_size;

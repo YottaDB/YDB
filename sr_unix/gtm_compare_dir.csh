@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2011 Fidelity Information Services, Inc       #
+#	Copyright 2011, 2013 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -22,13 +22,18 @@ exit
 GDE_EOF
 mupip create >& /dev/null
 cp $gtm_tools/dircompare.m.txt ./dircompare.m
-mumps -r dircompare $2/build.dir $3 $4 $5 > bout
-mumps -r dircompare $2/install.dir NOP NOP $5 > iout
+echo "setenv gtm_dist $gtm_dist"				>&! repeat
+echo "setenv gtmroutines '$gtmroutines'"			>>& repeat
+echo "setenv gtmgbldir mumps.gld"			>>& repeat
+echo "$gtm_dist/mumps -r dircompare $2/build.dir $3 $4 $5"	>>& repeat
+echo "$gtm_dist/mumps -r dircompare $2/install.dir NOP NOP $5"	>>& repeat
+$gtm_dist/mumps -r dircompare $2/build.dir $3 $4 $5 > dev.out
+$gtm_dist/mumps -r dircompare $2/install.dir NOP NOP $5 > install.out
 if ($6 == "os390") then
 	# we expect 4 diff lines at the beginning on zos so account for them
-	diff bout iout | tail -n +5 > diff.out
+	diff dev.out install.out | tail -n +5 > diff.out
 else
-	diff bout iout > diff.out
+	diff dev.out install.out > diff.out
 endif
 set numdiff=`wc -l < diff.out`
 echo

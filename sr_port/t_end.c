@@ -88,7 +88,6 @@
 #include "bml_status_check.h"
 #include "is_proc_alive.h"
 #include "muextr.h"
-#include "mupip_reorg.h"
 
 GBLREF	bool			rc_locked;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
@@ -187,8 +186,11 @@ if (history)								\
 
 #define	BUSY2FREE	0x00000001
 #define	RECYCLED2FREE	0x00000002
-#define	FREE_DIR_DATA	0x00000004
-/* free_dir_data denotes the block to be freed is the data block in directory tree */
+#define	FREE_DIR_DATA	0x00000004	/* denotes the block to be freed is a data block in directory tree */
+
+#define SAVE_2FREE_IMAGE(MODE, FREE_SEEN, CSD)								\
+	 (((gds_t_busy2free == MODE) && (!CSD->db_got_to_v5_once || (FREE_SEEN & FREE_DIR_DATA)))	\
+	|| (gds_t_recycled2free == MODE))
 
 trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 {
@@ -356,6 +358,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			return csa->ti->curr_tn;
 		}
 	}
+	assert((gds_t_committed < gds_t_busy2free)	&& (n_gds_t_op > gds_t_busy2free));
+	assert((gds_t_committed < gds_t_recycled2free)	&& (n_gds_t_op > gds_t_recycled2free));
+	assert((gds_t_committed < gds_t_write_root)	&& (n_gds_t_op > gds_t_write_root));
 	free_seen = 0;
 	cw_depth = cw_set_depth;
 	cw_bmp_depth = cw_depth;
@@ -368,22 +373,21 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		} else if (gds_t_busy2free == cw_set[0].mode)
 		{
 			assert(TREF(in_gvcst_bmp_mark_free));
-			assert(2 == cw_set_depth);
+			free_seen |= BUSY2FREE;
 			if (CSE_LEVEL_DRT_LVL0_FREE == cw_set[0].level)
-			{
-				/* the block is in fact level-0 block in directory tree */
+			{	/* the block is in fact a level-0 block in the directory tree */
 				assert(MUSWP_FREE_BLK == TREF(in_mu_swap_root_state));
 				free_seen |= FREE_DIR_DATA;
 			}
+			assert(2 == cw_set_depth);
 			cw_depth = 0;
-			free_seen |= BUSY2FREE;
 			cw_bmp_depth = 1;
 		} else if (gds_t_recycled2free == cw_set[0].mode)
-		{
-			assert(2 == cw_set_depth);
-			assert(process_id == cnl->trunc_pid && in_mu_truncate); /* In phase 1 of MUPIP REORG -TRUNCATE */
-			cw_depth = 1;
+		{	/* in phase 1 of MUPIP REORG -TRUNCATE, and we need to free a recycled block */
+			assert(in_mu_truncate);
 			free_seen |= RECYCLED2FREE;
+			assert(2 == cw_set_depth);
+			cw_depth = 0;
 			cw_bmp_depth = 1;
 		}
 	}
@@ -542,7 +546,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		assert(jgbl.gbl_jrec_time);
 	}
 	block_saved = FALSE;
-	ESTABLISH_RET(t_ch, 0);
+	ESTABLISH_NOUNWIND(t_ch);	/* avoid hefty setjmp call, which is ok since we never unwind t_ch */
 	assert(!csa->hold_onto_crit || csa->now_crit);
 	if (!csa->now_crit)
 	{
@@ -867,21 +871,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				cs = t1->cse;
 				if (cs)
 				{
-					/* we do not pin cache record for gds_t_recycled2free here since its cw_depth is larger
-					 * than 0 so we will pin it later during PINing cache record for every cs if
-					 * update_trans and before_image is true
-					 */
-					if (n_gds_t_op > cs->mode && gds_t_recycled2free != cs->mode) /* don't pass histories... */
+					if (n_gds_t_op > cs->mode)
 					{
 						assert(update_trans);
-						assert(gds_t_busy2free  > gds_t_committed);
-						assert(gds_t_busy2free  < n_gds_t_op);
-						assert(gds_t_write_root > gds_t_committed);
-						assert(gds_t_write_root < n_gds_t_op);
-						assert(gds_t_recycled2free > gds_t_committed);
-						assert(gds_t_recycled2free < n_gds_t_op);
-						assert((gds_t_committed > cs->mode)
-							|| ((free_seen & BUSY2FREE) && (gds_t_busy2free == cs->mode)));
 						PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 						/* If cs->mode is gds_t_busy2free, then the corresponding cache-record needs
 						 * to be pinned to write the before-image right away but this cse is not going
@@ -891,7 +883,12 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						 * that the cache-record corresponding to the gds_t_busy2free cse is always the
 						 * first one in the cr_array.
 						 */
+						assert((gds_t_committed > cs->mode)
+							|| (gds_t_busy2free == cs->mode) || (gds_t_recycled2free == cs->mode));
 						assert((gds_t_busy2free != cs->mode) || (1 == cr_array_index));
+						assert((gds_t_recycled2free != cs->mode) || (1 == cr_array_index));
+						assert((gds_t_busy2free != cs->mode) || (free_seen & BUSY2FREE));
+						assert((gds_t_recycled2free != cs->mode) || (free_seen & RECYCLED2FREE));
 					}
 					t1->cse = NULL;	/* reset for next transaction */
 				}
@@ -1036,8 +1033,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				 * or online integ) and did not rely on it for constructing the transaction.
 				 * Restart if block is not present in cache now or is being read in currently.
 				 */
-				assert(gds_t_busy2free != cs->mode);
-				if ((gds_t_acquired == cs->mode || gds_t_recycled2free == cs->mode) && (NULL != cs->old_block))
+				assert((gds_t_busy2free != cs->mode) && (gds_t_recycled2free != cs->mode));
+				if ((gds_t_acquired == cs->mode) && (NULL != cs->old_block))
 				{
 					assert(read_before_image == ((JNL_ENABLED(csa) && csa->jnl_before_image)
 								     || csa->backup_in_prog
@@ -1140,7 +1137,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		{
 			repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 			if (!repl_csa->hold_onto_crit)
-				grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+				grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 			assert(repl_csa->now_crit);
 			jnlpool_crit_acquired = TRUE;
 #			ifdef UNIX
@@ -1338,10 +1335,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 							 */
 							assert((gds_t_write_root == mode) || (gds_t_busy2free == mode)
 								|| (gds_t_recycled2free == mode));
-							if ((gds_t_write_root == mode)
-							 		|| ((gds_t_busy2free == mode)
-								 		&&  csd->db_got_to_v5_once
-										&& !(free_seen & FREE_DIR_DATA)))
+							if (!SAVE_2FREE_IMAGE(mode, free_seen, csd))
 								continue;
 						}
 						old_block = (blk_hdr_ptr_t)cs->old_block;
@@ -1467,27 +1461,18 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			} else
 				jnl_write_ztp_logical(csa, non_tp_jfb_ptr, com_csum);
 		}
-		/* write to snapshot and backup file for busy2free and recycled2free mode. */
 		if (free_seen)
-		{
-			/* gds_t_busy2free or gds_t_recycled2free mode only appears in mupip reorg -truncate or v4-v5 upgrade.
-			 * mupip reorg -truncate works only for BG mode, and for MM, we must have blks_to_upgrd == 0, therefore
-			 * we will never have MM for gds_t_busy2free and gds_t_recycled2free mode
+		{	/* Write to snapshot and backup file for busy2free and recycled2free mode. These modes only appear in
+			 * mupip reorg -truncate or v4-v5 upgrade, neither of which can occur with MM.
 			 */
 			assert(!is_mm);
-			assert((2 == cw_set_depth) && (gds_t_writemap == cw_set[1].mode));
 			cs = &cw_set[0];
-			mode = cs->mode;
-			blkid = cs->blk;
-			/* we always need to write the block to snapshot file when the block is data block in gv tree */
-			if ((gds_t_busy2free == mode && (!csd->db_got_to_v5_once || (FREE_DIR_DATA & free_seen)))
-				|| (gds_t_recycled2free == mode))
+			if (SAVE_2FREE_IMAGE(cs->mode, free_seen, csd))
 			{
-				if (gds_t_busy2free == mode)
-				{
-					DEBUG_ONLY(csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != cnl->nbb);)
-					cr = db_csh_get(blkid);
-				}
+				blkid = cs->blk;
+				assert(!IS_BITMAP_BLK(blkid) && (blkid == cr_array[0]->blk));
+				csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != cnl->nbb);
+				cr = cr_array[0];
 				backup_cr = cr;
 				blk_ptr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 				backup_blk_ptr = blk_ptr;
@@ -1495,14 +1480,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						 dummysi->backup_block_saved);
 #				ifdef GTM_SNAPSHOT
 				if (SNAPSHOTS_IN_PROG(csa))
-				{
-					lcl_ss_ctx = SS_CTX_CAST(cs_addrs->ss_ctx);
-					/* we write the before-image to snapshot file only for FAST_INTEG and not for
+				{	/* we write the before-image to snapshot file only for FAST_INTEG and not for
 					 * regular integ because the block is going to be marked free at this point
 					 * and in case of a regular integ a before image will be written to the snapshot
 					 * file eventually when the free block gets reused. So the before-image writing
 					 * effectively gets deferred but does happen.
 					 */
+					lcl_ss_ctx = SS_CTX_CAST(cs_addrs->ss_ctx);
 					if (lcl_ss_ctx && FASTINTEG_IN_PROG(lcl_ss_ctx))
 						WRITE_SNAPSHOT_BLOCK(cs_addrs, cr, NULL, blkid, lcl_ss_ctx);
 				}
@@ -1545,11 +1529,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			{
 				mode = cs->mode;
 				assert((gds_t_write_root != mode) || ((cs - cw_set) + 1 == cw_depth));
+				assert((gds_t_committed > mode) ||
+					(gds_t_busy2free == mode) || (gds_t_recycled2free == mode) || (gds_t_write_root == mode));
 				cs->old_mode = (int4)mode;	/* note down before being reset to gds_t_committed */
-				assert(gds_t_committed < gds_t_write_root);
-				assert(gds_t_committed < gds_t_busy2free);
-				assert((n_gds_t_op != mode) && (gds_t_committed != mode));
-				assert((kill_t_write != mode) && (kill_t_create != mode));
 				if (gds_t_committed > mode)
 				{
 					DEBUG_ONLY(
@@ -1645,28 +1627,12 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 #			endif
 		}
 		start_tn = dbtn; /* start_tn temporarily used to store currtn (for bg_update_phase2) before releasing crit */
-	}
-	if (free_seen)
-	{
-		assert(!is_mm);
-		if (free_seen & BUSY2FREE)
-		{
-			assert((gds_t_busy2free == cw_set[0].mode) && cr_array_index && (cw_set[0].blk == cr_array[0]->blk));
-			assert(process_id == cr_array[0]->in_cw_set);
-			/* need to do below BEFORE releasing crit as we have no other lock on this buffer */
+		if (free_seen)
+		{	/* need to do below BEFORE releasing crit as we have no other lock on this buffer */
+			VMS_ONLY(assert((BUSY2FREE == free_seen) && (2 <= cr_array_index) && (cr_array_index <= 3)));
+			UNIX_ONLY(assert(2 == cr_array_index));	/* Unlike VMS, no chance to pin a twin for bitmap update */
+			assert((2 == cw_set_depth) && (process_id == cr_array[0]->in_cw_set));
 			UNPIN_CACHE_RECORD(cr_array[0]);
- 		} else if (free_seen & RECYCLED2FREE)
-		{
-			assert(gds_t_recycled2free == cw_set[0].mode);
-			if (read_before_image)
-			{
-				assert(cr_array_index == 2);
-				assert(cw_set[0].blk = cr_array[1]->blk);
-				assert(process_id == cr_array[1]->in_cw_set);
-				UNPIN_CACHE_RECORD(cr_array[1]);
-			} else
-				assert(cr_array_index == 1);
-				/* Never pinned it in the first place */
 		}
 	}
 	if (!csa->hold_onto_crit)

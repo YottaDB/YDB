@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,7 +106,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	cache_rec_ptr_t		dest_child_cr;
 	blk_segment		*bs1, *bs_ptr;
 	sm_uc_ptr_t		saved_blk, work_blk_ptr, work_parent_ptr, dest_parent_ptr, dest_blk_ptr,
-				bn_ptr, bmp_buff, tblk_ptr, rec_base, rPtr1;
+				bn_ptr, bmp_buff, tblk_ptr, rec_base, key_base;
 	boolean_t		gbl_target_was_set, blk_was_free, deleted;
 	gv_namehead		*save_targ;
 	srch_blk_status		bmlhist, destblkhist, *hist_ptr;
@@ -243,9 +243,9 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (SIZEOF(blk_hdr) >= ((blk_hdr_ptr_t)tblk_ptr)->bsiz)
 			continue;
 		/* get length of global variable name (do not read subscript) for dest_blk_id */
-		GET_GBLNAME_LEN(key_len_dir, rec_base + SIZEOF(rec_hdr));
+		key_len_dir = get_gblname_len(tblk_ptr, rec_base + SIZEOF(rec_hdr));
 		/* key_len = length of 1st key value (including subscript) for dest_blk_id */
-		GET_KEY_LEN(key_len, rec_base + SIZEOF(rec_hdr));
+		key_len = get_key_len(tblk_ptr, rec_base + SIZEOF(rec_hdr));
 		if ((1 >= key_len_dir || MAX_MIDENT_LEN + 1 < key_len_dir) || (2 >= key_len || MAX_KEY_SZ < key_len))
 		{	/* Earlier used to restart here always. But dest_blk_id can be a block,
 			 * which is just killed and still marked busy.  Skip it, if we are in last retry.
@@ -299,10 +299,10 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 */
 		memcpy(&((TREF(gv_reorgkey))->base[0]), rec_base + SIZEOF(rec_hdr), key_len);
 		(TREF(gv_reorgkey))->end = key_len - 1;
-		GET_KEY_LEN(key_len_dir, dir_hist_ptr->h[0].buffaddr + dir_hist_ptr->h[0].curr_rec.offset + SIZEOF(rec_hdr));
+		key_base = dir_hist_ptr->h[0].buffaddr + dir_hist_ptr->h[0].curr_rec.offset + SIZEOF(rec_hdr);
+		key_len_dir = get_key_len(dir_hist_ptr->h[0].buffaddr, key_base);
 		/* Get root of GVT for dest_blk_id */
-		GET_LONG(gv_target->root,
-			dir_hist_ptr->h[0].buffaddr + dir_hist_ptr->h[0].curr_rec.offset + SIZEOF(rec_hdr) + key_len_dir);
+		GET_LONG(gv_target->root, key_base + key_len_dir);
 		if ((0 == gv_target->root) || (gv_target->root > (cs_data->trans_hist.total_blks - 1)))
 		{
 			assert(t_tries < CDB_STAGNATE);

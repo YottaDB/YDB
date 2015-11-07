@@ -46,6 +46,7 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gtmio.h"
+#include "fork_init.h"
 
 GBLREF	bool			jobpid;	/* job's output files should have the pid appended to them. */
 GBLREF	volatile boolean_t	ojtimeout;
@@ -90,7 +91,6 @@ GBLREF char	gtm_dist[GTM_PATH_MAX];
 #define	JOB_CONTINUE		1
 #define JOB_EXIT		0
 
-
 #define KILL_N_REAP(PROCESS_ID, SIGNAL, RET_VAL)					\
 {											\
 	if (-1 != (RET_VAL = kill(PROCESS_ID, SIGNAL)))					\
@@ -99,6 +99,17 @@ GBLREF char	gtm_dist[GTM_PATH_MAX];
 		WAITPID(PROCESS_ID, &wait_status, 0, done_pid);				\
 		assert(done_pid == PROCESS_ID);						\
 	}										\
+}
+
+#define FORK_RETRY(PID)											\
+{													\
+	FORK(PID); /* BYPASSOK: we die after creating a child, no FORK_CLEAN needed */			\
+	while (-1 == PID)										\
+	{												\
+		assertpro(EAGAIN == errno || ENOMEM == errno);						\
+		usleep(50000);										\
+		FORK(PID);	/* BYPASSOK: we die after creating a child, no FORK_CLEAN needed */	\
+	}												\
 }
 
 error_def(ERR_JOBFAIL);
@@ -158,8 +169,6 @@ void job_term_handler(int sig)
 			_exit(exit_status);
 		else
 			return;
-		assert(FALSE);
-		_exit(EXIT_SUCCESS);
 }
 
 static int io_rename(job_params_type *jparms, const int jobid)
@@ -239,12 +248,8 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #pragma pointer_size (restore)
 #endif
 	par_pid = getppid();
-	while (-1 == (child_pid = fork()))	/* BYPASSOK: we die after creating a child, no FORK_CLEAN needed */
-	{
-		assertpro(EAGAIN == errno || ENOMEM == errno);
-		usleep(50000);
-	}
 
+	FORK_RETRY(child_pid);
 	if (child_pid == 0)
 	{
 		/* This is a child process (middle process, M)
@@ -343,63 +348,56 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		}
 
 		/* clone self and exit */
-		while (0 != (child_pid = fork()))	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+		FORK_RETRY(child_pid);
+		if (child_pid)	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
 		{
 			/* This is still the middle process.  */
-			if (0 > child_pid && (EAGAIN == errno || ENOMEM == errno))
+			/* Close the read end of the pipe between middle process and grandchild process. */
+			CLOSEFILE_RESET(mproc_fds[0], pipe_status);	/* resets "pipe_fds[0]" to FD_INVALID */
+			assert(SIZEOF(pid_t) == SIZEOF(child_pid));
+			/* if the Job pid need to be appended to the std out/err file names */
+			if (jobpid)
 			{
-				usleep(500000);
-				continue;
-			} else
-			{
-				/* Close the read end of the pipe between middle process and grandchild process. */
-				CLOSEFILE_RESET(mproc_fds[0], pipe_status);	/* resets "pipe_fds[0]" to FD_INVALID */
-				assert(SIZEOF(pid_t) == SIZEOF(child_pid));
-				/* if the Job pid need to be appended to the std out/err file names */
-				if (jobpid)
+				joberr = io_rename(jparms, child_pid);
+				if (joberr)
 				{
-					joberr = io_rename(jparms, child_pid);
-					if (joberr)
-					{
-						/* Inform grandchild that it will have to exit. If pipe operation failed terminate
-						 * the grandchild.
-						 */
-						decision = JOB_EXIT;
-						DOWRITERC(mproc_fds[1], &decision, SIZEOF(decision), pipe_status);
-						if (pipe_status)
-							kill(child_pid, SIGTERM);
-						DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
-						_exit(joberr);
-					}
-				}
-				/* write child_pid into pipe to be read by parent process(P) for $ZJOB */
-				DOWRITERC(pipe_fds[1], &child_pid, SIZEOF(child_pid), pipe_status);
-				/* Failed to send parent new JOBID. Terminate the child and exit middle process. */
-				if (pipe_status)
-				{
-					/* Inform grandchild that it will have to exit. If pipe operation failed terminate the
-					 * grandchild.
+					/* Inform grandchild that it will have to exit. If pipe operation failed terminate
+					 * the grandchild.
 					 */
-					joberr = joberr_pipe_mp;
 					decision = JOB_EXIT;
 					DOWRITERC(mproc_fds[1], &decision, SIZEOF(decision), pipe_status);
 					if (pipe_status)
 						kill(child_pid, SIGTERM);
+					DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 					_exit(joberr);
-				} else
-				{
-					/* Inform grandchild that everything is properly set for it and it is ready to continue. */
-					decision = JOB_CONTINUE;
-					DOWRITERC(mproc_fds[1], &decision, SIZEOF(decision), pipe_status);
-					/* If pipe_status is non-zero i.e. error occurred in pipe operation or total
-					 * SIZEOF(decision) bytes are not written in the pipe. In this case, we let the grandchild
-					 * handle its own fate as we have already conveyed back the grandchild's pid to parent
-					 * process and all the setup for the grandchild is successfully done.
-					 */
 				}
-				_exit(EXIT_SUCCESS);
 			}
-			assert(FALSE);
+			/* write child_pid into pipe to be read by parent process(P) for $ZJOB */
+			DOWRITERC(pipe_fds[1], &child_pid, SIZEOF(child_pid), pipe_status);
+			/* Failed to send parent new JOBID. Terminate the child and exit middle process. */
+			if (pipe_status)
+			{
+				/* Inform grandchild that it will have to exit. If pipe operation failed terminate the
+				 * grandchild.
+				 */
+				joberr = joberr_pipe_mp;
+				decision = JOB_EXIT;
+				DOWRITERC(mproc_fds[1], &decision, SIZEOF(decision), pipe_status);
+				if (pipe_status)
+					kill(child_pid, SIGTERM);
+				_exit(joberr);
+			} else
+			{
+				/* Inform grandchild that everything is properly set for it and it is ready to continue. */
+				decision = JOB_CONTINUE;
+				DOWRITERC(mproc_fds[1], &decision, SIZEOF(decision), pipe_status);
+				/* If pipe_status is non-zero i.e. error occurred in pipe operation or total
+				 * SIZEOF(decision) bytes are not written in the pipe. In this case, we let the grandchild
+				 * handle its own fate as we have already conveyed back the grandchild's pid to parent
+				 * process and all the setup for the grandchild is successfully done.
+				 */
+			}
+			_exit(EXIT_SUCCESS);
 		}
 		/* This is now the grandchild process (actual Job process) -- an orphan as soon as the exit(EXIT_SUCCESS) above
 		 * occurs. Revert the condition handler established by middle process and establish its own condition handler */

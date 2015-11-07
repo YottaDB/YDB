@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,12 +16,8 @@
 #include "gtm_unistd.h"
 #include "gtm_inet.h"
 #include "gtm_string.h"
-
 #include <errno.h>
-#ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
-#endif
-
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -55,22 +51,31 @@ int gtmsource_mode_change(int to_mode)
 		return (ABNORMAL_SHUTDOWN);
 	}
 
-	if (jnlpool.gtmsource_local->mode == to_mode)
+	if ((jnlpool.gtmsource_local->mode == GTMSOURCE_MODE_ACTIVE_REQUESTED)
+		|| (jnlpool.gtmsource_local->mode == GTMSOURCE_MODE_PASSIVE_REQUESTED))
+	{
+		repl_log(stderr, FALSE, TRUE, "Source Server %s already requested, not changing mode\n",
+				(to_mode == GTMSOURCE_MODE_ACTIVE_REQUESTED) ? "ACTIVATE" : "DEACTIVATE");
+		rel_sem(SOURCE, SRC_SERV_OPTIONS_SEM);
+		return (ABNORMAL_SHUTDOWN);
+	}
+	if (((GTMSOURCE_MODE_ACTIVE == jnlpool.gtmsource_local->mode) && (GTMSOURCE_MODE_ACTIVE_REQUESTED == to_mode))
+		|| ((GTMSOURCE_MODE_PASSIVE == jnlpool.gtmsource_local->mode) && (GTMSOURCE_MODE_PASSIVE_REQUESTED == to_mode)))
 	{
 		repl_log(stderr, FALSE, TRUE, "Source Server already %s, not changing mode\n",
-				(to_mode == GTMSOURCE_MODE_ACTIVE) ? "ACTIVE" : "PASSIVE");
+				(to_mode == GTMSOURCE_MODE_ACTIVE_REQUESTED) ? "ACTIVE" : "PASSIVE");
 		rel_sem(SOURCE, SRC_SERV_OPTIONS_SEM);
 		return (ABNORMAL_SHUTDOWN);
 	}
 
-	repl_log(stdout, FALSE, FALSE, "Initiating change of mode from %s to %s\n", (GTMSOURCE_MODE_ACTIVE == to_mode) ?
-			"PASSIVE" : "ACTIVE", (GTMSOURCE_MODE_ACTIVE == to_mode) ? "ACTIVE" : "PASSIVE");
+	repl_log(stdout, FALSE, FALSE, "Initiating change of mode from %s to %s\n", (GTMSOURCE_MODE_ACTIVE_REQUESTED == to_mode) ?
+			"PASSIVE" : "ACTIVE", (GTMSOURCE_MODE_ACTIVE_REQUESTED == to_mode) ? "ACTIVE" : "PASSIVE");
 
-	if (GTMSOURCE_MODE_ACTIVE == to_mode)
+	if (GTMSOURCE_MODE_ACTIVE_REQUESTED == to_mode)
 	{
 		jnlpool.gtmsource_local->secondary_port = gtmsource_options.secondary_port;
-		jnlpool.gtmsource_local->secondary_inet_addr = gtmsource_options.sec_inet_addr;
-		strcpy(jnlpool.gtmsource_local->secondary, gtmsource_options.secondary_host);
+		strcpy(jnlpool.gtmsource_local->secondary_host, gtmsource_options.secondary_host);
+		jnlpool.gtmsource_local->secondary_port = gtmsource_options.secondary_port;
 		memcpy(&jnlpool.gtmsource_local->connect_parms[0], &gtmsource_options.connect_parms[0],
 				SIZEOF(gtmsource_options.connect_parms));
 	}
@@ -90,7 +95,7 @@ int gtmsource_mode_change(int to_mode)
 	}
 
 	jnlpool.gtmsource_local->mode = to_mode;
-	grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+	grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 	if (update_disable)
 	{
 		jnlpool.jnlpool_ctl->upd_disabled = TRUE;

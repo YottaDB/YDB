@@ -1,6 +1,6 @@
 $!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 $!								!
-$!	Copyright 2001, 2007 Fidelity Information Services Inc	!
+$!	Copyright 2001, 2013 Fidelity Information Services Inc	!
 $!								!
 $!	This source code contains the intellectual property	!
 $!	of its copyright holder(s), and is made available	!
@@ -35,12 +35,15 @@ $ p3 = ""
 $ gosub getprod
 $ gosub getver
 $ gosub getdst
-$ VER 'VNO' P
+$ ver 'vno' p
 $ savpriv = f$setprv("bypas,cmkrnl,log_io,sysnam,volpro,oper")
 $ if f$getdvi(outdev,"devclass") .eq. 2
 $  then
 $   init/over=(accessibility,expiration,owner)/density=1600 'outdev' gtc
 $ endif
+$! Fix the Version #s in "gtm$vrt:[t%%]*_spkitbld.dat"
+$ @gtm$tools:spkitupdate.com 'vno'
+$!
 $ if (f$locate("GT.M",prd) + f$locate("ALL",prd)) .ne. prdlen2
 $  then
 $   @sys$update:spkitbld "" 'dst' "" gtm$vrt:[tls]gtm_spkitbld.dat
@@ -87,6 +90,7 @@ $  then
 $   if .not. f$getdvi(outdev,"MNT") then mount/foreign/noassist 'outdev'
 $   dismount/unload 'outdev'
 $ endif
+$ @gtm$tools:kitprepare.com 'vno'
 $goodbye:
 $ savpriv = f$setprv(savpriv)
 $ exit

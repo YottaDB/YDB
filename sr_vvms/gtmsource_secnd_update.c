@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@ int gtmsource_secnd_update(boolean_t print_message)
 		util_out_print("Error grabbing jnlpool option write lock. Could not initiate change log", TRUE);
 		return(ABNORMAL_SHUTDOWN);
 	}
-	grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+	grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 	jnlpool.jnlpool_ctl->upd_disabled = update_disable;
 	rel_lock(jnlpool.jnlpool_dummy_reg);
 	rel_sem(SOURCE, SRC_SERV_OPTIONS_SEM);

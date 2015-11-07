@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,7 @@
 
 #include "mdef.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
+#include "gtm_inet.h"
 
 #include <stddef.h>
 #include <lkidef.h>
@@ -70,7 +69,7 @@ static uint4 get_pagelet_count(boolean_t src_or_rcv, char *gsec_name, int4 *pgcn
 
 	/* Map initial pages required to get the header*/
 	hdr_pglets = DIVIDE_ROUND_UP(header_size[src_or_rcv], OS_PAGELET_SIZE);
-        if(SS$_NORMAL != (status = map_shm_aux(src_or_rcv, &d_gsec, hdr_pglets, shm_range)))
+        if (SS$_NORMAL != (status = map_shm_aux(src_or_rcv, &d_gsec, hdr_pglets, shm_range)))
 		/* Global section doesn't exist. Just return. Caller has to handle */
 		return status;
 
@@ -94,7 +93,7 @@ static int4 map_shm_aux(boolean_t src_or_rcv, struct dsc$descriptor_s *name_dsc,
 	/* Expand virtual address space */
         status = gtm_expreg(buff_pagelets, inadr, PSL$C_USER, 0);
         if (SS$_NORMAL != status)
-		rts_error(VARLSTCNT(7) ERR_POOLSETUP[src_or_rcv], 0,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_POOLSETUP[src_or_rcv], 0,
 				       ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to expand virtual address space"), status);
 
 	/* Optional gaurding of the shared space - to be done here, if needed.(gvcst_init_sysops.c is a sample)*/
@@ -119,7 +118,7 @@ int4 create_and_map_shm(boolean_t src_or_rcv, struct dsc$descriptor_s *name_dsc,
 	/* Expand virtual address space */
         status = gtm_expreg(buff_pagelets, shm_range, PSL$C_USER, 0);
         if (SS$_NORMAL != status)
-		rts_error(VARLSTCNT(7) ERR_POOLSETUP[src_or_rcv], 0,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_POOLSETUP[src_or_rcv], 0,
 				       ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to expand virtual address space"), status);
 
 	/* Optional gaurding of the shared space - to be done here, if needed.(gvcst_init_sysops.c is a sample)*/
@@ -129,7 +128,7 @@ int4 create_and_map_shm(boolean_t src_or_rcv, struct dsc$descriptor_s *name_dsc,
         status = init_sec(shm_range, name_dsc, 0, buff_pagelets, flags);
 
         if ((SS$_NORMAL != status) && (SS$_CREATED != status))
-		rts_error(VARLSTCNT(7) ERR_POOLSETUP[src_or_rcv], 0,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_POOLSETUP[src_or_rcv], 0,
 				       ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to Create/Map global section"), status);
 	return status;
 }
@@ -141,8 +140,8 @@ int4 map_shm(boolean_t src_or_rcv, struct dsc$descriptor_s *name_dsc, sm_uc_ptr_
 	sm_uc_ptr_t	inadr[2];
 
 	status = get_pagelet_count(src_or_rcv, name_dsc->dsc$a_pointer, &buff_pagelets);
-	if(SS$_NORMAL != status)
-		rts_error(VARLSTCNT(7) ERR_POOLSETUP[src_or_rcv], 0,
+	if (SS$_NORMAL != status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_POOLSETUP[src_or_rcv], 0,
 				       ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to get the number of gblsection pagelets"), status);
 
 	/* If jnl-pool-size has to be in multiple of pages, uncomment the next line */
@@ -162,7 +161,8 @@ boolean_t shm_exists(boolean_t src_or_rcv, struct dsc$descriptor_s *name_dsc)
 	status = gtm_expreg(buff_pagelets, inadr, PSL$C_USER, 0);
 	if (SS$_NORMAL != status)
 	{
-		rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to expand virtual address space"), status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
+				RTS_ERROR_LITERAL("Unable to expand virtual address space"), status);
 		return FALSE;
 	}
 
@@ -170,11 +170,13 @@ boolean_t shm_exists(boolean_t src_or_rcv, struct dsc$descriptor_s *name_dsc)
 	flags = SEC$M_SYSGBL | SEC$M_WRT;
 	res      = (SS$_NORMAL == sys$mgblsc(inadr, shm_range, PSL$C_USER, flags, name_dsc, NULL, 0));
 	status   = gtm_deltva(inadr, NULL, PSL$C_USER);
-	if(SS$_NORMAL != status)
-		if(SOURCE == src_or_rcv)
-			rts_error(VARLSTCNT(5) ERR_REPLWARN, 2, RTS_ERROR_LITERAL("Could not detach from journal pool"), status);
+	if (SS$_NORMAL != status)
+		if (SOURCE == src_or_rcv)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLWARN, 2,
+					RTS_ERROR_LITERAL("Could not detach from journal pool"), status);
 		else
-			rts_error(VARLSTCNT(5) ERR_REPLWARN, 2, RTS_ERROR_LITERAL("Could not detach from receiver pool"), status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLWARN, 2,
+					 RTS_ERROR_LITERAL("Could not detach from receiver pool"), status);
 	return res;
 }
 

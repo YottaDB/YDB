@@ -1379,7 +1379,7 @@ REPLNOXENDIAN	<!AD side is running on a GT.M version that does not support cross
 REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
 ZGOTOINVLVL2	<ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)>/error/fao=0!/ansi=0
 GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/error/fao=2!/ansi=0
-UNUSEDMSG1382	<FORCTRLINDX: Only used in V5.4-002>/error/fao=0!/ansi=0
+JNLORDBFLU	<Error flushing database blocks to !AD. See related messages in the operator log>/error/fao=2!/ansi=0
 ZCCLNUPRTNMISNG	<External call: Cleanup routine name missing. Cannot continue>/error/fao=0!/ansi=0
 ZCINVALIDKEYWORD	<External call: Invalid keyword found. Cannot continue>/error/fao=0!/ansi=0
 REPLNOMULTILINETRG	<Sequence number 0x!16@XQ contains a trigger definition too large for transmission to the current replicating instance, which does not support multi-line triggers - stopping replication>/error/fao=1!/ansi=0
@@ -1434,7 +1434,7 @@ ORLBKFRZOVER	<!AD : FREEZE on region !AD (!AD) cleared>/info/fao=6!/ansi=0
 ORLBKNOV4BLK	<Region !AD (!AD) has V4 format blocks. Database upgrade required. ONLINE ROLLBACK cannot continue>/error/fao=4!/ansi=0
 DBROLLEDBACK	<Concurrent ONLINE ROLLBACK detected on one or more regions. The current operation is no longer valid>/error/fao=0!/ansi=0
 DSEWCREINIT	<Database cache reinitialized by DSE for region !AD>/info/fao=2!/ansi=0
-UNUSEDMSG1437	<A total of !UL process(es) skipped database rundown due to a concurrent ONLINE ROLLBACK>/info/fao=1!/ansi=0
+MURNDWNOVRD	<OVERRIDE qualifier used with MUPIP RUNDOWN on database file !AD>/info/fao=2!/ansi=0
 ! The following error message is NOT issued to the user and is only internal to GT.M
 REPLONLNRLBK	<ONLINE ROLLBACK detected. Starting afresh>/error/fao=0!/ansi=0
 !
@@ -1521,6 +1521,12 @@ MMREGNOACCESS	<Region !AD (!AD) is no longer accessible. See prior error message
 MALLOCMAXUNIX	<Exceeded maximum allocation defined by $gtm_max_storalloc>/error/fao=0!/ansi=0
 MALLOCMAXVMS	<Exceeded maximum allocation defined by GTM_MAX_STORALLOC>/error/fao=0!/ansi=0
 HOSTCONFLICT	<Host !AD could not open database file !AD because it is marked as already open on node !AD>/error/fao=6!/ansi=0
+GETADDRINFO	<Error in getting address info>/error/fao=0!/ansi=0
+GETNAMEINFO	<Error in getting name info>/error/fao=0!/ansi=0
+SOCKBIND	<Error in binding TCP socket>/error/fao=0!/ansi=0
+INSTFRZDEFER	<Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict>/info/fao=4!/ansi=0
+REGOPENRETRY	<Attempt to open region !AD (!AD) using startup shortcut failed due to conflicting database shutdown. Retrying...>/info/fao=4!/ansi=0
+REGOPENFAIL	<Failed to open region !AD (!AD) due to conflicting database shutdown activity>/error/fao=4!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

@@ -37,6 +37,7 @@ GBLREF	volatile boolean_t	timer_in_handler;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	VSIG_ATOMIC_T		forced_exit;
 
 #ifdef DEBUG
 static uint4		nesting_level = 0;
@@ -86,12 +87,14 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 
 	SETUP_THREADGBL_ACCESS;
 	/* Since send_msg uses a global variable buffer, reentrant calls to send_msg will use the same buffer.
-	 * Ensure we never overwrite an under-construction send_msg buffer with a nested send_msg call. The
-	 * only exception to this is if the nested call to send_msg is done by exit handling code in which case
-	 * the latest send_msg call prevails and it is ok since we will never return to the original send_msg()
-	 * call again.  Detect if ever this assmption gets violated with an assert.
+	 * Ensure we never overwrite an under-construction send_msg buffer with a nested send_msg call. One
+	 * exception to this is if the nested call to send_msg is done by exit handling code in which case the
+	 * latest send_msg call prevails and it is ok since we will never return to the original send_msg call
+	 * again. The other exception is if enable interrupts in util_out_send_oper results in a new send_msg
+	 * in deferred_signal_handler.
 	 */
-	assert((0 == nesting_level) || ((2 > nesting_level) && timer_in_handler) || (EXIT_IMMED == exit_state));
+	assert((0 == nesting_level) || ((2 > nesting_level) && timer_in_handler)
+		|| (EXIT_IMMED == exit_state) || (2 == forced_exit));
 	DEBUG_ONLY(nesting_level++;)
         assert(arg_count > 0);
 	if ((NULL != TREF(util_outptr)) && (TREF(util_outptr) != TREF(util_outbuff_ptr)))

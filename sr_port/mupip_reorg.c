@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,7 +83,8 @@ GBLREF bool		mu_ctrly_occurred;
 GBLREF boolean_t	mu_reorg_process;
 GBLREF gd_addr 		*gd_header;
 GBLREF gd_region	*gv_cur_region;
-GBLREF gv_key           *gv_currkey_next_reorg;
+GBLREF gv_key           *gv_currkey_next_reorg, *gv_currkey, *gv_altkey;
+GBLREF int		gv_keysize;
 GBLREF gv_namehead	*reorg_gv_target;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
@@ -113,6 +114,7 @@ void mupip_reorg(void)
 	node_local_ptr_t	cnl;
 	trunc_region		*reg_list, *tmp_reg, *reg_iter, *prev_reg;
 	uint4			fs;
+	uint4			lcl_pid;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -215,7 +217,7 @@ void mupip_reorg(void)
 		/* gv_select will select globals for this clause */
 		gv_select(cli_buff, n_len, FALSE, "EXCLUDE", &exclude_gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk, FALSE);
 		if (!exclude_gl_head.next)
-			gtm_putmsg(VARLSTCNT(1) ERR_NOEXCLUDE);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOEXCLUDE);
 	}
 	n_len = SIZEOF(cli_buff);
 	memset(cli_buff, 0, n_len);
@@ -234,7 +236,7 @@ void mupip_reorg(void)
 	gv_select(cli_buff, n_len, FALSE, "SELECT", &gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk, restrict_reg);
 	if (!gl_head.next)
 	{
-		rts_error(VARLSTCNT(1) ERR_NOSELECT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSELECT);
 		mupip_exit(ERR_NOSELECT);
 	}
 	TREF(want_empty_gvts) = FALSE;
@@ -242,7 +244,10 @@ void mupip_reorg(void)
 	root_swap_statistic = 0;
 	mu_reorg_process = TRUE;
 	assert(NULL == gv_currkey_next_reorg);
-	GVKEY_INIT(gv_currkey_next_reorg, DBKEYSIZE(MAX_KEY_SZ));
+	gv_keysize = DBKEYSIZE(MAX_KEY_SZ);
+	GVKEY_INIT(gv_currkey_next_reorg, gv_keysize);
+	GVKEY_INIT(gv_currkey, gv_keysize);
+	GVKEY_INIT(gv_altkey, gv_keysize);
 	reorg_gv_target = targ_alloc(MAX_KEY_SZ, NULL, NULL);
 	reorg_gv_target->hist.depth = 0;
 	reorg_gv_target->alt_hist->depth = 0;
@@ -252,7 +257,7 @@ void mupip_reorg(void)
 		util_out_print("Global: !AD ", FLUSH, gl_ptr->name.str.len, gl_ptr->name.str.addr);
 		if (in_exclude_list((uchar_ptr_t)gl_ptr->name.str.addr, gl_ptr->name.str.len, &exclude_gl_head))
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_EXCLUDEREORG, 2, gl_ptr->name.str.len, gl_ptr->name.str.addr);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_EXCLUDEREORG, 2, gl_ptr->name.str.len, gl_ptr->name.str.addr);
 			reorg_success = FALSE;
 			continue;
 		}
@@ -266,52 +271,50 @@ void mupip_reorg(void)
 		SET_GV_CURRKEY_FROM_REORG_GV_TARGET;
 #		ifdef GTM_TRUNCATE
 		if (truncate)
-			/* No need to move root blocks unless truncating */
+		{	/* No need to move root blocks unless truncating */
 			cur_success &= mu_swap_root(&gl_ptr->name, &root_swap_statistic);
-		/* if we successfully reorged this global, add its corresponding region to the set (list) of regions to truncate */
-		if (cur_success)
-		{
-			for (reg_iter = reg_list, prev_reg = reg_list; reg_iter; reg_iter = reg_iter->next)
-				if (reg_iter->reg == gv_cur_region)
-					break;
-				else
-					prev_reg = reg_iter;
-			if (NULL == reg_iter)
-			{
-				tmp_reg = (trunc_region *)malloc(SIZEOF(trunc_region));
-				tmp_reg->reg = gv_cur_region;
-				tmp_reg->next = NULL;
-				if (NULL == reg_list)
-					reg_list = tmp_reg;
-				else
-					prev_reg->next = tmp_reg;
-#				ifdef GTM_TRIGGER
-				if (truncate)
-				{	/* Reorg ^#t in this region to move it out of the way. */
-					gn = literal_hasht;
-					util_out_print("   ", FLUSH);
-					util_out_print("Global: !AD (region !AD)", FLUSH,
-							gn.str.len, gn.str.addr, REG_LEN_STR(gv_cur_region));
-					reorg_gv_target->gvname.var_name.addr = gn.str.addr;
-					reorg_gv_target->gvname.var_name.len = gn.str.len;
-					reorg_success &= mu_reorg(&gn, &exclude_gl_head, &resume, index_fill_factor,
-							data_fill_factor, reorg_op);
-					SET_GV_CURRKEY_FROM_REORG_GV_TARGET;
-					reorg_success &= mu_swap_root(&gn, &root_swap_statistic);
+			if (cur_success)
+			{	/* add region corresponding to this global to the set (list) of regions to truncate */
+				for (reg_iter = reg_list, prev_reg = reg_list; reg_iter; reg_iter = reg_iter->next)
+					if (reg_iter->reg == gv_cur_region)
+						break;
+					else
+						prev_reg = reg_iter;
+				if (NULL == reg_iter)
+				{
+					tmp_reg = (trunc_region *)malloc(SIZEOF(trunc_region));
+					tmp_reg->reg = gv_cur_region;
+					tmp_reg->next = NULL;
+					if (NULL == reg_list)
+						reg_list = tmp_reg;
+					else
+						prev_reg->next = tmp_reg;
+#					ifdef GTM_TRIGGER
+					if (truncate)
+					{	/* Reorg ^#t in this region to move it out of the way. */
+						gn = literal_hasht;
+						reorg_gv_target->gvname.var_name.addr = gn.str.addr;
+						reorg_gv_target->gvname.var_name.len = gn.str.len;
+						cur_success = mu_reorg(&gn, &exclude_gl_head, &resume, index_fill_factor,
+								data_fill_factor, reorg_op);
+						reorg_success &= cur_success;
+						SET_GV_CURRKEY_FROM_REORG_GV_TARGET;
+						reorg_success &= mu_swap_root(&gn, &root_swap_statistic);
+					}
+#					endif
 				}
-#				endif
 			}
 		}
 #		endif
 		if (mu_ctrlc_occurred || mu_ctrly_occurred)
 		{
-			gtm_putmsg(VARLSTCNT(1) ERR_REORGCTRLY);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REORGCTRLY);
 			mupip_exit(ERR_MUNOFINISH);
 		}
 	}
 	if (!reorg_success)
 	{
-		rts_error(VARLSTCNT(1) ERR_REORGINC);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REORGINC);
 		mupip_exit(ERR_REORGINC);
 	}
 	else if (truncate)
@@ -324,7 +327,7 @@ void mupip_reorg(void)
 		cli_get_int("TRUNCATE", (int4 *)&truncate_percent);
 		if (99 < truncate_percent)
 		{
-			gtm_putmsg(VARLSTCNT(1) ERR_MUTRUNCPERCENT);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUTRUNCPERCENT);
 			mupip_exit(ERR_MUTRUNCFAIL);
 		}
 		for (reg_iter = reg_list; reg_iter; reg_iter = reg_iter->next)
@@ -336,10 +339,12 @@ void mupip_reorg(void)
 			cnl = csa->nl;
 			/* Ensure only one truncate process at a time operates on given region */
 			grab_crit(gv_cur_region);
-			if (cnl->trunc_pid && is_proc_alive(cnl->trunc_pid, 0))
+			lcl_pid = cnl->trunc_pid;
+			if (lcl_pid && is_proc_alive(lcl_pid, 0))
 			{
 				rel_crit(gv_cur_region);
-				send_msg(VARLSTCNT(4) ERR_MUTRUNC1ATIME, 3, cnl->trunc_pid, REG_LEN_STR(gv_cur_region));
+				send_msg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(4) ERR_MUTRUNC1ATIME, 3, lcl_pid,
+						REG_LEN_STR(gv_cur_region));
 				continue;
 			}
 			cnl->trunc_pid = process_id;
@@ -353,7 +358,7 @@ void mupip_reorg(void)
 			rel_crit(gv_cur_region);
 			if (mu_ctrlc_occurred || mu_ctrly_occurred)
 			{
-				gtm_putmsg(VARLSTCNT(1) ERR_REORGCTRLY);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REORGCTRLY);
 				mupip_exit(ERR_MUNOFINISH);
 			}
 		}

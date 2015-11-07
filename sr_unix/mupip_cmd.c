@@ -37,7 +37,7 @@
 #include "mupip_extend.h"
 #include "muextr.h"
 #include "mupip_freeze.h"
-#include "mupip_help.h"
+#include "util_help.h"
 #include "mupip_integ.h"
 #include "mupip_intrpt.h"
 #include "mupip_quit.h"
@@ -696,7 +696,7 @@ GBLDEF	CLI_ENTRY	mupip_cmd_ary[] = {
 { "EXTRACT",	mu_extract,	mup_extract_qual,	mup_extract_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "FREEZE",	mupip_freeze,	mup_freeze_qual,	mup_freeze_parm,	0, cli_disallow_mupip_freeze,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "FTOK",	mupip_ftok,	mup_ftok_qual,		mup_ftok_parm,		0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
-{ "HELP",	mupip_help,	0,			0,			0, 0,				0, VAL_DISALLOWED, 0, 0, 0, 0 },
+{ "HELP",	util_help,	0,			0,			0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "INTEG",	mupip_integ,	mup_integ_qual,		mup_integ_parm,		0, cli_disallow_mupip_integ,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "INTRPT",	mupip_intrpt,	0,			mup_intrpt_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "JOURNAL",	mupip_recover,	mup_journal_qual,	mup_journal_parm,	0, cli_disallow_mupip_journal,	0, VAL_DISALLOWED, 1, 0, 0, 0 },

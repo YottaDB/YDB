@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,7 @@
 #include "repl_filter.h"
 #include "repl_log.h"
 #include "gtmsource.h"
+#include "gtm_netdb.h"
 #include "sgtm_putmsg.h"
 #include "gt_timer.h"
 #include "min_max.h"
@@ -54,9 +55,6 @@
 #include "replgbl.h"
 
 #define RECVBUFF_REPLMSGLEN_FACTOR 		8
-
-#define GTMRECV_POLL_INTERVAL			(1000000 - 1)/* micro sec, almost 1 sec */
-#define MAX_GTMRECV_POLL_INTERVAL		1000000 /* 1 sec in micro sec */
 
 #define GTMRECV_WAIT_FOR_STARTJNLSEQNO		100 /* ms */
 
@@ -76,12 +74,12 @@
 
 GBLDEF	repl_msg_ptr_t		gtmrecv_msgp;
 GBLDEF	int			gtmrecv_max_repl_msglen;
-GBLDEF	struct timeval		gtmrecv_poll_interval, gtmrecv_poll_immediate;
 GBLDEF	int			gtmrecv_sock_fd = FD_INVALID;
 GBLDEF	boolean_t		repl_connection_reset = FALSE;
 GBLDEF	boolean_t		gtmrecv_wait_for_jnl_seqno = FALSE;
 GBLDEF	boolean_t		gtmrecv_bad_trans_sent = FALSE;
-GBLDEF	struct sockaddr_in	primary_addr;
+GBLDEF	struct addrinfo		primary_ai;
+GBLDEF	struct sockaddr_storage	primary_sas;
 
 GBLDEF	qw_num			repl_recv_data_recvd = 0;
 GBLDEF	qw_num			repl_recv_data_processed = 0;
@@ -171,7 +169,7 @@ static void do_flow_control(uint4 write_pos)
 		xoff_msg.type = REPL_XOFF;
 		memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, SIZEOF(seq_num));
 		xoff_msg.len = MIN_REPL_MSGLEN;
-		REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, xoff_msg.len, FALSE, &gtmrecv_poll_immediate)
+		REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, xoff_msg.len, REPL_POLL_NOWAIT)
 		{
 			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
 			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
@@ -188,13 +186,13 @@ static void do_flow_control(uint4 write_pos)
 			{
 				SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending XOFF msg. Error in send : %s",
 						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 			}
 			if (EREPL_SELECT == repl_errno)
 			{
 				SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending XOFF msg. Error in select : %s",
 						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 			}
 		}
 		if (gtmrecv_logstats)
@@ -205,15 +203,12 @@ static void do_flow_control(uint4 write_pos)
 				"processed\n", space_used);
 		xoff_sent = TRUE;
 		xoff_msg_log_cnt = 1;
-		assert(GTMRECV_WAIT_FOR_UPD_PROGRESS_US < MAX_GTMRECV_POLL_INTERVAL);
-		gtmrecv_poll_interval.tv_sec = 0;
-		gtmrecv_poll_interval.tv_usec = GTMRECV_WAIT_FOR_UPD_PROGRESS_US;
 	} else if (space_used < recvpool_low_watermark && xoff_sent)
 	{
 		xon_msg.type = REPL_XON;
 		memcpy((uchar_ptr_t)&xon_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, SIZEOF(seq_num));
 		xon_msg.len = MIN_REPL_MSGLEN;
-		REPL_SEND_LOOP(gtmrecv_sock_fd, &xon_msg, xon_msg.len, FALSE, &gtmrecv_poll_immediate)
+		REPL_SEND_LOOP(gtmrecv_sock_fd, &xon_msg, xon_msg.len, REPL_POLL_NOWAIT)
 		{
 			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
 			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
@@ -230,13 +225,13 @@ static void do_flow_control(uint4 write_pos)
 			{
 				SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending XON msg. Error in send : %s",
 						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 			}
 			if (EREPL_SELECT == repl_errno)
 			{
 				SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending XON msg. Error in select : %s",
 						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 			}
 		}
 		if (gtmrecv_logstats)
@@ -247,8 +242,6 @@ static void do_flow_control(uint4 write_pos)
 				"data\n", recvpool_size - space_used);
 		xoff_sent = FALSE;
 		xoff_msg_log_cnt = 0;
-		gtmrecv_poll_interval.tv_sec = 0;
-		gtmrecv_poll_interval.tv_usec = GTMRECV_POLL_INTERVAL;
 	}
 	return;
 }
@@ -258,12 +251,11 @@ static int gtmrecv_est_conn(void)
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
-	size_t			primary_addr_len;
 	fd_set			input_fds;
 	int			status;
 	const   int     	disable_keepalive = 0;
 	struct  linger  	disable_linger = {0, 0};
-	struct  timeval 	save_gtmrecv_poll_interval;
+	struct  timeval 	poll_interval;
 	char			print_msg[1024];
 	int			send_buffsize, recv_buffsize, tcp_r_bufsize;
 
@@ -275,9 +267,10 @@ static int gtmrecv_est_conn(void)
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;
+	primary_ai.ai_addr = (sockaddr_ptr)&primary_sas;
 
 	gtmrecv_comm_init((in_port_t)gtmrecv_local->listen_port);
-	primary_addr_len = SIZEOF(primary_addr);
+	primary_ai.ai_addrlen = SIZEOF(primary_sas);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Waiting for a connection...\n");
 	FD_ZERO(&input_fds);
 	FD_SET(gtmrecv_listen_sock_fd, &input_fds);
@@ -286,10 +279,12 @@ static int gtmrecv_est_conn(void)
 	 * SELECT macro is not used because the FD_SET is redone before the new
 	 * call to select (after the continue).
 	 */
-	save_gtmrecv_poll_interval = gtmrecv_poll_interval;
-	while (0 >= (status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &save_gtmrecv_poll_interval)))
+	poll_interval.tv_sec = 0;
+	poll_interval.tv_usec = REPL_POLL_WAIT;
+	while (0 >= (status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &poll_interval)))
 	{
-		save_gtmrecv_poll_interval = gtmrecv_poll_interval;
+		assert(0 == poll_interval.tv_sec);
+		poll_interval.tv_usec = REPL_POLL_WAIT;
 		FD_SET(gtmrecv_listen_sock_fd, &input_fds);
 		if (0 == status)
 			gtmrecv_poll_actions(0, 0, NULL);
@@ -299,24 +294,25 @@ static int gtmrecv_est_conn(void)
 		{
 			status = ERRNO;
 			SNPRINTF(print_msg, SIZEOF(print_msg), "Error in select on listen socket : %s", STRERROR(status));
-			rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 		}
 	}
-	ACCEPT_SOCKET(gtmrecv_listen_sock_fd, (struct sockaddr *)&primary_addr, (sssize_t *)&primary_addr_len, gtmrecv_sock_fd);
+	ACCEPT_SOCKET(gtmrecv_listen_sock_fd, primary_ai.ai_addr, (sssize_t *)&primary_ai.ai_addrlen, gtmrecv_sock_fd);
 	if (FD_INVALID == gtmrecv_sock_fd)
 	{
 		status = ERRNO;
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error accepting connection from Source Server : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 	}
 	/* Connection established */
 	repl_close(&gtmrecv_listen_sock_fd); /* Close the listener socket */
 	repl_connection_reset = FALSE;
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection accepted. Connection socket created.\n");
 	if (-1 == setsockopt(gtmrecv_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
 	{
 		status = ERRNO;
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket disable linger : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 	}
 
 #ifdef REPL_DISABLE_KEEPALIVE
@@ -326,13 +322,13 @@ static int gtmrecv_est_conn(void)
 		status = ERRNO;
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket disable keepalive : %s",
 				STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 	}
 #endif
 	if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &send_buffsize)))
 	{
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error getting socket send buffsize : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 	}
 	if (send_buffsize < GTMRECV_TCP_SEND_BUFSIZE)
 	{
@@ -342,19 +338,20 @@ static int gtmrecv_est_conn(void)
 			{
 				SNPRINTF(print_msg, SIZEOF(print_msg), "Could not set TCP send buffer size to %d : %s",
 						GTMRECV_MIN_TCP_SEND_BUFSIZE, STRERROR(status));
-				rts_error(VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2,
+						LEN_AND_STR(print_msg));
 			}
 		}
 	}
 	if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize))) /* may have changed */
 	{
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error getting socket send buffsize : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 	}
 	if (0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &recv_buffsize)))
 	{
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error getting socket recv buffsize : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 	}
 	if (recv_buffsize < GTMRECV_TCP_RECV_BUFSIZE)
 	{
@@ -368,13 +365,14 @@ static int gtmrecv_est_conn(void)
 			SNPRINTF(print_msg, SIZEOF(print_msg), "Could not set TCP receive buffer size in range [%d, %d], last "
 					"known error : %s", GTMRECV_MIN_TCP_RECV_BUFSIZE, GTMRECV_TCP_RECV_BUFSIZE,
 					STRERROR(status));
-			rts_error(VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2,
+					LEN_AND_STR(print_msg));
 		}
 	}
 	if (0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize))) /* may have changed */
 	{
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error getting socket recv buffsize : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 	}
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection established, using TCP send buffer size %d receive buffer size %d\n",
 			repl_max_send_buffsize, repl_max_recv_buffsize);
@@ -662,17 +660,19 @@ static void process_tr_buff(void)
 					else
 					{
 						if (EREPL_INTLFILTER_BADREC == repl_errno)
-							rts_error(VARLSTCNT(1) ERR_JNLRECFMT);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLRECFMT);
 						else if (EREPL_INTLFILTER_DATA2LONG == repl_errno)
-							rts_error(VARLSTCNT(4) ERR_JNLSETDATA2LONG, 2, jnl_source_datalen,
-								  jnl_dest_maxdatalen);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLSETDATA2LONG, 2,
+									jnl_source_datalen, jnl_dest_maxdatalen);
 						else if (EREPL_INTLFILTER_NEWREC == repl_errno)
-							rts_error(VARLSTCNT(4) ERR_JNLNEWREC, 2, (unsigned int)jnl_source_rectype,
-								  (unsigned int)jnl_dest_maxrectype);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLNEWREC, 2,
+									(unsigned int)jnl_source_rectype,
+									(unsigned int)jnl_dest_maxrectype);
 						else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
-								rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLGBL2LONG);
 						else if (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)
-							rts_error(VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1, &recvpool_ctl->jnl_seqno);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1,
+									&recvpool_ctl->jnl_seqno);
 						else /* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */
 							GTMASSERT;
 					}
@@ -689,8 +689,8 @@ static void process_tr_buff(void)
 					repl_filter_error(recvpool_ctl->jnl_seqno, status);
 				assert(write_len <= repl_filter_bufsiz);
 				if (write_len > recvpool_size)
-					rts_error(VARLSTCNT(11) ERR_REPLTRANS2BIG, 5, &recvpool_ctl->jnl_seqno,
-						  write_len, 0, RTS_ERROR_LITERAL("Receive"), ERR_TEXT, 2,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_REPLTRANS2BIG, 5, &recvpool_ctl->jnl_seqno,
+						  write_len, 0, LEN_AND_LIT("Receive"), ERR_TEXT, 2,
 						  LEN_AND_LIT("Post filter tr len larger than receive pool size"));
 
 				/* Switch buffers */
@@ -768,7 +768,7 @@ static void do_main_loop(boolean_t crash_restart)
 		((repl_start_msg_ptr_t)gtmrecv_msgp)->jnl_ver = jnl_ver;
 		QWASSIGN(*(seq_num *)&((repl_start_msg_ptr_t)gtmrecv_msgp)->start_seqno[0], request_from);
 		gtmrecv_msgp->len = MIN_REPL_MSGLEN;
-		REPL_SEND_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, gtmrecv_msgp->len, FALSE, &gtmrecv_poll_immediate)
+		REPL_SEND_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, gtmrecv_msgp->len, REPL_POLL_NOWAIT)
 		{
 			gtmrecv_poll_actions(0, 0, NULL);
 			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
@@ -780,7 +780,7 @@ static void do_main_loop(boolean_t crash_restart)
 			{
 				repl_close(&gtmrecv_sock_fd);
 				repl_connection_reset = TRUE;
-				sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLWARN, 2, RTS_ERROR_LITERAL("Connection closed"));
+				sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLWARN, 2, LEN_AND_LIT("Connection closed"));
 				repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
 				gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "ERR_REPLWARN", print_msg);
 				return;
@@ -789,13 +789,13 @@ static void do_main_loop(boolean_t crash_restart)
 			{
 				SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending (re)start jnlseqno. Error in send : %s",
 						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 			}
 			if (EREPL_SELECT == repl_errno)
 			{
 				SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending (re)start jnlseqno. Error in select : %s",
 						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 			}
 		}
 	}
@@ -824,7 +824,7 @@ static void do_main_loop(boolean_t crash_restart)
 	while (TRUE)
 	{
 		recvd_len = gtmrecv_max_repl_msglen - buff_unprocessed - skip_for_alignment;
-		while ((status = repl_recv(gtmrecv_sock_fd, (buffp + buff_unprocessed), &recvd_len, FALSE, &gtmrecv_poll_interval))
+		while ((status = repl_recv(gtmrecv_sock_fd, (buffp + buff_unprocessed), &recvd_len, REPL_POLL_WAIT))
 			       == SS_NORMAL && recvd_len == 0)
 		{
 			recvd_len = gtmrecv_max_repl_msglen - buff_unprocessed - skip_for_alignment;
@@ -835,7 +835,7 @@ static void do_main_loop(boolean_t crash_restart)
 				/* update process is still running slow, gtmrecv_poll_interval is now 0.
 				 * Force wait before logging any message.
 				 */
-				SHORT_SLEEP(GTMRECV_POLL_INTERVAL >> 10); /* approximate in ms */
+				SHORT_SLEEP(REPL_POLL_WAIT >> 10); /* approximate in ms */
 				REPL_DPRINT1("Waiting for Update Process to clear recvpool space\n");
 				xoff_msg_log_cnt = 0;
 			} else if (xoff_sent)
@@ -869,13 +869,14 @@ static void do_main_loop(boolean_t crash_restart)
 				{
 					SNPRINTF(print_msg, SIZEOF(print_msg), "Error in receiving from source. "
 							"Error in recv : %s", STRERROR(status));
-					rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+							LEN_AND_STR(print_msg));
 				}
 			} else if (EREPL_SELECT == repl_errno)
 			{
 				SNPRINTF(print_msg, SIZEOF(print_msg), "Error in receiving from source. Error in select : %s",
 						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 			}
 		}
 
@@ -907,8 +908,8 @@ static void do_main_loop(boolean_t crash_restart)
 				{
 					/* Too large a transaction to be
 					 * accommodated in the Receive Pool */
-					rts_error(VARLSTCNT(7) ERR_REPLTRANS2BIG, 5, &recvpool_ctl->jnl_seqno,
-						  data_len, 0, RTS_ERROR_LITERAL("Receive"));
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLTRANS2BIG, 5, &recvpool_ctl->jnl_seqno,
+						  data_len, 0, LEN_AND_LIT("Receive"));
 				}
 			}
 			buffered_data_len = ((data_len <= buff_unprocessed) ? data_len : buff_unprocessed);
@@ -934,8 +935,7 @@ static void do_main_loop(boolean_t crash_restart)
 						heartbeat.type = REPL_HEARTBEAT;
 						heartbeat.len = MIN_REPL_MSGLEN;
 						QWASSIGN(*(seq_num *)&heartbeat.ack_seqno[0], upd_proc_local->read_jnl_seqno);
-						REPL_SEND_LOOP(gtmrecv_sock_fd, &heartbeat, heartbeat.len,
-								FALSE, &gtmrecv_poll_immediate)
+						REPL_SEND_LOOP(gtmrecv_sock_fd, &heartbeat, heartbeat.len, REPL_POLL_NOWAIT)
 						{
 							gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
 							if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
@@ -1087,11 +1087,7 @@ void gtmrecv_process(boolean_t crash_restart)
 	gtmrecv_local = recvpool.gtmrecv_local;
 
 	jnl_ver = JNL_VER_THIS;
-	assert(GTMRECV_POLL_INTERVAL < MAX_GTMRECV_POLL_INTERVAL);
-	gtmrecv_poll_interval.tv_sec = 0;
-	gtmrecv_poll_interval.tv_usec = GTMRECV_POLL_INTERVAL;
-	gtmrecv_poll_immediate.tv_sec = 0;
-	gtmrecv_poll_immediate.tv_usec = 0;
+	assert(REPL_POLL_WAIT < MILLISECS_IN_SEC);
 	recvpool_size = recvpool_ctl->recvpool_size;
 	recvpool_high_watermark = (long)((float)RECVPOOL_HIGH_WATERMARK_PCTG / 100 * recvpool_size);
 	recvpool_low_watermark  = (long)((float)RECVPOOL_LOW_WATERMARK_PCTG  / 100 * recvpool_size);

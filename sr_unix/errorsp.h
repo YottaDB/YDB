@@ -15,6 +15,7 @@
 #include <setjmp.h>
 
 #include "gtm_stdio.h"
+#include "have_crit.h"
 
 #ifdef __MVS__
 #  define GTMCORENAME "gtmcore"
@@ -173,8 +174,8 @@ void ch_trace_point() {return;}
 				}
 #endif
 
-#define ESTABLISH_RET(x, ret)	{										\
-                                        CHTRACEPOINT;								\
+#define GTM_ASM_ESTABLISH	{	/* So named because gtm_asm_establish does exactly this */		\
+					CHTRACEPOINT;								\
 					ctxt++;									\
 					if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))	\
 						condstk_expand();						\
@@ -182,7 +183,15 @@ void ch_trace_point() {return;}
                                         ctxt->save_active_ch = active_ch;					\
                                         ctxt->ch_active = FALSE;						\
 					active_ch = ctxt;							\
+				}
+#define ESTABLISH_NOJMP(x)	{										\
+					GTM_ASM_ESTABLISH;							\
 					ctxt->ch = x;								\
+				}
+
+#define ESTABLISH_NOUNWIND(x)	ESTABLISH_NOJMP(x)
+#define ESTABLISH_RET(x, ret)	{										\
+					ESTABLISH_NOJMP(x);							\
 					if (setjmp(ctxt->jmp) == -1)						\
 					{									\
 						REVERT;								\
@@ -191,50 +200,20 @@ void ch_trace_point() {return;}
 				}
 
 #ifdef __cplusplus  /* must specify return value (if any) for C++ */
-#define ESTABLISH(x, ret)	{										\
-                                        CHTRACEPOINT;								\
-					ctxt++;									\
-					if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))	\
-						condstk_expand();						\
-                                        CHECKHIGHBOUND(ctxt);							\
-                                        ctxt->save_active_ch = active_ch;					\
-                                        ctxt->ch_active = FALSE;						\
-					active_ch = ctxt;							\
-					ctxt->ch = x;								\
-					if (setjmp(ctxt->jmp) == -1)						\
-					{									\
-						REVERT;								\
-						return ret;							\
-					}									\
-				}
+# define ESTABLISH(x, ret)	ESTABLISH_RET(x, ret)
 #else
-#define ESTABLISH(x)		{										\
-                                        CHTRACEPOINT;								\
-					ctxt++;									\
-					if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))	\
-						condstk_expand();						\
-                                        CHECKHIGHBOUND(ctxt);							\
-                                        ctxt->save_active_ch = active_ch;					\
-                                        ctxt->ch_active = FALSE;						\
-					active_ch = ctxt;							\
-					ctxt->ch = x;								\
+# define ESTABLISH(x)		{										\
+					ESTABLISH_NOJMP(x);							\
 					if (setjmp(ctxt->jmp) == -1)						\
 					{									\
 						REVERT;								\
 						return;								\
 					}									\
 				}
-#define ESTABLISH_NORET(x, did_long_jump)	{								\
+# define ESTABLISH_NORET(x, did_long_jump)									\
+				{										\
 					did_long_jump = FALSE;							\
-                                        CHTRACEPOINT;								\
-					ctxt++;									\
-					if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))	\
-						condstk_expand();						\
-                                        CHECKHIGHBOUND(ctxt);							\
-                                        ctxt->save_active_ch = active_ch;					\
-                                        ctxt->ch_active = FALSE;						\
-					active_ch = ctxt;							\
-					ctxt->ch = x;								\
+					ESTABLISH_NOJMP(x);							\
 					if (setjmp(ctxt->jmp) == -1)						\
 						did_long_jump = TRUE;						\
 				}
@@ -301,17 +280,24 @@ void ch_trace_point() {return;}
 					CONTINUE;							\
 				}
 
-#define UNWIND(dummy1, dummy2)	{									\
-					GBLREF	int		process_exiting;			\
-					GBLREF	boolean_t	ok_to_UNWIND_in_exit_handling;		\
-													\
-					assert(!process_exiting || ok_to_UNWIND_in_exit_handling);	\
-                                        CHTRACEPOINT;							\
-                                        chnd[current_ch].ch_active = FALSE;				\
-					active_ch++;							\
-                                        CHECKHIGHBOUND(active_ch);					\
-					ctxt = active_ch;						\
-					longjmp(active_ch->jmp, -1);					\
+/* Should never unwind a condition handler established with ESTABLISH_NOUNWIND. Currently t_ch and dbinit_ch are the only ones. */
+#define UNWINDABLE(unw_ch)	((&t_ch != unw_ch->ch) && (&dbinit_ch != unw_ch->ch))
+#define UNWIND(dummy1, dummy2)	{												\
+					GBLREF	int		process_exiting;						\
+					GBLREF	boolean_t	ok_to_UNWIND_in_exit_handling;					\
+																\
+					assert(!process_exiting || ok_to_UNWIND_in_exit_handling);				\
+					/* When we hit an error in the midst of commit, t_ch/t_commit_cleanup should be invoked	\
+					 * and clean it up before any condition handler on the stack unwinds. 			\
+					 */											\
+					assert(0 == have_crit(CRIT_IN_COMMIT));							\
+                                        CHTRACEPOINT;										\
+                                        chnd[current_ch].ch_active = FALSE;							\
+					active_ch++;										\
+                                        CHECKHIGHBOUND(active_ch);								\
+					ctxt = active_ch;									\
+					assert(UNWINDABLE(active_ch));								\
+					longjmp(active_ch->jmp, -1);								\
 				}
 
 #define START_CH		int current_ch;										\

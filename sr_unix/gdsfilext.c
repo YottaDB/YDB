@@ -107,7 +107,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	boolean_t		was_crit, is_mm;
 	char			buff[DISK_BLOCK_SIZE];
 	int			result, save_errno, status;
-	uint4			new_bit_maps, bplmap, map, new_blocks, new_total, max_tot_blks;
+	uint4			new_bit_maps, bplmap, map, new_blocks, new_total, max_tot_blks, old_total;
 	uint4			jnl_status, to_wait, to_msg, wait_period;
 	gtm_uint64_t		avail_blocks, mmap_sz;
 	off_t			new_eof;
@@ -117,6 +117,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	int4			prev_extend_blks_to_upgrd;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
+	cache_rec_ptr_t         cr;
 	DCL_THREADGBL_ACCESS;
 
 	assert(!IS_DSE_IMAGE);
@@ -227,11 +228,12 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		return (uint4)(FINAL_RETRY_FREEZE_PROG);
 	}
 	assert(cs_addrs->ti->total_blks == cs_data->trans_hist.total_blks);
-	if (cs_data->trans_hist.total_blks != filesize)
+	old_total = cs_data->trans_hist.total_blks;
+	if (old_total != filesize)
 	{	/* Somebody else has already extended it, since we are in crit, this is trust-worthy. However, in case of MM,
 		 * we still need to remap the database
 		 */
-		assert((cs_data->trans_hist.total_blks > filesize) GTM_TRUNCATE_ONLY( || !is_mm));
+		assert((old_total > filesize) GTM_TRUNCATE_ONLY( || !is_mm));
 		/* For BG, someone else could have truncated or extended - we have no idea */
 		GDSFILEXT_CLNUP;
 		return (SS_NORMAL);
@@ -285,9 +287,24 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 					ERR_SYSCALL, 5, LEN_AND_LIT("munmap()"), CALLFROM, save_errno);
 			return (uint4)(NO_FREE_SPACE);
 		}
+	} else
+	{	/* Due to concurrency issues, it is possible some process had issued a disk read of the GDS block# corresponding
+		 * to "old_total" right after a truncate wrote a 512-byte block of zeros on disk (to signal end of the db file).
+		 * If so, the global buffer containing this block needs to be invalidated now as part of the extend. If not, it is
+		 * possible the EOF block on disk is now going to be overwritten by a properly initialized bitmap block (as part
+		 * of the gdsfilext below) while the global buffer continues to have an incorrect copy of that bitmap block and
+		 * this in turn would cause XXXX failures due to a bad bitmap block in shared memory. (GTM-7519)
+		 */
+		cr = db_csh_get((block_id)old_total);
+		if ((NULL != cr) && ((cache_rec_ptr_t)CR_NOTVALID != cr))
+		{
+			assert((0 == cr->dirty) && (0 == cr->bt_index) && !cr->stopped);
+			cr->cycle++;
+			cr->blk = CR_BLKEMPTY;
+		}
 	}
 	CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
-	new_total = cs_data->trans_hist.total_blks + new_blocks;
+	new_total = old_total + new_blocks;
 	new_eof = ((off_t)(cs_data->start_vbn - 1) * DISK_BLOCK_SIZE) + ((off_t)new_total * cs_data->blk_size);
 	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd, new_eof, buff, DISK_BLOCK_SIZE, save_errno);
 	if ((ENOSPC == save_errno) && IS_GTM_IMAGE)
@@ -365,7 +382,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	}
 	if (new_bit_maps)
 	{
-		for (map = ROUND_UP(cs_data->trans_hist.total_blks, bplmap); map < new_total; map += bplmap)
+		for (map = ROUND_UP(old_total, bplmap); map < new_total; map += bplmap)
 		{
 			DEBUG_ONLY(new_bit_maps--;)
 			if (SS_NORMAL != (status = bml_init(map)))
@@ -402,8 +419,8 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	assert(0 < (int)blocks);
 	assert(0 < (int)(cs_addrs->ti->free_blocks + blocks));
 	cs_addrs->ti->free_blocks += blocks;
-	blocks = cs_data->trans_hist.total_blks;
 	cs_addrs->total_blks = cs_addrs->ti->total_blks = new_total;
+	blocks = old_total;
 	if (blocks / bplmap * bplmap != blocks)
 	{
 		bit_set(blocks / bplmap, MM_ADDR(cs_data)); /* Mark old last local map as having space */

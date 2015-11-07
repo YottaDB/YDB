@@ -520,7 +520,7 @@ boolean_t mur_close_files(void)
 					 * the rolled_bak prefix. user can decide to delete these */
 					rename_fn = fn;
 					prepare_unique_name((char *)end_jctl->jnl_fn, end_jctl->jnl_fn_len,
-						PREFIX_ROLLED_BAK, "", rename_fn, &rename_fn_len, &ustatus);
+						PREFIX_ROLLED_BAK, "", rename_fn, &rename_fn_len, 0, &ustatus);
 					UNIX_ONLY(WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa));
 						/* wait for instance freeze before journal file renames */
 					if (SS_NORMAL == gtm_rename((char *)end_jctl->jnl_fn, end_jctl->jnl_fn_len,
@@ -607,7 +607,7 @@ boolean_t mur_close_files(void)
 					assert(!jgbl.onlnrlbk);
 					assert(anticipatory_freeze_available);
 					assert(!csa->hold_onto_crit);
-					grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+					grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 				}
 				last_histinfo_seqno = repl_inst_histinfo_truncate(murgbl.consist_jnl_seqno);
 				if ((NULL != jnlpool_ctl) && !was_crit)
@@ -878,7 +878,8 @@ boolean_t mur_close_files(void)
 				|| (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number)
 				|| (WBTEST_JNL_FILE_OPEN_FAIL == gtm_white_box_test_case_number)
 				|| (WBTEST_JNL_CREATE_FAIL == gtm_white_box_test_case_number)
-				|| (WBTEST_RECOVER_ENOSPC == gtm_white_box_test_case_number)));
+				|| (WBTEST_RECOVER_ENOSPC == gtm_white_box_test_case_number)
+				|| (WBTEST_WCS_FLU_FAIL == gtm_white_box_test_case_number)));
 		assert(!murgbl.clean_exit);
 		if (murgbl.wrn_count)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_JNLACTINCMPLT);

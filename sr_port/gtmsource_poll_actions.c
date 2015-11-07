@@ -85,7 +85,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Shutdown signalled\n");
 		gtmsource_end(); /* Won't return */
 	}
-#ifdef UNIX
+#	ifdef UNIX
 	if (jnlpool.jnlpool_ctl->freeze != last_seen_freeze_flag)
 	{
 		last_seen_freeze_flag = jnlpool.jnlpool_ctl->freeze;
@@ -104,13 +104,14 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		}
 	}
-#endif
+#	endif
 	if (GTMSOURCE_START == gtmsource_state)
 		return (SS_NORMAL);
-	if (GTMSOURCE_CHANGING_MODE != gtmsource_state && GTMSOURCE_MODE_PASSIVE == gtmsource_local->mode)
+	if (GTMSOURCE_CHANGING_MODE != gtmsource_state && GTMSOURCE_MODE_PASSIVE_REQUESTED == gtmsource_local->mode)
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Changing mode from ACTIVE to PASSIVE\n");
 		gtmsource_state = GTMSOURCE_CHANGING_MODE;
+		gtmsource_local->mode = GTMSOURCE_MODE_PASSIVE;
 		UNIX_ONLY(gtmsource_local->gtmsource_state = gtmsource_state;)
 		return (SS_NORMAL);
 	}
@@ -145,7 +146,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 			return (SS_NORMAL);
 		}
 
-		if (gtmsource_is_heartbeat_due(&now) && !gtmsource_is_heartbeat_stalled)
+		if (GTMSOURCE_IS_HEARTBEAT_DUE(&now) && !heartbeat_stalled)
 		{
 			gtmsource_send_heartbeat(&now);
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state ||

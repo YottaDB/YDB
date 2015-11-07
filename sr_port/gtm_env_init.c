@@ -75,6 +75,7 @@ GBLREF	block_id	gtm_tp_allocation_clue;	/* block# hint to start allocation for c
 GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
 GBLREF	boolean_t	ztrap_new;		/* Each time $ZTRAP is set it is automatically NEW'd */
 GBLREF	size_t		gtm_max_storalloc;	/* Used for testing: creates an allocation barrier */
+GBLREF	boolean_t	ipv4_only;		/* If TRUE, only use AF_INET. */
 
 void	gtm_env_init(void)
 {
@@ -86,8 +87,9 @@ void	gtm_env_init(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (!TREF(gtm_env_init_done))
+	if (!TREF(gtm_env_init_started))
 	{
+		TREF(gtm_env_init_started) = TRUE;
 		/* See if a debug level has been specified. Do this first since gtmDebugLevel needs
 		 * to be initialized before any mallocs are done in the system.
 		 */
@@ -304,8 +306,13 @@ void	gtm_env_init(void)
 		val.addr = GTM_MAX_STORALLOC;
 		val.len = SIZEOF(GTM_MAX_STORALLOC) - 1;
 		gtm_max_storalloc = trans_numeric(&val, &is_defined, TRUE);
+#		ifdef UNIX
+		/* See if gtm_ipv4_only is set */
+		val.addr = GTM_IPV4_ONLY;
+		val.len = SIZEOF(GTM_IPV4_ONLY) - 1;
+		ipv4_only = logical_truth_value(&val, FALSE, NULL);
+#		endif
 		/* Platform specific initializations */
 		gtm_env_init_sp();
-		TREF(gtm_env_init_done) = TRUE;
 	}
 }

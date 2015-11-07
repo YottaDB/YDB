@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,6 +87,9 @@ GBLDEF uint4	txtrel_cnt;	/* count of text relocation records */
 /* its referenced in ind_code.c */
 GBLDEF int              calculated_code_size, generated_code_size;
 
+error_def(ERR_UNIMPLOP);
+error_def(ERR_MAXARGCNT);
+
 void trip_gen(triple *ct)
 {
 	oprtype		**sopr, *opr;	/* triple operand */
@@ -99,8 +102,6 @@ void trip_gen(triple *ct)
 	oprtype		*irep_opr;
 	short		*repl, repcnt;	/* temp irep ptr */
 	int4		off;
-	error_def	(ERR_UNIMPLOP);
-	error_def	(ERR_MAXARGCNT);
 
 	tp = ttt[ct->opcode];
 	if (tp <= 0)
@@ -125,8 +126,8 @@ void trip_gen(triple *ct)
 				continue;
 			}
 			*sopr++ = opr;
-			if (sopr >= ARRAYTOP(saved_opr))
-				rts_error(VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS);
+			if (sopr >= ARRAYTOP(saved_opr))	/* user-visible max args is MAX_ARGS - 3 */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS - 3);
 		}
 		opr++;
 	}
@@ -752,8 +753,6 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 	int4			offset, literal;
 	triple			*ct;
 
-	error_def		(ERR_UNIMPLOP);
-
 	if (opr->oprclass == TRIP_REF)
 	{
 		ct = opr->oprval.tref;
@@ -790,7 +789,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 						temp_reg = I386_REG_ECX;
 						break;
 					default:
-						rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 						break;
 					}
 					pc_value_idx = code_idx + 5;
@@ -832,7 +831,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 						code_idx += 1 + SIZEOF(int4);
 					break;
 				default:
-					rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 					break;
 				}
 				break;
@@ -940,7 +939,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 					emit_base_offset(use_reg, base_reg, offset);
 				break;
 			default:
-				rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 				break;
 			}
 			break;
@@ -970,7 +969,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 						temp_reg = I386_REG_ECX;
 						break;
 					default:
-						rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 						break;
 					}
 					code_buf[code_idx++] = I386_INS_CALL_Jv;
@@ -1032,7 +1031,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 					}
 					break;
 				default:
-					rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 					break;
 				}
 				break;
@@ -1146,7 +1145,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 					emit_base_offset(use_reg, base_reg, offset);
 				break;
 			default:
-				rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 				break;
 			}
 			break;
@@ -1175,9 +1174,6 @@ void emit_xfer(short xfer)
 
 void emit_op_base_offset(generic_op op, short base_reg, int offset, short use_reg)
 {
-
-	error_def	(ERR_UNIMPLOP);
-
 	switch (op)
 	{
 	case CLEAR:
@@ -1221,7 +1217,7 @@ void emit_op_base_offset(generic_op op, short base_reg, int offset, short use_re
 		code_buf[code_idx++] = 0;
 		break;
 	default:
-		rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 		break;
 	}
 }
@@ -1271,8 +1267,6 @@ void emit_base_offset (short reg_opcode, short base_reg, int4 offset)
 
 void emit_op_alit (generic_op op, unsigned char use_reg)
 {
-	error_def	(ERR_UNIMPLOP);
-
 	switch (op)
 	{
 	case LOAD_ADDRESS:
@@ -1289,7 +1283,7 @@ void emit_op_alit (generic_op op, unsigned char use_reg)
 		code_buf[code_idx++] = I386_INS_PUSH_Iv;
 		break;
 	default:
-		rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 		break;
 	}
 }

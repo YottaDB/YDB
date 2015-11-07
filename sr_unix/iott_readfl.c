@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,6 +80,13 @@ static readonly char		dc1 = 17;
 static readonly char		dc3 = 19;
 static readonly unsigned char	eraser[3] = { NATIVE_BS, NATIVE_SP, NATIVE_BS };
 
+error_def(ERR_CTRAP);
+error_def(ERR_IOEOF);
+error_def(ERR_NOPRINCIO);
+error_def(ERR_ZINTRECURSEIO);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_STACKCRIT);
+
 #ifdef UNICODE_SUPPORTED
 
 /* Maintenance of $ZB on a badchar error and returning partial data (if any) */
@@ -122,6 +129,8 @@ void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
                         iod = io_curr_device.in;
                         memcpy(iod->dollar.zb, delimptr, MIN(delimlen, ESC_LEN - 1));
                         iod->dollar.zb[MIN(delimlen, ESC_LEN - 1)] = '\0';
+                        memcpy(iod->dollar.key, delimptr, MIN(delimlen, DD_BUFLEN - 1));
+                        iod->dollar.key[MIN(delimlen, DD_BUFLEN - 1)] = '\0';
                 }
         }
 }
@@ -151,7 +160,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	int		outlen;			/* total characters in line so far */
 	int		keypad_len, backspace, delete;
 	int		up, down, right, left, insert_key;
-	boolean_t	escape_edit;
+	boolean_t	escape_edit, empterm;
 	int4		msec_timeout;		/* timeout in milliseconds */
 	io_desc		*io_ptr;
 	d_tt_struct	*tt_ptr;
@@ -165,13 +174,6 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	struct timeval	input_timeval;
 	struct timeval	save_input_timeval;
 
-	error_def(ERR_CTRAP);
-	error_def(ERR_IOEOF);
-	error_def(ERR_NOPRINCIO);
-	error_def(ERR_ZINTRECURSEIO);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
-
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	io_ptr = io_curr_device.in;
@@ -179,6 +181,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	assert(dev_open == io_ptr->state);
 	iott_flush(io_curr_device.out);
 	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);	/* get initial mode */
+	empterm	= (TT_EMPTERM & tt_ptr->ext_cap);
 	ioptr_width = io_ptr->width;
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	/* if utf8_active, need room for multi byte characters plus wint_t buffer */
@@ -193,7 +196,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		{
 			tt_ptr->mupintr = FALSE;
 			tt_state->who_saved = ttwhichinvalid;
-			rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		}
 		assert(length == tt_state->length);
 		if (ttread != tt_state->who_saved)
@@ -280,7 +283,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			if (0 != status)
 			{
 				io_ptr->dollar.za = 9;
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			}
 		}
 	}
@@ -304,7 +307,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				if (0 != status)
 				{
 					io_ptr->dollar.za = 9;
-					rts_error(VARLSTCNT(1) status);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
 			}
 #endif
@@ -430,7 +433,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 					io_ptr->dollar.y++;
 					tt_ptr->discard_lf = FALSE;
 					if (io_ptr->error_handler.len > 0)
-						rts_error(VARLSTCNT(1) ERR_IOEOF);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 					break;
 				} else
 					io_ptr->dollar.zeof = FALSE;
@@ -518,7 +521,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
                         GETASCII(asc_inchar,inchar);
 			if (!edit_mode && (dx >= ioptr_width) && io_ptr->wrap && !(mask & TRM_NOECHO))
 			{
-				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
+				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, STRLEN(NATIVE_TTEOL));
 				dx = 0;
 			}
 			if ((' ' > INPUT_CHAR) && (tt_ptr->enbld_outofbands.mask & (1 << INPUT_CHAR)))
@@ -529,7 +532,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				SEND_KEYPAD_LOCAL
 				if (!msec_timeout)
 					iott_rterm(io_ptr);
-				rts_error(VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
 				break;
 			}
 			if (((0 != (mask & TRM_ESCAPE)) || edit_mode)
@@ -576,7 +579,10 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				assert(0 <= instr);
 				assert(!edit_mode || 0 <= dx);
 				assert(outlen >= instr);
-				if ((int)inchar == tt_ptr->ttio_struct->c_cc[VERASE]
+				/* For most of the terminal the 'kbs' string capability is a byte in length. It means that it is
+				  Not treated as escape sequence. So explicitly check if the input corresponds to the 'kbs' */
+				if ((((int)inchar == tt_ptr->ttio_struct->c_cc[VERASE]) ||
+				    (empterm && ('\0' == KEY_BACKSPACE[1]) && (inchar == KEY_BACKSPACE[0])))
 					&& !(mask & TRM_PASTHRU))
 				{
 					if (0 < instr && (edit_mode || 0 < dx))
@@ -628,6 +634,11 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 							}
 						}
 						dx_outlen = compute_dx(BUFF_ADDR(0), outlen, ioptr_width, dx_start);
+					} else if (empterm && (0 == outlen))
+					{
+						assert(zb_ptr == io_ptr->dollar.zb);
+						*zb_ptr++ = (unsigned char)INPUT_CHAR;
+						break;
 					}
 				} else
 				{
@@ -913,7 +924,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 						prin_in_dev_failure = TRUE;
 					else
 					{
-                                        	send_msg(VARLSTCNT(1) ERR_NOPRINCIO);
+                                        	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
                                         	stop_image_no_core();
 					}
                                 }
@@ -921,14 +932,14 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				{
 					io_ptr->dollar.za = 9;
 					SEND_KEYPAD_LOCAL
-					rts_error(VARLSTCNT(1) ERR_IOEOF);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 				} else
 				{
 					io_ptr->dollar.zeof = TRUE;
 					io_ptr->dollar.za = 0;
 					SEND_KEYPAD_LOCAL
 					if (0 < io_ptr->error_handler.len)
-						rts_error(VARLSTCNT(1) ERR_IOEOF);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 				}
 				break;
 			}
@@ -940,7 +951,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				io_ptr->dollar.y++;
 				SEND_KEYPAD_LOCAL
 				if (0 < io_ptr->error_handler.len)
-					rts_error(VARLSTCNT(1) ERR_IOEOF);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 				break;
 			}
 		} else if (EINTR != errno)	/* rdlen < 0 */
@@ -948,7 +959,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			term_error_line = __LINE__;
 			goto term_error;
 		}
-		if (FINI ==  io_ptr->esc_state)
+		if (FINI == io_ptr->esc_state)
 		{
 			int zb_len = (int)(zb_ptr - io_ptr->dollar.zb);
 
@@ -1006,6 +1017,10 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 							goto term_error;
 					}
 					dx_outlen = compute_dx(BUFF_ADDR(0), outlen, ioptr_width, dx_start);
+				} else if (empterm && 0 == outlen)
+				{
+					assert(instr == 0);
+					break;
 				}
 				escape_edit = TRUE;
 			}
@@ -1100,6 +1115,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		}
 	} while (outlen < length);
 	*zb_ptr++ = 0;
+	memcpy(io_ptr->dollar.key, io_ptr->dollar.zb, (zb_ptr - io_ptr->dollar.zb));
 	if (!msec_timeout)
 	{
 		iott_rterm(io_ptr);
@@ -1112,7 +1128,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		if (0 != status)
 		{
 			io_ptr->dollar.za = 9;
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 	}
 	SEND_KEYPAD_LOCAL	/* to turn keypad off if possible */
@@ -1157,7 +1173,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				io_ptr->dollar.y %= io_ptr->length;
 			io_ptr->dollar.x %= ioptr_width;
 			if (0 == io_ptr->dollar.x)
-				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
+				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, STRLEN(NATIVE_TTEOL));
 		}
 	}
 	return ((short)ret);
@@ -1169,6 +1185,6 @@ term_error:
 	SEND_KEYPAD_LOCAL	/* to turn keypad off if possible */
 	if (!msec_timeout)
 		iott_rterm(io_ptr);
-	rts_error(VARLSTCNT(1) save_errno);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 	return FALSE;
 }

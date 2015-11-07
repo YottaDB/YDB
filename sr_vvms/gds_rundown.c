@@ -41,7 +41,6 @@
 #include "locks.h"
 #include "util.h"
 #include "send_msg.h"
-#include "tp_grab_crit.h"
 #include "change_reg.h"
 #include "is_proc_alive.h"
 #include "del_sec.h"

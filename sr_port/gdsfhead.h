@@ -1337,11 +1337,14 @@ enum tp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] */
  * the restart will anyway be detected before commit. In this cases, this variable will take on non-zero values.
  * The commit logic will assert that this variable is indeed zero after validation but before proceeding with commit.
  */
-#define	DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH	(1 << 0)	/* Restartable situation encountered in tp_hist */
-#define	DONOTCOMMIT_GVCST_DELETE_BLK_CSE_TLEVEL	(1 << 1)	/* Restartable situation encountered in gvcst_delete_blk */
-#define	DONOTCOMMIT_JNLGETCHECKSUM_NULL_CR	(1 << 2)	/* Restartable situation encountered in jnl_get_checksum.h */
-#define	DONOTCOMMIT_GVCST_KILL_ZERO_TRIGGERS	(1 << 3)	/* Restartable situation encountered in gvcst_kill */
-#define	DONOTCOMMIT_GVCST_BLK_BUILD_TPCHAIN	(1 << 4)	/* Restartable situation encountered in gvcst_blk_build */
+#define	DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH		(1 << 0) /* Restartable situation encountered in tp_hist */
+#define	DONOTCOMMIT_GVCST_DELETE_BLK_CSE_TLEVEL		(1 << 1) /* Restartable situation encountered in gvcst_delete_blk */
+#define	DONOTCOMMIT_JNLGETCHECKSUM_NULL_CR		(1 << 2) /* Restartable situation encountered in jnl_get_checksum.h */
+#define	DONOTCOMMIT_GVCST_KILL_ZERO_TRIGGERS		(1 << 3) /* Restartable situation encountered in gvcst_kill */
+#define	DONOTCOMMIT_GVCST_BLK_BUILD_TPCHAIN		(1 << 4) /* Restartable situation encountered in gvcst_blk_build */
+#define	DONOTCOMMIT_T_QREAD_BAD_PVT_BUILD		(1 << 5) /* Restartable situation due to bad private build in t_qread */
+#define	DONOTCOMMIT_GVCST_SEARCH_LEAF_BUFFADR_NOTSYNC	(1 << 6) /* Restartable situation encountered in gvcst_search */
+#define	DONOTCOMMIT_GVCST_SEARCH_BLKTARGET_MISMATCH	(1 << 7) /* Restartable situation encountered in gvcst_search */
 
 #define TAB_BG_TRC_REC(A,B)	B,
 enum bg_trc_rec_type
@@ -3945,7 +3948,8 @@ void		bt_malloc(sgmnt_addrs *csa);
 void		bt_refresh(sgmnt_addrs *csa, boolean_t init);
 void		db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd);
 void		grab_crit(gd_region *reg);
-void		grab_lock(gd_region *reg, uint4 onln_rlbk_action);
+boolean_t	grab_crit_immediate(gd_region *reg);
+boolean_t	grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_action);
 void		gv_init_reg(gd_region *reg);
 void		gvcst_init(gd_region *greg);
 enum cdb_sc	gvincr_compute_post_incr(srch_blk_status *bh);

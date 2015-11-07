@@ -1,241 +1,554 @@
+1 Introduction
+   Introduction
 
-1 Overview
-  The MUMPS LOCK Utility
-   The GT.M LOCK Utility, LKE, provides a tool  for  examining  and  changing
-   the GT.M LOCK environment. In MUMPS, the  LOCK  command  reserves  one  or
-   more resource names. Only one process at a time  can  reserve  a  resource
-   name. No other process  sharing  the  same  environment  can  successfully
-   LOCK that resource name  at  the  same  time.  MUMPS  code  commonly  uses
-   LOCKs as flags  controlling  access  to  global  data.  Generally  a  LOCK
-   specifies the same as the  name  of  the  global  variable  that  requires
-   protected access. However, this is only  a  convention.  A  LOCK  argument
-   may contain any  subscripted  or  unsubscripted  MUMPS  name  including  a
-   name with no preceding caret (^). Because  they  have  the  appearance  of
-   local variable names, resource names  with  no  preceding  caret  (^)  are
-   commonly referred to as "local LOCKs."
+   The M Lock Utility (LKE) is a tool for examining and changing the GT.M
+   LOCK environment. For a description of M LOCKs, refer to the LOCKs section
+   in the General Language Features of M chapter and the description of the
+   LOCK command in the Commands chapter of the GT.M Programmer's Guide.
 
-   The  ZALLOCATE  and   ZDEALLOCATE   commands   provide   an   alternative,
-   non-standard, mechanism for managing LOCKs.
+   The two primary functions of the M Lock Utility (LKE) are:
 
-2 Functions
-  Functions
-   The two primary functions of the MUMPS LOCK Utility (LKE) are:
+     o SHOW all or specified LOCKs currently active
+     o CLEAR all or specified LOCKs currently active
 
-   o    SHOW all or specified LOCKs currently active on the system
+   When debugging an M application, you may use LKE to identify a possible
+   deadlock situation, that is, two or more processes have LOCKs and are
+   waiting to add resource names LOCKed by the other(s).
 
-   o    CLEAR all or specified LOCKs currently active on the system
+   Process 1   Process 2
+   LOCK A
+               LOCK B
+               LOCK +A
+   LOCK +B
 
-   When debugging a MUMPS application, you may  use  LKE  to  identify  and
-   clear a  possible  deadlock  situation,  i.e.,  two  or  more  processes
-   have LOCKs  and  are  waiting  to  add  resource  names  LOCKed  by  the
-   other(s).
+   Process 1 has A LOCKed and attempts to LOCK B. Process 2 has B LOCKed and
+   attempts to LOCK A. Because these processes do not release their current
+   LOCKs before adding additional LOCKs, nor do they provide a timeout to
+   detect the problem, they are deadlocked. Neither process can proceed
+   normally. You can use LKE to release one of the LOCKs so both processes
+   may execute. However, because releasing a LOCK may cause the process to
+   violate its design assumptions, terminating one process is generally a
+   safer way to break the deadlock.
 
-   When used  with  GT.CM,  LKE  may  display  and  change  information  on
-   other nodes of a distributed database system.
+   **Note**
 
-2 LOCK_database
-  MUMPS LOCKs and Global Directories
-   GT.M  distributes  the  LOCK   database   among   the   database   files
-   identified  by  the  Global  Directory  (GD).   The   Global   Directory
-   Editor (GDE) creates and maintains Global Directories.
+   When a process leaves M, GT.M normally releases any LOCKs or ZALLOCATEs
+   held by that process. If a GT.M process terminates abnormally, or if the
+   system "crashes" while a GT.M process is active, GT.M cannot perform
+   normal clean-up. However, as soon as any other process waits several
+   seconds for a LOCK owned by a process that no longer exists, GT.M
+   automatically clears the "orphaned" LOCK.
 
-   GT.M maps LOCKs of resource names starting  with  a  caret  (^)  to  the
-   database file  used  to  map  variables  with  the  same  name.  If  the
-   Global Directory maps the name A to file  A.DAT,  GT.M  maps  all  LOCKs
-   on resource name ^A to file A.DAT.
+2 Invoke
+   Invoke
 
-   GT.M maps  LOCKs  on  names  not  starting  with  a  caret  (^)  to  the
-   region of the database specified with  the  GDE  command  LOCK  -REGION.
-   By default, GDE  creates  Global  Directories  mapping  local  LOCKs  to
-   the region DEFAULT.
+   GT.M installation procedure places the LKE utility package in a directory
+   specified by the environment variable gtm_dist.
 
-   These two factors result in the following:
+   LKE requires that the environment variable gtmgbldir be defined.
 
-   o    ^ LOCKs automatically intersect for all  users  of  the  same  data
-        in any database file, because  GT.M  stores  the  ^  LOCKs  in  the
-        same file as the data
+   Invoke LKE using the following command at the shell prompt. If this does
+   not work, consult your system manager to investigate setup and file access
+   issues.
 
-   o    "local"  LOCKs  intersect  dependent  on  the   Global   Directory,
-        because users may access  the  database  through  different  Global
-        Directories.
+   $gtm_dist/lke LKE>
 
-2 Global_Directories
-  Establishing a Global Directory
-   GDE  and  LKE  use  the  environment  variable  gtmgbldir  to   identify
-   which file  to  use  for  the  Global  Directory.  gtmgbldir  should  be
-   defined by individual users in their login files.
+   **Important**
 
-   Example
+   Always run LKE on the node where the lock is held.
 
-   $ gtmgbldir=prod.gld
-   $ export gtmgbldir
+   When LKE is ready to accept commands, it displays the LKE> prompt. To
+   leave LKE, enter the EXIT command at the LKE> prompt.
 
-   When a process  invokes  a  GT.M  image,  GT.M  identifies  the  current
-   Global  Directory  by  the  environment   variable   gtmgbldir.   Within
-   MUMPS, SET $zgbldir=expr  changes  the  Global  Directory.  $zgbldir  is
-   an  intrinsic  special  variable.  An  individual  LOCK,  ZALLOCATE   or
-   ZDEALLOCATE  argument  may  specify  a   Global   Directory   with   the
-   extended global syntax.
+   When additional information is entered on the command line after the LKE
+   command, LKE processes the additional information as its command.
 
-1 CLEAR
-  C[LEAR]
-   The  CLEAR  command  removes  active  LOCKs.  The  format  of  the   CLEAR
-   command is:
+   $gtm_dist/lke show -all
+
+   This command displays all current LOCKs and then returns to the shell
+   prompt.
+
+   If your LKE argument contains quotes, precede each quote in the argument
+   by a back-slash (\) or enclose the entire argument in a set of quotes
+   (matching single or double). Apply this convention only for those LKE
+   commands that you run from the shell.
+
+   $gtm_dist/lke show -lock="^Account(\"Name\")"
+   $gtm_dist/lke show -lock='^Account("Name")'
+
+   Both these commands display the status of LOCK ^Account("Name") in the
+   default region.
+
+1 Commands
+   Commands
+
+   The format for the LKE commands is:
+
+   command [-qualifier[=qualifier-value]]
+
+   LKE accepts command and qualifier abbreviations. The section describing
+   each command provides the minimal abbreviation that can be used for that
+   command, and the command qualifiers, if any. FIS recommends the use of a
+   minimum of four characters for key words in scripts to ensure new keywords
+   do not conflict with older scripts.
+
+2 Clear
+   Clear
+
+   Use the CLEAR command to remove active LOCKs.
+
+   **Caution**
+
+   FIS recommends restricting the use of the LKE CLEAR facility to debugging
+   environments; removing LOCKs in a production environment typically
+   violates application design assumptions and can cause aberrant process
+   behavior. GT.M automatically removes abandoned LOCKs so it is typically
+   safer to MUPIP STOP a process that is inappropriately hanging on to a
+   LOCK.
+
+   The format of the CLEAR command is:
 
    C[LEAR] [-qualifier...]
 
-   The optional CLEAR command qualifiers are:
+   The optional qualifiers are:
 
    -A[LL]
-   -I[NTERACTIVE]
-   -O[UTPUT]=file-spec
+   -L[OCK]
+   -[NO]C[RIT]
+   -[NO]EXACT
+   -[NO]I[NTERACTIVE]
+   -O[UTPUT]="file-name"
    -P[ID]=pid
    -R[EGION]=region-name
 
    By default, CLEAR operates interactively (-INTERACTIVE).
 
-2 Qualifiers
+   Qualifiers for CLEAR
 
--ALL
-  -A[LL]
-   Specifies  the  removal  of  all  current  LOCKs.  If  used  with  the
-   -REGION qualifier -ALL removes  all  LOCKs  in  the  region.  Issue  a
-   CLEAR -ALL  only  when  there  are  no  active  GT.M  processes  using
-   LOCKs or when you can predict the effect on the application.
+   -A[LL]
 
-   The   -ALL   qualifier   is   incompatible   with   the   -INTERACTIVE
-   qualifier.
+   Specifies all current LOCKs.
 
--INTERACTIVE
-  -I[NTERACTIVE]
-   Clears  one  LOCK  at  a  time  interactively.   LKE   displays   each
-   current LOCK with the  PID  of  the  owner  process  and  prompts  for
-   verification  that  the  LOCK  should  be  cleared.  LKE  retains  the
-   LOCK for any response other than Y[ES].
+     o -ALL removes all current LOCKs.
+     o If used, CLEAR and -REGION qualifier, -ALL removes all LOCKs in that
+       region.
+     o Issue a CLEAR - ALL only when there are no active GT.M processes using
+       LOCKs, or when you can predict the effect on the application.
+     o By default, CLEAR -ALL operates interactively (-INTERACTIVE).
 
-   The   -INTERACTIVE   qualifier   is   incompatible   with   the   -ALL
-   qualifier.
+   -[NO]C[RIT]
 
-   By default, CLEAR operates interactively (-INTERACTIVE).
+   Allows LKE CLEAR to work even if another process is holding a critical
+   section.
 
--OUTPUT
-  -OUTPUT=file-spec
-   Directs the  reporting  of  all  cleared  LOCKs.  If  you  specify  an
-   existing file, LKE overwrites that file.
+   **Caution**
 
-   The -OUTPUT qualifier is compatible with all other qualifiers.
+   This can damage current LOCKs and the LOCK mechanism. It is intended for
+   use only under the direction of FIS.
 
-   By default, CLEAR sends its messages to the standard output.
+   By default LKE operates in CRIT mode and ensures a consistent view of
+   LOCKs by using the database critical section(s).
 
--PID
-  -/P[ID]=pid
-   Clears   all   LOCKs   associated   with   the    specified    process
-   identification  number.  LKE  interprets  the   PID   as   a   decimal
-   number.  This  command  provides  a  means  for  directing  CLEAR   to
-   LOCKs held by a process that is behaving abnormally.
+   -[NO]EXACT
 
-   The -PID qualifier is compatible with all other qualifiers.
+   Limits the CLEAR command to the exact resource name specified with
+   -LOCK=resource_name. NOEXACT (the default) treats the specified resource
+   name as a prefix and works not only on it, but also on any of its
+   descendants, since their existence effectively LOCK their parent tree.
 
--REGION
-  -/R[EGION]=region-name
-   Clears LOCKs mapped by  the  current  Global  Directory  to  a  region
-   specified by the region-name.
+   -L[OCK]=""resource_name""
 
-   The -REGION qualifier is compatible with all other qualifiers.
+   Unless used with -EXACT, specifies the leading prefix for an implicit wild
+   card search of all locks that start with the resource_name.
 
-   By default, CLEAR -REGION= operates interactively (-INTERACTIVE).
+     o The resource_name is enclosed in two double quotation marks ("" "").
+       Because M resource names are formatted the same as global nodes with
+       punctuation characters, in this context they are usually enclosed in
+       sets of double quotation marks with string subscripts enclosed in sets
+       of two double quotations.
+     o When used with CLEAR, -LOCK removes the locks that start with
+       resource_name.
+     o When used with SHOW,-LOCK provides a precise way to examine the
+       specified lock.
 
-1 EXIT
-  E[XIT]
-   The EXIT command ends an LKE session.  The  format  of  the  EXIT  command
-   is:
+   -[NO]I[NTERACTIVE]
+
+   Interactively clears one LOCK at a time. LKE displays each current LOCK
+   with the PID of the owner process and prompts for verification that the
+   LOCK should be cleared. LKE retains the LOCK for any response other than
+   Y[ES].
+
+     o By default, CLEAR operates interactively (-INTERACTIVE).
+     o To avoid holding a lock resource too long, LKE skips to the next
+       matching LOCK if there is no operator response for several seconds.
+     o -NOINTERACTIVE forces the action to take place without user
+       confirmation of each change. Using -NOINTERACTIVE prevents the LKE
+       operator from controlling the LOCK subsystem for potentially long
+       periods of time when many locks are held. To do this, it limits the
+       amount of time it waits for each response.
+
+   -O[UTPUT]="file-name"
+
+   Directs the reporting of all specified LOCKs to a file.
+
+     o If you specify an existing file, LKE creates a new version and
+       overwrites that file.
+     o If file-name has permission issues, OUTPUT reports the cause of the
+       error.
+     o The -OUTPUT qualifier is compatible with all other qualifiers.
+     o By default, CLEAR sends output messages to stdout.
+
+   -P[ID]=pid
+
+   Specifies the process identification number that holds a LOCK on a
+   resource name.
+
+     o LKE interprets pid as a decimal number.
+     o PID clears LOCKs held by the process with the specified process
+       identification number.
+     o Provides a means for directing CLEAR to LOCKs held by a process that
+       is behaving abnormally.
+     o The -PID qualifier is compatible with all other qualifiers.
+
+   -R[EGION]=region-name
+
+   region-namespecifies the region that holds the locked resource names.
+
+     o REGION clears LOCKs mapped by the current global directory to a region
+       specified by the region-name.
+     o The -REGION qualifier is compatible with all other qualifiers.
+     o By default, CLEAR -REGION= operates interactively (-INTERACTIVE).
+
+   Example:
+
+   LKE>CLEAR -ALL
+
+   This command clears all current LOCKs.
+
+   Example:
+
+   LKE>clear -pid=2325 -interactive
+
+   This command presents all LOCKs held by the process with PID equal to
+   2325. You can choose whether or not to clear each LOCK.
+
+   LKE>clear -reg=areg -interactive
+
+   This command produces an output like the following:
+
+   AREG ^a Owned by PID= 2083 which is an existing
+   process Clear lock ?
+
+   Type Yes or Y in response to the prompt.
+
+   LKE responds with an informational message:
+
+   %GTM-S-LCKGONE, Lock removed : ^a
+
+   Type Yes or N or No or N until all LOCKs are displayed and acted upon.
+
+   LKE> clear -pid=4208 -nointeractive
+
+   This command clears the lock held by a process with PID 4208. This command
+   produces an output like the following:
+
+   DEFAULT Lock removed : ^A
+
+   Note that -NOINTERACTIVE forced the action without asking for a
+   confirmation.
+
+   Example:
+
+   LKE>clear -lock="^a("b")
+   Clear lock ? y
+   Lock removed : ^a("b")
+   LKE>
+
+   This command clears lock ^a("b") in the default region.
+
+   Example:
+
+   LKE>clear -lock="^a" -nointeractive
+
+   This command clears all the locks that start with "^a" in the default
+   region. -NOINTERACTIVE qualifier instructs LKE to clear these locks
+   without further user intervention.
+
+   Example:
+
+   LKE>clear -lock="^a" -exact -nointeractive
+
+   This command clears lock ^a in the default region. -NOINTERACTIVE
+   instructs LKE to clear lock ^a without further user intervention.
+
+   Example:
+
+   LKE>CLEAR -PID=4109 -LOCK=""^A""
+   Clear lock ? Y
+   Lock removed : ^A
+   LKE>
+
+   This command clears LOCK ^A held by process with PID 4109.
+
+2 SHow
+   SHow
+
+   Use the SHOW command to get status of the LOCK mechanism and the LOCK
+   database. The format of the SHOW command is:
+
+   SH[OW] [-qualifier...]
+
+   The optional qualifiers are:
+
+   -A[LL]
+   -L[OCK]
+   -[NO]C[RIT]
+   -O[UTPUT]="file-name"
+   -P[ID]=pid
+   -R[EGION]=region-name
+   -W[AIT]
+
+     o By default, SHOW displays -A[LL].
+     o The SHOW command reports active LOCKs. Information includes the LOCK
+       resource name and the process identification (PID) of the LOCK owner.
+     o LKE SHOW displays lock space usage with a message in the form of:
+       "%GTM-I-LOCKSPACEUSE, Estimated free lock space: xxx% of pppp pages."
+       If the lock space is full, it also displays a LOCKSPACEFULL error.
+     o A LOCK command which finds no room in LOCK_SPACE to queue a waiting
+       LOCK, does a slow poll waiting for LOCK_SPACE to become available. If
+       LOCK does not acquire the ownership of the named resource with the
+       specified timeout, it returns control to the application with $TEST=0.
+       If timeout is not specified, the LOCK command continues to do a slow
+       poll till the space becomes available.
+     o LOCK commands which find no available lock space send a LOCKSPACEFULL
+       message to the operator log. To prevent flooding the operator log,
+       GT.M suppresses further such messages until the lock space usage drops
+       below 75% full.
+     o The results of a SHOW may be immediately "outdated" by M LOCK
+       activity.
+     o If the LOCK is owned by a GT.CM server on behalf of a client GT.M
+       process, then LKE SHOW displays the client NODENAME (limited to the
+       first 15 characters) and clientPID. The client PID (CLNTPID) is a
+       decimal value in UNIX.
+
+   **Note**
+
+       GT.CM is an RPC-like way of remotely accessing a GT.M database.
+
+   -ALL
+
+   Specifies all current LOCKs.
+
+     o -ALL displays all current LOCKs in all regions and information about
+       the state of processes owning these LOCKs.
+     o The -ALL qualifier is compatible with all other qualifiers.
+     o When -ALL is combined with -PID or -REGION, the most restrictive
+       qualifier prevails.
+     o SHOW -ALL and -WAIT displays both -ALL and -WAIT information.
+
+   -L[OCK]=resource_name
+
+   resource_name specifies a single lock.
+
+     o The resource_name is enclosed in double quotation marks ("" "").
+       Because M resource names are formatted the same as global nodes with
+       punctuation characters, in this context they are usually enclosed in
+       sets of double quotation marks with string subscripts enclosed in sets
+       of two double quotations.
+     o When used with the CLEAR command, the LOCK qualifier removes the
+       specified lock.
+     o When used with the SHOW command, the LOCK qualifier provides a precise
+       way to examine the specified lock and any descendant LOCKed resources.
+
+   -[NO]C[RIT]
+
+   Allows the SHOW command to work even if another process is holding a
+   critical section.
+
+     o By default LKE operates in CRIT mode and ensures a consistent view of
+       LOCKs by using the database critical section(s).
+     o Use NOCRIT with SHOW only when normal operation is unsuccessful, as
+       NOCRIT may cause LKE to report incomplete or inconsistent information.
+
+   -O[UTPUT]="file-name"
+
+   Directs the reporting of all specified LOCKs to a file.
+
+     o If you specify an existing file, LKE creates a new version and
+       overwrites that file.
+     o The -OUTPUT qualifier is compatible with all other qualifiers.
+     o By default, the SHOW command send output messages to stdout.
+
+   -P[ID]=pid
+
+   Specifies the process identification number that holds a LOCK on a
+   resource name.
+
+     o LKE interprets pid as a decimal number.
+     o PID displays all LOCKs owned by the specified process identification
+       number.
+     o The -PID qualifier is compatible with all other qualifiers; the most
+       restrictive of the qualifiers prevails.
+     o By default, SHOW displays the LOCKs for all PIDs.
+
+   -R[EGION]=region-name
+
+   Specifies the region that holds the locked resource names.
+
+     o The REGION qualifier displays LOCKs of that specified region.
+     o The REGION qualifier is compatible with all other qualifiers; the most
+       restrictive of the qualifiers prevails.
+     o By default, SHOW displays the LOCKs for all regions.
+
+   -W[AIT]
+
+   Displays the LOCK resource name and the process state information of all
+   processes waiting for the LOCK to be granted.
+
+     o SHOW -WAIT does not display the owner of the LOCK.
+     o SHOW -ALL -WAIT displays both -ALL and -WAIT information.
+     o When a process abandons a "wait" request, that request may continue to
+       appear in LKE SHOW -WAIT displays. This appearance is harmless, and is
+       automatically eliminated if the GT.M lock management requires the
+       space which it occupies.
+
+   Use the following procedure to display all LOCKs active in the database(s)
+   defined by the current global directory.
+
+   LKE> SHOW -ALL -WAIT
+
+   This produces an output like the following:
+
+   No locks were found in DEFAULT
+   AREG
+   ^a Owned by PID=2080 which is an existing process
+   BREG
+   ^b(2) Owned by PID= 2089 which is a nonexistent process
+   No locks were found in CREG
+
+   Example:
+
+   LKE>SHOW -ALL
+
+   This command displays all LOCKs mapped to all regions of the current
+   global directory. It produces an output like the following:
+
+   DEFAULT
+   ^A Owned by PID= 5052 which is an existing process
+   ^B Owned by PID= 5052 which is an existing process
+   %GTM-I-LOCKSPACEUSE, Estimated free lock space: 99% of 40 pages
+
+   Example:
+
+   LKE>show -lock="^a"(""b"")"
+
+   This command shows lock ^a("b") in the default region.
+
+   Example:
+
+   LKE>SHOW -CRIT
+
+   This command displays all the applicable locks held by a process that is
+   holding a critical section.
+
+   Example:
+
+   LKE>show -all -output="abc.lk"
+
+   This command create a new file called abc.lk that contains the output of
+   the SHOW -ALL command.
+
+   Example:
+
+   LKE>show -pid=4109
+
+   This command displays all locks held by process with PID 4109 and the
+   total lock space usage.
+
+   Example:
+
+   LKE>show -region=DEFAULT -lock=""^A""
+
+   This command displays the lock on ^A in the region DEFAULT. It produces an
+   output like the following:
+
+   DEFAULT
+   ^A Owned by PID= 5052 which is an existing process
+   %GTM-I-LOCKSPACEUSE, Estimated free lock space: 99% of 40 pages
+
+2 Exit
+   Exit
+
+   The EXIT command ends an LKE session. The format of the EXIT command is:
 
    E[XIT]
 
-1 HELP
-  H[ELP]
-   The HELP command explains LKE commands. The format  of  the  HELP  command
-   is:
+2 Help
+   Help
+
+   The HELP command explains LKE commands. The format of the HELP command is:
 
    H[ELP] [options...]
 
-   Enter the LKE  command  for  which  you  want  information  at  the  Topic
-   prompt(s). Use <RETURN> or <CTRL Z> to return to the LKE prompt.
+   Enter the LKE command for which you want information at the Topic
+   prompt(s) and then press RETURN or CTRL-Z to return to the LKE prompt.
 
-   Example
+   Example:
 
    LKE> HELP SHOW
 
    This command displays help for the SHOW command.
 
+2 SPawn
+   SPawn
 
-1 SHOW
-  SH[OW]
-   The SHOW command provides a  status  report  on  the  LOCK  mechanism  and
-   the LOCK database. The format of the SHOW command is:
-
-   SH[OW] [ -qualifier...]
-
-   By default, SHOW displays -ALL.
-
-   The  SHOW  command  reports  active  LOCKs.  Information  displayed  about
-   specific  LOCKs  includes  the  LOCK  resource  name   and   the   process
-   identification (PID) of the LOCK owner. The  results  of  a  SHOW  may  be
-   immediately "outdated" by MUMPS LOCK activity.
-
-2 Qualifiers
--ALL
-  -A[LL]
-   Specifies  a  display  of  all  current  LOCKs  in  all  regions   and
-   information about the state  of  processes  owning  these  LOCKs.  The
-   -ALL  qualifier  is  compatible  with  all  other   qualifiers.   SHOW
-   -ALL -WAIT displays both -ALL and -WAIT information.
-
-   By default, SHOW displays -ALL.
-
--OUTPUT
-  -OUTPUT=file-spec
-   Directs the reporting  of  the  current  LOCKs.  When  you  specify  a
-   file, LKE overwrites that file.
-
-   The -OUTPUT qualifier is compatible with all other qualifiers.
-
-   By default, SHOW directs all messages to SYS$OUTPUT.
-
--PID
-  -P[ID]=process-identification
-   Displays all LOCKs owned by the specified PID.
-
-   The -PID qualifier is compatible with all other qualifiers.
-
-   By default, SHOW displays the LOCKs for all PIDs.
-
--REGION
-  -R[EGION]=region-name
-   Displays LOCKs for the specified region.
-
-   The -REGION qualifier is compatible with all other qualifiers.
-
-   By default, SHOW displays the LOCKs for all regions.
-
--WAIT
-  -W[AIT]
-   Displays   the   LOCK   resource   name   and   the   process    state
-   information of all processes waiting  for  the  LOCK  to  be  granted.
-   LKE  does  not  display  the  owner  of  the  LOCK.  SHOW  -ALL  -WAIT
-   displays both -ALL and -WAIT information.
-
-1 SPAWN
-  SP[AWN]
-   The  SPAWN  command  creates  a  sub-process  for  access  to  the   shell
-   without terminating the current LKE environment.  Use  the  SPAWN  command
-   to suspend a session and issue shell commands  such  as  ls  or  printenv.
-   The SPAWN command accepts an optional  command  string  for  execution  by
-   the spawned sub-process.  If  the  SPAWN  has  command  string  parameter,
-   the created sub-process prompts  and  accepts  any  legal  shell  command.
-   To terminate the sub-process use the shell logout command.
+   Use the SPAWN command to create a sub-process for access to the shell
+   without terminating the current LKE environment. Use the SPAWN command to
+   suspend a session and issue shell commands such as ls or printenv.
 
    The format of the SPAWN command is:
 
    SP[AWN]
+
+   The SPAWN command has no qualifiers.
+
+   Example:
+
+   LKE>spawn
+
+   This command creates a sub-process for access to the current shell without
+   terminating the current LKE environment. Type exit to return to LKE.
+
+1 Summary
+   Summary
+
+   +-------------------------------------------------------------------+
+   | COMMAND |      QUALIFIER      |             COMMENTS              |
+   |---------+---------------------+-----------------------------------|
+   |         | -ALL                |                                   |
+   |         | -L[OCK]             |                                   |
+   |         | -[NO]CRIT           |                                   |
+   |         | -[NO]EXACT          |                                   |
+   | C[LEAR] |                     | Use CLEAR with care and planning. |
+   |         | -[NO]I[NTERACTIVE]  |                                   |
+   |         | -O[UTPUT]=file-name |                                   |
+   |         | -P[ID]=pid          |                                   |
+   |         | -R[EGION]=name      |                                   |
+   |---------+---------------------+-----------------------------------|
+   | E[XIT]  | none                | -                                 |
+   |---------+---------------------+-----------------------------------|
+   | H[ELP]  | [option]            | -                                 |
+   |---------+---------------------+-----------------------------------|
+   |         | -ALL                |                                   |
+   |         | -L[OCK]             |                                   |
+   |         | -[NO]CRIT           |                                   |
+   |         | -N[OINTERACTIVE]    |                                   |
+   | SH[OW]  |                     | -                                 |
+   |         | -O[UTPUT]=file-name |                                   |
+   |         | -P[ID]=pid          |                                   |
+   |         | -R[EGION]=name      |                                   |
+   |         | -W[AIT]             |                                   |
+   |---------+---------------------+-----------------------------------|
+   | SP[AWN] | none                | shellcommand                      |
+   +-------------------------------------------------------------------+
 

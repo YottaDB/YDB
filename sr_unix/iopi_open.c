@@ -33,6 +33,7 @@
 #include "iosp.h"
 #include "jobsp.h"
 #include "have_crit.h"
+#include "fork_init.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #include "gtm_zos_chset.h"
@@ -351,10 +352,10 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	{
 		PIPE_ERROR_INIT();
 		if (0 == sparams[PCOMMAND])
-		    rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+		    rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 			      ERR_TEXT, 2, LEN_AND_LIT("Missing command string"));
 		else
-			rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_LIT("Command string has no value"));
 	} else
 	{
@@ -367,7 +368,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			{
 				PIPE_ERROR_INIT();
 				SPRINTF(error_str, "%s%s", INVALID_CMD, ret_token);
-				rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 					  ERR_TEXT, 2, LEN_AND_STR(error_str));
 			}
 		}
@@ -378,7 +379,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	if (sparams[PSHELL] && (0 == slen[PSHELL]))
 	{
 		PIPE_ERROR_INIT();
-		rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 			  ERR_TEXT, 2, LEN_AND_LIT("SHELL parameter has no value"));
 	} else if (0 != slen[PSHELL])
 	{
@@ -393,7 +394,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			assert(GTM_MAX_DIR_LEN - 1 >= STRLEN(pshell));
 			SPRINTF(error_str, "Invalid shell: %s", pshell);
 			PIPE_ERROR_INIT();
-			rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_STR(error_str));
 		}
 		pshell_name = basename(pshell);
@@ -404,7 +405,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	if (sparams[PSTDERR] && (0 == slen[PSTDERR]))
 	{
 		PIPE_ERROR_INIT();
-		rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 			  ERR_TEXT, 2, LEN_AND_LIT("STDERR parameter has no value"));
 	} else if (0 != slen[PSTDERR])
 	{
@@ -419,7 +420,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	{
 		save_errno = errno;
 		PIPE_ERROR_INIT();
-		rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 			  ERR_TEXT, 2, LEN_AND_LIT("PIPE - pipe(pfd_write) failed"), save_errno);
 	} else
 	{
@@ -439,7 +440,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - pipe(pfd_read) failed"), save_errno);
 		} else
 		{
@@ -459,7 +460,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - pipe(pfd_read_stderr) failed"), save_errno);
 		} else
 		{
@@ -474,12 +475,12 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	}
 	file_des_write = pfd_write[1];
 	/*do the fork and exec */
-	cpid = fork();	/* BYPASSOK: we exec() immediately, no FORK_CLEAN needed */
+	FORK(cpid);	/* BYPASSOK: we exec() immediately, no FORK_CLEAN needed */
 	if (-1 == cpid)
 	{
 		save_errno = errno;
 		PIPE_ERROR_INIT();
-		rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 			  ERR_TEXT, 2, LEN_AND_LIT("PIPE - fork() failed"), save_errno);	/* BYPASSOK */
 	}
 	if (0 == cpid)
@@ -514,7 +515,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_write[0]) failed in child"), save_errno);
 		}
 		if (return_stdout)
@@ -525,7 +526,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			{
 				save_errno = errno;
 				PIPE_ERROR_INIT();
-				rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 					  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_read[1],1) failed in child"), save_errno);
 			}
 			/* stderr also becomes pfd_read[1] if return_stderr is false*/
@@ -536,8 +537,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				{
 					save_errno = errno;
 					PIPE_ERROR_INIT();
-					rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io, ERR_TEXT,
-						  2, LEN_AND_LIT("PIPE - dup2(pfd_read[1],2) failed in child"), save_errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
+							dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
+							LEN_AND_LIT("PIPE - dup2(pfd_read[1],2) failed in child"), save_errno);
 				}
 			}
 		}
@@ -548,8 +550,10 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			{
 				save_errno = errno;
 				PIPE_ERROR_INIT();
-				rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io, ERR_TEXT,
-					  2, LEN_AND_LIT("PIPE - dup2(pfd_read_stderr[1],2) failed in child"), save_errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
+						dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
+						LEN_AND_LIT("PIPE - dup2(pfd_read_stderr[1],2) failed in child"),
+						save_errno);
 			}
 		}
 		if (0 == slen[PSHELL])
@@ -568,7 +572,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - execl() failed in child"), save_errno);
 		}
 	} else
@@ -604,13 +608,13 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			{
 				save_errno = errno;
 				PIPE_ERROR_INIT();
-				rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 					  ERR_TEXT, 2, LEN_AND_LIT("Error in stream open"), save_errno);
 			}
 			d_rm->read_fildes = file_des_read;
 		}
-		SPRINTF(&d_rm->dollar_key[0], "%d", cpid); /* save in pipe specific structure for $KEY access */
-		memcpy(d_rm->dollar_device, "0", SIZEOF("0"));
+		SPRINTF(&iod->dollar.key[0], "%d", cpid); /* save in pipe specific structure for $KEY access */
+		memcpy(iod->dollar.device, "0", SIZEOF("0"));
 		iod->state = dev_closed;
                 d_rm->stream = FALSE;
                 iod->width = DEF_RM_WIDTH;
@@ -679,7 +683,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				io_ptr->dev_sp = (void*)malloc(SIZEOF(d_rm_struct));
 				memset(io_ptr->dev_sp, 0, SIZEOF(d_rm_struct));
 				in_d_rm = (d_rm_struct *) io_ptr->dev_sp;
-				memcpy(in_d_rm->dollar_device, "0", SIZEOF("0"));
+				memcpy(io_ptr->dollar.device, "0", SIZEOF("0"));
 				io_ptr->state = dev_closed;
 				in_d_rm->stream = d_rm->stream;
 				io_ptr->width = iod->width;
@@ -689,6 +693,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				io_ptr->dollar.y = 0;
 				io_ptr->dollar.za = 0;
 				io_ptr->dollar.zb[0] = 0;
+				io_ptr->dollar.key[0] = 0;
+				io_ptr->dollar.device[0] = 0;
 				io_ptr->disp_ptr = iod->disp_ptr;
 				in_d_rm->fixed = d_rm->fixed;
 				in_d_rm->noread = TRUE;
@@ -711,9 +717,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	flags = 0;
 	FCNTL2(file_des_write, F_GETFL, flags);
 	if (0 > flags)
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
 	FCNTL3(file_des_write, F_SETFL, (flags | O_NONBLOCK), fcntl_res);
 	if (0 > fcntl_res)
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
 	return iorm_open(dev_name, pp, file_des_write, mspace, timeout);
 }

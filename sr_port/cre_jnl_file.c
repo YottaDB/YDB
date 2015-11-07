@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,39 +112,34 @@ uint4	cre_jnl_file(jnl_create_info *info)
 {
 	mstr 		filestr;
 	int 		org_fn_len, rename_fn_len, fstat;
-	uint4		ustatus;
 	char		*org_fn, rename_fn[MAX_FN_LEN];
+	boolean_t	no_rename;
 
+	assert(0 != jgbl.gbl_jrec_time);
 	if (!info->no_rename)	/* ***MAY*** be rename is required */
 	{
+		no_rename = FALSE;
 		if (SS_NORMAL != (info->status = prepare_unique_name((char *)info->jnl, info->jnl_len, "", "",
-				rename_fn, &rename_fn_len, &info->status2)))
-		{	/* prepare_unique_name calls append_time_stamp which needs to open the info->jnl file.
-			 * We are here because append_time_stamp failed to open info->jnl or something else.
-			 * So check if info->jnl is present in the system */
-			filestr.addr = (char *)info->jnl;
-			filestr.len = info->jnl_len;
-			if (FILE_NOT_FOUND != (fstat = gtm_file_stat(&filestr, NULL, NULL, FALSE, &ustatus)))
-			{
-				if (FILE_STAT_ERROR == fstat)
-				{
-					STATUS_MSG(info);	/* for prepare_unique_name call */
-					info->status = ustatus;
-					info->status2 = SS_NORMAL;
-				}
-				STATUS_MSG(info);
-				return EXIT_ERR;
-			}
-			if (IS_GTM_IMAGE)
-				send_msg(VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
-			else
-				gtm_putmsg(VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
-			STATUS_MSG(info);
-			info->status = info->status2 = SS_NORMAL;
-			info->no_rename = TRUE;		/* We wanted to rename, but not required */
-			info->no_prev_link = TRUE;	/* No rename => no prev_link */
+				rename_fn, &rename_fn_len, jgbl.gbl_jrec_time, &info->status2)))
+		{
+			no_rename = TRUE;
 		} else
 		{
+			filestr.addr = (char *)info->jnl;
+			filestr.len = info->jnl_len;
+			if (FILE_PRESENT != (fstat = gtm_file_stat(&filestr, NULL, NULL, FALSE, (uint4 *)&info->status)))
+			{
+				if (FILE_NOT_FOUND != fstat)
+				{
+					STATUS_MSG(info);
+					return EXIT_ERR;
+				}
+				if (IS_GTM_IMAGE)
+					send_msg(VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
+				else
+					gtm_putmsg(VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
+				no_rename = TRUE;
+			}
 			/* Note if info->no_prev_link == TRUE, we do not keep previous link, though rename can happen */
 			if (JNL_ENABLED(info) && !info->no_prev_link)
 			{
@@ -152,6 +147,13 @@ uint4	cre_jnl_file(jnl_create_info *info)
 				info->prev_jnl_len = rename_fn_len;
 			} else
 				assert(info->no_prev_link);
+		}
+		if (no_rename)
+		{
+			STATUS_MSG(info);
+			info->status = info->status2 = SS_NORMAL;
+			info->no_rename = TRUE; /* We wanted to rename, but not required anymore */
+			info->no_prev_link = TRUE;	/* No rename => no prev_link */
 		}
 	} /* else we know for sure rename is not required */
 	return (cre_jnl_file_common(info, rename_fn, rename_fn_len));
@@ -171,13 +173,13 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	fd_type			channel;
 	char            	*jrecbuf, *jrecbuf_base;
 	gd_id			jnlfile_id;
-#if defined(VMS)
+#	ifdef VMS
 	struct FAB      	fab;
 	struct NAM      	nam;
 	char            	es_buffer[MAX_FN_LEN], name_buffer[MAX_FN_LEN];
 	uint4			blk, block, zero_size;
 	io_status_block_disk	iosb;
-#elif defined(UNIX)
+#	else
 	struct stat		stat_buf;
 	int			fstat_res;
 	ZOS_ONLY(int		realfiletag;)
@@ -186,7 +188,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	struct stat		sb;
 	int			perm;
 	struct perm_diag_data	pdd;
-#endif
+#	endif
 	int			idx;
 	trans_num		db_tn;
 	uint4			temp_offset, temp_checksum, pfin_offset, eof_offset;
@@ -209,13 +211,13 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	{
 		create_fn = &fn_buff[0];
 		if (SS_NORMAL != (info->status = prepare_unique_name((char *)info->jnl, (int)info->jnl_len, "", EXT_NEW,
-								     (char *)create_fn, &create_fn_len, &info->status2)))
+								     (char *)create_fn, &create_fn_len, 0, &info->status2)))
 		{
 			STATUS_MSG(info);
 			return EXIT_ERR;
 		}
 	}
-#if defined(UNIX)
+#	ifdef UNIX
 	OPENFILE3((char *)create_fn, O_CREAT | O_EXCL | O_RDWR, 0600, channel);
 	if (-1 == channel)
 	{
@@ -223,10 +225,10 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		STATUS_MSG(info);
 		return EXIT_ERR;
 	}
-#if defined(__MVS__)
+#	ifdef __MVS__
  	if (-1 == gtm_zos_set_tag(channel, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
  		TAG_POLICY_SEND_MSG((char *)create_fn, errno, realfiletag, TAG_BINARY);
-#endif
+#	endif
 	FSTAT_FILE(channel, &stat_buf, fstat_res);
 	if (-1 == fstat_res)
 	{
@@ -290,7 +292,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	jrecbuf = (char *)ROUND_UP2((uintszofptr_t)jrecbuf_base, jnl_fs_block_size);
 	memset(jrecbuf, 0, jnl_fs_block_size);
 	set_gdid_from_stat(&jnlfile_id, &stat_buf);
-#elif defined(VMS)
+#	else
 	nam = cc$rms_nam;
 	nam.nam$l_rsa = name_buffer;
 	nam.nam$b_rss = SIZEOF(name_buffer);
@@ -334,7 +336,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	memcpy(jnlfile_id.did, &nam.nam$w_did, SIZEOF(jnlfile_id.did));
 	memcpy(jnlfile_id.fid, &nam.nam$w_fid, SIZEOF(jnlfile_id.fid));
 	jnl_fs_block_size = get_fs_block_size(channel);
-#endif
+#	endif
 	info->checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&jnlfile_id, SIZEOF(gd_id));
 	/* Journal file header size relies on this assert */
 	assert(256 == GTMCRYPT_RESERVED_HASH_LEN);

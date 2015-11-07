@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
  */
 
 
-#define BG_TRACE_PRO_ANY(C, X)	{C->hdr->X##_cntr++; C->hdr->X##_tn = C->ti->curr_tn;}
+#define BG_TRACE_PRO_ANY(C, X)	{C->hdr->X##_cntr++; C->hdr->X##_tn = C->hdr->trans_hist.curr_tn ;}
 #define BG_TRACE_PRO(Q) 	BG_TRACE_PRO_ANY(cs_addrs, Q)
 
 #ifdef DEBUG

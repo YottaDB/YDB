@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2011, 2012 Fidelity Information Services, Inc       #
+#	Copyright 2011, 2013 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -21,14 +21,12 @@ gtmsecshr%-r-xr-x--- gtmprofile_preV54000
 lke%-r-xr-x--- libgtmutil.sl
 semstat2%dr-xr-x--- plugin
 
-pro/plugin:
-zzz_insert%dr-xr-x--- o
-zzz_insert%dr-xr-x--- r
-
-pro/plugin/gtmcrypt:
-zzz_insert%-r--r----- source.tar
-
 pro/utf8:
 TTTGEN.m -> ../TTTGEN.m%lrwxr-xr-x README.txt -> ../README.txt
 dse -> ../dse%lrwxr-xr-x custom_errors_sample.txt -> ../custom_errors_sample.txt
+gtmstart.gtc -> ../gtmstart.gtc%-r-sr-x--- gtmsecshr
+gtmstart.gtc -> ../gtmstart.gtc%dr-x------ gtmsecshrdir
 lke -> ../lke%-r-xr-x--- libgtmutil.sl
+
+pro/utf8/gtmsecshrdir:
+zzz_insert%-r-s------ gtmsecshr

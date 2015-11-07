@@ -50,5 +50,14 @@
 	rslt = c - (unsigned char *)str;					\
 }
 #endif
+#define STRNDUP(STR, MAXLEN, DST)						\
+{										\
+	size_t local_len;							\
+										\
+	STRNLEN(STR, MAXLEN, local_len);					\
+	DST = (char *) malloc(local_len + 1);					\
+	memcpy(DST, STR, local_len);						\
+	DST[local_len] = '\0';							\
+}
 
 #endif

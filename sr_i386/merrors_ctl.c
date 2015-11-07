@@ -1217,7 +1217,7 @@ LITDEF	err_msg merrors[] = {
 	"REPLXENDIANFAIL", "!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ", 3,
 	"ZGOTOINVLVL2", "ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)", 0,
 	"GTMSECSHRCHDIRF", "gtmsecshr unable to chdir to its temporary directory (!AD)", 2,
-	"UNUSEDMSG1382", "FORCTRLINDX: Only used in V5.4-002", 0,
+	"JNLORDBFLU", "Error flushing database blocks to !AD. See related messages in the operator log", 2,
 	"ZCCLNUPRTNMISNG", "External call: Cleanup routine name missing. Cannot continue", 0,
 	"ZCINVALIDKEYWORD", "External call: Invalid keyword found. Cannot continue", 0,
 	"REPLNOMULTILINETRG", "Sequence number 0x!16@XQ contains a trigger definition too large for transmission to the current replicating instance, which does not support multi-line triggers - stopping replication", 1,
@@ -1272,7 +1272,7 @@ LITDEF	err_msg merrors[] = {
 	"ORLBKNOV4BLK", "Region !AD (!AD) has V4 format blocks. Database upgrade required. ONLINE ROLLBACK cannot continue", 4,
 	"DBROLLEDBACK", "Concurrent ONLINE ROLLBACK detected on one or more regions. The current operation is no longer valid", 0,
 	"DSEWCREINIT", "Database cache reinitialized by DSE for region !AD", 2,
-	"UNUSEDMSG1437", "A total of !UL process(es) skipped database rundown due to a concurrent ONLINE ROLLBACK", 1,
+	"MURNDWNOVRD", "OVERRIDE qualifier used with MUPIP RUNDOWN on database file !AD", 2,
 	"REPLONLNRLBK", "ONLINE ROLLBACK detected. Starting afresh", 0,
 	"SRVLCKWT2LNG", "PID !UL is holding the source server lock. Waited for !UL minute(s). Now exiting", 2,
 	"IGNBMPMRKFREE", "Ignoring bitmap free-up operation for region !AD (!AD) due to concurrent ONLINE ROLLBACK", 4,
@@ -1357,6 +1357,12 @@ LITDEF	err_msg merrors[] = {
 	"MALLOCMAXUNIX", "Exceeded maximum allocation defined by $gtm_max_storalloc", 0,
 	"MALLOCMAXVMS", "Exceeded maximum allocation defined by GTM_MAX_STORALLOC", 0,
 	"HOSTCONFLICT", "Host !AD could not open database file !AD because it is marked as already open on node !AD", 6,
+	"GETADDRINFO", "Error in getting address info", 0,
+	"GETNAMEINFO", "Error in getting name info", 0,
+	"SOCKBIND", "Error in binding TCP socket", 0,
+	"INSTFRZDEFER", "Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict", 4,
+	"REGOPENRETRY", "Attempt to open region !AD (!AD) using startup shortcut failed due to conflicting database shutdown. Retrying...", 4,
+	"REGOPENFAIL", "Failed to open region !AD (!AD) due to conflicting database shutdown activity", 4,
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -2563,7 +2569,7 @@ LITDEF	int ERR_REPLNOXENDIAN = 150381962;
 LITDEF	int ERR_REPLXENDIANFAIL = 150381970;
 LITDEF	int ERR_ZGOTOINVLVL2 = 150381978;
 LITDEF	int ERR_GTMSECSHRCHDIRF = 150381986;
-LITDEF	int ERR_UNUSEDMSG1382 = 150381994;
+LITDEF	int ERR_JNLORDBFLU = 150381994;
 LITDEF	int ERR_ZCCLNUPRTNMISNG = 150382002;
 LITDEF	int ERR_ZCINVALIDKEYWORD = 150382010;
 LITDEF	int ERR_REPLNOMULTILINETRG = 150382018;
@@ -2618,7 +2624,7 @@ LITDEF	int ERR_ORLBKFRZOVER = 150382403;
 LITDEF	int ERR_ORLBKNOV4BLK = 150382410;
 LITDEF	int ERR_DBROLLEDBACK = 150382418;
 LITDEF	int ERR_DSEWCREINIT = 150382427;
-LITDEF	int ERR_UNUSEDMSG1437 = 150382435;
+LITDEF	int ERR_MURNDWNOVRD = 150382435;
 LITDEF	int ERR_REPLONLNRLBK = 150382442;
 LITDEF	int ERR_SRVLCKWT2LNG = 150382450;
 LITDEF	int ERR_IGNBMPMRKFREE = 150382459;
@@ -2703,9 +2709,15 @@ LITDEF	int ERR_MMREGNOACCESS = 150383082;
 LITDEF	int ERR_MALLOCMAXUNIX = 150383090;
 LITDEF	int ERR_MALLOCMAXVMS = 150383098;
 LITDEF	int ERR_HOSTCONFLICT = 150383106;
+LITDEF	int ERR_GETADDRINFO = 150383114;
+LITDEF	int ERR_GETNAMEINFO = 150383122;
+LITDEF	int ERR_SOCKBIND = 150383130;
+LITDEF	int ERR_INSTFRZDEFER = 150383139;
+LITDEF	int ERR_REGOPENRETRY = 150383147;
+LITDEF	int ERR_REGOPENFAIL = 150383154;
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1344};
+	1350};

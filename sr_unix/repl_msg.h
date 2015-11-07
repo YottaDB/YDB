@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,7 @@ enum
 	REPL_HISTREC,			/* 31 */  /* sent in the middle of a journal record stream to signal start of new history */
 	REPL_NEED_STRMINFO,		/* 32 */  /* sent by a supplementary source server to a supplementary receiver server */
 	REPL_STRMINFO,			/* 33 */  /* sent in response to a REPL_NEED_STRMINFO message */
+	REPL_LOGFILE_INFO,		/* 34 */  /* sent (at time of handshake) to communicate to one another the $CWD/logfile */
 	REPL_MSGTYPE_LAST=256		/* 256 */
 	/* any new message need to be added before REPL_MSGTYPE_LAST */
 };
@@ -57,14 +58,22 @@ enum
 #define	REPL_PROTO_VER_UNINITIALIZED	(char)0xFF	/* -1, the least of the versions to denote an uninitialized version field */
 #define	REPL_PROTO_VER_DUALSITE		(char)0x0	/* Versions GT.M V5.0 and prior that dont support multi site replication */
 #define	REPL_PROTO_VER_MULTISITE	(char)0x1	/* Versions V5.1-000 and above that support multi site replication */
-#define	REPL_PROTO_VER_MULTISITE_CMP	(char)0x2	/* Versions V5.3-003 and above that suport multisite replication with
+#define	REPL_PROTO_VER_MULTISITE_CMP	(char)0x2	/* Versions V5.3-003 and above that support multisite replication with
 							 * the ability to compress the logical records in the replication pipe.
 							 */
-#define	REPL_PROTO_VER_SUPPLEMENTARY	(char)0x3	/* Versions V5.5-000 and above that suport supplementary instances */
-#define	REPL_PROTO_VER_THIS		REPL_PROTO_VER_SUPPLEMENTARY
+#define	REPL_PROTO_VER_SUPPLEMENTARY	(char)0x3	/* Versions V5.5-000 and above that support supplementary instances */
+#define	REPL_PROTO_VER_REMOTE_LOGPATH	(char)0x4	/* Versions V6.0-003 and above that send remote $CWD as part of handshake */
+#define	REPL_PROTO_VER_THIS		REPL_PROTO_VER_REMOTE_LOGPATH
 							/* The current/latest version of the communication protocol between the
 							 * primary (source server) and secondary (receiver server or rollback)
 							 */
+/* Below macro defines the maximum size of the replication logfile path information that will be sent across to the other side.
+ * While the actual path max is defined by GTM_PATH_MAX, the value of GTM_PATH_MAX differ across different platforms and so we
+ * cannot always be sure if this side can store the remote side's logfile path. Since REPL_LOGFILE_INFO message is sent across
+ * only during handshake, malloc too is an overkill. So, have a fixed size buffer (see repl_logfile_info_msg_t beow) bounded by
+ * the below size.
+ */
+#define REPL_LOGFILE_PATH_MAX		1023
 
 /* A few of these flag bits (e.g. START_FLAG_SRCSRV_IS_VMS) are no longer used but they should not be removed just in case prior
  * versions that used those bitslots communicate with a newer version that assigns a different meaning to those slots. Any new
@@ -371,6 +380,19 @@ typedef struct		/* Used to send a message of type REPL_BADTRANS or REPL_CMP2UNCM
 	char		filler_32[16];
 } repl_badtrans_msg_t;
 
+typedef struct
+{
+	int4		type;
+	int4		len;
+	int4		fullpath_len;
+	uint4		pid;
+	char		proto_ver;
+	char		filler_32[15]; /* to ensure that at least 32 bytes are sent across (gtmrecv_fetchresync relies on this) */
+	char		fullpath[REPL_LOGFILE_PATH_MAX + 1]; /* + 1 for null-terminator */
+} repl_logfile_info_msg_t;
+
+#define REPL_LOGFILE_INFO_MSGHDR_SZ	OFFSETOF(repl_logfile_info_msg_t, fullpath[0])
+
 #if defined(__osf__) && defined(__alpha)
 # pragma pointer_size(save)
 # pragma pointer_size(long)
@@ -406,5 +428,6 @@ void	gtmsource_send_new_histrec(void);
 void	gtmrecv_repl_send(repl_msg_ptr_t msgp, int4 type, int4 len, char *msgtypestr, seq_num optional_seqno);
 void	gtmrecv_send_histinfo(repl_histinfo *histinfo);
 void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, boolean_t is_rcvr_srvr);
+uint4   repl_logfileinfo_get(char *logfile, repl_logfile_info_msg_t *msgp, boolean_t cross_endian, FILE *logfp);
 
 #endif

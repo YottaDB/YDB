@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -119,14 +119,6 @@ int	iotcp_fillroutine(void)
 	tcp_routines.aa_connect = gtm_connect;
 	tcp_routines.aa_getsockname = getsockname;
 	tcp_routines.aa_getsockopt = getsockopt;
-#ifndef htons       /* if htons is not a macro, assign the routine */
-	tcp_routines.aa_htons = htons;
-#endif
-	tcp_routines.aa_inet_addr = INET_ADDR;
-	tcp_routines.aa_inet_ntoa = INET_NTOA;
-#ifndef ntohs
-	tcp_routines.aa_ntohs = ntohs;
-#endif
 	tcp_routines.aa_listen = listen;
 	tcp_routines.aa_recv = (int (*)())gtm_recv;
 	tcp_routines.aa_select = select;

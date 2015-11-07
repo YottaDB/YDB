@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,11 +109,11 @@ void gv_rundown(void)
 #				if defined(DEBUG) && defined(UNIX)
 				if (is_jnlpool_creator && ANTICIPATORY_FREEZE_AVAILABLE && TREF(gtm_test_fake_enospc))
 				{	/* Clear ENOSPC faking now that we are running down */
-					csa = &FILE_INFO(r_local)->s_addrs;
+					csa = REG2CSA(r_local);
 					if (csa->nl->fake_db_enospc || csa->nl->fake_jnl_enospc)
 					{
-						send_msg(VARLSTCNT(8) ERR_TEXT, 2, DB_LEN_STR(r_local), ERR_TEXT, 2,
-							 LEN_AND_LIT("Resetting fake_db_enospc and fake_jnl_enospc"));
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TEXT, 2, DB_LEN_STR(r_local), ERR_TEXT,
+							     2, LEN_AND_LIT("Resetting fake_db_enospc and fake_jnl_enospc"));
 						csa->nl->fake_db_enospc = FALSE;
 						csa->nl->fake_jnl_enospc = FALSE;
 					}
@@ -244,5 +244,5 @@ void gv_rundown(void)
 #	endif
 
 	if (EXIT_NRM != rundown_status)
-		rts_error(VARLSTCNT(1) ERR_NOTALLDBRNDWN);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBRNDWN);
 }

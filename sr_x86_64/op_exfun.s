@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2012 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2013 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -77,7 +77,7 @@ error:	movl	ERR_GTMCHECK(REG_IP),REG32_ARG1
 	jmp	retlab
 
 long:	movq	REG64_ACCUM,msf_mpc_off(REG64_ARG2)
-	addl	REG32_ARG1, msf_mpc_off(REG64_ARG2)
+	addq	REG64_ARG1,msf_mpc_off(REG64_ARG2)
 cont:	call	exfun_frame
 
 	movl	act_cnt(REG_FRAME_POINTER),REG32_ACCUM

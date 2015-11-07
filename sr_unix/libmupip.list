@@ -198,6 +198,7 @@ repl_inst_edit
 repl_ipc_cleanup
 repl_log
 repl_log_init
+repl_logfileinfo_get
 repl_tr_good
 replic_gbldefs
 ss_anal_shdw_file

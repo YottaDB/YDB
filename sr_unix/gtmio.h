@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -428,7 +428,6 @@ error_def(ERR_PREMATEOF);
 		RC = errno;									\
 	else											\
 		RC = -1;		/* Something kept us from writing what we wanted */	\
-	GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_DSKNOSPCAVAIL, RC, ENOSPC);			\
 }
 
 #else /* real lseek and read/write - still need to protect against interrupts inbetween calls */
@@ -663,13 +662,15 @@ error_def(ERR_PREMATEOF);
 					}									\
 					FCNTL3(FDESC, F_SETFL, FLAGS, tfcntl_res);				\
 					if (0 > tfcntl_res)							\
-						rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);	\
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 		\
+							5, LEN_AND_LIT("fcntl"), CALLFROM, errno);		\
 					*BLOCKED_IN = TRUE;							\
 					if (PIPE_ZERO_TIMEOUT)							\
 					{									\
 						TOFLAG = FALSE;							\
 						/* Set a timer for 1 sec so atomic read x:0 will still work on	\
-						   loaded systems but timeout on incomplete reads.  Any characters	\
+						   loaded systems but timeout on incomplete reads.  		\
+						   Any characters						\
 						   read to this point will be returned. */ 			\
 						*MSEC_TIMEOUT = timeout2msec(1);				\
 						start_timer(TIMER_ID, *MSEC_TIMEOUT, wake_alarm, 0, NULL);	\
@@ -779,12 +780,12 @@ error_def(ERR_PREMATEOF);
 #define DOLLAR_DEVICE_SET(DEVPTR,STATUS)							\
 {												\
 	len = SIZEOF(ONE_COMMA) - 1;								\
-	memcpy(DEVPTR->dollar_device, ONE_COMMA, len);						\
+	memcpy(DEVPTR->dollar.device, ONE_COMMA, len);					\
 	errptr = (char *)STRERROR(STATUS);							\
 	/* make sure there is room for the 1, and the null at the end */			\
-	errlen = MIN(STRLEN(errptr), SIZEOF(DEVPTR->dollar_device) - SIZEOF(ONE_COMMA));	\
-	memcpy(&DEVPTR->dollar_device[len], errptr, errlen);					\
-	DEVPTR->dollar_device[len + errlen] = '\0';						\
+	errlen = MIN(STRLEN(errptr), SIZEOF(DEVPTR->dollar.device) - SIZEOF(ONE_COMMA));	\
+	memcpy(&DEVPTR->dollar.device[len], errptr, errlen);				\
+	DEVPTR->dollar.device[len + errlen] = '\0';					\
 }
 
 #define DOLLAR_DEVICE_WRITE(DEVPTR,STATUS)						\
@@ -796,7 +797,7 @@ error_def(ERR_PREMATEOF);
 	if (EAGAIN == STATUS)								\
 	{										\
 		len = SIZEOF(ONE_COMMA_UNAVAILABLE);					\
-		memcpy(DEVPTR->dollar_device, ONE_COMMA_UNAVAILABLE, len);		\
+		memcpy(DEVPTR->dollar.device, ONE_COMMA_UNAVAILABLE, len);		\
 	} else										\
 		DOLLAR_DEVICE_SET(DEVPTR,STATUS);					\
 }

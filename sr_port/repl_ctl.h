@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,11 @@ typedef struct {
 	uint4		buffremaining;	/* Remaining buffer space */
 	unsigned char	*base_buff;	/* Actual malloced buffer start : Not necessarily "gtm_fs_block_size" aligned */
 	unsigned char	*base;		/* "gtm_fs_block_size" aligned buffer start */
+#	ifdef DEBUG
+	uint4		save_readaddr;		/* copy of readaddr before repl_read_file updates it */
+	uint4		save_dskaddr;		/* copy of dskaddr noted down, in repl_read_file, from shared memory */
+	uint4		save_buffremaining;	/* copy of buffremaining before repl_read_file updates it */
+#	endif
 } repl_buff_desc;
 
 #define REPL_BLKSIZE(x)		((x)->fc->jfh->alignsize)

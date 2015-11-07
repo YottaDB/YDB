@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,12 +20,5 @@ void gtm_asm_establish(void);		/* Only needs to be declared here as is only call
 
 void gtm_asm_establish(void)
 {
-	CHTRACEPOINT;
-	ctxt++;
-	if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))
-		condstk_expand();
-	CHECKHIGHBOUND(ctxt);
-	ctxt->save_active_ch = active_ch;
-	ctxt->ch_active = FALSE;
-	active_ch = ctxt;
+	GTM_ASM_ESTABLISH;
 }

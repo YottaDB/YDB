@@ -78,8 +78,9 @@ uint4 mur_process_intrpt_recov()
 		io_status_block_disk	iosb;
 	)
 	boolean_t			jfh_changed;
-	jnl_record		*jnlrec;
-	jnl_file_header		*jfh;
+	jnl_record			*jnlrec;
+	jnl_file_header			*jfh;
+	jnl_tm_t			now;
 
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
@@ -252,6 +253,7 @@ uint4 mur_process_intrpt_recov()
 		assert((dba_mm == cs_data->acc_meth) || (rctl->csd == cs_data));
 		rctl->csd = cs_data;
 	}
+	JNL_SHORT_TIME(now);
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
 		TP_CHANGE_REG_IF_NEEDED(rctl->gd);
@@ -274,7 +276,7 @@ uint4 mur_process_intrpt_recov()
 		assert(rctl->csd->jnl_file_len == jctl->jnl_fn_len); 			       /* latest gener file name */
 		assert(0 == memcmp(rctl->csd->jnl_file_name, jctl->jnl_fn, jctl->jnl_fn_len)); /* should match db header */
 		if (SS_NORMAL != (status = prepare_unique_name((char *)jctl->jnl_fn, jctl->jnl_fn_len, "", "",
-								rename_fn, &rename_fn_len, &status2)))
+								rename_fn, &rename_fn_len, now, &status2)))
 			return status;
 		jctl->jnl_fn_len = rename_fn_len;  /* change the name in memory to the proposed name */
 		memcpy(jctl->jnl_fn, rename_fn, rename_fn_len + 1);

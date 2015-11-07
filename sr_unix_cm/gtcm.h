@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ int		gtcm_dmpstat  P((int));
 void		gtcm_rep_err  P((char *, int));
 int		omi_srvc_xact P((omi_conn *));
 int		rc_srvc_xact  P((omi_conn *, char *));
-char		*gtcm_hname    P((struct sockaddr_in *));
+char		*gtcm_hname    P((struct addrinfo *));
 void		gtcm_cpktdmp  P((char *, int, char *));
 void		gtcm_pktdmp   P((char *, int, char *));
 void		init_hist     P((void));

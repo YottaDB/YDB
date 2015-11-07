@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1263,7 +1263,7 @@ int4	repl_inst_reset_zqgblmod_seqno_and_tn(void)
 		 * an online rollback is detected, return without resetting max_zqgblmod_seqno. The caller knows to take appropriate
 		 * action (on seeing -1 as the return code).
 		 */
-		grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 		if (repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle)
 		{
 			assert(is_rcvr_server);

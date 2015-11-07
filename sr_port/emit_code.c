@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -176,8 +176,8 @@ void trip_gen (triple *ct)
 				continue;
 			}
 			*sopr++ = opr;
-			if (sopr >= ARRAYTOP(saved_opr))
-				rts_error(VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS);
+			if (sopr >= ARRAYTOP(saved_opr))	/* user-visible max args is MAX_ARGS - 3 */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS - 3);
 		}
 		opr++;
 	}
@@ -1743,8 +1743,8 @@ void	emit_pop(int count)
 
 void	add_to_vax_push_list(int pushes_seen)
 {	/* Make sure there's enough room */
-	if (pushes_seen > MAX_ARGS)
-		rts_error(VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS);
+	if (pushes_seen > MAX_ARGS)	/* user-visible max args is MAX_ARGS - 3 */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS - 3);
 	push_list_index++;
 	if (push_list_index >= PUSH_LIST_SIZE)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,7 @@
 
 #include "dse_exit.h"
 #include "util_spawn.h"
+#include "util_help.h"
 #include "dse_cmd_disallow.h"
 
 /*************************************************************
@@ -367,7 +368,7 @@ GBLDEF CLI_ENTRY dse_cmd_ary[] = {
 { "EVALUATE",     dse_eval,       dse_eval_qual,     0, 0, 0,                       0, VAL_DISALLOWED, 0, 0, 0, 0 },
 { "EXIT",         dse_exit,       0,                 0, 0, 0,                       0, VAL_DISALLOWED, 0, 0, 0, 0 },
 { "FIND",         dse_f_blk,      dse_find_qual,     0, 0, cli_disallow_dse_find,   0, VAL_DISALLOWED, 0, 0, 0, 0 },
-{ "HELP",         dse_help,       0,                 0, 0, 0,                       0, VAL_DISALLOWED, 0, 0, 0, 0 },
+{ "HELP",         util_help,      0,                 0, 0, 0,                       0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "INTEGRIT",     dse_integ,      dse_integrit_qual, 0, 0, 0,                       0, VAL_DISALLOWED, 0, 0, 0, 0 },
 { "MAPS",         dse_maps,       dse_map_qual,      0, 0, cli_disallow_dse_maps,   0, VAL_DISALLOWED, 0, 0, 0, 0 },
 { "OPEN",         dse_open,       dse_open_qual,     0, 0, 0,                       0, VAL_DISALLOWED, 0, 0, 0, 0 },

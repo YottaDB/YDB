@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2012 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -138,7 +138,7 @@ proc	;
 	Set vaxcopts="/vaxc"
 	Set deccslit="/assume=nowritable_string_literals"
 	Set deccopts="/standard=vaxc/share_globals/float=g_float"
-	Set deccopts=deccopts_"/warn=disable=(signedknown,signedmember,questcompare,questcompare1)/inc=gtm$src:"
+	Set deccopts=deccopts_"/warn=disable=(signedknown,signedmember,questcompare,questcompare1)/inc=(gtm$src:,tcpip$examples:)"
 	If (vaxoraxp="VAX")&(vaxc=1) Set opts=vaxcopts
 	Else  Set opts=deccopts_deccslit
 	Set opts=opts_listopts_"'p2'"

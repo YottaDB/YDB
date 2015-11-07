@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,11 +59,11 @@ void iorm_wteol(int4 x,io_desc *iod)
 		rm_ptr = (d_rm_struct *)iod->dev_sp;
 	}
 	if (rm_ptr->noread)
-		rts_error(VARLSTCNT(1) ERR_DEVICEREADONLY);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEREADONLY);
 	if (!iod->dollar.zeof && !rm_ptr->fifo && !rm_ptr->pipe)
 	{
 		iod->dollar.za = 9;
-		rts_error(VARLSTCNT(1) ERR_NOTTOEOFONPUT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTTOEOFONPUT);
 	}
 	rm_ptr->lastop = RM_WRITE;
 #ifdef __MVS__
@@ -83,9 +83,9 @@ void iorm_wteol(int4 x,io_desc *iod)
 					if (-1 == res_size)
 					{
 						int real_errno = errno;
-						DOLLAR_DEVICE_WRITE(rm_ptr,real_errno);
+						DOLLAR_DEVICE_WRITE(iod, real_errno);
 						iod->dollar.za = 9;
-						rts_error(VARLSTCNT(1) real_errno);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
 					}
 					iod->ochset = CHSET_UTF16BE;
 					get_chset_desc(&chset_names[iod->ochset]);
@@ -130,9 +130,9 @@ void iorm_wteol(int4 x,io_desc *iod)
 						DOWRITERC(rm_ptr->fildes, temppadarray, bytes_per_char, status);
 						if (0 != status)
 						{
-							DOLLAR_DEVICE_WRITE(rm_ptr,status);
+							DOLLAR_DEVICE_WRITE(iod, status);
 							iod->dollar.za = 9;
-							rts_error(VARLSTCNT(1) status);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 						}
 					}
 					assert(rm_ptr->out_bytes == rm_ptr->recordsize);
@@ -153,9 +153,9 @@ void iorm_wteol(int4 x,io_desc *iod)
 				if (-1 == res_size)
 				{
 					int real_errno = errno;
-					DOLLAR_DEVICE_WRITE(rm_ptr,real_errno);
+					DOLLAR_DEVICE_WRITE(iod, real_errno);
 					iod->dollar.za = 9;
-					rts_error(VARLSTCNT(1) real_errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
 				}
 				assert(res_size == pad_size);
 			}
@@ -164,9 +164,9 @@ void iorm_wteol(int4 x,io_desc *iod)
 			DOWRITERC(rm_ptr->fildes, RMEOL, STRLEN(RMEOL), status);
 			if (0 != status)
 			{
-				DOLLAR_DEVICE_WRITE(rm_ptr,status);
+				DOLLAR_DEVICE_WRITE(iod, status);
 				iod->dollar.za = 9;
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			}
 		}
 		*dollarx_ptr = 0;

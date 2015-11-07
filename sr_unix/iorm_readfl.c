@@ -92,14 +92,14 @@ void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned cha
 		{	/* Set $KEY and $ZB with the failing badchar */
 			memcpy(iod->dollar.zb, delimptr, MIN(delimlen, ESC_LEN - 1));
 			iod->dollar.zb[MIN(delimlen, ESC_LEN - 1)] = '\0';
-			memcpy(rm_ptr->dollar_key, delimptr, MIN(delimlen, RM_BUFLEN - 1));
-			rm_ptr->dollar_key[MIN(delimlen, RM_BUFLEN - 1)] = '\0';
+			memcpy(iod->dollar.key, delimptr, MIN(delimlen, DD_BUFLEN - 1));
+			iod->dollar.key[MIN(delimlen, DD_BUFLEN - 1)] = '\0';
                 }
         }
-	/* set dollar_device in the output device */
+	/* set dollar.device in the output device */
 	len = SIZEOF(ONE_COMMA) - 1;
-	memcpy(rm_ptr->dollar_device, ONE_COMMA, len);
-	memcpy(&rm_ptr->dollar_device[len], BADCHAR_DEVICE_MSG, SIZEOF(BADCHAR_DEVICE_MSG));
+	memcpy(iod->dollar.device, ONE_COMMA, len);
+	memcpy(&iod->dollar.device[len], BADCHAR_DEVICE_MSG, SIZEOF(BADCHAR_DEVICE_MSG));
 }
 #endif
 
@@ -1408,7 +1408,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	real_errno = errno;
 	if (TRUE == do_clearerr)
 		clearerr(filstr);
-	memcpy(rm_ptr->dollar_device, "0", SIZEOF("0"));
+	memcpy(io_ptr->dollar.device, "0", SIZEOF("0"));
 	io_ptr->dollar.za = 0;
 	/* On error, getc() returns EOF while read() returns -1. Both code paths converge here. Thankfully EOF is -1 on all
 	 * platforms that we know of so it is enough to check for -1 status here. Assert that below.
@@ -1426,7 +1426,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 				cancel_timer(timer_id);
 			io_ptr->dollar.za = 9;
 			/* save error in $device */
-			DOLLAR_DEVICE_SET(rm_ptr, real_errno);
+			DOLLAR_DEVICE_SET(io_ptr, real_errno);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
 		}
 		ret = FALSE;
@@ -1470,7 +1470,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		}
 		/* on end of file set $za to 9 */
 		len = SIZEOF(ONE_COMMA_DEV_DET_EOF);
-		memcpy(rm_ptr->dollar_device, ONE_COMMA_DEV_DET_EOF, len);
+		memcpy(io_ptr->dollar.device, ONE_COMMA_DEV_DET_EOF, len);
 		io_ptr->dollar.za = 9;
 
 		if ((TRUE == io_ptr->dollar.zeof) && (RM_READ == saved_lastop))

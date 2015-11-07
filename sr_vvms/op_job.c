@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,8 @@ int op_job(mval *label, ...)
 {
 	va_list			var, save;
 	bool			defprcnam, timed;
-	char			combuf[128];
+	/* The max possible value for combuff is 268, 256 bytes for DEFAULT + 12 bytes for set_default_ */
+	char			combuf[268];
 	int4			argcnt, i, offset, timeout;
 	unsigned int		ast_stat;
 	mstr			command;
@@ -134,7 +135,7 @@ int op_job(mval *label, ...)
 				argcnt--;
 				break;
 			}
-			rts_error(VARLSTCNT(3) ERR_JOBARGMISSING, 1, argcnt - i);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBARGMISSING, 1, argcnt - i);
 		}
 		MV_FORCE_STR(inp);
 		if (inp->str.len > cmaxmsg)
@@ -150,7 +151,7 @@ int op_job(mval *label, ...)
 	if (!ojchkbytcnt(cmaxmsg))
 	{
 		va_end(save);
-		rts_error(VARLSTCNT(1) ERR_INSFFBCNT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INSFFBCNT);
 	}
 	if (timeout < 0)
 		timeout = 0;
@@ -170,7 +171,7 @@ int op_job(mval *label, ...)
 			{
 				ojerrcleanup();
 				va_end(save);
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			}
 			ojpchan = 0;
 		}
@@ -181,7 +182,7 @@ int op_job(mval *label, ...)
 			{
 				ojerrcleanup();
 				va_end(save);
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			}
 			ojcchan = 0;
 		}
@@ -231,7 +232,7 @@ int op_job(mval *label, ...)
 				{
 					ojerrcleanup();
 					va_end(save);
-					rts_error(VARLSTCNT(1) status);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
 				ojpchan = 0;
 				status = sys$dassgn(ojcchan);
@@ -239,7 +240,7 @@ int op_job(mval *label, ...)
 				{
 					ojerrcleanup();
 					va_end(save);
-					rts_error(VARLSTCNT(1) status);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
 				ojcchan = 0;
 				ojcpid = 0;
@@ -252,7 +253,7 @@ int op_job(mval *label, ...)
 		default:
 			ojerrcleanup();
 			va_end(save);
-			rts_error(VARLSTCNT(3) ERR_JOBFAIL, 0, status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBFAIL, 0, status);
 			break;
 		}
 	} while (SS$_NORMAL != status);
@@ -282,7 +283,7 @@ int op_job(mval *label, ...)
 	{
 		ojerrcleanup();
 		va_end(save);
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	}
 	/* Assertion: successful ENQ */
 	ojsetattn(ERR_ACK);
@@ -321,7 +322,7 @@ int op_job(mval *label, ...)
 	if (!(status & 1))
 	{
 		ojerrcleanup();
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	}
 	/* Assertion: successful ACK */
 	--ojastq;
@@ -330,7 +331,7 @@ int op_job(mval *label, ...)
 	if (!(status & 1))
 	{
 		ojerrcleanup();
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	}
 	ojpchan = 0;
 	dummstr.len = 0;
@@ -340,7 +341,7 @@ int op_job(mval *label, ...)
 	if (!(status & 1))
 	{
 		ojerrcleanup();
-		rts_error(VARLSTCNT(1) status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	}
 	ojcchan = 0;
 	if (timed)

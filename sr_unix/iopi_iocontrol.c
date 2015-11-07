@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,7 @@ void	iopi_iocontrol(mstr *d)
 			CLOSEFILE_RESET(d_rm->fildes, rc);	/* resets "d_rm->fildes" to FD_INVALID */
 		}
 	} else
-		rts_error(VARLSTCNT(1) ERR_INVCTLMNE);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVCTLMNE);
 	return;
 }
 
@@ -72,15 +72,13 @@ void	iopi_dlr_device(mstr *d)
 {
 	io_desc         *iod;
         int             len;
- 	d_rm_struct	*d_rm;
 
 	/* We will default to the output device for setting $device, since pipe uses both */
         iod = io_curr_device.out;
-        d_rm = (d_rm_struct *)iod->dev_sp;
- 	len = STRLEN(d_rm->dollar_device);
+ 	len = STRLEN(iod->dollar.device);
 	/* verify internal buffer has enough space for $DEVICE string value */
 	assert((int)d->len > len);
-	memcpy(d->addr, d_rm->dollar_device, MIN(len,d->len));
+	memcpy(d->addr, iod->dollar.device, MIN(len,d->len));
 	d->len = len;
 	return;
 }
@@ -89,16 +87,14 @@ void	iopi_dlr_key(mstr *d)
 {
 	io_desc         *iod;
         int             len;
- 	d_rm_struct	*d_rm;
 
         iod = io_curr_device.out;
-        d_rm = (d_rm_struct *)iod->dev_sp;
 
-        len = STRLEN(d_rm->dollar_key);
+        len = STRLEN(iod->dollar.key);
         /* verify internal buffer has enough space for $KEY string value */
         assert((int)d->len > len);
 	if (len > 0)
-	        memcpy(d->addr, d_rm->dollar_key, MIN(len,d->len));
+	        memcpy(d->addr, iod->dollar.key, MIN(len,d->len));
         d->len = len;
         return;
 }

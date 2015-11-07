@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,11 @@
 #include <sys/statvfs.h>
 
 #define STATVFS(pathname,fsinfo,statvfs_res) (statvfs_res = statvfs(pathname, fsinfo))
-#define FSTATVFS(filedesc,fstatvfsinfo,fstatvfs_res) (fstatvfs_res = fstatvfs(filedesc, fstatvfsinfo))
+#define FSTATVFS(filedesc,fstatvfsinfo,fstatvfs_res) 		\
+{								\
+	DEFER_INTERRUPTS(INTRPT_IN_FSTAT);			\
+	fstatvfs_res = fstatvfs(filedesc, fstatvfsinfo);	\
+	ENABLE_INTERRUPTS(INTRPT_IN_FSTAT);			\
+}
 
 #endif

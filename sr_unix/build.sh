@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2009, 2012 Fidelity Information Services, Inc #
+#	Copyright 2009, 2013 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -81,7 +81,7 @@ options_incpath="-I /usr/local/include/ -I /usr/include -I $builddir -I $gtm_dis
 base_libname="libgtmcrypt"
 # Common CC options for various platforms
 if [ "AIX" = "$hostos" ] ; then
-	cc_common="-c -qchars=signed -qsrcmsg -qmaxmem=8192 -D_BSD=43 -D_LARGE_FILES -D_TPARM_COMPAT -D_AIO_AIX_SOURCE -DCOMPAT_43"
+	cc_common="-c -qchars=signed -qsrcmsg -qmaxmem=8192 -D_BSD=43 -D_LARGE_FILES -D_TPARM_COMPAT -D_AIO_AIX_SOURCE"
 	cc_common="$cc_common -qro -qroconst -D_USE_IRS -q64"
 	ld_common="-q64 -brtl"
 	aix_loadmap_option="-bcalls:$builddir/$base_libname.so.map -bmap:$builddir/$base_libname.so.map"

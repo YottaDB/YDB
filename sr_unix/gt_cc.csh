@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2013 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -31,36 +31,39 @@ if ( $?comlist_gt_cc == "0" ) then
 	exit 1
 endif
 
-# Bourne shell is less verbose about background processes, so use that.
+alias	gt_cc_local	"comlist_gt_cc"
 
-# However, comlist_gt_cc is generally an alias, which we can't pass to the Bourne shell,
-# so expand it repeatedly until it isn't an alias anymore.
-# Assumes aliases expand as basic commands.
+set cfilelist=($*)
+set cmdfile="$gtm_log/gt_cc_$$__batch.csh"
+set background="&"
+if ($HOST:r:r:r =~ {snail,turtle}) set background=""
 
-set comlist_gt_cc=($comlist_gt_cc)
+echo 'alias	gt_cc_local	"$comlist_gt_cc"' >> $cmdfile
 
-while(`alias $comlist_gt_cc[1]` != "")
-	set comlist_gt_cc= ( `alias $comlist_gt_cc[1]` $comlist_gt_cc[2-$#comlist_gt_cc] )
+foreach cfile ($cfilelist)
+	set outfile="$gtm_log/gt_cc_$$_${cfile:t:r}.out"
+	set redir=">& $outfile"
+	echo "(echo $cfile ; eval 'gt_cc_local $cfile') $redir $background" >> $cmdfile
 end
 
-/bin/sh <<ENDSH
-files="$*"
+echo "wait" >> $cmdfile
 
-for i in \$files
-do
-	outfile="$gtm_log/gt_cc_local_$$_\`basename \$i\`.out"
-	echo \$i > \$outfile
-	$comlist_gt_cc \$i >> \$outfile 2>&1 &
-done
+set cmdout="$gtm_log/gt_cc_$$__batch.out"
+source $cmdfile >& $cmdout
 
-wait
+set stat=$status
 
-for i in \$files
-do
-	outfile="$gtm_log/gt_cc_local_$$_\`basename \$i\`.out"
-	/bin/cat \$outfile
-	/bin/rm \$outfile
-done
-ENDSH
+foreach cfile ($cfilelist)
+	set outfile="$gtm_log/gt_cc_$$_${cfile:t:r}.out"
+	/bin/cat $outfile
+	/bin/rm $outfile
+end
+
+if ($stat) then
+	/bin/cat $cmdout
+else
+	/bin/rm $cmdfile
+	/bin/rm $cmdout
+endif
 
 exit 0

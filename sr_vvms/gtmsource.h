@@ -13,11 +13,9 @@
 #define GTMSOURCE_H
 
 /* for in_addr_t typedef on Linux */
-#ifdef __linux__
 #include "gtm_inet.h"
-#else
-#include <netinet/in.h>
-#endif
+#include "gtm_ipv6.h"
+#include <gtm_socket.h>
 
 /* Needs mdef.h, gdsfhead.h and its dependencies */
 #define JNLPOOL_DUMMY_REG_NAME		"JNLPOOL_REG"
@@ -37,7 +35,9 @@ enum
 enum
 {
 	GTMSOURCE_MODE_PASSIVE,
-	GTMSOURCE_MODE_ACTIVE
+	GTMSOURCE_MODE_ACTIVE,
+	GTMSOURCE_MODE_PASSIVE_REQUESTED,
+	GTMSOURCE_MODE_ACTIVE_REQUESTED
 };
 
 #define SRV_ALIVE		0x0
@@ -55,9 +55,6 @@ typedef enum
 	GTMSOURCE_WAITING_FOR_XON,
 	GTMSOURCE_CHANGING_MODE
 } gtmsource_state_t;
-
-#define MAX_GTMSOURCE_POLL_WAIT	     	1000000 /* 1s in micro secs */
-#define GTMSOURCE_POLL_WAIT	        (MAX_GTMSOURCE_POLL_WAIT - 1) /* micro sec, almost 1s */
 
 #define GTMSOURCE_WAIT_FOR_RECEIVER_TO_QUIT     5 /* seconds */
 #define GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN  (1000 - 1) /* ms */
@@ -208,14 +205,18 @@ typedef struct
 	uint4		statslog;	/* Boolean - detailed log on/off? */
 	uint4		shutdown;	/* Use to communicate shutdown related values */
 	int4		shutdown_time;	/* Time allowed for shutdown in seconds */
-	uint4		secondary_inet_addr; /* IP address of the secondary */
+	uint4		filler4;	/* Keep secondary_inet_addr aligned */
+	union gtm_sockaddr_in46	secondary_inet_addr;	/* IP address of the secondary */
+	int			secondary_af;		/* address family of the seconary */
+	int			secondary_addrlen;	/* length of the secondary address */
 	uint4		secondary_port;	/* Port at which Receiver is listening */
 	uint4		changelog; 	/* change the log file or log interval */
 	uint4		log_interval;	/* seqno count interval at which source server prints messages about replic traffic */
 	uint4		filler2;	/* make gtmsource_local_struct size multiple of 8 bytes */
 	int4		connect_parms[GTMSOURCE_CONN_PARMS_COUNT]; /* Connect failure tries parms. Add fillers (if necessary)
 								    * based on GTMSOURCE_CONN_PARMS_COUNT */
-	char		secondary[MAX_HOST_NAME_LEN];
+	uint4		filler3;	/* extra space after connect_parms */
+	char            secondary_host[MAX_HOST_NAME_LEN];
 	char		filter_cmd[MAX_FILTER_CMD_LEN];
 	char		log_file[MAX_FN_LEN + 1];
 	char		statslog_file[MAX_FN_LEN + 1];
@@ -309,7 +310,6 @@ typedef struct
 	int4		shutdown_time;
 	int4		buffsize;
 	int4		mode;
-	in_addr_t       sec_inet_addr; /* 32 bits */
 	int4		secondary_port;
 	uint4		src_log_interval;
 	int4		connect_parms[GTMSOURCE_CONN_PARMS_COUNT];
@@ -318,16 +318,16 @@ typedef struct
 	char            log_file[MAX_FN_LEN + 1];
 } gtmsource_options_t;
 
-#define EXIT_IF_REPLOFF_JNLON(gd_header)						\
-	region_top = gd_header->regions + gd_header->n_regions;				\
-	for (reg = gd_header->regions; reg < region_top; reg++)				\
-	{										\
-		csa = &FILE_INFO(reg)->s_addrs;						\
-		if (!REPL_ALLOWED(csa) && JNL_ALLOWED(csa))				\
-		{									\
-		 	gtm_putmsg(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(reg));	\
-			gtmsource_autoshutdown();					\
-		}									\
+#define EXIT_IF_REPLOFF_JNLON(gd_header)									\
+	region_top = gd_header->regions + gd_header->n_regions;							\
+	for (reg = gd_header->regions; reg < region_top; reg++)							\
+	{													\
+		csa = &FILE_INFO(reg)->s_addrs;									\
+		if (!REPL_ALLOWED(csa) && JNL_ALLOWED(csa))							\
+		{												\
+		 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(reg));	\
+			gtmsource_autoshutdown();								\
+		}												\
 	}
 
 #define UPDATE_RESYNC_SEQNO(REGION, pre_update, post_update)							\
@@ -374,7 +374,7 @@ int		gtmsource_comm_init(void);
 int		gtmsource_ctl_close(void);
 int		gtmsource_ctl_init(void);
 int		gtmsource_end1(boolean_t auto_shutdown);
-int		gtmsource_est_conn(struct sockaddr_in *secondary_addr);
+int		gtmsource_est_conn(void);
 int		gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple);
 int		gtmsource_get_opt(void);
 int		gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status);
@@ -395,7 +395,6 @@ int		gtmsource_update_resync_tn(seq_num resync_seqno);
 void		gtmsource_autoshutdown(void);
 void		gtmsource_end(void);
 void		gtmsource_exit(int exit_status);
-void		gtmsource_init_sec_addr(struct sockaddr_in *secondary_addr);
 void		gtmsource_seqno_init(void);
 void		gtmsource_sigstop(void);
 boolean_t	jnlpool_hasnt_overflowed(jnlpool_ctl_ptr_t jctl, uint4 jnlpool_size, qw_num read_addr);

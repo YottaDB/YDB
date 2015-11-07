@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@
 
 #define TT_EDITING		0x1000
 #define TT_NOINSERT		0x2000
+#define TT_EMPTERM		0x4000
 
 enum	tt_which
 {

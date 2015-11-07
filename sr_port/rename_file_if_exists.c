@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
+#include "gtm_time.h"
 #include <errno.h>
 
 #include "gdsroot.h"
@@ -31,6 +32,9 @@
 #include "gtmmsg.h"
 #include "gtm_file_stat.h"
 
+error_def(ERR_FILERENAME);
+error_def(ERR_RENAMEFAIL);
+
 /* --------------------------------------------------------------------------------
 	This function  renames a file, if exists. Otherwise do nothing.
   --------------------------------------------------------------------------------- */
@@ -38,8 +42,7 @@ int rename_file_if_exists(char *org_fn, int org_fn_len, char *rename_fn, int *re
 {
 	mstr 		orgfile;
 	int		status;
-	error_def(ERR_FILERENAME);
-	error_def(ERR_RENAMEFAIL);
+	jnl_tm_t	now;
 
 	memcpy(rename_fn, org_fn, org_fn_len + 1); /* Ensure it to be NULL terminated */
 	*rename_fn_len = org_fn_len;
@@ -51,7 +54,8 @@ int rename_file_if_exists(char *org_fn, int org_fn_len, char *rename_fn, int *re
 		return RENAME_FAILED;
 	/* File is present in the system */
 	assert(0 <  MAX_FN_LEN - org_fn_len - 1);
-	if (SS_NORMAL != (status = prepare_unique_name(org_fn, org_fn_len, "", "", rename_fn, rename_fn_len, ustatus)))
+	JNL_SHORT_TIME(now);
+	if (SS_NORMAL != (status = prepare_unique_name(org_fn, org_fn_len, "", "", rename_fn, rename_fn_len, now, ustatus)))
 		return RENAME_FAILED;
 	assert(0 == rename_fn[*rename_fn_len]);
 	if (SS_NORMAL != (status= gtm_rename(org_fn, org_fn_len, rename_fn, *rename_fn_len, ustatus)))

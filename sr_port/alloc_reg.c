@@ -42,7 +42,7 @@ LITDEF int4 sa_class_sizes[VALUED_REF_TYPES] =
 };
 LITREF octabstruct 		oc_tab[];
 
-#define MAX_TEMP_COUNT		128	/* bad things, which need investigation, happen if we raise this above 1024 */
+#define MAX_TEMP_COUNT		1024
 
 error_def(ERR_TMPSTOREMAX);
 
@@ -170,7 +170,7 @@ void alloc_reg(void)
 					for (c = 0; tempcont[r][c] && (MAX_TEMP_COUNT > c); c++)
 						;
 					if (MAX_TEMP_COUNT <= c)
-						rts_error(VARLSTCNT(1) ERR_TMPSTOREMAX);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TMPSTOREMAX);
 					tempcont[r][c] = 1;
 					x->destination.oprclass = r;
 					x->destination.oprval.temp = c;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,10 @@ LITREF	mstr		set_default_;
 LITREF	mstr		atsign;
 LITREF	mstr		run__nodebug_;
 
+error_def		(ERR_IVTIME);
+error_def		(ERR_PRCNAMLEN);
+error_def		(ERR_PARFILSPC);
+
 void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, mstr *image,
         mstr *input, mstr *output, mstr *error, struct dsc$descriptor_s *prcnam, int4 *baspri,
         int4 *stsflg, mstr *gbldir, mstr *startup, struct dsc$descriptor_s *logfile, mstr *deffs,
@@ -43,9 +47,6 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 	int4			defstsflg;
 	MSTR_CONST(defoutext, ".MJO");
 	MSTR_CONST(deferrext, ".MJE");
-	error_def		(ERR_IVTIME);
-	error_def		(ERR_PRCNAMLEN);
-	error_def		(ERR_PARFILSPC);
 
 /* Initializations */
 	*defprcnam = FALSE;
@@ -77,7 +78,7 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 		case jp_default:
 			if (*p != 0)
 			{
-				deffs->len = *p;
+				deffs->len = (int)((unsigned char) *p);
 				deffs->addr = (p + 1);
 			}
 			break;
@@ -87,35 +88,35 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 		case jp_error:
 			if (*p != 0)
 			{
-				error->len = *p;
+				error->len = (int)((unsigned char) *p);
 				error->addr = (p + 1);
 			}
 			break;
 		case jp_gbldir:
 			if (*p != 0)
 			{
-				gbldir->len = *p;
+				gbldir->len = (int)((unsigned char) *p);
 				gbldir->addr = (p + 1);
 			}
 			break;
 		case jp_image:
 			if (*p != 0)
 			{
-				image->len = *p;
+				image->len = (int)((unsigned char) *p);
 				image->addr = p + 1;
 			}
 			break;
 		case jp_input:
 			if (*p != 0)
 			{
-				input->len = *p;
+				input->len = (int)((unsigned char) *p);
 				input->addr = p + 1;
 			}
 			break;
 		case jp_logfile:
 			if (*p != 0)
 			{
-				logfile->dsc$w_length = *p;
+				logfile->dsc$w_length = (int)((unsigned char) *p);
 				logfile->dsc$a_pointer = p + 1;
 			}
 			break;
@@ -131,7 +132,7 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 		case jp_output:
 			if (*p != 0)
 			{
-				output->len = *p;
+				output->len = (int)((unsigned char) *p);
 				output->addr = p + 1;
 			}
 			break;
@@ -141,23 +142,23 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 		case jp_process_name:
 			if (*p != 0)
 			{
-				prcnam->dsc$w_length = *p;
+				prcnam->dsc$w_length = (int)((unsigned char) *p);
 				prcnam->dsc$a_pointer = p + 1;
 			}
 			break;
 		case jp_schedule:
-			timdsc.dsc$w_length = *p;
+			timdsc.dsc$w_length = (int)((unsigned char) *p);
 			timdsc.dsc$b_dtype = DSC$K_DTYPE_T;
 			timdsc.dsc$b_class = DSC$K_CLASS_S;
 			timdsc.dsc$a_pointer = p + 1;
 			status = sys$bintim (&timdsc, schedule);
 			if (status != SS$_NORMAL)
-				rts_error(VARLSTCNT(4) ERR_IVTIME, 2, timdsc.dsc$w_length, timdsc.dsc$a_pointer);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_IVTIME, 2, timdsc.dsc$w_length, timdsc.dsc$a_pointer);
 			break;
 		case jp_startup:
 			if (*p != 0)
 			{
-				startup->len = *p;
+				startup->len = (int)((unsigned char) *p);
 				startup->addr = p + 1;
 			}
 			break;
@@ -175,7 +176,7 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 			p += SIZEOF(int4);
 			break;
 		case jpdt_str:
-			p += (unsigned) *p + 1;
+			p += ((int)((unsigned char)*p)) + 1;
 			break;
 		default:
 			GTMASSERT;
@@ -187,7 +188,7 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 		ojdefimage (image);
 	else
 		if ((status = ojchkfs (image->addr, image->len, TRUE)) != RMS$_NORMAL)
-			rts_error(VARLSTCNT(7) ERR_PARFILSPC, 4, 5, "IMAGE", image->len, image->addr, status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_PARFILSPC, 4, 5, "IMAGE", image->len, image->addr, status);
 	*cmaxmsg = MAX(*cmaxmsg, run__nodebug_.len + image->len);
 	if (input->len == 0)
 	{
@@ -196,7 +197,7 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 	}
 	else
 		if ((status = ojchkfs (input->addr, input->len, TRUE)) != RMS$_NORMAL)
-			rts_error(VARLSTCNT(7) ERR_PARFILSPC, 4, 5, "INPUT", input->len, input->addr, status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_PARFILSPC, 4, 5, "INPUT", input->len, input->addr, status);
 	*cmaxmsg = MAX(*cmaxmsg, 1 + input->len);
 	if (output->len == 0)
 	{
@@ -211,7 +212,7 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 	}
 	else
 		if ((status = ojchkfs (output->addr, output->len, FALSE)) != RMS$_NORMAL)
-			rts_error(VARLSTCNT(7) ERR_PARFILSPC, 4, 6, "OUTPUT", output->len, output->addr, status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_PARFILSPC, 4, 6, "OUTPUT", output->len, output->addr, status);
 	*cmaxmsg = MAX(*cmaxmsg, 1 + output->len);
 	if (error->len == 0)
 	{
@@ -226,11 +227,12 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 	}
 	else
 		if ((status = ojchkfs (error->addr, error->len, FALSE)) != RMS$_NORMAL)
-			rts_error(VARLSTCNT(7) ERR_PARFILSPC, 4, 5, "ERROR", error->len, error->addr, status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_PARFILSPC, 4, 5, "ERROR", error->len, error->addr, status);
 	*cmaxmsg = MAX(*cmaxmsg, 1 + error->len);
 
 	if (prcnam->dsc$w_length > MAX_PRCNAM_LEN)
-		rts_error(VARLSTCNT(5) ERR_PRCNAMLEN, 3, prcnam->dsc$w_length, prcnam->dsc$a_pointer, MAX_PRCNAM_LEN);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
+				ERR_PRCNAMLEN, 3, prcnam->dsc$w_length, prcnam->dsc$a_pointer, MAX_PRCNAM_LEN);
 	if (prcnam->dsc$w_length == 0)
 	{
 		ojdefprcnam (prcnam);
@@ -241,17 +243,18 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 
 	if (gbldir->len != 0)
 		if ((status = ojchkfs (gbldir->addr, gbldir->len, FALSE)) != RMS$_NORMAL)
-			rts_error(VARLSTCNT(7) ERR_PARFILSPC, 4, 6, "GBLDIR", gbldir->len, gbldir->addr, status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_PARFILSPC, 4, 6, "GBLDIR", gbldir->len, gbldir->addr, status);
 	*cmaxmsg = MAX(*cmaxmsg, 1 + gbldir->len);
 	if (startup->len != 0)
 		if ((status = ojchkfs (startup->addr, startup->len, TRUE)) != RMS$_NORMAL)
-			rts_error(VARLSTCNT(7) ERR_PARFILSPC, 4, 7, "STARTUP", startup->len, startup->addr, status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7)
+					ERR_PARFILSPC, 4, 7, "STARTUP", startup->len, startup->addr, status);
 	*cmaxmsg = MAX(*cmaxmsg, atsign.len + startup->len);
 	if (deffs->len == 0)
 		ojdefdeffs (deffs);
 	else
 		if ((status = ojchkfs (deffs->addr, deffs->len, FALSE)) != RMS$_NORMAL)
-			rts_error(VARLSTCNT(7) ERR_PARFILSPC, 4, 7, "DEFAULT", deffs->len, deffs->addr, status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_PARFILSPC, 4, 7, "DEFAULT", deffs->len, deffs->addr, status);
 	*cmaxmsg = MAX(*cmaxmsg, set_default_.len + deffs->len);
 	if (logfile->dsc$w_length == 0)
 	{
@@ -260,7 +263,7 @@ void ojparams(unsigned char *p, mval *routine, bool *defprcnam, int4 *cmaxmsg, m
 	}
 	else
 		if ((status = ojchkfs (logfile->dsc$a_pointer, logfile->dsc$w_length, FALSE)) != RMS$_NORMAL)
-			rts_error(VARLSTCNT(7) ERR_PARFILSPC, 4, 7, "LOGFILE", logfile->dsc$w_length,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_PARFILSPC, 4, 7, "LOGFILE", logfile->dsc$w_length,
 				logfile->dsc$a_pointer, status);
 	return;
 }

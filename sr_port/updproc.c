@@ -167,60 +167,61 @@ error_def(ERR_TRIGDEFNOSYNC);
 error_def(ERR_UPDREPLSTATEOFF);
 
 /* The below logic does "jnl_ensure_open" and other pre-requisites. This code is very similar to t_end.c */
-#define	DO_JNL_ENSURE_OPEN(CSA, JPC)									\
-{													\
-	jnl_buffer_ptr_t	jbp;									\
-	uint4			jnl_status;								\
-													\
-	assert(CSA = &FILE_INFO(gv_cur_region)->s_addrs);	/* so we can use gv_cur_region below */	\
-	assert(JPC == CSA->jnl);									\
-	SET_GBL_JREC_TIME;	/* needed for jnl_put_jrt_pini() */					\
-	jbp = JPC->jnl_buff;										\
-	/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order	\
-	 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write		\
-	 * journal records (if it decides to switch to a new journal file).				\
-	 */												\
-	ADJUST_GBL_JREC_TIME(jgbl, jbp);								\
-	/* Make sure timestamp of this seqno is >= timestamp of previous seqno. Note: The below		\
-	 * macro invocation should be done AFTER the ADJUST_GBL_JREC_TIME call as the below resets	\
-	 * jpl->prev_jnlseqno_time. Doing it the other way around would mean the reset will happen	\
-	 * with a potentially lower value than the final adjusted time written in the jnl record.	\
-	 */												\
-	ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jnlpool_ctl);						\
-	if (JNL_ENABLED(CSA))										\
-	{												\
-		jnl_status = jnl_ensure_open();								\
-		if (0 == jnl_status)									\
-		{											\
-			if (0 == JPC->pini_addr)							\
-				jnl_put_jrt_pini(CSA);							\
-		} else											\
-		{											\
-			if (SS_NORMAL != JPC->status)							\
-				rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(CSA->hdr),		\
-					DB_LEN_STR(gv_cur_region), JPC->status);			\
-			else										\
-				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(CSA->hdr),		\
-					DB_LEN_STR(gv_cur_region));					\
-		}											\
-	}												\
+#define	DO_JNL_ENSURE_OPEN(CSA, JPC)										\
+{														\
+	jnl_buffer_ptr_t	jbp;										\
+	uint4			jnl_status;									\
+														\
+	assert(CSA = &FILE_INFO(gv_cur_region)->s_addrs);	/* so we can use gv_cur_region below */		\
+	assert(JPC == CSA->jnl);										\
+	SET_GBL_JREC_TIME;	/* needed for jnl_put_jrt_pini() */						\
+	jbp = JPC->jnl_buff;											\
+	/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order		\
+	 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write			\
+	 * journal records (if it decides to switch to a new journal file).					\
+	 */													\
+	ADJUST_GBL_JREC_TIME(jgbl, jbp);									\
+	/* Make sure timestamp of this seqno is >= timestamp of previous seqno. Note: The below			\
+	 * macro invocation should be done AFTER the ADJUST_GBL_JREC_TIME call as the below resets		\
+	 * jpl->prev_jnlseqno_time. Doing it the other way around would mean the reset will happen		\
+	 * with a potentially lower value than the final adjusted time written in the jnl record.		\
+	 */													\
+	ADJUST_GBL_JREC_TIME_JNLPOOL(jgbl, jnlpool_ctl);							\
+	if (JNL_ENABLED(CSA))											\
+	{													\
+		jnl_status = jnl_ensure_open();									\
+		if (0 == jnl_status)										\
+		{												\
+			if (0 == JPC->pini_addr)								\
+				jnl_put_jrt_pini(CSA);								\
+		} else												\
+		{												\
+			if (SS_NORMAL != JPC->status)								\
+				rts_error_csa(CSA_ARG(CSA) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(CSA->hdr),	\
+					DB_LEN_STR(gv_cur_region), JPC->status);				\
+			else											\
+				rts_error_csa(CSA_ARG(CSA) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(CSA->hdr),	\
+					DB_LEN_STR(gv_cur_region));						\
+		}												\
+	}													\
 }
 
 #ifdef UNIX
-# define UPDPROC_ONLN_RLBK_CLNUP(REG)									\
-{													\
-	sgmnt_addrs		*csa;									\
-													\
-	assert(0 != have_crit(CRIT_HAVE_ANY_REG));							\
-	csa = &FILE_INFO(REG)->s_addrs;									\
-	assert(csa->now_crit);										\
-	SYNC_ONLN_RLBK_CYCLES;										\
-	if (REG == jnlpool.jnlpool_dummy_reg)								\
-		rel_lock(REG);										\
-	else												\
-		rel_crit(REG);										\
-	RESET_ALL_GVT_CLUES;										\
-	rts_error(VARLSTCNT(1) ERR_REPLONLNRLBK); /* transfers control back to updproc_ch */		\
+# define UPDPROC_ONLN_RLBK_CLNUP(REG)						\
+{										\
+	sgmnt_addrs		*csa;						\
+										\
+	assert(0 != have_crit(CRIT_HAVE_ANY_REG));				\
+	csa = &FILE_INFO(REG)->s_addrs;						\
+	assert(csa->now_crit);							\
+	SYNC_ONLN_RLBK_CYCLES;							\
+	if (REG == jnlpool.jnlpool_dummy_reg)					\
+		rel_lock(REG);							\
+	else									\
+		rel_crit(REG);							\
+	RESET_ALL_GVT_CLUES;							\
+	/* transfers control back to updproc_ch */				\
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLONLNRLBK); 		\
 }
 
 /* Receiver eventually sees the upd_proc_local->onln_rlbk_flag being set, drains the replication pipe, closes the connection and
@@ -269,7 +270,7 @@ CONDITION_HANDLER(updproc_ch)
 			INT8_PRINT(recvpool.upd_proc_local->read_jnl_seqno),
 			INT8_PRINTX(recvpool.upd_proc_local->read_jnl_seqno));
 		/* This is a kludge. We can come here from 2 places.
-		 *	( i) From a call to t_retry which does a rts_error(ERR_TPRETRY).
+		 *	( i) From a call to t_retry which does a rts_error(ERR_TPRETRY)
 		 *	(ii) From updproc_actions() where immediately after op_tcommit we detect that dollar_tlevel is non-zero.
 		 * In the first case, we need to do a tp_restart. In the second, op_tcommit would have already done it for us.
 		 * The way we detect the second case is from the value of first_sgm_info since it is NULLified in tp_restart.
@@ -356,7 +357,7 @@ int updproc(void)
 	proc_name_desc.dsc$b_dtype = DSC$K_DTYPE_T;
 	proc_name_desc.dsc$b_class = DSC$K_CLASS_S;
 	if (SS$_NORMAL != (status = sys$setprn(&proc_name_desc)))
-		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Unable to change update process name"), status);
 #	else
 	/* In the update process, we want every replicated update from an originating instances to end up in a replicated region
@@ -376,7 +377,10 @@ int updproc(void)
 	NON_GTMTRIG_ONLY(skip_dbtriggers = TRUE;)
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool)); /* For util_base_ch and mupip_exit */
 	if (updproc_init(&gld_db_files, &start_jnl_seqno) == UPDPROC_EXISTS) /* we got the global directory header already */
-		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Update Process already exists"));
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0,
+			ERR_TEXT, 2, RTS_ERROR_LITERAL("Update Process already exists"));
+	}
 	OPERATOR_LOG_MSG;
 	/* Initialization of all the relevant global datastructures and allocation for TP */
 	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
@@ -431,7 +435,7 @@ int updproc(void)
 				{	/* A concurrent online rollback. Handle it */
 					LOG_ONLINE_ROLLBACK_EVENT;
 					assert(!repl_csa->now_crit && !set_onln_rlbk_flg);
-					grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+					grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 					SYNC_ONLN_RLBK_CYCLES;
 					rel_lock(jnlpool.jnlpool_dummy_reg);
 					upd_proc_local->onln_rlbk_flg = TRUE; /* let receiver know about the online rollback */
@@ -465,7 +469,7 @@ int updproc(void)
 			repl_log(updproc_log_fp, TRUE, TRUE,
 				"JNLSEQNO of last transaction written to journal pool = "INT8_FMT" "INT8_FMTX"\n",
 				INT8_PRINT(jnlpool_ctl->jnl_seqno), INT8_PRINTX(jnlpool_ctl->jnl_seqno));
-			rts_error(VARLSTCNT(1) ERR_SECONDAHEAD);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SECONDAHEAD);
 		}
 #		else
 		/* The SECONDAHEAD check is performed in the receiver server after it has connected with the source
@@ -537,24 +541,22 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
-	sgmnt_addrs		*csa, *repl_csa;
+	sgmnt_addrs		*csa, *repl_csa, *tmpcsa = NULL;
 	sgmnt_data_ptr_t	csd;
 	char	           	gv_mname[MAX_KEY_SZ];
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, scan_char, next_char;
 	boolean_t		log_switched = FALSE;
 #	ifdef UNIX
 	boolean_t		suppl_root_primary, suppl_propagate_primary;
+	repl_histinfo		histinfo;
+	repl_old_triple_jnl_t	*input_old_triple;
+	repl_histrec_jnl_ptr_t	input_histjrec;
+	uint4			expected_rec_len;
 #	endif
 	jnl_private_control	*jpc;
 	gld_dbname_list		*curr;
 	gd_region		*save_reg;
 	uint4			write_wrap, cntr, last_nullsubs, last_subs, keyend;
-	UNIX_ONLY(
-		repl_histinfo			histinfo;
-		repl_old_triple_jnl_ptr_t	input_old_triple;
-		repl_histrec_jnl_ptr_t		input_histjrec;
-		uint4				expected_rec_len;
-	)
 #	ifdef GTM_TRIGGER
 	uint4			nodeflags;
 	boolean_t		primary_has_trigdef, secondary_has_trigdef;
@@ -673,7 +675,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 #			ifdef UNIX
 			if (!upd_proc_local->onln_rlbk_flg && (repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle))
 			{	/* A concurrent online rollback happened. Start afresh */
-				grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+				grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 				UPDPROC_ONLN_RLBK_CLNUP(jnlpool.jnlpool_dummy_reg); /* No return */
 			} /* else onln_rlbk_flag is already set and the receiver should take the next appropriate action */
 #			endif
@@ -858,7 +860,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						rel_crit(gv_cur_region);
 					}
 					TP_CHANGE_REG(save_reg);
-					grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+					grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 					if (repl_csa->onln_rlbk_cycle != jnlpool_ctl->onln_rlbk_cycle)
 						UPDPROC_ONLN_RLBK_CLNUP(jnlpool.jnlpool_dummy_reg); /* No return */
 					jnlpool_ctl->strm_seqno[histinfo.strm_index] = strm_seqno;
@@ -871,7 +873,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
  				assert(jnlpool.jnlpool_ctl->upd_disabled || (strm_index == histinfo.strm_index));
 			}
 			/* Now that we have constructed the history, add it to the instance file. */
-			grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 			if (repl_csa->onln_rlbk_cycle != jnlpool_ctl->onln_rlbk_cycle)
 				UPDPROC_ONLN_RLBK_CLNUP(jnlpool.jnlpool_dummy_reg); /* No return */
 			repl_inst_histinfo_add(&histinfo);
@@ -1001,21 +1003,26 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		}
 		if (upd_good_record == bad_trans_type)
 		{
-			UNIX_ONLY(
-				if (suppl_propagate_primary)
+#			ifdef UNIX
+			if (suppl_propagate_primary)
+			{
+				rec_strm_seqno = GET_STRM_SEQNO(rec);
+				strm_index = GET_STRM_INDEX(rec_strm_seqno);
+				rec_strm_seqno = GET_STRM_SEQ60(rec_strm_seqno);
+				strm_seqno = jnlpool_ctl->strm_seqno[strm_index];
+				/* In the event of a concurrent ONLINE ROLLBACK, it is likely that the strm_seqno is less than
+				 * rec_strm_seqno. In that case, do not issue STRMSEQMISMTCH error as that would be incorrect.
+				 * Instead, continue and eventually, either the update process or the transaction processing logic
+				 * will detect the online rollback and take appropriate action.
+				 */
+				if ((rec_strm_seqno != strm_seqno) && (repl_csa->onln_rlbk_cycle == jnlpool_ctl->onln_rlbk_cycle))
 				{
-					rec_strm_seqno = GET_STRM_SEQNO(rec);
-					strm_index = GET_STRM_INDEX(rec_strm_seqno);
-					rec_strm_seqno = GET_STRM_SEQ60(rec_strm_seqno);
-					strm_seqno = jnlpool_ctl->strm_seqno[strm_index];
-					if (rec_strm_seqno != strm_seqno)
-					{
-						assert(FALSE);
-						rts_error(VARLSTCNT(5) ERR_STRMSEQMISMTCH, 3,
-								strm_index, &rec_strm_seqno, &strm_seqno);
-					}
+					assert(FALSE);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_STRMSEQMISMTCH, 3,
+							strm_index, &rec_strm_seqno, &strm_seqno);
 				}
-			)
+			}
+#			endif
 			if (JRT_NULL == rectype)
 			{	/* Play the NULL transaction into the database and journal files */
 				save_reg = gv_cur_region;
@@ -1084,7 +1091,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					 * the journal seqno on the secondary database will get out-of-sync with that of
 					 * the primary database.
 					 */
-					gtm_putmsg(VARLSTCNT(6) ERR_UPDREPLSTATEOFF, 4,
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_UPDREPLSTATEOFF, 4,
 						mname.len, mname.addr, DB_LEN_STR(gv_cur_region));
 					/* Shut down the update process normally */
 					upd_proc_local->upd_proc_shutdown = SHUTDOWN;
@@ -1096,6 +1103,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				if (gv_currkey->end + 1 > gv_cur_region->max_key_size)
 				{
 					bad_trans_type = upd_bad_key_size;
+					tmpcsa = csa;
 					assert(gtm_white_box_test_case_enabled
 						&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number));
 				} else
@@ -1180,6 +1188,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 										gv_cur_region->max_rec_size)
 						{
 							bad_trans_type = upd_bad_val_size;
+							tmpcsa = csa;
 							assert(gtm_white_box_test_case_enabled
 								&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number));
 						} else
@@ -1204,9 +1213,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 								trigdef_inst = "replicating";
 								no_trigdef_inst = "originating";
 							}
-							send_msg(VARLSTCNT(9) ERR_TRIGDEFNOSYNC, 7, mname.len, mname.addr,
-									LEN_AND_STR(trigdef_inst), LEN_AND_STR(no_trigdef_inst),
-									&jnl_seqno);
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_TRIGDEFNOSYNC, 7,
+									mname.len, mname.addr, LEN_AND_STR(trigdef_inst),
+									LEN_AND_STR(no_trigdef_inst), &jnl_seqno);
 						}
 					}
 #					endif
@@ -1291,7 +1300,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						GV_SET_LAST_SUBSCRIPT_INCOMPLETE(fmtBuff, endBuff);
 						if (NULL != gv_failed_key)	/* Free memory if it has been used */
 							free(gv_failed_key);
-						rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, endBuff - fmtBuff, fmtBuff);
+						assert(NULL != tmpcsa);
+						rts_error_csa(CSA_ARG(tmpcsa) VARLSTCNT(6) ERR_GVSUBOFLOW, 0,
+									ERR_GVIS, 2, endBuff - fmtBuff, fmtBuff);
 						break;
 					case upd_bad_val_size:
 						if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ,
@@ -1299,7 +1310,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 							end = &buff[MAX_ZWR_KEY_SZ - 1];
 						if (NULL != gv_failed_key)	/* Free memory if it has been used */
 							free(gv_failed_key);
-						rts_error(VARLSTCNT(10) ERR_REC2BIG, 4,
+						assert(NULL != tmpcsa);
+						rts_error_csa(CSA_ARG(tmpcsa) VARLSTCNT(10) ERR_REC2BIG, 4,
 							VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +) val_mv.str.len,
 							(int4)gv_cur_region->max_rec_size, REG_LEN_STR(gv_cur_region),
 							ERR_GVIS, 2, end - buff, buff);

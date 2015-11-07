@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,6 @@ GBLREF	int			gtmsource_sock_fd;
 GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_log_fd;
 GBLREF 	FILE			*gtmsource_log_fp;
-GBLREF  struct timeval          gtmsource_poll_wait, gtmsource_poll_immediate;
 GBLREF  gtmsource_state_t       gtmsource_state;
 GBLREF	gd_addr          	*gd_header;
 
@@ -85,7 +84,7 @@ int gtmsource_init_heartbeat(void)
 			heartbeat_period, heartbeat_max_wait, num_q_entries);
 	if (!(repl_heartbeat_que_head = (repl_heartbeat_que_entry_t *)malloc(num_q_entries * SIZEOF(repl_heartbeat_que_entry_t))))
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error in allocating heartbeat queue"), errno);
+			LEN_AND_LIT("Error in allocating heartbeat queue"), errno);
 
 	memset(repl_heartbeat_que_head, 0, num_q_entries * SIZEOF(repl_heartbeat_que_entry_t));
 	repl_heartbeat_free_head = repl_heartbeat_que_head + 1;
@@ -177,7 +176,7 @@ int gtmsource_send_heartbeat(time_t *now)
 
 	heartbeat_element->heartbeat.type = REPL_HEARTBEAT;
 	heartbeat_element->heartbeat.len = MIN_REPL_MSGLEN;
-	REPL_SEND_LOOP(gtmsource_sock_fd, &heartbeat_element->heartbeat, MIN_REPL_MSGLEN, FALSE, &gtmsource_poll_immediate)
+	REPL_SEND_LOOP(gtmsource_sock_fd, &heartbeat_element->heartbeat, MIN_REPL_MSGLEN, REPL_POLL_NOWAIT)
 	{
 		gtmsource_poll_actions(FALSE);  /* Recursive call */
 		if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state ||
@@ -209,11 +208,11 @@ int gtmsource_send_heartbeat(time_t *now)
 	}
 	if (EREPL_SEND == repl_errno)
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error sending HEARTBEAT message. Error in send"), status);
+			LEN_AND_LIT("Error sending HEARTBEAT message. Error in send"), status);
 
 	if (EREPL_SELECT == repl_errno)
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error sending HEARTBEAT message. Error in select"), status);
+			LEN_AND_LIT("Error sending HEARTBEAT message. Error in select"), status);
 
 	GTMASSERT;
 }

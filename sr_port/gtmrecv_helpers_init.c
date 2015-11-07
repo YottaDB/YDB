@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #ifdef UNIX
 #include <sys/types.h>
 #include "gtm_unistd.h"
+#include "fork_init.h"
 #include <sys/wait.h>
 #elif defined(VMS)
 #include <descrip.h> /* Required for gtmrecv.h */
@@ -84,11 +85,12 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	save_shutdown = helper->helper_shutdown;
 	helper->helper_shutdown = NO_SHUTDOWN;
 #ifdef UNIX
-	if (0 > (helper_pid = fork()))	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+	FORK(helper_pid);	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+	if (0 > helper_pid)
 	{
 		save_errno = errno;
 		helper->helper_shutdown = save_shutdown;
-		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				LEN_AND_LIT("Could not fork update process"), save_errno);
 		repl_errno = EREPL_UPDSTART_FORK;
 		return UPDPROC_START_ERR;
@@ -103,10 +105,11 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 								dont_sendmsg_on_log2long)))
 		{
 			helper->helper_shutdown = save_shutdown;
-			gtm_putmsg(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				   LEN_AND_LIT("Could not find path of Helper Process. Check value of $gtm_dist"));
 			if (SS_LOG2LONG == i4status)
-				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(UPDHELPER_CMD), SIZEOF(helper_cmd) - 1);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3,
+						LEN_AND_LIT(UPDHELPER_CMD), SIZEOF(helper_cmd) - 1);
 			repl_errno = EREPL_UPDSTART_BADPATH;
 			return UPDPROC_START_ERR;
 		}
@@ -116,7 +119,7 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 		{
 			save_errno = errno;
 			helper->helper_shutdown = save_shutdown;
-			gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				   LEN_AND_LIT("Could not exec Helper Process"), save_errno);
 			repl_errno = EREPL_UPDSTART_EXEC;
 			return UPDPROC_START_ERR;
@@ -132,7 +135,8 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 					    		UPDHELPER_MBX_PREFIX, mbx_suffix, &cmd_channel, &helper->helper_pid_prev,
 							ERR_RECVPOOLSETUP)))
 	{
-		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, LEN_AND_LIT("Unable to spawn Helper process"), status);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,
+				ERR_TEXT, 2, LEN_AND_LIT("Unable to spawn Helper process"), status);
 		helper->helper_shutdown = save_shutdown;
 		repl_errno = EREPL_UPDSTART_FORK;
 		return UPDPROC_START_ERR;
@@ -150,7 +154,7 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	/* Deassign the send-cmd mailbox channel */
 	if (SS_NORMAL != (status = sys$dassgn(cmd_channel)))
 	{
-		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Unable to close upd-send-cmd mbox channel"), status);
 		helper->helper_shutdown = save_shutdown;
 		repl_errno = EREPL_UPDSTART_BADPATH; /* Just to make an auto-shutdown */

@@ -66,6 +66,8 @@ GBLREF int4		 error_condition;
 /* MUM_TSTART unwinds the current C-stack and restarts executing generated code from the top of the current M-stack */
 #define MUM_TSTART              UNWIND(&mch->CHF_MCH_DEPTH, CODE_ADDRESS(mum_tstart))
 
+#define ESTABLISH_NOJMP(x)	lib$establish(x)
+#define ESTABLISH_NOUNWIND(x)	lib$establish(x)
 #define ESTABLISH_RET(x,ret)	lib$establish(x)
 #define ESTABLISH(x)		lib$establish(x)
 

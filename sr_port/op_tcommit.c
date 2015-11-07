@@ -113,23 +113,27 @@ STATICFNDCL void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm
 
 STATICFNDEF void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm_info *si)
 {
-	cw_set_element		*update_cse;
+	cw_set_element		*cse;
 	srch_blk_status		*t1;
 	blk_segment		*array, *seg, *stop_ptr;
 	sm_long_t		delta;
 	sgmnt_addrs		*csa;
+#	ifdef DEBUG
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	csa = si->tp_csa;
 	delta = (sm_long_t)(csa->db_addrs[0] - old_db_addrs[0]);
 	assert(0 != delta);
 	/* update cse's update array and old_block */
-	for (update_cse = si->first_cw_set; NULL != update_cse; update_cse = update_cse->next_cw_set)
+	for (cse = si->first_cw_set; NULL != cse; cse = cse->next_cw_set)
 	{
-		TRAVERSE_TO_LATEST_CSE(update_cse);
-		if (gds_t_writemap != update_cse->mode)
+		TRAVERSE_TO_LATEST_CSE(cse);
+		if (gds_t_writemap != cse->mode)
 		{
-			array = (blk_segment *)update_cse->upd_addr;
-			stop_ptr = update_cse->first_copy ? array : array + 1;
+			array = (blk_segment *)cse->upd_addr;
+			stop_ptr = cse->first_copy ? array : array + 1;
 			seg = (blk_segment *)array->addr;
 			while (seg != stop_ptr)
 			{
@@ -138,15 +142,24 @@ STATICFNDEF void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm
 				seg--;
 			}
 		}
-		if (NULL != update_cse->old_block)
+		if (NULL != cse->old_block)
 		{
-			if ((old_db_addrs[0] <= update_cse->old_block) && (old_db_addrs[1] >= update_cse->old_block))
-				update_cse->old_block += delta;
+			if ((old_db_addrs[0] <= cse->old_block) && (old_db_addrs[1] >= cse->old_block))
+				cse->old_block += delta;
 			/* else, old_block is already updated -- this is mostly the case with gds_t_writemap in which case
 			 * bm_getfree invokes t_write_map
 			 */
-			assert((csa->db_addrs[0] <= update_cse->old_block)
-					&& (csa->db_addrs[1] >= update_cse->old_block));
+#			ifdef DEBUG
+			if (!((csa->db_addrs[0] <= cse->old_block) && (csa->db_addrs[1] >= cse->old_block)))
+			{	/* cse->old_block is pointing outside mmap bounds; most likely it points to the private memory.
+				 * But cse->old_block, at all times should point to the before image of the database block and so
+				 * should NOT point to private memory. This indicates that t_qread (below) did a private build on
+				 * an incorrect block and tp_tend will detect this and restart. To be sure, set donot_commit.
+				 */
+				assert(CDB_STAGNATE > t_tries);
+				TREF(donot_commit) |= DONOTCOMMIT_T_QREAD_BAD_PVT_BUILD;
+			}
+#			endif
 		}
 	}
 	/* update all the tp_hist */
@@ -366,7 +379,6 @@ enum cdb_sc	op_tcommit(void)
 							}
 							cse->blk = new_blk;
 							cse->mode = gds_t_acquired;
-							assert(!is_mm || (new_blk < csa->total_blks));
 							assert(GDSVCURR == cse->ondsk_blkver);
 							/* Assert that in final retry total_blks (private and shared) are in sync */
 							assert((CDB_STAGNATE > t_tries) || !is_mm

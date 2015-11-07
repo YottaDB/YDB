@@ -101,16 +101,27 @@ if ($#argv < 1) then
 	set syntaxerr = 1
 else
 	set testinstall = 0
+	set leavedir = 0
+	# when present, do not fire off a background kitstart
 	if ("$1" == "logfile") then
 		set logfile = 1
 		shift
 	endif
+	# perform a test installation
 	if ("$1" == "-ti") then
 		set testinstall = 1
 		shift
 	endif
+	# build a kit on a non-dist server
 	set allow = 0
 	if ("$1" == "-allow") then
+		set allow = 1
+		shift
+	endif
+	# Test the test install
+	if ("$1" == "-tti") then
+		set testinstall = 1
+		set leavedir = 1
 		set allow = 1
 		shift
 	endif
@@ -121,11 +132,12 @@ endif
 
 if ($syntaxerr) then
 	echo ""
-	echo "Usage : $0 [-ti] [-allow] <ver> [pro | dbg | bta]"
+	echo "Usage : $0 [-ti] [-allow] [-tti] <ver> [pro | dbg | bta]"
 	echo ""
 	echo "<ver>       : Version with no punctuations; create distribution of this GT.M version (must be in $gtm_root)"
 	echo "-ti         : Test installation"
 	echo "-allow      : allow kit to be built on a non-distribution server"
+	echo "-tti        : Test the test installation, implies -allow and always leaves dist, tmp_dist, install directories"
 	echo "[pro | dbg | bta] : Create distribution of this image; or pro and dbg if not specified"
 	echo ""
 	exit 1
@@ -357,7 +369,6 @@ echo "Files in $dist"
 /bin/ls -lR $dist
 echo ""
 
-set leavedir = 0
 set kitver = ${gtm_ver:t:s/V//}
 
 if ($testinstall) then
@@ -422,15 +433,10 @@ n
 CONFIGURE_EOF
 		endif
 
-		# We need for root to be a member of the restricted group.  It is a member of the "root" group
-		# for all linux OS and it is a member of "lp" for all others except osf1 where it is "vboxusers"
-		if("$osname" == "linux") then
-			setenv rootgroup "root"
-		else if ("$osname" != "osf1") then
-			setenv rootgroup "lp"
-		else
-			setenv rootgroup "vboxusers"
-		endif
+		# We need for root to be a member of the restricted group so that it can run tests. root is a
+		# member of the gtmsec NIS group.
+		setenv rootgroup gtmsec
+
 		# V54002 now asks for an installation group before the restricted group question so response is
 		# reversed from V54000
 		# V54003 now asks whether or not to retain .o files if libgtmutil.so is created
@@ -493,12 +499,13 @@ CONFIGURE_EOF
 		if ("pro" == ${image}) then
 			# create the build.dir.  Only have to do it once
 			cd $gtm_ver || exit 14
+			# insert "pro:" for non Linux/Solaris
 			if ((${osname} != linux) && (${osname} != solaris)) echo pro: > ${tmp_dist}/build.dir
 			ls -lR pro >> ${tmp_dist}/build.dir
 			if (aix == ${osname}) then
-				cat ${tmp_dist}/build.dir | \
-awk '$0 == "pro/gtmsecshrdir:" {printf "\n%s\n", $0} $0 != "pro/gtmsecshrdir:" {printf "%s\n", $0}' > ${tmp_dist}/tbuild.dir
-				mv ${tmp_dist}/tbuild.dir ${tmp_dist}/build.dir
+				# insert a newline before "pro/gtmsecshrdir:" on AIX
+				mv ${tmp_dist}/build.dir ${tmp_dist}/tbuild.dir
+				awk '/^pro.gtmsecshrdir:$/{print ""}{print $0}' ${tmp_dist}/tbuild.dir > ${tmp_dist}/build.dir
 			endif
 
 			# make a defgroup directory under ${tmp_dist} and copy in the build.dir for use in
@@ -511,36 +518,38 @@ awk '$0 == "pro/gtmsecshrdir:" {printf "\n%s\n", $0} $0 != "pro/gtmsecshrdir:" {
 			while (2 > $both)
 				# create the install.dir from both installations
 				cd ${install}/$defgroup
+				# insert "pro:" for non Linux/Solaris
 				if ((${osname} != linux) && (${osname} != solaris)) echo pro: > ${tmp_dist}/$defgroup/install.dir
 				ls -lR pro >> ${tmp_dist}/$defgroup/install.dir
 				if (aix == ${osname}) then
-					cat ${tmp_dist}/$defgroup/install.dir | \
-awk '$0 == "pro/gtmsecshrdir:" {printf "\n%s\n", $0} $0 != "pro/gtmsecshrdir:" {printf "%s\n", $0}' > \
-${tmp_dist}/$defgroup/tinstall.dir
-					mv ${tmp_dist}/$defgroup/tinstall.dir ${tmp_dist}/$defgroup/install.dir
+					# insert a newline before "pro/gtmsecshrdir:" on AIX
+					mv ${tmp_dist}/$defgroup/install.dir ${tmp_dist}/$defgroup/tinstall.dir
+					awk '/^pro.gtmsecshrdir:$/{print ""}{print $0}' ${tmp_dist}/$defgroup/tinstall.dir \
+						 > ${tmp_dist}/$defgroup/install.dir
 				endif
 				cd ${tmp_dist}/${image}
 				set comp="$gtm_tools/gtm_compare_dir.csh ${install} ${tmp_dist}/$defgroup $gtm_tools/bdelete.txt"
+				set adddir=$gtm_tools/badd.txt
+				set deldir=$gtm_tools/bdeldir.txt
 				if (("linux" == ${osname}) && ("i686" == ${arch})) then
-					$comp $gtm_tools/linuxi686_badd.txt $gtm_tools/bdeldir.txt ${osname}
-					set teststat = $status
+					set adddir=$gtm_tools/linuxi686_badd.txt
 				else if (("hpux" == ${osname}) && ("parisc" == ${arch})) then
-					$comp $gtm_tools/hpuxparisc_badd.txt $gtm_tools/hpuxparisc_bdeldir.txt ${osname}
-					set teststat = $status
+					set adddir=$gtm_tools/hpuxparisc_badd.txt
+					set deldir=$gtm_tools/hpuxparisc_bdeldir.txt
 				else if (("hpux" == ${osname}) && ("ia64" == ${arch})) then
-					$comp $gtm_tools/hpuxia64_badd.txt $gtm_tools/bdeldir.txt ${osname}
-					set teststat = $status
+					set adddir=$gtm_tools/hpuxia64_badd.txt
 				else if (("osf1" == ${osname}) && ("alpha" == ${arch})) then
-					$comp $gtm_tools/osf1alpha_badd.txt $gtm_tools/hpuxparisc_bdeldir.txt ${osname}
-					set teststat = $status
-				else
-					$comp $gtm_tools/badd.txt $gtm_tools/bdeldir.txt ${osname}
-					set teststat = $status
+					set adddir=$gtm_tools/osf1alpha_badd.txt
+					set deldir=$gtm_tools/hpuxparisc_bdeldir.txt
 				endif
+				$comp $adddir $deldir ${osname}
+				set teststat = $status
 				if ($teststat) then
 					echo ""
 					echo "Comparison of build and install directories failed."
 					echo "Look in ${tmp_dist}/$defgroup/dircompare/diff.out"
+					echo "$comp $adddir $deldir ${osname}"
+					chmod -R ugo+rwx ${tmp_dist}/$defgroup/dircompare
 					exit 16
 				endif
 				# to simplify the code to do the gtm_compare_dir.csh for both restricted and unrestricted group

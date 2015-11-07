@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,9 +63,15 @@ LITDEF jp_datatype	job_param_datatypes[] =
 #include "jobparams.h"
 };
 
+/* Maximum length string for any JOB parameter. Length limit
+ * dictated by having only one byte to represent the string
+ * length. That translates to 255 characters*/
+#define MAXJOBPARSTRLEN 255
+
 error_def(ERR_JOBPARNOVAL);
 error_def(ERR_JOBPARNUM);
 error_def(ERR_JOBPARSTR);
+error_def(ERR_JOBPARTOOLONG);
 error_def(ERR_JOBPARUNK);
 error_def(ERR_JOBPARVALREQ);
 
@@ -118,6 +124,11 @@ int one_job_param (char **parptr)
 				return FALSE;
 			}
 			len = (TREF(window_mval)).str.len;
+			if (MAXJOBPARSTRLEN < len)
+			{
+				stx_error (ERR_JOBPARTOOLONG);
+				return FALSE;
+			}
 			*(*parptr)++ = len;
 			memcpy(*parptr, (TREF(window_mval)).str.addr, len);
 			*parptr += len;

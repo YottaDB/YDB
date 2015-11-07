@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,6 @@
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	boolean_t	dse_running;
-GBLREF	boolean_t	mu_reorg_upgrd_dwngrd_in_prog;
 
 void gvcst_map_build(uint4 *array, sm_uc_ptr_t base_addr, cw_set_element *cs, trans_num ctn)
 {
@@ -47,33 +45,7 @@ void gvcst_map_build(uint4 *array, sm_uc_ptr_t base_addr, cw_set_element *cs, tr
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	base_addr += SIZEOF(blk_hdr);
 	assert(cs_addrs->now_crit); /* Don't want to be messing with highest_lbm_with_busy_blk outside crit */
-	if (cs_addrs->nl->trunc_pid)
-	{ /* A truncate is in progress. We need to 1) update cnl->highest_lbm_with_busy_blk if needed and 2) select bml_free if
-	   * this is a t_recycled2free transaction.
-	   */
-		if (cs->reference_cnt > 0)
-		{
-			bml_func = bml_busy;
-			cs_addrs->nl->highest_lbm_with_busy_blk = MAX(cs->blk, cs_addrs->nl->highest_lbm_with_busy_blk);
-		} else if (cs->reference_cnt < 0)
-		{
-			if (cs_addrs->hdr->db_got_to_v5_once && (CSE_LEVEL_DRT_LVL0_FREE != cs->level))
-				bml_func = bml_recycled;
-			else /* always set the block as free when gvcst_bmp_mark_free a level-0 block in DIR tree */
-			{
-				bml_func = bml_free;
-				/* reset level since t_end will call bml_status_check which has an assert for bitmap block level */
-				cs->level = LCL_MAP_LEVL;
- 			}
-		} else	/* cs->reference_cnt == 0 */
-		{
-			if (cs_addrs->hdr->db_got_to_v5_once && mu_reorg_upgrd_dwngrd_in_prog)
-				bml_func = bml_recycled;
-			else
-				bml_func = bml_free;
-		}
-	} else /* Choose bml_func as it was chosen before truncate feature. */
-		bml_func = (cs->reference_cnt > 0) ? bml_busy : (cs_addrs->hdr->db_got_to_v5_once ? bml_recycled : bml_free);
+	DETERMINE_BML_FUNC(bml_func, cs, cs_addrs);
 	DEBUG_ONLY(prev_bitnum = -1;)
 	while (bitnum = *array)		/* caution : intended assignment */
 	{

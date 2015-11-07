@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,8 @@ void		db_auto_upgrade(gd_region *reg);
 #ifdef VMS
 void		db_init(gd_region *reg, sgmnt_data_ptr_t tsd);
 #else
-void		db_init(gd_region *reg);
+int		db_init(gd_region *reg);
+void		db_init_err_cleanup(boolean_t retry_dbinit);
 void		gvcst_redo_root_search(void);
 #endif
 gd_region	*dbfilopn (gd_region *reg);

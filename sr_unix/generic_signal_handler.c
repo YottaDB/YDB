@@ -163,7 +163,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			} else
 			{	/* Special case for gtmsecshr - no deferral just exit */
 				forced_exit_err = ERR_GTMSECSHRSHUTDN;
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
+				if (OK_TO_SEND_MSG)
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
 			}
 			dont_want_core = TRUE;
 			break;

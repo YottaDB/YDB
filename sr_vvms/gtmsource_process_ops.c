@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include "gtm_socket.h"
 #include "gtm_inet.h"
+#include "gtm_netdb.h"
 #include <sys/time.h>
 #include <errno.h>
 #include "gtm_fcntl.h"
@@ -20,10 +21,7 @@
 #include "gtm_stat.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-#ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
-#endif
-
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -58,7 +56,6 @@ GBLREF	gd_addr			*gd_header;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF  seq_num                 gtmsource_save_read_jnl_seqno;
-GBLREF	struct timeval		gtmsource_poll_wait, gtmsource_poll_immediate;
 GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	repl_msg_ptr_t		gtmsource_msgp;
 GBLREF	int			gtmsource_msgbufsiz;
@@ -85,36 +82,29 @@ error_def(ERR_UNIMPLOP);
 
 static	unsigned char		*tcombuff, *msgbuff, *filterbuff;
 
-void gtmsource_init_sec_addr(struct sockaddr_in *secondary_addr)
-{
-	gtmsource_local_ptr_t	gtmsource_local;
-
-	gtmsource_local = jnlpool.gtmsource_local;
-	memset((char *)secondary_addr, 0, SIZEOF(*secondary_addr));
-	(*secondary_addr).sin_family = AF_INET;
-	(*secondary_addr).sin_addr.s_addr = gtmsource_local->secondary_inet_addr;
-	(*secondary_addr).sin_port = htons(gtmsource_local->secondary_port);
-}
-
-int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
+int gtmsource_est_conn()
 {
 	int			connection_attempts, alert_attempts, save_errno, status;
 	char			print_msg[1024], msg_str[1024];
 	gtmsource_local_ptr_t	gtmsource_local;
 	int			send_buffsize, recv_buffsize, tcp_s_bufsize;
-	int 		logging_period, logging_interval; /* logging period = soft_tries_period*logging_interval */
-	int 		logging_attempts;
+	int 			logging_period, logging_interval; /* logging period = soft_tries_period*logging_interval */
+	int 			logging_attempts;
+	sockaddr_ptr		secondary_sa;
+	int			secondary_addrlen;
 
 	gtmsource_local = jnlpool.gtmsource_local;
 	/* Connect to the secondary - use hard tries, soft tries ... */
 	connection_attempts = 0;
-	gtmsource_comm_init();
+	gtmsource_comm_init(); /* set up gtmsource_loal.secondary_ai */
+	secondary_sa = (sockaddr_ptr)(&gtmsource_local->secondary_inet_addr);
+	secondary_addrlen = gtmsource_local->secondary_addrlen;
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "Connect hard tries count = %d, Connect hard tries period = %d\n",
 		 gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT],
 		 gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD]);
 	do
 	{
-		status = gtm_connect(gtmsource_sock_fd, (struct sockaddr *)secondary_addr, SIZEOF(*secondary_addr));
+		status = gtm_connect(gtmsource_sock_fd, secondary_sa, secondary_addrlen);
 		if (0 == status)
 			break;
 		repl_log(gtmsource_log_fp, FALSE, FALSE, "%d hard connection attempt failed : %s\n", connection_attempts + 1,
@@ -148,7 +138,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 		connection_attempts = 0;
 		do
 		{
-			status = gtm_connect(gtmsource_sock_fd, (struct sockaddr *)secondary_addr, SIZEOF(*secondary_addr));
+			status = gtm_connect(gtmsource_sock_fd, secondary_sa, secondary_addrlen);
 			if (0 == status)
 				break;
 			repl_close(&gtmsource_sock_fd);
@@ -187,7 +177,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 	if (0 != (status = get_send_sock_buff_size(gtmsource_sock_fd, &send_buffsize)))
 	{
 		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket send buffsize : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 	}
 	if (send_buffsize < GTMSOURCE_TCP_SEND_BUFSIZE)
 	{
@@ -201,17 +191,18 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 			SNPRINTF(msg_str, SIZEOF(msg_str), "Could not set TCP send buffer size in range [%d, %d], last "
 					"known error : %s", GTMSOURCE_MIN_TCP_SEND_BUFSIZE, GTMSOURCE_TCP_SEND_BUFSIZE,
 					STRERROR(status));
-			rts_error(VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 		}
 	}
 	if (0 != (status = get_send_sock_buff_size(gtmsource_sock_fd, &repl_max_send_buffsize))) /* may have changed */
 	{
 		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket send buffsize : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 	}
 	if (0 != (status = get_recv_sock_buff_size(gtmsource_sock_fd, &recv_buffsize)))
-		rts_error(VARLSTCNT(10) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_LIT("Error getting socket recv buffsize"),
-			ERR_TEXT, 2, RTS_ERROR_STRING(STRERROR(status)));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				LEN_AND_LIT("Error getting socket recv buffsize"),
+				ERR_TEXT, 2, LEN_AND_STR(STRERROR(status)));
 	if (recv_buffsize < GTMSOURCE_TCP_RECV_BUFSIZE)
 	{
 		if (0 != (status = set_recv_sock_buff_size(gtmsource_sock_fd, GTMSOURCE_TCP_RECV_BUFSIZE)))
@@ -220,14 +211,15 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 			{
 				SNPRINTF(msg_str, SIZEOF(msg_str), "Could not set TCP recv buffer size to %d : %s",
 						GTMSOURCE_MIN_TCP_RECV_BUFSIZE, STRERROR(status));
-				rts_error(VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2,
+						LEN_AND_STR(msg_str));
 			}
 		}
 	}
 	if (0 != (status = get_recv_sock_buff_size(gtmsource_sock_fd, &repl_max_recv_buffsize))) /* may have changed */
 	{
 		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket recv buffsize : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 	}
 	return (SS_NORMAL);
 }
@@ -345,7 +337,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 	for (; SS_NORMAL == status;)
 	{
 		repl_log(gtmsource_log_fp, FALSE, FALSE, "Waiting for (re)start JNL_SEQNO/FETCH RESYSNC msg\n");
-		REPL_RECV_LOOP(gtmsource_sock_fd, &msg, MIN_REPL_MSGLEN, FALSE, &gtmsource_poll_wait)
+		REPL_RECV_LOOP(gtmsource_sock_fd, &msg, MIN_REPL_MSGLEN, REPL_POLL_WAIT)
 		{
 			gtmsource_poll_actions(FALSE);
 			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
@@ -428,7 +420,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 					*recvd_jnl_seqno = GTM_BYTESWAP_64(*recvd_jnl_seqno);
 				QWASSIGN(*(seq_num *)&xoff_ack.msg[0], *recvd_jnl_seqno);
 				xoff_ack.len = MIN_REPL_MSGLEN;
-				REPL_SEND_LOOP(gtmsource_sock_fd, &xoff_ack, xoff_ack.len, FALSE, &gtmsource_poll_immediate)
+				REPL_SEND_LOOP(gtmsource_sock_fd, &xoff_ack, xoff_ack.len, REPL_POLL_NOWAIT)
 				{
 					gtmsource_poll_actions(FALSE);
 					if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
@@ -466,7 +458,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 	gtmsource_local = jnlpool.gtmsource_local;
 	if (recvd_start_flags & START_FLAG_UPDATERESYNC)
 	{
-		grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 		QWASSIGN(gtmsource_local->read_jnl_seqno, jctl->jnl_seqno);
 		QWASSIGN(gtmsource_local->read_addr, jctl->write_addr);
 		gtmsource_local->read = jctl->write;

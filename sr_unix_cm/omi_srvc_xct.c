@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,18 +99,18 @@ int	omi_srvc_xact (omi_conn *cptr)
 		if (errno == ETIMEDOUT)
 		{
 			OMI_DBG((omi_debug, "%s: connection %d to %s timed out.\n",
-				 SRVR_NAME, cptr->stats.id, gtcm_hname(&cptr->stats.sin)));
+				 SRVR_NAME, cptr->stats.id, gtcm_hname(&cptr->stats.ai)));
 		}
 		else if (errno == ECONNRESET)
 		{
 			OMI_DBG((omi_debug, "%s: connection %d to %s closed by remote client.\n",
-				 SRVR_NAME, cptr->stats.id, gtcm_hname(&cptr->stats.sin)));
+				 SRVR_NAME, cptr->stats.id, gtcm_hname(&cptr->stats.ai)));
 		}
 		else
 		{
 			char	msg[256];
 			SPRINTF(msg, "Attempted read from connection %d to %s failed",
-				cptr->stats.id, gtcm_hname(&cptr->stats.sin));
+				cptr->stats.id, gtcm_hname(&cptr->stats.ai));
 			gtcm_rep_err(msg, save_errno);
 		}
 		return -1;
@@ -426,17 +426,17 @@ int	omi_srvc_xact (omi_conn *cptr)
 			if (errno == ETIMEDOUT)
 			{
 				OMI_DBG((omi_debug, "%s: connection %d to %s timed out.\n",
-					 SRVR_NAME, cptr->stats.id, gtcm_hname(&cptr->stats.sin)));
+					 SRVR_NAME, cptr->stats.id, gtcm_hname(&cptr->stats.ai)));
 			}
 			else if (errno == ECONNRESET)
 			{
 				OMI_DBG((omi_debug, "%s: connection %d to %s closed by remote client.\n",
-					 SRVR_NAME, cptr->stats.id, gtcm_hname(&cptr->stats.sin)));
+					 SRVR_NAME, cptr->stats.id, gtcm_hname(&cptr->stats.ai)));
 			}
 			else if (errno == EPIPE)
 			{
 				OMI_DBG((omi_debug, "%s: remote client no longer attached to connection %d, %s.\n",
-					 SRVR_NAME, cptr->stats.id, gtcm_hname(&cptr->stats.sin)));
+					 SRVR_NAME, cptr->stats.id, gtcm_hname(&cptr->stats.ai)));
 			}
 			else if (errno == EINTR)
 				continue;

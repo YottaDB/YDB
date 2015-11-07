@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,8 +32,15 @@
 GBLREF int		COLUMNS, GTM_LINES, AUTO_RIGHT_MARGIN;
 GBLREF uint4		gtm_principal_editing_defaults;
 GBLREF io_pair		io_std_device;
-LITREF unsigned char	io_params_size[];
 GBLREF	boolean_t	gtm_utf8_mode;
+LITREF unsigned char	io_params_size[];
+
+error_def(ERR_BADCHSET);
+error_def(ERR_NOTERMENTRY);
+error_def(ERR_NOTERMENV);
+error_def(ERR_NOTERMINFODB);
+error_def(ERR_TCGETATTR);
+error_def(ERR_ZINTRECURSEIO);
 
 short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
 {
@@ -44,13 +51,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	int		save_errno;
 	int		p_offset;
 	mstr		chset;
-
-	error_def(ERR_NOTERMENV);
-	error_def(ERR_NOTERMENTRY);
-	error_def(ERR_NOTERMINFODB);
-	error_def(ERR_TCGETATTR);
-	error_def(ERR_BADCHSET);
-	error_def(ERR_ZINTRECURSEIO);
+	boolean_t	empt = FALSE;
 
 	ioptr = dev_name->iod;
 	if (ioptr->state == dev_never_opened)
@@ -68,7 +69,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	}
 	tt_ptr = (d_tt_struct *)dev_name->iod->dev_sp;
 	if (tt_ptr->mupintr)
-		rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	p_offset = 0;
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
@@ -80,8 +81,12 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			break;
 		} else  if (ch == iop_canonical)
 			tt_ptr->canonical = TRUE;
-		else  if (ch == iop_nocanonical)
+		else if (ch == iop_nocanonical)
 			tt_ptr->canonical = FALSE;
+		else if (ch == iop_empterm)
+			empt = TRUE;
+		else if (ch == iop_noempterm)
+			empt = FALSE;
 		else if (iop_m == ch)
 			ioptr->ichset = ioptr->ochset = CHSET_M;
 		else if (gtm_utf8_mode && iop_utf8 == ch)
@@ -102,7 +107,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				else
 					ioptr->ochset = CHSET_UTF8;
 			else
-				rts_error(VARLSTCNT(4) ERR_BADCHSET, 2, chset.len, chset.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, chset.len, chset.addr);
 		}
 		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
 			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
@@ -119,7 +124,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			if (gtm_isanlp(tt_ptr->fildes) == 0)
-				rts_error(VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		if (IS_GTM_IMAGE)
 			/* Only the true runtime runs with the modified terminal settings */
@@ -132,12 +137,12 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				env_term = GETENV("TERM");
 				if (!env_term)
 				{
-					rts_error(VARLSTCNT(1) ERR_NOTERMENV);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTERMENV);
 					env_term = "unknown";
 				}
-				rts_error(VARLSTCNT(4) ERR_NOTERMENTRY, 2, LEN_AND_STR(env_term));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTERMENTRY, 2, LEN_AND_STR(env_term));
 			} else
-				rts_error(VARLSTCNT(1) ERR_NOTERMINFODB);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTERMINFODB);
 		}
 		ioptr->width = COLUMNS;
 		ioptr->length = GTM_LINES;
@@ -151,6 +156,8 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			ioptr->ichset = ioptr->ochset = gtm_utf8_mode ? CHSET_UTF8 : CHSET_M;	/* default */
 		} else
 			tt_ptr->ext_cap = 0;
+		if (empt)
+			tt_ptr->ext_cap |= TT_EMPTERM;
 		if (tt_ptr->default_mask_term)
 		{
 			memset(&tt_ptr->mask_term.mask[0], 0, SIZEOF(io_termmask));

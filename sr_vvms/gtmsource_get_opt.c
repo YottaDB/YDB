@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,6 +52,10 @@
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		update_disable;
 
+error_def(ERR_GETADDRINFO);
+error_def(ERR_GETNAMEINFO);
+error_def(ERR_TEXT);
+
 int gtmsource_get_opt(void)
 {
 	boolean_t	secondary, dotted_notation;
@@ -59,6 +63,10 @@ int gtmsource_get_opt(void)
 	unsigned short	secondary_len;
 	char		secondary_sys[MAX_SECONDARY_LEN], *c;
 	struct hostent	*sec_hostentry;
+	struct addrinfo *ai_ptr;
+	int		errcode;
+	char		*ip_end;
+	int		port_len;
 
 	boolean_t	log, log_interval_specified;
 	unsigned short	log_file_len;
@@ -109,50 +117,38 @@ int gtmsource_get_opt(void)
 			 * and secondary_port */
 			c = secondary_sys;
 			dotted_notation = TRUE;
-			while(*c && *c != ':')
+			if ('[' == *c)
 			{
-				if ('.' != *c && !ISDIGIT(*c))
-					dotted_notation = FALSE;
-				gtmsource_options.secondary_host[index++] = *c++;
+				ip_end = strchr(++c, ']');
+				if (NULL == ip_end || 0 == (index = ip_end - c))
+				{
+					util_out_print("Invalid IP address !AD", TRUE,
+						LEN_AND_STR(secondary_sys));
+					return(-1);
+				}
+				memcpy(gtmsource_options.secondary_host, c, index);
+				gtmsource_options.secondary_host[index] = '\0';
+				c = ip_end + 1;
+			} else
+			{
+				while(*c && *c != ':')
+					gtmsource_options.secondary_host[index++] = *c++;
+				gtmsource_options.secondary_host[index] = '\0';
 			}
-			gtmsource_options.secondary_host[index] = '\0';
 			if (':' != *c)
 			{
 				util_out_print("Secondary port number should be specified", TRUE);
 				return(-1);
 			}
+			port_len = strlen(++c);
 			errno = 0;
-			if (((0 == (gtmsource_options.secondary_port = ATOI(++c))) && (0 != errno))
+			if (((0 == (gtmsource_options.secondary_port = ATOI(c))) && (0 != errno))
 				|| (0 >= gtmsource_options.secondary_port))
 			{
 				util_out_print("Error parsing secondary port number !AD", TRUE, LEN_AND_STR(c));
 				return(-1);
 			}
-			/* Validate the specified secondary host name */
-			if (dotted_notation)
-			{
-				if ((in_addr_t)-1 ==
-					(gtmsource_options.sec_inet_addr = INET_ADDR(gtmsource_options.secondary_host)))
-				{
-					util_out_print("Invalid IP address !AD", TRUE,
-						LEN_AND_STR(gtmsource_options.secondary_host));
-					return(-1);
-				}
-			} else
-			{
-				for (tries = 0;
-		     	     	     tries < MAX_GETHOST_TRIES &&
-		     	     	     !(sec_hostentry = GETHOSTBYNAME(gtmsource_options.secondary_host)) &&
-		     	     	     h_errno == TRY_AGAIN;
-		     	     	     tries++);
-				if (NULL == sec_hostentry)
-				{
-					util_out_print("Could not find IP address for !AD", TRUE,
-						LEN_AND_STR(gtmsource_options.secondary_host));
-					return(-1);
-				}
-				gtmsource_options.sec_inet_addr = ((struct in_addr *)sec_hostentry->h_addr_list[0])->s_addr;
-			}
+			assert(NI_MAXSERV > port_len);
 		}
 		if (CLI_PRESENT == cli_present("CONNECTPARAMS"))
 		{

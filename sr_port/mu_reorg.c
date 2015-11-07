@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -128,7 +128,7 @@ error_def(ERR_MUREORGFAIL);
 	ABORT_TRANS_IF_GBL_EXIST_NOMORE(LCL_T_TRIES, tn_aborted);								\
 	if (tn_aborted)														\
 	{															\
-		gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);						\
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);			\
 		reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused, file_extended, lvls_reduced, blks_coalesced,\
 				blks_split, blks_swapped);									\
 		return TRUE; /* It is not an error if the global (that once existed) doesn't exist anymore (due to ROLLBACK) */	\
@@ -254,13 +254,18 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 		SETUP_TRIGGER_GLOBAL;
 		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+		if (0 != gv_target->root)
+		{
+			util_out_print("   ", FLUSH);
+			util_out_print("Global: !AD (region !AD)", FLUSH, gn->str.len, gn->str.addr, REG_LEN_STR(gv_cur_region));
+		}
 	} else
 #	endif	/* Initialization for current global */
 		op_gvname(VARLSTCNT(1) gn);
 	/* Cannot proceed for read-only data files */
 	if (gv_cur_region->read_only)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		return FALSE;
 	}
 	if (0 == gv_target->root)
@@ -275,7 +280,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 	if (*resume && 0 != cs_data->reorg_restart_key[0])
 	{
 		/* resume from last key reorged in GVT */
-		GET_KEY_LEN(tkeysize, &cs_data->reorg_restart_key[0]);
+		tkeysize = get_key_len(NULL, &cs_data->reorg_restart_key[0]);
 		memcpy(gv_currkey->base, cs_data->reorg_restart_key, tkeysize);
 		gv_currkey->end = tkeysize - 1;
 		dest_blk_id = cs_data->reorg_restart_block;
@@ -370,7 +375,8 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					status = mu_split(level, i_max_fill, d_max_fill, &cnt1, &cnt2);
 					if (cdb_sc_maxlvl == status)
 					{
-						gtm_putmsg(VARLSTCNT(4) ERR_MAXBTLEVEL, 2, gn->str.len, gn->str.addr);
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_MAXBTLEVEL, 2, gn->str.len,
+								gn->str.addr);
 						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
 							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
 						return FALSE;
@@ -499,7 +505,8 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					 *	here gv_currkey_next_reorg will be set from right sibling
 					 */
 					cw_set_depth = cw_map_depth = 0;
-					GET_KEY_LEN(tkeysize, rtsib_hist->h[0].buffaddr + SIZEOF(blk_hdr) + SIZEOF(rec_hdr));
+					tkeysize = get_key_len(rtsib_hist->h[0].buffaddr, rtsib_hist->h[0].buffaddr
+											+ SIZEOF(blk_hdr) + SIZEOF(rec_hdr));
 					if (2 < tkeysize && MAX_KEY_SZ >= tkeysize)
 					{
 						memcpy(&(gv_currkey_next_reorg->base[0]), rtsib_hist->h[0].buffaddr

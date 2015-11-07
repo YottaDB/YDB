@@ -119,7 +119,7 @@ error_def(ERR_TEXT);
 		if (NULL != jnlpool.jnlpool_ctl)								\
 		{												\
 			if (-1 == shmdt((caddr_t)jnlpool.jnlpool_ctl))						\
-				gtm_putmsg(VARLSTCNT(5) ERR_REPLWARN, 2,					\
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLWARN, 2,			\
 					RTS_ERROR_LITERAL("Could not detach from journal pool"), errno);	\
 			jnlpool_ctl = NULL;									\
 			jnlpool.jnlpool_ctl = NULL;								\
@@ -131,7 +131,7 @@ error_def(ERR_TEXT);
 		}												\
 		assert(INVALID_SHMID != udi->shmid);								\
 		if (0 != shm_rmid(udi->shmid))									\
-			gtm_putmsg(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,				\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,		\
 				 RTS_ERROR_LITERAL("Error removing jnlpool "), errno);				\
 		remove_sem_set(SOURCE);										\
 	}													\
@@ -141,7 +141,8 @@ error_def(ERR_TEXT);
 {																\
 	if ((GTMSOURCE_DUMMY_STATE != gtmsourcelocal_ptr->gtmsource_state) || (0 != gtmsourcelocal_ptr->gtmsource_pid))		\
 	{	/* Slot is in an out-of-design situation. Send an operator log message with enough debugging detail */		\
-		send_msg(VARLSTCNT(7) ERR_JNLPOOLBADSLOT, 5, LEN_AND_STR((char *)gtmsourcelocal_ptr->secondary_instname),	\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLBADSLOT, 5,							\
+			 LEN_AND_STR((char *)gtmsourcelocal_ptr->secondary_instname),						\
 			gtmsourcelocal_ptr->gtmsource_pid, gtmsourcelocal_ptr->gtmsource_state,					\
 			gtmsourcelocal_ptr->gtmsrc_lcl_array_index);								\
 	}															\
@@ -182,7 +183,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			gtmsource_options.showfreeze;
 	memset(machine_name, 0, SIZEOF(machine_name));
 	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, status))
-		rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
 	if (NULL == recvpool.recvpool_dummy_reg)
 	{
 		r_save = gv_cur_region;
@@ -221,7 +222,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	 * or shut down replication for this instance. We will release ftok semaphore when initialization is done.
 	 */
 	if (!ftok_sem_get(jnlpool.jnlpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE))
-		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 	is_src_srvr = (GTMSOURCE == pool_user);
 	/* If caller is source server and secondary instance name has been specified check if it is different from THIS instance */
@@ -230,7 +231,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		if (0 == STRCMP(repl_instance.inst_info.this_instname, gtmsource_options.secondary_instname))
 		{
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(4) ERR_REPLINSTNMSAME, 2, LEN_AND_STR((char *)repl_instance.inst_info.this_instname));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLINSTNMSAME, 2,
+					 LEN_AND_STR((char *)repl_instance.inst_info.this_instname));
 		}
 	}
 	new_ipc = FALSE;
@@ -243,13 +245,14 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 			if (GTMRELAXED == pool_user)
 				return;
-			rts_error(VARLSTCNT(4) ERR_NOJNLPOOL, 2, full_len, udi->fn);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOJNLPOOL, 2, full_len, udi->fn);
 		}
 		if (repl_instance.crash)
 		{
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Instance file header has crash field set to TRUE");
-			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2,
+					LEN_AND_STR(scndry_msg));
 		}
 		DEBUG_ONLY(sem_created = TRUE);
 		new_ipc = TRUE;
@@ -257,7 +260,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		if (INVALID_SEMID == (udi->semid = init_sem_set_source(IPC_PRIVATE, NUM_SRC_SEMS, RWDALL | IPC_CREAT)))
 		{
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error creating journal pool semaphore"), errno);
 		}
 		/* Following will set semaphore SOURCE_ID_SEM value as GTM_ID. In case we have orphaned semaphore
@@ -269,7 +272,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			save_errno = errno;
 			remove_sem_set(SOURCE);		/* Remove what we created */
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with jnlpool semctl SETVAL"), save_errno);
 		}
 		/* Warning: We must read the sem_ctime using IPC_STAT after SETVAL, which changes it. We must NOT do any
@@ -281,7 +284,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			save_errno = errno;
 			remove_sem_set(SOURCE);		/* Remove what we created */
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with jnlpool semctl IPC_STAT"), save_errno);
 		}
 		udi->gt_sem_ctime = semarg.buf->sem_ctime;
@@ -295,14 +298,15 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Error with semctl on Journal Pool SEMID (%d)",
 					repl_instance.jnlpool_semid);
-			rts_error(VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
 					ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
 		} else if (semarg.buf->sem_ctime != repl_instance.jnlpool_semid_ctime)
 		{
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Creation time for Journal Pool SEMID (%d) is %d; Expected %d",
 					repl_instance.jnlpool_semid, semarg.buf->sem_ctime, repl_instance.jnlpool_semid_ctime);
-			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2,
+					LEN_AND_STR(scndry_msg));
 		}
 		udi->semid = repl_instance.jnlpool_semid;
 		udi->gt_sem_ctime = repl_instance.jnlpool_semid_ctime;
@@ -316,7 +320,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		if (SS_NORMAL != status)
 		{
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with journal pool access semaphore"), errno);
 		}
 		udi->grabbed_access_sem = TRUE;
@@ -348,7 +352,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		REMOVE_OR_RELEASE_SEM(new_ipc);
 		ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 		SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Error with semctl on Journal Pool SHMID (%d)", repl_instance.jnlpool_shmid);
-		rts_error(VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2,
+				LEN_AND_STR(scndry_msg), save_errno);
 	} else if (shmstat.shm_ctime != repl_instance.jnlpool_shmid_ctime)
 	{	/* shared memory was possibly reused (causing shm_ctime and jnlpool_shmid_ctime to be different. We can't rely
 		 * on the shmid as it could be connected to a valid instance file in a different environment. Create new IPCs
@@ -366,7 +371,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 		if (GTMRELAXED == pool_user)
 			return;
-		rts_error(VARLSTCNT(4) ERR_NOJNLPOOL, 2, full_len, udi->fn);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOJNLPOOL, 2, full_len, udi->fn);
 	}
 	if (repl_instance.file_corrupt)
 	{	/* Indicates that a prior rollback was killed and so requires a re-run. It is also possible this process started
@@ -382,7 +387,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			REMOVE_OR_RELEASE_SEM(new_ipc);
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Instance file header has file_corrupt field set to TRUE");
-			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2,
+					LEN_AND_STR(scndry_msg));
 		}
 	}
 	if (new_ipc)
@@ -393,7 +399,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			save_errno = errno;
 			remove_sem_set(SOURCE);
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Error with journal pool creation"), save_errno);
 		}
 		if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
@@ -401,7 +407,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			save_errno = errno;
 			DETACH_AND_REMOVE_SHM_AND_SEM; /* remove any sem/shm we had created */
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Error with jnlpool shmctl IPC_STAT"), save_errno);
 		}
 		udi->gt_shm_ctime = shmstat.shm_ctime;
@@ -415,7 +421,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 		/* Assert below ensures we dont try to clean up the journal pool even though we errored out while attaching to it */
 		assert(NULL == jnlpool.jnlpool_ctl);
-		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error with journal pool shmat"), save_errno);
 	}
 	jnlpool.jnlpool_ctl = tmp_jnlpool_ctl;
@@ -477,7 +483,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			udi->grabbed_access_sem = FALSE;
 			udi->counter_acc_incremented = FALSE;
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2, LEN_AND_LIT("Error initializing custom errors"));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+					LEN_AND_LIT("Error initializing custom errors"));
 		}
 		jnlpool_ctl->critical_off = (sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)jnlpool_ctl;
 		jnlpool_ctl->filehdr_off = (sm_uc_ptr_t)jnlpool.repl_inst_filehdr - (sm_uc_ptr_t)jnlpool_ctl;
@@ -501,7 +508,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		jnlpool_mutex_spin_parms->mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
 		jnlpool_mutex_spin_parms->mutex_que_entry_space_size = DEFAULT_NUM_CRIT_ENTRY;
 		assert(!skip_locks);
-		grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 		/* Flush the file header to disk so future callers of "jnlpool_init" see the jnlpool_semid and jnlpool_shmid */
 		repl_inst_flush_filehdr();
 		/* Initialize GTMSRC_LCL section in journal pool */
@@ -528,7 +535,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		udi->grabbed_access_sem = FALSE;
 		udi->counter_acc_incremented = FALSE;
 		ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-		rts_error(VARLSTCNT(10) ERR_REPLREQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(machine_name),
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_REPLREQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(machine_name),
 			ERR_TEXT, 2, RTS_ERROR_TEXT("Journal pool is incompletely initialized. Run MUPIP RUNDOWN first."));
 	}
 	slot_needs_init = FALSE;
@@ -604,7 +611,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 						ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 						/* Assert we did not create shm or sem so no need to remove any */
 						assert(!new_ipc);
-						rts_error(VARLSTCNT(5) ERR_SRCSRVEXISTS, 3,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SRCSRVEXISTS, 3,
 							LEN_AND_STR(gtmsource_options.secondary_instname), gtmsource_pid);
 					}
 				} else
@@ -632,7 +639,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 						ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 						/* Assert we did not create shm or sem so no need to remove any */
 						assert(!new_ipc);
-						rts_error(VARLSTCNT(4) ERR_SRCSRVNOTEXIST, 2,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SRCSRVNOTEXIST, 2,
 							LEN_AND_STR(gtmsource_options.secondary_instname));
 					}
 				}
@@ -657,7 +664,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 					ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 					/* Assert we did not create shm or sem so no need to remove any */
 					assert(!new_ipc);
-					rts_error(VARLSTCNT(6) ERR_REPLINSTSECNONE, 4,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTSECNONE, 4,
 						LEN_AND_STR(gtmsource_options.secondary_instname), full_len, udi->fn);
 				} else
 				{	/* Find a used slot that can be reused. Find one with least value of "connect_jnl_seqno". */
@@ -685,7 +692,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 						ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 						/* Assert we did not create shm or sem so no need to remove any */
 						assert(!new_ipc);
-						rts_error(VARLSTCNT(5) ERR_SRCSRVTOOMANY, 3, NUM_GTMSRC_LCL, full_len, udi->fn);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SRCSRVTOOMANY, 3, NUM_GTMSRC_LCL,
+								full_len, udi->fn);
 					} else
 					{	/* We want to reinitialize the source server related fields in "gtmsource_local"
 						 * as well as reinitialize any fields that intersect with "gtmsrc_lcl" as this
@@ -720,7 +728,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 					ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 					/* Assert we did not create shm or sem so no need to remove any */
 					assert(!new_ipc);
-					rts_error(VARLSTCNT(6) ERR_REPLINSTSECNONE, 4,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTSECNONE, 4,
 						LEN_AND_STR(gtmsource_options.secondary_instname), full_len, udi->fn);
 				}
 			}
@@ -746,7 +754,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 				udi->grabbed_access_sem = FALSE;
 				udi->counter_acc_incremented = FALSE;
 				ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-				rts_error(VARLSTCNT(4) ERR_PRIMARYISROOT, 2,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PRIMARYISROOT, 2,
 					LEN_AND_STR((char *)repl_instance.inst_info.this_instname));
 			}
 		} else if (is_src_srvr)
@@ -762,7 +770,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 					udi->grabbed_access_sem = FALSE;
 					udi->counter_acc_incremented = FALSE;
 					ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-					rts_error(VARLSTCNT(4) ERR_PRIMARYNOTROOT, 2,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PRIMARYNOTROOT, 2,
 						LEN_AND_STR((char *)repl_instance.inst_info.this_instname));
 				} else
 				{	/* ACTIVATE was specified. Check if there is only one process attached to the journal
@@ -779,7 +787,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 						udi->grabbed_access_sem = FALSE;
 						udi->counter_acc_incremented = FALSE;
 						ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-						rts_error(VARLSTCNT(4) ERR_ACTIVATEFAIL, 2,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ACTIVATEFAIL, 2,
 							LEN_AND_STR(gtmsource_options.secondary_instname));
 					} else
 						hold_onto_ftok_sem = TRUE;
@@ -801,7 +809,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			udi->grabbed_access_sem = FALSE;
 			udi->counter_acc_incremented = FALSE;
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLPOOLSETUP, 0,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Journal pool has not been initialized"));
 		}
 		/* Initialize the shared memory fields. */
@@ -818,21 +826,21 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		QWASSIGNDW(jnlpool_ctl->write_addr, 0);
 		if (0 < jnlpool.repl_inst_filehdr->num_histinfo)
 		{
-			grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 			status = repl_inst_histinfo_get(jnlpool.repl_inst_filehdr->num_histinfo - 1, &last_histinfo);
 			rel_lock(jnlpool.jnlpool_dummy_reg);
 			assert(0 == status);
 			if (0 != status)
 			{
 				assert(ERR_REPLINSTNOHIST == status);	/* the only error returned by repl_inst_histinfo_get() */
-				grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+				grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 				repl_inst_flush_jnlpool(TRUE, TRUE); /* to reset "crash" field in instance file header to FALSE */
 				rel_lock(jnlpool.jnlpool_dummy_reg);
 				DETACH_AND_REMOVE_SHM_AND_SEM;	/* remove any sem/shm we had created */
 				udi->grabbed_access_sem = FALSE;
 				udi->counter_acc_incremented = FALSE;
 				ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-				rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Error reading last history record in replication instance file"));
 			}
 			instfilehdr_seqno = jnlpool.repl_inst_filehdr->jnl_seqno;
@@ -840,14 +848,14 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			assert(instfilehdr_seqno);
 			if (instfilehdr_seqno < last_histinfo.start_seqno)
 			{	/* The jnl seqno in the instance file header is not greater than the last histinfo's start seqno */
-				grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+				grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 				repl_inst_flush_jnlpool(TRUE, TRUE); /* to reset "crash" field in instance file header to FALSE */
 				rel_lock(jnlpool.jnlpool_dummy_reg);
 				DETACH_AND_REMOVE_SHM_AND_SEM;	/* remove any sem/shm we had created */
 				udi->grabbed_access_sem = FALSE;
 				udi->counter_acc_incremented = FALSE;
 				ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-				rts_error(VARLSTCNT(8) ERR_REPLINSTSEQORD, 6, LEN_AND_LIT("Instance file header"),
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTSEQORD, 6, LEN_AND_LIT("Instance file header"),
 					&instfilehdr_seqno, &last_histinfo.start_seqno, LEN_AND_STR(udi->fn));
 			}
 			jnlpool_ctl->last_histinfo_seqno = last_histinfo.start_seqno;
@@ -909,7 +917,6 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			gtmsourcelocal_ptr->statslog = FALSE;
 			gtmsourcelocal_ptr->shutdown = NO_SHUTDOWN;
 			gtmsourcelocal_ptr->shutdown_time = -1;
-			gtmsourcelocal_ptr->secondary_inet_addr = gtmsource_options.sec_inet_addr;
 			gtmsourcelocal_ptr->secondary_port = gtmsource_options.secondary_port;
 			STRCPY(gtmsourcelocal_ptr->secondary_host, gtmsource_options.secondary_host);
 			STRCPY(gtmsourcelocal_ptr->filter_cmd, gtmsource_options.filter_cmd);
@@ -949,7 +956,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			/* Now make the corresponding changes from gtmsource_local to the gtmsrc_lcl structure and flush to disk.
 			 * This assumes "jnlpool.gtmsource_local" is set appropriately.
 			 */
-			grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 			repl_inst_flush_gtmsrc_lcl();
 			rel_lock(jnlpool.jnlpool_dummy_reg);
 		}
@@ -975,7 +982,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 				ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 				/* Assert we did not create shm or sem so no need to remove any */
 				assert(!new_ipc);
-				rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Error in rel_sem"), save_errno);
 			}
 			udi->grabbed_access_sem = FALSE;
@@ -988,7 +995,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 								 * later when source server connects to receiver */
 	}
 	if (!hold_onto_ftok_sem && !ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, FALSE))
-		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	pool_init = TRUE;
 	ENABLE_FREEZE_ON_ERROR;
 	return;
@@ -1006,8 +1013,8 @@ void jnlpool_detach(void)
  			rel_gtmsource_srv_latch(&jnlpool.gtmsource_local->gtmsource_srv_latch);
  		JNLPOOL_SHMDT(status, save_errno);
  		if (0 > status)
- 			rts_error(VARLSTCNT(5) ERR_REPLWARN, 2, RTS_ERROR_LITERAL("Could not detach from journal pool"),
- 					save_errno);
+ 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLWARN, 2,
+					RTS_ERROR_LITERAL("Could not detach from journal pool"), save_errno);
 		jnlpool.repl_inst_filehdr = NULL;
 		jnlpool.gtmsrc_lcl_array = NULL;
 		jnlpool.gtmsource_local_array = NULL;

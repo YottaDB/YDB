@@ -81,6 +81,7 @@
 #include "gtm_imagetype_init.h"
 #include "gtm_threadgbl_init.h"
 #include "hashtab.h"
+#include "fork_init.h"
 #ifdef UNICODE_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
@@ -483,7 +484,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	CLOSELOG();
 	ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION);
 	first_syslog = TRUE;
-	pid = fork();	/* Timers have not been initialized, no need to do FORK_CLEAN; BYPASSOK */
+	FORK(pid);	/* Timers have not been initialized, no need to do FORK_CLEAN; BYPASSOK */
 	if (0 > pid)
 	{	/* Fork failed */
 		save_errno = errno;
@@ -512,7 +513,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	/* Init signal handling which works slightly different than in other utilities - gtmsecshr has its own handler which
 	 * *calls* generic_signal_handler (which always returns for gtmsecshr) - we then drive our normal exit handling.
 	 */
-	sig_init(gtmsecshr_signal_handler, gtmsecshr_signal_handler, NULL, NULL);
+	sig_init(gtmsecshr_signal_handler, NULL, NULL, NULL);
 	file_des = sysconf(_SC_OPEN_MAX);
 	for (file_des = file_des - 1; file_des >= 3; file_des--)
 	{	/* Close the file only if we have it open. This is to avoid a CLOSEFAIL error in case of

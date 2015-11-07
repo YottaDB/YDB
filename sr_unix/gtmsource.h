@@ -13,15 +13,12 @@
 #define GTMSOURCE_H
 
 /* for in_addr_t typedef on Linux */
-#ifdef __linux__
 #include "gtm_inet.h"
-#else
-#include <netinet/in.h>
 GBLREF gd_addr	*gd_header;
-#endif
 #include "min_max.h"
 #include "mdef.h"
 #include "gt_timer.h"
+#include "gtm_ipv6.h" /* for union gtm_sockaddr_in46 */
 
 /* Needs mdef.h, gdsfhead.h and its dependencies */
 #define JNLPOOL_DUMMY_REG_NAME		"JNLPOOL_REG"
@@ -47,7 +44,9 @@ enum
 enum
 {
 	GTMSOURCE_MODE_PASSIVE,
-	GTMSOURCE_MODE_ACTIVE
+	GTMSOURCE_MODE_ACTIVE,
+	GTMSOURCE_MODE_PASSIVE_REQUESTED,
+	GTMSOURCE_MODE_ACTIVE_REQUESTED
 };
 
 enum
@@ -80,9 +79,6 @@ typedef enum
 						 */
 	GTMSOURCE_NUM_STATES
 } gtmsource_state_t;
-
-#define MAX_GTMSOURCE_POLL_WAIT	     	1000000 /* 1s in micro secs */
-#define GTMSOURCE_POLL_WAIT	        (MAX_GTMSOURCE_POLL_WAIT - 1) /* micro sec, almost 1s */
 
 #define GTMSOURCE_WAIT_FOR_RECEIVER_TO_QUIT     5 /* seconds */
 #define GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN  (1000 - 1) /* ms */
@@ -335,7 +331,9 @@ typedef struct
 							 * FALSE after the message gets sent.
 							 */
 	char			secondary_host[MAX_HOST_NAME_LEN];	/* hostname of the secondary */
-	uint4			secondary_inet_addr;	/* IP address of the secondary */
+	union gtm_sockaddr_in46	secondary_inet_addr;	/* IP address of the secondary */
+	int			secondary_af;		/* address family of the seconary */
+	int			secondary_addrlen;	/* length of the secondary address */
 	uint4			secondary_port;		/* Port at which Receiver is listening */
 	boolean_t		child_server_running;	/* Set to FALSE before starting a source server;
 							 * Set to TRUE by the source server process after its initialization.
@@ -352,6 +350,9 @@ typedef struct
 	int4			shutdown_time;		/* Time allowed for shutdown in seconds */
 	char			filter_cmd[MAX_FILTER_CMD_LEN];	/* command to run to invoke the external filter (if needed) */
 	global_latch_t		gtmsource_srv_latch;
+#if 0
+	int4			padding;		/* Pad structure out to multiple of 8 bytes - un-"#if 0" if needed */
+#endif
 } gtmsource_local_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -461,7 +462,6 @@ typedef struct
 	int4		shutdown_time;
 	int4		buffsize;
 	int4		mode;
-	in_addr_t       sec_inet_addr; /* 32 bits */
 	int4		secondary_port;
 	uint4		src_log_interval;
 	int4		connect_parms[GTMSOURCE_CONN_PARMS_COUNT];
@@ -476,7 +476,7 @@ typedef struct
 int		gtmsource(void);
 boolean_t	gtmsource_is_heartbeat_overdue(time_t *now, repl_heartbeat_msg_ptr_t overdue_heartbeat);
 int		gtmsource_alloc_filter_buff(int bufsiz);
-int		gtmsource_alloc_msgbuff(int maxbuffsize);
+int		gtmsource_alloc_msgbuff(int maxbuffsize, boolean_t discard_oldbuff);
 int		gtmsource_alloc_tcombuff(void);
 void		gtmsource_free_filter_buff(void);
 void		gtmsource_free_msgbuff(void);
@@ -488,7 +488,7 @@ int		gtmsource_ctl_close(void);
 int		gtmsource_ctl_init(void);
 int		gtmsource_jnlpool(void);
 int		gtmsource_end1(boolean_t auto_shutdown);
-int		gtmsource_est_conn(struct sockaddr_in *secondary_addr);
+int		gtmsource_est_conn(void);
 int		gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple);
 int		gtmsource_get_opt(void);
 int		gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_src_servers_running);
@@ -507,7 +507,6 @@ int		gtmsource_stopfilter(void);
 int		gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno);
 void		gtmsource_end(void);
 void		gtmsource_exit(int exit_status);
-void		gtmsource_init_sec_addr(struct sockaddr_in *secondary_addr);
 void		gtmsource_seqno_init(boolean_t this_side_std_null_coll);
 void		gtmsource_stop(boolean_t exit);
 void		gtmsource_sigstop(void);

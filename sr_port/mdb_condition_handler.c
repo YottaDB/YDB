@@ -940,7 +940,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 				 "re-dispatching error frame\n"));
 			MUM_TSTART_FRAME_CHECK;
 			MUM_TSTART;	/* unwind the current C-stack and restart executing from the top of the current M-stack */
-			assert(FALSE);
 		} else if ((0 != dollar_etrap.str.len) || (0 != dollar_ztrap.str.len))
 		{
 			assert(!ztrap_explicit_null);

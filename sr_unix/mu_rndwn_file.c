@@ -105,6 +105,8 @@ error_def(ERR_DBNAMEMISMATCH);
 error_def(ERR_DBNOTGDS);
 error_def(ERR_DBRDONLY);
 error_def(ERR_DBSHMNAMEDIFF);
+error_def(ERR_JNLORDBFLU);
+error_def(ERR_MURNDWNOVRD);
 error_def(ERR_MUUSERECOV);
 error_def(ERR_MUUSERLBK);
 error_def(ERR_SEMREMOVED);
@@ -194,11 +196,11 @@ error_def(ERR_VERMISMATCH);
 	if (REPL_ENABLED(tsd) && tsd->jnl_before_image)							\
 	{												\
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_MUUSERLBK, 2, DB_LEN_STR(REG),		\
-			ERR_TEXT, 2, LEN_AND_STR("Run MUPIP JOURNAL ROLLBACK"));			\
+			ERR_TEXT, 2, LEN_AND_LIT("Run MUPIP JOURNAL ROLLBACK"));			\
 	} else												\
 	{												\
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_MUUSERECOV, 2, DB_LEN_STR(REG),	\
-			ERR_TEXT, 2, LEN_AND_STR("Run MUPIP JOURNAL RECOVER"));				\
+			ERR_TEXT, 2, LEN_AND_LIT("Run MUPIP JOURNAL RECOVER"));				\
 	}												\
 }
 
@@ -213,6 +215,8 @@ error_def(ERR_VERMISMATCH);
  * Parameters:
  *	standalone = TRUE  => create semaphore to get standalone access
  *	standalone = FALSE => rundown shared memory
+ *	Note:	Currently there are no callers with standalone == FALSE other
+ *		than MUPIP RUNDOWN.
  * Return Value:
  *	TRUE for success
  *	FALSE for failure
@@ -242,7 +246,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	gd_segment		*seg;
 	int			gtmcrypt_errno;
 #	endif
-	boolean_t		prevent_rundown;
+	boolean_t		override_present, wcs_flu_success, prevent_mu_rndwn;
 	unsigned char		*fn;
 	mstr 			jnlfile;
 	int			jnl_fd;
@@ -412,39 +416,49 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	}
 	udi->grabbed_access_sem = TRUE;
 	udi->counter_acc_incremented = no_shm_exists;
-	/* Always proceed with rundown if either journaling is off, OVERRIDE qualifier is present, or we got here
-	 * as a part of MUPIP JOURNAL -RECOVER or MUPIP JOURNAL -ROLLBACK.
+	override_present = (cli_present("OVERRIDE") == CLI_PRESENT);
+	/* Proceed with rundown if either journaling is off or we got here as a result of MUPIP JOURNAL -RECOVER or
+	 * MUPIP JOURNAL -ROLLBACK, unless the OVERRIDE qualifier is present (see the following code).
 	 */
-	prevent_rundown = JNL_ENABLED(tsd) && (CLI_PRESENT != cli_present("OVERRIDE")) && !standalone;
+	prevent_mu_rndwn = JNL_ENABLED(tsd) && !standalone;
 	/* Now rundown database if shared memory segment exists. We try this for both values of 'standalone'. */
 	if (no_shm_exists)
 	{
-		if (prevent_rundown)
-		{	/* Issue error if the crash bit in the journal file is set thereby preventing the user from doing a less
-			 * appropriate operation than RECOVER or ROLLBACK.
-			 */
-			jnlfile.addr = (char *)tsd->jnl_file_name;
-			jnlfile.len = tsd->jnl_file_len;
-			if (FILE_PRESENT & gtm_file_stat(&jnlfile, NULL, NULL, TRUE, &status2))
-			{	/* The journal file exists. */
-				assert('\0' == jnlfile.addr[jnlfile.len]);
-				jnlfile.addr[jnlfile.len] = '\0';	/* In case the above assert fails. */
-				OPENFILE(jnlfile.addr, O_RDONLY, jnl_fd);
-				if (0 <= jnl_fd)
-				{
-					DO_FILE_READ(jnl_fd, 0, &header, SIZEOF(header), status1, status2);
-					if (SS_NORMAL == status1)
-					{	/* FALSE in the call below is so that NO gtm_putmsg are printed even on errors. */
-						CHECK_JNL_FILE_IS_USABLE(&header, status1, FALSE, 0, NULL);
-						if ((SS_NORMAL == status1)
-						    && (ARRAYSIZE(header.data_file_name) > header.data_file_name_length))
-						{
-							assert('\0' == header.data_file_name[header.data_file_name_length]);
-							header.data_file_name[header.data_file_name_length] = '\0';
-							if (is_file_identical((char *)header.data_file_name,
-							    (char *)gv_cur_region->dyn.addr->fname) && header.crash)
+		if (prevent_mu_rndwn)
+		{
+			if (override_present)
+			{	/* If the rundown should normally be prevented, but the operator specified an OVERRIDE qualifier,
+				 * record the fact of the usage in the syslog and continue.
+				 */
+				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_MURNDWNOVRD, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
+					LEN_AND_LIT("Overriding enabled journaling state"));
+			} else
+			{	/* Issue error if the crash bit in the journal file is set thereby preventing the user from doing a
+				 * less appropriate operation than RECOVER or ROLLBACK.
+				 */
+				jnlfile.addr = (char *)tsd->jnl_file_name;
+				jnlfile.len = tsd->jnl_file_len;
+				if (FILE_PRESENT & gtm_file_stat(&jnlfile, NULL, NULL, TRUE, &status2))
+				{	/* The journal file exists. */
+					assert('\0' == jnlfile.addr[jnlfile.len]);
+					jnlfile.addr[jnlfile.len] = '\0';	/* In case the above assert fails. */
+					OPENFILE(jnlfile.addr, O_RDONLY, jnl_fd);
+					if (0 <= jnl_fd)
+					{
+						DO_FILE_READ(jnl_fd, 0, &header, SIZEOF(header), status1, status2);
+						if (SS_NORMAL == status1)
+						{	/* FALSE in the call below is to skip gtm_putmsgs even on errors. */
+							CHECK_JNL_FILE_IS_USABLE(&header, status1, FALSE, 0, NULL);
+							if ((SS_NORMAL == status1)
+							    && (ARRAYSIZE(header.data_file_name) > header.data_file_name_length))
 							{
-								PRINT_PREVENT_RUNDOWN_MESSAGE(reg);
+								assert('\0' == header.data_file_name[header.data_file_name_length]);
+								header.data_file_name[header.data_file_name_length] = '\0';
+								if (is_file_identical((char *)header.data_file_name,
+								    (char *)gv_cur_region->dyn.addr->fname) && header.crash)
+								{
+									PRINT_PREVENT_RUNDOWN_MESSAGE(reg);
+								}
 							}
 						}
 					}
@@ -585,9 +599,18 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	tp_change_reg();
 	SEG_SHMATTACH(0, reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 	cs_addrs->nl = (node_local_ptr_t)cs_addrs->db_addrs[0];
-	if (prevent_rundown && cs_addrs->nl->jnl_file.u.inode)
-	{	/* Journal file state being still open in shared memory implies a crashed state, so error out. */
-		PRINT_PREVENT_RUNDOWN_MESSAGE(reg);
+	if (prevent_mu_rndwn && cs_addrs->nl->jnl_file.u.inode)
+	{
+		if (override_present)
+		{	/* If the rundown should normally be prevented, but the operator specified an OVERRIDE qualifier, record
+			 * the fact of the usage in the syslog and continue.
+			 */
+			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_MURNDWNOVRD, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
+				LEN_AND_LIT("Overriding OPEN journal file state in shared memory"));
+		} else
+		{	/* Journal file state being still open in shared memory implies a crashed state, so error out. */
+			PRINT_PREVENT_RUNDOWN_MESSAGE(reg);
+		}
 	}
 	/* The following checks for GDS_LABEL_GENERIC, gtm_release_name, and cs_addrs->nl->glob_sec_init ensure that the
 	 * shared memory under consideration is valid.  First, since cs_addrs->nl->label is in the same place for every
@@ -660,12 +683,10 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				if (FALSE == is_gdid_stat_identical(&cs_addrs->nl->unique_id.uid, &stat_buf))
 				{
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(10) MAKE_MSG_INFO(ERR_DBIDMISMATCH), 4,
-							cs_addrs->nl->fname,
-					      DB_LEN_STR(reg), udi->shmid, ERR_TEXT, 2,
+					      cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid, ERR_TEXT, 2,
 					      LEN_AND_LIT("[MUPIP] Database filename and fileid in shared memory are not in sync"));
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(10) MAKE_MSG_INFO(ERR_DBIDMISMATCH), 4,
-							cs_addrs->nl->fname,
-					      DB_LEN_STR(reg), udi->shmid, ERR_TEXT, 2,
+					      cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid, ERR_TEXT, 2,
 					      LEN_AND_LIT("[MUPIP] Database filename and fileid in shared memory are not in sync"));
 					db_shm_in_sync = FALSE;
 					/* In this case, the shared memory points to a file that exists in the filesystem but
@@ -691,6 +712,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				db_shm_in_sync = FALSE;
 				remove_shmid = FALSE;
 			}
+			wcs_flu_success = TRUE;
 			/* If db & shm are not in sync at this point, skip the part of flushing shm to db file on disk.
 			 * We still need to reset the fields (shmid, semid etc.) in db file header.
 			 * About deleting the shmid, it depends on the type of out-of-sync between db & shm. This is handled
@@ -844,8 +866,32 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 						 * So, a new process will switch the journal file and cut the journal file link,
 						 * though it might be a good journal without an EOF
 						 */
-						wcs_flu(WCSFLU_NONE);
-						csd = cs_addrs->hdr;
+						wcs_flu_success = wcs_flu(WCSFLU_NONE);
+						if (!wcs_flu_success)
+						{
+							if (override_present && !standalone)
+							{	/* Case of MUPIP RUNDOWN with OVERRIDE flag; continue. */
+								send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_MURNDWNOVRD, 2,
+									DB_LEN_STR(reg), ERR_TEXT, 2, LEN_AND_LIT(
+									"Overriding error during database block flush"));
+								csd = cs_addrs->hdr;
+							} else
+							{	/* In case of MUPIP RUNDOWN append a suggestion to use OVERRIDE flag
+								 * to bypass the error.
+								 */
+								if (standalone)
+									rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4)
+										ERR_JNLORDBFLU, 2, DB_LEN_STR(reg));
+								else
+									rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(8)
+										ERR_JNLORDBFLU, 2, DB_LEN_STR(reg),
+										ERR_TEXT, 2, LEN_AND_LIT(
+										"To force the operation to proceed, use the "
+										"OVERRIDE qualifier"));
+								assert(FALSE);	/* The above rts_error should not return. */
+								return FALSE;
+							}
+						}
 					}
 					jpc = cs_addrs->jnl;
 					if (NULL != jpc)
@@ -875,25 +921,33 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				csd_size = tsd_size;	/* SIZEOF(sgmnt_data) */
 			}
 			reg->open = FALSE;
-			/* Note: At this point we have write permission */
-			memset(csd->machine_name, 0, MAX_MCNAMELEN);
-			if (!mupip_jnl_recover)
-				csd->freeze = 0;
-			RESET_SHMID_CTIME(csd);
-			if (!standalone)
-			{	/* Invalidate semid in the file header as part of rundown. The actual semaphore still
-				 * exists and we'll remove that just before releasing the ftok semaphore. However, if the
-				 * MUPIP RUNDOWN command gets killed AFTER we write the file header but BEFORE we remove
-				 * the semaphore from the system, we can have an orphaned semaphore. But, this is okay
-				 * since an arugment-less MUPIP RUNDOWN, if invoked, will remove those orphaned semaphores
-				 */
-				RESET_SEMID_CTIME(csd);
-			}
-			DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, csd, csd_size, status);
-			if (0 != status)
-			{
-				RNDWN_ERR("!AD -> Error writing header to disk.", reg);
-				CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
+			/* If wcs_flu returned FALSE, it better be because of MUPIP RUNDOWN run with OVERRIDE qualifier. */
+			assert(wcs_flu_success || (override_present && !standalone));
+			/* In case MUPIP RUNDOWN is invoked with OVERRIDE qualifier and we ignored a FALSE return from wcs_flu, do
+			 * not update the database header, thus forcing the operator to either use a ROLLBACK/RECOVER or supply the
+			 * OVERRIDE qualifier with RUNDOWN before GT.M could again be used to access the database.
+			 */
+			if (wcs_flu_success)
+			{	/* Note: At this point we have write permission */
+				memset(csd->machine_name, 0, MAX_MCNAMELEN);
+				if (!mupip_jnl_recover)
+					csd->freeze = 0;
+				RESET_SHMID_CTIME(csd);
+				if (!standalone)
+				{	/* Invalidate semid in the file header as part of rundown. The actual semaphore still
+					 * exists and we'll remove that just before releasing the ftok semaphore. However, if the
+					 * MUPIP RUNDOWN command gets killed AFTER we write the file header but BEFORE we remove
+					 * the semaphore from the system, we can have an orphaned semaphore. But, this is okay
+					 * since an arugment-less MUPIP RUNDOWN, if invoked, will remove those orphaned semaphores
+					 */
+					RESET_SEMID_CTIME(csd);
+				}
+				DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, csd, csd_size, status);
+				if (0 != status)
+				{
+					RNDWN_ERR("!AD -> Error writing header to disk.", reg);
+					CLNUP_AND_RETURN(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
+				}
 			}
 			if (NULL != tsd)
 			{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,9 +87,9 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 		DOWRITERC(rm_ptr->fildes, outstart, outlen, status);
 		if (0 != status)
 		{
-			DOLLAR_DEVICE_WRITE(rm_ptr,status);
+			DOLLAR_DEVICE_WRITE(iod, status);
 			iod->dollar.za = 9;
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 		rm_ptr->out_bytes += outlen;
 	}
@@ -146,9 +146,9 @@ void iorm_write_utf(mstr *v)
 				DOWRITERC(rm_ptr->fildes, outstart, outbytes, status);
 				if (0 != status)
 				{
-					DOLLAR_DEVICE_WRITE(rm_ptr,status);
+					DOLLAR_DEVICE_WRITE(iod, status);
 					iod->dollar.za = 9;
-					rts_error(VARLSTCNT(1) status);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
 				outptr = outstart;
 				rm_ptr->out_bytes = outbytes = 0;
@@ -206,9 +206,9 @@ void iorm_write_utf(mstr *v)
 				}
 				if (0 != status)
 				{
-					DOLLAR_DEVICE_WRITE(rm_ptr,status);
+					DOLLAR_DEVICE_WRITE(iod, status);
 					iod->dollar.za = 9;
-					rts_error(VARLSTCNT(1) status);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
 			}
 			iod->dollar.x += usedwidth;
@@ -246,9 +246,9 @@ void iorm_write_utf(mstr *v)
 						DOWRITERC(rm_ptr->fildes, temppadarray, padsize, status);
 						if (0 != status)
 						{
-							DOLLAR_DEVICE_WRITE(rm_ptr,status);
+							DOLLAR_DEVICE_WRITE(iod, status);
 							iod->dollar.za = 9;
-							rts_error(VARLSTCNT(1) status);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 						}
 					}
 					assert(rm_ptr->out_bytes == rm_ptr->recordsize);
@@ -320,14 +320,14 @@ void iorm_write(mstr *v)
 #else
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
 #endif
-	memcpy(rm_ptr->dollar_device, "0", SIZEOF("0"));
+	memcpy(iod->dollar.device, "0", SIZEOF("0"));
 
 	if (rm_ptr->noread)
-		rts_error(VARLSTCNT(1) ERR_DEVICEREADONLY);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEREADONLY);
 	if (!iod->dollar.zeof && !rm_ptr->fifo && !rm_ptr->pipe)
 	{
 	 	iod->dollar.za = 9;
-		rts_error(VARLSTCNT(1) ERR_NOTTOEOFONPUT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTTOEOFONPUT);
 	}
 
 	/* if it's a fifo and not system output/error, last operation was not a write and O_NONBLOCK is not set
@@ -337,12 +337,12 @@ void iorm_write(mstr *v)
 		flags = 0;
 		FCNTL2(rm_ptr->fildes, F_GETFL, flags);
 		if (0 > flags)
-			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
 		if (!(flags & O_NONBLOCK))
 		{
 			FCNTL3(rm_ptr->fildes, F_SETFL, (flags | O_NONBLOCK), fcntl_res);
 			if (0 > fcntl_res)
-				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
 		}
 	}
 
@@ -376,9 +376,9 @@ void iorm_write(mstr *v)
 		}
 		if (0 != status)
 		{
-			DOLLAR_DEVICE_WRITE(rm_ptr,status);
+			DOLLAR_DEVICE_WRITE(iod, status);
 			iod->dollar.za = 9;
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 		iod->dollar.x += len;
 		if ((inlen -= len) <= 0)
@@ -394,9 +394,9 @@ void iorm_write(mstr *v)
 				DOWRITERC(rm_ptr->fildes, RMEOL, STRLEN(RMEOL), status);
 				if (0 != status)
 				{
-					DOLLAR_DEVICE_WRITE(rm_ptr,status);
+					DOLLAR_DEVICE_WRITE(iod, status);
 					iod->dollar.za = 9;
-					rts_error(VARLSTCNT(1) status);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 				}
 			}
 

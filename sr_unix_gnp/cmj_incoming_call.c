@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,16 +20,17 @@
 #include <errno.h>
 #include "gtmio.h"
 #include "relqop.h"
+#include "gtm_string.h" /* for memcpy */
 
 void cmj_incoming_call(struct NTD *tsk)
 {
 	int rval, rc;
 	struct CLB *lnk;
-	struct sockaddr_in in;
-	GTM_SOCKLEN_TYPE sz = SIZEOF(in);
+	struct sockaddr_storage sas;
+	GTM_SOCKLEN_TYPE sz = SIZEOF(struct sockaddr);
 	cmi_status_t status;
 
-	while ((-1 == (rval = ACCEPT(tsk->listen_fd, (struct sockaddr *)&in, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
+	while ((-1 == (rval = ACCEPT(tsk->listen_fd, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
 		;
 	while (rval >= 0)
 	{
@@ -59,14 +60,16 @@ void cmj_incoming_call(struct NTD *tsk)
 			tsk->max_fd = rval;
 		lnk->mun = rval;
 		lnk->sta = CM_CLB_IDLE;
-		lnk->peer = in;
+		memcpy(&lnk->peer_sas, &sas, sz);
+		lnk->peer_ai.ai_addr = (struct sockaddr *)&lnk->peer_sas;
+		lnk->peer_ai.ai_addrlen = sz;
 		insqh(&lnk->cqe, &tsk->cqh);
 		lnk->ntd = tsk;
 		FD_SET(rval, &tsk->es);
 		/* setup for callback processing */
 		lnk->deferred_event = TRUE;
 		lnk->deferred_reason = CMI_REASON_CONNECT;
-		while ((-1 == (rval = ACCEPT(tsk->listen_fd, (struct sockaddr *)&in, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
-			;
+		while ((-1 == (rval = ACCEPT(tsk->listen_fd, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sz)))
+			 && EINTR == errno);
 	}
 }

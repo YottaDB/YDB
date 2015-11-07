@@ -110,11 +110,11 @@ LITREF	char 			*trigger_subs[];
 #define	BUILD_COMMAND_BITMAP(BITMAP, COMMANDS)									\
 {														\
 	char		lcl_cmds[MAX_COMMANDS_LEN + 1];								\
-	char		*lcl_ptr;										\
+	char		*lcl_ptr, *strtok_ptr;									\
 														\
 	memcpy(lcl_cmds, COMMANDS, STRLEN(COMMANDS) + 1);							\
 	BITMAP = 0;												\
-	lcl_ptr = strtok(lcl_cmds, ",");									\
+	lcl_ptr = strtok_r(lcl_cmds, ",", &strtok_ptr);								\
 	do													\
 	{													\
 		switch (*lcl_ptr)										\
@@ -154,7 +154,7 @@ LITREF	char 			*trigger_subs[];
 				GTMASSERT;	/* Parsing should have found invalid command */			\
 				break;										\
 		}												\
-	} while (lcl_ptr = strtok(NULL, ","));									\
+	} while (lcl_ptr = strtok_r(NULL, ",", &strtok_ptr));							\
 }
 
 #define	COMMAND_BITMAP_TO_STR(COMMANDS, BITMAP, LEN)								\
@@ -180,11 +180,11 @@ LITREF	char 			*trigger_subs[];
 #define	BUILD_OPTION_BITMAP(BITMAP, OPTIONS)									\
 {														\
 	char		lcl_options[MAX_OPTIONS_LEN + 1];							\
-	char		*lcl_ptr;										\
+	char		*lcl_ptr, *strtok_ptr;									\
 														\
 	memcpy(lcl_options, OPTIONS, STRLEN(OPTIONS) + 1);							\
 	BITMAP = 0;												\
-	lcl_ptr = strtok(lcl_options, ",");									\
+	lcl_ptr = strtok_r(lcl_options, ",", &strtok_ptr);							\
 	if (NULL != lcl_ptr)											\
 		do												\
 		{												\
@@ -215,7 +215,7 @@ LITREF	char 			*trigger_subs[];
 					GTMASSERT;	/* Parsing should have found invalid command */		\
 					break;									\
 			}											\
-		} while (lcl_ptr = strtok(NULL, ","));								\
+		} while (lcl_ptr = strtok_r(NULL, ",", &strtok_ptr));						\
 }
 
 #define	OPTION_BITMAP_TO_STR(OPTIONS, BITMAP, LEN)								\

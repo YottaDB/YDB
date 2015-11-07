@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,11 +41,17 @@
 #include "tp.h"
 #include "tp_restart.h"
 #ifdef UNIX
-#include "deferred_signal_handler.h"
+# include "deferred_signal_handler.h"
 #endif
 #ifdef GTM_TRIGGER
-#include "gv_trigger.h"
-#include "gtm_trigger.h"
+# include "gv_trigger.h"
+# include "gtm_trigger.h"
+# include "gt_timer.h"
+# include "wbox_test_init.h"
+#endif
+#ifdef DEBUG
+# include "gtmio.h"
+# include "gtm_stdio.h"
 #endif
 
 GBLREF	stack_frame	*frame_pointer;
@@ -56,8 +62,34 @@ GBLREF	unsigned char	*tp_sp, *tpstackbase, *tpstacktop;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
 GBLREF	uint4		dollar_tlevel;
 GBLREF	symval		*curr_symval;
+GBLREF	uint4		process_id;
+GBLREF	sgmnt_addrs	*csa;
 #ifdef GTM_TRIGGER
 GBLREF	int		tprestart_state;	/* When triggers restart, multiple states possible. See tp_restart.h */
+#endif
+
+/* Define whitebox test case as a macro only for a debug build */
+#ifdef DEBUG
+#  define TPUNWND_WBOX_TEST													 \
+{																 \
+	if (WBTEST_ENABLED(WBTEST_TRIGR_TPRESTART_MSTOP))									 \
+	{	/* For this white box test, we're going to send ourselves a SIGTERM termination signal at a specific point 	 \
+		 * in the processing to make sure it succeeds without exploding during rundown. To test the condition GTM-7811	 \
+		 * fixes, where TPUNWND_WBOX_TEST is seen, move the reset for dollar_tlevel from before the ENABLE_INTERRUTPS	 \
+		 * macro to after the TPUNWND_WBOX_TEST, rebuild and re-run test to see it explode.				 \
+		 */														 \
+		kill(process_id, SIGTERM);											 \
+		hiber_start(20 * 1000);			/* Wait up to 20 secs - don't use wait_any as the heartbeat timer	 \
+							 * will kill this wait in 0-7 seconds or so.				 \
+							 */									 \
+		/* We sent, we waited, wait expired - weird - funky condition is for identification purposes (to identify the	 \
+		 * actual assert). We should be dead or dying, not trying to resume.						 \
+		 */														 \
+		assertpro(WBTEST_TRIGR_TPRESTART_MSTOP == 0);									 \
+	}															 \
+}
+#else
+#  define TPUNWND_WBOX_TEST
 #endif
 
 error_def(ERR_STACKUNDERFLO);
@@ -78,18 +110,20 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 
 	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
 	DEFER_INTERRUPTS(INTRPT_IN_TP_UNWIND);
-
-	DBGRFCT((stderr, "\ntp_unwind: Beginning TP unwind process\n"));
-	restore_lv = (invocation_type == RESTART_INVOCATION);
+	/* Unwind the requested TP levels */
+#	if defined(DEBUG_REFCNT) || defined(DEBUG_ERRHND)
+	DBGFPF((stderr, "\ntp_unwind: Beginning TP unwind process\n"));
+#	endif
+	restore_lv = (RESTART_INVOCATION == invocation_type);
 	lvscan = &first_lvscan;
 	lvscan->next = NULL;
 	lvscan->elemcnt = 0;
-	assert(tp_sp <= tpstackbase  &&  tp_sp > tpstacktop);
-	assert(tp_pointer <= (tp_frame *)tpstackbase  &&  tp_pointer > (tp_frame *)tpstacktop);
+	assert((tp_sp <= tpstackbase) && (tp_sp > tpstacktop));
+	assert((tp_pointer <= (tp_frame *)tpstackbase) && (tp_pointer > (tp_frame *)tpstacktop));
 	for (tl = dollar_tlevel;  tl > newlevel;  --tl)
 	{
 		DBGRFCT((stderr, "\ntp_unwind: Unwinding level %d -- tp_pointer: 0x"lvaddr"\n", tl, tp_pointer));
-		assert(NULL != tp_pointer);
+		assertpro(NULL != tp_pointer);
 		for (restore_ent = tp_pointer->vars;  NULL != restore_ent;  restore_ent = tp_pointer->vars)
 		{
 			/*********************************************************************************/
@@ -115,9 +149,10 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 #				ifdef GTM_TRIGGER
 				if (0 != rc)
 				{
+					dollar_tlevel = tl;			/* Record fact if we unwound some tp_frames */
 					ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND); /* drive any MUPIP STOP/signals deferred
 										 * while in this function */
-					dollar_tlevel = tl;		/* Record fact if we unwound some tp_frames */
+					TPUNWND_WBOX_TEST;			/* Debug-only wbox-test to simulate SIGTERM */
 					INVOKE_RESTART;
 				}
 #				endif
@@ -165,23 +200,25 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 			tp_pointer->vars = restore_ent->next;
 			free(restore_ent);
 		}
-		if (tp_pointer->fp == frame_pointer && mv_chain->mv_st_type == MVST_TPHOLD && msp == (unsigned char *)mv_chain)
+		if ((tp_pointer->fp == frame_pointer) && (MVST_TPHOLD == mv_chain->mv_st_type)
+		    && (msp == (unsigned char *)mv_chain))
 			POP_MV_STENT();
 		if (NULL == tp_pointer->old_tp_frame)
 			tp_sp = tpstackbase;
 		else
 			tp_sp = (unsigned char *)tp_pointer->old_tp_frame;
 		if (tp_sp > tpstackbase)
-			rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
 		if (tp_pointer->tp_save_all_flg)
 			--tp_pointer->sym->tp_save_all;
 		if ((NULL != (tp_pointer = tp_pointer->old_tp_frame))	/* Note assignment */
-			&& ((tp_pointer < (tp_frame *)tp_sp) || (tp_pointer > (tp_frame *)tpstackbase)
+		    && ((tp_pointer < (tp_frame *)tp_sp) || (tp_pointer > (tp_frame *)tpstackbase)
 			|| (tp_pointer < (tp_frame *)tpstacktop)))
-				rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
 	}
 	if ((0 != newlevel) && restore_lv)
 	{	/* Restore current context (without releasing) */
+		assertpro(NULL != tp_pointer);
 		DBGRFCT((stderr, "\n\n** tp_unwind: Newlevel (%d) != 0 loop processing\n", newlevel));
 		for (restore_ent = tp_pointer->vars;  NULL != restore_ent;  restore_ent = restore_ent->next)
 		{
@@ -198,9 +235,10 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 #			ifdef GTM_TRIGGER
 			if (0 != rc)
 			{
+				dollar_tlevel = tl;			/* Record fact if we unwound some levels */
 				ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND);	/* drive any MUPIP STOP/signals deferred while
 									 * in this function */
-				dollar_tlevel = tl;		/* Record fact if we unwound some levels */
+				TPUNWND_WBOX_TEST;			/* Debug-only wbox-test to simulate SIGTERM */
 				INVOKE_RESTART;
 			}
 #			endif
@@ -242,7 +280,7 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 		}
 	}
 	assert(0 == lvscan->elemcnt);	/* verify no elements queued that were not scanned */
-	rollback_locks = (invocation_type != COMMIT_INVOCATION);
+	rollback_locks = (COMMIT_INVOCATION != invocation_type);
 	for (prior = &mlk_pvt_root, mlkp = *prior;  NULL != mlkp;  mlkp = *prior)
 	{
 		if (mlkp->granted)
@@ -265,11 +303,11 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 					mlkp->zalloc = oldlock->zalloc;
 				}
 			}
-			if (NULL != oldlock && oldlock->tplevel == newlevel)
+			if ((NULL != oldlock) && (oldlock->tplevel == newlevel))
 			{	/* Remove lock reference from level being unwound to,
 				 * now that any {level,zalloc} state information has been restored.
 				 */
-				assert(NULL == oldlock->next || oldlock->next->tplevel < newlevel);
+				assert((NULL == oldlock->next) || (oldlock->next->tplevel < newlevel));
 				mlkp->tp = oldlock->next;	/* update root reference pointer */
 				free(oldlock);
 			} else
@@ -315,7 +353,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvsc
 	 */
 	if (curr_symval != tp_pointer->sym)
 	{	/* Unwind as many stackframes as are necessary up to the max */
-		while(curr_symval != tp_pointer->sym && frame_pointer < tp_pointer->fp)
+		while((curr_symval != tp_pointer->sym) && (frame_pointer < tp_pointer->fp))
 		{
 #			ifdef GTM_TRIGGER
 			if (SFT_TRIGR & frame_pointer->type)
@@ -335,15 +373,14 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvsc
 		if (curr_symval != tp_pointer->sym)
 		{	/* Unwind as many mv_stents as are necessary up to the max */
 			mvc = mv_chain;
-			while(curr_symval != tp_pointer->sym && mvc < tp_pointer->mvc)
+			while((curr_symval != tp_pointer->sym) && (mvc < tp_pointer->mvc))
 			{
 				unw_mv_ent(mvc);
 				mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
 			}
 			mv_chain = mvc;
 			/* Final check */
-			if (curr_symval != tp_pointer->sym)
-				GTMASSERT;
+			assertpro(curr_symval == tp_pointer->sym);
 		}
 	}
 	var_cloned = curr_lv->tp_var->var_cloned;
@@ -361,7 +398,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvsc
 			 * it is no longer used) and replace with desired previous lv_val whose use count
 			 * was incremented when it was saved.
 			 */
-			if (curr_lv != (inuse_lv = (lv_val *)tabent->value))
+			if (curr_lv != (inuse_lv = (lv_val *)tabent->value))	/* Note assignment */
 			{
 				if (inuse_lv)
 					DECR_BASE_REF_RQ(tabent, inuse_lv, FALSE);
@@ -414,7 +451,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvsc
 			assert(LVT_PARENT(lvt_child) == ((lvTreeNode *)curr_lv->tp_var->save_value));
 			LV_CHILD(save_lv) = NULL;	/* now that curr_lv->tp_var->var_cloned has been reset */
 			LVT_PARENT(lvt_child) = (lvTreeNode *)curr_lv;
-			if (curr_lv->has_aliascont && NULL != lvscan_anchor)
+			if (curr_lv->has_aliascont && (NULL != lvscan_anchor))
 			{	/* Some ref counts need to be restored for arrays this tree points to -- but only if the
 				 * array contains pointers (alias containers).
 				 */
@@ -434,7 +471,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvsc
 					*lvscan_anchor = newlvscan;
 					lvscan = newlvscan;
 				}
-				assert(ARY_SCNCNTNR_MAX >= elemindx && 0 <= elemindx);
+				assert((ARY_SCNCNTNR_MAX >= elemindx) && (0 <= elemindx));
 				lvscan->ary_scncntnr[elemindx] = curr_lv;
 			}
 		}

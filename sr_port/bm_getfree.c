@@ -209,11 +209,14 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 			bit_clear(bml / BLKS_PER_LMAP, MM_ADDR(cs_data)); /* repair master map error */
 		}
 	}
-	/* If not in the final retry, it is possible that free_bit is >= map_size (e.g. if bitmap block gets recycled). */
-	if (map_size <= (uint4)free_bit && CDB_STAGNATE <= t_tries)
-	{	/* bad free bit */
+	/* If not in the final retry, it is possible that free_bit is >= map_size, e.g., if the buffer holding the bitmap block
+	 * gets recycled with a non-bitmap block in which case the bit that bm_find_blk returns could be greater than map_size.
+	 * But, this should never happen in final retry.
+	 */
+	if ((map_size <= (uint4)free_bit) && (CDB_STAGNATE <= t_tries))
+	{	/* Bad free bit. */
 		assert((NO_FREE_SPACE == free_bit) && (lcnt > local_maps));	/* All maps full, should have extended */
-		GTMASSERT;
+		assertpro(FALSE);
 	}
 	if (0 != depth)
 	{

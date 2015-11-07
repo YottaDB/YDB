@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "gtm_netdb.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
+#include "gtm_ipv6.h"
 
 #include "cmidef.h"
 #include "eintr_wrappers.h"
@@ -39,16 +40,17 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 	char *envvar;
 	struct protoent *p;
 	unsigned short myport;
-	struct sockaddr_in in;
 	sigset_t oset;
 	int on = 1;
 	int rval, rc, save_errno;
+	struct addrinfo	*ai_ptr, *local_ai_ptr;
+	boolean_t	af;
 
 	status = cmj_netinit();
 	if (CMI_ERROR(status))
 		return status;
 
-	status = cmj_getsockaddr(tnd, &in);
+	status = cmj_getsockaddr(NULL, tnd, &local_ai_ptr);
 	if (CMI_ERROR(status))
 		return status;
 	ntd_root->pool_size = pool_size;
@@ -61,9 +63,13 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 		return CMI_NETFAIL;
 
 	/* create the listening socket */
-	ntd_root->listen_fd = socket(AF_INET, SOCK_STREAM, p->p_proto);
-	if (FD_INVALID == ntd_root->listen_fd)
+	if ((GTM_IPV6_SUPPORTED && !ipv4_only)
+			&& (FD_INVALID != (ntd_root->listen_fd = socket(AF_INET6, SOCK_STREAM, p->p_proto))))
+		af = AF_INET6;
+	else if (FD_INVALID == (ntd_root->listen_fd = socket(AF_INET, SOCK_STREAM, p->p_proto)))
 		return errno;
+	else
+		af = AF_INET;
 
 	/* make sure we can re-run quickly w/o reuse problems */
 	status = setsockopt(ntd_root->listen_fd, SOL_SOCKET, SO_REUSEADDR,
@@ -75,7 +81,19 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 		return save_errno;
 	}
 
-	status = bind(ntd_root->listen_fd, (struct sockaddr*)&in, SIZEOF(in));
+	for(ai_ptr = local_ai_ptr; NULL != ai_ptr; ai_ptr = ai_ptr->ai_next)
+		if (af == ai_ptr->ai_family)
+			break;
+
+	if (NULL == ai_ptr)
+	{
+		CLOSEFILE_RESET(ntd_root->listen_fd, rc);
+		return CMI_NETFAIL;
+	}
+
+	status = bind(ntd_root->listen_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
+	freeaddrinfo(ai_ptr);
+
 	if (-1 == status)
 	{
 		save_errno = errno;

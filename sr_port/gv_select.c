@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,7 +111,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 		}
 		if (0 >= len)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_SELECTSYNTAX, 2, LEN_AND_STR(opname));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SELECTSYNTAX, 2, LEN_AND_STR(opname));
 			mupip_exit(ERR_MUNOACTION);
 		}
 		c = gmap_beg.addr;
@@ -123,7 +123,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 				len--;
 			} else
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_SELECTSYNTAX, 2, LEN_AND_STR(opname));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SELECTSYNTAX, 2, LEN_AND_STR(opname));
 				mupip_exit(ERR_MUNOACTION);
 			}
 			num_quote--;
@@ -153,7 +153,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 			*c = '~';
 		} else if (':' != *c)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_SELECTSYNTAX, 2, LEN_AND_STR(opname));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SELECTSYNTAX, 2, LEN_AND_STR(opname));
 			mupip_exit(ERR_MUNOACTION);
 		} else
 		{
@@ -170,7 +170,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 			MSTR_CMP(gmap_beg, gmap_end, rslt);
 			if (((c - gmap_end.addr) != gmap_end.len) || (0 < rslt))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_SELECTSYNTAX, 2, LEN_AND_STR(opname));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SELECTSYNTAX, 2, LEN_AND_STR(opname));
 				mupip_exit(ERR_MUNOACTION);
 			}
 		}
@@ -253,7 +253,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
                                 {
                                         if (cs_addrs->hdr->freeze)
                                         {
-                                                gtm_putmsg(VARLSTCNT(4) ERR_FREEZE, 2, gv_cur_region->rname_len,
+                                                gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FREEZE, 2, gv_cur_region->rname_len,
 							gv_cur_region->rname);
                                                 mupip_exit(ERR_MUNOFINISH);
                                         }
@@ -261,7 +261,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 					if (gv_cur_region->read_only)
 					{
 						util_out_print("Cannot freeze the database",TRUE);
-						gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2,
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRDONLY, 2,
 							DB_LEN_STR(gv_cur_region));
 						mupip_exit(ERR_MUNOFINISH);
 					}
@@ -270,7 +270,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 						hiber_start(1000);
 						if (mu_ctrly_occurred || mu_ctrlc_occurred)
 						{
-							gtm_putmsg(VARLSTCNT(1) ERR_FREEZECTRL);
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_FREEZECTRL);
                                                 	mupip_exit(ERR_MUNOFINISH);
 						}
 					}
@@ -281,7 +281,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 			gl_ptr = (glist*)malloc(SIZEOF(glist) - 1 + curr_gbl_name.str.len);
 			gl_ptr->name.mvtype = MV_STR;
 			gl_ptr->name.str.addr = (char*)gl_ptr->nbuf;
-			gl_ptr->name.str.len = curr_gbl_name.str.len;
+			gl_ptr->name.str.len = MIN(curr_gbl_name.str.len, MAX_MIDENT_LEN);
 			memcpy(gl_ptr->nbuf, curr_gbl_name.str.addr, curr_gbl_name.str.len);
 			gl_ptr->next = 0;
 			if (append_gbl)

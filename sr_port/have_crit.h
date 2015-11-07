@@ -18,18 +18,12 @@
 #endif
 
 /* states of CRIT passed as argument to have_crit() */
-#define CRIT_IN_COMMIT		0x00000001
-#define CRIT_NOT_TRANS_REG	0x00000002
-#define CRIT_RELEASE		0x00000004
-#define CRIT_ALL_REGIONS	0x00000008
-
-#define	CRIT_IN_WTSTART		0x00000010	/* check if csa->in_wtstart is true */
-
-/* Note absence of any flags is default value which finds if any region
- * or the replication pool have crit or are getting crit. It returns
- * when one is found without checking further.
-*/
-#define CRIT_HAVE_ANY_REG	0x00000000
+#define CRIT_HAVE_ANY_REG	0x00000001
+#define CRIT_IN_COMMIT		0x00000002
+#define CRIT_NOT_TRANS_REG	0x00000004
+#define CRIT_RELEASE		0x00000008
+#define CRIT_ALL_REGIONS	0x00000010
+#define	CRIT_IN_WTSTART		0x00000020	/* check if csa->in_wtstart is true */
 
 #ifdef DEBUG
 #include "wbox_test_init.h"
@@ -66,6 +60,8 @@ typedef enum
 	INTRPT_IN_FUNC_WITH_MALLOC,	/* Deferring interrupts while in libc- or system functions that do a malloc internally. */
 	INTRPT_IN_FDOPEN,		/* Deferring interrupts in fdopen. */
 	INTRPT_IN_LOG_FUNCTION,		/* Deferring interrupts in openlog, syslog, or closelog. */
+	INTRPT_IN_FORK_OR_SYSTEM,	/* Deferring interrupts in fork or system. */
+	INTRPT_IN_FSTAT,		/* Deferring interrupts in fstat. */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum */
 } intrpt_state_t;
 
@@ -192,7 +188,9 @@ GBLREF	boolean_t	deferred_timers_check_needed;
 	}												\
 }
 
-#define	OK_TO_SEND_MSG	((INTRPT_IN_X_TIME_FUNCTION != intrpt_ok_state) && (INTRPT_IN_LOG_FUNCTION != intrpt_ok_state))
+#define	OK_TO_SEND_MSG	((INTRPT_IN_X_TIME_FUNCTION != intrpt_ok_state) 				\
+			&& (INTRPT_IN_LOG_FUNCTION != intrpt_ok_state)					\
+			&& (INTRPT_IN_FORK_OR_SYSTEM != intrpt_ok_state))
 
 uint4 have_crit(uint4 crit_state);
 

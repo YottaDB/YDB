@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,6 @@
 #include "filestruct.h"
 #include "send_msg.h"
 #include "mutex.h"
-#include "tp_grab_crit.h"
 #include "deferred_signal_handler.h"
 #include "wcs_recover.h"
 #include "caller_id.h"
@@ -40,7 +39,7 @@ error_def(ERR_CRITRESET);
 error_def(ERR_DBCCERR);
 error_def(ERR_DBFLCORRP);
 
-bool	tp_grab_crit(gd_region *reg)
+boolean_t grab_crit_immediate(gd_region *reg)
 {
 	unix_db_info 		*udi;
 	sgmnt_addrs  		*csa;
@@ -87,6 +86,8 @@ bool	tp_grab_crit(gd_region *reg)
 		CRIT_TRACE(crit_ops_gw);		/* see gdsbt.h for comment on placement */
 		crit_count = 0;
 	}
+	else
+		assert(FALSE);
 	if (csd->file_corrupt && !mupip_jnl_recover)
 	{
 		if (!IS_DSE_IMAGE)

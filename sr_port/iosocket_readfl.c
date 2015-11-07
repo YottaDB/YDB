@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,13 +110,13 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 		{	/* Set $KEY and $ZB with the failing badchar */
 			memcpy(iod->dollar.zb, delimptr, MIN(delimlen, ESC_LEN - 1));
 			iod->dollar.zb[MIN(delimlen, ESC_LEN - 1)] = '\0';
-			memcpy(dsocketptr->dollar_key, delimptr, MIN(delimlen, DD_BUFLEN - 1));
-			dsocketptr->dollar_key[MIN(delimlen, DD_BUFLEN - 1)] = '\0';
+			memcpy(iod->dollar.key, delimptr, MIN(delimlen, DD_BUFLEN - 1));
+			iod->dollar.key[MIN(delimlen, DD_BUFLEN - 1)] = '\0';
 		}
 	}
 	len = SIZEOF(ONE_COMMA) - 1;
-	memcpy(dsocketptr->dollar_device, ONE_COMMA, len);
-	memcpy(&dsocketptr->dollar_device[len], BADCHAR_DEVICE_MSG, SIZEOF(BADCHAR_DEVICE_MSG));
+	memcpy(iod->dollar.device, ONE_COMMA, len);
+	memcpy(&iod->dollar.device[len], BADCHAR_DEVICE_MSG, SIZEOF(BADCHAR_DEVICE_MSG));
 }
 #endif
 
@@ -156,13 +156,13 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	if (0 >= dsocketptr->n_socket)
 	{
 		iod->dollar.za = 9;
-		rts_error(VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
 		return 0;
 	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
 	{
 		iod->dollar.za = 9;
-		rts_error(VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 		return 0;
 	}
 	utf8_active = NON_UNICODE_ONLY(FALSE) UNICODE_ONLY(gtm_utf8_mode ? IS_UTF_CHSET(ichset) : FALSE);
@@ -192,7 +192,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		assertpro(sockwhich_invalid != sockintr->who_saved);	/* Interrupt should never have an invalid save state */
 		/* Check we aren't recursing on this device */
 		if (dollar_zininterrupt)
-			rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
                 assertpro(sockwhich_readfl == sockintr->who_saved);	/* ZINTRECURSEIO should have caught */
 		DBGSOCK((stdout, "socrfl: *#*#*#*#*#*#*#  Restarted interrupted read\n"));
 		dsocketptr->mupintr = FALSE;
@@ -335,8 +335,9 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				iod->dollar.za = 9;
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
-				rts_error(VARLSTCNT(7) ERR_GETSOCKOPTERR, 5, LEN_AND_LIT("F_GETFL FOR NON BLOCKING I/O"),
-					  save_errno, LEN_AND_STR(errptr));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_GETFL FOR NON BLOCKING I/O"),
+					  	save_errno, LEN_AND_STR(errptr));
 			}
 			FCNTL3(socketptr->sd, F_SETFL, flags & (~(O_NDELAY | O_NONBLOCK)), fcntl_res);
 			if (fcntl_res < 0)
@@ -344,8 +345,9 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				iod->dollar.za = 9;
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
-				rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
-					  save_errno, LEN_AND_STR(errptr));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
+						save_errno, LEN_AND_STR(errptr));
 			}
 #			endif
 			sys_get_curr_time(&cur_time);
@@ -375,7 +377,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		}
 	}
 	sockintr->end_time_valid = FALSE;
-	dsocketptr->dollar_key[0] = '\0';
+	iod->dollar.key[0] = '\0';
 	iod->dollar.zb[0] = '\0';
 	more_data = TRUE;
 	real_errno = 0;
@@ -536,7 +538,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							if (CHSET_UTF16LE == ichset)
 							{
 								iod->dollar.za = 9;
-								rts_error(VARLSTCNT(6) ERR_BOMMISMATCH, 4,
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BOMMISMATCH, 4,
 									  chset_names[CHSET_UTF16BE].len,
 									  chset_names[CHSET_UTF16BE].addr,
 									  chset_names[CHSET_UTF16LE].len,
@@ -552,7 +554,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
                                                         if (CHSET_UTF16BE == ichset)
 							{
 								iod->dollar.za = 9;
-                                                                rts_error(VARLSTCNT(6) ERR_BOMMISMATCH, 4,
+                                                                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BOMMISMATCH, 4,
                                                                           chset_names[CHSET_UTF16LE].len,
                                                                           chset_names[CHSET_UTF16LE].addr,
                                                                           chset_names[CHSET_UTF16BE].len,
@@ -618,9 +620,9 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 						memcpy(iod->dollar.zb, socketptr->idelimiter[ii].addr,
 						       MIN(socketptr->idelimiter[ii].len, ESC_LEN - 1));
 						iod->dollar.zb[MIN(socketptr->idelimiter[ii].len, ESC_LEN - 1)] = '\0';
-						memcpy(dsocketptr->dollar_key, socketptr->idelimiter[ii].addr,
+						memcpy(iod->dollar.key, socketptr->idelimiter[ii].addr,
 						       MIN(socketptr->idelimiter[ii].len, DD_BUFLEN - 1));
-						dsocketptr->dollar_key[MIN(socketptr->idelimiter[ii].len, DD_BUFLEN - 1)] = '\0';
+						iod->dollar.key[MIN(socketptr->idelimiter[ii].len, DD_BUFLEN - 1)] = '\0';
 						break;
 					}
 				}
@@ -645,7 +647,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		if (bytes_read > MAX_STRLEN)
 		{
 			iod->dollar.za = 9;
-			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 		}
 		orig_bytes_read = bytes_read;
 		if (0 != bytes_read)
@@ -763,8 +765,9 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				iod->dollar.za = 9;
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
-				rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
-					  save_errno, LEN_AND_STR(errptr));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
+						save_errno, LEN_AND_STR(errptr));
 			}
 #			endif
 			if (out_of_time)
@@ -846,13 +849,13 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	} else
 	{
 		v->str.len = 0;
-		v->str.addr = dsocketptr->dollar_key;
+		v->str.addr = iod->dollar.key;
 	}
 	if (status >= 0)
 	{	/* No real problems */
 		iod->dollar.zeof = FALSE;
 		iod->dollar.za = 0;
-		memcpy(dsocketptr->dollar_device, "0", SIZEOF("0"));
+		memcpy(iod->dollar.device, "0", SIZEOF("0"));
 	} else
 	{	/* There's a significant problem */
 		DBGSOCK((stdout, "socrfl: Error handling triggered - status: %d\n", status));
@@ -860,10 +863,10 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			iod->dollar.x = 0;
 		iod->dollar.za = 9;
 		len = SIZEOF(ONE_COMMA) - 1;
-		memcpy(dsocketptr->dollar_device, ONE_COMMA, len);
+		memcpy(iod->dollar.device, ONE_COMMA, len);
 		errptr = (char *)STRERROR(real_errno);
 		errlen = STRLEN(errptr);
-		memcpy(&dsocketptr->dollar_device[len], errptr, errlen + 1);	/* + 1 for null */
+		memcpy(&iod->dollar.device[len], errptr, errlen + 1);	/* + 1 for null */
 #		ifdef UNIX
 		if (io_curr_device.in == io_std_device.in)
 		{
@@ -871,7 +874,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				prin_in_dev_failure = TRUE;
 			else
 			{
-				send_msg(VARLSTCNT(1) ERR_NOPRINCIO);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
 				stop_image_no_core();
 			}
 		}
@@ -880,7 +883,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		{
 			iod->dollar.zeof = TRUE;
 			if (socketptr->ioerror)
-				rts_error(VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
 		} else
 			iod->dollar.zeof = TRUE;
 	}

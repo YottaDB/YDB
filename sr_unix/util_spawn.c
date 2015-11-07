@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 void util_spawn(void)
 {
 	char *cmd;
+	int  rc;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -26,13 +27,15 @@ void util_spawn(void)
 		cmd = GETENV("SHELL");
 		if (!cmd)
 			cmd = "/bin/sh";
-		if (-1 == SYSTEM(cmd))
+		rc = SYSTEM(cmd);
+		if (-1 == rc)
 			PERROR("system : ");
 	} else
 	{
 		assert(TAREF1(parm_ary, TREF(parms_cnt) - 1));
 		assert((char *)-1L != (TAREF1(parm_ary, TREF(parms_cnt) - 1)));
-		if (-1 == SYSTEM(TAREF1(parm_ary, TREF(parms_cnt) - 1)))
+		rc = SYSTEM((TAREF1(parm_ary, TREF(parms_cnt) - 1)));
+		if (-1 == rc)
 			PERROR("system : ");
 	}
 }

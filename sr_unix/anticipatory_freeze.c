@@ -60,6 +60,7 @@ error_def(ERR_ENOSPCQIODEFER);
 error_def(ERR_REPLINSTFREEZECOMMENT);
 error_def(ERR_REPLINSTFROZEN);
 error_def(ERR_TEXT);
+error_def(ERR_INSTFRZDEFER);
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
@@ -151,14 +152,16 @@ boolean_t	is_anticipatory_freeze_needed(sgmnt_addrs *csa, int msg_id)
 
 	assert(NULL != jnlpool.jnlpool_ctl);
 	/* Certain error messages should NOT trigger a freeze even if they are so configured in the custom errors file as they might
-	 * result in instance freezes that can be set indefinitely. Currently, we know of at least two such messages:
-	 * 1. ENOSPCQIODEFER : To ensure we don't set anticipatory freeze if we don't/can't hold crit (due to possible deadlock)
+	 * result in instance freezes that can be set indefinitely. Currently, we know of at least 3 such messages:
+	 * 1. ENOSPCQIODEFER and INSTFRZDEFER : To ensure we don't set anticipatory freeze if we don't/can't hold crit
+	 *					(due to possible deadlock)
 	 * 2. DSKSPCAVAILABLE : To ensure we don't set anticipatory freeze if the disk space becomes available after an initial
 	 *			lack of space.
-	 * 3. ASSERT : To ensure we don't go into an infinite recursion and blow the stack doing assert() calls here.
+	 * These messages have csa == NULL so they are guarranteed to not trigger a freeze.
 	 */
-	if ((ERR_ENOSPCQIODEFER == msg_id) || (ERR_DSKSPCAVAILABLE == msg_id) DEBUG_ONLY(|| (ERR_ASSERT == msg_id)))
-		return FALSE;
+
+	assert(((ERR_ENOSPCQIODEFER != msg_id) && (ERR_DSKSPCAVAILABLE != msg_id) && (ERR_INSTFRZDEFER != msg_id))
+	       || (NULL == csa));
 	if (!csa || !csa->nl || !csa->hdr || !csa->hdr->freeze_on_fail)
 		return FALSE;
 	ctl = err_check(msg_id);
@@ -177,6 +180,7 @@ void		set_anticipatory_freeze(sgmnt_addrs *csa, int msg_id)
 {
 	boolean_t			was_crit;
 	sgmnt_addrs			*repl_csa;
+	const err_msg			*msginfo;
 #	ifdef DEBUG
 	qw_off_t			write_addr;
 	uint4				write;
@@ -191,13 +195,23 @@ void		set_anticipatory_freeze(sgmnt_addrs *csa, int msg_id)
 	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 	assert(NULL != repl_csa);
 	was_crit = repl_csa->now_crit;
-	if (!was_crit && !repl_csa->hold_onto_crit)
-		grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+	if (!was_crit)
+	{
+		if (csa->now_crit)
+			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+		else if (FALSE == grab_lock(jnlpool.jnlpool_dummy_reg, FALSE, GRAB_LOCK_ONLY))
+		{
+			MSGID_TO_ERRMSG(msg_id, msginfo);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INSTFRZDEFER, 4, LEN_AND_STR(msginfo->tag),
+				     REG_LEN_STR(csa->region));
+			return;
+		}
+	}
 	/* Now that we hold necessary locks, set the freeze and the comment field */
 	jnlpool.jnlpool_ctl->freeze = TRUE;
 	GENERATE_INST_FROZEN_COMMENT(jnlpool.jnlpool_ctl->freeze_comment, SIZEOF(jnlpool.jnlpool_ctl->freeze_comment), msg_id);
 	/* TODO : Do we need a SHM_WRITE_MEMORY_BARRIER ? */
-	if (!was_crit && !repl_csa->hold_onto_crit)
+	if (!was_crit)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 }
 
@@ -360,19 +374,18 @@ void clear_fake_enospc_if_master_dead(void)
 		{
 			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
 			{
-				if (!r_local->open || r_local->was_open)
-					continue;
 				if ((dba_bg != r_local->dyn.addr->acc_meth) && (dba_mm != r_local->dyn.addr->acc_meth))
 					continue;
-				csa = &FILE_INFO(r_local)->s_addrs;
-				if (csa->nl->fake_db_enospc || csa->nl->fake_jnl_enospc)
-				{
-					csa->nl->fake_db_enospc = FALSE;
-					csa->nl->fake_jnl_enospc = FALSE;
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TEXT, 2, DB_LEN_STR(r_local), ERR_TEXT, 2,
-						 LEN_AND_LIT("Resetting fake_db_enospc and fake_jnl_enospc because fake ENOSPC"
-							     " master is dead"));
-				}
+				csa = REG2CSA(r_local);
+				if ((NULL != csa) && (NULL != csa->nl))
+					if (csa->nl->fake_db_enospc || csa->nl->fake_jnl_enospc)
+					{
+						csa->nl->fake_db_enospc = FALSE;
+						csa->nl->fake_jnl_enospc = FALSE;
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TEXT, 2, DB_LEN_STR(r_local), ERR_TEXT,
+							     2, LEN_AND_LIT("Resetting fake_db_enospc and fake_jnl_enospc because "
+									    "fake ENOSPC master is dead"));
+					}
 			}
 		}
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -460,8 +460,15 @@ void zshow_devices(zshow_out *output)
 						} else
 						{
 							ZS_STR_OUT(&v, remote_text);
-							v.str.addr = socketptr->remote.saddr_ip;
-							v.str.len = strlen(socketptr->remote.saddr_ip);
+							if (NULL != socketptr->remote.saddr_ip)
+							{
+								v.str.addr = socketptr->remote.saddr_ip;
+								v.str.len = strlen(socketptr->remote.saddr_ip);
+							} else
+							{
+								v.str.addr = "";
+								v.str.len = 0;
+							}
 							zshow_output(output, &v.str);
 							ZS_ONE_OUT(&v, at_text);
 							MV_FORCE_MVAL(&m, (int)socketptr->remote.port);

@@ -1215,7 +1215,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* REPLXENDIANFAIL */
 	   0,	/* ZGOTOINVLVL2 */
 	   0,	/* GTMSECSHRCHDIRF */
-	   0,	/* UNUSEDMSG1382 */
+	   0,	/* JNLORDBFLU */
 	   0,	/* ZCCLNUPRTNMISNG */
 	   0,	/* ZCINVALIDKEYWORD */
 	   0,	/* REPLNOMULTILINETRG */
@@ -1270,7 +1270,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* ORLBKNOV4BLK */
 	   0,	/* DBROLLEDBACK */
 	   0,	/* DSEWCREINIT */
-	   0,	/* UNUSEDMSG1437 */
+	   0,	/* MURNDWNOVRD */
 	   0,	/* REPLONLNRLBK */
 	   0,	/* SRVLCKWT2LNG */
 	   0,	/* IGNBMPMRKFREE */
@@ -1355,4 +1355,10 @@ const static readonly int error_ansi[] = {
 	   0,	/* MALLOCMAXUNIX */
 	   0,	/* MALLOCMAXVMS */
 	   0,	/* HOSTCONFLICT */
+	   0,	/* GETADDRINFO */
+	   0,	/* GETNAMEINFO */
+	   0,	/* SOCKBIND */
+	   0,	/* INSTFRZDEFER */
+	   0,	/* REGOPENRETRY */
+	   0,	/* REGOPENFAIL */
 	};

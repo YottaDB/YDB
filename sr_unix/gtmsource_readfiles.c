@@ -143,6 +143,11 @@ static	int repl_read_file(repl_buff_t *rb)
 		assert(!fc->jfh->crash);
 		dskaddr = REAL_END_OF_DATA(fc);
 	}
+#	ifdef DEBUG
+	b->save_readaddr = b->readaddr;
+	b->save_dskaddr = dskaddr;
+	b->save_buffremaining = b->buffremaining;
+#	endif
 	/* Make sure we do not read beyond end of data in the journal file */
 	/* Note : This logic is always needed when journal file is pre-allocated.
 	 * With no pre-allocation, this logic is needed only when repl_read_file is called from
@@ -167,11 +172,11 @@ static	int repl_read_file(repl_buff_t *rb)
 	if ((off_t)-1 == lseek(fc->fd, (off_t)start_addr, SEEK_SET))
 	{
 		repl_errno = EREPL_JNLFILESEEK;
-		return (ERRNO);
+		return (errno);
 	}
 	READ_FILE(fc->fd, b->base + REPL_BLKSIZE(rb) - b->buffremaining - (b->readaddr - start_addr),
 		  end_addr - start_addr, nb);
-	status = ERRNO;
+	status = errno;
 	if (nb < (b->readaddr - start_addr))
 	{	/* This case means that we didn't read enough bytes to get from the alignment point in the disk file
 		 * to the start of the actual desired read (the offset we did the lseek to above).  This can't happen
@@ -445,7 +450,7 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, REAL_JNL_HDR_LEN, status);
 			if (SS_NORMAL != status)
 				rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, ctl->jnl_fn_len, ctl->jnl_fn,
-						ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in reading jfh in update_eof_addr"), status);
+						ERR_TEXT, 2, LEN_AND_LIT("Error in reading jfh in update_eof_addr"), status);
 			REPL_DPRINT2("Update EOF : Jnl file hdr refreshed from file for %s\n", ctl->jnl_fn);
 			ctl->eof_addr_final = TRUE; /* No more updates to fc->eof_addr for this journal file */
 		}
@@ -763,7 +768,7 @@ static void increase_buffer(unsigned char **buff, int *buflen, int buffer_needed
 	REPL_DPRINT3("Buff space shortage. Attempting to increase buff space. Curr buff space %d. Attempt increase to atleast %d\n",
 		     gtmsource_msgbufsiz, newbuffsize);
 	old_msgp = (unsigned char *)gtmsource_msgp;
-	if ((alloc_status = gtmsource_alloc_msgbuff(newbuffsize)) != SS_NORMAL)
+	if ((alloc_status = gtmsource_alloc_msgbuff(newbuffsize, FALSE)) != SS_NORMAL)
 	{
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			  LEN_AND_LIT("Error extending buffer space while reading files. Malloc error"), alloc_status);
@@ -873,7 +878,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 			{
 				assert(FALSE);
 				rts_error(VARLSTCNT(7) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno,
-						ERR_TEXT, 2, RTS_ERROR_LITERAL("Early EOF found"));
+						ERR_TEXT, 2, LEN_AND_LIT("Early EOF found"));
 			}
 		} else if (status == EREPL_JNLRECINCMPL)
 		{	/* Log warning message for every certain number of attempts. There might have been a crash and the file
@@ -1939,7 +1944,7 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 	assert(0 < max_zqgblmod_seqno);
 	assert(resync_seqno >= max_zqgblmod_seqno);
 	assert(!(FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs.now_crit));
-	grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+	grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 	{
 		assert(process_id != jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);

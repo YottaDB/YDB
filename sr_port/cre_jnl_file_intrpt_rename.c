@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 
 	filestr.addr = (char *)fn;
 	filestr.len = fn_len;
-	prepare_unique_name((char *)fn, fn_len, "", EXT_NEW, (char *)ext_new_jnl_fn, &ext_new_jnl_fn_len, &ustatus);
+	prepare_unique_name((char *)fn, fn_len, "", EXT_NEW, (char *)ext_new_jnl_fn, &ext_new_jnl_fn_len, 0, &ustatus);
 	assert(SS_NORMAL == ustatus);
 	status1 = gtm_file_stat(&filestr, NULL, NULL, FALSE, &ustatus);
 	if (FILE_STAT_ERROR == status1)

@@ -389,7 +389,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		assert(NULL != jnlpool.repl_inst_filehdr);
 		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-		grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 		jnlpool.repl_inst_filehdr->recvpool_shmid = udi->shmid;
 		jnlpool.repl_inst_filehdr->recvpool_semid = udi->semid;
 		jnlpool.repl_inst_filehdr->recvpool_shmid_ctime = udi->gt_shm_ctime;

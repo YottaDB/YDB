@@ -16,7 +16,6 @@
 #include "anticipatory_freeze.h"
 #include "wait_for_disk_space.h"
 #include "gtmio.h"
-#include "tp_grab_crit.h"
 #include "have_crit.h"
 #include "filestruct.h"
 #include "jnl.h"
@@ -48,6 +47,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	int		fn_len, tmp_errno;
 	boolean_t	freeze_cleared;
 	char		wait_comment[MAX_FREEZE_COMMENT_LEN];
+	sgmnt_addrs	*repl_csa;
 #	ifdef DEBUG
 		uint4	lcl_lseekwrite_target;
 #	endif
@@ -65,35 +65,30 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 			|| !(*is_anticipatory_freeze_needed_fnptr)(csa, ERR_DSKNOSPCAVAIL))
 		return;
 	fn_len = STRLEN(fn);
-	was_crit = csa->now_crit;
+	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+	was_crit = repl_csa->now_crit;
 	reg = csa->region;
-	/* Let us take the case this process has opened the database but does not hold crit on it. If we come in to this
-	 * function while trying to flush either to the db or jnl, setting the instance freeze would require a "grab_lock"
-	 * which could hang due to another process holding that and in turn waiting for the exact same db or jnl write
-	 * to succeed. This has the potential of creating a deadlock so we avoid that by returning right away. Since we
-	 * dont hold crit, this call to do the jnl or db write is not critical in the sense no process will be affected
-	 * because this write did not happen. Therefore it is okay to return right away. On the other hand if this
-	 * process holds crit, then it is not possible that the other process holds the jnlpool lock
-	 * and is waiting for the db or jnl qio (since that flow usually happens in t_end and tp_tend
-	 * where db crit is first obtained before jnlpool lock is). Therefore it is safe to do a grab_lock
-	 * in that case without worrying about potential deadlocks.
-	 * Update *save_errno to indicate this is not a ENOSPC condition (since we have chosen to defer
-	 * the ENOSPC condition to some other process that encounters it while holding crit).
-	 *
-	 * There is a possibility that if the caller is jnl_wait we will retry this logic indefinitely without ever
-	 * setting instance freeze because we dont hold crit. To avoid that, do tp_grab_crit to see if it is available.
-	 * If so, go ahead with freezing the instance. If not issue QIODEFER message and return. It is still possible
-	 * the same process issues multiple QIODEFER messages before the instance gets frozen. But it should be rare.
-	 */
 	if (!was_crit)
-		tp_grab_crit(reg);
-	if (!csa->now_crit)
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ENOSPCQIODEFER, 2, fn_len, fn);
-		*save_errno = ERR_ENOSPCQIODEFER;
-		return;
+	{	/* Setting the instance freeze requires the journal pool lock (grab_lock). However, we need to be careful
+		 * to avoid a deadlock. A deadlock is possible if we hold the io_in_prog_latch, and meanwhile another
+		 * process has grabbed crit in t_end/tp_tend, grabbed the journal pool lock, and is now waiting on the
+		 * io_in_prog_latch (e.g., via jnl_write). By doing a blocking wait in grab_lock here, we would
+		 * deadlock. Therefore, we must pass is_blocking_wait = FALSE to grab_lock. If grab_lock does not succeed,
+		 * we return right away and do not complete the jnl or db write operation for which we are waiting for disk
+		 * space. Since we do not hold crit, we can safely proceed without its completion.
+		 *	On the other hand, this scenario is not possible if we hold crit on the region of interest. In this
+		 * case, a normal grab_lock is fine (is_blocking_wait = TRUE).
+		 */
+		if (csa->now_crit)
+			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+		else if (FALSE == grab_lock(jnlpool.jnlpool_dummy_reg, FALSE, GRAB_LOCK_ONLY))
+		{
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ENOSPCQIODEFER, 2, fn_len, fn);
+			*save_errno = ERR_ENOSPCQIODEFER;
+			return;
+		}
 	}
-	/* We either came into this function holding crit or "tp_grab_crit" succeeded */
+	/* We either came into this function holding journal pool lock or grab_lock() succeeded */
 	assert(NULL != jnlpool.jnlpool_ctl);
 	assert(NULL != fn);	/* if "csa" is non-NULL, fn better be non-NULL as well */
 	/* The "send_msg" of DSKNOSPCAVAIL done below will set instance freeze (the configuration file includes it). After that, we
@@ -155,6 +150,6 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	*save_errno = tmp_errno;
 	ENABLE_INTERRUPTS(INTRPT_IN_WAIT_FOR_DISK_SPACE);
 	if (!was_crit)
-		rel_crit(reg);
+		rel_lock(jnlpool.jnlpool_dummy_reg);
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,12 +81,12 @@ void set_sem_set_src(int semid)
 }
 int init_sem_set_recvr(sem_key_t key, int nsems, permissions_t sem_flags)
 {
+	int		semid;
+
 	assert(IPC_PRIVATE == (key_t)key);
 	assert(SIZEOF(key_t) >= SIZEOF(sem_key_t));
-	sem_set_id[RECV] = semget(key, nsems, sem_flags);
-	holds_sem[RECV][RECV_POOL_ACCESS_SEM] = FALSE;
-	holds_sem[RECV][RECV_SERV_COUNT_SEM] = FALSE;
-	holds_sem[RECV][UPD_PROC_COUNT_SEM] = FALSE;
+	semid = semget(key, nsems, sem_flags);
+	set_sem_set_recvr(semid);
 	return sem_set_id[RECV];
 }
 void set_sem_set_recvr(int semid)
@@ -95,6 +95,7 @@ void set_sem_set_recvr(int semid)
 	holds_sem[RECV][RECV_POOL_ACCESS_SEM] = FALSE;
 	holds_sem[RECV][RECV_SERV_COUNT_SEM] = FALSE;
 	holds_sem[RECV][UPD_PROC_COUNT_SEM] = FALSE;
+	holds_sem[RECV][RECV_SERV_OPTIONS_SEM] = FALSE;
 }
 
 int grab_sem(int set_index, int sem_num)

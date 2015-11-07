@@ -178,7 +178,7 @@ THREADGBLDEF(gtmdbgflags,			int)
 THREADGBLDEF(gtmdbgflags_freq,			int)
 THREADGBLDEF(gtmdbgflags_freq_cntr,		int)
 #endif
-THREADGBLDEF(gtm_env_init_done,			boolean_t)			/* gtm_env_init flag for completion */
+THREADGBLDEF(gtm_env_init_started,		boolean_t)			/* gtm_env_init flag envvar processing */
 THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() function pointer */
 THREADGBLDEF(gtm_environment_init,		boolean_t)			/* indicates GT.M development environment rather
 										 * than a production environment */
@@ -285,6 +285,8 @@ THREADGBLDEF(ci_table, 				callin_entry_list *)		/* Callin table in the form of 
 THREADGBLDEF(extcall_package_root,		struct extcall_package_list *)	/* External call table package list */
 #ifdef UNIX
 THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* Current nested depth of callin environments */
+THREADGBLDEF(in_gtmci,				boolean_t)			/* Indicates if we are in one of the gtm_ci...
+										 * functions. */
 #endif
 
 THREADGBLDEF(want_empty_gvts,			boolean_t)			/* set to TRUE by MUPIP REORG when it is selecting

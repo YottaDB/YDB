@@ -1,12 +1,13 @@
 /****************************************************************
  *								*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 #include "mdef.h"
 
 #include <errno.h>
@@ -29,6 +30,7 @@
 #include "stringpool.h"
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
+#include "gtm_netdb.h"
 
 GBLREF 	tcp_library_struct	tcp_routines;
 GBLREF	d_socket_struct		*socket_pool, *newdsocket;
@@ -41,24 +43,20 @@ LITREF	mstr			chset_names[];
 
 error_def(ERR_ABNCOMPTINC);
 error_def(ERR_ADDRTOOLONG);
-error_def(ERR_SOCKETEXIST);
 error_def(ERR_DELIMSIZNA);
 error_def(ERR_DELIMWIDTH);
 error_def(ERR_DEVPARINAP);
 error_def(ERR_DEVPARMNEG);
+error_def(ERR_GETNAMEINFO);
 error_def(ERR_ILLESOCKBFSIZE);
 error_def(ERR_MRTMAXEXCEEDED);
+error_def(ERR_SOCKETEXIST);
 error_def(ERR_SOCKMAX);
+error_def(ERR_TEXT);
 error_def(ERR_ZFF2MANY);
 error_def(ERR_ZINTRECURSEIO);
 
 #define ESTABLISHED		"ESTABLISHED"
-
-#define FREE_SOCKPTR(sockptr)							\
-{										\
-	if (NULL != sockptr->buffer) free(sockptr->buffer);			\
-	free(sockptr);								\
-}
 
 short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 timepar)
 {
@@ -71,7 +69,6 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	int			d_socket_struct_len;
 	ABS_TIME		cur_time, end_time;
 	io_desc			*ioptr;
-	struct sockaddr_in	peer;		/* socket address + port */
 	fd_set			tcp_fd;
 	uint4			bfsize = DEFAULT_SOCKET_BUFFER_SIZE, ibfsize;
         d_socket_struct         *dsocketptr;
@@ -95,6 +92,9 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	char			ioerror, ip[3], tcp[4],
  		                sock_handle[MAX_HANDLE_LEN], delimiter[MAX_DELIM_LEN + 1];
 	int			socketptr_delim_len;
+	char			ipaddr[SA_MAXLEN];
+	int			errcode;
+	struct addrinfo		*ai_ptr, *remote_ai_ptr;
 
 	ioptr = dev->iod;
 	assert((params) *(pp->str.addr + p_offset) < (unsigned char)n_iops);
@@ -142,7 +142,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		{
 			dsocketptr->mupintr = FALSE;
 			sockintr->who_saved = sockwhich_invalid;
-			rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		}
 		if (sockwhich_connect != sockintr->who_saved)
 			GTMASSERT;	/* ZINTRECURSEIO should have caught */
@@ -165,7 +165,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		if (NULL == newdsocket)
 			newdsocket = (d_socket_struct *)malloc(d_socket_struct_len);
 		memcpy(newdsocket, dsocketptr, d_socket_struct_len);
-		memcpy(newdsocket->dollar_device, "0", SIZEOF("0"));
+		memcpy(ioptr->dollar.device, "0", SIZEOF("0"));
 		zff_len = -1; /* indicates neither ZFF nor ZNOFF specified */
 		delimiter_len = -1; /* indicates neither DELIM nor NODELIM specified */
 		ichset_specified = ochset_specified = FALSE;
@@ -178,7 +178,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					if (((MAX_DELIM_LEN + 1) * MAX_N_DELIMITER) >= delimiter_len)
 						memcpy(delimiter_buffer, (pp->str.addr + p_offset + 1), delimiter_len);
 					else
-						rts_error(VARLSTCNT(1) ERR_DELIMSIZNA);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
 					break;
 				case iop_ipchset:
 					UNICODE_ONLY(
@@ -263,13 +263,13 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 				case iop_zbfsize:
 					GET_ULONG(bfsize, pp->str.addr + p_offset);
 					if ((0 == bfsize) || (MAX_SOCKET_BUFFER_SIZE < bfsize))
-						rts_error(VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
 					break;
 				case iop_zibfsize:
 					ibfsize_specified = TRUE;
 					GET_ULONG(ibfsize, pp->str.addr + p_offset);
 					if ((0 == ibfsize) || (MAX_INTERNAL_SOCBUF_SIZE < ibfsize))
-						rts_error(VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
 					break;
 				case iop_zlisten:
 					listen_specified = TRUE;
@@ -279,8 +279,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 						memset(sockaddr, 0, SIZEOF(sockaddr));
 						memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
 					} else
-						rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len, pp->str.addr + p_offset + 1,
-							  len, SA_MAXLITLEN);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len,
+								 pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
 					break;
 				case iop_connect:
 					connect_specified = TRUE;
@@ -290,8 +290,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 						memset(sockaddr, 0, SIZEOF(sockaddr));
 						memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
 					} else
-						rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len, pp->str.addr + p_offset + 1,
-							  len, SA_MAXLITLEN);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ADDRTOOLONG, 4,
+								 len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
 					break;
 				case iop_ioerror:
 					ioerror_specified = TRUE;
@@ -310,13 +310,13 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					memcpy(sock_handle, pp->str.addr + p_offset + 1, handle_len);
 					break;
 				case iop_socket:
-					rts_error(VARLSTCNT(1) ERR_DEVPARINAP);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARINAP);
 					break;
 				case iop_zff:
 					if (MAX_ZFF_LEN >= (zff_len = (int4)(unsigned char)*(pp->str.addr + p_offset)))
 						memcpy(zff_buffer, (char *)(pp->str.addr + p_offset + 1), zff_len);
 					else
-						rts_error(VARLSTCNT(4) ERR_ZFF2MANY, 2, zff_len, MAX_ZFF_LEN);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFF2MANY, 2, zff_len, MAX_ZFF_LEN);
 					break;
 				case iop_znoff:
 					zff_len = 0;
@@ -333,9 +333,10 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					if (-1 == moreread_timeout)
 						moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
 					else if (-1 > moreread_timeout)
-						rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 					else if (MAX_MOREREAD_TIMEOUT < moreread_timeout)
-						rts_error(VARLSTCNT(3) ERR_MRTMAXEXCEEDED, 1, MAX_MOREREAD_TIMEOUT);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MRTMAXEXCEEDED, 1,
+								 MAX_MOREREAD_TIMEOUT);
 					moreread_specified = TRUE;
 					break;
 				default:
@@ -354,13 +355,13 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			get_chset_desc(&chset_names[ioptr->ochset]);
 		if (listen_specified && connect_specified)
 		{
-			rts_error(VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("CONNECT"),
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("CONNECT"),
 					LEN_AND_LIT("ZLISTEN"), LEN_AND_LIT("OPEN"));
 		return FALSE;
 		}
 		if (delay_specified && nodelay_specified)
 		{
-			rts_error(VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("DELAY"),
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("DELAY"),
 					LEN_AND_LIT("NODELAY"), LEN_AND_LIT("OPEN"));
 			return FALSE;
 		}
@@ -384,9 +385,11 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			{
 				if (iosocket_handle(sock_handle, &handle_len, FALSE, newdsocket) >= 0)
 				{
-					FREE_SOCKPTR(socketptr);
+					if (FD_INVALID != socketptr->temp_sd)
+						tcp_routines.aa_close(socketptr->temp_sd);
+					SOCKET_FREE(socketptr);
 					assert(ioptr->newly_created == FALSE);
-					rts_error(VARLSTCNT(4) ERR_SOCKETEXIST, 2, handle_len, sock_handle);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKETEXIST, 2, handle_len, sock_handle);
                   			return FALSE;
                 		}
 			} else
@@ -399,18 +402,18 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			if (ioptr->wrap && 0 != socketptr->n_delimiter && ioptr->width < socketptr->delimiter[0].len)
 			{
 				socketptr_delim_len = socketptr->delimiter[0].len;
-				iosocket_delimiter((unsigned char *)NULL, 0, socketptr, TRUE);
-				FREE_SOCKPTR(socketptr);
-				rts_error(VARLSTCNT(4) ERR_DELIMWIDTH, 2, ioptr->width, socketptr_delim_len);
+				SOCKET_FREE(socketptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DELIMWIDTH, 2, ioptr->width, socketptr_delim_len);
 				assert(FALSE);
 			}
 			/* connects newdsocket and socketptr (the new socket) */
 			if (gtm_max_sockets <= newdsocket->n_socket)
 			{
 				assert(ioptr->newly_created == FALSE);
-				iosocket_delimiter((unsigned char *)NULL, 0, socketptr, TRUE);
-				FREE_SOCKPTR(socketptr);
-				rts_error(VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+				if (FD_INVALID != socketptr->temp_sd)
+					tcp_routines.aa_close(socketptr->temp_sd);
+				SOCKET_FREE(socketptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
 				return FALSE;
 			}
 			socketptr->dev = newdsocket;
@@ -436,24 +439,37 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
        	{
 		if (socketptr->sd > 0)
 			(void)tcp_routines.aa_close(socketptr->sd);
-		iosocket_delimiter((unsigned char *)NULL, 0, socketptr, TRUE);
-		if (NULL != socketptr->zff.addr)
-			free(socketptr->zff.addr);
-		FREE_SOCKPTR(socketptr);
+		SOCKET_FREE(socketptr);
 		return FALSE;
 	} else if (is_principal)
 	{	/* fill in what bind or connect would */
-		strncpy(socketptr->local.saddr_ip, tcp_routines.aa_inet_ntoa(socketptr->local.sin.sin_addr),
-			SIZEOF(socketptr->local.saddr_ip));
-		strncpy(socketptr->remote.saddr_ip, tcp_routines.aa_inet_ntoa(socketptr->remote.sin.sin_addr),
-			SIZEOF(socketptr->remote.saddr_ip));
+		ai_ptr = &(socketptr->local.ai);
+		remote_ai_ptr = &(socketptr->remote.ai);
+		/* translate internal address to numeric ip address */
+		GETNAMEINFO(SOCKET_LOCAL_ADDR(socketptr), ai_ptr->ai_addrlen, ipaddr, SIZEOF(ipaddr), NULL, 0, NI_NUMERICHOST,
+				errcode);
+		if (0 != errcode)
+		{
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+			return FALSE;
+		}
+		STRNDUP(ipaddr, SIZEOF(ipaddr), socketptr->local.saddr_ip);
+		GETNAMEINFO(SOCKET_REMOTE_ADDR(socketptr), remote_ai_ptr->ai_addrlen, ipaddr, SIZEOF(ipaddr), NULL, 0,
+				NI_NUMERICHOST, errcode);
+		if (0 != errcode)
+		{
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+			return FALSE;
+		}
+		STRNDUP(ipaddr, SIZEOF(ipaddr), socketptr->remote.saddr_ip);
 		len = SIZEOF(ESTABLISHED) - 1;
-		memcpy(&newdsocket->dollar_key[0], ESTABLISHED, len);
-		newdsocket->dollar_key[len++] = '|';
-		memcpy(&newdsocket->dollar_key[len], socketptr->handle, socketptr->handle_len);
+		memcpy(&ioptr->dollar.key[0], ESTABLISHED, len);
+		ioptr->dollar.key[len++] = '|';
+		memcpy(&ioptr->dollar.key[len], socketptr->handle, socketptr->handle_len);
 		len += socketptr->handle_len;
-		newdsocket->dollar_key[len++] = '|';
-		strcpy(&newdsocket->dollar_key[len], socketptr->remote.saddr_ip);	/* Copies in terminating NULL */
+		ioptr->dollar.key[len++] = '|';
+		strncpy(&ioptr->dollar.key[len], socketptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
+		ioptr->dollar.key[DD_BUFLEN-1] = '\0';			/* In case we fill the buffer */
 	}
 	/* commit the changes to the list */
 	if (listen_specified || connect_specified || is_principal)

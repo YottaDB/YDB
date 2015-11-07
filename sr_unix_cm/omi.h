@@ -304,7 +304,8 @@ typedef struct	omi_cn_stat
 {
 	int			id;
 	time_t			start;
-	struct sockaddr_in	sin;
+	struct addrinfo		ai;
+	struct sockaddr_storage sas;
 	int			bytes_recv;
 	int			bytes_send;
 	int			xact[OMI_OP_MAX];

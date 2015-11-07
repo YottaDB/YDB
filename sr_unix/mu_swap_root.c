@@ -128,19 +128,21 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 		SETUP_TRIGGER_GLOBAL;
 		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+		if (0 == gv_target->root)
+			return TRUE;
 	} else
 #	endif	/* Initialization for current global */
 		op_gvname(VARLSTCNT(1) (gn));
-	if (0 == gv_target->root)
-	{	/* Global does not exist (online rollback). No problem. */
-		gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
-		return TRUE;
-	}
 	csa = cs_addrs;
 	cnl = csa->nl;
 	csd = cs_data;	/* Be careful to keep csd up to date. With MM, cs_data can change, and
 			 * dereferencing an older copy can result in a SIG-11.
 			 */
+	if (0 == gv_target->root)
+	{	/* Global does not exist (online rollback). No problem. */
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+		return TRUE;
+	}
 	if (dba_mm == csd->acc_meth)
 		/* return for now without doing any swapping operation because later mu_truncate
 		 * is going to issue the MUTRUNCNOTBG message.
@@ -203,7 +205,7 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 			ABORT_TRANS_IF_GBL_EXIST_NOMORE(lcl_t_tries, tn_aborted);
 			if (tn_aborted)
 			{	/* It is not an error if the global (that once existed) doesn't exist anymore (due to ROLLBACK) */
-				gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
 				return TRUE;
 			}
 			continue;
@@ -266,12 +268,15 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 			if (!csa->now_crit)
 				WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
 			DEBUG_ONLY(lcl_t_tries = t_tries);
+			TREF(in_mu_swap_root_state) = MUSWP_DIRECTORY_SWAP;
 			if ((trans_num)0 == (ret_tn = t_end(dir_hist_ptr, NULL, TN_NOT_SPECIFIED)))
 			{
+				TREF(in_mu_swap_root_state) = MUSWP_NONE;
 				need_kip_incr = FALSE;
 				assert(NULL == kip_csa);
 				continue;
 			}
+			TREF(in_mu_swap_root_state) = MUSWP_NONE;
 			gvcst_kill_sort(&kill_set_list);
 			TREF(in_mu_swap_root_state) = MUSWP_FREE_BLK;
 			GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg, inctn_bmp_mark_free_mu_reorg,
@@ -340,6 +345,13 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		assert(t_tries < CDB_STAGNATE);
 		t_retry(cdb_sc_badbitmap);
 		return RETRY_SWAP;
+	}
+	if (child_blk_id <= free_blk_id)
+	{	/* stop swapping root or DT blocks once the database is truncated well enough. A good heuristic for this is to check
+		 * if the block is to be swapped into a higher block number and if so do not swap
+		 */
+		t_abort(gv_cur_region, csa);
+		return ABORT_SWAP;
 	}
 	/* ====== begin update array ======
 	 * Four blocks get changed.

@@ -15,7 +15,6 @@
 #define DEF_RM_WIDTH		32767
 #define DEF_RM_RECORDSIZE	32767
 #define DEF_RM_LENGTH		66
-#define RM_BUFLEN		80
 #define CHUNK_SIZE		512
 
 #define	ONE_COMMA			"1,"
@@ -131,8 +130,6 @@ typedef struct
 	struct	io_desc_struct	*stderr_child;	/* pointer to io descriptor for pipe stderr device */
 	struct	io_desc_struct	*stderr_parent;	/* pointer to io descriptor for pipe which opened stderr device */
 	pid_t		pipe_pid;		/* child process id for reaping on close */
-	char		dollar_key[RM_BUFLEN];	/* String representation of process id of child - $KEY */
-	char		dollar_device[RM_BUFLEN];/* String representation $DEVICE */
 	Dev_param_pairs dev_param_pairs;
 	int		bufsize;	/* Size of inbuf */
 	int		outbufsize;	/* Size of outbuf */

@@ -269,6 +269,8 @@ void zshow_devices(zshow_out *output)
 							ZS_PARM_SP(&v, zshow_edit);
 						if (TT_NOINSERT & tt_ptr->ext_cap)
 							ZS_PARM_SP(&v, zshow_noinse);
+						if (TT_EMPTERM & tt_ptr->ext_cap)
+							ZS_PARM_SP(&v, zshow_empterm);
 						if (tt_ptr->canonical)
 							ZS_STR_OUT(&v, "CANONICAL ");
 						switch(l->iod->ichset)
@@ -595,15 +597,22 @@ void zshow_devices(zshow_out *output)
 							} else
 							{
 								ZS_STR_OUT(&v, remote_text);
-								v.str.addr = socketptr->remote.saddr_ip;
-								v.str.len = STRLEN(socketptr->remote.saddr_ip);
+								if (NULL != socketptr->remote.saddr_ip)
+								{
+									v.str.addr = socketptr->remote.saddr_ip;
+									v.str.len = STRLEN(socketptr->remote.saddr_ip);
+								} else
+								{
+									v.str.addr = "";
+									v.str.len = 0;
+								}
 								zshow_output(output, &v.str);
 								ZS_ONE_OUT(&v, at_text);
 								tmpport = (int)socketptr->remote.port;
 								MV_FORCE_MVAL(&m, tmpport);
 								mval_write(output, &m, FALSE);
 								ZS_ONE_OUT(&v, space_text);
-								if (socketptr->local.saddr_ip[0])
+								if (NULL != socketptr->local.saddr_ip)
 								{
 									ZS_STR_OUT(&v, local_text);
 									v.str.addr = socketptr->local.saddr_ip;

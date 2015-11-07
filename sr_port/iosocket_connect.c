@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,6 @@
 #include "gtm_time.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
-#include <netinet/tcp.h>
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "stringpool.h"
@@ -29,6 +28,8 @@
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "outofband.h"
+#include "gtm_netdb.h"
+#include "gtm_ipv6.h"
 
 #define	ESTABLISHED	"ESTABLISHED"
 
@@ -42,16 +43,17 @@ GBLREF	int			socketus_interruptus;
 GBLREF	d_socket_struct		*newdsocket;	/* in case jobinterrupt */
 GBLREF	int4			gtm_max_sockets;
 
-error_def(ERR_SOCKINIT);
-error_def(ERR_OPENCONN);
-error_def(ERR_TEXT);
+error_def(ERR_GETNAMEINFO);
 error_def(ERR_GETSOCKOPTERR);
+error_def(ERR_OPENCONN);
 error_def(ERR_SETSOCKOPTERR);
-error_def(ERR_ZINTRECURSEIO);
+error_def(ERR_SOCKINIT);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
+error_def(ERR_TEXT);
+error_def(ERR_ZINTRECURSEIO);
 
-boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz)
+boolean_t iosocket_connect(socket_struct *sockptr, int4 timepar, boolean_t update_bufsiz)
 {
 	int		temp_1;
 	char		*errptr;
@@ -67,19 +69,21 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 	ABS_TIME        cur_time, end_time;
 	struct timeval	*sel_time;
         mv_stent        *mv_zintdev;
+	struct addrinfo *remote_ai_ptr, *raw_ai_ptr;
+	int		errcode, real_errno;
+	char		ipaddr[SA_MAXLEN + 1];
 	GTM_SOCKLEN_TYPE	sockbuflen;
 
 	DBGSOCK((stdout, "socconn: ************* Entering socconn - timepar: %d\n",timepar));
         /* check for validity */
-	dsocketptr = socketptr->dev;
+	dsocketptr = sockptr->dev;
         assert(NULL != dsocketptr);
         sockintr = &dsocketptr->sock_save_state;
 	iod = dsocketptr->iod;
 	real_dsocketptr = (d_socket_struct *)iod->dev_sp;	/* not newdsocket which is not saved on error */
         real_sockintr = &real_dsocketptr->sock_save_state;
 
-        dsocketptr->dollar_key[0] = '\0';
-        real_dsocketptr->dollar_key[0] = '\0';
+        iod->dollar.key[0] = '\0';
 	need_socket = need_connect = TRUE;
 	need_select = FALSE;
 
@@ -89,7 +93,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
                 if (sockwhich_invalid == sockintr->who_saved)
                         GTMASSERT;      /* Interrupt should never have an invalid save state */
                 if (dollar_zininterrupt)
-                        rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
                 if (sockwhich_connect != sockintr->who_saved)
                         GTMASSERT;      /* ZINTRECURSEIO should have caught */
                 DBGSOCK((stdout, "socconn: *#*#*#*#*#*#*#  Restarted interrupted connect\n"));
@@ -99,7 +103,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
                         if (sockintr->end_time_valid)
                                 /* Restore end_time for timeout */
                                 end_time = sockintr->end_time;
-			if (socket_connect_inprogress == socketptr->state && FD_INVALID != socketptr->sd)
+			if ((socket_connect_inprogress == sockptr->state) && (FD_INVALID != sockptr->sd))
 			{
 				need_select = TRUE;
 				need_socket = need_connect = FALSE;	/* sd still good */
@@ -127,77 +131,127 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 	real_sockintr->end_time_valid = sockintr->end_time_valid = FALSE;
 	last_errno = 0;
 
+	remote_ai_ptr = (struct addrinfo*)(&(sockptr->remote.ai));
 	do
 	{
-		if (need_socket && FD_INVALID != socketptr->sd)
+		/* If the connect was failed, we may have already changed the remote.
+	 	 * So, the remote ai_addr should be restored.
+	 	 */
+		assertpro(NULL != sockptr->remote.ai_head);
+		memcpy(remote_ai_ptr, sockptr->remote.ai_head, SIZEOF(struct addrinfo));
+		if (need_socket && (FD_INVALID != sockptr->sd))
 		{
-			tcp_routines.aa_close(socketptr->sd);
-			socketptr->sd = FD_INVALID;
+			tcp_routines.aa_close(sockptr->sd);
+			sockptr->sd = FD_INVALID;
 		}
 		assert(FD_INVALID == -1);
 		if (need_socket)
 		{
-	        	if (-1 == (socketptr->sd = tcp_routines.aa_socket(AF_INET, SOCK_STREAM, 0)))
-        		{
-                		errptr = (char *)STRERROR(errno);
+			real_errno = -2;
+			for (raw_ai_ptr = remote_ai_ptr; NULL != raw_ai_ptr; raw_ai_ptr = raw_ai_ptr->ai_next)
+			{
+				if (-1 == (sockptr->sd = tcp_routines.aa_socket(raw_ai_ptr->ai_family, raw_ai_ptr->ai_socktype,
+										  raw_ai_ptr->ai_protocol)))
+					real_errno = errno;
+				else
+				{
+					real_errno = 0;
+					break;
+				}
+			}
+			if (0 != real_errno)
+			{
+				if (NULL != sockptr->remote.ai_head)
+				{
+					freeaddrinfo(sockptr->remote.ai_head);
+					sockptr->remote.ai_head = NULL;
+				}
+				assertpro(-2 != real_errno);
+				errptr = (char *)STRERROR(real_errno);
 				errlen = STRLEN(errptr);
-                		rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
-                		return FALSE;
-        		}
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
+				return FALSE;
+			}
+			assertpro(NULL != raw_ai_ptr);/* either there is an IPv6 or an IPv4 address */
+			memcpy(remote_ai_ptr, raw_ai_ptr, SIZEOF(struct addrinfo));
+			SOCKET_AI_TO_REMOTE_ADDR(sockptr, raw_ai_ptr);
+			remote_ai_ptr->ai_addr = SOCKET_REMOTE_ADDR(sockptr);
+			remote_ai_ptr->ai_addrlen = raw_ai_ptr->ai_addrlen;
+			remote_ai_ptr->ai_next = NULL;
 			need_socket = FALSE;
 			temp_1 = 1;
-			if (-1 == tcp_routines.aa_setsockopt(socketptr->sd, SOL_SOCKET, SO_REUSEADDR, &temp_1, SIZEOF(temp_1)))
+			if (-1 == tcp_routines.aa_setsockopt(sockptr->sd, SOL_SOCKET, SO_REUSEADDR, &temp_1, SIZEOF(temp_1)))
         		{
 				save_errno = errno;
                 		errptr = (char *)STRERROR(save_errno);
                 		errlen = STRLEN(errptr);
-				tcp_routines.aa_close(socketptr->sd);	/* Don't leave a dangling socket around */
-				socketptr->sd = FD_INVALID;
-                		rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+				tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
+				sockptr->sd = FD_INVALID;
+				if (NULL != sockptr->remote.ai_head)
+				{
+					freeaddrinfo(sockptr->remote.ai_head);
+					sockptr->remote.ai_head = NULL;
+				}
+                		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					  RTS_ERROR_LITERAL("SO_REUSEADDR"), save_errno, errlen, errptr);
                 		return FALSE;
         		}
 #ifdef			TCP_NODELAY
-			temp_1 = socketptr->nodelay ? 1 : 0;
-			if (-1 == tcp_routines.aa_setsockopt(socketptr->sd,
+			temp_1 = sockptr->nodelay ? 1 : 0;
+			if (-1 == tcp_routines.aa_setsockopt(sockptr->sd,
 						     IPPROTO_TCP, TCP_NODELAY, &temp_1, SIZEOF(temp_1)))
         		{
 				save_errno = errno;
                 		errptr = (char *)STRERROR(save_errno);
                 		errlen = STRLEN(errptr);
-				tcp_routines.aa_close(socketptr->sd);	/* Don't leave a dangling socket around */
-				socketptr->sd = FD_INVALID;
-                		rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+				tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
+				sockptr->sd = FD_INVALID;
+				if (NULL != sockptr->remote.ai_head)
+				{
+					freeaddrinfo(sockptr->remote.ai_head);
+					sockptr->remote.ai_head = NULL;
+				}
+                		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 					  RTS_ERROR_LITERAL("TCP_NODELAY"), save_errno, errlen, errptr);
                 		return FALSE;
         		}
 #endif
 			if (update_bufsiz)
 			{
-				if (-1 == tcp_routines.aa_setsockopt(socketptr->sd,
-							     SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, SIZEOF(socketptr->bufsiz)))
+				if (-1 == tcp_routines.aa_setsockopt(sockptr->sd,
+							     SOL_SOCKET, SO_RCVBUF, &sockptr->bufsiz, SIZEOF(sockptr->bufsiz)))
 				{
 					save_errno = errno;
 					errptr = (char *)STRERROR(save_errno);
          				errlen = STRLEN(errptr);
-					tcp_routines.aa_close(socketptr->sd);	/* Don't leave a dangling socket around */
-					socketptr->sd = FD_INVALID;
-                			rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+					tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
+					sockptr->sd = FD_INVALID;
+					if (NULL != sockptr->remote.ai_head)
+					{
+						freeaddrinfo(sockptr->remote.ai_head);
+						sockptr->remote.ai_head = NULL;
+					}
+                			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 						  RTS_ERROR_LITERAL("SO_RCVBUF"), save_errno, errlen, errptr);
 					return FALSE;
 				}
 			} else
 			{
-				sockbuflen = SIZEOF(socketptr->bufsiz);
-				if (-1 == tcp_routines.aa_getsockopt(socketptr->sd,
-							     SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, &sockbuflen))
+				sockbuflen = SIZEOF(sockptr->bufsiz);
+				if (-1 == tcp_routines.aa_getsockopt(sockptr->sd,
+							     SOL_SOCKET, SO_RCVBUF, &sockptr->bufsiz, &sockbuflen))
 				{
 					save_errno = errno;
 					errptr = (char *)STRERROR(save_errno);
          				errlen = STRLEN(errptr);
-					tcp_routines.aa_close(socketptr->sd);	/* Don't leave a dangling socket around */
-					socketptr->sd = FD_INVALID;
-                			rts_error(VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
+					tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
+					sockptr->sd = FD_INVALID;
+					if (NULL != sockptr->remote.ai_head)
+					{
+						freeaddrinfo(sockptr->remote.ai_head);
+						sockptr->remote.ai_head = NULL;
+					}
+                			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
 						  RTS_ERROR_LITERAL("SO_RCVBUF"), save_errno, errlen, errptr);
 					return FALSE;
 				}
@@ -207,8 +261,8 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 		if (need_connect)
 		{
 			/* Use plain connect to allow jobinterrupt */
-			assert(FD_INVALID != socketptr->sd);
-			res = connect(socketptr->sd, (struct sockaddr *)&socketptr->remote.sin, SIZEOF(socketptr->remote.sin));
+			assert(FD_INVALID != sockptr->sd);
+			res = connect(sockptr->sd, SOCKET_REMOTE_ADDR(sockptr), remote_ai_ptr->ai_addrlen);
 			if (res < 0)
 			{
 				save_errno = errno;
@@ -284,12 +338,12 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 					}
 				}
 				FD_ZERO(&writefds);
-				FD_SET(socketptr->sd, &writefds);
-				res = select(socketptr->sd + 1, NULL, &writefds, NULL, sel_time);
+				FD_SET(sockptr->sd, &writefds);
+				res = select(sockptr->sd + 1, NULL, &writefds, NULL, sel_time);
 				if (0 < res)
 				{	/* check for socket error */
 					sockbuflen = SIZEOF(sockerror);
-					res = getsockopt(socketptr->sd, SOL_SOCKET, SO_ERROR,
+					res = getsockopt(sockptr->sd, SOL_SOCKET, SO_ERROR,
 							&sockerror, &sockbuflen);
 					if (0 == res && 0 == sockerror)
 					{	/* got it */
@@ -337,38 +391,55 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 		}
 		if (save_errno)
 		{
-			if (FD_INVALID != socketptr->sd)
+			if (FD_INVALID != sockptr->sd)
 			{
-				tcp_routines.aa_close(socketptr->sd);	/* Don't leave a dangling socket around */
-				socketptr->sd = FD_INVALID;
+				tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
+				sockptr->sd = FD_INVALID;
+			}
+			if (NULL != sockptr->remote.ai_head)
+			{
+				freeaddrinfo(sockptr->remote.ai_head);
+				sockptr->remote.ai_head = NULL;
 			}
 			errptr = (char *)STRERROR(save_errno);
 			errlen = STRLEN(errptr);
 			if (dev_open == iod->state)
 			{
 				iod->dollar.za = 9;
-				memcpy(real_dsocketptr->dollar_device, ONE_COMMA, SIZEOF(ONE_COMMA));
-				memcpy(&real_dsocketptr->dollar_device[SIZEOF(ONE_COMMA) - 1],
+				memcpy(iod->dollar.device, ONE_COMMA, SIZEOF(ONE_COMMA));
+				memcpy(&iod->dollar.device[SIZEOF(ONE_COMMA) - 1],
 						errptr, errlen + 1); /* + 1 for null */
 			}
-			if (socketptr->ioerror)
-				rts_error(VARLSTCNT(6) ERR_OPENCONN, 0, ERR_TEXT, 2, errlen, errptr);
+			if (sockptr->ioerror)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_OPENCONN, 0, ERR_TEXT, 2, errlen, errptr);
 			errno = save_errno;
 			return FALSE;
 		}
 		if (no_time_left)
+		{
+			if (NULL != sockptr->remote.ai_head)
+			{
+				freeaddrinfo(sockptr->remote.ai_head);
+				sockptr->remote.ai_head = NULL;
+			}
 			return FALSE;	/* caller will close socket */
+		}
 		if (res < 0 && outofband)	/* if connected delay outofband */
 		{
 			DBGSOCK((stdout, "socconn: outofband interrupt received (%d) -- "
 				 "queueing mv_stent for wait intr\n", outofband));
 			if (need_connect)
 			{	/* no connect in progress */
-				tcp_routines.aa_close(socketptr->sd);	/* Don't leave a dangling socket around */
-				socketptr->sd = FD_INVALID;
-				socketptr->state = socket_created;
+				tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
+				sockptr->sd = FD_INVALID;
+				sockptr->state = socket_created;
 			} else
-				socketptr->state = socket_connect_inprogress;
+				sockptr->state = socket_connect_inprogress;
+			if (NULL != sockptr->remote.ai_head)
+			{
+				freeaddrinfo(sockptr->remote.ai_head);
+				sockptr->remote.ai_head = NULL;
+			}
 			real_sockintr->who_saved = sockintr->who_saved = sockwhich_connect;
 			if (NO_M_TIMEOUT != timepar)
 			{
@@ -384,7 +455,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 			PUSH_MV_STENT(MVST_ZINTDEV);
 			mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 			mv_chain->mv_st_cont.mvs_zintdev.io_ptr = NULL;
-			mv_chain->mv_st_cont.mvs_zintdev.socketptr = socketptr;	/* for sd and to free structure */
+			mv_chain->mv_st_cont.mvs_zintdev.socketptr = sockptr;	/* for sd and to free structure */
 			mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = d_socket_struct_len;
 			mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)stringpool.free;
 			memcpy (stringpool.free, (unsigned char *)newdsocket, d_socket_struct_len);
@@ -401,20 +472,36 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 		hiber_start(100);
 	} while (res < 0);
 
-	/* handle the local information later.
-	   SPRINTF(socketptr->local.saddr_ip, "%s", tcp_routines.aa_inet_ntoa(socketptr->remote.sin.sin_addr));
-	   socketptr->local.port = GTM_NTOHS(socketptr->remote.sin.sin_port);
-	*/
-	socketptr->state = socket_connected;
-	socketptr->first_read = socketptr->first_write = TRUE;
+	sockptr->state = socket_connected;
+	sockptr->first_read = sockptr->first_write = TRUE;
 	/* update dollar_key */
         len = SIZEOF(ESTABLISHED) - 1;
-        memcpy(&dsocketptr->dollar_key[0], ESTABLISHED, len);
-        dsocketptr->dollar_key[len++] = '|';
-        memcpy(&dsocketptr->dollar_key[len], socketptr->handle, socketptr->handle_len);
-        len += socketptr->handle_len;
-        dsocketptr->dollar_key[len++] = '|';
-	strcpy(&dsocketptr->dollar_key[len], socketptr->remote.saddr_ip); /* Also copies in trailing null */
+        memcpy(&iod->dollar.key[0], ESTABLISHED, len);
+        iod->dollar.key[len++] = '|';
+        memcpy(&iod->dollar.key[len], sockptr->handle, sockptr->handle_len);
+        len += sockptr->handle_len;
+        iod->dollar.key[len++] = '|';
+	/* translate internal address to numeric ip address */
+	assert(FALSE == need_socket);
+	if (NULL != sockptr->remote.ai_head)
+	{
+		freeaddrinfo(sockptr->remote.ai_head);
+		sockptr->remote.ai_head = NULL;
+	}
+	GETNAMEINFO(SOCKET_REMOTE_ADDR(sockptr), remote_ai_ptr->ai_addrlen, ipaddr, SA_MAXLEN, NULL, 0, NI_NUMERICHOST, errcode);
+	if (0 != errcode)
+	{
+		if (FD_INVALID != sockptr->sd)
+		{
+			tcp_routines.aa_close(sockptr->sd);	/* Don't leave a dangling socket around */
+			sockptr->sd = FD_INVALID;
+		}
+		RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+		return FALSE;
+	}
+	STRNDUP(ipaddr, SA_MAXLEN, sockptr->remote.saddr_ip);
+	strncpy(&iod->dollar.key[len], sockptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
+	iod->dollar.key[DD_BUFLEN-1] = '\0';			/* In case we fill the buffer */
 
 	return TRUE;
 }

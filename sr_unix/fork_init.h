@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2012 Fidelity Information Services, Inc.*
+ *	Copyright 2011, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,8 @@
 #ifndef _FORK_INIT_H
 #define _FORK_INIT_H
 
+#include "have_crit.h"
+
 /* This macro takes care of safely clearing the timer queue and resetting the
  * timer-related globals when we need to fork-off a process. Please note that
  * it is unnecessary to use this macro when the fork is immediately followed
@@ -20,11 +22,19 @@
  * situations, append BYPASSOK comment directives to the lines with fork
  * instances.
  */
+
 #define FORK_CLEAN(pid)			\
 {					\
-	pid = fork();			\
+	FORK(pid);			\
 	if (0 == pid)			\
 		clear_timers();		\
+}
+
+#define FORK(pid)                       		\
+{                                       		\
+	DEFER_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM)	\
+	pid = fork();                   		\
+	ENABLE_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM)	\
 }
 
 #endif

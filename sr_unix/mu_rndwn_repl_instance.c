@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -282,7 +282,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 			assert(INVALID_SEMID != sem_id);
 			if (!mur_options.rollback)
 			{	/* Invoked by MUPIP RUNDOWN in which case the semaphores needs to be removed. But, remove the
-				 * semaphore ONLY if we created it here OR the journal pool was successfully removed.
+				 * semaphore ONLY if we created it here OR the receive pool was successfully removed.
 				 */
 				if ((sem_created || (SS_NORMAL == recvpool_stat))
 					&& (SS_NORMAL == mu_replpool_release_sem(&repl_instance, RECVPOOL_SEGMENT, TRUE)))
@@ -315,7 +315,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 						START_HEARTBEAT_IF_NEEDED;
 						mutex_per_process_init();
 						if (!was_crit)
-							grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+							grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 					}
 					repl_inst_recvpool_reset();
 					if ((NULL != jnlpool_ctl) && !was_crit)
@@ -333,7 +333,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 				 * skip the ones that are present in the ignore list.
 				 */
 				assert((sem_created || (SS_NORMAL == recvpool_stat)) || holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
-				holds_sem[RECV][RECV_POOL_ACCESS_SEM] = FALSE;
+				DEBUG_ONLY(set_sem_set_recvr(sem_id));
 			}
 		} else if (rndwn_both_pools && (INVALID_SHMID != shm_id))
 		{

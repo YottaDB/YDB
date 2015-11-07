@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,6 +65,7 @@ int gtmsource_checkhealth(void)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	char			errtxt[OUT_BUFF_SIZE];
+	char			*modestr;
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	if (NULL != jnlpool.gtmsource_local)	/* Check health of a specific source server */
@@ -92,14 +93,27 @@ int gtmsource_checkhealth(void)
 		srv_alive = (0 == gtmsource_pid) ? FALSE : is_proc_alive(gtmsource_pid, 0);
 		if (srv_alive)
 		{
-			repl_log(stderr, FALSE, TRUE, FORMAT_STR1, gtmsource_pid, "Source server", "",
-				((GTMSOURCE_MODE_ACTIVE == gtmsourcelocal_ptr->mode) ? "ACTIVE" : "PASSIVE"));
+			if (GTMSOURCE_MODE_ACTIVE == gtmsourcelocal_ptr->mode)
+				modestr = "ACTIVE";
+			else if (GTMSOURCE_MODE_ACTIVE_REQUESTED == gtmsourcelocal_ptr->mode)
+				modestr = "ACTIVE REQUESTED";
+			else if (GTMSOURCE_MODE_PASSIVE == gtmsourcelocal_ptr->mode)
+				modestr = "PASSIVE";
+			else if (GTMSOURCE_MODE_PASSIVE_REQUESTED == gtmsourcelocal_ptr->mode)
+				modestr = "PASSIVE REQUESTED";
+			else
+			{
+				assert(gtmsourcelocal_ptr->mode != gtmsourcelocal_ptr->mode);
+				modestr = "UNKNOWN";
+			}
+			repl_log(stderr, FALSE, TRUE, FORMAT_STR1, gtmsource_pid, "Source server", "", modestr);
 			status |= SRV_ALIVE;
 			num_servers++;
 		} else
 		{
 			repl_log(stderr, FALSE, TRUE, FORMAT_STR, gtmsource_pid, "Source server", " NOT");
-			gtm_putmsg(VARLSTCNT(4) ERR_SRCSRVNOTEXIST, 2, LEN_AND_STR(gtmsourcelocal_ptr->secondary_instname));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SRCSRVNOTEXIST, 2,
+					LEN_AND_STR(gtmsourcelocal_ptr->secondary_instname));
 			status |= SRV_DEAD;
 		}
 		if (NULL != jnlpool.gtmsource_local)
@@ -133,7 +147,7 @@ int gtmsource_checkhealth(void)
 	all_files_open = region_init(FALSE);
 	if (!all_files_open)
 	{
-		gtm_putmsg(VARLSTCNT(1) ERR_NOTALLDBOPN);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTALLDBOPN);
 		status |= SRV_ERR;
 	} else
 	{

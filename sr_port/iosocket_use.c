@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,6 @@
 
 #include <errno.h>
 #include "gtm_inet.h"
-#include <netinet/tcp.h>
 #include "copy.h"
 #include "io.h"
 #include "io_params.h"
@@ -117,7 +116,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		if (dsocketptr->mupintr)
 		{	/* And if we are in $zinterrupt code this is not allowed */
 			if (dollar_zininterrupt)
-				rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 			/* We are not in $zinterrupt code and this device was not resumed properly
 			   so clear its restartability.
 			*/
@@ -146,7 +145,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				tab = pp->str.addr + p_offset + 1;
 				if ((fil_type = namelook(filter_index, filter_names, tab, len)) < 0)
 				{
-					rts_error(VARLSTCNT(1) ERR_TTINVFILTER);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TTINVFILTER);
 					return;
 				}
 				switch (fil_type)
@@ -184,13 +183,13 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				n_specified++;
 				connect_specified = TRUE;
 				len = *(pp->str.addr + p_offset);
-				if (len < SA_MAXLITLEN)
+				if (len < USR_SA_MAXLITLEN)
 				{
 					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), len);
 					sockaddr[len] = '\0';
 				} else
-					rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG,
-						  4, len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ADDRTOOLONG,
+						  4, len, pp->str.addr + p_offset + 1, len, USR_SA_MAXLITLEN);
 				break;
 			case iop_delimiter:
 				n_specified++;
@@ -198,7 +197,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				if (((MAX_DELIM_LEN + 1) * MAX_N_DELIMITER) >= delimiter_len)
 					memcpy(delimiter_buffer, (pp->str.addr + p_offset + 1), delimiter_len);
 				else
-					rts_error(VARLSTCNT(1) ERR_DELIMSIZNA);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
 				break;
 			case	iop_nodelimiter:
 				delimiter_len = 0;
@@ -213,13 +212,13 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				bfsize_specified = TRUE;
 				GET_ULONG(bfsize, pp->str.addr + p_offset);
 				if ((0 == bfsize) || (MAX_SOCKET_BUFFER_SIZE < bfsize))
-					rts_error(VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
 				break;
 			case	iop_zibfsize:
 				ibfsize_specified = TRUE;
 				GET_ULONG(ibfsize, pp->str.addr + p_offset);
 				if ((0 == ibfsize) || (MAX_INTERNAL_SOCBUF_SIZE < ibfsize))
-					rts_error(VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, ibfsize);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, ibfsize);
 				break;
 			case iop_ioerror:
 				n_specified++;
@@ -230,13 +229,13 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				n_specified++;
 				listen_specified = TRUE;
 				len = *(pp->str.addr + p_offset);
-				if (len < SA_MAXLITLEN)
+				if (len < USR_SA_MAXLITLEN)
 				{
 					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), len);
 					sockaddr[len] = '\0';
 				} else
-					rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG,
-						  4, len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ADDRTOOLONG,
+						  4, len, pp->str.addr + p_offset + 1, len, USR_SA_MAXLITLEN);
 				break;
 			case iop_socket:
 				n_specified++;
@@ -266,7 +265,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				if (MAX_ZFF_LEN >= (zff_len = (int4)(unsigned char)*(pp->str.addr + p_offset)))
 					memcpy(zff_buffer, (char *)(pp->str.addr + p_offset + 1), zff_len);
 				else
-					rts_error(VARLSTCNT(4) ERR_ZFF2MANY, 2, zff_len, MAX_ZFF_LEN);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFF2MANY, 2, zff_len, MAX_ZFF_LEN);
 				break;
 			case iop_znoff:
 				zff_len = 0;
@@ -274,14 +273,14 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			case iop_length:
 				GET_LONG(length, pp->str.addr + p_offset);
 				if (length < 0)
-					rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 				iod->length = length;
 				break;
 			case iop_width:
 				/* SOCKET WIDTH is handled the same way as TERMINAL WIDTH */
 				GET_LONG(width, pp->str.addr + p_offset);
 				if (width < 0)
-					rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 				if (0 == width)
 				{
 					iod->width = TCPDEF_WIDTH;
@@ -304,9 +303,9 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				if (-1 == moreread_timeout)
 					moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
 				else if (-1 > moreread_timeout)
-					rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 				else if (MAX_MOREREAD_TIMEOUT < moreread_timeout)
-					rts_error(VARLSTCNT(3) ERR_MRTMAXEXCEEDED, 1, MAX_MOREREAD_TIMEOUT);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MRTMAXEXCEEDED, 1, MAX_MOREREAD_TIMEOUT);
                                 moreread_specified = TRUE;
                                 break;
 			default:
@@ -322,17 +321,20 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	/* ------------------------------ compatibility verification -------------------------------- */
 	if ((socket_specified) && ((n_specified > 2) || ((2 == n_specified) && (0 >= delimiter_len))))
 	{
-		rts_error(VARLSTCNT(8) ERR_ACOMPTBINC, 6, LEN_AND_LIT("SOCKET"), LEN_AND_LIT("DELIMITER"), LEN_AND_LIT("USE"));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ACOMPTBINC, 6, LEN_AND_LIT("SOCKET"), LEN_AND_LIT("DELIMITER"),
+				 LEN_AND_LIT("USE"));
 		return;
 	}
 	if (connect_specified && listen_specified)
 	{
-		rts_error(VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("CONNECT"), LEN_AND_LIT("ZLISTEN"), LEN_AND_LIT("USE"));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("CONNECT"), LEN_AND_LIT("ZLISTEN"),
+				 LEN_AND_LIT("USE"));
 		return;
 	}
 	if (delay_specified && nodelay_specified)
 	{
-		rts_error(VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("DELAY"), LEN_AND_LIT("NODELAY"), LEN_AND_LIT("OPEN"));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("DELAY"), LEN_AND_LIT("NODELAY"),
+				 LEN_AND_LIT("OPEN"));
 		return;
 	}
 	/* ------------------ make a local copy of device structure to play with -------------------- */
@@ -343,7 +345,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	{
 		if (1 < n_specified)
 		{
-			rts_error(VARLSTCNT(6) ERR_ANCOMPTINC, 4, LEN_AND_LIT("DETACH"), LEN_AND_LIT("USE"));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ANCOMPTINC, 4, LEN_AND_LIT("DETACH"), LEN_AND_LIT("USE"));
 			return;
 		}
 		if (NULL == socket_pool)
@@ -365,12 +367,12 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	   */
 		if (1 < n_specified)
 		{
-			rts_error(VARLSTCNT(6) ERR_ANCOMPTINC, 4, LEN_AND_LIT("ATTACH"), LEN_AND_LIT("USE"));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ANCOMPTINC, 4, LEN_AND_LIT("ATTACH"), LEN_AND_LIT("USE"));
 			return;
 		}
 		if (NULL == socket_pool)
 		{
-			rts_error(VARLSTCNT(4) ERR_SOCKNOTFND, 2, handlea_len, handlea);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handlea_len, handlea);
 			return;
 		}
 		iosocket_switch(handlea, handlea_len, socket_pool, newdsocket);
@@ -395,7 +397,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			/* use the socket flag to identify which socket to apply changes */
 			if (0 > (index = iosocket_handle(handles, &handles_len, FALSE, newdsocket)))
 			{
-				rts_error(VARLSTCNT(4) ERR_SOCKNOTFND, 2, handles_len, handles);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handles_len, handles);
 				return;
 			}
 			newdsocket->current_socket = index;
@@ -406,10 +408,12 @@ void	iosocket_use(io_desc *iod, mval *pp)
      			if (newdsocket->n_socket <= newdsocket->current_socket)
 	     		{
 				assert(FALSE);
-				rts_error(VARLSTCNT(4) ERR_CURRSOCKOFR, 2, newdsocket->current_socket, newdsocket->n_socket);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, newdsocket->current_socket,
+						newdsocket->n_socket);
      				return;
      			}
 		}
+		socketptr->temp_sd = FD_INVALID;
 	}
 	newsocket = *socketptr;
 	/* ---------------------- apply changes to the local copy of the socket --------------------- */
@@ -438,7 +442,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 							   &newsocket.delimiter[0], NULL, NULL);
 					if (MAX_DELIM_LEN < new_len)
 					{
-						rts_error(VARLSTCNT(1) ERR_DELIMSIZNA);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
 						return;
 					}
 				} else
@@ -456,7 +460,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		}
 	}
 	if (iod->wrap && 0 != newsocket.n_delimiter && iod->width < newsocket.delimiter[0].len)
-		rts_error(VARLSTCNT(4) ERR_DELIMWIDTH, 2, iod->width, newsocket.delimiter[0].len);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DELIMWIDTH, 2, iod->width, newsocket.delimiter[0].len);
 	if (0 <= zff_len && /* ZFF or ZNOFF specified */
 	    0 < (newsocket.zff.len = zff_len)) /* assign the new ZFF len, might be 0 from ZNOFF, or ZFF="" */
 	{	/* ZFF="non-zero-len-string" specified */
@@ -467,7 +471,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			lcl_zff.len = zff_len;
 			new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset], &lcl_zff, NULL, NULL);
 			if (MAX_ZFF_LEN < new_len)
-				rts_error(VARLSTCNT(4) ERR_ZFF2MANY, 2, new_len, MAX_ZFF_LEN);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFF2MANY, 2, new_len, MAX_ZFF_LEN);
                         if (NULL == newsocket.zff.addr) /* we rely on newsocket.zff.addr being set to 0 in iosocket_create() */
                                 newsocket.zff.addr = (char *)malloc(MAX_ZFF_LEN);
 			newsocket.zff.len = new_len;
@@ -512,7 +516,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
-                	rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("TCP_NODELAY"), save_errno, LEN_AND_STR(errptr));
+                	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("TCP_NODELAY"), save_errno,
+					 LEN_AND_STR(errptr));
 			return;
 		}
 #endif
@@ -522,13 +527,14 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
-                	rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("SO_RCVBUF"), save_errno, LEN_AND_STR(errptr));
+                	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("SO_RCVBUF"), save_errno,
+					 LEN_AND_STR(errptr));
 			return;
 		}
 		if (socketptr->buffer_size != newsocket.buffer_size)
 		{
 			if (socketptr->buffered_length > bfsize)
-				rts_error(VARLSTCNT(4) ERR_SOCKBFNOTEMPTY, 2, bfsize, socketptr->buffered_length);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKBFNOTEMPTY, 2, bfsize, socketptr->buffered_length);
 			newsocket.buffer = (char *)malloc(bfsize);
 			if (0 < socketptr->buffered_length)
 			{
@@ -544,12 +550,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
         {	/* error message should be printed from bind/connect */
                 if (socketptr->sd > 0)
                         (void)tcp_routines.aa_close(socketptr->sd);
-                iosocket_delimiter((unsigned char *)NULL, 0, &newsocket, TRUE);
-		if (NULL != socketptr->zff.addr)
-			free(socketptr->zff.addr);
-		if (NULL != socketptr->buffer)
-			free(socketptr->buffer);
-                free(socketptr);
+		SOCKET_FREE(socketptr);
                 return;
         }
 	/* ------------------------------------ commit changes -------------------------------------- */
@@ -557,7 +558,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	{
                 if (gtm_max_sockets <= newdsocket->n_socket)
                 {
-                        rts_error(VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
                         return;
                 }
 		/* a new socket is created. so add to the list */

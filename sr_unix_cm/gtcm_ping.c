@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,11 +25,9 @@
 #include "gtm_time.h"
 #endif
 #include <sys/types.h>
-#include "gtm_netdb.h"
 #include "gtm_socket.h"
-#ifndef __MVS__
-#include <netinet/tcp.h>
-#endif
+#include "gtm_netdb.h"
+#include "gtm_ipv6.h"
 
 #include "gtm_inet.h"
 #ifndef __MVS__
@@ -72,6 +70,9 @@ struct icmp
 #endif /* __CYGWIN__ || __MVS */
 
 #ifdef __MVS__
+
+error_def(ERR_GETNAMEINFO);
+
 struct ip
   {
     unsigned int ip_v:4;		/* version */
@@ -124,8 +125,8 @@ int init_ping(void)
 int icmp_ping(int conn)
 {
 	fd_set			fdmask;
-	struct sockaddr_in	paddr;
-	GTM_SOCKLEN_TYPE	paddr_len = SIZEOF(struct sockaddr_in);
+	struct sockaddr_storage	paddr;
+	GTM_SOCKLEN_TYPE	paddr_len = SIZEOF(struct sockaddr_storage);
 	struct icmp		*icp;
 	struct ip		*ip;
 	struct timeval		timeout;
@@ -163,21 +164,14 @@ int icmp_ping(int conn)
 	}
 #ifdef DEBUG_PING
 	{
-		char *host;
+		char host[SA_MAXLEN];
 		struct hostent *he;
-		char msg[64];
-#ifndef SUNOS
-		host = inet_ntoa(paddr.sin_addr.s_addr);
-		if ((he = gethostbyaddr(paddr.sin_addr.s_addr, SIZEOF(paddr.sin_addr.s_addr), 0)))
-			host = he->h_name;
-#else
-	 SPRINTF(msg, "%d.%d.%d.%d",
-		   paddr.sin_addr.s_addr >> 24,
-		   paddr.sin_addr.s_addr >> 16 & 0xFF,
-		   paddr.sin_addr.s_addr >> 8 & 0xFF,
-		   paddr.sin_addr.s_addr & 0xFF);
-		host = msg;
-#endif
+		if (0 != (errcode = getnameinfo((struct sockaddr *)&paddr, paddr_len, host, SA_MAXLEN, NULL, 0 0)))
+		{
+			assert(FALSE);
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+			return FALSE;
+		}
 		OMI_DBG((omi_debug, "ping: send to %s\n",host));
 	}
 #endif
@@ -192,7 +186,7 @@ int icmp_ping(int conn)
  */
 int get_ping_rsp(void)
 {
-	struct sockaddr_in from;
+	struct sockaddr_storage from;
 	register int cc;
 	GTM_SOCKLEN_TYPE fromlen;
 	struct icmp *icp;
@@ -203,6 +197,9 @@ int get_ping_rsp(void)
 		FPRINTF(stderr,"icmp_ping:  no ping socket.\n");
 		exit(1);
 	}
+	/* SIZEOF() does not provide correct fromlen.
+	 * fromlen in fact decided by recvfrom() below, so no need getaddrinfo() is needed to obtain the correct fromlen
+	 */
 	fromlen = SIZEOF(from);
 	while ((cc = (int)(recvfrom(pingsock, (char *)pingrcv, IP_MAXPACKET, 0, (struct sockaddr *)&from,
 					(GTM_SOCKLEN_TYPE *)&fromlen))) < 0)
@@ -217,22 +214,14 @@ int get_ping_rsp(void)
 	/* xxxxxxx icp = (struct icmp *)(pingrcv + (ip->ip_hl << 2)); */
 #ifdef DEBUG_PING
 	{
-		char *host;
+		char host[SA_MAXLEN];
 		struct hostent *he;
-		char msg[64];
-#ifndef SUNOS
-		host = inet_ntoa(from.sin_addr.s_addr);
-		if ((he = gethostbyaddr(from.sin_addr.s_addr,
-					SIZEOF(from.sin_addr.s_addr), 0)))
-			host = he->h_name;
-#else
-	 SPRINTF(msg, "%d.%d.%d.%d",
-		   from.sin_addr.s_addr >> 24,
-		   from.sin_addr.s_addr >> 16 & 0xFF,
-		   from.sin_addr.s_addr >> 8 & 0xFF,
-		   from.sin_addr.s_addr & 0xFF);
-		host = msg;
-#endif
+		if (0 != (errcode = getnameinfo((struct sockaddr *)&from, fromlen, host, SA_MAXLEN, NULL, 0 0)))
+		{
+			assert(FALSE);
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+			return FALSE;
+		}
 		OMI_DBG((omi_debug, "ping: response from %s\n",host));
 	}
 #endif

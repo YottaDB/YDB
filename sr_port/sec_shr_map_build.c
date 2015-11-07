@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,14 +20,21 @@
 #include "gdsbml.h"
 #include "probe.h"
 #include "sec_shr_map_build.h"
+#include "min_max.h"
 
 int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, cw_set_element *cs, trans_num ctn, int bplmap)
 {
-	boolean_t		busy, recycled;
 	uint4			setbit;
 	unsigned char		*ptr;
-	sgmnt_data_ptr_t	csd;
 	uint4			bitnum, ret, prev;
+#ifdef UNIX
+	uint4			(*bml_func)();
+#else	/* gtmsecshr on VMS uses a very minimal set of modules so we dont want to pull in bml_*() functions there
+	 * and hence avoid using function pointers
+	 */
+	uint4			bml_func;
+	uint4			bml_busy = 1, bml_free = 2, bml_recycled = 3;
+#endif
 #ifdef DEBUG
 	int4			prev_bitnum, actual_cnt = 0;
 #endif
@@ -41,22 +48,23 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 		assert(FALSE);
 		return FALSE;
 	}
-	busy = (cs->reference_cnt > 0);
-	if (!busy)
+	/* The following PROBE's are needed before DETERMINE_BML_FUNC, as the macro uses these pointers. */
+	if (!GTM_PROBE(SIZEOF(sgmnt_addrs), csa, READ))
 	{
-		if (!GTM_PROBE(SIZEOF(sgmnt_addrs), csa, READ))
-		{
-			assert(FALSE);
-			return FALSE;
-		}
-		csd = csa->hdr;
-		if (!GTM_PROBE(SIZEOF(sgmnt_data), csd, READ))
-		{
-			assert(FALSE);
-			return FALSE;
-		}
-		recycled = csd->db_got_to_v5_once ? TRUE : FALSE;
+		assert(FALSE);
+		return FALSE;
 	}
+	if (!(GTM_PROBE(NODE_LOCAL_SIZE_DBS, csa->nl, WRITE)))
+	{
+		assert(FALSE);
+		return FALSE;
+	}
+	if (!GTM_PROBE(SIZEOF(sgmnt_data), csa->hdr, READ))
+	{
+		assert(FALSE);
+		return FALSE;
+	}
+	DETERMINE_BML_FUNC(bml_func, cs, csa);
 	DEBUG_ONLY(prev_bitnum = -1;)
 	for (;;)
 	{
@@ -82,7 +90,7 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 			return FALSE;
 		}
 		setbit &= 7;
-		if (busy)
+		if (bml_busy == bml_func)
 		{
 			*ptr &= ~(3 << setbit);	/* mark block as BUSY (00) */
 			DEBUG_ONLY(actual_cnt++);
@@ -93,7 +101,7 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 				if (!prev)
 					actual_cnt--;
 			)
-			if (recycled)
+			if (bml_recycled == bml_func)
 				*ptr |= (3 << setbit);	/* mark block as RECYCLED (11) */
 			else
 			{	/* mark block as FREE (01) */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 /* Define macros to do system calls and restart as appropriate
  *
  * FCNTL, FCNTL3	Loop until fcntl call succeeds or fails with other than EINTR.
- * TCFLUSH			Loop until tcflush call succeeds or fails with other than EINTR.
+ * TCFLUSH		Loop until tcflush call succeeds or fails with other than EINTR.
  * Tcsetattr		Loop until tcsetattr call succeeds or fails with other than EINTR.
  */
 
@@ -31,198 +31,199 @@
 #include "wbox_test_init.h"
 #endif
 
-#define ACCEPT_SOCKET(SOCKET, ADDR, LEN, RC)	\
-{						\
-	do					\
-	{					\
-	   RC = ACCEPT(SOCKET, ADDR, LEN);	\
-	} while(-1 == RC && EINTR == errno);	\
+#define ACCEPT_SOCKET(SOCKET, ADDR, LEN, RC)		\
+{							\
+	do						\
+	{						\
+		RC = ACCEPT(SOCKET, ADDR, LEN);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define CHG_OWNER(PATH, OWNER, GRP, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = CHOWN(PATH, OWNER, GRP);	\
-	} while(-1 == RC && EINTR == errno);	\
+#define CHG_OWNER(PATH, OWNER, GRP, RC)			\
+{							\
+	do						\
+	{						\
+		RC = CHOWN(PATH, OWNER, GRP);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define CLOSEDIR(DIR, RC)			\
-{						\
-	do					\
-	{					\
-	   RC = closedir(DIR);			\
-	} while(-1 == RC && EINTR == errno);	\
+#define CLOSEDIR(DIR, RC)				\
+{							\
+	do						\
+	{						\
+		RC = closedir(DIR);			\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define CONNECT_SOCKET(SOCKET, ADDR, LEN, RC)	\
-{						\
-	do					\
-	{					\
-	   RC = CONNECT(SOCKET, ADDR, LEN);	\
-	} while(-1 == RC && EINTR == errno);	\
+#define CONNECT_SOCKET(SOCKET, ADDR, LEN, RC)		\
+{							\
+	do						\
+	{						\
+		RC = CONNECT(SOCKET, ADDR, LEN);	\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define CREATE_FILE(PATHNAME, MODE, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = CREAT(PATHNAME, MODE);		\
-	} while(-1 == RC && EINTR == errno);	\
+#define CREATE_FILE(PATHNAME, MODE, RC)			\
+{							\
+	do						\
+	{						\
+		RC = CREAT(PATHNAME, MODE);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define DOREAD_A_NOINT(FD, BUF, SIZE, RC)	\
-{						\
-	do					\
-	{					\
-	   RC = DOREAD_A(FD, BUF, SIZE);	\
-	} while(-1 == RC && EINTR == errno);	\
+#define DOREAD_A_NOINT(FD, BUF, SIZE, RC)		\
+{							\
+	do						\
+	{						\
+		RC = DOREAD_A(FD, BUF, SIZE);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define DUP2(FDESC1, FDESC2, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = dup2(FDESC1, FDESC2);		\
-	} while(-1 == RC && EINTR == errno);	\
+#define DUP2(FDESC1, FDESC2, RC)			\
+{							\
+	do						\
+	{						\
+		RC = dup2(FDESC1, FDESC2);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define FCLOSE(STREAM, RC)			\
-{						\
-	do					\
-	{					\
-	   RC = fclose(STREAM);			\
-	} while(-1 == RC && EINTR == errno);	\
+#define FCLOSE(STREAM, RC)				\
+{							\
+	do						\
+	{						\
+		RC = fclose(STREAM);			\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define FCNTL2(FDESC, ACTION, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = fcntl(FDESC, ACTION);		\
-	} while(-1 == RC && EINTR == errno);	\
+#define FCNTL2(FDESC, ACTION, RC)			\
+{							\
+	do						\
+	{						\
+		RC = fcntl(FDESC, ACTION);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define FCNTL3(FDESC, ACTION, ARG, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = fcntl(FDESC, ACTION, ARG);	\
-	} while(-1 == RC && EINTR == errno);	\
+#define FCNTL3(FDESC, ACTION, ARG, RC)			\
+{							\
+	do						\
+	{						\
+		RC = fcntl(FDESC, ACTION, ARG);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define FGETS_FILE(BUF, LEN, FP, RC)		\
-{						\
-	do					\
-	{					\
-	   FGETS(BUF, LEN, FP, RC);		\
+#define FGETS_FILE(BUF, LEN, FP, RC)			\
+{							\
+	do						\
+	{						\
+		FGETS(BUF, LEN, FP, RC);		\
 	} while(NULL == RC && !feof(FP) && ferror(FP) && EINTR == errno);	\
 }
 
-#define FSTAT_FILE(FDESC, INFO, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = fstat(FDESC, INFO);		\
-	} while(-1 == RC && EINTR == errno);	\
+#define FSTAT_FILE(FDESC, INFO, RC)			\
+{							\
+	do						\
+	{						\
+		DEFER_INTERRUPTS(INTRPT_IN_FSTAT);	\
+		RC = fstat(FDESC, INFO);		\
+		ENABLE_INTERRUPTS(INTRPT_IN_FSTAT);	\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define FSTATVFS_FILE(FDESC, FSINFO, RC)	\
-{						\
-	do					\
-	{					\
-	   FSTATVFS(FDESC, FSINFO, RC);		\
-	} while(-1 == RC && EINTR == errno);	\
+#define FSTATVFS_FILE(FDESC, FSINFO, RC)		\
+{							\
+	do						\
+	{						\
+		FSTATVFS(FDESC, FSINFO, RC);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define FTRUNCATE(FDESC, LENGTH, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = ftruncate(FDESC, LENGTH);	\
-	} while(-1 == RC && EINTR == errno);	\
+#define FTRUNCATE(FDESC, LENGTH, RC)			\
+{							\
+	do						\
+	{						\
+		RC = ftruncate(FDESC, LENGTH);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define MSGSND(MSGID, MSGP, MSGSZ, FLG, RC)	\
-{						\
-	do					\
-	{					\
-	   RC = msgsnd(MSGID, MSGP, MSGSZ, FLG);\
-	} while(-1 == RC && EINTR == errno);	\
+#define MSGSND(MSGID, MSGP, MSGSZ, FLG, RC)		\
+{							\
+	do						\
+	{						\
+		RC = msgsnd(MSGID, MSGP, MSGSZ, FLG);	\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define OPEN_PIPE(FDESC, RC)			\
-{						\
-	do					\
-	{					\
-	   RC = pipe(FDESC);			\
-	} while(-1 == RC && EINTR == errno);	\
+#define OPEN_PIPE(FDESC, RC)				\
+{							\
+	do						\
+	{						\
+		RC = pipe(FDESC);			\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define READ_FILE(FD, BUF, SIZE, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = read(FD, BUF, SIZE);		\
-	} while(-1 == RC && EINTR == errno);	\
+#define READ_FILE(FD, BUF, SIZE, RC)			\
+{							\
+	do						\
+	{						\
+		RC = read(FD, BUF, SIZE);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define RECVFROM_SOCK(SOCKET, BUF, LEN, FLAGS,	\
-		 ADDR, ADDR_LEN, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = RECVFROM(SOCKET, BUF, LEN,	\
-			 FLAGS, ADDR, ADDR_LEN);\
-	} while(-1 == RC && EINTR == errno);	\
+#define RECVFROM_SOCK(SOCKET, BUF, LEN, FLAGS,		\
+		 ADDR, ADDR_LEN, RC)			\
+{							\
+	do						\
+	{						\
+		RC = RECVFROM(SOCKET, BUF, LEN,		\
+			 FLAGS, ADDR, ADDR_LEN);	\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define SELECT(FDS, INLIST, OUTLIST, XLIST,	\
-		 TIMEOUT, RC)			\
-{						\
-        struct timeval eintr_select_timeval;	\
-	do					\
-	{					\
-	   eintr_select_timeval = *(TIMEOUT);	\
-	   RC = select(FDS, INLIST, OUTLIST,	\
-		         XLIST,			\
-		         &eintr_select_timeval);\
-	} while(-1 == RC && EINTR == errno);	\
+#define SELECT(FDS, INLIST, OUTLIST, XLIST,		\
+		 TIMEOUT, RC)				\
+{							\
+	struct timeval eintr_select_timeval;		\
+	do						\
+	{						\
+		eintr_select_timeval = *(TIMEOUT);	\
+		RC = select(FDS, INLIST, OUTLIST,	\
+			XLIST, &eintr_select_timeval);	\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
 
-#define SEND(SOCKET, BUF, LEN, FLAGS, RC)	\
-{						\
-	do					\
-	{					\
-	   RC = send(SOCKET, BUF, LEN, FLAGS);	\
-	} while(-1 == RC && EINTR == errno);	\
+#define SEND(SOCKET, BUF, LEN, FLAGS, RC)		\
+{							\
+	do						\
+	{						\
+		RC = send(SOCKET, BUF, LEN, FLAGS);	\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define SENDTO_SOCK(SOCKET, BUF, LEN, FLAGS,	\
-		 ADDR, ADDR_LEN, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = SENDTO(SOCKET, BUF, LEN, FLAGS,	\
-			 ADDR, ADDR_LEN);	\
-	} while(-1 == RC && EINTR == errno);	\
+#define SENDTO_SOCK(SOCKET, BUF, LEN, FLAGS,		\
+		 ADDR, ADDR_LEN, RC)			\
+{							\
+	do						\
+	{						\
+		RC = SENDTO(SOCKET, BUF, LEN, FLAGS,	\
+			 ADDR, ADDR_LEN);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define STAT_FILE(PATH, INFO, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = Stat(PATH, INFO);		\
+#define STAT_FILE(PATH, INFO, RC)			\
+{							\
+	do						\
+	{						\
+		RC = Stat(PATH, INFO);			\
 	} while((uint4)-1 == RC && EINTR == errno);	\
 }
 
-#define TCFLUSH(FDESC, REQUEST, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = tcflush(FDESC, REQUEST);	\
-	} while(-1 == RC && EINTR == errno);	\
+#define TCFLUSH(FDESC, REQUEST, RC)			\
+{							\
+	do						\
+	{						\
+		RC = tcflush(FDESC, REQUEST);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
 #if defined(UNIX)
@@ -234,27 +235,27 @@
 	SIGPROCMASK(SIG_BLOCK, &block_ttinout, &oldset, rc);	\
 	do							\
 	{							\
-	   RC = tcsetattr(FDESC, WHEN, TERMPTR);		\
+		RC = tcsetattr(FDESC, WHEN, TERMPTR);		\
 	} while(-1 == RC && EINTR == errno);			\
 	ERRNO = errno;						\
 	SIGPROCMASK(SIG_SETMASK, &oldset, NULL, rc);		\
 }
 #endif
 
-#define TRUNCATE_FILE(PATH, LENGTH, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = TRUNCATE(PATH, LENGTH);		\
-	} while(-1 == RC && EINTR == errno);	\
+#define TRUNCATE_FILE(PATH, LENGTH, RC)			\
+{							\
+	do						\
+	{						\
+		RC = TRUNCATE(PATH, LENGTH);		\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
-#define WAIT(STATUS, RC)			\
-{						\
-	do					\
-	{					\
-	   RC = wait(STATUS);			\
-	} while(-1 == RC && EINTR == errno);	\
+#define WAIT(STATUS, RC)				\
+{							\
+	do						\
+	{						\
+		RC = wait(STATUS);			\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
 #define WAITPID(PID, STATUS, OPTS, RC)											\
@@ -267,16 +268,16 @@
 	assert(getpid() != PID);											\
 	do														\
 	{														\
-	   RC = waitpid(PID, STATUS, OPTS);										\
+		RC = waitpid(PID, STATUS, OPTS);									\
 	} while(-1 == RC && EINTR == errno);										\
 }
 
-#define GTM_FSYNC(FD, RC)			\
-{						\
-	do					\
-	{					\
-	   RC = fsync(FD);			\
-	} while(-1 == RC && EINTR == errno);	\
+#define GTM_FSYNC(FD, RC)				\
+{							\
+	do						\
+	{						\
+		RC = fsync(FD);				\
+	} while(-1 == RC && EINTR == errno);		\
 }
 
 #define SIGPROCMASK(FUNC, NEWSET, OLDSET, RC)		\

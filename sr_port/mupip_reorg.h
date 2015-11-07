@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,9 +10,6 @@
  ****************************************************************/
 
 #ifndef MUPIP_REORG_DEFINED
-#define MUSWP_NONE		0
-#define MUSWP_INCR_ROOT_CYCLE 	1
-#define MUSWP_FREE_BLK		2
 
 /* prototypes */
 

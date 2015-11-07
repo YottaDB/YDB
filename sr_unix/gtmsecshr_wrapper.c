@@ -29,6 +29,7 @@
 #ifndef __MVS__
 #  include <malloc.h>
 #endif
+#include <signal.h>
 #include <errno.h>
 #define ROOTUID 0
 #define ROOTGID 0
@@ -186,7 +187,13 @@ int main()
 	char 		gtm_secshr_orig_path[MAX_ENV_VAR_VAL_LEN];
 	int		gtm_tmp_exists = 0;
 	int		gtm_dbglvl_exists = 0;
+	sigset_t	mask;
 
+	/* Reset the signal mask (since the one inherited from the invoking process might have signals such as SIGALRM or SIGTERM
+	 * blocked) to let gtmsecshr manage its own signals using sig_init.
+	 */
+	sigemptyset(&mask);
+	sigprocmask(SIG_SETMASK, &mask, NULL);
 	OPENLOG("GTMSECSHRINIT", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
 	ret = 0; /* start positive */
 	/* get the ones we need */

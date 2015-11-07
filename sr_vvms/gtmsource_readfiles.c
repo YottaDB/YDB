@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,23 +14,12 @@
 #include "gtm_string.h"
 
 #include <stddef.h>	/* for offsetof macro */
-#ifdef UNIX
-#include "gtm_ipc.h"
-#endif
 #include "gtm_socket.h"
 #include "gtm_inet.h"
-#ifdef UNIX
-#include <sys/un.h>
-#endif
 #include <sys/time.h>
 #include <errno.h>
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#ifdef UNIX
-#include "gtm_stat.h"
-#include "gtmio.h"
-#endif
-#ifdef VMS
 #include <ssdef.h>
 #include <rms.h>
 #include <devdef.h>
@@ -42,8 +31,6 @@
 #include <efndef.h>
 #include <secdef.h>
 #include "iosb_disk.h"
-#endif
-
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"

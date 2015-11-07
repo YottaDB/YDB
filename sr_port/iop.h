@@ -212,4 +212,6 @@ IOP_DESC(194, iop_nodestroy, 0, IOP_CLOSE_OK, 0),
 IOP_DESC(195, iop_rundown, 0, IOP_CLOSE_OK, 0),
 IOP_DESC(196, iop_follow, 0, IOP_OPEN_OK|IOP_USE_OK, 0),
 IOP_DESC(197, iop_nofollow, 0, IOP_OPEN_OK|IOP_USE_OK, 0),
-IOP_DESC(198, n_iops, 0, 0, 0)
+IOP_DESC(198, iop_empterm, 0, IOP_OPEN_OK|IOP_USE_OK, 0),
+IOP_DESC(199, iop_noempterm, 0, IOP_OPEN_OK|IOP_USE_OK, 0),
+IOP_DESC(200, n_iops, 0, 0, 0)

@@ -47,6 +47,7 @@
 #include "gtmio.h"
 #include "have_crit.h"
 #include "gtm_time.h"
+#include "fork_init.h"
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
@@ -241,7 +242,7 @@ void gcore_server(void)
 		dump_rc_hist();
 	}
 
-	pid=fork();	/* BYPASSOK: we are dumping a core, so no FORK_CLEAN needed */
+	FORK(pid);	/* BYPASSOK: we are dumping a core, so no FORK_CLEAN needed */
 	if (pid < 0)	/* fork error */
 	{
 		OMI_DBG((omi_debug,

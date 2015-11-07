@@ -51,14 +51,14 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	char 		*tmp_time;
 
 #ifdef BSD_TCP
-	GTM_SOCKLEN_TYPE			sln;
-	struct sockaddr_in	sin;
+	GTM_SOCKLEN_TYPE	sln;
+	struct sockaddr_storage	sas;
 	int			optsize;
 	const boolean_t		keepalive = TRUE;
 
 	/*  Accept the connection from the network layer */
-	sln = SIZEOF(sin);
-	if ((fd = accept(cll->nve, (struct sockaddr *)&sin, (GTM_SOCKLEN_TYPE *)&sln)) < 0)
+	sln = SIZEOF(sas);
+	if ((fd = accept(cll->nve, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sln)) < 0)
 		return -1;
 #endif				/* defined(BSD_TCP) */
 
@@ -86,7 +86,9 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	memset(cptr->of, 0, SIZEOF(struct rc_oflow));
 	cptr->pklog = FD_INVALID;
 	/*  Initialize the statistics */
-	memcpy(&cptr->stats.sin,&sin,SIZEOF(sin));
+	memcpy(&cptr->stats.sas, &sas, sln);
+	cptr->stats.ai.ai_addr = (struct sockaddr *)&cptr->stats.sas;
+	cptr->stats.ai.ai_addrlen = sln;
 	cptr->stats.bytes_recv = 0;
 	cptr->stats.bytes_send = 0;
 	cptr->stats.start      = time((time_t *)0);
@@ -102,7 +104,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 
 		for (prev = NULL, this = cll->head; this; prev = this, this = this->next)
 		{
-			if (this->stats.sin.sin_addr.s_addr == sin.sin_addr.s_addr)
+			if (0 == memcmp((sockaddr_ptr)(&this->stats.sas), (sockaddr_ptr)&sas, sln))
 			{
 				if (cll->tail == this)
 				    cll->tail = cptr;
@@ -113,7 +115,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 				cptr->next = this->next;
 				OMI_DBG_STMP;
 				OMI_DBG((omi_debug, "%s: dropping old connection to %s\n",
-					SRVR_NAME, gtcm_hname(&cptr->stats.sin)));
+					SRVR_NAME, gtcm_hname(&cptr->stats.ai)));
 				gtcm_cn_disc(this, cll);
 				break;
 			}
@@ -158,7 +160,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	)
 	GTM_CTIME(tmp_time, &cptr->stats.start);
 	OMI_DBG((omi_debug, "%s: connection %d from %s by user <%s> at %s", SRVR_NAME,
-		cptr->stats.id, gtcm_hname(&cptr->stats.sin), cptr->ag_name, tmp_time));
+		cptr->stats.id, gtcm_hname(&cptr->stats.ai), cptr->ag_name, tmp_time));
 	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, SIZEOF(keepalive)) < 0)
 	{
 		PERROR("setsockopt:");

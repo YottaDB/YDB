@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,7 @@ uint4 have_crit(uint4 crit_state)
 		UNIX_ONLY(assert(!jgbl.onlnrlbk)); /* should not request crit to be released if online rollback */
 		crit_state |= CRIT_ALL_REGIONS;
 	}
-	if (0 != crit_count)
+	if ((0 != crit_count) && (crit_state & CRIT_HAVE_ANY_REG))
 	{
 		crit_reg_cnt++;
 		if (0 == (crit_state & CRIT_ALL_REGIONS))
@@ -79,7 +79,7 @@ uint4 have_crit(uint4 crit_state)
 				csa = &FILE_INFO(r_local)->s_addrs;
 				if (NULL != csa)
 				{
-					if (csa->now_crit)
+					if ((csa->now_crit) && (crit_state & CRIT_HAVE_ANY_REG))
 					{
 						crit_reg_cnt++;
 						/* It is possible that if DSE has done a CRIT REMOVE and stolen our crit, it
@@ -98,12 +98,11 @@ uint4 have_crit(uint4 crit_state)
 						    (0 == (crit_state & CRIT_NOT_TRANS_REG) ||
 						     crit_deadlock_check_cycle != csa->crit_check_cycle))
 						{
-							assert(FALSE);
+							assert(WBTEST_HOLD_CRIT_ENABLED);
 							assert(!csa->hold_onto_crit);
 							rel_crit(r_local);
-							send_msg(VARLSTCNT(8) ERR_MUTEXRELEASED, 6,
-								 process_id, process_id,  DB_LEN_STR(r_local),
-								 dollar_tlevel, t_tries);
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_MUTEXRELEASED, 6, process_id,
+								     process_id,  DB_LEN_STR(r_local), dollar_tlevel, t_tries);
 						}
 						if (0 == (crit_state & CRIT_ALL_REGIONS))
 							return crit_reg_cnt;
@@ -132,7 +131,7 @@ uint4 have_crit(uint4 crit_state)
 	if (NULL != jnlpool.jnlpool_ctl)
 	{
 		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
-		if (NULL != csa && csa->now_crit)
+		if ((NULL != csa) && csa->now_crit && (crit_state & CRIT_HAVE_ANY_REG))
 		{
 			crit_reg_cnt++;
 			if (0 != (crit_state & CRIT_RELEASE))

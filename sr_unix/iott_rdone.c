@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,6 +51,13 @@ GBLREF	boolean_t	gtm_utf8_mode;
 
 LITREF	unsigned char	lower_to_upper_table[];
 
+error_def(ERR_CTRAP);
+error_def(ERR_IOEOF);
+error_def(ERR_NOPRINCIO);
+error_def(ERR_ZINTRECURSEIO);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_STACKCRIT);
+
 int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 {
 	boolean_t	ret = FALSE, timed, utf8_active, zint_restart, first_time;
@@ -76,13 +83,6 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	ABS_TIME	cur_time, end_time;
 	mv_stent	*mv_zintdev;
 
-	error_def(ERR_CTRAP);
-	error_def(ERR_IOEOF);
-	error_def(ERR_NOPRINCIO);
-	error_def(ERR_ZINTRECURSEIO);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
-
 	io_ptr = io_curr_device.in;
 	assert (io_ptr->state == dev_open);
 	iott_flush(io_curr_device.out);
@@ -103,7 +103,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 		{
 			tt_ptr->mupintr = FALSE;
 			tt_state->who_saved = ttwhichinvalid;
-			rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		}
 		if (ttrdone != tt_state->who_saved)
 			GTMASSERT;	/* ZINTRECURSEIO should have caught */
@@ -151,7 +151,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			if (0 != status)
 			{
 				io_ptr->dollar.za = 9;
-				rts_error(VARLSTCNT(1) status);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 			}
 		}
 	}
@@ -249,7 +249,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 				io_ptr->dollar.za = 9;
 				if (timed && (0 == msec_timeout))
 					iott_rterm(io_ptr);
-				rts_error(VARLSTCNT(1) errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
 			}
 		} else if (0 == selstat)
@@ -350,7 +350,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 					if (0 == msec_timeout)
 				  		iott_rterm(io_ptr);
 				}
-				rts_error(VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
 				ret = FALSE;
 				break;
 			}
@@ -430,7 +430,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 							if (0 == msec_timeout)
 								iott_rterm(io_ptr);
 						}
-						rts_error(VARLSTCNT(1)  status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1)  status);
 					}
 				}
 				break;
@@ -442,7 +442,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 				io_ptr->dollar.za = 9;
 				if (timed && (0 == msec_timeout))
 					iott_rterm(io_ptr);
-				rts_error(VARLSTCNT(1) errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
 			}
 		} else
@@ -461,20 +461,20 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 					prin_in_dev_failure = TRUE;
 				else
 				{
-					send_msg(VARLSTCNT(1) ERR_NOPRINCIO);
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
 					stop_image_no_core();
 				}
 			}
 			if (io_ptr->dollar.zeof)
 			{
 				io_ptr->dollar.za = 9;
-				rts_error(VARLSTCNT(1) ERR_IOEOF);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 			} else
 			{
 				io_ptr->dollar.zeof = TRUE;
 				io_ptr->dollar.za   = 0;
 				if (io_ptr->error_handler.len > 0)
-					rts_error(VARLSTCNT(1) ERR_IOEOF);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 			}
 			break;
 		}
@@ -492,7 +492,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 		if (0 != status)
 		{
 			io_ptr->dollar.za = 9;
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
         }
 
@@ -536,9 +536,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			*zb_ptr++ = 0;
 		}
 		else
-		{
 			io_ptr->dollar.zb[0] = '\0';
-		}
 		if ((!(msk_in & tt_ptr->mask_term.mask[msk_num])) && (!(mask & TRM_NOECHO)))
 		{
 			if ((io_ptr->dollar.x += inchar_width) >= io_ptr->width && io_ptr->wrap)
@@ -548,10 +546,11 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 					io_ptr->dollar.y %= io_ptr->length;
 				io_ptr->dollar.x %= io_ptr->width;
 				if (io_ptr->dollar.x == 0)
-                                        DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
+                                        DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, STRLEN(NATIVE_TTEOL));
 			}
 		}
 	}
+	memcpy(io_ptr->dollar.key, io_ptr->dollar.zb, (zb_ptr - io_ptr->dollar.zb));
 
 	return ret;
 }

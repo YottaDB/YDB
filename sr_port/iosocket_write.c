@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,11 +72,11 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
 	{
-		rts_error(VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 		return;
 	}
 	if (dsocketptr->mupintr)
-		rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 #ifdef MSG_NOSIGNAL
 	flags = MSG_NOSIGNAL;		/* return EPIPE instead of SIGPIPE */
 #else
@@ -99,7 +99,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			DBGSOCK2((stdout, "socwrite: TCP send of BOM-BE with rc %d\n", status));
 			if (0 != status)
 			{
-				SOCKERROR(iod, dsocketptr, socketptr, ERR_SOCKWRITE, status);
+				SOCKERROR(iod, socketptr, ERR_SOCKWRITE, status);
 				return;
 			}
 #ifdef UNIX
@@ -114,7 +114,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 				new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset], &socketptr->zff, NULL,
 							NULL);
 				if (MAX_ZFF_LEN < new_len)
-					rts_error(VARLSTCNT(4) ERR_ZFF2MANY, 2, new_len, MAX_ZFF_LEN);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFF2MANY, 2, new_len, MAX_ZFF_LEN);
 				if (NULL != socketptr->zff.addr) /* we rely on newsocket.zff.addr being set to NULL
 								    in iosocket_create() */
 					socketptr->zff.addr = (char *)malloc(MAX_ZFF_LEN);
@@ -129,7 +129,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 								&socketptr->delimiter[0], NULL, NULL);
 				if (MAX_DELIM_LEN < new_len)
 				{
-					rts_error(VARLSTCNT(1) ERR_DELIMSIZNA);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
 					return;
 				}
 				socketptr->odelimiter0.len = new_len;
@@ -140,7 +140,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 		}
 		socketptr->first_write = FALSE;
 	}
-	memcpy(dsocketptr->dollar_device, "0", SIZEOF("0"));
+	memcpy(iod->dollar.device, "0", SIZEOF("0"));
 	if (CHSET_M != iod->ochset)
 	{ /* For ochset == UTF-8, validate the output,
 	   * For ochset == UTF-16[B|L]E, convert the output (and validate during conversion)
@@ -194,7 +194,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 							  socketptr->odelimiter0.len, status));
 						if (0 != status)
 						{
-							SOCKERROR(iod, dsocketptr, socketptr, ERR_SOCKWRITE, status);
+							SOCKERROR(iod, socketptr, ERR_SOCKWRITE, status);
 							return;
 						}
 #ifdef UNIX
@@ -234,7 +234,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			DBGSOCK2((stdout, "socwrite: TCP data send of %d bytes with rc %d\n", b_len, status));
 			if (0 != status)
 			{
-				SOCKERROR(iod, dsocketptr, socketptr, ERR_SOCKWRITE, status);
+				SOCKERROR(iod, socketptr, ERR_SOCKWRITE, status);
 				return;
 			}
 #ifdef UNIX

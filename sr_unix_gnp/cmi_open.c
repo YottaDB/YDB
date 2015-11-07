@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,14 +38,13 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	int rval;
 	unsigned char *cp;
 	char hn[MAX_HOST_NAME_LEN];
-	struct sockaddr_in in;
-	struct hostent *hp;
-	struct protoent *p;
+	struct addrinfo	*ai_ptr, *ai_head;
 	sigset_t oset;
 	int new_fd, rc, save_errno;
 	int			sockerror;
 	GTM_SOCKLEN_TYPE	sockerrorlen;
 	fd_set			writefds;
+	int			save_error;
 
 	if (!ntd_root)
 	{
@@ -55,14 +54,10 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	}
 	lnk->ntd = ntd_root;
 
-	status = cmj_resolve_nod_tnd(&lnk->nod, &lnk->tnd, &in);
+	status = cmj_getsockaddr(&lnk->nod, &lnk->tnd, &ai_head);
 	if (CMI_ERROR(status))
 		return status;
 
-	p = getprotobyname(GTCM_SERVER_PROTOCOL);
-	endprotoent();
-	if (!p)
-		return CMI_NETFAIL;
 
 	lnk->mun = -1;
 	memset((void *)&lnk->cqe, 0, SIZEOF(lnk->cqe));
@@ -74,11 +69,18 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	lnk->sta = CM_CLB_DISCONNECT;
 	lnk->err = NULL;
 	lnk->ast = NULL;
-	new_fd = socket(AF_INET, SOCK_STREAM, p->p_proto);
-	if (FD_INVALID == new_fd)
+	for(ai_ptr = ai_head; NULL != ai_ptr; ai_ptr = ai_ptr->ai_next)
+	{
+		if (FD_INVALID != (new_fd = socket(ai_ptr->ai_family, ai_ptr->ai_socktype, ai_ptr->ai_protocol)))
+			break;
+		save_errno = errno;
+	}
+	if (NULL == ai_ptr)
+	{
+		freeaddrinfo(ai_head);
 		return errno;
-
-	rval = connect(new_fd, (struct sockaddr *)&in, SIZEOF(in));
+	}
+	rval = connect(new_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
 	if ((-1 == rval) && ((EINTR == errno) || (EINPROGRESS == errno)
 #if (defined(__osf__) && defined(__alpha)) || defined(__sun) || defined(__vms)
             || (EWOULDBLOCK == errno)
@@ -126,12 +128,15 @@ cmi_status_t cmi_open(struct CLB *lnk)
 			if (new_fd > ntd_root->max_fd)
 				ntd_root->max_fd = new_fd;
 			lnk->mun = new_fd;
-			lnk->peer = in;
+			memcpy((struct sockaddr *)(&lnk->peer_sas), ai_ptr->ai_addr, ai_ptr->ai_addrlen);
+			memcpy(&lnk->peer_ai, ai_ptr, SIZEOF(struct addrinfo));
+			lnk->peer_ai.ai_addr = (struct sockaddr *)(&lnk->peer_sas);
 			FD_SET(new_fd, &ntd_root->es);
 			lnk->sta = CM_CLB_IDLE;
 		} else
 			CLOSEFILE_RESET(new_fd, rc);	/* resets "new_fd" to FD_INVALID */
 	}
 	SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
+	freeaddrinfo(ai_head);			/* prevent mem-leak */
 	return status;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,9 @@ typedef struct
 GBLDEF	int4		fd_ops_array_index = -1;
 GBLDEF	int4		fd_ops_array_num_wraps = 0;		/* to get an idea how many total files were opened/closed */
 GBLDEF	fd_trace	fd_ops_array[FD_OPS_ARRAY_SIZE];	/* space for FD_TRACE macro to record info */
+
+error_def(ERR_CLOSEFAIL);
+error_def(ERR_CALLERID);
 
 /* Determine on what platforms and build types we want to get caller_id information. In pro builds, invoke caller_id only on
  * those platforms where caller_id is lightweight (i.e. caller_id.s exists). Thankfully AIX (necessary for D9I11-002714)
@@ -149,13 +152,14 @@ int gtm_pipe1(int pipefd[2])
 	return status;
 }
 
-int gtm_socket(int domain, int type, int protocol)
+int gtm_socket(int family, int type, int protocol)
 {
 	int	fd;
 
-	fd = socket(domain, type, protocol);
-	FD_TRACE(fd_ops_socket, fd, 0);
-	assert(-1 != fd);
+	fd = socket(family, type, protocol);
+	if (-1 != fd)
+		FD_TRACE(fd_ops_socket, fd, 0);
+	/* it is possible that fd will be -1 if the address family is not supported */
 	return fd;
 }
 
@@ -164,15 +168,12 @@ int gtm_close(int fd)
 	int	status;
 	int	save_errno;
 
-	error_def(ERR_CLOSEFAIL);
-	error_def(ERR_CALLERID);
-
 	status = close(fd);
 	save_errno = errno;
 	FD_TRACE(fd_ops_close, fd, status);
 	if ((-1 == status) && (EINTR != save_errno))
 	{
-		send_msg(VARLSTCNT(4) ERR_CLOSEFAIL, 1, fd, save_errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, fd, save_errno);
 		SEND_CALLERID("gtm_close()");
 		assert(FALSE);
 	}

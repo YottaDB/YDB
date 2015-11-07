@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,13 +29,13 @@
 
 /* Given org_fn this will create rename_fn
  *	a) If prefix is not null, rename_fn = prefix + org_fn
- *		b) If suffix is not null, rename_fn = org_fn + suffix
- *	c) If prefix and suffix both not null  Then
+ *	b) If suffix is not null, rename_fn = org_fn + suffix
+ *	c) If prefix and suffix are both null, then
  *		rename_fn = org_fn + timestamp
  *		If rename_fn exists, add numbers to make it non-existance file
  */
 uint4 	prepare_unique_name(char *org_fn, int org_fn_len, char *prefix, char *suffix,
-		char *rename_fn, int *rename_fn_len, uint4 *ustatus)
+		char *rename_fn, int *rename_fn_len, jnl_tm_t now, uint4 *ustatus)
 {
 	mstr 		filestr;
 	char		*filename_begin, append_char[MAX_CHARS_APPEND] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
@@ -82,9 +82,8 @@ uint4 	prepare_unique_name(char *org_fn, int org_fn_len, char *prefix, char *suf
 	filestr.len = org_fn_len;
 	rename_fn[filestr.len] = 0;
 	assert(filestr.len + 1 < MAX_FN_LEN);
-	if (SS_NORMAL != (status1 = append_time_stamp(rename_fn, filestr.len, &length, ustatus)))
+	if (SS_NORMAL != (status1 = append_time_stamp(rename_fn, &filestr.len, now)))
 		return status1;
-	filestr.len += length;
 	if (FILE_PRESENT == (file_stat = gtm_file_stat(&filestr, NULL, NULL, FALSE, ustatus))) /* One already exists */
 	{	/* new name refers to an existing file - stuff numbers on the end until its unique */
 		rename_fn[filestr.len] = '_';

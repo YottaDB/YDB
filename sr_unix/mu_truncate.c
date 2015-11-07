@@ -322,8 +322,8 @@ boolean_t mu_truncate(int4 truncate_percent)
 		return FALSE;
 	}
 	csa->nl->highest_lbm_with_busy_blk = MAX(found_busy_blk, csa->nl->highest_lbm_with_busy_blk);
-	assert(csa->nl->highest_lbm_with_busy_blk % BLKS_PER_LMAP == 0); /* should be a bitmap block */
-	new_total = MIN(old_total, csa->nl->highest_lbm_with_busy_blk +  BLKS_PER_LMAP);
+	assert(IS_BITMAP_BLK(csa->nl->highest_lbm_with_busy_blk));
+	new_total = MIN(old_total, csa->nl->highest_lbm_with_busy_blk + BLKS_PER_LMAP);
 	if (mu_ctrly_occurred || mu_ctrlc_occurred)
 	{
 		rel_crit(gv_cur_region);

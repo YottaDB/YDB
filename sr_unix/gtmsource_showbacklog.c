@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,8 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 
+error_def(ERR_SRCSRVNOTEXIST);
+
 int gtmsource_showbacklog(void)
 {
 	seq_num			seq_num, jnl_seqno, read_jnl_seqno;
@@ -54,8 +56,6 @@ int gtmsource_showbacklog(void)
 	int4			index;
 	boolean_t		srv_alive;
 	uint4			gtmsource_pid;
-
-	error_def(ERR_SRCSRVNOTEXIST);
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
@@ -95,9 +95,10 @@ int gtmsource_showbacklog(void)
 		util_out_print("!@UQ : sequence number of last transaction sent by source server", TRUE, &seq_num);
 		srv_alive = (0 == gtmsource_pid) ? FALSE : is_proc_alive(gtmsource_pid, 0);
 		if (!srv_alive)
-			gtm_putmsg(VARLSTCNT(4) MAKE_MSG_WARNING(ERR_SRCSRVNOTEXIST), 2,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_WARNING(ERR_SRCSRVNOTEXIST), 2,
 						LEN_AND_STR(gtmsourcelocal_ptr->secondary_instname));
-		else if (gtmsourcelocal_ptr->mode == GTMSOURCE_MODE_PASSIVE)
+		else if ((gtmsourcelocal_ptr->mode == GTMSOURCE_MODE_PASSIVE)
+				|| (gtmsourcelocal_ptr->mode == GTMSOURCE_MODE_ACTIVE_REQUESTED))
 			util_out_print("WARNING - Source Server is in passive mode, transactions are not being replicated", TRUE);
 		if (NULL != jnlpool.gtmsource_local)
 			break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,7 +71,8 @@ void mutex_sock_init(void)
 		return;
 	/* Create the socket used for sending and receiving mutex wake mesgs */
 	if (FD_INVALID == (mutex_sock_fd = socket(AF_UNIX, SOCK_DGRAM, 0)))
-		rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("Error with mutex socket create"), errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+			      RTS_ERROR_TEXT("Error with mutex socket create"), errno);
 	memset((char *)&mutex_sock_address, 0, SIZEOF(mutex_sock_address));
 	/* Get the socket path */
 	mutex_sock_dir_lognam.len = SIZEOF(MUTEX_SOCK_DIR) - 1;
@@ -91,7 +92,8 @@ void mutex_sock_init(void)
 		mutex_sock_path[mutex_sock_path_len] = '\0';
 	}
 	if ((mutex_sock_path_len + MAX_MUTEX_SOCKFILE_NAME_LEN) > SIZEOF(mutex_sock_address.sun_path))
-		rts_error(VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("Mutex socket path too long"));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+			      RTS_ERROR_TEXT("Mutex socket path too long"));
 	strcpy(mutex_sock_path + mutex_sock_path_len, MUTEX_SOCK_FILE_PREFIX);
 	mutex_sock_path_len += (SIZEOF(MUTEX_SOCK_FILE_PREFIX) - 1);
 	mutex_wake_this_proc_prefix_len = mutex_sock_path_len;
@@ -99,7 +101,8 @@ void mutex_sock_init(void)
 	strcpy(mutex_sock_path + mutex_sock_path_len, (char *)pid2ascx(pid_str, process_id));
 	mutex_sock_path_len += STRLEN((char *)pid_str);
 	if (mutex_sock_path_len > SIZEOF(mutex_sock_address.sun_path))
-		rts_error(VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("Mutex socket path too long"));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+			      RTS_ERROR_TEXT("Mutex socket path too long"));
 	mutex_sock_address.sun_family = AF_UNIX;
 	strcpy(mutex_sock_address.sun_path, mutex_sock_path);
 	mutex_sock_len = SIZEOF(mutex_sock_address.sun_family) + mutex_sock_path_len + 1; /* Include NULL byte in length */
@@ -127,29 +130,30 @@ void mutex_sock_init(void)
 							       mutex_sock_path_len + 1)))
 			{
 				DEBUG_ONLY(if (existed))	/* Avoid mesg unless socket existed */
-					send_msg(VARLSTCNT(8) ERR_MUTEXRSRCCLNUP, 2, mutex_sock_path_len, mutex_sock_path,
-						 ERR_TEXT, 2, LEN_AND_LIT("Resource removed by gtmsecshr"));
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUTEXRSRCCLNUP, 2, mutex_sock_path_len,
+						     mutex_sock_path, ERR_TEXT, 2, LEN_AND_LIT("Resource removed by gtmsecshr"));
 			} else if (ENOENT != status)
-				rts_error(VARLSTCNT(10) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 					  LEN_AND_LIT("gtmsecshr failed to remove leftover mutex resource"),
 					  ERR_TEXT, 2, mutex_sock_path_len, mutex_sock_path);
 			/* else don't bother if somebody removed the file before gtmsecshr got to it */
 		}
 	} else  /* unlink succeeded - socket must have existed - now cleaned up */
-		send_msg(VARLSTCNT(4) ERR_MUTEXRSRCCLNUP, 2, mutex_sock_path_len, mutex_sock_path);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUTEXRSRCCLNUP, 2, mutex_sock_path_len, mutex_sock_path);
 	if (0 > BIND(mutex_sock_fd, (struct sockaddr *)&mutex_sock_address, mutex_sock_len))
-		rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("Error with mutex socket bind"), errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+			      RTS_ERROR_TEXT("Error with mutex socket bind"), errno);
 	/* Set the socket permissions to override any umask settings.
 	 * Allow owner and group read and write access.
 	 */
 	STAT_FILE(mutex_sock_address.sun_path, &mutex_sock_stat_buf, status);
 	if (-1 == status)
-		rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 			  RTS_ERROR_TEXT("Error with mutex socket stat"),
 			  errno);
 	mutex_sock_stat_buf.st_mode |= (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 	if (-1 == CHMOD(mutex_sock_address.sun_path, mutex_sock_stat_buf.st_mode))
-		rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 			  RTS_ERROR_TEXT("Error with mutex socket chmod"),
 			  errno);
 	/* Clear the descriptor set used to sense wake up message */

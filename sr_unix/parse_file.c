@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,11 @@
 #include "gtm_inet.h"		/* for struct in_addr */
 #include "gtm_stat.h"
 #include "gtm_string.h"
+#include "gtm_stdio.h"
 #include "gtm_unistd.h"
+#include "gtm_socket.h" /* for using sockaddr and sockaddr_storage */
 #include "gtm_netdb.h"
+#include "gtm_ipv6.h"
 
 #include "parse_file.h"
 #include "io.h"
@@ -23,8 +26,18 @@
 #include "eintr_wrappers.h"
 #include "trans_log_name.h"
 #include "setzdir.h"
+#include "gtmmsg.h" /* for gtm_putmsg */
 
 #define LOCALHOSTNAME "localhost"
+#define LOCALHOSTNAME6 "::1"
+
+error_def(ERR_FILENOTFND);
+error_def(ERR_GETADDRINFO);
+error_def(ERR_GETNAMEINFO);
+error_def(ERR_PARBUFSM);
+error_def(ERR_PARNORMAL);
+error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
 
 enum	parse_state
 {
@@ -40,7 +53,8 @@ GBLREF mval	dollar_zdir;
 int4	parse_file(mstr *file, parse_blk *pblk)
 {
 	struct stat		statbuf;
-	struct hostent		*hostinfo;
+	struct addrinfo		*ai_ptr = NULL, *localhost_ai_ptr = NULL, *temp_ai_ptr = NULL;
+	struct addrinfo		hints;
 	mstr			trans, tmp;
 	int			status, diff, local_node_len, query_node_len, node_name_len;
 	parse_blk		def;
@@ -50,13 +64,10 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 	char			def_string[MAX_FBUFF + 1];
 	boolean_t		hasnode, hasdir, hasname, hasext, wilddir, wildname;
 	enum parse_state	state;
-	struct in_addr		query_ip, localhost_ip, *local_ip;
+	struct sockaddr_storage	query_sas;
+	struct sockaddr		localhost_sa, *localhost_sa_ptr;
 	mval			def_trans;
-
-	error_def(ERR_PARNORMAL);
-	error_def(ERR_PARBUFSM);
-	error_def(ERR_FILENOTFND);
-	error_def(ERR_SYSCALL);
+	int			errcode;
 
 	pblk->fnb = 0;
 	assert(((unsigned int)pblk->buff_size + 1) <= (MAX_FBUFF + 1));
@@ -126,39 +137,61 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 				assert(':' == *(trans.addr + query_node_len));
 				memcpy(query_node_name, trans.addr, query_node_len);
 				query_node_name[query_node_len] = 0;
-				local_ip = NULL;	/* null value needed in case can't find query node (remote default) */
-				if (NULL != (hostinfo = GETHOSTBYNAME(query_node_name)))
-				{	/* We know about this node -- check further */
-					query_ip = *(struct in_addr *)hostinfo->h_addr;
-					/* See if is a "localhost" (127.0.0.1 usually) node */
-					if (NULL != (hostinfo = GETHOSTBYNAME(LOCALHOSTNAME)))
+				localhost_sa_ptr = NULL;	/* null value needed if not find query node (remote default) */
+				CLIENT_HINTS(hints);
+				if (0 != (errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr)))
+					ai_ptr = NULL;		/* skip additional lookups */
+				else
+					memcpy((sockaddr_ptr)&query_sas, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
+				CLIENT_HINTS(hints);
+				if (0 == (errcode = getaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr)))
+				{
+					if (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
+							localhost_ai_ptr->ai_addrlen))
+						localhost_sa_ptr = localhost_ai_ptr->ai_addr;
+				}
+				FREEADDRINFO(localhost_ai_ptr);
+				if (ai_ptr && !localhost_sa_ptr)
+				{	/* Have not yet established this is not a local node -- check further */
+					GETHOSTNAME(local_node_name, MAX_HOST_NAME_LEN, status);
+					if (-1 == status)
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+								LEN_AND_LIT("gethostname"), CALLFROM, errno);
+					CLIENT_HINTS(hints);
+					if (0 != (errcode = getaddrinfo(local_node_name, NULL, &hints, &localhost_ai_ptr)))
+						localhost_ai_ptr = NULL;	/* empty address list */
+					for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
+					     temp_ai_ptr = temp_ai_ptr->ai_next)
 					{
-						localhost_ip = *(struct in_addr *)hostinfo->h_addr;
-						if (0 == memcmp(&localhost_ip, &query_ip, SIZEOF(struct in_addr)))
-							local_ip = &localhost_ip;
-					}
-					if (!local_ip)
-					{	/* Have not yet established this as a local node -- check further */
-						GETHOSTNAME(local_node_name, MAX_HOST_NAME_LEN, status);
-						if (-1 == status)
-							rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("gethostname"),
-								  CALLFROM, errno);
-						if (NULL == (hostinfo = GETHOSTBYNAME(local_node_name)))
-							rts_error(VARLSTCNT(7) ERR_SYSCALL, 5, LEN_AND_LIT("gethostbyname"),
-								  CALLFROM);
-						for (hostaddrlist = (char **) hostinfo->h_addr_list; ; hostaddrlist++)
+						if (0 == memcmp((sockaddr_ptr)&query_sas, temp_ai_ptr->ai_addr,
+								 temp_ai_ptr->ai_addrlen))
 						{
-							local_ip = (struct in_addr *)*hostaddrlist;
-							if (!local_ip)		/* End of list -- must be remote */
-								break;
-							if (0 == memcmp(&query_ip, local_ip, SIZEOF(struct in_addr)))
-								break;		/* Tiz truly a local node */
+							localhost_sa_ptr = temp_ai_ptr->ai_addr;
+							break;		/* Tiz truly a local node */
 						}
 					}
-				} /* Else, unknown nodename -- treat as remote (probably fail later) */
-
-				if (!local_ip)		/* Not local (or an unknown) host given */
+					FREEADDRINFO(localhost_ai_ptr);
+				}
+				if (ai_ptr && !localhost_sa_ptr)
+				{
+					CLIENT_HINTS(hints);
+					if (0 != (errcode = getaddrinfo(LOCALHOSTNAME6, NULL, &hints, &localhost_ai_ptr)))
+						localhost_ai_ptr = NULL;	/* empty address list */
+					for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
+					     temp_ai_ptr = temp_ai_ptr->ai_next)
+					{
+						if (0 == memcmp((sockaddr_ptr)&query_sas, temp_ai_ptr->ai_addr,
+								 temp_ai_ptr->ai_addrlen))
+						{
+							localhost_sa_ptr = temp_ai_ptr->ai_addr;
+							break;		/* Tiz truly a local node */
+						}
+					}
+					FREEADDRINFO(localhost_ai_ptr);
+				}
+				if (!localhost_sa_ptr)		/* Not local (or an unknown) host given */
 				{	/* Remote node specified -- don't apply any defaults */
+					FREEADDRINFO(ai_ptr);
 					pblk->l_node = trans.addr;
 					pblk->b_node = node_name_len;
 					pblk->l_dir = base;
@@ -169,7 +202,7 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 					pblk->fnb |= (hasnode << V_HAS_NODE);
 					return ERR_PARNORMAL;
 				}
-
+				FREEADDRINFO(ai_ptr);
 				/* Remove local node name from filename buffer */
 				assert(0 < trans.len - node_name_len);
 				memmove(trans.addr, node, trans.len - node_name_len);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,9 @@
 
 #include <sys/types.h>
 #include "gtm_inet.h"
+#include "gtm_netdb.h"
+#include "gtm_socket.h" /* for using sockaddr_storage */
+#include "iotcpdef.h"
 
 #ifndef GTM_MB_LEN_MAX
 #include "gtm_utf8.h"
@@ -74,28 +77,110 @@
 
 #define	ONE_COMMA			"1,"
 
-#define SOCKERROR(iod, dsocketptr, socketptr, gtmerror, syserror) \
-{ \
-	int	errlen; \
-	char	*errptr; \
-	iod->dollar.za = 9; \
-	memcpy(dsocketptr->dollar_device, ONE_COMMA, SIZEOF(ONE_COMMA)); \
-	errptr = (char *)STRERROR(syserror); \
-	errlen = STRLEN(errptr); \
-	memcpy(&dsocketptr->dollar_device[SIZEOF(ONE_COMMA) - 1], errptr, errlen + 1); /* + 1 for null */ \
-	assert(ERR_SOCKWRITE == gtmerror);				\
-	UNIX_ONLY(if (iod == io_std_device.out)				\
-		{							\
-			if (!prin_out_dev_failure)			\
-				prin_out_dev_failure = TRUE;		\
-			else						\
-			{						\
-				send_msg(VARLSTCNT(1) ERR_NOPRINCIO);	\
-				stop_image_no_core();			\
-			}						\
-		})							\
-	if (socketptr->ioerror) \
-		rts_error(VARLSTCNT(6) gtmerror, 0, ERR_TEXT, 2, errlen, errptr); \
+#define SOCKERROR(iod, socketptr, gtmerror, syserror) 							\
+{ 													\
+	int	errlen; 										\
+	char	*errptr; 										\
+	iod->dollar.za = 9; 										\
+	memcpy(iod->dollar.device, ONE_COMMA, SIZEOF(ONE_COMMA)); 					\
+	errptr = (char *)STRERROR(syserror); 								\
+	errlen = STRLEN(errptr); 									\
+	memcpy(&iod->dollar.device[SIZEOF(ONE_COMMA) - 1], errptr, errlen + 1); /* + 1 for null */ 	\
+	assert(ERR_SOCKWRITE == gtmerror);								\
+	UNIX_ONLY(if (iod == io_std_device.out)								\
+		{											\
+			if (!prin_out_dev_failure)							\
+				prin_out_dev_failure = TRUE;						\
+			else										\
+			{										\
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);			\
+				stop_image_no_core();							\
+			}										\
+		})											\
+	if (socketptr->ioerror) 									\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) gtmerror, 0, ERR_TEXT, 2, errlen, errptr); 	\
+}
+
+#define SOCKET_ALLOC(SOCKPTR)										\
+{													\
+	SOCKPTR = (socket_struct *)malloc(SIZEOF(socket_struct));					\
+	memset(SOCKPTR, 0, SIZEOF(socket_struct));							\
+}
+
+#define SOCKET_ADDR(SOCKPTR, SOCKEND)										\
+	((sockaddr_ptr)(SOCKPTR->SOCKEND.sa									\
+		? SOCKPTR->SOCKEND.sa										\
+		: (SOCKPTR->SOCKEND.sa = (struct sockaddr *)malloc(SIZEOF(struct sockaddr_storage)))))
+
+#define SOCKET_LOCAL_ADDR(SOCKPTR)	SOCKET_ADDR(SOCKPTR, local)
+#define SOCKET_REMOTE_ADDR(SOCKPTR)	SOCKET_ADDR(SOCKPTR, remote)
+
+#define SOCKET_ADDR_COPY(SOCKADDRESS, SOCKADDRPTR, SOCKADDRLEN)			\
+{										\
+	if (SOCKADDRESS.sa)							\
+		free(SOCKADDRESS.sa);						\
+	SOCKADDRESS.sa = (struct sockaddr *)malloc(SOCKADDRLEN);		\
+	memcpy(SOCKADDRESS.sa, SOCKADDRPTR, SOCKADDRLEN);			\
+}
+
+#define SOCKET_AI_TO_ADDR(SOCKPTR, AIPTR, SOCKEND)	SOCKET_ADDR_COPY((SOCKPTR)->SOCKEND, (AIPTR)->ai_addr, (AIPTR)->ai_addrlen)
+#define SOCKET_AI_TO_LOCAL_ADDR(SOCKPTR, AIPTR)		SOCKET_AI_TO_ADDR(SOCKPTR, AIPTR, local)
+#define SOCKET_AI_TO_REMOTE_ADDR(SOCKPTR, AIPTR)	SOCKET_AI_TO_ADDR(SOCKPTR, AIPTR, remote)
+
+#define SOCKET_ADDRLEN(SOCKPTR, AIPTR, SOCKEND)									\
+		(((SOCKPTR)->SOCKEND.sa) ? ((AIPTR)->ai_addrlen) : (SIZEOF(struct sockaddr_storage)))
+
+#define SOCKET_BUFFER_INIT(SOCKPTR, SIZE)					\
+{										\
+	SOCKPTR->buffer = (char *)malloc(SIZE);					\
+	SOCKPTR->buffer_size = SIZE;						\
+	SOCKPTR->buffered_length = SOCKPTR->buffered_offset = 0;		\
+}
+
+#define SOCKET_FREE(SOCKPTR)							\
+{										\
+	if (NULL != SOCKPTR->buffer) 						\
+		free(SOCKPTR->buffer);						\
+	if (NULL != SOCKPTR->zff.addr)						\
+		free(SOCKPTR->zff.addr);					\
+	if (NULL != SOCKPTR->local.sa)						\
+		free(SOCKPTR->local.sa);					\
+	if (NULL != SOCKPTR->remote.sa)						\
+		free(SOCKPTR->remote.sa);					\
+	if (NULL != SOCKPTR->local.saddr_ip)					\
+		free(SOCKPTR->local.saddr_ip);					\
+	if (NULL != SOCKPTR->remote.saddr_ip)					\
+		free(SOCKPTR->remote.saddr_ip);					\
+	iosocket_delimiter((unsigned char *)NULL, 0, SOCKPTR, TRUE);		\
+	free(SOCKPTR);								\
+}
+
+#define SOCKET_DUP(SOCKPTR, NEWSOCKPTR)										\
+{														\
+	NEWSOCKPTR = (socket_struct *)malloc(SIZEOF(socket_struct));						\
+	*NEWSOCKPTR = *SOCKPTR;											\
+	if (NULL != SOCKPTR->buffer) 										\
+		NEWSOCKPTR->buffer = (char *)malloc(SOCKPTR->buffer_size);					\
+	if (NULL != SOCKPTR->zff.addr)										\
+	{													\
+		NEWSOCKPTR->zff.addr = (char *)malloc(MAX_ZFF_LEN);						\
+		memcpy(NEWSOCKPTR->zff.addr, SOCKPTR->zff.addr, SOCKPTR->zff.len);				\
+	}													\
+	if (NULL != SOCKPTR->local.sa)										\
+	{													\
+		NEWSOCKPTR->local.sa = (struct sockaddr *)malloc(SOCKPTR->local.ai.ai_addrlen);			\
+		memcpy(NEWSOCKPTR->local.sa, SOCKPTR->local.sa, SOCKPTR->local.ai.ai_addrlen);			\
+	}													\
+	if (NULL != SOCKPTR->remote.sa)										\
+	{													\
+		NEWSOCKPTR->remote.sa = (struct sockaddr *)malloc(SOCKPTR->remote.ai.ai_addrlen);		\
+		memcpy(NEWSOCKPTR->remote.sa, SOCKPTR->remote.sa, SOCKPTR->remote.ai.ai_addrlen);		\
+	}													\
+	if (NULL != SOCKPTR->local.saddr_ip)									\
+		STRNDUP(SOCKPTR->local.saddr_ip, SA_MAXLEN, NEWSOCKPTR->local.saddr_ip);			\
+	if (NULL != SOCKPTR->remote.saddr_ip)									\
+		STRNDUP(SOCKPTR->remote.saddr_ip, SA_MAXLEN, NEWSOCKPTR->remote.saddr_ip);			\
+	iosocket_delimiter_copy(SOCKPTR, NEWSOCKPTR);								\
 }
 
 enum socket_state
@@ -124,15 +209,17 @@ enum socket_which		/* which module saved the interrupted info */
 
 typedef struct socket_address_type
 {
-	struct sockaddr_in      	sin;     /* accurate one */
+	struct sockaddr		      	*sa;
+	struct addrinfo			ai;
+	struct addrinfo			*ai_head; /* store the head of addrinfo linked list */
 	unsigned short                  port;
-	char            		saddr_ip[SA_MAXLEN];
-	char				saddr_lit[SA_MAXLITLEN];
+	char            		*saddr_ip;
 } socket_address;
 
 typedef struct socket_struct_type
 {
 	int 				sd; 		/* socket descriptor */
+	int				temp_sd;	/* a temp socket descriptor only to test whether IPv6 can be created */
 	struct 	d_socket_struct_type	*dev; 		/* point back to the driver */
 	boolean_t			passive,
 					ioerror,
@@ -181,8 +268,6 @@ typedef struct d_socket_struct_type
 	boolean_t                     	mupintr;			/* We were mupip interrupted */
 	int4				current_socket;			/* current socket index */
 	int4				n_socket;			/* number of sockets	*/
-        char                            dollar_device[DD_BUFLEN];
-	char				dollar_key[DD_BUFLEN];
 	struct io_desc_struct		*iod;				/* Point back to main IO descriptor block */
 	struct socket_struct_type 	*socket[1];			/* Array size determined by gtm_max_sockets */
 } d_socket_struct;

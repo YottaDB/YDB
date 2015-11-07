@@ -544,7 +544,7 @@ STATICFNDEF void dump_all_triggers(uint4 file_name_len, mval *op_val)
 
 boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_name, uint4 file_name_len)
 {
-	char			*sel_ptr, *prev_ptr, *ptr1, *ptr2;
+	char			*sel_ptr, *strtok_ptr, *prev_ptr, *ptr1, *ptr2;
 	int			gbl_len, prev_len;
 	mstr			gbl_name;
 	sgmnt_addrs		*csa;
@@ -642,7 +642,7 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 	else
 	{
 		len = select_list_len;
-		sel_ptr = strtok(save_select_list, ",");
+		sel_ptr = strtok_r(save_select_list, ",", &strtok_ptr);
 		do
 		{
 			trig_name = ('^' != *sel_ptr);
@@ -696,7 +696,7 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 			if (0 != gv_target->root)
 				write_gbls_or_names(gbl_name.addr, gbl_name.len, file_name_len, &op_val, trig_name);
 			RESTORE_TRIGGER_REGION_INFO;
-		} while (NULL != (sel_ptr = strtok(NULL, ",")));	/* Embedded assignment is intended */
+		} while (NULL != (sel_ptr = strtok_r(NULL, ",", &strtok_ptr)));	/* Embedded assignment is intended */
 	}
 	if (0 != file_name_len)
 	{

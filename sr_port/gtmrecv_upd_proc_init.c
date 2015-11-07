@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include "gtm_inet.h"
 #ifdef UNIX
 #include <sys/wait.h>
+#include "fork_init.h"
 #elif defined(VMS)
 #include <descrip.h>
 #endif
@@ -83,17 +84,19 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	if ((upd_status = is_updproc_alive()) == SRV_ERR)
 	{
 		save_errno = errno;	/* errno from get_sem_info() called from is_updproc_alive() */
-		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-			   RTS_ERROR_LITERAL("Receive pool semctl failure"), UNIX_ONLY(save_errno) VMS_ONLY(REPL_SEM_ERRNO));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			   	RTS_ERROR_LITERAL("Receive pool semctl failure"),
+				UNIX_ONLY(save_errno) VMS_ONLY(REPL_SEM_ERRNO));
 		repl_errno = EREPL_UPDSTART_SEMCTL;
 		return(UPDPROC_START_ERR);
 	} else if (upd_status == SRV_ALIVE && !fresh_start)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_LITERAL("Update process already exists. Not starting it"));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,
+				RTS_ERROR_LITERAL("Update process already exists. Not starting it"));
 		return(UPDPROC_EXISTS);
 	} else if (upd_status == SRV_ALIVE)
 	{
-		gtm_putmsg(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Update process already exists. Please kill it before a fresh start"));
 		return(UPDPROC_EXISTS);
 	}
@@ -102,10 +105,11 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	recvpool.upd_proc_local->upd_proc_shutdown = NO_SHUTDOWN;
 
 #ifdef UNIX
-	if (0 > (upd_pid = fork()))	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+	FORK(upd_pid);	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+	if (0 > upd_pid)
 	{
 		recvpool.upd_proc_local->upd_proc_shutdown = save_upd_status;
-		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Could not fork update process"), errno);
 		repl_errno = EREPL_UPDSTART_FORK;
 		return(UPDPROC_START_ERR);
@@ -119,17 +123,18 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 						dont_sendmsg_on_log2long);
 		if (status != SS_NORMAL)
 		{
-			gtm_putmsg(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				   RTS_ERROR_LITERAL("Could not find path of Update Process. Check value of $gtm_dist"));
 			if (SS_LOG2LONG == status)
-				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(UPDPROC_CMD), SIZEOF(upd_proc_cmd) - 1);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5)
+					ERR_LOGTOOLONG, 3, LEN_AND_LIT(UPDPROC_CMD), SIZEOF(upd_proc_cmd) - 1);
 			repl_errno = EREPL_UPDSTART_BADPATH;
 			return(UPDPROC_START_ERR);
 		}
 		upd_proc_cmd[upd_proc_trans_cmd.len] = '\0';
 		if (EXECL(upd_proc_cmd, upd_proc_cmd, UPDPROC_CMD_ARG1, UPDPROC_CMD_ARG2, NULL) < 0)
 		{
-			gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				   RTS_ERROR_LITERAL("Could not exec Update Process"), errno);
 			repl_errno = EREPL_UPDSTART_EXEC;
 			return(UPDPROC_START_ERR);
@@ -140,7 +145,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	status = repl_create_server(&cmd_desc, "GTMU", "", &cmd_channel, &upd_pid, ERR_RECVPOOLSETUP);
 	if (SS_NORMAL != status)
 	{
-		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Unable to spawn Update process"), status);
 		recvpool.upd_proc_local->upd_proc_shutdown = save_upd_status;
 		repl_errno = EREPL_UPDSTART_FORK;
@@ -167,7 +172,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	/* Deassign the send-cmd mailbox channel */
 	if (SS_NORMAL != (status = sys$dassgn(cmd_channel)))
 	{
-		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Unable to close upd-send-cmd mbox channel"), status);
 		recvpool.upd_proc_local->upd_proc_shutdown = save_upd_status;
 		repl_errno = EREPL_UPDSTART_BADPATH; /* Just to make an auto-shutdown */
@@ -184,12 +189,12 @@ int gtmrecv_start_updonly(void)
 
 	if ((upd_status = is_updproc_alive()) == SRV_ALIVE)
 	{
-		gtm_putmsg(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Update Process exists already. New process not started"));
 		return(UPDPROC_START_ERR);
 	} else if (upd_status == SRV_ERR)
 	{
-		gtm_putmsg(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Error in starting up update process"));
 		return(UPDPROC_START_ERR);
 	}
@@ -205,7 +210,8 @@ int gtmrecv_start_updonly(void)
 
 	if (start_status == UPDPROC_STARTED)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_REPLINFO, 2, RTS_ERROR_LITERAL("Update Process started successfully"));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLINFO, 2,
+				RTS_ERROR_LITERAL("Update Process started successfully"));
 		return(UPDPROC_STARTED);
 	}
 #ifdef VMS
@@ -213,14 +219,15 @@ int gtmrecv_start_updonly(void)
 #endif
 	if (start_status == UPDPROC_START)
 	{
-		gtm_putmsg(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Receiver server is not alive to start update process. Please start receiver server"));
 	} else if (start_status == UPDPROC_START_ERR)
 	{
-		gtm_putmsg(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Error starting update process"));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+				RTS_ERROR_LITERAL("Error starting update process"));
 	} else if (start_status == UPDPROC_EXISTS)
 	{
-		gtm_putmsg(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Update Process exists already. New process not started"));
 	}
 	return(UPDPROC_START_ERR);

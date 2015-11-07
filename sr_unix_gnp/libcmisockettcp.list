@@ -24,7 +24,6 @@ cmj_init_clb
 cmj_netinit
 cmj_postevent
 cmj_read
-cmj_resolve_nod_tnd
 cmj_select
 cmj_setupfd
 cmj_unit2clb

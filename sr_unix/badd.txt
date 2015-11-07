@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2011, 2012 Fidelity Information Services, Inc       #
+#	Copyright 2011, 2013 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -30,4 +30,9 @@ zzz_insert%-r--r----- source.tar
 pro/utf8:
 TTTGEN.m -> ../TTTGEN.m%lrwxrwxrwx README.txt -> ../README.txt
 dse -> ../dse%lrwxrwxrwx custom_errors_sample.txt -> ../custom_errors_sample.txt
+gtmstart.gtc -> ../gtmstart.gtc%-r-sr-x--- gtmsecshr
+gtmstart.gtc -> ../gtmstart.gtc%dr-x------ gtmsecshrdir
 lke -> ../lke%-r-xr-x--- libgtmutil.so
+
+pro/utf8/gtmsecshrdir:
+zzz_insert%-r-s------ gtmsecshr

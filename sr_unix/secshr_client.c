@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,7 @@
 #include "secshr_client.h"
 #include "gtm_semutils.h"
 #include "hashtab.h"		/* for STR_HASH macro */
+#include "fork_init.h"
 
 GBLREF struct sockaddr_un       gtmsecshr_sock_name;
 GBLREF key_t                    gtmsecshr_key;
@@ -114,7 +115,7 @@ const static char readonly *secshrstart_error_code[] = {
 			errorindex = LASTEXITCODE;						\
 		assert(0 <= errorindex);							\
 		assert(ARRAYSIZE(secshrstart_error_code) > errorindex);				\
-		gtm_putmsg(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"),	\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"),	\
 			process_id, ERR_TEXT, 2,						\
 			RTS_ERROR_STRING(secshrstart_error_code[errorindex]));			\
 		if (FATALFAILURE(create_server_status))						\
@@ -197,19 +198,22 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
                 if (SS_NORMAL != status)
 		{
 			if (SS_LOG2LONG == status)
-				send_msg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtmsecshr_logname.len, gtmsecshr_logname.addr,
-					 SIZEOF(gtmsecshr_path) - 1);
-                        send_msg(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
-				 ERR_TEXT, 2, RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
-                        rts_error(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
-				  ERR_TEXT, 2, RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3,
+					gtmsecshr_logname.len, gtmsecshr_logname.addr, SIZEOF(gtmsecshr_path) - 1);
+                        send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3,
+					RTS_ERROR_TEXT("Client"), process_id, ERR_TEXT, 2,
+					RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
+                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3,
+					RTS_ERROR_TEXT("Client"), process_id, ERR_TEXT, 2,
+					RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
 		}
 		gtmsecshr_pathname.addr[gtmsecshr_pathname.len] = '\0';
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
-			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM, errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("stat"), CALLFROM, errno);
 		if ((ROOTUID != stat_buf.st_uid) ||
 		    !(stat_buf.st_mode & S_ISUID))
-			rts_error(VARLSTCNT(1) ERR_GTMSECSHRPERM);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
 		gtmsecshr_file_check_done = TRUE;
 	}
 	if (!gtmsecshr_sock_init_done && (0 < (init_ret_code = gtmsecshr_sock_init(CLIENT))))	/* Note assignment */
@@ -260,9 +264,10 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 			{
 				if (0 < loop_count)
 					/* No message unless attempted server start at least once */
-					send_msg(VARLSTCNT(11) ERR_GTMSECSHRSRVF, 4, RTS_ERROR_TEXT("Client"), process_id,
-						 loop_count - 1, ERR_TEXT, 2, RTS_ERROR_TEXT("sendto to gtmsecshr failed"),
-						 save_errno);
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_GTMSECSHRSRVF, 4,
+							RTS_ERROR_TEXT("Client"), process_id,
+							loop_count - 1, ERR_TEXT, 2,
+							RTS_ERROR_TEXT("sendto to gtmsecshr failed"), save_errno);
 				START_SERVER;
 				DBGGSSHR((LOGFLAGS, "secshr_client: sendto() failed - restarting server\n"));
 			}
@@ -303,8 +308,9 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 					continue;
 				if (EBADF == save_errno)
 					break;
-				send_msg(VARLSTCNT(11) ERR_GTMSECSHRSRVF, 4, RTS_ERROR_TEXT("Client"), process_id, loop_count - 1,
-					 ERR_TEXT, 2, RTS_ERROR_TEXT("recvfrom from gtmsecshr failed"), save_errno);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_GTMSECSHRSRVF, 4,
+						RTS_ERROR_TEXT("Client"), process_id, loop_count - 1, ERR_TEXT, 2,
+						RTS_ERROR_TEXT("recvfrom from gtmsecshr failed"), save_errno);
 				if ((ECONNRESET == save_errno) || (ENOTCONN == save_errno))
 				{
 					num_chars_recvd = 0;
@@ -337,10 +343,10 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 				  req_code, ret_code));
 			if (INVALID_COMKEY == ret_code)
 			{	/* Comkey mismatch means for a different version of GT.M - we will not handle it */
-				send_msg(VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_TEXT("Client"),
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_TEXT("Client"),
 					 process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
 					 ERR_TEXT, 2, RTS_ERROR_STRING("Communicating with wrong GT.M version"));
-				rts_error(VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_TEXT("Client"),
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_TEXT("Client"),
 					  process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
 					  ERR_TEXT, 2, RTS_ERROR_STRING("Communicating with wrong GT.M version"));
 				break;	/* rts_error should not return */
@@ -353,10 +359,11 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 					 * handles actual error.
 					 */
 					if ((-1 != Stat(path, &stat_buf)) || (ENOENT != ret_code))
-						send_msg(VARLSTCNT(14) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_TEXT("Client"),
-							 process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
-							 ERR_TEXT, 2, RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]),
-							 mesg.code);
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_GTMSECSHRSRVFIL, 7,
+								RTS_ERROR_TEXT("Client"),
+							 	process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
+								ERR_TEXT, 2, RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]),
+								mesg.code);
 					else
 						ret_code = 0;	/* File is gone so this or a previous try actually worked */
 					break;
@@ -365,10 +372,11 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 					 * got a reply confused or lost). If not there, no error. Else error to op-log.
 					 */
 					if ((-1 != semctl(id, 0, GETVAL)) && !SEM_REMOVED(errno))
-						send_msg(VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_TEXT("Client"),
-							 process_id, mesg.pid, req_code, mesg.mesg.id, ERR_TEXT, 2,
-							 RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]),
-							 mesg.code);
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
+								RTS_ERROR_TEXT("Client"),
+							 	process_id, mesg.pid, req_code, mesg.mesg.id, ERR_TEXT, 2,
+								RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]),
+								mesg.code);
 					else
 						ret_code = 0;	/* File is gone so this or a previous try actually worked */
 				case REMOVE_SHM:
@@ -377,21 +385,23 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 					 * Note -
 					 */
 					if ((-1 != shmctl(id, IPC_STAT, &shm_info)) && !SEM_REMOVED(errno))
-						send_msg(VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_TEXT("Client"),
-							 process_id, mesg.pid, req_code, mesg.mesg.id, ERR_TEXT, 2,
-							 RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]),
-							 mesg.code);
-						else
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
+								RTS_ERROR_TEXT("Client"),
+							 	process_id, mesg.pid, req_code, mesg.mesg.id, ERR_TEXT, 2,
+								RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]),
+								mesg.code);
+					else
 						ret_code = 0;	/* File is gone so this or a previous try actually worked */
 					break;
 				case FLUSH_DB_IPCS_INFO:	/* Errors handled by caller */
 					break;
 				default:
 					if (EPERM != mesg.code && EACCES != mesg.code)
-						send_msg(VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_TEXT("Client"),
-							 process_id, mesg.pid, req_code, mesg.mesg.id, ERR_TEXT, 2,
-							 RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]),
-							 mesg.code);
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
+								RTS_ERROR_TEXT("Client"),
+								process_id, mesg.pid, req_code, mesg.mesg.id, ERR_TEXT, 2,
+							 	RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]),
+							 	mesg.code);
 					break;
 			}
 		}
@@ -400,14 +410,17 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	if (MAX_COMM_ATTEMPTS < loop_count)
 	{
 		ret_code = -1;
-		gtm_putmsg(VARLSTCNT(10) ERR_GTMSECSHRSRVF, 4, RTS_ERROR_TEXT("Client"), process_id, loop_count - 1,
-			   ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to communicate with gtmsecshr"));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSRVF, 4,
+				RTS_ERROR_TEXT("Client"), process_id, loop_count - 1,
+			   	ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to communicate with gtmsecshr"));
 		/* If gtm_tmp is not defined, show default path */
 		if (gtm_tmp_ptr = GETENV("gtm_tmp"))
-			send_msg(VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT(gtm_tmp_ptr),
-				 ERR_TEXT, 2, RTS_ERROR_TEXT("(from $gtm_tmp)"));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,
+				RTS_ERROR_TEXT(gtm_tmp_ptr),
+				ERR_TEXT, 2, RTS_ERROR_TEXT("(from $gtm_tmp)"));
 		else
-			send_msg(VARLSTCNT(4) ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT("/tmp"));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4)
+					ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT("/tmp"));
 	}
 	if (ONETIMESOCKET == init_ret_code)
 		gtmsecshr_sock_cleanup(CLIENT);
@@ -425,14 +438,15 @@ int create_server(void)
 #	endif
 	int		save_errno;
 
-        if (0 == (child_pid = fork()))	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+	FORK(child_pid);	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+	if (0 == child_pid)
 	{
 		process_id = getpid();
 		/* Do exec using gtmsecshr_path, which was initialize in file check code - send_mesg2gtmsecshr */
 		status = EXECL(gtmsecshr_path, gtmsecshr_path, 0);
 		if (-1 == status)
 		{
-                        send_msg(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
+                        send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
 				 ERR_TEXT, 2, RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
 			exit(UNABLETOEXECGTMSECSHR);
 		}
@@ -441,7 +455,7 @@ int create_server(void)
 		if (-1 == child_pid)
 		{
 			status = GNDCHLDFORKFLD;
-			gtm_putmsg(VARLSTCNT(10) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
 				   ERR_TEXT,  2, RTS_ERROR_TEXT("Failed to fork off gtmsecshr"), errno);
 			/* Sleep for a while and hope a subsequent fork will succeed */
 			hiber_start(1000);
@@ -461,8 +475,9 @@ int create_server(void)
 				else if (EINTR != errno)
 				{
 					status = GNDCHLDFORKFLD;
-					gtm_putmsg(VARLSTCNT(10) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
-						   ERR_TEXT, 2, RTS_ERROR_TEXT("Error spawning gtmsecshr"), errno);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3,
+							RTS_ERROR_TEXT("Client"), process_id,
+							ERR_TEXT, 2, RTS_ERROR_TEXT("Error spawning gtmsecshr"), errno);
 				}
 			}
 		}

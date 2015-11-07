@@ -340,8 +340,8 @@ boolean_t	tp_tend()
 		 * 	(b) If we are in the final retry and we don't hold crit on some region.
 		 * 	(c) If we are in the final retry and we hold crit on a frozen region that we want to update.
 		 * 		This is possible if:
-		 *		(1) We did a tp_grab_crit through one of the gvcst_* routines when we first encountered the region
-		 *		    in the TP transaction and it wasn't locked down although it was frozen then.
+		 *		(1) We did a grab_crit_immediate() through one of the gvcst_* routines when we first encountered the
+		 *		    region in the TP transaction and it wasn't locked down although it was frozen then.
 		 *		(2) tp_crit_all_regions notices that at least one of the participating regions did ONLY READs, it
 		 *		    will not wait for any freeze on THAT region to complete before grabbing crit. Later, in the
 		 *		    final retry, if THAT region did an update which caused op_tcommit to invoke bm_getfree ->
@@ -507,7 +507,7 @@ boolean_t	tp_tend()
 	 * file being operated on, the obtains will always occurr in a consistent manner. Therefore, we
 	 * will grab crit on each file with wait since deadlock should not be able to occurr.
 	 */
-	ESTABLISH_RET(t_ch, FALSE);
+	ESTABLISH_NOUNWIND(t_ch);	/* avoid hefty setjmp call, which is ok since we never unwind t_ch */
 	for (lcnt = 0; ; lcnt++)
 	{
 		x_lock = TRUE;		/* Assume success */
@@ -1245,7 +1245,7 @@ boolean_t	tp_tend()
 		jpl = jnlpool_ctl;
 		tjpl = temp_jnlpool_ctl;
 		if (!repl_csa->hold_onto_crit)
-			grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 #		ifdef UNIX
 		if (jnlpool.jnlpool_ctl->freeze)
 		{

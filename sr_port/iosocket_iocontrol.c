@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +66,7 @@ void	iosocket_iocontrol(mstr *d)
 			timeout = NO_M_TIMEOUT;
 		iosocket_wait(io_curr_device.out, timeout); /* depth really means timeout here. */
 	} else
-		rts_error(VARLSTCNT(1) ERR_INVCTLMNE);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVCTLMNE);
 
 	return;
 }
@@ -75,15 +75,12 @@ void	iosocket_dlr_device(mstr *d)
 {
 	io_desc		*iod;
 	int		len;
-	d_socket_struct *dsocketptr;
 
 	iod = io_curr_device.out;
-	dsocketptr = (d_socket_struct *)iod->dev_sp;
-
- 	len = STRLEN(dsocketptr->dollar_device);
+ 	len = STRLEN(iod->dollar.device);
 	/* verify internal buffer has enough space for $DEVICE string value */
 	assert((int)d->len > len);
-	memcpy(d->addr, dsocketptr->dollar_device, len);
+	memcpy(d->addr, iod->dollar.device, len);
 	d->len = len;
 	return;
 }
@@ -92,16 +89,13 @@ void	iosocket_dlr_key(mstr *d)
 {
 	io_desc         *iod;
         int             len;
-        d_socket_struct *dsocketptr;
 
         iod = io_curr_device.out;
-        dsocketptr = (d_socket_struct *)iod->dev_sp;
-
-        len = STRLEN(dsocketptr->dollar_key);
+        len = STRLEN(iod->dollar.key);
         /* verify internal buffer has enough space for $DEVICE string value */
         assert((int)d->len > len);
 	if (len > 0)
-	        memcpy(d->addr, dsocketptr->dollar_key, len);
+	        memcpy(d->addr, iod->dollar.key, len);
         d->len = len;
         return;
 }

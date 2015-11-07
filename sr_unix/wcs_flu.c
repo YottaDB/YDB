@@ -224,6 +224,7 @@ boolean_t wcs_flu(uint4 options)
 		ADJUST_GBL_JREC_TIME(jgbl, jb);
 		assert(csa == cs_addrs);	/* for jnl_ensure_open */
 		jnl_status = jnl_ensure_open();
+		WBTEST_ASSIGN_ONLY(WBTEST_WCS_FLU_FAIL, jnl_status, ERR_JNLFILOPN);
 		if (SS_NORMAL != jnl_status)
 		{
 			assert(ERR_JNLFILOPN == jnl_status);
@@ -292,11 +293,14 @@ boolean_t wcs_flu(uint4 options)
 	cnl->wcsflu_pid = process_id;
 	if (dba_mm == csd->acc_meth)
 	{
-		if ((csd->freeze || flush_msync) && (csa->ti->last_mm_sync != csa->ti->curr_tn))
+		if (WBTEST_ENABLED(WBTEST_WCS_FLU_FAIL)
+			|| ((csd->freeze || flush_msync) && (csa->ti->last_mm_sync != csa->ti->curr_tn)))
 		{
-			if (0 == MSYNC((caddr_t)(MM_BASE_ADDR(csa)), (caddr_t)csa->db_addrs[1]))
-				csa->ti->last_mm_sync = csa->ti->curr_tn;	/* Save when did last full sync */
-			else
+			if (!(WBTEST_ENABLED(WBTEST_WCS_FLU_FAIL))
+				&& (0 == MSYNC((caddr_t)(MM_BASE_ADDR(csa)), (caddr_t)csa->db_addrs[1])))
+			{	/* Save when did last full sync */
+				csa->ti->last_mm_sync = csa->ti->curr_tn;
+			} else
 			{
 				REL_CRIT_BEFORE_RETURN;
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), ERR_TEXT, 2,
@@ -310,9 +314,10 @@ boolean_t wcs_flu(uint4 options)
 		 * In case of mupip rundown, we know no one else is accessing shared memory so no point waiting.
 		 */
 		assert(!in_mu_rndwn_file || (0 == cnl->wcs_phase2_commit_pidcnt));
-		if (cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL))
+		if (WBTEST_ENABLED(WBTEST_WCS_FLU_FAIL) || (cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL)))
 		{
-			assert(WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number); /* see wcs_phase2_commit_wait.c */
+			assert((WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number) /* see wcs_phase2_commit_wait.c */
+				|| (WBTEST_WCS_FLU_FAIL == gtm_white_box_test_case_number));
 			REL_CRIT_BEFORE_RETURN;
 			return FALSE;	/* We expect the caller to trigger cache-recovery which will fix this counter */
 		}

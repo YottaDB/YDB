@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,7 +94,7 @@ void iott_use(io_desc *iod, mval *pp)
 	{
 		if (tt_ptr->mupintr)
 			if (dollar_zininterrupt)
-				rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 			else
 			{	/* The interrupted read was not properly resumed so clear it now */
 				tt_ptr->mupintr = FALSE;
@@ -111,11 +111,11 @@ void iott_use(io_desc *iod, mval *pp)
                                         prin_out_dev_failure = TRUE;
                                 else
                                 {
-                                        send_msg(VARLSTCNT(1) ERR_NOPRINCIO);
+                                        send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
                                         stop_image_no_core();
                                 }
                         }
-                        rts_error(VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
+                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		flush_input = FALSE;
 		d_in = iod->pair.in;
@@ -134,6 +134,12 @@ void iott_use(io_desc *iod, mval *pp)
 				case iop_nocanonical:
 					tt_ptr->canonical = FALSE;
 					t.c_lflag &= ~(ICANON);
+					break;
+				case iop_empterm:
+					tt_ptr->ext_cap |= TT_EMPTERM;
+					break;
+				case iop_noempterm:
+					tt_ptr->ext_cap &= ~TT_EMPTERM;
 					break;
 				case iop_cenable:
 					temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
@@ -223,7 +229,7 @@ void iott_use(io_desc *iod, mval *pp)
 					ttab = pp->str.addr + p_offset + 1;
 					if ((fil_type = namelook(filter_index, filter_names, ttab, len)) < 0)
 					{
-						rts_error(VARLSTCNT(1) ERR_TTINVFILTER);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TTINVFILTER);
 						return;
 					}
 					switch (fil_type)
@@ -265,7 +271,7 @@ void iott_use(io_desc *iod, mval *pp)
 				case iop_length:
 					GET_LONG(length, pp->str.addr + p_offset);
 					if (0 > length)
-						rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 					d_out->length = length;
 					break;
 				case iop_pasthru:
@@ -282,7 +288,7 @@ void iott_use(io_desc *iod, mval *pp)
 					temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 					DOWRITERC(temp_ptr->fildes, &dc1, 1, status);
 					if (0 != status)
-						rts_error(VARLSTCNT(1) status);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 					mask_in &= (~TRM_READSYNC);
 					break;
 				case iop_terminator:
@@ -333,10 +339,10 @@ void iott_use(io_desc *iod, mval *pp)
 				case iop_width:
 					GET_LONG(width, pp->str.addr + p_offset);
 					if (0 > width)
-						rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVPARMNEG);
 					/* Do not allow a WIDTH of 1 if UTF mode (ICHSET or OCHSET is not M) */
 					if ((1 == width) && ((CHSET_M != d_in->ochset) || (CHSET_M != d_in->ichset)))
-						rts_error(VARLSTCNT(1) ERR_WIDTHTOOSMALL);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_WIDTHTOOSMALL);
 					if (0 == width)
 					{
 						d_out->wrap = FALSE;
@@ -409,14 +415,14 @@ void iott_use(io_desc *iod, mval *pp)
 		temp_ptr = (d_tt_struct *)d_in->dev_sp;
 		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
 		if (0 != status)
-			rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 		temp_ptr->term_ctrl = mask_in;
 		memcpy(&temp_ptr->mask_term, &mask_term, SIZEOF(io_termmask));
 		if (flush_input)
 		{
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
 			if (0 != status)
-				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LIT_AND_LEN("tcflush input"),
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LIT_AND_LEN("tcflush input"),
 					CALLFROM, errno);
 		}
 	} else if (tt_ptr->mupintr && !dollar_zininterrupt)

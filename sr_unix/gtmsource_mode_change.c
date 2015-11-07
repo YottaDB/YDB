@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,12 +18,7 @@
 #include "gtm_string.h"
 #include "gtmio.h"
 #include "repl_sp.h"
-
 #include <errno.h>
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
-
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -57,12 +52,20 @@ int gtmsource_mode_change(int to_mode)
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	repl_log(stdout, TRUE, TRUE, "Initiating %s operation on source server pid [%d] for secondary instance [%s]\n",
-		(GTMSOURCE_MODE_ACTIVE == to_mode) ? "ACTIVATE" : "DEACTIVATE",
+		(GTMSOURCE_MODE_ACTIVE_REQUESTED == to_mode) ? "ACTIVATE" : "DEACTIVATE",
 		jnlpool.gtmsource_local->gtmsource_pid, jnlpool.gtmsource_local->secondary_instname);
-	if (jnlpool.gtmsource_local->mode == to_mode)
+	if ((jnlpool.gtmsource_local->mode == GTMSOURCE_MODE_ACTIVE_REQUESTED)
+		|| (jnlpool.gtmsource_local->mode == GTMSOURCE_MODE_PASSIVE_REQUESTED))
+	{
+		repl_log(stderr, FALSE, TRUE, "Source Server %s already requested, not changing mode\n",
+				(to_mode == GTMSOURCE_MODE_ACTIVE_REQUESTED) ? "ACTIVATE" : "DEACTIVATE");
+		return (ABNORMAL_SHUTDOWN);
+	}
+	if (((GTMSOURCE_MODE_ACTIVE == jnlpool.gtmsource_local->mode) && (GTMSOURCE_MODE_ACTIVE_REQUESTED == to_mode))
+		|| ((GTMSOURCE_MODE_PASSIVE == jnlpool.gtmsource_local->mode) && (GTMSOURCE_MODE_PASSIVE_REQUESTED == to_mode)))
 	{
 		repl_log(stderr, FALSE, TRUE, "Source Server already %s, not changing mode\n",
-				(to_mode == GTMSOURCE_MODE_ACTIVE) ? "ACTIVE" : "PASSIVE");
+				(to_mode == GTMSOURCE_MODE_ACTIVE_REQUESTED) ? "ACTIVE" : "PASSIVE");
 		return (ABNORMAL_SHUTDOWN);
 	}
 	assert(ROOTPRIMARY_UNSPECIFIED != gtmsource_options.rootprimary);
@@ -74,7 +77,7 @@ int gtmsource_mode_change(int to_mode)
 		if (log_fd < 0) {
 			save_errno = ERRNO;
 			err_code = STRERROR(save_errno);
-			gtm_putmsg(VARLSTCNT(8) ERR_REPLLOGOPN, 6,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLLOGOPN, 6,
 					   LEN_AND_STR(gtmsource_options.log_file),
 					   LEN_AND_STR(err_code),
 					   LEN_AND_STR(NULL_DEVICE));
@@ -83,7 +86,7 @@ int gtmsource_mode_change(int to_mode)
 		CLOSEFILE_IF_OPEN(log_fd, close_status);
 		assert(close_status==0);
 	}
-	if ((GTMSOURCE_MODE_ACTIVE == to_mode)
+	if ((GTMSOURCE_MODE_ACTIVE_REQUESTED == to_mode)
 			&& (ROOTPRIMARY_SPECIFIED == gtmsource_options.rootprimary) && jnlpool.jnlpool_ctl->upd_disabled)
 	{	/* ACTIVATE is specified with ROOTPRIMARY on a journal pool that was created with PROPAGATEPRIMARY. This is a
 		 * case of transition from propagating primary to root primary. Enable updates in this journal pool and append
@@ -93,16 +96,16 @@ int gtmsource_mode_change(int to_mode)
 	}
 	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-	grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+	grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 	/* Any ACTIVATE/DEACTIVATE versus ROOTPRIMARY/PROPAGATE incompatibilities have already been checked in the
 	 * function "jnlpool_init" so go ahead and document the impending activation/deactivation and return.
 	 * This flag will be eventually detected by the concurrently running source server which will then change mode.
 	 */
-	if (GTMSOURCE_MODE_ACTIVE == to_mode)
+	if (GTMSOURCE_MODE_ACTIVE_REQUESTED == to_mode)
 	{
 		jnlpool.gtmsource_local->secondary_port = gtmsource_options.secondary_port;
-		jnlpool.gtmsource_local->secondary_inet_addr = gtmsource_options.sec_inet_addr;
 		STRCPY(jnlpool.gtmsource_local->secondary_host, gtmsource_options.secondary_host);
+		jnlpool.gtmsource_local->secondary_port = gtmsource_options.secondary_port;
 		memcpy(&jnlpool.gtmsource_local->connect_parms[0], &gtmsource_options.connect_parms[0],
 				SIZEOF(gtmsource_options.connect_parms));
 	}

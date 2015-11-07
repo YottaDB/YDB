@@ -381,10 +381,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				jnl_info.alloc = (0 == csd->jnl_alq) ? JNL_ALLOC_DEF : csd->jnl_alq;
 				assert(JNL_ALLOC_DEF >= JNL_ALLOC_MIN);
 				if (JNL_ALLOC_MIN > jnl_info.alloc)
-				{	/* Fix file header in addition to fixing new journal file settings */
-					csd->jnl_alq = JNL_ALLOC_MIN;
-					jnl_info.alloc = JNL_ALLOC_MIN;
-				}
+					jnl_info.alloc = JNL_ALLOC_MIN;				/* Fix new journal settings. */
 			}
 			if (!jnl_options.alignsize_specified)
 			{
@@ -392,10 +389,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					csd->alignsize; /* In bytes */
 				assert(JNL_DEF_ALIGNSIZE >= JNL_MIN_ALIGNSIZE);
 				if ((DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE) > jnl_info.alignsize)
-				{	/* Fix file header in addition to fixing new journal file settings */
-					csd->alignsize = (DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE);
-					jnl_info.alignsize = (DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE);
-				}
+					jnl_info.alignsize = (DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE); /* Fix new journal settings. */
 			}
 			if (jnl_info.alignsize <= csd->blk_size)
 			{

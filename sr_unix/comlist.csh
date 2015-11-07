@@ -679,7 +679,8 @@ else
 	@ savestatus = $status
 endif
 if ((0 != $savestatus) || (! -e GTMDefinedTypesInit.m)) then
-	set errmsg = "COMLIST-E-FAIL gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m - see log in $gtm_obj/gengtmdeftypes.log"
+	set errmsg = "COMLIST-E-FAIL gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m "
+	set errmsg = "$errmsg - see log in $gtm_obj/gengtmdeftypes.log"
 	if (`expr $gtm_verno \< V900`) then
 		@ comlist_status = $savestatus  # No errors for development - this fails the build
 	else
@@ -747,40 +748,27 @@ exit
 GDE_in1
 if (0 != $status) @ comlist_status = $status
 
-# Create the GT.M help database file.
-setenv gtmgbldir $gtm_dist/gtmhelp.gld
-gde <<GDE_in_gtmhelp
-Change -segment DEFAULT	-block=2048	-file=$gtm_dist/gtmhelp.dat
+# Create the GT.M/GDE/MUPIP/DSE/LKE help databases
+foreach hlp (*.hlp)
+	set prefix=${hlp:r}
+	if ("${prefix}" == "mumps") set prefix="gtm"
+	setenv gtmgbldir $gtm_dist/${prefix}help.gld
+	gde <<GDE_in_help
+Change -segment DEFAULT	-block=2048	-file=\$gtm_dist/${prefix}help.dat
 Change -region DEFAULT	-record=1020	-key=255
-GDE_in_gtmhelp
-if (0 != $status) @ comlist_status = $status
+GDE_in_help
+	if (0 != $status) @ comlist_status = $status
 
-mupip create
-if (0 != $status) @ comlist_status = $status
+	mupip create
+	if (0 != $status) @ comlist_status = $status
 
-gtm <<GTM_in_gtmhelp
+	gtm <<GTM_in_gtmhelp
 Do ^GTMHLPLD
-$gtm_dist/mumps.hlp
+$gtm_dist/${hlp}
 Halt
 GTM_in_gtmhelp
-if (0 != $status) @ comlist_status = $status
-
-# Create the GDE help database file.
-setenv gtmgbldir $gtm_dist/gdehelp.gld
-gde <<GDE_in_gdehelp
-Change -segment DEFAULT	-block=2048	-file=$gtm_dist/gdehelp.dat
-Change -region DEFAULT	-record=1020	-key=255
-GDE_in_gdehelp
-if (0 != $status) @ comlist_status = $status
-
-mupip create
-if (0 != $status) @ comlist_status = $status
-
-gtm <<GTM_in_gdehelp
-Do ^GTMHLPLD
-$gtm_dist/gde.hlp
-GTM_in_gdehelp
-if (0 != $status) @ comlist_status = $status
+	if (0 != $status) @ comlist_status = $status
+end
 
 chmod 775 *	# do not check $status here because we know it will be 1 since "gtmsecshr" permissions cannot be changed.
 

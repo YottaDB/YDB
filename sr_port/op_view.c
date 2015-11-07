@@ -25,6 +25,7 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
+#include "gdsbgtr.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "cmd_qlf.h"
@@ -51,6 +52,7 @@
 #include "gtm_malloc.h"
 #include "alias.h"
 #include "fullbool.h"
+#include "anticipatory_freeze.h"
 #ifdef GTM_TRIGGER
 # include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
 # include "gv_trigger.h"
@@ -64,6 +66,9 @@
 # endif
 #endif
 
+STATICFNDCL void view_dbflushop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
+
+GBLREF	volatile int4 		db_fsync_in_prog;
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	bool			undef_inhibit, jobpid;
 GBLREF	bool			view_debug1, view_debug2, view_debug3, view_debug4;
@@ -93,6 +98,7 @@ GBLREF	pid_t			process_id;
 error_def(ERR_ACTRANGE);
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_COLLDATAEXISTS);
+error_def(ERR_DBFSYNCERR);
 error_def(ERR_INVZDIRFORM);
 error_def(ERR_ISOLATIONSTSCHN);
 error_def(ERR_JNLFLUSH);
@@ -209,37 +215,13 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			outval.mvtype = MV_STR;
 			view_debug4 = (0 != MV_FORCE_INT(parmblk.value));
 			break;
+		case VTK_DBSYNC:
+		case VTK_EPOCH:
 		case VTK_FLUSH:
-			if (NULL == gd_header)		/* open gbldir */
-				gvinit();
-			save_reg = gv_cur_region;
-			if (NULL == parmblk.gv_ptr)
-			{	/* flush all regions */
-				reg = gd_header->regions;
-				r_top = reg + gd_header->n_regions - 1;
-			} else	/* flush selected region */
-				r_top = reg = parmblk.gv_ptr;
-			for (;  reg <= r_top;  reg++)
-			{
-				if (!reg->open)
-					gv_init_reg(reg);
-				if (!reg->read_only)
-				{
-					gv_cur_region = reg;
-					change_reg(); /* for jnl_ensure_open */
-					ENSURE_JNL_OPEN(cs_addrs, gv_cur_region);
-					/* We should NOT invoke wcs_recover here because it's possible we are in the final retry
-					 * of a TP transaction. In this case, we likely have pointers to non-dirty global buffers
-					 * in our transaction histories. Doing cache recovery could dry clean most of these buffers.
-					 * And that might cause us to get confused, attempt to restart, and incorrectly issue a
-					 * TPFAIL error because we are already in the final retry. By passing the WCSFLU_IN_COMMIT
-					 * bit, we instruct wcs_flu to avoid wcs_recover.
-					 */
-					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH | WCSFLU_IN_COMMIT);
-				}
-			}
-			gv_cur_region = save_reg;
-			change_reg();
+		case VTK_JNLFLUSH:
+		case VTK_DBFLUSH:
+			arg = (numarg > 1) ? va_arg(var, mval *) : NULL;
+			view_dbflushop(vtp->keycode, &parmblk, arg);
 			break;
 		case VTK_FULLBOOL:
 			TREF(gtm_fullbool) = FULL_BOOL;
@@ -338,59 +320,6 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			}
 			break;
 #		endif
-		case VTK_JNLFLUSH:
-			if (NULL == gd_header)		/* open gbldir */
-				gvinit();
-			save_reg = gv_cur_region;
-			if (NULL == parmblk.gv_ptr)
-			{	/* flush all journal files */
-				reg = gd_header->regions;
-				r_top = reg + gd_header->n_regions - 1;
-			} else	/* flush journal for selected region */
-				r_top = reg = parmblk.gv_ptr;
-			for (;  reg <= r_top;  reg++)
-			{
-				if (!reg->open)
-					gv_init_reg(reg);
-				gv_cur_region = reg;
-				change_reg();
-				csa = cs_addrs;
-				csd = csa->hdr;
-				if (JNL_ENABLED(csd))
-				{
-					was_crit = csa->now_crit;
-					if (!was_crit)
-						grab_crit(reg);
-					if (JNL_ENABLED(csd))
-					{
-						jnl_status = jnl_ensure_open();
-						if (0 == jnl_status)
-						{
-							jb = csa->jnl->jnl_buff;
-							if (SS_NORMAL == (jnl_status = jnl_flush(reg)))
-							{
-								assert(jb->dskaddr == jb->freeaddr);
-								UNIX_ONLY(jnl_fsync(reg, jb->dskaddr));
-								UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr));
-							} else
-							{
-								send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2,
-									JNL_LEN_STR(csd), ERR_TEXT, 2,
-									RTS_ERROR_TEXT("Error with journal flush during op_view"),
-									jnl_status);
-								assert(FALSE);
-							}
-						} else
-							send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
-									DB_LEN_STR(reg));
-					}
-					if (!was_crit)
-						rel_crit(reg);
-				}
-			}
-			gv_cur_region = save_reg;
-			change_reg();
-			break;
 		case VTK_JNLWAIT:
 			/* go through all regions that could have possibly been open across all global directories */
 			for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
@@ -802,5 +731,118 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWCMD);
 	}
 	va_end(var);
+	return;
+}
+
+void view_dbflushop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
+{
+	uint4			jnl_status, dummy_errno;
+	int4			nbuffs;
+	int			save_errno;
+	int			status, lcnt, icnt;
+	gd_region		*reg, *r_top, *save_reg;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	jnl_buffer_ptr_t	jb;
+	boolean_t		was_crit;
+	UNIX_ONLY(unix_db_info	*udi;)
+
+	if (NULL == gd_header)		/* open gbldir */
+		gvinit();
+	save_reg = gv_cur_region;
+	if (NULL == parmblkptr->gv_ptr)
+	{	/* operate on all regions */
+		reg = gd_header->regions;
+		r_top = reg + gd_header->n_regions - 1;
+	} else	/* operate on selected region */
+		r_top = reg = parmblkptr->gv_ptr;
+	for (; reg <= r_top; reg++)
+	{
+		if (!reg->open)
+			gv_init_reg(reg);
+		gv_cur_region = reg;
+		switch(keycode)
+		{
+			case VTK_DBSYNC:
+#				ifdef UNIX
+				if (!reg->read_only)
+				{
+					change_reg();
+					csa = cs_addrs;
+					udi = FILE_INFO(reg);
+					DB_FSYNC(reg, udi, csa, db_fsync_in_prog, save_errno);
+					if (0 != save_errno)
+					{
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg),
+								save_errno);
+						save_errno = 0;
+					}
+				}
+#				endif
+				break;
+			case VTK_FLUSH:
+			case VTK_EPOCH:
+				if (!reg->read_only)
+				{
+					change_reg(); /* for jnl_ensure_open */
+					ENSURE_JNL_OPEN(cs_addrs, gv_cur_region);
+					/* We should NOT invoke wcs_recover here because it's possible we are in the final retry
+					 * of a TP transaction. In this case, we likely have pointers to non-dirty global buffers
+					 * in our transaction histories. Doing cache recovery could dry clean most of these buffers.
+					 * And that might cause us to get confused, attempt to restart, and incorrectly issue a
+					 * TPFAIL error because we are already in the final retry. By passing the WCSFLU_IN_COMMIT
+					 * bit, we instruct wcs_flu to avoid wcs_recover.
+					 */
+					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH | WCSFLU_IN_COMMIT);
+				}
+				break;
+			case VTK_JNLFLUSH:
+				change_reg();
+				csa = cs_addrs;
+				csd = csa->hdr;
+				if (JNL_ENABLED(csd))
+				{
+					was_crit = csa->now_crit;
+					if (!was_crit)
+						grab_crit(reg);
+					if (JNL_ENABLED(csd))
+					{
+						jnl_status = jnl_ensure_open();
+						if (0 == jnl_status)
+						{
+							jb = csa->jnl->jnl_buff;
+							if (SS_NORMAL == (jnl_status = jnl_flush(reg)))
+							{
+								assert(jb->dskaddr == jb->freeaddr);
+								UNIX_ONLY(jnl_fsync(reg, jb->dskaddr));
+								UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr));
+							} else
+							{
+								send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFLUSH, 2,
+									JNL_LEN_STR(csd), ERR_TEXT, 2,
+									RTS_ERROR_TEXT("Error with journal flush during op_view"),
+									jnl_status);
+								assert(FALSE);
+							}
+						} else
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
+									DB_LEN_STR(reg));
+					}
+					if (!was_crit)
+						rel_crit(reg);
+				}
+				break;
+			case VTK_DBFLUSH:
+				if (!reg->read_only)
+				{
+					change_reg(); /* for jnl_ensure_open */
+					nbuffs = (NULL != thirdarg) ? MV_FORCE_INT(thirdarg) : cs_addrs->nl->wcs_active_lvl;
+					JNL_ENSURE_OPEN_WCS_WTSTART(cs_addrs, reg, nbuffs, dummy_errno);
+				}
+				break;
+		}
+	}
+	gv_cur_region = save_reg;
+	change_reg();
 	return;
 }

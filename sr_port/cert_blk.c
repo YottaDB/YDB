@@ -41,6 +41,7 @@
 
 GBLREF	uint4		dollar_tlevel;
 GBLREF	boolean_t	dse_running;
+GBLREF	boolean_t	mu_reorg_upgrd_dwngrd_in_prog;
 
 error_def(ERR_DBBLEVMX);
 error_def(ERR_DBBLEVMN);
@@ -111,7 +112,9 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	boolean_t		is_gvt, is_directory, first_key, full, prev_char_is_delimiter;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	bplmap = csd->bplmap;
@@ -231,19 +234,24 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 		RTS_ERROR_FUNC(csa, ERR_DBBSIZMX, util_buff);
 		return FALSE;
 	}
-	if (0 == root)
-	{
+	is_directory = FALSE;
+	is_gvt = FALSE;
+	/* if both "is_directory" and "is_gvt" are FALSE, then we dont know YET if the given block is a directory or gvt */
+	if (DIR_ROOT == root)
+		is_directory = TRUE;
+	if ((0 != root) && (DIR_ROOT != root))
+		is_gvt = TRUE;
+	/* MUPIP REORG -TRUNCATE has some special cases */
+	if (MUSWP_INCR_ROOT_CYCLE == TREF(in_mu_swap_root_state))
+	{	/* We could be updating either a gvt root block or a directory leaf block. Don't know yet. */
 		is_directory = FALSE;
 		is_gvt = FALSE;
-		/* if both "is_directory" and "is_gvt" are FALSE, then we dont know YET if the given block is a directory or gvt */
-	} else if (DIR_ROOT == root)
-	{
+	} else if (MUSWP_DIRECTORY_SWAP == TREF(in_mu_swap_root_state))
+	{	/* We know we're updating a directory block, even though root is not DIR_ROOT. root and gv_target correspond
+		 * to the gvt being REORG'ed.
+		 */
 		is_directory = TRUE;
 		is_gvt = FALSE;
-	} else
-	{
-		is_directory = FALSE;
-		is_gvt = TRUE;
 	}
 	blk_top = (sm_uc_ptr_t)bp + blk_size;
 	first_key = TRUE;
@@ -421,8 +429,10 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 					RTS_ERROR_FUNC(csa, ERR_DBPTRNOTPOS, util_buff);
 					return FALSE;
 				}
-				if (child > csa->ti->total_blks)
-				{
+				if ((child > csa->ti->total_blks) && !mu_reorg_upgrd_dwngrd_in_prog)
+				{	/* REORG -UPGRADE/DOWNGRADE can update recycled blocks, which may contain children beyond
+					 * the total_blks if a truncate happened sometime after the block was killed.
+					 */
 					RTS_ERROR_FUNC(csa, ERR_DBPTRMX, util_buff);
 					return FALSE;
 				}

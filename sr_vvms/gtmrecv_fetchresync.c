@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include "gtm_stdio.h"
 #include "gtm_socket.h"
+#include "gtm_netdb.h"
 #include "gtm_inet.h"
 #include "gtm_time.h" /* needed for difftime() definition */
 #include "gtm_fcntl.h"
@@ -53,16 +54,21 @@
 #define MAX_ATTEMPTS_FOR_FETCH_RESYNC	60 /* max-wait in seconds for source server response after connection is established */
 #define MAX_WAIT_FOR_FETCHRESYNC_CONN	60 /* max-wait in seconds to establish connection with the source server */
 #define FETCHRESYNC_PRIMARY_POLL	(MICROSEC_IN_SEC - 1) /* micro seconds, almost 1 second */
-#define GRAB_SEM_ERR_OUT 		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,\
+#define GRAB_SEM_ERR_OUT 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,\
 					  ERR_TEXT, 2,\
-					  RTS_ERROR_LITERAL("Error with receive pool semaphores. Receiver Server possibly exists"))
+					  LEN_AND_LIT("Error with receive pool semaphores. Receiver Server possibly exists"))
 
 GBLREF	uint4			process_id;
 GBLREF	int			gtmrecv_listen_sock_fd, gtmrecv_sock_fd;
-GBLREF	struct sockaddr_in	primary_addr;
+GBLREF	struct addrinfo		primary_ai;
+GBLREF	struct sockaddr_storage	primary_sas;
 GBLREF	seq_num			seq_num_zero;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
+
+error_def(ERR_RECVPOOLSETUP);
+error_def(ERR_REPLCOMM);
+error_def(ERR_TEXT);
 
 CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 {
@@ -80,7 +86,6 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 	mstr            log_nam, trans_log_nam;
 	char            trans_buff[MAX_FN_LEN+1];
 	key_t		recvpool_key;
-	size_t		primary_addr_len;
 	repl_msg_t	msg;
 	unsigned char	*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
 	int		tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
@@ -98,11 +103,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 								by global_name() */
 	mstr			res_name_str;
 	time_t			t1, t2;
-	struct timeval	gtmrecv_fetchresync_max_wait, gtmrecv_fetchresync_immediate, gtmrecv_fetchresync_poll;
-
-	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
+	struct timeval	gtmrecv_fetchresync_max_wait;
 
 	recvpool_key = -1;
 	ESTABLISH(gtmrecv_fetchresync_ch);
@@ -111,14 +112,11 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 	log_nam.addr = GTM_GBLDIR;
 	log_nam.len = SIZEOF(GTM_GBLDIR) - 1;
 	if (trans_log_name(&log_nam, &trans_log_nam, trans_buff) != SS_NORMAL)
-		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("gtmgbldir not defined"));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+				LEN_AND_LIT("gtmgbldir not defined"));
 	trans_buff[trans_log_nam.len] = '\0';
 	gtmrecv_fetchresync_max_wait.tv_sec = MAX_WAIT_FOR_FETCHRESYNC_CONN;
 	gtmrecv_fetchresync_max_wait.tv_usec = 0;
-	gtmrecv_fetchresync_immediate.tv_sec = 0;
-	gtmrecv_fetchresync_immediate.tv_usec = 0;
-	gtmrecv_fetchresync_poll.tv_sec = 0;
-	gtmrecv_fetchresync_poll.tv_usec = FETCHRESYNC_PRIMARY_POLL;
 	/* Get Recv. Pool Resource Name : name_dsc holds the resource name */
 	set_gdid_from_file((gd_id_ptr_t)&file_id, trans_buff, trans_log_nam.len);
 	global_name("GT$R", &file_id, res_name); /* R - Stands for Receiver Pool */
@@ -127,9 +125,9 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
         name_dsc.dsc$b_dtype = DSC$K_DTYPE_T;
         name_dsc.dsc$b_class = DSC$K_CLASS_S;
 	name_dsc.dsc$a_pointer[name_dsc.dsc$w_length] = '\0';
-	if(0 != init_sem_set_recvr(&name_dsc))
-		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,
-				       ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with receiver pool sem init."), REPL_SEM_ERRNO);
+	if (0 != init_sem_set_recvr(&name_dsc))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,
+				       ERR_TEXT, 2, LEN_AND_LIT("Error with receiver pool sem init."), REPL_SEM_ERRNO);
 	/* Lock all access to receive pool */
 	status = grab_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
 	if (0 == status)
@@ -159,11 +157,12 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 		GRAB_SEM_ERR_OUT;
 	}
 	/* Global section shouldn't already exist */
-	if(shm_exists(RECV, &name_dsc))
-		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0,
-			ERR_TEXT, 2, RTS_ERROR_LITERAL("Receive pool exists. Receiver Server possibly exists already!"));
+	if (shm_exists(RECV, &name_dsc))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0,
+			ERR_TEXT, 2, LEN_AND_LIT("Receive pool exists. Receiver Server possibly exists already!"));
 	gtmrecv_comm_init(port);
-	primary_addr_len = SIZEOF(primary_addr);
+	primary_ai.ai_addr = (sockaddr_ptr)&primary_sas;
+	primary_ai.ai_addrlen = SIZEOF(primary_sas);
 	repl_log(stdout, TRUE, TRUE, "Waiting for a connection...\n");
 	FD_ZERO(&input_fds);
 	FD_SET(gtmrecv_listen_sock_fd, &input_fds);
@@ -186,22 +185,23 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 		{
 			status = ERRNO;
 			SNPRINTF(err_string, SIZEOF(err_string), "Error in select on listen socket : %s", STRERROR(status));
-			rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
 		}
 	}
 	if (status == 0)
 	{
 		repl_log(stdout, TRUE, TRUE, "Waited about %d seconds for connection from primary source server\n",
 				MAX_WAIT_FOR_FETCHRESYNC_CONN);
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Waited too long to get a connection request. Check if primary is alive."));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				LEN_AND_LIT("Waited too long to get a connection request. Check if primary is alive."));
 	}
-	ACCEPT_SOCKET(gtmrecv_listen_sock_fd, (struct sockaddr *)&primary_addr, (sssize_t *)&primary_addr_len, gtmrecv_sock_fd);
+
+	ACCEPT_SOCKET(gtmrecv_listen_sock_fd, primary_ai.ai_addr, (sssize_t *)&primary_ai.ai_addrlen, gtmrecv_sock_fd);
 	if (gtmrecv_sock_fd < 0)
 	{
 		status = ERRNO;
 		SNPRINTF(err_string, SIZEOF(err_string), "Error accepting connection from Source Server : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
 	}
 	repl_log(stdout, TRUE, TRUE, "Connection established\n");
 	repl_close(&gtmrecv_listen_sock_fd);
@@ -209,14 +209,14 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 		|| 0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize)))
 	{
 		SNPRINTF(err_string, SIZEOF(err_string), "Error getting socket send/recv bufsizes : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
 		return ERR_REPLCOMM;
 	}
 	msg.type = REPL_FETCH_RESYNC;
 	memset(&msg.msg[0], 0, MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
 	QWASSIGN(*(seq_num *)&msg.msg[0], jgbl.max_resync_seqno);
 	msg.len = MIN_REPL_MSGLEN;
-	REPL_SEND_LOOP(gtmrecv_sock_fd, &msg, msg.len, FALSE, &gtmrecv_fetchresync_immediate)
+	REPL_SEND_LOOP(gtmrecv_sock_fd, &msg, msg.len, REPL_POLL_NOWAIT);
 		; /* Empty Body */
 	if (status != SS_NORMAL)
 	{
@@ -224,17 +224,17 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 		{
 			SNPRINTF(err_string, SIZEOF(err_string), "Error sending FETCH RESYNC message. Error in send : %s",
 				 STRERROR(status));
-			rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
 		}
 		if (repl_errno == EREPL_SELECT)
 		{
 			SNPRINTF(err_string, SIZEOF(err_string), "Error sending FETCH RESYNC message. Error in select : %s",
 				 STRERROR(status));
-			rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
 		}
 	}
 	wait_count = MAX_ATTEMPTS_FOR_FETCH_RESYNC;
-	REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_fetchresync_poll)
+	REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, REPL_POLL_WAIT)
 	{
 		if (0 >= wait_count)
 			break;
@@ -247,18 +247,18 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 		{
 			SNPRINTF(err_string, SIZEOF(err_string), "Error receiving RESYNC JNLSEQNO. Error in recv : %s",
 				 STRERROR(status));
-			rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
 		}
 		if (repl_errno == EREPL_SELECT)
 		{
 			SNPRINTF(err_string, SIZEOF(err_string), "Error receiving RESYNC JNLSEQNO. Error in select : %s",
 				 STRERROR(status));
-			rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
 		}
 	}
 	if (wait_count <= 0)
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Waited too long to get fetch resync message from primary. Check if primary is alive."));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+			LEN_AND_LIT("Waited too long to get fetch resync message from primary. Check if primary is alive."));
 	REVERT;
 	QWASSIGN(*resync_seqno, *(seq_num *)&msg.msg[0]);
 	repl_log(stdout, TRUE, TRUE, "Received RESYNC SEQNO is "INT8_FMT"\n", INT8_PRINT(*resync_seqno));
@@ -270,7 +270,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 	 */
 	rel_sem_immediate(RECV, RECV_SERV_COUNT_SEM);
 	/* Wait till connection is broken or REPL_CONN_CLOSE is received */
-	REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_fetchresync_poll)
+	REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, REPL_POLL_WAIT)
 	{
 		REPL_DPRINT1("FETCH_RESYNC : Waiting for source to send CLOSE_CONN or connection breakage\n");
 	}

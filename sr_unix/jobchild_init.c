@@ -35,6 +35,7 @@
 #include "invocation_mode.h"
 #include "gtmci.h"
 #include "send_msg.h"
+#include "have_crit.h"
 
 #define FILE_NAME_SIZE	255
 
@@ -69,6 +70,7 @@ void jobchild_init(void)
 	mval		job_args[MAX_ACTUALS];
 	mstr		routine, label;
 	int		offset;
+	int		rc;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -88,9 +90,15 @@ void jobchild_init(void)
 		/* read parameters into parameter structure */
 		ojchildparms(&jparms, &job_arglist, job_args);
 		/* Execute the command to be run before executing the actual M routine */
-		if (jparms.startup.len && (0 != SYSTEM(jparms.startup.addr)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("STARTUP command failed"));
-		if(!job_addr(&jparms.routine, &jparms.label, jparms.offset, (char **)&base_addr, (char **)&transfer_addr))
+		if (jparms.startup.len)
+		{
+			rc = SYSTEM(jparms.startup.addr);
+			if ((0 != rc))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,
+						LEN_AND_LIT("STARTUP command failed"));
+		}
+		if(!job_addr(&jparms.routine, &jparms.label, jparms.offset,
+				(char **)&base_addr, (char **)&transfer_addr))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 		/* Set process priority */
 		if (jparms.baspri)

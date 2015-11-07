@@ -565,7 +565,7 @@ boolean_t mur_open_files()
 		 */
 		if (NULL != jnlpool_ctl)
 		{	/* Validate the journal pool is accessible and the offsets of various structures within it are intact */
-			grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 			csa->hold_onto_crit = TRUE;	/* No more unconditional rel_lock() */
 			assert(jnlpool.repl_inst_filehdr->crash); /* since we haven't removed the journal pool */
 			repl_inst_flush_jnlpool(FALSE, FALSE);

@@ -1847,9 +1847,6 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			SECSHR_PROBE_REGION(reg);	/* SECSHR_PROBE_REGION sets csa */
 			if (csa->now_crit)
 			{
-				/* for normal termination we should not have been holding the journal pool crit lock */
-				assert((NORMAL_TERMINATION) != secshr_state || ((gtm_white_box_test_case_enabled
-				       && (WBTEST_ANTIFREEZE_DSKNOSPCAVAIL == gtm_white_box_test_case_number))));
 				jpl = (jnlpool_ctl_ptr_t)((sm_uc_ptr_t)csa->critical - JNLPOOL_CTL_SIZE); /* see jnlpool_init() for
 													   * relationship between
 													   * critical and jpl */

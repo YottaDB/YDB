@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +12,8 @@
 /* iosocket_create.c */
 /* this module takes care of
  *	1. allocate the space
- *	2. for passive: local.sin.sin_addr.s_addr & local.sin.sin_port
- *	   for active : remote.sin.sin_addr.s_addr & remote.sin.sin_port
+ *	2. for passive: local.sa & local.ai
+ *	   for active : remote.sa & remote.ai
  *	   for $principal: via getsockname and getsockpeer
  *	3. socketptr->protocol
  *	4. socketptr->sd (initialized to -1) unless already open via inetd
@@ -29,6 +29,8 @@
 #include "gtm_netdb.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
+#include "gtm_ipv6.h"
+#include "gtm_stdlib.h"
 
 #include "io.h"
 #include "iotcproutine.h"
@@ -37,128 +39,214 @@
 #include "iosocketdef.h"
 #include "min_max.h"
 #include "gtm_caseconv.h"
-
-#ifdef __osf__
-/* Tru64 does not have the prototype for "hstrerror" even though the function is available in the library.
- * Until we revamp the TCP communications setup stuff to use the new(er) POSIX definitions, we cannot move
- * away from "hstrerror". Declare prototype for this function in Tru64 manually until then.
- */
-const char *hstrerror(int err);
-#endif
+#include "util.h"
 
 GBLREF	tcp_library_struct	tcp_routines;
 
 error_def(ERR_GETSOCKNAMERR);
+error_def(ERR_GETADDRINFO);
+error_def(ERR_GETNAMEINFO);
 error_def(ERR_INVPORTSPEC);
 error_def(ERR_INVADDRSPEC);
 error_def(ERR_PROTNOTSUP);
 error_def(ERR_TEXT);
+error_def(ERR_SOCKINIT);
+
+/* PORT_PROTO_FORMAT defines the format for <port>:<protocol> */
+#define PORT_PROTO_FORMAT "%hu:%3[^:]"
+#define	SEPARATOR ':'
 
 socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 {
-	socket_struct	*socketptr;
-	bool		passive = FALSE;
-	unsigned short	port;
-	int		ii, save_errno, tmplen;
-	GTM_SOCKLEN_TYPE	socknamelen;
-	char 		temp_addr[SA_MAXLITLEN], addr[SA_MAXLEN], tcp[4], *adptr;
-	const char	*errptr;
+	socket_struct		*socketptr;
+	socket_struct		*prev_socketptr;
+	socket_struct		*socklist_head;
+	bool			passive = FALSE;
+	unsigned short		port;
+	int			ii, save_errno, tmplen, errlen;
+	char 			temp_addr[SA_MAXLITLEN], tcp[4], *adptr;
+	const char		*errptr;
+	struct addrinfo		*ai_ptr;
+	struct addrinfo		hints, *addr_info_ptr = NULL;
+	int			af;
+	int			sd;
+	int			errcode;
+	char			port_buffer[NI_MAXSERV];
+	int			port_buffer_len;
+	int			colon_cnt;
+	char			*last_2colon;
+	int			addrlen;
+	GTM_SOCKLEN_TYPE	tmp_addrlen;
 
-	socketptr = (socket_struct *)malloc(SIZEOF(socket_struct));
-	memset(socketptr, 0, SIZEOF(socket_struct));
 	if (0 > file_des)
 	{	/* no socket descriptor yet */
-		if (SSCANF(sockaddr, "%[^:]:%hu:%3[^:]", temp_addr, &port, tcp) < 3)
+		memset(&hints, 0, SIZEOF(hints));
+
+		colon_cnt = 0;
+		for (ii = strlen(sockaddr) - 1; 0 <= ii; ii--)
 		{
-			passive = TRUE;
-			socketptr->local.sin.sin_addr.s_addr = INADDR_ANY;
-			if(SSCANF(sockaddr, "%hu:%3[^:]", &port, tcp) < 2)
+			if (SEPARATOR == sockaddr[ii])
 			{
-				free(socketptr);
-				rts_error(VARLSTCNT(1) ERR_INVPORTSPEC);
+				colon_cnt++;
+				if (2 == colon_cnt)
+				{
+					last_2colon = &sockaddr[ii];
+					break;
+				}
+			}
+		}
+		if (0 == colon_cnt)
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVPORTSPEC);
+			return NULL;
+		}
+		if (1 == colon_cnt)
+		{	/* for listening socket or broadcasting socket */
+			if (SSCANF(sockaddr, PORT_PROTO_FORMAT, &port, tcp) < 2)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVPORTSPEC);
 				return NULL;
 			}
-			socketptr->local.sin.sin_port = GTM_HTONS(port);
-			socketptr->local.sin.sin_family = AF_INET;
-			socketptr->local.port = port;
-		} else
-		{
-			for (ii = 0; ISDIGIT_ASCII(temp_addr[ii]) || '.' == temp_addr[ii]; ii++) /* NOTE: only ASCII digits */
-				;							   /* allowed for dotted notation address */
-			if (temp_addr[ii] != '\0')
+			passive = TRUE;
+			/* We always first try using IPv6 address, if supported */
+			af = ((GTM_IPV6_SUPPORTED && !ipv4_only) ? AF_INET6 : AF_INET);
+			if (-1 == (sd = tcp_routines.aa_socket(af, SOCK_STREAM, IPPROTO_TCP)))
 			{
-				SPRINTF(socketptr->remote.saddr_lit, "%s", temp_addr);
-				adptr = iotcp_name2ip(temp_addr);
-				if (NULL == adptr)
+				/* Try creating IPv4 socket */
+				af = AF_INET;
+				if (-1 == (sd = tcp_routines.aa_socket(af, SOCK_STREAM, IPPROTO_TCP)))
 				{
-					free(socketptr);
-#if !defined(__hpux) && !defined(__MVS__)
-					errptr = HSTRERROR(h_errno);
-					rts_error(VARLSTCNT(6) ERR_INVADDRSPEC, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
-#else
-					/* Grumble grumble HPUX and z/OS don't have hstrerror() */
-					rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);
-#endif
+					save_errno = errno;
+					errptr = (char *)STRERROR(save_errno);
+					errlen = STRLEN(errptr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, save_errno, errlen, errptr);
 					return NULL;
 				}
-
-				SPRINTF(addr, "%s", adptr);
-			} else
-				SPRINTF(addr, "%s", temp_addr);
-			if ((unsigned int)-1 == (socketptr->remote.sin.sin_addr.s_addr = tcp_routines.aa_inet_addr(addr)))
-			{	/* Errno not set by inet_addr() */
-				free(socketptr);
-				rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);
+			}
+			SERVER_HINTS(hints, af);
+			port_buffer_len = 0;
+			I2A(port_buffer, port_buffer_len, port);
+			port_buffer[port_buffer_len]='\0';
+			if (0 != (errcode = getaddrinfo(NULL, port_buffer, &hints, &addr_info_ptr)))
+			{
+				tcp_routines.aa_close(sd);
+				RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
 				return NULL;
 			}
-			socketptr->remote.sin.sin_port = GTM_HTONS(port);
-			socketptr->remote.sin.sin_family = AF_INET;
+			SOCKET_ALLOC(socketptr);
+			socketptr->local.port = port;
+			socketptr->temp_sd = sd;
+			socketptr->sd = FD_INVALID;
+			ai_ptr = &(socketptr->local.ai);
+			memcpy(ai_ptr, addr_info_ptr, SIZEOF(struct addrinfo));
+			SOCKET_AI_TO_LOCAL_ADDR(socketptr, addr_info_ptr);
+			ai_ptr->ai_addr = SOCKET_LOCAL_ADDR(socketptr);
+			ai_ptr->ai_addrlen = addr_info_ptr->ai_addrlen;
+			ai_ptr->ai_next = NULL;
+			freeaddrinfo(addr_info_ptr);
+		} else
+		{	/* connection socket */
+			assert(2 == colon_cnt);
+			if (SSCANF(last_2colon + 1, PORT_PROTO_FORMAT, &port, tcp) < 2)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVPORTSPEC);
+				return NULL;
+			}
+			/* for connection socket */
+			SPRINTF(port_buffer, "%hu", port);
+			addrlen = last_2colon - sockaddr;
+			if ('[' == sockaddr[0])
+			{
+				if (NULL == memchr(sockaddr, ']', addrlen))
+				{
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVPORTSPEC);
+					return NULL;
+				}
+				addrlen -= 2;
+				memcpy(temp_addr, &sockaddr[1], addrlen);
+			} else
+				memcpy(temp_addr, sockaddr, addrlen);
+			temp_addr[addrlen] = 0;
+			CLIENT_HINTS(hints);
+			if (0 != (errcode = getaddrinfo(temp_addr, port_buffer, &hints, &addr_info_ptr)))
+			{
+				RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
+				return NULL;
+			}
+			/*  we will test all address families in iosocket_connect() */
+			SOCKET_ALLOC(socketptr);
+			socketptr->remote.ai_head = addr_info_ptr;
 			socketptr->remote.port = port;
-			SPRINTF(socketptr->remote.saddr_ip, "%s", addr);
+			socketptr->sd = socketptr->temp_sd = FD_INVALID; /* don't mess with 0 */
 		}
 		lower_to_upper((uchar_ptr_t)tcp, (uchar_ptr_t)tcp, SIZEOF("TCP") - 1);
 		if (0 == MEMCMP_LIT(tcp, "TCP"))
-			socketptr->protocol = socket_tcpip;
-		else
 		{
-			free(socketptr);
-			rts_error(VARLSTCNT(4) ERR_PROTNOTSUP, 2, MIN(strlen(tcp), SIZEOF("TCP") - 1), tcp);
+			socketptr->protocol = socket_tcpip;
+		} else
+		{
+			SOCKET_FREE(socketptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PROTNOTSUP, 2, MIN(strlen(tcp), SIZEOF("TCP") - 1), tcp);
 			return NULL;
 		}
-		socketptr->sd = FD_INVALID; /* don't mess with 0 */
-		socketptr->state = socket_created; /* Is this really useful? */
+		socketptr->state = socket_created;
+		SOCKET_BUFFER_INIT(socketptr, bfsize);
+		socketptr->passive = passive;
+		socketptr->moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
+
+		return socketptr;
 	} else
 	{	/* socket already setup by inetd */
+		SOCKET_ALLOC(socketptr);
 		socketptr->sd = file_des;
-		socknamelen = SIZEOF(socketptr->local.sin);
-		if (-1 == tcp_routines.aa_getsockname(socketptr->sd, (struct sockaddr *)&socketptr->local.sin, &socknamelen))
+		socketptr->temp_sd = FD_INVALID;
+		ai_ptr = &(socketptr->local.ai);
+		tmp_addrlen = SIZEOF(struct sockaddr_storage);
+		if (-1 == tcp_routines.aa_getsockname(socketptr->sd, SOCKET_LOCAL_ADDR(socketptr), &tmp_addrlen))
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
 			tmplen = STRLEN(errptr);
-			free(socketptr);
-			rts_error(VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
+			SOCKET_FREE(socketptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 			return NULL;
 		}
-		socketptr->local.port = GTM_NTOHS(socketptr->local.sin.sin_port);
-		socknamelen = SIZEOF(socketptr->remote.sin);
-		if (-1 == getpeername(socketptr->sd, (struct sockaddr *)&socketptr->remote.sin, (GTM_SOCKLEN_TYPE *)&socknamelen))
+		ai_ptr->ai_addrlen = tmp_addrlen;
+		/* extract port information */
+		GETNAMEINFO(SOCKET_LOCAL_ADDR(socketptr), tmp_addrlen, NULL, 0, port_buffer, NI_MAXSERV, NI_NUMERICSERV, errcode);
+		if (0 != errcode)
+		{
+			SOCKET_FREE(socketptr);
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+			return NULL;
+		}
+		socketptr->local.port = ATOI(port_buffer);
+		tmp_addrlen = SIZEOF(struct sockaddr_storage);
+		if (-1 == getpeername(socketptr->sd, SOCKET_REMOTE_ADDR(socketptr), &tmp_addrlen))
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
 			tmplen = STRLEN(errptr);
-			free(socketptr);
-			rts_error(VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr); /* need new error */
+			SOCKET_FREE(socketptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 			return NULL;
 		}
-		socketptr->remote.port = GTM_NTOHS(socketptr->remote.sin.sin_port);
+		socketptr->remote.ai.ai_addrlen = tmp_addrlen;
+		assert(0 != SOCKET_REMOTE_ADDR(socketptr)->sa_family);
+		GETNAMEINFO(SOCKET_REMOTE_ADDR(socketptr), socketptr->remote.ai.ai_addrlen, NULL, 0, port_buffer, NI_MAXSERV,
+				NI_NUMERICSERV, errcode);
+		if (0 != errcode)
+		{
+			SOCKET_FREE(socketptr);
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+			return NULL;
+		}
+		socketptr->remote.port = ATOI(port_buffer);
 		socketptr->state = socket_connected;
 		socketptr->protocol = socket_tcpip;
+		SOCKET_BUFFER_INIT(socketptr, bfsize);
+		socketptr->passive = passive;
+		socketptr->moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
+		return socketptr;
 	}
-	socketptr->buffer = (char *)malloc(bfsize);
-	socketptr->buffer_size = bfsize;
-	socketptr->buffered_length = socketptr->buffered_offset = 0;
-	socketptr->passive = passive;
-	socketptr->moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
-	return socketptr;
 }

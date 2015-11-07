@@ -1,6 +1,6 @@
 /****************************************************************
 *								*
-*	Copyright 2012 Fidelity Information Services, Inc	*
+*	Copyright 2012, 2013 Fidelity Information Services, Inc	*
 *								*
 *	This source code contains the intellectual property	*
 *	of its copyright holder(s), and is made available	*
@@ -101,12 +101,12 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 		currpos = (char *)i2asc((unsigned char*)currpos, (unsigned int)count);
 		*currpos++ = 0;
 		assert(currpos - (TREF(gtm_waitstuck_script)).addr <= (TREF(gtm_waitstuck_script)).len);
-		status = SYSTEM((char *)((TREF(gtm_waitstuck_script)).addr));
+		status = SYSTEM(((char *)((TREF(gtm_waitstuck_script)).addr)));
 		if (-1 == status)
 		{	/* SYSTEM failed */
 			save_errno = errno;
-			send_msg(VARLSTCNT(6) ERR_STUCKACT, 4, LEN_AND_LIT("FAILURE"), LEN_AND_STR(command));
-			send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("system"), CALLFROM, save_errno);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_STUCKACT, 4, LEN_AND_LIT("FAILURE"), LEN_AND_STR(command));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("system"), CALLFROM, save_errno);
 		} else
 		{	/* check on how the command did */
 			assert(SIZEOF(wait_stat) == SIZEOF(int4));
@@ -119,23 +119,27 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 			{
 				status = WEXITSTATUS(wait_stat);
 				if (!status)
-					send_msg(VARLSTCNT(6) ERR_STUCKACT, 4, LEN_AND_LIT("SUCCESS"), LEN_AND_STR(command));
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_STUCKACT, 4,
+							LEN_AND_LIT("SUCCESS"), LEN_AND_STR(command));
 				else
 				{
-					send_msg(VARLSTCNT(6) ERR_STUCKACT, 4, LEN_AND_LIT("FAILURE"), LEN_AND_STR(command));
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_STUCKACT, 4,
+							LEN_AND_LIT("FAILURE"), LEN_AND_STR(command));
 					if (WIFSIGNALED(wait_stat))
 					{
 						status = WTERMSIG(wait_stat);
-						send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("PROCSTUCK terminated by signal"),
-							CALLFROM, status);
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+							LEN_AND_LIT("PROCSTUCK terminated by signal"), CALLFROM, status);
 					} else
-						send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("PROCSTUCK"), CALLFROM, status);
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+							LEN_AND_LIT("PROCSTUCK"), CALLFROM, status);
 				}
 			} else
 			{	/* it's gone rogue' */
-				send_msg(VARLSTCNT(6) ERR_STUCKACT, 4, LEN_AND_LIT("FAILURE"), LEN_AND_STR(command));
-				send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("PROCSTUCK did not report status"), CALLFROM,
-					 status);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_STUCKACT, 4,
+						LEN_AND_LIT("FAILURE"), LEN_AND_STR(command));
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+						LEN_AND_LIT("PROCSTUCK did not report status"), CALLFROM, status);
 				assert(FALSE);
 			}
 		}

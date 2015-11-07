@@ -14,14 +14,14 @@
 
 #ifdef GTMDBGFLAGS_ENABLED
 # define GTMDBGFLAGS_MASK_SET(MASK)	(TREF(gtmdbgflags) & MASK)
-# define GTMDBGFLAGS_ONLY(MASK, FREQ, ...)											\
+# define GTMDBGFLAGS_ONLY(MASK, ...)												\
 {																\
 	DCL_THREADGBL_ACCESS;													\
 																\
 	SETUP_THREADGBL_ACCESS;													\
 	if (GTMDBGFLAGS_MASK_SET(MASK))												\
 	{															\
-		TREF(gtmdbgflags_freq_cntr)++;											\
+		(TREF(gtmdbgflags_freq_cntr))++;										\
 		if (TREF(gtmdbgflags_freq) == TREF(gtmdbgflags_freq_cntr))							\
 		{														\
 			__VA_ARGS__;												\

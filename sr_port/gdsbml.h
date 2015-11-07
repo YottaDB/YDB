@@ -84,6 +84,50 @@
 
 #define MASTER_MAP_BITS_PER_LMAP	1
 
+
+#define DETERMINE_BML_FUNC_COMMON(FUNC, CS, CSA)								\
+{														\
+	FUNC = (CS->reference_cnt > 0) ? bml_busy : (CSA->hdr->db_got_to_v5_once ? bml_recycled : bml_free);	\
+}
+#ifndef UNIX
+ #define DETERMINE_BML_FUNC(FUNC, CS, CSA)	DETERMINE_BML_FUNC_COMMON(FUNC, CS, CSA)
+#else
+# define DETERMINE_BML_FUNC(FUNC, CS, CSA)											\
+{																\
+	GBLREF	boolean_t	mu_reorg_upgrd_dwngrd_in_prog;									\
+																\
+	if (CSA->nl->trunc_pid)													\
+	{	/* A truncate is in progress. If we are acquiring a block, we need to update cnl->highest_lbm_with_busy_blk to	\
+		 * avoid interfering with the truncate. If we are truncate doing a t_recycled2free mini-transaction, we need to	\
+		 * select bml_free.												\
+		 */														\
+		if (cs->reference_cnt > 0)											\
+		{														\
+			FUNC = bml_busy;											\
+			CSA->nl->highest_lbm_with_busy_blk = MAX(CS->blk, CSA->nl->highest_lbm_with_busy_blk);			\
+		} else if (cs->reference_cnt < 0)										\
+		{														\
+			if (CSA->hdr->db_got_to_v5_once && (CSE_LEVEL_DRT_LVL0_FREE != CS->level))				\
+				FUNC = bml_recycled;										\
+			else													\
+			{	/* always set the block as free when gvcst_bmp_mark_free a level-0 block in DIR tree; reset	\
+				 * level since t_end will call bml_status_check which has an assert for bitmap block level	\
+				 */												\
+				FUNC = bml_free;										\
+				CS->level = LCL_MAP_LEVL;									\
+ 			}													\
+		} else	/* cs->reference_cnt == 0 */										\
+		{														\
+			if (CSA->hdr->db_got_to_v5_once && mu_reorg_upgrd_dwngrd_in_prog)					\
+				FUNC = bml_recycled;										\
+			else													\
+				FUNC = bml_free;										\
+		}														\
+	} else	/* Choose bml_func as it was chosen before truncate feature. */							\
+		DETERMINE_BML_FUNC_COMMON(FUNC, CS, CSA);									\
+}
+#endif
+
 int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits);
 int4 bml_init(block_id bml);
 uint4 bml_busy(uint4 setbusy, sm_uc_ptr_t map);

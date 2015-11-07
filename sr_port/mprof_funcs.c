@@ -57,6 +57,10 @@ STATICDEF gtm_uint64_t		process_system, process_user;	/* Store system and user C
 STATICDEF mstr			mprof_mstr;			/* Area to hold global and subscripts. */
 STATICDEF boolean_t 		use_realtime_flag = FALSE;	/* Indicates whether clock_gettime is unable to use CLOCK_MONOTONIC
 								 * flag and so should use CLOCK_REALTIME instead. */
+#ifdef __osf__
+STATICDEF struct rusage		last_usage = {0, 0};		/* Contains the last value obtained via getrusage() on Tru64. */
+#endif
+
 LITDEF  MIDENT_CONST(above_routine, "*above*");
 
 #ifdef DEBUG
@@ -72,16 +76,16 @@ LITDEF  MIDENT_CONST(above_routine, "*above*");
 #ifdef UNIX
 #  define TIMES			times_usec
 #  define CHILDREN_TIMES	children_times_usec
-#  define MPROF_RTS_ERROR(x)	rts_error x
+#  define MPROF_RTS_ERROR(x)	rts_error_csa x
 #elif defined(VMS)
 #  define TIMES			get_cputime
 #  define MPROF_RTS_ERROR(x)		\
 {					\
 	if (mdb_ch_set)			\
-		rts_error x;		\
+		rts_error_csa x;	\
 	else				\
 	{				\
-		gtm_putmsg x;		\
+		gtm_putmsg_csa x;	\
 		exit(EXIT_FAILURE);	\
 	}				\
 }
@@ -98,8 +102,8 @@ LITDEF  MIDENT_CONST(above_routine, "*above*");
 	assert((x->e.usr_time < RUNTIME_LIMIT) && (x->e.sys_time < RUNTIME_LIMIT) && (x->e.elp_time < RUNTIME_LIMIT));	\
 }
 
-#define RTS_ERROR_VIEWNOTFOUND(x)	MPROF_RTS_ERROR((VARLSTCNT(8) ERR_VIEWNOTFOUND, 2, gvn->str.len, gvn->str.addr, \
-						ERR_TEXT, 2, RTS_ERROR_STRING(x)));
+#define RTS_ERROR_VIEWNOTFOUND(x)	MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_VIEWNOTFOUND, 2, gvn->str.len,	\
+						gvn->str.addr, ERR_TEXT, 2, RTS_ERROR_STRING(x)));
 
 
 /* do the MPROF initialization */
@@ -142,8 +146,27 @@ STATICFNDEF void times_usec(ext_tms *curr)
         struct timespec	elp_time;
 
 	res = getrusage(RUSAGE_SELF, &usage);
-	if (res == -1)
-		MPROF_RTS_ERROR((VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("getrusage"), CALLFROM, errno));
+	if (-1 == res)
+		MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("getrusage"), CALLFROM, errno));
+#	ifdef __osf__
+	/* On Tru64 getrusage sometimes fails to increment the seconds value when the microseconds wrap around at 1M. If we detect
+	 * this, we make a second call to getrusage if so. A more complete check would be to also verify whether the new seconds
+	 * value is less than the previous one, but we anyway have an assert in UPDATE_TIME that would catch that, and our testing
+	 * on Tru64 has not shown that type of faulty behavior.
+	 */
+	if (((usage.ru_utime.tv_sec == last_usage.ru_utime.tv_sec) && (usage.ru_utime.tv_usec < last_usage.ru_utime.tv_usec))
+	    || ((usage.ru_stime.tv_sec == last_usage.ru_stime.tv_sec) && (usage.ru_stime.tv_usec < last_usage.ru_stime.tv_usec)))
+	{
+		DEBUG_ONLY(last_usage = usage);
+		res = getrusage(RUSAGE_SELF, &usage);
+		if (-1 == res)
+			MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("getrusage"), CALLFROM, errno));
+		/* In debug also ensure that a subsequent call to getrusage restored the seconds value. */
+		assert((usage.ru_utime.tv_sec > last_usage.ru_utime.tv_sec)
+			|| (usage.ru_stime.tv_sec > last_usage.ru_stime.tv_sec));
+	}
+	last_usage = usage;
+#	endif
 	curr->tms_utime = (usage.ru_utime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_utime.tv_usec;
 	curr->tms_stime = (usage.ru_stime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_stime.tv_usec;
 	/* Also start recording the elapsed time. */
@@ -157,7 +180,8 @@ STATICFNDEF void times_usec(ext_tms *curr)
 				use_realtime_flag = TRUE;
 				continue;
 			} else
-				MPROF_RTS_ERROR((VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("clock_gettime"), CALLFROM, errno));
+				MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("clock_gettime"), CALLFROM, errno));
 		}
 		break;
 	}
@@ -172,7 +196,7 @@ STATICFNDEF void child_times_usec(void)
 
 	res = getrusage(RUSAGE_CHILDREN, &usage);
 	if (res == -1)
-		MPROF_RTS_ERROR((VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("getrusage"), CALLFROM, errno));
+		MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("getrusage"), CALLFROM, errno));
 	child_user = (usage.ru_utime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_utime.tv_usec;
 	child_system = (usage.ru_stime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_stime.tv_usec;
 	return;
@@ -185,7 +209,7 @@ STATICFNDEF void get_cputime (ext_tms *curr)
 	int	jpi_code = JPI$_CPUTIM;
 
 	if ((status = lib$getjpi(&jpi_code, &process_id, 0, &cpu_time_used, 0, 0)) != SS$_NORMAL)
-		MPROF_RTS_ERROR((VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("LIB$GETJPI"), CALLFROM, status));
+		MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("LIB$GETJPI"), CALLFROM, status));
 	curr->tms_utime = cpu_time_used;
 	curr->tms_stime = 0;
 	return;
@@ -205,11 +229,11 @@ void turn_tracing_on(mval *gvn, boolean_t from_env, boolean_t save_gbl)
 	{
 		if (is_tracing_on)
 		{
-			gtm_putmsg(VARLSTCNT(1) ERR_TRACINGON);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRACINGON);
 			return;
 		}
 		if ((0 == gvn->str.len) || ('^' != gvn->str.addr[0]))
-			MPROF_RTS_ERROR((VARLSTCNT(4) ERR_NOTGBL, 2, gvn->str.len, gvn->str.addr));
+			MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTGBL, 2, gvn->str.len, gvn->str.addr));
 	}
 	/* The following should only be a one-time operation. */
 	if (!TREF(mprof_ptr))
@@ -925,7 +949,7 @@ STATICFNDEF void parse_gvn(mval *gvn)
 	c_ref = gvn->str.addr;
 	c_top = c_ref + gvn->str.len;
 	if (!gvn->str.len || ('^' != *c_ref++))
-		MPROF_RTS_ERROR((VARLSTCNT(4) ERR_NOTGBL, 2, gvn->str.len, gvn->str.addr));
+		MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTGBL, 2, gvn->str.len, gvn->str.addr));
 	if (mprof_mstr.len < 4 * gvn->str.len)
 	{	/* We are going to return an array of mvals pointing to global-name and subscript. We should
 		 * never be needing more than 4 * gvn->str.len since the only expandable entity that can be
@@ -1036,7 +1060,7 @@ STATICFNDEF void parse_gvn(mval *gvn)
 			}
 			spt->str.len = INTCAST(mpsp - spt->str.addr);
 			if (MAX_GVSUBSCRIPTS <= count)
-				MPROF_RTS_ERROR((VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS));
+				MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS));
 			(TREF(mprof_ptr))->gvargs.args[count++] = spt++;
 			if (',' != *c_ref)
 				break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,9 +17,6 @@
 #endif
 #include <sys/ioctl.h>
 #include "gtm_inet.h"
-#ifndef __MVS__
-#include <netinet/tcp.h>
-#endif
 #include <errno.h>
 #include "eintr_wrappers.h"
 

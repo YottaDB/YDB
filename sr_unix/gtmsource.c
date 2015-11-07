@@ -149,9 +149,9 @@ int gtmsource()
 	if (gtmsource_options.shut_down)
 		gtmsource_exit(gtmsource_shutdown(FALSE, NORMAL_SHUTDOWN) - NORMAL_SHUTDOWN);
 	else if (gtmsource_options.activate)
-		gtmsource_exit(gtmsource_mode_change(GTMSOURCE_MODE_ACTIVE) - NORMAL_SHUTDOWN);
+		gtmsource_exit(gtmsource_mode_change(GTMSOURCE_MODE_ACTIVE_REQUESTED) - NORMAL_SHUTDOWN);
 	else if (gtmsource_options.deactivate)
-		gtmsource_exit(gtmsource_mode_change(GTMSOURCE_MODE_PASSIVE) - NORMAL_SHUTDOWN);
+		gtmsource_exit(gtmsource_mode_change(GTMSOURCE_MODE_PASSIVE_REQUESTED) - NORMAL_SHUTDOWN);
 	else if (gtmsource_options.checkhealth)
 		gtmsource_exit(gtmsource_checkhealth() - NORMAL_SHUTDOWN);
 	else if (gtmsource_options.changelog)
@@ -390,13 +390,15 @@ int gtmsource()
 		gtmsource_poll_actions(FALSE);
 		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 			continue;
+		if (GTMSOURCE_MODE_ACTIVE_REQUESTED == gtmsource_local->mode)
+			gtmsource_local->mode = GTMSOURCE_MODE_ACTIVE;
 		SPRINTF(tmpmsg, "GTM Replication Source Server now in ACTIVE mode using port %d", gtmsource_local->secondary_port);
 		sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
 		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-		grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		{
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "Starting afresh due to ONLINE ROLLBACK\n");

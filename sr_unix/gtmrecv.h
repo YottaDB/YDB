@@ -205,7 +205,6 @@ typedef struct
 typedef struct
 {
 	uint4		recv_serv_pid;		/* Process identification of receiver server */
-	int4		primary_inet_addr;	/* IP address of the primary system */
 	int4		lastrecvd_time;		/* unused */
 	/* Data items used in communicating action qualifiers (show statistics, shutdown) and
 	 * qualifier values (log file, shutdown time, etc). */

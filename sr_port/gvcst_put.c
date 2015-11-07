@@ -151,7 +151,7 @@ error_def(ERR_UNIMPLOP);
 /* Before issuing an error, add GVT to the list of known gvts in this TP transaction in case it is not already done.
  * This GVT addition is usually done by "tp_hist" but that function has most likely not yet been invoked in gvcst_put.
  * Doing this addition will ensure we remember to reset any non-zero clue in dir_tree as part of tp_clean_up when a TROLLBACK
- * or TRESTART (implicit or explicit) occurs. Not doing so could means if an rts_error(ERR_REC2BIG) happens here, control will
+ * or TRESTART (implicit or explicit) occurs. Not doing so could means if an ERR_REC2BIG happens here, control will
  * go to the error trap and if it does a TROLLBACK (which does a tp_clean_up) we would be left with a potentially out-of-date
  * clue of GVT which if used for later global references could result in db integ errors.
  */
@@ -163,7 +163,7 @@ error_def(ERR_UNIMPLOP);
 	{															\
 		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))					\
 			end = &buff[MAX_ZWR_KEY_SZ - 1];									\
-		rts_error(VARLSTCNT(10) ERR_REC2BIG, 4, VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +)			\
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(10) ERR_REC2BIG, 4, VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +)	\
 			  value.len, (int4)gv_cur_region->max_rec_size,								\
 			  REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, end - buff, buff);						\
 	}															\
@@ -179,7 +179,7 @@ error_def(ERR_UNIMPLOP);
 	 */															\
 	if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))						\
 		end = &buff[MAX_ZWR_KEY_SZ - 1];										\
-	rts_error(VARLSTCNT(11) ERR_RSVDBYTE2HIGH, 5, new_blk_size_single,							\
+	rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(11) ERR_RSVDBYTE2HIGH, 5, new_blk_size_single,				\
 		REG_LEN_STR(gv_cur_region), blk_size, blk_reserved_bytes,							\
 		ERR_GVIS, 2, end - buff, buff);											\
 }
@@ -334,7 +334,7 @@ void	gvcst_put(mval *val)
 				 * as in the case of implicit TP for triggers, we issue a DBROLLEDBACK error that the application
 				 * programmer can catch.
 				 */
-				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
 		}
 		tp_set_sgm();
 		GVCST_ROOT_SEARCH;
@@ -483,6 +483,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	mval			*lcl_val;			/* local copy of "val" at function entry.
 								 * used to restore "val" in case of TP restarts */
 	mval			*lcl_val_forjnl;
+	mval			*pval;				/* copy of "value" (an mstr), protected from stp gcol */
 	DEBUG_ONLY(enum cdb_sc	save_cdb_status;)
 #	endif
 #	ifdef DEBUG
@@ -1023,7 +1024,15 @@ tn_restart:
 				ztold_mval->str.len = data_len;
 				if (data_len)
 				{
-					ENSURE_STP_FREE_SPACE(data_len);
+					if (!(IS_STP_SPACE_AVAILABLE(data_len)))
+					{
+						PUSH_MV_STENT(MVST_MVAL);       /* protect "value" mstr from stp gcol */
+						pval = &mv_chain->mv_st_cont.mvs_mval;
+						pval->str = value;
+						ENSURE_STP_FREE_SPACE(data_len);
+						value = pval->str;
+						POP_MV_STENT();                 /* pval */
+					}
 					ztold_mval->str.addr = (char *)stringpool.free;
 					memcpy(ztold_mval->str.addr, (sm_uc_ptr_t)rp + cur_val_offset, data_len);
 					stringpool.free += data_len;
@@ -1260,7 +1269,7 @@ tn_restart:
 						 * definition for why the below macro call is necessary.
 						 */
 						ADD_TO_GVT_TP_LIST(gv_target, RESET_FIRST_TP_SRCH_STATUS_FALSE);
-						rts_error(VARLSTCNT(4) ERR_GVINCRISOLATION, 2,
+						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_GVINCRISOLATION, 2,
 							gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
 					}
 					if (NULL == cse->recompute_list_tail ||
@@ -1300,7 +1309,6 @@ tn_restart:
 			assert(blk_reserved_size >= blk_fill_size);
 			extra_record_orig_size = 0;
 			prev_rec_offset = bh->prev_rec.offset;
-			assert(new_blk_size_single <= new_blk_size_r);
 			/* Decide which side (left or right) the new record goes. Ensure either side has at least one record.
 			 * This means we might not honor the desired FillFactor if the only record in a block exceeds the
 			 * blk_fill_size, but in this case we are guaranteed the block has room for the current reserved bytes.
@@ -2571,7 +2579,7 @@ retry:
 		 * Issue DBROLLEDBACK error that the application programmer can catch and do the necessary stuff.
 		 */
 		assert(gtm_trigger_depth == tstart_trigger_depth);
-		rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DBROLLEDBACK);
 	}
 	/* Note: In case of cdb_sc_onln_rlbk1, the restart logic will take care of doing the root search */
 #	endif

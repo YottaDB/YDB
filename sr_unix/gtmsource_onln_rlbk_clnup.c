@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,7 @@ void	gtmsource_onln_rlbk_clnup()
 		 */
 		gtmsource_local->gtmsource_state = gtmsource_state = GTMSOURCE_HANDLE_ONLN_RLBK;
 		if (!was_crit)
-			grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 		/* We have to let the read files logic know that until we have sent data "upto" the current journal sequence number
 		 * at this point, we cannot rely on the journal pool. Indicate this through the gtmsource_save_read_jnl_seqno global
 		 * variable

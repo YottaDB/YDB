@@ -1,6 +1,6 @@
 $!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 $!								!
-$!	Copyright 2001, 2012 Fidelity Information Services, Inc	!
+$!	Copyright 2001, 2013 Fidelity Information Services, Inc	!
 $!								!
 $!	This source code contains the intellectual property	!
 $!	of its copyright holder(s), and is made available	!
@@ -37,7 +37,8 @@ $ minimal = f$trnlnm("minimal_build")
 $ bypass_vercheck = f$trnlnm("runall_bypass_version_check")
 $ stop_with_compile = f$trnlnm("runall_stop_with_compile")
 $!
-$ common_options := /standard=vaxc/share/assume=nowrit/float=g_float/warn=disable=(signedknown,signedmember)/inc=(gtm$src:)
+$ common_options := /standard=vaxc/share/assume=nowrit/float=g_float
+$ common_options := 'common_options'/warn=disable=(signedknown,signedmember)/inc=(gtm$src:,tcpip$examples:)
 $ ccdbg := cc'common_options'/define=(debug,nolicense)/debug/nooptimize
 $ ccbta := cc'common_options'/debug/nooptimize
 $ ccpro := cc'common_options'

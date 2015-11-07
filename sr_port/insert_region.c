@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,6 @@
 #include "dbfilop.h"
 #include "gtmmsg.h"
 #include "is_file_identical.h"
-#include "tp_grab_crit.h"
 #include "t_retry.h"
 #include "wcs_mm_recover.h"
 #include "gtmimagename.h"
@@ -205,7 +204,7 @@ tp_region	*insert_region(	gd_region	*reg,
 		 * 	tp_restart() (invoked through t_retry from gvcst_init) will open "reg" as well as get crit on it for us.
 		 */
 		DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
-		if (FALSE == tp_grab_crit(reg))		/* Attempt lockdown now */
+		if (FALSE == grab_crit_immediate(reg))		/* Attempt lockdown now */
 		{
 			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 			t_retry(cdb_sc_needcrit);	/* avoid deadlock -- restart transaction */

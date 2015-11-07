@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "have_crit.h"
+#include "eintr_wrappers.h"
 #include "get_fs_block_size.h"
 
 #ifndef VMS

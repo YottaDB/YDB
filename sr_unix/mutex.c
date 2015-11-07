@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -304,7 +304,7 @@ static	void	crash_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 	} while (TRUE);
 }
 
-static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_lock_type)
+static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_lock_type, sgmnt_addrs *csa)
 {
 	enum cdb_sc		status;
 	boolean_t		wakeup_status;
@@ -465,7 +465,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 			if (MUTEX_LOCK_WRITE == mutex_lock_type)
 				return (cdb_sc_normal);
 		} else
-			mutex_deadlock_check(addr);	/* Timed out: See if any deadlocks and fix if detected */
+			mutex_deadlock_check(addr, csa); /* Timed out: See if any deadlocks and fix if detected */
 		status = mutex_wakeup(addr); /* Timed out or reader. In case
 					      * of reader this causes
 					      * accelerated wakeup of readers
@@ -576,7 +576,7 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 						{
 							MUTEX_DPRINT3("%d: Inserted %d into wait queue\n", process_id,
 									free_slot->pid);
-							return (mutex_long_sleep(addr, mutex_lock_type));
+							return (mutex_long_sleep(addr, mutex_lock_type, csa));
 						}
 					} while (--queue_retry_counter_insq);
 					if (!(--quant_retry_counter_insq))
@@ -615,6 +615,7 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 			} else
 				assert(process_exiting);	/* timers might be off, but this adds CPU load at an awkward time */
 			MICROSEC_SLEEP(ONE_MILLION - 1);	/* Wait a second, then try again */
+			mutex_deadlock_check(addr, csa);
 			if (++redo_cntr < MUTEX_MAX_WAIT_FOR_PROGRESS_CNTR)
 				break;
 			return (cdb_sc_normal);

@@ -34,11 +34,14 @@ endif
 
 alias	gt_as_local	"$comlist_gt_as"
 
-set platform_name = `uname | sed 's/-//g' | sed 's,/,,' | tr '[A-Z]' '[a-z]'`
+set os = `uname`
+set platform_name = ${os:gs/-//:s,/,,:al}
 set mach_type = `uname -m`
 
 set asmlist=($*)
 set cmdfile="$gtm_log/gt_as_$$__batch.csh"
+set background="&"
+if ($HOST:r:r:r =~ {snail,turtle,lespaul,pfloyd,strato}) set background=""
 
 echo 'alias gt_as_local "$comlist_gt_as"' >> $cmdfile
 
@@ -49,13 +52,14 @@ foreach asm ($asmlist)
 		set file=$asm:t:r:r
 		set sfile="${gtm_obj}/${file}_cpp.s"
 		set ofile="${gtm_obj}/${file}.o"
-		echo "(eval 'gt_cpp -E $asm' > $sfile ; eval 'gt_as_local $sfile -o $ofile' ; /bin/rm $sfile) $redir &" >> $cmdfile
+		echo "(eval 'gt_cpp -E $asm' > $sfile ; eval 'gt_as_local $sfile -o $ofile' ; /bin/rm $sfile)"	\
+		     "$redir $background" >> $cmdfile
 	else if ( "os390" == $platform_name ) then
 		set file=$asm:t:r
 		set dbgfile="${gtm_obj}/${file}.dbg"
-		echo "(eval 'gt_as_local $asm' ; if ( -e $dbgfile ) chmod ugo+r $dbgfile) $redir &" >> $cmdfile
+		echo "(eval 'gt_as_local $asm' ; if ( -e $dbgfile ) chmod ugo+r $dbgfile) $redir $background" >> $cmdfile
 	else
-		echo "eval 'gt_as_local $asm' $redir &" >> $cmdfile
+		echo "eval 'gt_as_local $asm' $redir $background" >> $cmdfile
 	endif
 end
 

@@ -27,13 +27,15 @@ error_def(ERR_DBCCERR);
 GBLREF volatile int4		crit_count;
 GBLREF uint4			exi_condition;
 GBLREF uint4			process_id;
+GBLREF sgmnt_addrs		*vms_mutex_check_csa;
 
-void grab_lock(gd_region *reg, uint4 dummy)
+boolean_t grab_lock(gd_region *reg, boolean_t dummy1, uint4 dummy2)
 {
 	enum cdb_sc	status;
 	sgmnt_addrs	*csa;
 
 	csa = &FILE_INFO(reg)->s_addrs;
+	vms_mutex_check_csa = csa;
 	assert(!lib$ast_in_prog());
 
 	if (!csa->now_crit)
@@ -48,18 +50,18 @@ void grab_lock(gd_region *reg, uint4 dummy)
 			switch (status)
 			{
 			case cdb_sc_critreset:
-				rts_error(ERR_CRITRESET, 2, REG_LEN_STR(reg));
+				rts_error_csa(CSA_ARG(NULL) ERR_CRITRESET, 2, REG_LEN_STR(reg));
 			case cdb_sc_dbccerr:
-				rts_error(ERR_DBCCERR, 2, REG_LEN_STR(reg));
+				rts_error_csa(CSA_ARG(NULL) ERR_DBCCERR, 2, REG_LEN_STR(reg));
 			default:
 				GTMASSERT;
 			}
-			return;
+			return TRUE;
 		}
 		assert(csa->nl->in_crit == 0);
 		csa->nl->in_crit = process_id;
 		CRIT_TRACE(crit_ops_gw);		/* see gdsbt.h for comment on placement */
 		crit_count = 0;
 	}
-	return;
+	return TRUE;
 }

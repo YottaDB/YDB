@@ -126,16 +126,22 @@ error_def(ERR_TEXT);
 
 #define INST_FROZEN_COMMENT			"PID %d encountered %s; Instance frozen"
 
-#define GENERATE_INST_FROZEN_COMMENT(BUF, BUF_LEN, MSG_ID)							\
-{														\
-	GBLREF uint4		process_id;									\
-	const err_ctl		*ctl;										\
-	const err_msg		*msginfo;									\
-														\
-	ctl = err_check(MSG_ID);										\
-	assert(NULL != ctl);											\
-	GET_MSG_INFO(MSG_ID, ctl, msginfo);									\
-	SNPRINTF(BUF, BUF_LEN, INST_FROZEN_COMMENT, process_id, msginfo->tag);					\
+#define MSGID_TO_ERRMSG(MSG_ID, ERRMSG)				\
+{								\
+	const err_ctl		*ctl;				\
+								\
+	ctl = err_check(MSG_ID);				\
+	assert(NULL != ctl);					\
+	GET_MSG_INFO(MSG_ID, ctl, ERRMSG);			\
+}
+
+#define GENERATE_INST_FROZEN_COMMENT(BUF, BUF_LEN, MSG_ID)			\
+{										\
+	GBLREF uint4		process_id;					\
+	const err_msg		*msginfo;					\
+										\
+	MSGID_TO_ERRMSG(MSG_ID, msginfo);					\
+	SNPRINTF(BUF, BUF_LEN, INST_FROZEN_COMMENT, process_id, msginfo->tag);	\
 }
 
 /* This is a version of the macro which waits for the instance freeze to be lifted off assuming the process has

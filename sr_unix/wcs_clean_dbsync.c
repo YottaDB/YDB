@@ -32,7 +32,6 @@
 #include "gdsbgtr.h"		/* for the BG_TRACE_PRO macros */
 #include "gtmio.h"		/* for the GET_LSEEK_FLAG macro */
 #include "wcs_clean_dbsync.h"
-#include "tp_grab_crit.h"
 #include "wcs_flu.h"
 #include "lockconst.h"
 
@@ -135,9 +134,9 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		dbsync_defer_timer = TRUE;
 		GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
 		DEBUG_ONLY(
-			/* We invoke tp_grab_crit below which can potentially do cache-recoveries if cnl->wc_blocked is set.
+			/* We invoke grab_crit_immediate below which can potentially do cache-recoveries if cnl->wc_blocked is set.
 			 * But wcs_recover has an assert that we never invoke it in the final retry. This is to avoid
-			 * restarts in the final retry. But wcs_clean_dbsync invokes tp_grab_crit only if we dont already
+			 * restarts in the final retry. But wcs_clean_dbsync invokes grab_crit_immediate only if we dont already
 			 * hold crit and that means we have already finished commit on this particular region (e.g. if
 			 * commit is complete on all regions and crit is released on all of them but before we reset t_tries
 			 * to 0 in t_end/tp_tend) so it is okay to invoke wcs_recover in that case. Signal that to wcs_recover
@@ -159,12 +158,12 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			&& (!jpc || !jpc->jnl_buff || (LOCK_AVAILABLE == jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid))
 			&& ((NULL == check_csaddrs) || !T_IN_CRIT_OR_COMMIT_OR_WRITE(check_csaddrs))
 			&& !T_IN_CRIT_OR_COMMIT_OR_WRITE(csa)
-			&& (FALSE != tp_grab_crit(reg)))
-		{	/* Note that tp_grab_crit invokes wcs_recover in case cnl->wc_blocked is non-zero.
-			 * This means we could be doing cache recovery even though we are in interrupt code.
-			 * If this is found undesirable, the logic in tp_grab_crit that invokes wcs_recover has to be re-examined.
+			&& (FALSE != grab_crit_immediate(reg)))
+		{	/* Note that grab_crit_immediate invokes wcs_recover in case cnl->wc_blocked is non-zero.  This means we
+			 * could be doing cache recovery even though we are in interrupt code.  If this is found undesirable, the
+			 * logic in grab_crit_immediate that invokes wcs_recover has to be re-examined.
 			 */
-			/* Note that if we are here, we have obtained crit using tp_grab_crit. */
+			/* Note that if we are here, we have obtained crit using grab_crit_immediate. */
 			assert(csa->ti->early_tn == csa->ti->curr_tn);
 			/* Do not invoke wcs_flu if the database has a newer journal file than what this process had open
 			 * when the dbsync timer was started in wcs_wtstart. This is because mainline (non-interrupt) code

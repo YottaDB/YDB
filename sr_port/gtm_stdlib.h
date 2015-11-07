@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,11 +40,11 @@ char *gtm_getenv(char *varname);
 #define STRTOU64L	strtoull
 #endif
 #define MKSTEMP(template,mkstemp_res)	(mkstemp_res = mkstemp(template))
-#ifndef __CYGWIN__
-#define SYSTEM	system
+#ifdef VMS
+#define SYSTEM system
 #else
 #define SYSTEM	gtm_system
-int gtm_system(const char *line);
+int gtm_system(const char *cmdline);
 #endif
 
 #endif

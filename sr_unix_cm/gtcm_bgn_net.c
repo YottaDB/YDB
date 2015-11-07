@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,8 @@
 
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"		/* for close() used by CLOSEFILE_RESET */
-#include "gtm_time.h"		/* for ctime() and time() */
+#include "gtm_time.h"		/* for GTM_CTIME() and GTM_TIME() */
+#include "gtm_string.h"
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
@@ -30,6 +31,9 @@ static char rcsid[] = "$Header:$";
 
 #include "gtcm.h"
 #include "gtmio.h"
+#include "gtm_socket.h"
+#include "gtm_netdb.h"
+#include "gtm_ipv6.h"
 
 GBLREF char	*omi_service;
 GBLREF int	rc_server_id;
@@ -38,6 +42,10 @@ GBLREF int	authenticate;
 GBLREF int	psock;
 GBLREF int	ping_keepalive;
 GBLREF int	omi_pid;
+
+error_def(ERR_GETADDRINFO);
+error_def(ERR_GETNAMEINFO);
+error_def(ERR_TEXT);
 
 int gtcm_bgn_net(omi_conn_ll *cll)
 {
@@ -49,10 +57,12 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 #ifdef NET_TCP
 	struct servent		*se;
 	unsigned short		port;
+	char			port_buffer[NI_MAXSERV];
 #endif /* defined(NET_TCP) */
 #ifdef BSD_TCP
-	struct sockaddr_in	sin;
+	struct addrinfo		*ai_ptr, hints;
 	const  boolean_t	reuseaddr = TRUE;
+	int			errcode;
 #else /* defined(BSD_TCP) */
 #ifdef SYSV_TCP
 	struct t_bind		*bind;
@@ -75,33 +85,43 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	if (!omi_service)
 		omi_service = SRVC_NAME;
 #ifdef NET_TCP
-/*  If not specified, we ask the system for any port */
-	if (!omi_service)
-		port = htons(0);
-/*  Ask for a specific port */
-	else
-	{
-		if (ISDIGIT_ASCII(*omi_service))
-			port = atoi(omi_service);
-		else
-		{
-			se = getservbyname(omi_service, "tcp");
-			endservent();
-			if (!se)
-			{
-				OMI_DBG((omi_debug, "%s:  Service \"%s\" not found in /etc/services.\n", SRVR_NAME, omi_service));
-				return -1;
-			}
-			port = htons(se->s_port);
-		}
-	}
+	/* NET_TCP is defined only when BSD_TCP is defined or SYSV_TCP is defined, but SYSV_TCP is never defined (a bug?)
+	 * so we move the code of obtaining port information from service down to #ifdef BSD_TCP
+	 */
+#ifdef SYSV_TCP
+	GTMASSERT;
+#endif
 #endif /* defined(NET_TCP) */
 #ifdef BSD_TCP
-	/*  Create a socket */
-	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	/*  Create a socket always tries IPv6 first */
+	SERVER_HINTS(hints, ((GTM_IPV6_SUPPORTED && !ipv4_only) ? AF_INET6 : AF_INET));
+	if ((fd = socket(hints.ai_family, SOCK_STREAM, 0)) < 0)
 	{
-		save_errno = errno;
-		return save_errno;
+		if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+		{
+			save_errno = errno;
+			return save_errno;
+		}
+		hints.ai_family = AF_INET;
+	}
+	/*  Bind an address to the socket */
+	if (0 != (errcode = getaddrinfo(NULL, omi_service, &hints, &ai_ptr)))
+	{
+		RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
+		return errcode;
+	}
+	if (ISDIGIT_ASCII(*omi_service))
+		port = atoi(omi_service);
+	else
+	{
+		if (0 != (errcode = getnameinfo(ai_ptr->ai_addr, ai_ptr->ai_addrlen, NULL, 0, port_buffer,
+						 NI_MAXSERV, NI_NUMERICSERV)))
+		{
+			assert(FALSE);
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+			return errcode;
+		}
+		port = atoi(port_buffer);
 	}
 	/*  Reuse a specified address */
 	if (port && setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&reuseaddr, SIZEOF(reuseaddr)) < 0)
@@ -110,11 +130,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}
-	/*  Bind an address to the socket */
-	sin.sin_family      = AF_INET;
-	sin.sin_addr.s_addr = INADDR_ANY;
-	sin.sin_port        = htons(port);
-	if (bind(fd, (struct sockaddr *)&sin, SIZEOF(sin)) < 0)
+	if (bind(fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen) < 0)
 	{
 		save_errno = errno;
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
@@ -146,6 +162,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	return 0;
 #else /* defined(BSD_TCP) */
 #ifdef SYSV_TCP
+	GTMASSERT;
 	if ((fd = t_open(SYSV_TCP, O_RDWR, NULL)) < 0)
 	{
 		save_errno = errno;

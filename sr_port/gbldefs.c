@@ -1089,3 +1089,12 @@ GBLDEF	boolean_t	gtm_main_thread_id_set;		/* Indicates whether the thread ID is 
 GBLDEF	boolean_t	gtm_jvm_process;		/* Indicates whether we are running with JVM or stand-alone. */
 #endif
 GBLDEF	size_t		gtm_max_storalloc;	/* Maximum that GTM allows to be allocated - used for testing */
+#ifdef VMS
+GBLDEF		sgmnt_addrs	*vms_mutex_check_csa;	/* On VMS, mutex_deadlock_check() is directly called from mutex.mar. In
+							 * order to avoid passing csa parameter from the VMS assembly, we set this
+							 * global from mutex_lock* callers.
+							 */
+#endif
+GBLDEF	boolean_t	ipv4_only;		/* If TRUE, only use AF_INET.
+						 * Reflects the value of the gtm_ipv4_only environment variable, so is process wide.
+						 */

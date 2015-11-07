@@ -1,6 +1,6 @@
 $!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 $!								!
-$!	Copyright 2001, 2012 Fidelity Information Services, Inc	!
+$!	Copyright 2001, 2013 Fidelity Information Services, Inc	!
 $!								!
 $!	This source code contains the intellectual property	!
 $!	of its copyright holder(s), and is made available	!
@@ -85,7 +85,7 @@ $! ---------- build crashandburn -----------
 $!
 $ @gtm$tools:build_print_stage "Building CRASHANDBURN" "middle"
 $ ccopts := /standard=vaxc/share_globals/float=g_float/warn=disable=(signedknown,signedmember,questcompare,questcompare1)
-$ ccopts = ccopts + "/inc=gtm$src:/assume=nowritable_string_literals/nolist/define=(TEST_REPL"
+$ ccopts = ccopts + "/inc=(gtm$src:,tcpip$examples:)/assume=nowritable_string_literals/nolist/define=(TEST_REPL"
 $ if "P" .nes. f$edit(f$extract(0, 1, p2), "UPCASE") then $ ccopts = ccopts + ",DEBUG"
 $ ccopts = ccopts + ")"
 $ if "D" .eqs. f$edit(f$extract(0, 1, p2), "UPCASE") then $ ccopts = ccopts + "/nooptimize/debug"

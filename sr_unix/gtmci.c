@@ -104,6 +104,7 @@ error_def(ERR_MAXSTRLEN);
 #define REVERT_AND_RETURN						\
 {									\
 	REVERT; /* gtmci_ch */						\
+	TREF(in_gtmci) = FALSE;						\
 	return 0;							\
 }
 
@@ -205,7 +206,6 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	GTM_PTHREAD_ONLY(assert(gtm_main_thread_id_set && pthread_equal(gtm_main_thread_id, pthread_self())));
 	set_blocksig();
 	added = FALSE;
 	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_ci to be
@@ -217,11 +217,16 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
+	TREF(in_gtmci) = TRUE;
 	if (!gtm_startup_active || !(frame_pointer->flags & SFF_CI))
 	{
 		if ((status = gtm_init()) != 0)
+		{
+			TREF(in_gtmci) = FALSE;
 			return status;
+		}
 	}
+	GTM_PTHREAD_ONLY(assert(gtm_main_thread_id_set && pthread_equal(gtm_main_thread_id, pthread_self())));
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (msp < fgncal_stack)	/* Unwind all arguments left on the stack by previous gtm_cij. */
 		fgncal_unwind();
@@ -273,6 +278,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	has_return = (gtm_void != entry->return_type);
 	if (has_return)
 	{	/* Create mval slot for return value */
+		MV_INIT(&arg_mval);
 		param_blk.retaddr = (void *)push_lvval(&arg_mval);
 		arg_blob_ptr = &arg_blob[0] + GTM64_ONLY(1) NON_GTM64_ONLY(2);
 		java_arg_type = arg_types + 1;
@@ -395,7 +401,9 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	intrpt_ok_state = old_intrpt_state;		/* Restore the old interrupt state. */
 	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr. */
 	if (1 != mumps_status)
-	{	/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
+	{
+		TREF(in_gtmci) = FALSE;
+		/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
 		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
 		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
 		 */
@@ -477,6 +485,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		}
 	}
 	REVERT;
+	TREF(in_gtmci) = FALSE;
 	return 0;
 }
 
@@ -515,10 +524,14 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
+	TREF(in_gtmci) = TRUE;
 	if (!gtm_startup_active || !(frame_pointer->flags & SFF_CI))
 	{
 		if ((status = gtm_init()) != 0)
+		{
+			TREF(in_gtmci) = FALSE;
 			return status;
+		}
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (msp < fgncal_stack)	/* unwind all arguments left on the stack by previous gtm_ci */
@@ -747,7 +760,9 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	intrpt_ok_state = old_intrpt_state; /* restore the old interrupt state */
 	var_on_cstack_ptr = save_var_on_cstack_ptr; /* restore the old environment's var_on_cstack_ptr */
 	if (1 != mumps_status)
-	{	/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
+	{
+		TREF(in_gtmci) = FALSE;
+		/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
 		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
 		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
 		 */
@@ -866,6 +881,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	}
 	va_end(temp_var);
 	REVERT;
+	TREF(in_gtmci) = FALSE;
 	return 0;
 }
 
@@ -916,6 +932,8 @@ int gtm_init()
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
+	if (!TREF(in_gtmci))
+		return 0;
 	if (!gtm_startup_active)
 	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
 		gtm_imagetype_init(GTM_IMAGE);

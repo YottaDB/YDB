@@ -51,6 +51,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		dse_running;
+GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	sgm_info		*sgm_info_ptr;
@@ -148,6 +149,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		  size,
 		  save_errno);
 	assert((0 == save_errno) GTM_TRUNCATE_ONLY(|| (-1 == save_errno)));
+	WBTEST_ASSIGN_ONLY(WBTEST_PREAD_SYSCALL_FAIL, save_errno, EIO);
 #	ifdef GTM_CRYPT
 	if (is_encrypted && (0 == save_errno))
 	{
@@ -217,13 +219,14 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	in_dsk_read--;
 	/* Expect t_tries to be 3 if we have crit. Exceptions: gvcst_redo_root_search (where t_tries is temporarily reset
 	 * for the duration of the redo_root_search and so we should look at the real t_tries in redo_rootsrch_ctxt),
-	 * gvcst_expand_free_subtree and DSE (where we grab crit before doing the t_qread irrespective of t_tries), and
-	 * forward recovery (where we grab crit before doing everything).
+	 * gvcst_expand_free_subtree, REORG UPGRADE/DOWNGRADE, DSE (where we grab crit before doing the t_qread irrespective
+	 * of t_tries), forward recovery (where we grab crit before doing everything)
 	 */
 	effective_t_tries = UNIX_ONLY( (TREF(in_gvcst_redo_root_search)) ? (TREF(redo_rootsrch_ctxt)).t_tries : ) t_tries;
 	effective_t_tries = MAX(effective_t_tries, t_tries);
 	killinprog = (NULL != ((dollar_tlevel) ? sgm_info_ptr->kip_csa : kip_csa));
-	assert(dse_running || killinprog || (cs_addrs->now_crit != (CDB_STAGNATE > effective_t_tries)) || jgbl.forw_phase_recovery);
+	assert(dse_running || killinprog || jgbl.forw_phase_recovery || mu_reorg_upgrd_dwngrd_in_prog
+			|| (cs_addrs->now_crit != (CDB_STAGNATE > effective_t_tries)));
 	if (!blk_free && cs_addrs->now_crit && !dse_running && (0 == save_errno))
 	{	/* Do basic checks on GDS block that was just read. Do it only if holding crit as we could read
 		 * uninitialized blocks otherwise. Also DSE might read bad blocks even inside crit so skip checks.

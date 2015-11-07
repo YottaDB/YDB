@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ int gtmsource_setfreeze(void)
 	if (gtmsource_options.freezeval)
 	{
 		assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
-		grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK); /* sets gtmsource_state */
+		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK); /* sets gtmsource_state */
 	} else
 		assert(!holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	jnlpool.jnlpool_ctl->freeze = gtmsource_options.freezeval;

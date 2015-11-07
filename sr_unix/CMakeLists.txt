@@ -37,7 +37,7 @@ if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
 endif()
 
 # If it's a debug build make sure GT.M uses all of its debug options
-set(CMAKE_C_FLAGS_DEBUG -DDEBUG)
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 
 set(install_permissions_script
   OWNER_READ OWNER_EXECUTE OWNER_WRITE
@@ -717,7 +717,10 @@ endforeach()
 #-----------------------------------------------------------------------------
 set(gtm_hlp mumps.hlp)
 set(gde_hlp gde.hlp)
-foreach(help gtm gde)
+set(mupip_hlp mupip.hlp)
+set(dse_hlp dse.hlp)
+set(lke_hlp lke.hlp)
+foreach(help gtm gde mupip dse lke)
   set(CMAKE_CONFIGURABLE_FILE_CONTENT
     "Change -segment DEFAULT -block=2048 -file=\$gtm_dist/${help}help.dat
 Change -region DEFAULT -record=1020 -key=255

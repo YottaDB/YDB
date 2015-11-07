@@ -75,6 +75,7 @@
 #include "gtmio.h"
 #include "have_crit.h"
 #include "util.h"
+#include "sleep.h"
 #if defined(__osf__)
 # define HZ	CLK_TCK
 #elif defined(__MVS__)
@@ -95,6 +96,7 @@ int4	time();
 #define TIMER_BLOCK_SIZE	64	/* # of timer entries allocated initially as well as at every expansion */
 #define GT_TIMER_EXPAND_TRIGGER	8	/* if the # of timer entries in the free queue goes below this, allocate more */
 #define GT_TIMER_INIT_DATA_LEN	8
+#define MAX_TIMER_POP_TRACE_SZ	32
 
 #define ADD_SAFE_HNDLR(HNDLR)						\
 {									\
@@ -126,6 +128,17 @@ STATICDEF int		safe_handlers_cnt;
 
 STATICDEF boolean_t	stolen_timer = FALSE;	/* only complain once, used in check_for_timer_pops() */
 STATICDEF char 		*whenstolen[] = {"check_for_timer_pops", "check_for_timer_pops first time"}; /* for check_for_timer_pops */
+
+#ifdef DEBUG
+STATICDEF int		trc_timerpop_idx;
+STATICDEF GT_TIMER	trc_timerpop_array[MAX_TIMER_POP_TRACE_SZ];
+
+# define TRACE_TIMER_POP(TIMER_INFO)							\
+{											\
+	memcpy(&trc_timerpop_array[trc_timerpop_idx], TIMER_INFO, SIZEOF(GT_TIMER));	\
+	trc_timerpop_idx = (trc_timerpop_idx + 1) % MAX_TIMER_POP_TRACE_SZ;		\
+}
+#endif
 
 /* Flag signifying timer is active. Especially useful when the timer handlers get nested. This has not been moved to a
  * threaded framework because we do not know how timers will be used with threads.
@@ -281,28 +294,35 @@ void hiber_start(uint4 hiber)
 	TID		tid;
 	sigset_t	savemask;
 
-	assertpro(1 > timer_stack_count);	/* timer services are unavailable from within a timer handler */
+	assertpro(1 > timer_stack_count);		/* timer services are unavailable from within a timer handler */
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal */
-	waitover = FALSE;			/* when OUR timer pops, it will set this flag */
-	waitover_addr = &waitover;
-	tid = (TID)waitover_addr;		/* unique id of this timer */
-	start_timer_int((TID)tid, hiber, hiber_wake, SIZEOF(waitover_addr), &waitover_addr, TRUE);
-	/* we will loop here until OUR timer pops and sets OUR flag */
-	do
+	/* sigsuspend() sets the signal mask to 'savemask' and waits for an ALARM signal. If the SIGALRM is a member of savemask,
+	 * this process will never receive SIGALRM, and it will hang indefinitely. One such scenario would be if we interrupted a
+	 * timer handler with kill -15, thus getting all timer setup reset by generic_signal_handler, and the gtm_exit_handler
+	 * ended up invoking hiber_start (when starting gtmsecshr server, for instance). In such situations rely on something other
+	 * than GT.M timers.
+	 */
+	if (sigismember(&savemask, SIGALRM))
 	{
-		/*
-		 * sigsuspend() sets the signal mask to 'savemask' and waits for an ALARM signal. If the SIGALRM is a memeber of
-		 * savemask, This process will never receive SIGALRM, and it will hang indefinitely. Hence following assert added to
-		 * catch such out-of-design situation.
-		 */
-		assert(!sigismember(&savemask, SIGALRM));
-		sigsuspend(&savemask);		/* unblock SIGALRM and wait for timer interrupt */
-		if (outofband)
+		NANOSLEEP(hiber);
+	} else
+	{
+		waitover = FALSE;			/* when OUR timer pops, it will set this flag */
+		waitover_addr = &waitover;
+		tid = (TID)waitover_addr;		/* unique id of this timer */
+		start_timer_int((TID)tid, hiber, hiber_wake, SIZEOF(waitover_addr), &waitover_addr, TRUE);
+		/* we will loop here until OUR timer pops and sets OUR flag */
+		do
 		{
-                        cancel_timer(tid);
-			break;
-		}
-	} while(FALSE == waitover);
+			assert(!sigismember(&savemask, SIGALRM));
+			sigsuspend(&savemask);		/* unblock SIGALRM and wait for timer interrupt */
+			if (outofband)
+			{
+				cancel_timer(tid);
+				break;
+			}
+		} while(FALSE == waitover);
+	}
 	sigprocmask(SIG_SETMASK, &savemask, NULL);	/* reset signal handlers */
 }
 
@@ -318,6 +338,14 @@ void hiber_start_wait_any(uint4 hiber)
 	}
 	assertpro(1 > timer_stack_count);		/* timer services are unavailable from within a timer handler */
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);	/* block SIGALRM signal and set new timer */
+	/* Even though theoretically it is possible for any signal other than SIGALRM to discontinue the wait in sigsuspend,
+	 * the intended use of this function targets only timer-scheduled events. For that reason, assert that SIGALRMs are
+	 * not blocked prior to scheduling a timer, whose delivery we will be waiting upon, as otherwise we might end up
+	 * waiting indefinitely. Note, however, that the use of NANOSLEEP in hiber_start, explained in the accompanying
+	 * comment, should not be required in hiber_start_wait_any, as we presently do not invoke this function in interrupt-
+	 * induced code, and so we should not end up here with SIGALARMs blocked.
+	 */
+	assert(!sigismember(&savemask, SIGALRM));
 	start_timer_int((TID)hiber_start_wait_any, hiber, NULL, 0, NULL, TRUE);
 	sigsuspend(&savemask);				/* unblock SIGALRM and wait for timer interrupt */
 	cancel_timer((TID)hiber_start_wait_any);	/* cancel timer block before reenabling */
@@ -647,6 +675,7 @@ STATICFNDEF void timer_handler(int why)
 				timer_in_handler = FALSE;
 				if (!tpop->safe)		/* if safe, avoid a system call */
 					sys_get_curr_time(&at);	/* refresh current time if called a handler */
+				DEBUG_ONLY(TRACE_TIMER_POP(tpop));
 			}
 			tpop->next = (GT_TIMER *)timefree;	/* put timer block on the free chain */
 			timefree = tpop;

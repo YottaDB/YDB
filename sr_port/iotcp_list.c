@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,11 +25,15 @@
 #include "iotcproutine.h"
 #include "iotcpdef.h"
 
+error_def(ERR_SOCKINIT);
+error_def(ERR_TEXT);
+
 /* list of listening sockets */
 typedef struct	lsock_rec_s
 {
 	int			socket;
-	struct sockaddr_in	sin;
+	struct sockaddr_storage	sas;
+	struct addrinfo		ai;
 	struct lsock_rec_s	*next;
 	io_log_name		*ldev;		/* listening device record */
 } lsock_rec;
@@ -55,8 +59,8 @@ int	iotcp_getlsock(io_log_name *dev)
 	tcpptr = (d_tcp_struct *)dev->iod->dev_sp;
 
 	for (ls = lsock_list;  ls != NULL;  ls = ls->next)
-	if (tcpptr->sin.sin_addr.s_addr == ls->sin.sin_addr.s_addr  &&  tcpptr->sin.sin_port == ls->sin.sin_port)
-		return ls->socket;
+		if (0 == memcmp(&(tcpptr->sas), &(ls->sas), SIZEOF(tcpptr->sas)))
+			return ls->socket;
 
 	return iotcp_newlsock(dev, tcpptr);
 }
@@ -76,20 +80,16 @@ int	iotcp_newlsock(io_log_name *dev, d_tcp_struct *tcpptr)
 	char		*errptr;
 	int4		errlen;
 
-	error_def(ERR_SOCKINIT);
-	error_def(ERR_TEXT);
-
-
 #ifdef DEBUG_TCP
 	PRINTF("iotcp_newlsock ---\n");
 #endif
 
-	lsock = tcp_routines.aa_socket(AF_INET, SOCK_STREAM, 0);
+	lsock = tcp_routines.aa_socket(tcpptr->ai.ai_family, tcpptr->ai.ai_socktype, tcpptr->ai.ai_protocol);
 	if (lsock == -1)
 	{
 		errptr = (char *)STRERROR(errno);
 		errlen = STRLEN(errptr);
-		rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 		return 0;
 	}
 
@@ -99,16 +99,16 @@ int	iotcp_newlsock(io_log_name *dev, d_tcp_struct *tcpptr)
 		errptr = (char *)STRERROR(errno);
 		errlen = STRLEN(errptr);
 		(void)tcp_routines.aa_close(lsock);
-		rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 		return 0;
 	}
 
-	if (tcp_routines.aa_bind(lsock, (struct sockaddr *)&tcpptr->sin, SIZEOF(struct sockaddr)) == -1)
+	if (-1 == tcp_routines.aa_bind(lsock, tcpptr->ai.ai_addr, tcpptr->ai.ai_addrlen))
 	{
 		errptr = (char *)STRERROR(errno);
 		errlen = STRLEN(errptr);
 		(void)tcp_routines.aa_close(lsock);
-		rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 		return 0;
 	}
 
@@ -118,7 +118,7 @@ int	iotcp_newlsock(io_log_name *dev, d_tcp_struct *tcpptr)
 		errptr = (char *)STRERROR(errno);
 		errlen = STRLEN(errptr);
 		(void)tcp_routines.aa_close(lsock);
-		rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 		return 0;
 	}
 
@@ -154,7 +154,9 @@ int	iotcp_newlsock(io_log_name *dev, d_tcp_struct *tcpptr)
 	/* add to our list of tcp listening sockets */
 	new_lsock = (lsock_rec *)malloc(SIZEOF(lsock_rec));
 	new_lsock->socket = lsock;
-	new_lsock->sin = tcpptr->sin;
+	new_lsock->ai = tcpptr->ai;
+	new_lsock->sas = tcpptr->sas;
+	new_lsock->ai.ai_addr = (struct sockaddr *)(&new_lsock->sas);
 	new_lsock->next = lsock_list;
 	new_lsock->ldev = ldev;
 	lsock_list = new_lsock;
@@ -171,7 +173,11 @@ void iotcp_rmlsock(io_desc *iod)
 	for (prev = NULL, ls = lsock_list;  ls != NULL;)
 	{
 		next = ls->next;
-		if (tcpptr->sin.sin_port == ls->sin.sin_port)
+		/* Actually it's enough to just compare the port number, however extracting port from
+		 * sas needs to call getnameinfo(). Same sas can guarantee the same port, so
+		 * it's enough to use sas to detect whether the device is what we want to delete
+		 */
+		if (0 == memcmp(&(tcpptr->sas), &(ls->sas), SIZEOF(tcpptr->sas)))
 		{
 			if (prev)
 				prev->next = ls->next;

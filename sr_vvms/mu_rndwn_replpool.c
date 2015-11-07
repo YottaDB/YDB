@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,10 +17,9 @@
 #include <psldef.h>
 #include <descrip.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
+#include "gtm_inet.h" /* Required for gtmsource.h */
 #include <stddef.h>
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
@@ -46,6 +45,10 @@
 LITREF char	gtm_release_name[];
 LITREF int4	gtm_release_name_len;
 
+error_def(ERR_VERMISMATCH);
+error_def(ERR_MUREPLPOOL);
+error_def(ERR_TEXT);
+
 #define MU_RNDWN_REPLPOOL_RETURN(RETVAL)	\
 {						\
 	detach_shm(shm_range);			\
@@ -63,9 +66,6 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, boolean_t rndwn_al
 	sm_uc_ptr_t		shm_range[2];
 	replpool_id_ptr_t	rp_id_ptr;
 	struct dsc$descriptor_s name_dsc;
-	error_def(ERR_VERMISMATCH);
-	error_def(ERR_MUREPLPOOL);
-	error_def(ERR_TEXT);
 
 	/* name_dsc holds the resource name */
 	*segment_found = FALSE;
@@ -83,14 +83,14 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, boolean_t rndwn_al
 	*segment_found = TRUE;
 	if (SS$_NORMAL != (status = register_with_gsec(&name_dsc, &shm_lockid)))
 	{
-		gtm_putmsg(VARLSTCNT(9) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("Failed to register with replpool"), status);
 		return FALSE;
 	}
 	status = map_shm(which_pool, &name_dsc, shm_range);
 	if (SS$_NORMAL != status)
 	{
-		gtm_putmsg(VARLSTCNT(9) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("Failed to map replpool segment"), status);
 		signoff_from_gsec(shm_lockid);
 		return FALSE;
@@ -103,16 +103,16 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, boolean_t rndwn_al
 	if (memcmp(rp_id_ptr->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 1))
 	{
 		if (!memcmp(rp_id_ptr->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 3))
-			gtm_putmsg(VARLSTCNT(8) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Incorrect version for the replpool segment."));
 		else
-			gtm_putmsg(VARLSTCNT(4) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Incorrect replpool format for the segment."));
 		MU_RNDWN_REPLPOOL_RETURN(FALSE);
 	}
 	if (memcmp(rp_id_ptr->now_running, gtm_release_name, gtm_release_name_len + 1))
 	{
-		gtm_putmsg(VARLSTCNT(12) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
 			ERR_VERMISMATCH, 6, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
 			gtm_release_name_len, gtm_release_name, LEN_AND_STR(rp_id_ptr->now_running));
 		MU_RNDWN_REPLPOOL_RETURN(FALSE);
@@ -121,7 +121,7 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, boolean_t rndwn_al
 		memcpy(replpool_id->gtmgbldir, rp_id_ptr->gtmgbldir, MAX_FN_LEN + 1);
 	else if	(strcmp(replpool_id->gtmgbldir, rp_id_ptr->gtmgbldir))
 	{
-		gtm_putmsg(VARLSTCNT(8) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("Global directory name does not match that in the replpool segment."));
 		MU_RNDWN_REPLPOOL_RETURN(FALSE);
 	}
@@ -129,18 +129,18 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, boolean_t rndwn_al
 	{
 		if (SS$_NOTQUEUED == status)
 		{
-			gtm_putmsg(VARLSTCNT(8) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Replpool segment is in use by another process."));
 		} else
 		{
-			gtm_putmsg(VARLSTCNT(9) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Failed to get last_user status for replpool segment."), status);
 		}
 		MU_RNDWN_REPLPOOL_RETURN(FALSE);
 	}
 	if (SS$_NORMAL != (status = delete_shm(&name_dsc)))
 	{
-		gtm_putmsg(VARLSTCNT(9) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_MUREPLPOOL, 2, name_dsc.dsc$w_length, name_dsc.dsc$a_pointer,
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("Failed to delete replpool segment."), status);
 		MU_RNDWN_REPLPOOL_RETURN(FALSE);
 	}

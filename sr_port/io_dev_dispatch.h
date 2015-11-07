@@ -17,7 +17,11 @@
 
 UNIX_ONLY(GBLDEF) VMS_ONLY(LITDEF) dev_dispatch_struct io_dev_dispatch[] =
 {
+#	ifdef UNIX
+	iotype(iott, iott, iott),
+#	else
 	iotype(iott, iott, nil),
+#	endif
 	iotype(iomt, iomt, nil),
 #	ifdef UNIX
 	iotype(iorm, iorm, iopi),

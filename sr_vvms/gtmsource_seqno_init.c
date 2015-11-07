@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,10 +14,7 @@
 #include "gtm_string.h"
 #include "gtm_inet.h"
 #include "gtm_fcntl.h"
-#ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
-#endif
-
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"

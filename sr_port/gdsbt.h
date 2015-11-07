@@ -475,7 +475,7 @@ typedef struct node_local_struct
 	cnl->crit_ops_array[coidx].epid = process_id;			\
 	cnl->crit_ops_array[coidx].crit_act = (X);			\
 	cnl->crit_ops_array[coidx].curr_tn = (NULL != csa->hdr) ?	\
-						csa->ti->curr_tn : 0;	\
+		csa->hdr->trans_hist.curr_tn  : 0;			\
 }
 
 /* The following macro checks that curr_tn and early_tn are equal right before beginning a transaction commit.

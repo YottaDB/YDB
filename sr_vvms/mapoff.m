@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2012 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2013 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -57,7 +57,8 @@ mapoff(imgoff); get module corresponding to img+offset and print it out
 	set origdelta=$extract(delta,5,8)
 	if (0=$d(^offset(module,delta))) set delta=$order(^offset(module,delta),-1)
 	s sdelta=$extract(delta,5,8)
-	write imgoff,modulestr," : line ",$j(^offset(module,delta,0),3)," : ",boffset,"+",origdelta,"   [listline ",$j(^offset(module,delta,1),4)," : ",boffset,"+",sdelta,"]",!
+	write imgoff,modulestr," : line ",$j(^offset(module,delta,0),3)," : ",boffset,"+",origdelta
+	write "   [listline ",$j(^offset(module,delta,1),4)," : ",boffset,"+",sdelta,"]",!
 	q
 	;
 initoff(module)
@@ -71,7 +72,8 @@ initoff(module)
 	use outfile
 	; It is important that NO warnings are issued by the compiler as otherwise this tool's line# mapping scheme fails.
 	; Hence the /nowarn below.
-	write "$ common_options := /standard=vaxc/share/assume=nowrit/float=g_float/inc=(here:,gtm$src:,decw$include)/nowarn",!
+	write "$ common_options := /standard=vaxc/share/assume=nowrit/"
+	write "float=g_float/inc=(here:,gtm$src:,decw$include,tcpip$examples:)/nowarn",!
 	write "$ ccdbg := cc'common_options'/define=(debug,nolicense)/debug/nooptimize",!
 	write "$ ccpro := cc'common_options'",!
 	write "$    ",!

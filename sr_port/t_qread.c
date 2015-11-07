@@ -282,11 +282,13 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			}
 		}
 	}
-	if ((blk >= csa->ti->total_blks) || (blk < 0))
-	{	/* requested block out of range; could occur because of a concurrency conflict */
-		if ((&FILE_INFO(gv_cur_region)->s_addrs != csa) || (csd != cs_data))
-			GTMASSERT;
-		assert(FALSE == csa->now_crit);
+	if ((uint4)blk >= (uint4)csa->ti->total_blks)
+	{	/* Requested block out of range; could occur because of a concurrency conflict. mm_read and dsk_read assume blk is
+		 * never negative or greater than the maximum possible file size. If a concurrent REORG truncates the file, t_qread
+		 * can proceed despite blk being greater than total_blks. But dsk_read handles this fine; see comments below.
+		 */
+		assert((&FILE_INFO(gv_cur_region)->s_addrs == csa) && (csd == cs_data));
+		assert(!csa->now_crit);
 		rdfail_detail = cdb_sc_blknumerr;
 		return (sm_uc_ptr_t)NULL;
 	}
@@ -372,7 +374,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				assert(0 == cr->dirty);
 				assert(cr->read_in_progress >= 0);
 				CR_BUFFER_CHECK(gv_cur_region, csa, csd, cr);
-				if (SS_NORMAL != (status = dsk_read(blk, GDS_REL2ABS(cr->buffaddr), &ondsk_blkver, lcl_blk_free)))
+				buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+				if (SS_NORMAL != (status = dsk_read(blk, buffaddr, &ondsk_blkver, lcl_blk_free)))
 				{	/* buffer does not contain valid data, so reset blk to be empty */
 					cr->cycle++;	/* increment cycle for blk number changes (for tp_hist and others) */
 					cr->blk = CR_BLKEMPTY;
@@ -403,10 +406,14 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							return (sm_uc_ptr_t)NULL;
 						}
 					}
-					if (-1 == status)
-					{
-						/* could have been concurrent truncate, and we read a blk >= csa->ti->total_blks */
-						/* restart */
+					if ((-1 == status) && !was_crit)
+					{	/* LSEEKREAD and, consequently, dsk_read return -1 in case pread is unable to fetch
+						 * a full database block's length of data. This can happen if the requested read is
+						 * past the end of the file, which can happen if a concurrent truncate occurred
+						 * after the blk >= csa->ti->total_blks comparison above. Allow for this scenario
+						 * by restarting. However, if we've had crit the whole time, no truncate could have
+						 * happened. -1 indicates a problem with the file, so fall through to DBFILERR.
+						 */
 						rdfail_detail = cdb_sc_truncate;
 						return (sm_uc_ptr_t)NULL;
 					}
@@ -418,8 +425,18 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					}
 #					endif
 					else
+					{	/* A DBFILERR can be thrown for two possible reasons:
+						 * (1) LSEEKREAD returned an unexpected error due to a filesystem problem; or
+						 * (2) csa/cs_addrs/csd/cs_data are out of sync, and we're trying to read a block
+						 * number for one region from another region with fewer total_blks.
+						 *    We suspect the former is what happened in GTM-7623. Apparently the latter
+						 * has been an issue before, too. If either occurs again in pro, this assertpro
+						 * distinguishes the two possibilities.
+						 */
+						assertpro((&FILE_INFO(gv_cur_region)->s_addrs == csa) && (csd == cs_data));
 						rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
 								status);
+					}
 				}
 				disk_blk_read = TRUE;
 				assert(0 <= cr->read_in_progress);
@@ -435,7 +452,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				{	/* keep the parantheses for the if (although single line) since the following is a macro */
 					RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, cr, *cycle);
 				}
-				return (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+				return buffaddr;
 			} else  if (!was_crit && (BAD_LUCK_ABOUNDS > ocnt))
 			{
 				assert(!hold_onto_crit);

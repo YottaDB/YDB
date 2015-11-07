@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,8 @@ int gtmsource_showbacklog(void)
 	if (QWNE(seq_num, seq_num_zero))
 		QWDECRBY(seq_num, seq_num_one);
 	util_out_print("!@UQ : sequence number of last transaction sent by source server", TRUE, &seq_num);
-	if (jnlpool.gtmsource_local->mode == GTMSOURCE_MODE_PASSIVE)
+	if ((jnlpool.gtmsource_local->mode == GTMSOURCE_MODE_PASSIVE)
+		|| ( jnlpool.gtmsource_local->mode == GTMSOURCE_MODE_ACTIVE_REQUESTED))
 		util_out_print("WARNING - Source Server is in passive mode, transactions are not being replicated", TRUE);
 	return (NORMAL_SHUTDOWN);
 }

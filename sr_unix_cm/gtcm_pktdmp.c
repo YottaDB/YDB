@@ -31,38 +31,34 @@
 GBLREF omi_conn		*curr_conn;
 GBLREF char		*omi_service;
 
+error_def(ERR_GETADDRINFO);
+error_def(ERR_GETNAMEINFO);
+error_def(ERR_TEXT);
+
 /* return in a static buffer the ASCII representation of a network address.
    Returned as:
    "hostid (nn.nn.nn.nn)" or "nn.nn.nn.nn" depending on whether or not
    the host is listed in /etc/hosts.
  */
-char *gtcm_hname(struct sockaddr_in *sin)
+char *gtcm_hname(struct addrinfo *ai_ptr)
 {
-    struct hostent	*he;
-    static char name[256];
+	static char name[NI_MAXHOST + NI_MAXSERV + 4];
+	char ipname[NI_MAXSERV];
+	char host[NI_MAXHOST];
+	int	errcode;
 
-#ifndef SUNOS
-    if ((he = gethostbyaddr((void *)&sin->sin_addr.s_addr,
-			    SIZEOF(struct in_addr), AF_INET)))
-	SPRINTF(name,"%s (%d.%d.%d.%d)",he->h_name,
-		   sin->sin_addr.s_addr >> 24,
-		   sin->sin_addr.s_addr >> 16 & 0xFF,
-		   sin->sin_addr.s_addr >> 8 & 0xFF,
-		   sin->sin_addr.s_addr & 0xFF);
-    else
-	SPRINTF(name,"%d.%d.%d.%d",
-		   sin->sin_addr.s_addr >> 24,
-		   sin->sin_addr.s_addr >> 16 & 0xFF,
-		   sin->sin_addr.s_addr >> 8 & 0xFF,
-		   sin->sin_addr.s_addr & 0xFF);
-#else
-    SPRINTF(name,"%d.%d.%d.%d",
-	    sin->sin_addr.s_addr >> 24,
-	    sin->sin_addr.s_addr >> 16 & 0xFF,
-	    sin->sin_addr.s_addr >> 8 & 0xFF,
-	    sin->sin_addr.s_addr & 0xFF);
-#endif
-    return name;
+	if(0 != (errcode = getnameinfo(ai_ptr->ai_addr, ai_ptr->ai_addrlen, ipname,
+					 SIZEOF(ipname), NULL, 0, NI_NUMERICHOST)))
+	{
+		RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+		return NULL;
+	}
+	if(0 == (errcode = getnameinfo(ai_ptr->ai_addr, ai_ptr->ai_addrlen, host, SIZEOF(host),
+					NULL, 0, NI_NAMEREQD)))
+		SPRINTF(name, "%s (%s)", host, ipname);
+	else
+		SPRINTF(name, "%s", ipname);
+	return name;
 }
 
 
@@ -77,7 +73,7 @@ void gtcm_cpktdmp(char *ptr, int length, char *msg)
     if (curr_conn && (512-strlen(msg)) > 25)
     {
 	SPRINTF(newmsg,"Conn: %s - %s",
-		gtcm_hname(&curr_conn->stats.sin), msg);
+		gtcm_hname(&curr_conn->stats.ai), msg);
 
 	gtcm_pktdmp(ptr, length, newmsg);
     }

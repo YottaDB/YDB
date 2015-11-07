@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,7 @@
 #include "stringpool.h"
 #include "setterm.h"
 #include "op.h"
+#include "fork_init.h"
 
 GBLREF	io_pair		io_std_device;
 GBLREF	mval 		dollar_zsource;
@@ -58,26 +59,26 @@ void op_zedit(mval *v, mval *p)
 		edt = GETENV("EDITOR");
 		if (!edt)
 			edt = "editor";
-		rts_error(VARLSTCNT(4) ERR_FILENOTFND, 2, LEN_AND_STR(edt));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILENOTFND, 2, LEN_AND_STR(edt));
 	}
 	MV_FORCE_STR(v);
 	MV_FORCE_STR(p);
 	src.len = v->str.len;
 	src.addr = v->str.addr;
 	if (0 == src.len)
-		rts_error(VARLSTCNT(4) ERR_ZEDFILSPEC, 2, src.len, src.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, src.len, src.addr);
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = es;
 	pblk.buff_size = MAX_FBUFF;
 	status = parse_file(&src, &pblk);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(5) ERR_ZEDFILSPEC, 2, src.len, src.addr, status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZEDFILSPEC, 2, src.len, src.addr, status);
 	has_ext = 0 != (pblk.fnb & F_HAS_EXT);
 	exp_dir = 0 != (pblk.fnb & F_HAS_DIR);
 	if (!(pblk.fnb & F_HAS_NAME))
 	{
 		assert(!has_ext);
-		rts_error(VARLSTCNT(4) ERR_ZEDFILSPEC, 2, pblk.b_esl, pblk.buffer);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, pblk.b_esl, pblk.buffer);
 	}
 	if (!exp_dir)
 	{
@@ -96,14 +97,14 @@ void op_zedit(mval *v, mval *p)
 		{
 			typ = STR_LIT_LEN(DOTM);
 			if (path_len + typ > MAX_FBUFF)
-				rts_error(VARLSTCNT(4) ERR_ZEDFILSPEC, 2, path_len, es);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, path_len, es);
 			memcpy(&es[path_len], DOTM, STR_LIT_LEN(DOTM));
 			path_len += typ;
 		}
 	} else
 	{
 		if ((STR_LIT_LEN(DOTOBJ) == pblk.b_ext) && !MEMCMP_LIT(ptr + pblk.b_name, DOTOBJ))
-			rts_error(VARLSTCNT(4) ERR_ZEDFILSPEC, 2, path_len, es);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, path_len, es);
 		else if ((STR_LIT_LEN(DOTM) == pblk.b_ext) && !MEMCMP_LIT(ptr + pblk.b_name, DOTM))
 			typ = STR_LIT_LEN(DOTM);
 	}
@@ -139,7 +140,7 @@ void op_zedit(mval *v, mval *p)
 			assert(ZRO_TYPE_SOURCE == srcdir->type);
 			tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1;
 			if (path_len + srcdir->str.len + tslash >= SIZEOF(es))
-				rts_error(VARLSTCNT(4) ERR_ZEDFILSPEC, 2, src.len, src.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, src.len, src.addr);
 			memmove(&es[ srcdir->str.len + tslash], &es[0], path_len);
 			if (tslash)
 				es[ srcdir->str.len ] = '/';
@@ -157,7 +158,7 @@ void op_zedit(mval *v, mval *p)
 	act.sa_flags = 0;
 	act.sa_handler = SIG_IGN;
 	sigaction(SIGINT, &act, &intr);
-	childid = fork();	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
+	FORK(childid);	/* BYPASSOK: we exec immediately, no FORK_CLEAN needed */
 	if (childid)
 	{
 		waitid = (int)childid;

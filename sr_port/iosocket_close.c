@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,7 +107,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 	{
 		if (0 > (index = iosocket_handle(sock_handle, &handle_len, FALSE, dsocketptr)))
 		{
-			rts_error(VARLSTCNT(4) ERR_SOCKNOTFND, 2, handle_len, sock_handle);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handle_len, sock_handle);
 			return;
 		}
 		start = end = index;
@@ -121,11 +121,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 	{
 		socketptr = dsocketptr->socket[ii];
 		tcp_routines.aa_close(socketptr->sd);
-		iosocket_delimiter((unsigned char *)NULL, 0, socketptr, TRUE); /* free the delimiter space */
-		free(socketptr->buffer);
-		if (NULL != socketptr->zff.addr)
-			free(socketptr->zff.addr);
-		free(socketptr);
+		SOCKET_FREE(socketptr);
 		if (dsocketptr->current_socket >= ii)
 			dsocketptr->current_socket--;
 		for (jj = ii + 1; jj <= dsocketptr->n_socket - 1; jj++)

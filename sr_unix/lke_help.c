@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,5 +23,5 @@
 
 void lke_help(void)
 {
-	PRINTF("Help command not implemented in this revision\n");
+	/* This function is a STUB to avoid editting sr_port/lke.h */
 }

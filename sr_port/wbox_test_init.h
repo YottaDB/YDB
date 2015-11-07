@@ -71,7 +71,7 @@ typedef enum {
 	WBTEST_JNL_FILE_OPEN_FAIL,		/* 43 : Unix only.  Journal file open always return ERR_JNLFILOPN */
 	WBTEST_FAIL_ON_SHMGET,			/* 44 : Unix only.  Cause db_init() to fail on shmget */
 	WBTEST_EXTEND_JNL_FSYNC,		/* 45 : enter a long loop upon trying to do jnl_fsync */
-	WBTEST_CMP_SOLVE_TIMEOUT,		/* 46 : !!! UNUSED !!! */
+	WBTEST_TRIGR_TPRESTART_MSTOP,		/* 46 : Trigger being restarted gets a MUPIP STOP - shouldn't fail */
 	WBTEST_SENDTO_EPERM,			/* 47 : Will sleep in grab_crit depending on gtm_white_box_test_case_number */
 	WBTEST_ALLOW_ARBITRARY_FULLY_UPGRADED,	/* 48 : Allows csd->fully_upgraded to take arbitrary values (via DSE) and prevents
 						 *      assert in mur_process_intrpt_recov.c */
@@ -99,8 +99,8 @@ typedef enum {
 	WBTEST_HOLD_CRIT_TILL_LCKALERT,		/* 66 : Grab and hold crit until 15 seconds past what triggers a lock alert message
 						 *      which should invoke a mutex salvage */
 	WBTEST_OPER_LOG_MSG,			/* 67 : send message to operator log */
+	WBTEST_UNUSED_1,			/* 68 :  */
 	/* Begin ANTIFREEZE related white box test cases */
-	WBTEST_ANTIFREEZE_DSKNOSPCAVAIL,	/* 68 :  */
 	WBTEST_ANTIFREEZE_JNLCLOSE,		/* 69 :  */
 	WBTEST_ANTIFREEZE_DBBMLCORRUPT,		/* 70 :  */
 	WBTEST_ANTIFREEZE_DBDANGER,		/* 71 :  */
@@ -120,17 +120,23 @@ typedef enum {
 	WBTEST_LONGSLEEP_IN_REPL_SHUTDOWN,	/* 84 : Sleep in Source/Receiver shutdown logic to ensure sem/shm is not removed */
 	WBTEST_FORCE_WCS_GET_SPACE,		/* 85 : Simulate state in which nearly all global buffers are dirty, forcing
 						 *      wcs_get_space to be called before committing an update */
-	/* HugeTLB tests */
+	/* Begin HugeTLB tests */
 	WBTEST_HUGETLB_DLOPEN,			/* 86 : Fail dlopen(libhugetlbfs.so) */
 	WBTEST_HUGETLB_DLSYM,			/* 87 : Fail dlsym(shmget) */
 	WBTEST_FSYNC_SYSCALL_FAIL,		/* 88 : Force error from fsync() */
 	WBTEST_HUGE_ALLOC,			/* 89 : Force ZALLOCSTOR, ZREALSTOR, and ZUSEDSTOR to be values exceeding
-						 *	the capacity of four-byte ints. */
+						 *	the capacity of four-byte ints */
 	WBTEST_MMAP_SYSCALL_FAIL,		/* 90 : Force mmap() to return an error */
 	WBTEST_TAMPER_HOSTNAME,			/* 91 : Change host name in db_init to call condition handler */
-	WBTEST_RECOVER_ENOSPC			/* 92 : Cause ENOSPC error on Xth write to test return status on error */
-	/* Note: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
+	WBTEST_RECOVER_ENOSPC,			/* 92 : Cause ENOSPC error on Xth write to test return status on error */
+	WBTEST_WCS_FLU_FAIL,			/* 93 : Simulates a failure in wcs_flu */
+	WBTEST_PREAD_SYSCALL_FAIL,		/* 94 : Simulate pread() error in dsk_read */
+	WBTEST_HOLD_CRIT_ENABLED,		/* 95 : Enable $view("PROBECRIT","REGION") command to cold crit */
+	WBTEST_HOLD_FTOK_UNTIL_BYPASS		/* 96 : Hold the ftok semaphore until another process comes and bypasses
+						 *      it*/
+	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
+	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be levereged.
 	 */
 } wbtest_code_t;
 

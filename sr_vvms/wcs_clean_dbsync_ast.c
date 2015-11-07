@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,7 +120,7 @@ void	wcs_clean_dbsync_ast(sgmnt_addrs *csa)
 		 *   4) We are in a "fast lock".
 		 * Out of the above, items (2) & (3) are currently being taken care of below since they can cause
 		 *	deadlocks (if not taken care of) while the others are just performance enhancements. Note
-		 *	that the last part of (3) is taken care of by doing a tp_grab_crit() rather than a grab_crit().
+		 *	that the last part of (3) is taken care of by doing a grab_crit_immediate() rather than a grab_crit().
 		 * Also to be taken care of are the following situations.
 		 *   1) We are currently in wcs_wtfini be it the same or a different region.
 		 *	To avoid reentrancy issues (if same region) and deadlock issues (if different region).
@@ -135,8 +135,8 @@ void	wcs_clean_dbsync_ast(sgmnt_addrs *csa)
 			GTM_MALLOC_NO_RENT_ONLY(&& 0 == gtmMallocDepth)
 			&& ((NULL == save_csa) || !T_IN_CRIT_OR_COMMIT_OR_WRITE(save_csa))
 			&& !T_IN_CRIT_OR_COMMIT_OR_WRITE(csa)
-			&& (TRUE == tp_grab_crit(reg)))
-		{	/* Note that if we are here, we have obtained crit using tp_grab_crit. Also tp_grab_crit
+			&& (TRUE == grab_crit_immediate(reg)))
+		{	/* Note that if we are here, we have obtained crit using grab_crit_immediate. Also grab_crit_immediate
 			 * doesn't call wcs_recover if wc_blocked is TRUE in order to prevent possible deadlocks.
 			 * Note that mutex_lockwim() cannot be used since crit_count is not maintained there.
 			 */

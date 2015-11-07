@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,15 +12,14 @@
 #ifndef GTMSOURCE_HEARTBEAT_H
 #define GTMSOURCE_HEARTBEAT_H
 
-#define gtmsource_stall_heartbeat	heartbeat_stalled = TRUE;
-#define gtmsource_restart_heartbeat	heartbeat_stalled = FALSE;
 #define gtmsource_is_heartbeat_stalled	(heartbeat_stalled)
+
 #ifndef REPL_DISABLE_HEARTBEAT
-#define gtmsource_is_heartbeat_due(now)												\
+#define GTMSOURCE_IS_HEARTBEAT_DUE(NOW)												\
 	(0 != last_sent_time													\
-	 && difftime(*(now), last_sent_time) >= (double)jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD])
+	 && difftime(*(NOW), last_sent_time) >= (double)jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD])
 #else
-#define gtmsource_is_heartbeat_due(now) FALSE
+#define GTMSOURCE_IS_HEARTBEAT_DUE(NOW) FALSE
 #endif
 
 GBLREF	boolean_t			heartbeat_stalled;

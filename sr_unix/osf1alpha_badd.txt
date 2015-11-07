@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2011, 2012 Fidelity Information Services, Inc       #
+#	Copyright 2011, 2013 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -21,10 +21,3 @@ gtmsecshr%-r-xr-x--- gtmprofile_preV54000
 lke%-r--r----- libgtmutil.so
 semstat2%dr-xr-x--- plugin
 zzz_insert%-r--r----- so_locations
-
-pro/plugin:
-zzz_insert%dr-xr-x--- o
-zzz_insert%dr-xr-x--- r
-
-pro/plugin/gtmcrypt:
-zzz_insert%-r--r----- source.tar

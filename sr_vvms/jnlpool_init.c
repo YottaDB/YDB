@@ -158,11 +158,12 @@ void jnlpool_init(jnlpool_user pool_user,
 	log_nam.len = SIZEOF(GTM_GBLDIR) - 1;
 
 	if (SS_NORMAL != trans_log_name(&log_nam, &trans_log_nam, trans_buff))
-		rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("gtm$gbldir not defined"));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+				RTS_ERROR_LITERAL("gtm$gbldir not defined"));
 	trans_buff[trans_log_nam.len] = '\0';
 	full_len = trans_log_nam.len;
 	if (!get_full_path(&trans_buff, trans_log_nam.len, &trans_buff, &full_len, SIZEOF(trans_buff), &ustatus))
-		rts_error(VARLSTCNT(8) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Failed to get full path for gtm$gbldir"), ustatus);
 	trans_log_nam.len = full_len;	/* since on vax, mstr.len is a 'short' */
 	memcpy(jnlpool_dummy_seg.fname, trans_buff, trans_log_nam.len);
@@ -191,10 +192,10 @@ void jnlpool_init(jnlpool_user pool_user,
 
 	assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
 	if (0 != init_sem_set_source(&name_dsc))
-		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			  RTS_ERROR_LITERAL("Error with journal pool sem init."), REPL_SEM_ERRNO);
 	if (0 != grab_sem(SOURCE, JNL_POOL_ACCESS_SEM))
-		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			  RTS_ERROR_LITERAL("Error with journal pool access semaphore"), REPL_SEM_ERRNO);
 	have_source_access_sem = TRUE;
 	if (GTMSOURCE == pool_user && gtmsource_startup)
@@ -202,7 +203,7 @@ void jnlpool_init(jnlpool_user pool_user,
 		/* Get the option semaphore */
 		if (0 != grab_sem(SOURCE, SRC_SERV_OPTIONS_SEM))
 		{
-			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
 				  ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with journal pool option semaphore"), REPL_SEM_ERRNO);
 		}
 		have_source_options_sem = TRUE;
@@ -211,11 +212,11 @@ void jnlpool_init(jnlpool_user pool_user,
 		{
 			if (REPL_SEM_NOT_GRABBED)
 			{
-				rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLPOOLSETUP, 0,
 					  ERR_TEXT, 2, RTS_ERROR_LITERAL("Source Server already exists"));
 			} else
 			{
-				rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 					  RTS_ERROR_LITERAL("Error with journal pool server count semaphore"), REPL_SEM_ERRNO);
 			}
 		}
@@ -238,7 +239,7 @@ void jnlpool_init(jnlpool_user pool_user,
 	 * to make sure that nobody else is attached to the jnlpool global section when detaching from it*/
 
 	if (SS$_NORMAL != (status = register_with_gsec(&jnlpool.vms_jnlpool_key.desc, &jnlpool.shm_lockid)))
-		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Unable to get lock on jnlpool"), status);
 	gsec_is_registered = TRUE;
 
@@ -246,7 +247,7 @@ void jnlpool_init(jnlpool_user pool_user,
 	{	/* Global section should already exist */
 		if (SS$_NORMAL != (status = map_shm(SOURCE, &name_dsc, jnlpool.shm_range)))
 		{
-			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Journal pool does not exist"), status);
 		}
 		shm_created = FALSE;
@@ -259,7 +260,7 @@ void jnlpool_init(jnlpool_user pool_user,
 			shm_created = FALSE;
 		else
 		{
-			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to create or map to jnlpool global section"), status);
 		}
 	}
@@ -291,7 +292,7 @@ void jnlpool_init(jnlpool_user pool_user,
 	if (!jnlpool_dummy_sa->nl->glob_sec_init) /* Shared memory is created by this process */
 	{
 		if (GTMSOURCE != pool_user || !gtmsource_startup)
-			rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLPOOLSETUP, 0,
 					       ERR_TEXT, 2, RTS_ERROR_LITERAL("Journal pool has not been initialized"));
 
 		/* Initialize the shared memory fields */
@@ -334,9 +335,8 @@ void jnlpool_init(jnlpool_user pool_user,
 		jnlpool.gtmsource_local->statslog = FALSE;
 		jnlpool.gtmsource_local->shutdown = FALSE;
 		jnlpool.gtmsource_local->shutdown_time = -1;
-		jnlpool.gtmsource_local->secondary_inet_addr = gtmsource_options.sec_inet_addr;
 		jnlpool.gtmsource_local->secondary_port = gtmsource_options.secondary_port;
-		strcpy(jnlpool.gtmsource_local->secondary, gtmsource_options.secondary_host);
+		strcpy(jnlpool.gtmsource_local->secondary_host, gtmsource_options.secondary_host);
 		strcpy(jnlpool.gtmsource_local->filter_cmd, gtmsource_options.filter_cmd);
 		strcpy(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
 		jnlpool.gtmsource_local->statslog_file[0] = '\0';
@@ -372,9 +372,10 @@ void	jnlpool_detach(void)
 	{
 		/* Delete expanded virtual address space */
 		if (SS$_NORMAL != (status = detach_shm(jnlpool.shm_range)))
-			rts_error(VARLSTCNT(5) ERR_REPLWARN, 2, RTS_ERROR_LITERAL("Could not detach from journal pool"), status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLWARN, 2,
+					RTS_ERROR_LITERAL("Could not detach from journal pool"), status);
 		if (SS$_NORMAL != (status = signoff_from_gsec(jnlpool.shm_lockid)))
-			rts_error(VARLSTCNT(7) ERR_REPLERR, 0,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLERR, 0,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Error dequeueing lock on jnlpool global section"), status);
 		jnlpool_ctl = NULL;
 		memset(&jnlpool, 0, SIZEOF(jnlpool));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,12 @@
  * as the second parameter is a constant so all this should get evaluated at compile-time itself.
  */
 #define DBKEYSIZE(KSIZE)	(ROUND_UP((KSIZE + MAX_GVKEY_PADDING_LEN), 4))
+
+/* Possible states for TREF(in_mu_swap_root_state) (part of MUPIP REORG -TRUNCATE) */
+#define MUSWP_NONE		0	/* default; not in mu_swap_root */
+#define MUSWP_INCR_ROOT_CYCLE 	1	/* moving a root block; need to increment root_search_cycle */
+#define MUSWP_FREE_BLK		2	/* freeing a directory block; need to write leaf blocks to snapshot file */
+#define MUSWP_DIRECTORY_SWAP	3	/* moving a directory block; just checked by cert_blk */
 
 typedef	gtm_uint64_t	trans_num;
 typedef	uint4		trans_num_4byte;

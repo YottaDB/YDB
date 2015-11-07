@@ -1,219 +1,593 @@
-
 1 Overview
-  GDE Overview
-   The  GT.M  Global  Directory  Editor,  GDE,  is  a  tool   for   creating,
-   examining, and modifying Global  Directories  (GDs).  A  Global  Directory
-   is a file that identifies:
+   Overview
 
-   o    What global variables go to what database files
+   The GT.M Global Directory Editor (GDE) is a utility that enables you to
+   create, examine, and modify a global directory. GDE is a program written
+   in M and you can invoke it from the shell with $gtm_dist/mumps -run ^GDE,
+   with the gtm alias gtm -run GDE, or from inside the direct mode with Do
+   ^GDE.
 
-   o    The size limits for names and values of global variables
+   **Note**
 
-   o    Other database characteristics
+   The input to GDE can be a text file. In a production environment, FIS
+   recommends using text files to define database configurations, and putting
+   these text files under version control.
 
-   o    If and what type of journaling should take place
+   A global directory stores database attributes and mapping rules. The
+   mapping rules are like a sieve for globals that determines which database
+   files hold which global names. The database attributes serve as a
+   blueprint that MUPIP CREATE uses to create new database file(s). Once a
+   database file is created, GT.M continues to use the global directory as a
+   sieve. However, once MUPIP CREATE applies the database attributes
+   (blueprint) to create a database file, GT.M does not use the blueprint
+   until the next MUPIP CREATE. Therefore, if you use MUPIP SET (or DSE) to
+   change the attributes of a database file, always perform an equivalent
+   change to any global directory used for a subsequent MUPIP CREATE.
 
-   All MUMPS programs that use  the  same  Global  Directory  share  all  the
-   same global  variables,  unless  the  Global  Directory  uses  environment
-   variables  for  which  users   have   varying   definitions.   The   local
-   variables are accessible only among  programs  executed  within  a  single
-   process scope.
+2 Identifying_the_Current_Global_Directory
+   Identifying the Current Global Directory
 
-2 Functions
-  GDE Functions
-   The main functions of the Global Directory Editor are to:
+   GT.M identifies the current Global Directory by referring to the
+   environment variable gtmgbldir. GDE, MUPIP, LKE, DSE, and the GT.M
+   run-time system use this environment variable. The run-time system
+   normally uses this environment variable, but may also access a Global
+   Directory by setting $ZGBLDIR or by using the extended global reference ||
+   or {} syntax.
 
-   o   Define the mapping of global variables to database files
+   If you maintain multiple Global Directories, define gtmgbldir to point to
+   the currently active Global Directory. You may want to define gtmgbldir in
+   your login file. Note that this definition is a pathname. If it does not
+   start with a "/", then it is a relative pathname and GT.M searches for it
+   starting in the current working directory.
 
-   o   Define the  character  limitations  of  global  variable  names  and
-       records
+   To change the current Global Directory assignment, specify a new
+   definition for gtmgbldir.
 
-   o   Provide  the  MUMPS  Peripheral  Interchange  Program  (MUPIP)  with
-       characteristics  (e.g.,  -ALLOCATION  size)  used  in  creating  and
-       extending a database file
-
-   o   Define whether a database file should be journaled and how
-
-   o   Define the -ACCESS_METHOD used to  access  the  database  files  and
-       other database characteristics
-
-2 Mapping
-  Mapping
-   Defining  a  "map,"  i.e.,  where  GT.M  stores   a   global   variable,
-   requires defining, not only the NAME of  the  global  variable  and  the
-   database  FILE  in  the  Global  Directory,  but  also  the  REGION  and
-   SEGMENT.
-
-   A REGION is a logical structure that  holds  information  such  as  key-
-   and  record-size  about  a  portion  of  a  database.   GT.M   and   the
-   operating system handle data stored in  a  REGION  together  by  storing
-   it in the same place or  places,  backing  it  up  as  a  unit,  etc.  A
-   REGION must map to a SEGMENT.
-
-   A  SEGMENT  defines  additional  database  storage  characteristics  not
-   required for UNIX files. A SEGMENT must  map  to  a  FILE.  The  SEGMENT
-   exists   primarily   for   future   design   considerations,   when    a
-   one-to-one  correspondence  between  the  REGION  and  SEGMENT  will  no
-   longer be required.
-
-   The  connection  in  the  map  between  a  name  and  a  file  is   very
-   important  and  is  used  by  the  run-time   system   and   most   GT.M
-   utilities. Specifying  a  map  requires  entering  (a)  NAME(S)  with  a
-   connection to a REGION,  a  REGION  with  a  connection  to  a  SEGMENT,
-   and a SEGMENT with  a  connection  to  a  database  file.  The  commands
-   may be issued in any order, but the final  result  must  be  a  complete
-   logical path from name to file.
-
-   NAME(s) ---> REGION ---> SEGMENT ---> FILE
-
-2 Default_GD
-  Creating a Default Global Directory
-   The  Global  Directory   Editor   creates   a   quick   default   Global
-   Directory  for  purposes  such  as  development  and  testing  work.   A
-   default  Global  Directory  also  serves  as   a   starting   point   or
-   template for a custom Global Directory.
-
-   To  create  a   default   Global   Directory   structure,   invoke   and
-   immediately EXIT GDE. GDE creates a  Global  Directory  mapping  of  all
-   NAMEs  to  the  REGION  DEFAULT,  the  default  REGION  to  the  SEGMENT
-   DEFAULT and the default SEGMENT to  the  default  file-name  MUMPS  with
-   the default file extension of .DAT.
-
-2 Custom_GD
-  Creating a Custom Global Directory
-   When a default Global Directory does  not  meet  your  needs,  you  need
-   to customize a  Global  Directory.  Usually  you  customize  the  Global
-   Directory  when  you  define  your  production   database   file.   This
-   enables you to optimize the sharing and location of your data.
-
-   To  create  a  custom  Global  Directory,  invoke  GDE  and  issue   the
-   commands necessary to build  the  desired  Global  Directory.  For  more
-   information  about  mapping,  refer  to   the   "How   to   Map   Global
-   Variables" section.
-
-2 GTM$GBLDIR
- Defining      the      gtmgbldir       Environment              Variable
-   GT.M  identifies  the  current  Global  Directory  by  the   environment
-   variable  gtmgbldir.  GDE,  MUPIP,  LKE,  DSE  and  the  GT.M   run-time
-   system use this environment  variable  to  identify  the  file  used  as
-   the  Global  Directory.  The  run-time   system   normally   uses   this
-   environment  variable,  but  may  also  access  a  Global  Directory  by
-   setting $ZGBLDIR or the extended global reference ([]) syntax.
-
-   If  you  maintain  multiple  Global  Directories,  define  gtmgbldir  to
-   the Global Directory you currently  want  to  use.    You  may  want  to
-   define gtmgbldir in your login file.
-
-   Example
+   Example:
 
    $ gtmgbldir=prod.gld
    $ export gtmgbldir
 
-1 Command_syntax
-  Command Syntax
+2 Creating_a_Default_Global_Directory
+   Creating a Default Global Directory
+
+   When you invoke GDE and no Global Directory exists for gtmgbldir, GDE
+   produces a default Global Directory that contains a minimal set of
+   required components and values for database characteristics. It can be
+   used for purposes such as development and testing work. A default Global
+   Directory also serves as a starting point or template for building custom
+   global directories.
+
+   To retain this default Global Directory, exit GDE without making any
+   changes.
+
+   Example:
+
+   $ gtmgbldir=./mumps.gld
+   $ export gtmgbldir
+   $ gtm
+   GTM>d ^GDE
+   %GDE-I-GDUSEDEFS, Using defaults for Global Directory
+   /usr/accntg/jones/mumps.gld
+   GDE> EXIT
+   %GDE-I-VERIFY, Verification OK
+   %GDE-I-GDCREATE, Creating Global Directory file
+   /usr/accntg/jones/mumps.gld
+
+2 Mapping_Global_Variables_in_a_Global_Directory
+   Mapping Global Variables in a Global Directory
+
+   Mapping is the process of connecting a global variable name to a database
+   file.
+
+   A complete mapping has the following four components:
+
+     o NAME
+     o REGION
+     o SEGMENT
+     o FILE
+
+   These components may be defined in any order, but the final result must be
+   a complete logical path from name to file:
+
+   NAME(s) ---> REGION ---> SEGMENT ---> FILE
+
+   The default Global Directory contains one complete mapping that comprises
+   these entries for name, region, segment, and file.
+
+   * ---> DEFAULT ---> DEFAULT ---> mumps.dat
+   (NAME) (REGION) (SEGMENT) (FILE)
+
+   The * wildcard identifies all possible global names. Subsequent edits
+   create entries for individual global names or name prefixes.
+
+   Regions and segments store information used to control the creation of the
+   file. The characteristics stored with the region and segment are passed to
+   MUPIP only when creating the database file using the CREATE command, so
+   subsequent changes to these characteristics in the Global Directory have
+   no effect on an existing database.
+
+   When you create a new mapping, GDE ensures that it has all these
+   components by refusing to complete the EXIT command until all components
+   of the mapping exist. Informational messages inform you of any missing or
+   extra components.
+
+2 Examining_the_Default_Global_Directory
+   Examining the Default Global Directory
+
+   The default Global Directory looks like this:
+
+                                  *** TEMPLATES ***
+                                                                             Std      Inst
+                                                Def     Rec   Key Null       Null     Freeze   Qdb
+    Region                                     Coll    Size  Size Subs       Coll Jnl on Error Rndwn
+    ----------------------------------------------------------------------------------------------------
+    <default>                                     0    4080   255 NEVER      Y    Y   DISABLED DISABLED
+                 Jnl File (def ext: .mjl)  Before  Buff      Alloc      Exten   AutoSwitch
+    --------------------------------------------------------------------------------------
+    <default>    <based on DB file-spec>   Y       2308       2048       2048      8386560
+
+    Segment          Active              Acc Typ Block      Alloc Exten Options
+    ------------------------------------------------------------------------------
+    <default>          *                 BG  DYN  4096       5000 10000 GLOB =1000
+                                                                        LOCK = 40
+                                                                        RES  =   0
+                                                                        ENCR = OFF
+    <default>                            MM  DYN  4096       5000 10000 DEFER
+                                                                        LOCK = 40
+
+            *** NAMES ***
+    Global                             Region
+    ------------------------------------------------------------------------------
+    *                                  DEFAULT
+
+                                   *** REGIONS ***
+                                                                                          Std      Inst
+                           Dynamic                          Def      Rec   Key Null       Null     Freeze   Qdb
+    Region                 Segment                         Coll     Size  Size Subs       Coll Jnl on Error Rndwn
+    -----------------------------------------------------------------------------------------------------------------
+    DEFAULT                DEFAULT                            0     4080   255 NEVER      Y    Y   DISABLED DISABLED
+
+                             *** JOURNALING INFORMATION ***
+    Region                          Jnl File (def ext: .mjl)  Before Buff      Alloc      Exten   AutoSwitch
+    --------------------------------------------------------------------------------------------------------
+    DEFAULT                         $gtmdir/$gtmver/g/gtm.mjl
+                                                              Y      2308       2048       2048      8386560
+
+                                   *** SEGMENTS ***
+    Segment                         File (def ext: .dat)Acc Typ Block      Alloc Exten Options
+    -------------------------------------------------------------------------------------------
+    DEFAULT                         $gtmdir/$gtmver/g/gtm.dat
+                                                        BG  DYN  4096       5000 10000 GLOB=1000
+                                                                                       LOCK=  40
+                                                                                       RES =   0
+                                                                                       ENCR=OFF
+
+                                     *** MAP ***
+      -  -  -  -  -  -  -  -  -  - Names -  -  - -  -  -  -  -  -  -
+    From                            Up to                            Region / Segment / File(def ext: .dat)
+    --------------------------------------------------------------------------------------------------------
+    %                               ...                              REG = DEFAULT
+                                                                     SEG = DEFAULT
+                                                                     FILE = $gtmdir/$gtmver/g/gtm.dat
+    LOCAL LOCKS                                                      REG = DEFAULT
+                                                                     SEG = DEFAULT
+                                                                     FILE = $gtmdir/$gtmver/g/gtm.dat
+   GDE>
+
+   There are five primary sections in a Global Directory:
+
+     o TEMPLATES
+     o NAMES
+     o REGIONS
+     o SEGMENTS
+     o MAP
+
+   The function of each section in the Global Directory is described as
+   follows:
+
+   TEMPLATES
+
+   This section of the Global Directory provides a default value for every
+   database or file parameter passed to GT.M as part of a region or segment
+   definition. GDE uses templates to complete a region or segment definition
+   where one of these necessary values is not explicitly defined.
+
+   GDE provides initial default values when creating a new Global Directory.
+   You can then change any of the values using the appropriate -REGION or
+   -SEGMENT qualifiers with the TEMPLATE command.
+
+   NAMES
+
+   An M program sees a monolithic global variable name space. The NAMES
+   section of the Global Directory partitions the name space so that
+   different globals reside in different files. While each M global can
+   reside in only one file, each file can store many M globals.
+
+   REGIONS
+
+   The REGIONS section lists all of the regions in the Global Directory. Each
+   region defines common properties for all the M global variables;
+   therefore, multiple sets of names from the NAMES section map onto a single
+   region.
+
+   You assign these values by specifying the appropriate qualifier when you
+   create or modify individual regions. If you do not specify a value for a
+   particular parameter, GDE assigns the default value from the TEMPLATES
+   section.
+
+   SEGMENTS
+
+   This section of the Global Directory lists currently defined segments.
+   While regions specify properties of global variables, segments specify the
+   properties of files. There is a one-to-one mapping between regions and
+   segments. You assign these values by specifying the appropriate qualifier
+   when you create or modify individual segments. If you do not specify a
+   value for a particular parameter, GDE assigns the default value from the
+   TEMPLATES section.
+
+   MAP
+
+   This section of the Global Directory lists the current mapping of names to
+   region to segment to file. In the default Global Directory, there are two
+   lines in this section: one specifies the destination for all globals, the
+   other one is for local locks. If you add any new mapping component
+   definitions (that is, any new names, regions, or segments), this section
+   displays the current status of that mapping. Any components of the mapping
+   not currently defined display "NONE". Because GDE requires all elements of
+   a mapping to be defined, you will not be able to EXIT (and save) your
+   Global Directory until you complete all mappings.
+
+2 Global_Directory_Abbreviations
+   Global Directory Abbreviations
+
+   GDE uses the following abbreviations to display the output of a global
+   directory. The following list show global directory abbreviations with the
+   associated qualifiers. For a description of the function of individual
+   qualifiers, see "GDE Command Summary".
+
+   Abbreviation           Full Form
+   Acc                    ACCESS_METHOD
+   Alloc                  ALLOCATION
+   AutoSwitch             AUTOSWITCHLIMIT
+   Block                  BLOCK_SIZE
+   Buff                   BUFFER_SIZE
+   Def Coll               COLLATION_DEFAULT
+   Exten                  EXTENSION_COUNT
+   File                   FILE_NAME
+   GLOB                   GLOBAL_BUFFER_COUNT
+   Inst Freeze On Error   INST_FREEZE_ON_ERROR
+   JNL                    JOURNAL
+   KeySize                KEY_SIZE
+   LOCK                   LOCK_SPACE
+   Null Subs              NULL_SUBSCRIPTS
+   Qdb Rndwn              QDBRUNDOWN
+   Std Null Coll          STDNULLCOLL
+   Rec Size               RECORD_SIZE
+   RES                    RESERVED_BYTES
+   Region                 REGION
+   Typ                    DYNAMIC_SEGMENT
+
+2 Customizing_a_Global_Directory
+   Customizing a Global Directory
+
+   Once you have installed GT.M and verified its operation, create a Global
+   Directory based on your needs. To create this customized Global Directory,
+   use the appropriate GDE commands and qualifiers to build the desired
+   Global Directory. The GDE commands are described later in this chapter.
+
+   You can also create a text file of GDE commands with a standard text
+   editor and process this file with GDE. In a production environment, this
+   gives better configuration control than interactive usage with GDE.
+
+3 Adding_a_Journaling_Information_Section
+   Adding a Journaling Information Section
+
+   If you select the -JOURNAL option when you ADD or CHANGE a region in a
+   Global Directory, the following section is added to your Global Directory
+   and displays when you invoke SHOW. The columns provided display the values
+   you selected with the journal options, or defaults provided by FIS for any
+   options not explicitly defined.
+
+                    *** JOURNALING INFORMATION ***
+    Region            Jnl File (def ext: .mjl)  Before Buff      Alloc      Exten   AutoSwitch
+    ------------------------------------------------------------------------------------------
+    DEFAULT           $gtmdir/$gtmver/g/gtm.mjl
+                                                Y      2308       2048       2048      8386560
+
+1 Using_GDE
+   Using GDE
+
+   The default installation procedure places the GDE utility into a directory
+   assigned to the environment variable gtm_dist.
+
+   To invoke GDE:
+
+   from within GTM, use the command:
+
+   GTM>do ^GDE
+
+   from the shell, enter:
+
+   $ mumps -r GDE
+
+   GDE displays informational messages like the following, and then the GDE>
+   prompt:
+
+   %GDE-I-LOADGD, loading Global Directory file /prod/mumps.gld
+   %GDE-I-VERIFY, Verification OK
+   GDE>
+
+   If this does not work, contact your system manager to investigate setup
+   and file access issues.
+
+   To leave GDE:
+
+    1. Use the GDE EXIT command to save all changes and return to the shell.
+
+       GDE> EXIT
+
+    2. Use the GDE QUIT command to discard all changes and return to the
+       shell. This will not save any changes.
+
+       GDE> QUIT
+
+2 Guidelines_for_Mapping
+   Guidelines for Mapping
+
+   This section lists the parameters that apply to defining each component of
+   a mapping.
+
+   NAME
+
+   The name is the portion of the global variable name without subscripts.
+   More than one name can map to a single region, but a single name can only
+   map to one region.
+
+   A name:
+
+     o Maps to only one region in the Global Directory.
+     o Is case sensitive.
+     o Must begin with an alphabetic character or a percent sign (%).
+     o Can be one to 31 alphanumeric characters.
+     o Can be a discrete "global" name, for example, aaa corresponds to the
+       global variable ^aaa.
+     o Can be a partial name ending with a wild card ("*"), for example, abc*
+       represents all globals beginning with the letters ^abc.
+
+   REGION
+
+   A region is a logical structure that holds information about a portion of
+   a database, such as key-size and record-size. A key is the internal
+   representation of a global variable name. In this chapter the terms global
+   variable name and key are used interchangeably. A record refers to a key
+   and its data.
+
+   A Global Directory must have at least one region. A region only maps to a
+   single segment. More than one name may map to a region.
+
+   A region name:
+
+     o Can include alphanumerics, dollar signs ($), and underscores ( _ ).
+     o Can have from 1 to 16 characters.
+
+   GDE automatically converts region names to uppercase, and uses DEFAULT for
+   the default region name.
+
+   SEGMENT
+
+   A segment defines file-related database storage characteristics. A segment
+   must map to a single file. A segment can be mapped by only one region.
+
+   GT.M uses a segment to define a physical file and access method for the
+   database stored in that file.
+
+   A segment-name:
+
+     o Can include alphanumerics, dollar signs ($), and underscores ( _ )
+     o Can have from one to 16 characters
+
+   GDE automatically converts segment names to uppercase. GDE uses DEFAULT
+   for the default segment name.
+
+   FILE
+
+   Files are the structures provided by UNIX for the storage and retrieval of
+   information. Files used by GT.M must be random-access files resident on
+   disk.
+
+   By default, GDE uses the file-name mumps.dat for the DEFAULT segment. GDE
+   adds the .dat to the file name when you do not specify an extension.
+   Generally, avoid non-graphic and punctuation with potential semantic
+   significance to the file system in file names as they tend to produce
+   operational difficulties.
+
+3 Example_of_a_Basic_Mapping
+   Example of a Basic Mapping
+
+   To complete this procedure, you must have already opened a Global
+   Directory.
+
+     o ADD a new global variable name.
+
+       GDE> add -name cus -region=cusreg
+
+       This maps the global name cus to the region cusreg.
+
+     o ADD region cusreg, if it does not exist.
+
+       GDE> add -region cusreg -d=cusseg
+
+       This creates the region cusreg and connects it to the segment cusseg.
+       -d[ynamic] is a required qualifier that takes the associated
+       segment-name as a value.
+
+     o ADD segment cusreg, if it does not exist, and link it to a file.
+
+       GDE> add -segment cusseg -file=cus
+
+       This creates the segment cusseg and connects it to the file cus.dat.
+
+   To review the information you have added to the Global Directory, enter
+   the command SHOW.
+
+   To perform a base consistency check in the configuration, enter the
+   command VERIFY.
+
+   To exit the Global Directory and save your changes, enter the command
+   EXIT. At this point, GDE performs an automatic verification. If
+   successfully confirmed, the mappings and database specifications become
+   part of the Global Directory, available for access by processes,
+   utilities, and the run-time system.
+
+   Only MUPIP CREATE uses the database specifications; run-time processes and
+   other utility functions use only the map and ignore the other information
+   in a global directory.
+
+1 Commands
+   Commands
+
+   This section describes the GDE commands. GDE allows abbreviations of
+   commands. The section describing each command provides the minimum
+   abbreviation for that command and a description of any qualifiers that are
+   not object-related. The section discussing the object-type describes all
+   the associated object-related qualifiers.
+
+   Command Syntax:
+
    The general format for GDE commands is:
 
-   command        [-object-type]        [object-name]         [-qualifier...]
-   ex:      -NAME          Name-space    -region-qualifier...
-            -REGION        Region-name   -region-qualifier...
-            -SEGMENT       Segment-name  -segment-qualifier...
+   command [-object-type] [object-name] [-qualifier]
 
    where:
 
-   Object-type             Indicates whether the command operates on a
-                           -N[AME],
-   -                        R[EGION]  or -S[EGMENT].
+   -object-type
 
-   Object-name             Specifies the name of a N[AME] space, R[EGION] or
-                           S[EGMENT]. Object-names of different types may
-                           have the  same name.
+           Indicates whether the command operates on a -N[AME] space,
+           -R[EGION], or -S[EGMENT].
 
-   Name-space              Specifies a name or name prefix that maps to a
-                           REGION.  Names may include the wildcard operator *
-                           as a suffix.
+   object-name
 
-   Region-name             Specifies a REGION name.
+           Specifies the name of the N[AME] space, R[EGION], or S[EGMENT].
+           Objects of different types may have the same name. Name spaces may
+           include the wildcard operator (*) as a suffix.
 
-   Segment-name            Specifies a SEGMENT name.
+   -qualifier
 
-   Qualifier               Indicates a command or object qualifier.
+           Indicates an object qualifier.
 
-   The  format  for  each  command  specifies  required  qualifiers  for  the
-   command.
+   The format description for each individual command specifies required
+   qualifiers for that command.
 
-   The @,  EXIT,  HELP,  LOG,  QUIT  and  SPAWN  commands  do  not  use  this
-   general  format.  For  the  applicable  format,  refer  to   the   section
-   explaining each of these commands.
+   The @, EXIT, HELP, LOG, QUIT, SETGD, and SPAWN commands do not use this
+   general format. For the applicable format, refer to the section explaining
+   each of these commands.
 
-   Comments on the command line may  be  delimited  by  an  exclamation  mark
-   (!). An exclamation  mark  not  enclosed  in  quotes  (")  causes  GDE  to
-   ignore the rest of the input line.
+   Comments on the command line may be delimited by an exclamation mark (!).
 
-1 at-sign
-  @
-   The @ command executes a GDE command  file.  Use  the  @  command  to  run
-   stored GDE command sequences from an interactive session.
+   **Caution**
+
+   An exclamation mark not enclosed in quotation marks ("") causes GDE to
+   ignore the rest of that input line.
+
+2 at-sign
+   at-sign
+
+   The @ command executes a GDE command file. Use the @ command to execute
+   GDE commands stored in a text file.
 
    The format of the @ command is:
 
-   @ file-name
+   @file-name
 
-   The file-name specifies the command file  to  execute.  GDE  provides  the
-   default file extension ".COM" in creating the file-name.
+   The file-name specifies the command file to execute. Use the file-name
+   alone for a file in the current working directory, or specify the relative
+   path, or the full path.
 
-   GDE executes each line of the  command  file  as  if  the  line  had  been
-   typed at the terminal.
+   GDE executes each line of the command file as if it were entered at the
+   terminal.
 
-   Example
+   Example:
 
    GDE> @standard
 
-   This command transfers the  GDE  input  to  STANDARD.COM  in  the  current
-   default  directory.  STANDARD.COM  should  contain   GDE   commands;   any
-   comments should start with an exclamation mark (!).
+   This command executes the GDE commands in the file to standard in the
+   current working directory. standard should contain GDE commands; comments
+   should start with an exclamation mark (!).
 
-1 ADD
-  A[DD]
-   The ADD command inserts a new NAME, REGION, or  SEGMENT  into  the  Global
+2 Add
+   Add
+
+   The ADD command inserts a new name, region, or segment into the Global
    Directory.
 
-   The format of the ADD command is:
+   The format of the ADD command is one of the f ollowing:
 
-   A[DD]-N[AME]               name-space                -R[EGION]=region-name
-   A[DD]-R[EGION]   region-name   -D[YNAMIC]=segment-name   [-region-qual...]
-   A[DD]-S[EGMENT] segment-name -F[ILE_NAME]=file-name [-segment-qual...]
+   A[DD]-N[AME] name-space -R[EGION]=region-name
+   A[DD]-R[EGION] region-name -D[YNAMIC]=segment-name [-REGION-qualifier...]
+   A[DD]-S[EGMENT] segment-name [-SEGMENT-qualifier...] -F[ILE_NAME]=file-name
 
-   The  ADD  command   requires   specification   of   an   object-type   and
-   object-name. GDE supplies default values for qualifiers not supplied.
+   The ADD command requires specification of an object-type and object-name.
+   GDE supplies default values from the templates for qualifiers not
+   explicitly supplied in the command.
 
-   Name-spaces and file  namesare  case-sensitive  while  other  objects  are
-   not.
+   Name spaces and file-names are case-sensitive; other objects are not
+   case-sensitive.
 
-1 CHANGE
-  C[HANGE]
-   The CHANGE command  alters  the  NAME  to  REGION  or  REGION  to  SEGMENT
-   mapping and the environment for a REGION or SEGMENT.
+   Example:
+
+   GDE> add -segment temp -file_name=scratch
+
+   This command creates a segment-name TEMP and maps it to the file
+   scratch.dat in the current working directory. However, if you specify
+   scratch is as the file-name, in other words specify it in the form of an
+   environment variable, GT.M finds the file using the translation of that
+   environment variable.
+
+2 Change
+   Change
+
+   The CHANGE command alters the name-to-region or region-to-segment mapping
+   and /or the environment for a region or segment.
 
    The format of the CHANGE command is:
 
-   C[HANGE]-N[AME]              name-space               -R[EGION]=new-region
-   C[HANGE]-R[EGION]            region-name            [-region-qualifier...]
-   C[HANGE]-S[EGMENT] segment-name [-segment-qualifier...]
+   C[HANGE]-N[AME] name-space -R[EGION]=new-region
+   C[HANGE]-R[EGION] region-name [-REGION-qualifier...]
+   C[HANGE]-S[EGMENT] segment-name [-SEGMENT-qualifier...]
 
-   The  CHANGE  command  requires  specification  of   an   object-type   and
+   The CHANGE command requires specification of an object-type and
    object-name.
 
-   Changes to  the  database  environment  characteristics  take  effect  the
-   next time you create a new file with the  MUPIP  CREATE  command.  Mapping
-   changes  take  effect  for  subsequent  image  activation,   for   example
-   following the next RUN or MUMPS-DIRECT command.
+   Once you exit GDE, mapping changes take effect for any subsequent image
+   activation (for example, the next RUN or the mumps -direct command).
+   Changes to database parameters only take effect for new database files
+   created with subsequent MUPIP CREATE commands that use the modified Global
+   Directory. Use the MUPIP SET command (or in some cases DSE) to change
+   characteristics of existing database files.
 
-1 DELETE
-  D[ELETE]
-   The DELETE command removes a NAME, REGION,  or  SEGMENT  from  the  Global
-   Directory. The DELETE command does not delete the  actual  data  from  the
-   database but can make the data inaccessible  to  MUMPS  images  using  the
-   resulting directory.
+   Example:
+
+   GDE> change -region master -dynamic=temp -key=100
+
+   This command changes the region master to use the segment temp and
+   establishes a maximum KEY_SIZE of 100 characters for the next creation of
+   a file for this region. The segment change takes effect the first time the
+   system uses the Global Directory after the GDE session EXITs, while the
+   KEY_SIZE change takes effect after the next MUPIP CREATE that creates a
+   new database file for segment temp.
+
+2 Delete
+   Delete
+
+   The DELETE command removes a name, region, or segment from the Global
+   Directory. The DELETE command does not delete any actual data. However,
+   GT.M does not access database files that do not have mapped global
+   variables except through extended references using an alternative global
+   directory that does not map to them. Note that GT.M replication does not
+   support global updates made with extended references, unless they actually
+   map to the same file as they would with the master global directory of the
+   instance.
 
    The format of the DELETE command is:
 
@@ -221,77 +595,99 @@
    D[ELETE]-R[EGION] region-name
    D[ELETE]-S[EGMENT] segment-name
 
-   The  DELETE  command  requires  specification  of   an   object-type   and
+   The DELETE command requires specification of an object-type and
    object-name.
 
-   Deleting a NAME removes the NAME to  REGION  mapping.  Deleting  a  REGION
-   unmaps all NAMES mapped to the  REGION.  Deleting  a  SEGMENT  unmaps  the
-   REGION mapped to the SEGMENT.
+   Deleting a name removes the name-to-region mapping. Deleting a region
+   unmaps all names mapped to the region. Deleting a segment unmaps the
+   region mapped to the segment.
 
-   Map the  deleted  names  to  another  REGION  or  the  deleted  REGION  to
-   another SEGMENT using the CHANGE command.
-   The default name-space (*) can not be deleted.
+   You may map the deleted names to another region or the deleted region to
+   another segment using the CHANGE command.
 
-1 EXIT
-  E[XIT]
-   The EXIT command writes all  changes  made  in  the  current  GDE  editing
-   session to the Global Directory.
+   The default name-space (*) cannot be deleted.
+
+   Example:
+
+   GDE> del -name T*
+
+   This command deletes the explicit mapping of all global names starting
+   with the letter "T." This command does not delete any global variables.
+   However, it may make preexisting globals starting with the letter "T"
+   invisible, at least while using this global directory, because the T*
+   global names map to the default namespace going forward.
+
+2 Exit
+   Exit
+
+   The EXIT command writes all changes made in the current GDE editing
+   session to the Global Directory and terminates the current editing
+   session.
 
    The format of the EXIT command is:
 
    E[XIT]
 
-   GDE performs a full  verification  test  (VERIFY)  on  the  data.  If  the
-   verification succeeds, GDE writes the new Global  Directory  to  disk  and
-   issues a verification message.
+   GDE performs a full verification test (VERIFY) on the data. If the
+   verification succeeds, GDE writes the new Global Directory to file system
+   and issues a verification message.
 
-   If the verification fails, GDE displays  a  listing  of  all  unverifiable
-   mappings and  waits  for  corrections.  Make  appropriate  corrections  or
-   leave the Global Directory  in  its  original,  unedited  state  by  using
-   the QUIT command.
+   If the verification fails, GDE displays a listing of all unverifiable
+   mappings and waits for corrections. Make appropriate corrections, or leave
+   the Global Directory in its original, unedited state by using the QUIT
+   command.
 
-   If you have not made any changes to the Global  Directory,  GDE  does  not
-   create a new Global Directory.
+   If you have not made any changes to the Global Directory, GDE does not
+   save a new Global Directory unless the original global directory had an
+   older format which GDE has automatically upgraded. Note that while GDE
+   upgrades older global directories to the current version, there is no
+   facility to downgrade global directories to prior versions, so you should
+   always save copies of any global directories that might be needed to
+   retrieve archival data.
 
-1 HELP
-  H[ELP]
-   The HELP command explains  the  GDE  commands.  The  format  of  the  HELP
-   command is:
+2 Help
+   Help
 
-   HE[LP] [keyword...]
+   The HELP command displays online information about GDE commands and
+   qualifiers.
 
-   Specify the GDE command for  which  you  want  information  at  the  Topic
-   prompt. The help facility also provides an "Overview."
+   The format of the HELP command is:
 
-   Use <RETURN> or <CTRL Z> to return to the GDE prompt.
+   H[ELP] [topic...]
 
-1 LOCKS
-  LOC[KS]
-   The LOCKS command specifies the REGION  into  which  GT.M  maps  locks  on
-   names not starting with ^.  GDE  maps  locks  on  global  names  (starting
-   with ^) to the region of the database specified for that name.
+   where topic specifies the GDE command for which you want information. If
+   you omit the topic, GDE prompts you for it.
+
+2 LOCks
+   LOCks
+
+   The LOCKS command specifies the region into which GT.M maps locks on
+   resource names not starting with a caret symbol (^). GDE maps locks on
+   resource names, starting with a caret symbol (^), to the database region
+   mapped for the global variable name matching the resource name.
 
    The format of the LOCKS command is:
 
    LOC[KS] -R[EGION]=region-name
 
-   The LOCK -REGION= qualifier allows specification of  a  region  for  local
+   The LOCKS -REGION= qualifier allows specification of a region for local
    locks. By default, GDE maps local locks to the default region DEFAULT.
 
+   Example:
 
-   Example
+   GDE> lock -region=main
 
-   GDE> LOCK-REGION=MAIN
+   This command maps all locks on resource names that don't start with the
+   caret symbol, "^" to the region main.
 
-   This command maps all locks  on  resource  names  that  don't  start  with
-   "^" to region MAIN.
+2 LOG
+   LOG
 
-1 LOG
-  LOG
-   The LOG command creates a log  file  of  all  GDE  commands  and  displays
-   for  the  current  editing  session.  Because   the   system   places   an
-   exclamation point (i.e., the comment  symbol)  before  all  display  lines
-   in the log, a log can be used with the @ sign as a command procedure.
+   The LOG command creates a log file of all GDE commands and displays for
+   the current editing session. Because the system places an exclamation
+   point (!) (i.e., the comment symbol) before all display lines that are not
+   entered by the user. In the log, the log can be used with the @ symbol as
+   a command procedure.
 
    The format of the LOG command is:
 
@@ -299,152 +695,238 @@
    LOG -ON[=file-name]
    LOG -OF[F]
 
-   The LOG command without a qualifier reports  the  current  status  of  GDE
-   logging. The LOG command displays a message  showing  whether  logging  is
-   in effect and the specification of  the  current  log  file  for  the  GDE
-   session.
+   The LOG command, without a qualifier, reports the current status of GDE
+   logging. The LOG command displays a message showing whether logging is in
+   effect and the specification of the current log file for the GDE session.
 
-   The log facility  can  be  turned  on  and  off  using  the  -ON  or  -OFF
-   qualifiers any time during a GDE session.  However,  GDE  closes  the  log
-   files only when the GDE session ends.
+   The log facility can be turned on and off using the -ON or -OFF qualifiers
+   any time during a GDE session. However, GDE closes the log files only when
+   the GDE session ends.
 
-   The -ON qualifier has an optional argument  of  a  file-name,  which  must
-   identify  a  legal  UNIX  file.  GDE  uses  the  default  file   extension
-   ".LOG". If LOG -ON has  no  file-name  argument,  GDE  uses  the  previous
-   log file for the editing session. If  no  log  file  has  previously  been
-   specified during this editing session,  GDE  uses  the  default  log  file
+   The -ON qualifier has an optional argument of a file, which must identify
+   a legal UNIX file. If LOG -ON has no file-argument, GDE uses the previous
+   log file for the editing session. If no log file has previously been
+   specified during this editing session, GDE uses the default log file
    GDELOG.LOG.
 
-1 QUIT
-  Q[UIT]
-   The QUIT command ends the  current  editing  session  without  saving  any
-   changes to the Global Directory. GDE does not  create  an  updated  Global
-   Directory file.
+   Example:
+
+   GDE> log -on="standard.log"
+
+   This command turns on logging of the session and directs the output to
+   standard.log.
+
+2 Quit
+   Quit
+
+   The QUIT command ends the current editing session without saving any
+   changes to the Global Directory. GDE does not update the Global Directory
+   file.
 
    The format of the QUIT command is:
 
    Q[UIT]
 
-   If the session  made  changes  to  the  Global  Directory,  GDE  issues  a
-   message warning that the Global Directory has not been updated.
+   If the session made changes to the Global Directory, GDE issues a message
+   warning that the Global Directory has not been updated.
 
-1 RENAME
-  R[ENAME]
-   The RENAME command allows changes of a NAME,  the  name  of  a  REGION  or
-   the name of a SEGMENT.
+2 Rename
+   Rename
+
+   The RENAME command allows you to change a name-space, the name of a
+   region, or the name of a segment.
 
    The format of the RENAME command is:
 
    R[ENAME]-N[AME] old-name new-name
-   R[ENAME]-R[EGION] old-reg-name new-reg-name
-   R[ENAME]-S[EGMENT] old-seg-name new-seg-name
+   R[ENAME]-R[EGION] old-region-name new-region-name
+   R[ENAME]-S[EGMENT] old-segment-name new-segment-name
 
-   The RENAME command  requires  specification  of  an  object-type  and  two
+   The RENAME command requires specification of an object-type and two
    object-names.
 
-   When renaming a REGION,  GDE  transfers  all  NAME  mappings  to  the  new
-   REGION. When renaming a SEGMENT, GDE  transfers  the  REGION  mappings  to
-   the new SEGMENT.
+   When renaming a region, GDE transfers all name mappings to the new region.
+   When renaming a segment, GDE transfers the region mapping to the new
+   segment.
 
-1 SETGD
-  SE[TGD]
-   The SETGD command closes out edits  on  one  Global  Directory  and  opens
-   edits on another.
+   Example:
+
+   GDE> rename -segment stable table
+
+   This command renames segment stable to table and shifts any region mapped
+   to stable so it is mapped to table.
+
+2 SEtgd
+   SEtgd
+
+   The SETGD command closes out edits on one Global Directory and opens edits
+   on another.
 
    The format of the SETGD command is:
 
    SE[TGD] -F[ILE]=file-name [-Q[UIT]]
 
-   The  -FILE=file-name  qualifier  identifies  the  new  Global   Directory.
-   When you provide  a  partial  file-name,  GDE  uses  the  current  default
-   directory and defaults the type to .GLD.
+   The -FILE=file-name specifies a different Global Directory file. When you
+   provide a file-name without a full or relative pathname GDE uses the
+   current working directory; if the file is missing an extension, then GDE
+   defaults the type to .gld.
 
-   The -QUIT qualifier specifies that any changes  that  have  been  made  to
-   the current Global Directory are  not  written,  i.e.,  are  lost,  during
-   the change of Global Directory.
+   The -QUIT qualifier specifies that any changes made to the current Global
+   Directory are not written and are lost when you change Global Directories.
 
-   A SETGD changes the Global Directory  on  which  the  GDE  edits  act.  If
-   the  current  Global  Directory  has  not  been  modified  or  the   -QUIT
-   qualifier appears in the  command,  the  change  simply  occurs.  However,
-   if the current Global  Directory  has  been  modified,  GDE  verifies  the
-   Global Directory, and if  the  verification  is  successful,  writes  that
-   Global Directory.  If  the  verification  is  not  successful,  the  SETGD
-   fails.
+   SETGD changes the Global Directory that GDE is editing. If the current
+   Global Directory has not been modified, or the -QUIT qualifier appears in
+   the command, the change simply occurs. However, if the current Global
+   Directory has been modified, GDE verifies the Global Directory, and if the
+   verification is successful, writes that Global Directory. If the
+   verification is not successful, the SETGD fails.
 
-1 SHOW
-  SH[OW]
-   The  SHOW  command  displays  information   about   NAMEs,   REGIONs   and
-   SEGMENTs.
+   Example:
+
+   GDE> SETGD -f="temp"
+
+   This changes the Global Directory being edited to temp. The quotation
+   marks around the file name identifies the name of the file unequivocally
+   to UNIX. If the -f is the final qualifier on the line, then the quotation
+   marks are unnecessary.
+
+2 SHow
+   SHow
+
+   The SHOW command displays information contained in the Global Directory
+   about names, regions, and segments.
 
    The format of the SHOW command is:
 
+   SH[OW] -C[OMMAND] -F[ILE]=[gde-command-file]
    SH[OW] -N[AME] [name-space]
    SH[OW] -R[EGION] [region-name]
    SH[OW] -S[EGMENT] [segment-name]
-   SH[OW] -M[AP] [R[EGION]=region-name]
+   SH[OW] -M[AP] [-R[EGION]=region-name]
    SH[OW] -T[EMPLATE]
    SH[OW] -A[LL]
 
-   The object-type  is  optional.  -MAP,  -TEMPLATE,  and  -ALL  are  special
-   qualifiers used as follows:
+   -COMMAND: Displays GDE commands that recreate the current Global Directory
+   state.
 
-   o    -MAP - displays the mapping of  all  NAMES,  REGIONs,  SEGMENTs,  and
-        files
+   -F[ILE]=gde-command-file: Optionally specifies a file to hold the GDE
+   commands produced by -COMMAND. -FILE must must always appear after
+   -COMMAND.
 
-   o    -TEMPLATE - displays the current REGION and SEGMENT templates
+   -NAME, -REGION, -SEGMENT, -MAP, -TEMPLATE, and -ALL are qualifiers that
+   cause GDE to display selected portions of the Global Directory as follows:
 
-   o    -ALL - displays all templates, the map, and  information  about  each
-        defined NAME, REGION, and SEGMENT
+   -MAP: Displays the current mapping of all names, regions, segments, and
+   files. This qualifier corresponds to the section of the SHOW report titled
+   ***MAP***. The output of a SHOW -MAP may be restricted to a particular
+   region by specifying a -REGION qualifier with a region name argument.
+
+   -TEMPLATE: Displays the current region and segment templates. This
+   qualifier corresponds to the section of the SHOW report titled:
+
+   ***TEMPLATES***
+
+   -ALL: Displays the entire Global Directory. This qualifier corresponds to
+   displaying "all" sections of the SHOW report:
+
+   ***TEMPLATES***, ***NAMES***, ***REGIONS***, ***SEGMENTS***,  ***MAP***.
 
    By default, SHOW displays -ALL.
 
+   If you want to print the Global Directory, create a log file by executing
+   LOG -ON= before executing the SHOW command. The -LOG command captures all
+   the commands entered and output. You can print the log file if you want a
+   hard copy record.
 
-1 SPAWN
-  SP[AWN]
-   The SPAWN command  creates  a  child  process  for  access  to  the  shell
-   without terminating the current GDE environment.  Use  the  SPAWN  command
-   to suspend a session and issue shell commands  such  as  ls  or  printenv.
-   The SPAWN  command  spawns  (forks)  a  child  process  with  an  optional
-   command string.  If  SPAWN  has  no  command  string  parameter,  the  GDE
-   command leaves the terminal at the prompt for the  shell  of  the  spawned
-   process.
+   If you want to export the current Global Directory state, create a GDE
+   command file with the SHOW -COMMAND -FILE=gde-command-file and run it in
+   the target environment.
 
-   The format of the SPAWN command is:
+   Example:
 
-   SP[AWN] [shell command]
+   GDE>show -template
+                               *** TEMPLATES ***
+                                                                       Std      Inst
+                                          Def     Rec   Key Null       Null     Freeze   Qdb
+    Region                               Coll    Size  Size Subs       Coll Jnl on Error Rndwn
+    ----------------------------------------------------------------------------------------------
+    <default>                               0    4080   255 NEVER      Y    Y   DISABLED DISABLED
+                     Jnl File (def ext: .mjl)  Before  Buff      Alloc      Exten   AutoSwitch
+    ------------------------------------------------------------------------------------------
+    <default>        <based on DB file-spec>   Y       2308       2048       2048      8386560
 
-   Example
+    Segment          Active              Acc Typ Block      Alloc Exten Options
+    ------------------------------------------------------------------------------
+    <default>          *                 BG  DYN  4096       5000 10000 GLOB =1000
+                                                                        LOCK = 40
+                                                                        RES  =   0
+                                                                        ENCR = OFF
+    <default>                            MM  DYN  4096       5000 10000 DEFER
+                                                                        LOCK = 40
 
-   GDE> SPAWN "ls *.DAT"
+   This displays only the TEMPLATES section of the Global Directory.
 
-   This command invokes a directory listing  of  all  files  in  the  current
-   default directory with a .DAT extension.
+   GDE>SHOW -command
+   TEMPLATE -SEGMENT -ACCESS_METHOD=MM -BLOCK_SIZE=4096 -ALLOCATION=5000 -EXTENSION_COUNT=10000
+   -LOCK_SPACE=40 -RESERVED_BYTES=0 -DEFER
+   TEMPLATE -SEGMENT -ACCESS_METHOD=BG -BLOCK_SIZE=4096 -ALLOCATION=5000 -EXTENSION_COUNT=10000
+   -LOCK_SPACE=40 -RESERVED_BYTES=0 -GLOBAL_BUFFER_COUNT=1000
+   TEMPLATE -REGION -RECORD_SIZE=4080 -KEY_SIZE=255 -NULL_SUBSCRIPTS=NEVER -STDNULLCOLL
+   -NOINST_FREEZE_ON_ERROR -NOQDBRUNDOWN
+   TEMPLATE -REGION
+   -JOURNAL=(BEFORE_IMAGE,BUFFER_SIZE=2308,ALLOCATION=2048,EXTENSION=2048,AUTOSWITCHLIMIT=8386560)
+   !
+   LOCKS -REGION=DEFAULT
 
-1 TEMPLATE
-  T[EMPLATE]
-   The TEMPLATE command maintains a  set  of  REGION  and  SEGMENT  qualifier
-   values for use as templates when ADDing  regions  and  segments.  When  an
-   ADD  command  omits  qualifiers,  GDE  uses   the   template   values   as
-   defaults. GDE maintains a separate set of  SEGMENT  qualifier  values  for
-   each ACCESS_METHOD. When GDE  modifies  the  ACCESS_METHOD,  it  activates
-   the appropriate set of  TEMPLATEs  and  sets  all  unspecified  qualifiers
-   to the template defaults for the  new  ACCESS_METHOD.  Use  the  GDE  SHOW
-   command to display qualifier values for all ACCESS_METHODs.
+   CHANGE -REGION DEFAULT -DYNAMIC=DEFAULT -COLLATION_DEFAULT=0 -RECORD_SIZE=4080 -KEY_SIZE=255
+   -NULL_SUBSCRIPTS=NEVER -STDNULLCOLL
+   -JOURNAL=(BEFORE_IMAGE,BUFFER_SIZE=2308,ALLOCATION=2048,EXTENSION=2048,AUTOSWITCHLIMIT=8386560,
+   FILE="$gtmdir/$gtmver/g/gtm.mjl") -NOINST_FREEZE_ON_ERROR -NOQDBRUNDOWN
+   !
+   CHANGE -SEGMENT DEFAULT -ACCESS_METHOD=BG -BLOCK_SIZE=4096 -ALLOCATION=5000 -EXTENSION_COUNT=10000
+   -LOCK_SPACE=40 -RESERVED_BYTES=0 -GLOBAL_BUFFER_COUNT=1000 -FILE=$gtmdir/$gtmver/g/gtm.dat
+   !
+
+   This command displays the GDE commands to recreate the current global
+   directory state.
+
+2 Template
+   Template
+
+   The TEMPLATE command maintains a set of -REGION and -SEGMENT qualifier
+   values for use as templates when ADDing regions and segments. When an ADD
+   command omits qualifiers, GDE uses the template values as defaults.
+
+   GDE maintains a separate set of -SEGMENT qualifier values for each
+   ACCESS_METHOD. When GDE modifies the ACCESS_METHOD, it activates the
+   appropriate set of TEMPLATEs and sets all unspecified qualifiers to the
+   template defaults for the new ACCESS_METHOD. Use the GDE SHOW command to
+   display qualifier values for all ACCESS_METHODs.
 
    The format of the TEMPLATE command is:
 
-   T[EMPLATE]-R[EGION] [-region-qualifier...]
-   T[EMPLATE]-S[EGMENT] [-segment-qualifier...]
+   T[EMPLATE] -R[EGION] [-REGION-qualifier...]
+   T[EMPLATE] -S[EGMENT] [-SEGMENT-qualifier...]
 
    The TEMPLATE command requires specification of an object-type.
 
-1 VERIFY
-  V[ERIFY]
-   The VERIFY command checks the  NAME  to  REGION  mappings  to  insure  all
-   NAMES map to a  REGION.  The  VERIFY  command  checks  REGION  to  SEGMENT
-   mappings to insure each REGION maps to a SEGMENT,  each  SEGMENT  maps  to
-   only one REGION and the SEGMENT maps to a  UNIX  file.  The  EXIT  command
-   implicitly performs a VERIFY -ALL.
+   Example:
+
+   GDE> template -segment -allocation=200000
+
+   This command modifies the segment template so that any segments ADDed
+   after this time produce database files with an ALLOCATION of 200,000 GDS
+   blocks.
+
+2 Verify
+   Verify
+
+   The VERIFY command validates information entered into the current Global
+   Directory. It checks the name-to-region mappings to ensure all names map
+   to a region. The VERIFY command checks region-to-segment mappings to
+   ensure each region maps to a segment, each segment maps to only one
+   region, and the segment maps to a UNIX file. The EXIT command implicitly
+   performs a VERIFY -ALL.
 
    The format of the VERIFY command is:
 
@@ -456,425 +938,743 @@
    V[ERIFY] -T[EMPLATE]
    V[ERIFY] -A[LL]
 
-   The object-type  is  optional.  -MAP,  -TEMPLATE,  and  -ALL  are  special
+   The object-type is optional. -MAP, -TEMPLATE, and -ALL are special
    qualifiers used as follows:
 
-   o    -MAP - checks that all NAMES map to a REGION, all REGIONs  map  to  a
-        SEGMENT, and all SEGMENTs map to a FILE
+   -MAP
 
-   o    -TEMPLATE - checks that all templates currently  are  consistent  and
-        useable
+           Checks that all names map to a region, all regions map to a
+           segment, and all segments map to a file.
 
-   o    -ALL - checks all map and template data
+   -TEMPLATE
 
-   VERIFY with no qualifier, VERIFY -MAP  and  VERIFY  -ALL  each  check  all
+           Checks that all templates currently are consistent and useable.
+
+   -ALL
+
+           Checks all map and template data.
+
+   VERIFY with no qualifier, VERIFY -MAP, and VERIFY -ALL each check all
    current information.
 
+   Example:
+
+   GDE> verify -region regis
+
+   This command verifies the region regis.
+
 1 Qualifiers
-  GDE Command Qualifiers
-   The  -NAME,  -REGION,  and  -SEGMENT  qualifiers  each   have   additional
-   qualifiers  used  to  further  define  or  specify  characteristics  of  a
-   NAME,  REGION,  or  SEGMENT.  This  section  discusses  these   additional
-   qualifiers.
+   Qualifiers
+
+   The -NAME, -REGION, and -SEGMENT qualifiers each have additional
+   qualifiers used to further define or specify characteristics of a name,
+   region, or segment. For more information, refer to the additional topics.
 
 2 Name_Qualifiers
-  Name Qualifiers
-   The only -NAME qualifier, used with  the  commands  ADD  or  CHANGE,  is
-   the -REGION qualifier.
+   Name Qualifiers
 
-3 -REGION
-  -R[EGION]=region-name
-   Specifies the name of a REGION.
+   The following -NAME qualifier can be used with the ADD or CHANGE commands.
+
+   -REGION=region-name
+
+   Specifies the name of a region. Region names are not case-sensitive, but
+   are represented as uppercase by GDE.
+
+   The minimum length is one alphabetic character.
 
    The maximum length is 16 alphanumeric characters.
 
-   Example
+   Example:
 
-   GDE> add-Name a*-Region=areg
+   GDE> add -name a* -region=areg
 
-   This command creates the name "a," if  it  does  not  exist  and  maps
-   it to the region "areg."
+   This command creates the name-space a*, if it does not exist, and maps it
+   to the region areg.
 
+   Summary
+
+   +------------------------------------------------------------------+
+   |                       GDE NAME Qualifiers                        |
+   |------------------------------------------------------------------|
+   |             QUALIFIER              | DEFAULT | MINIMUM | MAXIMUM |
+   |------------------------------------+---------+---------+---------|
+   | -R[EGION]=region-name (characters) | (none)  | 1A      | 16A/N   |
+   +------------------------------------------------------------------+
 
 2 Region_Qualifiers
-  Region Qualifiers
-   The following -REGION qualifiers  can  be  used  with  the  ADD,  CHANGE
-   or TEMPLATE commands.
+   Region Qualifiers
 
-3 -DYNAMIC_SEGMENT
-  -D[YNAMIC_SEGMENT]=segment-name
-   Specifies  the  name  of  a  dynamic  SEGMENT.   A   dynamic   segment
-   allows read-write access.
+   The following -REGION qualifiers can be used with the ADD, CHANGE, or
+   TEMPLATE commands.
 
-   The minimum length is 1 alpha character.
+   -C[OLLATION_SEQUENCE]=id number
+
+   Specifies the number of the collation sequence definition to be used as
+   the default for this database file. The number can be any integer from 0
+   to 255. The number you assign as a value must match the number of a
+   defined collation sequence that resides in the shared library pointed to
+   by the environment variable gtm_collate_n. For information on defining
+   this environment variable and creating an alternate collation sequence,
+   refer to the "Internationalization" chapter in the GT.M Programmer's
+   Guide.
+
+   The minimum COLLATION_SEQUENCE ID number is zero, which is the standard M
+   collation sequence.
+
+   The maximum COLLATION_SEQUENCE ID number is 255.
+
+   By default, GDE uses zero (0) as the COLLATION_SEQUENCE ID.
+
+   -D[YNAMIC_SEGMENT]=segment-name
+
+   Specifies the name of the segment to which the region is mapped.
+   Segment-names are not case-sensitive, but are displayed as uppercase by
+   GDE.
+
+   The minimum length is one alphabetic character.
 
    The maximum length is 16 alphanumeric characters.
 
-3 -KEY_SIZE
-  -K[EY_SIZE]=size in bytes
-   Specifies  the  maximum  size  of  keys,  in  bytes,  which   can   be
-   stored in the region.
+   -K[EY_SIZE]=size in bytes
 
-   CAUTION: The  key  size  must  be  less  than  the  record  size.  GDE
-   rejects the command if  the  key  size  is  greater  than  the  record
-   size.
+   Specifies the maximum size of keys, in bytes, which can be stored in the
+   region. The KEY_SIZE must be less than the RECORD_SIZE. GDE rejects the
+   command if the KEY_SIZE is inappropriate for the RECORD_SIZE.
 
-   The minimum key size is 3 bytes.
+   The minimum KEY_SIZE is three bytes.
 
-   The maximum key size is 255 bytes.
+   The maximum KEY_SIZE is 1019 bytes.
 
-   By default, GDE uses a key size of 64 bytes.
+   When determining the maximum key size, applications should consider the
+   following:
 
-3 -RECORD_SIZE
-  -R[ECORD_SIZE]=size in bytes
-   Specifies the maximum record size,  in  bytes,  which  can  be  stored
-   in the region.
+     o A key must fit within one database block and the maximum KEY_SIZE is
+       limited to 40 bytes less than the block size. For example, a 1024 byte
+       block can support a maximum KEY_SIZE of 984 bytes and a 1536 byte
+       block size is the smallest that supports a maximum KEY_SIZE of 1019
+       bytes.
+     o GT.M uses packed decimal representation for numeric subscripts which
+       may be larger or smaller than the original representation.
+     o GT.M substitutes an element terminator for the caret (^), any comma
+       (,), and any right parenthesis ()).
+     o GT.M adds an extra byte for every string element, including the global
+       name.
 
-   CAUTION: The  key  size  must  be  less  than  the  record  size.  GDE
-   rejects the command if the key size exceeds the record size.
+   For example, the key ^ACN ("Name", "Type") internally occupies 17 bytes.
 
-   The record size  must  be  less  than  half  the  block  size  of  the
-   segment to which the region maps. If  the  record  size  is  not  less
-   than  half  the  block  size  minus  7  bytes,  GDE  issues  an  error
-   message. To VERIFY or EXIT, you must change the record size.
+   By default, GDE uses a KEY_SIZE of 64 bytes.
 
-   The minimum record size is 7 bytes.
+   -R[ECORD_SIZE]=size in bytes
 
-   The maximum record size is 32,508 bytes.
+   Specifies the maximum size (in bytes) of a global variable node's value
+   that can be stored in a region. The KEY_SIZE must be less than the
+   RECORD_SIZE. GDE rejects the command if the KEY_SIZE is inappropriate for
+   the RECORD_SIZE.
 
-   By default, GDE uses a record size of 256 bytes.
+   If the size of a global exceeds one database block, GT.M implicitly spans
+   that global across multiple database blocks. In the event a global
+   variable node spans multiple blocks, and the process is not already within
+   a TP transaction, the GT.M run-time system automatically and transparently
+   performs the entire operation within an implicit TP transaction (just as
+   is the case with triggers).
 
-3 -NULL_SUBSCRIPTS
-  -[NO]N[ULL_SUBSCRIPTS]
-   Indicates   whether   GT.M   allows   null   subscripts   for   global
-   variables  stored  in  the  region,   i.e.,   whether   GT.M   permits
-   reference such as ^aaa("",1).
+   The minimum RECORD_SIZE is seven or eight, depending on your platform.
 
-   By default, REGIONS have -NONULL_SUBSCRIPTS.
+   The maximum RECORD_SIZE is 1,048,576 bytes (1MiB).
 
-3 -JOURNAL
-  -[NO]J[OURNAL][=journal-option-list]
-   Specifies whether the database  file  allows  journaling  and,  if  it
-   does, establishes characteristics for the journal file.
+   By default, GDE uses a RECORD_SIZE of 256 bytes.
 
-   -NOJOURNAL  specifies  that  the  database   file   does   not   allow
-   journaling. -NOJOURNAL does not accept an argument assignment.
+   -[NO]N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]
 
-   -JOURNAL  specifies  that  journaling  is  allowed.   -JOURNAL   takes
-   one   or   more    arguments    in    a    journal-option-list.    The
-   journal-option-list  contains  keywords  separated  with  commas   (,)
-   enclosed  in  parentheses  ().  When  the  list  contains   only   one
-   keyword, the parentheses are optional.
+   Indicates whether GT.M allows null subscripts for global variables stored
+   in the region (that is, whether GT.M permits references such as
+   ^aaa("",1)).
 
-   For  more  information   about   journaling,   refer   to   the   GT.M
-   Journaling  chapter  of  the  GT.M   Administration   and   Operations
-   Guide.
+   ALWAYS indicates that the null subscripts for global variables are
+   allowed.
 
-4 BEFORE_IMAGE
-  [NO]BE[FORE_IMAGE]
-   [NO]BEFORE_IMAGE  controls  whether  the  journal   should   capture
-   before  images  of  information  that  an   update   is   about   to
-   modify.
+   NEVER indicates that null subscripts for global variables are not allowed.
 
-   A  BEFORE_IMAGE  journal  permits  the  possibility  of   performing
-   "roll-back"   recovery   (i.e.,   Backward    Recovery)    of    the
-   associated  database  file.  BEFORE_IMAGE  increases  the  load   on
-   I/O and CPU resources and therefore may affect performance.
+   EXISTING indicates that null subscripts for global variable can be
+   accessed and updated, but not created anew.
 
-4 FILE_NAME
-  F[ILE_NAME]=file-name
-   FILE_NAME=file-name specifies the name of the journal file.
+   By default, regions have -NULL_SUBSCRIPTS=NEVER.
 
-   Journal file-name are limited to 255 characters.
+   -[NO]STDNULLCOLL[=TRUE|FALSE]
 
-   By default,  GDE  derives  the  file-name  from  the  database  file
-   name.
+   Determines whether GT.M null subscripts collate in conformance to the M
+   standard.
 
-   By default, GDE uses a journal file type of .MJL.
+   If -STDNULLCOLL is set to TRUE or -STDNULLCOLL is specified, subscripts of
+   globals in the database follow the M standard where the null subscript
+   collates before all other subscripts.
 
-4 ALLOCATION
-  A[LLOCATION]=blocks
-   ALLOCATION=blocks  specifies  the  initial  size  of   the   journal
-   file  in    blocks.  Because  frequent   journal   file   extensions
-   degrade  run-time  performance,   make   journal   file   allocation
-   ample for a production database file.
+   If -STDNULLCOLL is set to FALSE or -NOSTDNULLCOLL is specified, null
+   subscripts collate between numeric and string subscripts.
 
-   When  you  change  the  ALLOCATION   and   do   not   also   specify
-   EXTENSION,  the  EXTENSION  automatically  changes  to   equal   the
-   ALLOCATION.
+   -[NO]INST[_FREEZE_ON_ERROR]
 
-   The minimum allocation is 10 blocks.
+   Controls whether custom errors in a region should automatically cause an
+   Instance Freeze. This qualifier modifies the value of "Inst Freeze on
+   Error" file header element.
 
-   The maximum allocation is 16777216 blocks.
+   -[NO]Q[DBRUNDOWN]
 
-   By default, GDE uses an allocation of 100 blocks.
+   Quickens normal process shutdown where a large number of processes
+   accessing a database file are required to shutdown almost simultaneously,
+   for example, in benchmarking scenarios. When a terminating GT.M process
+   observes that a large number of processes are attached to a database file
+   and QDBRUNDOWN is enabled, it bypasses checking whether it is the last
+   process accessing the database. Such a check occurs in a critical section
+   and bypassing it also bypasses the usual RUNDOWN actions which accelerates
+   process shutdown removing a possible impediment to process startup. By
+   default, QDBRUNDOWN is disabled.
 
-4 EXTENSION
-  E[XTENSION]=blocks
-   EXTENSION=blocks  specifies  the  size  by  which  a  journal   file
-   extends  when  it  becomes  full.  EXTENSION=0  prevents   automatic
-   journal   file   extension.   Because    frequent    journal    file
-   extensions  degrade   run-time   performance,   make   the   journal
-   file extension ample for a production database file.
+   Note that with QDBRUNDOWN there is a possibility of race condition that
+   might leave the database fileheader and IPC resources in need of cleanup.
+   Although QDBRUNDOWN minimizes the probability of such a race condition, it
+   cannot eliminate it. When using QDBRUNDOWN, FIS recommends an explicit
+   MUPIP RUNDOWN of the database file after the last process exits, to ensure
+   the cleanup of database fileheader and IPC resources.
 
-   When  you  change  the  ALLOCATION   and   do   not   also   specify
-   EXTENSION,  the  EXTENSION  automatically  changes  to   equal   the
-   ALLOCATION.
+   -[NO]J[OURNAL][=journal-option-list]
 
-   The minimum EXTENSION is 0 blocks.
+   Specifies whether the database file allows journaling. If it does, this
+   qualifier establishes characteristics for the journal file.
 
-   The maximum EXTENSION is 65536 blocks.
+   -NOJOURNAL specifies that updates to the database file are not journaled.
+   -NOJOURNAL does not accept an argument assignment.
 
-   By default, GDE uses an EXTENSION of 100 blocks.
+   -JOURNAL specifies that journaling is allowed. -JOURNAL takes one or more
+   arguments in a journal-option-list. The journal-option-list contains
+   keywords separated with commas (,) enclosed in parentheses ( ). If the
+   list contains only one keyword, the parentheses are optional.
 
-4 BUFFER_SIZE
-  BU[FFER_SIZE]=pages
-   BUFFER_SIZE=pages  specifies  the   amount   of   memory   used   to
-   buffer  journal  file   output.   A   larger   BUFFER_SIZE   usually
-   smooths and improves run-time performance.
+   Although you do not have to establish the criteria for your journaling
+   process at this point, it is efficient to do so, even if you are not
+   entirely sure you will use journaling. The options available for -JOURNAL
+   set up the environment, so it is ready for you to enable with MUPIP SET
+   -JOURNAL. You can also change or add any of the established options at
+   that time.
 
-   A  larger  BUFFER_SIZE  requires  more   memory   resources,   which
-   may  be  scarce.  A  larger  BUFFER_SIZE  provides  more  room   for
-   journal  records  in  memory  on  their  way   to   the   disk   and
-   therefore increases  the  number  of  update  records  that  may  be
-   lost in a system failure.
+   The journal-option-list includes:
 
-   The  minimum  BUFFER_SIZE  is  enough  512-byte  pages  to  hold   2
-   GDS database blocks.
+     o [NO]BE[FORE_IMAGE]
+     o F[ILE_NAME]=file-specification-name
 
-   The maximum BUFFER_SIZE is 2000 pages.
+     o AUTOSWITCHLIMIT=blocks
 
-   By default, GDE uses a BUFFER_SIZE of 128 pages.
+     o A[LLOCATION]=blocks
+
+     o E[XTENSION]=blocks
+     o BU[FFER_SIZE]=pages
+
+   The following section describes some -JOURNAL options.
+
+   Specifies the limit on the size of a journal file. When the journal file
+   size reaches the limit, GT.M automatically performs an implicit online
+   switch to a new journal file.
+
+   -[NO]BE[FORE_IMAGE]
+
+   [NO]BEFORE_IMAGE controls whether the journal should capture before images
+   of information that an update is about to modify.
+
+   The BEFORE_IMAGE option is required if you plan to consider "roll-back"
+   (Backward) recovery of the associated database file or if you plan to use
+   certain database replication options.
+
+   -F[ILE_NAME]="file-name"
+
+   Specifies the name of the journal file.
+
+   The name should always be enclosed in quotation marks in this context.
+
+   Journal file-specifications-names are limited to 255 characters.
+
+   By default, GDE derives the file-specification-name from the database
+   "file-name".
+
+   By default, GDE uses a journal file extension of .mjl.
+
+   JOL Summary
+
+   With GDE, you can create the journal files and define the journal
+   parameters; however, you must use MUPIP SET to actually enable journaling.
+
+   Summary
+
+   The following table summarizes GDE region qualifiers. It provides their
+   abbreviations, defaults (as provided by FIS), and allowable minimum and
+   maximum values.
+
+ +-----------------------------------------------------------------------------+
+ |                            GDE REGION Qualifiers                            |
+ |-----------------------------------------------------------------------------|
+ |                 QUALIFIER                  | DEFAULT  | MINIMUM |  MAXIMUM  |
+ |--------------------------------------------+----------+---------+-----------|
+ |-C[OLLATION_SEQUENCE]=id-number (integer)   |0         |0        |255        |
+ |--------------------------------------------+----------+---------+-----------|
+ |-D[YNAMIC_SEGMENT] =segment-name (char)     |-         |1        |16         |
+ |--------------------------------------------+----------+---------+-----------|
+ |-K[EY_SIZE]=size in bytes (integer)         |64        |3        |1019       |
+ |--------------------------------------------+----------+---------+-----------|
+ |-R[ECORD_SIZE]=size in bytes (integer)      |256       |7        |1,048,576  |
+ |                                            |          |         |(1 MiB)    |
+ |--------------------------------------------+----------+---------+-----------|
+ |-N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]  |NEVER     |-        |-          |
+ |--------------------------------------------+----------+---------+-----------|
+ |-[NO]STDNULLCOLL                            |N         |-        |-          |
+ |--------------------------------------------+----------+---------+-----------|
+ |-[NO]INST[_FREEZE_ON_ERROR]                 |DISABLED  |-        |-          |
+ |--------------------------------------------+----------+---------+-----------|
+ |-[NO]Q[DBRUNDOWN]                           |DISABLED  |-        |-          |
+ |--------------------------------------------+----------+---------+-----------|
+ |-[NO]J[OURNAL] [=journal-option-list]       |-NOJ      |-        |-          |
+ +-----------------------------------------------------------------------------+
 
 2 Segment_Qualifiers
-  Segment Qualifiers
-   The following -SEGMENT qualifiers can be  used  with  the  ADD,  CHANGE,
-   or TEMPLATE commands.
+   Segment Qualifiers
 
-3 -FILE_NAME
-  -F[ILE_NAME]="filename"
-   Specifies the file name  for  a  SEGMENT.  The  filename  must  appear
-   in quotes to  distinguish  its  slashes  from  those  of  the  command
-   qualifiers. GT.M allows  the  use  of  environment  variables  in  the
-   filename.
+   The following -SEGMENT qualifiers can be used with the ADD, CHANGE, or
+   TEMPLATE commands.
 
-   The maximum filename length is 255 characters.
+   -AC[CESS_METHOD]=code
 
-   By default, GDE uses a file name of MUMPS.
+   Specifies the access method or the GT.M buffering strategy for storing and
+   retrieving data from the global database file.
 
-   By default, GDE uses a file extension of .DAT.
+     o code can have 2 values - Buffered Global (BG) or Memory Mapped (MM).
+       The default value is BG.
+     o With BG, the global buffer pool manages the buffers (the OS/file
+       system may also provide additional buffering). You get the choice of
+       using BEFORE_IMAGE or NOBEFORE_IMAGE journaling for your database.
 
-3 -ACCESS_METHOD
-  -AC[CESS_METHOD]=code
-   Specifies the access method GT.M  uses  to  store  and  retrieve  data
-   from  the  global  database  file.  The  two  methods   are   Buffered
-   Global (BG) and Mapped Memory (MM).
+          o BG supports both forward and backward recovery and rollback to
+            recover a database without a restore.
+          o BG is a likely choice when you need faster recovery times from
+            system failures.
 
-   GDE  maintains  a  separate  set  of  SEGMENT  qualifier  values   for
-   each  ACCESS_METHOD.  When  GDE   modifies   the   ACCESS_METHOD,   it
-   activates  the   appropriate   set   of   TEMPLATEs   and   sets   all
-   unspecified  qualifiers  to  the  template  defaults   for   the   new
-   ACCESS_METHOD.
+     o With MM, GT.M bypasses the global buffer pool and relies entirely on
+       the OS/file system to manage the data traffic between memory and disk.
+       GT.M has no control over the timing of disk updates, therefore there
+       is a greater reliance on the OS/file system for database performance.
 
-   By default, GDE uses an access method of BG.
+          o MM supports NOBEFORE_IMAGE journaling only. GT.M triggers an
+            error if you use MM with BEFORE_IMAGE Journaling. MM also
+            supports MUPIP FORWARD -RECOVER and MUPIP JOURNAL -ROLLBACK with
+            the -RESYNC or -FETCHRESYNC qualifiers to generate lost and
+            broken transaction files. For more information, see the
+            Journaling chapter.
+          o MM does not support backward recovery/rollback.
+          o MM is a possible choice when you need performance advantage in
+            situations where the above restrictions are acceptable.
 
+     o GDE maintains a separate set of segment qualifier values for each
+       ACCESS_METHOD.
+     o When GDE modifies the ACCESS_METHOD, it activates the appropriate set
+       of TEMPLATEs and sets all unspecified qualifiers to the default values
+       of the new ACCESS_METHOD.
 
-3 -BLOCK_SIZE
-  -BL[OCK_SIZE]=size
-   Specifies the  size,  in  bytes,  of  each  database  block  on  disk.
-   The block-size must be  a  multiple  of  512.  If  the  block-size  is
-   not a multiple of 512, GDE rounds  off  the  block-size  to  the  next
-   highest multiple of 512 and issues a warning message.
+   Example:
 
-   If the specified  block-size  is  less  than  the  minimum,  GDE  uses
-   the  minimum  block-size.  If  the  specified  block-size  is  greater
-   than the maximum, GDE issues an error message.
+   GDE> change -segment DEFAULT -access_method=MM
 
-   A  1024  byte  or  2048  byte  block-size   serves   well   for   most
-   applications.
+   This command sets MM as the access method or the GT.M buffering strategy
+   for storing and retrieving database for segment DEFAULT.
 
+   -AL[LOCATION]=blocks
 
-   The minimum block-size is 512 bytes.
+   Specifies the number of blocks GT.M allocates to a disk file when MUPIP
+   creates the file. For GDS files, the number of bytes allocated is the size
+   of the database file header plus the ALLOCATION size times the BLOCK_SIZE.
 
-   The maximum block-size is 65,024 bytes.
+     o The minimum ALLOCATION is 10 blocks.
+     o The maximum ALLOCATION is 1,040,187,392 blocks.
+     o By default, GDE uses an ALLOCATION of 100 blocks.
+     o The maximum size of a database file is 1,040,187,392(992Mi) blocks.
+     o Out of the requested allocation, GT.M always reserves 32 global
+       buffers for BG access method for read-only use to ensure that
+       non-dirty global buffers are always available.
+     o The default ALLOCATION was chosen for initial development and
+       experimentation with GT.M. Because file fragmentation impairs
+       performance, make the initial allocation for production files and
+       large projects large enough to hold the anticipated contents of the
+       file for a length of time consistent with your UNIX file
+       reorganization schedule.
 
-   By default, GDE uses  a  block-size  of  1024  bytes  for  BG  and  MM
-   files.
+   -BL[OCK_SIZE]=size
 
-3 -ALLOCATION
-  -AL[LOCATION]=size
-   Specifies  the  number  of  blocks  GT.M  allocates  to  a  disk  file
-   when MUPIP creates the file.  For  GDS  files,  the  number  of  bytes
-   allocated is ALLOCATION size times the BLOCK_SIZE.
+   Specifies the size, in bytes, of each database block in the file system.
+   The BLOCK_SIZE must be a multiple of 512. If the BLOCK_SIZE is not a
+   multiple of 512, GDE rounds off the BLOCK_SIZE to the next highest
+   multiple of 512 and issues a warning message.
 
-   The   default   allocation   was   chosen   for   small    development
-   projects. Use  larger  allocations  for  production  files  and  large
-   projects.  Because  file  fragmentation  impairs   performance,   make
-   the  initial  allocation  large  enough  to   hold   the   anticipated
-   contents of the file  for  a  length  of  time  consistent  with  your
-   UNIX file reorganization schedule.
+   If the specified BLOCK_SIZE is less than the minimum, GDE uses the minimum
+   BLOCK_SIZE. If the specified BLOCK_SIZE is greater than the maximum, GDE
+   issues an error message.
 
-   The minimum ALLOCATION is 10 blocks.
+   A BLOCK_SIZE that is equal to the page size used by your UNIX
+   implementation serves well for most applications, and is a good starting
+   point.
 
-   The maximum ALLOCATION is 16777216 blocks.
+   You should determine the block sizes for your application through
+   performance timing and benchmarking. In general, larger block sizes are
+   more efficient from the perspective of the input/output subsystem.
+   However, larger block sizes use more system resources (CPU and shared
+   memory) and may increase collision and retry rates for transaction
+   processing.
 
-   By default, GDE uses an ALLOCATION of 100 blocks.
+   **Note**
 
-3 -EXTENSION_COUNT
-  -E[XTENSION_COUNT]=size
-   Specifies the number of extra  GDS  blocks  of  disk  space  by  which
-   the file should extend.  The  extend  amount  is  interpreted  as  the
-   number  of  usable  GDS  blocks  to  create  with  the  extension.  To
-   calculate the number  of  host  operating  system  blocks  added  with
-   each extension, multiply the  number  of  GDS  blocks  added  by  (GDS
-   block size/host block  size);  to  this  amount,  add  one  local  bit
-   map block for each  512-byte  block  added  in  each  extension,  plus
-   one for any remaining bytes.
+   Global nodes that span blocks incur some overhead and optimum application
+   performance is likely to be obtained from a BLOCK_SIZE that accommodates
+   the majority of nodes within a single block. If you adjust the BLOCK_SIZE,
+   you should also adjust GLOBAL_BUFFER_COUNT.
 
-   The  default  extension  amount  was  chosen  for  small   development
-   projects.  Use  larger  extensions  for  larger  files.  Because  many
-   file  extensions  adversely  affect  performance,  set  up  extensions
-   appropriate to the file allocation.
+   GDE does not allow you to change the block size to an arbitrary number. It
+   always rounds the block size to the next higher multiple of 512, because
+   the database block size must always be a multiple of 512.
 
-   BG files may extend automatically  when  the  file  is  full.  A  zero
-   extension size prevents a BG file from automatically extending.
+   The minimum BLOCK_SIZE is 512 bytes.
 
-   BG  files  may  be,  and  MM  files  must  be,  extended  with   MUPIP
-   EXTEND. When a MUPIP  EXTEND  command  does  not  include  a  -BLOCKS=
-   qualifier,  EXTEND  uses  the   extension   size   in   the   database
-   header. The extension  amount  may  be  changed  with  the  MUPIP  SET
-   command. To  require  explicit  expansion  for  BG  files  with  MUPIP
-   EXTEND, set -EXTENSION_COUNT to zero.
+   The maximum BLOCK_SIZE is 65,024 bytes.
 
-   The minimum EXTENSION is 0 blocks.
+   **Note**
+
+   FIS recommends against using databases with block sizes larger than 16KB.
+   If a specific global variable has records that have large record sizes,
+   FIS recommends placing that global variable in a file by itself with large
+   block sizes and using more appropriate block sizes for other global
+   variables. 4KB and 8KB are popular database block sizes.
+
+   By default, GDE uses a BLOCK_SIZE of 1024 bytes.
+
+   -[NO]ENcryption
+
+   Specifies whether or not the database file for a segment is flagged for
+   encryption. Note that MUPIP CREATE acquires an encryption key for this
+   file and puts a cryptographic hash of the key in the database file header.
+
+   -EX[TENSION_COUNT]=blocks
+
+   Specifies the number of extra GDS blocks of disk space by which the file
+   should extend. The extend amount is interpreted as the number of usable
+   GDS blocks to create with the extension. To calculate the number of host
+   operating system blocks added with each extension, multiply the number of
+   GDS blocks added by (GDS BLOCK_SIZE/host BLOCK_SIZE); add one local bitmap
+   block for each 512 blocks added in each extension to the amount from step
+   1. If the extension is not a multiple of 512, remember to roundup when
+   figuring the number of bitmap blocks.
+
+   When a MUPIP EXTEND command does not include a -BLOCKS= qualifier, EXTEND
+   uses the extension size in the database header.
+
+   The extension amount may be changed with the MUPIP SET command.
+
+   The minimum EXTENSION is zero blocks.
 
    The maximum EXTENSION is 65,535 blocks.
 
    By default, GDE uses an EXTENSION of 100 blocks.
 
-3 -GLOBAL_BUFFER_COUNT
-  -G[LOBAL_BUFFER_COUNT]=size
-   Specifies  the  number  of  global  buffers   for   a   file.   Global
-   buffers serve as part of the database caching mechanisms.
+   Like allocation, the default extension amount was chosen for initial
+   development and experimentation with GT.M projects. Use larger extensions
+   for larger files. Because multiple file extensions adversely affect
+   performance, set up extensions appropriate to the file allocation.
 
-   Avoid  inadequate  settings  of  this   factor.   However,   if   your
-   system  is  memory  constrained  and  the  database  file  traffic  is
-   not  heavy  enough  to  hold   the   cache   in   memory,   increasing
-   GLOBAL_BUFFER_COUNT   may   induce   paging.   Therefore,    do    not
-   increase   this   factor   to   a   large   value   without    careful
-   observation.
+   -F[ILE_NAME]=file-name
 
-   The  proper  number  of  GLOBAL_BUFFERs  depends  on  the  application
-   and the amount  of  primary  memory  available  on  the  system.  Most
-   production  databases  exhibit  a  direct  relationship  between   the
-   number   of   GLOBAL_BUFFERs    and    performance.    However,    the
-   relationship is  not  linear,  but  rather  more  parabolic,  so  that
-   increases past  some  point  have  progressively  less  benefit.  This
-   point  of  diminishing  returns  depends  on  the   application.   For
-   most  applications,  Greystone   expects   the   optimum   number   of
-   GLOBAL_BUFFERs to be between 512 and 2048.
+   Specifies the file for a segment.
 
-   Generally, you  should  increase  the  number  of  GLOBAL_BUFFERs  for
-   production GDS  databases.  This  is  because  GT.M  uses  the  shared
-   memory database cache associated with  each  GDS  file  for  the  vast
-   majority of caching.
+   The maximum file name length is 255 characters.
 
-   The minimum for BG is 64 blocks.
+   By default, GDE uses a file-name of mumps followed by the default
+   extension, which is .dat.
 
-   The maximum for BG is 4096 blocks.
+   -G[LOBAL_BUFFER_COUNT]=size
 
-   By default, GDE uses a GLOBAL_BUFFER_COUNT of 1024 blocks.
+   Specifies the number of global buffers for a file. Global buffers reside
+   in shared memory and are part of the database caching mechanisms. Global
+   buffers do not apply to MM databases.
 
-3 -DEFER
-  -[NO]D[EFER]
-   Instructs  GT.M  whether  or  not  to  store  updates  on   the   disk
-   immediately.
+   Choose the settings for this qualifier carefully. Small numbers of global
+   buffers tend to throttle database performance. However, if your system has
+   limited memory and the database file traffic is not heavy enough to hold
+   the cache in memory, increasing GLOBAL_BUFFER_COUNT may trigger paging.
 
-   DEFER has  a  significant  performance  benefit  for  heavily  updated
-   database  files.  However,  DEFER  should  only  be  used  for  files,
-   such  as  those  containing  temporary  storage  for  reports,   which
-   can be recreated if the system crashes.
+   If database global buffers are paged out, it may result in poor
+   performance. Therefore, do not increase this factor to a large value
+   without careful observation.
 
-   By default, GDE makes MM database files -DEFER.
+   The proper number of GLOBAL_BUFFERs depends on the application and the
+   amount of primary memory available on the system. Most production
+   databases exhibit a direct relationship between the number of
+   GLOBAL_BUFFERs and performance. However, the relationship is not linear,
+   but asymptotic, so that increases past some point have progressively less
+   benefit. This point of diminishing returns depends on the application. For
+   most applications, FIS expects the optimum number of GLOBAL_BUFFERs to be
+   between 1K and 64K.
 
-3 -LOCK_SPACE
-  -LOC[K_SPACE]=size
-   Specifies  the  number  of  pages  of  space  to  use  for  the   lock
-   database stored with this segment.  If  GT.M  runs  out  of  space  to
-   store  locks,  the  system  becomes  slightly  less   efficient.   The
-   default amount is generous for most MUMPS applications.
+   Because transaction processing can be involved in an update and a
+   transaction is limited to half the GLOBAL_BUFFER_COUNT, the value for
+   GLOBAL_BUFFER_COUNT should therefore be at least twenty-six plus twice the
+   number of the blocks required by the largest global variable node in your
+   application.
+
+   Generally, you should increase the number of GLOBAL_BUFFERs for production
+   GDS databases. This is because GT.M uses the shared memory database cache
+   associated with each GDS file for the majority of caching.
+
+   The minimum GLOBAL_BUFFER_COUNT for BG is 64 blocks.
+
+   The maximum for GLOBAL_BUFFER_COUNT for BG is 2147483647 blocks, but may
+   vary depending on your platform.
+
+   By default, GDE uses a GLOBAL_BUFFER_COUNT that is appropriate for the
+   typical size of the platform.
+
+   **Note**
+
+   If global buffers are "paged out," improvements in system performance
+   resulting from more global buffers will be more than offset by the
+   dramatic slowdown that results from globals buffers that are "paged out."
+
+   -L[OCK_SPACE]=integer
+
+   Specifies the number of pages of space to use for the lock database stored
+   with this segment. The size of a page is always 512 bytes.
+
+   As GT.M runs out of space to store LOCK control information, LOCKs become
+   progressively less efficient. If a single process consumes all the LOCK
+   space, it cannot continue, and any other processes cannot proceed using
+   LOCKs.
 
    The minimum LOCK_SPACE is 10 pages.
 
-   The maximum LOCK_SPACE is 1000 pages.
+   The maximum LOCK_SPACE is 65,536 pages.
 
-   By default, GDE uses a LOCK_SPACE of 20 pages.
+   By default, GDE uses a LOCK_SPACE of 40 pages.
 
-1 Guidelines
-  Mapping Guidelines
-   Global  Directory  maps  consist  of  a  hierarchy  of   NAMEs,   REGIONs,
-   SEGMENTs  and  FILEs.  The  following  section  provides  guidelines   for
-   defining and using these mapping components.
+   LOCK_SPACE usage depends on the number of locks and the number of
+   processes waiting for locks. To estimate lock space needs, here is a rule
+   of thumb:
 
-2 Names
-  NAME Guidelines
-   GT.M uses a NAME to  place  global  variables  in  a  physical  database
-   file.
-   A NAME:
+     o 1.5KB overhead for the lock space, plus
+     o 640 bytes for each lock base name, plus
+     o 128 bytes for each subscript, plus
+     o 128 bytes for each waiting process.
 
-   o   Maps to only one REGION in the Global Directory
+   Generally, you would limit LOCK_SPACE when memory is scarce or you want to
+   be made aware of unexpected levels of LOCK usage. For most other cases,
+   there is no reason to limit the LOCK_SPACE. If you are introducing new
+   code, FIS recommends using TSTART and TCOMMIT as a more efficient
+   alternate for most LOCKs because it pushes the responsibility for
+   Isolation onto GT.M, which internally manages them with optimistic
+   algorithms.
 
-   o   Can be a discrete "global" name, e.g., aaa is a discrete global
+   -R[ESERVED_BYTES]=size
 
-   o   Can be a partial name ending with a wild card ("*")
+   Specifies the size to be reserved in each database block. RESERVED_BYTES
+   is generally used to reserve room for compatibility with other
+   implementations of M or to observe communications protocol restrictions.
+   RESERVED_BYTES may also be used as a user-managed fill factor.
 
-   o   Must begin with an alphabetic character or a % sign
+   The minimum RESERVED_BYTES is zero bytes.
 
-   o   Can be 1 to 8 alphanumeric characters
+   The maximum Reserved_Bytes is the block size minus the size of the block
+   header (which is 7 or 8 depending on your platform) minus the maximum
+   record size.
 
-   o   Is case sensitive
+   By default, GDE uses a RESERVED_BYTES size of zero bytes.
 
-   A wild card defines all  names  starting  with  the  characters  of  the
-   partial name. For  example,  abc*,  defines  the  range  of  all  global
-   names beginning with the three characters "abc."
+   Summary
 
-2 Regions
-  REGION Guidelines
-   GT.M uses a REGION  to  logically  define  a  portion  of  the  database
-   with  the  same  characteristics,  such  as  key  and   record-size.   A
-   REGION maps to a SEGMENT. More than one NAME may  map  to  a  REGION.  A
-   Global Directory must have at least one REGION.
+   The following table summarizes GDE segment qualifiers. It provides
+   abbreviations, defaults (as provided by FIS), and allowable minimum and
+   maximum values.
 
-   A region-name:
+   +------------------------------------------------------------------------+
+   |                         GDE SEGMENT Qualifiers                         |
+   |------------------------------------------------------------------------|
+   |           QUALIFIER           |  DEFAULT  | MIN |         MAX          |
+   |------------------------------------------------------------------------|
+   |            ** BLOCK_SIZE minus the size of the block header            |
+   |------------------------------------------------------------------------|
+   |                         * May vary by platform                         |
+   |------------------------------------------------------------------------|
+   | -AC[CESS_METHOD]=BG|MM        | BG        | -   | -                    |
+   |-------------------------------+-----------+-----+----------------------|
+   | -AL[LOCATION]=size (blocks)   | 100       | 10  | 1,040,187,392(992Mi) |
+   |-------------------------------+-----------+-----+----------------------|
+   | -BL[OCK_SIZE]=size (bytes)    | 1024      | 512 | 65024                |
+   |-------------------------------+-----------+-----+----------------------|
+   | -[NO]EN[CRYPTION]             | 0         |     |                      |
+   |-------------------------------+-----------+-----+----------------------|
+   | -EX[TENSION_COUNT]=size       | 100       | 0   | 65,535               |
+   | (blocks)                      |           |     |                      |
+   |-------------------------------+-----------+-----+----------------------|
+   | -F[ILE_NAME]=file-name        | mumps.dat | -   | 255                  |
+   | (chars)                       |           |     |                      |
+   |-------------------------------+-----------+-----+----------------------|
+   | -G[LOBAL_BUFFER_COUNT]=size   | 1024*     | 64  | 2147483647           |
+   | (blocks)                      |           |     |                      |
+   |-------------------------------+-----------+-----+----------------------|
+   | -L[OCK_SPACE]=size (pages)    | 40        | 10  | 65536                |
+   |-------------------------------+-----------+-----+----------------------|
+   | -R[ESERVED_BYTES]=size        | 0         | 0   | block size-7         |
+   | (bytes)                       |           |     |                      |
+   +------------------------------------------------------------------------+
 
-   o   Must begin with an alphabetic character, except for DEFAULT
+1 Summary
+   Summary
 
-   o   Can include alphanumerics, a dollar sign and an underscore
+   The following table summarizes GDE commands, abbreviations, object types,
+   required object names, and optional qualifiers.
 
-   o   Can be 1 to 15 characters
+   +------------------------------------------------------------------------+
+   |                          GDE Command Summary                           |
+   |------------------------------------------------------------------------|
+   |  Command   | Specified Object |    Required Object Name/[Optional]     |
+   |            |       Type       |               Qualifier                |
+   |------------------------------------------------------------------------|
+   |        * -ALL is the default for the SHOW and VERIFY commands.         |
+   |------------------------------------------------------------------------|
+   | @          | N/A              | file-name                              |
+   |------------+------------------+----------------------------------------|
+   |            |                  | name-space                             |
+   | A[DD]      | -N[AME]          |                                        |
+   |            |                  | -R[EGION]=region-name                  |
+   |------------+------------------+----------------------------------------|
+   |            |                  | region-name                            |
+   | -          | -R[EGION]        |                                        |
+   |            |                  | -D[YNAMIC]=segment-name                |
+   |            |                  | [-REGION-qualifier...]                 |
+   |------------+------------------+----------------------------------------|
+   |            |                  | segment-name                           |
+   | -          | -S[EGMENT]       |                                        |
+   |            |                  | -F[ILE_NAME]=file-name                 |
+   |            |                  | [-SEGMENT-qualifier...]                |
+   |------------+------------------+----------------------------------------|
+   |            |                  | name-space                             |
+   | C[HANGE]   | -N[AME]          |                                        |
+   |            |                  | -R[EGION]=new-region                   |
+   |------------+------------------+----------------------------------------|
+   |            |                  | region-name                            |
+   | -          | -R[EGION]        |                                        |
+   |            |                  | [-REGION-qualifier...]                 |
+   |------------+------------------+----------------------------------------|
+   |            |                  | segment-name                           |
+   | -          | -S[EGMENT]       |                                        |
+   |            |                  | [-SEGMENT-qualifier]                   |
+   |------------+------------------+----------------------------------------|
+   | D[ELETE]   | -N[AME]          | name-space                             |
+   |------------+------------------+----------------------------------------|
+   | -          | -R[EGION]        | region-name                            |
+   |------------+------------------+----------------------------------------|
+   | -          | -S[EGMENT]       | segment-name                           |
+   |------------+------------------+----------------------------------------|
+   | E[XIT]     | N/A              | N/A                                    |
+   |------------+------------------+----------------------------------------|
+   | HE[LP]     | N/A              | Keyword                                |
+   |------------+------------------+----------------------------------------|
+   | LOC[KS]    | N/A              | -R[EGION]=region-name                  |
+   |------------+------------------+----------------------------------------|
+   |            |                  | [-ON][=file-name]                      |
+   | LOG        | N/A              |                                        |
+   |            |                  | [-OF[F]]                               |
+   |------------+------------------+----------------------------------------|
+   | Q[UIT]     | N/A              | N/A                                    |
+   |------------+------------------+----------------------------------------|
+   | R[ENAME]   | -N[AME]          | old-name new-name                      |
+   |------------+------------------+----------------------------------------|
+   | -          | -R[EGION]        | old-reg-name new-reg-name              |
+   |------------+------------------+----------------------------------------|
+   | -          | -S[EGMENT]       | old-seg-name new-seg-name              |
+   |------------+------------------+----------------------------------------|
+   | SE[TGD]    | N/A              | -F[ILE]=file-name [-Q[UIT]]            |
+   |------------+------------------+----------------------------------------|
+   | SH[OW]     | -N[AME]          | [name-space]                           |
+   |------------+------------------+----------------------------------------|
+   | -          | -R[EGION]        | [region-name]                          |
+   |------------+------------------+----------------------------------------|
+   | -          | -S[EGMENT]       | [segment-name]                         |
+   |------------+------------------+----------------------------------------|
+   | -          | -M[AP]           | [R[EGION]=region-name]                 |
+   |------------+------------------+----------------------------------------|
+   | -          | T[EMPLATE]       | N/A                                    |
+   |------------+------------------+----------------------------------------|
+   | -          | -A[LL]*          | N/A                                    |
+   |------------+------------------+----------------------------------------|
+   | T[EMPLATE] | -R[EGION]        | [-REGION-qualifier...]                 |
+   |------------+------------------+----------------------------------------|
+   | -          | -S[EGMENT]       | [ -SEGMENT-qualifier...]               |
+   |------------+------------------+----------------------------------------|
+   | V[ERIFY]   | -N[AME]          | [name-space]                           |
+   |------------+------------------+----------------------------------------|
+   | -          | -R[EGION]        | [region-name]                          |
+   |------------+------------------+----------------------------------------|
+   | -          | -S[EGMENT]       | [segment-name]                         |
+   |------------+------------------+----------------------------------------|
+   | -          | -M[AP]           | N/A                                    |
+   |------------+------------------+----------------------------------------|
+   | -          | -T[EMPLATE]      | N/A                                    |
+   |------------+------------------+----------------------------------------|
+   | -          | -A[LL]*          | N/A                                    |
+   +------------------------------------------------------------------------+
 
-   GDE automatically converts region-names to upper-case.
+2 Qualifier_Summary
+   Qualifier Summary
 
-   By default, GDE uses DEFAULT for the default region-name.
+   The following table summarizes all qualifiers for the ADD, CHANGE, and
+   TEMPLATE commands. The defaults are those supplied by FIS.
 
-2 Segments
-  SEGMENT Guidelines
-   GT.M uses a SEGMENT to define a physical  file  and  access  method  for
-   the database stored in that file.  A  SEGMENT  maps  to  only  one  UNIX
-   file. A SEGMENT can be mapped by only one REGION.
-
-   A segment-name:
-
-   o   Must begin with an alphabetic character
-
-   o   Can include alphanumerics, a dollar sign and an underscore
-
-   o   Can be 1 to 15 characters
-
-   GDE automatically converts segment-names to upper-case.
-
-   By default, GDE uses  the  file  name  MUMPS  for  the  DEFAULT  default
-   segment. By default, GDE uses  the  file  extension  .DAT  for  database
-   files.
-
+   +------------------------------------------------------------------------------------------------+
+   |                                     GDE Command Qualifiers                                     |
+   |------------------------------------------------------------------------------------------------|
+   |                 QUALIFIER                  |  DEF  | MIN |        MAX        | NAM | REG | SEG |
+   |------------------------------------------------------------------------------------------------|
+   |                       * DEFAULT is the default region- and segment-name                        |
+   |                               ** MUMPS is the default file-name                                |
+   |                                    *** May vary by platform                                    |
+   |                                    **** -NONULL_SUBSCRIPTS                                     |
+   |------------------------------------------------------------------------------------------------|
+   |-AC[CESS_METHOD]=code                       |BG     |-    |-                  |-    |-    |X    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-AL[LOCATION]=size(blocks)                  |100    |10   |1040187392(992Mi)  |-    |-    |X    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-BL[OCK_SIZE]=size(bytes)                   |1024   |512  |65024              |-    |-    |X    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-C[OLLATION_SEQUENCE]=id-number (integer)   |0      |0    |255                |-    |X    |-    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-D[YNAMIC_SEGMENT]=segment-name (chars)     |*      |1A   |16A/N              |-    |X    |-    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-EX[TENSION_COUNT]=size (blks)              |100    |0    |65535              |-    |-    |X    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-F[ILE_NAME]=file-name (chars)              |**     |1A   |255A/N             |-    |-    |X    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-G[LOBAL_BUFFER_COUNT]=size (blocks)        |1024   |64   |2147483647 ***     |-    |-    |X    |
+   |                                            |***    |     |                   |     |     |     |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-K[EY_SIZE]=size (bytes)                    |64     |3    |1019               |-    |X    |-    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-L[OCK_SPACE]=size (pages)                  |40     |10   |65536              |-    |-    |X    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-[NO]INST[_FREEZE_ON_ERROR]                 |FALSE  |-    |-                  |-    |X    |-    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-[NO]Q[DBRUNDOWN]                           |FALSE  |-    |-                  |-    |X    |-    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-[NO]J[OURNAL]=option-list                  |-NOJ   |-    |-                  |-    |X    |-    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]  |NEVER  |-    |-                  |-    |X    |-    |
+   |                                            |or ****|     |                   |     |     |     |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-[NO]STDNULLCOLL[=TRUE|FALSE]               |FALSE  |-    |-                  |-    |X    |-    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-R[ECORD_SIZE]=size (bytes)                 |256    |7    |1048576            |-    |X    |-    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-R[EGION] region-name (chars)               |*      |1A   |16A/N              |X    |-    |-    |
+   |--------------------------------------------+-------+-----+-------------------+-----+-----+-----|
+   |-R[ESERVED_BYTES]=size (bytes)              |0      |0    |blocksize          |-    |-    |X    |
+   +------------------------------------------------------------------------------------------------+
 

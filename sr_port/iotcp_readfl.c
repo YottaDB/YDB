@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,11 @@ GBLREF	spdesc			stringpool;
 GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	int4			outofband;
 
+error_def(ERR_IOEOF);
+error_def(ERR_TEXT);
+error_def(ERR_GETSOCKOPTERR);
+error_def(ERR_SETSOCKOPTERR);
+
 int	iotcp_readfl(mval *v, int4 width, int4 timeout)
 /* 0 == width is a flag that the caller is read and the length is not actually fixed */
 /* timeout in seconds */
@@ -58,11 +63,6 @@ int	iotcp_readfl(mval *v, int4 width, int4 timeout)
 	fd_set		tcp_fd;
 	char		*errptr;
 	int4		errlen;
-
-	error_def(ERR_IOEOF);
-	error_def(ERR_TEXT);
-	error_def(ERR_GETSOCKOPTERR);
-	error_def(ERR_SETSOCKOPTERR);
 
 #ifdef DEBUG_TCP
 	PRINTF("%s >>>\n", __FILE__);
@@ -114,7 +114,8 @@ int	iotcp_readfl(mval *v, int4 width, int4 timeout)
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
-				rts_error(VARLSTCNT(7) ERR_GETSOCKOPTERR, 5, LEN_AND_LIT("F_GETFL FOR NON BLOCKING I/O"),
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_GETFL FOR NON BLOCKING I/O"),
 						save_errno, LEN_AND_STR(errptr));
 			}
 			FCNTL3(tcpptr->socket, F_SETFL, flags & (~(O_NDELAY | O_NONBLOCK)), fcntl_res);
@@ -122,7 +123,8 @@ int	iotcp_readfl(mval *v, int4 width, int4 timeout)
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
-				rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
 						save_errno, LEN_AND_STR(errptr));
 			}
 #endif
@@ -213,7 +215,8 @@ int	iotcp_readfl(mval *v, int4 width, int4 timeout)
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(errno);
-				rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
 					  	save_errno, LEN_AND_STR(errptr));
 			}
 			errno = real_errno;
@@ -252,29 +255,29 @@ int	iotcp_readfl(mval *v, int4 width, int4 timeout)
 		if (tcp_routines.aa_select(tcpptr->socket + 1, (void *)(tcpptr->urgent ? &tcp_fd : 0), (void *)0,
 								(void *)(tcpptr->urgent ? 0 : &tcp_fd), &zero) > 0)
 		{
-			memcpy(tcpptr->dollar_device, "1,", len);
+			memcpy(io_ptr->dollar.device, "1,", len);
 			if (tcpptr->urgent)
 			{
-				memcpy(&tcpptr->dollar_device[len], "No ",SIZEOF("No "));
+				memcpy(&io_ptr->dollar.device[len], "No ",SIZEOF("No "));
 				len += SIZEOF("No ") - 1;
 			}
-			memcpy(&tcpptr->dollar_device[len], "Urgent Data", SIZEOF("Urgent Data"));
+			memcpy(&io_ptr->dollar.device[len], "Urgent Data", SIZEOF("Urgent Data"));
 		} else
 */
-			memcpy(tcpptr->dollar_device, "0", SIZEOF("0"));
+			memcpy(io_ptr->dollar.device, "0", SIZEOF("0"));
 	} else
 	{	/* there's a significant problem */
 		if (0 == i)
 			io_ptr->dollar.x = 0;
 		io_ptr->dollar.za = 9;
-		memcpy(tcpptr->dollar_device, "1,", len);
+		memcpy(io_ptr->dollar.device, "1,", len);
 		errptr = (char *)STRERROR(errno);
 		errlen = STRLEN(errptr);
-		memcpy(&tcpptr->dollar_device[len], errptr, errlen);
+		memcpy(&io_ptr->dollar.device[len], errptr, errlen);
 		if (io_ptr->dollar.zeof || -1 == status || 0 < io_ptr->error_handler.len)
 		{
 			io_ptr->dollar.zeof = TRUE;
-			rts_error(VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
 		} else
 			io_ptr->dollar.zeof = TRUE;
 	}

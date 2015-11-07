@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,6 +81,7 @@ void repl_inst_create(void)
 	gtmsrc_lcl_ptr_t	gtmsrc_lcl_array;
 	mstr			log_nam, trans_name;
 	uint4			status2;
+	jnl_tm_t		now;
 
 	if (!repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error))
 		GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
@@ -132,8 +133,9 @@ void repl_inst_create(void)
 			rts_error(VARLSTCNT(4) ERR_REPLINSTSTNDALN, 2, inst_fn_len, inst_fn);
 			assert(FALSE);
 		}
+		JNL_SHORT_TIME(now);
 		if (SS_NORMAL != (status = prepare_unique_name((char *)inst_fn, inst_fn_len, "", "",
-				rename_fn, &rename_fn_len, &status2)))
+				rename_fn, &rename_fn_len, now, &status2)))
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Error preparing unique name for renaming instance file"));
 			if (SS_NORMAL != status2)

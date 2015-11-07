@@ -35,7 +35,6 @@
 #ifdef UNIX
 #include "repl_msg.h"		/* needed for gtmsource.h */
 #include "gtmsource.h"		/* needed for SYNC_ONLN_RLBK_CYCLES */
-#include "tp_grab_crit.h"
 #endif
 
 #define	REPOSITION_PTR(ptr, type, delta, begin, end)			\
@@ -448,8 +447,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 #	ifdef UNIX
 	if (MISMATCH_ROOT_CYCLES(csa, csa->nl))
 	{	/* We want to sync the online rollback cycles ONLY under crit. So, grab_crit and sync the
-		 * cycles. While tp_grab_crit would have been a better choice, the reason we don't use
-		 * tp_grab_crit here is because if we don't sync cycles because we don't hold crit but
+		 * cycles. While grab_crit_immediate would have been a better choice, the reason we don't use
+		 * grab_crit_immediate here is because if we don't sync cycles because we don't hold crit but
 		 * do invoke t_retry which increments $zonlnrlbk and on the subsequent retry we remain
 		 * unlucky in getting crit, we will end up incrementing $zonlnrlbk more than once for a
 		 * single online rollback event. In the worst case we will have $zonlnrlbk=3 which from

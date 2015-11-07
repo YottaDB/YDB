@@ -95,15 +95,17 @@ LITDEF mval default_mupip_trigger_etrap = DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , (S
 static readonly nametabent editing_params[] =
 {
 	{7, "EDITING"},
+	{7, "EMPTERM"},
 	{6, "INSERT"},
 	{9, "NOEDITING"},
+	{9, "NOEMPTERM"},
 	{8, "NOINSERT"}
 };
 static readonly unsigned char editing_index[27] =
 {
-	0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2,
-	2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-	4, 4, 4
+	0, 0, 0, 0, 0, 2, 2, 2, 2, 3, 3, 3,
+	3, 3, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+	6, 6, 6
 };
 static readonly unsigned char init_break[1] = {'B'};
 
@@ -197,13 +199,19 @@ void	gtm_env_init_sp(void)
 				case 0:	/* EDITING */
 					gtm_principal_editing_defaults |= TT_EDITING;
 					break;
-				case 1:	/* INSERT */
+				case 1:	/* EMPTERM */
+					gtm_principal_editing_defaults |= TT_EMPTERM;
+					break;
+				case 2:	/* INSERT */
 					gtm_principal_editing_defaults &= ~TT_NOINSERT;
 					break;
-				case 2:	/* NOEDITING */
+				case 3:	/* NOEDITING */
 					gtm_principal_editing_defaults &= ~TT_EDITING;
 					break;
-				case 3:	/* NOINSERT */
+				case 4:	/* NOEMPTERM */
+					gtm_principal_editing_defaults &= ~TT_EMPTERM;
+					break;
+				case 5:	/* NOINSERT */
 					gtm_principal_editing_defaults |= TT_NOINSERT;
 					break;
 				}

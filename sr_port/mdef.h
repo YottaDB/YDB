@@ -132,6 +132,16 @@ error_def(ERR_ASSERT);
 #	define	FD_INVALID_NONPOSIX	 0	/* fd of 0 is invalid in VMS if using RMS sys$open calls (non-posix interface) */
 #endif
 
+#if defined(UNIX)
+#	define	USE_POLL
+#	define	POLL_ONLY(X)	X
+#	define	SELECT_ONLY(X)
+#else
+#	define	USE_SELECT
+#	define	POLL_ONLY(X)
+#	define	SELECT_ONLY(X)	X
+#endif
+
 /* INTPTR_T is an integer that has the same length as a pointer on each platform.  Its basic use is for arithmetic
  * or generic parameters.  For all platforms except Tru64/VMS (alpha platforms), the [U]INTPTR_T types will be
  * equivalenced to [u]intptr_t.  But since this type is used for alignment and other checking, and since Tru64/VMS
@@ -378,7 +388,12 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define MAX_NUM_SIZE			64
 #define MAX_FORM_NUM_SUBLEN		128	/* this is enough to hold the largest numeric subscript */
 #define PERIODIC_FLUSH_CHECK_INTERVAL	(30 * 1000)
-#define MAX_ARGS			256 /* in formallist */
+
+#ifndef __sparc
+# define MAX_ARGS			256 /* in formallist */
+#else	/* Sparc super frame has room for 256 args, but functions or concatenate are limited to somewhat fewer */
+# define MAX_ARGS			242
+#endif
 
 #ifdef UNIX
 # define MAX_KEY_SZ	1023		/* maximum database key size */

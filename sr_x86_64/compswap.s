@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2013 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -34,4 +34,5 @@ ENTRY compswap
 
 fail:
 	xor	REG32_RET0,REG32_RET0		# return FALSE
+	pause
 	ret

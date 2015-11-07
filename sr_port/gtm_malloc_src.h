@@ -71,6 +71,7 @@
 #include "cache.h"
 #include "gtm_malloc.h"
 #include "have_crit.h"
+#include "gtm_env_init.h"
 #ifdef UNIX
 #  include "gtmio.h"
 #  include "deferred_signal_handler.h"
@@ -493,7 +494,19 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	char		*ascNum;
 	storElem	*uStor;
 	int		i, sizeIndex, testSize, blockSize, save_errno;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	/* If this routine is entered and environment vars have not yet been processed with a call to gtm_env_init(),
+	 * then do this now. Since this will likely trigger a call to this routine *again*, verify if we still need
+	 * to do this and if not, just return.
+	 */
+	if (!TREF(gtm_env_init_started))
+	{
+		gtm_env_init();
+		if (gtmSmInitialized)
+			return;		/* A nested call took care of this already so we're done! */
+	}
 	/* WARNING!! Since this is early initialization, the following asserts are not well behaved if they do
 	 * indeed trip. The best that can be hoped for is they give a condition handler exhausted error on
 	 * GTM startup. Unfortunately, more intelligent responses are somewhat elusive since no output devices
@@ -536,7 +549,6 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 		}
 	);
 	dqinit(&storExtHdrQ, links);
-
 	/* One last task before we consider ourselves initialized. Allocate the out-of-memory mitigation storage
 	 * that we will hold onto but not use. If we get an out-of-memory error, this storage will be released back
 	 * to the OS for it or GTM to use as necessary while we try to go about an orderly shutdown of our process.
@@ -721,9 +733,8 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 		if (gtmSmInitialized)
 		{
 			hdrSize = OFFSETOF(storElem, userStorage);		/* Size of storElem header */
-			NON_GTM64_ONLY(if ((size + hdrSize) < size) GTMASSERT); /* Check for wrap in 32 bit platforms */
+			NON_GTM64_ONLY(assertpro((size + hdrSize) >= size));	/* Check for wrap in 32 bit platforms */
 			assert((hdrSize + SIZEOF(markerChar)) < MINTWO);
-
 			NON_GMR_ONLY(fast_lock_count++);
 			++gtmMallocDepth;				/* Nesting depth of memory calls */
 			reentered = (1 < gtmMallocDepth);
@@ -896,8 +907,7 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 	if (GDL_None == gtmDebugLevel)
 	{
 #	endif
-		if (!gtmSmInitialized)	/* Storage must be init'd before can free anything */
-			GTMASSERT;
+		assertpro(gtmSmInitialized);	/* Storage must be init'd before can free anything */
 		/* If we are exiting, don't bother with frees. Process destruction can do it *UNLESS* we are handling an
 		 * out of memory condition with the proviso that we can't return memory if we are already nested.
 		 */
@@ -915,8 +925,7 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 			if ((unsigned char *)addr != &NullStruct.nullStr[0])
 			{
 				dqIndex = gtmMallocDepth - 2;		/* 0 origin index into defer queues */
-				if (MAXDEFERQUEUES <= dqIndex)		/* Can't run out of queues */
-					GTMASSERT;
+				assertpro(MAXDEFERQUEUES > dqIndex);	/* Can't run out of queues */
 				hdrSize = offsetof(storElem, userStorage);
 				uStor = (storElem *)((unsigned long)addr - hdrSize);		/* Backup ptr to element header */
 				uStor->userStorage.deferFreeNext = deferFreeQueues[dqIndex];

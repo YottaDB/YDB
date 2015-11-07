@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,11 +32,12 @@
 #include <errno.h>
 #include "gtm_time.h"
 #include "gtm_socket.h"
+#include "gtm_netdb.h"
+#include "gtm_ipv6.h"
 #include "gtm_inet.h"
 #include "gtm_string.h"
 #include "gtm_ctype.h"
 #include "gtm_stdio.h"
-#include "gtm_netdb.h"
 
 #include "copy.h"
 #include "gt_timer.h"
@@ -62,85 +63,83 @@ const char *hstrerror(int err);
 
 GBLREF tcp_library_struct       tcp_routines;
 
+error_def(ERR_GETADDRINFO);
+error_def(ERR_GETNAMEINFO);
 error_def(ERR_INVADDRSPEC);
 error_def(ERR_IPADDRREQ);
 error_def(ERR_SETSOCKOPTERR);
-error_def(ERR_SOCKINIT);
-error_def(ERR_SYSCALL);
 error_def(ERR_SOCKACPT);
+error_def(ERR_SOCKINIT);
 error_def(ERR_SOCKLISTEN);
+error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 
 int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /* host needs to be NULL terminated */
 {
 	boolean_t		no_time_left = FALSE, error_given = FALSE;
 	char			temp_addr[SA_MAXLEN + 1], addr[SA_MAXLEN + 1];
-	char 			*from, *to, *errptr, *temp_ch, *adptr;
+	char 			*from, *to, *errptr, *temp_ch;
+	char			ipname[SA_MAXLEN];
 	int			match, sock, sendbufsize, ii, on = 1, temp_1 = -2;
 	GTM_SOCKLEN_TYPE	size;
 	int4                    rv, msec_timeout;
-	struct	sockaddr_in	sin;
-	in_addr_t		temp_sin_addr;
+	struct addrinfo		*ai_ptr = NULL, *remote_ai_ptr = NULL, *remote_ai_head, hints;
+	char			port_buffer[NI_MAXSERV], *brack_pos;
+
+	int			host_len, addr_len, port_len;
 	char                    msg_buffer[1024];
 	mstr                    msg_string;
 	ABS_TIME                cur_time, end_time;
 	fd_set                  tcp_fd;
-	struct sockaddr_in      peer;
+	struct sockaddr_storage peer;
 	short 			retry_num;
 	int 			save_errno, errlen;
 	const char		*terrptr;
+	int			errcode;
+	boolean_t		af;
 
-	temp_sin_addr = 0;
 	msg_string.len = SIZEOF(msg_buffer);
 	msg_string.addr = msg_buffer;
-	memset((char *)&sin, 0, SIZEOF(struct sockaddr_in));
 	/* ============================= initialize structures ============================== */
 	if (NULL != host)
 	{
-		temp_ch = host;
-		while(ISDIGIT_ASCII(*temp_ch) || ('.' == *temp_ch))
-			temp_ch++;
-		if ('\0' != *temp_ch)
+		host_len = strlen(host);
+		if ('[' == host[0])
 		{
-			adptr = iotcp_name2ip(host);
-			if (NULL == adptr)
+			brack_pos = memchr(host, ']', SA_MAXLEN);
+			if (NULL == brack_pos || (&host[1] == brack_pos))
 			{
-#				if !defined(__hpux) && !defined(__MVS__)
-				terrptr = HSTRERROR(h_errno);
-				rts_error(VARLSTCNT(6) ERR_INVADDRSPEC, 0, ERR_TEXT, 2, LEN_AND_STR(terrptr));
-#				else
-				/* Grumble grumble HPUX and z/OS don't have hstrerror() */
-				rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);
-#				endif
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVADDRSPEC);
 				return -1;
 			}
-			SPRINTF(addr, "%s", adptr);
+			addr_len = brack_pos - &(host[1]);
+			memcpy(addr, &host[1], addr_len);
+			if ('\0' != *(brack_pos + 1))
+			{	/* not allowed to have special symbols other than [ and ] */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVADDRSPEC);
+				return -1;
+			}
 		} else
-			SPRINTF(addr, "%s", host);
-
-		if ((unsigned int)-1 == (temp_sin_addr = tcp_routines.aa_inet_addr(addr)))
-		{
-			gtm_putmsg(VARLSTCNT(1) ERR_INVADDRSPEC);
-			assert(FALSE);
-			return  -1;
+		{	/* IPv4 address only */
+			addr_len = strlen(host);
+			if (0 == addr_len)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVADDRSPEC);
+				return -1;
+			}
+			memcpy(addr, &host[0], addr_len);
 		}
-	}
-	if (passive)
-		/* We can only listen on our own system */
-		sin.sin_addr.s_addr = INADDR_ANY;
-	else
-	{
-		if (0 == temp_sin_addr)
-		{ 	/* If no address was specified */
-			gtm_putmsg(VARLSTCNT(1) ERR_IPADDRREQ);
-			assert(FALSE);
+		addr[addr_len] = '\0';
+		CLIENT_HINTS(hints);
+		port_len = 0;
+		I2A(port_buffer, port_len, port);
+		port_buffer[port_len]='\0';
+		if (0  != (errcode = getaddrinfo(addr, port_buffer, &hints, &remote_ai_head)))
+		{
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
 			return -1;
 		}
-		/* Set where to send the connection attempt */
-		sin.sin_addr.s_addr = temp_sin_addr;
 	}
-	sin.sin_port = GTM_HTONS(port);
-	sin.sin_family = AF_INET;
 
 	/* ============================== do the connection ============================== */
 	if (passive)
@@ -148,15 +147,31 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		struct timeval  utimeout, save_utimeout;
 		int 		lsock;
 
-		lsock = tcp_routines.aa_socket(AF_INET, SOCK_STREAM, 0);
+		af = ((GTM_IPV6_SUPPORTED && !ipv4_only) ? AF_INET6 : AF_INET);
+		lsock = tcp_routines.aa_socket(af, SOCK_STREAM, IPPROTO_TCP);
 		if (-1 == lsock)
 		{
-			save_errno = errno;
-			errptr = (char *)STRERROR(save_errno);
-         		errlen = STRLEN(errptr);
-			gtm_putmsg(VARLSTCNT(5) ERR_SOCKINIT, 3, save_errno, errlen, errptr);
-			assert(FALSE);
+			af = AF_INET;
+			if (-1 == (lsock = tcp_routines.aa_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)))
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(save_errno);
+        	 		errlen = STRLEN(errptr);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, save_errno, errlen, errptr);
+				assert(FALSE);
+				return -1;
+			}
+		}
+		SERVER_HINTS(hints, af);
+		/* We can only listen on our own system */
+		port_len = 0;
+		I2A(port_buffer, port_len, port);
+		port_buffer[port_len]='\0';
+		if (0 != (errcode = getaddrinfo(NULL, port_buffer, &hints, &ai_ptr)))
+		{
+			RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
 			return -1;
+
 		}
 		/* allow multiple connections to the same IP address */
 		if (-1 == tcp_routines.aa_setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
@@ -165,19 +180,20 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			(void)tcp_routines.aa_close(lsock);
 			errptr = (char *)STRERROR(save_errno);
          		errlen = STRLEN(errptr);
-                	gtm_putmsg(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-					RTS_ERROR_LITERAL("SO_REUSEADDR"), save_errno, errlen, errptr);
+                	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+					LEN_AND_LIT("SO_REUSEADDR"), save_errno, errlen, errptr);
 			assert(FALSE);
 			return -1;
 		}
-		if (-1 == tcp_routines.aa_bind(lsock, (struct sockaddr *)&sin, SIZEOF(struct sockaddr)))
+		if (-1 == tcp_routines.aa_bind(lsock, ai_ptr->ai_addr, ai_ptr->ai_addrlen))
 		{
 			save_errno = errno;
 			(void)tcp_routines.aa_close(lsock);
-			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
-				   RTS_ERROR_LITERAL("bind()"), CALLFROM, save_errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				   LEN_AND_LIT("bind()"), CALLFROM, save_errno);
 			return -1;
 		}
+		freeaddrinfo(ai_ptr);
 		/* establish a queue of length MAX_CONN_PENDING for incoming connections */
 		if (-1 == tcp_routines.aa_listen(lsock, MAX_CONN_PENDING))
 		{
@@ -185,7 +201,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			(void)tcp_routines.aa_close(lsock);
 			errptr = (char *)STRERROR(save_errno);
 			errlen = STRLEN(errptr);
-			gtm_putmsg(VARLSTCNT(6) ERR_SOCKLISTEN, 0, ERR_TEXT, 2, errlen, errptr);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKLISTEN, 0, ERR_TEXT, 2, errlen, errptr);
 			assert(FALSE);
 			return -1;
 		}
@@ -197,15 +213,14 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			utimeout.tv_sec = timeout;
 			utimeout.tv_usec = 0;
 		}
-		while(1)
+		FD_ZERO(&tcp_fd);
+		while (TRUE)
 		{
-			while(1)
+			while (TRUE)
 			{
-				/*
-				 * the check for EINTR below is valid and should not be converted to an EINTR
-				 * wrapper macro, since it might be a timeout.
+				/* The check for EINTR below is valid and should not be converted to an EINTR wrapper macro
+				 * since it might be a timeout.
 				 */
-				FD_ZERO(&tcp_fd);
 				FD_SET(lsock, &tcp_fd);
                                 save_utimeout = utimeout;
 				rv = tcp_routines.aa_select(lsock + 1, (void *)&tcp_fd, (void *)0, (void *)0,
@@ -234,110 +249,46 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			} else  if (0 > rv)
 			{
 				(void)tcp_routines.aa_close(lsock);
-				gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
-					   RTS_ERROR_LITERAL("select()"), CALLFROM, save_errno);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					   LEN_AND_LIT("select()"), CALLFROM, save_errno);
 				assert(FALSE);
 				return -1;
 			}
-			size = SIZEOF(struct sockaddr_in);
-			sock = tcp_routines.aa_accept(lsock, &peer, &size);
-			save_errno = errno;
-			if (-1 == sock)
+			size = SIZEOF(struct sockaddr_storage);
+			sock = tcp_routines.aa_accept(lsock, (struct sockaddr*)(&peer), &size);
+			if (FD_INVALID == sock)
 			{
+				save_errno = errno;
 #				ifdef __hpux
-				/* ENOBUFS in HP-UX is either because of a memory problem or when we have received a RST just
-				 * after a SYN before an accept call. Normally this is not fatal and is just a transient state.
-				 * Hence exiting just after a single error of this kind should not be done. So retry in case
-				 * of HP-UX and ENOBUFS error.
-				 */
 				if (ENOBUFS == save_errno)
-				{
-					retry_num = 0;
-					while (HPUX_MAX_RETRIES > retry_num)
-					{	/* In case of succeeding with select in first go, accept will still get 5ms time
-						 * difference.
-						 */
-						SHORT_SLEEP(5);
-						for ( ; HPUX_MAX_RETRIES > retry_num; retry_num++)
-						{
-							utimeout.tv_sec = 0;
-							utimeout.tv_usec = HPUX_SEL_TIMEOUT;
-							FD_ZERO(&tcp_fd);
-							FD_SET(lsock, &tcp_fd);
-							rv = tcp_routines.aa_select(lsock + 1, (void *)&tcp_fd, (void *)0,
-							 (void *)0, &utimeout);
-							save_errno = errno;
-							if (0 < rv)
-								break;
-							else
-								SHORT_SLEEP(5);
-						}
-						if (0 > rv)
-			                        {
-                			                (void)tcp_routines.aa_close(lsock);
-							gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
-								   RTS_ERROR_LITERAL("select()"),
-								   CALLFROM, save_errno);
-							assert(FALSE);
-							return -1;
-	                		        }
-						if (0 == rv)
-						{
-							(void)tcp_routines.aa_close(lsock);
-							util_out_print("Select timed out.\n", TRUE);
-							assert(FALSE);
-							return -1;
-						}
-						sock = tcp_routines.aa_accept(lsock, &peer, &size);
-						save_errno = errno;
-						if ((-1 == sock) && (ENOBUFS  == save_errno))
-							retry_num++;
-						else
-							break;
-					}
-				}
-				if (-1 == sock)
+					continue;
 #				endif
-				{
-					(void)tcp_routines.aa_close(lsock);
-					errptr = (char *)STRERROR(save_errno);
-					errlen = STRLEN(errptr);
-					gtm_putmsg(VARLSTCNT(6) ERR_SOCKACPT, 0, ERR_TEXT, 2, errlen, errptr);
-					assert(FALSE);
-					return -1;
-				}
+				(void)tcp_routines.aa_close(lsock);
+				errptr = (char *)STRERROR(save_errno);
+				errlen = STRLEN(errptr);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKACPT, 0, ERR_TEXT, 2, errlen, errptr);
+				assert(FALSE);
+				return -1;
 			}
-			SPRINTF(&temp_addr[0], "%s", tcp_routines.aa_inet_ntoa(peer.sin_addr));
+			GETNAMEINFO((struct sockaddr*)(&peer), size, temp_addr, SA_MAXLEN + 1, NULL, 0, NI_NUMERICHOST, errcode);
+			if (0 != errcode)
+			{
+				RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+				return -1;
+			}
 #			ifdef	DEBUG_ONLINE
 			PRINTF("Connection is from : %s\n", &temp_addr[0]);
 #			endif
-			/* Check if connection is from whom we want it to be from. Note that this is not a robust check
-			   (potential for multiple IP addrs for a resolved name but workarounds for this exist so not a lot
-			   of effort has been expended here at this time. Especially since the check is easily spoofed with
-			   raw sockets anyway. It is more for the accidental "oops" type check than serious security..
-			*/
-			if ((0 == temp_sin_addr) || (0 == memcmp(&addr[0], &temp_addr[0], strlen(addr))))
-				break;
-			else
-			{	/* Connection not from expected host */
-				(void)tcp_routines.aa_close(sock);
-				if (NO_M_TIMEOUT != timeout)
-				{
-					sys_get_curr_time(&cur_time);
-					cur_time = sub_abs_time(&end_time, &cur_time);
-					utimeout.tv_sec = ((cur_time.at_sec > 0) ? cur_time.at_sec : 0);
-				}
-				if (!error_given)
-				{
-					util_out_print("Connection from !AD rejected and ignored (expected from !AD)", TRUE,
-						       LEN_AND_STR(&temp_addr[0]), LEN_AND_STR(&addr[0]));
-					error_given = TRUE;
-				}
-			}
+			break;
+			/* previously there is following check here
+			 * if ((0 == temp_sin_addr) || (0 == memcmp(&addr[0], &temp_addr[0], strlen(addr))))
+                         * However, temp_sin_addr is always 0 on server side, and addr(local address) shoud not equal to
+			 * temp_addr(remote address), so the entire check should be removed
+			 */
 		}
 		(void)tcp_routines.aa_close(lsock);
 	} else
-	{
+	{	/* client side (connection side) */
 		if (NO_M_TIMEOUT != timeout)
 		{
 			msec_timeout = timeout2msec(timeout);
@@ -350,47 +301,44 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		{
 			if (1 != temp_1)
 				tcp_routines.aa_close(sock);
-			sock = tcp_routines.aa_socket(AF_INET, SOCK_STREAM, 0);
-			if (-1 == sock)
+			assert(NULL != remote_ai_head);
+			for (remote_ai_ptr = remote_ai_head; NULL != remote_ai_ptr; remote_ai_ptr = remote_ai_ptr->ai_next)
+			{
+				sock = tcp_routines.aa_socket(remote_ai_ptr->ai_family, remote_ai_ptr->ai_socktype,
+							      remote_ai_ptr->ai_protocol);
+				if (FD_INVALID != sock)
+					break;
+			}
+			if (FD_INVALID == sock)
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);
 				errlen = STRLEN(errptr);
-				gtm_putmsg(VARLSTCNT(5) ERR_SOCKINIT, 3, save_errno, errlen, errptr);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, save_errno, errlen, errptr);
 				assert(FALSE);
 				return -1;
 			}
 			/* Allow multiple connections to the same IP address */
-			if      (-1 == tcp_routines.aa_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
+			if (-1 == tcp_routines.aa_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
 			{
 				save_errno = errno;
 				(void)tcp_routines.aa_close(sock);
 				errptr = (char *)STRERROR(save_errno);
 				errlen = STRLEN(errptr);
-				gtm_putmsg(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-					   RTS_ERROR_LITERAL("SO_REUSEADDR"), save_errno, errlen, errptr);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+					   LEN_AND_LIT("SO_REUSEADDR"), save_errno, errlen, errptr);
 				assert(FALSE);
 				return -1;
 			}
-			temp_1 = tcp_routines.aa_connect(sock, (struct sockaddr *)(&sin), SIZEOF(sin));
+			temp_1 = tcp_routines.aa_connect(sock, remote_ai_ptr->ai_addr, remote_ai_ptr->ai_addrlen);
 			save_errno = errno;
-			/*
-			 * the check for EINTR below is valid and should not be converted to an EINTR
-			 * wrapper macro, because other error conditions are checked, and a retry is not
-			 * immediately performed.
-			 */
-			if ((0 > temp_1) && (ECONNREFUSED != save_errno) && (EINTR != save_errno))
+			/* tcp_routines.aa_connect == gtm_connect should have handled EINTR. Assert that */
+			assert((0 <= temp_1) || (EINTR != save_errno));
+			if ((0 > temp_1) && (ECONNREFUSED != save_errno))
 			{
 				(void)tcp_routines.aa_close(sock);
-				gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
-					   RTS_ERROR_LITERAL("connect()"), CALLFROM, save_errno);
-				assert(FALSE);
-				return -1;
-			}
-			if ((0 > temp_1) && (EINTR == save_errno))
-			{
-				(void)tcp_routines.aa_close(sock);
-				util_out_print("Interrupted.", TRUE);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					   LEN_AND_LIT("connect()"), CALLFROM, save_errno);
 				assert(FALSE);
 				return -1;
 			}
@@ -404,6 +352,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			SHORT_SLEEP(NAP_LENGTH);               /* Sleep for NAP_LENGTH ms */
 		} while ((FALSE == no_time_left) && (0 > temp_1));
 
+		freeaddrinfo(remote_ai_head);
 		if (0 > temp_1) /* out of time */
 		{
 			tcp_routines.aa_close(sock);

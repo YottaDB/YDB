@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2011, 2012 Fidelity Information Services, Inc       #
+#	Copyright 2011, 2013 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -13,11 +13,12 @@ echo ""
 echo "------------------------------------------------------------------------"
 set arch = `grep arch $gtm_ver/pro/arch.gtc | awk -F= '{print $2}' | tr -d '\"'`
 cd $1
+# Source the installed GT.M's configuration
 source ./gtmcshrc
 setenv gtmgbldir mumps.gld
 gde exit
 mupip create
-gtm << \EOF >&! gtm_test_install.out
+gtm << \EOF						>&! gtm_test_install.out
 set ^X=1
 set x=2
 write $ORDER(^%),!
@@ -31,13 +32,7 @@ zhelp
 zwrite ^X
 halt
 EOF
-cat << EOF
-Please run zhelp manually:
-cd `pwd`
-source ./gtmcshrc
-gtm
-zhelp
-EOF
+
 
 mkdir test_gtm
 cd test_gtm
@@ -57,10 +52,11 @@ setenv save_gtm_dist $gtm_dist
 unsetenv gtm_dist
 # set to test directory
 setenv gtmdir $save_gtm_dist/test_gtm
+# NOTE: this is not the alias gtm, but the script sr_unix/gtm.gtc
 ../gtm -r sim >& gtm.out
 # get $ZCHSET
-echo "" >>&! $save_gtm_dist/gtm_test_install.out
-grep ZCHSET gtm.out >>&! $save_gtm_dist/gtm_test_install.out
+echo ""							>>&! $save_gtm_dist/gtm_test_install.out
+grep ZCHSET gtm.out					>>&! $save_gtm_dist/gtm_test_install.out
 
 #get version number
 
@@ -71,13 +67,13 @@ cd $gtmver/g
 
 setenv gtm_dist $save_gtm_dist
 
-$gtm_dist/mupip journal -extract -forward gtm.mjl >& mupip.out
-(setenv gtmgbldir $gtm_dist/test_gtm/mumps.gld; $gtm_dist/mupip integ -reg "*"  >& integ.out)
+$gtm_dist/mupip journal -extract -forward gtm.mjl 				>& mupip.out
+env gtmgbldir=$gtm_dist/test_gtm/mumps.gld $gtm_dist/mupip integ -reg "*"	>& integ.out
 # output the change lines
-echo "" >>&! $gtm_dist/gtm_test_install.out
-echo "Global changes in the gtm.mjl file:" >>&! $gtm_dist/gtm_test_install.out
-grep = gtm.mjf | awk -F\\ '{print ($NF)}' >>&! $gtm_dist/gtm_test_install.out
-cat integ.out >>&! $gtm_dist/gtm_test_install.out
+echo ""							>>&! $gtm_dist/gtm_test_install.out
+echo "Global changes in the gtm.mjl file:"		>>&! $gtm_dist/gtm_test_install.out
+grep = gtm.mjf | awk -F\\ '{print ($NF)}'		>>&! $gtm_dist/gtm_test_install.out
+cat integ.out						>>&! $gtm_dist/gtm_test_install.out
 
 cd $gtm_dist
 
@@ -181,13 +177,13 @@ end
 set msg2 = `ls -al * | grep -v \> | grep w- | wc -l`
 @ msg2 = $msg2 - 7
 if ( $msg2 ) then
-    echo "Number of writeable lines = $msg2"	>>&! gtm_test_install.out
-    ls -al * | grep -v \> | grep w-		>>&! gtm_test_install.out
+    echo "Number of writeable lines = $msg2"		>>&! gtm_test_install.out
+    ls -al * | grep -v \> | grep w-			>>&! gtm_test_install.out
 endif
 
 setenv gtm_dist .
 
-gtm << EOF >>&! gtm_test_install.out
+gtm << EOF						>>&! gtm_test_install.out
 write \$zchset
 EOF
 
@@ -197,14 +193,14 @@ if ( -d utf8) then
 	setenv LD_LIBRARY_PATH $libpath
 	setenv LIBPATH $libpath
 	setenv gtm_chset utf-8
-	set utflocale = `locale -a | grep -i en_us | grep -i utf | sed 's/.lp64$//' | grep '8$' | head -n1`
+	set utflocale = `locale -a | grep -i en_us | grep -i utf | sed 's/.lp64$//' | grep '8$' | head -n 1`
 	if ( "OS/390" == `uname` ) then
 		setenv gtm_chset_locale $utflocale
 	else
 		setenv LC_ALL $utflocale
 	endif
 
-gtm << EOF >>&! gtm_test_install.out
+gtm << EOF						>>&! gtm_test_install.out
 write \$zchset
 EOF
 
@@ -220,24 +216,33 @@ EOF
 	# make gtm set the utf locale
 	unsetenv LC_CTYPE
 	../gtm -r sim >& gtm.out
+
 	# get $ZCHSET
-	echo "" >>&! $save_gtm_dist/gtm_test_install.out
-	grep ZCHSET gtm.out >>&! $save_gtm_dist/gtm_test_install.out
+	echo ""						>>&! $save_gtm_dist/gtm_test_install.out
+	grep ZCHSET gtm.out				>>&! $save_gtm_dist/gtm_test_install.out
+	# test gtmsecshr with an alternate user
+	set XCMD='do ^GTMHELP("",$ztrnlnm("gtm_dist")_"/gtmhelp.gld")'
+	su - gtmtest1 -c "env LD_LIBRARY_PATH=$libpath LC_ALL=$LC_ALL gtm_chset=UTF-8 gtm_dist=$gtm_dist gtmroutines='$gtmroutines' $gtm_dist/mumps -run %XCMD '${XCMD:q}' < /dev/null" > gtmtest.out   #BYPASSOK line length
+	# if we see the 'Topic? ' prompt, all is well
+	grep -q '^Topic. $' gtmtest.out
+	if ( $status ) cat gtmtest.out			>>&! $save_gtm_dist/gtm_test_install.out
 	# get journal output
 	cd V*/g
 
-	$save_gtm_dist/mupip journal -extract -forward gtm.mjl >& mupip.out
-	(setenv gtmgbldir $save_gtm_dist/test_gtm/mumps.gld; $save_gtm_dist/mupip integ -reg "*"  >& integ.out)
+	$save_gtm_dist/mupip journal -extract -forward gtm.mjl					>& mupip.out
+	env gtmgbldir=$save_gtm_dist/test_gtm/mumps.gld $save_gtm_dist/mupip integ -reg "*"	>& integ.out
+
 	# output the change lines
-	echo "" >>&! $save_gtm_dist/gtm_test_install.out
-	echo "Global changes in the gtm.mjl file:" >>&! $save_gtm_dist/gtm_test_install.out
-	grep = gtm.mjf | awk -F\\ '{print ($NF)}' >>&! $save_gtm_dist/gtm_test_install.out
-	cat integ.out >>&! $save_gtm_dist/gtm_test_install.out
+	echo ""						>>&! $save_gtm_dist/gtm_test_install.out
+	echo "Global changes in the gtm.mjl file:"	>>&! $save_gtm_dist/gtm_test_install.out
+	awk -F\\ '/=/{print ($NF)}' gtm.mjf		>>&! $save_gtm_dist/gtm_test_install.out
+	cat integ.out					>>&! $save_gtm_dist/gtm_test_install.out
+	$gtm_dist/gtmsecshr				>>&! $save_gtm_dist/gtm_test_install.out
 	cd $save_gtm_dist
 
 else
-
-cat <<EOF >>&! gtm_test_install.out
+	# BEGIN - Fake the UTF-8 mode run for platforms that don't support it
+cat <<EOF						>>&! gtm_test_install.out
 
 GTM>
 UTF-8
@@ -262,6 +267,7 @@ Data                2               2           0.585             2
 Free             4994              NA              NA            NA
 Total            5000               7              NA             4
 EOF
+	#  END  - Fake the UTF-8 mode run for platforms that don't support it
 endif
 
 # strip off the copyright lines

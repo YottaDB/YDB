@@ -67,6 +67,7 @@ LITDEF nametabent dev_param_names[] =
 	,{2,"EB*"}	,{4,"EBCD"}
 	,{2,"EC*"}
 	,{2,"ED*"}	,{4,"EDIT"}
+	,{4,"EMPT*"}	,{7,"EMPTERM"}
 	,{6,"ERASEL*"}
 	,{6,"ERASET*"}
 	,{2,"ES*"}
@@ -121,6 +122,7 @@ LITDEF nametabent dev_param_names[] =
 	,{4,"NOEB*"}
 	,{4,"NOEC*"}	,{6,"NOECHO"}
 	,{4,"NOED*"}	,{6,"NOEDIT"}
+	,{6,"NOEMPT*"}	,{9,"NOEMPTERM"}
 	,{4,"NOES*"}	,{6,"NOESCA"}
 	,{5,"NOEXT*"}
 	,{5,"NOFIL*"}
@@ -260,27 +262,31 @@ LITDEF nametabent dev_param_names[] =
 	,{4,"ZWRA*"}
 };
 /* Offset of letter in dev_param_names */
+/* Following array has reached the maximum value limit(255) for its entry. Hence adddition of the next deviceparameter needs
+ * to change this array to short or int. This will lead to change the interface to namelook() and the type of the first argument
+ * passed to it. Once that is implemented, remove this comment.
+ */
 LITDEF	unsigned char dev_param_index[27] =
 {
 /*	A    B    C    D    E    F    G    H    I    J    K    L    M    N   */
-	0,   5,   9,   26,  34,  47,  62,  64,  68,  74,  74,  74,  82,  85,
+	0,   5,   9,   26,  34,  49,  64,  66,  70,  76,  76,  76,  84,  87,
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	149, 154, 173, 174, 187, 205, 214, 220, 221, 236, 237, 238, 252
+	153, 158, 177, 178, 191, 209, 218, 224, 225, 240, 241, 242, 255
 };
 /* Offset of string within letter in dev_param_names */
 /* maintained in conjunction with zshow_params.h   = offset in letter, letter  */
 LITDEF zshow_index zshow_param_index[] =
 {
-/*	ALLO     BLOC    COMMAND   CONV     CTRA     DELE   DEST     EBCD     EDIT    EXCE     EXTE     FIELD    */
-	{2,0},   {2,1},   {9,2},  {12,2},  {16,2},  {1,3},  {3,3},  {1,4},   {4,4},  {9,4},   {11,4},  {2,5},
+/*	ALLO     BLOC    COMMAND   CONV     CTRA     DELE   DEST     EBCD     EDIT    EMPTERM 	EXCE     EXTE     FIELD    */
+	{2,0},   {2,1},   {9,2},  {12,2},  {16,2},  {1,3},  {3,3},  {1,4},   {4,4},   {6,4},   {11,4},   {13,4},  {2,5},
 /*	FIL     FIXED  FOLLOW */
 	{5,5},  {8,5},  {14,5},
 /*  	HOST    ICHSET   INDEPENDENT  INSE     LAB */
 	{3,7},	{0,8},   {2,8},      {4,8},   {1,11},
-/*	LENG     NOCENE   NODEST    NOECHO   NOEDIT   NOESCA   NOFOLLOW  NOHOST   NOINSE     */
-	{3,11},  {7,13},  {10,13},  {15,13}, {17,13}, {19,13}, {25,13},  {29,13}, {31,13},
+/*	LENG     NOCENE   NODEST    NOECHO   NOEDIT   NOEMPTERM NOESCA   NOFOLLOW  NOHOST   NOINSE     */
+	{3,11},  {7,13},  {10,13},  {15,13}, {17,13}, {19,13},  {21,13}, {27,13},  {31,13}, {33,13},
 /*	NOPAST   NOREADS  NOTTSY   NOTYPE   NOWRAP   OCHSET   PAD     PARSE   PAST     PRMMBX   RCHK    */
-	{37,13}, {42,13}, {53,13}, {55,13}, {61,13}, {1,14},  {8,15}, {11,15}, {13,15}, {17,15}, {1,17},
+	{39,13}, {44,13}, {55,13}, {57,13}, {63,13}, {1,14},  {8,15}, {11,15}, {13,15}, {17,15}, {1,17},
 /*      READ     READS	  REC      SHAR     SHELL    STDERR   TERM     TTSY     TYPE    UIC      WAIT     WCHK   */
 	{2,17},  {4,17},  {5,17},  {5,18},  {7,18},  {15,18},  {1,19},  {6,19},  {8,19}, {1,20},  {2,22},  {4,22},
 /*      WIDTH   WRITE  */
@@ -337,6 +343,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_ebcdic ,iop_ebcdic
 		,iop_echo
 		,iop_editing ,iop_editing
+		,iop_empterm ,iop_empterm
 		,iop_eraseline
 		,iop_erasetape
 		,iop_escape
@@ -391,6 +398,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_noebcdic
 		,iop_noecho ,iop_noecho
 		,iop_noediting ,iop_noediting
+		,iop_noempterm ,iop_noempterm
 		,iop_noescape ,iop_noescape
 		,iop_inhextgap
 		,iop_nofilter
@@ -531,8 +539,14 @@ int deviceparameters(oprtype *c, char who_calls)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert((SIZEOF(dev_param_names) / SIZEOF(nametabent) == dev_param_index[26]));
-	assert((SIZEOF(dev_param_data) / SIZEOF(unsigned char)) == dev_param_index[26]);
+	/* The value of dev_param_index[26] should be 256 but is 255 since that is all that can fit in a unsigned char. That is why
+	 * following asserts has (dev_param_index[26] + 1). Once the type of dev_param_index is changed, the "+ 1" in following
+	 * assert should be removed.
+	 */
+	assert((SIZEOF(dev_param_names) / SIZEOF(nametabent) == dev_param_index[26] + 1));
+	assert((SIZEOF(dev_param_data) / SIZEOF(unsigned char)) == dev_param_index[26] + 1);
+	assert(dev_param_index[26] == 255);
+	assert(SIZEOF(dev_param_index[26] == SIZEOF(char)));
 	is_parm_list = (TK_LPAREN == TREF(window_token));
 	if (is_parm_list)
 		advancewindow();

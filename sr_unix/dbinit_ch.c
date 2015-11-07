@@ -25,6 +25,7 @@
 #include "gdsfhead.h"
 #include "error.h"
 #include "filestruct.h"
+#include "gvcst_protos.h"
 #include "jnl.h"
 #include "do_semop.h"
 #include "mmseg.h"
@@ -39,17 +40,23 @@ GBLREF gd_region		*db_init_region;
 
 CONDITION_HANDLER(dbinit_ch)
 {
-	unix_db_info		*udi;
-	gd_segment		*seg;
-	sgmnt_addrs		*csa;
-	int			rc, lcl_new_dbinit_ipc;
-
 	START_CH;
 	if (SUCCESS == SEVERITY || INFO == SEVERITY)
 	{
 		PRN_ERROR;
 		CONTINUE;
 	}
+	db_init_err_cleanup(FALSE);
+	NEXTCH
+}
+
+void db_init_err_cleanup(boolean_t retry_dbinit)
+{
+	unix_db_info		*udi;
+	gd_segment		*seg;
+	sgmnt_addrs		*csa;
+	int			rc, lcl_new_dbinit_ipc;
+
 	assert(NULL != db_init_region);
 	seg = db_init_region->dyn.addr;
 	udi = NULL;
@@ -57,9 +64,9 @@ CONDITION_HANDLER(dbinit_ch)
 		udi = FILE_INFO(db_init_region);
 	if (NULL != udi)
 	{
-		if (FD_INVALID != udi->fd)
+		if (FD_INVALID != udi->fd && !retry_dbinit)
 			CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
-		assert(FD_INVALID == udi->fd);
+		assert(FD_INVALID == udi->fd || retry_dbinit);
 		csa = &udi->s_addrs;
 #		ifdef GTM_CRYPT
 		if (NULL != csa->encrypted_blk_contents)
@@ -83,7 +90,6 @@ CONDITION_HANDLER(dbinit_ch)
 			shmdt((caddr_t)csa->nl);
 			csa->nl = (node_local_ptr_t)NULL;
 		}
-
 		if (udi->new_shm && (INVALID_SHMID != udi->shmid))
 		{
 			shm_rmid(udi->shmid);
@@ -115,7 +121,7 @@ CONDITION_HANDLER(dbinit_ch)
 			do_semop(udi->ftok_semid, DB_COUNTER_SEM, -1, SEM_UNDO | IPC_NOWAIT);
 		udi->counter_ftok_incremented =FALSE;
 		udi->grabbed_ftok_sem = FALSE;
-		if (!IS_GTCM_GNP_SERVER_IMAGE) /* gtcm_gnp_server reuses file_cntl */
+		if (!IS_GTCM_GNP_SERVER_IMAGE && !retry_dbinit) /* gtcm_gnp_server reuses file_cntl */
 		{
 			free(seg->file_cntl->file_info);
 			free(seg->file_cntl);
@@ -123,6 +129,6 @@ CONDITION_HANDLER(dbinit_ch)
 		}
 	}
 	/* Enable interrupts in case we are here with intrpt_ok_state == INTRPT_IN_GVCST_INIT due to an rts error. */
-	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT);
-	NEXTCH;
+	if (!retry_dbinit)
+		ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT);
 }

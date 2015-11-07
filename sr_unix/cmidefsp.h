@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,8 @@ typedef mstr cmi_descriptor;
 
 #include <signal.h>
 #include "gtm_unistd.h"
+#include "gtm_netdb.h"
+#include "gtm_socket.h"	/* for sockaddr_storage */
 
 typedef struct
 {
@@ -84,7 +86,7 @@ typedef struct clb_stat_struct
  * Individual link connections doubly linked list
  */
 
-#include <netinet/in.h>
+#include "gtm_inet.h"
 #ifdef __MVS__
 /* need fd_set */
 #include <sys/time.h>
@@ -92,26 +94,27 @@ typedef struct clb_stat_struct
 
 struct CLB
 {
-	que_ent cqe;			/* forward/backward links */
-	struct NTD *ntd;		/* back pointer to ntd */
-	cmi_descriptor nod;		/* node */
-	cmi_descriptor tnd;		/* taskname */
-	struct sockaddr_in peer;	/* peer */
-	int mun;                        /* endpoint's file descriptor */
-	void *usr;			/* client specific storage */
-	qio_iosb ios;			/* used for tracking inprocess I/O */
-	unsigned short cbl;		/* number of bytes read */
-	unsigned short mbl;		/* max size buffer */
-	unsigned char *mbf;		/* pointer to buffer */
-	unsigned char urgdata;		/* buffer for urgent data */
-	int fd_async;			/* TRUE --> fd is in async mode */
-	int deferred_event;		/* TRUE --> deferred event signaled */
-	cmi_reason_t deferred_reason;	/* reason for deferred event */
-	cmi_status_t deferred_status;	/* status for deferred event */
-	int sta;			/* CM_ state */
-	int prev_sta;			/* CM_ state before URG WRITE, to be restored after URG WRITE completes */
-	void (*err)(struct CLB *);	/* link status error callback - not used */
-	void (*ast)(struct CLB *);	/* I/O call back for async read/write */
+	que_ent cqe;				/* forward/backward links */
+	struct NTD *ntd;			/* back pointer to ntd */
+	cmi_descriptor nod;			/* node */
+	cmi_descriptor tnd;			/* taskname */
+	struct sockaddr_storage peer_sas;	/* peer */
+	struct addrinfo		peer_ai;	/* peer */
+	int mun;     		                /* endpoint's file descriptor */
+	void *usr;				/* client specific storage */
+	qio_iosb ios;				/* used for tracking inprocess I/O */
+	unsigned short cbl;			/* number of bytes read */
+	unsigned short mbl;			/* max size buffer */
+	unsigned char *mbf;			/* pointer to buffer */
+	unsigned char urgdata;			/* buffer for urgent data */
+	int fd_async;				/* TRUE --> fd is in async mode */
+	int deferred_event;			/* TRUE --> deferred event signaled */
+	cmi_reason_t deferred_reason;		/* reason for deferred event */
+	cmi_status_t deferred_status;		/* status for deferred event */
+	int sta;				/* CM_ state */
+	int prev_sta;				/* CM_ state before URG WRITE, to be restored after URG WRITE completes */
+	void (*err)(struct CLB *);		/* link status error callback - not used */
+	void (*ast)(struct CLB *);		/* I/O call back for async read/write */
 	struct clb_stat_struct stt;
 };
 
@@ -215,8 +218,7 @@ cmi_status_t cmj_write_start(struct CLB *lnk);
 cmi_status_t cmj_write_urg_start(struct CLB *lnk);
 void cmj_write_interrupt(struct CLB *lnk, int signo);
 void cmj_init_clb(struct NTD *tsk, struct CLB *lnk);
-cmi_status_t cmj_resolve_nod_tnd(cmi_descriptor *nod, cmi_descriptor *tnd, struct sockaddr_in *inp);
-cmi_status_t cmj_getsockaddr(cmi_descriptor *tnd, struct sockaddr_in *inp);
+cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct addrinfo **ai_ptr);
 cmi_status_t cmi_write_urg(struct CLB *c, unsigned char data);
 cmi_status_t cmi_init(
 		cmi_descriptor *tnd,

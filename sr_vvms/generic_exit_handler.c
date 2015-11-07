@@ -131,7 +131,7 @@ void generic_exit_handler(void)
 		 *		early_tn is set to curr_tn + 1 (just like (a)) so no special processing is needed.
 		 *	c) When the intrpt_ok_state is flagged
 		 */
-		if ((0 != have_crit(CRIT_IN_COMMIT)) || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state))
+		if ((0 != have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)) || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state))
 		{
 			assert(!process_exiting);
 			EXIT_HANDLER(&exi_blk);

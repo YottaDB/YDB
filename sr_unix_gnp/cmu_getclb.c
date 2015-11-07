@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +13,14 @@
 #include "cmidef.h"
 #include "gtm_string.h"
 #include "eintr_wrappers.h"
+#include "gtm_netdb.h"
+#include "gtm_socket.h"
+#include "iotcpdef.h"
 
 GBLREF struct NTD *ntd_root;
+
+error_def(ERR_GETNAMEINFO);
+error_def(ERR_TEXT);
 
 struct CLB *cmu_getclb(cmi_descriptor *node, cmi_descriptor *task)
 {
@@ -22,10 +28,10 @@ struct CLB *cmu_getclb(cmi_descriptor *node, cmi_descriptor *task)
 	struct CLB *p;
 	que_ent_ptr_t qp;
 	sigset_t oset;
-	struct sockaddr_in in;
+	struct addrinfo *ai_ptr;
 	int rc;
 
-	status = cmj_resolve_nod_tnd(node, task, &in);
+	status = cmj_getsockaddr(node, task, &ai_ptr);
 	if (CMI_ERROR(status))
 		return NULL;
 
@@ -36,9 +42,8 @@ struct CLB *cmu_getclb(cmi_descriptor *node, cmi_descriptor *task)
 				qp = RELQUE2PTR(p->cqe.fl))
 		{
 			p = QUEENT2CLB(qp, cqe);
-			if (p->peer.sin_port == in.sin_port && 0 == memcmp(&p->peer.sin_addr, &in.sin_addr, SIZEOF(in.sin_addr)))
-			{ /* (port, address) pair is necessary and sufficient for uniqueness. There might be other fields in
-			     sockaddr_in that might be implementation dependent. So, compare only (port, address) pair. */
+			if (0 == memcpy(ai_ptr->ai_addr, (sockaddr_ptr)(&p->peer_sas), ai_ptr->ai_addrlen))
+			{
 				sigprocmask(SIG_SETMASK, &oset, NULL);
 				return p;
 			}

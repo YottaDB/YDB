@@ -199,7 +199,6 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 					"the shutdown command.\n");
 			status = decr_sem(SOURCE, SRC_SERV_COUNT_SEM);
 			assert(0 == status);
-			assert(FALSE);
 			return ABNORMAL_SHUTDOWN;
 		}
 	} else

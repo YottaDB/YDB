@@ -183,7 +183,8 @@ bool	mubfilcpy (backup_reg_list *list)
 	command[cmdlen] = 0;
 	if (debug_mupip)
 		util_out_print("!/MUPIP INFO:   !AD", TRUE, cmdlen, command);
-	if (0 != (rv = SYSTEM((char *)command)))
+	rv = SYSTEM(((char *)command));
+	if (0 != rv)
 	{
 		if (-1 == rv)
 		{
@@ -487,7 +488,8 @@ bool	mubfilcpy (backup_reg_list *list)
 	command[cmdlen] = 0;
 	if (debug_mupip)
 		util_out_print("MUPIP INFO:   !AD", TRUE, cmdlen, command);
-	if (0 != (rv = SYSTEM((char *)command)))
+	rv = SYSTEM(((char *)command));
+	if (0 != rv)
 	{
 		if (-1 == rv)
 		{

@@ -40,6 +40,7 @@ error_def(ERR_BADCHSET);
 #define MAX_DEVCTL_LENGTH	256
 #define IO_ESC			0x1b
 #define MAX_DEV_TYPE_LEN	7
+#define DD_BUFLEN		80
 
 #define CHAR_FILTER 128
 #define ESC1 1
@@ -125,6 +126,8 @@ typedef struct io_desc_struct
 		unsigned short	zeof;
 		unsigned short	za;
 		unsigned char	zb[ESC_LEN];
+ 		char		key[DD_BUFLEN];
+ 		char		device[DD_BUFLEN];
 	}dollar;
 	unsigned char			esc_state;
 	void				*dev_sp;
@@ -263,6 +266,7 @@ ioxx_open(ff);
 #ifdef UNIX
 ioxx_open(pi);
 xxdlr(iopi);	/* we need iopi_iocontrol(), iopi_dlr_device() and iopi_dlr_key() */
+xxdlr(iott);	/* we need iott_iocontrol(), iott_dlr_device() and iott_dlr_key() */
 #endif
 ioxx_wttab(us);
 /* iott_ prototypes */
@@ -297,7 +301,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar);
 void iosocket_poolinit(void);
 
 /* iotcp_ prototypes */
-char *iotcp_name2ip(char *name);
 int iotcp_fillroutine(void);
 int iotcp_getlsock(io_log_name *dev);
 void iotcp_rmlsock(io_desc *iod);
