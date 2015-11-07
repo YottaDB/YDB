@@ -194,7 +194,7 @@ chmod 444 $readme_txt
 # be copied as a part of open source distribution (down the script)
 set open_source = 0
 set GNU_COPYING_license = "${gtm_com}/COPYING"
-if (("$osname" == "linux" && ( "$arch" == "i686" || "x8664" == "$arch" )) || ("$osname" == "osf1" && "$arch" == "alpha")) then
+if (("$osname" == "linux" && ( "$arch" == "i586" || "x8664" == "$arch" )) || ("$osname" == "osf1" && "$arch" == "alpha")) then
 	set open_source = 1
 	/bin/cp -pf $cms_tools/opensource_COPYING $GNU_COPYING_license
 	chmod 444 $GNU_COPYING_license
@@ -323,7 +323,7 @@ foreach image ($imagetype)
 	# no directories to be writeable for group or world if aix or 32-bit linux, otherwise for all
 	chmod a+x configure
 	chmod a+x gtminstall
-	if ((aix == ${osname}) || ((linux == ${osname}) && (i686 == "$arch"))) then
+	if ((aix == ${osname}) || ((linux == ${osname}) && ("i586" == "$arch"))) then
 		find . -type d -exec chmod go-w {} \;
 	else
 		find . -type d -exec chmod a-w {} \;
@@ -388,9 +388,9 @@ if ($testinstall) then
 		# blank line for default group
 		# V54003 now asks whether or not to retain .o files if libgtmutil.so is created
 		# We answer "y" to this question
-		# If libgtmutil.so is not created(on i686) this question is not asked
+		# If libgtmutil.so is not created(on i586) this question is not asked
 		if ("$osname" != "osf1") then
-			if ("$osname" == "linux" && "$arch" == "i686") then
+			if ("$osname" == "linux" && "$arch" == "i586") then
 				sh ./configure << CONFIGURE_EOF
 
 
@@ -438,9 +438,9 @@ CONFIGURE_EOF
 		# reversed from V54000
 		# V54003 now asks whether or not to retain .o files if libgtmutil.so is created
 		# We answer "y" to this question
-		# If libgtmutil.so is not created(on i686) this question is not asked
+		# If libgtmutil.so is not created(on i586) this question is not asked
 		if("$osname" != "osf1") then
-			if ("$osname" == "linux" && "$arch" == "i686") then
+			if ("$osname" == "linux" && "$arch" == "i586") then
 	 			sh ./configure << CONFIGURE_EOF
 
 $rootgroup
@@ -528,7 +528,7 @@ CONFIGURE_EOF
 				set comp="$gtm_tools/gtm_compare_dir.csh ${install} ${tmp_dist}/$defgroup $gtm_tools/bdelete.txt"
 				set adddir=$gtm_tools/badd.txt
 				set deldir=$gtm_tools/bdeldir.txt
-				if (("linux" == ${osname}) && ("i686" == ${arch})) then
+				if (("linux" == ${osname}) && ("i586" == ${arch})) then
 					set adddir=$gtm_tools/linuxi686_badd.txt
 				else if (("hpux" == ${osname}) && ("parisc" == ${arch})) then
 					set adddir=$gtm_tools/hpuxparisc_badd.txt

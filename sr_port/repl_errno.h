@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,11 +48,10 @@ enum
 	EREPL_INTLFILTER_DATA2LONG,		/* 285 */
 	EREPL_INTLFILTER_REPLGBL2LONG,		/* 286 */
 	EREPL_FILTERRECV,			/* 287 */
-	EREPL_FILTERNOSPC,			/* 288 */
-	EREPL_INTLFILTER_SECNODZTRIGINTP,	/* 289 */
-	EREPL_INTLFILTER_MULTILINEXECUTE,	/* 290 */
-	EREPL_FILTERTIMEDOUT,			/* 291 */
-	EREPL_MAXERRNO				/* 292 */
+	EREPL_INTLFILTER_PRILESSTHANV62,	/* 288 */
+	EREPL_INTLFILTER_SECLESSTHANV62,	/* 289 */
+	EREPL_FILTERTIMEDOUT,			/* 290 */
+	EREPL_MAXERRNO				/* 291 */
 };
 
 #endif

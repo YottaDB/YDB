@@ -572,14 +572,7 @@ void dse_chng_fhead(void)
 			cs_data->db_got_to_v5_once = TRUE;
 	}
 	if (CLI_PRESENT == cli_present("GVSTATSRESET"))
-	{
-		/* Clear statistics in NODE-LOCAL first */
-#		define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	cs_addrs->nl->gvstats_rec.COUNTER = 0;
-#		include "tab_gvstats_rec.h"
-#		undef TAB_GVSTATS_REC
-		/* Do it in the file-header next */
-		gvstats_rec_cnl2csd(cs_addrs);
-	}
+		CLRGVSTATS(cs_addrs);
 	if (CLI_PRESENT == cli_present("ONLINE_NBB"))
 	{
 		buf_len = SIZEOF(buf);

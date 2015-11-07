@@ -84,6 +84,9 @@ typedef struct global_tlvl_info_struct
 #	endif
 	struct ua_list	*curr_ua;		/* points to global variable curr_ua at start of this transaction */
 	char		*upd_array_ptr;		/* points to global variable update_array_ptr at start of this transaction */
+#	ifdef GTM_TRIGGER
+	int		ztrigbuffLen;		/* copy of TREF(ztrigbuffLen) at start of this transaction */
+#	endif
 } global_tlvl_info;
 
 /* A note on the buddy lists used in sgm_info structure,
@@ -709,7 +712,7 @@ typedef struct trans_restart_hist_struct
 				{	/* TROLLBACK(0) or TRESTART. Reset db_dztrigger_cycle to 0 since we are going to start 	\
 					 * a new transaction. But, we want to ensure that the new transaction re-reads triggers	\
 					 * since any gvt which updated its gvt_trigger in this transaction will be stale as	\
-					 * they never got committed.								\
+					 * they never got committed. We will later ensure csa->db_dztrigger_cycle is non-zero.	\
 					 */											\
 					gvnh->db_dztrigger_cycle = 0;								\
 					gvnh->db_trigger_cycle = 0;								\
@@ -753,10 +756,13 @@ typedef struct trans_restart_hist_struct
 		} else if (!COMMIT)												\
 		{	/* This is either a complete rollback or a restart. In either case, set csa->incr_db_trigger_cycle 	\
 			 * to FALSE for all csa referenced in this transaction as they are anyways not going to be committed.	\
+			 * Based on this though, set csa->db_dztrigger_cycle to a non-zero value this way we ensure		\
+			 * triggers are forced to be re-read on the restart/rollback so any cached stale trigger state from	\
+			 * the current failed try is thrown away.								\
 			 */													\
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)						\
 			{													\
-				si->tp_csa->db_dztrigger_cycle = 0;								\
+				si->tp_csa->db_dztrigger_cycle = si->tp_csa->incr_db_trigger_cycle ? 1 : 0;			\
 				si->tp_csa->incr_db_trigger_cycle = FALSE;							\
 			}													\
 		}														\
@@ -794,17 +800,19 @@ typedef struct trans_restart_hist_struct
 }
 # ifdef DEBUG
 #  define TP_ASSERT_ZTRIGGER_CYCLE_RESET										\
-{	/* At the end of a transaction (either because of trestart, complete trollback or tcommit) ensure that 		\
-	 * csa->db_dztrigger_cycle is reset to zero. It's okay not to check if all gvt updated in this transaction	\
-	 * also has gvt->db_dztrigger_cycle set back to zero because if they don't there are other asserts that 	\
-	 * will trip in the subsequent transactions									\
+{	/* At the end of a transaction commit ensure that csa->db_dztrigger_cycle is reset to zero.			\
+	 * In the case of trestart and/or rollback, this value could be 1 if $ztrigger activity happened in		\
+	 * the failed try. Because of this it is also possible the value could be 1 after a commit (that is preceded	\
+	 * by a restart). Assert this.											\
+	 * It's okay not to check if all gvt updated in this transaction also has gvt->db_dztrigger_cycle set		\
+	 * back to zero because if they don't there are other asserts that will trip in the subsequent transactions.	\
 	 */														\
 	GBLREF	sgm_info	*first_sgm_info;									\
 															\
 	sgm_info		*si;											\
 															\
 	for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)							\
-		assert(0 == si->tp_csa->db_dztrigger_cycle);								\
+		assert((0 == si->tp_csa->db_dztrigger_cycle) || (1 == si->tp_csa->db_dztrigger_cycle));			\
 }
 # else
 #  define TP_ASSERT_ZTRIGGER_CYCLE_RESET

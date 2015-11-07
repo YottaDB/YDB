@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,61 +10,17 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <time.h>
+#include "gtm_time.h"
+#include <sys/time.h>
+#include <errno.h>
 #include "sleep.h"
 
-#ifndef __MVS__
-
-int m_sleep(int seconds)
-{
-    m_time_t rqtp, rmtp;
-
-    rqtp.tv_sec=seconds;
-    rqtp.tv_nsec=0;
-
-    return nanosleep_func(&rqtp,&rmtp);
-}
-
-int m_usleep(int useconds)
-{
-    m_time_t rqtp, rmtp;
-
-    rqtp.tv_sec=0;
-    rqtp.tv_nsec=useconds*1000;
-
-    return nanosleep_func(&rqtp,&rmtp);
-}
-
-int m_nsleep(int nseconds)
-{
-    m_time_t rqtp, rmtp;
-
-    rqtp.tv_sec=0;
-    rqtp.tv_nsec=nseconds;
-
-    return nanosleep_func(&rqtp,&rmtp);
-}
-
-#else
-
-/* OS390 versions must use usleep, which doesn't use m_time_t struct */
-
-#include "gtm_unistd.h"
-
-int m_sleep(int seconds)
-{
-    return nanosleep_func((useconds_t)(1000 * seconds));
-}
-
-int m_usleep(int useconds)
-{
-    return nanosleep_func((useconds_t)useconds);
-}
-
-/* Note: this functions is not called by anyone */
-int m_nsleep(int nseconds)	/* On OS390, this will sleep for one microsecond */
-{
-    return nanosleep_func((useconds_t)1);
-}
-
+#ifdef __MVS__
+/* OS390 versions must use usleep */
+#  include "gtm_unistd.h"
 #endif
+
+void m_usleep(int useconds)
+{
+	SLEEP_USEC(useconds, FALSE);
+}

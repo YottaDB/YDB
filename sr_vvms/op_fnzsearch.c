@@ -64,7 +64,7 @@ int op_fnzsearch(mval *file, mint strm, mint mcmd, mval *ret)
 	}
 	assert(fab_sea != 0);
 	index = (short)strm;
-	if (mcmd && ((MAX_STRM_CT < index) || ( 0 > index)))	/* Bypass stream check for internal uses */
+	if (mcmd && ((MAX_STRM_CT <= index) || ( 0 > index)))	/* Bypass stream check for internal uses */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSRCHSTRMCT);
 	MV_FORCE_STR(file);
 	if (file->str.len > MAX_FN_LEN)

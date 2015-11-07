@@ -42,10 +42,24 @@ error_def(ERR_PREMATEOF);
 static char		buff1[BUFF_SIZE];
 static char		*buff1_end;
 static char		*buff1_ptr;
-static ssize_t		buff1_ptr_file_offset;
+static off_t		buff1_ptr_file_offset;
 static char		*load_fn_ptr;
 static int		load_fn_len;
-static readonly unsigned char open_params_list[] =
+static unsigned char open_params_list_default[] =
+{
+	(unsigned char)iop_recordsize,	/* 64K enough to hold MAX_BLK_SZ */
+#	ifdef BIGENDIAN
+	(unsigned char)0, (unsigned char)0, (unsigned char)255, (unsigned char)255,
+#	else
+	(unsigned char)255, (unsigned char)255, (unsigned char)0, (unsigned char)0,
+#	endif
+	(unsigned char)iop_readonly,
+	(unsigned char)iop_m,
+	/* iop_stream not included since it is necessary only if we are opening file for write (which is not the case here) */
+	(unsigned char)iop_nowrap,
+	(unsigned char)iop_eol
+};
+static unsigned char open_params_list_rewind[] =
 {
 	(unsigned char)iop_recordsize,	/* 64K enough to hold MAX_BLK_SZ */
 #	ifdef BIGENDIAN
@@ -61,16 +75,23 @@ static readonly unsigned char open_params_list[] =
 	(unsigned char)iop_eol
 };
 
-void file_input_init(char *fn, short fn_len)
+void file_input_init(char *fn, short fn_len, open_params_flags params_flag)
 {
 	int		status;
 	mval		pars, val;
 	unsigned char	no_param = (unsigned char)iop_eol;
+	unsigned char*	open_params;
 
 	ESTABLISH(mupip_load_ch);
 	pars.mvtype = MV_STR;
-	pars.str.len = SIZEOF(open_params_list);
-	pars.str.addr = (char *)open_params_list;
+	if (params_flag & IOP_REWIND)
+	{
+		pars.str.len = SIZEOF(open_params_list_rewind);
+		pars.str.addr = (char *)open_params_list_rewind;
+	} else { /* IOP_EOL */
+		pars.str.len = SIZEOF(open_params_list_default);
+		pars.str.addr = (char *)open_params_list_default;
+	}
 	val.mvtype = MV_STR;
 	val.str.len = fn_len;
 	val.str.addr = (char *)fn;
@@ -103,7 +124,17 @@ void file_input_close(void)
 	op_close(&val, &pars);
 }
 
-int file_input_bin_get(char **in_ptr, ssize_t *file_offset, char **buff_base, boolean_t do_rts_error)
+void file_input_bin_init(char *line1_ptr, int line1_len)
+{
+	assert(buff1_ptr == buff1);
+	assert(line1_len < BUFF_SIZE);
+	assert(buff1_end == buff1_ptr);
+	assert(0 == buff1_ptr_file_offset);
+	memcpy(buff1_ptr, line1_ptr, line1_len);
+	buff1_end += line1_len;
+}
+
+int file_input_bin_get(char **in_ptr, off_t *file_offset, char **buff_base, boolean_t do_rts_error)
 {
 	char	*ptr;
 	int	rd_cnt, rd_len, ret, s1;
@@ -120,8 +151,7 @@ int file_input_bin_get(char **in_ptr, ssize_t *file_offset, char **buff_base, bo
 				if (do_rts_error)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
 				ret = ERR_PREMATEOF;
-			}
-			else if (-1 == rd_len)
+			} else if (-1 == rd_len)
 			{
 				if (do_rts_error)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADFILERR, 2, load_fn_len, load_fn_ptr);
@@ -192,14 +222,44 @@ int file_input_bin_read(void)
 	return rdlen;
 }
 
-int file_input_get(char **in_ptr)
+int file_input_get_xchar(char *in_ptr, int max_chars_to_read) /* uses opreadfl with a buffered getc call to read file content */
 {
-	char	*ptr, *tmp_ptr;
-	int	rd_len, s1;
-	mval	val;
-	static unsigned int mbuff_len = BUFF_SIZE;
-	unsigned int new_mbuff_len, ret_len;
-	static char *mbuff = buff1;
+	int		rd_len;
+	mval		val;
+
+	op_readfl(&val, max_chars_to_read, dollar_tlevel ? 0: NO_M_TIMEOUT);
+	rd_len = val.str.len;
+	if ((0 == rd_len) && io_curr_device.in->dollar.zeof)
+		return -1;
+	memcpy(in_ptr, val.str.addr, rd_len);
+	return rd_len;
+}
+
+int file_input_read_xchar(char *in_ptr, int max_chars_to_read) /* uses DOREADRL with read system api to read file content */
+{
+	int		rd_len;
+	io_desc		*iod;
+	d_rm_struct     *d_rm;
+
+	iod = io_curr_device.in;
+	d_rm = (d_rm_struct *)iod->dev_sp;
+	assert(NULL != d_rm);
+	DOREADRL(d_rm->fildes, in_ptr, max_chars_to_read, rd_len);
+	return rd_len;
+}
+
+/* Returns
+ *	-1 (FILE_INPUT_GET_ERROR) in case of errors,
+ *	-2 (FILE_INPUT_GET_LINE2LONG) in case line length of read becomes > input max_len (assuming max_len is non-zero)
+ */
+int file_input_get(char **in_ptr, int max_len)
+{
+	char			*ptr, *tmp_ptr;
+	int			rd_len, s1;
+	mval			val;
+	static char 		*mbuff = buff1;
+	static unsigned int	mbuff_len = BUFF_SIZE;
+	unsigned int 		new_mbuff_len, ret_len;
 
 	ESTABLISH_RET(mupip_load_ch, 0);
 	ret_len = 0;
@@ -212,28 +272,29 @@ int file_input_get(char **in_ptr)
 			REVERT;
 			if (io_curr_device.in->dollar.x)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PREMATEOF);
-			return -1;
+			return FILE_INPUT_GET_ERROR;
 		}
-		if (mbuff_len < ret_len + rd_len)
+		if (max_len && ((ret_len + rd_len) > max_len))
+		{
+			REVERT;
+			return FILE_INPUT_GET_LINE2LONG;
+		}
+		if (mbuff_len < (ret_len + rd_len))
 		{
 			new_mbuff_len = MAX((ret_len + rd_len), (2 * mbuff_len));
 			tmp_ptr = (char *)malloc(new_mbuff_len);
 			if (NULL == tmp_ptr)
 			{
 				REVERT;
-				return -1;
+				return FILE_INPUT_GET_ERROR;
 			}
-			if (mbuff != buff1)
-			{
-				memcpy(tmp_ptr, mbuff, (ret_len));
-				free (mbuff);
-			} else
-				memcpy(tmp_ptr, buff1, (ret_len));
+			memcpy(tmp_ptr, mbuff, ret_len);
+			if (mbuff != buff1)	/* do not free static array, free all later expansions (malloc buffers) */
+				free(mbuff);
 			mbuff = tmp_ptr;
 			mbuff_len = new_mbuff_len;
-
 		}
-		memcpy((unsigned char *) (mbuff + ret_len), val.str.addr, rd_len);
+		memcpy((unsigned char *)(mbuff + ret_len), val.str.addr, rd_len);
 		ret_len += rd_len;
 		if ( !(io_curr_device.in->dollar.x) )
 		{

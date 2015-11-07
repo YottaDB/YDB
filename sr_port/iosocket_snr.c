@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,6 +62,9 @@ static int fcntl_res;
 #include "min_max.h"
 #include "gtm_utf8.h"
 #include "outofband.h"
+#ifdef GTM_TLS
+#include "gtm_tls.h"
+#endif
 
 /* MAX_SNR_IO is for read loop in iosocket_snr_utf_prebuffer(). It is possible for a series of interrupts (one
  * from each active region) to interfere with this read so be generous here.
@@ -77,6 +80,9 @@ GBLREF	io_pair 		io_curr_device;
 GBLREF	bool			out_of_time;
 GBLREF	spdesc 			stringpool;
 GBLREF	int4			outofband;
+#ifdef GTM_TLS
+GBLREF	gtm_tls_ctx_t		*tls_ctx;
+#endif
 
 /* Local routine we aren't making static due to increased debugging difficult static routines make */
 ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength, int flags, ABS_TIME *time_for_read);
@@ -145,13 +151,19 @@ ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, i
  */
 ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength, int flags, ABS_TIME *time_for_read)
 {
-	int		status, bytesread, real_errno;
-	fd_set		tcp_fd;
-	struct timeval	lcl_time_for_read;
+	int		status, real_errno;
+	ssize_t		bytesread;
+	boolean_t	pollread;
 #	ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 	long		poll_timeout;
 	unsigned long	poll_nfds;
 	struct pollfd	poll_fdlist[1];
+#	else
+	fd_set		tcp_fd, *readfds, *writefds;
+	struct timeval	lcl_time_for_read;
+#	endif
+#	ifdef GTM_TLS
+	int		tlspolldirection = 0;
 #	endif
 
 	DBGSOCK2((stdout, "socsnrio: Socket read request - socketptr: 0x"lvaddr"  buffer: 0x"lvaddr"  maxlength: %d  flags: %d  ",
@@ -161,36 +173,92 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 #ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 	assertpro(FD_SETSIZE > socketptr->sd);
 	FD_ZERO(&tcp_fd);
-	FD_SET(socketptr->sd, &tcp_fd);
-	assert(0 != FD_ISSET(socketptr->sd, &tcp_fd));
-	lcl_time_for_read.tv_sec = time_for_read->at_sec;
-	lcl_time_for_read.tv_usec = (gtm_tv_usec_t) time_for_read->at_usec;
-	status = select(socketptr->sd + 1, (void *)(&tcp_fd), (void *)0, (void *)0, &lcl_time_for_read);
-#else
-	poll_fdlist[0].fd = socketptr->sd;
-	poll_fdlist[0].events = POLLIN;
-	poll_nfds = 1;
-	poll_timeout = time_for_read->at_usec / 1000;	/* convert to millisecs */
-	status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 #endif
-	real_errno = errno;
-	DEBUG_ONLY(gettimeofday(&tvafter, NULL);)
-	DBGSOCK2((stdout, "socsnrio: Select return code: %d :: errno: %d\n", status, real_errno));
-        if (0 < status)
+	while (TRUE)
 	{
-                RECV(socketptr->sd, buffer, maxlength, flags, bytesread);
-		real_errno = errno;
-		socketptr->last_recv_errno = (-1 != status) ? 0 : real_errno;	/* Save status of last recv for dbging purposes */
-		DBGSOCK2((stdout, "socsnrio: aa_recv return code: %d :: errno: %d\n", bytesread, errno));
-		if ((0 == bytesread) ||
-		    ((-1 == bytesread) && ((ECONNRESET == real_errno) || (EPIPE == real_errno) || (EINVAL == real_errno))))
-                {       /* Lost connection */
-                        if (0 == bytesread)
-                                errno = ECONNRESET;
-                        return (ssize_t)(-2);
-                }
-		DBGSOCK_ONLY2(errno = real_errno);
-                return bytesread;
+		status = 0;
+#		ifdef GTM_TLS
+		if (socketptr->tlsenabled)
+		{
+			pollread = (tlspolldirection == GTMTLS_WANT_WRITE) ? FALSE : TRUE;
+			status = gtm_tls_cachedbytes((gtm_tls_socket_t *)socketptr->tlssocket);
+		} else
+#		endif
+			pollread = TRUE;
+		if (0 == status)
+		{	/* if TLS cachedbytes available no need to poll */
+#			ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+			FD_SET(socketptr->sd, &tcp_fd);
+			assert(0 != FD_ISSET(socketptr->sd, &tcp_fd));
+			lcl_time_for_read.tv_sec = time_for_read->at_sec;
+			lcl_time_for_read.tv_usec = (gtm_tv_usec_t)time_for_read->at_usec;
+			if (pollread)
+			{
+				readfds = &tcp_fd;
+				writefds = NULL;
+			} else
+			{
+				writefds = &tcp_fd;
+				readfds = NULL;
+			}
+			status = select(socketptr->sd + 1, readfds, writefds, NULL, &lcl_time_for_read);
+#			else
+			poll_fdlist[0].fd = socketptr->sd;
+			poll_fdlist[0].events = pollread ? POLLIN : POLLOUT;
+			poll_nfds = 1;
+			poll_timeout = time_for_read->at_usec / 1000;	/* convert to millisecs */
+			status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
+#			endif
+			real_errno = errno;
+			DEBUG_ONLY(gettimeofday(&tvafter, NULL);)
+			DBGSOCK2((stdout, "socsnrio: Select return code: %d :: errno: %d\n", status, real_errno));
+		}
+		if (0 < status)
+		{
+#			ifdef GTM_TLS
+			if (socketptr->tlsenabled)
+			{
+				bytesread = gtm_tls_recv((gtm_tls_socket_t *)socketptr->tlssocket, buffer, maxlength);
+				if (0 < bytesread)
+					return bytesread;
+				/* if want read or write, need to loop */
+				/* after setting tlspolldirection */
+				switch (bytesread)
+				{
+					case GTMTLS_WANT_READ:
+						tlspolldirection = GTMTLS_WANT_READ;
+						break;
+					case GTMTLS_WANT_WRITE:
+						tlspolldirection = GTMTLS_WANT_WRITE;
+						break;
+					default:
+						socketptr->last_recv_errno = errno = gtm_tls_errno();
+						if (ECONNRESET == errno)
+						{
+							return (ssize_t)(-2);
+						} else
+							return (ssize_t)(-1);
+				}
+				continue;
+			} else
+#			endif
+			{
+				RECV(socketptr->sd, buffer, maxlength, flags, bytesread);
+				real_errno = errno;
+				socketptr->last_recv_errno = (-1 != status) ? 0 : real_errno;	/* Save status for dbg purposes */
+				DBGSOCK2((stdout, "socsnrio: aa_recv return code: %d :: errno: %d\n", bytesread, errno));
+				if ((0 == bytesread) || ((-1 == bytesread) && ((ECONNRESET == real_errno) || (EPIPE == real_errno)
+					|| (EINVAL == real_errno))))
+				{	/* Lost connection */
+					if (0 == bytesread)
+						errno = ECONNRESET;
+					return (ssize_t)(-2);
+				}
+				DBGSOCK_ONLY2(errno = real_errno);
+				return bytesread;
+			}
+		} else
+			break;		/* nothing ready */
 	}
 	DBGSOCK_ONLY2(errno = real_errno);
 	return (ssize_t)status;
@@ -266,8 +334,8 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			break;
 		case CHSET_UTF16LE:
 			mblen = UTF16LE_MBFOLLOW(readptr, readptr + socketptr->buffered_length);
-                        if (0 > mblen)
-                                mblen = 1;      /* If buffer is too small we will get -1 here. Assume need 2 chars */
+			if (0 > mblen)
+				mblen = 1;	/* If buffer is too small we will get -1 here. Assume need 2 chars */
 			break;
 		case CHSET_UTF16:
 			/* Special case as we don't know which mode we are in. This should only be used when
@@ -281,7 +349,7 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			{
 				mblen = UTF16BE_MBFOLLOW(readptr, readptr + socketptr->buffered_length);
 				if (0 > mblen)
-					mblen = 1;      /* If buffer is too small we will get -1 here. Assume need 2 chars */
+					mblen = 1;	/* If buffer is too small we will get -1 here. Assume need 2 chars */
 			}
 			break;
 		default:
@@ -314,7 +382,7 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			bytesread = (int)iosocket_snr_io(socketptr, readptr, readlen, flags, time_for_read);
 			DBGSOCK2((stdout, "socsnrupb: Read %d chars\n", bytesread));
 			if (0 > bytesread)
-			{       /* Some error occurred. Check for restartable condition. */
+			{	/* Some error occurred. Check for restartable condition. */
 				if (EINTR == errno)
 					if (!out_of_time)
 						continue;

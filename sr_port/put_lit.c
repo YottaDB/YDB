@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,10 +35,10 @@ oprtype put_lit(mval *x)
 	ref = newtriple(OC_LIT);
 	ref->operand[0].oprclass = MLIT_REF;
 	/* Multiple reasons to use hashtab since coerce which processes integer parms to functions will
-	   actually *remove* literals if they were just put on so we don't want to convert to hashtab
-	   then have that literal and/or some others yanked to pull us back under the count as that would
-	   confuse things mightily.
-	*/
+	 * actually *remove* literals if they were just put on so we don't want to convert to hashtab
+	 * then have that literal and/or some others yanked to pull us back under the count as that would
+	 * confuse things mightily.
+	 */
 	usehtab = (LIT_HASH_CUTOVER < mlitmax) || (complits_hashtab && complits_hashtab->base);
 	if (!usehtab)
 	{	/* Brute force scan under cutover .. should include all intrinsics */

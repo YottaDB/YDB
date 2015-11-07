@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,7 +91,8 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 			return FALSE;
 		if ((jnl_info->alloc < JNL_ALLOC_MIN) || (jnl_info->alloc > JNL_ALLOC_MAX))
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_JNLINVALLOC, 3, jnl_info->alloc, JNL_ALLOC_MIN, JNL_ALLOC_MAX);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_JNLINVALLOC, 3,
+						jnl_info->alloc, JNL_ALLOC_MIN, JNL_ALLOC_MAX);
 			return FALSE;
 		}
 	}
@@ -101,7 +102,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 			return FALSE;
 		if (alignsize < JNL_MIN_ALIGNSIZE)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_JNLMINALIGN, 2, alignsize, JNL_MIN_ALIGNSIZE);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLMINALIGN, 2, alignsize, JNL_MIN_ALIGNSIZE);
 			return FALSE;
 		}
 		if (alignsize > JNL_MAX_ALIGNSIZE)
@@ -109,11 +110,12 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 			util_out_print("ALIGNSIZE cannot be greater than !UL", TRUE, JNL_MAX_ALIGNSIZE);
 			return FALSE;
 		}
-		LOG2_OF_INTEGER(alignsize, bits_of_alignsize);
+		assert(4 == SIZEOF(alignsize));	/* so we can use the 32bit version of ceil_log2 */
+		bits_of_alignsize = ceil_log2_32bit(alignsize);
 		if ((1 << bits_of_alignsize) != alignsize)
 		{
 			alignsize = 1 << bits_of_alignsize; /* This will make alignsize power of two */
-			gtm_putmsg(VARLSTCNT(3) ERR_JNLALIGNSZCHG, 1, alignsize);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JNLALIGNSZCHG, 1, alignsize);
 		}
 		jnl_info->alignsize = alignsize * DISK_BLOCK_SIZE;
 	}
@@ -124,7 +126,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		if (JNL_AUTOSWITCHLIMIT_MIN > jnl_info->autoswitchlimit
 			|| JNL_ALLOC_MAX < jnl_info->autoswitchlimit)
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_JNLINVSWITCHLMT, 3, jnl_info->autoswitchlimit,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_JNLINVSWITCHLMT, 3, jnl_info->autoswitchlimit,
 								JNL_AUTOSWITCHLIMIT_MIN, JNL_ALLOC_MAX);
 			return FALSE;
 		}
@@ -163,7 +165,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		}
 		if (jnl_info->extend > JNL_EXTEND_MAX)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_JNLINVEXT, 2, jnl_info->extend, JNL_EXTEND_MAX);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLINVEXT, 2, jnl_info->extend, JNL_EXTEND_MAX);
 			return FALSE;
 		}
 	}

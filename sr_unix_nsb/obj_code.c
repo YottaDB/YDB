@@ -49,7 +49,9 @@ GBLREF char			cg_phase;	/* code generation phase */
 GBLREF char			cg_phase_last;	/* previous code generation phase */
 GBLREF int4			curr_addr, code_size;
 GBLREF char			object_file_name[];
+GBLREF int			object_file_des;
 
+error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 
 void	cg_lab (mlabel *l, int4 base);
@@ -85,6 +87,7 @@ void	cg_lab (mlabel *l, int4 base);
 
 void	obj_code (uint4 src_lines, void *checksum_ctx)
 {
+	int		status;
 	rhdtyp		rhead;
 	mline		*mlx, *mly;
 	var_tabent	*vptr;
@@ -171,13 +174,16 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 	}
 	if (0 != lnr_pad_len) /* emit padding so literal text pool starts on proper boundary */
 		emit_immed(PADCHARS, lnr_pad_len);
-#if !defined(__MVS__) && !defined(__s390__)	/* assert not valid for instructions on OS390 */
+#	if !defined(__MVS__) && !defined(__s390__)	/* assert not valid for instructions on OS390 */
 	assert(code_size == psect_use_tab[GTM_CODE]);
-#endif
+#	endif
 	emit_literals();
-	close_object_file();
+	finish_object_file();
+	CLOSE_OBJECT_FILE(object_file_des, status);
+	if (-1 == status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, errno);
 	/* Ready to make object visible. Rename from tmp name to real routine name */
-	rename_tmp_object_file(object_file_name);
+	RENAME_TMP_OBJECT_FILE(object_file_name);
 }
 
 void	cg_lab (mlabel *l, int4 base)

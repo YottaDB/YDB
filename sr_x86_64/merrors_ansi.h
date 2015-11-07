@@ -609,7 +609,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* FREEZEID */
 	   0,	/* BLKWRITERR */
 	   0,	/* STOPTIMEOUT */
-	   0,	/* TRIGMODINTP */
+	   0,	/* UNUSEDMSG776 */
 	   0,	/* BCKUPBUFLUSH */
 	   0,	/* NOFORKCORE */
 	   0,	/* JNLREAD */
@@ -731,7 +731,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* SCNDDBNOUPD */
 	   0,	/* MUINFOUINT4 */
 	   0,	/* NLMISMATCHCALC */
-	   0,	/* UNUSEDMSG898 */
+	   0,	/* RELINKCTLFULL */
 	   0,	/* UNUSEDMSG899 */
 	   0,	/* DBBADNSUB */
 	   0,	/* DBBADKYNM */
@@ -1200,13 +1200,13 @@ const static readonly int error_ansi[] = {
 	   0,	/* SSATTACHSHM */
 	   0,	/* TRIGDEFNOSYNC */
 	   0,	/* TRESTMAX */
-	   0,	/* UNUSEDMSG1367 */
+	   0,	/* ZLINKBYPASS */
 	   0,	/* GBLEXPECTED */
 	   0,	/* GVZTRIGFAIL */
 	   0,	/* MUUSERLBK */
 	   0,	/* SETINSETTRIGONLY */
 	   0,	/* DZTRIGINTRIG */
-	   0,	/* SECNODZTRIGINTP */
+	   0,	/* UNUSEDMSG1373 */
 	   0,	/* BOOLSIDEFFECT */
 	   0,	/* DBBADUPGRDSTATE */
 	   0,	/* WRITEWAITPID */
@@ -1218,7 +1218,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLORDBFLU */
 	   0,	/* ZCCLNUPRTNMISNG */
 	   0,	/* ZCINVALIDKEYWORD */
-	   0,	/* REPLNOMULTILINETRG */
+	   0,	/* UNUSEDMSG1385 */
 	   0,	/* DBSHMNAMEDIFF */
 	   0,	/* SHMREMOVED */
 	   0,	/* DEVICEWRITEONLY */
@@ -1370,7 +1370,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* ISSPANGBL */
 	   0,	/* TPNOSUPPORT */
 	   0,	/* GVSUBSERR */
-	   0,	/* TRIGNOSPANGBL */
+	   0,	/* UNUSEDMSG1539 */
 	   0,	/* FILTERTIMEDOUT */
 	   0,	/* TLSDLLNOOPEN */
 	   0,	/* TLSINIT */
@@ -1407,4 +1407,19 @@ const static readonly int error_ansi[] = {
 	  13,	/* LABELNOTFND */
 	   0,	/* RELINKCTLERR */
 	   0,	/* INVLINKTMPDIR */
+	   0,	/* NOEDITOR */
+	   0,	/* UPDPROC */
+	   0,	/* HLPPROC */
+	   0,	/* REPLNOHASHTREC */
+	   0,	/* REMOTEDBNOTRIG */
+	   0,	/* NEEDTRIGUPGRD */
+	   0,	/* REQRLNKCTLRNDWN */
+	   0,	/* RLNKCTLRNDWNSUC */
+	   0,	/* RLNKCTLRNDWNFL */
+	   0,	/* MPROFRUNDOWN */
+	   0,	/* ZPEEKNOJNLINFO */
+	   0,	/* TLSPARAM */
+	   0,	/* RLNKRECLATCH */
+	   0,	/* RLNKSHMLATCH */
+	   0,	/* JOBLVN2LONG */
 	};

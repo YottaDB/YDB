@@ -29,12 +29,10 @@
 #include "gtm_socket.h"
 #include "gtm_unistd.h"
 #include "gtm_limits.h"
+#include "gtm_un.h"
 
 #include <signal.h>
 #include <sys/time.h>
-#ifdef UNIX
-# include <sys/un.h>
-#endif
 #ifdef VMS
 # include <descrip.h>		/* Required for gtmsource.h */
 # include <ssdef.h>
@@ -152,9 +150,8 @@
 # include "gtm_trigger.h"
 #endif
 
-#ifdef USHBIN_SUPPORTED
+#ifdef AUTORELINK_SUPPORTED
 # include "relinkctl.h"
-# include "zhist.h"
 #endif
 
 #include "gtm_threadgbl_init.h"
@@ -228,4 +225,6 @@ void gtm_threadgbl_init(void)
 	(TREF(replgbl)).jnl_release_timeout = DEFAULT_JNL_RELEASE_TIMEOUT;
 	(TREF(window_ident)).addr = TADR(window_string);
 	TREF(util_outbuff_ptr) = TADR(util_outbuff);	/* Point util_outbuff_ptr to the beginning of util_outbuff at first. */
+	TREF(util_outptr) = TREF(util_outbuff_ptr);
+	TREF(max_advancewindow_line) = MAX_SRCLINE;
 }

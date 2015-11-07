@@ -102,9 +102,11 @@ CONDITION_HANDLER(iomt_ch);
 CONDITION_HANDLER(jnl_file_autoswitch_ch);
 CONDITION_HANDLER(job_init_ch);
 CONDITION_HANDLER(jobexam_dump_ch);
+#ifdef VMS
 CONDITION_HANDLER(lastchance1);
 CONDITION_HANDLER(lastchance2);
 CONDITION_HANDLER(lastchance3);
+#endif
 CONDITION_HANDLER(mdb_condition_handler);
 CONDITION_HANDLER(mu_freeze_ch);
 CONDITION_HANDLER(mu_int_ch);

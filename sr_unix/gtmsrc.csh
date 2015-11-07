@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2014 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -83,7 +83,7 @@ if ( $?gtmsrc_last_exe == "1" ) then
 	set	path =			`echo $path        | sed -e "s|$gtmsrc_last_exe|$gtm_exe|"`
 
 	# (Note: the use of an intermediate gtmroutines shell variable is necessary for csh; tcsh doesn't require it.)
-	set	gtmsrc_gtmroutines =	`echo $gtmroutines | sed -e "s|$gtmsrc_last_exe|$gtm_exe|"`
+	set	gtmsrc_gtmroutines =	`echo "$gtmroutines" | sed -e "s|$gtmsrc_last_exe|$gtm_exe|"`
 	setenv	gtmroutines		"$gtmsrc_gtmroutines"
 endif
 setenv gtmsrc_last_exe	$gtm_exe

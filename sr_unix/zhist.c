@@ -15,10 +15,9 @@
 
 #include "min_max.h"
 #include <rtnhdr.h>
-#include "zhist.h"
 #include "gtmlink.h"
 
-#ifdef USHBIN_SUPPORTED /* This entire file */
+#ifdef AUTORELINK_SUPPORTED /* This entire file */
 
 /* Routine called from op_rhd_ext() to determine if the routine being called needs to be relinked. To return TRUE,
  * the following conditions must be met:
@@ -37,77 +36,100 @@
 boolean_t need_relink(rhdtyp *rtnhdr, zro_hist *zhist)
 {
 	zro_validation_entry	*iter;
-	uint4			cur_cycle;
+	uint4			cur_cycle, rtnnmlen;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(NULL != zhist);		/* Should be called unless relinking is possible */
+	assert(NULL != zhist);		/* Shouldn't be called unless relinking is possible */
 	/* TODO: Do this check second, if below logic would return TRUE */
 	if ((LINK_NORECURSIVE == TREF(relink_allowed)) && on_stack(rtnhdr, NULL))
 		return FALSE;	/* can't relink, or else we'll get LOADRUNNING */
-	/* If SET=$ZRO cycle has changed since validation list was compiled, recreate the list.... just fully relink */
-	/* TODO: Only relink when absolutely necessary. If routine has same hash in same location, don't relink */
+	/* If $ZROUTINES cycle has changed since validation list was created, signal relink but the relink only
+	 * actually happens if the file op_zlink() locates has a different object hashcode than the currently
+	 * linked routine - else it just rebuilds the history and calls it good.
+	 */
 	if (zhist->zroutines_cycle != TREF(set_zroutines_cycle))
 		return TRUE;
 	/* Traverse list corresponding to zro entries */
 	for (iter = &zhist->base[0]; iter != zhist->end; iter++)
 	{
-		/* TODO: assert routine name near cycle_reladdr == current routine invocation */
-		cur_cycle = RELINKCTL_CYCLE_READ(iter->relinkctl_bkptr, iter->cycle_loc);
+		DEBUG_ONLY(rtnnmlen = mid_len(&iter->relinkrec->rtnname_fixed));
+		assert((rtnnmlen == rtnhdr->routine_name.len)	/* Verify have the right entry - compare names */
+		       && (0 == memcmp(&iter->relinkrec->rtnname_fixed, rtnhdr->routine_name.addr, rtnnmlen)));
+		cur_cycle = iter->relinkrec->cycle;
 		if (cur_cycle != iter->cycle)
 			return TRUE;
 	}
 	return FALSE;
 }
 
-/* Routine called from zro_search()
- * zro_zhist_saverecent
- * INPUT:
- * 	array of history entries created during zro_search()
- * OUTPUT:
- * 	global variable TREF(recent_zhist), which is then "passed" to incr_link, which associates this history with routine hdr
+/* Routine called from zro_search_hist() to copy a given search history block from stack memory to malloc'd memory
+ * so it can be attached to the routine header of the linked routine.
+ *
+ * Parameters:
+ *   zhist_valent      - Last search history entry + 1
+ *   zhist_valent_base - First search history entry
+ *
+ * Return value:
+ *   Malloc'd block of search history header (zro_hist *) followed by the array of search history entries for
+ *   the given routine.
  */
-void zro_zhist_saverecent(zro_validation_entry *zhent, zro_validation_entry *zhent_base)
+zro_hist *zro_zhist_saverecent(zro_search_hist_ent *zhist_valent_end, zro_search_hist_ent *zhist_valent_base)
 {
-	int		hist_len;
-	zro_hist	*lcl_recent_zhist;
+	int			hist_len;
+	relinkrec_t		*rec;
+	zro_hist		*lcl_recent_zhist;
+	zro_validation_entry	*zhent;
+	zro_search_hist_ent	*zhist_valent;
+	mstr			rtnname;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Malloc and save zhist copy */
-	assert(NULL != zhent);
-	assert(NULL != zhent_base);
-	hist_len = zhent - zhent_base;
-	lcl_recent_zhist = (zro_hist *)malloc(SIZEOF(zro_hist) + SIZEOF(zro_validation_entry) * hist_len);
+	/* Malloc and return zhist copy */
+	assert(NULL != zhist_valent_end);
+	assert(NULL != zhist_valent_base);
+	hist_len = zhist_valent_end - zhist_valent_base;
+	lcl_recent_zhist = (zro_hist *)malloc(SIZEOF(zro_hist) + (SIZEOF(zro_validation_entry) * hist_len));
 	lcl_recent_zhist->zroutines_cycle = TREF(set_zroutines_cycle);
 	lcl_recent_zhist->end = &lcl_recent_zhist->base[0] + hist_len;
-	memcpy((char *)&lcl_recent_zhist->base[0], (char *)zhent_base, SIZEOF(zro_validation_entry) * hist_len);
-	TREF(recent_zhist) = lcl_recent_zhist;
+	for (zhist_valent = zhist_valent_base, zhent = &lcl_recent_zhist->base[0];
+		0 < hist_len;
+			zhist_valent++, zhent++, hist_len--)
+	{
+		rtnname.addr = zhist_valent->rtnname.c;
+		rtnname.len = zhist_valent->rtnname_len;
+		assert(NULL != zhist_valent->zro_valent.relinkctl_bkptr);
+		rec = relinkctl_insert_record(zhist_valent->zro_valent.relinkctl_bkptr, &rtnname);
+		assert(NULL != rec);
+		zhist_valent->zro_valent.relinkrec = rec;
+		zhist_valent->zro_valent.cycle = rec->cycle;
+		memcpy((char *)zhent, (char *)&zhist_valent->zro_valent, SIZEOF(zro_validation_entry));
+	}
+	return lcl_recent_zhist;
 }
 
-/*
- * zro_record_zhist
- * INPUT:
- * 	routine name
- * 	$ZROUTINES entry identifier
- * OUTPUT:
- * 	cycle_addr
- * 	current value at cycle_addr
- * 	NOTE: both saved into current history entry, "zhent"
+/* Routine called from zro_search_hist() to add a $ZROUTINES entry to the (local) search history for a given object file.
+ *
+ * Parameters:
+ *   zhist_valent	- $ZROUTINES search history entry to be filled in.
+ *   obj_container	- $ZROUTINES entry for a given object directory.
+ *   rtnname		- mstr addr containing name of the routine.
+ *
  */
-void zro_record_zhist(zro_validation_entry *zhent, zro_ent *obj_container, mstr *rtnname)
+void zro_record_zhist(zro_search_hist_ent *zhist_valent, zro_ent *obj_container, mstr *rtnname)
 {
 	open_relinkctl_sgm	*linkctl;
-	relinkrec_loc_t		rec;
 	int			len;
 
 	assert(NULL != obj_container);
 	linkctl = obj_container->relinkctl_sgmaddr;
 	assert(NULL != linkctl);
-	zhent->relinkctl_bkptr = linkctl;
-	assert(NULL != zhent);
-	rec = relinkctl_insert_record(linkctl, rtnname);
-	zhent->cycle_loc = rec;
-	zhent->cycle = RELINKCTL_CYCLE_READ(linkctl, zhent->cycle_loc);
+	zhist_valent->zro_valent.relinkctl_bkptr = linkctl;
+	assert(NULL != zhist_valent);
+	assert(rtnname->len < SIZEOF(mident_fixed));
+	memcpy(zhist_valent->rtnname.c, rtnname->addr, rtnname->len);
+	zhist_valent->rtnname_len = rtnname->len;
+	if (SIZEOF(zhist_valent->rtnname) > rtnname->len)
+		memset((zhist_valent->rtnname.c + rtnname->len), '\0', SIZEOF(zhist_valent->rtnname) - rtnname->len);
 }
-#endif /* USHBIN_SUPPORTED */
+#endif /* AUTORELINK_SUPPORTED */

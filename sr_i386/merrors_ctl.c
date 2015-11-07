@@ -330,7 +330,7 @@ LITDEF	err_msg merrors[] = {
 	"FREEZE", "Region: !AD is already frozen", 2,
 	"NOSELECT", "None of the selected variables exist -- halting", 0,
 	"EXTRFAIL", "Extract failed for the global ^!AD. MUPIP INTEG should be run.", 2,
-	"LDBINFMT", "Corrupt binary format header information", 0,
+	"LDBINFMT", "Unrecognized header for load file", 0,
 	"NOPREVLINK", "Journal file !AD has a null previous link", 2,
 	"CCEDUMPON", "", 0,
 	"CCEDMPQUALREQ", "A qualifier (DB,[NO]ON, or NOW) is required with the DUMP command", 0,
@@ -413,7 +413,7 @@ LITDEF	err_msg merrors[] = {
 	"TEXT", "!AD", 2,
 	"ZWRSPONE", "Subscript patterns in ZWRITE are atomic; Invalid delimiter", 0,
 	"FILEDEL", "File !AD successfully deleted", 2,
-	"JNLBADLABEL", "Journal file !AD does not have a GT.M Journal File Label", 2,
+	"JNLBADLABEL", "Journal file !AD has a bad GT.M Journal File Label. Expected !AD. Found !AD.", 6,
 	"JNLREADEOF", "End of journal file encountered for !AD", 2,
 	"JNLRECFMT", "Journal file record format error encountered", 0,
 	"BLKTOODEEP", "Block level too deep", 0,
@@ -611,7 +611,7 @@ LITDEF	err_msg merrors[] = {
 	"FREEZEID", "Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ", 7,
 	"BLKWRITERR", "Unable to queue disk write for block 0x!XL.  Will keep trying.", 1,
 	"STOPTIMEOUT", "Waited too long for stopped process to release.  Region: !AD.", 2,
-	"TRIGMODINTP", "Triggers for a given global cannot be both used and modified or removed in the same transaction", 0,
+	"UNUSEDMSG776", "TRIGMODINTP last used in V6.2-000", 0,
 	"BCKUPBUFLUSH", "Unable to flush buffer for online backup", 0,
 	"NOFORKCORE", "Unable to fork off process to create core.  Core creation postponed.", 0,
 	"JNLREAD", "Error reading from journal file !AD at offset [0x!XL]", 3,
@@ -644,7 +644,7 @@ LITDEF	err_msg merrors[] = {
 	"JNLRDONLY", "Journal file !AD read only", 2,
 	"ANCOMPTINC", "Deviceparameter !AD is not compatible with any other deviceparameters in the !AD command", 4,
 	"ABNCOMPTINC", "Deviceparameter !AD and deviceparameter !AD are not compatible in the !AD command", 6,
-	"RECLOAD", "Error loading record number: !UL!/", 1,
+	"RECLOAD", "Error loading record number: !@UQ!/", 1,
 	"SOCKNOTFND", "Socket !AD not found", 2,
 	"CURRSOCKOFR", "Current socket of index !UL is out of range.  There are only !UL sockets.", 2,
 	"SOCKETEXIST", "Socket !AD already exists", 2,
@@ -733,7 +733,7 @@ LITDEF	err_msg merrors[] = {
 	"SCNDDBNOUPD", "Database Updates not allowed on the secondary", 0,
 	"MUINFOUINT4", "!AD : !UL [0x!XL]", 4,
 	"NLMISMATCHCALC", "Location of !AD expected at 0x!XL, but found at 0x!XL", 4,
-	"UNUSEDMSG898", "GTMSECSHRLOGSWH last used in V5.5-000", 0,
+	"RELINKCTLFULL", "Relinkctl file for directory !AD is full (maximum entries !UL)", 3,
 	"UNUSEDMSG899", "GTMSECSHRDEFLOG last used in V5.5-000", 0,
 	"DBBADNSUB", "!AD Bad numeric subscript", 2,
 	"DBBADKYNM", "!AD Bad key name", 2,
@@ -1202,13 +1202,13 @@ LITDEF	err_msg merrors[] = {
 	"SSATTACHSHM", "Error while attaching to shared memory identifier !UL", 1,
 	"TRIGDEFNOSYNC", "Global ^!AD has triggers defined on the !AD instance but none on the !AD instance. Current journal sequence number is 0x!16@XQ", 7,
 	"TRESTMAX", "TRESTART not allowed in a final TP retry more than once", 0,
-	"UNUSEDMSG1367", "TPLOCKRESTMAX : Last used in V5.5-000", 0,
+	"ZLINKBYPASS", "ZLINK of !AD bypassed - Identical routine already linked", 2,
 	"GBLEXPECTED", "Global variable reference expected in this context", 0,
 	"GVZTRIGFAIL", "ZTRIGGER of a global variable failed.  Failure code: !AD.", 2,
 	"MUUSERLBK", "Abnormal shutdown of replication-enabled database !AD detected", 2,
 	"SETINSETTRIGONLY", "ISV !AD can only be modified in a 'SET' type trigger", 2,
 	"DZTRIGINTRIG", "$ZTRIGGER() is not allowed inside trigger context. Trigger name: !AD", 2,
-	"SECNODZTRIGINTP", "Sequence number 0x!16@XQ contains $ZTRIGGER() updates made inside a transaction which the current replicating instance does not support. The replicating instance must be upgraded to at least V5.4-002 to support this type of transaction. Cannot continue", 1,
+	"UNUSEDMSG1373", "SECNODZTRIGINTP : Last used in V6.2-000", 0,
 	"BOOLSIDEFFECT", "Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression", 0,
 	"DBBADUPGRDSTATE", "Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.", 4,
 	"WRITEWAITPID", "PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD", 6,
@@ -1220,7 +1220,7 @@ LITDEF	err_msg merrors[] = {
 	"JNLORDBFLU", "Error flushing database blocks to !AD. See related messages in the operator log", 2,
 	"ZCCLNUPRTNMISNG", "External call: Cleanup routine name missing. Cannot continue", 0,
 	"ZCINVALIDKEYWORD", "External call: Invalid keyword found. Cannot continue", 0,
-	"REPLNOMULTILINETRG", "Sequence number 0x!16@XQ contains a trigger definition too large for transmission to the current replicating instance, which does not support multi-line triggers - stopping replication", 1,
+	"UNUSEDMSG1385", "REPLNOMULTILINETRG : Last used in V6.2-000", 0,
 	"DBSHMNAMEDIFF", "Database file !AD points to shared memory (id = !UL) which points to a different database file !AZ", 4,
 	"SHMREMOVED", "Removed Shared Memory id !UL corresponding to file !AD", 3,
 	"DEVICEWRITEONLY", "Cannot read from a write-only device", 0,
@@ -1240,7 +1240,7 @@ LITDEF	err_msg merrors[] = {
 	"JIUNHNDINT", "An error during $ZINTERRUPT processing was not handled: !AD", 2,
 	"GTMASSERT2", "!AD - Assert failed !AD line !UL for expression (!AD)", 7,
 	"ZTRIGNOTRW", "ZTRIGGER cannot operate on read-only region !AD", 2,
-	"TRIGMODREGNOTRW", "Trigger(s) cannot be added/changed/deleted because region !AD is read-only", 2,
+	"TRIGMODREGNOTRW", "Trigger(s) cannot be added/changed/deleted/upgraded because region !AD is read-only", 2,
 	"INSNOTJOINED", "Replicating Instance !AD is not a member of the same Group as Instance !AD", 4,
 	"INSROLECHANGE", "Supplementary Instance !AD and non-Supplementary Instance !AD belong to the same Group", 4,
 	"INSUNKNOWN", "Supplementary Instance !AD has no instance definition for non-Supplementary Instance !AD", 4,
@@ -1372,7 +1372,7 @@ LITDEF	err_msg merrors[] = {
 	"ISSPANGBL", "Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory", 2,
 	"TPNOSUPPORT", "Operation cannot be performed while inside of a TP transaction", 0,
 	"GVSUBSERR", "Invalid subscripted global name specification in $VIEW() function", 0,
-	"TRIGNOSPANGBL", "Triggers cannot be installed/deleted for global name !AD as it spans multiple regions in current global directory", 2,
+	"UNUSEDMSG1539", "TRIGNOSPANBL : Last used in V6.2-000", 0,
 	"FILTERTIMEDOUT", "Replication server timed out attempting to read seqno !16@XQ from external filter", 1,
 	"TLSDLLNOOPEN", "Failed to load GT.M TLS/SSL library for secure communication", 0,
 	"TLSINIT", "Failed to initialize GT.M TLS/SSL library for secure communication", 0,
@@ -1409,6 +1409,21 @@ LITDEF	err_msg merrors[] = {
 	"LABELNOTFND", "GOTO referenced a label that does not exist", 0,
 	"RELINKCTLERR", "Error with relink control structure for $ZROUTINES directory !AD", 2,
 	"INVLINKTMPDIR", "Value for $gtm_linktmpdir is either not found or not a directory: !AD", 2,
+	"NOEDITOR", "Can't find an executable editor: !AD", 2,
+	"UPDPROC", "Update Process error", 0,
+	"HLPPROC", "Helper Process error", 0,
+	"REPLNOHASHTREC", "Sequence number 0x!16@XQ contains trigger definition updates. !AD side must be at least V6.2-000 for replication to continue", 3,
+	"REMOTEDBNOTRIG", "Trigger operations on global !AD not supported as it maps to database region !AD that points to a remote file", 4,
+	"NEEDTRIGUPGRD", "Cannot do trigger operation on database file !AD until it is upgraded; Run MUPIP TRIGGER -UPGRADE first", 2,
+	"REQRLNKCTLRNDWN", "Error accessing relinkctl file for $ZROUTINES directory !AD. Must be rundown", 2,
+	"RLNKCTLRNDWNSUC", "Relinkctl file for $ZROUTINES directory !AD successfully rundown", 2,
+	"RLNKCTLRNDWNFL", "Relinkctl file for $ZROUTINES directory !AD failed to rundown as it is open by !UL process(es)", 3,
+	"MPROFRUNDOWN", "Error during M-profiling rundown", 0,
+	"ZPEEKNOJNLINFO", "$ZPEEK() unable to access requested journal structure - region !AD is not currently journaled", 2,
+	"TLSPARAM", "TLS parameter !AD !AD", 4,
+	"RLNKRECLATCH", "Failed to get latch on relinkctl record for routine name !AZ in $ZROUTINES directory !AD", 3,
+	"RLNKSHMLATCH", "Failed to get latch on relinkctl shared memory for $ZROUTINES directory !AD", 2,
+	"JOBLVN2LONG", "The zwrite representation of a local variable transferred to a JOB'd process can not exceed !UL. Encountered size: !UL", 2,
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -2009,7 +2024,7 @@ LITDEF	int ERR_MEMORYRECURSIVE = 150377116;
 LITDEF	int ERR_FREEZEID = 150377123;
 LITDEF	int ERR_BLKWRITERR = 150377131;
 LITDEF	int ERR_STOPTIMEOUT = 150377138;
-LITDEF	int ERR_TRIGMODINTP = 150377146;
+LITDEF	int ERR_UNUSEDMSG776 = 150377146;
 LITDEF	int ERR_BCKUPBUFLUSH = 150377154;
 LITDEF	int ERR_NOFORKCORE = 150377160;
 LITDEF	int ERR_JNLREAD = 150377170;
@@ -2131,7 +2146,7 @@ LITDEF	int ERR_SECONDAHEAD = 150378090;
 LITDEF	int ERR_SCNDDBNOUPD = 150378098;
 LITDEF	int ERR_MUINFOUINT4 = 150378107;
 LITDEF	int ERR_NLMISMATCHCALC = 150378114;
-LITDEF	int ERR_UNUSEDMSG898 = 150378122;
+LITDEF	int ERR_RELINKCTLFULL = 150378122;
 LITDEF	int ERR_UNUSEDMSG899 = 150378131;
 LITDEF	int ERR_DBBADNSUB = 150378138;
 LITDEF	int ERR_DBBADKYNM = 150378146;
@@ -2600,13 +2615,13 @@ LITDEF	int ERR_TCOMMITDISALLOW = 150381842;
 LITDEF	int ERR_SSATTACHSHM = 150381850;
 LITDEF	int ERR_TRIGDEFNOSYNC = 150381856;
 LITDEF	int ERR_TRESTMAX = 150381866;
-LITDEF	int ERR_UNUSEDMSG1367 = 150381874;
+LITDEF	int ERR_ZLINKBYPASS = 150381875;
 LITDEF	int ERR_GBLEXPECTED = 150381882;
 LITDEF	int ERR_GVZTRIGFAIL = 150381890;
 LITDEF	int ERR_MUUSERLBK = 150381898;
 LITDEF	int ERR_SETINSETTRIGONLY = 150381906;
 LITDEF	int ERR_DZTRIGINTRIG = 150381914;
-LITDEF	int ERR_SECNODZTRIGINTP = 150381922;
+LITDEF	int ERR_UNUSEDMSG1373 = 150381922;
 LITDEF	int ERR_BOOLSIDEFFECT = 150381928;
 LITDEF	int ERR_DBBADUPGRDSTATE = 150381936;
 LITDEF	int ERR_WRITEWAITPID = 150381946;
@@ -2618,7 +2633,7 @@ LITDEF	int ERR_GTMSECSHRCHDIRF = 150381986;
 LITDEF	int ERR_JNLORDBFLU = 150381994;
 LITDEF	int ERR_ZCCLNUPRTNMISNG = 150382002;
 LITDEF	int ERR_ZCINVALIDKEYWORD = 150382010;
-LITDEF	int ERR_REPLNOMULTILINETRG = 150382018;
+LITDEF	int ERR_UNUSEDMSG1385 = 150382018;
 LITDEF	int ERR_DBSHMNAMEDIFF = 150382026;
 LITDEF	int ERR_SHMREMOVED = 150382035;
 LITDEF	int ERR_DEVICEWRITEONLY = 150382042;
@@ -2770,7 +2785,7 @@ LITDEF	int ERR_GBLNOMAPTOREG = 150383202;
 LITDEF	int ERR_ISSPANGBL = 150383210;
 LITDEF	int ERR_TPNOSUPPORT = 150383218;
 LITDEF	int ERR_GVSUBSERR = 150383226;
-LITDEF	int ERR_TRIGNOSPANGBL = 150383234;
+LITDEF	int ERR_UNUSEDMSG1539 = 150383234;
 LITDEF	int ERR_FILTERTIMEDOUT = 150383242;
 LITDEF	int ERR_TLSDLLNOOPEN = 150383250;
 LITDEF	int ERR_TLSINIT = 150383258;
@@ -2807,9 +2822,24 @@ LITDEF	int ERR_CRYPTBADWRTPOS = 150383498;
 LITDEF	int ERR_LABELNOTFND = 150383506;
 LITDEF	int ERR_RELINKCTLERR = 150383514;
 LITDEF	int ERR_INVLINKTMPDIR = 150383522;
+LITDEF	int ERR_NOEDITOR = 150383530;
+LITDEF	int ERR_UPDPROC = 150383538;
+LITDEF	int ERR_HLPPROC = 150383546;
+LITDEF	int ERR_REPLNOHASHTREC = 150383554;
+LITDEF	int ERR_REMOTEDBNOTRIG = 150383562;
+LITDEF	int ERR_NEEDTRIGUPGRD = 150383570;
+LITDEF	int ERR_REQRLNKCTLRNDWN = 150383578;
+LITDEF	int ERR_RLNKCTLRNDWNSUC = 150383587;
+LITDEF	int ERR_RLNKCTLRNDWNFL = 150383594;
+LITDEF	int ERR_MPROFRUNDOWN = 150383602;
+LITDEF	int ERR_ZPEEKNOJNLINFO = 150383610;
+LITDEF	int ERR_TLSPARAM = 150383618;
+LITDEF	int ERR_RLNKRECLATCH = 150383626;
+LITDEF	int ERR_RLNKSHMLATCH = 150383634;
+LITDEF	int ERR_JOBLVN2LONG = 150383642;
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1396};
+	1411};

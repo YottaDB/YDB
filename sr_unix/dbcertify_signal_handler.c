@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,9 +78,9 @@ error_def(ERR_KRNLKILL);
 
 void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 {
-	boolean_t	exit_now;
+	boolean_t		dbc_critical, exit_now;
 	gtm_sigcontext_t	*context_ptr;
-	void		(*signal_routine)();
+	void			(*signal_routine)();
 
 	/* Save parameter value in global variables for easy access in core */
 	dont_want_core = FALSE;		/* (re)set in case we recurse */
@@ -119,11 +119,12 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 				}
 				++core_in_progress;
 				DUMP_CORE;
-				GTMASSERT;
+				assertpro(FALSE);
 			default:
 				;
 		}
 	}
+	dbc_critical = ((NULL != psa_gbl) && psa_gbl->dbc_critical);
 	switch(sig)
 	{
 		case SIGINT:
@@ -132,7 +133,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			/* If nothing pending AND we have crit or already in exit processing, wait to
 			 * invoke shutdown.
 			 */
-			if ((EXIT_PENDING_TOLERANT >= exit_state) && (psa_gbl->dbc_critical || exit_handler_active))
+			if ((EXIT_PENDING_TOLERANT >= exit_state) && (dbc_critical || exit_handler_active))
 			{
 				SET_FORCED_EXIT_STATE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -165,10 +166,10 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 					break;
 				default:
 					exit_state = EXIT_IMMED;
-					GTMASSERT;
+					assertpro(FALSE);
 			}
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
-			if ((EXIT_PENDING_TOLERANT >= exit_state) && (psa_gbl->dbc_critical || exit_handler_active))
+			if ((EXIT_PENDING_TOLERANT >= exit_state) && (dbc_critical || exit_handler_active))
 			{
 				SET_FORCED_EXIT_STATE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -215,7 +216,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 		case SIGDANGER:
 			forced_exit_err = ERR_KRNLKILL;
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
-			if ((EXIT_PENDING_TOLERANT >= exit_state) && (psa_gbl->dbc_critical || exit_handler_active))
+			if ((EXIT_PENDING_TOLERANT >= exit_state) && (dbc_critical || exit_handler_active))
 			{
 				SET_FORCED_EXIT_STATE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -242,7 +243,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 					/* This signal was SENT to us so it can wait until we are out of crit to cause an exit */
 					forced_exit_err = ERR_KILLBYSIGUINFO;
 					/* If nothing pending AND we have crit or already exiting, wait to invoke shutdown */
-					if ((EXIT_PENDING_TOLERANT >= exit_state) && (psa_gbl->dbc_critical || exit_handler_active))
+					if ((EXIT_PENDING_TOLERANT >= exit_state) && (dbc_critical || exit_handler_active))
 					{
 						SET_FORCED_EXIT_STATE;
 						exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -281,7 +282,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 					break;
 				default:
 					exit_state = EXIT_IMMED;
-					GTMASSERT;
+					assertpro(FALSE);
 			}
 			if (0 != signal_info.sig_err)
 			{
@@ -297,7 +298,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 		gtm_fork_n_core();
 	}
 	/* As on VMS, a mupip stop does not drive the condition handlers unless we are in crit */
-	if ((psa_gbl->dbc_critical || SIGTERM != exi_condition) && CHANDLER_EXISTS)
+	if ((dbc_critical || (SIGTERM != exi_condition)) && CHANDLER_EXISTS)
 		DRIVECH(exi_condition);
 
 	assert((EXIT_IMMED <= exit_state) || !exit_handler_active);

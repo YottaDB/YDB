@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@
 #include "show_source_line.h"
 
 GBLREF	boolean_t	run_time;
-GBLREF	short int	source_column;
+GBLREF	int		source_column;
 
 error_def(ERR_SIDEEFFECTEVAL);
 error_def(ERR_VAREXPECTED);

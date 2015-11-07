@@ -44,8 +44,10 @@
 #include "memcoherency.h"
 #include "getjobnum.h"
 #include "gtmimagename.h"
+#include "wbox_test_init.h"
 
-#define UPDHELPER_CMD_MAXLEN		1024
+
+#define UPDHELPER_CMD_MAXLEN		GTM_PATH_MAX
 #define UPDHELPER_CMD			"%s/mupip"
 #define UPDHELPER_CMD_FILE		"mupip"
 #define UPDHELPER_CMD_ARG1		"replicate"
@@ -68,6 +70,7 @@ error_def(ERR_GTMDISTUNVERIF);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_TEXT);
+error_def(ERR_HLPPROC);
 
 static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 {
@@ -93,13 +96,27 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	if (!gtm_dist_ok_to_use)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+	if (WBTEST_ENABLED(WBTEST_MAXGTMDIST_HELPER_PROCESS))
+	{
+		memset(gtm_dist, 'a', GTM_PATH_MAX-2);
+		gtm_dist[GTM_PATH_MAX-1] = '\0';
+	}
+	helper_cmd_len = SNPRINTF(helper_cmd, UPDHELPER_CMD_MAXLEN, UPDHELPER_CMD, gtm_dist);
+	if ((-1 == helper_cmd_len) || (UPDHELPER_CMD_MAXLEN <= helper_cmd_len))
+	{
+		helper->helper_shutdown = save_shutdown;
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_HLPPROC, 0, ERR_TEXT, 2,
+			   LEN_AND_LIT("Could not find path of Helper Process. Check value of $gtm_dist"));
+		repl_errno = EREPL_UPDSTART_BADPATH;
+		return UPDPROC_START_ERR ;
+	}
 	FORK(helper_pid);
 	if (0 > helper_pid)
 	{
 		save_errno = errno;
 		helper->helper_shutdown = save_shutdown;
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				LEN_AND_LIT("Could not fork update process"), save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_HLPPROC, 0, ERR_TEXT, 2,
+				LEN_AND_LIT("Could not fork Helper process"), save_errno);
 		repl_errno = EREPL_UPDSTART_FORK;
 		return UPDPROC_START_ERR;
 	}
@@ -107,24 +124,17 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	{	/* helper */
 		getjobnum();
 		helper->helper_pid_prev = process_id; /* identify owner of slot */
-		helper_cmd_len = SNPRINTF(helper_cmd, UPDHELPER_CMD_MAXLEN, UPDHELPER_CMD, gtm_dist);
-		if(-1 == helper_cmd_len)
-		{
-			helper->helper_shutdown = save_shutdown;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				   LEN_AND_LIT("Could not find path of Helper Process. Check value of $gtm_dist"));
-			repl_errno = EREPL_UPDSTART_BADPATH;
-			return UPDPROC_START_ERR;
-		}
+		if (WBTEST_ENABLED(WBTEST_BADEXEC_HELPER_PROCESS))
+			STRCPY(helper_cmd, "ersatz");
 		if (-1 == EXECL(helper_cmd, helper_cmd, UPDHELPER_CMD_ARG1, UPDHELPER_CMD_ARG2,
 				(UPD_HELPER_READER == helper_type) ? UPDHELPER_READER_CMD_ARG3 : UPDHELPER_WRITER_CMD_ARG3, NULL))
 		{
 			save_errno = errno;
 			helper->helper_shutdown = save_shutdown;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_HLPPROC, 0, ERR_TEXT, 2,
 				   LEN_AND_LIT("Could not exec Helper Process"), save_errno);
 			repl_errno = EREPL_UPDSTART_EXEC;
-			return UPDPROC_START_ERR;
+			_exit(UPDPROC_START_ERR);
 		}
 	}
 #elif defined(VMS)

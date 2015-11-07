@@ -27,6 +27,7 @@ set buildaux_status = 0
 set dollar_sign = \$
 set mach_type = `uname -m`
 set platform_name = `uname | sed 's/-//g' | tr '[A-Z]' '[a-z]'`
+set host=$HOST:r:r:r
 
 if ( $1 == "" ) then
 	@ buildaux_status++
@@ -485,7 +486,7 @@ if ( $buildaux_ftok == 1 ) then
 		set aix_loadmap_option = "-bcalls:$gtm_map/ftok.loadmap -bmap:$gtm_map/ftok.loadmap -bxref:$gtm_map/ftok.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/ftok -L$gtm_obj $gtm_obj/ftok.o \
-			$gt_ld_sysrtns -lmumps $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/ftok.map
+			$gt_ld_sysrtns -lmupip -lmumps -lstub $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/ftok.map
 	if ( $status != 0  ||  ! -x $3/ftok ) then
 		@ buildaux_status++
 		echo "buildaux-E-linkftok, Failed to link ftok (see ${dollar_sign}gtm_map/ftok.map)" \
@@ -566,16 +567,6 @@ if ($buildaux_gtmcrypt == 1) then
 		else
 			set make = "make"
 		endif
-		# libssl.so isn't available on pfloyd. Skip building SSL/TLS reference implementation library on pfloyd. This is
-		# okay since pfloyd is AIX 5.3 which isn't a supported AIX version anyways.
-		set host=$HOST:r:r:r
-		if ($host !~ pfloyd) then
-			$make gtmtls image=$plugin_build_type
-			if ($status) then
-				@ buildaux_status++
-				echo "buildaux-E-tls, failed to build libgtmtls.so." >> $gtm_log/error.${gtm_exe:t}.log
-			endif
-		endif
 		# On tuatara, atlhxit1 and atlhxit2 Libgcrypt version is too low to support FIPS mode. Add necessary flags to
 		# Makefile to tell the plugin to build without FIPS support.
 		if ($host =~ {tuatara,atlhxit1,atlhxit2}) then
@@ -583,27 +574,6 @@ if ($buildaux_gtmcrypt == 1) then
 		else
 			set fips_flag = ""
 		endif
-		# Build all possible encryption libraries based on what encryption libraries are supported in this platform.
-		foreach supported_lib ($supported_list)
-			foreach algorithm ("AES256CFB" "BLOWFISHCFB")
-				if ("gcrypt" == "$supported_lib" && "BLOWFISHCFB" == "$algorithm") continue
-				echo "####### Building encryption plugin using $supported_lib with $algorithm algorithm #########"
-				$make gtmcrypt image=$plugin_build_type thirdparty=$supported_lib algo=$algorithm $fips_flag
-				if ($status) then
-					@ buildaux_status++
-					echo "buildaux-E-libgtmcrypt, failed to build gtmcrypt and/or helper scripts."	\
-									>> $gtm_log/error.${gtm_exe:t}.log
-				endif
-				echo ""
-			end
-		end
-		# Now that the individual libraries are built, go ahead and build the maskpass
-		$make maskpass
-		if ($status) then
-			@ buildaux_status++
-			echo "buildaux-E-maskpass, failed to build maskpass." >> $gtm_log/error.${gtm_exe:t}.log
-		endif
-		#
 		if ($gtm_verno =~ V[4-8]*) then
 			# For production builds don't do any randomizations.
 			set algorithm = "AES256CFB"
@@ -613,32 +583,39 @@ if ($buildaux_gtmcrypt == 1) then
 				set encryption_lib = "gcrypt"
 			endif
 		else
-			# Now that we've built "possibly" more than one encryption library, choose one configuration (based on
-			# third-party library and algorithm) randomly and install that.
+			# Randomly choose one configuration based on third-party library and algorithm.
 			set rand = `echo $#supported_list | awk '{srand() ; print 1+int(rand()*$1)}'`
 			set encryption_lib = $supported_list[$rand]
 			if ("gcrypt" == "$encryption_lib") then
 				# Force AES as long as the plugin is linked against libgcrypt
 				set algorithm = "AES256CFB"
 			else
-				# OpenSSL, V9* build. Go ahead and randomize the algorithm
-				# increase probability of AES256CFB, the industry standard and the one we officially support
+				# OpenSSL, V9* build. Go ahead and randomize the algorithm. Increase the probability of AES256CFB,
+				# the industry standard and the one we officially support.
 				set algorithms = ("AES256CFB" "AES256CFB" "BLOWFISHCFB")
 				set rand = `echo $#algorithms | awk '{srand() ; print 1+int(rand()*$1)}'`
 				set algorithm = $algorithms[$rand]
 			endif
 		endif
-		$make install thirdparty=$encryption_lib algo=$algorithm
+		# Build and install all encryption libraries and executables.
+		$make install algo=$algorithm image=$plugin_build_type thirdparty=$encryption_lib $fips_flag
 		if ($status) then
 			@ buildaux_status++
-			echo "buildaux-E-libgtmcrypt, failed to install libgtmcrypt and/or helper scripts"		\
+			echo "buildaux-E-libgtmcrypt, failed to install libgtmcrypt and/or helper scripts"	\
+						>> $gtm_log/error.${gtm_exe:t}.log
+		endif
+		# Remove temporary files.
+		$make clean
+		if ($status) then
+			@ buildaux_status++
+			echo "buildaux-E-libgtmcrypt, failed to clean libgtmcrypt and/or helper scripts"	\
 						>> $gtm_log/error.${gtm_exe:t}.log
 		endif
 		# Create the one time gpgagent.tab file.
 		echo "$gtm_dist_plugin/libgtmcryptutil.so" >&! $gtm_dist_plugin/gpgagent.tab
 		echo "unmaskpwd: gtm_status_t gc_mask_unmask_passwd(I:gtm_string_t*,O:gtm_string_t*[512])"	\
-							>>&! $gtm_dist_plugin/gpgagent.tab
-		#
+						>>&! $gtm_dist_plugin/gpgagent.tab
+
 		popd >&! /dev/null
 	endif
 endif

@@ -298,7 +298,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 		cli_get_string_token(eof);
 		if (TREF(parms_cnt) >= gpcmd_verb->max_parms)
 		{
-			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Too many parameters ");
+			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Too many parameters");
 			return (-1);
 		}
 		TAREF1(parm_str_len, TREF(parms_cnt)) = strlen(cli_token_buf) + 1;

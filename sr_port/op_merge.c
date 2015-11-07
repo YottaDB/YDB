@@ -469,6 +469,7 @@ void op_merge(void)
 				lvzwr_init(zwr_patrn_mident, &mglvnp->lclp[IND2]->v);
 				lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
 				lvzwr_var(mglvnp->lclp[IND2], 0);
+				TREF(in_zwrite) = FALSE;
 #				ifdef DEBUG
 				/* assert that destination got all data of the source and its descendants */
 				op_fndata(mglvnp->lclp[IND2], value);
@@ -495,6 +496,7 @@ void op_merge(void)
 				lvzwr_init(zwr_patrn_mident, &mglvnp->lclp[IND2]->v);
 				lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
 				lvzwr_var(mglvnp->lclp[IND2], 0);
+				TREF(in_zwrite) = FALSE;
 				gvname_env_restore(gblp1);	 /* store destination as naked indicator in gv_currkey */
 			}
 		}

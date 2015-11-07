@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,8 +51,6 @@ GBLREF void		(*tp_timeout_action_ptr)(void);
 GBLREF void		(*tp_timeout_clear_ptr)(void);
 GBLREF void		(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
-GBLREF void		(*op_write_ptr)(mval *v);
-GBLREF void		(*op_wteol_ptr)(int4 n);
 GBLREF void		(*unw_prof_frame_ptr)(void);
 GBLREF void		(*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_error() so gtm_utf8.c can avoid pulling
 								 * stx_error() into gtmsecshr, and thus just about everything else
@@ -113,8 +111,6 @@ void init_gtm(void)
 	ctrlc_handler_ptr = ctrlc_handler;
 	if (MUMPS_UTILTRIGR != invocation_mode)
 		op_open_ptr = op_open;
-	op_write_ptr = op_write;
-	op_wteol_ptr = op_wteol;
 	unw_prof_frame_ptr = unw_prof_frame;
 	stx_error_fptr = stx_error;
 	show_source_line_fptr = show_source_line;

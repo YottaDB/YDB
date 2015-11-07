@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 #include "cmd.h"
 #include "namelook.h"
 
-GBLREF short int 	source_column;
+GBLREF int 	source_column;
 
 error_def(ERR_INVZSTEP);
 error_def(ERR_ZSTEPARG);

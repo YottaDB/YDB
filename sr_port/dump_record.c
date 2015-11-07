@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,8 +51,6 @@ GBLREF int              patch_is_fdmp;
 GBLREF int              patch_fdmp_recs;
 GBLREF gd_region    	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
-
-LITREF	mval		literal_hasht;
 
 #define MAX_UTIL_LEN		80
 #define	NUM_BYTES_PER_LINE	20

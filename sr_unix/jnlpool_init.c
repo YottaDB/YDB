@@ -959,7 +959,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			assert(NULL != gtmsourcelocal_ptr);
 			QWASSIGNDW(gtmsourcelocal_ptr->read_addr, 0);
 			gtmsourcelocal_ptr->read = 0;
-			gtmsourcelocal_ptr->read_state = READ_POOL;
+			gtmsourcelocal_ptr->read_state = gtmsourcelocal_ptr->jnlfileonly ? READ_FILE : READ_POOL;
 			gtmsourcelocal_ptr->mode = gtmsource_options.mode;
 			gtmsourcelocal_ptr->statslog = FALSE;
 			gtmsourcelocal_ptr->shutdown = NO_SHUTDOWN;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,9 @@ GBLREF uint4		zwrtacindx;
 void lvzwr_init(enum zwr_init_types zwrpattyp, mval *val)
 {
 	lvzwrite_datablk	*prevzwrb;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Standard call at start of zwrite type functions. If this symval has aliases in it,
 	 * prep a hash table we will use to track the lv_val addrs we process (but only if not merging).
 	 */
@@ -68,5 +70,6 @@ void lvzwr_init(enum zwr_init_types zwrpattyp, mval *val)
 	if (!lvzwrite_block->sub)
 		lvzwrite_block->sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * MAX_LVSUBSCRIPTS);
 	lvzwrite_block->fixed = TRUE;
+	TREF(in_zwrite) = TRUE;
 	return;
 }

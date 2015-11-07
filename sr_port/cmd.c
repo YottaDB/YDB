@@ -52,7 +52,7 @@ int cmd(void)
 	 * One for full command and one for short-hand notation.
 	 * For example, B and and BREAK.
 	 */
-LITDEF nametabent cmd_names[] =
+	LITDEF nametabent cmd_names[] =
 	{
 		{1, "B"}, {5, "BREAK"}
 		,{1, "C"}, {5, "CLOSE"}
@@ -97,7 +97,7 @@ LITDEF nametabent cmd_names[] =
 		,{2, "ZL"}, {5, "ZLINK"}
 		,{2, "ZM"}, {8, "ZMESSAGE"}
 		,{2, "ZP"}, {6, "ZPRINT"}
-#		ifdef USHBIN_SUPPORTED
+#		ifdef AUTORELINK_SUPPORTED
 		,{3, "ZRU"}, {8, "ZRUPDATE"}
 #		endif
 		,{3, "ZSH"}, {5, "ZSHOW"}
@@ -134,7 +134,7 @@ LITDEF unsigned char cmd_index[27] =
 	{
 		0, 0, 2, 4, 6, 8, 10, 12, 15, 17, 19, 21, 23
 		,25, 27, 29, 29, 31, 33, 35, 43, 45, 47, 49
-		,51, 51, 94 GTMTRIG_ONLY(+ 2) USHBIN_ONLY(+ 2) /* add ztrigger and zrupdate, respectively */
+		,51, 51, 94 GTMTRIG_ONLY(+ 2) ARLINK_ONLY(+ 2) /* add ztrigger and zrupdate, respectively */
 	};
 LITDEF struct
 	{
@@ -189,7 +189,7 @@ LITDEF struct
 		,{m_zlink, 1, 1, ALL_SYS}, {m_zlink, 1, 1, ALL_SYS}
 		,{m_zmessage, 0, 1, ALL_SYS}, {m_zmessage, 0, 1, ALL_SYS}
 		,{m_zprint, 1, 1, ALL_SYS}, {m_zprint, 1, 1, ALL_SYS}
-#		ifdef USHBIN_SUPPORTED
+#		ifdef AUTORELINK_SUPPORTED
 		,{m_zrupdate, 0, 1, ALL_SYS}, {m_zrupdate, 0, 1, ALL_SYS}
 #		endif
 		,{m_zshow, 1, 1, ALL_SYS}, {m_zshow, 1, 1, ALL_SYS}

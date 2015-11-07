@@ -69,12 +69,12 @@
 #  include "gtmsecshr.h"
 # endif
 #endif
-#if defined(DEBUG) && defined(USHBIN_SUPPORTED)
+#ifdef AUTORELINK__SUPPORTED
 # include "relinkctl.h"
 #endif
 #include "gtmimagename.h"
 
-STATICFNDCL void view_dbflushop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
+STATICFNDCL void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
 
 GBLREF	volatile int4 		db_fsync_in_prog;
 GBLREF	boolean_t		certify_all_blocks;
@@ -144,54 +144,50 @@ error_def(ERR_ZDEFACTIVE);
 
 void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 {
-	int4			testvalue, tmpzdefbufsiz;
-	uint4			jnl_status, dummy_errno;
-	int			status, lcnt, icnt, recnum;
+	boolean_t		dbgdmpenabled, was_crit, was_skip_gtm_putmsg;
+	char			*chptr;
+	collseq			*new_lcl_collseq;
+	gd_addr			*addr_ptr;
 	gd_region		*reg, *r_top, *save_reg;
+	gvnh_reg_t		*gvnh_reg;
+	gvnh_spanreg_t		*gvspan;
 	gv_namehead		*gvnh;
-	mval			*arg, *nextarg, outval;
+	hash_table_mname	*table;
+	ht_ent_mname		*tabent, *table_base_orig, *topent;
+	int			clrlen, lcnt, lct, icnt, ncol, nct, status, table_size_orig;
+	int4			testvalue, tmpzdefbufsiz;
+	jnl_buffer_ptr_t	jb;
+	lv_blk			*lvbp;
+	lv_val			*lv, *lvp, *lvp_top;
 	mstr			tmpstr;
+	mval			*arg, *nextarg, outval;
+	noisolation_element	*gvnh_entry;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	symval			*cstab, *lvlsymtab;
+	uint4			jnl_status, dummy_errno;
 	va_list			var;
 	viewparm		parmblk, parmblk2;
 	viewtab_entry		*vtp;
-	gd_addr			*addr_ptr;
-	gvnh_reg_t		*gvnh_reg;
-	gvnh_spanreg_t		*gvspan;
-	noisolation_element	*gvnh_entry;
-	int			lct, ncol, nct;
-	collseq			*new_lcl_collseq;
-	ht_ent_mname		*tabent, *topent;
-	lv_val			*lv;
-	symval			*cstab;
-	sgmnt_addrs		*csa;
-	sgmnt_data_ptr_t	csd;
-	jnl_buffer_ptr_t	jb;
-	int			table_size_orig;
-	ht_ent_mname		*table_base_orig;
-	hash_table_mname	*table;
-	boolean_t		dbgdmpenabled, was_crit, was_skip_gtm_putmsg;
-	symval			*lvlsymtab;
-	lv_blk			*lvbp;
-	lv_val			*lvp, *lvp_top;
-#	if defined(DEBUG) && defined(USHBIN_SUPPORTED)
+#	ifdef AUTORELINK_SUPPORTED
 	open_relinkctl_sgm	*linkctl;
 	relinkrec_t		*linkrec;
+	int			recnum;
 #	endif
 	VMS_ONLY(int		numarg;)
-
 	static readonly char msg1[] = "Caution: Database Block Certification Has Been ";
-	static readonly char msg2[] = "Disabled";
-	static readonly char msg3[] = "Enabled";
 	static readonly char lv_msg1[] =
 		"Caution: GT.M reserved local variable string pointer duplicate check diagnostic has been";
-	static readonly char upper[] = "UPPER";
+	static readonly char msg2[] = "Disabled";
+	static readonly char msg3[] = "Enabled";
 	static readonly char lower[] = "LOWER";
+	static readonly char upper[] = "UPPER";
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, keyword);
 	VMS_ONLY(va_count(numarg));
-		jnl_status = 0;
+	jnl_status = 0;
 	assertpro(1 <= numarg);
 	MV_FORCE_STR(keyword);
 	numarg--;	/* remove keyword from count */
@@ -232,13 +228,15 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			outval.mvtype = MV_STR;
 			view_debug4 = (0 != MV_FORCE_INT(parmblk.value));
 			break;
+		case VTK_DBFLUSH:
 		case VTK_DBSYNC:
 		case VTK_EPOCH:
 		case VTK_FLUSH:
+		case VTK_GVSRESET:
 		case VTK_JNLFLUSH:
-		case VTK_DBFLUSH:
+		case VTK_POOLLIMIT:
 			arg = (numarg > 1) ? va_arg(var, mval *) : NULL;
-			view_dbflushop(vtp->keycode, &parmblk, arg);
+			view_dbop(vtp->keycode, &parmblk, arg);
 			break;
 #		ifdef UNIX
 		case VTK_DMTERM:
@@ -443,7 +441,8 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			}
 			was_skip_gtm_putmsg = TREF(skip_gtm_putmsg);
 			TREF(skip_gtm_putmsg) = TRUE;	/* to avoid ready_collseq from doing gtm_putmsg in case of errors.
-							 * not doing so will cause GDECHECK errors in caller (GDE). */
+							 * not doing so will cause GDECHECK errors in caller (GDE).
+							 */
 			new_lcl_collseq = ready_collseq(lct);
 			TREF(skip_gtm_putmsg) = was_skip_gtm_putmsg;
 			if (0 == new_lcl_collseq)
@@ -619,9 +618,9 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			tmpzdefbufsiz = MV_FORCE_INT(parmblk.value);
 			if (1 == tmpzdefbufsiz)
 				tmpzdefbufsiz = ZDEFDEF;
-			else  if (tmpzdefbufsiz < ZDEFMIN)
+			else if (tmpzdefbufsiz < ZDEFMIN)
 				tmpzdefbufsiz = ZDEFMIN;
-			else  if (tmpzdefbufsiz > ZDEFMAX)
+			else if (tmpzdefbufsiz > ZDEFMAX)
 				tmpzdefbufsiz = ZDEFMAX;
 			zdefbufsiz = (unsigned short)tmpzdefbufsiz;
 			break;
@@ -682,7 +681,8 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			break;
 		case VTK_LVREHASH:
 			/* This doesn't actually expand or contract the local variable hash table but does cause it to be
-			 * rebuilt. Then we need to do the same sort of cleanup that add_hashtab_mname_symval does. */
+			 * rebuilt. Then we need to do the same sort of cleanup that add_hashtab_mname_symval does.
+			 */
 			/* Step 1: remember table we started with */
 			table = &curr_symval->h_symtab;
 			table_base_orig = table->base;
@@ -702,7 +702,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 		case VTK_STORDUMP:
 #			if defined(DEBUG) && defined(UNIX)
 			if (gtm_white_box_test_case_enabled
-			    && (WBTEST_HOLD_CRIT_TILL_LCKALERT == gtm_white_box_test_case_number))
+				&& (WBTEST_HOLD_CRIT_TILL_LCKALERT == gtm_white_box_test_case_number))
 			{	/* Hold crit for a long enough interval to generate lock alert which then does a continue_proc */
 				grab_crit(gv_cur_region);
 				icnt = TREF(continue_proc_cnt);
@@ -796,34 +796,13 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			lv = (lv_val *)parmblk.value;
 			util_out_print("", RESET);	/* Reset the buffer */
 			util_out_print("LV: !AD  addr: 0x!XJ  mvtype: 0x!4XW  sign: !UB  exp: !UL  m[0]: !UL [0x!XL]  "
-				       "m[1]: !UL [0x!XL]  str.len: !UL  str.addr: 0x!XJ", SPRINT, arg->str.len, arg->str.addr,
-				       lv, lv->v.mvtype, lv->v.sgn, lv->v.e, lv->v.m[0], lv->v.m[0], lv->v.m[1], lv->v.m[1],
-				       lv->v.str.len, lv->v.str.addr);
+					"m[1]: !UL [0x!XL]  str.len: !UL  str.addr: 0x!XJ", SPRINT, arg->str.len, arg->str.addr,
+					lv, lv->v.mvtype, lv->v.sgn, lv->v.e, lv->v.m[0], lv->v.m[0], lv->v.m[1], lv->v.m[1],
+					lv->v.str.len, lv->v.str.addr);
 			outval.str.addr = TREF(util_outptr);
 			outval.str.len = STRLEN(TREF(util_outptr));
 			op_write(&outval);
 			op_wteol(1);
-			break;
-#		endif
-#		if defined(DEBUG) && defined(USHBIN_SUPPORTED)
-		case VTK_RCTLDUMP:
-			util_out_print("", RESET);	/* Reset output buffer */
-			for (linkctl = TREF(open_relinkctl_list); NULL != linkctl; linkctl = linkctl->next)
-			{
-				util_out_print_gtmio("relinkctl: 0x!XJ  entryname: !AD  records: !UL  hdr: 0x!XJ  base: 0x!XJ"
-						     "  locked: !UL", FLUSH, linkctl, linkctl->zro_entry_name.len,
-						     linkctl->zro_entry_name.addr, linkctl->n_records, linkctl->hdr,
-						     linkctl->rec_base, linkctl->locked);
-				util_out_print_gtmio("  hdr: records: !UL  nattached: !UL", FLUSH, linkctl->hdr->n_records,
-						     linkctl->hdr->nattached);
-				for (linkrec = linkctl->rec_base, recnum = 1; recnum <= linkctl->hdr->n_records;
-				     linkrec++, recnum++)
-				{
-					util_out_print_gtmio("    rec#!4UL: rtnname: !AD  cycle: !UL", FLUSH, recnum,
-							     mid_len(&linkrec->rtnname_fixed), &linkrec->rtnname_fixed.c,
-							     linkrec->cycle);
-				}
-			}
 			break;
 #		endif
 		default:
@@ -834,17 +813,16 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	return;
 }
 
-void view_dbflushop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
+void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 {
-	uint4			jnl_status, dummy_errno;
-	int4			nbuffs;
-	int			save_errno;
-	int			status, lcnt, icnt;
+	boolean_t		was_crit;
 	gd_region		*reg, *r_top, *save_reg;
+	int			icnt, lcnt, save_errno, status;
+	int4			nbuffs;
+	jnl_buffer_ptr_t	jb;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	jnl_buffer_ptr_t	jb;
-	boolean_t		was_crit;
+	uint4			jnl_status, dummy_errno;
 	UNIX_ONLY(unix_db_info	*udi;)
 
 	if (NULL == gd_header)		/* open gbldir */
@@ -863,6 +841,14 @@ void view_dbflushop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 		gv_cur_region = reg;
 		switch(keycode)
 		{
+			case VTK_DBFLUSH:
+				if (!reg->read_only)
+				{
+					change_reg(); /* for jnl_ensure_open */
+					nbuffs = (NULL != thirdarg) ? MV_FORCE_INT(thirdarg) : cs_addrs->nl->wcs_active_lvl;
+					JNL_ENSURE_OPEN_WCS_WTSTART(cs_addrs, reg, nbuffs, dummy_errno);
+				}
+				break;
 			case VTK_DBSYNC:
 #				ifdef UNIX
 				if (!reg->read_only)
@@ -880,8 +866,8 @@ void view_dbflushop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 				}
 #				endif
 				break;
-			case VTK_FLUSH:
 			case VTK_EPOCH:
+			case VTK_FLUSH:
 				if (!reg->read_only)
 				{
 					change_reg(); /* for jnl_ensure_open */
@@ -895,6 +881,12 @@ void view_dbflushop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 					 */
 					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_IN_COMMIT | WCSFLU_SPEEDUP_NOBEFORE);
 				}
+				break;
+			case VTK_GVSRESET:
+				change_reg();
+				if (!reg->read_only)
+					CLRGVSTATS(cs_addrs);
+				memset((char *)&cs_addrs->gvstats_rec, 0, SIZEOF(gvstats_rec_t));	/* always process-private */
 				break;
 			case VTK_JNLFLUSH:
 				change_reg();
@@ -932,13 +924,18 @@ void view_dbflushop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 						rel_crit(reg);
 				}
 				break;
-			case VTK_DBFLUSH:
-				if (!reg->read_only)
-				{
-					change_reg(); /* for jnl_ensure_open */
-					nbuffs = (NULL != thirdarg) ? MV_FORCE_INT(thirdarg) : cs_addrs->nl->wcs_active_lvl;
-					JNL_ENSURE_OPEN_WCS_WTSTART(cs_addrs, reg, nbuffs, dummy_errno);
-				}
+			case VTK_POOLLIMIT:
+				change_reg();
+				csa = cs_addrs;
+				csd = csa->hdr;
+				nbuffs = MV_FORCE_INT(thirdarg);
+				if ((MV_STR & thirdarg->mvtype) && ('%' == thirdarg->str.addr[thirdarg->str.len - 1]))
+					nbuffs = (100 == nbuffs) ? 0 : (csd->n_bts * nbuffs) / 100;		/* percentage */
+				csa->gbuff_limit = (0 == nbuffs) ? 0 : MAX(MIN(nbuffs, csd->n_bts * .5), MIN_GBUFF_LIMIT);
+				/* to pick the current "hand" as a pseudo-random spot for our area see dbg code in gvcst_init
+				 * but for the first release of this always pick the end of the buffer
+				 */
+				csa->our_midnite = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets + csd->n_bts;
 				break;
 		}
 	}

@@ -263,6 +263,11 @@ case ${gtm_hostos}_${gtm_arch} in
         gtm_ftp_dirname="hpux_ia64"
         gtm_flavor="ia64"
         gtm_install_flavor="IA64" ;;
+    linux_i586) gtm_sf_dirname="GT.M-x86-Linux"
+        gtm_ftp_dirname="linux"
+        gtm_flavor="i586"
+        gtm_install_flavor="x86"
+        gtm_shlib_support="N" ;;
     linux_i686) gtm_sf_dirname="GT.M-x86-Linux"
         gtm_ftp_dirname="linux"
         gtm_flavor="i686"

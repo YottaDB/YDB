@@ -24,17 +24,14 @@ typedef	struct glist_struct
 #define	DO_ROOT_SEARCH_FALSE	FALSE
 #define	DO_ROOT_SEARCH_TRUE	TRUE
 
-#define	RECORDSTAT_REGION_LIT		" (region "
-#define	RECORDSTAT_REGION_LITLEN	STR_LIT_LEN(RECORDSTAT_REGION_LIT)
-
 #define	PRINT_REG_FALSE		FALSE
 #define	PRINT_REG_TRUE		TRUE
 
 #define	ISSUE_RECORDSTAT_MSG(GL_PTR, GBLSTAT, PRINT_REG)						\
 {													\
-	char	gbl_name_buff[MAX_MIDENT_LEN + 2 + RECORDSTAT_REGION_LITLEN + MAX_RN_LEN + 1];		\
+	char	gbl_name_buff[MAX_MIDENT_LEN + 2 + SPANREG_REGION_LITLEN + MAX_RN_LEN + 1];		\
 					/* 2 for null and '^', MAX_RN_LEN for region name,		\
-					 * RECORDSTAT_REGION_LITLEN for " (region " and 1 for ")" */	\
+					 * SPANREG_REGION_LITLEN for " (region " and 1 for ")" */	\
 	int	gbl_buff_index;										\
 													\
 	gbl_name_buff[0]='^';										\
@@ -42,8 +39,8 @@ typedef	struct glist_struct
 	gbl_buff_index = 1 + GNAME(GL_PTR).len;								\
 	if (PRINT_REG && (NULL != GL_PTR->gvnh_reg->gvspan))						\
 	{												\
-		MEMCPY_LIT(&gbl_name_buff[gbl_buff_index], RECORDSTAT_REGION_LIT);			\
-		gbl_buff_index += RECORDSTAT_REGION_LITLEN;						\
+		MEMCPY_LIT(&gbl_name_buff[gbl_buff_index], SPANREG_REGION_LIT);				\
+		gbl_buff_index += SPANREG_REGION_LITLEN;						\
 		memcpy(&gbl_name_buff[gbl_buff_index], gl_ptr->reg->rname, gl_ptr->reg->rname_len);	\
 		gbl_buff_index += gl_ptr->reg->rname_len;						\
 		gbl_name_buff[gbl_buff_index++] = ')';							\
@@ -99,6 +96,7 @@ typedef struct coll_hdr_struct
 	unsigned char	pad;
 } coll_hdr;
 
+#define MU_FMT_UNRECOG		-1
 #define MU_FMT_GO		0
 #define MU_FMT_BINARY		1
 #define MU_FMT_GOQ		2

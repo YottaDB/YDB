@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *    Copyright 2001, 2013 Fidelity Information Services, Inc   *
+ *    Copyright 2001, 2014 Fidelity Information Services, Inc   *
  *                                                              *
  *    This source code contains the intellectual property       *
  *    of its copyright holder(s), and is made available         *
@@ -14,13 +14,14 @@
 
 #include <sys/types.h>
 
-#ifdef GTM64
-typedef	long		int8;		/* 8-byte signed integer */
-typedef unsigned long	uint8;	  	/* 8-byte unsigned integer */
-typedef unsigned long 	gtm_uint8;	/*these two datatypes are defined because */
-typedef		 long	gtm_int8;	/*int8 and uint8 are system defined in AIX_64*/
-#define INT8_NATIVE
+/* All current Unix platforms support {u,}int64_t, so set these up regardless of GTM64 setting. */
+#ifndef int8
+typedef	int64_t		int8;		/* 8-byte signed integer */
+typedef uint64_t	uint8;	  	/* 8-byte unsigned integer */
 #endif
+typedef uint64_t 	gtm_uint8;	/* these two datatypes are defined because */
+typedef	int64_t		gtm_int8;	/* int8 and uint8 are system defined in AIX_64 */
+#define INT8_NATIVE
 
 #ifdef __s390__
 typedef		 short int2;		/* 2-byte signed integer */
@@ -42,6 +43,7 @@ typedef uint2 mach_inst;
 #ifdef __sparc
 #define CACHELINE_SIZE	256
 #define USHBIN_SUPPORTED
+#define AUTORELINK_SUPPORTED
 #define LINKAGE_PSECT_BOUNDARY	8
 #define OFF_T_LONG
 #define INO_T_LONG
@@ -71,6 +73,9 @@ typedef uint4 mach_inst;
 #define MUTEX_MSEM_WAKE
 #define POSIX_MSEM
 #define USHBIN_SUPPORTED
+/* #define AUTORELINK_SUPPORTED -- not yet due to issues with replacing mapped object files - revisit if/when support objects in
+ * shared memory.
+ */
 #define OFF_T_LONG
 /* Make sure linkage Psect is aligned on appropriate boundary. */
 #ifdef __ia64
@@ -126,7 +131,8 @@ typedef unsigned short	in_port_t;
 #  ifdef __linux__
 #    undef BIGENDIAN
 #    define USHBIN_SUPPORTED
-     /* Make sure linkage Psect is aligned on appropriate boundary. */
+#    define AUTORELINK_SUPPORTED /* If this ever comes back */
+     /* Make sure linkage Psect is aligned on appropriate boundary */
 #    define LINKAGE_PSECT_BOUNDARY  8
 typedef uint4 mach_inst;	/* machine instruction */
 #  elif defined(__hpux)
@@ -146,6 +152,7 @@ typedef char  mach_inst;	/* machine instruction */
 #ifdef __x86_64__
 #define CACHELINE_SIZE	64
 #define USHBIN_SUPPORTED
+#define AUTORELINK_SUPPORTED
 #define INO_T_LONG
 /*
 #define MUTEX_MSEM_WAKE

@@ -54,8 +54,8 @@ typedef struct plength_struct
 #define F_HAS_DIR	4	/* 0x04 If file has explicit directory path */
 #define F_WILD_NAME	8	/* 0x08 If there is a wild card character in the name */
 #define F_WILD_DIR	16	/* 0x10 If there is a wild card character in the directory */
-#define F_WILD		24	/* 0x20 If there is a wild card character in the result */
-#define F_HAS_NODE	32	/* 0x40 If there is a node specification on the front - db opening only */
+#define F_WILD		24	/* 0x18 If there is a wild card character in the result (dir or name) */
+#define F_HAS_NODE	32	/* 0x20 If there is a node specification on the front - db opening only */
 
 #define V_HAS_EXT	0	/* Bit offsets for F_ constants */
 #define V_HAS_NAME	1
@@ -64,7 +64,9 @@ typedef struct plength_struct
 #define V_WILD_DIR	4
 #define V_HAS_NODE	5	/* DB opening only */
 
-#define F_SYNTAXO	1	/* SYNTAX ONLY */
+#define F_SYNTAXO	1	/* SYNTAX ONLY - Otherwise checks on directory existence returning ERR_FILENOTFOUND if
+				 * directory does not exist or is not a directory.
+				 */
 #define F_PARNODE	2	/* Look for a node specification - db opening only */
 
 int4 parse_file(mstr *file, parse_blk *pblk);

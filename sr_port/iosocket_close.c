@@ -37,6 +37,9 @@
 #include "iosocketdef.h"
 #include "stringpool.h"
 #include "eintr_wrappers.h"
+#ifdef GTM_TLS
+#include "gtm_tls.h"
+#endif
 
 GBLREF	io_desc		*active_device;
 GBLREF	int		process_exiting;
@@ -50,6 +53,7 @@ error_def(ERR_CLOSEFAIL);
 error_def(ERR_FILEOPENFAIL);
 error_def(ERR_SOCKNOTFND);
 error_def(ERR_SYSCALL);
+error_def(ERR_TLSIOERROR);
 
 void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boolean_t socket_delete, boolean_t socket_specified);
 
@@ -59,7 +63,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 	unsigned char	ch;
 	int		handle_len;
 	d_socket_struct	*dsocketptr;
-	char		sock_handle[MAX_HANDLE_LEN];
+	char		sock_handle[MAX_HANDLE_LEN], *errp;
 	int4		start, end, index;
 	int		p_offset = 0;
 	boolean_t	socket_destroy = FALSE;
@@ -152,6 +156,7 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 {
 	int4		ii,jj;
 	int		rc, save_fd, save_rc = 0, save_errno;
+	ssize_t		status;
 	socket_struct	*socketptr;
 #	ifndef VMS
 	struct stat	statbuf, fstatbuf;
@@ -182,6 +187,28 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 					LEN_AND_LIT("unlink during socket delete"), CALLFROM, errno);
 		}
 #		endif
+		/* below is similar to iosocket_flush but socketptr may not be current socket */
+		if (socketptr->obuffer_timer_set)
+		{
+			cancel_timer((TID)socketptr);
+			socketptr->obuffer_timer_set = FALSE;
+		}
+		status = 1;		/* OK value */
+		if ((0 < socketptr->obuffer_length) && (0 == socketptr->obuffer_errno))
+		{
+			socketptr->obuffer_output_active = TRUE;
+			status = iosocket_output_buffer(socketptr);
+			socketptr->obuffer_output_active = FALSE;
+		}
+		if ((0 < socketptr->obuffer_size) && ((0 >= status) || (0 != socketptr->obuffer_errno)))
+			iosocket_buffer_error(socketptr);	/* pre-existing error or error flushing buffer */
+#ifdef		GTM_TLS
+		if (socketptr->tlsenabled)
+		{
+			gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
+			socketptr->tlsenabled = FALSE;
+		}
+#endif
 		CLOSE(socketptr->sd, rc);
 		if (-1 == rc)
 		{

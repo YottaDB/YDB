@@ -167,6 +167,24 @@ void	gtm_env_init(void)
 			}
 		} else
 			(TREF(mprof_env_gbl_name)).str.addr = NULL;
+		val.addr = GTM_POOLLIMIT;
+		val.len = SIZEOF(GTM_POOLLIMIT) - 1;
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		{	/* Note assignment above */
+			if (SIZEOF(buf) >= trans.len)
+			{
+				if (('0' == (char)(*trans.addr)) || (0 == trans.len))
+					(TREF(gbuff_limit)).str.len = 0;
+				else
+				{
+					(TREF(gbuff_limit)).str.len = trans.len;
+					(TREF(gbuff_limit)).str.addr = malloc(trans.len);
+					memcpy((TREF(gbuff_limit)).str.addr, trans.addr, trans.len);
+				}
+			}
+		} else
+			(TREF(gbuff_limit)).str.len = 0;
+		(TREF(gbuff_limit)).mvtype = MV_STR;
 #		ifdef DEBUG
 		/* GTM_GVUNDEF_FATAL environment/logical */
 		val.addr = GTM_GVUNDEF_FATAL;

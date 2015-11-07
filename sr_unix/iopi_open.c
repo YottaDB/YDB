@@ -38,6 +38,8 @@
 #include "gtm_zos_io.h"
 #include "gtm_zos_chset.h"
 #endif
+#include "send_msg.h"
+#include "wbox_test_init.h"
 
 LITREF	unsigned char		io_params_size[];
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
@@ -49,6 +51,13 @@ error_def(ERR_DEVOPENFAIL);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 ZOS_ONLY(error_def(ERR_BADTAG);)
+
+enum
+{
+	PARSE_OK = 1,		/* the parse passed */
+	PARSE_FAIL,		/* the parse failed but $PATH is defined in the environment */
+	PARSE_FAIL_NOPATH	/* the parse failed and $PATH is undefined in the environment */
+};
 
 #define FREE_ALL { if (NULL != copy_cmd_string) free(copy_cmd_string); if (NULL != temp) free(temp);\
 		if (NULL != buf)  free(buf); if (NULL != dir_in_path) free(dir_in_path);if (NULL != command2) free(command2); }
@@ -109,11 +118,11 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	int env_inc;
 	struct stat sb;
 	char *path, path_buff[GTM_PATH_MAX];
-	char *temp;
-	char *buf;
-	char *dir_in_path;
-	char *command2;
-	char *copy_cmd_string;
+	char *temp = NULL;
+	char *buf = NULL;
+	char *dir_in_path = NULL;
+	char *command2 = NULL;
+	char *copy_cmd_string = NULL;
 	char *token1;
 	char *token2;
 	char *token3;
@@ -123,17 +132,20 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	int cmd_string_size;
 
 	path = GETENV("PATH");
-	path_len = STRLEN(path);
-	if (GTM_PATH_MAX <= path_len)
-		path_len = GTM_PATH_MAX - 1;
-	memcpy(path_buff, path, path_len + 1);	/* + 1 for null */
-	path = path_buff;
+	if (NULL != path)
+	{
+		path_len = STRLEN(path);
+		if (GTM_PATH_MAX <= path_len)
+			path_len = GTM_PATH_MAX - 1;
+		memcpy(path_buff, path, path_len + 1);	/* + 1 for null */
+		path = path_buff;
+		dir_in_path = (char *)malloc(GTM_PATH_MAX);
+	}
 
 	cmd_string_size = STRLEN(cmd_string) + 1;
 	pathsize = GTM_PATH_MAX + cmd_string_size;
 	buf = (char *)malloc(pathsize);
 	copy_cmd_string = (char *)malloc(cmd_string_size);
-	dir_in_path = (char *)malloc(GTM_PATH_MAX);
 	command2 = (char *)malloc(cmd_string_size);
 	temp = (char *)malloc(pathsize);
 	memcpy(copy_cmd_string, cmd_string, cmd_string_size);
@@ -148,7 +160,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 			break;
 
 		/* separate into tokens using space as delimiter */
-		/* if the first token is a non-alpha-numeric or if it is nohup the skip it */
+		/* if the first token is a non-alpha-numeric or if it is nohup then skip it */
 		/* and use the next one as a command to find */
 		memcpy(command2, token1, STRLEN(token1) + 1);
 
@@ -176,18 +188,19 @@ int parse_pipe(char *cmd_string, char *ret_token)
 			/* if the first character is a $ sign then assume it is an environment variable used
 			   like $gtm_dist/mupip.  Get the environment variable and substitute it. */
 			notfound = TRUE;
+			temp[0] = '\0';
 			if ('$' == *token2)
 			{
 				for (env_inc = 1; '/' != *(token2 + env_inc); env_inc++)
 				{
 					temp[env_inc - 1] = *(token2 + env_inc);
 				}
-				temp[env_inc] = '\0';
+				temp[env_inc - 1] = '\0';
 				env_var = GETENV(temp);
 				if (NULL != env_var)
 				{
 					/* build a translated path to command */
-					assert(cmd_string_size > (STRLEN(token2 + env_inc) + STRLEN(env_var)));
+					assert(pathsize > (STRLEN(token2 + env_inc) + STRLEN(env_var)));
 					SPRINTF(temp, "%s%s", env_var, token2 + env_inc);
 
 					/* The command must be a regular file and executable */
@@ -215,21 +228,24 @@ int parse_pipe(char *cmd_string, char *ret_token)
 					notfound = TRUE;
 			}
 
-			/* search all the directories in the $PATH */
-			memcpy(dir_in_path, path, path_len + 1);
-			for (str3= dir_in_path; TRUE == notfound; str3 = NULL)
+			/* search all the directories in the $PATH if defined */
+			if (NULL != path)
 			{
-				token3 = strtok_r(str3, ":", &saveptr3);
-				if (NULL == token3)
-					break;
-				SPRINTF(buf, "%s/%s", token3, token2);
-				notfound = TRUE;
-				/* The command must be a regular file and executable */
-				STAT_FILE(buf, &sb, ret_stat);
-				if (0 == ret_stat && (S_ISREG(sb.st_mode)) && (sb.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
+				memcpy(dir_in_path, path, path_len + 1);
+				for (str3 = dir_in_path; TRUE == notfound; str3 = NULL)
 				{
-					notfound = FALSE;
-					break;
+					token3 = strtok_r(str3, ":", &saveptr3);
+					if (NULL == token3)
+						break;
+					SPRINTF(buf, "%s/%s", token3, token2);
+					notfound = TRUE;
+					/* The command must be a regular file and executable */
+					STAT_FILE(buf, &sb, ret_stat);
+					if (0 == ret_stat && (S_ISREG(sb.st_mode)) && (sb.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
+					{
+						notfound = FALSE;
+						break;
+					}
 				}
 			}
 		}
@@ -238,11 +254,14 @@ int parse_pipe(char *cmd_string, char *ret_token)
 			assert(GTM_PATH_MAX > (STRLEN(token2) + 1));
 			memcpy(ret_token, token2, STRLEN(token2) + 1);
 			FREE_ALL;
-			return(FALSE);
+			if (NULL != path)
+				return(PARSE_FAIL);
+			else
+				return(PARSE_FAIL_NOPATH);
 		}
 	}
 	FREE_ALL;
-	return(TRUE);
+	return(PARSE_OK);
 }
 
 /* When we are in this routine dev_name is same as naml in io_open_try() */
@@ -256,6 +275,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 }
 
 #define INVALID_CMD "Invalid command string: "
+#define INVALID_CMD2 "$PATH undefined, Invalid command string: "
 
 short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
 {
@@ -286,11 +306,12 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	char 		*sh;
 	int		independent = FALSE;
 	int		parse = FALSE;
+	int		parse_result;
 	int 		status_read;
 	int		return_stdout = TRUE;
 	int		return_stderr = FALSE;
 	char		ret_token[GTM_MAX_DIR_LEN];
-	char		error_str[MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD)];
+	char		error_str[MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2)];
 	int		save_errno;
 	int		flags;
 	int		fcntl_res, rc;
@@ -302,7 +323,11 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	boolean_t	textflag;
 	int		ccsid, status, realfiletag;
 #endif
+#	ifdef DEBUG
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	iod = dev_name->iod;
 
 	while (iop_eol != *(pp->str.addr + p_offset))
@@ -365,10 +390,13 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		pcommand[slen[PCOMMAND]] = '\0';
 		if (TRUE == parse)
 		{
-			if (FALSE == parse_pipe(pcommand, ret_token))
+			if (PARSE_OK != (parse_result = parse_pipe(pcommand, ret_token)))
 			{
 				PIPE_ERROR_INIT();
-				SPRINTF(error_str, "%s%s", INVALID_CMD, ret_token);
+				if (PARSE_FAIL == parse_result)
+					SPRINTF(error_str, "%s%s", INVALID_CMD, ret_token);
+				else
+					SPRINTF(error_str, "%s%s", INVALID_CMD2, ret_token);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 					  ERR_TEXT, 2, LEN_AND_STR(error_str));
 			}
@@ -515,49 +543,52 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 
 		CLOSEFILE(0, rc);
 		/* stdin becomes pfd_write[0] */
-		if (-1 == dup2(pfd_write[0], 0))
+		if (DEBUG_ONLY(WBTEST_ENABLED(WBTEST_BADDUP_PIPE_STDIN) ||) (-1 == dup2(pfd_write[0], 0)))
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_write[0]) failed in child"), save_errno);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_write[0]) failed in child"));
+			_exit(ERR_DEVOPENFAIL);
 		}
 		if (return_stdout)
 		{
 			/* stdout becomes pfd_read[1] */
 			CLOSEFILE(1, rc);
-			if (-1 == dup2(pfd_read[1], 1))
+			if (DEBUG_ONLY(WBTEST_ENABLED(WBTEST_BADDUP_PIPE_STDOUT) ||) (-1 == dup2(pfd_read[1], 1)))
 			{
 				save_errno = errno;
 				PIPE_ERROR_INIT();
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-					  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_read[1],1) failed in child"), save_errno);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+					  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_read[1],1) failed in child"));
+				_exit(ERR_DEVOPENFAIL);
 			}
 			/* stderr also becomes pfd_read[1] if return_stderr is false*/
 			if (FALSE == return_stderr)
 			{
 				CLOSEFILE(2, rc);
-				if (-1 == dup2(pfd_read[1], 2))
+				if (DEBUG_ONLY(WBTEST_ENABLED(WBTEST_BADDUP_PIPE_STDERR1) ||) (-1 == dup2(pfd_read[1], 2)))
 				{
 					save_errno = errno;
 					PIPE_ERROR_INIT();
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
 							dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
-							LEN_AND_LIT("PIPE - dup2(pfd_read[1],2) failed in child"), save_errno);
+							LEN_AND_LIT("PIPE - dup2(pfd_read[1],2) failed in child"));
+					_exit(ERR_DEVOPENFAIL);
 				}
 			}
 		}
 		if (return_stderr)
 		{
 			CLOSEFILE(2, rc);
-			if (-1 == dup2(pfd_read_stderr[1], 2))
+			if (DEBUG_ONLY(WBTEST_ENABLED(WBTEST_BADDUP_PIPE_STDERR2) ||) (-1 == dup2(pfd_read_stderr[1], 2)))
 			{
 				save_errno = errno;
 				PIPE_ERROR_INIT();
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
 						dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
-						LEN_AND_LIT("PIPE - dup2(pfd_read_stderr[1],2) failed in child"),
-						save_errno);
+						LEN_AND_LIT("PIPE - dup2(pfd_read_stderr[1],2) failed in child"));
+				_exit(ERR_DEVOPENFAIL);
 			}
 		}
 		if (0 == slen[PSHELL])
@@ -569,18 +600,23 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			{
 				ret = EXECL("/bin/sh", "sh", "-c", pcommand, (char *)NULL);
 			} else
-				ret = EXECL(sh, basename(sh), "-c", pcommand, (char *)NULL);
+				if (!WBTEST_ENABLED(WBTEST_BADEXEC_PIPE_PROCESS))
+					ret = EXECL(sh, basename(sh), "-c", pcommand, (char *)NULL);
+				else
+					ret = -1;
 		} else
 			ret = EXECL(pshell, pshell_name, "-c", pcommand, (char *)NULL);
 		if (-1 == ret)
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - execl() failed in child"), save_errno);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - execl() failed in child"));
+			_exit(-1);
 		}
 	} else
 	{	/* in parent */
+		DEBUG_ONLY(TREF(fork_without_child_wait) = TRUE);	/* set variable to help assert in "relinkctl_rundown()" */
 		CLOSEFILE_RESET(pfd_write[0], rc);          /* Close unused read end; Resets "pfd_write[0]" to FD_INVALID */
 		ZOS_ONLY(if (-1 == gtm_zos_setcvtmode(pfd_write[1], write_cvt[PARENTCVT]))
 			TAG_POLICY_SEND_MSG("PIPE - conversion mode(pfd_write) failed", errno, realfiletag, ccsid));

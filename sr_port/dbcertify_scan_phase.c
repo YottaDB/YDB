@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -420,6 +420,8 @@ void dbcertify_scan_phase(void)
 		psa->iebl = iebl;
 	}
 	free(psa);
+	assert(psa == psa_gbl);
+	psa_gbl = NULL;	/* nullify the global variable now that it has been freed */
 }
 
 /* Write the given output record but keep the global variable "chksum" updated with the tally.
@@ -853,16 +855,21 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 /* Simple cleanup routine for this scan phaase */
 void dbc_scan_phase_cleanup(void)
 {
+	phase_static_area	*psa;
+
+	psa = psa_gbl;
+	if (NULL == psa)
+		return;
 	/* Cleanup our temporary files */
-	if (psa_gbl->tmp_file_names_gend)
+	if (psa->tmp_file_names_gend)
 	{	/* only close/delete if we know what they are */
-		if (psa_gbl->tcfp)
-			dbc_close_command_file(psa_gbl);
-		if (!psa_gbl->keep_temp_files)
-			dbc_remove_command_file(psa_gbl);
-		if (psa_gbl->trfp)
-			dbc_close_result_file(psa_gbl);
-		if (!psa_gbl->keep_temp_files)
-			dbc_remove_result_file(psa_gbl);
+		if (psa->tcfp)
+			dbc_close_command_file(psa);
+		if (!psa->keep_temp_files)
+			dbc_remove_command_file(psa);
+		if (psa->trfp)
+			dbc_close_result_file(psa);
+		if (!psa->keep_temp_files)
+			dbc_remove_result_file(psa);
 	}
 }

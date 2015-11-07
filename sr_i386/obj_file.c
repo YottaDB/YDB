@@ -44,6 +44,7 @@ GBLREF mident		module_name;
 GBLREF boolean_t	run_time;
 GBLREF int4		mlmax, mvmax;
 GBLREF int4		code_size, lit_addrs, lits_size;
+GBLREF spdesc		stringpool;
 
 GBLDEF int4	psect_use_tab[GTM_LASTPSECT];	/* bytes of each psect in this module */
 GBLREF char	object_file_name[];
@@ -58,7 +59,8 @@ GBLREF uint4 txtrel_cnt;
 static uint4 cdlits;
 static struct rel_table *data_rel, *data_rel_end;
 static struct rel_table *text_rel, *text_rel_end;
-DEBUG_ONLY(static uint4 		txtrel_cnt_in_hdr;)
+static struct sym_table *symbols;
+DEBUG_ONLY(static uint4 txtrel_cnt_in_hdr;)
 
 error_def(ERR_OBJFILERR);
 error_def(ERR_STRINGOFLOW);
@@ -68,10 +70,8 @@ void create_object_file(rhdtyp *rhead)
 	struct exec	hdr;
 
 	assert(!run_time);
-
 	init_object_file_name(); /* inputs: cmd_qlf.object_file, module_name; outputs: object_file_name, object_name_len */
 	object_file_des = mk_tmp_object_file(object_file_name, object_name_len);
-
 	memcpy(&rhead->jsb[0], "GTM_CODE", SIZEOF(rhead->jsb));
 	emit_addr((char *)&rhead->src_full_name.addr - (char *)rhead,
 		(int4)rhead->src_full_name.addr, (int4 *)&rhead->src_full_name.addr);
@@ -79,7 +79,6 @@ void create_object_file(rhdtyp *rhead)
 		(int4)rhead->routine_name.addr, (int4 *)&rhead->routine_name.addr);
 	txtrel_cnt += 2;
 	DEBUG_ONLY(txtrel_cnt_in_hdr = txtrel_cnt;)
-
 	set_psect(GTM_CODE, 0);
 	hdr.a_magic = OMAGIC;
 	hdr.a_stamp = OBJ_LABEL;
@@ -96,7 +95,7 @@ void create_object_file(rhdtyp *rhead)
 	emit_immed((char *)rhead, SIZEOF(*rhead));
 }
 
-void close_object_file(void)
+void finish_object_file(void)
 {
 	assert(0 == PADLEN(lits_size, NATIVE_WSIZE));
 	resolve_sym();
@@ -108,7 +107,6 @@ void close_object_file(void)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 }
 
-
 void drop_object_file(void)
 {
 	int	rc;
@@ -119,8 +117,6 @@ void drop_object_file(void)
 		CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
         }
 }
-
-GBLREF spdesc stringpool;
 
 void emit_addr(int4 refaddr, int4 offset, int4 *result)
 {
@@ -152,7 +148,6 @@ void emit_addr(int4 refaddr, int4 offset, int4 *result)
 	return;
 }
 
-
 void emit_pidr(int4 refoffset, int4 data_offset, int4 *result)
 {
 	struct rel_table *newrel;
@@ -177,7 +172,6 @@ void emit_pidr(int4 refoffset, int4 data_offset, int4 *result)
 		data_rel_end = newrel;
 	}
 }
-
 
 void emit_reference(uint4 refaddr, mstr *name, uint4 *result)
 {
@@ -212,13 +206,11 @@ void emit_reference(uint4 refaddr, mstr *name, uint4 *result)
 	}
 }
 
-
 /*
  *	emit_immed
  *
  *	Args:  buffer of executable code, and byte count to be output.
  */
-
 void emit_immed(char *source, uint4 size)
 {
 	short int write;
@@ -245,13 +237,11 @@ void emit_immed(char *source, uint4 size)
 	}
 }
 
-
 /*
  *	buff_emit
  *
  *	Args:  buffer pointer, number of bytes to emit
  */
-
 void buff_emit(void)
 {
 	uint4 stat;
@@ -260,7 +250,6 @@ void buff_emit(void)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 	emit_buff_used = 0;
 }
-
 
 void set_psect(unsigned char psect,unsigned char offset)
 {
@@ -276,8 +265,6 @@ void set_psect(unsigned char psect,unsigned char offset)
  *	Description:  Buffers a definition of a global symbol with the
  *		given name and value in the given psect.
  */
-
-static struct sym_table *symbols;
 struct sym_table *define_symbol(unsigned char psect, mstr *name, int4 value)
 {
 	int cmp;
@@ -341,7 +328,6 @@ void resolve_sym(void)
 	}
 }
 
-
 void output_relocation(void)
 {
 	struct rel_table 	*rel;
@@ -368,7 +354,6 @@ void output_relocation(void)
 	assert(cnt == lit_addrs);
 }
 
-
 void output_symbol(void)
 {
 	uint4 string_length;
@@ -392,15 +377,12 @@ void output_symbol(void)
 	}
 }
 
-
 void obj_init(void)
 {
 	cdlits = txtrel_cnt = 0;
 	data_rel = text_rel = data_rel_end = text_rel_end = 0;
 	symbols = 0;
 }
-
-
 
 void emit_literals(void)
 {

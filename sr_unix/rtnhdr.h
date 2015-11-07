@@ -52,6 +52,35 @@ typedef struct
 	char_ptr_t	ext_ref;	/* Address (quadword on alpha) this linkage entry resolves to or NULL */
 } lnk_tabent;
 
+#ifdef AUTORELINK_SUPPORTED
+#include "relinkctl.h"		/* Needed for open_relinkctl_sgm type in zro_validation_entry */
+/* Link search history entry - contains information to find the record in the relevant relinkctl file and what
+ * the cycle was when loaded.
+ */
+typedef struct
+{
+	uint4			cycle;			/* Copy of relinkctl file cycle when loaded */
+	relinkrec_t		*relinkrec;		/* Pointer to relinkctl record */
+	open_relinkctl_sgm	*relinkctl_bkptr;	/* Address of mapped relinkctl file */
+} zro_validation_entry;
+/* Header for search history block */
+typedef struct
+{
+	uint4			zroutines_cycle;	/* Value of set_zroutines_cycle when history created */
+	zro_validation_entry	*end;			/* -> Last record + 1 */
+	zro_validation_entry	base[1];		/* First history record (others follow) */
+} zro_hist;
+/* Structure used to queue up a list of validation entries and routine names before finalizing them into a
+ * zro_hist structure.
+ */
+typedef struct
+{
+	zro_validation_entry	zro_valent;		/* Validation entry data (this record) */
+	mident_fixed		rtnname;		/* Routine name associated with this validation entry */
+	int4			rtnname_len;
+} zro_search_hist_ent;
+#endif
+
 /* rhead_struct is the routine header; it occurs at the beginning of the
  * object code part of each module. Since this structure may be resident in
  * a shared library, this structure is considered inviolate. Therefore there is
@@ -87,12 +116,15 @@ typedef struct	rhead_struct
 	int4			lnrtab_len;		/* Number of linenumber table entries */
 	unsigned char		*literal_text_adr;	/* Address of literal text pool (offset in original rtnhdr) */
 	int4			literal_text_len;	/* Length of literal text pool */
+	boolean_t		shared_object;		/* Linked as a shared object */
 	mval			*literal_adr;		/* (#) Address of literal mvals (offset in original rtnhdr) */
 	int4			literal_len;		/* Number of literal mvals */
 	lnk_tabent		*linkage_adr;		/* (#) Address of linkage Psect (offset in original rtnhdr) */
 	int4			linkage_len;		/* Number of linkage entries */
 	int4			rel_table_off;		/* Offset to relocation table (not kept) */
 	int4			sym_table_off;		/* Offset to symbol table (not kept) */
+	boolean_t		rtn_relinked;		/* Routine has been relinked while this version was active. Check on
+							 * unwind to see if this routine needs to be cleaned up. */
 	unsigned char		*shared_ptext_adr;	/* If shared routine (shared library or object), points to shared copy */
 	unsigned char		*ptext_adr;		/* (#) address of start of instructions (offset in original rtnhdr)
 							 * If shared routine, points to shared copy unless breakpoints are active.
@@ -102,6 +134,7 @@ typedef struct	rhead_struct
 	int4			checksum;		/* 4-byte source code checksum (for platforms where MD5 is unavailable) */
 	int4			temp_mvals;		/* (#) temp_mvals value of current module version */
 	int4			temp_size;		/* (#) temp_size value of current module version */
+	boolean_t		has_ZBREAK;		/* This routine has a ZBREAK in it - disable it for autorelink */
 	struct rhead_struct	*current_rhead_adr;	/* (#) Address of routine header of current module version */
 	struct rhead_struct	*old_rhead_adr;		/* (#) Chain of replaced routine headers */
 #	ifdef GTM_TRIGGER
@@ -109,14 +142,18 @@ typedef struct	rhead_struct
 #	else
 	void_ptr_t		filler1;
 #	endif
-	unsigned char		checksum_md5[16];	/* 16-byte MD5 checksum of routine source code */
+	unsigned char		checksum_128[16];	/* 16-byte MurmurHash3 checksum of routine source code */
 	struct rhead_struct	*active_rhead_adr;	/* Chain of active old versions, fully reserved for continued use */
 	routine_source		*source_code;		/* Source code used by $TEXT */
-	void_ptr_t		zhist;			/* If shared object -> validation list/array (actual type is zro_hist *) */
+	ARLINK_ONLY(zro_hist	*zhist;)		/* If shared object -> validation list/array */
+	gtm_uint64_t		objhash;		/* When object file is created, contains hash of object file */
 	unsigned char		*lbltext_ptr;		/* Label name text blob if shared object replaced */
-	uint4			shared_len;		/* Length of mmaped segment (needed for munmap) */
+	uint4			object_len;		/* Length of wrapped GT.M object */
 	uint4			routine_source_offset;	/* Offset of M source within literal text pool */
-	IA64_ONLY(void_ptr_t	filler2;)		/* IA64 needs 16 byte alignment */
+	mstr			*linkage_names;		/* Offset to mstr table of symbol names indexed same as linkage table */
+#	ifdef AUTORELINK_SUPPORTED
+	open_relinkctl_sgm	*relinkctl_bkptr;	/* Back pointer to relinkctl file that loaded this shared rtnobj */
+#	endif
 } rhdtyp;
 
 /* Routine table entry */
@@ -178,6 +215,20 @@ typedef struct
 /* Types that are different depending on shared/unshared unix binaries */
 #define LABENT_LNR_OFFSET lnr_adr
 
+/* When a routine is recursively linked, the old routine hdr/label table are copied and
+ * attached to active_rhead_adr pointer of the replaced routine header. At unwind or goto time,
+ * we check if these copies can be cleaned up with the following macro.
+ */
+#define CLEANUP_COPIED_RECURSIVE_RTN(RTNHDR)											\
+{																\
+	/* For USHBIN_SUPPORTED routines, if the rtn_relinked flag is ON in the routine header (which results from not cleaning	\
+	 * up a routine when it is either explicitly or automatically re-linked), check if the stack contains any more		\
+	 * references to this routine header. If not, it is ripe for cleanup as it has been replaced so drive zr_unlink_rtn()	\
+	 * on it.														\
+	 */															\
+	if ((RTNHDR)->rtn_relinked)												\
+		zr_cleanup_recursive_rtn(RTNHDR);										\
+}
 /* Format of a relocation datum. */
 struct	relocation_info
 {
@@ -221,7 +272,7 @@ struct	sym_table
 #define NOVERIFY	FALSE
 
 /* Prototypes */
-int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_t verifytrig);
+int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp **rtn_vec);
 void free_src_tbl(rhdtyp *rtn_vector);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
 int4 *find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_name);
@@ -239,5 +290,12 @@ char *rtnlaboff2entryref(char *entryref_buff, mident *rtn, mident *lab, int offs
 boolean_t on_stack(rhdtyp *rtnhdr, boolean_t *need_duplicate);
 rhdtyp *op_rhd_ext(mval *rtname, mval *lblname, rhdtyp *rhd, void *lnr);
 void *op_lab_ext(void);
+void zr_cleanup_recursive_rtn(rhdtyp *rtnhdr);
+#ifdef AUTORELINK_SUPPORTED
+#include "zroutinessp.h"	/* Needed for zro_ent type for zro_record_zhist declaration */
+boolean_t need_relink(rhdtyp *rtnhdr, zro_hist *zhist);
+zro_hist *zro_zhist_saverecent(zro_search_hist_ent *zhist_valent, zro_search_hist_ent *zhist_valent_base);
+void zro_record_zhist(zro_search_hist_ent *zhist_valent, zro_ent *obj_container, mstr *rtnname);
+#endif /* AUTORELINK_DEFINED */
 
 #endif /* RTNHDR_H_INCLUDED */

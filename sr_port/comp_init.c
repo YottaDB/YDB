@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,8 +40,8 @@ void comp_init(mstr *src, oprtype *dst)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if ((unsigned)src->len >= MAX_SRCLINE)
-		rts_error(VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
+	if ((unsigned)src->len >= TREF(max_advancewindow_line))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_INDRMAXLEN, 1, TREF(max_advancewindow_line));
 	memcpy(source_buffer,src->addr,src->len);
 	source_buffer[src->len + 1] = source_buffer[src->len] = 0;
 	TREF(compile_time) = TRUE;
@@ -57,6 +57,7 @@ void comp_init(mstr *src, oprtype *dst)
 		indr_stringpool = stringpool;
 	} else
 		stringpool = indr_stringpool;
+	mcfree();
 	tripinit();
 	lb_init();
 	assert(TREF(for_stack_ptr) == TADR(for_stack));

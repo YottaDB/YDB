@@ -43,6 +43,7 @@ GBLREF	sm_uc_ptr_t		jnldata_base;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		is_replicator;
 
 error_def(ERR_JNLWRTDEFER);
 error_def(ERR_JNLWRTNOWWRTR);
@@ -71,6 +72,8 @@ void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, 
 	DEBUG_ONLY(uint4	lcl_dskaddr;)
 	uchar_ptr_t		tmp_buff;
 
+	if (!is_replicator)
+		return;
 	assert(NULL != jnl_rec);
 	assert(rectype > JRT_BAD  &&  rectype < JRT_RECTYPES && JRT_ALIGN != rectype);
 	assert(jrt_is_replicated[rectype]);

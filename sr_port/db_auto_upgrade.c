@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,8 +132,11 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV60001:
 				/* GT.M V60002 introduced mutex_spin_parms.mutex_que_entry_space_size */
 				NUM_CRIT_ENTRY(csd) = DEFAULT_NUM_CRIT_ENTRY;
-				break;
 			case GDSMV60002:
+				/* GT.M V62001 introduced ^#t upgrade. Record this pending event in filehdr. */
+				UNIX_ONLY(csd->hasht_upgrade_needed = TRUE;)
+				break;
+			case GDSMV62001:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
@@ -149,7 +152,7 @@ void db_auto_upgrade(gd_region *reg)
                  */
 		assert(!dse_running);
 		csd->db_got_to_v5_once = TRUE; /* fix it in PRO */
-		send_msg(VARLSTCNT(6) ERR_DBBADUPGRDSTATE, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBBADUPGRDSTATE, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
 	}
 	return;
 }

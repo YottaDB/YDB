@@ -85,6 +85,6 @@ INDIR(indir_fndata,		f_data,		OC_FNDATA)
 ,INDIR(indir_savglvn0,		indirection,	0)		/* this entry and the following use indirection as a dummy value */
 ,INDIR(indir_savlvn,		indirection,	0)
 ,INDIR(indir_savglvn1,		indirection,	0)		/* 0 and 1 (above) separate 2 variants of generated code */
-#ifdef USHBIN_SUPPORTED
+#ifdef AUTORELINK_SUPPORTED
 ,INDIR(indir_zrupdate,		m_zrupdate,	0)
 #endif

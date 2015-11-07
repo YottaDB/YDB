@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,15 @@
 #include "gvnh_spanreg.h"
 #include "change_reg.h"
 
+#ifdef EXTRACT_HASHT_GLOBAL
+# include "gv_trigger_common.h"	/* for IS_GVKEY_HASHT_GBLNAME and HASHT_GBL_CHAR1 macros */
+# ifdef GTM_TRIGGER
+#  include "gv_trigger.h"
+#  include "targ_alloc.h"
+#  include "gvcst_protos.h"	/* for gvcst_root_search prototype used in GVTR_SWITCH_REG_AND_HASHT_BIND_NAME macro */
+# endif
+#endif
+
 #define	MAX_GMAP_ENTRIES_PER_ITER	2 /* maximum increase (could even be negative) in gmap array size per call to global_map */
 
 error_def(ERR_DBRDONLY);
@@ -88,6 +97,11 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	hash_table_int8		ext_hash;
 #	else
 	hash_table_int4		ext_hash;
+#	endif
+#	ifdef EXTRACT_HASHT_GLOBAL
+	gvnh_reg_t		*hashgbl_gvnh_reg = NULL;
+	gd_region		*r_top;
+	sgmnt_addrs		*csa;
 #	endif
 
 	memset(gmap, 0, SIZEOF(gmap));
@@ -231,6 +245,39 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 			 */
 			if (MAX_MIDENT_LEN < curr_gbl_name.str.len)
 				curr_gbl_name.str.len = MAX_MIDENT_LEN;
+#			if defined(GTM_TRIGGER) && defined(EXTRACT_HASHT_GLOBAL)
+			if (HASHT_GBL_CHAR1 == curr_gbl_name.str.addr[0])
+			{	/* Global names starting with "#" e.g. ^#t. Consider these as spanning across
+				 * all regions of the gbldir for the purposes of the caller (MUPIP EXTRACT
+				 * or MUPIP REORG or MUPIP SIZE).
+				 */
+				if (NULL == hashgbl_gvnh_reg)
+				{
+					hashgbl_gvnh_reg = (gvnh_reg_t *)malloc(SIZEOF(gvnh_reg_t));
+					/* initialize gvnh_reg fields to NULL specifically gvnh_reg->gvspan
+					 * as this is used by the caller of gv_select.
+					 */
+					memset(hashgbl_gvnh_reg, 0, SIZEOF(gvnh_reg_t));
+				}
+				/* At this time, only ^#t is supported. In the future ^#k or some such globals
+				 * might be supported for other purposes. The following code needs to change if/when
+				 * that happens.
+				 */
+				assert(IS_GVKEY_HASHT_GBLNAME(curr_gbl_name.str.len, curr_gbl_name.str.addr));
+				if (!gd_header)
+					gvinit();
+				for (reg = gd_header->regions, r_top = reg + gd_header->n_regions; reg < r_top; reg++)
+				{
+					GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
+					csa = cs_addrs;
+					if (NULL == csa)	/* not BG or MM access method */
+						continue;
+					gv_select_reg((void *)&ext_hash, freeze, reg_max_rec, reg_max_key,
+									reg_max_blk, restrict_reg, hashgbl_gvnh_reg, &gl_tail);
+				}
+				break;
+			}
+#			endif
 			COMPUTE_HASH_MSTR(curr_gbl_name.str, hash_code);
 			op_gvname_fast(VARLSTCNT(2) hash_code, &curr_gbl_name);
 			assert((dba_bg == REG_ACC_METH(gv_cur_region)) || (dba_mm == REG_ACC_METH(gv_cur_region)));
@@ -246,8 +293,9 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 				gv_select_reg((void *)&ext_hash, freeze, reg_max_rec, reg_max_key, reg_max_blk,
 										restrict_reg, gvnh_reg, &gl_tail);
 			else
-			{	/* If global spans multiple regions, make sure gv_targets corresponding to ALL spanned regions
-				 * are allocated and gv_target->root is also initialized accordingly for all the spanned regions.
+			{	/* If global spans multiple regions, make sure gv_targets corresponding to ALL
+				 * spanned regions are allocated and gv_target->root is also initialized
+				 * accordingly for all the spanned regions.
 				 */
 				gvnh_spanreg_subs_gvt_init(gvnh_reg, gd_header, NULL);
 				maxi = gvspan->max_reg_index;
@@ -264,7 +312,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 						gv_cur_region = reg;
 						change_reg();
 						gv_select_reg((void *)&ext_hash, freeze, reg_max_rec, reg_max_key,
-										reg_max_blk, restrict_reg, gvnh_reg, &gl_tail);
+									reg_max_blk, restrict_reg, gvnh_reg, &gl_tail);
 					}
 				}
 			}
@@ -282,6 +330,10 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	}
 	if (gmap_ptr_base != &gmap[0])
 		free(gmap_ptr_base);
+#	ifdef EXTRACT_HASHT_GLOBAL
+	if (NULL != hashgbl_gvnh_reg)
+		free(hashgbl_gvnh_reg);
+#	endif
 }
 
 /* Assumes "gv_target" and "gv_cur_region" are properly setup at function entry */

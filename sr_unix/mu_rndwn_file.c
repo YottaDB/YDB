@@ -993,7 +993,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			if (0 != shm_rmid(udi->shmid))
 			{
 				save_errno = errno;
-				if ((EINVAL != save_errno) && (EIDRM != save_errno))
+				if (!SHM_REMOVED(save_errno))
 				{
 					assert(FALSE);
 					RNDWN_ERR("!AD -> Error removing shared memory.", reg);

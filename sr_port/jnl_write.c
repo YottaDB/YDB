@@ -50,6 +50,7 @@ GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		in_jnl_file_autoswitch;
+GBLREF	boolean_t		is_replicator;
 
 #ifdef DEBUG
 STATICDEF	int		jnl_write_recursion_depth;
@@ -520,7 +521,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	jpc->new_freeaddr = lcl_freeaddr + rlen;
 	INCR_GVSTATS_COUNTER(csa, cnl, n_jbuff_bytes, rlen);
 	assert(lcl_free == jpc->new_freeaddr % lcl_size);
-	if (REPL_ENABLED(csa) && is_replicated)
+	if (REPL_ENABLED(csa) && is_replicated && is_replicator)
 	{	/* If the database is encrypted, then at this point jfb->buff will contain encrypted
 		 * data which we don't want to to push into the jnlpool. Instead, we make use of the
 		 * alternate alt_buff which is guaranteed to contain the original unencrypted data.

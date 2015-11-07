@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -105,7 +105,7 @@ void dbcertify_exit_handler(void)
 		 * But the commit phase (beginning from when early_tn is curr_tn + 1 to when they become equal) is a relatively
 		 * 	finite window wherefrom we are guaranteed to return.
 		 */
-		if (psa_gbl->dbc_critical)
+		if ((NULL != psa_gbl) && psa_gbl->dbc_critical)
 		{
 			EXIT_HANDLER(&exi_blk);
 			ESTABLISH(exi_ch);
@@ -117,8 +117,11 @@ void dbcertify_exit_handler(void)
 	print_exit_stats();
 	if (0 == exi_condition)
 		exi_condition = ERR_UNKNOWNFOREX;
-	if (psa_gbl->phase_one)
-		dbc_scan_phase_cleanup();
-	else
-		dbc_certify_phase_cleanup();
+	if (NULL != psa_gbl)
+	{
+		if (psa_gbl->phase_one)
+			dbc_scan_phase_cleanup();
+		else
+			dbc_certify_phase_cleanup();
+	}
 }

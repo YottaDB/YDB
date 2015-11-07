@@ -140,9 +140,24 @@ typedef enum {
 	WBTEST_INFO_HUB_SEND_ZMESS,		/* 101 : Print messages triggered via ZMESSAGE to the syslog */
 	WBTEST_SKIP_CORE_FOR_MEMORY_ERROR,	/* 102 : Do not generate core file in case of GTM-E-MEMORY fatal error */
 	WBTEST_EXTFILTER_INDUCE_ERROR,		/* 103 : Do not assert in case of external filter error (test induces that) */
+	WBTEST_BADEXEC_UPDATE_PROCESS,		/* 104 : Prevent the update process from EXECing */
+	WBTEST_BADEXEC_HELPER_PROCESS,		/* 105 : Prevent the helper processes from EXECing */
+	WBTEST_BADEDITOR_GETEDITOR,		/* 106 : Have geteditor return that it was unable to find an editor*/
+	WBTEST_BADEXEC_OP_ZEDIT,		/* 107 : Give a invalid executable path to an editor so EXEC will fail*/
+	WBTEST_BADEXEC_SECSHR_PROCESS,		/* 108 : Prevent the SECSHR process from being EXEC'ed */
+	WBTEST_BADDUP_PIPE_STDIN,		/* 109 : Prevent dup2() of stdin in forked piped process */
+	WBTEST_BADDUP_PIPE_STDOUT,		/* 110 : Prevent dup2() of stdout in forked piped process */
+	WBTEST_BADDUP_PIPE_STDERR1,		/* 111 : Prevent dup2() of stderr in forked piped process */
+	WBTEST_BADDUP_PIPE_STDERR2,		/* 112 : Prevent second dup2() of stderr in forked piped process */
+	WBTEST_BADEXEC_PIPE_PROCESS,		/* 113 : Prevent the SECSHR process from being EXEC'ed */
+	WBTEST_MAXGTMDIST_UPDATE_PROCESS,	/* 114 : Make gtm_dist too big for update process */
+	WBTEST_MAXGTMDIST_HELPER_PROCESS,	/* 115 : Make gtm_dist too big for helper process */
+	WBTEST_MAX_TRIGNAME_SEQ_NUM,		/* 116 : Induce "too many triggers" error sooner (MAX_TRIGNAME_SEQ_NUM) */
+	WBTEST_RELINKCTL_MAX_ENTRIES,		/* 117 : Bring down the maximum number of relink control entries in one file */
+	WBTEST_FAKE_BIG_KEY_COUNT		/* 118 : fake large increase in mupip load key count to show it doesn't overflow */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
-	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be levereged.
+	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.
 	 */
 } wbtest_code_t;
 

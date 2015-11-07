@@ -259,7 +259,7 @@ void gtm$startup(struct startup_vector *svec, boolean_t is_dal)
 		if (0 != svec->user_spawn_flag)
 		{
 		        if (SS$_NORMAL != (trust_status = sys$getjpiw(EFN$C_ENF, 0, 0, item_list, 0, 0, 0)))
-			        rts_error(VARLSTCNT(1) trust_status);
+			        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) trust_status);
 			else if (imagpriv & PRV$M_CMEXEC)
 			       trust = svec->user_spawn_flag;
 		}
@@ -351,7 +351,7 @@ void gtm$startup(struct startup_vector *svec, boolean_t is_dal)
 		} else
 		{
 			licensed = FALSE;
-			rts_error(VARLSTCNT(1) status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 #		endif
 		jobinterrupt_init();
@@ -416,6 +416,7 @@ void gtm$startup(struct startup_vector *svec, boolean_t is_dal)
 		assert(FALSE == curr_symval->alias_activity);
 		curr_symval->alias_activity = TRUE;
 		lvzwr_init(0, (mval *)NULL);
+		TREF(in_zwrite) = FALSE;
 		curr_symval->alias_activity = FALSE;
 		/* Initialize cache structure for $Piece function (except for Vax which does not use this) */
 		for (i = 0; FNPC_MAX > i; i++)

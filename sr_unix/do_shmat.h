@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #ifndef __DO_SHMAT_H__
 #define __DO_SHMAT_H__
 
-void *do_shmat(int4 shmid, const void *shmaddr, int4 shmflg);
+void *do_shmat(int4 shmid, const void *shm_base, int4 shmflg);
+void *do_shmat_exec_perm(int4 shmid, size_t shm_size, int *save_errno);
 
 #endif

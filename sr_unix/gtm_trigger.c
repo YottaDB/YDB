@@ -91,6 +91,7 @@ GBLREF	mval			dollar_ztrap;
 GBLREF	mval			gtm_trigger_etrap;
 GBLREF	mstr			*dollar_ztname;
 GBLREF	mval			*dollar_ztdata;
+GBLREF	mval			*dollar_ztdelim;
 GBLREF	mval			*dollar_ztoldval;
 GBLREF	mval			*dollar_ztriggerop;
 GBLREF	mval			*dollar_ztupdate;
@@ -260,7 +261,7 @@ CONDITION_HANDLER(gtm_trigger_complink_ch)
 
 CONDITION_HANDLER(gtm_trigger_ch)
 {	/* Condition handler for trigger execution - This handler is pushed on first for a given trigger level, then
-	 * mdb_condition_handler is pushed on so will appearr multiple times as trigger depth increases. There is
+	 * mdb_condition_handler is pushed on so will appear multiple times as trigger depth increases. There is
 	 * always an mdb_condition_handler behind us for an earlier trigger level and we let it handle severe
 	 * errors for us as it gives better diagnostics (e.g. GTM_FATAL_ERROR dumps) in addition to the file core dump.
 	 */
@@ -449,7 +450,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	PUSH_MV_STENT(MVST_MSAV);
 	mv_chain->mv_st_cont.mvs_msav.v = dollar_zsource;
 	mv_chain->mv_st_cont.mvs_msav.addr = &dollar_zsource;
-	TREF(trigger_compile) = TRUE;		/* Set flag so compiler knows this is a special trigger compile */
+	TREF(trigger_compile) = TRUE;	/* Set flag so compiler knows this is a special trigger compile */
 	op_zcompile(&zcompprm, TRUE);	/* Compile but don't use $ZCOMPILE qualifiers */
 	TREF(trigger_compile) = FALSE;	/* compile_source_file() establishes handler so always returns */
 	if (0 != TREF(dollar_zcstatus))
@@ -472,7 +473,9 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 #		ifdef GEN_TRIGLINKFAIL_ERROR
 		UNLINK(objname);				/* delete object before it can be used */
 #		endif
+		TREF(trigger_compile) = TRUE;			/* Overload flag so we know it is a trigger link */
 		op_zlink(&zlfile, (mval *)&literal_null);	/* need cast due to "extern const" attributes */
+		TREF(trigger_compile) = FALSE;			/* If doesn't return, condition handler will clear */
 		/* No return here if link fails for some reason */
 		trigdsc->rtn_desc.rt_adr = find_rtn_hdr(&trigdsc->rtn_desc.rt_name);
 		/* Verify can find routine we just put there. Catastrophic if not */
@@ -528,8 +531,8 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		if (0 != gtm_trigger_complink(trigdsc, TRUE))
 		{
 			PRN_ERROR;	/* Leave record of what error caused the compilation failure if any */
-			rts_error_csa(CSA_ARG(cs_addrs)
-				VARLSTCNT(4) ERR_TRIGCOMPFAIL, 2, trigdsc->rtn_desc.rt_name.len, trigdsc->rtn_desc.rt_name.addr);
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TRIGCOMPFAIL, 2,
+				trigdsc->rtn_desc.rt_name.len - 1, trigdsc->rtn_desc.rt_name.addr);
 		}
 	}
 	assert(trigdsc->rtn_desc.rt_adr);
@@ -608,6 +611,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		mv_st_ent->mv_st_cont.mvs_trigr.savextref.len = extnam_str.len;
 		mv_st_ent->mv_st_cont.mvs_trigr.ztname_save = dollar_ztname;
 		mv_st_ent->mv_st_cont.mvs_trigr.ztdata_save = dollar_ztdata;
+		mv_st_ent->mv_st_cont.mvs_trigr.ztdelim_save = dollar_ztdelim;
 		mv_st_ent->mv_st_cont.mvs_trigr.ztoldval_save = dollar_ztoldval;
 		mv_st_ent->mv_st_cont.mvs_trigr.ztriggerop_save = dollar_ztriggerop;
 		mv_st_ent->mv_st_cont.mvs_trigr.ztupdate_save = dollar_ztupdate;
@@ -618,17 +622,19 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigdsc_last_save = trigdsc;
 		mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigprm_last_save = trigprm;
 #		endif
-		/* If this is a spanning node update, a spanning node condition handler may be at the front of the line. However,
-		 * the condition handler just behind it should be either mdb_condition_handler or ch_at_trigger_init.
+		/* If this is a spanning node or spanning region update, a spanning node/region condition handler may be ahead.
+		 * However, the handler just behind it should be either mdb_condition_handler or ch_at_trigger_init.
 		 */
 		assert(((0 == gtm_trigger_depth)
-			&& (((ch_at_trigger_init == ctxt->ch)
-			     || ((ch_at_trigger_init == (ctxt - 1)->ch)
-				 && ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch))))))
-		       || ((0 < gtm_trigger_depth)
-			   && (((&mdb_condition_handler == ctxt->ch)
-				|| ((&mdb_condition_handler == (ctxt - 1)->ch)
-				    && ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)))))));
+				&& (((ch_at_trigger_init == ctxt->ch)
+					|| ((ch_at_trigger_init == (ctxt - 1)->ch)
+						&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
+							|| (&gvcst_spr_kill_ch == ctxt->ch))))))
+			|| ((0 < gtm_trigger_depth)
+				&& (((&mdb_condition_handler == ctxt->ch)
+					|| ((&mdb_condition_handler == (ctxt - 1)->ch)
+						&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
+							|| (&gvcst_spr_kill_ch == ctxt->ch)))))));
 		mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save = ctxt;
 		mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigger_depth_save = gtm_trigger_depth;
 		if (0 == gtm_trigger_depth)
@@ -682,6 +688,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	/* Set new value of trigger ISVs. Previous values already saved in trigger base frame */
 	dollar_ztname = &trigdsc->rtn_desc.rt_name;
 	dollar_ztdata = (mval *)trigprm->ztdata_new;
+	dollar_ztdelim = (mval *)trigprm->ztdelim_new;
 	dollar_ztoldval = trigprm->ztoldval_new;
 	dollar_ztriggerop = (mval *)trigprm->ztriggerop_new;
 	dollar_ztupdate = trigprm->ztupdate_new;

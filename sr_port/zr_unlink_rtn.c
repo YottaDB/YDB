@@ -14,7 +14,6 @@
 #include <stddef.h>	/* for offsetof macro */
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
-#include "sys/mman.h"
 
 #include <rtnhdr.h>
 #include "fix_pages.h"
@@ -27,6 +26,9 @@
 #include "zr_unlink_rtn.h"
 #include "zroutines.h"
 #include "incr_link.h"
+#ifdef UNIX
+#include "rtnobj.h"
+#endif
 
 /* Routine to unlink given old flavor of routine (as much of it as we are able).
  *
@@ -42,7 +44,6 @@
  */
 void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 {
-	unsigned char	*map_adr;	/* If code section is mmapped from shared .o file */
 	textElem        *telem;
 	rhdtyp		*rhdr, *next_rhdr;
 
@@ -69,14 +70,11 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
         {	/* Object is not resident in a shared library */
 		if (!free_all)
 			zlmov_lnames(old_rhead); 	/* Copy the label names from literal pool to malloc'd area */
-		if (0 < old_rhead->shared_len)
-		{	/* Object is being shared via mmap() */
-			assert(NULL != old_rhead->shared_ptext_adr);
-			assert(old_rhead->shared_ptext_adr == old_rhead->ptext_adr);
-			map_adr = old_rhead->shared_ptext_adr  - SIZEOF(rhdtyp)- NATIVE_HDR_LEN;
-			munmap(map_adr, old_rhead->shared_len);
-
-		} else
+#		ifdef AUTORELINK_SUPPORTED
+		if (old_rhead->shared_object)
+			rtnobj_shm_free(old_rhead, LATCH_GRABBED_FALSE); /* Object is shared via rtnobj shared memory */
+		else
+#		endif
 		{	/* Process private linked object */
 			GTM_TEXT_FREE(old_rhead->ptext_adr);
 		}
@@ -92,20 +90,27 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 	old_rhead->vartab_adr = NULL;
 	free(old_rhead->linkage_adr);		/* Release the old linkage section */
 	old_rhead->linkage_adr = NULL;
-#	else
+#	ifdef AUTORELINK_SUPPORTED
+	if (NULL != old_rhead->zhist)
+	{	/* Free history used for autorelink if present */
+		free(old_rhead->zhist);
+		old_rhead->zhist = NULL;
+	}
+#	endif /* AUTORELINK_SUPPORTED */
+#	else  /* (now) !USHBIN_SUPPORTED */
 	if (!old_rhead->old_rhead_ptr)
-	{	/* On VMS, this makes the routine "malleable" and on UNIX tiz a stub */
+	{	/* On VMS, this makes the routine "malleable" and on UNIX tiz currently a stub */
 	        fix_pages((unsigned char *)old_rhead, (unsigned char *)LNRTAB_ADR(old_rhead)
 			  + (SIZEOF(lnr_tabent) * old_rhead->lnrtab_len));
 	}
-#	endif
+#	endif /* !USHBIN_SUPPORTED */
 	if (free_all)
 	{	/* We are not keeping any parts of this routine (generally used for triggers and for gtm_unlink_all()) */
 #		ifdef USHBIN_SUPPORTED
 		free(old_rhead->labtab_adr);	/* Usually non-releasable but not in this case */
 		if (old_rhead->lbltext_ptr)
 			free(old_rhead->lbltext_ptr);	/* Get rid of any label text hangers-on */
-		if (old_rhead->shared_len)		/* If this is a shared object (not library), drop rtn name/path text */
+		if (old_rhead->shared_object)		/* If this is a shared object (not library), drop rtn name/path text */
 			free(old_rhead->src_full_name.addr);
 		/* Run the chain of old (replaced) versions freeing them also if they exist*/
 		for (rhdr = OLD_RHEAD_ADR(old_rhead); NULL != rhdr; rhdr = next_rhdr)
@@ -113,7 +118,7 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 			next_rhdr = rhdr->old_rhead_adr;
 			if (rhdr->lbltext_ptr)
 				free(rhdr->lbltext_ptr);	/* Get rid of any label text hangers-on */
-			if (rhdr->shared_len)			/* If this is a shared object, drop rtn name/path text */
+			if (rhdr->shared_object)		/* If this is a shared object, drop rtn name/path text */
 				free(rhdr->src_full_name.addr);
 			free(rhdr->labtab_adr);			/* Free dangling label table */
 			free(rhdr);

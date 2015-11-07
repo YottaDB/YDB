@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -820,6 +820,10 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 			util_out_print( PREFIX_SOURCELOCAL "Currently Reading from     !R21AZ [0x!XL]", TRUE, idx,
 				string, gtmsourcelocal_ptr->read_state);
 		}
+
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, jnlfileonly), SIZEOF(gtmsourcelocal_ptr->jnlfileonly));
+		PRINT_BOOLEAN(PREFIX_SOURCELOCAL "Journal File Only                   !R12AZ",
+				gtmsourcelocal_ptr->jnlfileonly, idx);
 
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, read), SIZEOF(gtmsourcelocal_ptr->read));
 		util_out_print( PREFIX_SOURCELOCAL "Relative Read Offset                  !10UL [0x!XL]", TRUE, idx,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@ CONDITION_HANDLER(job_init_ch)
 /* Child process test and initialization. If this copy of GTM is a child process, then initialize the child. */
 void jobchild_init(void)
 {
-	unsigned int	status;
+	boolean_t	need_rtnobj_shm_free;
 	job_params_type	jparms;
 	unsigned char	*transfer_addr;		/* Transfer data */
 	rhdtyp		*base_addr;
@@ -71,7 +71,7 @@ void jobchild_init(void)
 	mval		job_args[MAX_ACTUALS];
 	mstr		routine, label;
 	int		offset;
-	int		rc;
+	int		status;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -84,7 +84,8 @@ void jobchild_init(void)
 		/* read parameters into parameter structure  - references CHILD_FLAG_ENV */
 		ojchildparms(&jparms, &job_arglist, job_args);
 		/* Clear the environment variable so that subsequent child mumps processes can start normal initialization. */
-		if (PUTENV(CLEAR_CHILD_FLAG_ENV))
+		PUTENV(status, CLEAR_CHILD_FLAG_ENV);
+		if (status)
 		{
 			util_out_print("Unable to clear gtmj0 process !UL exiting.", TRUE, process_id);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
@@ -92,14 +93,17 @@ void jobchild_init(void)
 		/* Execute the command to be run before executing the actual M routine */
 		if (jparms.startup.len)
 		{
-			rc = SYSTEM(jparms.startup.addr);
-			if (-1 == rc)
+			status = SYSTEM(jparms.startup.addr);
+			if (-1 == status)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBSTARTCMDFAIL, 0, errno);
-			else if (0 != rc)
+			else if (0 != status)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_JOBSTARTCMDFAIL, 0);
 		}
-		if(!job_addr(&jparms.routine, &jparms.label, jparms.offset,
-				(char **)&base_addr, (char **)&transfer_addr))
+		/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
+		 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
+		 */
+		if (!job_addr(&jparms.routine, &jparms.label, jparms.offset,
+				(char **)&base_addr, (char **)&transfer_addr, &need_rtnobj_shm_free))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 		/* Set process priority */
 		if (jparms.baspri)
@@ -136,7 +140,11 @@ void jobchild_init(void)
 			if (!cli_get_str("INFILE", run_file_name, &arg_len))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RUNPARAMERR);
 			lref_parse((uchar_ptr_t)run_file_name, &routine, &label, &offset);
-			if(!job_addr(&routine, &label, offset, (char **)&base_addr, (char **)&transfer_addr))
+			/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
+			 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
+			 */
+			if (!job_addr(&routine, &label, offset, (char **)&base_addr,
+					(char **)&transfer_addr, &need_rtnobj_shm_free))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 		} else if (MUMPS_CALLIN & invocation_mode) /* call-in mode */
 		{

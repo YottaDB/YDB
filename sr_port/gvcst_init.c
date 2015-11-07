@@ -56,6 +56,7 @@
 #include "process_gvt_pending_list.h"
 #include "gvt_hashtab.h"
 #include "gtmmsg.h"
+#include "op.h"
 #ifdef UNIX
 #include "heartbeat_timer.h"
 #include "anticipatory_freeze.h"
@@ -68,6 +69,7 @@
 #include "gtm_dbjnl_dupfd_check.h"
 #endif
 
+GBLREF	boolean_t		mu_reorg_process;
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -100,7 +102,9 @@ GBLREF	boolean_t		pool_init;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	jnlpool_addrs		jnlpool;
 #endif
-
+#ifdef DEBUG
+GBLREF	uint4			process_id;
+#endif
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
 
@@ -112,6 +116,9 @@ error_def(ERR_DBVERPERFWARN1);
 error_def(ERR_DBVERPERFWARN2);
 error_def(ERR_MMNODYNUPGRD);
 error_def(ERR_REGOPENFAIL);
+
+static readonly mval literal_poollimit =
+	DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, (SIZEOF("POOLLIMIT") - 1), "POOLLIMIT", 0, 0);
 
 void	assert_jrec_member_offsets(void)
 {
@@ -223,6 +230,7 @@ void gvcst_init(gd_region *greg)
 #	endif
 	int			max_fid_index;
 	mstr			log_nam, trans_log_nam;
+	mval			reg_nam_mval = DEFINE_MVAL_STRING(MV_STR, 0 , 0 , SIZEOF(MAX_RN_LEN), 0, 0, 0);
 	char			trans_buff[MAX_FN_LEN + 1];
 	unique_file_id		*greg_fid, *reg_fid;
 	tp_region		*tr;
@@ -325,6 +333,8 @@ void gvcst_init(gd_region *greg)
 	csa->hdr = NULL;
         csa->nl = NULL;
         csa->jnl = NULL;
+	csa->gbuff_limit = 0;
+	csa->our_midnite = NULL;
 	csa->persistent_freeze = FALSE;	/* want secshr_db_clnup() to clear an incomplete freeze/unfreeze codepath */
 	csa->regcnt = 1;	/* At this point, only one region points to this csa */
 	csa->db_addrs[0] = csa->db_addrs[1] = NULL;
@@ -638,7 +648,37 @@ void gvcst_init(gd_region *greg)
 			assert(0 == reformat_buffer_in_use);
 			--fast_lock_count;
 		}
-
+		assert(MV_STR & (TREF(gbuff_limit)).mvtype);
+		if (mu_reorg_process && (0 == (TREF(gbuff_limit)).str.len))
+		{	/* if the environment variable wasn't supplied, use the default for REORG */
+			(TREF(gbuff_limit)).str.len = SIZEOF(REORG_GBUFF_LIMIT);
+			(TREF(gbuff_limit)).str.addr = malloc(SIZEOF(REORG_GBUFF_LIMIT));
+			memcpy((TREF(gbuff_limit)).str.addr, REORG_GBUFF_LIMIT, SIZEOF(REORG_GBUFF_LIMIT));
+		}
+		if ((0 != (TREF(gbuff_limit)).str.len) PRO_ONLY(&& mu_reorg_process))	/* if reorg or dbg apply env var */
+		{
+			reg_nam_mval.str.len = greg->rname_len;
+			reg_nam_mval.str.addr = (char *)&greg->rname;
+			op_view(VARLSTCNT(3) &literal_poollimit, &reg_nam_mval, &(TREF(gbuff_limit)));
+#			ifdef DEBUG
+			if (!mu_reorg_process)		/* in dbg, randomize sizes to get test coverage */
+			{
+				if ((process_id & 1) ^ csa->regnum)
+				{
+					csa->gbuff_limit ^= process_id;
+					csa->gbuff_limit &= ((csd->n_bts / 2) - 1);
+				} else
+					csa->gbuff_limit = 0;
+			}
+			if (process_id & 2)		/* also randomize our_midnite */
+			{
+				csa->our_midnite = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
+				csa->our_midnite += (process_id & (csd->n_bts - 1));
+				assert((csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets + csd->n_bts)
+					> csa->our_midnite);
+			}
+#			endif
+		}
 	}
 	if ((dba_bg == greg_acc_meth) || (dba_mm == greg_acc_meth))
 	{

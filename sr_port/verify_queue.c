@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,19 +10,12 @@
  ****************************************************************/
 
 /* Routines to verify a simple double-linked queue.
-
-   If we fail any of these tests, we will gtmassert in case a call to
-   this routine is made from "pro" code. No messages are produced by
-   this code since they would be useful only in the context of the
-   dumped data and would scare the hell out of the user anyway.
-
-   Two versions of this test are supplied. The first will lock the queue
-   header first. The second assumes the queue is already locked.
-
-   Most(All?) calls to this routine are compiled in by specifying the compile
-   flag DEBUG_QUEUE.
-
-*/
+ *
+ * If we fail any of these tests in pro code, we gtmassert.
+ * This code produces no messages because they would be useful only in the context of the dumped data and would scare the user.
+ * We have two versions of this test. The first locks the queue header. The second assumes the queue is already locked.
+ * Most calls to this routine are compiled in by specifying the compile flag DEBUG_QUEUE.
+ */
 
 #include "mdef.h"
 
@@ -54,16 +47,14 @@ GBLREF	volatile int4	fast_lock_count;
 GBLREF	pid_t		process_id;
 VMS_ONLY(GBLREF	uint4	image_count;)	/* Needed for GET/RELEASE_SWAPLOCK */
 
-void verify_queue_lock(que_head_ptr_t qhdr)
+gtm_uint64_t verify_queue_lock(que_head_ptr_t qhdr)
 {
 	que_ent_ptr_t	qe, last_qe;
-	int		i, k;
-	boolean_t		got_lock;
+	gtm_uint64_t	i, k;
+	boolean_t	got_lock;
 
 	++fast_lock_count;
-
-	/* Before we can play with the queue, we have to lock it
-	   to prevent it from being changed out from underneath us */
+	/* Before running this queue, must lock it to prevent it from being changed during our run */
 	for (got_lock = FALSE, k = 0; k < QI_STARVATION; ++k)
 	{
 		for (i = 0; got_lock == FALSE && i < QI_RETRY; ++i)
@@ -73,48 +64,27 @@ void verify_queue_lock(que_head_ptr_t qhdr)
 		if (0 != k)
 			wcs_backoff(k);
 	}
-
-	if (!got_lock)			/* We gotta have our lock */
-		GTMASSERT;
-
-	/* Now run through queue. Verify the fwd and backward chain ptrs */
-	last_qe = (que_ent_ptr_t)qhdr;
-	for (qe = (que_ent_ptr_t)((sm_uc_ptr_t)qhdr + qhdr->fl);
-	     qe != (que_ent_ptr_t)qhdr;
-	     qe = (que_ent_ptr_t)((sm_uc_ptr_t)qe + qe->fl))
-	{
-
-		if ((que_ent_ptr_t)((sm_uc_ptr_t)qe + qe->bl) != last_qe)	/* Back pointer works good? */
-		{
-/*                      ASWP(&qhdr->latch, LOCK_AVAILABLE, latch); */
-			GTMASSERT;
-		}
-		last_qe = qe;
-	}
-
+	assertpro(got_lock);			/* We gotta have our lock */
+	i = verify_queue(qhdr);
 	/* Release locks */
 	RELEASE_SWAPLOCK(&qhdr->latch);
 	--fast_lock_count;
-
-	return;
+	return i;
 }
 
-
-void verify_queue(que_head_ptr_t qhdr)
+gtm_uint64_t verify_queue(que_head_ptr_t qhdr)
 {
+	gtm_uint64_t	i;
 	que_ent_ptr_t	qe, last_qe;
 
-	/* Now run through queue. Verify the fwd and backward chain ptrs */
+	/* run through queue. Verify the fwd and backward chain ptrs */
 	last_qe = (que_ent_ptr_t)qhdr;
-	for (qe = (que_ent_ptr_t)((sm_uc_ptr_t)qhdr + qhdr->fl);
+	for (i = 0, qe = (que_ent_ptr_t)((sm_uc_ptr_t)qhdr + qhdr->fl);
 	     qe != (que_ent_ptr_t)qhdr;
-	     qe = (que_ent_ptr_t)((sm_uc_ptr_t)qe + qe->fl))
+	     qe = (que_ent_ptr_t)((sm_uc_ptr_t)qe + qe->fl), i++)
 	{
-
-		if ((que_ent_ptr_t)((sm_uc_ptr_t)qe + qe->bl) != last_qe)	/* Back pointer works good? */
-			GTMASSERT;
+		assertpro((que_ent_ptr_t)((sm_uc_ptr_t)qe + qe->bl) == last_qe);	/* Back pointer works good? */
 		last_qe = qe;
 	}
-
-	return;
+	return i;
 }

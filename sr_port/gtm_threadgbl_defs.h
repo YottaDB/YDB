@@ -50,13 +50,20 @@ THREADGBLDEF(expr_depth,			unsigned int)			/* expression nesting level */
 THREADGBLDEF(expr_start,			triple *)			/* chain anchor for side effect early evaluation */
 THREADGBLDEF(expr_start_orig,			triple *)			/* anchor used to test if there's anything hung on
 										 * expr_start */
+THREADGBLDEF(defined_symbols,			struct sym_table *)		/* Anchor for symbol chain */
 THREADGBLDEF(for_stack_ptr,			oprtype **)			/* part of FOR compilation nesting mechanism */
 THREADGBLDEF(gtm_fullbool,			unsigned int)			/* controls boolean side-effect behavior defaults
 										 * to 0 (GTM_BOOL) */
 THREADGBLDEF(ind_result,			mval *)				/* pointer to indirection return location */
 THREADGBLDEF(ind_source,			mval *)				/* pointer to indirection source location */
 THREADGBLDEF(indirection_mval,			mval)				/* used for parsing subscripted indirection */
-THREADGBLDEF(last_source_column,		short int)			/* parser tracker */
+THREADGBLDEF(last_source_column,		int)				/* parser tracker */
+THREADGBLDEF(max_advancewindow_line,		int4)				/* the maximum source line length */
+THREADGBLDEF(linkage_first,			struct linkage_entry *)		/* Start of linkage (extern) list this routine */
+THREADGBLDEF(linkage_last,			struct linkage_entry *)		/* Last added entry */
+#ifdef USHBIN_SUPPORTED
+THREADGBLDEF(objhash_state,			hash128_state_t)		/* Seed value - progressive hash of object file */
+#endif
 THREADGBLDEF(pos_in_chain,			triple)				/* anchor used to restart after a parsing error */
 THREADGBLDEF(s2n_intlit, 			boolean_t)			/* type info from s2n for advancewindow */
 THREADGBLDEF(routine_source_offset,		uint4)				/* offset of M source within literal text pool */
@@ -80,6 +87,7 @@ THREADGBLDEF(dbinit_max_hrtbt_delta,		uint4)				/* max heartbeats before we bail
 THREADGBLDEF(dollar_zmaxtptime, 		int4)				/* tp timeout in seconds */
 THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */
 THREADGBLDEF(donot_write_inctn_in_wcs_recover,	boolean_t)			/* TRUE if wcs_recover should NOT write INCTN */
+THREADGBLDEF(gbuff_limit,			mval)				/* holds a GTM_POOLLIMIT value for REORG or DBG */
 THREADGBLDEF(gd_targ_tn,			trans_num)			/* number that is incremented for every gvcst_spr*
 										 * action. helps easily determine whether a region
 										 * has already been seen in this gvcst_spr* action.
@@ -191,6 +199,8 @@ THREADGBLDEF(replgbl,				replgbl_t)			/* set of global variables needed by the s
 										 * server */
 THREADGBLDEF(tqread_nowait,			boolean_t)			/* avoid sleeping in t_qread if TRUE */
 /* Miscellaneous */
+THREADGBLDEF(arlink_enabled,			boolean_t)			/* TRUE if any zroutines segment is autorelink
+										 * enabled. */
 THREADGBLDEF(collseq_list,			collseq *)			/* list of pointers to currently mapped collation
 										 * algorithms - since this seems only used in
 										 * collseq.c -seems more like a STATICDEF */
@@ -260,9 +270,13 @@ THREADGBLDEF(mprof_reclaim_cnt,			int)				/* Amount of mem to reclaim after unw_
 THREADGBLDEF(mprof_stack_curr_frame, 		mprof_stack_frame *)		/* Pointer to the last frame on the mprof stack */
 THREADGBLDEF(mprof_stack_next_frame, 		mprof_stack_frame *)		/* Pointer to the next frame to be put on the
 										 * mprof stack */
-#ifdef USHBIN_SUPPORTED
+#ifdef AUTORELINK_SUPPORTED
 THREADGBLDEF(open_relinkctl_list,		open_relinkctl_sgm *)		/* Anchor for open relinkctl list; similar to
 										 * open_shlib_root */
+THREADGBLDEF(relinkctl_shm_min_index,		int)				/* Minimum size of rtnobj shared memory segment
+										 * is 2**relinkctl_shm_min_index
+										 */
+THREADGBLDEF(gtm_autorelink_keeprtn,		boolean_t)			/* do not let go of objects in rtnobj shm */
 #endif
 #ifdef UNIX
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
@@ -277,9 +291,6 @@ THREADGBLDEF(pipefifo_interrupt,		int)				/* count of number of times a pipe or 
 										 * interrupted */
 #endif
 THREADGBLDEF(prof_fp,				mprof_stack_frame *)		/* Stack frame that mprof currently operates on */
-#ifdef USHBIN_SUPPORTED
-THREADGBLDEF(recent_zhist,			zro_hist *)			/* Saved history from last zro_search */
-#endif
 THREADGBLDEF(relink_allowed,			int)				/* Non-zero if recursive relink permitted */
 THREADGBLDEF(set_zroutines_cycle,		uint4)				/* Informs us if we changed $ZROUTINES between
 										 * linking a routine and invoking it
@@ -329,6 +340,7 @@ THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_rest
 THREADGBLDEF(user_id,				uint4)				/* USERID number */
 #endif
 THREADGBLAR1DEF(window_string,			char,	SIZEOF(mident_fixed))	/* Buffer for window_ident */
+THREADGBLAR1DEF(tmp_object_file_name,		char,	GTM_PATH_MAX)		/* Hold temporary object name across routines */
 
 /* Utility I/O */
 THREADGBLDEF(last_va_list_ptr,			va_list)			/* Last variable-length argument list used for util
@@ -347,6 +359,9 @@ THREADGBLDEF(extcall_package_root,		struct extcall_package_list *)	/* External c
 #ifdef UNIX
 THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* Current nested depth of callin environments */
 THREADGBLDEF(temp_fgncal_stack,			unsigned char *)		/* Override for fgncal_stack when non-NULL */
+THREADGBLDEF(midchild_send_locals,		boolean_t)			/* The middle child will send the locals to the
+										 * grandchild using ojmidchild_send_var() if TRUE.
+										 */
 #endif
 THREADGBLDEF(want_empty_gvts,			boolean_t)			/* set to TRUE by MUPIP REORG when it is selecting
 										 * globals to be reorged. Need to be able to select
@@ -391,6 +406,7 @@ THREADGBLDEF(no_spangbls,			boolean_t)	/* This process does not need to worry ab
 								 * irrespective of whether the global spans regions or not.
 								 */
 THREADGBLDEF(max_fid_index,			int)		/* maximum value of csa->fid_index across all open csa's */
+THREADGBLDEF(is_mu_rndwn_rlnkctl,		int)		/* this process is MUPIP RUNDOWN -RELINKCTL */
 #ifdef GTM_TRIGGER
 THREADGBLDEF(gvt_triggers_read_this_tn,		boolean_t)			/* if non-zero, indicates triggers were read for
 										 * at least one gv_target in this transaction.
@@ -407,6 +423,13 @@ THREADGBLDEF(op_fntext_tlevel,			uint4)				/* Non-zero implies $TEXT argument is
 										 * the time of the call to "get_src_line" in
 										 * op_fntext.c. Later used by fntext_ch.c.
 										 */
+THREADGBLDEF(in_op_fntext,			boolean_t)			/* Denote the trigger was processed in $Text() */
+THREADGBLDEF(ztrigbuff,				char *)				/* Buffer to hold $ztrigger/mupip-trigger output
+										 * until TCOMMIT.
+										 */
+THREADGBLDEF(ztrigbuffAllocLen,			int)				/* Length of allocated ztrigbuff buffer */
+THREADGBLDEF(ztrigbuffLen,			int)				/* Length of used ztrigbuff buffer */
+THREADGBLDEF(ztrig_use_io_curr_device,		boolean_t)	/* Use current IO device instead of stderr/util_out_print */
 #endif
 
 /* Debug values */
@@ -435,4 +458,14 @@ THREADGBLDEF(activelv_dbg_array,		activelv_dbg_t *)	/* pointer to array holding 
 									 * ACTIVELV_DBG_ARRAY_SIZE_DEF most recent
 									 * invocations of SET_ACTIVE_LV */
 THREADGBLDEF(cli_get_str_max_len,		uint4)
-#endif
+# ifdef GTM_TRIGGER
+THREADGBLDEF(gtmio_skip_tlevel_assert,		boolean_t)	/* Allow for "util_out_print_gtmio" calls without TP
+								 * if this variable is TRUE.
+								 */
+THREADGBLDEF(in_trigger_upgrade,		boolean_t)	/* caller is MUPIP TRIGGER -UPGRADE */
+#endif	/* #ifdef GTM_TRIGGER */
+THREADGBLDEF(gtm_test_autorelink_always,	boolean_t)	/*  DEBUG-only option to enable/disable autorelink always */
+THREADGBLDEF(fork_without_child_wait,		boolean_t)	/*  we did a FORK but did not wait for child to detach from
+								 *  inherited shm so shm_nattch could be higher than we expect.
+								 */
+#endif	/* #ifdef DEBUG */

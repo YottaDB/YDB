@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +9,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _GTM_TLS_H
-#define _GTM_TLS_H
+#ifndef GTM_TLS_H
+#define GTM_TLS_H
 
 #define gtm_tls_get_error		(*gtm_tls_get_error_fptr)
 #define gtm_tls_errno			(*gtm_tls_errno_fptr)
@@ -70,7 +70,7 @@
 #define gtm_tls_session_close		intrsafe_gtm_tls_session_close
 #define gtm_tls_fini			intrsafe_gtm_tls_fini
 
-#undef _GTM_TLS_INTERFACE_H	/* Allows us to include gtm_tls_interface.h twice. */
+#undef GTM_TLS_INTERFACE_H	/* Allows us to include gtm_tls_interface.h twice. */
 #include "gtm_tls_interface.h"	/* BYPASSOK : intentional duplicate include. */
 
 GBLREF	gtm_tls_ctx_t			*tls_ctx;

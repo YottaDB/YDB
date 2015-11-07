@@ -95,7 +95,7 @@ typedef struct	rhead_struct
 #	ifdef GTM_TRIGGER
 	void_ptr_t	trigr_handle;		/* Type is void to avoid needing gv_trigger.h to define gv_trigger_t addr */
 #	endif
-	unsigned char	checksum_md5[16];	/* 16-byte MD5 checksum of routine source code */
+	unsigned char	checksum_128[16];	/* 16-byte MurmurHash3 checksum of routine source code */
 	routine_source	*source_code;		/* source code used by $TEXT */
 	uint4		routine_source_offset;	/* (updated) when compiled with EMBED_SOURCE: offset of M source within literal text
 						 * pool; becomes absolute address in incr_link
@@ -144,7 +144,7 @@ typedef struct
 #define VERIFY		TRUE
 #define NOVERIFY	FALSE
 
-int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_t verifytrig);
+int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp **rtn_vec);
 void free_src_tbl(rhdtyp *rtn_vector);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
 int4 *find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_name);

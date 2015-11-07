@@ -313,7 +313,7 @@ XFER(xf_fnzsocket, op_fnzsocket)
 XFER(xf_fnzsyslog, op_fnzsyslog),
 XFER(xf_zrupdate, op_zrupdate)
 #endif
-#ifdef USHBIN_SUPPORTED
+#ifdef AUTORELINK_SUPPORTED
 ,
 XFER(xf_rhd_ext, op_rhd_ext),
 XFER(xf_lab_ext, op_lab_ext)

@@ -26,7 +26,11 @@ endif
 
 DISTDIR = $(gtm_dist)
 PLUGINDIR = $(DISTDIR)/plugin
+GTMCRYPTDIR = $(PLUGINDIR)/gtmcrypt
 CURDIR = `pwd`
+
+# Find out whether we are already in $gtm_dist/plugin/gtmcrypt directory.
+NOT_IN_GTMCRYPTDIR = $(shell [ "$(CURDIR)" = "$(GTMCRYPTDIR)" ] ; echo $$?)
 
 # Determine machine and OS type.
 UNAMESTR = $(shell uname -a)
@@ -35,7 +39,7 @@ MACHTYPE = $(shell uname -m)
 ifneq (,$(findstring Linux,$(UNAMESTR)))
 	FILEFLAG = -L
 endif
-# 64 bit system? 0 for yes!
+# 64 bit version of GT.M? 0 for yes!
 BIT64 = $(shell file $(FILEFLAG) $(DISTDIR)/mumps | grep -q -E '64-bit|ELF-64'; echo $$?)
 
 # Default installation target. This allows for the build system to randomize `thirdparty' and `algo' thereby changing the default
@@ -52,10 +56,9 @@ else
 endif
 
 CC = cc
-LD = $(CC)
 
 # Setup common compiler flags
-CFLAGS = -c $(debug_flag) $(optimize) -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES -D_LARGEFILE64_SOURCE=1
+CFLAGS = $(debug_flag) $(optimize) -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES -D_LARGEFILE64_SOURCE=1
 
 ifneq ($(gcrypt_nofips),0)
 	gcrypt_nofips_flag = -DGCRYPT_NO_FIPS
@@ -119,7 +122,10 @@ ifneq (,$(findstring AIX,$(UNAMESTR)))
 	CFLAGS += -qro -qroconst -q64
 	# -q64 for 64-bit object generation
 	# -brtl for allowing both '.a' and '.so' to be searched at runtime.
-	LDFLAGS = -q64 -brtl
+	# -bhalt:5 is to disable warnings about duplicate symbols that come from
+	#  libgtmcryptutil.so and other .so that need pulling the same object
+	#  file (/lib/crt0_64.o)
+	LDFLAGS = -q64 -brtl -bhalt:5
 	RPATHFLAGS =
 	# -G so that we can build shared library
 	# -bexpall exports all symbols from the shared library.
@@ -145,81 +151,67 @@ LDFLAGS += $(LIBFLAGS) -o
 
 COMMON_LIBS = -lgtmcryptutil -lconfig
 
-# List of all files needed for building the encryption plugin.
+# Lists of all files needed for building the encryption plugin.
+crypt_util_srcfiles = gtmcrypt_util.c
+crypt_util_hdrfiles = gtmcrypt_util.h gtmcrypt_interface.h
 crypt_srcfiles = gtmcrypt_ref.c gtmcrypt_pk_ref.c gtmcrypt_dbk_ref.c gtmcrypt_sym_ref.c
-crypt_objfiles = gtmcrypt_ref.o gtmcrypt_pk_ref.o gtmcrypt_dbk_ref.o gtmcrypt_sym_ref.o
-all_crypt_objfiles = $(crypt_objfiles)
+crypt_hrdfiles = gtmcrypt_ref.h gtmcrypt_pk_ref.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_interface.h
+tls_srcfiles = gtm_tls_impl.c
+tls_hdrfiles = gtm_tls_impl.h gtm_tls_interface.h
 
-tls_srcfiles = gtm_tls_impl.c gtm_tls_impl.h gtm_tls_interface.h
-tls_objfiles = gtm_tls_impl.o
+all: libgtmcryptutil.so maskpass gcrypt openssl libgtmtls.so
 
-all_objfiles = $(all_crypt_objfiles) $(tls_objfiles) maskpass.o gtmcrypt_util.o gtmcrypt_util_syslib.o
+libgtmcryptutil.so: $(crypt_util_srcfiles) $(crypt_util_hdrfiles)
+	@echo ; echo "Compiling $@..."
+	$(CC) $(CFLAGS) $(default_thirdparty_CFLAGS) $(crypt_util_srcfiles) $(LDSHR) $(LDFLAGS) $@ $(default_thirdparty_LDFLAGS)
 
-all: libgtmcryptutil.so maskpass gcrypt openssl gtmtls
-	rm -f $(crypt_objfiles) maskpass.o
+# Since maskpass is a standalone utility, link it (implicitly) with gtmcrypt_util.o instead of libgtmcryptutil.so. This allows
+# maskpass to be run without setting LD_LIBRARY_PATH/LIBPATH to load libgtmcryptutil.so. As a standalone utility maskpass should
+# not depend on functions like `gtm_malloc' and `gtm_free', so we are compiling the executable with -DUSE_SYSLIB_FUNCS.
+maskpass: maskpass.c $(crypt_util_srcfiles) $(crypt_util_hdrfiles)
+	@echo ; echo "Compiling $@..."
+	$(CC) $(CFLAGS) -DUSE_SYSLIB_FUNCS $(default_thirdparty_CFLAGS) maskpass.c $(crypt_util_srcfiles)	\
+		$(LDFLAGS) $@ $(default_thirdparty_LDFLAGS)
 
-gtmcrypt_util.o: gtmcrypt_util.c
-	$(CC) $(CFLAGS) $(default_thirdparty_CFLAGS) $^
+gcrypt: libgtmcrypt_gcrypt_AES256CFB.so
 
-# Rules for building libgtmcryptutil.so
-libgtmcryptutil.so: gtmcrypt_util.o
-	$(LD) $^ $(LDSHR) $(LDFLAGS) $@ $(default_thirdparty_LDFLAGS)
+libgtmcrypt_gcrypt_AES256CFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcryptutil.so
+	@echo ; echo "Compiling $@..."
+	$(CC) $(CFLAGS) -DUSE_GCRYPT -DUSE_AES256CFB $(gcrypt_nofips_flag) $(crypt_srcfiles) $(LDSHR)		\
+		$(RPATHFLAGS) $(LDFLAGS) $@ -lgcrypt -lgpgme -lgpg-error $(COMMON_LIBS)
 
-# Rules for building maskpass
-maskpass.o: maskpass.c
-	$(CC) $(CFLAGS) $^
+openssl: libgtmcrypt_openssl_AES256CFB.so libgtmcrypt_openssl_BLOWFISHCFB.so
 
-# Since maskpass is a standalone utility and doesn't depend on functions like `gtm_malloc' and `gtm_free' for memory allocation,
-# build gtmcrypt_util.c with -DUSE_SYSLIB_FUNCS.
-gtmcrypt_util_syslib.o: gtmcrypt_util.c
-	$(CC) $(CFLAGS) -DUSE_SYSLIB_FUNCS $(default_thirdparty_CFLAGS) -o $@ $^
+libgtmcrypt_openssl_AES256CFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcryptutil.so
+	@echo ; echo "Compiling $@..."
+	$(CC) $(CFLAGS) -DUSE_OPENSSL -DUSE_AES256CFB $(crypt_srcfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS)	\
+		$@ -lcrypto -lgpgme -lgpg-error $(COMMON_LIBS)
 
-# Since maskpass is a standalone utility, link it with gtmcrypt_utils_syslib.o instead of libgtmcryptutil.so. This allows maskpass
-# to be run without the need for the user setting LD_LIBRARY_PATH/LIBPATH to load libgtmcryptutil.so.
-maskpass: maskpass.o gtmcrypt_util_syslib.o
-	$(LD) $(LDFLAGS) maskpass $^ $(default_thirdparty_LDFLAGS)
+libgtmcrypt_openssl_BLOWFISHCFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcryptutil.so
+	@echo ; echo "Compiling $@..."
+	$(CC) $(CFLAGS) -DUSE_OPENSSL -DUSE_BLOWFISHCFB $(crypt_srcfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS)	\
+	$@ -lcrypto -lgpgme -lgpg-error $(COMMON_LIBS)
 
-# Rules for building libgtmtls.so
-gtm_tls_impl.o: gtm_tls_impl.c
-	$(CC) $(CFLAGS) $<
+libgtmtls.so: $(tls_srcfiles) $(tls_hdrfiles) libgtmcryptutil.so
+	@echo ; echo "Compiling $@..."
+	$(CC) $(CFLAGS) $(tls_srcfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS) $@ -lssl $(COMMON_LIBS)
 
-gtmtls: gtm_tls_impl.o libgtmcryptutil.so
-	$(LD) $< $(LDSHR) $(RPATHFLAGS) $(LDFLAGS) lib$@.so -lssl $(COMMON_LIBS)
-
-# Rules for building all supported variations of encryption libraries. These again point to the specific ones.
-gcrypt: gcrypt_AES256CFB
-
-openssl: openssl_AES256CFB openssl_BLOWFISHCFB
-
-# Rules for building specific encryption libraries.
-gcrypt_AES256CFB: $(crypt_srcfiles) libgtmcryptutil.so
-	$(CC) $(CFLAGS) -DUSE_GCRYPT -DUSE_AES256CFB $(gcrypt_nofips_flag) $(crypt_srcfiles)
-	$(LD) $(crypt_objfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS) libgtmcrypt_$@.so -lgcrypt -lgpgme -lgpg-error $(COMMON_LIBS)
-
-openssl_AES256CFB: $(crypt_srcfiles) libgtmcryptutil.so
-	$(CC) $(CFLAGS) -DUSE_OPENSSL -DUSE_AES256CFB $(crypt_srcfiles)
-	$(LD) $(crypt_objfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS) libgtmcrypt_$@.so -lcrypto -lgpgme -lgpg-error $(COMMON_LIBS)
-
-openssl_BLOWFISHCFB: $(crypt_srcfiles) libgtmcryptutil.so
-	$(CC) $(CFLAGS) -DUSE_OPENSSL -DUSE_BLOWFISHCFB $(crypt_srcfiles)
-	$(LD) $(crypt_objfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS) libgtmcrypt_$@.so -lcrypto -lgpgme -lgpg-error $(COMMON_LIBS)
-
-# The below rule is useful when the user wants to [re]build a specific target (one of gcrypt_AES256CFB, openssl_AES256CFB or
-# openssl_BLOWFISHCFB).
-gtmcrypt: $(thirdparty)_$(algo)
-
-
-# install, uninstall and cleanup rules.
-install:
-	rm -f $(all_objfiles)
-	mv *.so $(PLUGINDIR)
-	ln -s ./$(install_targ) $(PLUGINDIR)/libgtmcrypt.so
+install: all
+	@echo ; echo "Installing shared libraries to $(PLUGINDIR) and maskpass to $(PLUGINDIR)/gtmcrypt..."
+	cp -f *.so $(PLUGINDIR)
+	ln -fs ./$(install_targ) $(PLUGINDIR)/libgtmcrypt.so
+ifeq ($(NOT_IN_GTMCRYPTDIR),1)
+	cp -f maskpass $(PLUGINDIR)/gtmcrypt
+endif
 
 uninstall:
+	@echo ; echo "Uninstalling shared libraries from $(PLUGINDIR) and maskpass from $(PLUGINDIR)/gtmcrypt..."
 	rm -f $(PLUGINDIR)/*.so
 	rm -f $(PLUGINDIR)/gtmcrypt/maskpass
 
 clean:
-	rm -f $(all_objfiles)
+	@echo ; echo "Removing generated files..."
 	rm -f *.so
+ifeq ($(NOT_IN_GTMCRYPTDIR),1)
 	rm -f maskpass
+endif

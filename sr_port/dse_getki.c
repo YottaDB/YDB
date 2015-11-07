@@ -44,8 +44,6 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_namehead	*gv_target;
 
-LITREF	mval		literal_hasht;
-
 int dse_getki(char *dst, int *len, char *qual, int qual_len)
 {
 	char 		buf[MAX_ZWR_KEY_SZ], *src, *temp_dst, *bot, *top, *tmp, slit[MAX_KEY_SZ + 1], key_buf[MAX_KEY_SZ + 1];

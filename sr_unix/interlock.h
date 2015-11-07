@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -102,9 +102,13 @@
 #endif /* __ia64, __x86_64__, and __sparc */
 /* Use COMPSWAP_UNLOCK to release the lock because of the memory barrier and other-processor notification it implies. Also
  * the usage of COMPSWAP_UNLOCK allows us to check (with low cost) that we have/had the lock we are trying to release.
- * If we don't have the lock and are trying to release it, a GTMASSERT seems the logical choice as the logic is very broken
- * at that point. If this macro is used in part of an expression, the GTMASSERT path must also return a value (to keep
- * the compiler happy) thus the construct (GTMASSERT, 0) which returns a zero (see usage with assert() on UNIX).
+ * If we don't have the lock and are trying to release it, an assertpro seems the logical choice as the logic is very broken
+ * at that point. If this macro is used in part of an expression, the assertpro path must also return a value (to keep
+ * the compiler happy) thus the construct (assertpro, 0) which returns a zero (see usage with assert() on UNIX).
  */
-#define RELEASE_SWAPLOCK(X)		(COMPSWAP_UNLOCK((X), process_id, 0, LOCK_AVAILABLE, 0) ? 1 : (GTMASSERT, 0))
+#define RELEASE_SWAPLOCK(X)		(COMPSWAP_UNLOCK((X), process_id, 0, LOCK_AVAILABLE, 0) ? 1 : (assertpro(FALSE), 0))
+
+/* Function prototypes */
+boolean_t	grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs);
+void		rel_latch(sm_global_latch_ptr_t latch);
 

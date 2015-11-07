@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
 #include "comp_esc.h"
 
 GBLREF unsigned char *source_buffer;
-GBLREF short int source_column;
+GBLREF int   source_column;
 GBLREF char *lexical_ptr;
 GBLREF struct ce_sentinel_desc	*ce_def_list;
 

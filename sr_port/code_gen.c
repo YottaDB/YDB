@@ -29,7 +29,8 @@ GBLREF	triple		t_orig;		/* head of triples */
 GBLREF	char		cg_phase;	/* code generation phase */
 GBLREF	int4		curr_addr;	/* current address */
 GBLREF	src_line_struct	src_head;
-GBLREF	short		source_column,source_line;
+GBLREF	short		source_line;
+GBLREF int		source_column;
 GBLREF	int4		pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
 
 void	code_gen(void)

@@ -70,7 +70,7 @@ int m_do(void)
 				assert(TRIP_REF == calltrip->operand[1].oprclass);
 				if (OC_CDLIT == calltrip->operand[1].oprval.tref->opcode)
 					assert(CDLT_REF == calltrip->operand[1].oprval.tref->operand[0].oprclass);
-				else USHBIN_ONLY(if (OC_LAB_EXT != calltrip->operand[1].oprval.tref->opcode))
+				else ARLINK_ONLY(if (OC_LAB_EXT != calltrip->operand[1].oprval.tref->opcode))
 				{
 					assert(OC_LABADDR == calltrip->operand[1].oprval.tref->opcode);
 					assert(TRIP_REF == calltrip->operand[1].oprval.tref->operand[1].oprclass);

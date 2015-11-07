@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,6 +109,7 @@ static readonly char zsystem_text[] = "$ZSYSTEM";
 #ifdef GTM_TRIGGER
 static readonly char ztname_text[] = "$ZTNAME";
 static readonly char ztdata_text[] = "$ZTDATA";
+static readonly char ztdelim_text[] = "$ZTDELIM";
 #endif
 static readonly char ztexit_text[] = "$ZTEXIT";
 GTMTRIG_ONLY(static readonly char ztlevel_text[] = "$ZTLEVEL";)
@@ -161,6 +162,7 @@ GBLREF boolean_t	dollar_zquit_anyway;
 #ifdef GTM_TRIGGER
 GBLREF mstr		*dollar_ztname;
 GBLREF mval		*dollar_ztdata;
+GBLREF mval		*dollar_ztdelim;
 GBLREF mval		*dollar_ztoldval;
 GBLREF mval		*dollar_ztriggerop;
 GBLREF mval		dollar_ztslate;
@@ -671,6 +673,18 @@ void zshow_svn(zshow_out *output, int one_sv)
 			} else
 				memcpy(&var, &literal_zero, SIZEOF(mval));
 			ZS_VAR_EQU(&x, ztdata_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZTDELIM:
+			if (NULL != dollar_ztdelim && (0 < dollar_ztdelim->str.len))
+			{
+				var.mvtype = MV_STR;
+				var.str = dollar_ztdelim->str;
+			} else
+				memcpy(&var, &literal_null, SIZEOF(mval));
+			ZS_VAR_EQU(&x, ztdelim_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;

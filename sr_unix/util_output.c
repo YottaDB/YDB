@@ -65,11 +65,12 @@ GBLREF	boolean_t		is_updproc;
 GBLREF	boolean_t		is_updhelper;
 GBLREF  recvpool_addrs          recvpool;
 GBLREF  uint4                   process_id;
-GBLREF	void			(*op_write_ptr)(mval *v);
-GBLREF	void			(*op_wteol_ptr)(int4 n);
 
 error_def(ERR_REPLINSTACC);
 error_def(ERR_TEXT);
+
+#define	ZTRIGBUFF_INIT_ALLOC		1024	/* start at 1K */
+#define	ZTRIGBUFF_INIT_MAX_GEOM_ALLOC	1048576	/* stop geometric growth at this value */
 
 #define GETFAOVALDEF(faocnt, var, type, result, defval) \
 	if (faocnt > 0) {result = (type)va_arg(var, type); faocnt--;} else result = defval;
@@ -739,8 +740,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 	SETUP_THREADGBL_ACCESS;
 	if (IS_GTMSECSHR_IMAGE && (FLUSH == flush))
 		flush = OPER;			/* All gtmsecshr origin msgs go to operator log */
-	if (NULL == TREF(util_outptr))
-		TREF(util_outptr) = TREF(util_outbuff_ptr);
+	assert(NULL != TREF(util_outptr));
 	if (NULL != message)
 	{
 		util_avail_len = INTCAST(TREF(util_outbuff_ptr) + OUT_BUFF_SIZE - TREF(util_outptr) - 2);
@@ -798,7 +798,6 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 				case FLUSH:
 					if (use_stdio)
 					{
-						assert(NULL != op_write_ptr);
 						flushtxt.addr = fmt_buff;
 						flushtxt.len = INTCAST(TREF(util_outptr) - TREF(util_outbuff_ptr));
 						save_io_curr_device = io_curr_device;
@@ -848,36 +847,29 @@ void	util_out_print(caddr_t message, int flush, ...)
 	va_end(var);
 }
 
-/* Used primarily by MUPIP in the MUPIP TRIGGER routines where output can either be output "normally" there or
- * when the same trigger parsing/loading functions are called from within GTM, the output is done with GTM IO
- * routines.
+/* Saves a copy of the current unflushed buffer in util_outbuff_ptr into dst.
+ * The length of the allocated buffer at "dst" is passed in as *dst_len.
+ * If that length is not enough to store the unflushed buffer, FALSE is returned right away.
+ * If not, the length of the unflushed buffer is stored in dst_len, the actual unflushed buffer
+ * is copeid over to "dst", and a TRUE is returned.
  */
-void	util_out_print_gtmio(caddr_t message, int flush, ...)
+boolean_t	util_out_save(char *dst, int *dstlen_ptr)
 {
-	int		flush_it;
-	boolean_t	usestdio;
-	va_list		var;
-	mval		flushtxt;
+	int	srclen, dstlen;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	va_start(var, flush);
-	usestdio = IS_MCODE_RUNNING;
-	assert((FLUSH == flush) || (NOFLUSH == flush));
-	flush_it = ((FLUSH == flush) && !usestdio) ? FLUSH : NOFLUSH;
-	util_out_print_vaparm(message, flush_it, var, MAXPOSINT4);
-	if (usestdio && (FLUSH == flush))
-	{	/* Message should be in buffer and we just need to flush it */
-		assert(NULL != op_write_ptr);
-		flushtxt.mvtype = MV_STR;
-		flushtxt.str.addr = TREF(util_outbuff_ptr);
-		flushtxt.str.len = INTCAST(TREF(util_outptr) - TREF(util_outbuff_ptr));
-		(*op_write_ptr)(&flushtxt);
-		(*op_wteol_ptr)(1);
-		TREF(util_outptr) = TREF(util_outbuff_ptr);	/* Signal text is flushed */
-	}
-	va_end(TREF(last_va_list_ptr));
-	va_end(var);
+	assert(NULL != TREF(util_outptr));
+	srclen = INTCAST(TREF(util_outptr) - TREF(util_outbuff_ptr));
+	assert(0 <= srclen);
+	assert(OUT_BUFF_SIZE >= srclen);
+	dstlen = *dstlen_ptr;
+	assert(0 <= dstlen);
+	if (srclen > dstlen)
+		return FALSE;
+	*dstlen_ptr = srclen;
+	memcpy(dst, TREF(util_outbuff_ptr), srclen);
+	return TRUE;
 }
 
 /* If $x of the standard output device is non-zero, and we are going to flush a buffer,

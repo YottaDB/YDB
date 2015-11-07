@@ -33,6 +33,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include "zr_unlink_rtn.h"
 #ifdef GTM_TRIGGER
 # include "gtm_trigger_trc.h"
 #endif
@@ -59,7 +60,9 @@ error_def(ERR_TPQUIT);
 /* This has to be maintained in parallel with unw_retarg(), the unwind with a return argument (extrinisic quit) routine. */
 void op_unwind(void)
 {
+	rhdtyp			*rtnhdr;
 	mv_stent 		*mvc;
+	stack_frame		*fp;
 	DBGEHND_ONLY(stack_frame *prevfp;)
 	DCL_THREADGBL_ACCESS;
 
@@ -116,6 +119,7 @@ void op_unwind(void)
 #	endif
 	DRAIN_GLVN_POOL_IF_NEEDED;
 	PARM_ACT_UNSTACK_IF_NEEDED;
+	USHBIN_ONLY(rtnhdr = frame_pointer->rvector);	/* Save rtnhdr for cleanup call below */
 	frame_pointer = frame_pointer->old_frame_pointer;
 	DBGEHND((stderr, "op_unwind: Stack frame 0x"lvaddr" unwound - frame 0x"lvaddr" now current - New msp: 0x"lvaddr"\n",
 		 prevfp, frame_pointer, msp));
@@ -128,6 +132,7 @@ void op_unwind(void)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
 		assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	}
+	USHBIN_ONLY(CLEANUP_COPIED_RECURSIVE_RTN(rtnhdr));
 	/* We just unwound a frame. May have been either a zintrupt frame and/or may have unwound a NEW'd ZTRAP or even cleared
 	 * our error state. If we have a deferred timeout and none of the deferral conditions are anymore in effect, release
 	 * the hounds.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@
 #ifdef GTM_TRIGGER
 #include <rtnhdr.h>
 #include "gv_trigger.h"		/* for TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
+#include "util.h"		/* for TP_ZTRIGBUFF_PRINT macro */
 #endif
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -190,7 +191,8 @@ void	tp_clean_up(boolean_t rollback_flag)
 									 */
 		}
 		GTMTRIG_ONLY(assert(!TREF(gvt_triggers_read_this_tn));)
-		GTMTRIG_ONLY(TP_ASSERT_ZTRIGGER_CYCLE_RESET;) /* for all regions, we better have csa->db_dztrigger_cycle = 0*/
+		/* Assert that for all regions, we have csa->db_dztrigger_cycle = 0 or 1 (based on commit/restart/rollback) */
+		GTMTRIG_ONLY(TP_ASSERT_ZTRIGGER_CYCLE_RESET;)
 		for (si = first_sgm_info;  si != NULL;  si = next_si)
 		{
 			TP_TEND_CHANGE_REG(si);
@@ -432,9 +434,10 @@ void	tp_clean_up(boolean_t rollback_flag)
 	sgm_info_ptr = NULL;
 	first_sgm_info = NULL;
 	/* ensure that we don't have crit on any region at the end of a TP transaction (be it GT.M or MUPIP). The only exception
-	 * is ONLINE ROLLBACK which holds crit for the entire duration
+	 * is ONLINE ROLLBACK or MUPIP TRIGGER -UPGRADE which holds crit for the entire duration
 	 */
-	assert((CDB_STAGNATE == t_tries) || (0 == have_crit(CRIT_HAVE_ANY_REG)) UNIX_ONLY(|| jgbl.onlnrlbk));
+	assert((CDB_STAGNATE == t_tries) || (0 == have_crit(CRIT_HAVE_ANY_REG))
+						UNIX_ONLY(|| jgbl.onlnrlbk || TREF(in_trigger_upgrade)));
 	/* Now that this transaction try is done (need to start a fresh try in case of a restart; in case of commit the entire
 	 * transaction is done) ensure first_tp_si_by_ftok is NULL at end of tp_clean_up as this field is relied upon by
 	 * secshr_db_clnup and t_commit_cleanup to determine if we have an ongoing transaction. In case of a successfully
@@ -445,4 +448,11 @@ void	tp_clean_up(boolean_t rollback_flag)
 	assert(rollback_flag || (NULL == first_tp_si_by_ftok));
 	first_tp_si_by_ftok = NULL;
 	ENABLE_INTERRUPTS(INTRPT_IN_TP_CLEAN_UP);	/* check if any MUPIP STOP/signals were deferred while in this function */
+#	ifdef GTM_TRIGGER
+	if (!rollback_flag)
+	{
+		TP_ZTRIGBUFF_PRINT; /* TP is committed so print $ZTRIGGER/MUPIP-TRIGGER activity output in this tn */
+	} else
+		TREF(ztrigbuffLen) = 0;
+#	endif
 }

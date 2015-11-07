@@ -17,10 +17,8 @@
  *		Loop until open succeeds or fails with other than EINTR.
  *		Opens with O_DSYNC/O_SYNC in direct mode where possible.
  *		Else opens only with O_DSYNC or O_SYNC.
- * OPEN_OBJECT_FILE
- *		Opens the object file and waits till it gets a lock(shr/excl).
- *		Sets default perms if it creates a new file.
- * CLOSE_OBJECT_FILE - close the object file after releasing the lock on it.
+ * OPEN_OBJECT_FILE	Opens the object file.
+ * CLOSE_OBJECT_FILE	Close the object file.
  * CLOSEFILE	Loop until close succeeds for fails with other than EINTR.
  * CLOSEFILE_RESET
  * 		Loop until close succeeds for fails with other than EINTR.
@@ -193,10 +191,8 @@ error_def(ERR_PREMATEOF);
 #else
 #define LOCK_IS_ALLOWED(FDESC, STATUS)	STATUS = 0
 #endif
-#define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC)	FDESC = open_object_file(FNAME, FFLAG);
-
+#define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC)	OPENFILE(FNAME, FFLAG, FDESC)
 #define CLOSE_OBJECT_FILE(FDESC, RC)		CLOSEFILE_RESET(FDESC, RC)
-
 #define CLOSEFILE(FDESC, RC)					\
 {								\
 	do							\
@@ -616,7 +612,7 @@ error_def(ERR_PREMATEOF);
 		   the CHUNK_SIZE, no need to read once again since it is in BLOCKING mode, in which case it will return -1.	\
 		   So in the first read itself (after a successful read) break from the infinite loop. This variable is TRUE    \
 		   if DOREADRLTO2 macro is called for a CHUNK_SIZE read. In other places (eg: iorm_get) it will be FALSE.	\
-		   */											 	\
+		*/												\
 			if (UTF_VAR_PF)										\
 				break;										\
 		} else if (EINTR != errno || TOFLAG)								\
@@ -832,11 +828,4 @@ typedef struct
 	fflush(STREAM);					\
 	ENABLE_INTERRUPTS(INTRPT_IN_FFLUSH);		\
 }
-
-/* Prototypes */
-int open_object_file(const char *fname, int fflag);
-int mk_tmp_object_file(const char *object_fname, int object_fname_len);
-void rename_tmp_object_file(const char *object_fname);
-void init_object_file_name(void);
-
 #endif

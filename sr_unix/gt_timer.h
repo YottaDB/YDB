@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,17 +83,69 @@ typedef struct st_timer_alloc
 	struct st_timer_alloc	*next;
 } st_timer_alloc;
 
-#define MAX_TIMER_HNDLRS	10	/* Max # of safe timer handlers */
+#define MAX_SAFE_TIMER_HNDLRS	10	/* Max # of safe timer handlers */
 #define GT_WAKE
-
-/* Set each timer request to go for 10ms more than requested, since the
- * interval timer alarm will sometimes go off early on many UNIX systems.
- * 10ms is more than enough for all systems tested so far (SunOS, Solaris,
- * HP/UX, NonStop/UX)
- */
-#define SLACKTIME		10
-
 #define CANCEL_TIMERS		cancel_unsafe_timers()
+
+/* Uncomment the below #define if you want to print the status of the key timer-related variables as well as the entire timer queue
+ * when operations such as addition, cancelation, or handling of a timer occur.
+ *
+ * #define TIMER_DEBUGGING
+ */
+
+#ifdef TIMER_DEBUGGING
+#  define DUMP_TIMER_INFO(LOCATION)								\
+{												\
+	int		i;									\
+	GT_TIMER	*cur_timer;								\
+	char		*s_heartbeat_timer = "heartbeat_timer";					\
+	char		*s_wcs_clean_dbsync = "wcs_clean_dbsync";				\
+	char		*s_wcs_stale = "wcs_stale";						\
+	char		*s_hiber_wake = "hiber_wake";						\
+	char		*s_unknown = "unknown";							\
+	char		*handler;								\
+												\
+	cur_timer = (GT_TIMER *)timeroot;							\
+	FPRINTF(stderr, "------------------------------------------------------\n"		\
+		"%s\n---------------------------------\n"					\
+		"Timer Info:\n"									\
+		"  system timer active: %d\n"							\
+		"  timer in handler:    %d\n"							\
+		"  timer stack count:   %d\n"							\
+		"  heartbeat started:   %d\n",							\
+		LOCATION, timer_active, timer_in_handler, timer_stack_count, heartbeat_started);\
+	FFLUSH(stderr);										\
+	i = 0;											\
+	while (cur_timer)									\
+	{											\
+		if ((void (*)())heartbeat_timer_ptr == cur_timer->handler)			\
+			handler = s_heartbeat_timer;						\
+		else if ((void (*)())wcs_clean_dbsync_fptr == cur_timer->handler)		\
+			handler = s_wcs_clean_dbsync;						\
+		else if ((void (*)())wcs_stale_fptr == cur_timer->handler)			\
+			handler = s_wcs_stale;							\
+		else if ((void (*)())hiber_wake == cur_timer->handler)				\
+			handler = s_hiber_wake;							\
+		else										\
+			handler = s_unknown;							\
+		FPRINTF(stderr, "  - timer #%d:\n"						\
+			"      handler:    %s\n"						\
+			"      safe:       %d\n"						\
+			"      start_time: [at_sec: %ld; at_usec: %ld]\n"			\
+			"      expir_time: [at_sec: %ld; at_usec: %ld]\n",			\
+			i, handler, cur_timer->safe,						\
+			cur_timer->start_time.at_sec, cur_timer->start_time.at_usec,		\
+			cur_timer->expir_time.at_sec, cur_timer->expir_time.at_usec);		\
+		FFLUSH(stderr);									\
+		cur_timer = cur_timer->next;							\
+		i++;										\
+	}											\
+	FPRINTF(stderr, "------------------------------------------------------\n");		\
+	FFLUSH(stderr);										\
+}
+#else
+#  define DUMP_TIMER_INFO(LOCATION)
+#endif
 
 int4		abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2);
 void		add_int_to_abs_time(ABS_TIME *atps, int4 ival, ABS_TIME *atpd);

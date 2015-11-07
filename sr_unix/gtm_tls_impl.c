@@ -49,7 +49,186 @@ STATICDEF DH			*dh512, *dh1024;	/* Diffie-Hellman structures for Ephemeral Diffi
  * EXP: Export Ciphers.
  * MD5 : MD5 message digest.
  */
-#define CIPHER_LIST			"ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH"
+#define REPL_CIPHER_LIST			"ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH"
+
+#define OPTIONEND ':'
+#define OPTIONENDSTR ":"
+#define OPTIONNOT '!'
+#define DEFINE_SSL_OP(OP_DEF)   { #OP_DEF , OP_DEF }
+struct gtm_ssl_options
+{
+	const char	*opt_str;
+	long		opt_val;
+};
+STATICDEF struct gtm_ssl_options gtm_ssl_verify_mode_list[] =
+{
+	DEFINE_SSL_OP(SSL_VERIFY_PEER),
+	DEFINE_SSL_OP(SSL_VERIFY_NONE),
+	DEFINE_SSL_OP(SSL_VERIFY_FAIL_IF_NO_PEER_CERT),
+	DEFINE_SSL_OP(SSL_VERIFY_CLIENT_ONCE),
+	{NULL, 0}
+};
+STATICDEF struct gtm_ssl_options gtm_ssl_options_list[] =
+{
+#ifdef	SSL_OP_MICROSOFT_SESS_ID_BUG
+	DEFINE_SSL_OP(SSL_OP_MICROSOFT_SESS_ID_BUG),
+#endif
+#ifdef	SSL_OP_NETSCAPE_CHALLENGE_BUG
+	DEFINE_SSL_OP(SSL_OP_NETSCAPE_CHALLENGE_BUG),
+#endif
+#ifdef	SSL_OP_LEGACY_SERVER_CONNECT
+	DEFINE_SSL_OP(SSL_OP_LEGACY_SERVER_CONNECT),
+#endif
+#ifdef	SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG
+	DEFINE_SSL_OP(SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG),
+#endif
+#ifdef	SSL_OP_SSLREF2_REUSE_CERT_TYPE_BUG
+	DEFINE_SSL_OP(SSL_OP_SSLREF2_REUSE_CERT_TYPE_BUG),
+#endif
+#ifdef	SSL_OP_MICROSOFT_BIG_SSLV3_BUFFER
+	DEFINE_SSL_OP(SSL_OP_MICROSOFT_BIG_SSLV3_BUFFER),
+#endif
+#ifdef	SSL_OP_SAFARI_ECDHE_ECDSA_BUG
+	DEFINE_SSL_OP(SSL_OP_SAFARI_ECDHE_ECDSA_BUG),
+#endif
+#ifdef	SSL_OP_SSLEAY_080_CLIENT_DH_BUG
+	DEFINE_SSL_OP(SSL_OP_SSLEAY_080_CLIENT_DH_BUG),
+#endif
+#ifdef	SSL_OP_TLS_D5_BUG
+	DEFINE_SSL_OP(SSL_OP_TLS_D5_BUG),
+#endif
+#ifdef	SSL_OP_TLS_BLOCK_PADDING_BUG
+	DEFINE_SSL_OP(SSL_OP_TLS_BLOCK_PADDING_BUG),
+#endif
+#ifdef	SSL_OP_MSIE_SSLV2_RSA_PADDING
+	DEFINE_SSL_OP(SSL_OP_MSIE_SSLV2_RSA_PADDING),
+#endif
+#ifdef	SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS
+	DEFINE_SSL_OP(SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS),
+#endif
+#ifdef	SSL_OP_ALL
+	DEFINE_SSL_OP(SSL_OP_ALL),
+#endif
+#ifdef	SSL_OP_NO_QUERY_MTU
+	DEFINE_SSL_OP(SSL_OP_NO_QUERY_MTU),
+#endif
+#ifdef	SSL_OP_COOKIE_EXCHANGE
+	DEFINE_SSL_OP(SSL_OP_COOKIE_EXCHANGE),
+#endif
+#ifdef	SSL_OP_NO_TICKET
+	DEFINE_SSL_OP(SSL_OP_NO_TICKET),
+#endif
+#ifdef	SSL_OP_CISCO_ANYCONNECT
+	DEFINE_SSL_OP(SSL_OP_CISCO_ANYCONNECT),
+#endif
+#ifdef	SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION
+	DEFINE_SSL_OP(SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION),
+#endif
+#ifdef	SSL_OP_NO_COMPRESSION
+	DEFINE_SSL_OP(SSL_OP_NO_COMPRESSION),
+#endif
+#ifdef	SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION
+	DEFINE_SSL_OP(SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION),
+#endif
+#ifdef	SSL_OP_SINGLE_ECDH_USE
+	DEFINE_SSL_OP(SSL_OP_SINGLE_ECDH_USE),
+#endif
+#ifdef	SSL_OP_SINGLE_DH_USE
+	DEFINE_SSL_OP(SSL_OP_SINGLE_DH_USE),
+#endif
+#ifdef	SSL_OP_EPHEMERAL_RSA
+	DEFINE_SSL_OP(SSL_OP_EPHEMERAL_RSA),
+#endif
+#ifdef	SSL_OP_CIPHER_SERVER_PREFERENCE
+	DEFINE_SSL_OP(SSL_OP_CIPHER_SERVER_PREFERENCE),
+#endif
+#ifdef	SSL_OP_TLS_ROLLBACK_BUG
+	DEFINE_SSL_OP(SSL_OP_TLS_ROLLBACK_BUG),
+#endif
+#ifdef	SSL_OP_NO_SSLv2
+	DEFINE_SSL_OP(SSL_OP_NO_SSLv2),
+#endif
+#ifdef	SSL_OP_NO_SSLv3
+	DEFINE_SSL_OP(SSL_OP_NO_SSLv3),
+#endif
+#ifdef	SSL_OP_NO_TLSv1
+	DEFINE_SSL_OP(SSL_OP_NO_TLSv1),
+#endif
+#ifdef	SSL_OP_NO_TLSv1_2
+	DEFINE_SSL_OP(SSL_OP_NO_TLSv1_2),
+#endif
+#ifdef	SSL_OP_NO_TLSv1_1
+	DEFINE_SSL_OP(SSL_OP_NO_TLSv1_1),
+#endif
+#ifdef	SSL_OP_PKCS1_CHECK_1
+	DEFINE_SSL_OP(SSL_OP_PKCS1_CHECK_1),
+#endif
+#ifdef	SSL_OP_PKCS1_CHECK_2
+	DEFINE_SSL_OP(SSL_OP_PKCS1_CHECK_2),
+#endif
+#ifdef	SSL_OP_NETSCAPE_CA_DN_BUG
+	DEFINE_SSL_OP(SSL_OP_NETSCAPE_CA_DN_BUG),
+#endif
+#ifdef	SSL_OP_NETSCAPE_DEMO_CIPHER_CHANGE_BUG
+	DEFINE_SSL_OP(SSL_OP_NETSCAPE_DEMO_CIPHER_CHANGE_BUG),
+#endif
+#ifdef	SSL_OP_CRYPTOPRO_TLSEXT_BUG
+	DEFINE_SSL_OP(SSL_OP_CRYPTOPRO_TLSEXT_BUG),
+#endif
+	{NULL, 0}
+};
+
+STATICDEF long parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_table_size, const char *options, long current,
+					long *clear);
+STATICDEF long parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_table_size, const char *options, long current,
+					long *clear)
+{
+	int		negate;
+	size_t		num_options, index, optionlen;
+	long		bitmask;
+	const char	*charptr, *optionend;
+
+	if (NULL == options)
+		return 0;
+	negate = 0;
+	bitmask = current;
+	num_options = opt_table_size/SIZEOF(struct gtm_ssl_options);
+	for (charptr = options; *charptr; charptr = optionend)
+	{
+		if (OPTIONEND == *charptr)
+			if ('\0' == *++charptr)
+				break;
+		optionend = strstr((const char *)charptr, OPTIONENDSTR);
+		if (NULL == optionend)
+			optionend = charptr + strlen(charptr);
+		if (OPTIONNOT == *charptr)
+		{
+			negate = TRUE;
+			charptr++;
+		} else
+			negate = FALSE;
+		optionlen = optionend - charptr;
+		for (index = 0; num_options > index ; index++)
+		{
+			if (NULL == opt_table[index].opt_str)
+				break;
+			if (0 == strncmp(opt_table[index].opt_str, charptr, optionlen))
+			{
+				if (negate)
+				{
+					bitmask &= ~opt_table[index].opt_val;
+					if (NULL != clear)
+						*clear |= opt_table[index].opt_val;
+				} else
+					bitmask |= opt_table[index].opt_val;
+				break;
+			}
+		}
+		if (num_options <= index)
+			;	/* option not found - ignore */
+	}
+	return bitmask;
+}
 
 #ifdef DEBUG_SSL
 #define SSL_DPRINT(FP, ...)		{fprintf(FP, __VA_ARGS__); fflush(FP);}	/* BYPASSOK -- cannot use FFLUSH. */
@@ -206,6 +385,8 @@ STATICFNDEF int init_dhparams(void)
 	int		rv1, rv2;
 	const char	*dh512_fn, *dh1024_fn;
 
+	if (dh1024)
+		return 0;	/* already have */
 	rv1 = config_lookup_string(&gtm_tls_cfg, "tls.dh512", &dh512_fn);
 	rv2 = config_lookup_string(&gtm_tls_cfg, "tls.dh1024", &dh1024_fn);
 	if (!rv1 && !rv2)
@@ -229,7 +410,7 @@ STATICFNDEF int init_dhparams(void)
 
 STATICFNDEF DH *tmp_dh_callback(SSL *ssl, int is_export, int keylength)
 {
-	assert(dh512 && dh1024 && (512 <= keylength));
+	assert(dh512 && dh1024 && ((512 == keylength) || (1024 == keylength)));
 	return (512 == keylength) ? dh512 : dh1024;
 }
 
@@ -245,14 +426,15 @@ const char *gtm_tls_get_error(void)
 
 gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 {
-	const char		*CAfile = NULL, *CApath = NULL, *crl, *CAptr;
+	const char		*CAfile = NULL, *CApath = NULL, *crl, *CAptr, *cipher_list, *options_string, *verify_mode_string;
 	char			*config_env;
-	int			rv, rv1, rv2, fips_requested, fips_enabled;
+	int			rv, rv1, rv2, fips_requested, fips_enabled, verify_mode;
 #	if (((LIBCONFIG_VER_MAJOR == 1) && (LIBCONFIG_VER_MINOR >= 4)) || (LIBCONFIG_VER_MAJOR > 1))
 	int			verify_depth, session_timeout;
 #	else
 	long int		verify_depth, session_timeout;
 #	endif
+	long			options_mask, options_current, options_clear;
 	SSL_CTX			*ctx;
 	X509_STORE		*store;
 	X509_LOOKUP		*lookup;
@@ -274,8 +456,6 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 			return NULL; /* Relevant error detail populated in the above macro. */
 	}
 	OpenSSL_add_all_algorithms();
-	OpenSSL_add_all_ciphers();
-	OpenSSL_add_all_digests();
 	/* Setup function pointers to symbols exported by libgtmshr.so. */
 	if (0 != gc_load_gtmshr_symbols())
 		return NULL;
@@ -308,6 +488,13 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	/* Get global SSL configuration parameters */
 	if (config_lookup_int(cfg, "tls.verify-depth", &verify_depth))
 		SSL_CTX_set_verify_depth(ctx, verify_depth);
+	if (CONFIG_TRUE == config_lookup_string(cfg, "tls.verify-mode", &verify_mode_string))
+	{
+		verify_mode = (int)parse_SSL_options(&gtm_ssl_verify_mode_list[0], SIZEOF(gtm_ssl_verify_mode_list),
+					verify_mode_string, (long)0, NULL);
+		SSL_CTX_set_verify(ctx, verify_mode, NULL);
+	} else
+		flags |= GTMTLS_OP_ABSENT_VERIFYMODE;
 	rv1 = config_lookup_string(cfg, "tls.CAfile", &CAfile);
 	rv2 = config_lookup_string(cfg, "tls.CApath", &CApath);
 	/* Setup trust locations for peer verifications. This adds on to any trust locations that was previously loaded. */
@@ -375,25 +562,43 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 			SSL_CTX_set_timeout(ctx, session_timeout);
 	} else
 		SSL_CTX_set_timeout(ctx, DEFAULT_SESSION_TIMEOUT);
-	if (0 >= SSL_CTX_set_cipher_list(ctx, CIPHER_LIST))
+	if (CONFIG_FALSE == config_lookup_string(cfg, "tls.cipher-list", &cipher_list))
+		cipher_list = NULL;
+	else if (('\0' != cipher_list[0]) && (0 >= SSL_CTX_set_cipher_list(ctx, cipher_list)))
 	{
-		GC_APPEND_OPENSSL_ERROR("Failed to add Cipher-List command string: %s.", CIPHER_LIST);
+		GC_APPEND_OPENSSL_ERROR("Failed to add Cipher-List command string: %s.", cipher_list);
 		SSL_CTX_free(ctx);
 		config_destroy(cfg);
 		return NULL;
+	}	/* use OpenSSL default */
+	if (CONFIG_TRUE == config_lookup_string(cfg, "tls.ssl-options", &options_string))
+	{
+		options_current = SSL_CTX_get_options(ctx);
+		options_clear = 0;
+		options_mask = parse_SSL_options(&gtm_ssl_options_list[0], SIZEOF(gtm_ssl_options_list), options_string,
+					options_current, &options_clear);
+		if (0 != options_mask)
+			options_mask = SSL_CTX_set_options(ctx, options_mask);
+		if (0 != options_clear)
+			options_mask = SSL_CTX_clear_options(ctx, options_clear);
 	}
 	gtm_tls_ctx = MALLOC(SIZEOF(gtm_tls_ctx_t));
 	gtm_tls_ctx->ctx = ctx;
+	if (NULL == cipher_list)
+		flags |= GTMTLS_OP_ABSENT_CIPHER;
+	else if ('\0' == cipher_list[0])
+		flags |= GTMTLS_OP_DEFAULT_CIPHER;
 	gtm_tls_ctx->flags = flags;
 	gtm_tls_ctx->fips_mode = fips_enabled;
 	gtm_tls_ctx->compile_time_version = OPENSSL_VERSION_NUMBER;
 	gtm_tls_ctx->runtime_version = SSLeay();
+	gtm_tls_ctx->version = version;
 	return gtm_tls_ctx;
 }
 
 void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 {
-	char			*env_name_ptr, *env_value, prompt[256];
+	char			*env_name_ptr, *env_value, prompt[GTM_PASSPHRASE_MAX_ASCII + 1];
 	gtmtls_passwd_list_t	*pwent_node;
 	passwd_entry_t		*pwent;
 
@@ -404,7 +609,7 @@ void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 	assert(PASSPHRASE_ENVNAME_MAX > STRLEN(env_name_ptr));
 	assert(SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1 < STRLEN(env_name_ptr));
 	env_name_ptr += (SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1);
-	SNPRINTF(prompt, 256, "Enter passphrase for TLSID %s: ", env_name_ptr);
+	SNPRINTF(prompt, GTM_PASSPHRASE_MAX_ASCII, "Enter passphrase for TLSID %s: ", env_name_ptr);
 	pwent = NULL;
 	if (0 == gc_update_passwd(env_name, &pwent, prompt, TRUE))
 	{
@@ -420,10 +625,16 @@ void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 
 gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_socket, int sockfd, char *id, int flags)
 {
-	int			len;
-	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN], input_env_name[PASSPHRASE_ENVNAME_MAX], *env_name_ptr;
-	char			prompt[256];
-	const char		*cert, *private_key, *format;
+	int			len, verify_mode, verify_mode_set, nocert, nopkey;
+	long			options_mask, options_current, options_clear;
+#	if (((LIBCONFIG_VER_MAJOR == 1) && (LIBCONFIG_VER_MINOR >= 4)) || (LIBCONFIG_VER_MAJOR > 1))
+	int			verify_depth, session_timeout;
+#	else
+	long int		verify_depth, session_timeout;
+#	endif
+	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN], input_env_name[PASSPHRASE_ENVNAME_MAX + 1], *env_name_ptr;
+	char			prompt[GTM_PASSPHRASE_MAX_ASCII + 1];
+	const char		*cert, *private_key, *format, *cipher_list, *options_string, *verify_mode_string;
 	FILE			*fp;
 	SSL			*ssl;
 	SSL_CTX			*ctx;
@@ -447,105 +658,191 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		return NULL;
 	}
 
-	if (VERIFY_PEER(flags))
+	if ('\0' != id[0])
+	{
+		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.verify-mode", id);
+		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &verify_mode_string))
+		{
+			verify_mode = (int)parse_SSL_options(&gtm_ssl_verify_mode_list[0], SIZEOF(gtm_ssl_verify_mode_list),
+						verify_mode_string, (long)0, NULL);
+			if (SSL_VERIFY_PEER & verify_mode)
+				flags |= GTMTLS_OP_VERIFY_PEER;
+			verify_mode_set = TRUE;
+		} else if (GTMTLS_OP_ABSENT_VERIFYMODE & tls_ctx->flags)
+		{
+			verify_mode = (GTMTLS_OP_VERIFY_PEER & flags) ? SSL_VERIFY_PEER : SSL_VERIFY_NONE;
+			verify_mode_set = TRUE;
+		} else
+			verify_mode_set = FALSE;
+		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.cipher-list", id);
+		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &cipher_list))
+		{
+			if ('\0' == cipher_list[0]) /* use default instead of tls.cipher-list if empty string */
+				cipher_list = (GTMTLS_OP_SOCKET_DEV & flags) ? SSL_DEFAULT_CIPHER_LIST : REPL_CIPHER_LIST;
+		} else
+			cipher_list = NULL;
+	} else if (!CLIENT_MODE(flags))
+	{	/* server mode needs certificate and thus tlsid */
+		UPDATE_ERROR_STRING("Server mode requires a certificate but no TLSID specified");
+		SSL_free(ssl);
+		return NULL;
+	} else
+	{
+		assert(GTMTLS_OP_SOCKET_DEV & flags);
+		cipher_list = NULL;
+		if (GTMTLS_OP_ABSENT_VERIFYMODE & tls_ctx->flags)
+		{
+			verify_mode = (GTMTLS_OP_VERIFY_PEER & flags) ? SSL_VERIFY_PEER : SSL_VERIFY_NONE;
+			verify_mode_set = TRUE;
+		} else
+			verify_mode_set = FALSE;
+	}
+	if (verify_mode_set)
+		SSL_set_verify(ssl, verify_mode, NULL);
+	if (NULL == cipher_list)
+	{	/* no cipher-list in labelled section or no section */
+		if (0 != ((GTMTLS_OP_ABSENT_CIPHER | GTMTLS_OP_DEFAULT_CIPHER) &tls_ctx->flags))
+		{	/* no or default cipher specified top level */
+			cipher_list = (GTMTLS_OP_SOCKET_DEV & flags) ? SSL_DEFAULT_CIPHER_LIST : REPL_CIPHER_LIST;
+		}
+	}
+	if ((NULL != cipher_list) && (0 >= SSL_set_cipher_list(ssl, cipher_list)))
+	{
+		GC_APPEND_OPENSSL_ERROR("Failed to add Cipher-List command string: %s.", cipher_list);
+		SSL_free(ssl);
+		return NULL;
+	}
+	if ('\0' != id[0])
 	{
 		/* First lookup the certificate and private key associated with the provided id in the configuration file. */
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.cert", id);
 		if (!config_lookup_string(cfg, cfg_path, &cert))
 		{
-			UPDATE_ERROR_STRING("Certificate corresponding to TLSID: %s not found in configuration file.", id);
-			SSL_free(ssl);
-			return NULL;
-		}
-
+			if (!CLIENT_MODE(flags))
+			{
+				UPDATE_ERROR_STRING("Certificate corresponding to TLSID: %s not found in configuration file.", id);
+				SSL_free(ssl);
+				return NULL;
+			} else
+				nocert = TRUE;
+		} else
+			nocert = FALSE;
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.key", id);
-		if (!config_lookup_string(cfg, cfg_path, &private_key))
+		if (config_lookup_string(cfg, cfg_path, &private_key))
 		{
-			UPDATE_ERROR_STRING("Private Key corresponding to TLSID: %s not found in configuration file.", id);
-			SSL_free(ssl);
-			return NULL;
-		}
-
+			if (nocert)
+			{
+				UPDATE_ERROR_STRING("Private key but no certificate corresponding to TLSID:"
+					" %s in configuration file.", id);
+				SSL_free(ssl);
+				return NULL;
+			}
+		} else if (!nocert)
+			private_key = cert;	/* assume both in one file */
 		/* Verify that the format, if specified, is of PEM type as that's the only kind we support now. */
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.format", id);
 		if (config_lookup_string(cfg, cfg_path, &format))
 		{
+			if (nocert)
+			{
+				UPDATE_ERROR_STRING("Format but no certificate corresponding to TLSID: %s in configuration file.",
+					id);
+				SSL_free(ssl);
+				return NULL;
+			}
 			if (((SIZEOF("PEM") - 1) != strlen(format))
-					|| (format[0] != 'P') || (format[1] != 'E') || (format[2] != 'M'))
+				|| (format[0] != 'P') || (format[1] != 'E') || (format[2] != 'M'))
 			{
 				UPDATE_ERROR_STRING("Unsupported format type %s found for TLSID: %s.", format, id);
 				SSL_free(ssl);
 				return NULL;
 			}
 		}
-		/* Setup the certificate to be used for this connection */
-		if (!SSL_use_certificate_file(ssl, cert, SSL_FILETYPE_PEM))
+		if (!nocert)
 		{
-			GC_APPEND_OPENSSL_ERROR("Failed to add certificate %s.", cert);
-			SSL_free(ssl);
-			return NULL;
-		}
-
-		/* Before setting up the private key, check-up on the password for the private key. */
-		SNPRINTF(input_env_name, PASSPHRASE_ENVNAME_MAX, GTMTLS_PASSWD_ENV_PREFIX "%s", id);
-		if (NULL != (pwent_node = gtmtls_passwd_listhead))
-		{	/* Lookup to see if we have already prefetched the password. */
-			while (NULL != pwent_node)
+			/* Setup the certificate to be used for this connection */
+			if (!SSL_use_certificate_file(ssl, cert, SSL_FILETYPE_PEM))
 			{
-				env_name_ptr = pwent_node->pwent->env_name;
-				len = STRLEN(env_name_ptr);
-				assert(len < PASSPHRASE_ENVNAME_MAX);
-				assert(len > SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1);
-				if ((len == STRLEN(input_env_name)) && (0 == strncmp(input_env_name, env_name_ptr, len)))
-					break;
-				pwent_node = pwent_node->next;
-			}
-		}
-		if (NULL == pwent_node)
-		{	/* Lookup failed. Create a new entry for the given id. */
-			pwent = NULL;
-			SNPRINTF(prompt, 256, "Enter passphrase for TLSID %s:", id);
-			if (0 != gc_update_passwd(input_env_name, &pwent, prompt, GTMTLS_OP_INTERACTIVE_MODE & tls_ctx->flags))
-			{
+				GC_APPEND_OPENSSL_ERROR("Failed to add certificate %s.", cert);
 				SSL_free(ssl);
 				return NULL;
 			}
-			pwent_node = MALLOC(SIZEOF(gtmtls_passwd_list_t));
-			pwent_node->next = gtmtls_passwd_listhead;
-			pwent_node->pwent = pwent;
-			gtmtls_passwd_listhead = pwent_node;
-		} else
-			pwent = pwent_node->pwent;
-		assert((NULL != pwent) && (NULL != pwent_node));
-		/* Setup the private key corresponding to the certificate and the callback function to obtain the password for the
-		 * key. We cannot use the much simpler SSL_use_PrivateKey file to load the private key file because we want fine
-		 * grained control on the password callback mechanism. For this purpose, use the PEM_read_PrivateKey function which
-		 * supports callbacks for individual private keys.
-		 */
-		fp = fopen(private_key, "r");
-		evp_pkey = PEM_read_PrivateKey(fp, &evp_pkey, &passwd_callback, pwent);
-		fclose(fp);	/* Close the file irrespective of whether the above function succeeded or failed. */
-		if (NULL == evp_pkey)
-		{
-			GC_APPEND_OPENSSL_ERROR("Failed to read private key %s.", private_key);
-			SSL_free(ssl);
-			return NULL;
+			/* Before setting up the private key, check-up on the password for the private key. */
+			SNPRINTF(input_env_name, PASSPHRASE_ENVNAME_MAX, GTMTLS_PASSWD_ENV_PREFIX "%s", id);
+			if (NULL != (pwent_node = gtmtls_passwd_listhead))
+			{	/* Lookup to see if we have already prefetched the password. */
+				while (NULL != pwent_node)
+				{
+					env_name_ptr = pwent_node->pwent->env_name;
+					len = STRLEN(env_name_ptr);
+					assert(len < PASSPHRASE_ENVNAME_MAX);
+					assert(len > SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1);
+					if ((len == STRLEN(input_env_name)) && (0 == strncmp(input_env_name, env_name_ptr, len)))
+						break;
+					pwent_node = pwent_node->next;
+				}
+			}
+			if (NULL == pwent_node)
+			{	/* Lookup failed. Create a new entry for the given id. */
+				pwent = NULL;
+				SNPRINTF(prompt, GTM_PASSPHRASE_MAX_ASCII, "Enter passphrase for TLSID %s:", id);
+				if (0 != gc_update_passwd(input_env_name, &pwent, prompt, 0))
+				{
+					SSL_free(ssl);
+					return NULL;
+				}
+				pwent_node = MALLOC(SIZEOF(gtmtls_passwd_list_t));
+				pwent_node->next = gtmtls_passwd_listhead;
+				pwent_node->pwent = pwent;
+				gtmtls_passwd_listhead = pwent_node;
+			} else
+				pwent = pwent_node->pwent;
+			assert((NULL != pwent) && (NULL != pwent_node));
+			/* Setup the private key corresponding to the certificate and the callback function to obtain
+		 	* the password for the key. We cannot use the much simpler SSL_use_PrivateKey file to load
+		 	* the private key file because we want fine grained control on the password callback mechanism.
+		 	* For this purpose, use the PEM_read_PrivateKey function which
+		 	* supports callbacks for individual private keys.
+		 	*/
+			fp = fopen(private_key, "r");
+			if (NULL != fp)
+			{
+				evp_pkey = PEM_read_PrivateKey(fp, &evp_pkey, &passwd_callback, pwent);
+				fclose(fp);
+			} else
+				evp_pkey = NULL;
+			if (NULL == evp_pkey)
+			{
+				if (NULL == fp)
+				{
+					UPDATE_ERROR_STRING("Private Key corresponding to TLSID:"
+						" %s - error opening file %s: %s.", id, private_key, strerror(errno));
+				} else if (ERR_GET_REASON(ERR_peek_error()) == PEM_R_NO_START_LINE)
+				{	/* give clearer error if only cert given but it doesn't have the key */
+					UPDATE_ERROR_STRING("Private Key corresponding to TLSID:"
+						" %s not found in configuration file.", id);
+				} else
+				{
+					GC_APPEND_OPENSSL_ERROR("Failed to read private key %s.", private_key);
+				}
+				SSL_free(ssl);
+				return NULL;
+			}
+			if (!SSL_use_PrivateKey(ssl, evp_pkey))
+			{
+				GC_APPEND_OPENSSL_ERROR("Failed to use private key %s.", private_key);
+				SSL_free(ssl);
+				return NULL;
+			}
+			/* Verify that private key matches the certificate */
+			if (!SSL_check_private_key(ssl))
+			{
+				GC_APPEND_OPENSSL_ERROR("Consistency check failed for private key: %s and certificate: %s\n",
+						private_key, cert);
+				SSL_free(ssl);
+				return NULL;
+			}
 		}
-		if (!SSL_use_PrivateKey(ssl, evp_pkey))
-		{
-			GC_APPEND_OPENSSL_ERROR("Failed to use private key %s.", private_key);
-			SSL_free(ssl);
-			return NULL;
-		}
-		/* Verify that private key matches the certificate */
-		if (!SSL_check_private_key(ssl))
-		{
-			GC_APPEND_OPENSSL_ERROR("Consistency check failed for private key: %s and certificate: %s\n",
-							private_key, cert);
-			SSL_free(ssl);
-			return NULL;
-		}
-		SSL_set_verify(ssl, SSL_VERIFY_PEER, NULL);
 	}
 	/* OpenSSL does not recommend enabling compression as the current state of the SSL/TLS protocol does not specify identifiers
 	 * for compression libraries thereby allowing for incompatibilities when different SSL/TLS implementations are used in the
@@ -561,7 +858,26 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	compression = SSL_COMP_get_compression_methods();
 	sk_SSL_COMP_zero(compression);
 #	endif
-	if (0 == (GTMTLS_OP_CLIENT_MODE & flags))
+	if ('\0' != id[0])
+	{
+		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.ssl-options", id);
+		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &options_string))
+		{
+			options_current = SSL_get_options(ssl);
+			options_clear = 0;
+			options_mask = parse_SSL_options(&gtm_ssl_options_list[0], SIZEOF(gtm_ssl_options_list), options_string,
+					options_current, &options_clear);
+			if (0 != options_mask)
+				options_mask = SSL_set_options(ssl, options_mask);
+			if (0 != options_clear)
+				options_mask = SSL_clear_options(ssl, options_clear);
+
+		}
+		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.verify-depth", id);
+		if (CONFIG_TRUE == config_lookup_int(cfg, cfg_path, &verify_depth))
+			SSL_set_verify_depth(ssl, verify_depth);
+	}
+	if (!CLIENT_MODE(flags))
 	{	/* Socket created for server mode operation. Set a session ID context for session resumption at the time of
 		 * reconnection.
 		 */
@@ -572,10 +888,10 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			return NULL;
 		}
 		/* Set up Ephemeral Diffie-Hellman key exchange callback. This callback is invoked whenever, during the connection
-		 * time, OpenSSL requires Diffie-Hellman key parameters. The SSL_OP_SINGLE_DH_USE is turned on so that the same
-		 * private key is not used for each session. This means a little extra computation during the time of handshake, but
-		 * is recommended by the OpenSSL community.
-		 */
+	 	* time, OpenSSL requires Diffie-Hellman key parameters. The SSL_OP_SINGLE_DH_USE is turned on so that the same
+	 	* private key is not used for each session. This means a little extra computation during the time of handshake, but
+	 	* is recommended by the OpenSSL community.
+	 	*/
 		if (-1 == init_dhparams())
 		{
 			SSL_free(ssl);
@@ -602,6 +918,8 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		socket = prev_socket;
 	socket->flags = flags;
 	socket->ssl = ssl;
+	socket->gtm_ctx = tls_ctx;
+	strncpy(socket->tlsid, (const char *)id, SIZEOF(socket->tlsid));
 	/* Now, store the `socket' structure in the `SSL' structure so that we can get it back in a callback that receives an
 	 * `SSL' structure. Ideally, we should be using SSL_set_ex_data/SSL_get_ex_data family of functions. But, these functions
 	 * operate on a specific index (obtained by calling SSL_get_ex_new_index). But, since the library should potentially
@@ -617,7 +935,7 @@ int gtm_tls_connect(gtm_tls_socket_t *socket)
 {
 	int		rv;
 
-	assert(socket->flags & GTMTLS_OP_CLIENT_MODE);
+	assert(CLIENT_MODE(socket->flags));
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	if (NULL != socket->session)
 	{	/* Old session available. Reuse it. */
@@ -648,10 +966,20 @@ int gtm_tls_accept(gtm_tls_socket_t *socket)
 int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 {
 	int		rv;
+	gtm_tls_ctx_t	*tls_ctx;
 
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	if (0 >= (rv = SSL_renegotiate(socket->ssl)))
 		return ssl_error(socket->ssl, rv);
+#	ifdef TLS_RENEGOTIATE_NO_HANDSHAKE
+	tls_ctx = socket->gtm_ctx;
+	assert(tls_ctx);
+	if (GTMTLS_OP_INTERACTIVE_MODE & tls_ctx->flags)
+	{	/* avoid hanging until client does I/O */
+		socket->flags |= GTMTLS_OP_RENEGOTIATE_REQUESTED;
+		return 0;
+	}
+#	endif
 	do
 	{
 		if (0 < (rv = SSL_do_handshake(socket->ssl)))
@@ -766,6 +1094,8 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 			if (-1 == format_ASN1_TIME(X509_get_notAfter(peer), conn_info->not_after, MAX_TIME_STRLEN))
 				SNPRINTF(conn_info->not_after, MAX_TIME_STRLEN, "Bad certificate date");
 			X509_free(peer);
+			if (GTM_TLS_API_VERSION_SOCK <= socket->gtm_ctx->version)
+				conn_info->options = SSL_get_options(ssl);
 			return 0;
 		} else
 		{
@@ -811,9 +1141,8 @@ int gtm_tls_cachedbytes(gtm_tls_socket_t *socket)
 
 void gtm_tls_socket_close(gtm_tls_socket_t *socket)
 {
-	assert(socket);
 	tls_errno = 0;
-	if (NULL == socket->ssl)
+	if ((NULL == socket) || (NULL == socket->ssl))
 		return;
 	DBG_VERIFY_SOCK_IS_BLOCKING(GET_SOCKFD(socket->ssl));
 	/* Invoke SSL_shutdown to close the SSL/TLS connection. Although the protocol (and the OpenSSL library) supports

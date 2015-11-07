@@ -24,9 +24,12 @@
 #include "gtm_ipc.h"
 #include <errno.h>
 #include "gtm_string.h"
+#include "cli.h"
 
 #define DEFAULT_ID	43
 #define ID_PREFIX	"-id="
+
+GBLDEF   CLI_ENTRY       *cmd_ary = NULL; /* The GTCM server does not have any command tables so initialize command array to NULL */
 
 #define PrintUsage \
 	{ \

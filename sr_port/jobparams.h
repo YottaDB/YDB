@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,7 @@
 	JPDEF (jp_nodetached,		jpdt_nul),
 	JPDEF (jp_noswapping,		jpdt_nul),
 	JPDEF (jp_output,		jpdt_str),
+	JPDEF (jp_passcurlvn,		jpdt_nul),
 	JPDEF (jp_priority,		jpdt_num),
 	JPDEF (jp_process_name,		jpdt_str),
 	JPDEF (jp_schedule,		jpdt_str),

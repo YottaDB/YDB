@@ -39,6 +39,7 @@
 #include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "mu_interactive.h"
+#include "wbox_test_init.h"
 
 GBLREF bool		mupip_error_occurred;
 GBLREF bool		mu_ctrly_occurred;
@@ -59,7 +60,7 @@ error_def(ERR_RECLOAD);
 #define GO_PUT_SUB		0
 #define GO_PUT_DATA		1
 #define GO_SET_EXTRACT		2
-#define DEFAULT_MAX_REC_SIZE 3096
+#define DEFAULT_MAX_REC_SIZE	3096
 #define ISSUE_TRIGDATAIGNORE_IF_NEEDED(KEYLENGTH, PTR, HASHT_GBL)								\
 {																\
 	/* The ordering of the && below is important as the caller uses HASHT_GBL to be set to TRUE if the global pointed to 	\
@@ -74,11 +75,12 @@ error_def(ERR_RECLOAD);
 
 void go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1);
 
-void go_load(uint4 begin, uint4 end)
+void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2_ptr, int line2_len)
 {
 	char		*ptr;
 	int		len, fmt, keylength, keystate;
-	uint4	        iter, max_data_len, max_subsc_len, key_count, max_rec_size;
+	uint4	        max_data_len, max_subsc_len, max_rec_size;
+	gtm_uint64_t	iter, tmp_rec_count, key_count;
 	mstr            src, des;
 	unsigned char   *rec_buff, ch;
 	boolean_t	utf8_extract, format_error = FALSE, hasht_ignored = FALSE, hasht_gbl = FALSE;
@@ -88,17 +90,10 @@ void go_load(uint4 begin, uint4 end)
 
 	gvinit();
 
-	max_rec_size = DEFAULT_MAX_REC_SIZE;
-	rec_buff = (unsigned char *)malloc(max_rec_size);
-
 	fmt = MU_FMT_ZWR;	/* by default, the extract format is ZWR (not GO) */
-	len = file_input_get(&ptr);
-	if (mupip_error_occurred)
-	{
-		free(rec_buff);
-		return;
-	}
-	if (len >= 0)
+	len = line1_len;
+	ptr = line1_ptr;
+	if (0 <= len)
 	{
 		util_out_print("!AD", TRUE, len, ptr);
 		utf8_extract = ((len >= STR_LIT_LEN(UTF8_NAME)) &&
@@ -110,17 +105,12 @@ void go_load(uint4 begin, uint4 end)
 			else
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
 			mupip_error_occurred = TRUE;
-			free(rec_buff);
 			return;
 		}
 	} else
 		mupip_exit(ERR_LOADFILERR);
-	len = file_input_get(&ptr);
-	if (mupip_error_occurred)
-	{
-		free(rec_buff);
-		return;
-	}
+	len = line2_len;
+	ptr = line2_ptr;
 	if (len >= 0)
 	{
 		util_out_print("!AD", TRUE, len, ptr);
@@ -131,16 +121,12 @@ void go_load(uint4 begin, uint4 end)
 		begin = 3;
 	for (iter = 3; iter < begin; iter++)
 	{
-		len = file_input_get(&ptr);
+		len = file_input_get(&ptr, 0);
 		if (len < 0)	/* The IO device has signalled an end of file */
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, begin);
 			mupip_error_occurred = TRUE;
-		}
-		if (mupip_error_occurred)
-		{
-			util_out_print("Error reading record number: !UL\n", TRUE, iter);
-			free(rec_buff);
+			util_out_print("Error reading record number: !@UQ\n", TRUE, &iter);
 			return;
 		}
 	}
@@ -149,6 +135,9 @@ void go_load(uint4 begin, uint4 end)
 	max_data_len = 0;
 	max_subsc_len = 0;
 	key_count = 0;
+	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, 4294967196U); /* (2**32)-100=4294967196 */
+	max_rec_size = DEFAULT_MAX_REC_SIZE;
+	rec_buff = (unsigned char *)malloc(max_rec_size);
 	for (iter = begin - 1; ; )
 	{
 		if (++iter > end)
@@ -159,14 +148,15 @@ void go_load(uint4 begin, uint4 end)
 			break;
 		if (mu_ctrlc_occurred)
 		{
-			util_out_print("!AD:!_  Key cnt: !UL  max subsc len: !UL  max data len: !UL", TRUE,
-				       LEN_AND_LIT("LOAD TOTAL"), key_count, max_subsc_len, max_data_len);
-			util_out_print("Last LOAD record number: !UL", TRUE, key_count ? iter : 0);
+			util_out_print("!AD:!_  Key cnt: !@UQ  max subsc len: !UL  max data len: !UL", TRUE,
+				       LEN_AND_LIT("LOAD TOTAL"), &key_count, max_subsc_len, max_data_len);
+			tmp_rec_count = key_count ? iter : 0;
+			util_out_print("Last LOAD record number: !@UQ", TRUE, &tmp_rec_count);
 			mu_gvis();
 			util_out_print(0, TRUE);
 			mu_ctrlc_occurred = FALSE;
 		}
-		if (0 > (len = file_input_get(&ptr)))
+		if (0 > (len = file_input_get(&ptr, 0)))
 			break;
 		if (mupip_error_occurred)
 		{
@@ -205,7 +195,7 @@ void go_load(uint4 begin, uint4 end)
 			if (mupip_error_occurred)
 			{
 				mu_gvis();
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, iter);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, &iter);
 				gv_target = NULL;
 				gv_currkey->base[0] = '\0';
 				ONERROR_PROCESS;
@@ -225,7 +215,8 @@ void go_load(uint4 begin, uint4 end)
 			des.addr = (char *)rec_buff;
 			if (FALSE == zwr2format(&src, &des))
 			{
-				util_out_print("Format error in record number !8UL: !/!AD", TRUE, iter, src.len, src.addr);
+				util_out_print("Format error in record number: !@UQ!/With content:!/!AD",
+					TRUE, &iter, src.len, src.addr);
 				format_error = TRUE;
 				continue;
 			}
@@ -236,7 +227,7 @@ void go_load(uint4 begin, uint4 end)
 			if (mupip_error_occurred)
 			{
 				mu_gvis();
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, iter);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, &iter);
 				ONERROR_PROCESS;
 			}
 			key_count++;
@@ -245,7 +236,7 @@ void go_load(uint4 begin, uint4 end)
 			ISSUE_TRIGDATAIGNORE_IF_NEEDED(len, ptr, hasht_gbl);
 			if (hasht_gbl)
 			{
-				if (0 > (len = file_input_get(&ptr)))
+				if (0 > (len = file_input_get(&ptr, 0)))
 					break;
 				iter++;
 				hasht_gbl = FALSE;
@@ -255,7 +246,7 @@ void go_load(uint4 begin, uint4 end)
 			if (mupip_error_occurred)
 			{
 				mu_gvis();
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, iter);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, &iter);
 				gv_target = NULL;
 				gv_currkey->base[0] = '\0';
 				ONERROR_PROCESS;
@@ -267,12 +258,12 @@ void go_load(uint4 begin, uint4 end)
 				iter--;	/* Decrement as didn't load key */
 				break;
 			}
-			if ((len = file_input_get(&ptr)) < 0)
+			if (0 > (len = file_input_get(&ptr, 0)))
 			        break;
 			if (mupip_error_occurred)
 			{
 				mu_gvis();
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, iter);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, &iter);
 				break;
 			}
 			stringpool.free = stringpool.base;
@@ -282,7 +273,7 @@ void go_load(uint4 begin, uint4 end)
 			if (mupip_error_occurred)
 			{
 				mu_gvis();
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, iter);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, &iter);
 				ONERROR_PROCESS;
 			}
 			key_count++;
@@ -295,9 +286,10 @@ void go_load(uint4 begin, uint4 end)
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_LOADCTRLY);
 		mupip_exit(ERR_MUNOFINISH);
 	}
-	util_out_print("LOAD TOTAL!_!_Key Cnt: !UL  Max Subsc Len: !UL  Max Data Len: !UL",TRUE,key_count,max_subsc_len,
+	util_out_print("LOAD TOTAL!_!_Key Cnt: !@UQ  Max Subsc Len: !UL  Max Data Len: !UL",TRUE,&key_count,max_subsc_len,
 			max_data_len);
-	util_out_print("Last LOAD record number: !UL\n", TRUE, key_count ? (iter - 1) : 0);
+	tmp_rec_count = key_count ? (iter - 1) : 0;
+	util_out_print("Last LOAD record number: !@UQ\n", TRUE, &tmp_rec_count);
 	if (format_error)
 		mupip_exit(ERR_LOADFILERR);
 }

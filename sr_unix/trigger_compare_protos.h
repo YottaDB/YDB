@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,5 +19,5 @@ void build_set_cmp_str(char *trigvn, int trigvn_len, char **values, uint4 *value
 
 boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_hash, int trig_indx, int *hash_indx);
 boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *value_len, stringkey *trigger_hash, int *hash_indx,
-	int *trig_indx, int match_index, boolean_t doing_set);
+	int *trig_indx, boolean_t doing_set);
 #endif

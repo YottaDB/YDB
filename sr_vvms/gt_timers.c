@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
  * Following routines are top level, user callable
  * routines of this package:
  *
- * void sys_get_cur_time(ABS_TIME atp)
+ * void sys_get_curr_time(ABS_TIME atp)
  * 	fetch absolute time into stucture
  *
  * void hiber_start(uint4 hiber)
@@ -62,7 +62,7 @@ void sys_get_curr_time(ABS_TIME *atp)
 		atp->at_sec = (uint4)(((((double)systim[1]) * MAX_INT) + (double)systim[0]) / 10000000.0);
 		return;
 	}
-	rts_error(VARLSTCNT(1) status);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 }
 
 static void hiber_start_ast(void)

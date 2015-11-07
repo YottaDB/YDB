@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,9 +43,9 @@ const static readonly unsigned char job_param_index[27] =
 {
       /* A(2)    B(0)   C(2)   D(4)   E(2)   F(0)  G(2)  H(0)  I(4)   J(0)  K(0)  L(2)  M(0) */
 	 0,	2,    	 2,     4,     8,    10,     10,   12,   12,    16,   16,   16,   18,
-      /* N(6)	O(2)	P(4)	Q(0)	R(0)	S(6)	T(0)   U(0)	V(0)	W(0)   X(0)	Y(0)	Z(0) */
-	18,	24,	26,	30,	30,	30,	37,	37,	37,	37,	37,	37,	37,
-	37
+      /* N(6)	O(2)	P(6)	Q(0)	R(0)	S(6)	T(0)   U(0)	V(0)	W(0)   X(0)	Y(0)	Z(0) */
+	18,	24,	26,	32,	32,	32,	39,	39,	39,	39,	39,	39,	39,
+	39
 };
 #else
 const static readonly unsigned char job_param_index[27] =

@@ -23,7 +23,6 @@
 #include "eintr_wrappers.h"
 #include "error.h"
 #include "zro_shlibs.h"
-#include "zhist.h"
 #include "gtm_limits.h"
 
 #define GETTOK		zro_gettok(&lp, top, &tok)
@@ -62,6 +61,7 @@ void zro_load(mstr *str)
 
 	SETUP_THREADGBL_ACCESS;
 	(TREF(set_zroutines_cycle))++;		/* Signal need to recompute zroutines histories for each linked routine */
+	ARLINK_ONLY(TREF(arlink_enabled) = FALSE);	/* Set if any zro entry is enabled for autorelink */
 	memset(array, 0, SIZEOF(array));
 	lp = str->addr;
 	top = lp + str->len;
@@ -73,7 +73,7 @@ void zro_load(mstr *str)
 	pblk.buffer = tranbuf;
 	toktyp = GETTOK;
 	if (ZRO_EOL == toktyp)
-	{	/* Null string - set default */
+	{	/* Null string - set default - implies current working directory only */
 		array[0].count = 1;
 		array[1].type = ZRO_TYPE_OBJECT;
 		array[1].str.len = 0;
@@ -96,18 +96,18 @@ void zro_load(mstr *str)
 			 * user desires this directory to have auto-relink capability.
 			 */
 			enable_autorelink = FALSE;
-#			ifdef USHBIN_SUPPORTED
-			/* Only shared binary platforms recognize the auto-relink indicator. Specifying "*" at end of other
-			 * directories causes an error further downstream (FILEPARSE) when the "*" is not stipped off the file
-			 * name - unless someone has managed to create a directory with a "*" suffix.
+			/* All platforms allow the auto-relink indicator on object directories but only autorelink able platforms
+			 * (#ifdef AUTORELINK_SUPPORTED is set) do anything with it. Other platforms just ignore it. Specifying
+			 * "*" at end of non-object directories causes an error further downstream (FILEPARSE) when the "*" is
+			 * not stripped off the file name - unless someone has managed to create a directory with a "*" suffix.
 			 */
 			if (ZRO_ALF == *(tok.addr + tok.len - 1))
 			{	/* Auto-relink is indicated */
 				enable_autorelink = TRUE;
+				TREF(arlink_enabled) = TRUE;
 				--tok.len;		/* Remove indicator from name so we can use it */
 				assert(0 <= tok.len);
 			}
-#			endif
 			if (SIZEOF(tranbuf) <= tok.len)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
 					      ERR_FILEPARSE, 2, tok.len, tok.addr);
@@ -140,7 +140,17 @@ void zro_load(mstr *str)
 				array[oi].type = ZRO_TYPE_OBJECT;
 				array[oi + 1].type = ZRO_TYPE_COUNT;
 				si = oi + 2;
-#				ifdef USHBIN_SUPPORTED
+#				ifdef AUTORELINK_SUPPORTED
+#					ifdef DEBUG
+					/* If env var gtm_test_autorelink_always is set in dbg version, treat every
+					 * object directory specified in $zroutines as if * has been additionally specified.
+					 */
+					if (TREF(gtm_test_autorelink_always))
+					{
+						enable_autorelink = TRUE;
+						TREF(arlink_enabled) = TRUE;
+					}
+#					endif
 				if (enable_autorelink)
 				{	/* Only setup autorelink struct if it is enabled */
 					transtr.addr = tranbuf;
@@ -228,8 +238,8 @@ void zro_load(mstr *str)
 		assert((TREF(zro_root))->type == ZRO_TYPE_COUNT);
 		oi = (TREF(zro_root))->count;
 		assert(oi);
-		for (op = TREF(zro_root) + 1; oi-- > 0; )
-		{	/* release space held by translated entries */
+		for (op = TREF(zro_root) + 1; 0 < oi--;)
+		{	/* Release space held by translated entries */
 			assert((ZRO_TYPE_OBJECT == op->type) || (ZRO_TYPE_OBJLIB == op->type));
 			if (op->str.len)
 				free(op->str.addr);
@@ -237,7 +247,7 @@ void zro_load(mstr *str)
 				continue;	/* i.e. no sources for shared library */
 			assert(ZRO_TYPE_COUNT == op->type);
 			si = (op++)->count;
-			for ( ; si-- > 0; op++)
+			for (; si-- > 0; op++)
 			{
 				assert(ZRO_TYPE_SOURCE == op->type);
 				if (op->str.len)
@@ -248,10 +258,10 @@ void zro_load(mstr *str)
 	}
 	TREF(zro_root) = (zro_ent *)malloc(total_ents * SIZEOF(zro_ent));
 	memcpy((uchar_ptr_t)TREF(zro_root), (uchar_ptr_t)array, total_ents * SIZEOF(zro_ent));
-	assert((TREF(zro_root))->type == ZRO_TYPE_COUNT);
+	assert(ZRO_TYPE_COUNT == (TREF(zro_root))->type);
 	oi = (TREF(zro_root))->count;
 	assert(oi);
-	for (op = TREF(zro_root) + 1; oi-- > 0; )
+	for (op = TREF(zro_root) + 1; 0 < oi--;)
 	{
 		assert((ZRO_TYPE_OBJECT == op->type) || (ZRO_TYPE_OBJLIB == op->type));
 		if (op->str.len)
@@ -270,7 +280,7 @@ void zro_load(mstr *str)
 			continue;
 		assert(ZRO_TYPE_COUNT == op->type);
 		si = (op++)->count;
-		for ( ; si-- > 0; op++)
+		for (; 0 < si--; op++)
 		{
 			assert(ZRO_TYPE_SOURCE == op->type);
 			if (op->str.len)

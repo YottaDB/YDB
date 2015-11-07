@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@ typedef struct linkage_entry
 {
 	struct linkage_entry	*next;
 	struct sym_table	*symbol;
+	size_t			lit_offset;	/* Offset into literal string pool where string name was stored */
 } linkage_entry;
 
 struct sym_table *define_symbol(unsigned char psect, mstr *name);

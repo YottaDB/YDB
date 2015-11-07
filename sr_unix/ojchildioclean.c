@@ -30,7 +30,6 @@
 #endif
 #include <rtnhdr.h>
 #include "relinkctl.h"
-#include "zhist.h"
 
 GBLREF	int			mutex_sock_fd;
 
@@ -77,7 +76,7 @@ void ojchildioclean(void)
 #endif
 	/* Since we are removing artifacts from the originating process (which still has these files open), there is
 	 * no need to decrement the counts (they will increase if this process links the same files). The FALSE
-	 * argument prevents the count from being modified in this cleanup.
+	 * argument prevents the relinkctl-attach & rtnobj-reference counts from being modified in this cleanup.
 	 */
-	USHBIN_ONLY(relinkctl_rundown(FALSE));
+	ARLINK_ONLY(relinkctl_rundown(FALSE, FALSE));
 }

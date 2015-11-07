@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@ GBLREF	boolean_t	run_time;
 GBLREF	char		*lexical_ptr;
 GBLREF	spdesc		stringpool;
 GBLREF	unsigned char	*source_buffer;
-GBLREF	short int	source_column;
+GBLREF	int		source_column;
 
 error_def(ERR_BOOLSIDEFFECT);
 error_def(ERR_EXPR);

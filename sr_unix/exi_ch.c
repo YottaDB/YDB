@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,40 +10,28 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "gtm_unistd.h"
 
 #include "error.h"
-#include "io.h"
 #include "util.h"
 
 GBLREF	int4		exi_condition;
 GBLREF	boolean_t	created_core;
 GBLREF	boolean_t	dont_want_core;
+DEBUG_ONLY(GBLREF boolean_t ok_to_UNWIND_in_exit_handling;)
 
-error_def(ERR_ASSERT);
-error_def(ERR_FORCEDHALT);
-error_def(ERR_GTMASSERT);
-error_def(ERR_GTMASSERT2);
-error_def(ERR_GTMCHECK);
-error_def(ERR_IORUNDOWN);
-error_def(ERR_MEMORY);
-error_def(ERR_OUTOFSPACE);
-error_def(ERR_STACKOFLOW);
-error_def(ERR_VMSMEMORY);
-
-CONDITION_HANDLER(lastchance3)
+CONDITION_HANDLER(exi_ch)
 {
-
 	START_CH(TRUE);
 	ESTABLISH(terminate_ch);
+	exi_condition = SIGNAL;
 	if (DUMPABLE)
 	{
 		PRN_ERROR;
-		dec_err(VARLSTCNT(1) ERR_IORUNDOWN);
 		if (!SUPPRESS_DUMP)
 			DUMP_CORE;
 		PROCDIE(exi_condition);
 	}
 	REVERT;
+	DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);
 	UNWIND(NULL, NULL);
 }

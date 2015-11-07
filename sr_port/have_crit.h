@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -188,6 +188,7 @@ GBLREF	boolean_t	deferred_timers_check_needed;
 
 #define	OK_TO_SEND_MSG	((INTRPT_IN_X_TIME_FUNCTION != intrpt_ok_state) 				\
 			&& (INTRPT_IN_LOG_FUNCTION != intrpt_ok_state)					\
+			&& (INTRPT_IN_FUNC_WITH_MALLOC != intrpt_ok_state)				\
 			&& (INTRPT_IN_FORK_OR_SYSTEM != intrpt_ok_state))
 
 uint4 have_crit(uint4 crit_state);

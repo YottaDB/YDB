@@ -36,6 +36,7 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 {
 	const char	*ptr;
 	boolean_t	do_all = FALSE,
+			done_a = FALSE,
 			done_b = FALSE,
 			done_c = FALSE,
 			done_d = FALSE,
@@ -55,6 +56,8 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 	{
 		switch (*ptr)
 		{
+			case 'A':
+			case 'a':
 			case 'B':
 			case 'b':
 			case 'C':
@@ -107,7 +110,16 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 	{
 		output.line_num = 1;
 		switch (*ptr)
-		{	case 'B':
+		{
+			case 'A':
+			case 'a':
+				if (done_a)
+					break;
+				done_a = TRUE;
+				output.code = 'A';
+				ARLINK_ONLY(zshow_rctldump(&output));
+				break;
+			case 'B':
 			case 'b':
 				if (done_b)
 					break;

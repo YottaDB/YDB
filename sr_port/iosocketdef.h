@@ -90,6 +90,8 @@ typedef struct
 #define INITIAL_MOREREAD_TIMEOUT	200
 #define DEFAULT_MOREREAD_TIMEOUT	10
 #define MAX_MOREREAD_TIMEOUT		999
+/* For buffered output, wait this long for socket to be ready to output */
+#define DEFAULT_WRITE_WAIT		200
 
 #define	ONE_COMMA			"1,"
 
@@ -327,7 +329,7 @@ typedef struct socket_struct_type
 	size_t				buffer_size;			/* size of the buffer for this socket */
 	size_t				buffered_length;		/* length of stuff buffered for this socket */
 	size_t				buffered_offset;		/* offset of the buffered stuff to buffer head */
-	char				*buffer;			/* pointer to the the buffer of this socket */
+	char				*buffer;			/* pointer to the buffer of this socket */
 	boolean_t			nodelay;
 	boolean_t			first_read;
 	boolean_t			first_write;
@@ -345,6 +347,23 @@ typedef struct socket_struct_type
 	boolean_t			pendingevent;		/* if listening, needs accept */
 	enum socket_creator		howcreated;
 	char				*parenthandle;		/* listening socket this created from */
+	size_t				obuffer_size;		/* size of the output buffer for this socket */
+	size_t				obuffer_length;		/* length of output in this buffer */
+	size_t				obuffer_offset;		/* offset of the buffered output to buffer head */
+	volatile boolean_t		obuffer_timer_set;	/* timer scheduled to flush buffer */
+	volatile boolean_t		obuffer_output_active;	/* in buffer output now */
+	int				obuffer_flush_time;	/* flush output buffer after this many milliseconds */
+	int				obuffer_wait_time;	/* wait for output ready this many milliseconds */
+	int				obuffer_errno;		/* save status from timed output attempt */
+	char				*obuffer;		/* pointer to the output buffer of this socket */
+	boolean_t			nonblocking;		/* socket has been set O_NONBLOCK */
+#ifdef GTM_TLS
+	boolean_t			tlsenabled;
+	void				*tlssocket;		/* actually gtm_tls_socket_t */
+	boolean_t			tlsreadblocked;
+	boolean_t			tlswriteblocked;
+	short				tlspolldirection;	/* what TLS wants */
+#endif
 } socket_struct;
 
 typedef struct socket_interrupt_type
@@ -389,4 +408,9 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 boolean_t iosocket_listen_sock(socket_struct *socketptr, unsigned short len);
 void iosocket_close_one(d_socket_struct *dsocketptr, int index);
 int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boolean_t selectfirst);
+ssize_t iosocket_output_buffer(socket_struct *socketptr);
+void iosocket_buffer_error(socket_struct *socketptr);
+#ifdef GTM_TLS
+void    iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password, mval *extraarg);
+#endif
 #endif

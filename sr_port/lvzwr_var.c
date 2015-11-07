@@ -34,6 +34,7 @@
 #include "gtm_string.h"
 #include "alias.h"
 #include "promodemo.h"	/* for "demote" prototype used in LV_NODE_GET_KEY */
+#include "jobsp.h"
 
 #define eb_less(u, v)    (numcmp(u, v) < 0)
 
@@ -120,6 +121,15 @@
 		lvzwr_var((lv_val *)NODE, n + 1);						\
 }
 
+#ifdef UNIX
+/* job command needs to send the local variables to the child */
+#define MIDCHILD_SEND_VAR			\
+{						\
+	if (TREF(midchild_send_locals))		\
+		ojmidchild_send_var();		\
+}
+#endif
+
 GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF int4		outofband;
 GBLREF zshow_out	*zwr_output;
@@ -178,11 +188,11 @@ void lvzwr_var(lv_val *lv, int4 n)
 		return;
 	if (outofband)
 	{
-		assert(TREF(in_zwrite));
-		TREF(in_zwrite) = FALSE;
+		assert(TREF(in_zwrite));	/* in_zwrite indicates we are properly set up for a zwrite and should be cleared */
+		TREF(in_zwrite) = FALSE;	/* 	here along with the below 2 because outofband_action may not return */
 		lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
 		outofband_action(FALSE);
-		TREF(in_zwrite) = TRUE;
+		TREF(in_zwrite) = TRUE;		/* in case we come back because the outofband_action turns out to be info */
 	}
 	lvzwrite_block->curr_subsc = n;
 	zwr_sub = (zwr_sub_lst *)lvzwrite_block->sub;
@@ -216,6 +226,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 			if (zav->value_printed)
 			{
 				lvzwr_out(lv);
+				UNIX_ONLY(MIDCHILD_SEND_VAR);
 				lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
 				return;
 			} else
@@ -230,6 +241,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 		|| ((0 != n) && !(lvzwrite_block->mask >> n))))
 	{	/* Print value for *this* node  */
 		lvzwr_out(lv);
+		UNIX_ONLY(MIDCHILD_SEND_VAR);
 	}
 	if (verify_hash_add && !lvzwrite_block->zav_added)
 	{	/* lvzwr_out processing didn't add a zav for this var. Take care of that now so we

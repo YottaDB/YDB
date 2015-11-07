@@ -47,15 +47,15 @@
 #include "anticipatory_freeze.h"
 #include "eintr_wrappers.h"
 
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	uint4		process_id;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	volatile int4	db_fsync_in_prog;	/* for DB_FSYNC macro usage */
-GBLREF 	jnl_gbls_t	jgbl;
-GBLREF 	bool		in_backup;
+GBLREF	bool			in_backup;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	uint4			process_id;
+GBLREF	volatile int4		db_fsync_in_prog;	/* for DB_FSYNC macro usage */
+GBLREF	jnl_gbls_t		jgbl;
 #ifdef DEBUG
-GBLREF	boolean_t	in_mu_rndwn_file;
-GBLREF	boolean_t	mupip_jnl_recover;
+GBLREF	boolean_t		in_mu_rndwn_file;
+GBLREF	boolean_t		mupip_jnl_recover;
 #endif
 
 error_def(ERR_DBFILERR);
@@ -151,6 +151,7 @@ error_def(ERR_WRITERSTUCK);
 
 #define REL_CRIT_BEFORE_RETURN			\
 {						\
+	cnl->doing_epoch = FALSE;		\
 	cnl->wcsflu_pid = 0;			\
 	if (!was_crit)				\
 		rel_crit(gv_cur_region);	\
@@ -215,8 +216,15 @@ boolean_t wcs_flu(uint4 options)
 	if (jnl_enabled)
 	{
 		jb = jpc->jnl_buff;
-		/* Assert that we aren't trying to flush a completed journal file */
-		assert(!jb->last_eof_written);
+		/* If we are trying to flush a completed journal file, make sure there is nothing else to do and return. */
+		if (jb->last_eof_written)
+		{
+			assert(jb->fsync_dskaddr == jb->freeaddr);
+			assert((dba_bg != csd->acc_meth)
+				|| (!cnl->wcs_active_lvl && !csa->acc_meth.bg.cache_state->cacheq_active.fl));
+			REL_CRIT_BEFORE_RETURN;
+			return TRUE;
+		}
 		/* Assert that we never flush the cache in the midst of a database commit. The only exception is MUPIP RUNDOWN */
 		assert((csa->ti->curr_tn == csa->ti->early_tn) || in_mu_rndwn_file);
 		if (!jgbl.dont_reset_gbl_jrec_time)
@@ -246,6 +254,7 @@ boolean_t wcs_flu(uint4 options)
 	if (jnl_enabled)
 	{
 		assert(SS_NORMAL == jnl_status);
+		cnl->doing_epoch = sync_epoch || write_epoch;
 		epoch_already_current = (jb->post_epoch_freeaddr == jb->freeaddr);	/* crit held, so this stays valid */
 		if (return_early = (speedup_nobefore && !csd->jnl_before_image))
 		{	/* Finish easiest option first. This database has NOBEFORE image journaling and caller has asked for
@@ -444,6 +453,7 @@ boolean_t wcs_flu(uint4 options)
 						 * will get confused (see explanation above where variable "in_commit" gets set).
 						 */
 						assert(was_crit);	/* so dont need to rel_crit */
+						cnl->doing_epoch = FALSE;
 						cnl->wcsflu_pid = 0;
 						return FALSE;
 					}

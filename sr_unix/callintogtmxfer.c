@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 
 #include "callintogtmxfer.h"
 #include "gt_timer.h"
+#include "have_crit.h"
 
 typedef	int	(*int_fptr)();
 
@@ -51,7 +52,7 @@ void init_callin_functable(void)
 {
 	unsigned char 	*env_top, *address_top;
 	uint4 		address_len;
-	int		save_errno;
+	int		save_errno, status;
 
 	address_top = GTM64_ONLY(i2ascl)NON_GTM64_ONLY(i2asc)(gtmvectortable_address, (UINTPTR_T)(&callintogtm_vectortable[0]));
 	*address_top = '\0';
@@ -60,9 +61,10 @@ void init_callin_functable(void)
 	MEMCPY_LIT(env_top, GTM_CALLIN_START_ENV);
 	memcpy((env_top + strlen(GTM_CALLIN_START_ENV)), gtmvectortable_address, address_len);
 	*(env_top + strlen(GTM_CALLIN_START_ENV) + address_len) = '\0';
-	if (PUTENV((char *)gtmvectortable_env))
+	PUTENV(status, (char *)gtmvectortable_env);
+	if (status)
 	{
 		save_errno = errno;
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("putenv"), CALLFROM, save_errno);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("putenv"), CALLFROM, save_errno);
 	}
 }

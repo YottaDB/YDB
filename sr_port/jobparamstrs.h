@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,9 @@ JPSDEF ( 5,  "NOACC",	jp_noaccount),		JPSDEF ( 8, "NOACCOUN*",	jp_noaccount),
 JPSDEF ( 5,  "NODET",	jp_nodetached),		JPSDEF ( 8, "NODETACH*",	jp_nodetached),
 JPSDEF ( 5,  "NOSWA",	jp_noswapping),		JPSDEF ( 8, "NOSWAPPI*",	jp_noswapping),
 JPSDEF ( 3,  "OUT",	jp_output),		JPSDEF ( 6,  "OUTPUT",		jp_output),
+#ifdef UNIX
+JPSDEF ( 4,  "PASS",	jp_passcurlvn),		JPSDEF ( 10,  "PASSCURLVN",	jp_passcurlvn),
+#endif
 JPSDEF ( 3,  "PRI",	jp_priority),		JPSDEF ( 8,  "PRIORITY",	jp_priority),
 JPSDEF ( 3,  "PRO",	jp_process_name),	JPSDEF ( 7, "PROCESS*",		jp_process_name),
 JPSDEF ( 3,  "SCH",	jp_schedule),		JPSDEF ( 8,  "SCHEDULE",	jp_schedule),

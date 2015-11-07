@@ -466,4 +466,6 @@ CONDITION_HANDLER(gvcst_spr_queryget_ch);
 CONDITION_HANDLER(op_fnzpeek_ch);
 CONDITION_HANDLER(op_fnzpeek_getpool_ch);
 
+CONDITION_HANDLER(trigger_upgrade_ch);
+
 #endif

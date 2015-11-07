@@ -75,6 +75,7 @@ GBLREF lv_xnew_var		*xnewvar_anchor;
 #ifdef GTM_TRIGGER
 GBLREF mstr			*dollar_ztname;
 GBLREF mval			*dollar_ztdata;
+GBLREF mval			*dollar_ztdelim;
 GBLREF mval			*dollar_ztoldval;
 GBLREF mval			*dollar_ztriggerop;
 GBLREF mval			*dollar_ztupdate;
@@ -443,6 +444,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			dollar_ztvalue = mv_st_ent->mv_st_cont.mvs_trigr.ztvalue_save;
 			dollar_ztname = mv_st_ent->mv_st_cont.mvs_trigr.ztname_save;
 			dollar_ztdata = mv_st_ent->mv_st_cont.mvs_trigr.ztdata_save;
+			dollar_ztdelim = mv_st_ent->mv_st_cont.mvs_trigr.ztdelim_save;
 			dollar_ztoldval = mv_st_ent->mv_st_cont.mvs_trigr.ztoldval_save;
 			dollar_ztriggerop = mv_st_ent->mv_st_cont.mvs_trigr.ztriggerop_save;
 			dollar_ztupdate = mv_st_ent->mv_st_cont.mvs_trigr.ztupdate_save;
@@ -465,13 +467,15 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			ctxt = mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save;
 			/* same assert as in gtm_trigger.c */
 			assert(((0 == gtm_trigger_depth)
-				&& (((ch_at_trigger_init == ctxt->ch)
-				     || ((ch_at_trigger_init == (ctxt - 1)->ch)
-					 && ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch))))))
-			       || ((0 < gtm_trigger_depth)
-				   && (((&mdb_condition_handler == ctxt->ch)
-					|| ((&mdb_condition_handler == (ctxt - 1)->ch)
-					    && ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)))))));
+					&& (((ch_at_trigger_init == ctxt->ch)
+						|| ((ch_at_trigger_init == (ctxt - 1)->ch)
+							&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
+								|| (&gvcst_spr_kill_ch == ctxt->ch))))))
+				|| ((0 < gtm_trigger_depth)
+					&& (((&mdb_condition_handler == ctxt->ch)
+						|| ((&mdb_condition_handler == (ctxt - 1)->ch)
+							&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
+								|| (&gvcst_spr_kill_ch == ctxt->ch)))))));
 			active_ch = ctxt;
 			ctxt->ch_active = FALSE;
 			if (tp_timeout_deferred && !((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT))

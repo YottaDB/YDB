@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,8 @@
  * TADR			    - Used to obtain the address of the element.
  * TREF			    - Used to dereference a global var (see notes at TREF macro for usage).
  * TAREF1/TAREF2	    - Used to access array elements - TAREF1 for vectors, TAREF2 for 2 subscript access.
+ * TLEN			    - Used to obtain length of total element for both one and two dimension arrays. Not
+ *			      defined for non-arrays.
  * RFPTR		    - Used to reference a function pointer in an expression or conditional.
  * SFPTR		    - Used to set a new value into a function pointer.
  * IVFPTR		    - Used to invoke a function pointer.
@@ -81,6 +83,9 @@
 
 /* For address of item use TADR(name) macro */
 #define TADR(name) ((ggt_##name *)((char *)lcl_gtm_threadgbl + ggo_##name))
+
+/* For character length of character arrays (for arrays only) */
+#define TLEN(name) (ggl_##name)
 
 /* For access to single dimension array (vector), use TAREF1 macro */
 #define TAREF1(name, indx1) (TADR(name))[indx1]

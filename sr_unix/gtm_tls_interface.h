@@ -9,13 +9,14 @@
  *								*
  ****************************************************************/
 
-#ifndef _GTM_TLS_INTERFACE_H
-#define _GTM_TLS_INTERFACE_H
+#ifndef GTM_TLS_INTERFACE_H
+#define GTM_TLS_INTERFACE_H
 
-#ifndef _GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
-#define _GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
+#ifndef GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
+#define GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
 
-#define GTM_TLS_API_VERSION		0x00000001
+#define GTM_TLS_API_VERSION		0x00000002
+#define GTM_TLS_API_VERSION_SOCK	0x00000002	/* when TLS sockets added */
 
 #define MAX_X509_LEN			256
 #define MAX_ALGORITHM_LEN		64
@@ -37,7 +38,16 @@
 #define GTMTLS_WANT_WRITE		-3
 
 #define GTMTLS_PASSWD_ENV_PREFIX	"gtmtls_passwd_"
+/* below also defined in gtmcrypt_util.h so prevent redefinition in gtm_tls_impl.h */
+#ifndef GTM_PASSPHRASE_MAX
+#define GTM_PASSPHRASE_MAX            512     /* obfuscated */
+#define GTM_PASSPHRASE_MAX_ASCII      (GTM_PASSPHRASE_MAX / 2)
+#elif GTM_PASSPHRASE_MAX != 512
+#error "GTM-E-GTMTLSINTERFACE different values for GTM_PASSPHRASE_MAX"
+#endif
 
+/* Note these flags may be in either the ctx or ssl structures but not all
+ * may have meaning in both. */
 /* Whether the library is loaded in an interactive environment so that password prompting can happen if needed. */
 #define GTMTLS_OP_INTERACTIVE_MODE	0x00000001
 /* Turn-on compression for SSL/TLS protocol. */
@@ -46,6 +56,18 @@
 #define GTMTLS_OP_CLIENT_MODE		0x00000004
 /* Peer verification is needed. */
 #define GTMTLS_OP_VERIFY_PEER		0x00000008
+/* Socket device */
+#define GTMTLS_OP_SOCKET_DEV		0x00000010
+/* No cipher list specifed at top tls level */
+#define GTMTLS_OP_ABSENT_CIPHER		0x00000020
+/* Default cipher list used */
+#define GTMTLS_OP_DEFAULT_CIPHER	0x00000040
+/* REPL_CIPHER_LIST used */
+#define GTMTLS_OP_REPL_CIPHER		0x00000080
+/* No verify mode specifed at top tls level */
+#define GTMTLS_OP_ABSENT_VERIFYMODE	0x00000100
+/* Server requested renegotiation without waiting for handshake */
+#define GTMTLS_OP_RENEGOTIATE_REQUESTED	0x00000200
 
 #define GTMTLS_IS_FIPS_MODE(CTX)	(TRUE == CTX->fips_mode)
 #define GTMTLS_RUNTIME_LIB_VERSION(CTX)	(CTX->runtime_version)
@@ -67,14 +89,10 @@ typedef struct gtm_tls_conn_info_struct
 	char		issuer[MAX_X509_LEN];		/* CA who issued the certificate. */
 	char		not_before[MAX_TIME_STRLEN];	/* Date before which the certificate is not valid. */
 	char		not_after[MAX_TIME_STRLEN];	/* Date after which the certificate is not valid. */
+	/* items after this added for GTM_TLS_API_VERSION_SOCK */
+	long		options;			/* bitmask of SSL options */
+	int		renegotiation_pending;		/* no handshake yet */
 } gtm_tls_conn_info;
-
-typedef struct gtm_tls_session_struct
-{
-	int			flags;
-	void			*ssl;
-	void			*session;
-} gtm_tls_socket_t;
 
 typedef struct gtm_tls_ctx_struct
 {
@@ -83,9 +101,19 @@ typedef struct gtm_tls_ctx_struct
 	unsigned long		compile_time_version;	/* OpenSSL version that this library is compiled with. */
 	unsigned long		runtime_version;	/* OpenSSL version that this library is currently running with. */
 	void			*ctx;
+	int			version;		/* GTM_TLS_API_VERSION */
 } gtm_tls_ctx_t;
 
-#endif	/* _GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED */
+typedef struct gtm_tls_session_struct
+{
+	int			flags;
+	void			*ssl;
+	void			*session;
+	char			tlsid[MAX_TLSID_LEN + 1];
+	gtm_tls_ctx_t		*gtm_ctx;
+} gtm_tls_socket_t;
+
+#endif	/* GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED */
 
 /* Note: The below function prototypes should be kept in sync with the corresponding declarations/definitions in sr_unix/gtm_tls.h
  * and sr_unix/gtm_tls_funclist.h.

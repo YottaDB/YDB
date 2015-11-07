@@ -37,6 +37,9 @@
 #include "stringpool.h"
 #include "min_max.h"
 #include "rtn_src_chksum.h"
+#include "mmrhash.h"
+#include "arlinkdbg.h"
+#include "incr_link.h"
 
 GBLDEF uint4 			lits_text_size, lits_mval_size;
 
@@ -61,7 +64,9 @@ GBLREF int4			sym_table_size;
 GBLREF int4			linkage_size;
 GBLREF uint4			lnkrel_cnt;	/* number of entries in linkage Psect to relocate */
 GBLREF spdesc			stringpool;
+GBLREF short			object_name_len;
 GBLREF char			object_file_name[];
+GBLREF int			object_file_des;
 
 #define PTEXT_OFFSET SIZEOF(rhdtyp)
 
@@ -79,8 +84,10 @@ GBLREF char			object_file_name[];
  *	|     code	|  \                              \
  *	+ - - - - - - - +   |                              |
  *	| line num tbl	|   |- R/O releasable              |
- *	+ - - - - - - - +  /                               |- R/O releasable
- *	| lit text pool	| /                                |
+ *	+ - - - - - - - +   |                              |- R/O releasable
+ *	| lit text pool	|   |                              |
+ *	+---------------+  /                               |
+ *	| lkg name tbl 	| /              		   |
  *	+---------------+                                 /
  *	| lit mval tbl 	| \                              /
  *	+---------------+  |- R/W releasable
@@ -94,25 +101,30 @@ GBLREF char			object_file_name[];
  *	+---------------+
  *
  * Note in addition to the above layout, a "linkage section" is allocated at run time and is
- * also releasable.
+ * also releasable. The linkage table and the linkage name table are co-indexed and provide the
+ * routine or label names for the given entry. The linkage name table consists of unrelocated mstrs
+ * as they are only ever used once so need not be resolved.
  *
  * If GTM_DYNAMIC_LITERALS is enabled, the literal mval table becomes part of the R/O-release section.
  * In the case of shared libraries, this spares each process from having to take a malloced copy the lit mval table
  * at link time (sr_unix/incr_link.c). This memory saving optimization is only available on USHBIN-supported platforms
  */
 
+error_def(ERR_OBJFILERR);
+error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 
-void cg_lab (mlabel *mlbl, char *do_emit);
+STATICFNDCL void cg_lab (mlabel *mlbl, char *do_emit);
 
 void obj_code (uint4 src_lines, void *checksum_ctx)
 {
-	int		i;
-	uint4		lits_pad_size, object_pad_size, lnr_pad_size;
+	int		i, status;
+	uint4		lits_pad_size, object_pad_size, lnr_pad_size, lnkname_pad_size;
 	int4		offset;
 	int4		old_code_size;
 	rhdtyp		rhead;
 	mline		*mlx, *mly;
+	gtm_uint16	objhash;
 	var_tabent	*vptr;
 	DCL_THREADGBL_ACCESS;
 
@@ -137,8 +149,8 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	curr_addr = PTEXT_OFFSET;
 	cg_phase = CGP_APPROX_ADDR;
 	cg_phase_last = CGP_NOSTATE;
-	IA64_ONLY(calculated_code_size = 0;)
-	IA64_DEBUG_ONLY(calculated_count = 0;)
+	IA64_ONLY(calculated_code_size = 0);
+	IA64_DEBUG_ONLY(calculated_count = 0);
 	code_gen();
 	code_size = curr_addr;
 	cg_phase = CGP_ADDR_OPT;
@@ -158,7 +170,7 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	if (!(cmd_qlf.qlf & CQ_OBJECT))
 		return;
 	/* Executable code offset setup */
-	IA64_ONLY(assert(!(PTEXT_OFFSET % SECTION_ALIGN_BOUNDARY));)
+	IA64_ONLY(assert(!(PTEXT_OFFSET % SECTION_ALIGN_BOUNDARY)));
 	rhead.ptext_adr = (unsigned char *)PTEXT_OFFSET;
 	rhead.ptext_end_adr = (unsigned char *)(size_t)code_size;
 	/* Line number table offset setup */
@@ -172,6 +184,11 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	rhead.literal_text_len = lits_text_size;
 	code_size += lits_text_size;
 	assert(0 == PADLEN(code_size, NATIVE_WSIZE));
+	/* Literal extern (linkage) names section (same # of entries as linkage table) */
+	rhead.linkage_names = (mstr *)(size_t)code_size;
+	code_size += ((linkage_size / SIZEOF(lnk_tabent)) * SIZEOF(mstr));
+	lnkname_pad_size = PADLEN(code_size, NATIVE_WSIZE);
+	code_size += lnkname_pad_size;
 	/* Literal mval section offset setup */
 	rhead.literal_adr = (mval *)(size_t)code_size;
 	rhead.literal_len = lits_mval_size / SIZEOF(mval);
@@ -207,6 +224,7 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	object_pad_size = PADLEN(code_size, OBJECT_SIZE_ALIGNMENT);
 	code_size += object_pad_size;
 	gtm_object_size = code_size;
+	rhead.object_len = gtm_object_size;
 	set_rtnhdr_checksum(&rhead, (gtm_rtn_src_chksum_ctx *)checksum_ctx);
 	rhead.objlabel = MAGIC_COOKIE;
 	rhead.temp_mvals = sa_temps[TVAL_REF];
@@ -214,11 +232,16 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	rhead.compiler_qlf = cmd_qlf.qlf;
 	if (cmd_qlf.qlf & CQ_EMBED_SOURCE)
 		rhead.routine_source_offset = TREF(routine_source_offset);
-	/* Start the creation of the output object */
+	/* Start the creation of the output object. On Linux, Solaris, and HPUX, we use ELF routines to push out native object
+	 * code wrapper so the wrapper is not part of the object code hash. However, on AIX, the native XCOFF wrapper is pushed
+	 * out by our own routines so is part of the hash. Note for AIX, the create_object_file() routine will duplicate the
+	 * hash initialization macro below after the native header is written out but before the GT.M object header is written.
+	 */
+	HASH128_STATE_INIT(TREF(objhash_state), 0);
 	create_object_file(&rhead);
 	cg_phase = CGP_MACHINE;
-	IA64_ONLY(generated_code_size = 0;)
-	IA64_DEBUG_ONLY(generated_count = 0;)
+	IA64_ONLY(generated_code_size = 0);
+	IA64_DEBUG_ONLY(generated_count = 0);
 	code_gen();
 	IA64_DEBUG_ONLY(
 	if (calculated_code_size != generated_code_size)
@@ -285,27 +308,35 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	/* The label table */
 	if (mlabtab)
 		walktree((mvar *)mlabtab, cg_lab, (char *)TRUE);
-	/* Resolve locally defined symbols */
-	resolve_sym();
-	/* Output relocation entries for the linkage section */
-	output_relocation();
-	/* Output the symbol table text pool */
-	output_symbol();
+	resolve_sym();		/* Associate relocation entries for the same symbol/linkage-table slot together */
+	output_relocation();	/* Output relocation entries for the linkage section */
+	output_symbol();	/* Output the symbol table text pool */
 	/* If there is padding we need to do to fill out the object to the required boundary do it.. */
 	if (object_pad_size)
 	{
 		assert(STR_LIT_LEN(PADCHARS) >= object_pad_size);
 		emit_immed(PADCHARS, object_pad_size);
 	}
-	close_object_file();
+	finish_object_file();	/* Flushes object file buffers and writes remaining native object structures */
+	/* Get our 128 bit hash though only the first 8 bytes of it get saved in the routine header */
+	gtmmrhash_128_result(TADR(objhash_state), gtm_object_size, &objhash);
+	DBGARLNK((stderr, "obj_code: Computed hash value of 0x"lvaddr" for file %.*s\n", objhash.one, object_name_len,
+		  object_file_name));
+	if ((off_t)-1 == lseek(object_file_des, (off_t)(NATIVE_HDR_LEN + OFFSETOF(rhdtyp, objhash)), SEEK_SET))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
+	emit_immed((char *)&objhash.one, SIZEOF(gtm_uint64_t));	/* Update 8 bytes of objhash in the file header */
+	buff_flush();						/* Push it out */
+	CLOSE_OBJECT_FILE(object_file_des, status);
+	if (-1 == status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, errno);
 	/* Ready to make object visible. Rename from tmp name to real routine name */
-	rename_tmp_object_file(object_file_name);
+	RENAME_TMP_OBJECT_FILE(object_file_name);
 }
 
 /* Routine called to process a given label. Cheezy 2nd parm is due to general purpose
  * mechanism of the walktree routine that calls us.
  */
-void	cg_lab(mlabel *mlbl, char *do_emit)
+STATICFNDEF void cg_lab(mlabel *mlbl, char *do_emit)
 {
 	lab_tabent	lent;
 	mstr		glob_name;
@@ -315,11 +346,13 @@ void	cg_lab(mlabel *mlbl, char *do_emit)
 		if (do_emit)
 		{	/* Output (2nd) pass, emit the interesting information */
 			lent.lab_name.len = mlbl->mvname.len;
-			lent.lab_name.addr = (char *)(mlbl->mvname.addr - (char *)stringpool.base);
-											/* Offset into literal text pool */
+			lent.lab_name.addr = (0 < lent.lab_name.len)			/* Offset into literal text pool */
+				? (char *)(mlbl->mvname.addr - (char *)stringpool.base) : NULL;
 			lent.LABENT_LNR_OFFSET = (lnr_tabent *)(SIZEOF(lnr_tabent) * mlbl->ml->line_number);
 											/* Offset into lnr table */
 			lent.has_parms = (NO_FORMALLIST != mlbl->formalcnt);		/* Flag to indicate any formallist */
+			GTM64_ONLY(lent.filler = 0);					/* Remove garbage due so hashes well */
+			UNICODE_ONLY(lent.lab_name.char_len = 0);			/* .. ditto .. */
 			emit_immed((char *)&lent, SIZEOF(lent));
 		} else
 		{	/* 1st pass, do the definition but no emissions */

@@ -40,6 +40,9 @@
 #include "send_msg.h"
 #include "error.h"
 #include "trace_table.h"
+#ifdef GTM_TLS
+#include "gtm_tls.h"
+#endif
 
 GBLREF	stack_frame      	*frame_pointer;
 GBLREF	unsigned char    	*stackbase, *stacktop, *msp, *stackwarn;
@@ -127,7 +130,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	int		ret, byteperchar;
 	boolean_t 	timed, vari, more_data, terminator, has_delimiter, requeue_done, do_delim_conv, need_get_chset;
 	boolean_t	zint_restart, outofband_terminate, one_read_done, utf8_active;
-	int		flags, len, real_errno, save_errno, fcntl_res, errlen, charlen, stp_need;
+	int		flags, len, real_errno, save_errno, fcntl_res, errlen, devlen, charlen, stp_need;
 	int		bytes_read, orig_bytes_read, ii, max_bufflen, bufflen, chars_read, mb_len, match_delim;
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
@@ -889,9 +892,17 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		iod->dollar.za = 9;
 		len = SIZEOF(ONE_COMMA) - 1;
 		memcpy(iod->dollar.device, ONE_COMMA, len);
-		errptr = (char *)STRERROR(real_errno);
+#ifdef		GTM_TLS
+		if (socketptr->tlsenabled && (0 > real_errno))
+			errptr = (char *)gtm_tls_get_error();
+		else	/* TLS not enabled or system call error */
+#endif
+			errptr = (char *)STRERROR(real_errno);
 		errlen = STRLEN(errptr);
-		memcpy(&iod->dollar.device[len], errptr, errlen + 1);	/* + 1 for null */
+                devlen = MIN((SIZEOF(iod->dollar.device) - len - 1), errlen);
+                memcpy(&iod->dollar.device[len], errptr, devlen + 1);
+                if (devlen < errlen)
+                        iod->dollar.device[SIZEOF(iod->dollar.device) - 1] = '\0';
 #		ifdef UNIX
 		if (io_curr_device.in == io_std_device.in)
 		{

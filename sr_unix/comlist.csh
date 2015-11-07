@@ -326,16 +326,6 @@ if ( "$HOSTOS" == "OS/390disable" ) then
 	cp $gtm_inc/gtm_stat.h .
 endif
 
-
-if ( "$HOSTOS" == "SunOS" ) then
-	# Support for RPC implementation of DAL's and ZCALL's.
-	# gtm_descript.h is already copied.
-	cp $gtm_inc/gtmidef.h .
-endif
-
-cp $gtm_pct/*.hlp .
-
-
 #	If this is a test version not being built in $gtm_exe
 #	(see value of $3), then make sure ./obj and ./map exist.
 if ( ! -d ./obj ) then
@@ -654,16 +644,16 @@ rm -f obj/gengtmdeftypes.log* >& /dev/null
 rm -f GTMDefinedTypesInit.m >& /dev/null
 echo "Generating GTMDefinedTypesInit.m"
 if ($?work_dir) then
-	if (-e $work_dir/tools/cms_tools/gengtmdeftypes.csh) then
+	if (-e $work_dir/tools/cms_tools/builddefinedtypes/gengtmdeftypes.csh) then
 		echo "Using gengtmdeftypes.csh from $work_dir"
-		$work_dir/tools/cms_tools/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
+		$work_dir/tools/cms_tools/builddefinedtypes/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
 		@ savestatus = $status
 	else
-		$cms_tools/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
+		$cms_tools/builddefinedtypes/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
 		@ savestatus = $status
 	endif
 else
-	$cms_tools/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
+	$cms_tools/builddefinedtypes/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
 	@ savestatus = $status
 endif
 if ((0 != $savestatus) || (! -e GTMDefinedTypesInit.m)) then
@@ -739,32 +729,11 @@ if ($status) then
 endif
 
 # Create the GT.M/GDE/MUPIP/DSE/LKE help databases
-foreach hlp (*.hlp)
-	set hlp_status = 0
-	set prefix=${hlp:r}
-	if ("${prefix}" == "mumps") set prefix="gtm"
-	setenv gtmgbldir $gtm_dist/${prefix}help.gld
-	gde <<GDE_in_help
-Change -segment DEFAULT	-block=2048	-file=\$gtm_dist/${prefix}help.dat
-Change -region DEFAULT	-record=1020	-key=255
-GDE_in_help
-
-	if ($status) @ hlp_status++
-	mupip create
-	if ($status) @ hlp_status++
-	gtm <<GTM_in_gtmhelp
-Do ^GTMHLPLD
-$gtm_dist/${hlp}
-Halt
-GTM_in_gtmhelp
-
-	if ($status) @ hlp_status++
-	if ($hlp_status) then
-		@ comlist_status = $comlist_status + $hlp_status
-		echo "comlist-E-hlp, Error processing $hlp file" >> $errorlog
-	endif
-
-end
+$gtm_tools/generate_help.csh $gtm_pct $errorlog
+if ($status) then
+	@ comlist_status++
+	echo "comlist-E-hlp, Error generating hlp databases" >> $errorlog
+endif
 
 chmod 775 *	# do not check $status here because we know it will be 1 since "gtmsecshr" permissions cannot be changed.
 

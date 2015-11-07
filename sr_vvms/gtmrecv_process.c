@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,7 +121,6 @@ error_def(ERR_REPLCOMM);
 error_def(ERR_REPLGBL2LONG);
 error_def(ERR_REPLTRANS2BIG);
 error_def(ERR_REPLWARN);
-error_def(ERR_SECNODZTRIGINTP);
 error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
 
@@ -672,9 +671,6 @@ static void process_tr_buff(void)
 									(unsigned int)jnl_dest_maxrectype);
 						else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLGBL2LONG);
-						else if (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1,
-									&recvpool_ctl->jnl_seqno);
 						else /* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */
 							assertpro(repl_errno != repl_errno);
 					}

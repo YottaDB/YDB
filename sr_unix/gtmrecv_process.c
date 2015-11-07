@@ -198,14 +198,12 @@ error_def(ERR_INSNOTJOINED);
 error_def(ERR_INSROLECHANGE);
 error_def(ERR_INSUNKNOWN);
 error_def(ERR_JNLNEWREC);
-error_def(ERR_JNLRECFMT);
 error_def(ERR_JNLSETDATA2LONG);
 error_def(ERR_NOSUPPLSUPPL);
 error_def(ERR_PRIMARYNOTROOT);
 error_def(ERR_RCVRMANYSTRMS);
 error_def(ERR_REPL2OLD);
 error_def(ERR_REPLCOMM);
-error_def(ERR_REPLGBL2LONG);
 error_def(ERR_REPLINSTNOHIST);
 error_def(ERR_REPLINSTREAD);
 error_def(ERR_REPLNOTLS);
@@ -213,7 +211,6 @@ error_def(ERR_REPLTRANS2BIG);
 error_def(ERR_REPLXENDIANFAIL);
 error_def(ERR_RESUMESTRMNUM);
 error_def(ERR_REUSEINSTNAME);
-error_def(ERR_SECNODZTRIGINTP);
 error_def(ERR_SECONDAHEAD);
 error_def(ERR_STRMNUMIS);
 error_def(ERR_SUPRCVRNEEDSSUPSRC);
@@ -486,11 +483,11 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 			}
 			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
 			{
-				/* This code will need changes in case the jnl-ver changes from V24 to V25 so add an assert to
+				/* This code will need changes in case the jnl-ver changes from V25 to V26 so add an assert to
 				 * alert to that possibility. Once the code is fixed for the new jnl format, change the assert
 				 * to reflect the new latest jnl-ver.
 				 */
-				assert(JNL_VER_THIS == V24_JNL_VER);
+				assert(JNL_VER_THIS == V25_JNL_VER);
 				/* To better understand the logic below (particularly the use of hardcoded offsets), see comment
 				 * in repl_filter.c (search for "struct_jrec_upd layout" for the various jnl versions we support).
 				 */
@@ -959,12 +956,13 @@ void	gtmrecv_repl_send(repl_msg_ptr_t msgp, int4 type, int4 len, char *msgtypest
  */
 void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, boolean_t is_rcvr_srvr)
 {
-	boolean_t		remote_side_is_supplementary, grab_lock_needed;
+	boolean_t		remote_side_is_supplementary, grab_lock_needed, lms_group_different;
 	repl_inst_hdr_ptr_t	inst_hdr;
 	repl_instinfo_msg_t	instinfo_msg;
 	repl_inst_uuid		*strm_start, *strm_top, *strm_info;
 	FILE			*log_fp;
 	int			reuse_slot, first_usable_slot;
+	uint4			creator_pid;
 	seq_num			strm_jnl_seqno;
 	sgmnt_addrs		*repl_csa;
 	DCL_THREADGBL_ACCESS;
@@ -975,8 +973,25 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	remote_side_is_supplementary = need_instinfo_msg->is_supplementary;
 	remote_side->is_supplementary = remote_side_is_supplementary;
 	assert(remote_side->endianness_known); /* ensure remote_side->cross_endian is reliable */
-	if (remote_side->cross_endian)
-		ENDIAN_CONVERT_REPL_INST_UUID(&need_instinfo_msg->lms_group_info);
+	/* If the remote source server is <= V62000 it would have endian converted "need_instinfo_msg" ONLY IF
+	 * src_jnl_ver < rcv_jnl_ver. If remote source server is > V62000 it would have endian converted unconditionally.
+	 * So we dont need to do the endian conversion in either of those cases. The need_instinfo_msg->proto_ver will let
+	 * us distinguish the > V62000 vs <= V62000 case. But if src version is <= V62000, we cannot easily distinguish what
+	 * the other side's jnl_ver is so we dont know if the source server would have endian converted or not. We work around
+	 * it by assuming that pids are limited to a max of 2**24 and so the most significant byte of the 4-byte pid should be 0.
+	 * This trick might not work always in case an OS supports > 2**24 pid number (I dont know of any now) OR if both the
+	 * most and least significant bytes of the 4-byte pid are 0, but if it does not, the worst we will see is a) an incorrect
+	 * INSNOTJOINED error issued by the receiver server OR b) an incorrect lms_group_info copied over into the instance file
+	 * (which will soon elicit some other related error). We can address (a) by trying out endian converting again below to
+	 * see if that prevents the error and if so use that instead but we cannot address (b) with this trick.
+	 * We can live with since the fix for (b) is to upgrade the receiver side to GTM V62001 or higher.
+	 */
+	if (remote_side->cross_endian && (REPL_PROTO_VER_XENDIANFIXES > need_instinfo_msg->proto_ver))
+	{
+		creator_pid = need_instinfo_msg->lms_group_info.creator_pid;
+		if (!(creator_pid & 0xff) && (creator_pid & 0xff000000))
+			ENDIAN_CONVERT_REPL_INST_UUID(&need_instinfo_msg->lms_group_info);
+	}
 	assert(is_rcvr_srvr && (NULL != gtmrecv_log_fp) || !is_rcvr_srvr && (NULL == gtmrecv_log_fp));
 	assert(!is_rcvr_srvr || !repl_csa->hold_onto_crit);
 	assert(is_rcvr_srvr || !jgbl.onlnrlbk || repl_csa->hold_onto_crit);
@@ -1045,7 +1060,26 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		if (memcmp(&need_instinfo_msg->lms_group_info, &inst_hdr->lms_group_info, SIZEOF(inst_hdr->lms_group_info)))
 		{	/* Source and Receiver are part of DIFFERENT LMS Groups. If this instance is supplementary and remote
 			 * side is not supplementary then we expect them to be different. Otherwise issue error.
+			 * Note that because of an issue with endian-conversion (see big comment at start of this function),
+			 * it is possible this lms_group_info would be good (i.e. passed the memcmp) if endian-converted. So
+			 * try that once and if it still fails, go ahead with issuing an error.
 			 */
+			lms_group_different = TRUE;
+			if (remote_side->cross_endian && (REPL_PROTO_VER_XENDIANFIXES > need_instinfo_msg->proto_ver))
+			{
+				ENDIAN_CONVERT_REPL_INST_UUID(&need_instinfo_msg->lms_group_info);
+				if (!memcmp(&need_instinfo_msg->lms_group_info,
+						&inst_hdr->lms_group_info, SIZEOF(inst_hdr->lms_group_info)))
+					lms_group_different = FALSE;	/* stay with converted lms_group_info as it is good */
+				else
+				{	/* neither works so return to the original */
+					ENDIAN_CONVERT_REPL_INST_UUID(&need_instinfo_msg->lms_group_info);
+				}
+			}
+		} else
+			lms_group_different = FALSE;
+		if (lms_group_different)
+		{
 			if (!inst_hdr->is_supplementary || remote_side_is_supplementary)
 			{
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INSNOTJOINED, 4,
@@ -1781,23 +1815,17 @@ STATICFNDEF void process_tr_buff(int msg_type)
 						write_len = out_size;
 					else
 					{
-						assert(EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno);
-						if (EREPL_INTLFILTER_BADREC == repl_errno)
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLRECFMT);
-						else if (EREPL_INTLFILTER_DATA2LONG == repl_errno)
+						if (EREPL_INTLFILTER_DATA2LONG == repl_errno)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLSETDATA2LONG, 2,
 									jnl_source_datalen, jnl_dest_maxdatalen);
 						else if (EREPL_INTLFILTER_NEWREC == repl_errno)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JNLNEWREC, 2,
 									(unsigned int)jnl_source_rectype,
 									(unsigned int)jnl_dest_maxrectype);
-						else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLGBL2LONG);
-						else if (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1,
-									&recvpool_ctl->jnl_seqno);
-						else /* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */
-							assertpro(repl_errno != repl_errno);
+						else
+						{
+							INT_FILTER_RTS_ERROR(recvpool_ctl->jnl_seqno, repl_errno); /* no return */
+						}
 					}
 				} else
 					memcpy(repl_filter_buff, recvpool.recvdata_base + write_off, write_len);
@@ -2677,7 +2705,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared, copied_to_recvpool;
 	gtmrecv_local_ptr_t		gtmrecv_local;
 	gtm_time4_t			ack_time;
-	int4				msghdrlen, strm_num;
+	int4				msghdrlen, strm_num, processed_hdrlen;
 	int4				need_histinfo_num;
 	int				cmpret;
 	int				msg_type, msg_len;
@@ -2860,8 +2888,8 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				DO_FLOW_CONTROL(write_loc);
 			}
 			if (xoff_sent && GTMRECV_XOFF_LOG_CNT <= xoff_msg_log_cnt)
-			{	/* update process is still running slow, Force wait before logging any message. */
-				SHORT_SLEEP(REPL_POLL_WAIT >> 10); /* approximate in ms */
+			{	/* Update process is still running slow; force wait before logging any message. */
+				SHORT_SLEEP(MILLISECS_IN_SEC - 1); /* Sleep for one second. */
 				REPL_DPRINT1("Waiting for Update Process to clear recvpool space\n");
 				xoff_msg_log_cnt = 0;
 			} else if (xoff_sent)
@@ -2936,7 +2964,8 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				msg_type = (((repl_msg_ptr_t)buffp)->type & REPL_TR_CMP_MSG_TYPE_MASK);
 				if (REPL_TR_CMP_JNL_RECS == msg_type)
 				{
-					msg_len = ((repl_msg_ptr_t)buffp)->len - REPL_MSG_HDRLEN;
+					processed_hdrlen = REPL_MSG_HDRLEN;
+					msg_len = ((repl_msg_ptr_t)buffp)->len - processed_hdrlen;
 					gtmrecv_repl_cmpmsglen = msg_len;
 					gtmrecv_repl_uncmpmsglen = (((repl_msg_ptr_t)buffp)->type >> REPL_TR_CMP_MSG_TYPE_BITS);
 					assert(0 < gtmrecv_repl_uncmpmsglen);
@@ -2945,9 +2974,9 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					 * since 8-byte aligned length would have been sent by the source server anyways.
 					 */
 					msg_len = ROUND_UP(msg_len, REPL_MSG_ALIGN);
-					buffp += REPL_MSG_HDRLEN;
+					buffp += processed_hdrlen;
 					exp_data_len = gtmrecv_repl_uncmpmsglen;
-					buff_unprocessed -= REPL_MSG_HDRLEN;
+					buff_unprocessed -= processed_hdrlen;
 					GTMRECV_SET_BUFF_TARGET_CMPBUFF(gtmrecv_repl_cmpmsglen, gtmrecv_repl_uncmpmsglen,
 						gtmrecv_cur_cmpmsglen);
 				} else if (REPL_TR_CMP_JNL_RECS2 == msg_type)
@@ -2958,6 +2987,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					if (msghdrlen > buff_unprocessed)	/* Did not receive the full-header.            */
 						break;				/* Break out of here and read more data first. */
 					msghdrlen = REPL_MSG_HDRLEN; /* reset to regular msg hdr length for future messages */
+					processed_hdrlen = REPL_MSG_HDRLEN2;
 					cmpmsgp = (repl_cmpmsg_ptr_t)buffp;
 					if (remote_side->cross_endian)
 					{
@@ -2968,16 +2998,17 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					gtmrecv_repl_uncmpmsglen = cmpmsgp->uncmplen;
 					assert(0 < gtmrecv_repl_uncmpmsglen);
 					assert(REPL_TR_CMP_THRESHOLD <= gtmrecv_repl_uncmpmsglen);
-					msg_len = ((repl_msg_ptr_t)buffp)->len - REPL_MSG_HDRLEN2;
+					msg_len = ((repl_msg_ptr_t)buffp)->len - processed_hdrlen;
 					/* Unlike REPL_TR_CMP_JNL_RECS message, msg_len is guaranteed to be 8-byte aligned here */
-					buffp += REPL_MSG_HDRLEN2;
+					buffp += processed_hdrlen;
 					exp_data_len = gtmrecv_repl_uncmpmsglen;
-					buff_unprocessed -= REPL_MSG_HDRLEN2;
+					buff_unprocessed -= processed_hdrlen;
 					GTMRECV_SET_BUFF_TARGET_CMPBUFF(gtmrecv_repl_cmpmsglen, gtmrecv_repl_uncmpmsglen,
 						gtmrecv_cur_cmpmsglen);
 				} else
 				{
-					msg_len = ((repl_msg_ptr_t)buffp)->len - REPL_MSG_HDRLEN;
+					processed_hdrlen = REPL_MSG_HDRLEN;
+					msg_len = ((repl_msg_ptr_t)buffp)->len - processed_hdrlen;
 					exp_data_len = msg_len;
 					if (REPL_TR_JNL_RECS == msg_type || REPL_OLD_TRIPLE == msg_type || REPL_HISTREC == msg_type)
 					{
@@ -2991,8 +3022,8 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						PREPARE_RECVPOOL_FOR_WRITE(exp_data_len, 0);
 						DEBUG_ONLY(recvpool_prepared = TRUE);
 					} /* for REPL_TR_CMP_JNL_RECS{2}, receive pool is prepared after uncompression */
-					buffp += REPL_MSG_HDRLEN;
-					buff_unprocessed -= REPL_MSG_HDRLEN;
+					buffp += processed_hdrlen;
+					buff_unprocessed -= processed_hdrlen;
 				}
 				assert(0 <= buff_unprocessed);
 				assert(0 == (msg_len % REPL_MSG_ALIGN));
@@ -3477,13 +3508,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						assert(IF_INVALID != repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 						assert(IF_NONE != repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 						gtmrecv_filter |= INTERNAL_FILTER;
-						/* Any time the ^#t global format version is bumped, the below
-						 * assert will trip. This way, anyone who bumps the trigger label
-						 * ensures that the internal filter routines in repl_filter.c are
-						 * accordingly changed to upgrade triggers before applying them
-						 * on the current database which supports the latest ^#t format.
-						 */
-						assert(0 == MEMCMP_LIT(HASHT_GBL_CURLABEL, "2"));
 						gtmrecv_alloc_filter_buff(gtmrecv_max_repl_msglen);
 					} else
 					{
@@ -3662,8 +3686,8 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				buff_unprocessed += buffered_data_len;
 				data_len += buffered_data_len;
 				if (buffp_start != buff_start)
-					memmove(buff_start, buffp_start, buff_unprocessed + REPL_MSG_HDRLEN);
-				buffp = buff_start + REPL_MSG_HDRLEN; /* + REPL_MSG_HDRLEN since we already processed the header. */
+					memmove(buff_start, buffp_start, buff_unprocessed + processed_hdrlen);
+				buffp = buff_start + processed_hdrlen;
 			} else if (0 != buff_unprocessed)
 			{	/* We have an incomplete header. Move it to the beginning of the allocated buffer space. */
 				memmove(buff_start, buffp, buff_unprocessed);

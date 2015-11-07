@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,12 +12,11 @@
 #include "mdef.h"
 #include "compiler.h"
 
-oprtype put_indr(x)
-oprtype *x;
+oprtype put_indr(oprtype *x)
 {
-mval *p;
-oprtype a;
-a.oprclass = INDR_REF;
-a.oprval.indr = x;
-return a;
+	oprtype a;
+
+	a.oprclass = INDR_REF;
+	a.oprval.indr = x;
+	return a;
 }

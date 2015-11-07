@@ -33,7 +33,8 @@
 
 #define HOPELESS_COMPILE 128
 
-GBLREF short int source_column, source_line;
+GBLREF short int source_line;
+GBLREF int	source_column;
 
 GBLREF unsigned char		source_file_name[];
 GBLREF unsigned char 		*source_buffer;

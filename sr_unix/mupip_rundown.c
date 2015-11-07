@@ -99,7 +99,7 @@ void mupip_rundown(void)
 	SETUP_THREADGBL_ACCESS;
 	exit_status = SS_NORMAL;
 	file = (CLI_PRESENT == cli_present("FILE"));
-	region = (CLI_PRESENT == cli_present("REGION"));
+	region = (CLI_PRESENT == cli_present("REGION")) || (CLI_PRESENT == cli_present("R"));
 	TREF(skip_file_corrupt_check) = TRUE;	/* rundown the database even if csd->file_corrupt is TRUE */
 	arg_present = (0 != TREF(parms_cnt));
 	if ((file == region) && (TRUE == file))

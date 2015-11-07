@@ -296,7 +296,8 @@ GBLDEF	char		*lexical_ptr;
 GBLDEF	int4		aligned_source_buffer[MAX_SRCLINE / SIZEOF(int4) + 1];
 GBLDEF	unsigned char	*source_buffer = (unsigned char *)aligned_source_buffer;
 GBLDEF	src_line_struct	src_head;
-GBLDEF	short int	source_column, source_line;
+GBLDEF	short int	source_line;
+GBLDEF	int		source_column;
 GBLDEF	bool		devctlexp;
 GBLDEF 	char		cg_phase;       /* code generation phase */
 /* Previous code generation phase: Only used by emit_code.c to initialize the push list at the
@@ -405,8 +406,6 @@ GBLDEF	int			gtmrecv_srv_count;
 GBLDEF	volatile int4		db_fsync_in_prog;
 GBLDEF	volatile int4		jnl_qio_in_prog;
 #ifdef UNIX
-GBLDEF	void			(*op_write_ptr)(mval *);
-GBLDEF	void			(*op_wteol_ptr)(int4 n);
 GBLDEF	gtmsiginfo_t		signal_info;
 #ifndef MUTEX_MSEM_WAKE
 GBLDEF	int			mutex_sock_fd = FD_INVALID;
@@ -717,7 +716,6 @@ GBLDEF	boolean_t	gvdupsetnoop = TRUE;	/* if TRUE, duplicate SETs do not change G
 						 * behavior is turned ON. GT.M has a way of turning it off with a VIEW command.
 						 */
 GBLDEF boolean_t	gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
-UNIX_ONLY(GBLDEF int4	gtm_shmflags;)		/* Extra flags for shmat */
 #ifdef VMS
 GBLDEF	uint4	gtm_memory_noaccess_defined;	/* count of the number of GTM_MEMORY_NOACCESS_ADDR logicals which are defined */
 GBLDEF	uint4	gtm_memory_noaccess[GTM_MEMORY_NOACCESS_COUNT];	/* see VMS gtm_env_init_sp.c */
@@ -973,6 +971,7 @@ GBLDEF	boolean_t 	*ztvalue_changed_ptr;		/* -> boolean in current gtm_trigger_pa
 GBLDEF	boolean_t	ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
 GBLDEF	mstr		*dollar_ztname;
 GBLDEF	mval		*dollar_ztdata,
+			*dollar_ztdelim,
 			*dollar_ztoldval,
 			*dollar_ztriggerop,
 			*dollar_ztupdate,
@@ -1113,5 +1112,4 @@ GBLDEF	gtm_tls_ctx_t	*tls_ctx;			/* Process private pointer to SSL/TLS context. 
 							 * Socket devices.
 							 */
 #endif
-
 GBLDEF lv_val		*active_lv;

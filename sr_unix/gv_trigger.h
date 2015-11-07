@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -128,7 +128,7 @@ typedef struct gv_trigger_struct
 					 *	piecearray[1].min=8, piecearray[1].max=8 */
 	rtn_tabent	rtn_desc;	/* Compiled routine name/objcode; Inited by gvtr_db_read_hasht() */
 	boolean_t	is_zdelim;	/* TRUE if "ZDELIM" was specified; FALSE if "DELIM" was specified */
-	mstr		delimiter;	/* is a copy of ^#t(<GBL>,<index>,"DELIM") or ^#t(..."ZDELIM") whichever is defined */
+	mval		delimiter;	/* is a copy of ^#t(<GBL>,<index>,"DELIM") or ^#t(..."ZDELIM") whichever is defined */
 	mstr		options;	/* is a copy of ^#t(<GBL>,<index>,"OPTIONS") */
 	mval		xecute_str;	/* Trigger code to execute */
 	struct gvt_trigger_struct	/* top of gvt_trigger block this trigger belongs to. Used in src lookup when we know */
@@ -201,11 +201,21 @@ typedef struct gvtr_invoke_parms_struct
 	ztrig_cycle_mismatch = (CSA->db_dztrigger_cycle && (GVT->db_dztrigger_cycle != CSA->db_dztrigger_cycle));		\
 	db_trigger_cycle_mismatch = (GVT->db_trigger_cycle != cycle);								\
 	cycle_mismatch = (db_trigger_cycle_mismatch || ztrig_cycle_mismatch);							\
+	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: CSA->db_ztrigger_cycle=%d\n", cycle));				\
+	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: GVT->db_trigger_cycle=%d\n", GVT->db_trigger_cycle));		\
+	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: CSA->db_dztrigger_cycle=%d\n", CSA->db_dztrigger_cycle));		\
+	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: GVT->db_dztrigger_cycle=%d\n", GVT->db_dztrigger_cycle));		\
+	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: local_tn=%d\n", local_tn));						\
+	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: GVT->trig_local_tn=%d\n", GVT->trig_local_tn));			\
+	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: ztrig_cycle_mismatch=%d\n", ztrig_cycle_mismatch));			\
+	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: db_trigger_cycle_mismatch=%d\n", db_trigger_cycle_mismatch));	\
+	DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: cycle_mismatch=%d t_tries=%d\n", cycle_mismatch, t_tries));		\
 	/* Set up wrapper even if no triggers if this is for ZTRIGGER command */						\
 	if (cycle_mismatch || (NULL != GVT->gvt_trigger) || (ERR_GVZTRIGFAIL == T_ERR))						\
 	{	/* Create TP wrap if needed */											\
 		if (!dollar_tlevel)												\
 		{	/* need to create implicit TP wrap */									\
+			DBGTRIGR((stderr, "GVTR_INIT_AND_TPWRAP_IF_NEEDED: creating TP wrapper\n"));				\
 			DEBUG_ONLY(was_nontp = TRUE;)										\
 			assert(!LCL_TSTART);											\
 			/* Set a debug-only global variable to indicate that from now onwards, until the completion of this	\
@@ -415,8 +425,8 @@ typedef struct gvtr_invoke_parms_struct
 	hasht_tree = CSA->hasht_tree;								\
 	if (NULL == hasht_tree)									\
 	{	/* Allocate gv_target like structure for "^#t" global in this database file */	\
-		gvname.var_name.addr = literal_hasht.str.addr;					\
-		gvname.var_name.len = literal_hasht.str.len;					\
+		gvname.var_name.addr = HASHT_GBLNAME;						\
+		gvname.var_name.len = HASHT_GBLNAME_LEN;					\
 		gvname.marked = FALSE;								\
 		COMPUTE_HASH_MNAME(&gvname);							\
 		hasht_tree = targ_alloc(CSA->hdr->max_key_size, &gvname, NULL);			\
@@ -429,6 +439,10 @@ typedef struct gvtr_invoke_parms_struct
 #define INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED										\
 {															\
 	unsigned char		*key;											\
+															\
+	GBLREF	gv_key			*gv_currkey;									\
+	GBLREF	gd_region		*gv_cur_region;									\
+	GBLREF	sgmnt_data_ptr_t	cs_data;									\
 															\
 	key = &gv_currkey->base[0];											\
 	memcpy(key, HASHT_GBLNAME, HASHT_GBLNAME_FULL_LEN);	/* including terminating '\0' subscript */		\
@@ -445,23 +459,28 @@ typedef struct gvtr_invoke_parms_struct
 	GVCST_ROOT_SEARCH;												\
 }
 
-#define	SWITCH_TO_DEFAULT_REGION			\
-{							\
-	GBLREF	uint4		dollar_tlevel;		\
-	GBLREF	gd_addr		*gd_header;		\
-	GBLREF	gv_namehead	*gv_target;		\
-							\
-	gd_region		*default_region;	\
-							\
-	assert(NULL != gd_header);			\
-	default_region = gd_header->maps->reg.addr;	\
-	if (!default_region->open)			\
-		gv_init_reg(default_region);		\
-	TP_CHANGE_REG_IF_NEEDED(default_region);	\
-	SET_GVTARGET_TO_HASHT_GBL(cs_addrs);		\
-	assert(NULL != gv_target);			\
-	if (dollar_tlevel)				\
-		tp_set_sgm();				\
+/* Caller has to check for "NULL" value of "cs_addrs" and act accordingly */
+#define	GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg)							\
+{													\
+	GBLREF	uint4		dollar_tlevel;								\
+	GBLREF	gv_namehead	*gv_target;								\
+	GBLREF	gd_region	*gv_cur_region;								\
+	GBLREF	gv_key		*gv_currkey;								\
+													\
+	if (!reg->open)											\
+		gv_init_reg(reg);									\
+	gv_cur_region = reg;										\
+	change_reg(); /* TP_CHANGE_REG wont work as we need to set sgm_info_ptr */			\
+	if (NULL != cs_addrs)										\
+	{												\
+		SET_GVTARGET_TO_HASHT_GBL(cs_addrs);	/* sets up gv_target */				\
+		assert(NULL != gv_target);								\
+		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;	/* sets up gv_currkey */			\
+	} else												\
+	{												\
+		DEBUG_ONLY(gv_target = NULL;)	/* to keep cs_addrs/gv_target in sync */		\
+		DEBUG_ONLY(gv_currkey->base[0] = '\0';)	/* to keep gv_target/gv_currkey in sync */	\
+	}												\
 }
 
 GBLREF	uint4		dollar_tlevel;
@@ -622,6 +641,21 @@ GBLREF	int4		tstart_trigger_depth;
 	util_ptr += STR_LIT_LEN(PARAM);							\
 	UTIL_LEN = UINTCAST(util_ptr - &UTIL_BUFF[0]);					\
 	assert(MAX_TRIG_UTIL_LEN >= UTIL_LEN);						\
+}
+
+/* This error macro is used for all definition errors where the target is ^#t(GVN,<index>,<required subscript>) */
+#define HASHT_GVN_DEFINITION_RETRY_OR_ERROR(INDEX,SUBSCRIPT,CSA)				\
+{												\
+	if (CDB_STAGNATE > t_tries)								\
+		t_retry(cdb_sc_triggermod);							\
+	else											\
+	{											\
+		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
+		/* format "INDEX,SUBSCRIPT" of ^#t(GVN,INDEX,SUBSCRIPT) in the error message */	\
+		SET_PARAM_STRING(util_buff, util_len, INDEX, SUBSCRIPT);			\
+		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,	\
+			trigvn_len, trigvn, util_len, util_buff);				\
+	}											\
 }
 
 #endif

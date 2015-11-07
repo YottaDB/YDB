@@ -11,14 +11,16 @@
 
 #include "mdef.h"
 
-#ifdef USHBIN_SUPPORTED /* entire file */
+#ifdef AUTORELINK_SUPPORTED /* entire file */
 #include "gtm_string.h"
 
 #include <rtnhdr.h>
 #include "op.h"
 #include "relinkctl.h"
-#include "zhist.h"
 #include "min_max.h"
+#include "zbreak.h"
+
+GBLREF z_records 	zbrk_recs;	/* ZBREAKs in effect */
 
 /* Rebuffering macro for routine and label name for use when needed. Note we don't even do the
  * MV_FORCE_STR() on the given mval until we know we are going to use it.
@@ -52,12 +54,9 @@ rhdtyp *op_rhd_ext(mval *rtname, mval *lbname, rhdtyp *rhd, void *lnr)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* The are two potential future updates here:
-	 *   1. Desire to remove the two additional opcodes and revert back to the single call opcode (op_call, op_extexfun, etc).
-	 *      This would have positive performance enhancements through less generated code and shorter call path if doable.
-	 *   2. Intention is to change the syntax of ZRUPDATE such that routines can be specified in groups surrounded by
-	 *	parentheses (e.g. ZRUPDATE (a.o,b.o,c.o)) which would make all 3 routines available simultaneously instead of
-	 *	serially. This will likely require some sort of locking protocols but is not yet defined.
+	/* Future TODO:
+	 *   Remove the two additional opcodes and revert back to the single call opcode (op_call, op_extexfun, etc).
+	 *   This would have positive performance enhancements through less generated code and shorter call path if doable.
 	 */
 	if (NULL == rhd)
 	{	/* Routine is not yet linked - perform auto-ZLINK */
@@ -70,23 +69,27 @@ rhdtyp *op_rhd_ext(mval *rtname, mval *lbname, rhdtyp *rhd, void *lnr)
 		return rhd;
 	}
 	/* Routine is already linked, but we need to check if a new version is available. This involves traversing the
-	 * "validation linked list", looking for changes in different $zro entries. But we also need to base our checks
-	 * on the most recent version of the routine loaded.
+	 * "validation linked list", looking for changes in different $ZROUTINES entries. But we also need to base our
+	 * checks on the most recent version of the routine loaded. Note autorelink is only possible when no ZBREAKs are
+	 * defined in the given routine.
 	 */
-	rhd = rhd->current_rhead_adr;
-	if ((NULL != rhd->zhist) && need_relink(rhd, (zro_hist *)rhd->zhist))
-	{
-		REBUFFER_MIDENT(rtname, &rtnname, rtnname_buff);
-		REBUFFER_MIDENT(lbname, &lblname, lblname_buff);
-		op_zlink(&rtnname, NULL);
-		rhd = rhd->current_rhead_adr;		/* Pickup routine header of new version to avoid lookup */
-		assert((NULL == rhd->zhist) || (((zro_hist *)(rhd->zhist))->zroutines_cycle == TREF(set_zroutines_cycle)));
-		op_labaddr(rhd, &lblname, 0);
-		TREF(lab_lnr) = &((TREF(lab_proxy)).lnr_adr);
-		return rhd;
+	if (!rhd->has_ZBREAK)
+	{	/* Only look for autorelink when no ZBREAKs are defined in this routine */
+		rhd = rhd->current_rhead_adr;		/* Update rhd to most currently linked version */
+		if ((NULL != rhd->zhist) && need_relink(rhd, (zro_hist *)rhd->zhist))
+		{	/* Relink appears to be needed */
+			REBUFFER_MIDENT(rtname, &rtnname, rtnname_buff);
+			REBUFFER_MIDENT(lbname, &lblname, lblname_buff);
+			op_zlink(&rtnname, NULL);
+			rhd = rhd->current_rhead_adr;		/* Pickup routine header of new version to avoid lookup */
+			assert((NULL == rhd->zhist) || (((zro_hist *)(rhd->zhist))->zroutines_cycle == TREF(set_zroutines_cycle)));
+			op_labaddr(rhd, &lblname, 0);
+			TREF(lab_lnr) = &((TREF(lab_proxy)).lnr_adr);
+			return rhd;
+		}
 	}
 	/* Linked routine is already the latest */
 	TREF(lab_lnr) = lnr;
 	return rhd;
 }
-#endif /* USHBIN_SUPPORTED */
+#endif /* AUTORELINK_SUPPORTED */

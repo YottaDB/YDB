@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,7 +71,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 																 \
 		lcl_msgstr = (gtm_ftok_sem == SEMTYPE) ? "SEMWT2LONG_FTOK_SUCCEEDED: semop for the ftok semaphore succeeded"	 \
 							: "SEMWT2LONG_ACCSEM_SUCCEEDED: semop for the ftok semaphore succeeded"; \
-		send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(lcl_msgstr));							 \
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(lcl_msgstr));					 \
 	}															 \
 }
 
@@ -124,7 +124,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 			rts_error(VARLSTCNT(11) DBFILERR_PARAMS(REG), CRITSEMFAIL_PARAMS(REG),			\
 				SEMKEYINUSE_PARAMS(UDI));							\
 		} else												\
-			GTMASSERT;										\
+			assertpro(FALSE);									\
 	} else if (ERR_MAXSEMGETRETRY == RETSTAT->status2)							\
 	{													\
 		rts_error(VARLSTCNT(7) DBFILERR_PARAMS(REG), ERR_MAXSEMGETRETRY, 1, MAX_SEMGET_RETRIES);	\
@@ -140,7 +140,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 		rts_error(VARLSTCNT(13) DBFILERR_PARAMS(REG),							\
 			SEMWT2LONG_PARAMS(REG, RETSTAT, GTM_SEMTYPE, tot_wait_time));				\
 	} else													\
-		GTMASSERT;											\
+		assertpro(FALSE);										\
 }
 
 /* Set the value of semaphore number 2 ( = FTOK_SEM_PER_ID - 1) as GTM_ID. This way, in case of an orphaned
@@ -183,7 +183,5 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrt
 	RETSTAT->module = __FILE__;											\
 	return FALSE;													\
 }
-
-#define SEM_REMOVED(ERRNO)	((EINVAL == ERRNO) || (EIDRM == ERRNO))	/* EIDRM is only on Linux */
 
 #endif /* GTM_SEMUTILS_H */

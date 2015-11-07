@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,9 @@
 
 enum perm_target_types
 {
-    PERM_FILE,			/* request permissions for creating a new file */
-    PERM_IPC			/* request permissions for initializing IPCs (shm/sem) */
+    PERM_FILE = 0x01,			/* request permissions for creating a new file */
+    PERM_IPC  = 0x02,			/* request permissions for initializing IPCs (shm/sem) */
+    PERM_EXEC = 0x80			/* request execute permissions, masked with the above */
 };
 
 struct perm_diag_data

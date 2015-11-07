@@ -90,6 +90,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		        bfsize_specified = FALSE,
 		        ibfsize_specified = FALSE,
 		        moreread_specified = FALSE,
+		        flush_specified = FALSE,
 		        create_new_socket;
 	int4 		index, n_specified, zff_len, delimiter_len, moreread_timeout;
 	int		fil_type, nodelay, p_offset = 0;
@@ -306,6 +307,10 @@ void	iosocket_use(io_desc *iod, mval *pp)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MRTMAXEXCEEDED, 1, MAX_MOREREAD_TIMEOUT);
                                 moreread_specified = TRUE;
                                 break;
+			case iop_flush:
+				n_specified++;
+				flush_specified = TRUE;
+				break;
 			default:
 				/* ignore deviceparm */
 				break;
@@ -495,6 +500,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	if (!create_new_socket)
 	{
 		/* these changes apply to only pre-existing sockets */
+		if (flush_specified)
+			iosocket_flush(iod);	/* buffered output if any */
 		if (bfsize_specified)
 			newsocket.buffer_size = bfsize;
 #ifdef TCP_NODELAY

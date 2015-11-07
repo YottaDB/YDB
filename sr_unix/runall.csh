@@ -260,7 +260,7 @@ else
 		echo "...... Searching for --------> out-of-date PCT ROUTINEs ...... "
 		pushd $gtm_pct >& /dev/null
 		ln -s $gtm_exe/${latest_exe_with_rel_path} __temp_runall_${latest_exe}
-		ls -1Lat | sed -n '1,/__temp_runall_'${latest_exe}'/p' | grep -E '\.m$' >>&! ${TMP_DIR}_pct_files
+		ls -1Lat | sed -n '1,/__temp_runall_'${latest_exe}'/p' | grep -E '\.(m|hlp)$' >>&! ${TMP_DIR}_pct_files
 		rm -f __temp_runall_${latest_exe} >& /dev/null
 		popd >& /dev/null
 	else
@@ -569,6 +569,13 @@ else
 	set build_routine = `cat ${TMP_DIR}_build_routine.final`
 	$shell $gtm_tools/buildaux.csh $RUNALL_VERSION $RUNALL_IMAGE $gtm_root/$RUNALL_VERSION/$RUNALL_IMAGE $build_routine
 	if (0 != $status) @ runall_status = $status
+endif
+
+# Create the GT.M/GDE/MUPIP/DSE/LKE help databases
+$gtm_tools/generate_help.csh $gtm_pct $gtm_log/error.${RUNALL_IMAGE}.log
+if ($status) then
+	@ runall_status++
+	echo "runall-E-hlp, Error generating hlp databases"
 endif
 
 echo ""

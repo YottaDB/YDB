@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,19 +30,16 @@
  * if we are eligible for this unwind. If not, this is an out-of-design condition we need to protect
  * against.
  */
-#define TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND								\
-{													\
-	if (SFT_TRIGR & frame_pointer->type)								\
-	{												\
-		if (INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state)					\
-		{	/* Remove this errant frame and continue to restart */				\
-			DBGTRIGR((stderr, "%s: trigger-no-mans-land situation - removing trigger "	\
-				  "base frame\n", __FILE__));						\
-			gtm_trigger_fini(FALSE, FALSE);							\
-		} else											\
-			/* Bad mojo - not in trigger-no-mans-land - unknown issue to protect against */	\
-			GTMASSERT;									\
-	}												\
+#define TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND							\
+{												\
+	if (SFT_TRIGR & frame_pointer->type)							\
+	{											\
+		assertpro(INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state);			\
+		/* Remove this errant frame and continue to restart */				\
+		DBGTRIGR((stderr, "%s: trigger-no-mans-land situation - removing trigger "	\
+			  "base frame\n", __FILE__));						\
+		gtm_trigger_fini(FALSE, FALSE);							\
+	}											\
 }
 
 typedef enum
@@ -63,6 +60,7 @@ typedef struct
 						 */
 	const mval	*ztdata_new;		/* $Data status of trigger value being Set/Killed - points to a constant mval
 						 * in mtables.c */
+	const mval	*ztdelim_new;		/* mval to set into $ZTDELIM - points to a string pool entry */
 	const mval	*ztriggerop_new;	/* Opcode type invoking the trigger - points to a constant mval in mtables.c */
 	mval		*ztupdate_new;		/* mval to set into $ZTUPDATE.
 						 * Points to stringpool at "gtm_trigger" entry - is NOT updated by the function */

@@ -244,19 +244,15 @@
    the above command looks like the following:
 
    Block 3   Size 4B   Level 0   TN 6 V5
-
    Rec:1  Blk 3  Off 10  Size 14  Cmpc 0  Key ^Fruits(1)
          10 : | 14  0  0  0 46 72 75 69 74 73  0 BF 11  0  0 41 70 70 6C 65|
               |  .  .  .  .  F  r  u  i  t  s  .  .  .  .  .  A  p  p  l  e|
-
    Rec:2  Blk 3  Off 24  Size D  Cmpc 8  Key ^Fruits(2)
          24 : |  D  0  8  0 21  0  0 42 61 6E 61 6E 61                     |
               |  .  .  .  .  !  .  .  B  a  n  a  n  a                     |
-
    Rec:3  Blk 3  Off 31  Size D  Cmpc 8  Key ^Fruits(3)
          31 : |  D  0  8  0 31  0  0 43 68 65 72 72 79                     |
               |  .  .  .  .  1  .  .  C  h  e  r  r  y                     |
-
    Rec:4  Blk 3  Off 3E  Size D  Cmpc 8  Key ^Fruits(4)
          3E : |  D  0  8  8 41  0  0 47 72 61 70 65 73                     |
               |  .  .  .  .  A  .  .  G  r  a  p  e  s                     |
@@ -1216,7 +1212,6 @@
 
    DSE> CACHE -VERIFY -ALL
    Time 26-FEB-2011 14:31:30 : Region DEFAULT : Cache verification is clean
-
    Execute CACHE recover command if Cache verification is "NOT" clean.
 
    This command reports the state of database cache for all regions.
@@ -1233,7 +1228,6 @@
    DSE> CACHE -SHOW
    File    /home/jdoe/node1/areg.dat
    Region  AREG
-
    Region AREG : Shared_memory       = 0x00002B6845040000
    Region AREG :  node_local         = 0x0000000000000000
    Region AREG :  critical           = 0x0000000000010000
@@ -1248,7 +1242,6 @@
    Region AREG :  th_base            = 0x00000000002C71D0
    Region AREG :  bt_record          = 0x00000000002C7200 : Numelems = 0x00000400 : Elemsize = 0x00000040
    Region AREG :  shared_memory_size = 0x00000000002D8000
-
    DSE>
 
 2 CLose
@@ -1499,7 +1492,6 @@
 
    File    /home/jdoe/.fis-gtm/V6.1-000_x86_64/g/gtm.dat
    Region  DEFAULT
-
    File            /home/jdoe/.fis-gtm/V6.1-000_x86_64/g/gtm.dat
    Region          DEFAULT
    Date/Time       27-JAN-2014 03:13:40 [$H = 63214,11620]
@@ -1589,7 +1581,6 @@
    Example:
 
    DSE> evaluate -number=10 -decimal
-
    Hex:  A   Dec:  10
 
    This command displays the hexadecimal equivalent of decimal number 10.
@@ -1597,7 +1588,6 @@
    Example:
 
    DSE> evaluate -number=10 -hexadecimal
-
    Hex:  10   Dec:  16
 
    This command displays the decimal equivalent of hexadecimal 10.
@@ -1605,7 +1595,6 @@
    Example:
 
    $ dse evaluate -number=10
-
    Hex:  10   Dec:  16
 
    This command displays the decimal equivalent of Hexadecimal 10. Note that
@@ -1759,7 +1748,6 @@
    Directory path
    Path--blk:off
    1:10 2:1E
-
    Global paths
    Path--blk:off
    6:51 1A4:249 180
@@ -1772,7 +1760,6 @@
    Example:
 
    DSE> find -free -hint=180
-
    Next free block is D8F.
 
    This command locates the "closest" free block to block 180.
@@ -1947,7 +1934,6 @@
    Block      1A0: |  XXXXXXXX  XXXXXXXX  XXXXXXXX  XXXXXXXX  |
    Block      1C0: |  XXXXXXXX  XXXXXXXX  XXXXXXXX  XXXXXXXX  |
    Block      1E0: |  XXXXXXXX  XXXXXXXX  XXXXXXXX  XXXXXXXX  |
-
    'X' == BUSY  '.' == FREE  ':' == REUSABLE  '?' == CORRUPT
 
    Note that BLOCK 20 is marked as REUSABLE, which means FREE but in need of
@@ -1961,7 +1947,6 @@
    is as follows:
 
    Block 0  Size 90  Level -1  TN 1 V5   Master Status: Free Space
-
                    Low order                         High order
    Block        0: |  XXX.....  ........  ........  ........  |
    Block       20: |  X.......  ........  ........  ........  |
@@ -1979,7 +1964,6 @@
    Block      1A0: |  ........  ........  ........  ........  |
    Block      1C0: |  ........  ........  ........  ........  |
    Block      1E0: |  ........  ........  ........  ........  |
-
    'X' == BUSY  '.' == FREE  ':' == REUSABLE  '?' == CORRUPT
 
    Note that the BLOCK 20 is marked as BUSY.
@@ -2009,7 +1993,6 @@
    Example:
 
    DSE> OPEN
-
    Current output file:  var.out
 
    This command displays the current output file. In this case, the output
@@ -2176,7 +2159,6 @@
    Example:
 
    DSE> range -lower="^Fruits(15)" -upper="^Fruits(877)" -from=A -to=F
-
    Blocks in the specified key range:
    Block: 0000000A Level: 0
    Block: 0000000B Level: 0
@@ -2184,7 +2166,6 @@
    Block: 0000000D Level: 0
    Block: 0000000E Level: 0
    Block: 0000000F Level: 0
-
    Found 6 blocks
 
    This command search for keys between ^Fruits(15) and ^Fruits(877).
@@ -2845,15 +2826,16 @@
 
    Copyright 2014
 
-   Fidelity Information Services, Inc. All rights reserved.
+   Fidelity National Information Services, Inc. and/or its subsidiaries. All
+   rights reserved.
 
    Permission is granted to copy, distribute and/or modify this document
    under the terms of the GNU Free Documentation License, Version 1.3 or any
    later version published by the Free Software Foundation; with no Invariant
    Sections, no Front-Cover Texts and no Back-Cover Texts.
 
-   GT.M(TM) is a trademark of Fidelity Information Services, Inc. Other
-   trademarks are the property of their respective owners.
+   GT.M(TM) is a trademark of Fidelity National Information Services, Inc.
+   Other trademarks are the property of their respective owners.
 
    This document contains a description of GT.M and the operating
    instructions pertaining to the various functions that comprise the system.
@@ -2864,7 +2846,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.2-000 of the
+   This help file is a concise representation of revision V6.2-001 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

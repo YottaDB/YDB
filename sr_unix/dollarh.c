@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 
 void dollarh(time_t intime, uint4 *days, time_t *seconds)
 {
-	uint4		tdays;
+	int4		tdays;
 	int		isdst;
 	struct tm	*ttime;
 	time_t		mktime_ret;
@@ -40,22 +40,17 @@ void dollarh(time_t intime, uint4 *days, time_t *seconds)
 	 * is to block signals (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT, SIGALRM) during the function and then restore them
 	 * at the end. [C9D06-002271] [C9I03-002967].
 	 */
-	GTM_LOCALTIME(ttime, &intime);		/* represent intime as local time in case of offsets from UCT other than hourly */
+	GTM_LOCALTIME(ttime, &intime);		/* represent intime as local time in case of offsets from UTC other than hourly */
 	*seconds  = (time_t)(ttime->tm_hour * HOUR) + (ttime->tm_min * MINUTE) + ttime->tm_sec;
 	isdst = ttime->tm_isdst;
-	GTM_GMTIME(ttime, &intime);			/* represent intime as UCT */
+	GTM_GMTIME(ttime, &intime);		/* represent intime as UTC */
 	ttime->tm_isdst = isdst; 		/* use GTM_LOCALTIME to tell mktime whether daylight savings needs to be applied */
 	GTM_MKTIME(mktime_ret, ttime);
 	assert((time_t)-1 != mktime_ret);
-	tdays = (uint4)((intime + (time_t)difftime(intime, mktime_ret)) / ONEDAY) + DAYS;	/* adjust relative to UTC */
-	*days = tdays;				/* use temp local in case the caller has overlapped arguments */
-	/* Assert that $H always moves forward. The only exception is a negative time adjustment due to DST change.
-	 * Do asserts AFTER unblocking signals as otherwise assert failures could hang and/or result in no cores.
-	 * DSE and MUPIP use this function to potentially display times in the past (e.g. in DSE DUMP -FILE,
-	 * MUPIP JOURNAL EXTRACT) so restrict this assert to the runtime for now.
-	 */
-	assert(!IS_GTM_IMAGE || ((*days == old_days) && (*seconds >= old_seconds)) || (*days > old_days)
-		|| (0 < old_isdst) && (0 == isdst));
+	/* adjust relative to UTC - have to round the other way if intime is less than or equal to the UTC offset */
+	tdays = (int4)(intime - mktime_ret);
+	tdays = (int4)(((intime + tdays - (((intime + tdays) > 0) ? 0 : (ONEDAY - 1))) / ONEDAY) + DAYS);
+	*days = (uint4)tdays;				/* use temp local in case the caller has overlapped arguments */
 	DEBUG_ONLY(old_seconds = (uint4)*seconds; old_days = *days; old_intime = intime; old_isdst = isdst;)
 	return;
 }

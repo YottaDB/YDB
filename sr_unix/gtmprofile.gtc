@@ -164,12 +164,12 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
 	    if [ -d $gtm_dist/plugin/o/utf8 ] ; then
 		gtmroutines=`$gtm_dist/mumps -run %XCMD 'set x=$ztrnlnm("gtm_dist")_"/plugin/o/utf8/*."_$ztrnlnm("tmp_gtm_shlib") for  set y=$zsearch(x) quit:""=y  write y," "'`"$gtm_dist/plugin/o/utf8($gtm_dist/plugin/r) $gtmroutines"
 	    fi
-            gtmroutines=`$gtm_dist/mumps -run %XCMD 'set x=$ztrnlnm("gtmdir")_"/"_$ztrnlnm("gtmver")_"/o/utf8/*."_$ztrnlnm("tmp_gtm_shlib") for  set y=$zsearch(x)  quit:""=y  write y," "'`"$gtmdir/$gtmver/o/utf8($gtmdir/$gtmver/r $gtmdir/r) $gtmroutines"
+            gtmroutines=`$gtm_dist/mumps -run %XCMD 'set x=$ztrnlnm("gtmdir")_"/"_$ztrnlnm("gtmver")_"/o/utf8/*."_$ztrnlnm("tmp_gtm_shlib") for  set y=$zsearch(x)  quit:""=y  write y," "'`"$gtmdir/$gtmver/o/utf8*($gtmdir/$gtmver/r $gtmdir/r) $gtmroutines"
 	else
 	    if [ -d $gtm_dist/plugin/o ] ; then
 		gtmroutines=`$gtm_dist/mumps -run %XCMD 'set x=$ztrnlnm("gtm_dist")_"/plugin/o/*."_$ztrnlnm("tmp_gtm_shlib") for  set y=$zsearch(x) quit:""=y  write y," "'`"$gtm_dist/plugin/o($gtm_dist/plugin/r) $gtmroutines"
 	    fi
-            gtmroutines=`$gtm_dist/mumps -run %XCMD 'set x=$ztrnlnm("gtmdir")_"/"_$ztrnlnm("gtmver")_"/o/*."_$ztrnlnm("tmp_gtm_shlib") for  set y=$zsearch(x)  quit:""=y  write y," "'`"$gtmdir/$gtmver/o($gtmdir/$gtmver/r $gtmdir/r) $gtmroutines"
+            gtmroutines=`$gtm_dist/mumps -run %XCMD 'set x=$ztrnlnm("gtmdir")_"/"_$ztrnlnm("gtmver")_"/o/*."_$ztrnlnm("tmp_gtm_shlib") for  set y=$zsearch(x)  quit:""=y  write y," "'`"$gtmdir/$gtmver/o*($gtmdir/$gtmver/r $gtmdir/r) $gtmroutines"
 	fi
     fi
     export gtmroutines
@@ -253,6 +253,12 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
     if [ -z "$gtm_retention" ] ; then
         gtm_retention=42 ; export gtm_retention
     fi
+    # Set & uncomment these as required
+    # Refer to the GT.M Administration & Operations Guide for complete list of GT.M environment variables
+    # export gtm_autorelink_keeprtn=1	# leave auto-relinked object code in the shared memory repositories
+    # export gtm_linktmpdir=    	# put relinkctl files in location other than $gtm_tmp
+    # export gtm_baktmpdir=		# location for MUPIP BACKUP temporary snapshot files
+    # export gtm_snaptmpdir=		# location for MUPIP INTEG temporary snapshot files
 
     # Set environment variables for plugins in $gtm_dist/plugin
     tmp_gtm_tmp=`uname -s`

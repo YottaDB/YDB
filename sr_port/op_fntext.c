@@ -20,14 +20,20 @@
 #include "op.h"
 #include "stringpool.h"
 #include "compiler.h"
+#include "min_max.h"
 #ifdef GTM_TRIGGER
 # include "gtm_trigger_trc.h"
+#else
+# define DBGIFTRIGR(x)
+# define DBGTRIGR(x)
+# define DBGTRIGR_ONLY(x)
 #endif
 #include "stack_frame.h"
 
 GBLREF	spdesc		stringpool;
 GBLREF	stack_frame	*frame_pointer;
-GBLREF	uint4		dollar_tlevel;
+GTMTRIG_ONLY(GBLREF	uint4		dollar_tlevel);
+DBGTRIGR_ONLY(GBLREF	unsigned int	t_tries;)
 
 error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLMODULE);
@@ -37,13 +43,14 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 /* int_exp contains label offset or line number to reference */
 /* ret is used to return the correct string to caller */
 {
-	char		*cp;
-	int		i, lbl, letter;
-	mval		*temp_rtn, temp_mval;
-	mstr		*sld;
-	uint4		stat;
-	rhdtyp		*rtn_vector;
-	boolean_t	is_trigger, current_rtn = FALSE;
+	char			*cp;
+	int			i, lbl, letter;
+	mval			*temp_rtn, temp_mval;
+	mstr			*sld;
+	uint4			stat;
+	rhdtyp			*rtn_vector;
+	boolean_t		current_rtn = FALSE;
+	GTMTRIG_ONLY(boolean_t	is_trigger;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -58,19 +65,20 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 	sld = (mstr *)NULL;
 	ESTABLISH(fntext_ch);	/* to swallow errors and permit an emptystring result */
 	GTMTRIG_ONLY(IS_TRIGGER_RTN(&temp_rtn->str, is_trigger));
+	DBGIFTRIGR((stderr, "op_fntext: entering $tlevel=%d $t_tries=%d\n", dollar_tlevel, t_tries));
 	if ((0 == int_exp) && ((0 == label->str.len) || (0 == *label->str.addr)))
 		stat = ZEROLINE;
 	else
 	{
 #ifdef GTM_TRIGGER
+		DBGIFTRIGR((stderr, "op_fntext: fetching $TEXT() source for a trigger\n"));
 		if (is_trigger)
 		{
-			DBGTRIGR((stderr, "op_fntext: fetching $TEXT() source for a trigger\n"));
 			assert(0 == TREF(op_fntext_tlevel));
 			TREF(op_fntext_tlevel) = 1 + dollar_tlevel;
 		}
 #endif
-		stat = get_src_line(temp_rtn, label, int_exp, &sld, VERIFY);
+		stat = get_src_line(temp_rtn, label, int_exp, &sld, &rtn_vector);
 		GTMTRIG_ONLY(TREF(op_fntext_tlevel) = 0);
 	}
 	if (0 == (stat & (CHECKSUMFAIL | NEGATIVELINE)))
@@ -128,5 +136,6 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 		ret->str.addr = (char *)stringpool.free;
 		stringpool.free += ret->str.len;
 	}
+	DBGIFTRIGR((stderr, "op_fntext: exiting\n\n"));
 	return;
 }

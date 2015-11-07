@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -391,7 +391,7 @@ typedef struct node_local_struct
 	boolean_t	snapshot_in_prog;	 /* Tells GT.M if any snapshots are in progress */
 	uint4		num_snapshots_in_effect; /* how many snapshots are currently in place for this region */
 	uint4		wbox_test_seq_num;	 /* used to coordinate with sequential testing steps */
-	NON_GTM64_ONLY(int4 filler_8byte_align;) /* To align the following member at an 8-byte boundry on 32-bit platforms */
+	NON_GTM64_ONLY(int4 filler_8byte_align;) /* To align the following member at an 8-byte boundary on 32-bit platforms */
 	UNIX_ONLY(pid_t kip_pid_array[MAX_KIP_PID_SLOTS];) /* Processes actively doing kill (0 denotes empty slots) */
 	gtm_uint64_t	sec_size;	/* Upon going to larger shared memory sizes, we realized that this does not	*/
 					/* need	to be in the file header but the node local since it can be calculated	*/
@@ -425,6 +425,8 @@ typedef struct node_local_struct
 	 */
 	boolean_t	fake_db_enospc;		/* used only by dbg versions to simulate ENOSPC scenarios in the database file */
 	boolean_t	fake_jnl_enospc;	/* used only by dbg versions to simulate ENOSPC scenarios in the journal  file */
+	boolean_t	doing_epoch;		/* set when performing an epoch */
+	NON_GTM64_ONLY(int4 filler_8byte_align1;) /* 8-byte align the stucture on 32-bit platforms; 64s do it implicitly */
 #	endif
 } node_local;
 

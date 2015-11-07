@@ -12,7 +12,6 @@
 #include "mdef.h"
 
 #include <sys/types.h>
-#include <sys/mman.h>
 #include <sys/shm.h>
 
 #include <errno.h>
@@ -36,9 +35,12 @@
 #include "gtmdbglvl.h"
 #include "cmd_qlf.h"	/* needed for CQ_UTF8 */
 #include "gtm_text_alloc.h"
-#include "zhist.h"
 #include "send_msg.h"
 #include "cacheflush.h"
+#include "rtnobj.h"
+#include "zbreak.h"
+#include "interlock.h"
+#include "util.h"
 
 /* Define linkage types */
 typedef enum
@@ -71,6 +73,7 @@ typedef enum
 	{											\
 		free(hdr);									\
 		hdr = NULL;									\
+		RELEASE_RECENT_ZHIST;								\
 		return IL_RECOMPILE;	/* Signal recompile */					\
 	}											\
 }
@@ -115,40 +118,63 @@ error_def(ERR_DLLCHSETUTF8);
 error_def(ERR_DLLVERSION);
 error_def(ERR_INVOBJFILE);
 error_def(ERR_LOADRUNNING);
-error_def(ERR_TEXT);
+error_def(ERR_RLNKRECLATCH);
 error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+error_def(ERR_ZLINKBYPASS);
 error_def(ERR_ZLINKFILE);
 
 STATICFNDCL void	res_free(res_list *root);
 STATICFNDCL boolean_t	addr_fix(int file, unsigned char *shdr, linktype linktyp, urx_rtnref *urx_lcl);
-STATICFNDCL void	zl_error(linktype linktyp, int4 file, int4 err, int4 len, char *addr, int4 len2, char *addr2);
-STATICFNDCL void	zl_error_hskpng(linktype linktyp, int4 file);
+STATICFNDCL void	zl_error(void *recent_zhist, linktype linktyp, int4 file, int4 err, int4 len, char *addr,
+				 int4 len2, char *addr2);
+STATICFNDCL void	zl_error_hskpng(linktype linktyp, int4 file, void *recent_zhist);
 
 /* incr_link - read and process a mumps object module.  Link said module to currently executing image */
-boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *fname)
+#ifdef AUTORELINK_SUPPORTED
+boolean_t incr_link(int file_desc, zro_ent *zro_entry, zro_hist *recent_zhist, uint4 fname_len, char *fname)
+#else
+boolean_t incr_link(int file_desc, zro_ent *zro_entry, uint4 fname_len, char *fname)
+#endif
 {
-	rhdtyp		*old_rhead;
-	int		sect_ro_rel_size, sect_rw_rel_size, name_buf_len, alloc_len, order, rc, save_errno;
-	uint4		lcl_compiler_qlf;
-	boolean_t	dynlits;
-	ssize_t	 	status, sect_rw_nonrel_size, sect_ro_rel_offset;
-	size_t		offset_correction;
-	lab_tabent	*lbt_ent, *lbt_bot, *lbt_top, *olbt_ent, *olbt_bot, *olbt_top;
-	mident_fixed	module_name;
-	pre_v5_mident	*pre_v5_routine_name;
-	urx_rtnref	urx_lcl_anchor;
-	unsigned char	*shdr, *rel_base, *newaddr;
-	mval		*curlit, *littop;
-	lab_tabent	*curlbe, *lbetop;
-	var_tabent	*curvar, *vartop;
-	char		name_buf[PATH_MAX + 1], marker[SIZEOF(JSB_MARKER) - 1], *rw_rel_start;
-	linktype	linktyp;
-	struct stat	obj_stat;
-	ZOS_ONLY(ESD	symbol;)
+	rhdtyp			*old_rhead;
+	rtn_tabent		*tabent_ptr;
+	int			sect_ro_rel_size, sect_rw_rel_size, name_buf_len, alloc_len, order;
+	uint4			lcl_compiler_qlf;
+	boolean_t		dynlits;
+	ssize_t	 		status, sect_rw_nonrel_size, sect_ro_rel_offset;
+	size_t			offset_correction, rtnname_off;
+	lab_tabent		*lbt_ent, *lbt_bot, *lbt_top, *olbt_ent, *olbt_bot, *olbt_top;
+	mident_fixed		module_name;
+	pre_v5_mident		*pre_v5_routine_name;
+	urx_rtnref		urx_lcl_anchor;
+	unsigned char		*shdr, *rel_base, *newaddr;
+	mstr			rtnname;
+	mval			*curlit, *littop;
+	lab_tabent		*curlbe, *lbetop;
+	var_tabent		*curvar, *vartop;
+	char			name_buf[PATH_MAX + 1], marker[SIZEOF(JSB_MARKER) - 1], *rw_rel_start;
+	char			rtnname_buf[MAX_MIDENT_LEN];
+	linktype		linktyp;
+	va_list			save_last_va_list_ptr;
+	boolean_t		util_copy_saved;
+	char			*save_util_outptr;
+	int4			save_error_condition;
+	ZOS_ONLY(ESD		symbol;)
 #	ifdef _AIX
-	FILHDR          hddr;
-	unsigned short  magic;
+	FILHDR          	hddr;
+	unsigned short  	magic;
 #	endif
+#	ifdef AUTORELINK_SUPPORTED
+	relinkrec_t		*rec;
+	zro_validation_entry	*zhent;
+	open_relinkctl_sgm	*linkctl;
+#	ifdef DEBUG
+	relinkrec_t		*relinkrec;
+	int			rtnlen;
+	char			save_char, *rtnname2;
+#	endif /* DEBUG */
+#	endif /* AUTORELINK_SUPPORTED */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -161,9 +187,9 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	ZOS_FREE_TEXT_SECTION;
 #	endif
 	urx_lcl_anchor.len = 0;
-	urx_lcl_anchor.addr = 0;
+	urx_lcl_anchor.addr = NULL;
 	urx_lcl_anchor.lab = 0;
-	urx_lcl_anchor.next = 0;
+	urx_lcl_anchor.next = NULL;
 	assert(NULL == hdr);
 	assert(NULL == sect_ro_rel);
 	assert(NULL == sect_rw_rel);
@@ -172,18 +198,53 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	shdr = NULL;
 	sect_ro_rel = sect_rw_rel = sect_rw_nonrel = NULL;
 	if (file_desc)
-	{	/* This is a disk resident object we mmap and share if autorelink is enabled in that directory, or instead we
+	{	/* This is a disk resident object we share if autorelink is enabled in that directory, or instead we
 		 * read/link into process private storage if autorelink is not enabled.
 		 */
 		if ((NULL == zro_entry) || (NULL == zro_entry->relinkctl_sgmaddr))
+		{
 			linktyp = LINK_PPRIVOBJ;
-		else
+			/* No history if process private link */
+			ARLINK_ONLY(assert(NULL == recent_zhist));
+		} else
+		{
 			linktyp =  LINK_SHROBJ;
+#			if defined(AUTORELINK_SUPPORTED) && defined(DEBUG)
+			/* Need a history if sharing the object */
+			assert(NULL != recent_zhist);
+			/* Later call to rtnobj_shm_malloc will use recent_zhist->end - 1 as the zro_validation_entry
+			 * to get at the linkctl and relinkrec so assert that it is indeed linkctl corresponding to zro_entry.
+			 */
+			assert((recent_zhist->end - 1)->relinkctl_bkptr
+			       == (open_relinkctl_sgm *)zro_entry->relinkctl_sgmaddr);
+			relinkrec = (recent_zhist->end - 1)->relinkrec;
+			rtnlen = STRLEN(relinkrec->rtnname_fixed.c);
+			assert(fname_len >= (STR_LIT_LEN(DOTOBJ) + rtnlen));
+			rtnname2 = fname + fname_len - 1;
+			while (rtnname2 >= fname)
+			{
+				if ('/' == *rtnname2)
+				{
+					rtnname2++;
+					break;
+				}
+				rtnname2--;
+			}
+			save_char = *rtnname2;
+			if ('_' == save_char)
+				*rtnname2 = '%'; /* Temporary adjustment for below assert to not fail */
+			assert(!memcmp(relinkrec->rtnname_fixed.c, rtnname2, rtnlen));
+			if ('_' == save_char)
+				*rtnname2 = save_char;	/* restore */
+#			endif	/* AUTORELINK_SUPPORTED && DEBUG */
+		}
 		NON_USHBIN_ONLY(assert(LINK_PPRIVOBJ == linktyp));	/* No autorelink in non-ushbin platform */
 	} else
-	{	/* With no file descriptor, this can only be linkage from a shared library */
+	{
+		/* With no file descriptor, this can only be linkage from a shared library and shared libraries have no history */
+		ARLINK_ONLY(assert(NULL == recent_zhist));
+		assert(NULL != zro_entry);
 		linktyp = LINK_SHRLIB;
-		NON_USHBIN_ONLY(assert(FALSE /* Shared libraries not supported on this platform */));
 	}
 	/* Get the routine header where we can make use of it */
 	hdr = (rhdtyp *)malloc(SIZEOF(rhdtyp));
@@ -200,35 +261,9 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			memcpy(hdr, shdr, SIZEOF(rhdtyp));
 			hdr->shlib_handle = zro_entry->shrlib;
 			break;
-		case LINK_SHROBJ:
-			FSTAT_FILE(file_desc, &obj_stat, rc);
-			if (-1 == rc)
-			{	/* Need to not use zl_error() here since need compound error to put out errno */
-				save_errno = errno;
-				ZOS_FREE_TEXT_SECTION;
-				zl_error_hskpng(linktyp, file_desc);
-				rts_error_csa(NULL, VARLSTCNT(5) ERR_ZLINKFILE, 2, fname_len, fname, save_errno);
-			}
-			/* Share the object file (in its entirety) via mmap() */
-			shdr = (unsigned char *)mmap(NULL, obj_stat.st_size, PROT_EXEC|PROT_READ, MAP_SHARED, file_desc, 0)
-				+ NATIVE_HDR_LEN;		/* shdr->routinehdr (past native object header) */
-			if (MAP_FAILED == (void *)shdr)
-			{	/* If mmap() fails, send error to both process and to syslog. Note we do not use zlerror()
-				 * here since need to send a compound message about the failure.
-				 */
-				save_errno = errno;
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_ZLINKFILE, 2, fname_len, fname, ERR_SYSCALL,
-					     5, LEN_AND_LIT("mmap"), CALLFROM, save_errno);
-				ZOS_FREE_TEXT_SECTION;
-				zl_error_hskpng(linktyp, file_desc);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_ZLINKFILE, 2, fname_len, fname, ERR_SYSCALL,
-					      5, LEN_AND_LIT("mmap"), CALLFROM, save_errno);
-			}
-			memcpy(hdr, shdr, SIZEOF(rhdtyp));
-			hdr->shared_len = obj_stat.st_size;	/* Record length we shared so we can unmap it when done */
-			break;
 #		endif
 		case LINK_PPRIVOBJ:
+		case LINK_SHROBJ:
 			/* Seek past native object headers to get GT.M object's routine header */
 			/* To check if it is not an xcoff64 bit .o */
 #			ifdef _AIX
@@ -239,11 +274,11 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 				if (magic != U64_TOCMAGIC)
 				{
 					ZOS_FREE_TEXT_SECTION;
-					zl_error_hskpng(linktyp, file_desc);
+					zl_error_hskpng(linktyp, file_desc, RECENT_ZHIST);
 					return IL_RECOMPILE;
 				}
 			} else
-				zl_error(linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+				zl_error(RECENT_ZHIST, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
 #			endif
 			/* In the GOFF .o on zOS, if the symbol name(name of the module) exceeds ESD_NAME_MAX_LENGTH (8),
 			 * then 2 extra extended records are emitted, which causes the start of text section to vary
@@ -252,20 +287,20 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			DOREADRC(file_desc, &symbol, SIZEOF(symbol), status);	/* This is HDR record */
 			if (0 == status)
 			{
-				DOREADRC(file_desc, &symbol, SIZEOF(symbol), status)	/* First symbol (ESD record) */
-					if (0 == status)
+				DOREADRC(file_desc, &symbol, SIZEOF(symbol), status);	/* First symbol (ESD record) */
+				if (0 == status)
+				{
+					if (0x01 == symbol.ptv[1])	/* Means the extended records are there */
+						extended_symbols_present = TRUE;
+					else
 					{
-						if (0x01 == symbol.ptv[1])	/* Means the extended records are there */
-							extended_symbols_present = TRUE;
-						else
-						{
-							assert(0x0 == symbol.ptv[1]);
-							extended_symbols_present = FALSE;
-						}
+						assert(0x0 == symbol.ptv[1]);
+						extended_symbols_present = FALSE;
 					}
+				}
 			}
 			if (0 != status)
-				zl_error(linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+				zl_error(RECENT_ZHIST, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
 #			endif
 			if (-1 != (status = (ssize_t)lseek(file_desc, NATIVE_HDR_LEN, SEEK_SET)))
 			{
@@ -276,7 +311,7 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			if (0 != status)
 			{
 				CHECK_NONUSB_RECOMPILE_RETURN;
-				zl_error(linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+				zl_error(RECENT_ZHIST, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
 			}
 			break;
 		default:
@@ -290,7 +325,7 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		{
 			CHECK_NONUSB_RECOMPILE_RETURN;
 		}
-		zl_error(linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+		zl_error(RECENT_ZHIST, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
 	}
 	/* Binary version check. If no match, shlib gets error, otherwise signal recompile */
 	if (MAGIC_COOKIE != hdr->objlabel)
@@ -305,7 +340,7 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 				pre_v5_routine_name = (pre_v5_mident *)((char*)hdr + PRE_V5_RTNHDR_RTNOFF);
 				for (len = 0; len < SIZEOF(pre_v5_mident) && pre_v5_routine_name->c[len]; len++)
 					;
-				zl_error(linktyp, 0, ERR_DLLVERSION, len, &(pre_v5_routine_name->c[0]),
+				zl_error(RECENT_ZHIST, linktyp, 0, ERR_DLLVERSION, len, &(pre_v5_routine_name->c[0]),
 					 zro_entry->str.len, zro_entry->str.addr);
 			}
 #			if defined(__osf__) || defined(__hppa)
@@ -315,7 +350,7 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 				 */
 				v50v51_mstr	*mstr5051;	/* declare here so don't have to conditionally add above */
 				mstr5051 = (v50v51_mstr *)((char *)hdr + V50V51_RTNHDR_RTNMSTR_OFFSET);
-				zl_error(linktyp, 0, ERR_DLLVERSION, mstr5051->len,
+				zl_error(RECENT_ZHIST, linktyp, 0, ERR_DLLVERSION, mstr5051->len,
 					 ((char *)shdr + *(int4 *)((char *)hdr + V50V51_FTNHDR_LITBASE_OFFSET)
 					  + (int4)mstr5051->addr), zro_entry->str.len, zro_entry->str.addr);
 			}
@@ -324,13 +359,13 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			{	/* Note: routine_name field has not been relocated yet, so compute its absolute
 				 * address in the shared library and use it
 				 */
-				zl_error(linktyp, 0, ERR_DLLVERSION, hdr->routine_name.len, (char *)shdr +
-					 (UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
+				zl_error(RECENT_ZHIST, linktyp, 0, ERR_DLLVERSION, hdr->routine_name.len,
+					(char *)shdr + (UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
 					 zro_entry->str.len, zro_entry->str.addr);
 			}
 		}
 		ZOS_FREE_TEXT_SECTION;
-		zl_error_hskpng(linktyp, file_desc);
+		zl_error_hskpng(linktyp, file_desc, RECENT_ZHIST);
 		return IL_RECOMPILE;
 	}
 	if (((hdr->compiler_qlf & CQ_UTF8) && !gtm_utf8_mode) || (!(hdr->compiler_qlf & CQ_UTF8) && gtm_utf8_mode))
@@ -342,17 +377,17 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			 */
 			if ((lcl_compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
 			{
-				zl_error(linktyp, 0, ERR_DLLCHSETUTF8, (int)hdr->routine_name.len, (char *)shdr +
-					 (UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
+				zl_error(NULL, linktyp, 0, ERR_DLLCHSETUTF8, (int)hdr->routine_name.len,
+					(char *)shdr + (UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
 					 (int)zro_entry->str.len, zro_entry->str.addr);
 			} else
 			{
-				zl_error(linktyp, 0, ERR_DLLCHSETM, (int)hdr->routine_name.len, (char *)shdr +
-					 (UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
+				zl_error(NULL, linktyp, 0, ERR_DLLCHSETM, (int)hdr->routine_name.len,
+					(char *)shdr + (UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
 					 (int)zro_entry->str.len, zro_entry->str.addr);
 			}
 		}
-		zl_error_hskpng(linktyp, file_desc);
+		zl_error_hskpng(linktyp, file_desc, RECENT_ZHIST);
 		if ((lcl_compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVOBJFILE, 2, fname_len, fname, ERR_TEXT, 2,
 				LEN_AND_LIT("Object compiled with CHSET=UTF-8 which is different from $ZCHSET"));
@@ -360,6 +395,117 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVOBJFILE, 2, fname_len, fname, ERR_TEXT, 2,
 				LEN_AND_LIT("Object compiled with CHSET=M which is different from $ZCHSET"));
 	}
+	/* We need to check if this is a relink of an already linked routine. To do that, we need to be able to fetch
+	 * the routine name from the object file in question in order to look the routine up.
+	 */
+	switch(linktyp)
+	{
+		ARLINK_ONLY(case LINK_SHROBJ:);
+		case LINK_PPRIVOBJ:
+			rtnname = ((rhdtyp *)hdr)->routine_name;
+			rtnname_off = (size_t)hdr->literal_text_adr + (size_t)rtnname.addr;	/* Offset into object of rtnname */
+			ZOS_ONLY(assertpro(FALSE /* Read file pointer being reset - recode for ZOS */));
+			/* Read the routine name from the object file */
+			if (-1 != (status = (ssize_t)lseek(file_desc, rtnname_off + NATIVE_HDR_LEN, SEEK_SET)))
+			{
+				DOREADRC_OBJFILE(file_desc, rtnname_buf, rtnname.len, status);
+			} else
+				status = errno;
+			if (0 != status)
+				zl_error(NULL, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+			rtnname.addr = rtnname_buf;
+			/* Reset read file-pointer for object file back to what it was */
+			status = (ssize_t)lseek(file_desc, NATIVE_HDR_LEN + SIZEOF(rhdtyp), SEEK_SET);
+			if (-1 == status)
+				zl_error(NULL, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+			break;
+		case LINK_SHRLIB:
+			rtnname = ((rhdtyp *)shdr)->routine_name;
+			/* Routine name not yet relocated so effectively do so */
+			rtnname.addr = (char *)shdr + (size_t)((rhdtyp *)shdr)->literal_text_adr + (size_t)rtnname.addr;
+			break;
+		default:
+			assert(FALSE);
+ 	}
+	/* Now check if we know about this routine and if so, if the (new) object hash is the same as the one we currently
+	 * have linked. Note both new and old flavors of the routine must either both not be autorelink-enabled or must
+	 * both be autorelink-enabled and if autorelink-enabled, must be loaded from the same directory and thus into the same
+	 * set of shared memory structures to be able to bypass the link. This might could be eased in the future for certain
+	 * special cases.
+	 */
+	if (find_rtn_tabent(&tabent_ptr, &rtnname))
+	{
+		old_rhead = (rhdtyp *)tabent_ptr->rt_adr;
+		assert(NULL != old_rhead);
+#		ifdef AUTORELINK_SUPPORTED
+		zhent = (LINK_SHROBJ == linktyp) ? recent_zhist->end - 1 : NULL;
+		if ((old_rhead->objhash == hdr->objhash)
+		    && (((NULL == zhent) && (NULL == old_rhead->relinkctl_bkptr))			/* Both non-relink */
+			|| (NULL != zhent) && (zhent->relinkctl_bkptr == old_rhead->relinkctl_bkptr)))  /* Both same relink */
+#		else
+		if (old_rhead->objhash == ((rhdtyp *)hdr)->objhash)
+#		endif
+		{	/* This is the same routine - abort re-link but if autorelink-enabled, use the new history.
+			 * Note even a psueo-relink should cancel all the breakpoints in the module. Note we don't address
+			 * issues with whether this would have been a recursive relink or not since when we don't actually do
+			 * the relink, there's no way to remove breakpoints when the last use of this routine leaves the stack
+			 * so eliminate the breakpoints now since newly linked routines are anyway not expected to have
+			 * breakpoints.
+			 */
+			zr_remove_zbrks(old_rhead, NOBREAKMSG);
+			/* Info level message that link was bypassed. Since this could pollute the error buffer, save and
+			 * restore it across the info message we put out (it is either displayed or it isn't - no need to cache it.
+			 */
+#			ifdef ZLINK_BYPASS /* #ifdef'd out for now due to issues with ERRWETRAP */
+			SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
+			save_error_condition = error_condition;
+			error_condition = 0;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKBYPASS, 2, fname_len, fname); /* Info msg returns */
+			error_condition = save_error_condition;
+			RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
+#			endif
+			/* Note do these cleanup  release/reset after the error message so these values still around if the error
+			 * causes an issue in debugging.
+			 */
+			free(hdr);		/* Don't need this (new) copy of routine header */
+			hdr = NULL;
+#			ifdef AUTORELINK_SUPPORTED
+			if (NULL != old_rhead->zhist)
+				free(old_rhead->zhist);		/* Free up previously auto-relinked structures */
+			/* Save new history if supplied or NULL */
+			old_rhead->zhist = recent_zhist;
+#			endif
+			return IL_DONE;		/* Pretend we did the link (which, effectively, we already have) */
+		}
+	}
+#	ifdef AUTORELINK_SUPPORTED
+	/* For shared object, time to pull it into shared memory */
+	if (LINK_SHROBJ == linktyp)
+	{
+		/* Currently, rtnobj_hdr_t->objLen is a 4-byte field so we cannot support object file sizes > 4Gb for now */
+		assert(4 == SIZEOF(hdr->object_len));	/* i.e. object file size is guaranteed to be < 4Gb */
+		assert(4 == SIZEOF(((rtnobj_hdr_t *)NULL)->objLen));	/* i.e. object file size is guaranteed to be < 4Gb */
+		/* Allocate buffer for routine object in shared memory. If one already exists, use it */
+		if ((size_t)MAXUINT4 <= ((size_t)hdr->object_len + OFFSETOF(rtnobj_hdr_t, userStorage)))
+		{	/* Currently, rtnobj_hdr_t->objLen is a 4-byte field so we cannot support object file
+			 * sizes > 4Gb for now.
+			 */
+			ZOS_FREE_TEXT_SECTION;
+			zl_error_hskpng(linktyp, file_desc, RECENT_ZHIST);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, fname_len, fname, ERR_TEXT, 2,
+				LEN_AND_LIT("Object file size > 4Gb cannot be auto-relinked"));
+		}
+		shdr = rtnobj_shm_malloc(recent_zhist, file_desc, hdr->object_len, hdr->objhash);
+		if (NULL == shdr)
+		{	/* Most likely lseek or read of object file into shared memory failed. Possible for example
+			 * if the object file is truncated. Issue error.
+			 */
+			zl_error(RECENT_ZHIST, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+		}
+		/* We need this link - continue setup */
+		assert(!memcmp(hdr, shdr, SIZEOF(rhdtyp))); /* we already read rtnhdr from disk, assert that is same as in shm */
+	}
+#	endif
 	/* Read in and/or relocate the pointers to the various sections. To understand the size calculations
 	 * being done note that the contents of the various xxx_adr pointers in the routine header are
 	 * initially the offsets from the start of the object. This is so we can address the various sections
@@ -372,6 +518,12 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	switch(linktyp)
 	{
 		case LINK_SHROBJ:
+			hdr->shared_object = TRUE;		/* Indicate this is linked as a shared object */
+#			ifdef AUTORELINK_SUPPORTED
+			zhent = recent_zhist->end - 1;
+			hdr->relinkctl_bkptr = zhent->relinkctl_bkptr;
+#			endif
+			/* Note - fall through */
 		case LINK_SHRLIB:
 			rel_base = shdr;
 			break;
@@ -382,7 +534,7 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			assert((INTPTR_T)sect_ro_rel == ((INTPTR_T)sect_ro_rel & ~(LINKAGE_PSECT_BOUNDARY - 1)));
 			DOREADRC_OBJFILE(file_desc, sect_ro_rel, sect_ro_rel_size, status);
 			if (0 != status)
-				zl_error(linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+				zl_error(NULL, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
 			/* The offset correction is the amount that needs to be applied to a given storage area that
 			 * is no longer contiguous with the routine header. In this case, the code and other sections
 			 * are no longer contiguous with the routine header but the initial offsets in the routine
@@ -428,6 +580,7 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	}
 	RELOCATE(hdr->lnrtab_adr, lnr_tabent *, rel_base);
 	RELOCATE(hdr->literal_text_adr, unsigned char *, rel_base);
+	RELOCATE(hdr->linkage_names, mstr *, rel_base);
 	if (dynlits)
 		RELOCATE(hdr->literal_adr, mval *, rel_base);
 	/* Read-write releasable section */
@@ -442,7 +595,7 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		case LINK_PPRIVOBJ:
 			DOREADRC_OBJFILE(file_desc, sect_rw_rel, sect_rw_rel_size, status);
 			if (0 != status)
-				zl_error(linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+				zl_error(NULL, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
 			break;
 		default:
 			assert(FALSE /* Invalid link type */);
@@ -512,7 +665,7 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		case LINK_PPRIVOBJ:
 			DOREADRC_OBJFILE(file_desc, sect_rw_nonrel, sect_rw_nonrel_size, status);
 			if (0 != status)
-				zl_error(linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+				zl_error(NULL, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
 			break;
 		default:
 			assert(FALSE /* Invalid link type */);
@@ -525,7 +678,9 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		RELOCATE(curlbe->lnr_adr, lnr_tabent *, hdr->lnrtab_adr);
 	}
 	/* Remaining initialization */
-	hdr->zhist = TREF(recent_zhist);	/* TODO: Document what this is or change to different mechanism */
+	ARLINK_ONLY(assert(((NULL == recent_zhist) && (LINK_SHROBJ != linktyp))
+			   || ((NULL != recent_zhist) && (LINK_SHROBJ == linktyp))));
+	ARLINK_ONLY(hdr->zhist = recent_zhist);
 	hdr->current_rhead_adr = hdr;
 	assert(hdr->routine_name.len < SIZEOF(zlink_mname.c));
 	memcpy(&zlink_mname.c[0], hdr->routine_name.addr, hdr->routine_name.len);
@@ -537,7 +692,9 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	if (!addr_fix(file_desc, shdr, linktyp, &urx_lcl_anchor))
 	{
 		urx_free(&urx_lcl_anchor);
-		zl_error(linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+		/* Decrement "refcnt" bump done by "rtnobj_shm_malloc" above */
+		ARLINK_ONLY(if (LINK_SHROBJ == linktyp) rtnobj_shm_free(hdr, LATCH_GRABBED_FALSE));
+		zl_error(RECENT_ZHIST, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
 	}
 	/* Register new routine in routine name vector displacing old one and performing any necessary cleanup */
 	if (!zlput_rname(hdr))
@@ -545,8 +702,14 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		urx_free(&urx_lcl_anchor);
 		/* Copy routine name to local variable because zl_error frees it. */
 		memcpy(&module_name.c[0], hdr->routine_name.addr, hdr->routine_name.len);
-		zl_error(linktyp, file_desc, ERR_LOADRUNNING, (int)hdr->routine_name.len, &module_name.c[0], 0, NULL);
+		/* Decrement "refcnt" bump done by "rtnobj_shm_malloc" above */
+		ARLINK_ONLY(if (LINK_SHROBJ == linktyp) rtnobj_shm_free(hdr, LATCH_GRABBED_FALSE));
+		zl_error(RECENT_ZHIST, linktyp, file_desc, ERR_LOADRUNNING, (int)hdr->routine_name.len, &module_name.c[0],
+			 0, NULL);
 	}
+	/* Now that new routine is registered, no longer need to do rtnobj_shm_free.
+	 * That will be done by relinkctl_rundown as part of scanning the rtn_names[] array.
+	 */
 	/* Fix up of routine headers for old versions of routine so they point to the newest version */
 	old_rhead = hdr->old_rhead_adr;
 	lbt_bot = hdr->labtab_adr;
@@ -578,6 +741,7 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		old_rhead->routine_name = hdr->routine_name;
 		old_rhead->vartab_len = hdr->vartab_len;
 		old_rhead->vartab_adr = hdr->vartab_adr;
+		old_rhead->shared_ptext_adr = hdr->shared_ptext_adr;
 		old_rhead->ptext_adr = hdr->ptext_adr;
 		old_rhead->ptext_end_adr = hdr->ptext_end_adr;
 		old_rhead->lnrtab_adr = hdr->lnrtab_adr;
@@ -589,7 +753,7 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		old_rhead->literal_adr = hdr->literal_adr;
 		old_rhead->literal_text_adr = hdr->literal_text_adr;
 		old_rhead->literal_len = hdr->literal_len;
-		old_rhead->zhist = hdr->zhist;
+		ARLINK_ONLY(old_rhead->zhist = hdr->zhist);
 		old_rhead = (rhdtyp *)old_rhead->old_rhead_adr;
 	}
 	/* Add local unresolves to global chain freeing elements that already existed in the global chain */
@@ -598,6 +762,7 @@ boolean_t incr_link (int file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	urx_resolve(hdr, (lab_tabent *)lbt_bot, (lab_tabent *)lbt_top);
 	if (LINK_PPRIVOBJ == linktyp)
 		cacheflush(hdr->ptext_adr, (hdr->ptext_end_adr - hdr->ptext_adr), BCACHE);
+	/* zOS cleanups */
 	ZOS_FREE_TEXT_SECTION;
 	/* Don't leave global pointers around to active blocks */
 	hdr = NULL;
@@ -891,12 +1056,12 @@ STATICFNDEF void res_free(res_list *root)
  *   len/addr   - length/address of 1st substitution string.
  *   len2/addr2 - length/address of 2nd substitution string.
  */
-STATICFNDEF void zl_error(linktype linktyp, int4 file, int4 err, int4 len, char *addr, int4 len2, char *addr2)
+STATICFNDEF void zl_error(void *recent_zhist, linktype linktyp, int4 file, int4 err, int4 len, char *addr, int4 len2, char *addr2)
 {
 	int rc;
 
 	ZOS_FREE_TEXT_SECTION;
-	zl_error_hskpng(linktyp, file);
+	zl_error_hskpng(linktyp, file, recent_zhist);
 	if (LINK_PPRIVOBJ == linktyp)
 	{	/* Only private process links have this area to free */
 		CLOSEFILE_RESET(file, rc);	/* resets "file" to FD_INVALID */
@@ -914,7 +1079,7 @@ STATICFNDEF void zl_error(linktype linktyp, int4 file, int4 err, int4 len, char 
  *   linktyp    - type of linkage performed (enum linktype).
  *   file       - file descriptor of open file.
  */
-STATICFNDEF void zl_error_hskpng(linktype linktyp, int4 file)
+STATICFNDEF void zl_error_hskpng(linktype linktyp, int4 file, void *recent_zhist)
 {
 	if (NULL != hdr)
 	{
@@ -936,4 +1101,5 @@ STATICFNDEF void zl_error_hskpng(linktype linktyp, int4 file)
 		GTM_TEXT_FREE(sect_ro_rel);
 		sect_ro_rel = NULL;
 	}
+	RELEASE_RECENT_ZHIST;
 }

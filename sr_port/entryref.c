@@ -238,7 +238,7 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 	return rettrip;
 }
 
-#ifdef USHBIN_SUPPORTED
+#ifdef AUTORELINK_SUPPORTED
 /* Routine used in a USHBIN build (UNIX Shared BInary) to generate the triples to reference (call, extrinsic or goto)
  * an external routine. This version calls additional opcodes to dynamically autorelink routines if the routine has been
  * changed since it was last linked if autorelinking is enabled. This requires that all such M-calls with a routine specified

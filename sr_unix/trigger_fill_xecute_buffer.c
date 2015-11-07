@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
 #include "format_targ_key.h"		/* for COPY_SUBS_TO_GVCURRKEY */
-#include "targ_alloc.h"			/* for SET_GVTARGET_TO_HASHT_GBL & SWITCH_TO_DEFAULT_REGION */
+#include "targ_alloc.h"			/* for SET_GVTARGET_TO_HASHT_GBL */
 #include "filestruct.h"			/* for INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED (FILE_INFO) */
 #include "mvalconv.h"
 #include "gdscc.h"			/* needed for tp.h */
@@ -42,6 +42,7 @@
 #include "gtmimagename.h"
 #include "trigger_fill_xecute_buffer.h"
 #include "trigger_gbl_fill_xecute_buffer.h"
+#include "gtm_trigger_trc.h"
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -54,8 +55,6 @@ GBLREF	int			tprestart_state;
 GBLREF	int4			tstart_trigger_depth;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	tp_frame		*tp_pointer;
-
-LITREF	mval			literal_hasht;
 
 error_def(ERR_TRIGNAMBAD);
 error_def(ERR_TPRETRY);
@@ -112,10 +111,12 @@ int trigger_fill_xecute_buffer(gv_trigger_t *trigdsc)
 		|| (tp_pointer->implicit_tstart && tp_pointer->implicit_trigger
 		&& (tstart_trigger_depth != gtm_trigger_depth)))	/* Case 3 */
 	{	/* Test for Case 3/4 where we get to do very little: */
+		DBGTRIGR((stderr, "trigger_fill_xecute_buffer: Case 2/3\n"));
 		assert((!tp_pointer->implicit_trigger) || (0 < gtm_trigger_depth));
 		trigger_fill_xecute_buffer_read_trigger_source(trigdsc);
 	} else
 	{	/* Test for Case 1 where we only need a condition handler */
+		DBGTRIGR((stderr, "trigger_fill_xecute_buffer: Case 1\n"));
 		assert(tp_pointer->implicit_tstart && tp_pointer->implicit_trigger);
 		assert(tstart_trigger_depth == gtm_trigger_depth);
 		ESTABLISH_RET(trigger_fill_xecute_buffer_ch, SIGNAL);
@@ -151,6 +152,8 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 	gvt_trigger = trigdsc->gvt_trigger;			/* We now know our base block now */
 	index = trigdsc - gvt_trigger->gv_trig_array + 1;	/* We now know our trigger index value */
 	i2mval(&trig_index, index);
+	DBGTRIGR((stderr, "trigger_fill_xecute_buffer_read_trigger_source: entry $tlevel:%d\tindex:%d of %d\n",
+				dollar_tlevel, index, gvt_trigger->num_gv_triggers));
 	gvt = gv_target = gvt_trigger->gv_target;		/* gv_target contains global name */
 	gbl.addr = gvt->gvname.var_name.addr;
 	gbl.len = gvt->gvname.var_name.len;
@@ -175,6 +178,7 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 		 * updater on the secondary so we dont expect it to see any concurrent trigger changes
 		 * Assert accordingly.
 		 */
+		DBGTRIGR((stderr, "trigger_fill_xecute_buffer_read_trigger_source: stale trigger view\n"));
 		assert(CDB_STAGNATE > t_tries);
 		assert(IS_GTM_IMAGE);
 		t_retry(cdb_sc_triggermod);

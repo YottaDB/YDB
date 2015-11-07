@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,21 +35,24 @@ typedef struct
 #ifdef GTM_TRIGGER
 /* Macro to determine if a routine name is a trigger name - the answer is yes if
  * the routine name contains a "#" which all triggers do. Args are mstr addr and boolean_t.
+ * Note: If # occurs after 31st byte, then it is treated as a non-trigger routine due to truncation.
  */
-# define IS_TRIGGER_RTN(RTNNAME, RSLT) 												\
-{ 																\
-	unsigned char	*cptr, *cptr_top;											\
-																\
-	if (0 < (RTNNAME)->len)													\
-	{															\
-		for (cptr = (unsigned char *)(RTNNAME)->addr, cptr_top = cptr + (RTNNAME)->len - 1; cptr <= cptr_top; --cptr_top) \
-		{														\
-			if ('#' == *cptr_top)											\
-				break;												\
-		}														\
-		RSLT = !(cptr > cptr_top);											\
-	} else															\
-		RSLT = FALSE;													\
+# define IS_TRIGGER_RTN(RTNNAME, RSLT) 										\
+{ 														\
+	char	*cptr, *cptr_top;										\
+	int	rtnlen;												\
+														\
+	rtnlen = MIN((RTNNAME)->len, MAX_MIDENT_LEN);								\
+	if (0 < rtnlen)												\
+	{													\
+		for (cptr = (RTNNAME)->addr, cptr_top = cptr + rtnlen - 1; cptr <= cptr_top; --cptr_top) 	\
+		{												\
+			if ('#' == *cptr_top)									\
+				break;										\
+		}												\
+		RSLT = !(cptr > cptr_top);									\
+	} else													\
+		RSLT = FALSE;											\
 }
 #else
 # define IS_TRIGGER_RTN(RTNNAME, RSLT) RSLT = FALSE

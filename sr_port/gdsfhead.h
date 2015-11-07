@@ -221,8 +221,8 @@ typedef cache_rec	**cache_rec_ptr_ptr_t;
 typedef cache_state_rec	*cache_state_rec_ptr_t;
 typedef cache_que_heads	*cache_que_heads_ptr_t;
 
-void verify_queue_lock(que_head_ptr_t qhdr);
-void verify_queue(que_head_ptr_t qhdr);
+gtm_uint64_t verify_queue_lock(que_head_ptr_t qhdr);
+gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 
 #ifdef DB64
 # ifdef __osf__
@@ -231,8 +231,8 @@ void verify_queue(que_head_ptr_t qhdr);
 #endif
 
 #ifdef DEBUG_QUEUE
-#define VERIFY_QUEUE(base)      	verify_queue(base)
-#define VERIFY_QUEUE_LOCK(base,latch)	verify_queue_lock(base,latch)
+#define VERIFY_QUEUE(base)		(void)verify_queue(base)
+#define VERIFY_QUEUE_LOCK(base,latch)	(void)verify_queue_lock(base,latch)
 #else
 #define VERIFY_QUEUE(base)
 #define VERIFY_QUEUE_LOCK(base,latch)
@@ -834,6 +834,8 @@ void verify_queue(que_head_ptr_t qhdr);
 				assert(reg->open);						\
 				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;			\
 				cs_data = cs_addrs->hdr;					\
+				assert((&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs)		\
+					&& cs_addrs->hdr == cs_data);				\
 				break;								\
 			case dba_usr:								\
 			case dba_cm:								\
@@ -845,7 +847,6 @@ void verify_queue(que_head_ptr_t qhdr);
 				break;								\
 		}										\
 	}											\
-	assert(&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs && cs_addrs->hdr == cs_data);	\
 }
 
 #define PUSH_GV_CUR_REGION(reg, sav_reg, sav_cs_addrs, sav_cs_data)				\
@@ -1499,17 +1500,41 @@ n_db_csh_acct_rec_types
 #undef TAB_DB_CSH_ACCT_REC
 
 #include "gvstats_rec.h"
+#ifdef UNIX
+#include "probecrit_rec.h"
+#endif
 
 #define	GVSTATS_SET_CSA_STATISTIC(csa, counter, value)		\
 {								\
 	csa->gvstats_rec.counter = value;			\
 }
 
-#define	INCR_GVSTATS_COUNTER(csa, cnl, counter, increment)	\
-{								\
-	csa->gvstats_rec.counter += increment;			\
-	cnl->gvstats_rec.counter += increment;			\
+#define	INCR_GVSTATS_COUNTER(csa, cnl, counter, increment)			\
+{										\
+	csa->gvstats_rec.counter += increment;	/* process private stats */	\
+	cnl->gvstats_rec.counter += increment;	/* database stats */		\
 }
+
+/* clear everything from the end of the encryption_hash up to the ntrpt_recov_resync_strm_seqno array, which includes:
+ * all bg_trc_rec_tn, all bg_trc_rec_cntr, all db_csh_acct_rec, all gvstats as well as any intervening filler;
+ * also clear tp_cdb_sc_blkmod
+ * This means we MUST NOT insert anything in the file header between the encryption_hash and intrpt_recov_resync_strm_seqno
+ * nor move either of those end points without appropriately adjusting this macro
+ */
+#define	CLRGVSTATS(CSA)									\
+{											\
+	char			*CHPTR;							\
+	int			CLRLEN;							\
+	sgmnt_data_ptr_t	CSD;							\
+											\
+	CSD = CSA->hdr;									\
+	CHPTR = (char *)&CSD->encryption_hash + GTMCRYPT_RESERVED_HASH_LEN;		\
+	CLRLEN = (char *)&CSD->intrpt_recov_resync_strm_seqno - CHPTR;			\
+	memset(CHPTR, 0, CLRLEN);							\
+	gvstats_rec_csd2cnl(CSA);	/* we update gvstats in cnl */			\
+	memset((char *)&CSD->tp_cdb_sc_blkmod, 0, SIZEOF(CSD->tp_cdb_sc_blkmod));	\
+}
+
 
 #if defined(DEBUG) || defined(DEBUG_DB_CSH_COUNTER)
 #	define	INCR_DB_CSH_COUNTER(csa, counter, increment)				\
@@ -1547,6 +1572,7 @@ enum tp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] */
 #define DONOTCOMMIT_REALLOCATE_BITMAP_BMLMOD		(1 << 8) /* Restartable situation encountered in reallocate_bitmap */
 #define DONOTCOMMIT_T_WRITE_CSE_DONE			(1 << 9) /* Restartable situation encountered in t_write */
 #define DONOTCOMMIT_T_WRITE_CSE_MODE			(1 << 10) /* Restartable situation encountered in t_write */
+#define DONOTCOMMIT_TRIGGER_SELECT_XECUTE		(1 << 11) /* Restartable situation encountered in trigger_select */
 
 #define TAB_BG_TRC_REC(A,B)	B,
 enum bg_trc_rec_type
@@ -1818,7 +1844,12 @@ typedef struct sgmnt_data_struct
 	char		machine_name[MAX_MCNAMELEN];
 	char            encryption_hash[GTMCRYPT_RESERVED_HASH_LEN];
 	/* char filler_2k[256] was here before adding the encryption_hash. Since the GTMCRYPT_RESERVED_HASH_LEN
-	 * consumes 256 bytes, filler_2k has been removed. */
+	 * consumes 256 bytes, filler_2k has been removed.
+	 */
+	/* The CLRGVSTATS macro wipes out everything from here through the GVSTATS fields up to intrpt_recov_resync_strm_seqno
+	 * starting from the end of the space reserved for the encryption_hash above - DO NOT insert anthing in this range or move
+	 * those two end points without appropriately adjusting that macro
+	 */
 	/************* BG_TRC_REC RELATED FIELDS ***********/
 #	define TAB_BG_TRC_REC(A,B)	bg_trc_rec_tn	B##_tn;
 #	include "tab_bg_trc_rec.h"
@@ -1867,10 +1898,12 @@ typedef struct sgmnt_data_struct
 								 * See comment in "mur_get_max_strm_reg_seqno" function for
 								 * purpose of this field. Must also be 8-byte aligned.
 								 */
+	/************* MISCELLANEOUS FIELDS ****************/
 	boolean_t	freeze_on_fail;		/* Freeze instance if failure of this database observed */
 	boolean_t	span_node_absent;	/* Database does not contain the spanning node */
 	boolean_t	maxkeysz_assured;	/* All the keys in the database are less than MAX_KEY_SIZE */
-	char		filler_7k[724];
+	boolean_t	hasht_upgrade_needed;	/* ^#t global needs to be upgraded from V62000 to post-V62000 format */
+	char		filler_7k[720];
 	char		filler_8k[1024];
 	/********************************************************/
 	/* Master bitmap immediately follows. Tells whether the local bitmaps have any free blocks or not. */
@@ -1923,6 +1956,8 @@ typedef struct
 #define NEG_MNTSSA_END  0x0FF
 #define KEY_DELIMITER   0X00
 #define MIN_DB_BLOCKS	10	/* this should be maintained in conjunction with the mimimum allocation in GDEINIT.M */
+#define MIN_GBUFF_LIMIT	32	/* minimum gbuff limit */
+#define REORG_GBUFF_LIMIT "64"	/* default gbuff_limit for REORG */
 
 /* definition for NULL_SUBSCRIPTS */
 #define NEVER		0
@@ -2237,12 +2272,16 @@ typedef struct	sgmnt_addrs_struct
 						 * should know to release crit even if hold_onto_crit is set to TRUE and so will
 						 * rely on this variable
 						 */
+	int4		gbuff_limit;		/* desired limit on global buffers; see db_csh_getn, op_view and op_fnview */
+	cache_rec_ptr_t	our_midnite;		/* anchor if we are using a gbuff_limit */
 #	ifdef UNIX
 	uint4		root_search_cycle;	/* local copy of cnl->root_search_cycle */
 	uint4		onln_rlbk_cycle;	/* local copy of cnl->onln_rlbk_cycle */
 	uint4		db_onln_rlbkd_cycle;	/* local copy of cnl->db_onln_rlbkd_cycle */
 	boolean_t	dbinit_shm_created;	/* TRUE if shared memory for this region was created by this process */
 	boolean_t	read_only_fs;		/* TRUE if the region is read_only and the header was not updated due to EROFS */
+	boolean_t	crit_probe;		/* flag for indicating the process is doing a crit probe on this region */
+	probecrit_rec_t	probecrit_rec;		/* fields defined in tab_probecrit_rec.h and initialized in probecrit_rec.h */
 #	endif
 } sgmnt_addrs;
 
@@ -2668,6 +2707,10 @@ typedef struct	gvnh_reg_struct
 	assert(added);												\
 }
 
+/* Below macro is used whenever we need to print region of interest in case of a global that spans multiple regions */
+#define	SPANREG_REGION_LIT	" (region "
+#define	SPANREG_REGION_LITLEN	STR_LIT_LEN(SPANREG_REGION_LIT)
+
 #define INVALID_GV_TARGET (gv_namehead *)-1L
 /* Below macro is used to get the "gvnh_reg->gvspan->gvt_array[]" contents taking into account some
  * might be set to INVALID_GV_TARGET (done only in DEBUG mode). In that case, we actually want to return NULL
@@ -2843,6 +2886,10 @@ GBLREF	gv_namehead	*gvt_tp_list;
  * away instead of recomputing them). The only exception is if we were interrupted in the middle of TP transaction by an
  * external signal which resulted in us terminating right away. In this case, we are guaranteed not to make a call to op_gvname
  * again (because we are exiting) so it is ok not to do this check if process_exiting is TRUE.
+ *
+ * Update: The above comment is no longer true. As part of GTM-2168, the fast path in op_gvname was removed but we have not
+ * removed code that does the below macro invocation since this is dbg-only and is anyways otherwise true. If it is a hassle
+ * ensuring the below anywhere, it should be okay to remove it then.
  */
 #define	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSADDRS)									\
 {																\
@@ -3570,8 +3617,6 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	}										\
 }
 
-#define INVALID_SEMID			-1
-#define INVALID_SHMID 			-1L
 #ifdef VMS
 #define NEW_DBINIT_SHM_IPC_MASK		(1 << 0)	/* 1 if db_init created a new shared memory (no pre-existing one) */
 #define NEW_DBINIT_SEM_IPC_MASK		(1 << 1)	/* 1 if db_init created a new access control semaphore */

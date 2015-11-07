@@ -220,13 +220,9 @@ error_def(ERR_JNLNEWREC);
 error_def(ERR_JNLSETDATA2LONG);
 error_def(ERR_REPLCOMM);
 error_def(ERR_REPLFTOKSEM);
-error_def(ERR_REPLGBL2LONG);
 error_def(ERR_REPLINSTNOHIST);
-error_def(ERR_REPLNOMULTILINETRG);
 error_def(ERR_REPLNOTLS);
-error_def(ERR_REPLRECFMT);
 error_def(ERR_REPLXENDIANFAIL);
-error_def(ERR_SECNODZTRIGINTP);
 error_def(ERR_TRIG2NOTRIG);
 error_def(ERR_TLSRENEGOTIATE);
 error_def(ERR_TEXT);
@@ -1090,11 +1086,6 @@ int gtmsource_process(void)
 			else
 				remote_side->null_subs_xform = FALSE;
 			gtmsource_filter |= INTERNAL_FILTER;
-			/* Any time the ^#t global format version is bumped, the below assert will trip. This way, anyone who bumps
-			 * the trigger label ensures that the internal filter routines in repl_filter.c are accordingly changed to
-			 * downgrade triggers before sending them across to a receiver that understands ONLY the prior ^#t format.
-			 */
-			assert(0 == MEMCMP_LIT(HASHT_GBL_CURLABEL, "2"));
 			gtmsource_alloc_filter_buff(gtmsource_msgbufsiz);
 		} else
 		{
@@ -1540,12 +1531,8 @@ int gtmsource_process(void)
 							 * do at this point.
 							 */
 							assert(intfilter_error);
-							assert((EREPL_INTLFILTER_BADREC == repl_errno)
-								|| (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
-								|| (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)
-								|| (EREPL_INTLFILTER_MULTILINEXECUTE == repl_errno));
 							assert(filter_seqno == pre_read_seqno);
-							INT_FILTER_RTS_ERROR(filter_seqno); /* no return */
+							INT_FILTER_RTS_ERROR(filter_seqno, repl_errno); /* no return */
 						}
 					}
 					assert(send_tr_len && (0 == (send_tr_len % REPL_MSG_ALIGN)));
@@ -1671,12 +1658,8 @@ int gtmsource_process(void)
 						 * the receiever server will communicate the appropriate sequence number as
 						 * part of the histinfo exchange.
 						 */
-						assert((EREPL_INTLFILTER_BADREC == repl_errno)
-							|| (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
-							|| (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)
-							|| (EREPL_INTLFILTER_MULTILINEXECUTE == repl_errno));
 						assert(filter_seqno <= post_read_seqno);
-						INT_FILTER_RTS_ERROR(filter_seqno); /* no return */
+						INT_FILTER_RTS_ERROR(filter_seqno, repl_errno); /* no return */
 					}
 					jnlpool.gtmsource_local->read_jnl_seqno = post_read_seqno;
 					if (GTMSOURCE_FH_FLUSH_INTERVAL <= difftime(gtmsource_now, gtmsource_last_flush_time))

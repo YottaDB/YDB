@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -149,11 +149,11 @@ void dbcertify_certify_phase(void)
 	{
 		save_errno = errno;
 		if (save_errno == ENOENT)
-			rts_error(VARLSTCNT(4) ERR_FILENOTFND, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILENOTFND, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
 		else
 		{
 			errmsg = STRERROR(save_errno);
-			rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn),
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn),
 				  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 		}
 	}
@@ -163,10 +163,10 @@ void dbcertify_certify_phase(void)
 #endif
 	dbc_read_p1out(psa, &psa->ofhdr, SIZEOF(p1hdr));		/* Read phase 1 output file header */
 	if (0 != memcmp(psa->ofhdr.p1hdr_tag, P1HDR_TAG, SIZEOF(psa->ofhdr.p1hdr_tag)))
-		rts_error(VARLSTCNT(4) ERR_DBCBADFILE, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBCBADFILE, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
 	if (0 == psa->ofhdr.tot_blocks)
 		/* Sanity check that the output file was finished and completed */
-		rts_error(VARLSTCNT(4) ERR_DBCSCNNOTCMPLT, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBCSCNNOTCMPLT, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
 	assert(0 != psa->ofhdr.tn);
 
 	/* Check if region name still associates to the same file */
@@ -207,9 +207,9 @@ void dbcertify_certify_phase(void)
 	dbc_init_db(psa);
 	if (0 != strcmp((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)psa->ofhdr.dbfn))
 		/* File name change means db was moved or at least is not as it was when it was scanned */
-		rts_error(VARLSTCNT(1) ERR_DBCNOTSAMEDB);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBCNOTSAMEDB);
 	if (psa->ofhdr.tn > psa->dbc_cs_data->trans_hist.curr_tn)
-		rts_error(VARLSTCNT(1) ERR_DBCNOTSAMEDB);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBCNOTSAMEDB);
 	psa->max_blk_len = psa->dbc_cs_data->blk_size - psa->dbc_cs_data->reserved_bytes;
 
 	/* Initialize maximum key we may need later if we encounter gvtroot blocks */
@@ -265,7 +265,7 @@ void dbcertify_certify_phase(void)
 				if (0 != psa->rhdr.akey_len)
 				{	/* This module does not need the ascii key so just bypass it if it exists */
 					if (0 != psa->rhdr.blk_levl || SIZEOF(psa->rslt_buff) < psa->rhdr.akey_len )
-						GTMASSERT;		/* Must be corrupted file? */
+						assertpro(FALSE);		/* Must be corrupted file? */
 					dbc_read_p1out(psa, (char_ptr_t)psa->rslt_buff, psa->rhdr.akey_len);
 				}
 				p1rec_read = TRUE;	/* Note, not reset by restarted transaction */
@@ -278,7 +278,7 @@ void dbcertify_certify_phase(void)
 		{
 			++restart_cnt;
 			if (MAX_RESTART_CNT < restart_cnt)
-				GTMASSERT;			/* No idea what could cause this.. */
+				assertpro(FALSE);			/* No idea what could cause this.. */
 			DBC_DEBUG(("DBC_DEBUG: ****************** Restarted transaction (%d) *****************\n",
 				   (rec_num + 1)));
 			/* "restart_transaction" is either set or cleared by dbc_split_blk() below */
@@ -302,14 +302,14 @@ void dbcertify_certify_phase(void)
 		{
 			((sgmnt_data_ptr_t)psa->dbc_cs_data)->certified_for_upgrade_to = GDSV6;
 			psa->dbc_fhdr_dirty = TRUE;
-			gtm_putmsg(VARLSTCNT(6) ERR_DBCDBCERTIFIED, 4, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
-				   RTS_ERROR_LITERAL("GT.M V5"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBCDBCERTIFIED, 4,
+				RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn), RTS_ERROR_LITERAL("GT.M V5"));
 		} else
 		{
 			DBC_DEBUG(("DBC_DEBUG: Database certification bypassed due to records to process limit being reached\n"));
 		}
 	} else
-		gtm_putmsg(VARLSTCNT(4) ERR_DBCDBNOCERTIFY, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBCDBNOCERTIFY, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
 
 	dbc_flush_fhead(psa);
 	dbc_close_db(psa);
@@ -351,6 +351,8 @@ void dbcertify_certify_phase(void)
 	if (psa->first_rec_key)
 		free(psa->first_rec_key);
 	free(psa);
+	assert(psa == psa_gbl);
+	psa_gbl = NULL;	/* nullify the global variable now that it has been freed */
 }
 
 /* Routine to handle the processing (splitting) of a given database block. If the current block process needs
@@ -473,7 +475,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		   3) There was a TN reset done.
 		   All three of these causes require a rerun of the scan phase.
 		*/
-		rts_error(VARLSTCNT(3) ERR_DBCMODBLK2BIG, 1, blk_num);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DBCMODBLK2BIG, 1, blk_num);
 	}
 	/* Isolate the full key in the first record of the block */
 	dbc_init_key(psa, &psa->first_rec_key);
@@ -524,9 +526,9 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			if (0 > blk_index)
 			{	/* Integrity error encountered or record not found. We cannot proceed */
 				assert(FALSE);
-				rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
-					  ERR_TEXT, 2,
-					  RTS_ERROR_LITERAL("Unable to find index (DT) record for an existing global"));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
+					ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
+					ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to find index (DT) record for an existing global"));
 			}
 			break;
 		case gdsblk_gvtindex:
@@ -536,8 +538,9 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			if (0 > dtblk_index)
 			{	/* Integrity error encountered or record not found. We cannot proceed */
 				assert(FALSE);
-				rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
-					  ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to locate DT leaf (root) block"));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
+					ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
+					ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to locate DT leaf (root) block"));
 			}
 			assert(0 == ((v15_blk_hdr_ptr_t)psa->blk_set[dtblk_index].old_buff)->levl);
 			/* Note level 0 directory blocks can have collation data in them but it would be AFTER
@@ -559,7 +562,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					if (-1 == blk_index)
 					{	/* Integrity error encountered. We cannot proceed */
 						assert(FALSE);
-						rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBCINTEGERR, 2,
 							  RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 							  ERR_TEXT, 2,
 							  RTS_ERROR_LITERAL("Unable to find index record for an existing global"));
@@ -584,7 +587,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 						}
 						return FALSE;	/* No restart necessary */
 					} else
-						GTMASSERT;
+						assertpro(FALSE);
 				}
 			} else
 			{	/* This is a gvtroot block and is the subject of our search */
@@ -593,7 +596,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			}
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE);
 	}
 	/* The most recently accessed block (that terminated the search) should be the block
 	   we are looking for (which should have been found in the cache as block 0. If not,
@@ -602,7 +605,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 	if (0 != blk_index)
 	{	/* Integrity error encountered. We cannot proceed */
 		assert(FALSE);
-		rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 			  ERR_TEXT, 2,
 			  RTS_ERROR_LITERAL("Did not locate record in same block as we started searching for"));
 	}
@@ -846,7 +849,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				blk_set_p->curr_rec + remain_offset,
 				remain_len - remain_offset);
 			if (0 == BLK_FINI(bs_ptr, bs1))
-				GTMASSERT;
+				assertpro(FALSE);
 			assert(blk_seg_cnt == new_blk_len);
 			DBC_DEBUG(("DBC_DEBUG: Stopping block scan after simple update (no further inserts to previous lvls)\n"));
 			completed = TRUE;
@@ -912,7 +915,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			/* Common initialization */
 			++psa->block_depth;			/* Need a new block to split into */
 			if (MAX_BLOCK_INFO_DEPTH <= psa->block_depth)
-				GTMASSERT;
+				assertpro(FALSE);
 			DBC_DEBUG(("DBC_DEBUG: Block index %d used for newly created split (lhs) block\n", psa->block_depth));
 			blk_set_new_p = &psa->blk_set[psa->block_depth];
 			dbc_init_blk(psa, blk_set_new_p, -1, gdsblk_create, new_lh_blk_len, curr_blk_levl);
@@ -944,7 +947,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 						 * it by NOT certifying the database and requiring a rerun of the SCAN
 						 */
 						assert(FALSE);
-						gtm_putmsg(VARLSTCNT(6) ERR_DBCREC2BIGINBLK, 4,
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBCREC2BIGINBLK, 4,
 							   blk_num, psa->dbc_cs_data->max_rec_size,
 							   psa->dbc_gv_cur_region->dyn.addr->fname_len,
 							   psa->dbc_gv_cur_region->dyn.addr->fname);
@@ -970,7 +973,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				}
 				/* Complete our LHS block */
 				if (0 == BLK_FINI(bs_ptr, bs1))
-					GTMASSERT;
+					assertpro(FALSE);
 				assert(blk_seg_cnt == new_lh_blk_len);
 				/* Remember key of last record in this block */
 				if (0 == ins_rec_len)
@@ -1006,7 +1009,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					DBC_DEBUG(("DBC_DEBUG: Splitting root block, extra block to be created\n"));
 					++psa->block_depth;			/* Need a new block to split into */
 					if (MAX_BLOCK_INFO_DEPTH <= psa->block_depth)
-						GTMASSERT;
+						assertpro(FALSE);
 					blk_set_rhs_p = &psa->blk_set[psa->block_depth];
 					dbc_init_blk(psa, blk_set_rhs_p, -1, gdsblk_create, new_rh_blk_len, curr_blk_levl);
 					/* We will put the pointers to both this block and the RHS we build next
@@ -1037,7 +1040,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					curr_blk_len - curr_rec_offset - SIZEOF(rec_hdr));
 				/* Complete update array */
 				if (0 == BLK_FINI(bs_ptr, bs1))
-					GTMASSERT;
+					assertpro(FALSE);
 				assert(blk_seg_cnt == new_rh_blk_len);
 			} else
 			{	/* Recompute sizes for inserted record being in righthand block as per
@@ -1071,7 +1074,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					*/
 					if (curr_blk_len <= psa->max_blk_len)
 						/* Well, that wasn't the problem, something else is wrong */
-						rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2,
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBCINTEGERR, 2,
 							  RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 							  ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to split block appropriately"));
 					/* If we do have to restart, we won't be able to reinvoke dbc_split_blk() with the
@@ -1084,7 +1087,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					     ++restart_cnt)
 					{
 						if (MAX_RESTART_CNT < restart_cnt)
-							GTMASSERT;		/* No idea what could cause this */
+							assertpro(FALSE);		/* No idea what could cause this */
 						DBC_DEBUG(("DBC_DEBUG: *** *** Recursive call to handle too large block 0x%x\n",
 							   restart_blk_set.blk_num));
 						psa->block_depth_hwm = -1;	/* Zaps cache so all blocks are re-read */
@@ -1116,7 +1119,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				BLK_SEG(bs_ptr,	blk_set_p->curr_rec - SIZEOF(block_id), SIZEOF(block_id));
 				/* Complete our LHS block */
 				if (0 == BLK_FINI(bs_ptr, bs1))
-					GTMASSERT;
+					assertpro(FALSE);
 				assert(blk_seg_cnt == new_lh_blk_len);
 				if (!got_root)
 				{
@@ -1148,7 +1151,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					DBC_DEBUG(("DBC_DEBUG: Splitting root block, extra block to be created\n"));
 					++psa->block_depth;			/* Need a new block to split into */
 					if (MAX_BLOCK_INFO_DEPTH <= psa->block_depth)
-						GTMASSERT;
+						assertpro(FALSE);
 					blk_set_rhs_p = &psa->blk_set[psa->block_depth];
 					/* Key for last record in the LHS block used to (re)construct root block */
 					last_rec_key = blk_set_p->curr_blk_key;
@@ -1191,7 +1194,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					blk_set_p->curr_rec + remain_offset,
 					remain_len - remain_offset);
 				if (0 == BLK_FINI(bs_ptr, bs1))
-					GTMASSERT;
+					assertpro(FALSE);
 				assert(blk_seg_cnt == new_rh_blk_len);
 			} /* else method (2) */
 			if (got_root)
@@ -1207,7 +1210,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				blk_set_p->blk_levl++;			/* Needs to be at a new level */
 				if (MAX_BT_DEPTH <= blk_set_p->blk_levl)
 					/* Tree is too high */
-					GTMASSERT;
+					assertpro(FALSE);
 				/* First record will have last key in LHS block */
 				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				next_rec_hdr->rsiz = SIZEOF(rec_hdr) + last_rec_key->end + 1 + SIZEOF(block_id);
@@ -1227,7 +1230,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				blk_set_rhs_p->ins_blk_id_p = rhs_block_id_p;	/* Receives block id when created */
 				/* Complete update array */
 				if (0 == BLK_FINI(bs_ptr, bs1))
-					GTMASSERT;
+					assertpro(FALSE);
 				/* The root block is the last one we need to change */
 				DBC_DEBUG(("DBC_DEBUG: Stopping block scan as blk_index %d is a root block\n", blk_index));
 				completed = TRUE;
@@ -1272,7 +1275,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		*/
 		dbc_init_db(psa);
 		if (created_blocks > psa->dbc_cs_data->trans_hist.free_blocks)
-			rts_error(VARLSTCNT(4) ERR_DBCNOEXTND, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBCNOEXTND, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
 		/* Database is now extended -- safest bet is to restart this particular update so that it is certain
 		   nothing else got in besides the extention.
 		*/
@@ -1306,8 +1309,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			if (NO_FREE_SPACE == lclmap_not_full)
 			{
 				assert(FALSE);
-				rts_error(VARLSTCNT(5) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
-					  ERR_BITMAPSBAD);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
+					ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn), ERR_BITMAPSBAD);
 			}
 			if (ROUND_DOWN2(psa->hint_blk, psa->dbc_cs_data->bplmap) != lclmap_not_full)
 				psa->hint_lcl = 1;
@@ -1328,8 +1331,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			if (NO_FREE_SPACE == lcl_blk)
 			{
 				assert(FALSE);
-				rts_error(VARLSTCNT(5) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
-					  ERR_BITMAPSBAD);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
+					ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn), ERR_BITMAPSBAD);
 			}
 			/* Found a free block, mark it busy. Note that bitmap blocks are treated somewhat differently
 			   than other blocks. We do not create an update array for them but just change the copy in
@@ -1437,7 +1440,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		psa->dbc_cs_data->trans_hist.curr_tn++;
 		psa->dbc_fhdr_dirty = TRUE;
 	} else
-		GTMASSERT;	/* If we got this far we should have split a block which would create a block */
+		assertpro(FALSE);	/* If we got this far we should have split a block which would create a block */
 	DBC_DEBUG(("DBC_DEBUG: Block processing completed\n"));
 	psa->blks_processed++;
 
@@ -1470,7 +1473,7 @@ void dbc_read_p1out(phase_static_area *psa, void *obuf, int olen)
 		save_errno = errno;
 		errmsg = STRERROR(save_errno);
 		assert(FALSE);
-		rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("read()"), CALLFROM,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("read()"), CALLFROM,
 			  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 	}
 }
@@ -1481,12 +1484,14 @@ void dbc_certify_phase_cleanup(void)
 	phase_static_area	*psa;
 
 	psa = psa_gbl;
+	if (NULL == psa)
+		return;
 	if (psa->dbc_gv_cur_region && psa->dbc_gv_cur_region->dyn.addr && psa->dbc_gv_cur_region->dyn.addr->file_cntl)
 	{
 		dbc_flush_fhead(psa);
 		dbc_close_db(psa);
 		if (psa->dbc_critical)
-			rts_error(VARLSTCNT(4) ERR_TEXT,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT,
 				  2, RTS_ERROR_LITERAL("Failure while in critical section -- database damage likely"));
 	}
 	UNIX_ONLY(dbc_release_standalone_access(psa));

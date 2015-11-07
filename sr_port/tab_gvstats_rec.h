@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,3 +64,13 @@ TAB_GVSTATS_REC(n_jrec_epoch_idle    , "JRI", "# of Idle epoch Journal Records  
 TAB_GVSTATS_REC(n_jrec_other         , "JRO", "# of Other Journal Records            ")
 TAB_GVSTATS_REC(n_jnl_extends        , "JEX", "# of Journal file EXtensions          ")
 TAB_GVSTATS_REC(n_db_extends         , "DEX", "# of Database file EXtensions         ")
+#ifdef UNIX
+TAB_GVSTATS_REC(n_crit_success       , "CAT", "# of crit acquired total successes    ")
+TAB_GVSTATS_REC(n_crits_in_epch      , "CFE", "# of attempts in CFT caused by epochs ")
+TAB_GVSTATS_REC(sq_crit_failed       , "CFS", "sum squares grab crit failed          ")
+TAB_GVSTATS_REC(n_crit_failed        , "CFT", "# of grab crit failures               ")
+TAB_GVSTATS_REC(sq_crit_que_slps     , "CQS", "sum squares grab crit queued sleeps   ")
+TAB_GVSTATS_REC(n_crit_que_slps      , "CQT", "# of grab crit queued sleeps          ")
+TAB_GVSTATS_REC(sq_crit_yields       , "CYS", "sum squares grab crit yields          ")
+TAB_GVSTATS_REC(n_crit_yields        , "CYT", "# of grab crit yields                 ")
+#endif

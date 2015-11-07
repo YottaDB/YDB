@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,12 @@ error_def(ERR_FILENOTFND);
 
 void rtn_src_chksum_init(gtm_rtn_src_chksum_ctx *ctx)
 {
+#	ifdef UNIX
+	HASH128_STATE_INIT(ctx->hash_state, 0);
+	ctx->total_size = 0;
+#	else
 	cvs_MD5Init(&ctx->md5ctx);
+#	endif
 }
 
 /*
@@ -40,16 +45,28 @@ void rtn_src_chksum_init(gtm_rtn_src_chksum_ctx *ctx)
 
 void rtn_src_chksum_line(gtm_rtn_src_chksum_ctx *ctx, const void *data, uint4 len)
 {
+#	ifdef UNIX
+	gtmmrhash_128_ingest(&ctx->hash_state, data, len);
+	ctx->total_size += len;
+#	else
 	cvs_MD5Update(&ctx->md5ctx, data, len);
+#	endif
 }
 
 /*
- * Finished computing checksum. Fill in digest[] array from MD5 context.
+ * Finished computing checksum. Fill in digest[] array.
  */
 
 void rtn_src_chksum_digest(gtm_rtn_src_chksum_ctx *ctx)
 {
+#	ifdef UNIX
+	gtm_uint16 hash;
+
+	gtmmrhash_128_result(&ctx->hash_state, ctx->total_size, &hash);
+	gtmmrhash_128_bytes(&hash, ctx->digest);
+#	else
 	cvs_MD5Final(ctx->digest, &ctx->md5ctx);
+#	endif
 #	ifndef GTM_USE_128BIT_SRC_CHKSUM
 	GET_ULONG(ctx->checksum, &ctx->digest[0]);
 #	endif
@@ -62,7 +79,7 @@ void rtn_src_chksum_digest(gtm_rtn_src_chksum_ctx *ctx)
 void set_rtnhdr_checksum(rhdtyp *hdr, gtm_rtn_src_chksum_ctx *ctx)
 {
 #	ifdef GTM_USE_128BIT_SRC_CHKSUM
-	memcpy(&hdr->checksum_md5[0], &ctx->digest[0], MD5_DIGEST_LENGTH);
+	memcpy(&hdr->checksum_128[0], &ctx->digest[0], MD5_DIGEST_LENGTH);
 #	else
 	hdr->checksum = ctx->checksum;
 #	endif
@@ -89,7 +106,7 @@ void rtn_src_chksum_buffer(gtm_rtn_src_chksum_ctx *ctx, const void *data, uint4 
 
 unsigned char *get_rtnhdr_checksum(rhdtyp *hdr)
 {
-	return &hdr->checksum_md5[0];
+	return &hdr->checksum_128[0];
 }
 
 /*

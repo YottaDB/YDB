@@ -19,7 +19,7 @@
 GBLREF mident_fixed	zlink_mname;
 GBLREF rtn_tabent	*rtn_names;
 
-#ifdef USHBIN_SUPPORTED
+#ifdef AUTORELINK_SUPPORTED
 LITDEF mval		literal_null;
 #endif
 
@@ -29,7 +29,7 @@ error_def(ERR_ZLMODULE);
 /* For routine name given, return routine header address if rhd not already set */
 rhdtyp	*op_rhdaddr(mval *name, rhdtyp *rhd)
 {
-#	ifdef USHBIN_SUPPORTED
+#	ifdef AUTORELINK_SUPPORTED
 	return op_rhd_ext(name, (mval *)&literal_null, rhd, NULL);
 #	else
 	return (NULL != rhd) ? rhd : op_rhdaddr1(name);
@@ -64,7 +64,7 @@ rhdtyp	*op_rhdaddr1(mval *name)
 				ERR_ZLMODULE, 2, strlen(&zlink_mname.c[0]), zlink_mname.c);
 #		endif
 	}
-#	ifdef USHBIN_SUPPORTED
+#	ifdef AUTORELINK_SUPPORTED
 	/* In this (autorelink) context, no need to pass 4th arg (*lnr) since other opcodes used in conjunction with
 	 * op_rhdaddr1 will handle label offset if necessary.
 	 */

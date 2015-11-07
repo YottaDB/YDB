@@ -492,7 +492,7 @@ EXTRACTFILERR	<Error with extract file !AD>/error/fao=2!/ansi=0
 FREEZE		<Region: !AD is already frozen>/info/fao=2!/ansi=0
 NOSELECT	<None of the selected variables exist -- halting>/warning/fao=0!/ansi=0
 EXTRFAIL	<Extract failed for the global ^!AD. MUPIP INTEG should be run.>/error/fao=2!/ansi=0
-LDBINFMT	<Corrupt binary format header information>/error/fao=0!/ansi=0
+LDBINFMT	<Unrecognized header for load file>/error/fao=0!/ansi=0
 NOPREVLINK	<Journal file !AD has a null previous link>/error/fao=2!/ansi=0
 CCEDUMPON	<>/fatal/fao=0!/ansi=0
 CCEDMPQUALREQ	<A qualifier (DB,[NO]ON, or NOW) is required with the DUMP command>/error/fao=0!/ansi=0
@@ -575,7 +575,7 @@ RECCNT		<Last LOAD record number: !UL>/info/fao=1!/ansi=0
 TEXT		<!AD>/info/fao=2!/ansi=0
 ZWRSPONE	<Subscript patterns in ZWRITE are atomic; Invalid delimiter>/error/fao=0!/ansi=0
 FILEDEL		<File !AD successfully deleted>/info/fao=2!/ansi=0
-JNLBADLABEL	<Journal file !AD does not have a GT.M Journal File Label>/error/fao=2!/ansi=0
+JNLBADLABEL	<Journal file !AD has a bad GT.M Journal File Label. Expected !AD. Found !AD.>/error/fao=6!/ansi=0
 JNLREADEOF	<End of journal file encountered for !AD>/error/fao=2!/ansi=0
 JNLRECFMT	<Journal file record format error encountered>/error/fao=0!/ansi=0
 BLKTOODEEP	<Block level too deep>/error/fao=0!/ansi=0
@@ -773,7 +773,7 @@ MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
 BLKWRITERR	<Unable to queue disk write for block 0x!XL.  Will keep trying.>/info/fao=1!/ansi=0
 STOPTIMEOUT	<Waited too long for stopped process to release.  Region: !AD.>/error/fao=2!/ansi=0
-TRIGMODINTP	<Triggers for a given global cannot be both used and modified or removed in the same transaction>/error/fao=0!/ansi=0
+UNUSEDMSG776	<TRIGMODINTP last used in V6.2-000>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
 JNLREAD		<Error reading from journal file !AD at offset [0x!XL]>/error/fao=3!/ansi=0
@@ -806,7 +806,7 @@ MUKILLIP	<Kill in progress indicator is set for file !AD - this !AD operation is
 JNLRDONLY	<Journal file !AD read only>/error/fao=2!/ansi=0
 ANCOMPTINC	<Deviceparameter !AD is not compatible with any other deviceparameters in the !AD command>/error/fao=4!/ansi=0
 ABNCOMPTINC	<Deviceparameter !AD and deviceparameter !AD are not compatible in the !AD command>/error/fao=6!/ansi=0
-RECLOAD		<Error loading record number: !UL!/>/error/fao=1!/ansi=0
+RECLOAD		<Error loading record number: !@UQ!/>/error/fao=1!/ansi=0
 SOCKNOTFND	<Socket !AD not found>/error/fao=2!/ansi=0
 CURRSOCKOFR	<Current socket of index !UL is out of range.  There are only !UL sockets.>/error/fao=2!/ansi=0
 SOCKETEXIST	<Socket !AD already exists>/error/fao=2!/ansi=79
@@ -895,7 +895,7 @@ SECONDAHEAD	<Secondary ahead of primary. !/ Secondary database possibly updated 
 SCNDDBNOUPD	<Database Updates not allowed on the secondary>/error/fao=0!/ansi=0
 MUINFOUINT4	<!AD : !UL [0x!XL]>/info/fao=4!/ansi=0
 NLMISMATCHCALC	<Location of !AD expected at 0x!XL, but found at 0x!XL>/error/fao=4!/ansi=0
-UNUSEDMSG898	<GTMSECSHRLOGSWH last used in V5.5-000>/error/fao=0!/ansi=0
+RELINKCTLFULL	<Relinkctl file for directory !AD is full (maximum entries !UL)>/error/fao=3!/ansi=0
 UNUSEDMSG899	<GTMSECSHRDEFLOG last used in V5.5-000>/info/fao=0!/ansi=0
 DBBADNSUB	<!AD Bad numeric subscript>/error/fao=2!/ansi=0
 DBBADKYNM	<!AD Bad key name>/error/fao=2!/ansi=0
@@ -1364,13 +1364,13 @@ TCOMMITDISALLOW	<TROLLBACK required after an unhandled error in trigger context>
 SSATTACHSHM	<Error while attaching to shared memory identifier !UL>/error/fao=1!/ansi=0
 TRIGDEFNOSYNC	<Global ^!AD has triggers defined on the !AD instance but none on the !AD instance. Current journal sequence number is 0x!16@XQ>/warning/fao=7!/ansi=0
 TRESTMAX	<TRESTART not allowed in a final TP retry more than once>/error/fao=0!/ansi=0
-UNUSEDMSG1367	<TPLOCKRESTMAX : Last used in V5.5-000>/error/fao=0!/ansi=0
+ZLINKBYPASS	<ZLINK of !AD bypassed - Identical routine already linked>/info/fao=2!/ansi=0
 GBLEXPECTED	<Global variable reference expected in this context>/error/fao=0!/ansi=0
 GVZTRIGFAIL	<ZTRIGGER of a global variable failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 MUUSERLBK	<Abnormal shutdown of replication-enabled database !AD detected>/error/fao=2!/ansi=0
 SETINSETTRIGONLY	<ISV !AD can only be modified in a 'SET' type trigger>/error/fao=2!/ansi=0
 DZTRIGINTRIG	<$ZTRIGGER() is not allowed inside trigger context. Trigger name: !AD>/error/fao=2!/ansi=0
-SECNODZTRIGINTP	<Sequence number 0x!16@XQ contains $ZTRIGGER() updates made inside a transaction which the current replicating instance does not support. The replicating instance must be upgraded to at least V5.4-002 to support this type of transaction. Cannot continue>/error/fao=1!/ansi=0
+UNUSEDMSG1373	<SECNODZTRIGINTP : Last used in V6.2-000>/error/fao=0!/ansi=0
 BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression>/warning/fao=0!/ansi=0
 DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
 WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
@@ -1382,7 +1382,7 @@ GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/err
 JNLORDBFLU	<Error flushing database blocks to !AD. See related messages in the operator log>/error/fao=2!/ansi=0
 ZCCLNUPRTNMISNG	<External call: Cleanup routine name missing. Cannot continue>/error/fao=0!/ansi=0
 ZCINVALIDKEYWORD	<External call: Invalid keyword found. Cannot continue>/error/fao=0!/ansi=0
-REPLNOMULTILINETRG	<Sequence number 0x!16@XQ contains a trigger definition too large for transmission to the current replicating instance, which does not support multi-line triggers - stopping replication>/error/fao=1!/ansi=0
+UNUSEDMSG1385	<REPLNOMULTILINETRG : Last used in V6.2-000>/error/fao=0!/ansi=0
 DBSHMNAMEDIFF	<Database file !AD points to shared memory (id = !UL) which points to a different database file !AZ>/error/fao=4!/ansi=0
 SHMREMOVED	<Removed Shared Memory id !UL corresponding to file !AD>/info/fao=3!/ansi=0
 DEVICEWRITEONLY	<Cannot read from a write-only device>/error/fao=0!/ansi=0
@@ -1402,7 +1402,7 @@ LOCKSPACEUSE	<Estimated free lock space: !UL% of !UL pages>/info/fao=2!/ansi=0
 JIUNHNDINT	<An error during $ZINTERRUPT processing was not handled: !AD>/error/fao=2!/ansi=0
 GTMASSERT2	<!AD - Assert failed !AD line !UL for expression (!AD)>/fatal/fao=7!/ansi=0
 ZTRIGNOTRW	<ZTRIGGER cannot operate on read-only region !AD>/error/fao=2!/ansi=0
-TRIGMODREGNOTRW	<Trigger(s) cannot be added/changed/deleted because region !AD is read-only>/error/fao=2!/ansi=0
+TRIGMODREGNOTRW	<Trigger(s) cannot be added/changed/deleted/upgraded because region !AD is read-only>/error/fao=2!/ansi=0
 INSNOTJOINED	<Replicating Instance !AD is not a member of the same Group as Instance !AD>/error/fao=4!/ansi=0
 INSROLECHANGE	<Supplementary Instance !AD and non-Supplementary Instance !AD belong to the same Group>/error/fao=4!/ansi=0
 INSUNKNOWN	<Supplementary Instance !AD has no instance definition for non-Supplementary Instance !AD>/error/fao=4!/ansi=0
@@ -1536,7 +1536,7 @@ GBLNOMAPTOREG	<Global !AD does not map to region !AD in current global directory
 ISSPANGBL	<Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory>/error/fao=2!/ansi=0
 TPNOSUPPORT	<Operation cannot be performed while inside of a TP transaction>/error/fao=0!/ansi=0
 GVSUBSERR	<Invalid subscripted global name specification in $VIEW() function>/error/fao=0!/ansi=0
-TRIGNOSPANGBL	<Triggers cannot be installed/deleted for global name !AD as it spans multiple regions in current global directory>/error/fao=2!/ansi=0
+UNUSEDMSG1539	<TRIGNOSPANBL : Last used in V6.2-000>/error/fao=0!/ansi=0
 FILTERTIMEDOUT	<Replication server timed out attempting to read seqno !16@XQ from external filter>/error/fao=1!/ansi=0
 TLSDLLNOOPEN	<Failed to load GT.M TLS/SSL library for secure communication>/error/fao=0!/ansi=0
 TLSINIT		<Failed to initialize GT.M TLS/SSL library for secure communication>/error/fao=0!/ansi=0
@@ -1573,6 +1573,21 @@ CRYPTBADWRTPOS	<Encrypted WRITE disallowed from a position different than where 
 LABELNOTFND	<GOTO referenced a label that does not exist>/error/fao=0!/ansi=13
 RELINKCTLERR	<Error with relink control structure for $ZROUTINES directory !AD>/error/fao=2!/ansi=0
 INVLINKTMPDIR	<Value for $gtm_linktmpdir is either not found or not a directory: !AD>/error/fao=2!/ansi=0
+NOEDITOR	<Can't find an executable editor: !AD>/error/fao=2!/ansi=0
+UPDPROC		<Update Process error>/error/fao=0!/ansi=0
+HLPPROC		<Helper Process error>/error/fao=0!/ansi=0
+REPLNOHASHTREC	<Sequence number 0x!16@XQ contains trigger definition updates. !AD side must be at least V6.2-000 for replication to continue>/error/fao=3!/ansi=0
+REMOTEDBNOTRIG	<Trigger operations on global !AD not supported as it maps to database region !AD that points to a remote file>/error/fao=4!/ansi=0
+NEEDTRIGUPGRD	<Cannot do trigger operation on database file !AD until it is upgraded; Run MUPIP TRIGGER -UPGRADE first>/error/fao=2!/ansi=0
+REQRLNKCTLRNDWN	<Error accessing relinkctl file for $ZROUTINES directory !AD. Must be rundown>/error/fao=2!/ansi=0
+RLNKCTLRNDWNSUC	<Relinkctl file for $ZROUTINES directory !AD successfully rundown>/info/fao=2!/ansi=0
+RLNKCTLRNDWNFL	<Relinkctl file for $ZROUTINES directory !AD failed to rundown as it is open by !UL process(es)>/error/fao=3!/ansi=0
+MPROFRUNDOWN	<Error during M-profiling rundown>/error/fao=0!/ansi=0
+ZPEEKNOJNLINFO	<$ZPEEK() unable to access requested journal structure - region !AD is not currently journaled>/error/fao=2!/ansi=0
+TLSPARAM	<TLS parameter !AD !AD>/error/fao=4!/ansi=0
+RLNKRECLATCH	<Failed to get latch on relinkctl record for routine name !AZ in $ZROUTINES directory !AD>/error/fao=3!/ansi=0
+RLNKSHMLATCH	<Failed to get latch on relinkctl shared memory for $ZROUTINES directory !AD>/error/fao=2!/ansi=0
+JOBLVN2LONG	<The zwrite representation of a local variable transferred to a JOB'd process can not exceed !UL. Encountered size: !UL>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

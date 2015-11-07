@@ -89,6 +89,7 @@ mu_replpool_grab_sem
 mu_replpool_release_sem
 mu_rndwn_all
 mu_rndwn_file
+mu_rndwn_rlnkctl
 mu_rndwn_repl_instance
 mu_rndwn_replpool
 mu_signal_process
@@ -128,6 +129,7 @@ mupip_help
 mupip_integ
 mupip_intrpt
 mupip_quit
+mupip_rctldump
 mupip_recover
 mupip_reorg
 mupip_restore
@@ -204,6 +206,7 @@ ss_anal_shdw_file
 ss_get_block
 ss_initiate
 ss_read_block
+trigger_upgrade
 upd_log_init
 updhelper_end
 updhelper_init

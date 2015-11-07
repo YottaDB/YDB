@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,6 +63,7 @@ void ojparams (char *p, job_params_type *job_params)
 	job_params->directory.addr = 0;
 	job_params->cmdline.len = 0;
 	job_params->cmdline.addr = 0;
+	job_params->passcurlvn = FALSE;
 
 		/* Process parameter list */
 	while (*p != jp_eol)
@@ -129,6 +130,9 @@ void ojparams (char *p, job_params_type *job_params)
 			}
 			break;
 
+		case jp_passcurlvn:
+			job_params->passcurlvn = TRUE;
+			break;
 		case jp_account:
 		case jp_detached:
 		case jp_image:

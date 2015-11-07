@@ -9,13 +9,9 @@
  *								*
  ****************************************************************/
 
-#ifndef MD5_DIGEST2HEX_INCLUDED
-#define MD5_DIGEST2HEX_INCLUDED
+#ifndef MU_RNDWN_RLNKCTL_INCLUDED
+#define MU_RNDWN_RLNKCTL_INCLUDED
 
-#include "md5hash.h"
+void mu_rndwn_rlnkctl(void);
 
-#define MD5_HEXSTR_LENGTH	33
-
-void md5_digest2hex(char hexstr[MD5_HEXSTR_LENGTH], const unsigned char digest[MD5_DIGEST_LENGTH]);
-
-#endif /* MD5_DIGEST2HEX_INCLUDED */
+#endif /* MU_RNDWN_RLNKCTL_INCLUDED */

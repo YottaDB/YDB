@@ -49,6 +49,16 @@ STATICFNDCL boolean_t handle_active_old_versions(boolean_t *duplicated, rhdtyp *
 GBLREF rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_end, *rtn_names_top;
 GBLREF stack_frame	*frame_pointer;
 
+/* Routine to perform routine table maintenance. In addition, if a routine is being replaced instead of just added, performs
+ * the necessary maintenance to the replaced routine.
+ *
+ * Parameter:
+ *   hdr - routine header address of the routine header just linked in
+ *
+ * Return value:
+ *   TRUE  - If routine updated/added.
+ *   FALSE - If routine could not be updated/added.
+ */
 bool zlput_rname (rhdtyp *hdr)
 {
 	rhdtyp		*old_rhead, *rhead;
@@ -95,7 +105,7 @@ bool zlput_rname (rhdtyp *hdr)
 		if (!handle_active_old_versions(&duplicated, old_rhead, hdr))
 			return FALSE;
 		if (!duplicated)
-			zr_unlink_rtn(old_rhead, FALSE); /* Release private code sections no longer in use */
+			zr_unlink_rtn(old_rhead, FALSE); /* Free releasable pieces of old routines */
 #		ifndef USHBIN_SUPPORTED
 		hdr->old_rhead_ptr = (int4)old_rhead;
 #		else /* USHBIN_SUPPORTED */
@@ -115,6 +125,10 @@ bool zlput_rname (rhdtyp *hdr)
  * Parameters:
  *   rtnhdr	    - The routine header to start our backwards search at.
  *   need_duplicate - Address of boolean_t to set if is the exact same routine (same routine header address).
+ *
+ * Return value:
+ *   TRUE -  If a stack frame specifies the supplied routine header.
+ *   FALSE - If no stack frame specifies the supplied routine header.
  */
 boolean_t on_stack(rhdtyp *rtnhdr, boolean_t *need_duplicate)
 {
@@ -135,10 +149,23 @@ boolean_t on_stack(rhdtyp *rtnhdr, boolean_t *need_duplicate)
 	return FALSE;
 }
 
+/* Routine to:
+ *   1. Check if the specified routine is currently on the M stack and if it is then
+ *   2. If we are running with VIEW LINK:RECURSIVE.
+ *   3. If no, then return FALSE to signify need for an error.
+ *   4. If yes, we need to do a number of things to allow both versions of the same routine to
+ *      exist on the M stack at the same time.
+ *
+ * Parameters:
+ *   duplicated  - Pointer to boolean return flag indicating we duplicated the input routine header and
+ *                 related fields.
+ *   old_rhead   - The routine header being replaced/checked.
+ *   hdr         - The new routine header doing the replacing.
+ */
 STATICFNDEF boolean_t handle_active_old_versions(boolean_t *duplicated, rhdtyp *old_rhead, rhdtyp *hdr)
 {
 	stack_frame	*fp;
-	rhdtyp 		*rhead, *new_rhead;
+	rhdtyp 		*rhead, *copy_rhead;
 	boolean_t	need_duplicate, is_on_stack;
 	ssize_t		sect_rw_nonrel_size;
 	DCL_THREADGBL_ACCESS;
@@ -157,26 +184,70 @@ STATICFNDEF boolean_t handle_active_old_versions(boolean_t *duplicated, rhdtyp *
 	}
 #	ifdef USHBIN_SUPPORTED
 	if (need_duplicate)
-	{
-		new_rhead = (rhdtyp *)malloc(SIZEOF(rhdtyp));
-		*new_rhead = *old_rhead;
-		new_rhead->current_rhead_adr = new_rhead;
-		old_rhead->active_rhead_adr = new_rhead; /* Reserve previous version on active chain */
+	{	/* The routine is on the M stack so is active. To allow it to stay there while we also link in a newer version
+		 * we need to make some changes to the older version. The way the replaced routine would normally be handled if
+		 * we weren't keeping it is the various sections of it would be released and the fields in its routine header be
+		 * reset to point to those sections in the latest version. That's still going to happen so what we do here is to
+		 * create a SEPARATE copy of the routine header that WON'T be modified so all its fields are intact and as they
+		 * were along with a separate copy of the label table since the replacement process also resets the label table
+		 * to point to the new version of the routine. Lastly, we'll run back through the stack changing the stack frame's
+		 * "rvector" field to point to the copied routine header so it continues to work as it did.
+		 */
+		copy_rhead = (rhdtyp *)malloc(SIZEOF(rhdtyp));
+		*copy_rhead = *old_rhead;
+		copy_rhead->current_rhead_adr = copy_rhead;	/* Grabs of current fhead need to stay with this one for this
+								 * older version
+								 */
+		copy_rhead->old_rhead_adr = old_rhead;	/* Link copied routine back to its original flavor. Used to know which
+							 * routine should have its active_rhead_adr field cleared when the copy
+							 * becomes inactive and gets cleaned up.
+							 */
+		assert(NULL == old_rhead->active_rhead_adr);
+		old_rhead->active_rhead_adr = copy_rhead; /* Reserve previous version on active chain */
 		for (fp = frame_pointer; NULL != fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))
 			if (CURRENT_RHEAD_ADR(fp->rvector) == old_rhead)
-				fp->rvector = new_rhead; /* Point frame's code vector at reserved copy of old routine version */
-		/* Any field (e.g. the label table) that is currently shared by old_rhead needs to be copied to a separate area
-		 * other fields (e.g. literal mvals) will be redirected for old_rhead, so we just need to keep the older version
-		 * around (don't free it).
+				fp->rvector = copy_rhead; /* Point frame's code vector at reserved copy of old routine version */
+		/* Need to preserve original copy of label table for as long as this routine is active since it is used by
+		 * routines like get_symb_line (or symb_line() it calls) and find_line_start() and find_line_addr(). Once the
+		 * routine is no longer active, this label table and the copied routine header can go away since no other
+		 * routine would have been able to resolve to it. We call the label table copy sect_rw_nonrel_* here because
+		 * that is how this section is identified everywhere else. But here, it is releasable when inactive.
 		 */
 		sect_rw_nonrel_size = old_rhead->labtab_len * SIZEOF(lab_tabent);
-		new_rhead->labtab_adr = (lab_tabent *)malloc(sect_rw_nonrel_size);
-		memcpy(new_rhead->labtab_adr, old_rhead->labtab_adr, sect_rw_nonrel_size);
-		/* Make sure to: skip urx_remove, do not free code section, etc. */
-		/* ALSO: We need to go through resolve linkage table entries corresponding to this the old version, and re-resolve
-		 * them to point into the new version */
+		copy_rhead->labtab_adr = (lab_tabent *)malloc(sect_rw_nonrel_size);
+		memcpy(copy_rhead->labtab_adr, old_rhead->labtab_adr, sect_rw_nonrel_size);
+		copy_rhead->rtn_relinked = TRUE; /* This flag is checked on unwind to see if routine should be cleaned up */
 		*duplicated = TRUE;
 	}
 #	endif /* USHBIN_SUPPORTED */
 	return TRUE;
 }
+
+#ifdef USHBIN_SUPPORTED
+/* Routine called from op_unwind/unw_retarg/flush_jmp (via CLEANUP_COPIED_RECURSIVE_RTN macro) when a routine pops with the
+ * rtn_relinked flag set indicating potential need to clean up a copied routine header and label table - along with the rest
+ * of the routine's pieces which were purposely bypassed since the routine was on the M stack at the time.
+ */
+void zr_cleanup_recursive_rtn(rhdtyp *rtnhdr)
+{
+	stack_frame	*fp;
+
+	/* See if routine is still in use */
+	for (fp = frame_pointer; fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))
+	{
+		if (rtnhdr == fp->rvector)
+			break; /* Found reference - not done with it */
+	}
+	if (NULL == fp)
+	{	/* We reached the end of the stack without finding the routine, seems ripe for cleaning */
+		assert(rtnhdr->old_rhead_adr->active_rhead_adr == rtnhdr);
+		assert(NULL == rtnhdr->active_rhead_adr);
+		zr_unlink_rtn(rtnhdr, FALSE);			/* Cleans up the copy */
+		assert(!rtnhdr->has_ZBREAK);
+		assert(!rtnhdr->old_rhead_adr->has_ZBREAK);	/* These should both be cleared now if ever set */
+		free(rtnhdr->labtab_adr);
+		rtnhdr->old_rhead_adr->active_rhead_adr = NULL;
+		free(rtnhdr);
+	}
+}
+#endif /* USHBIN_SUPPORTED */

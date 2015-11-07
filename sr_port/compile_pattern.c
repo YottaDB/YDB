@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@
 GBLREF spdesc		stringpool;
 GBLREF char		*lexical_ptr;
 GBLREF unsigned char	*source_buffer;
-GBLREF short int	source_column;
+GBLREF int		source_column;
 
 int compile_pattern(oprtype *opr, boolean_t is_indirect)
 {
@@ -70,6 +70,7 @@ int compile_pattern(oprtype *opr, boolean_t is_indirect)
 			stx_error(status);
 			return FALSE;
 		}
+		memset(&retmval, 0, SIZEOF(mval));
 		retmval.mvtype = MV_STR;
 		retmval.str.len = retstr.len * SIZEOF(uint4);
 		retmval.str.addr = (char *)stringpool.free;

@@ -26,7 +26,7 @@
 #endif
 
 GBLREF	unsigned char	*source_buffer;
-GBLREF	short int	source_column;
+GBLREF	int		source_column;
 GBLREF	char		*lexical_ptr;
 GBLREF	spdesc		stringpool;
 GBLREF	boolean_t	gtm_utf8_mode;
@@ -76,14 +76,15 @@ void advancewindow(void)
 		TREF(director_token) = TK_EOL;
 		return;		/* if next character is terminator, avoid incrementing past it */
 	case TK_QUOTE:
-		ENSURE_STP_FREE_SPACE(MAX_SRCLINE);
+		ENSURE_STP_FREE_SPACE(TREF(max_advancewindow_line));
 		cp1 = (unsigned char *)lexical_ptr + 1;
 		cp2 = cp3 = stringpool.free;
 		for (;;)
 		{
 #			ifdef UNICODE_SUPPORTED
 			if (gtm_utf8_mode)
-				cptr = (unsigned char *)UTF8_MBTOWC((sm_uc_ptr_t)cp1, source_buffer + MAX_SRCLINE, ch);
+				cptr = (unsigned char *)UTF8_MBTOWC((sm_uc_ptr_t)cp1, source_buffer + TREF(max_advancewindow_line),
+								    ch);
 #			endif
 			x = *cp1++;
 			if ((SP > x) UNICODE_ONLY(|| (gtm_utf8_mode && !(U_ISPRINT(ch)))))
@@ -178,7 +179,7 @@ void advancewindow(void)
 			break;
 	case TK_DIGIT:
 		(TREF(director_mval)).str.addr = lexical_ptr;
-		(TREF(director_mval)).str.len = MAX_SRCLINE;
+		(TREF(director_mval)).str.len = TREF(max_advancewindow_line);
 		(TREF(director_mval)).mvtype = MV_STR;
 		lexical_ptr = (char *)s2n(&(TREF(director_mval)));
 		if (!((TREF(director_mval)).mvtype &= MV_NUM_MASK))
@@ -293,6 +294,9 @@ void advancewindow(void)
  *
  * All other uses still prohibit '#' from being in an MNAME. Routines that need to allow # in a name can call this routine to
  * recombine the existing token and the look-ahead (director) token such that '#' is considered part of an mident.
+ *
+ * Update: Like '#', we need to allow '/' as well to allow for an overriding region name to be specified (where the
+ * trigger needs to be searched. So handle that as well in this same function.
  */
 void advwindw_hash_in_mname_allowed(void)
 {
@@ -310,9 +314,9 @@ void advwindw_hash_in_mname_allowed(void)
 	cp2 = ident_buffer + (TREF(window_ident)).len;
 	cp3 = ident_buffer + MAX_MIDENT_LEN;
 	*cp2++ = '#';	/* We are only called if director token is '#' so put that char in buffer now */
-	/* Start processing with the token following the '#' */
+	/* Start processing with the token following the '#'. Allow '#' and/or '/' in addition to usual stuff. */
 	for (x = *lexical_ptr, ch = ctypetab[x];
-	     ((TK_UPPER == ch) || (TK_DIGIT == ch) || (TK_LOWER == ch) || (TK_HASH == ch));
+	     ((TK_UPPER == ch) || (TK_DIGIT == ch) || (TK_LOWER == ch) || (TK_HASH == ch) || (TK_SLASH == ch));
 	     x = *++lexical_ptr, ch = ctypetab[x])
 	{
 		if (cp2 < cp3)

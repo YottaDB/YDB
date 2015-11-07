@@ -53,6 +53,7 @@
 #include "mupip_ftok.h"
 #include "mupip_endiancvt.h"
 #include "mupip_crypt.h"
+#include "mupip_hash.h"
 #include "gtmsource.h"
 #include "gtmrecv.h"
 #include "read_db_files_from_gld.h"	/* Needed for updproc.h */
@@ -61,6 +62,8 @@
 #ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
 #endif
+#include "mupip_rctldump.h"
+#include "mu_rndwn_rlnkctl.h"
 
 static CLI_ENTRY mup_set_journal_qual[] = {
 	{ "ALIGNSIZE",       0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
@@ -497,6 +500,7 @@ static CLI_ENTRY	gtmsource_qual[] = {
 	{"FILTER",               0, 0,                0,                      0, 0,                                  0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
 	{"FREEZE",               0, inst_freeze_qual, 0,                      0, 0,                                  0, VAL_NOT_REQ,    0, NON_NEG, VAL_STR, 0 },
 	{"INSTSECONDARY",        0, 0,                0,                      0, 0,                                  0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
+	{"JNLFILEONLY",          0, 0,                0,                      0, 0,                                  0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 	{"JNLPOOL",              0, inst_edit_qual,   0,                      0, cli_disallow_mupip_replic_editinst, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 	{"LOG",                  0, 0,                0,                      0, 0,                                  0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
 	{"LOG_INTERVAL",         0, 0,                0,                      0, 0,                                  0, VAL_REQ,        0, NON_NEG, VAL_NUM, 0 },
@@ -613,10 +617,15 @@ static	CLI_PARM	mup_rundown_parm[] = {
 	{ "", "", PARM_REQ}
 };
 
+/* Note: "R" is a duplicate of "REGION". It is there so -R usages continue to be treated as -REGION and not have an
+ * ambiguity with "RELINKCTL".
+ */
 static	CLI_ENTRY	mup_rundown_qual[] = {
-	{ "FILE",   	mupip_rundown, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-	{ "OVERRIDE",	mupip_rundown, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
-	{ "REGION", 	mupip_rundown, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+	{ "FILE",	mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+	{ "OVERRIDE",	mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+	{ "R",		mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+	{ "REGION",	mupip_rundown,    0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+	{ "RELINKCTL",	mu_rndwn_rlnkctl, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, 0,       0,       0 },
 	{ 0 }
 };
 
@@ -677,9 +686,10 @@ static readonly CLI_PARM mup_trig_sel_parm[] = {
 };
 
 static 	CLI_ENTRY	mup_trigger_qual[] = {
-{ "NOPROMPT",		  mupip_trigger, 0, 0,                 0, 0,		        0, VAL_NOT_REQ,	0, NON_NEG, VAL_STR,  0 },
-{ "SELECT",               mupip_trigger, 0, mup_trig_sel_parm, 0, 0,			0, VAL_NOT_REQ,	1, NON_NEG, VAL_STR,  0 },
-{ "TRIGGERFILE",	  mupip_trigger, 0, 0,                 0, 0,		        0, VAL_REQ,	0, NON_NEG, VAL_STR,  0 },
+{ "NOPROMPT",    mupip_trigger, 0, 0,                 0, 0, 0, VAL_NOT_REQ,     0, NON_NEG, VAL_STR,  0 },
+{ "SELECT",      mupip_trigger, 0, mup_trig_sel_parm, 0, 0, 0, VAL_NOT_REQ,     1, NON_NEG, VAL_STR,  0 },
+{ "TRIGGERFILE", mupip_trigger, 0, 0,                 0, 0, 0, VAL_REQ,         0, NON_NEG, VAL_STR,  0 },
+{ "UPGRADE",     mupip_trigger, 0, 0,                 0, 0, 0, VAL_DISALLOWED,  0, NON_NEG, VAL_N_A,  0 },
 { 0 }
 };
 #endif
@@ -704,6 +714,11 @@ static	CLI_ENTRY	mup_downgrade_qual[] = {
 { 0 }
 };
 
+static	CLI_PARM	mup_rctldump_parm[] = {
+	{ "DIRECTORY", "Directory: ", PARM_REQ},
+	{ "",          "",            PARM_REQ}
+};
+
 GBLDEF	CLI_ENTRY	mupip_cmd_ary[] = {
 { "BACKUP",	mupip_backup,	mup_backup_qual,	mup_backup_parm,	0, cli_disallow_mupip_backup,	0, VAL_DISALLOWED, 2, 0, 0, 0 },
 { "CONVERT",	mupip_cvtpgm,	mup_convert_qual,	mup_convert_parm,	0, 0,				0, VAL_DISALLOWED, 2, 0, 0, 0 },
@@ -716,12 +731,14 @@ GBLDEF	CLI_ENTRY	mupip_cmd_ary[] = {
 { "EXTRACT",	mu_extract,	mup_extract_qual,	mup_extract_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "FREEZE",	mupip_freeze,	mup_freeze_qual,	mup_freeze_parm,	0, cli_disallow_mupip_freeze,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "FTOK",	mupip_ftok,	mup_ftok_qual,		mup_ftok_parm,		0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
+{ "HASH",	mupip_hash,	0,			0,			0, 0,				0, VAL_DISALLOWED, MAX_PARMS, 0, 0, 0 },
 { "HELP",	util_help,	0,			0,			0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "INTEG",	mupip_integ,	mup_integ_qual,		mup_integ_parm,		0, cli_disallow_mupip_integ,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "INTRPT",	mupip_intrpt,	0,			mup_intrpt_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "JOURNAL",	mupip_recover,	mup_journal_qual,	mup_journal_parm,	0, cli_disallow_mupip_journal,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "LOAD",	mupip_cvtgbl,	mup_load_qual,		mup_load_parm,		0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "QUIT",	mupip_quit,	0,			0,			0, 0,				0, VAL_DISALLOWED, 0, 0, 0, 0 },
+{ "RCTLDUMP",	mupip_rctldump, 0,                      mup_rctldump_parm,	0, 0,				0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "REORG",	mupip_reorg,	mup_reorg_qual,		mup_reorg_parm,		0, cli_disallow_mupip_reorg,	0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "REPLICATE",	0,		mup_replicate_qual,	mup_replicate_parm,	0, cli_disallow_mupip_replicate,0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "RESTORE",	mupip_restore,	mup_restore_qual,	mup_restore_parm,	0, 0,				0, VAL_DISALLOWED, 2, 0, 0, 0 },

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,6 +91,7 @@ typedef struct
 	mval			*ztvalue_save;		/* Save it once per trigger level */
 	mstr			*ztname_save;
 	mval			*ztdata_save;
+	mval			*ztdelim_save;
 	mval			*ztoldval_save;
 	mval			*ztriggerop_save;
 	mval			*ztupdate_save;
@@ -237,24 +238,24 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #define	MVST_LAST	18	/* update this, mvs_size and mvs_save in mtables.c, and switches in unw_mv_ent.c,
 				 * stp_gcol_src.h, and get_ret_targ.c when adding a new MVST type */
 
-/* Variation of ROUND_UP2 macro that doesn't have the checking that generates a GTMASSERT. This is necessary because the
- * MV_SIZE macro is used in a static table initializer so cannot have executable (non-constant) code in it
+/* Variation of ROUND_UP2 macro that doesn't have the checking that generates an assertpro. This is necessary because
+ * the MV_SIZE macro is used in a static table initializer so cannot have executable (non-constant) code in it
  */
 #define ROUND_UP2_NOCHECK(VALUE,MODULUS) (((VALUE) + ((MODULUS) - 1)) & ~((MODULUS) - 1))
 #define MV_SIZE(X) \
         ROUND_UP2_NOCHECK(((SIZEOF(*mv_chain) - SIZEOF(mv_chain->mv_st_cont) + SIZEOF(mv_chain->mv_st_cont.X))), NATIVE_WSIZE)
 
-#define PUSH_MV_STENT(T) (((msp -= mvs_size[T]) <= stackwarn) ?							\
-	((msp <= stacktop) ? (msp += mvs_size[T]/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) :	\
-	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) :								\
-	(((mv_stent *)msp)->mv_st_type = T ,									\
-	((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)),				\
+#define PUSH_MV_STENT(T) (((msp -= mvs_size[T]) <= stackwarn) ?									\
+	((msp <= stacktop) ? (msp += mvs_size[T]/* fix stack */, rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW)) :	\
+	 rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT)) :								\
+	(((mv_stent *)msp)->mv_st_type = T ,											\
+	((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)),						\
 	mv_chain = (mv_stent *)msp)
 
 #define PUSH_MV_STCK(size, st_type) (((msp -= ROUND_UP(mvs_size[st_type] + (size), SIZEOF(char *))) <= stackwarn) ?	\
 	((msp <= stacktop) ? (msp += ROUND_UP(mvs_size[st_type] + (size), SIZEOF(char *)) /* fix stack */,		\
-        rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) :									\
-	rts_error(VARLSTCNT(1) ERR_STACKCRIT)) :									\
+        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW)) :							\
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT)) :							\
 	(((mv_stent *)msp)->mv_st_type = st_type,									\
 	((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)),					\
 	mv_chain = (mv_stent *)msp)

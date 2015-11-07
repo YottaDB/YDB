@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,10 +30,6 @@
  * associated with each error message is whether it can trigger anticipatory freeze or not.
  */
 #define MERRORS_ARRAY_SZ		(2 * 1024)	/* 2k should be enough for a while */
-
-#ifdef VMS
-#define MAX_GSEC_KEY_LEN		32 /* 31 is allowed + 1 for NULL terminator */
-#endif
 
 enum
 {
@@ -350,10 +346,12 @@ typedef struct
 	int4			shutdown_time;		/* Time allowed for shutdown in seconds */
 	char			filter_cmd[MAX_FILTER_CMD_LEN];	/* command to run to invoke the external filter (if needed) */
 	global_latch_t		gtmsource_srv_latch;
+	boolean_t		jnlfileonly;		/* Current source server is only reading from journal files */
 #	ifdef GTM_TLS
 	uint4			next_renegotiate_time;	/* Time (in future) at which the next SSL/TLS renegotiation happens. */
 	int4			num_renegotiations;	/* Number of SSL/TLS renegotiations that happened so far. */
 #	endif
+	int4			padding;		/* Keep size % 8 == 0 */
 } gtmsource_local_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -387,14 +385,6 @@ typedef gtmsource_local_struct *gtmsource_local_ptr_t;
 #define	JNLPOOL_CRIT_SIZE	(JNLPOOL_CRIT_SPACE + SIZEOF(mutex_spin_parms_struct) + SIZEOF(node_local))
 #define JNLDATA_BASE_OFF	(JNLPOOL_CTL_SIZE + JNLPOOL_CRIT_SIZE + REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE + GTMSOURCE_LOCAL_SIZE)
 
-#ifdef VMS
-typedef struct
-{
-	char			name[MAX_GSEC_KEY_LEN];
-	struct dsc$descriptor_s desc;
-} t_vms_shm_key;
-#endif
-
 /* the below structure has various fields that point to different sections of the journal pool */
 typedef struct
 {
@@ -405,11 +395,6 @@ typedef struct
 	repl_inst_hdr_ptr_t	repl_inst_filehdr;	/* pointer to the instance file header section in the journal pool */
 	gtmsrc_lcl_ptr_t	gtmsrc_lcl_array;	/* pointer to the gtmsrc_lcl array section in the journal pool */
 	sm_uc_ptr_t		jnldata_base;		/* pointer to the start of the actual journal record data */
-#ifdef VMS
-	sm_uc_ptr_t		shm_range[2];
-	t_vms_shm_key		vms_jnlpool_key;
-	int4			shm_lockid;
-#endif
 } jnlpool_addrs;
 
 #if defined(__osf__) && defined(__alpha)
@@ -459,6 +444,7 @@ typedef struct
 	boolean_t	setfreeze;	/* TRUE if -FREEZE was specified with a value, FALSE otherwise */
 	boolean_t	freezeval;	/* TRUE for -FREEZE=ON, FALSE for -FREEZE=OFF */
 	boolean_t	setcomment;	/* TRUE if -COMMENT was specified, FALSE otherwise */
+	boolean_t	jnlfileonly;	/* TRUE if -JNLFILEONLY was specified, FALSE otherwise */
 	int4		cmplvl;
 	int4		shutdown_time;
 	int4		buffsize;

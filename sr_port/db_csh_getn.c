@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,10 +75,10 @@ error_def(ERR_INVALIDRIP);
 
 cache_rec_ptr_t	db_csh_getn(block_id block)
 {
-	cache_rec_ptr_t		hdr, q0, start_cr, cr;
+	cache_rec_ptr_t		cr, hdr, midnite, our_midnite, q0, start_cr;
 	bt_rec_ptr_t		bt;
 	unsigned int		lcnt, ocnt;
-	int			rip, max_ent, pass1, pass2, pass3;
+	int			max_ent, pass0, pass0cnt, pass1, pass2, pass3, rip;
 	int4			flsh_trigger;
 	uint4			first_r_epid, latest_r_epid;
 	sgmnt_addrs		*csa;
@@ -95,15 +95,27 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	assert(csa->now_crit);
 	assert(csa == &FILE_INFO(gv_cur_region)->s_addrs);
 	max_ent = csd->n_bts;
-	cr = (cache_rec_ptr_t)GDS_REL2ABS(csa->nl->cur_lru_cache_rec_off);
 	hdr = csa->acc_meth.bg.cache_state->cache_array + (block % csd->bt_buckets);
 	start_cr = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
-	pass1 = max_ent;	/* skip referred or dirty or read-into cache records */
-	pass2 = 2 * max_ent;	/* skip referred cache records */
-	pass3 = 3 * max_ent;	/* skip nothing */
-	dont_flush_buff = gv_cur_region->read_only UNIX_ONLY(||
-		(!(dollar_tlevel ? sgm_info_ptr->update_trans : update_trans) && IS_REPL_INST_FROZEN)
-	);
+	pass0 = csa->gbuff_limit;		/* gbuff_limit set by VIEW "POOLLIMIT":<region> */
+	pass0cnt = (0 == pass0) ? 0 : 2;	/* used both as a flag we are limiting and a counter for 2 limited trips */
+	pass1 = max_ent;			/* skip referred or dirty or read-into cache records */
+	pass2 = 2 * max_ent;			/* skip referred cache records */
+	pass3 = 3 * max_ent;			/* skip nothing */
+	midnite = start_cr + max_ent;		/* "on the clock" - point at which we have to wrap or change tactics */
+	cr = (cache_rec_ptr_t)GDS_REL2ABS(csa->nl->cur_lru_cache_rec_off);
+	if (pass0cnt)
+	{
+		our_midnite = csa->our_midnite;		/* local copy of private "hand" for efficiency - only used if pass0cnt */
+		cr = our_midnite - pass0;		/* direct this process to an area behind our chosen spot */
+		if (cr < start_cr)
+			cr += max_ent;			/* we have to wrap before we use our_midnite */
+		else
+			midnite = our_midnite;
+	}
+	assert((start_cr <= cr) && ((start_cr + max_ent) > cr));
+	dont_flush_buff = gv_cur_region->read_only
+		 UNIX_ONLY(|| (!(dollar_tlevel ? sgm_info_ptr->update_trans : update_trans) && IS_REPL_INST_FROZEN));
 	INCR_DB_CSH_COUNTER(csa, n_db_csh_getns, 1);
 	DEFER_INTERRUPTS(INTRPT_IN_DB_CSH_GETN);
 	for (lcnt = 0;  ; lcnt++)
@@ -115,8 +127,36 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			break;
 		}
 		cr++;
-		if (cr == start_cr + max_ent)
+		if (cr == midnite)
+		{
 			cr = start_cr;
+			if (pass0cnt)
+			{	/* doing restricted looking */
+				if (midnite != our_midnite)
+				{	/* "ordinary" end of buffer - wrap and set up private stop */
+					assert((start_cr + max_ent) == midnite);
+					midnite = our_midnite;
+				} else
+				{	/* the end of our restricted area */
+					if (--pass0cnt)
+					{	/* if limiting and in pass0, do a 2nd scan of the limit area */
+						cr = our_midnite - pass0;		/* in our restricted area */
+						if (cr < start_cr)
+						{	/* wrap before our_midnite */
+							cr += max_ent;
+							midnite = start_cr + max_ent;
+						}
+					} else
+					{	/* or the limited area did not suffice - adopt the normal clock */
+						cr = (cache_rec_ptr_t)GDS_REL2ABS(csa->nl->cur_lru_cache_rec_off);
+						midnite = start_cr + max_ent;
+					}
+					assert((pass0cnt + lcnt) == pass0);
+					lcnt = 0;
+				}
+			}
+		}
+		assert((start_cr <= cr) && ((start_cr + max_ent) > cr));
 		VMS_ONLY(
 			if ((lcnt == pass1) || (lcnt == pass2))
 				wcs_wtfini(gv_cur_region);
@@ -266,7 +306,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				if (cr->read_in_progress < -1)
 				{
 					BG_TRACE_PRO(db_csh_getn_out_of_design);  /* outside of design; clear to known state */
-					send_msg(VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(gv_cur_region));
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(gv_cur_region));
 					assert(cr->r_epid == 0);
 					cr->r_epid = 0;
 					INTERLOCK_INIT(cr);
@@ -295,12 +335,11 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				BG_TRACE_PRO(db_csh_getn_buf_owner_stuck);
 				if (0 != latest_r_epid)
 				{
-					if (first_r_epid != latest_r_epid)
-						GTMASSERT;
+					assertpro(first_r_epid == latest_r_epid);
 					GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, latest_r_epid,
 								DEBUG_ONLY(TWICE) PRO_ONLY(ONCE));
 					RELEASE_BUFF_READ_LOCK(cr);
-					send_msg(VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id,
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id,
 						 cr->blk, cr, first_r_epid, DB_LEN_STR(gv_cur_region));
 					continue;
 				}
@@ -348,7 +387,8 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		q0 = (cache_rec_ptr_t)((sm_uc_ptr_t)cr + cr->blkque.fl);
 		shuffqth((que_ent_ptr_t)q0, (que_ent_ptr_t)hdr);
 		assert(0 == cr->dirty);
-		csa->nl->cur_lru_cache_rec_off = GDS_ABS2REL(cr);
+		if (!pass0cnt)
+			csa->nl->cur_lru_cache_rec_off = GDS_ABS2REL(cr);
 		if (lcnt > pass1)
 			csa->nl->cache_hits = 0;
 		csa->nl->cache_hits++;

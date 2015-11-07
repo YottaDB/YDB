@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@
 #include "stack_frame.h"
 
 GBLREF unsigned char 		*source_buffer;
-GBLREF short int 		source_column;
+GBLREF int	 		source_column;
 GBLREF spdesc 			stringpool;
 GBLREF mv_stent			*mv_chain;
 GBLREF unsigned char		*msp, *stackwarn, *stacktop;

@@ -72,7 +72,7 @@ int op_fnzsearch(mval *file, mint indx, mint mfunc, mval *ret)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (mfunc && ((MAX_STRM_CT < indx) || ( 0 > indx)))	/* Allow out-of-range stream if internal call */
+	if (mfunc && ((MAX_STRM_CT <= indx) || ( 0 > indx)))	/* Allow out-of-range stream if internal call */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSRCHSTRMCT);
 	ESTABLISH_RET(fnzsrch_ch, -1);
 	TREF(fnzsearch_nullsubs_sav) = TREF(lv_null_subs);

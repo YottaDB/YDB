@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,15 +65,33 @@
 		free(base);							\
 }
 
-/*
-Different Hash Computation Macros for Strings:
-All these were experminted and result is given in the design document of V5.0-000 longname project.
-For now we decided to use ELF_HASH.
-Do not remove the commented out section below which has all the hash functions.
-We can remove them when we are certain that ELF_HASH is the best choice for us.
-*/
-
+/* For string hashing, ELF hash was found to be the best during the V5.0-000 longnames project.
+ * During V6.2-001, Murmur3 hash was found to be much better than ELF in terms of # of collisions.
+ * So we are going with MMR hash for now in Unix. In VMS, we dont yet have mmrhash.c so we continue
+ * to use ELF hash there (no point spending time to move mmrhash.c from sr_unix to sr_port).
+ * In addition, the 32-bit murmur3 hash gives different values for the same input on different endian
+ * machines which would not work at least for triggers since we expect the trigger definition M code to
+ * hash to the same value on different endian machines (this is needed so mupip endiancvt does not need
+ * to worry about changing ^#t(.*TRHASH.*) nodes. Therefore we came up with a modified 32-bit murmur3 hash
+ * implementation that is endian independent (gtmmrhash_32).
+ */
+#ifdef UNIX
+#include "mmrhash.h"
+#define STR_HASH(KEY, LEN, HASH, SEED) gtmmrhash_32(KEY, LEN, SEED, (uint4 *)&HASH)
+/* The STR_PHASH* macros are the progressive variants of the STR_HASH macro. */
+#define	STR_PHASH_INIT(STATE, TOTLEN)			HASH128_STATE_INIT(STATE, 0); TOTLEN = 0
+#define	STR_PHASH_PROCESS(STATE, TOTLEN, KEY, LEN)	gtmmrhash_128_ingest(&STATE, KEY, LEN); TOTLEN += LEN
+#define	STR_PHASH_RESULT(STATE, TOTLEN, OUT4)			\
+{								\
+	gtm_uint16	out16;					\
+								\
+	gtmmrhash_128_result(&STATE, TOTLEN, &out16);		\
+	OUT4 = (uint4)out16.one;				\
+}
+#else
 #define STR_HASH ELF_HASH
+#endif
+
 #define ELF_HASH(sptr, len, hash, init_hashval)						\
 {											\
 	uint4	tempint;								\
@@ -88,62 +106,5 @@ We can remove them when we are certain that ELF_HASH is the best choice for us.
 	}										\
 	hash = hcode;									\
 }
-
-/*
-#define CHAR_BITS 8
-#define BITS_IN_int     (SIZEOF(int) * CHAR_BITS)
-#define THREE_QUARTERS  (BITS_IN_int * 3 / 4)
-#define ONE_EIGHTH      (BITS_IN_int / 8)
-#define HIGH_BITS       (~((unsigned int)(~0) >> ONE_EIGHTH ))
-#define PJW_HASH(sptr, len, hash, init_hashval)				\
-{									\
-	uint4 	tempint;						\
-	char *curr, *top;						\
-	hash = init_hashval;						\
-	for (curr = sptr, top = sptr + len; curr < top; curr++)		\
-	{								\
-		hash = ( hash << ONE_EIGHTH ) + *curr;			\
-		if ((tempint = hash & HIGH_BITS ) != 0 )		\
-			hash = ( hash ^ ( tempint >> THREE_QUARTERS )) & ~HIGH_BITS;\
-	}								\
-}
-
-
-#define MISC1_HASH(sptr, len, hash, init_hashval)			\
-{									\
-	char *curr;							\
-	curr = sptr;							\
-	int indx;							\
-	hash = init_hashval;						\
-	for (indx = 0; indx < len; indx++, curr++)			\
-		hash += (*curr * (len - indx));				\
-}
-#define MISC2_HASH(sptr, len, hash, init_hashval)			\
-
-{									\
-	char *curr;							\
-	curr = sptr;							\
-	int indx;							\
-	hash = init_hashval;						\
-	for (indx = 0; indx < len; indx++, curr++)			\
-		hash = hash*31 + *curr;					\
-}
-
-#define CURR_HASH(sptr, len, hash, init_hashval)			\
-{									\
-	char *ptr, tchar[MAXLEN];					\
-	int	indx;							\
-	uint4 temp1 = 0;						\
-	uint4 temp2 = 0;						\
-	memset(tchar, 0, MAXLEN);					\
-	memcpy(tchar, sptr, len);					\
-	ptr = &tchar[0];						\
-	for ( indx = 0; indx < 4; indx++, ptr++)			\
-		temp1 = temp1 * 256 + *ptr ;				\
-	for ( ; indx < 8; indx++, ptr++)				\
-		temp2 = temp2 * 256 + *ptr ;				\
-	hash = (temp1 << 1) ^ (temp2) ;					\
-}
-*/
 
 #endif

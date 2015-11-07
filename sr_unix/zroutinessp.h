@@ -32,7 +32,7 @@ typedef	struct zro_ent_type
 {
 	uint4		type;
 	uint4		count;
-	mstr		str;			/* Path name; str.addr is malloc'd TODO: why malloc'd?*/
+	mstr		str;			/* Path name */
 	void_ptr_t	shrlib; 		/* Result of dlopen(), if a shared library */
 	void_ptr_t	shrsym; 		/* Placeholder for result of fgn_getrtn(), which we pass from zro_search() to
 						 * incr_link().
@@ -43,5 +43,8 @@ typedef	struct zro_ent_type
 int zro_gettok(char **lp, char *top, mstr *tok);
 void zsrch_clr(int indx);
 void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, boolean_t skip);
+#ifdef AUTORELINK_SUPPORTED
+zro_hist *zro_search_hist(char *objnamebuf, zro_ent **objdir);
+#endif
 
 #endif /* ZROUTINESSP_H_INCLUDED */

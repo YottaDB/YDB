@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@
 #include "mvalconv.h"
 #include "namelook.h"
 
-GBLREF short int 	source_column;
+GBLREF int	 	source_column;
 GBLREF uint4 		pat_everything[];
 GBLREF mstr_len_t	sizeof_pat_everything;
 

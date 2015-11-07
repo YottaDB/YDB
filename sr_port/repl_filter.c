@@ -60,35 +60,37 @@
 #include "gtm_c_stack_trace.h"
 #include "fork_init.h"
 #endif
-#ifdef DEBUG
 #include "wbox_test_init.h"
-#endif
 #ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 #include <sys/poll.h>
 #endif
+#ifdef GTM_TRIGGER
+#include "trigger.h"
+#endif
 
-#define NULLSUBSC_TRANSFORM_IF_NEEDED(PTR)					\
-{										\
-	int			keylen;						\
-	uchar_ptr_t		lclptr;						\
-	DCL_THREADGBL_ACCESS;							\
-										\
-	SETUP_THREADGBL_ACCESS;							\
-	if (REMOTE_NULL_SUBS_XFORM)						\
-	{									\
-		assert(SIZEOF(jnl_str_len_t) == SIZEOF(uint4));			\
-		keylen = *((jnl_str_len_t *)(PTR));				\
-		keylen &= 0xFFFFFF;	/* to remove 8-bit nodeflags if any */	\
-		lclptr = PTR + SIZEOF(jnl_str_len_t);				\
-		if (STDNULL_TO_GTMNULL_COLL == REMOTE_NULL_SUBS_XFORM)		\
-		{								\
-			STD2GTMNULLCOLL(lclptr, keylen);			\
-		} else								\
-		{								\
-			GTM2STDNULLCOLL(lclptr, keylen);			\
-		}								\
-	}									\
-}										\
+/* Do not apply null subscript transformations to LGTRIG and ZTWORM type records */
+#define NULLSUBSC_TRANSFORM_IF_NEEDED(RECTYPE, PTR)					\
+{											\
+	int			keylen;							\
+	uchar_ptr_t		lclptr;							\
+	DCL_THREADGBL_ACCESS;								\
+											\
+	SETUP_THREADGBL_ACCESS;								\
+	if (!IS_ZTWORM(rectype) && !IS_LGTRIG(rectype) && REMOTE_NULL_SUBS_XFORM)	\
+	{										\
+		assert(SIZEOF(jnl_str_len_t) == SIZEOF(uint4));				\
+		keylen = *((jnl_str_len_t *)(PTR));					\
+		keylen &= 0xFFFFFF;	/* to remove 8-bit nodeflags if any */		\
+		lclptr = PTR + SIZEOF(jnl_str_len_t);					\
+		if (STDNULL_TO_GTMNULL_COLL == REMOTE_NULL_SUBS_XFORM)			\
+		{									\
+			STD2GTMNULLCOLL(lclptr, keylen);				\
+		} else									\
+		{									\
+			GTM2STDNULLCOLL(lclptr, keylen);				\
+		}									\
+	}										\
+}											\
 
 #define BREAK_IF_BADREC(RECLEN, STATUS)				\
 {								\
@@ -202,7 +204,8 @@
 	nodelen = *((uint4 *)jb);										\
 	assert(tail_minus_suffix_len >= (SIZEOF(jnl_str_len_t) + nodelen));					\
 	memcpy(cb, jb, tail_minus_suffix_len);									\
-	NULLSUBSC_TRANSFORM_IF_NEEDED(cb);									\
+	/* V17 did not support triggers, no need to send the actual rectype */					\
+	NULLSUBSC_TRANSFORM_IF_NEEDED(SET_KILL_ZKILL_MASK , cb);						\
 	jb += tail_minus_suffix_len;										\
 	cb += tail_minus_suffix_len;										\
 }
@@ -272,7 +275,8 @@
 	 */													\
 	((jnl_string *)cb)->nodeflags = 0;									\
 	GET_JREC_UPD_TYPE(jb, trigupd_type);									\
-	NULLSUBSC_TRANSFORM_IF_NEEDED(cb);									\
+	/* Caller excludes ZTWORM and LGTRIG already, no need to send the actual rectype */			\
+	NULLSUBSC_TRANSFORM_IF_NEEDED(SET_KILL_ZKILL_MASK , cb);						\
 	jb += tail_minus_suffix_len;										\
 	cb += tail_minus_suffix_len;										\
 }
@@ -408,26 +412,28 @@ enum
 
 GBLDEF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
-	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V24 to V17) */
-	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V24 to V18) */
-	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V24 to V19) */
-	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V24 to V20) */
-	IF_24TO21,	/* Convert from filter format V24 to V21 (i.e., from jnl ver V24 to V21) */
-	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V24 to V22) */
-	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V24 to V23) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V24 to V24) */
+	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V25 to V17) */
+	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V25 to V18) */
+	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V25 to V19) */
+	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V25 to V20) */
+	IF_24TO21,	/* Convert from filter format V24 to V21 (i.e., from jnl ver V25 to V21) */
+	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V25 to V22) */
+	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V25 to V23) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V24) */
+	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V25) */
 };
 
 GBLDEF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
-	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V17 to V24) */
-	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V18 to V24) */
-	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V19 to V24) */
-	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V20 to V24) */
-	IF_21TO24,	/* Convert from filter format V21 to V24 (i.e., from jnl ver V21 to V24) */
-	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V22 to V24) */
-	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V23 to V24) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V24 to V24) */
+	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V17 to V25) */
+	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V18 to V25) */
+	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V19 to V25) */
+	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V20 to V25) */
+	IF_21TO24,	/* Convert from filter format V21 to V24 (i.e., from jnl ver V21 to V25) */
+	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V22 to V25) */
+	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V23 to V25) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V24 to V25) */
+	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V25) */
 };
 
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
@@ -446,6 +452,8 @@ GBLREF boolean_t		heartbeat_started;
 #endif
 #endif
 GBLREF	uint4			process_id;
+
+LITREF	char			*trigger_subs[];
 
 error_def(ERR_FILTERBADCONV);
 error_def(ERR_FILTERCOMM);
@@ -631,7 +639,8 @@ int repl_filter_init(char *filter_cmd)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Could not exec filter"), ERRNO);
 			repl_errno = EREPL_FILTERSTART_EXEC;
-			return(FILTERSTART_ERR);
+			UNIX_ONLY(_exit(FILTERSTART_ERR);)
+			VMS_ONLY(return(FILTERSTART_ERR);) /* maintain existing for VMS */
 		}
 	} else
 	{	/* Error in fork */
@@ -1201,53 +1210,6 @@ void repl_check_jnlver_compat(UNIX_ONLY(boolean_t same_endianness))
 #	endif
 }
 
-static void upgrd_V19_hasht_xecute_string_to_V24(uchar_ptr_t jb, uchar_ptr_t cb, jnl_string *keystr, char *xecute_val_ptr,
-		uint4 *conv_reclen)
-{	/* Upgrade the ^#t("GBL",1,"XECUTE") node's value to the xecute string format supported in V5.4-002 (and later).
-	 * Before V5.4-002, the xecute string is stored as-is in the database. But, from V5.4-002, the xecute string is
-	 * stored differently based on whether it is a single-line trigger xecute string or a multi-line trigger xecute
-	 * string. If former, the xecute string is prefixed with a <SPACE> character. If latter, no <SPACE> is prefixed.
-	 * Since, V5.4-001 does NOT support multi-line triggers, all we need is to prefix the xecute string with <SPACE>
-	 */
-	 uint4			tmp_jrec_size, jrec_size, align_fill_size;
-	 uchar_ptr_t		srcptr;
-	 int			valstrlen, new_valstrlen;
-
-	/* An update-type journal record is formatted as follows:
-	 *
-	 * [FIXED_UPD_RECLEN][KEYLEN][NODEFLAGS][KEY][\0][VALUE_LEN][VALUE][PADDING_ZEROS][JREC_SUFFIX_SIZE]
-	 *
-	 * The input parameter 'xecute_val_ptr' points to the beginning of VALUE_LEN in the above journal format. Since
-	 * <SPACE> is added to the xecute string, this will affect the VALUE_LEN, PADDING_ZEROS, record length.
-	 * Note: 'cb' already has a copy of 'jb' and 'xecute_val_ptr' is a pointer inside 'cb'
-	 */
-	GET_MSTR_LEN(valstrlen, xecute_val_ptr); 	/* get the length of the value */
-	new_valstrlen = valstrlen + 1;
-	PUT_MSTR_LEN(xecute_val_ptr, new_valstrlen);
-	/* new record size and padding byte calculations */
-	tmp_jrec_size = FIXED_UPD_RECLEN
-				+ SIZEOF(jnl_str_len_t) + keystr->length
-				+ SIZEOF(mstr_len_t) + (valstrlen + 1)
-				+ JREC_SUFFIX_SIZE;
-	jrec_size = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY); /* new record size (aligned to 8 byte boundary) */
-	align_fill_size = jrec_size - tmp_jrec_size; /* necessary padding bytes */
-	/* add <SPACE> and copy the xecute string */
-	xecute_val_ptr += SIZEOF(mstr_len_t);		/* move to the beginning of the 'value' */
-	srcptr = jb + ((uchar_ptr_t)xecute_val_ptr - cb - 8);	/* pointer to the xecute string from the source buffer.
-								 * -8 needed because "strm_seqno" is absent in source. */
-	*xecute_val_ptr++ = ' ';			/* add the much needed <SPACE> */
-	memcpy(xecute_val_ptr, srcptr, valstrlen);	/* copy the actual xecute string */
-	xecute_val_ptr += valstrlen;
-	memset(xecute_val_ptr, 0, align_fill_size);	/* padding zeros for 8 byte alignment */
-	xecute_val_ptr += align_fill_size;		/* points to suffix */
-	/* fill suffix */
-	((jrec_suffix *)(xecute_val_ptr))->backptr = jrec_size;
-	((jrec_suffix *)(xecute_val_ptr))->suffix_code = JNL_REC_SUFFIX_CODE;
-	assert((0 != *conv_reclen) && !(*conv_reclen % JNL_REC_START_BNDRY));
-	if (*conv_reclen != jrec_size)
-		((jrec_prefix *)(cb))->forwptr = *conv_reclen = jrec_size;
-}
-
 /* The following code defines the functions that convert one jnl format to another.
  * The only replicated records we expect to see here are *SET* or *KILL* or TCOM or NULL records.
  * These fall under the following 3 structure types each of which is described for the different jnl formats we handle.
@@ -1336,6 +1298,7 @@ static void upgrd_V19_hasht_xecute_string_to_V24(uchar_ptr_t jb, uchar_ptr_t cb,
  *	This means, we need to have 8 more bytes in the conversion buffer for NULL type of records.
  * (d) If the null collation is different between primary and secondary (null_subs_xform) then appropriate conversion
  *     is needed
+ * (e) Note that V17 did not support triggers so dont need to check for ^#t or ZTRIG or ZTWORM or LGTRIG records.
  * Reformat accordingly.
  */
 int jnl_v17TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz)
@@ -1432,7 +1395,7 @@ int jnl_v17TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
  * (a) Since the remote side (V17) does NOT support triggers, skip ^#t, ZTWORM/LGTRIG/ZTRIG journal records
  *	& reset nodeflags (if set). If the entire transaction consists of skipped records, send a NULL record instead.
  *
- * Note: Although (1) is trigger specific, the logic should be available for trigger non-supporting platorms as well to
+ * Note: Although (a) is trigger specific, the logic should be available for trigger non-supporting platorms as well to
  * handle replication scenarios like V5.4-001 (TS) -> V5.4-002 (NTS) -> V4.4-004 (NTS) where TS indicates a trigger supporting
  * platform and NTS indicates either a version without trigger support OR is running on trigger non-supporting platform.
  */
@@ -1446,7 +1409,7 @@ int jnl_v24TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	jrec_prefix 		*prefix;
 	seq_num			this_upd_seqno;
 	uint4 			trigupd_type = NO_TRIG_JREC;
-	DEBUG_ONLY(boolean_t	non_ztrig_rec_found = FALSE;)
+	DEBUG_ONLY(boolean_t	non_trig_rec_found = FALSE;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1490,10 +1453,7 @@ int jnl_v24TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			jb += t_len;
 			if (is_set_kill_zkill_ztrig)
 			{
-				DEBUG_ONLY(
-					if (!IS_ZTRIG(rectype))
-						non_ztrig_rec_found = TRUE;
-				)
+				DEBUG_ONLY(non_trig_rec_found = TRUE;)
 				assert((cb - cstart) == (OFFSETOF(struct_jrec_upd, token_seq) + SIZEOF(token_seq_t)));
 				/* side-effect: increments cb and jb and GTM Null Collation or Standard Null Collation applied */
 				INITIALIZE_V17_MUMPS_NODE_FROM_V24(cstart, cb, jstart, jb, trigupd_type, FALSE);
@@ -1586,7 +1546,7 @@ int jnl_v24TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			 * (b) If the only records in a transaction are ZTRIG records and a TCOM record.
 			 * In both the above cases we need to send a NULL record instead.
 			 */
-			assert((HASHT_JREC == trigupd_type) || (FALSE == non_ztrig_rec_found));
+			assert((HASHT_JREC == trigupd_type) || (FALSE == non_trig_rec_found));
 			prefix = (jrec_prefix *)(cb);
 			if (V17_NULL_RECLEN > conv_bufsiz)
 			{
@@ -1610,8 +1570,8 @@ int jnl_v24TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
  * (b) If the receiver side does NOT support triggers, then skip ^#t/ZTWORM journal records & reset nodeflags (if set).
  *	Note that V19 did not support ZTRIG or LGTRIG records so dont need to check for them.
  *	If the entire transaction consists of skipped records, send a NULL record instead.
- * (c) If receiver side does support triggers, then fix ^#t("GBL","#LABEL") and ^#t("GBL",1,"XECUTE") to reflect newer format.
- *
+ * (c) If receiver side does support triggers, then issue error if ^#t records are found as those are not allowed in
+ *	the replication stream from V62001 onwards.
  * Note : For both (a) and (b), ZTRIG type of records are not possible in V19 (they start only from V21).
  * Reformat accordingly.
  */
@@ -1676,6 +1636,14 @@ int jnl_v19TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 						jb = jb + reclen;
 						jlen -= reclen;
 						continue;
+					} else if (HASHT_JREC == trigupd_type)
+					{	/* Journal record has a #t global. #t records are no longer allowed to V24,
+						 * only LGTRIG records are. But since the source version does not support
+						 * LGTRIG records, issue error.
+						 */
+						repl_errno = EREPL_INTLFILTER_PRILESSTHANV62;
+						status = -1;
+						break;
 					}
 				} else if (HASHT_JREC == trigupd_type)
 				{	/* Journal record has a #t global. #t records are not replicated if the secondary does not
@@ -1696,38 +1664,9 @@ int jnl_v19TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				memcpy(cb + V19_UPDATE_NUM_OFFSET + 8, jb + V19_UPDATE_NUM_OFFSET,
 					conv_reclen - 8 - V19_UPDATE_NUM_OFFSET);
 				mumps_node_ptr = cstart + V24_MUMPS_NODE_OFFSET;
-				if (HASHT_JREC == trigupd_type)
-				{	/* ^#t record */
-					assert(receiver_supports_triggers);
-					keystr = (jnl_string *)mumps_node_ptr;
-					keyend = &keystr->text[keystr->length - 1];
-					if (!MEMCMP_LIT((keyend - LITERAL_HASHLABEL_LEN), LITERAL_HASHLABEL))
-					{	/* ^#t("GBL","#LABEL") found. Adjust the value of this node to be equal to
-						 * HASHT_GBL_CURLABEL as the secondary is the latest trigger supported version.
-						 * But, we should do this ONLY if this is a SET record.
-						 */
-						if (IS_SET(rectype))
-						{	/* Upgrade the #LABEL to the current version's #LABEL */
-							/* '+ 1' below is to account for '- 1' done above */
-							ptr = keyend + SIZEOF(mstr_len_t) + 1;
-							assert(0 == MEMCMP_LIT(ptr, V19_HASHT_GBL_LABEL));
-							assert(STR_LIT_LEN(HASHT_GBL_CURLABEL) == STR_LIT_LEN(V19_HASHT_GBL_LABEL));
-							MEMCPY_LIT(ptr, HASHT_GBL_CURLABEL);
-						}
-					} else if (!MEMCMP_LIT(keyend - LITERAL_XECUTE_LEN, LITERAL_XECUTE))
-					{	/* ^#t("GBL",1,"XECUTE") found. Upgrade it to the current version's XECUTE format */
-						assert(IS_SET(rectype)); /* This better be a SET record */
-						if (IS_SET(rectype))
-						{	/* do the upgrade in PRO only if this is a SET record */
-							upgrd_V19_hasht_xecute_string_to_V24(jb, cb, keystr, keyend + 1,
-												&conv_reclen);
-							assert(0 == conv_reclen % JNL_REC_START_BNDRY);
-						}
-					}
-				}
 				if (!receiver_supports_triggers)
 					((jnl_string *)mumps_node_ptr)->nodeflags = 0;
-				NULLSUBSC_TRANSFORM_IF_NEEDED(mumps_node_ptr);
+				NULLSUBSC_TRANSFORM_IF_NEEDED(rectype, mumps_node_ptr);
 				if (IS_TUPD(rectype))
 					tupd_num++;
 				else if (IS_UUPD(rectype) && promote_uupd_to_tupd)
@@ -1836,9 +1775,9 @@ int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	jrec_prefix 		*prefix;
 	seq_num			this_upd_seqno;
 	uint4 			trigupd_type = NO_TRIG_JREC;
-	boolean_t		promote_uupd_to_tupd, hasht_update_found, normal_update_found, receiver_supports_triggers;
+	boolean_t		promote_uupd_to_tupd, receiver_supports_triggers;
 	boolean_t		hasht_seen;
-	DEBUG_ONLY(boolean_t	non_ztrig_rec_found = FALSE;)
+	DEBUG_ONLY(boolean_t	non_trig_rec_found = FALSE;)
 	jnl_string		*keystr;
 	DCL_THREADGBL_ACCESS;
 
@@ -1848,7 +1787,7 @@ int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	status = SS_NORMAL;
 	jlen = *jnl_len;
 	QWASSIGN(this_upd_seqno, seq_num_zero);
-	promote_uupd_to_tupd = hasht_update_found = normal_update_found = FALSE;
+	promote_uupd_to_tupd = FALSE;
 	hasht_seen = FALSE;
 	assert(is_src_server);
 	/* Since this filter function will be invoked only on the source side, the check for whether the receiver
@@ -1897,15 +1836,19 @@ int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			if (IS_SET_KILL_ZKILL_ZTWORM(rectype))
 			{
 				assert((cb == cstart) && (jb == jstart));
-				DEBUG_ONLY(
-					if (!IS_ZTRIG(rectype))
-						non_ztrig_rec_found = TRUE;
-				)
+				DEBUG_ONLY(non_trig_rec_found = TRUE;)
 				GET_JREC_UPD_TYPE(jb + V24_MUMPS_NODE_OFFSET, trigupd_type);
 				if (receiver_supports_triggers)
 				{
-					if (!normal_update_found)
-						normal_update_found = (HASHT_JREC != trigupd_type);
+					if (HASHT_JREC == trigupd_type)
+					{	/* Journal record has a #t global. #t records are no longer allowed from V24,
+						 * only LGTRIG records are. But since the receiver version does not support
+						 * LGTRIG records, issue error.
+						 */
+						repl_errno = EREPL_INTLFILTER_SECLESSTHANV62;
+						status = -1;
+						break;
+					}
 					if (NON_REPLIC_JREC_TRIG == trigupd_type)
 					{
 						if (IS_TUPD(rectype))
@@ -1931,57 +1874,9 @@ int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				/* t_len bytes have already been copied. Skip 8-byte strm_seqno (absent in V19) and copy rest */
 				memcpy(cb + t_len, jb + t_len + 8, conv_reclen - t_len);
 				mumps_node_ptr = (cb + V19_MUMPS_NODE_OFFSET);
-				if (HASHT_JREC == trigupd_type)
-				{
-					assert(receiver_supports_triggers);
-					if (!hasht_update_found)
-						hasht_update_found = TRUE;
-					/* Since the secondary side is running on an older trigger-supporting version than the
-					 * primary, the ^#t("GBL","#LABEL") value needs to be adjusted to have the value that the
-					 * secondary will understand. Not doing so will cause the secondary to issue TRIGDEFBAD
-					 * error.
-					 */
-					keystr = (jnl_string *)mumps_node_ptr;
-					keyend = &keystr->text[keystr->length - 1];
-					assert('\0' == *keyend); /* we better have a null terminator at the end of the key */
-					if (!MEMCMP_LIT((keyend - LITERAL_HASHLABEL_LEN), LITERAL_HASHLABEL))
-					{	/* ^#t("GBL","#LABEL") found. For details on the update record layout, see the
-						 * comment in upgrd_hasht_xecute_string
-						 */
-						ptr = keyend + SIZEOF(mstr_len_t) + 1; /* '+ 1' to account for '- 1' done above */
-						assert(0 == MEMCMP_LIT(ptr, HASHT_GBL_CURLABEL));
-						assert(STR_LIT_LEN(HASHT_GBL_CURLABEL) == STR_LIT_LEN(V19_HASHT_GBL_LABEL));
-						MEMCPY_LIT(ptr, V19_HASHT_GBL_LABEL);
-					} else if (0x80 == (unsigned char)(*(keyend - 1)))
-					{	/* last subscript is zero. Check if the preceding subscript is "XECUTE" */
-						ptr = keyend - 2; /* -1 for 0x80 and -1 for null terminator */
-						if (!MEMCMP_LIT((ptr - LITERAL_XECUTE_LEN), LITERAL_XECUTE))
-						{	/* preceding subscript is "XECUTE". Ensure the preceding character is \0 */
-							ptr -= (LITERAL_XECUTE_LEN + 1); /* +1 for the leading \0 */
-							assert(STR_SUB_PREFIX == ((unsigned char)(*ptr)));
-							if (STR_SUB_PREFIX == ((unsigned char)(*ptr)))
-							{	/* found ^#t("GBL",1,"XECUTE",0) which V5.4-001 secondary does
-								 * NOT understand
-								 */
-								repl_errno = EREPL_INTLFILTER_MULTILINEXECUTE;
-								status = -1;
-								break;
-							}
-						}
-					}
-				}
 				if (!receiver_supports_triggers)
 					((jnl_string *)mumps_node_ptr)->nodeflags = 0;
-				else if (hasht_update_found && normal_update_found)
-				{	/* A mix of ^#t updates and normal updates. Secondary (V5.4-000 to V5.4-001) does not
-					 * understand mix of such updates. Set error status and break. Replication cannot
-					 * continue unless $ztrigger() in TP (along with other updates) is eliminated.
-					 */
-					repl_errno = EREPL_INTLFILTER_SECNODZTRIGINTP;
-					status = -1;
-					break;
-				}
-				NULLSUBSC_TRANSFORM_IF_NEEDED(mumps_node_ptr);
+				NULLSUBSC_TRANSFORM_IF_NEEDED(rectype, mumps_node_ptr);
 				if (IS_TUPD(rectype))
 					tupd_num++;
 				else if (IS_UUPD(rectype) && promote_uupd_to_tupd)
@@ -2032,7 +1927,7 @@ int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			 * (b) If the only records in a transaction are ZTRIG records and a TCOM record.
 			 * In both the above cases we need to send a NULL record instead.
 			 */
-			assert((HASHT_JREC == trigupd_type) || (FALSE == non_ztrig_rec_found));
+			assert((HASHT_JREC == trigupd_type) || (FALSE == non_trig_rec_found));
 			prefix = (jrec_prefix *)(cb);
 			if (NULL_RECLEN > conv_bufsiz)
 			{
@@ -2058,10 +1953,11 @@ int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
  * (b) If the receiver side does NOT support triggers, then skip ^#t/ZTWORM/ZTRIG journal records & reset nodeflags (if set).
  *	Note that V21 did not support LGTRIG records so dont need to check for them.
  *	If the entire transaction consists of skipped records, send a NULL record instead.
+ * (c) If receiver side does support triggers, then issue error if ^#t records are found as those are not allowed in
+ *	the replication stream from V62001 onwards.
  * Reformat accordingly.
  * Note: This function (jnl_v21TOv24) is somewhat similar to jnl_v19TOv24 except that ZTRIG records can be seen in v21
- * whereas it cannot be in v19. In addition, no ^#t("GBL","#LABEL") or ^#t("GBL",1,"XECUTE") conversions are needed
- * since the ^#t format is unchanged between V21 and V24.
+ * whereas it cannot be in v19.
  */
 int jnl_v21TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz)
 {
@@ -2134,6 +2030,14 @@ int jnl_v21TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 						jb = jb + reclen;
 						jlen -= reclen;
 						continue;
+					} else if (HASHT_JREC == trigupd_type)
+					{	/* Journal record has a #t global. #t records are no longer allowed to V24,
+						 * only LGTRIG records are. But since the source version does not support
+						 * LGTRIG records, issue error.
+						 */
+						repl_errno = EREPL_INTLFILTER_PRILESSTHANV62;
+						status = -1;
+						break;
 					}
 				} else if (HASHT_JREC == trigupd_type)
 				{	/* Journal record has a #t global. #t records are not replicated if the secondary
@@ -2159,7 +2063,7 @@ int jnl_v21TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				/* V21 and V24 have same ^#t("GBL","#LABEL") value so no need to fix like is done for V19 to V24 */
 				if (!receiver_supports_triggers)
 					((jnl_string *)mumps_node_ptr)->nodeflags = 0;
-				NULLSUBSC_TRANSFORM_IF_NEEDED(mumps_node_ptr);
+				NULLSUBSC_TRANSFORM_IF_NEEDED(rectype, mumps_node_ptr);
 				if (IS_TUPD(rectype))
 					tupd_num++;
 				else if (IS_UUPD(rectype) && promote_uupd_to_tupd)
@@ -2243,7 +2147,7 @@ int jnl_v21TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
  * For differences between the two versions, see the comment in jnl_v19TOv24. In addition, take care of the following.
  * (a) If the remote side does NOT support triggers, then skip ^#t/ZTWORM/ZTRIG/LGTRIG journal records.
  *	If the entire transaction consists of skipped records, send a NULL record instead.
- * (b) If remote side does support triggers, then skip LGTRIG journal records as they are not known to the older journal format.
+ * (b) If remote side supports triggers, then error out for LGTRIG journal records as they are unknown to the older journal format.
  * Note: This function (jnl_v21TOv24) is somewhat similar to jnl_v24TOv19 except that ZTRIG records can be seen in v21
  * whereas it cannot be in v19. In addition, no ^#t("GBL","#LABEL") or ^#t("GBL",1,"XECUTE") conversions are needed
  * since the ^#t format is unchanged between V21 and V24.
@@ -2323,6 +2227,15 @@ int jnl_v24TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				GET_JREC_UPD_TYPE(jb + V24_MUMPS_NODE_OFFSET, trigupd_type);
 				if (receiver_supports_triggers)
 				{
+					if (HASHT_JREC == trigupd_type)
+					{	/* Journal record has a #t global. #t records are no longer allowed from V24,
+						 * only LGTRIG records are. But since the receiver version does not support
+						 * LGTRIG records, issue error.
+						 */
+						repl_errno = EREPL_INTLFILTER_SECLESSTHANV62;
+						status = -1;
+						break;
+					}
 					if (NON_REPLIC_JREC_TRIG == trigupd_type)
 					{
 						if (IS_TUPD(rectype))
@@ -2352,7 +2265,7 @@ int jnl_v24TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				mumps_node_ptr = (cb + V19_MUMPS_NODE_OFFSET);
 				if (!receiver_supports_triggers)
 					((jnl_string *)mumps_node_ptr)->nodeflags = 0;
-				NULLSUBSC_TRANSFORM_IF_NEEDED(mumps_node_ptr);
+				NULLSUBSC_TRANSFORM_IF_NEEDED(rectype, mumps_node_ptr);
 				if (IS_TUPD(rectype))
 					tupd_num++;
 				else if (IS_UUPD(rectype) && promote_uupd_to_tupd)
@@ -2424,7 +2337,9 @@ int jnl_v24TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
  * (a) If null-subscript collation is different between the primary and the secondary
  * (b) If the remote side does NOT support triggers, then skip ^#t/ZTWORM/ZTRIG journal records & reset nodeflags (if set).
  *	Note that V22 did not support LGTRIG records so dont need to check for them.
- * (c)	If the entire transaction consists of skipped records, send a NULL record instead.
+ * (c) If the entire transaction consists of skipped records, send a NULL record instead.
+ * (d) If receiver side does support triggers, then issue error if ^#t records are found as those are not allowed in
+ *	the replication stream from V62001 onwards.
  */
 int jnl_v22TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz)
 {
@@ -2467,7 +2382,7 @@ int jnl_v22TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			this_strm_seqno = GET_STRM_SEQNO(jb);
 		}
 		assert(IS_REPLICATED(rectype));
-		assert(JRT_MAX_V23 >= rectype);
+		assert(JRT_MAX_V22 >= rectype);
 		if (IS_TUPD(rectype))
 			promote_uupd_to_tupd = FALSE;
 		if (!receiver_supports_triggers && (IS_ZTRIG(rectype) || IS_ZTWORM(rectype)))
@@ -2499,6 +2414,14 @@ int jnl_v22TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 						jb = jb + reclen;
 						jlen -= reclen;
 						continue;
+					} else if (HASHT_JREC == trigupd_type)
+					{	/* Journal record has a #t global. #t records are no longer allowed to V24,
+						 * only LGTRIG records are. But since the source version does not support
+						 * LGTRIG records, issue error.
+						 */
+						repl_errno = EREPL_INTLFILTER_PRILESSTHANV62;
+						status = -1;
+						break;
 					}
 				} else if (HASHT_JREC == trigupd_type)
 				{	/* Journal record has a #t global. #t records are not replicated if the secondary does not
@@ -2519,7 +2442,7 @@ int jnl_v22TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				mumps_node_ptr = cb + FIXED_UPD_RECLEN;
 				if (!receiver_supports_triggers)
 					((jnl_string *)mumps_node_ptr)->nodeflags = 0;
-				NULLSUBSC_TRANSFORM_IF_NEEDED(mumps_node_ptr);
+				NULLSUBSC_TRANSFORM_IF_NEEDED(rectype, mumps_node_ptr);
 				if (IS_TUPD(rectype))
 					tupd_num++;
 				else if (IS_UUPD(rectype) && promote_uupd_to_tupd)
@@ -2586,7 +2509,7 @@ int jnl_v22TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 /* Convert a transaction from jnl version V24 (V6.2-000 onwards) to V22/V23 (V5.5-000 thru V6.1-000).
  * (a) If null-subscript collation is different between the primary and the secondary
  * (b) If the remote side does NOT support triggers, then skip ^#t/ZTWORM/ZTRIG journal records & reset nodeflags (if set).
- *	Note that V22 did not support LGTRIG records so dont need to check for them.
+ *	Note that V22 did not support LGTRIG records so issue an error.
  * (c) If remote side does support triggers, then skip LGTRIG journal records as they are not known to the older journal format.
  * (d)	If the entire transaction consists of skipped records, send a NULL record instead.
  */
@@ -2656,6 +2579,15 @@ int jnl_v24TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				GET_JREC_UPD_TYPE((jb + FIXED_UPD_RECLEN), trigupd_type);
 				if (receiver_supports_triggers)
 				{
+					if (HASHT_JREC == trigupd_type)
+					{	/* Journal record has a #t global. #t records are no longer allowed from V24,
+						 * only LGTRIG records are. But since the receiver version does not support
+						 * LGTRIG records, issue error.
+						 */
+						repl_errno = EREPL_INTLFILTER_SECLESSTHANV62;
+						status = -1;
+						break;
+					}
 					if (NON_REPLIC_JREC_TRIG == trigupd_type)
 					{
 						if (IS_TUPD(rectype))
@@ -2684,7 +2616,7 @@ int jnl_v24TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				mumps_node_ptr = cb + FIXED_UPD_RECLEN;
 				if (!receiver_supports_triggers)
 					((jnl_string *)mumps_node_ptr)->nodeflags = 0;
-				NULLSUBSC_TRANSFORM_IF_NEEDED(mumps_node_ptr);
+				NULLSUBSC_TRANSFORM_IF_NEEDED(rectype, mumps_node_ptr);
 				if (IS_TUPD(rectype))
 					tupd_num++;
 				else if (IS_UUPD(rectype) && promote_uupd_to_tupd)
@@ -2749,7 +2681,7 @@ int jnl_v24TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	return(status);
 }
 
-/* Convert a transaction from jnl version V24 (V6.2-000 onwards) to V24 (V6.2-000 onwards).
+/* Convert a transaction from filter format V24 (V6.2-000 onwards) to V24 (V6.2-000 onwards).
  * Same version filters are needed if one of the below is true.
  * (a) If null-subscript collation is different between the primary and the secondary
  * (b) If the remote side does NOT support triggers, then skip ^#t/ZTWORM/LGTRIG/ZTRIG journal records & reset nodeflags (if set).
@@ -2776,12 +2708,15 @@ int jnl_v24TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	jlen = *jnl_len;
 	this_upd_seqno = seq_num_zero;
 	promote_uupd_to_tupd = FALSE;
-	/* The following assert ensures that filtering is initiated by the responsible party and in the expected direction. */
-	assert(is_src_server);
-	/* Since this filter function will be invoked only on the source side, the check for whether the receiver
-	 * supports triggers is equal to checking whether the REMOTE side supports triggers.
+	/* Since filter format V24 corresponds to journal format V24 or V25, in case of a V24 source and V25 receiver,
+	 * the source server will not do any filter transformations (because receiver jnl ver is higher). This means
+	 * jnl_v24TOv24 filter conversion function will be invoked on the receiver side to do V24 to V25 jnl format conversion.
+	 * Therefore we cannot do an assert(is_src_server) which we otherwise would have had in case the latest filter
+	 * version corresponds to only ONE journal version.
+	 *	assert(is_src_server);
 	 */
-	receiver_supports_triggers = REMOTE_TRIGGER_SUPPORT;
+	assert(is_src_server || is_rcvr_server);
+	receiver_supports_triggers = (is_src_server ? REMOTE_TRIGGER_SUPPORT : LOCAL_TRIGGER_SUPPORT);
 	GTMTRIG_ONLY(assert(receiver_supports_triggers);)	/* if receiver is V24 format, it should have been built
 								 * with trigger support enabled since we dont either build
 								 * anymore OR replicate anymore to trigger unsupported platforms
@@ -2850,7 +2785,7 @@ int jnl_v24TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				mumps_node_ptr = cb + FIXED_UPD_RECLEN;
 				if (!receiver_supports_triggers)
 					((jnl_string *)mumps_node_ptr)->nodeflags = 0;
-				NULLSUBSC_TRANSFORM_IF_NEEDED(mumps_node_ptr);
+				NULLSUBSC_TRANSFORM_IF_NEEDED(rectype, mumps_node_ptr);
 				if (IS_TUPD(rectype))
 					tupd_num++;
 				else if (IS_UUPD(rectype) && promote_uupd_to_tupd)

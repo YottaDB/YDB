@@ -26,13 +26,15 @@
 #include "setterm.h"
 #include "op.h"
 #include "fork_init.h"
+#include "geteditor.h"
+#include "wbox_test_init.h"
 
 GBLREF	io_pair		io_std_device;
 GBLREF	mval 		dollar_zsource;
 GBLREF	mstr		editor;
 GBLREF	int4		dollar_zeditor;
 
-error_def(ERR_FILENOTFND);
+error_def(ERR_NOEDITOR);
 error_def(ERR_ZEDFILSPEC);
 
 void op_zedit(mval *v, mval *p)
@@ -43,9 +45,9 @@ void op_zedit(mval *v, mval *p)
 	int		objcnt;
 	int		waitid;
 	unsigned int	childid, status;
-#ifdef _BSD
+#	ifdef _BSD
 	union wait	wait_status;
-#endif
+#	endif
 	bool		has_ext, exp_dir;
 	parse_blk	pblk;
 	mstr		src;
@@ -54,12 +56,13 @@ void op_zedit(mval *v, mval *p)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	geteditor();
 	if (!editor.len)
 	{
 		edt = GETENV("EDITOR");
 		if (!edt)
 			edt = "editor";
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILENOTFND, 2, LEN_AND_STR(edt));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOEDITOR, 2, LEN_AND_STR(edt));
 	}
 	MV_FORCE_STR(v);
 	MV_FORCE_STR(p);
@@ -117,7 +120,7 @@ void op_zedit(mval *v, mval *p)
 		src.addr = es;
 		src.len = path_len;
 		srcdir = (zro_ent *)0;
-		zro_search(0, 0, &src, &srcdir, TRUE);
+		zro_search(NULL, NULL, &src, &srcdir, TRUE);
 		if (NULL == srcdir)
 		{	/* find the first source directory */
 			objcnt = (TREF(zro_root))->count;
@@ -184,7 +187,9 @@ void op_zedit(mval *v, mval *p)
 			setterm(io_std_device.in);
 	} else
 	{
+		if (WBTEST_ENABLED(WBTEST_BADEXEC_OP_ZEDIT))
+			STRCPY(editor.addr, "");
 		EXECL(editor.addr, editor.addr, es, 0);
-		exit(-1);
+		_exit(-1);
 	}
 }

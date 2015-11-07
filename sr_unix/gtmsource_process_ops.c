@@ -1384,11 +1384,16 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 		needinst_msg.lms_group_info = jnlpool.repl_inst_filehdr->lms_group_info;
 		/* Need to byteswap a few multi-byte fields to take into account the receiver endianness */
 		assert(remote_side->endianness_known);	/* only then is remote_side->cross_endian reliable */
-		if (remote_side->cross_endian && (this_side->jnl_ver < remote_side->jnl_ver))
+		/* Starting GT.M V62001, the receiver server expects an endian converted lms_group_info. So endian
+		 * convert in that case. Pre-V62001, the receiver unconditionally did the endian conversion. So skip
+		 * endian conversion in the source side in that case.
+		 */
+		if (remote_side->cross_endian && (REPL_PROTO_VER_XENDIANFIXES <= remote_side->proto_ver))
 			ENDIAN_CONVERT_REPL_INST_UUID(&needinst_msg.lms_group_info);
 		needinst_msg.proto_ver = REPL_PROTO_VER_THIS;
 		needinst_msg.is_rootprimary = !(jnlpool.jnlpool_ctl->upd_disabled);
 		needinst_msg.is_supplementary = jnlpool.repl_inst_filehdr->is_supplementary;
+		needinst_msg.jnl_ver = JNL_VER_THIS;
 		gtmsource_repl_send((repl_msg_ptr_t)&needinst_msg, "REPL_NEED_INSTINFO", MAX_SEQNO, INVALID_SUPPL_STRM);
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
 			return FALSE; /* send did not succeed */

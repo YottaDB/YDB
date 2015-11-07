@@ -14,6 +14,7 @@
 #include <signal.h>
 #include "gtm_unistd.h"
 #include "gtm_string.h"
+#include "gtm_time.h"
 
 #include "send_msg.h"
 #include "error.h"
@@ -33,31 +34,39 @@
 #include "gtmrecv.h"
 #include "anticipatory_freeze.h"
 #include "gtm_caseconv.h"
+#include "jnl.h"
+#include "dollarh.h"
 
 error_def(ERR_BADZPEEKARG);
 error_def(ERR_BADZPEEKFMT);
 error_def(ERR_BADZPEEKRANGE);
 error_def(ERR_MAXSTRLEN);
+error_def(ERR_ZPEEKNOJNLINFO);
 error_def(ERR_ZPEEKNORPLINFO);
 
 #define FMTHEXDGT(spfree, digit) *spfree++ = digit + ((digit <= 9) ? '0' : ('A' - 0x0A))
 #define ARGUMENT_MAX_LEN	MAX_MIDENT_LEN
 
 /* Codes for peek operation mnemonics */
-#define PO_CSAREG	0	/* Region information - sgmnt_addrs struct - process private structure */
-#define PO_FHREG	1	/* Fileheader information from sgmnt_data for specified region */
-#define PO_GDRREG	2	/* Region information - gd_region struct - process private structure */
-#define PO_NLREG	3	/* Fileheader information from node_local for specified region (transient - non permanent) */
-#define PO_NLREPL	4	/* Fileheader information from node_local for replication dummy region */
-#define PO_GLFREPL	5	/* Replication information from gtmsrc_lcl_array structure */
-#define PO_GSLREPL	6	/* Replication information from gtmsource_local_array structure */
-#define PO_JPCREPL	7	/* Replication information from jnlpool_ctl structure */
-#define PO_PEEK		8	/* Generalized peek specifying (base) address argument */
-#define PO_RIHREPL	9	/* Replication information from repl_inst_hdr structure */
-#define PO_RPCREPL	10	/* Replication information from recvpool_ctl_struct */
-#define PO_UPLREPL	11	/* Replication information from upd_proc_local_struct */
-#define PO_GRLREPL	12	/* Replication information from gtmrecv_local_struct */
-#define PO_UHCREPL	13	/* Replication information from upd_helper_ctl */
+typedef enum
+{
+	PO_CSAREG = 0,	/* 0 Region information - sgmnt_addrs struct - process private structure */
+	PO_FHREG,	/* 1 Fileheader information from sgmnt_data for specified region */
+	PO_GDRREG,	/* 2 Region information - gd_region struct - process private structure */
+	PO_NLREG,	/* 3 Fileheader information from node_local for specified region (transient - non permanent) */
+	PO_NLREPL,	/* 4 Fileheader information from node_local for replication dummy region */
+	PO_GLFREPL,	/* 5 Replication information from gtmsrc_lcl_array structure */
+	PO_GSLREPL,	/* 6 Replication information from gtmsource_local_array structure */
+	PO_JPCREPL,	/* 7 Replication information from jnlpool_ctl structure */
+	PO_PEEK,	/* 8 Generalized peek specifying (base) address argument */
+	PO_RIHREPL,	/* 9 Replication information from repl_inst_hdr structure */
+	PO_RPCREPL,	/* 10 Replication information from recvpool_ctl_struct */
+	PO_UPLREPL,	/* 11 Replication information from upd_proc_local_struct */
+	PO_GRLREPL,	/* 12 Replication information from gtmrecv_local_struct */
+	PO_UHCREPL,	/* 13 Replication information from upd_helper_ctl */
+	PO_JNLREG,	/* 14 Journal information - jnl_private_control */
+	PO_JBFREG	/* 15 Journal buffer information - jnl_buffer_ptr_t */
+} zpeek_mnemonic;
 
 GBLREF boolean_t        created_core;
 GBLREF sigset_t		blockalrm;
@@ -94,22 +103,26 @@ LITDEF nametabent zpeek_names[] =
 	,{3, "GLF"}, {7, "GLFREPL"}	/* 6, 7 */
 	,{3, "GRL"}, {7, "GRLREPL"}	/* 8, 9 */
 	,{3, "GSL"}, {7, "GSLREPL"}	/* 10, 11 */
-	,{3, "JPC"}, {7, "JPCREPL"}	/* 12, 13 */
-	,{2, "NL"}, {5, "NLREG"}	/* 14, 15 */
-	,{6, "NLREPL"}			/* 16 */
-	,{4, "PEEK"}			/* 17 */
-	,{3, "RIH"}, {7, "RIHREPL"}	/* 18, 19 */
-	,{3, "RPC"}, {7, "RPCREPL"}	/* 20, 21 */
-	,{3, "UHC"}, {7, "UHCREPL"}	/* 22, 23 */
-	,{3, "UPL"}, {7, "UPLREPL"}	/* 24, 25 */
-	                                /* Total length 26 */
+	,{3, "JBF"}, {6, "JBFREG"}	/* 12, 13 */
+	,{3, "JPC"}, {7, "JPCREPL"}	/* 14, 15 */
+	,{3, "JNL"}, {6, "JNLREG"}	/* 16, 17 */
+	,{2, "NL"}, {5, "NLREG"}	/* 18, 19 */
+	,{6, "NLREPL"}			/* 20 */
+	,{4, "PEEK"}			/* 21 */
+	,{3, "RIH"}, {7, "RIHREPL"}	/* 22, 23 */
+	,{3, "RPC"}, {7, "RPCREPL"}	/* 24, 25 */
+	,{3, "UHC"}, {7, "UHCREPL"}	/* 26, 27 */
+	,{3, "UPL"}, {7, "UPLREPL"}	/* 28, 29 */
+	                                /* Total length 30 */
 };
+/* Index to first entry with given starting letter */
 LITDEF unsigned char zpeek_index[] =
 {
 	 0,  0,  0,  2,  2,  2,  4, 12, 12,	/* a b c d e f g h i */
-	12, 14, 14, 14, 14, 17, 17, 18, 18,	/* j k l m n o p q r */
-	22, 22, 22, 26, 26, 26, 26, 26, 26	/* s t u v w x y z ~ */
+	12, 18, 18, 18, 18, 21, 21, 22, 22,	/* j k l m n o p q r */
+	26, 26, 26, 30, 30, 30, 30, 30, 30	/* s t u v w x y z ~ */
 };
+/* Associated fetch code for each entry with flag for whether arguments accepted after code (e.g. CSAREG:MUMPS) */
 LITDEF zpeek_data_typ zpeek_data[] =
 {
 	{PO_CSAREG, 1}, {PO_CSAREG, 1}
@@ -118,7 +131,9 @@ LITDEF zpeek_data_typ zpeek_data[] =
 	,{PO_GLFREPL, 1}, {PO_GLFREPL, 1}
 	,{PO_GRLREPL, 0}, {PO_GRLREPL, 0}
 	,{PO_GSLREPL, 1}, {PO_GSLREPL, 1}
+	,{PO_JBFREG, 1}, {PO_JBFREG, 1}
 	,{PO_JPCREPL, 0}, {PO_JPCREPL, 0}
+	,{PO_JNLREG, 1}, {PO_JNLREG, 1}
 	,{PO_NLREG, 1}, {PO_NLREG, 1}
 	,{PO_NLREPL, 0}
 	,{PO_PEEK, 1}
@@ -221,6 +236,9 @@ STATICFNDEF int op_fnzpeek_stpcopy(char *zpeekadr, int len, mval *ret, char fmtc
 	gtm_uint64_t	uint64;
 	unsigned char	*numstrstart, *numstrend;
 	unsigned char	*hexchr, *hexchrend, hexc, hexdgt, *spfree;
+	char		timebuff[MAXNUMLEN + 1];
+	time_t		seconds;
+	uint4		days;
 
 	ESTABLISH_RET(op_fnzpeek_ch, ERR_BADZPEEKRANGE);		/* If get an exception, likely due to bad range */
 	ret->mvtype = 0;						/* Prevent GC of incomplete field */
@@ -324,6 +342,18 @@ STATICFNDEF int op_fnzpeek_stpcopy(char *zpeekadr, int len, mval *ret, char fmtc
 			ret->str.len = INTCAST(numstrend - numstrstart);
 			stringpool.free = numstrend;
 			break;
+		case 'T':						/* Time ($HOROLOG) format */
+			if ((SIZEOF(uint4) != len) && (SIZEOF(gtm_uint64_t) != len))
+				return ERR_BADZPEEKFMT;
+			ENSURE_STP_FREE_SPACE(MAXNUMLEN + 1);
+			seconds = (SIZEOF(gtm_uint64_t) == len) ? *(gtm_uint64_t *)zpeekadr : *(uint4 *)zpeekadr;
+			dollarh(seconds, &days, &seconds);
+			ret->str.addr = (char *)stringpool.free;
+			stringpool.free  = i2asc(stringpool.free, days);
+			*stringpool.free++ = ',';
+			stringpool.free = i2asc(stringpool.free, (uint4)seconds);
+			ret->str.len = INTCAST((char *)stringpool.free - ret->str.addr);
+			break;
 		case 'Z':						/* Hex format (no 0x prefix) of storage as it exists */
 			if ((len * 2) > MAX_STRLEN)
 			{	/* Requested string return is too large */
@@ -412,6 +442,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	replpool_identifier	replpool_id;
 	unsigned int		full_len;
 	unsigned char		argument_uc_buf[ARGUMENT_MAX_LEN];
+	sgmnt_addrs		*csa;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -452,6 +483,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			case PO_FHREG:
 			case PO_GDRREG:
 			case PO_NLREG:
+			case PO_JNLREG:
+			case PO_JBFREG:
 				/* Uppercase the region name since that is what GDE does when creating them */
 				lower_to_upper(argument_uc_buf, argptr, arglen);
 				argptr = argument_uc_buf;	/* Reset now to point to upper case version */
@@ -521,6 +554,13 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			break;
 		case PO_NLREG:		/* r_ptr set from option processing */
 			zpeekadr = (&FILE_INFO(r_ptr)->s_addrs)->nl;
+			break;
+		case PO_JNLREG:		/* r_ptr set from option processing */
+		case PO_JBFREG:
+			csa = &FILE_INFO(r_ptr)->s_addrs;
+			if ((NULL == csa->jnl) || (jnl_open != csa->hdr->jnl_state))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZPEEKNOJNLINFO, 2, REG_LEN_STR(r_ptr));
+			zpeekadr = (PO_JNLREG == mnemonic_opcode) ? (void *)csa->jnl : (void *)csa->jnl->jnl_buff;
 			break;
 		case PO_GLFREPL:	/* This set of opcodes all require the journal pool to be initialized. Verify it */
 		case PO_GSLREPL:
@@ -612,6 +652,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			case 'C':	/* Character data - returned as is */
 			case 'I':	/* Signed integer format - up to 31 bits */
 			case 'S':	/* String data - Same as 'C' except string is NULL terminated */
+			case 'T':	/* Time ($H) format - length must be of 4 or 8 byte unsigned int */
 			case 'U':	/* Unsigned integer format - up to 64 bits */
 			case 'X':	/* Humeric hex format: e.g. 0x12AB. Total length is (2 * bytes) + 2 */
 			case 'Z':	/* Hex format - not treated as numeric. Shown as occurs in memory (subject to endian)

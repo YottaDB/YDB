@@ -67,12 +67,12 @@ gtm_char_t	*gtmcrypt_strerror(void);
  * encryption and decryption state objects is that for every encryption and decryption operation the initial IV is used, effectively
  * reverting to the original state.
  *
- * Arguments:	handle	Pointer which should get pointed to the database encryption state object.
+ * Arguments:	handle	Pointer to the database encryption state object supplied by the caller and filled in by this routine.
  * 		hash	Hash of the key.
  * 		iv	Initialization vector to use for encryption or decryption.
  *
- * Returns:	0 if the key was found and database encryption and decryption state objects were initialized or existed already; -1
- * 		otherwise.
+ * Returns:	0 if the routine found the key, and either found existing database encryption and decryption state objects or
+ * 		initialized them; -1 otherwise.
  */
 gtm_status_t	gtmcrypt_init_db_cipher_context_by_hash(gtmcrypt_key_t *handle, gtm_string_t hash, gtm_string_t iv);
 /***********************************************************************************************************************************
@@ -82,13 +82,15 @@ gtm_status_t	gtmcrypt_init_db_cipher_context_by_hash(gtmcrypt_key_t *handle, gtm
  * relying on the same key require individual encryption and decryption state objects as their states evolve with each encryption or
  * decryption operation.
  *
- * Arguments:	handle		Pointer which should get pointed to the device encryption or decryption state object.
+ * Arguments:	handle		Pointer to the database encryption state object supplied by the caller and filled in by this
+ * 				routine.
  * 		keyname		Name of the key.
  * 		iv		Initialization vector to use for encryption or decryption.
  * 		operation	Flag indicating whether encryption or decryption is desired; use GTMCRYPT_OP_ENCRYPT or
  * 				GTMCRYPT_OP_DECRYPT, respectively.
  *
- * Returns:	0 if the key was found and device encryption or decryption state object was initialized; -1 otherwise.
+ * Returns:	0 if the routine found the key, and either found existing database encryption and decryption state objects or
+ *		initialized them; -1 otherwise.
  */
 gtm_status_t	gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *handle, gtm_string_t keyname,
 				gtm_string_t iv, gtm_int_t operation);
@@ -98,18 +100,18 @@ gtm_status_t	gtmcrypt_init_device_cipher_context_by_keyname(gtmcrypt_key_t *hand
  * configuration file in case of devices, or a path to a database file otherwise.
  *
  * Arguments:	keyname		Name of the key.
- * 		hash_dest	Pointer to the location where the key's hash is to be copied.
+ * 		hash_dest	Pointer to the location for this routine to copy the key's hash.
  *
- * Returns:	0 if the key was found and key's hash was copied to the specified location; -1 otherwise.
+ * Returns:	0 if the routine found the key and copied its hash to the specified location; -1 otherwise.
  */
 gtm_status_t	gtmcrypt_obtain_db_key_hash_by_keyname(gtm_string_t keyname, gtm_string_t *hash_dest);
 /***********************************************************************************************************************************
  * Release the specified encryption or decryption state object, also releasing the decryption state if database encryption state is
  * specified.
  *
- * Arguments:	handle	Encryption or decryption state object to release.
+ * Arguments:   handle	Pointer to the encryption or decryption state object to release.
  *
- * Returns:	0 if the operation was successful; -1 otherwise.
+ * Returns:	0 if the operation succeeded; -1 otherwise.
  */
 gtm_status_t	gtmcrypt_release_key(gtmcrypt_key_t handle);
 /***********************************************************************************************************************************
@@ -124,17 +126,17 @@ gtm_status_t	gtmcrypt_release_key(gtmcrypt_key_t handle);
  * at. With Gcrypt, on the other hand, modifying the IV (iv_mode != GTMCRYPT_IV_CONTINUE) before an operation influences the
  * subsequent IV-non-modifying (iv_mode == GTMCRYPT_IV_CONTINUE) operations.
  *
- * Arguments:	handle			Encryption state object to use.
- * 		unencr_block		Block where unencrypted data is read from.
- * 		unencr_block_len	Length of the unencrypted (and encrypted) data block.
- * 		encr_block		Block where encrypted data is put into.
- * 		operation		Flag indicating whether encryption or decryption is desired; use GTMCRYPT_OP_ENCRYPT or
+ * Arguments:	handle			Encryption state object.
+ * 		unencr_block		Block of unencrypted data.
+ * 		unencr_block_len	Length of the unencrypted and encrypted data blocks.
+ * 		encr_block		Block of encrypted data.
+ * 		operation		Flag indicating whether to perform encryption or decryption; use GTMCRYPT_OP_ENCRYPT or
  * 					GTMCRYPT_OP_DECRYPT, respectively.
- * 		iv_mode			Flag indicating whether the initialization vector (IV) should be changed prior to the
- * 					operation; use GTMCRYPT_IV_CONTINUE to proceed without changing the IV, GTMCRYPT_IV_SET to
- * 					set the IV the value supplied in the iv argument, and GTMCRYPT_IV_RESET to reset the IV to
- * 					the value specified at initialization.
- * 		iv			Initialization vector to set the encryption state to when iv_mode is GTMCRYPT_IV_SET.
+ * 		iv_mode			Flag indicating whether to change the initialization vector (IV) prior to the operation; use
+ * 					GTMCRYPT_IV_CONTINUE to proceed without changing the IV, GTMCRYPT_IV_SET to set the IV the
+ * 					value supplied in the iv argument, and GTMCRYPT_IV_RESET to reset the IV to the value
+ * 					specified at initialization.
+ * 		iv			Initialization vector for the encryption state to take when iv_mode is GTMCRYPT_IV_SET.
  *
  * Returns:	0 if the operation succeeded; -1 otherwise.
  */
@@ -143,8 +145,8 @@ gtm_status_t	gtmcrypt_encrypt_decrypt(gtmcrypt_key_t handle, gtm_char_t *src_blo
 /***********************************************************************************************************************************
  * Compare the keys associated with two encryption or decryption state objects.
  *
- * Arguments:	handle1		First ecryption or decryption state object to use.
- * 		handle2		Second ecryption or decryption state object to use.
+ * Arguments:	handle1		First encryption or decryption state object.
+ * 		handle2		Second encryption or decryption state object.
  *
  * Returns:	1 if both encryption or decryption state objects use the same key; 0 otherwise.
  */

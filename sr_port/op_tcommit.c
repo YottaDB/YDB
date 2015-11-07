@@ -473,7 +473,7 @@ enum cdb_sc	op_tcommit(void)
 				GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return status = %d\n", status));)
 				return status;	/* return status to caller who cares about it */
 			}
-			assert(UNIX_ONLY(jgbl.onlnrlbk ||) (0 == have_crit(CRIT_HAVE_ANY_REG)));
+			assert(UNIX_ONLY(jgbl.onlnrlbk || TREF(in_trigger_upgrade) || ) (0 == have_crit(CRIT_HAVE_ANY_REG)));
 			csa = jnl_fence_ctl.fence_list;
 			if ((JNL_FENCE_LIST_END != csa) && jgbl.wait_for_jnl_hard && !is_updproc && !mupip_jnl_recover)
 			{	/* For mupip journal recover all transactions applied during forward phase are treated as
@@ -498,7 +498,7 @@ enum cdb_sc	op_tcommit(void)
 				rel_crit(tr->reg);
 			}
 		}
-		assert(UNIX_ONLY(jgbl.onlnrlbk ||) (0 == have_crit(CRIT_HAVE_ANY_REG)));
+		assert(UNIX_ONLY(jgbl.onlnrlbk || TREF(in_trigger_upgrade) || ) (0 == have_crit(CRIT_HAVE_ANY_REG)));
 		/* Commit was successful */
 		dollar_trestart = 0;
 		t_tries = 0;

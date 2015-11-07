@@ -109,6 +109,7 @@ GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
 GBLREF	boolean_t		is_updproc;
+GBLREF	boolean_t		is_replicator;
 GBLREF	seq_num			seq_num_zero;
 GBLREF	seq_num			seq_num_one;
 GBLREF	int			gv_fillfactor;
@@ -152,7 +153,7 @@ error_def(ERR_TEXT);
 	GBLREF	boolean_t		is_updproc;						\
 	UNIX_ONLY(GBLREF recvpool_addrs	recvpool;)						\
 												\
-	if (REPL_ALLOWED(CSA))									\
+	if (REPL_ALLOWED(CSA) && is_replicator)							\
 	{											\
 		assert(CSA->hdr->reg_seqno < TJPL->jnl_seqno);					\
 		CSA->hdr->reg_seqno = TJPL->jnl_seqno;						\
@@ -320,10 +321,11 @@ boolean_t	tp_tend()
 		csd = cs_data;
 		cnl = csa->nl;
 		is_mm = (dba_mm == csd->acc_meth);
-		UNIX_ONLY(
-			assert(!csa->hold_onto_crit || jgbl.onlnrlbk); /* In TP, hold_onto_crit is set ONLY by online rollback */
-			assert(!jgbl.onlnrlbk || (csa->hold_onto_crit && csa->now_crit));
-		)
+#		ifdef UNIX
+		assert(!csa->hold_onto_crit || jgbl.onlnrlbk || TREF(in_trigger_upgrade));
+		assert(!jgbl.onlnrlbk || (csa->hold_onto_crit && csa->now_crit));
+		assert(!TREF(in_trigger_upgrade) || (csa->hold_onto_crit && csa->now_crit));
+#		endif
 		si = (sgm_info *)(csa->sgm_info_ptr);
 		sgm_info_ptr = si;
 		*prev_tp_si_by_ftok = si;
@@ -424,7 +426,8 @@ boolean_t	tp_tend()
 			{
 				assert(JNL_ENABLED(csa) || REPL_WAS_ENABLED(csa));
 				replication = TRUE;
-				repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+				if (is_replicator)
+					repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 				jnl_participants++;
 			} else if (JNL_ENABLED(csa))
 			{
@@ -451,9 +454,17 @@ boolean_t	tp_tend()
 			SET_GBL_JREC_TIME;	/* initializes jgbl.gbl_jrec_time */
 		assert(jgbl.gbl_jrec_time);
 		/* If any one DB that we are updating has replication turned on and another has only journaling, issue error */
-		if (replication && yes_jnl_no_repl)
-			rts_error_csa(CSA_ARG(REG2CSA(save_gv_cur_region)) VARLSTCNT(4) ERR_REPLOFFJNLON, 2,
-					DB_LEN_STR(save_gv_cur_region));
+		if (replication)
+		{
+			if (yes_jnl_no_repl)
+				rts_error_csa(CSA_ARG(REG2CSA(save_gv_cur_region)) VARLSTCNT(4) ERR_REPLOFFJNLON, 2,
+						DB_LEN_STR(save_gv_cur_region));
+			/* If caller does NOT want this update to be replicated, turn "replication" local variable off.
+			 * The only such caller known at this time is "trigger_upgrade" - 2014/05/02.
+			 */
+			if (!is_replicator)
+				replication = FALSE;
+		}
 	}
 	if (!do_validation)
 	{
@@ -1778,8 +1789,8 @@ boolean_t	tp_tend()
 			rel_lock(jnlpool.jnlpool_dummy_reg);
 	}
 	/* Check that we DONT own crit on ANY region. The only exception is online mupip journal rollback/recovery
-	 * which holds crit for the entire process lifetime. */
-	assert(UNIX_ONLY(jgbl.onlnrlbk || ) (0 == have_crit(CRIT_HAVE_ANY_REG)));
+	 * or MUPIP TRIGGER -UPGRADE which holds crit for the entire process lifetime. */
+	assert(UNIX_ONLY(jgbl.onlnrlbk || TREF(in_trigger_upgrade) || ) (0 == have_crit(CRIT_HAVE_ANY_REG)));
 	/* the following section is the actual commitment of the changes in the database (phase2 for BG) */
 	for (si = first_tp_si_by_ftok;  (NULL != si); si = si->next_tp_si_by_ftok)
 	{

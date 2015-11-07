@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@ typedef enum
 	TRIGGER_COMPILE
 } trigger_action;
 
-int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op);
+int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op, rhdtyp **rtn_vec);
 
 #endif /* GTM_TRIGGER */
 

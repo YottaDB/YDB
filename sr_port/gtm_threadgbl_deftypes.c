@@ -23,7 +23,7 @@
 #include <signal.h>
 #include <sys/time.h>
 #ifdef UNIX
-# include <sys/un.h>
+# include "gtm_un.h"
 #endif
 #ifdef VMS
 # include <descrip.h>		/* Required for gtmsource.h */
@@ -142,9 +142,8 @@
 # include "gtm_trigger.h"
 #endif
 
-#ifdef USHBIN_SUPPORTED
+#ifdef AUTORELINK_SUPPORTED
 # include "relinkctl.h"
-# include "zhist.h"
 #endif
 
 /* This module's purpose is to generate gtm_threadgbl_deftypes.h for a given platform. This header file

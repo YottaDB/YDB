@@ -60,9 +60,6 @@
 #ifdef GTM_CRYPT
 # include "iormdef.h"
 #endif
-#ifdef USHBIN_SUPPORTED
-# include "relinkctl.h"
-#endif
 
 #ifndef STP_MOVE
 GBLDEF int	indr_stp_low_reclaim_passes = 0;
@@ -106,6 +103,7 @@ GBLREF hash_table_str		*complits_hashtab;
 GBLREF mval			*alias_retarg;
 GTMTRIG_ONLY(GBLREF mval 	dollar_ztwormhole;)
 DEBUG_ONLY(GBLREF   boolean_t	ok_to_UNWIND_in_exit_handling;)
+UNIX_ONLY(GBLREF io_pair	*io_std_device;)
 
 OS_PAGE_SIZE_DECLARE
 
@@ -500,9 +498,6 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 	glvn_pool_entry		*slot, *top;
 	int			i, n;
 	unsigned char		*old_free;
-#	ifdef USHBIN_SUPPORTED
-	open_relinkctl_sgm	*linkctl;
-#	endif
 #	ifdef GTM_CRYPT
 	d_rm_struct		*rm_ptr;
 #	endif
@@ -582,7 +577,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 	if (((stringpool.base != rts_stringpool.base) || (0 == cache_table.size)))
 	{
 #		ifndef STP_MOVE
-		if (0 != literal_chain.que.fl)
+		if (NULL != literal_chain.que.fl)
 		{	/* If hashtable exists, pull it all from there rather that searching for it twice */
 			if (complits_hashtab && complits_hashtab->base)
 			{
@@ -683,8 +678,16 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 			if ((IO_ESC != l->dollar_io[0]) && (l->iod->trans_name == l))
 			{
 				MSTR_STPG_ADD(&l->iod->error_handler);
+#				ifdef UNIX
+				/* if this is on UNIX and it is a split $principal, protect
+				 * error_handler defined on the output side
+				 */
+				if ((l->iod->pair.in != l->iod->pair.out)
+				    && (l->iod->pair.out == io_std_device->out))
+					MSTR_STPG_ADD(&l->iod->pair.out->error_handler);
+#				endif
 #				ifdef GTM_CRYPT
-				rm_ptr = (d_rm_struct *)l->iod->dev_sp;
+				rm_ptr = (rm == l->iod->type) ? (d_rm_struct *)l->iod->dev_sp : NULL;
 				if (NULL != rm_ptr)
 				{	/* Protect the IVs and KEYs as needed. */
 					if (rm_ptr->input_encrypted)
@@ -830,7 +833,11 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 			}
 			MVAL_STPG_ADD(m);
 		}
-		for (sf = frame_pointer; sf < (stack_frame *)stackbase; sf = sf->old_frame_pointer)
+		/* If LINK:RECURSIVE is enabled and the first M frame on the stack is recursively replaced, when it unwinds,
+		 * op_unwind() is going to unlink that version of the routine. We will eventually come here (as stp_move)
+		 * with a zeroed frame pointer so the test below needs to deal with a NULL frame_pointer value.
+		 */
+		for (sf = frame_pointer; (NULL != sf) && (sf < (stack_frame *)stackbase); sf = sf->old_frame_pointer)
 		{	/* Cover temp mvals in use */
 			if (NULL == sf->old_frame_pointer)
 			{	/* If trigger enabled, may need to jump over a base frame */
@@ -885,13 +892,6 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 				tf = tf->old_tp_frame;
 			}
 		}
-#		ifdef USHBIN_SUPPORTED
-		/* Make sure we keep track of the relinkable directory names */
-		for (linkctl = TREF(open_relinkctl_list); NULL != linkctl; linkctl = linkctl->next)
-		{
-			MSTR_STPG_ADD(&linkctl->zro_entry_name);
-		}
-#		endif
 	}
 	space_before_compact = stringpool.top - stringpool.free; /* Available space before compaction */
 	DEBUG_ONLY(blklen = stringpool.free - stringpool.base);

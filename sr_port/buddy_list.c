@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -183,7 +183,8 @@ char    *find_element(buddy_list *list, int4 index)
         if (index > list->nElems)
                 return NULL;
 	initAllocBits = list->initAllocBits;
-	for (i = initAllocBits; index >> i; i++);
+	for (i = initAllocBits; index >> i; i++)	/* not sure if "ceil_log2_32bit" would be faster here */
+		;
 	i = i - initAllocBits;
 	return list->ptrArray[i] + list->elemSize * (index - list->initAlloc * (i ? 1 << (i-1) : 0));
 }

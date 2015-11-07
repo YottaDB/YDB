@@ -66,6 +66,8 @@
 # define GTM_USESECSHR				"$gtm_usesecshr"
 /* GTM_TEST_FAKE_ENOSPC is used only in debug code so it does not have to go in gtm_logicals.h */
 # define GTM_TEST_FAKE_ENOSPC			"$gtm_test_fake_enospc"
+/* GTM_TEST_AUTORELINK_ALWAYS is used only in debug code so it does not have to go in gtm_logicals.h */
+# define GTM_TEST_AUTORELINK_ALWAYS		"$gtm_test_autorelink_always"
 #endif
 #define DEFAULT_MUPIP_TRIGGER_ETRAP 		"IF $ZJOBEXAM()"
 
@@ -77,7 +79,6 @@
 #endif
 #define MAX_TRANS_NAME_LEN			GTM_PATH_MAX
 
-GBLREF	int4			gtm_shmflags;			/* Shared memory flags for shmat() */
 GBLREF	uint4			gtm_principal_editing_defaults;	/* ext_cap flags if tt */
 GBLREF	boolean_t		is_gtm_chset_utf8;
 GBLREF	boolean_t		utf8_patnumeric;
@@ -128,6 +129,7 @@ void	gtm_env_init_sp(void)
 	char		buf[MAX_TRANS_NAME_LEN], *token, cwd[GTM_PATH_MAX];
 	char		*cwdptr, *trigger_etrap, *c, *end;
 	struct stat	outbuf;
+	int		gtm_autorelink_shm_min;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -156,9 +158,6 @@ void	gtm_env_init_sp(void)
 		} /* else gtm_core_file/gtm_core_putenv remain null and we likely cannot generate proper core files */
 	}
 #	endif
-	val.addr = GTM_SHMFLAGS;
-	val.len = SIZEOF(GTM_SHMFLAGS) - 1;
-	gtm_shmflags = (int4)trans_numeric(&val, &is_defined, TRUE);	/* Flags vlaue (0 is undefined or bad) */
 	val.addr = GTM_QUIET_HALT;
 	val.len = SIZEOF(GTM_QUIET_HALT) - 1;
 	ret = logical_truth_value(&val, FALSE, &is_defined);
@@ -345,7 +344,7 @@ void	gtm_env_init_sp(void)
 	{
 		init_relink_allowed(&trans); /* set TREF(relink_allowed) */
 	}
-#	ifdef USHBIN_SUPPORTED
+#	ifdef AUTORELINK_SUPPORTED
 	/* Set default or supplied value for $gtm_linktmpdir */
 	val.addr = GTM_LINKTMPDIR;
 	val.len = SIZEOF(GTM_LINKTMPDIR) - 1;
@@ -360,14 +359,15 @@ void	gtm_env_init_sp(void)
 		}
 	}
 	assert(GTM_PATH_MAX > trans.len);
+	/* Remove trailing '/' from path */
+	while ((1 < trans.len) && ('/' == trans.addr[trans.len - 1]))
+		trans.len--;
 	(TREF(gtm_linktmpdir)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
 	(TREF(gtm_linktmpdir)).len = trans.len;
 	/* For now, we assume that if the environment variable is defined to NULL, anticipatory freeze is NOT in effect */
 	if (0 < trans.len)
-	{
 		memcpy((TREF(gtm_linktmpdir)).addr, trans.addr, trans.len);
-		((TREF(gtm_linktmpdir)).addr)[trans.len] = '\0';
-	}
+	((TREF(gtm_linktmpdir)).addr)[trans.len] = '\0';
 	STAT_FILE((TREF(gtm_linktmpdir)).addr, &outbuf, stat_res);
 	if ((-1 == stat_res) || !S_ISDIR(outbuf.st_mode))
 	{	/* Either the directory doesn't exist or the entity is not a directory */
@@ -376,7 +376,24 @@ void	gtm_env_init_sp(void)
 		(TREF(gtm_linktmpdir)).len = SIZEOF(DEFAULT_GTM_TMP) - 1;
 		(TREF(gtm_linktmpdir)).addr = DEFAULT_GTM_TMP;
 	}
-#	endif
+	/* See if gtm_autorelink_shm is set */
+	val.addr = GTM_AUTORELINK_SHM;
+	val.len = SIZEOF(GTM_AUTORELINK_SHM) - 1;
+	gtm_autorelink_shm_min = trans_numeric(&val, &is_defined, TRUE);
+	if (!is_defined || !gtm_autorelink_shm_min)
+		TREF(relinkctl_shm_min_index) = 0;
+	else
+	{
+		gtm_autorelink_shm_min = (2 <= gtm_autorelink_shm_min) ? ceil_log2_32bit(gtm_autorelink_shm_min) : 0;
+		TREF(relinkctl_shm_min_index) = gtm_autorelink_shm_min;
+	}
+	/* See if gtm_autorelink_keeprtn is set */
+	val.addr = GTM_AUTORELINK_KEEPRTN;
+	val.len = SIZEOF(GTM_AUTORELINK_KEEPRTN) - 1;
+	TREF(gtm_autorelink_keeprtn) = logical_truth_value(&val, FALSE, &is_defined);
+	if (!is_defined)
+		TREF(gtm_autorelink_keeprtn) = FALSE;
+#	endif /* AUTORELINK_SUPPORTED */
 #	ifdef DEBUG
 	/* DEBUG-only option to bypass 'easy' methods of things and always use gtmsecshr for IPC cleanups, wakeups, file removal,
 	 * etc. Basically use gtmsecshr for anything where it is an option - helps with testing gtmsecshr for proper operation.
@@ -392,6 +409,12 @@ void	gtm_env_init_sp(void)
 	TREF(gtm_test_fake_enospc) = logical_truth_value(&val, FALSE, &is_defined);
 	if (!is_defined)
 		TREF(gtm_test_fake_enospc) = FALSE;
+	/* DEBUG-only option to enable autorelink on all directories in $zroutines (except for shlib directories) */
+	val.addr = GTM_TEST_AUTORELINK_ALWAYS;
+	val.len = SIZEOF(GTM_TEST_AUTORELINK_ALWAYS) - 1;
+	TREF(gtm_test_autorelink_always) = logical_truth_value(&val, FALSE, &is_defined);
+	if (!is_defined)
+		TREF(gtm_test_autorelink_always) = FALSE;
 #	endif
 #	ifdef GTMDBGFLAGS_ENABLED
 	val.addr = GTMDBGFLAGS;

@@ -62,6 +62,7 @@
 #ifdef GTM_TRIGGER
 #include <rtnhdr.h>			/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
+# include "gtm_trigger.h"
 #include "targ_alloc.h"
 #include "trigger.h"
 #include "hashtab_str.h"
@@ -150,16 +151,16 @@ GBLREF	int			tprestart_state;        /* When triggers restart, multiple states p
 GBLREF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related information */
 GBLREF	mval			dollar_ztwormhole;
 GBLREF	boolean_t		dollar_ztrigger_invoked;
+GBLREF	stack_frame		*frame_pointer;	/* needed by TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND macro */
 #endif
 GBLREF	boolean_t		skip_dbtriggers;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		gv_play_duplicate_kills;
 #ifdef UNIX
-GBLREF		int4			strm_index;
-STATICDEF	boolean_t		set_onln_rlbk_flg;
+GBLREF		int4		strm_index;
+STATICDEF	boolean_t	set_onln_rlbk_flg;
 #endif
 
-LITREF	mval			literal_hasht;
 static	boolean_t		updproc_continue = TRUE;
 
 error_def(ERR_GBLOFLOW);
@@ -265,9 +266,12 @@ error_def(ERR_UPDREPLSTATEOFF);
 
 CONDITION_HANDLER(updproc_ch)
 {
-	int		rc;
-	unsigned char	seq_num_str[32], *seq_num_ptr;
-	unsigned char	seq_num_strx[32], *seq_num_ptrx;
+	int			rc;
+	unsigned char		seq_num_str[32], *seq_num_ptr;
+	unsigned char		seq_num_strx[32], *seq_num_ptrx;
+#	ifdef GTM_TRIGGER
+	condition_handler	*save_active_ch;
+#	endif
 
 	START_CH(TRUE);
 	if ((int)ERR_TPRETRY == SIGNAL)
@@ -287,6 +291,24 @@ CONDITION_HANDLER(updproc_ch)
 		if (first_sgm_info GTMTRIG_ONLY( || (TPRESTART_STATE_NORMAL != tprestart_state)))
 		{
 			VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
+#			ifdef GTM_TRIGGER
+			/* Note: Below GTM_TRIGGER-only code is similar to mdb_condition_handler. But unlike there,
+			 * where MUM_TSTART is done inside the condition handler to transfer control, we do an UNWIND
+			 * here in updproc_ch. The UNWIND macro does an active_ch++ (to balance out the active_ch-- done
+			 * by START_CH done at the entry of every condition handler). We want to preserve active_ch in
+			 * the state that UNWIND expects. But the macro call done below calls gtm_trigger_fini which in
+			 * turn calls unw_mv_ent which could modify active_ch as part of popping MVST_TRIGR. Work around
+			 * that by saving and restoring active_ch after the macro call so UNWIND is fine. But what this
+			 * means is that for a short code window (from when unw_mv_ent sets active_ch to when we reset it
+			 * after the macro call below), active_ch would be incorrectly set to updproc_ch (instead of
+			 * util_base_ch which START_CH would have set it to above). But that is okay since we dont expect
+			 * any TPRETRY errors in this short window and updproc_ch would anyways transfer control to
+			 * util_base_ch (through NEXTCH) for all non-TPRETRY errors.
+			 */
+			save_active_ch = active_ch;
+			TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND;
+			active_ch = save_active_ch;
+#			endif
 			rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS); /* any nested errors will set SIGNAL accordingly */
 			assert(0 == rc);			/* No partials restarts can happen at this final level */
 			GTMTRIG_ONLY(assert(TPRESTART_STATE_NORMAL == tprestart_state));
@@ -1382,7 +1404,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						assert(NULL != tmpcsa);
 						rts_error_csa(CSA_ARG(tmpcsa) VARLSTCNT(10) ERR_REC2BIG, 4,
 							VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +) val_mv.str.len,
-							(int4)gv_cur_region->max_rec_size, REG_LEN_STR(gv_cur_region),
+							(int4)(tmpcsa->region)->max_rec_size, REG_LEN_STR(tmpcsa->region),
 							ERR_GVIS, 2, end - buff, buff);
 						break;
 				}

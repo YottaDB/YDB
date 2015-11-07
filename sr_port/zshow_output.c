@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,19 @@
 #define F_SUBSC_LEN		 3
 #define N_SUBSC_LEN		 5
 #define MIN_DATASIZE		40
-#define	ZSHOW_SPACE_INDENT	10	/* # of spaces every following line of zshow output is indented with */
+
+#define WRITE_ONE_LINE_FROM_BUFFER			\
+{							\
+	mv->str.addr = out->buff;			\
+	mv->str.len = INTCAST(out->ptr - out->buff);	\
+	mv->mvtype = MV_STR;				\
+	op_write(mv);					\
+	op_wteol(1);					\
+	out->ptr = out->buff;				\
+	out->len = 0;					\
+	out->displen = 0;				\
+	out->line_num++;				\
+}
 
 GBLREF	io_pair		io_curr_device;
 GBLREF	spdesc		stringpool;
@@ -61,7 +73,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 	mval		*mv, lmv;
 	lv_val		*lv, *lv_child;
 	char		buff, *strptr, *strnext, *strtop, *strbase, *leadptr;
-	int		key_ovrhd, str_processed, n_spaces, sbs_depth, dbg_sbs_depth;
+	int		key_ovrhd, str_processed, sbs_depth, dbg_sbs_depth;
 	ssize_t        	len, outlen, chcnt, char_len, disp_len ;
 	int		buff_len;
 	int		device_width, inchar_width, cumul_width;
@@ -101,10 +113,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 			str_processed = 0;
 		}
 		device_width = io_curr_device.out->width;
-		/* Do not indent if width is < the indentation length or if remaining width cannot accommodate one character */
-		n_spaces = (device_width > (ZSHOW_SPACE_INDENT UNICODE_ONLY(+ (gtm_utf8_mode ? GTM_MB_DISP_LEN_MAX : 0)))
-			? ZSHOW_SPACE_INDENT : 0);
-		if (str && (disp_len + out->displen > device_width))
+		if (str)
 		{
 			for (; (len > 0) && (disp_len + out->displen > device_width); )
 			{
@@ -143,37 +152,15 @@ void zshow_output(zshow_out *out, const mstr *str)
 				char_len -= chcnt;
 				assert((UNICODE_ONLY((gtm_utf8_mode) ?
 						     (ssize_t)UTF8_LEN_STRICT(strptr, (int)len) :) len) == char_len);
-				mv->str.addr = out->buff;
-				mv->str.len = INTCAST(out->ptr - out->buff);
-				mv->mvtype = MV_STR;
-				op_write(mv);
-				op_wteol(1);
-				out->ptr = out->buff + n_spaces;
-				memset(out->buff, ' ', n_spaces);
-				out->len = n_spaces;
-				out->displen = n_spaces;
-				out->line_num++;
+				WRITE_ONE_LINE_FROM_BUFFER;
 			}
-		}
-		if (str)
-		{
 			memcpy(out->ptr, str->addr + str_processed, len);
 			out->ptr += len;
 			out->len += (int)char_len;
 			out->displen += (int)disp_len;
 		}
 		if (out->flush && out->ptr != out->buff)
-		{
-			mv->str.addr = out->buff;
-			mv->str.len = INTCAST(out->ptr - out->buff);
-			mv->mvtype = MV_STR;
-			op_write(mv);
-			op_wteol(1);
-			out->ptr = out->buff;
-			out->len = 0;
-			out->displen = 0;
-			out->line_num++;
-		}
+			WRITE_ONE_LINE_FROM_BUFFER
 		break;
 	case ZSHOW_LOCAL:
 		if (out->code)
@@ -254,8 +241,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 						memcpy(mv->str.addr, &out->buff[0], mv->str.len);
 						stringpool.free += mv->str.len;
 						lv->v = *mv;
-						out->ptr = out->buff + 10;
-						memset(out->buff, ' ', 10);
+						out->ptr = out->buff;
 						out->line_num++;
 					}
 				}
@@ -360,8 +346,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				memcpy(mv->str.addr, &out->buff[0], mv->str.len);
 				stringpool.free += mv->str.len;
 				op_gvput(mv);
-				out->ptr = out->buff + 10;
-				memset(out->buff, ' ', 10);
+				out->ptr = out->buff;
 				out->line_num++;
 			}
 		}

@@ -88,6 +88,7 @@ error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVKILLFAIL);
 error_def(ERR_GVPUTFAIL);
 error_def(ERR_GVZTRIGFAIL);
+error_def(ERR_NEEDTRIGUPGRD);
 error_def(ERR_INDRMAXLEN);
 error_def(ERR_PATMAXLEN);
 error_def(ERR_TEXT);
@@ -100,20 +101,15 @@ error_def(ERR_TRIGSUBSCRANGE);
 LITREF	char	ctypetab[NUM_CHARS];
 LITREF	int4	gvtr_cmd_mask[GVTR_CMDTYPES];
 LITREF	mval	gvtr_cmd_mval[GVTR_CMDTYPES];
-LITREF	mval	literal_cmd;
-LITREF	mval	literal_delim;
-LITREF	mval	literal_gvsubs;
+LITREF	mval	literal_zero;
 LITREF	mval	literal_hashcount;
 LITREF	mval	literal_hashcycle;
 LITREF	mval	literal_hashlabel;
-LITREF	mval	literal_hasht;
-LITREF	mval	literal_options;
-LITREF	mval	literal_pieces;
-LITREF	mval	literal_xecute;
-LITREF	mval	literal_trigname;
-LITREF	mval	literal_chset;
-LITREF	mval	literal_zdelim;
-LITREF	mval	literal_zero;
+LITREF	mval	literal_null;
+
+#define TRIGGER_SUBSDEF(SUBSTYPE, SUBSNAME, LITMVALNAME, TRIGFILEQUAL, PARTOFHASH)	LITREF mval LITMVALNAME;
+#include "trigger_subs_def.h"
+#undef TRIGGER_SUBSDEF
 
 #define	GVTR_PARSE_POINT	1
 #define	GVTR_PARSE_LEFT		2
@@ -248,7 +244,7 @@ LITREF	mval	literal_zero;
 }
 
 /* This error macro is used for all definition errors where the target is ^#t(GVN,<index>,<required subscript>) */
-#define HASHT_GVN_DEFINITION_RETRY_OR_ERROR(INDEX,SUBSCRIPT,CSA)				\
+#define GVTR_HASHT_GVN_DEFINITION_RETRY_OR_ERROR(INDEX,SUBSCRIPT,CSA)				\
 {												\
 	if (CDB_STAGNATE > t_tries)								\
 	{											\
@@ -370,8 +366,8 @@ STATICFNDEF void gvtr_db_tpwrap_helper(sgmnt_addrs *csa, int err_code, boolean_t
 	REVERT;
 }
 
-/* Helper function used by "gvtr_db_read_hasht" function */
-STATICFNDEF boolean_t	gvtr_get_hasht_gblsubs(mval *subs_mval, mval *ret_mval)
+/* Helper function used by "gvtr_db_read_hasht" and "trigger_upgrade" functions */
+boolean_t	gvtr_get_hasht_gblsubs(mval *subs_mval, mval *ret_mval)
 {
 	uint4		curend;
 	boolean_t	was_null = FALSE, is_null = FALSE, is_defined;
@@ -383,26 +379,6 @@ STATICFNDEF boolean_t	gvtr_get_hasht_gblsubs(mval *subs_mval, mval *ret_mval)
 	assert(KEY_DELIMITER == gv_currkey->base[curend]);
 	assert(gv_target->gd_csa == cs_addrs);
 	COPY_SUBS_TO_GVCURRKEY(subs_mval, gv_cur_region, gv_currkey, was_null, is_null); /* updates gv_currkey */
-	is_defined = gvcst_get(ret_mval);
-	assert(!is_defined || (MV_STR & ret_mval->mvtype));	/* assert that gvcst_get() sets type of mval to MV_STR */
-	gv_currkey->end = curend;	/* reset gv_currkey->end to what it was at function entry */
-	gv_currkey->base[curend] = KEY_DELIMITER;    /* restore terminator for entire key so key is well-formed */
-	return is_defined;
-}
-
-STATICFNDEF boolean_t	gvtr_get_hasht_gblsubs_and_index(mval *subs_mval, mval *index, mval *ret_mval)
-{
-	uint4		curend;
-	boolean_t	was_null = FALSE, is_null = FALSE, is_defined;
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	is_defined = FALSE;
-	curend = gv_currkey->end; /* note down gv_currkey->end before changing it so we can restore it before function returns */
-	assert(KEY_DELIMITER == gv_currkey->base[curend]);
-	assert(gv_target->gd_csa == cs_addrs);
-	COPY_SUBS_TO_GVCURRKEY(subs_mval, gv_cur_region, gv_currkey, was_null, is_null); /* updates gv_currkey */
-	COPY_SUBS_TO_GVCURRKEY(index, gv_cur_region, gv_currkey, was_null, is_null); /* updates gv_currkey */
 	is_defined = gvcst_get(ret_mval);
 	assert(!is_defined || (MV_STR & ret_mval->mvtype));	/* assert that gvcst_get() sets type of mval to MV_STR */
 	gv_currkey->end = curend;	/* reset gv_currkey->end to what it was at function entry */
@@ -668,7 +644,15 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	{	/* ^#t global does not exist. Return right away. */
 		DBGTRIGR((stderr, "gvtr_db_read_hasht: no triggers\n"));
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
+		csa->hdr->hasht_upgrade_needed = FALSE;	/* Reset now that we know there is no ^#t global in this db.
+							 * Note: It is safe to do so even if we dont hold crit.
+							 */
 		return;
+	}
+	if (csa->hdr->hasht_upgrade_needed)
+	{	/* ^#t needs to be upgraded first before reading it. Cannot proceed. */
+		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
 	}
 	/* ^#t global exists.
 	 * Initialize gv_target->gvt_trigger from ^#t(<gbl>,...) where <gbl> is the global corresponding to save_gvtarget.
@@ -683,7 +667,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	 *
 	 *	^#t global structure created by MUPIP TRIGGER
 	 *	----------------------------------------------
-	 *	^#t("GBL","#LABEL")="1"                     # Format of the ^#t global for GBL. Currently set to 1.
+	 *	^#t("GBL","#LABEL")="3"                     # Format of the ^#t global for GBL. Currently set to 3.
 	 *						    # Will get bumped up in the future when the ^#t global format changes.
 	 *	^#t("GBL","#CYCLE")=<32-bit-decimal-number> # incremented every time any trigger changes happen in ^GBL global
 	 *	^#t("GBL","#COUNT")=1                       # indicating there is 1 trigger currently defined for ^GBL global
@@ -701,7 +685,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	 *          Read ^#t("GBL","#LABEL")
 	 * -----------------------------------------------------------------------------
 	 */
-	/* Check value of ^#t("GBL","#LABEL"). We expect it to be 1 indicating the format of the ^#t global.
+	/* Check value of ^#t("GBL","#LABEL"). We expect it to indicate the current format of the ^#t global.
 	 * If not, it is an integ error in the ^#t global so issue an appropriate error.
 	 */
 	gvt = save_gvtarget;	/* use smaller variable name as it is going to be used in lots of places below */
@@ -803,7 +787,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		/* Read in ^#t("GBL",1,"TRIGNAME")="GBL#1" */
 		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_trigname, ret_mval);
 		if (!is_defined)
-			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"TRIGNAME\"", csa);
+			GVTR_HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"TRIGNAME\"", csa);
 		trigdsc->rtn_desc.rt_name = ret_mval->str;	/* Copy trigger name mident */
 		trigdsc->gvt_trigger = gvt_trigger;		/* Save ptr to our main gvt_trigger struct for this trigger. With
 								 * this and given a gv_trigger_t, we can get to the gvt_trigger_t
@@ -821,7 +805,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		/* Read in ^#t("GBL",1,"CMD")="S,K,ZK,ZTK,ZTR" */
 		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_cmd, ret_mval);
 		if (!is_defined)
-			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"CMD\"", csa);
+			GVTR_HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"CMD\"", csa);
 		/* Initialize trigdsc->cmdmask */
 		ptr = ret_mval->str.addr;
 		ptr_top = ptr + ret_mval->str.len;
@@ -1035,14 +1019,13 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 			{
 				assert(!delim_defined); /* DELIM and ZDELIM should NOT have been specified at same time */
 				trigdsc->is_zdelim = TRUE;
-				/* Initialize trigdsc->delimiter */
-				trigdsc->delimiter = ret_mval->str;
 			}
 		}
 		if (delim_defined || zdelim_defined)	/* order of || is important since latter is set only if former is FALSE */
 		{
-			trigdsc->delimiter = ret_mval->str;
-			GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->delimiter);
+			/* Initialize trigdsc->delimiter */
+			trigdsc->delimiter = *ret_mval;
+			GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->delimiter.str);
 		}
 		/* Read in ^#t("GBL",1,"PIECES")="2:6;8"	*/
 		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_pieces, ret_mval);
@@ -1084,7 +1067,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		/* Read in ^#t("GBL",1,"CHSET")="UTF-8". If CHSET does not match gtm_chset issue error. */
 		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_chset, ret_mval);
 		if (!is_defined)
-			HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"CHSET\"", csa);
+			GVTR_HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"CHSET\"", csa);
 		if ((!gtm_utf8_mode && ((STR_LIT_LEN(CHSET_M_STR) != ret_mval->str.len)
 						|| memcmp(ret_mval->str.addr, CHSET_M_STR, STR_LIT_LEN(CHSET_M_STR))))
 			|| (gtm_utf8_mode && ((STR_LIT_LEN(CHSET_UTF8_STR) != ret_mval->str.len)
@@ -1331,7 +1314,6 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 {
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	gv_namehead		*dir_tree;
 	uint4			lcl_t_tries, save_t_tries, loopcnt;
 	uint4			cycle_start;
 	boolean_t		root_srch_needed;
@@ -1345,9 +1327,16 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 	save_t_tries = t_tries; /* note down the value of t_tries at the entry to this function */
 	csa = gvt->gd_csa;
 	assert(NULL != csa);	/* database for this gvt better be opened at this point */
-	dir_tree = csa->dir_tree;
-	if (gvt == dir_tree)
-		return; /* trigger initialization should return for directory tree (e.g. set^%GBLDEF is caller) */
+	/* The directory tree corresponds to a non-existent global which does not have any triggers so in this case
+	 * return right away. No trigger initialization needed.
+	 */
+	if (gvt == csa->dir_tree)
+		return;
+	/* We know there are no triggers for the ^#t global so return right away in that case too.
+	 * In fact it is necessary to do this if "trigger_upgrade" is caller as we dont want a NEEDTRIGUPGRD error there.
+	 */
+	if (gvt == csa->hasht_tree)
+		return;
 	csd = csa->hdr;
 	assert((gvt->db_trigger_cycle != cycle) || (gvt->db_dztrigger_cycle < csa->db_dztrigger_cycle));
 	root_srch_needed = FALSE;
@@ -1580,7 +1569,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	     (NULL != trigdsc) && (trigdsc != trigstop);
 	     --trigmax, trigdsc = *(gv_trigger_t **)((char *)trigdsc + trig_list_offset))	/* Follow the designated list */
 	{
-		DBGTRIGR((stderr, "gvtr_match_n_invoke: top of trigr scan loop\n"));
+		DBGTRIGR((stderr, "gvtr_match_n_invoke: top of trigr scan loop (%d)\n", trigmax));
 		trigstop = trigstart;		/* Stop when we get back to where we started */
 		assertpro(0 <= trigmax);		/* Loop ender "just in case" */
 		assert(trigdsc >= gvt_trigger->gv_trig_array);
@@ -1623,13 +1612,15 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 			 * If so, check if any of those pieces are different. If not, trigger should NOT be invoked.
 			 */
 			ok_to_invoke_trigger = TRUE;
+			trigparms->ztdelim_new = (mval *)&literal_null;
 			if (is_set_trigger)
 			{
 				assert(0 == ztupd_mval->mvtype);
-				if (trigdsc->delimiter.len)
+				if (trigdsc->delimiter.str.len)
 				{
+					trigparms->ztdelim_new = (mval *)&trigdsc->delimiter;
 					strpiecediff(&trigparms->ztoldval_new->str, &trigparms->ztvalue_new->str,
-						&trigdsc->delimiter, trigdsc->numpieces, trigdsc->piecearray,
+						&trigdsc->delimiter.str, trigdsc->numpieces, trigdsc->piecearray,
 						!trigdsc->is_zdelim && gtm_utf8_mode, ztupd_mstr);
 					if (!ztupd_mstr->len)
 					{	/* No pieces of interest changed. So dont invoke trigger. */

@@ -16,14 +16,15 @@
 #define	GTM_DIST_LOG			"$gtm_dist"
 
 /* Database */
-#define	GTM_GBLDIR			"$gtmgbldir"
 #define	GTM_BLKUPGRADE_FLAG		"$gtm_blkupgrade_flag"
 #define	GTM_DBFILEXT_SYSLOG_DISABLE	"$gtm_dbfilext_syslog_disable"
 #define	GTM_ENV_XLATE			"$gtm_env_translate"
 #define	GTM_FULLBLOCKWRITES		"$gtm_fullblockwrites"
 #define	GTM_GDSCERT			"$gtm_gdscert"
 #define	GTM_GVDUPSETNOOP		"$gtm_gvdupsetnoop"
+#define	GTM_GBLDIR			"$gtmgbldir"
 #define	GTM_GVUNDEF_FATAL		"$gtm_gvundef_fatal"
+#define	GTM_POOLLIMIT			"$gtm_poollimit"
 #define	GTM_TP_ALLOCATION_CLUE		"$gtm_tp_allocation_clue"
 #define	GTM_TPNOTACIDTIME		"$gtm_tpnotacidtime"
 #define	GTM_TPRESTART_LOG_DELTA		"$gtm_tprestart_log_delta"
@@ -85,7 +86,6 @@
 
 /* Database */
 #define	GTM_TMP_ENV			"$gtm_tmp"
-#define	GTM_SHMFLAGS			"$gtm_shmatflags"
 #define	GTM_TRIGGER_ETRAP		"$gtm_trigger_etrap"
 #define	GTM_SNAPTMPDIR			"$gtm_snaptmpdir"
 #define	GTM_DB_STARTUP_MAX_WAIT		"$gtm_db_startup_max_wait"
@@ -113,6 +113,8 @@
 /* [Auto]Relink related */
 #define	GTM_LINK			"$gtm_link"
 #define GTM_LINKTMPDIR			"$gtm_linktmpdir"
+#define	GTM_AUTORELINK_SHM 		"$gtm_autorelink_shm"
+#define	GTM_AUTORELINK_KEEPRTN		"$gtm_autorelink_keeprtn"	/* do not let go of objects in rtnobj shm */
 
 /* Miscellaneous */
 #define GTM_ERROR_ON_JNL_FILE_LOST	"$gtm_error_on_jnl_file_lost"

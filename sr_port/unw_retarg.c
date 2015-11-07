@@ -35,17 +35,24 @@
 #include "get_ret_targ.h"
 #include "opcode.h"
 #include "glvn_pool.h"
+#include "zr_unlink_rtn.h"
+#include "tp_timeout.h"
 
-GBLREF	void		(*unw_prof_frame_ptr)(void);
-GBLREF	stack_frame	*frame_pointer, *zyerr_frame;
-GBLREF	unsigned char	*msp,*stackbase,*stacktop;
-GBLREF	mv_stent	*mv_chain;
-GBLREF	tp_frame	*tp_pointer;
-GBLREF	boolean_t	is_tracing_on;
-GBLREF	symval		*curr_symval;
-GBLREF	mval		*alias_retarg;
-GBLREF	boolean_t	dollar_truth;
-GBLREF	boolean_t	dollar_zquit_anyway;
+GBLREF	void			(*unw_prof_frame_ptr)(void);
+GBLREF	stack_frame		*frame_pointer, *zyerr_frame;
+GBLREF	unsigned char		*msp, *stackbase, *stacktop;
+GBLREF	mv_stent		*mv_chain;
+GBLREF	tp_frame		*tp_pointer;
+GBLREF	boolean_t		is_tracing_on;
+GBLREF	symval			*curr_symval;
+GBLREF	mval			*alias_retarg;
+GBLREF	boolean_t		dollar_truth;
+GBLREF	boolean_t		dollar_zquit_anyway;
+GBLREF	boolean_t		dollar_zininterrupt;
+GBLREF	mval			dollar_ztrap;
+GBLREF	boolean_t		ztrap_explicit_null;
+GBLREF	boolean_t		tp_timeout_deferred;
+GBLREF	dollar_ecode_type	dollar_ecode;
 
 LITREF	mval 		literal_null;
 
@@ -57,9 +64,10 @@ error_def(ERR_TPQUIT);
 /* This has to be maintained in parallel with op_unwind(), the unwind without a return argument (intrinsic quit) routine. */
 int unw_retarg(mval *src, boolean_t alias_return)
 {
+	rhdtyp		*rtnhdr;
 	mval		ret_value, *trg;
 	boolean_t	got_ret_target;
-	stack_frame	*prevfp;
+	stack_frame	*prevfp, *fp;
 	lv_val		*srclv, *srclvc, *base_lv;
 	symval		*symlv, *symlvc;
 	int4		srcsymvlvl;
@@ -165,6 +173,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	DRAIN_GLVN_POOL_IF_NEEDED;
 	PARM_ACT_UNSTACK_IF_NEEDED;
+	USHBIN_ONLY(rtnhdr = frame_pointer->rvector);	/* Save rtnhdr for cleanup call below */
 	frame_pointer = frame_pointer->old_frame_pointer;
 	DBGEHND((stderr, "unw_retarg: Stack frame 0x"lvaddr" unwound - frame 0x"lvaddr" now current - New msp: 0x"lvaddr"\n",
 		 prevfp, frame_pointer, msp));
@@ -177,5 +186,12 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	if (!dollar_zquit_anyway || trg)
 		trg->mvtype |= MV_RETARG;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
+	USHBIN_ONLY(CLEANUP_COPIED_RECURSIVE_RTN(rtnhdr));
+	/* We just unwound a frame. May have been either a zintrupt frame and/or may have unwound a NEW'd ZTRAP or even cleared
+	 * our error state. If we have a deferred timeout and none of the deferral conditions are anymore in effect, release
+	 * the hounds.
+	 */
+	if (tp_timeout_deferred UNIX_ONLY(&& !dollar_zininterrupt) && ((0 == dollar_ecode.index) || !(ETRAP_IN_EFFECT)))
+		tptimeout_set(0);
 	return 0;
 }

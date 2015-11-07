@@ -45,8 +45,9 @@
 #include "repl_log.h"
 #include "eintr_wrappers.h"
 #include "gtmimagename.h"
+#include "wbox_test_init.h"
 
-#define UPDPROC_CMD_MAXLEN	1024
+#define UPDPROC_CMD_MAXLEN	GTM_PATH_MAX
 #define UPDPROC_CMD		"%s/mupip"
 #define UPDPROC_CMD_FILE	"mupip"
 #define UPDPROC_CMD_ARG1	"replicate"
@@ -68,6 +69,7 @@ error_def(ERR_LOGTOOLONG);
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_REPLINFO);
 error_def(ERR_TEXT);
+error_def(ERR_UPDPROC);
 
 int gtmrecv_upd_proc_init(boolean_t fresh_start)
 {
@@ -101,7 +103,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 		return(UPDPROC_EXISTS);
 	} else if (upd_status == SRV_ALIVE)
 	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDPROC, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Update process already exists. Please kill it before a fresh start"));
 		return(UPDPROC_EXISTS);
 	}
@@ -113,11 +115,24 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	if (!gtm_dist_ok_to_use)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+	if (WBTEST_ENABLED(WBTEST_MAXGTMDIST_UPDATE_PROCESS))
+	{
+		memset(gtm_dist, 'a', GTM_PATH_MAX-2);
+		gtm_dist[GTM_PATH_MAX-1] = '\0';
+	}
+	upd_proc_cmd_len = SNPRINTF(upd_proc_cmd, UPDPROC_CMD_MAXLEN, UPDPROC_CMD, gtm_dist);
+	if ((-1 == upd_proc_cmd_len) || (UPDPROC_CMD_MAXLEN <= upd_proc_cmd_len))
+	{
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDPROC, 0, ERR_TEXT, 2,
+			   RTS_ERROR_LITERAL("Could not find path of Update Process. Check value of $gtm_dist"));
+		repl_errno = EREPL_UPDSTART_BADPATH;
+		return(UPDPROC_START_ERR);
+	}
 	FORK(upd_pid);
 	if (0 > upd_pid)
 	{
 		recvpool.upd_proc_local->upd_proc_shutdown = save_upd_status;
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_UPDPROC, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Could not fork update process"), errno);
 		repl_errno = EREPL_UPDSTART_FORK;
 		return(UPDPROC_START_ERR);
@@ -125,20 +140,14 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	if (0 == upd_pid)
 	{
 		/* Update Process */
-		upd_proc_cmd_len = SNPRINTF(upd_proc_cmd, UPDPROC_CMD_MAXLEN, UPDPROC_CMD, gtm_dist);
-		if (-1 == upd_proc_cmd_len)
-		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				   RTS_ERROR_LITERAL("Could not find path of Update Process. Check value of $gtm_dist"));
-			repl_errno = EREPL_UPDSTART_BADPATH;
-			return(UPDPROC_START_ERR);
-		}
+		if (WBTEST_ENABLED(WBTEST_BADEXEC_UPDATE_PROCESS))
+		                STRCPY(upd_proc_cmd, "ersatz");
 		if (EXECL(upd_proc_cmd, upd_proc_cmd, UPDPROC_CMD_ARG1, UPDPROC_CMD_ARG2, NULL) < 0)
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_UPDPROC, 0, ERR_TEXT, 2,
 				   RTS_ERROR_LITERAL("Could not exec Update Process"), errno);
 			repl_errno = EREPL_UPDSTART_EXEC;
-			return(UPDPROC_START_ERR);
+			_exit(UPDPROC_START_ERR);
 		}
 	}
 #elif defined(VMS)
@@ -190,12 +199,12 @@ int gtmrecv_start_updonly(void)
 
 	if ((upd_status = is_updproc_alive()) == SRV_ALIVE)
 	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDPROC, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Update Process exists already. New process not started"));
 		return(UPDPROC_START_ERR);
 	} else if (upd_status == SRV_ERR)
 	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDPROC, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Error in starting up update process"));
 		return(UPDPROC_START_ERR);
 	}
@@ -220,15 +229,15 @@ int gtmrecv_start_updonly(void)
 #endif
 	if (start_status == UPDPROC_START)
 	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDPROC, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Receiver server is not alive to start update process. Please start receiver server"));
 	} else if (start_status == UPDPROC_START_ERR)
 	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDPROC, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error starting update process"));
 	} else if (start_status == UPDPROC_EXISTS)
 	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDPROC, 0, ERR_TEXT, 2,
 			   RTS_ERROR_LITERAL("Update Process exists already. New process not started"));
 	}
 	return(UPDPROC_START_ERR);

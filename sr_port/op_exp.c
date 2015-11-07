@@ -28,6 +28,7 @@ LITREF mval literal_zero;
 
 STATICFNDEF void op_exp_flgchk(mval *mv);
 
+error_def(ERR_DIVZERO);
 error_def(ERR_NEGFRACPWR);
 error_def(ERR_NUMOFLOW);
 
@@ -39,47 +40,38 @@ void op_exp(mval *u, mval* v, mval *p)
 	int		im0, im1, ie, i, j, j1;
 	boolean_t	fraction = FALSE, in = FALSE;
 	boolean_t	neg = FALSE, even = TRUE;
-	mval    	w, zmv;
-	int4    	n, n1;
+	mval		w, zmv;
+	int4		n, n1;
 	int4		z1_rnd, z2_rnd, pten;
 
 	u1_p = &u1;
 	memcpy(u1_p, u, SIZEOF(mval));
 	MV_FORCE_NUM(u1_p);
 	MV_FORCE_NUM(v);
-	if ((0 == v->m[1]) && (0 == v->m[0]))
-	{	/* 0**0 = 1 */
-		*p = literal_one;
-		return;
-	}
+	n = v->m[1];
 	if (0 != (v->mvtype & MV_INT))
 	{	/* Integer-ish exponent (could have up to 3 digits to right of decimal pt) */
-		n = v->m[1];
 		if (0 == n)
-		{	/* anything**0 = 1 where anything != 0 */
+		{	/* anything**0 = 1 */
 			*p = literal_one;
 			return;
 		}
 		if (0 != (u1_p->mvtype & MV_INT))
 		{	/* Integer-ish base */
 			if (0 == u1_p->m[1])
-			{	/* 0**anything = 0 */
-				*p = literal_zero;
-		                return;
+			{
+				if (0 <= n)
+				{	/* 0**anything non-negative = 0 */
+					*p = literal_zero;
+					return;
+				}
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DIVZERO);
 			}
-		} else if ((0 == u1_p->m[1]) && (0 == u1_p->m[0]))
-		{	/* 0**anything = 0 */
-			*p = literal_zero;
-			return;
-		}
+		} else
+			assert((0 != u1_p->m[1]) || (0 != u1_p->m[0]));
 		n1 = n / MV_BIAS;
 		if ((n1 * MV_BIAS) == n)
 		{	/* True non-fractional exponent */
-			if (0 == v->m[1])
-			{	/* Duplicate of check on line 58? */
-				*p = literal_one;
-				return;
-			}
 			if (0 > n1)
 			{	/* Create inverse due to negative exponent */
 				op_div((mval *)&literal_one, u1_p, &w);
@@ -102,7 +94,7 @@ void op_exp(mval *u, mval* v, mval *p)
 		{	/* Have non-integer exponent (has fractional component) */
 			if (0 != (u1_p->mvtype & MV_INT))
 			{	/* Base is integer-ish */
-                        	if (0 > u1_p->m[1])
+				if (0 > u1_p->m[1])
 				{	/* Base is negative, invalid exponent expression */
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NEGFRACPWR);
 					return;
@@ -115,31 +107,35 @@ void op_exp(mval *u, mval* v, mval *p)
 					return;
 				}
 			}
-                }
-        } else
+		}
+	} else
 	{	/* Exponent NOT integer-ish */
-	        if (0 != (u1_p->mvtype & MV_INT))
-        	{	/* Base is integer-ish */
-                	if (0 > u1_p->m[1])
-                	{	/* Base is negative - make positive but record was negative */
-                        	u1_p->m[1] = -u1_p->m[1];
-	                        neg = TRUE;
-        	        }
+		assert((0 != v->m[1]) || (0 != v->m[0]));
+		if (0 != (u1_p->mvtype & MV_INT))
+		{	/* Base is integer-ish */
 			if (0 == u1_p->m[1])
-			{	/* 0**anything is 0 */
-				*p = literal_zero;
-				return;
+			{
+				if (!v->sgn)
+				{	/* 0**anything non-negative = 0 */
+					*p = literal_zero;
+					return;
+				}
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DIVZERO);
 			}
-        	} else if (u1_p->sgn)
-        	{	/* Base is NOT integer-ish and is negative - clear sign and record with flag */
-                	u1_p->sgn = 0;
-	                neg = TRUE;
-			if ((0 == u1_p->m[1]) && (0 == u1_p->m[0]))
-			{	/* 0**anything is zero */
-				*p = literal_zero;
-				return;
+			if (0 > u1_p->m[1])
+			{	/* Base is negative - make positive but record was negative */
+				u1_p->m[1] = -u1_p->m[1];
+				neg = TRUE;
 			}
-        	}
+		} else
+		{	/* Base is NOT integer-ish */
+			assert((0 != u1_p->m[1]) || (0 != u1_p->m[0]));
+			if (u1_p->sgn)
+			{	/* and is negative - clear sign and record with flag */
+				u1_p->sgn = 0;
+				neg = TRUE;
+			}
+		}
 		if (NUM_DEC_DG_2L > (ie = (v->e - MV_XBIAS)))		/* Note assignment */
 		{	/* Need to determine 2 things:
 			 *   1. Whether this exponent has a fractional part (vs just being large)
@@ -208,7 +204,7 @@ void op_exp(mval *u, mval* v, mval *p)
 	if (HUGE_VAL == z)		/* Infinity return value check */
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
-	        return;
+		return;
 	}
 #	endif
 	p->sgn = (neg && !even);	/* Positive numbers only from here on out */
@@ -252,14 +248,14 @@ void op_exp(mval *u, mval* v, mval *p)
 	 * Could add checks for zero/infinity here to avoid lengthy (300ish iterations) while loops below.
 	 */
 	n = 0;
-        while (1e16 <= z)
+	while (1e16 <= z)
 	{
-                n += 5;
+		n += 5;
 		z *= 1e-5;
 	}
-        while (1e1 > z)
+	while (1e1 > z)
 	{
-                n -= 5;
+		n -= 5;
 		z *= 1e5;
 	}
 	while (1e9 <= z)

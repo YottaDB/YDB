@@ -109,7 +109,6 @@ GBLREF 	sgmnt_data_ptr_t 	cs_data;
 GBLREF  uint4                   image_count;
 #endif
 GBLREF boolean_t		disk_blk_read;
-LITREF	mval			literal_hasht;
 static	uint4			last_pre_read_offset;
 
 error_def(ERR_DBCCERR);

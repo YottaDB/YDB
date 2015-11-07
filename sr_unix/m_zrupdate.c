@@ -19,7 +19,7 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-#ifdef USHBIN_SUPPORTED
+#ifdef AUTORELINK_SUPPORTED
 /* Routine to compile ZRUPDATE command
  *
  * Current syntax:

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,12 +18,13 @@
 
 GBLREF spdesc stringpool;
 
-oprtype put_str(char *pt,mstr_len_t n)
+oprtype put_str(char *pt, mstr_len_t n)
 {
 	mval p;
 
 	ENSURE_STP_FREE_SPACE(n);
 	memcpy(stringpool.free, pt, n);
+	memset(&p, 0, SIZEOF(mval));
 	p.mvtype = MV_STR;
 	p.str.len = n;
 	p.str.addr = (char *) stringpool.free;

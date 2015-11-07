@@ -59,7 +59,6 @@
 #include "generic_signal_handler.h"
 #include "init_secshr_addrs.h"
 #include "zcall_package.h"
-#include "geteditor.h"
 #include "getzdir.h"
 #include "getzmode.h"
 #include "getzprocess.h"
@@ -92,6 +91,8 @@
 #include "heartbeat_timer.h"
 #include "gt_timers_add_safe_hndlrs.h"
 #include "continue_handler.h"
+#include "jobsp.h" /* For gcall.h */
+#include "gcall.h" /* For ojchildparms() */
 
 GBLDEF void			(*restart)() = &mum_tstart;
 #ifdef __MVS__
@@ -217,7 +218,6 @@ void gtm_startup(struct startup_vector *svec)
 	INVOKE_INIT_SECSHR_ADDRS;
 	getzprocess();
 	getzmode();
-	geteditor();
 	zcall_init();
 	cmd_qlf.qlf = glb_cmd_qlf.qlf;
 	cache_init();
@@ -309,7 +309,13 @@ void gtm_startup(struct startup_vector *svec)
 	assert(FALSE == curr_symval->alias_activity);
 	curr_symval->alias_activity = TRUE;
 	lvzwr_init((enum zwr_init_types)0, (mval *)NULL);
+	TREF(in_zwrite) = FALSE;
 	curr_symval->alias_activity = FALSE;
+	if ((GTM_IMAGE == image_type) && (NULL != svec->base_addr))
+		/* We are in the grandchild at this point. This call is made to greet local variables sent from the midchild. There
+		 * is no symbol table for locals before this point so we have to greet them here, after creating the symbol table.
+		 */
+		ojchildparms(NULL, NULL, NULL);
 	if ((NULL != (TREF(mprof_env_gbl_name)).str.addr))
 		turn_tracing_on(TADR(mprof_env_gbl_name), TRUE, (TREF(mprof_env_gbl_name)).str.len > 0);
 	return;

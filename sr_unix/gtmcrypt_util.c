@@ -52,9 +52,9 @@ GBLDEF gtm_free_fnptr_t			gtm_free_fnptr;
 
 #define Tcsetattr(FDESC, WHEN, TERMPTR, RC, ERRNO)									\
 {															\
-	sigset_t block_ttinout;												\
-	sigset_t oldset;												\
-	int rc;														\
+	sigset_t	block_ttinout;											\
+	sigset_t	oldset;												\
+	int		rc;												\
 															\
 	sigemptyset(&block_ttinout);											\
 	sigaddset(&block_ttinout, SIGTTIN);										\
@@ -113,9 +113,9 @@ void gtm_gcry_log_handler(void *opaque, int level, const char *fmt, va_list arg_
 	return;
 }
 
-int gc_read_passwd(char *prompt, char *buf, int maxlen)
+int gc_read_passwd(char *prompt, char *buf, int maxlen, void *tty)
 {
-	struct termios		new_tty, old_tty;
+	struct termios		new_tty, old_tty, *tty_copy;
 	int			fd, status, save_errno, istty, i, rv;
 	char			c;
 
@@ -126,10 +126,21 @@ int gc_read_passwd(char *prompt, char *buf, int maxlen)
 	fd = fileno(stdin);
 	if (FALSE != (istty = isatty(fd)))
 	{	/* Turn off terminal echo. */
-		if (0 != (status = tcgetattr(fd, &old_tty)))
+		status = tcgetattr(fd, &old_tty);
+		if (0 != status)
 		{
-			UPDATE_ERROR_STRING("Failed to obtain passphrase from terminal. %s", strerror(errno));
+			UPDATE_ERROR_STRING("Unable to set up terminal for safe password entry. Will not request passphrase. %s",
+				strerror(errno));
 			return -1;
+		}
+		if (NULL != tty)
+		{	/* In case a pointer was passed for the current terminal state, avoid a race condition with a potential
+			 * interrupt by first assigning a pointer for the allocated space to a local variable and only then
+			 * updating the passed-in pointer.
+			 */
+			tty_copy = (struct termios *)MALLOC(SIZEOF(struct termios));
+			memcpy(tty_copy, &old_tty, SIZEOF(struct termios));
+			*((struct termios **)tty) = tty_copy;
 		}
 		new_tty = old_tty;
 		new_tty.c_lflag &= ~ECHO;
@@ -142,7 +153,8 @@ int gc_read_passwd(char *prompt, char *buf, int maxlen)
 		Tcsetattr(fd, TCSAFLUSH, &new_tty, status, save_errno);
 		if (-1 == status)
 		{
-			UPDATE_ERROR_STRING("Failed to obtain passphrase from terminal. %s", strerror(save_errno));
+			UPDATE_ERROR_STRING("Unable to set up terminal for safe password entry. Will not request passphrase. %s",
+				strerror(save_errno));
 			return -1;
 		}
 	}
@@ -181,7 +193,7 @@ int gc_read_passwd(char *prompt, char *buf, int maxlen)
 		Tcsetattr(fd, TCSAFLUSH, &old_tty, status, save_errno);
 		if (-1 == status)
 		{
-			UPDATE_ERROR_STRING("Failed to obtain passphrase from terminal. %s", strerror(save_errno));
+			UPDATE_ERROR_STRING("Unable to restore terminal settings. %s", strerror(save_errno));
 			return -1;
 		}
 	}
@@ -357,7 +369,7 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 		gc_freeup_pwent(pwent);
 		return -1;
 	}
-	if (-1 == gc_read_passwd(prompt, passwd, GTM_PASSPHRASE_MAX))
+	if (-1 == gc_read_passwd(prompt, passwd, GTM_PASSPHRASE_MAX, NULL))
 	{
 		gc_freeup_pwent(pwent);
 		return -1;

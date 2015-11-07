@@ -122,7 +122,7 @@ void create_object_file(rhdtyp *rhead)
 	/* Action instructions and marker are not kept in the same array since the type of the elements of
 	 * the former (uint4) may be different from the type of the elements of the latter (char).
 	 * 'tiz cleaner this way rather than converting one to the other type in order to be accommodated
-	 * in an array
+	 * in an array.
 	 */
         assert(JSB_ACTION_N_INS * SIZEOF(jsb_action[0]) == SIZEOF(jsb_action));	/* JSB_ACTION_N_INS maintained? */
         assert(SIZEOF(jsb_action) <= SIZEOF(rhead->jsb));			/* Overflow check */
@@ -135,8 +135,9 @@ void create_object_file(rhdtyp *rhead)
 
 /* At this point, we know only gtm_object has been written onto the file.
  * Read that gtm_object and wrap it up in .text section, add remaining sections to native object(ELF)
- * Update the ELF, write it out to the object file and close the object file */
-void close_object_file(void)
+ * Update the ELF, write it out to the object file and close the object file.
+ */
+void finish_object_file(void)
 {
         int		i, status;
         size_t		bufSize;
@@ -324,7 +325,5 @@ void close_object_file(void)
         /* Free the memory malloc'ed above */
         free(string_tbl);
         free(gtm_obj_code);
-	if ((off_t)-1 == lseek(object_file_des, (off_t)0, SEEK_SET))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 }
 

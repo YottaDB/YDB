@@ -69,6 +69,7 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  *	V22	V22	GT.M V5.5-000	strm_seqno added to all logical records (supplementary instances)
  *	V22	V23	GT.M V6.0-000	Various journaling-related limits have changed, allowing for much larger journal records
  *	V24	V24	GT.M V6.2-000	New logical trigger journal record (TLGTRIG and ULGTRIG jnl records)
+ *	V24	V25	GT.M V6.2-001	No new jnl record but bump needed to replicate logical trigger jnl records (GTM-7509)
  */
 
 typedef enum
@@ -92,6 +93,7 @@ typedef enum
 	REPL_JNL_V22,		/* enum corresponding to journal format V22 */
 	REPL_JNL_V23,		/* enum corresponding to journal format V23 */
 	REPL_JNL_V24,		/* enum corresponding to journal format V24 */
+	REPL_JNL_V25,		/* enum corresponding to journal format V25 */
 	REPL_JNL_MAX
 } repl_jnl_t;
 
@@ -140,6 +142,8 @@ GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
  * 	EREPL_INTLFILTER_INCMPLREC - incomplete record in the filter buffer.
  *	EREPL_INTLFILTER_NEWREC - cannot convert record, the record is newer than the "to" version.
  *	EREPL_INTLFILTER_REPLGBL2LONG - record contains global name > 8 characters, which is not supported in remote side
+ *	EREPL_INTLFILTER_SECLESSTHANV62 - record contains #t global which is not allowed when source side is > V62000
+ *	EREPL_INTLFILTER_PRILESSTHANV62 - record contains #t global which is not allowed when receiver side is > V62000
  * In all error cases, conv_len will be the offset at which processing was stopped.
  */
 
@@ -156,6 +160,7 @@ GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 #define V22_JNL_VER		22
 #define V23_JNL_VER		23
 #define V24_JNL_VER		24
+#define V25_JNL_VER		25
 
 #define	V17_NULL_RECLEN		40	/* size of a JRT_NULL record in V17/V18 jnl format */
 #define	V19_NULL_RECLEN		40	/* size of a JRT_NULL record in V19/V20 jnl format */
@@ -252,19 +257,28 @@ void repl_filter_error(seq_num filter_seqno, int why);
 	assert(0 < OUT_BUFSIZ);									\
 }
 
+/* Below error_defs are needed by the following macros */
+error_def(ERR_REPLRECFMT);
+error_def(ERR_REPLGBL2LONG);
+error_def(ERR_REPLNOHASHTREC);
+
 #ifdef UNIX
-# define INT_FILTER_RTS_ERROR(FILTER_SEQNO)								\
-{													\
-	if (EREPL_INTLFILTER_BADREC == repl_errno)							\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLRECFMT);				\
-	else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)						\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLGBL2LONG);				\
-	else if (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)					\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1, &FILTER_SEQNO);	\
-	else if (EREPL_INTLFILTER_MULTILINEXECUTE == repl_errno)					\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_REPLNOMULTILINETRG, 1, &FILTER_SEQNO);	\
-	else	/* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */					\
-		assertpro(FALSE);									\
+# define INT_FILTER_RTS_ERROR(FILTER_SEQNO, REPL_ERRNO)										\
+{																\
+	assert((EREPL_INTLFILTER_BADREC == REPL_ERRNO)										\
+		|| (EREPL_INTLFILTER_REPLGBL2LONG == REPL_ERRNO)								\
+		|| (EREPL_INTLFILTER_PRILESSTHANV62 == REPL_ERRNO)								\
+		|| (EREPL_INTLFILTER_SECLESSTHANV62 == REPL_ERRNO));								\
+	if (EREPL_INTLFILTER_BADREC == REPL_ERRNO)										\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLRECFMT);							\
+	else if (EREPL_INTLFILTER_REPLGBL2LONG == REPL_ERRNO)									\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLGBL2LONG);							\
+	else if (EREPL_INTLFILTER_PRILESSTHANV62 == REPL_ERRNO)									\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLNOHASHTREC, 3, &FILTER_SEQNO, LEN_AND_LIT("Source"));		\
+	else if (EREPL_INTLFILTER_SECLESSTHANV62 == REPL_ERRNO)									\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLNOHASHTREC, 3, &FILTER_SEQNO, LEN_AND_LIT("Receiver"));	\
+	else	/* (EREPL_INTLFILTER_INCMPLREC == REPL_ERRNO) */								\
+		assertpro(FALSE);												\
 }
 #else
 # define INT_FILTER_RTS_ERROR(FILTER_SEQNO)					\

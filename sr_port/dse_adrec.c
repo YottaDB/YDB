@@ -126,11 +126,11 @@ void dse_adrec(void)
 			free(lbp);
 			return;
 		}
-		if (key_len + data_len >  csa->hdr->max_rec_size)
+		if (VMS_ONLY(key_len + ) data_len >  csa->hdr->max_rec_size)
 		{
 			t_abort(gv_cur_region, csa);
 			free(lbp);
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_REC2BIG, 4, key_len + data_len,
+ 			rts_error_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_REC2BIG, 4, VMS_ONLY(key_len + ) data_len,
 				(int4)csa->hdr->max_rec_size, REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, LEN_AND_STR(key));
 		}
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -470,5 +470,6 @@ int gtmsource_get_opt(void)
 		else
 			gtmsource_options.showfreeze = TRUE;
 	}
+	gtmsource_options.jnlfileonly = (CLI_PRESENT == cli_present("JNLFILEONLY"));
 	return(0);
 }

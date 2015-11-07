@@ -40,14 +40,19 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 	jnl_create_info		create;
 	char			prev_jnl_fn[JNL_NAME_SIZE];
 	int			status;
+#	if defined(GTM_TRIGGER) && defined(DEBUG)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	csa = &FILE_INFO(reg)->s_addrs;
 	jpc = csa->jnl;
-
-	assert((ERR_JNLFILOPN != sts) && (NOJNL != jpc->channel) || (ERR_JNLFILOPN == sts) && (NOJNL == jpc->channel));
+	assert(sts GTMTRIG_ONLY(|| TREF(in_trigger_upgrade)));
+	assert(!sts || ((ERR_JNLFILOPN != sts) && (NOJNL != jpc->channel)) || ((ERR_JNLFILOPN == sts) && (NOJNL == jpc->channel)));
 	if (NOJNL != jpc->channel)
 		JNL_FD_CLOSE(jpc->channel, status);	/* sets jpc->channel to NOJNL */
-	jnl_send_oper(jpc, sts);
+	if (sts)
+		jnl_send_oper(jpc, sts);
 	/* attempt to create a new journal file */
 	memset(&create, 0, SIZEOF(create));
 	create.status = create.status2 = SS_NORMAL;

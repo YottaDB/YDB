@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,6 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 	MAXSTR_BUFF_DECL(buff);
 
 	SETUP_THREADGBL_ACCESS;
-	TREF(in_zwrite) = TRUE;
 	VAR_START(var, arg1);
 	VMS_ONLY(va_count(count));
 	assert(1 < count);
@@ -115,7 +114,7 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 				lvzwr_arg(flag, (mval *)arg1, (mval *)0);
 				break;
 			default:
-				GTMASSERT;
+				assertpro(FALSE);
 				break;
 		}
 	}

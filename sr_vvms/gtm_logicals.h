@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,14 +16,15 @@
 #define	GTM_DIST_LOG			"GTM$DIST"
 
 /* Database */
-#define	GTM_GBLDIR			"GTM$GBLDIR"
 #define	GTM_BLKUPGRADE_FLAG		"GTM_BLKUPGRADE_FLAG"
 #define	GTM_DBFILEXT_SYSLOG_DISABLE	"GTM_DBFILEXT_SYSLOG_DISABLE"
 #define	GTM_ENV_XLATE			"GTM_ENV_TRANSLATE"
 #define	GTM_FULLBLOCKWRITES		"GTM_FULLBLOCKWRITES"
 #define	GTM_GDSCERT			"GTM_GDSCERT"
+#define	GTM_GBLDIR			"GTM$GBLDIR"
 #define	GTM_GVDUPSETNOOP		"GTM_GVDUPSETNOOP"
 #define	GTM_GVUNDEF_FATAL		"GTM_GVUNDEF_FATAL"
+#define	GTM_POOLLIMIT			"GTM_POOLLIMIT"
 #define	GTM_TP_ALLOCATION_CLUE		"GTM_TP_ALLOCATION_CLUE"
 #define	GTM_TPNOTACIDTIME		"GTM_TPNOTACIDTIME"
 #define	GTM_TPRESTART_LOG_DELTA		"GTM_TPRESTART_LOG_DELTA"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -142,7 +142,7 @@ CONDITION_HANDLER(op_fnztrigger_ch)
 void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 {
 	int				inparm_len, index;
-	uint4				dummy_stats[NUM_STATS], filename_len;
+	uint4				filename_len;
 	boolean_t			failed;
 	char				filename[MAX_FN_LEN + 1];
 	DCL_THREADGBL_ACCESS;
@@ -211,25 +211,25 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	switch(ztrprm_data[index])
 	{
 		case ZTRP_FILE:
-			if (0 == arg1->str.len)
-				/* 2nd parameter is missing */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 2);
-			if (MAX_FN_LEN < arg1->str.len)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_FILENAMETOOLONG);
-			/* The file name is in string pool so make a local copy in case GC happens */
-			strncpy(filename, arg1->str.addr, arg1->str.len);
-			filename_len = arg1->str.len;
-			filename[filename_len] = '\0';
-			failed = trigger_trgfile_tpwrap(filename, filename_len, TRUE);
+			/* If 2nd parameter is empty, do nothing (but dont issue error) */
+			if (arg1->str.len)
+			{
+				if (MAX_FN_LEN < arg1->str.len)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_FILENAMETOOLONG);
+				/* The file name is in string pool so make a local copy in case GC happens */
+				strncpy(filename, arg1->str.addr, arg1->str.len);
+				filename_len = arg1->str.len;
+				filename[filename_len] = '\0';
+				failed = trigger_trgfile_tpwrap(filename, filename_len, TRUE);
+			} else
+				failed = FALSE;
 			break;
 		case ZTRP_ITEM:
-			if (0 == arg1->str.len)
-				/* 2nd parameter is missing */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ZTRIGINVACT, 1, 2);
-			failed = trigger_update(arg1->str.addr, arg1->str.len);
+			/* If 2nd parameter is empty, do nothing (but dont issue error) */
+			failed = (arg1->str.len) ? trigger_update(arg1->str.addr, arg1->str.len) : FALSE;
 			break;
 		case ZTRP_SELECT:
-			failed = (TRIG_FAILURE == trigger_select(arg1->str.addr, arg1->str.len, NULL, 0));
+			failed = trigger_select_tpwrap(arg1->str.addr, arg1->str.len, NULL, 0);
 			break;
 		default:
 			assertpro(FALSE && ztrprm_data[index]);	/* Should never happen with checks above */

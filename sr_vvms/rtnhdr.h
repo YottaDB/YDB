@@ -136,7 +136,7 @@ typedef struct
 #define VERIFY		TRUE
 #define NOVERIFY	FALSE
 
-int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_t verifytrig);
+int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp **rtn_vec);
 void free_src_tbl(rhdtyp *rtn_vector);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
 int4 *find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_name);

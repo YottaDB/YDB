@@ -10,32 +10,36 @@ package.
 
 GT.M relies on CMake to generate the Makefiles to build GT.M from source. The
 prerequisites are CMake (at least 2.8.5), GNU make (at least 3.81), Linux
-(either x86 or x86_64), Unicode include files and GPG. Unicode include files
-are automatically installed if ICU is installed. GPG include files require
-installing the GNUPG and related library development packages. Debian 6, Ubuntu
-12.04 LTS and RHEL 6.0 were used to do the test builds for this distribution.
-The default ICU and GPG packages were taken from the distribution repositories.
+(either x86 or x86_64), libraries and development files for libz, Unicode,
+OpenSSL and GPG. Debian 6, Ubuntu 12.04/14.04 LTS and RHEL 6.0 were used to do
+the test builds for this distribution. The default ICU and GPG packages were
+taken from the distribution repositories.
 
 To build GT.M for Linux, do the following steps:
 
 1. Fulfill the pre-requisites
    Install developement libraries libelf, zlib, libicu, libgpgme, libgpg-error,
-   libgcrypt.
+   libgcrypt, libssl, libconfig.
 
    Ensure that your locale settings are correct, otherwise you will see
    GTM-E-NONUTF8LOCALE messages. Refer the Messages and Recovery Procedures
-   Manual if you do encounter these messages.
+   Manual if you do encounter these messages. The following should give you a
+   valid locale:
+
+   $ locale -a | gawk 'BEGIN{IGNORECASE=1}/en_us.utf-*8/{print;exit}'
+   en_US.utf8
+   $ export LANG=C LC_ALL= LC_CTYPE="<answer from above>" LC_COLLATE=C
 
    [optional] The GT.M source tarball includes pre-generated files. To generate
    these files requires a binary distribution of GT.M.  You can download GT.M
    from http://sourceforge.net/projects/fis-gtm/ Unpack the tar file and run
    the configure script as root. Note: the tar file unpacks everything into
    your current working directory, not a new subdirectory. The Linux Standard
-   Base (LSB) install path for GT.M V6.2-000 is /opt/fis-gtm/V6.2-000_i586 or
-   /opt/fis-gtm/V6.2-000_x8664. These instructions are written using x8664, please
+   Base (LSB) install path for GT.M V6.2-001 is /opt/fis-gtm/V6.2-001_i586 or
+   /opt/fis-gtm/V6.2-001_x8664. These instructions are written using x8664, please
    use i586 as necessary.
 
-   $ tar xfz gtm_V62000_linux_x8664_pro.tar.gz
+   $ tar xfz gtm_V62001_linux_x8664_pro.tar.gz
 
    # Note down the installation path for use with cmake below
 
@@ -43,16 +47,16 @@ To build GT.M for Linux, do the following steps:
 
 2. Unpack the GT.M sources
    The GT.M source tarball extracts to a directory with the version number in
-   the name, fis-gtm-V6.2-000
-   $ tar xfz fis-gtm-V6.2-000.tar.gz
-   $ cd fis-gtm-V6.2-000
+   the name, fis-gtm-V6.2-001
+   $ tar xfz fis-gtm-V6.2-001.tar.gz
+   $ cd fis-gtm-V6.2-001
 
    You should find this README, LICENSE, COPYING and CMakeLists.txt file and
    sr_* source directories.
 
 3. Building GT.M -
    <fis-gtm-build> can be a sub directory of the source directory,
-   fis-gtm-V6.2-000, or any other valid path.
+   fis-gtm-V6.2-001, or any other valid path.
 
    $ mkdir <fis-gtm-build>
    $ cd <fis-gtm-build>
@@ -71,16 +75,16 @@ To build GT.M for Linux, do the following steps:
    #
    #     -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package
    #
-   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.2-000
+   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.2-001
 
    $ make
 
    $ make install
 
-   $ cd package/lib/fis-gtm/V6.2-000_x86_64
+   $ cd package/lib/fis-gtm/V6.2-001_x86_64
 
    # Now you are ready to install GT.M. Answer a few questions and install it.
-   # The recommended installation path is /opt/fis-gtm/V6.2-000_x86_64
+   # The recommended installation path is /opt/fis-gtm/V6.2-001_x86_64
 
    $ sudo ./configure
 
@@ -88,3 +92,11 @@ To build GT.M for Linux, do the following steps:
 
 4. Packaging GT.M -
    Create a tar file from the installed directory
+
+FAQ:
+- The CMake build fails with the following message followed by one or more cases.
+	CMake Error: The following variables are used in this project, but they are set to NOTFOUND.
+	Please set them or make sure they are set and tested correctly in the CMake files:
+  This indicates that required libraries are not found. Please consult the list
+  of libraries and check your distributions package manager.
+

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -220,13 +220,14 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	/* Expect t_tries to be 3 if we have crit. Exceptions: gvcst_redo_root_search (where t_tries is temporarily reset
 	 * for the duration of the redo_root_search and so we should look at the real t_tries in redo_rootsrch_ctxt),
 	 * gvcst_expand_free_subtree, REORG UPGRADE/DOWNGRADE, DSE (where we grab crit before doing the t_qread irrespective
-	 * of t_tries), forward recovery (where we grab crit before doing everything)
+	 * of t_tries), forward recovery (where we grab crit before doing everything) OR MUPIP TRIGGER -UPGRADE (where we
+	 * grab crit before doing the entire ^#t upgrade TP transaction).
 	 */
 	effective_t_tries = UNIX_ONLY( (TREF(in_gvcst_redo_root_search)) ? (TREF(redo_rootsrch_ctxt)).t_tries : ) t_tries;
 	effective_t_tries = MAX(effective_t_tries, t_tries);
 	killinprog = (NULL != ((dollar_tlevel) ? sgm_info_ptr->kip_csa : kip_csa));
 	assert(dse_running || killinprog || jgbl.forw_phase_recovery || mu_reorg_upgrd_dwngrd_in_prog
-			|| (cs_addrs->now_crit != (CDB_STAGNATE > effective_t_tries)));
+			GTMTRIG_ONLY(|| TREF(in_trigger_upgrade)) || (cs_addrs->now_crit != (CDB_STAGNATE > effective_t_tries)));
 	if (!blk_free && cs_addrs->now_crit && !dse_running && (0 == save_errno))
 	{	/* Do basic checks on GDS block that was just read. Do it only if holding crit as we could read
 		 * uninitialized blocks otherwise. Also DSE might read bad blocks even inside crit so skip checks.

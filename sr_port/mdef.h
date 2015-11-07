@@ -83,6 +83,10 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
  */
 #define SHMDT(X)	shmdt((void *)(X))
 
+/* Because shmget and semget returns -1 to indicate error, -1 can never be a valid shmid or semid */
+#define INVALID_SEMID			-1
+#define INVALID_SHMID 			-1L
+
 /* constant needed for FIFO - OS390 redefines in mdefsp.h */
 #define FIFO_PERMISSION		010666 /* fifo with RW permissions for owner, group, other */
 
@@ -112,20 +116,31 @@ error_def(ERR_ASSERT);
 # define lvaddr "%08lx"
 #endif
 
+/* Need to set a flag to 0 or 1 depending on whether AUTORELINK_SUPPORTED is set or not. This is needed by gtmpcat so it can
+ * tell if autorelink is supported on the platform or not. While this could be done by always setting AUTORELINK_SUPPORTED
+ * which a value of 0 or 1, that's not how the code that uses it is structured so create this new variable with a value
+ * depending on whether AUTORELINK_SUPPORTED is defined or not.
+ */
+#ifdef AUTORELINK_SUPPORTED
+# define ARLINK_ENABLED 1
+#else
+# define ARLINK_ENABLED 0
+#endif
+
 /* Define GT.M interlude functions for open, close, pipe, creat and dup system calls. This lets GT.M trace through all file
- * descriptor activity (needed for D9I11-002714). Do this on all Unix platforms. Note that only the macro GTM_FD_TRACE is
+ * descriptor activity (needed for D9I11-002714). Do this on all UNIX platforms. Note that only the macro GTM_FD_TRACE is
  * defined here. gtm_unistd.h and gtm_fcntl.h define the actual GT.M interlude functions based on this macro.
  */
-#if defined(UNIX)
+#if defined(UNIX) && ! defined(STATIC_ANALYSIS)
 #	define	GTM_FD_TRACE
 #	define	GTM_FD_TRACE_ONLY(X)	X
 #else
 #	define	GTM_FD_TRACE_ONLY(X)
 #endif
 
-/* Define what is an invalid file descriptor in Unix and VMS. */
+/* Define what is an invalid file descriptor in UNIX and VMS. */
 #if defined(UNIX)
-#	define	FD_INVALID		-1	/* fd of -1 is invalid in Unix posix calls */
+#	define	FD_INVALID		-1	/* fd of -1 is invalid in UNIX posix calls */
 #	define	FD_INVALID_NONPOSIX	FD_INVALID
 #else
 #	define	FD_INVALID		-1	/* fd of -1 is invalid in VMS if using POSIX interface (open/close etc.) */
@@ -333,7 +348,7 @@ typedef struct
 #	define HAS_LITERAL_SECT
 #endif
 
-typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of type long */
+typedef long		ulimit_t;	/* NOT int4; the UNIX ulimit function returns a value of type long */
 
 /* Bit definitions for mval type (mvtype) */
 #define MV_NM		 1	/* 0x0001 */
@@ -455,6 +470,8 @@ mval *underr_strict(mval *start, ...);
 #define MV_FORCE_BOOL(X)	(MV_FORCE_NUM(X), (X)->m[1] ? TRUE : FALSE)
 #define MV_FORCE_INT(M)		(MV_FORCE_DEFINED(M), MV_FORCE_INTD(M))
 #define MV_FORCE_INTD(M)	(DBG_ASSERT(MV_DEFINED(M)) (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i(M))
+#define MV_FORCE_UINT(M)	(MV_FORCE_DEFINED(M), MV_FORCE_UINTD(M))
+#define MV_FORCE_UINTD(M)	(DBG_ASSERT(MV_DEFINED(M)) (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2ui(M))
 #define MV_FORCE_UMVAL(M,I)	(((I) >= 1000000) ? i2usmval((M),(int)(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
 #define MV_FORCE_MVAL(M,I)	(((I) >= 1000000 || (I) <= -1000000) ? i2mval((M),(int)(I)) : \
@@ -583,14 +600,6 @@ mval *underr_strict(mval *start, ...);
 /* Length needed to pad out to a given power of 2 boundary */
 #define PADLEN(value, bndry) (int)(ROUND_UP2((sm_long_t)(value), bndry) - (sm_long_t)(value))
 
-/* LOG2_OF_INTEGER returns the ceiling of log (base 2) of number */
-#define LOG2_OF_INTEGER(number, log2_of_number)			\
-{								\
-	int    temp = (number) - 1;				\
-	for (log2_of_number = 0; 0 < temp; log2_of_number++)	\
-	   temp = (temp) >> 1; 					\
-}
-
 #define CALLFROM	LEN_AND_LIT(__FILE__), __LINE__
 void gtm_assert(int file_name_len, char file_name[], int line_no);
 int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[], int line_no);
@@ -672,7 +681,7 @@ int4 timeout2msec(int4 timeout);
 /* If this is unix, we have a faster sleep for short sleeps ( < 1 second) than doing a hiber start.
  * Take this chance to define UNIX_ONLY and VMS_ONLY macros.
  */
-int m_usleep(int useconds);
+void m_usleep(int useconds);
 #ifdef UNIX
 #	define SHORT_SLEEP(x) {assert(1000 > (x)); m_usleep((x) * 1000);}
 #else
@@ -723,10 +732,11 @@ int m_usleep(int useconds);
 #endif
 
 /* Note the macros below refer to the UNIX Shared Binary Support. Because the
-   support is *specifically* for the Unix platform, "NON_USHBIN_ONLY()" will
-   also be true for VMS even though that platform does have shared binary support
-   (but it does not have Unix Shared Binary support). Use "NON_USHBIN_UNIX_ONLY()"
-   for UNIX platforms that do not support Shared Binaries. */
+ * support is *specifically* for the UNIX platform, "NON_USHBIN_ONLY()" will
+ * also be true for VMS even though that platform does have shared binary support
+ * (but it does not have UNIX Shared Binary support). Use "NON_USHBIN_UNIX_ONLY()"
+ * for UNIX platforms that do not support Shared Binaries.
+ */
 #ifdef USHBIN_SUPPORTED
 #	define USHBIN_ONLY(X)		X
 #	define NON_USHBIN_ONLY(X)
@@ -740,10 +750,17 @@ int m_usleep(int useconds);
 #		define NON_USHBIN_UNIX_ONLY(X)
 #	endif
 #endif
-
-/* Unicode. Although most (all?) Unix platforms currently support Unicode, that may
-   not always be the case so a separate contingent is defined.
-*/
+/* Autorelink related macros */
+#ifdef AUTORELINK_SUPPORTED
+#	define ARLINK_ONLY(X)		X
+#	define NON_ARLINK_ONLY(X)
+#else
+#	define ARLINK_ONLY(X)
+#	define NON_ARLINK_ONLY(X)	X
+#endif
+/* Unicode. Although most (all?) UNIX platforms currently support Unicode, that may
+ * not always be the case so a separate contingent is defined.
+ */
 #ifdef UNICODE_SUPPORTED
 #	define UNICODE_ONLY(X) X
 #	define NON_UNICODE_ONLY(X)
@@ -773,6 +790,9 @@ int m_usleep(int useconds);
    typedef	uint64_t		gtm_uint64_t;
    typedef	int64_t			gtm_int64_t;
 #endif
+
+int ceil_log2_32bit(uint4 num);
+int ceil_log2_64bit(gtm_uint64_t num);
 
 typedef INTPTR_T	sm_off_t;
 
@@ -1384,7 +1404,7 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define VARLSTCNT1(CNT)			VARLSTCNT(CNT)
 #define PUT_SYS_ERRNO(SYS_ERRNO) 	SYS_ERRNO
 #elif defined(UNIX)
-#define DAYS		47117 /* adjust Unix returned days (seconds converted to days); Unix zero time 1970 */
+#define DAYS		47117 /* adjust UNIX returned days (seconds converted to days); UNIX zero time 1970 */
 #define VARLSTCNT1(CNT)			VARLSTCNT(CNT + 1)
 #define PUT_SYS_ERRNO(SYS_ERRNO) 	0, SYS_ERRNO
 #else
@@ -1728,7 +1748,7 @@ typedef enum
 #	define	GTM_SNAPSHOT_ONLY(X)
 #endif
 
-/* Currently MUPIP REORG -TRUNCATE is only supported on Unix */
+/* Currently MUPIP REORG -TRUNCATE is only supported on UNIX */
 #ifdef UNIX
 #	define	GTM_TRUNCATE
 #	define	NON_GTM_TRUNCATE_ONLY(X)
@@ -1738,7 +1758,7 @@ typedef enum
 #	define	GTM_TRUNCATE_ONLY(X)
 #endif
 
-/* Currently triggers are supported only on Unix */
+/* Currently triggers are supported only on UNIX */
 #if defined(UNIX) && !defined(__hppa)	/* triggers not supported on HPUX-HPPA */
 #	define	GTM_TRIGGER
 #	define	GTMTRIG_ONLY(X)			X

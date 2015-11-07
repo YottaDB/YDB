@@ -270,11 +270,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	 * (b) DSE CRIT -SEIZE (and any command that follows it), DSE CHANGE -BLOCK, DSE ALL -SEIZE (and any command that follows)
 	 *	and DSE MAPS -RESTORE_ALL. Since we cannot distinguish between different DSE qualifiers, we use IS_DSE_IMAGE.
 	 * (c) gvcst_redo_root_search in the final retry.
+	 * (d) MUPIP TRIGGER -UPGRADE which is a TP transaction but it could do non-TP as part of gvcst_bmp_mark_free at the end.
 	 *
 	 * Since we don't expect hold_onto_crit to be set by any other utility/function, the below assert is valid and is intended
 	 * to catch cases where the field is inadvertently set to TRUE.
 	 */
-	assert(!csa->hold_onto_crit || IS_DSE_IMAGE UNIX_ONLY(|| jgbl.onlnrlbk || TREF(in_gvcst_redo_root_search)));
+	assert(!csa->hold_onto_crit || IS_DSE_IMAGE
+		UNIX_ONLY(|| jgbl.onlnrlbk || TREF(in_gvcst_redo_root_search) || TREF(in_trigger_upgrade)));
 	assert(cs_data == csd);
 	assert((t_tries < CDB_STAGNATE) || csa->now_crit);
 	assert(!dollar_tlevel);

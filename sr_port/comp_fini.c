@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@
  *	rts_stringpool to indr_stringpool during compilation setup.
  */
 GBLREF spdesc		stringpool, rts_stringpool, indr_stringpool;
-GBLREF short int	source_column;
+GBLREF int		source_column;
 GBLREF char		cg_phase;
 GBLREF unsigned char	*source_buffer;
 

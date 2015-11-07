@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,15 +22,23 @@
 
 #include <stdio.h>
 
+#ifdef UNIX
 /* If interrupted, this function has previously caused hangs to do a subsequent gtm_putmsg() invocation from
- * generic_signal_handler(), so just defer interrupts to be safe.
+ * generic_signal_handler(), so just defer interrupts to be safe. UNIX is a GT.M-specific compiler switch, which
+ * we expect to be undefined for any non-GT.M compilation that might include this file.
  */
-#define FDOPEN(VAR, FILE_DES, MODE)		\
+#  define FDOPEN(VAR, FILE_DES, MODE)		\
 {						\
 	DEFER_INTERRUPTS(INTRPT_IN_FDOPEN);	\
 	VAR = fdopen(FILE_DES, MODE);		\
 	ENABLE_INTERRUPTS(INTRPT_IN_FDOPEN);	\
 }
+#else
+#  define FDOPEN(VAR, FILE_DES, MODE)		\
+{						\
+	VAR = fdopen(FILD_DES, MODE);		\
+}
+#endif
 
 #define FGETS(strg, n, strm, fgets_res)	(fgets_res = fgets(strg,n,strm))
 #define Fopen				fopen

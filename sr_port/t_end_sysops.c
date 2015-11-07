@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1204,9 +1204,10 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	{	/* either it is a non-local bit-map or we are in dse_maps or MUPIP RECOVER writing an AIMG record */
 		assert((0 != (blkid & (BLKS_PER_LMAP - 1))) || write_after_image);
 		/* we should NOT be in crit for phase2 except dse_maps/dse_chng_bhead OR if cse has a non-zero recompute list. The
-		 * only exception to this is ONLINE ROLLBACK which holds crit for the entire duration
+		 * only exception to this is ONLINE ROLLBACK or MUPIP TRIGGER -UPGRADE which holds crit for the entire duration
 		 */
-		assert(!csa->now_crit || cs->recompute_list_head || dse_running UNIX_ONLY(|| jgbl.onlnrlbk));
+		assert(!csa->now_crit || cs->recompute_list_head || dse_running
+			UNIX_ONLY(|| jgbl.onlnrlbk || TREF(in_trigger_upgrade)));
 		if (FALSE == cs->done)
 		{	/* if the current block has not been built (from being referenced in TP) */
 			if (NULL != cs->new_buff)

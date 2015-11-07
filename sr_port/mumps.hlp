@@ -390,7 +390,6 @@
    GTM>kill A,B
 
    GTM>set A=1,*B=A ; B & A are aliases
-
    GTM>write B
    1
    GTM>
@@ -490,7 +489,6 @@
    A=1 ;*
    *B=A
    GTM>Kill *A ; Remove the association for A - it now has no association and no array
-
    GTM>ZWRite ; B is a traditional local variable
    B=1
    Example:
@@ -510,12 +508,9 @@
    A=2 ;*
    *B=A
    GTM>Kill A ; Kill the array
-
    GTM>ZWRite ; There's no data to show - only the association
    *B=A
-
    GTM>Set B=3 ; Create a new value
-
    GTM>ZWRite ; The association was unaffected by the Kill
    A=3 ;*
    *B=A
@@ -571,13 +566,9 @@
    GTM>ZWRite ; Verify that it's there
    A=1 ;*
    *B=A
-
    GTM>Kill (A) ; Kill everything except A
-
    GTM>ZWRite ; Demonstrate that A also has no array
-
    GTM>Set A=2 ; Create an array
-
    GTM>ZWRite ; The association survived the Kill
    A=2 ;*
    *B=A
@@ -615,7 +606,6 @@
      zwrite
      tcommit ; No global updates in this transaction!
      quit
-
    ------------
    Initial values & association
    A="Malvern"
@@ -677,7 +667,6 @@
      write "Rollback doesnt restore names and local arrays",!
      zwrite
      quit
-
    ------------
    Only containers before transaction:
    $ZWRTAC=""
@@ -808,10 +797,10 @@
 
    In UTF-8 mode, string processing functions (such as $EXTRACT()) operate on
    strings of multi-byte characters, and can therefore produce different
-   results in M and UTF-8 modes, depending on the actual data processed,
-    Each function has a "Z" alter ego (for example, $ZEXTRACT()) that can be
-   used to operate on  sequences of bytes identically in M and UTF-8 modes
-   (that is, in M mode, $EXTRACT() and $ZEXTRACT() behave identically).
+   results in M and UTF-8 modes, depending on the actual data processed. Each
+   function has a "Z" alter ego (for example, $ZEXTRACT()) that can be used
+   to operate on sequences of bytes identically in M and UTF-8 modes (that
+   is, in M mode, $EXTRACT() and $ZEXTRACT() behave identically).
 
    In M mode, the concept of an illegal character does not exist. In UTF-8
    mode, a sequence of bytes may not represent a valid character, and
@@ -1601,6 +1590,20 @@
 
    By default, the compiler produces object modules.
 
+4 [no]w[arning]
+   [no]w[arning]
+
+   Instructs the compiler to suppress error output; the default is -warning.
+
+   When used with the -list qualifier, the -nowarning qualifier does not
+   affect errors in the listing.
+
+   **Note**
+
+   When used with the -noobject qualifier, the -nowarning qualifier instructs
+   the compiler to produce no object with no indication of the fact or the
+   cause.
+
 4 r[un]
    r[un]
 
@@ -1851,18 +1854,13 @@
    GTM>write $zgbldir
    /usr/lib/fis-gtm/V5.4-002B_x86/mumps.gld
    GTM>set $zgbldir="test.gld"
-
    GTM>set a=10
-
    GTM>set b=a
-
    GTM>recall
-
    1 set b=a
    2 set a=10
    3 set $zgbldir="test.gld"
    4 write $zgbldir
-
    GTM>
 
    This REC[ALL] command displays the previously entered commands.
@@ -3612,19 +3610,15 @@
    Wrong again
    %GTM-I-BREAK, Break instruction encountered
                At M source location break+2^br
-
    GTM>ZCONTINUE
    Iteration 3    x=1
    OK
    %GTM-I-BREAK, Break instruction encountered
                At M source location break+2^br
-
    GTM>ZCONTINUE
    %GTM-I-BREAK, Break instruction encountered
                At M source location break+2^br
-
    GTM>ZCONTINUE
-
    GTM>
 
    This uses a BREAK with both command and argument postconditionals. The
@@ -3690,10 +3684,8 @@
      if $view("undef") set revert=1 view "noundef"
      if z="" write "Missing parameter.",!     view:revert "undef" quit
      else  write z*z,! view:revert "undef" quit
-
    GTM>do ^SQR(10)
    100
-
    GTM>do ^SQR
    Missing parameter.
 
@@ -3942,9 +3934,7 @@
    Example:
 
    GTM>Set X=1,Y=1,Z=2 Kill UNDEF
-
    GTM>If X=1,Y=1,Z=3,UNDEF=0 Write "HI"
-
    GTM>
 
    The IF command causes GT.M to cease executing the line after it determines
@@ -4070,6 +4060,24 @@
    using a file extension of .mjo and the current default directory of the
    process created by the JOB command.
 
+4 PASSCURLVN
+   PASSCURLVN
+
+   When a JOB command specifies the PASSCURLVN jobparameter, the new process
+   inherits the current collation, all locals, aliases, and alias containers
+   from the JOB'ng process' current stack level. As a result of this, a
+   ZWRITE issued in the JOB'd process has the same output, except for any out
+   of scope aliases, as a ZWRITE in the context of the JOB command. If the
+   JOB command finds a ZWRITE representation of any lvn, consisting of a its
+   full name, its subscripts, corresponding value, quotes and the "=" sign,
+   exceeding 1MiB, it produces an JOBLVN2LONG error both in the JOB'ng
+   process and in the JOB'd processes error output stream. If a JOB command
+   does not specify PASSCURLVN, the JOB'd process(es) inherits no local
+   variables from the parent. While not an inexpensive command, you can use
+   the "exclusive" NEW command to control the context passed to the JOB'd
+   process; for example, adding "NEW (LOCALA, LOCALB)" before the JOB command
+   would pass only LOCALA and LOCALB.
+
 4 STA[RTUP]="/path/to/shell/script"
    STA[RTUP]="/path/to/shell/script"
 
@@ -4140,13 +4148,10 @@
    Example:
 
        kill *
-
        write !,"gtm_stdxkill=",+$ztrnlnm("gtm_stdxkill"),!
-
        set (A,B,C,E)="input"
        do X(.A,.B)
        zwrite
-
        write !,"____________",!
        set (A,B,C,E)="input"
        do Y(.A,.B)
@@ -4170,12 +4175,10 @@
    A="output"
    B="output"
    C="input"
-
    ____________
    A="output"
    B="output"
    C="input"
-
    ____________
    A="base" ;*
    B="base" ;*
@@ -4222,19 +4225,12 @@
    GTM>Set ^gbl1="one"
 
    GTM>Set ^gbl1(1,1)="oneone"
-
    GTM>Set ^gbl1(1,1,3)="oneonethree"
-
    GTM>Set ^gbl1(1,2,4)="onetwofour"
-
    GTM>Set ^gbl2(2)="gbl2_2"
-
    GTM>Set ^gbl2(2,1,3)="gbl2_2_1_3"
-
    GTM>Set ^gbl2(2,1,4,5)="gbl2_2_1_4_5"
-
    GTM>Merge ^gbl1(1)=^gbl2(2)
-
    GTM>WRITE $Reference
    ^gbl1(1)
    GTM>ZWRite ^gbl1
@@ -4269,11 +4265,8 @@
    GTM>Kill
 
    GTM>Set ^gbl(1,2)="1,2"
-
    GTM>Merge lcl(3,4)=^gbl(1)
-
    GTM>Set ^("naked")=2
-
    GTM>ZWRite ^gbl
    ^gbl(1,2)="1,2"
    ^gbl("naked")=2
@@ -4577,11 +4570,9 @@
    GTM>Set x="I love hotdogs"
 
    GTM>Set $Extract(x,3,6)="want"
-
    GTM>Write x
    I want hotdogs
    GTM>Set $Extract(x,7)=" many "
-
    GTM>Write x
    I want many hotdogs
    GTM>
@@ -4595,14 +4586,11 @@
    GTM>kill A,B
 
    GTM>set A=1,A(1)=1,A(2)=2
-
    GTM>set *B=A ; A & B are aliases.
-
    GTM>zwrite B
    B=1 ;*
    B(1)=1
    B(2)=2
-
    GTM>
 
    This SET * command creates an alias associated between A and B. It
@@ -4614,13 +4602,10 @@
    GTM>kill A,B,C
 
    GTM>set A=1,*C(2)=A ; C(2) is a container
-
    GTM>zwrite
    A=1 ;*
    *C(2)=A
-
    GTM>set *B=C(2) ; B is now an alias
-
    GTM>write B,":",$length(C(2)),":" ; An alias variable provides access but a container doesn't
    1:0:
    GTM>
@@ -4923,6 +4908,17 @@
    performance and exists primarily as a tool for use by FIS. The default is
    GDSCERT:0.
 
+4 GVSRESET
+   GVSRESET
+
+   Resets the process-specific fields that are part of the ZSHOW "G" result
+   and database file header fields holding records reported by: GVSTAT, BG
+   trace, buffer pool accounting and the TP block modification details. Note
+   a VIEW "GVSRESET" performed by a process with read-only database access
+   changes only the process-specific information and has no effect on the
+   database file header. DSE CHANGE -FILEHEADER -GVSTATSRESET clears the same
+   database file header fields as VIEW "GVRESET";
+
 4 GVDUPSETNOOP
    GVDUPSETNOOP
 
@@ -5102,6 +5098,31 @@
    Identifies the file containing definitions of unique patterns for use with
    the "?" operator. These pattern definitions can be used in place of, or in
    addition to, the standard C, N, U, L, and P.
+
+4 POOLLIMIT
+   POOLLIMIT
+
+   VIEW "POOLLIMIT":<region>:expr, where expr is of the form n[%] provides a
+   mechanism for a process that has the potential to "churn" global buffers
+   to limit the potential impact on other processes by restricting the number
+   of global buffers it uses. If the expression ends with a per-cent sign
+   (%), the number is taken as an as a percentage of the configured global
+   buffers and otherwise as an ordinal number of preferred buffers; standard
+   M parsing and integer conversions apply. Preferred buffer values are
+   limited to between 32 and one less than half the buffer pool inclusive;
+   with the exception of zero (0) or 100 per cent, which turn off the
+   limitation; specifications exceeding those limits provide the value of the
+   nearer limit. If the argument specifies "*" for the region, the command
+   applies to all regions. $VIEW("POOLLIMIT",<region>) returns the current
+   value for the region as an ordinal number - zero (0) when there is no
+   limit in place. Note that this facility is designed for use by a
+   relatively small subset of processes. In addition, MUPIP REORG uses this
+   facility to limit its buffers to a value established by the UNIX
+   environment variable (or OpenVMS logical name) gtm_poollimit using the
+   syntax described for VIEW "POOLLIMIT" with a default of 64 if
+   gtm_poollimit is not specified. Note that this may slightly slow a
+   standalone REORG but can be overridden by defining gtm_poollimit as 0 or
+   "100%".
 
 4 RCTLDUMP
    RCTLDUMP
@@ -5370,7 +5391,6 @@
    Line #4:   for i=1:1:$order(merval(""),-1)  do
    Line #5:   . kill:i#2 merval(i)
    Line #6:   quit
-
    GTM>
 
    This shows that merge^profiling has an elapsed time of 16231 and the
@@ -5414,7 +5434,6 @@
    execute the following commands:
 
    GTM>ZBREAK merge^profiling:"view ""TRACE"":1:""^mtrc"" write ""Trace"""
-
    GTM>do ^profiling
    Trace
    GTM>view "TRACE":0:"^mtrc"
@@ -5522,45 +5541,29 @@
        new i,j,k,v
        set k=1
        view "TRACE":1:"^trc"
-
        for i=1:1:3  set v=i
-
        for i=1:1  set v=0  quit:i=3
-
        for i=1,2:1:4,6  set v=0
-
        for i=1:1,2  set v=0  quit:i=3
-
        for i=1:1:2  for j=1:1:3  set v=0
-
        for i=1:1:2
        .    for j=1:1:1  do
        ..        set v=0
-
        set j=5  for i=1:1:j  do
        .    set j=(j-1)
-
        for i=1:1:2  for j=1:1:3  do
        .    set v=0
-
        for i=1:1:2  do
        .    for j=1:1:3  set v=0
-
        for i=1:1:2  do
        .    for j=1:1:3  do
        ..        set v=0
-
        for i="foo","bar",1:1  set v=0  quit:i=3
-
        for  set k=k+1  quit:k=3
-
        for i=1:1:3  for j=1:1:(3-i)  set v=0
-
        for i=1:1:3  for j=1:1:(3-i)  for k=1:1:(j+1)  set v=0
-
        set k=3  view "TRACE":0:"^trc"
        zwrite ^trc
-
        quit
 
    On executing fortypes, the output looks something like the following:
@@ -5628,7 +5631,6 @@
    GTM>Kill A
 
    GTM>View "NOUNDEF"
-
    GTM>Write A,?10,$L(A)
             0
    GTM>
@@ -5650,9 +5652,7 @@
    LAB  Write !,"THIS IS NOSENSE"
            Quit
    GTM>View "LABELS":"UPPER"
-
    GTM>ZLink "NOSENSE.m"
-
    GTM>Do ^NOSENSE
    THIS IS NOSENSE
    GTM>
@@ -5827,7 +5827,6 @@
    SUB  Write !,"This is ZBTEST"
         Quit
    GTM>ZBREAK SUB^ZBTEST
-
    GTM>Do ^ZBTEST
    %GTM-I-BREAKZBA, Break instruction encountered during ZBREAK action
    At M source location SUB^ZBTEST
@@ -5843,9 +5842,7 @@
    GTM>ZBREAK -*
 
    GTM>ZGOTO
-
    GTM>ZBREAK SUB^ZBTEST:"W !,""Trace"""
-
    GTM>Do ^ZBTEST
    Trace
    This is ZBTEST
@@ -6006,7 +6003,6 @@
    Example:
 
    GTM>ZGOTO
-
    GTM>ZSHow
    +1^GTM$DMOD (Direct mode)
    GTM>
@@ -6152,14 +6148,10 @@
 
    GTM>zlink "sockexamplemulti2"
    %GTM-E-LOADRUNNING, Cannot ZLINK an active routine sockexamplemulti2
-
    GTM>zshow "S"
    sockexamplemulti2+12^sockexamplemulti2    (Direct mode)
-
    GTM>view "LINK":"RECURSIVE"
-
    GTM>zlink "sockexamplemulti2"
-
    GTM>
 
    This example demonstrates how VIEW "LINK":"RECURSIVE" command ZLINKs a
@@ -6194,30 +6186,19 @@
 3 Auto-ZLINK_setup
    Auto-ZLINK setup
 
-   This section describes the procedure to setup the field test grade
-   auto-relink functionality that is available in V6.2-000. Although V6.2-000
-   when used without auto-relink (i.e., without use of the ZRUPDATE command
-   or the special syntax in $ZROUTINES) is a generally available, production
-   grade release, use auto-relink only in development and test environments
-   where field test grade functionality is acceptable.
+   This section describes the procedure to setup the auto-relink
+   functionality. GT.M loads an object file linked from an object directory
+   (in $ZROUTINES) with a *-suffix (i.e. auto-relink-enabled) into a shared
+   memory segment (referred to henceforth as a Rtnobj shared memory segment).
+   At the invocation of DO, GOTO, or ZGOTO, extrinsic functions, ZBREAK,
+   ZPRINT or
 
-   By suffixing one or more directory names in $ZROUTINES with a single
-   asterisk (*), processes can subscribe to updates of object files published
-   in those directories. At the invocation of DO, GOTO, or ZGOTO, extrinsic
-   functions, $TEXT(), or ZPRINT that specify an entryref which includes a
-   routine name (vs. a label without a routine name), mumps processes (and
-   mupip processes executing trigger logic) automatically relink
-   ("auto-relink") and execute published new versions of routines.
+   $TEXT()
 
-     o Label references (that is , without a routine name), whether direct or
-       through indirection, always refer to the current routine, and do not
-       invoke auto-relink logic.
-     o Use shell quoting rules when appending asterisks to directory names in
-       the gtmroutines environment variable - asterisks must be passed in to
-       GT.M, and not expanded by the shell.
-     o GT.M accepts but ignores asterisk suffixes to directory names on
-       32-bit Linux on x86 platforms, where it does not provide
-       auto-relinking.
+   that specify an entryref which includes a routine name (in contrast to a
+   label without a routine name), mumps processes (and mupip processes
+   executing trigger logic) automatically relink ("auto-relink") and execute
+   published new versions of routines.
 
    The ZRUPDATE command publishes of new versions of routines to subscribers.
    To remove routines, delete the object files and publish the names of the
@@ -6226,59 +6207,64 @@
 
    If the path to a file is non-existent, the request is ignored except in
    the case where one desires a currently shared object file (one that was
-   accessed before it was deleted) to no longer be shared. In V6.2-000, if
-   the process executing the ZRUPDATE does not have read permission to any
-   directory in the path to a file, ZRUPDATE ignores the request; FIS expect
-   to correct this in the production release.
+   accessed before it was deleted) to no longer be shared.
 
-   To effect auto-relink, GT.M creates small temporary files in the directory
-   referred to by $gtm_linktmpdir (defaulting to $gtm_tmp, which in turn
-   defaults to /tmp, if unspecified). The names of these files are of the
-   form gtm-relinkctl-<md5sum> where <md5sum> is a hash of the realpath() to
-   an auto-relink directory. In the field test software, the permissions are
-   determined by the umask of the process creating a file. In the production
-   software, FIS intends for the group and permissions to match those for
-   shared resources as described in the section Shared Resources
-   Authorization Permissions in Appendix E (GT.M Security Philosophy) of the
-   UNIX Administration and Operations Guide. FIS recommends that all
-   processes that share a directory whose contents are subject to ZRUPDATE
-   use the same value for $gtm_linktmpdir so that all processes see update
-   notifications - with different values of $gtm_linktmpdir, a ZRUPDATE by a
-   process with one value of $gtm_linktmpdir would not be observed by a
-   process with a different value of that environment variable.
+   For each auto-relink enabled directory which a GT.M process accesses while
+   searching through $ZROUTINES, GT.M creates a small control file
+   (Relinkctl) in the directory identified by $gtm_linktmpdir (defaulting to
+   $gtm_tmp, which in turn defaults to /tmp, if unspecified). The names of
+   these files are of the form gtm-relinkctl-<murmur> where <murmur> is a
+   hash of the realpath() to an auto-relink directory; for example:
+   /tmp/gtm-relinkctl-f0938d18ab001a7ef09c2bfba946f002). With each Relinkctl
+   file, GT.M creates and associates a block of shared memory that contains
+   associated control structures. Among the structures is a cycle number
+   corresponding to each routine found in the routine directory; a change in
+   the cycle number informs a process that it may need to determine whether
+   there is a new version of a routine. Although GT.M only creates relinkctl
+   records for routines that actually exist on disk, it may increment cycle
+   numbers for existing relinkctl records even if they no longer exist on
+   disk.
 
-   When a process that has subscribed to updates to routines in a directory
-   links to a routine from that directory, it maps the object file to its
-   address space, sharing the object code with other processes that are so
-   subscribed, and without requiring the object code to be placed in a shared
-   library. Processes that have not subscribed to updates link using
-   process-private heap space as they have in prior versions.
+   GT.M creates both the Relinkctl file and shared memory with permissions
+   based on the logic described in the "IPC Permissions" column of the
+   "Shared Resource Authorization Permissions" section in the Administration
+   and Operations Guide, except that the object directory, rather than the
+   database file, provides the base permissions.
 
-   AIX has known architectural limitations to scalability when large numbers
-   of processes (thousands to tens of thousands) auto-relink large numbers of
-   routines (again thousands to tens of thousands of routines). In the
-   typical case where the number of dynamically modified routines is much
-   smaller than the total number of routines in an enterprise scale
-   application, a scalable way for large applications to use auto-relinking
-   on AIX is to place all routines in shared libraries, and define $ZROUTINES
-   with an auto-relink enabled patch directory preceding the shared library.
-   Scalability on HP-UX and Solaris is not known: FIS is not aware of any
-   inherent scalability issues other than those imposed by available hardware
-   resources when the product of the number of processes and the number of
-   auto-relinked remains well below the number of file descriptors made
-   available by the OS.
+   The MUPIP RCTLDUMP command reports information related to relinkctl files
+   and their associated shared memory segments.
 
-   Changing $ZROUTINES currently causes all routines linked from
-   auto-relink-enabled directories in the process to be re-linked. FIS
-   intends for this to generate an error in the production release.
+   The environment variable gtm_autorelink_keeprtn if set to 1, t[rue], or
+   y[es] causes exiting processes to leave auto-relinked object code in the
+   shared memory repositories, while if undefined, 0, f[alse] or n[o] causes
+   exiting processes to purge any routines currently use by no processes. All
+   values are case-independent. When gtm_autorelink_keeprtn is defined and
+   TRUE:
 
-   VIEW "RCTLDUMP" displays the created relinkctl files and the routines
-   looked for in their related directories. An entry in these files does not
-   mean that a given routine was found there. It merely means it was looked
-   for there and shows a cycle number (which ZRUPDATE bumps) whose change
-   indicates a new published version of the given object file. As it is a
-   diagnostic tool for the new feature, FIS may remove or modify this VIEW
-   option in subsequent releases.
+   FIS recommends that a directory in the $zroutines of a process be either
+   auto-relink-enabled or auto-relink-disabled for the life of the process.
+   Changing the auto-relink mode of the directory within a process is likely
+   to result in counter-intuitive results.
+
+   As arguments, ZRUPDATE takes object file names, including wild-cards of
+   the form accepted by $ZSEARCH(). If ZRUPDATE fails to find at least one
+   file to match an argument with a wild card, it issues an INFO message
+   (seen only if $PRINCIPAL has CENABLE). When an explicit name without a
+   wild card is specified, but there is no file in the directory or a
+   corresponding entry in the Relinkctl, ZRUPDATE produces an error. ZRUPDATE
+   issues most errors as FILEPARSE errors with a secondary error describing
+   the actual issue although some errors, depending on the reason and path by
+   which ZRUPDATE detects them, can be rather cryptic.
+
+   An explicit ZLINK or an auto-relink check the hash of an object and its
+   replacement. If they are identical, GT.M takes no action to replace the
+   current object, saving both memory and time.
+
+   An explicit ZLINK from an auto-relink directory acts as an implicit
+   ZRUPDATE.
+
+   Any ZBREAK in a routine disables that routine from auto-relinking by a
+   process until all ZBREAKs are removed.
 
 3 ZLINK,_auto-ZLINK_and_Routine_Names
    ZLINK, auto-ZLINK and Routine Names
@@ -6330,7 +6316,6 @@
    Example:
 
    GTM>ZMessage 2
-
    %SYSTEM-E-ENO2, No such file or directory
 
    This ZMESSAGE does not specify substitution text and the message does not
@@ -6389,7 +6374,6 @@
    GTM>ZPRINT X^RTN:X+5
 
    GTM>ZPRINT X+-5^RTN:X
-
    GTM>ZPRINT X^RTN:X+-5^RTN
 
    The first line displays the line beginning with the label X and the next 5
@@ -6406,6 +6390,13 @@
    GTM>
 
    This command displays the trigger code for trigger name A#1#.
+
+   ZPRINT ^x#/BREG : Print trigger routine user-named "x" in region BREG
+   ZPRINT ^x#1#/BREG : Print trigger routine auto-named "x#1" in region BREG
+   ZPRINT ^x#1#A/BREG : Print trigger routine auto-named "x#1", runtime disambiguated by "#A", AND in region BREG
+   ZPRINT +1^x#1#A/BREG : Print line 1 of trigger routine auto-named "x#1", runtime disambiguated by "#A", AND in region BREG
+
+   These are some examples of disambiguator combinations.
 
 2 ZRUPDATE
    ZRUPDATE
@@ -6429,7 +6420,7 @@
        was accessed before it was deleted) to no longer be shared. In
        V6.2-000, if the process executing the ZRUPDATE does not have read
        permission to any directory in the path to a file, ZRUPDATE ignores
-       the request; FIS expects to correct this in the production release.
+       the request; FIS expect to correct this in the production release.
      o To effect auto-relink, GT.M creates small temporary files in the
        directory referred to by $gtm_linktmpdir (defaulting to $gtm_tmp,
        which in turn defaults to /tmp, if unspecified). The names of these
@@ -6462,6 +6453,14 @@
    A ZSHOW argument is an expression containing codes selecting one or more
    types of information.
 
+   A: A stands for Autorelink and provides output in the same format as MUPIP
+   RCTLDUMP, but restricted to the routines linked by the process issuing the
+   command. ZSHOW "*" does not include ZSHOW "A" because of an expectation
+   that the typical volume of the information does not provide a good return
+   for its value. If you wish your error handling or INTRPT routines to dump
+   this information, ask for it explicitly, possibly by doing a ZSHOW "A"
+   into a local variable before doing a ZSHOW "*".
+
    B: displays active ZBREAK breakpoints
 
    D: displays device information
@@ -6473,8 +6472,8 @@
 
    L: displays GT.M LOCKs and ZALLOCATEs held by the process
 
-   R: displays the GT.M invocation stack and an MD5 checksum of M source code
-   for each routine on the stack.
+   R: displays the GT.M invocation stack and a hash based on the MurmurHash3
+   algorithm of M source code for each routine on the stack.
 
    S: displays the GT.M invocation stack
 
@@ -6506,6 +6505,14 @@
    SET : # of SET operations (TP and non-TP)
    KIL : # of KILl operations (kill as well as zwithdraw, TP and non-TP)
    GET : # of GET operations (TP and non-TP)
+   CAT : total of critical section acquisitions successes
+   CFE : total attempts in CFT caused by epochs
+   CFS : sum of squares of blocked critical section acquisitions
+   CFT : total of blocked critical section acquisitions
+   CQS : sum of squares of critical section acquisition queued sleeps
+   CQT : total of critical section acquisition queued sleeps
+   CYS : sum of squares of critical section acquisition processor yields
+   CYT : total of critical section acquisition processor yields
    DTA : # of DaTA operations (TP and non-TP)
    ORD : # of $ORDer() operations (TP and non-TP). The count of $Order(xxx,1) operations are reported under this item.
    ZPR : # of $ZPRevious() (reverse order) operations (TP and non-TP). The count of $Order(xxx,-1) operations are reported under this item.
@@ -6552,7 +6559,6 @@
    JRO : # of all journal records other than logical, PBLK, AIMG and EPOCH records written to the journal file (for example, PINI, PFIN, and so on.)
    JEX : # of times a process extends the journal file
    DEX : # of times a process extends the database file
-
    [NT]B[WR] mnemonics are satisfied by either disk access or, for databases that use the BG (buffered global) access method, global buffers in shared memory.
 
 3 Examples
@@ -6603,12 +6609,10 @@
    GLD:*,REG:*,SET:205,KIL:0,GET:1,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:9,DWT:15,
    NTW:203,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,
    TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
-
    GLD:/home/gtmuser1/.fis-gtm/V5.4-002B_x86/g/mumps.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,
    DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:411,DRD:9,DWT:15,NTW:2
    03,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,TR0:0,
    TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
-
    GLD:/tmp/tst/test.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,
    CTN:411,DRD:9,DWT:15,NTW:203,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,
    TBW:2,TBR:6,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
@@ -6624,7 +6628,6 @@
    GLD:*,REG:*,SET:0,KIL:0,GET:0,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:0,DWT:0,NTW:0,
    NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,NR3:0,TTW:0,TTR:0,TRB:0,
    TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
-
    GLD:/tmp/x1.gld,REG:REG1,SET:0,KIL:0,GET:0,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:0,
    DWT:0,NTW:0,NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,NR3:0,TTW:0,
    TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
@@ -6651,9 +6654,7 @@
    Example:
 
    GTM>LOCK ^FAIL:10
-
    GTM>lock (^SUCCESS1,^SUCCESS2)
-
    GTM>zshow "L"
    MLG:1,MLT:1
    LOCK ^SUCCESS1 LEVEL=1
@@ -6721,7 +6722,6 @@
 
    GTM>KILL  SET a(1,"D",3,5)="stuff",a(1,"X",2)="",a(1)=1
    GTM>ZSHow "d":a(1)
-
    GTM>ZWRite
    a(1)=1
    a(1,"D",1)="/dev/pts/1 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
@@ -6737,7 +6737,6 @@
    GTM>KILL ^ZSHOW
 
    GTM>ZB -*,lab^rout ZSH "B":^ZSHOW
-
    GTM>ZWRite ^ZSHOW
    ^ZSHOW("B",1)="LAB^ROUT"
    GTM>
@@ -7345,9 +7344,7 @@
        for i=1:1:$length(x) quit:" "'=$extract(x,i)
        for j=$length(x):-1:1 quit:" "'=$extract(x,j)
        quit $extract(x,i,j)
-
    GTM>set str=" MUMPS "
-
    GTM>write $length(str)
    7
    GTM>write $length($$^trim(str))
@@ -7395,7 +7392,6 @@
    Example:
 
    GTM>set t=1 for  set t=$find("BANANA","AN",t) quit:'t  write !,t
-
    4
    6
    GTM>
@@ -7798,9 +7794,7 @@
    Example:
 
    GTM>kill  set (a(1),a(2000),a("CAT"),a("cat"),a("ALF"),a(12))=1
-
    GTM>set x="" for  set x=$order(a(x)) quit:x=""  write !,x
-
    1
    12
    2000
@@ -7808,9 +7802,7 @@
    CAT
    cat
    GTM>kill a("CAT") set a(5,10)="woolworths",a("cat")="last"
-
    GTM>set x="" for  set x=$order(a(x),-1) quit:x=""  write !,x
-
    cat
    ALF
    2000
@@ -7832,7 +7824,6 @@
    GTM>kill set (%(1),tiva(2),A(3),tiv(4),Q(5),%a(6))=""
    GTM>set x="%"
    GTM>write:$data(@x) !,x for  set x=$order(@x) quit:x=""  write !,x
-
    %
    %a
    A
@@ -7842,7 +7833,6 @@
    x
    GTM>set $piece(x,"z",32)=""
    GTM>write:$data(@x) !,x for  set x=$order(@x,-1) quit:x=""  write !,x
-
    x
    tiva
    tiv
@@ -7944,7 +7934,6 @@
    GTM>write $data(^|"XXX"|ABC(1,2,3,4))
    0
    GTM>set X=$name(^(5,6))
-
    GTM>write $qlength(X)
    5
 
@@ -8044,7 +8033,6 @@
    lcl(1,2,"abc",5)=7
    lcl("x")=1
    GTM>set y="lcl"
-
    GTM>for  set y=$query(@y) quit:y=""  write !,y,"=",@y
 
    This example produces the results:
@@ -8144,12 +8132,10 @@
    Example:
 
    GTM>for i=3:-1:0 write !,$select(i=1:"here",i=2:"come",i=3:"Watson")
-
    Watson
    come
    here
    %GTM-E-SELECTFALSE, No argument to $SELECT was true
-
    GTM>
 
    This loop uses $SELECT() to WRITE a series of strings. Because there is no
@@ -8214,7 +8200,6 @@
    DLabel
      write !,$STACK
      quit
-
    0
    1
    1
@@ -8230,7 +8215,6 @@
     for l=dsm1:-1:0 do
     . write !,l
     . for i="ecode","place","mcode" write ?5,i,?15,$stack(l,i),!
-
    GTM>
 
    The above example can be used to display a trace of the code path that led
@@ -8245,53 +8229,40 @@
     if x>0 set $ecode=",U1," ; if condition
     else  set $ecode=",U2," ;  else condition
     quit
-
    GTM>do ^dstacktst(0)
-
    $stack(-1):2
    2    ecode
         place     debugerr+3^debugerr
         mcode      for l=dsm1:-1:0 do
-
    1    ecode     ,U2,
         place     label+2^dstacktst
         mcode      else  set $ecode=",U2," ;  else condition
-
    0    ecode
         place     +1^GTM$DMOD
         mcode
    %GTM-E-SETECODE, Non-empty value assigned to $ECODE (user-defined error trap)
-
    GTM>do ^dstacktst(1)
-
    $stack(-1):1
    1    ecode     ,U2,
         place     label+2^dstacktst
         mcode      else  set $ecode=",U2," ;  else condition
-
    0    ecode
         place     +1^GTM$DMOD
         mcode
    %GTM-E-SETECODE, Non-empty value assigned to $ECODE (user-defined error trap)
-
    GTM>set $ecode=""
-
    GTM>do ^dstacktst(1)
-
    $stack(-1):2
    2    ecode
         place     debugerr+3^debugerr
         mcode      for l=dsm1:-1:0 do
-
    1    ecode     ,U1,
         place     label+1^dstacktst
         mcode      if x>0 set $ecode=",U1," ; if condition
-
    0    ecode
         place     +1^GTM$DMOD
         mcode
    %GTM-E-SETECODE, Non-empty value assigned to $ECODE (user-defined error trap)
-
    GTM>
 
    This example shows how SETing $ECODE=.. makes $STACK() reports current
@@ -8458,13 +8429,11 @@
    |"GVNEXT"         |region        |Name of the next database region after the given one in alphabetical order (or M collation sequence); "" for region|
    |                 |              |starts with the first region. A return value of "" means that the global directory defines no additional regions.  |
    |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |                 |              |Encoded information about database behavior since segment creation. It also includes SET operations even if they   |
-   |                 |              |are inside a TP transaction.                                                                                       |
+   |                 |              |When                                                                                                               |
    |                 |              |                                                                                                                   |
-   |"GVSTAT"         |region        |If you require completely accurate GVSTATS, you need to ensure the last process to close a database always has     |
-   |                 |              |write access to the database files. If read-only processes are the active processes in a database, they cannot     |
-   |                 |              |update the database and may delete the shared memory where they have stored the counts of their actions (for       |
-   |                 |              |example, the number of blocks read).                                                                               |
+   |"GVSTAT"         |region        |read-only processes are the active in a database, they cannot update the database including the file header where  |
+   |                 |              |GVSTATS are stored. Therefore their counts are only stored in associated shared memory and must be flushed to the  |
+   |                 |              |file header by a process with write access, which might be a MUPIP RUNDOWN.                                        |
    |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
    |                 |              |Number of indirection cache hits since GT.M process startup.                                                       |
    |"ICHITS"         |none          |                                                                                                                   |
@@ -8509,6 +8478,9 @@
    |                 |              |By default, GT.M ensures Isolation, that is, a $VIEW command will return 0. The isolation-status of a global       |
    |                 |              |variable can be turned on and off by the VIEW "NOISOLATION" command.                                               |
    |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
+   |"PROBECRIT"      |region        |Acquires and releases a critical section for the region (the "probe"), returning a string with the following       |
+   |                 |              |fields:                                                                                                            |
+   |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
    |                 |              |Name of the region(s) holding the specified gvn.                                                                   |
    |                 |              |                                                                                                                   |
    |                 |              |If gvn spans more than one region, this function returns region name in an order where the first region is the     |
@@ -8521,7 +8493,8 @@
    |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
    |"PATCODE"        |none          |Name of the active patcode table; GT.M defaults this to "M".                                                       |
    |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
-   |"RTNCHECKSUM"    |routine name  |Returns the source check-sum for the most recently ZLINK'd version of the specified routine name.                  |
+   |"RTNCHECKSUM"    |routine name  |Use a 128 bit hash based on the MurmurHash3 algorithm to returns the source check-sum for the most recently ZLINK'd|
+   |                 |              |version of the specified routine name.                                                                             |
    |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
    |"RTNNEXT"        |routine name  |Name of the next routine in the image after the given one; "" (empty string) for routinename starts with the first |
    |                 |              |routine in ASCII collating sequence and a return value of the empty string indicates the end of the list.          |
@@ -8558,11 +8531,10 @@
    |                 |              |Displays the global name or a global name with subscript(s) of a database representation gds. The option collnum   |
    |                 |              |specifies the collnum specifies the alternate collation sequence number. If collnum is not specified, GT.M assumes |
    |                 |              |the default ASCII collation(collnum=0). This function is the inverse of the $VIEW("YGVN2GDS",<gvn>[,collnum])      |
-   |                 |              |function. For example:                                                                                             |
-   |"YGDS2GVN"       |gds[,collnum])|                                                                                                                   |
+   |"YGDS2GVN"       |gds[,collnum])|function. For example:                                                                                             |
+   |                 |              |                                                                                                                   |
    |                 |              |GTM>set y=$VIEW("YGDS2GVN",x) zwrite y                                                                             |
    |                 |              |y="^A(1,""abcd"")"                                                                                                 |
-   |                 |              |                                                                                                                   |
    |                 |              |GTM>                                                                                                               |
    |-----------------+--------------+-------------------------------------------------------------------------------------------------------------------|
    |"ZDATE_FORM"     |none          |Integer value showing whether four digit year code is active for $ZDATE(); GT.M defaults to 0 (for "YY" format).   |
@@ -8582,7 +8554,6 @@
    Example:
 
    GTM>Set a=1,*b(1)=a
-
    GTM>write $view("LV_CREF","a")," ",$view("LV_CREF","b")
    1 0
    GTM>write $view("LV_REF","a")," ",$view("LV_REF","b")
@@ -8596,9 +8567,7 @@
    Example:
 
    GTM>Set *a(1)=b,*b(1)=a
-
    GTM>kill *a,*b
-
    GTM>write $view("LV_GCOL")
    2
    GTM>
@@ -8666,15 +8635,12 @@
    Example:
 
    GTM>set A=1,*B(1)=A
-
    GTM>write "$zahandle(A)=""",$zahandle(A),""" $zahandle(B(1))=""",$zahandle(B(1)),""""
    $zahandle(A)="17B8810" $zahandle(B(1))="17B8810"
    GTM>set A("Subscript")="Value" ; Change array - but $ZAHandle() doesn't change
-
    GTM>write "$zahandle(A)=""",$zahandle(A),""" $zahandle(B(1))=""",$zahandle(B(1)),""""
    $zahandle(A)="17B8810" $zahandle(B(1))="17B8810"
    GTM>merge D=A ; A copy of the data has a different $zahandle()
-
    GTM>Write "$ZAHandle(A)=""",$ZAHandle(A),""" $ZAHandle(D)=""",$ZAHandle(D),""""
    $zahandle(A)="17B8810" $zahandle(D)="17B8C10"
    GTM>
@@ -8776,9 +8742,7 @@
    ; The binary representation of A is 01000001
    GTM>Set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1)
    ; The binary representation of B is 01000010
-
    GTM>set BITSTRINGAB=$zbitand(BITSTRINGA,BITSTRINGB)
-
    GTM>for i=1:1:8 write $zbitget(BITSTRINGAB,I)
    01000000
 
@@ -8804,13 +8768,10 @@
 
    GTM>set BITSTRINGA=$ZBITSET($ZBITSET($ZBITSTR(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-
    GTM>set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1)
    ; The binary representation of B is 01000010
-
    GTM>Set BITSTRINGC=$zbitor(BITSTRINGA,BITSTRINGB)
    ; A OR B=01000011
-
    GTM>write $zbitcount(BITSTRINGA)
    2
    GTM>write $zbitcount(BITSTRINGB)
@@ -8843,7 +8804,6 @@
 
    GTM>Set BITSTRINGA=$ZBITSET($ZBITSET($ZBITSTR(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-
    GTM>write $zbitfind(BITSTRINGA,1,3)
    9
    GTM>
@@ -8868,7 +8828,6 @@
 
    GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-
    GTM>for i=1:1:8 write $zbitget(BITSTRINGA,I)
    01000001
    GTM>
@@ -8909,7 +8868,6 @@
 
    GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-
    GTM>for i=1:1:8 write $zbitget($zbitnot(BITSTRINGA),I)
    10111110
    GTM>
@@ -8934,13 +8892,10 @@
 
    GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-
    GTM>set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1)
    ; The binary representation of B is 01000010
-
    GTM>set BITSTRINGC=$zbitor(BITSTRINGA,BITSTRINGB)
    ; A OR B=01000011
-
    GTM>write BITSTRINGC
    C
    GTM>
@@ -9003,11 +8958,8 @@
    Examples
 
    GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1) ; The binary representation of A is 01000001
-
    GTM>set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1); The binary representation of B is 01000010
-
    GTM>set BITSTRINGC=$zbitor(BITSTRINGA,BITSTRINGB) ; A XOR B=00000011
-
    GTM>for I=1:1:8 write $zbitget(BITSTRINGC,I)
    00000011
    GTM>
@@ -9149,11 +9101,9 @@
    GTM>Write $Length(T8)
    12
    GTM>Set T16=$zconvert(T8,"UTF-8","UTF-16LE")
-
    GTM>Write $length(T16)
    %GTM-E-BADCHAR, $ZCHAR(129,137,232,150) is not a valid character in the UTF-8 encoding form
    GTM>Set T16=$ZCOnvert(T16,"UTF-16LE","UTF-8")
-
    GTM>Write $length(T16)
    9
 
@@ -9193,7 +9143,6 @@
    GTM>write $data(b(1))," ",$zdata(b(1))
    1 101
    GTM>set b(1,2)=2
-
    GTM>write $data(b(1))," ",$zdata(b(1))
    11 111
    GTM>write $data(b(1,2))," ",$zdata(b(1,2))
@@ -9348,7 +9297,6 @@
    Example:
 
    GTM>write !,$zdate($H,"12:60:SS AM")
-
    10:35:51 PM
    GTM>
 
@@ -9358,7 +9306,6 @@
    Example:
 
    GTM>write !,$zdate(",36524","24-60")
-
    10-08
    GTM>
 
@@ -9373,7 +9320,6 @@
    GTM>write $zdate($H)
    01/18/11
    GTM>set $zdateform=1
-
    GTM>write $zdate($horolog)
    01/18/2011
    GTM>write $zdate($horolog,"MM/DD/YY")
@@ -9408,9 +9354,7 @@
    GTM>Set A="************"
 
    GTM>For i=0:1:$zlength(A)
-
    GTM>write !,$zascii($zextract(A,i)),"|"
-
    GTM>
 
    This example displays the numeric byte sequence of the sequence of octets
@@ -9451,7 +9395,6 @@
    Example:
 
    GTM>set t=1 for  set t=$zfind("***",$zchar(230,150,176),t) quit:'t  write !,t
-
    4
    GTM>
 
@@ -9502,7 +9445,6 @@
    to $ZPARSE(), as illustrated by the following M code:
 
    set deffn="GTM_JOBEXAMINE.ZSHOW_DMP_"_$JOB_"_"_<cntr>
-
    set filespec=$zparse(expr1,"",deffn)
 
    The $ZJOBEXAM()does not trigger error processing except when there is a
@@ -9526,7 +9468,6 @@
    GTM>write x
    /home/gtmuser1/.fis-gtm/V5.4-002B_x86/r/GTM_JOBEXAM.ZSHOW_DMP_28760_1
    GTM>set x=$zjobexam("test.file")
-
    GTM>write x
    /home/gtmuser1/.fis-gtm/V5.4-002B_x86/r/test.file
    GTM>
@@ -9625,7 +9566,6 @@
    Example:
 
    GTM>write $zmessage(36)
-
    Interrupted system call
    GTM>
 
@@ -9768,7 +9708,6 @@
    Example:
 
    GTM>for i=0:1:3 write !,$zpiece("*"_$zchar(64)_"*",$zchar(64),i),"|"
-
    |
    *|
    *|
@@ -9782,13 +9721,11 @@
    Example:
 
    GTM>for i=-1:1:3 write !,$zpiece("*"_$zchar(64)_"*",$zchar(64),i,i+1),"|"
-
    |
    *|
    *@*|
    *|
    |
-
    GTM>
 
    This example is similar to the previous example except that it displays
@@ -9805,7 +9742,7 @@
    Example:
 
    GTM>Set $piece(x,$zchar(64),25)="" write x
-   ***@@@@@@@@@@@@@@@@@@@@@@@@
+   ???@@@@@@@@@@@@@@@@@@@@@@@@
 
    This SETs the 25th piece of the variable x to null, with delimiter
    $ZCHAR(64). This produces a byte sequence of 24 at-signs (@) preceding the
@@ -9829,100 +9766,116 @@
 
    $ZPEEK("mnemonic[:argument]",offset,length[,format])
 
-     o mnemonic specifies the memory area $ZPEEK() is to access. Some
+     * mnemonic specifies the memory area $ZPEEK() is to access. Some
        mnemonics have arguments separated from the mnemonic by a colon (":").
        The mnemonics are case independent. Possible mnemonics, their possible
        abbreviations and their arguments are:
 
-          o CSA[REG] - returns a value from the sgmnt_addrs (process private)
+          * CSA[REG] - returns a value from the sgmnt_addrs (process private)
             control block. Takes a case independent region name as an
             argument.
-          o FH[REG] - returns a value from the sgmnt_data (shared file
+          * FH[REG] - returns a value from the sgmnt_data (shared file
             header) control block. Takes a case independent region name as an
             argument.
-          o GDR[REG] - returns a value from the gd_region (process private)
+          * GDR[REG] - returns a value from the gd_region (process private)
             control block. Takes a case independent region name as an
             argument.
-          o GLF[REPL] - returns a value from the jnlpool.gtmsrc_lcl_array[n]
+          * GLF[REPL] - returns a value from the jnlpool.gtmsrc_lcl_array[n]
             control block. Takes a numeric index (n) as an argument.
-          o GRL[REPL] - returns a value from the recvpool.gtmrecv_local
+          * GRL[REPL] - returns a value from the recvpool.gtmrecv_local
             control block. No argument allowed. Only available when run on a
             non-primary instance.
-          o GSL[REPL] - returns a value from the
+          * GSL[REPL] - returns a value from the
             jnlpool.gtmsource_local_array[n] control block. Takes a numeric
             index (n) as an argument.
-          o JPC[REPL] - returns a value from the jnlpool.jnlpool_ctl control
+          * JBF[REG]:region[ -obtains fields in shared jnl_buffer structure.
+          * JNL[REG]:region[ - obtains fields in the jnl_private_control
+            structure.
+          * JPC[REPL] - returns a value from the jnlpool.jnlpool_ctl control
             block. No argument allowed.
-          o NL[REG] - returns a value from the node_local (shared) control
+          * NL[REG] - returns a value from the node_local (shared) control
             block. Takes a case independent region name as an argument.
-          o NLREPL - returns a value from the node_local (shared) control
+          * NLREPL - returns a value from the node_local (shared) control
             block associated with replication. No argument allowed.
-          o PEEK - returns a value based on the supplied argument. Argument
+          * PEEK - returns a value based on the supplied argument. Argument
             is the base address of whatever is being fetched in 0xhhhhhhh
             format where the h's are hex digits.
-          o RIH[REPL] - returns a value from the jnlpool.repl_inst_filehdr
+          * RIH[REPL] - returns a value from the jnlpool.repl_inst_filehdr
             control block. No argument allowed.
-          o RPC[REPL] - returns a value from the recvpool.recvpool_ctl
+          * RPC[REPL] - returns a value from the recvpool.recvpool_ctl
             control block. No argument allowed. Only available when run on a
             non-primary instance.
-          o UHC[REPL] - returns a value from the recvpool.upd_helper_ctl
+          * UHC[REPL] - returns a value from the recvpool.upd_helper_ctl
             control block. No argument allowed. Only available when run on a
             non-primary instance.
-          o UPL[REPL] - returns a value from the recvpool.upd_proc_local
+          * UPL[REPL] - returns a value from the recvpool.upd_proc_local
             control block. No argument allowed. Only available when run on a
             non-primary instance.
 
-     o offset (first integer expression) is a numeric value that specifies
+     * offset (first integer expression) is a numeric value that specifies
        the offset from the address supplied or implied by the the mnemonic
        and argument. Specifying a negative offset results in a BADZPEEKARG
        error. Specifying too large an offset such that unavailable memory is
        specified results in a BADZPEEKRANGE error.
-     o length (second integer expression) is a numeric value that specifies
+     * length (second integer expression) is a numeric value that specifies
        the length of the field to be fetched. Specifying a negative legnth
        results in a BADZPEEKARG error. Specifying a length that exceeds the
        maximum string length results in a MAXSTRLEN error. Specifying too
        large a length such that unavailable memory is specified results in a
        BADZPEEKRANGE error.
-     o format is an optional single case independent character formatting
+     * format is an optional single case independent character formatting
        code for the retrieved data. The formatting codes are:
 
-          o C : returns a character representations of the memory locations;
+          * C : returns a character representations of the memory locations;
             this is the DEFAULT if the fourth argument is not specified.
-          o I : returns a signed integer value - negative values have a
+          * I : returns a signed integer value - negative values have a
             preceding minus sign (-); the length can be 1, 2, 4, or 8 bytes.
-          o U : returns an unsigned integer value - all bits are part of the
+          * U : returns an unsigned integer value - all bits are part of the
             numeric value; the length can be 1, 2, 4, or 8 bytes.
-          o S : returns a character representation of the memory locations
+          * S : returns a character representation of the memory locations
             and the first NULL character found terminates the returned
             string; that is: the specified length is a maximum.
-          o X : returns a hexadecimal value as 0xXXXXXX where XXXXXX is twice
+          * T: Selects a $HOROLOG format for a field of 4 or 8 bytes which is
+            intended for use on fields in UNIX time format (seconds since
+            01/01/1970)
+
+            X : returns a hexadecimal value as 0xXXXXXX where XXXXXX is twice
             the specified length in bytes, so requested length 1 returns 0xXX
             and length 4 returns 0xXXXXXXXX; the length can be 1, 2, 4, or 8
             bytes.
-          o Z : returns a hexadecimal representation of the memory locations
+
+          * Z : returns a hexadecimal representation of the memory locations
             as 'X' does, without regard to endianness, and with no length
             restriction other than max string length.
-          o $ZPEEK() function generates an UNDEF error when VIEW UNDEF is not
+          * $ZPEEK() function generates an UNDEF error when VIEW UNDEF is not
             set and format parameter is specified but is undefined.
 
    **Note**s
 
-     o $ZPEEK() has no UTF-8 checking. It is possible for values returned by
+     * $ZPEEK() has no UTF-8 checking. It is possible for values returned by
        the 'C' and 'S' codes to have invalid UTF-8 values in them. Take care
        when processing values obtained by these codes to either use "VIEW
        NOBADCHAR" when dealing with such values and/or use the $Zxxx()
        flavors of functions like $ZPIECE(), $ZEXTRACT(),etc which also do not
        raise BADCHAR errors when encountering invalid UTF-8 encoded strings.
-     o Note that $ZPEEK() with 8 byte numeric formatting can return numeric
+     * Note that $ZPEEK() with 8 byte numeric formatting can return numeric
        string values that exceed GT.M's current limit of 18 digits of
        precision. If the values are used as strings, the extra digits are
        preserved, but if used arithmetically, the lower precision digits can
        be lost.
-     o When values from replication structures are requested and the
+     * When values from replication structures are requested and the
        structures are not available due to replication not running or, in the
        case of the gtmrecv.* control block base options, if not running on a
        non-primary instance where the gtmrecv.* control are available, a
        ZPEEKNOREPLINFO error is raised.
+     * The JNL[REG] and JBL[REG] mnemonics and characteristics are defined by
+       the running the GTMDefinedTypesInit.m utility, which produces a
+       cross-index in the form:
+
+       gtmtypfldindx(<structure-name>.<field-mnemonic>)=<n>
+
+       where gtmtypes(<structure-name>,<n>,*) nodes contain the field
+       characteristics
 
 2 $ZPrevious()
    $ZPrevious()
@@ -10168,11 +10121,9 @@
    Example:
 
    GTM>job ^Somejob
-
    GTM>set ret=$&gtmposix.signalval("SIGUSR1",.sigusr1) zwrite
    ret=0
    sigusr1=10
-
    GTM>write $zsigproc($zjob,sigusr1)
    0
    GTM>
@@ -10194,13 +10145,9 @@
    GTM>write $ZCHSET
    M
    GTM>set char1="a" ; one byte character
-
    GTM>set char2="c,"; two-byte character
-
    GTM>set char3="*"; three-byte character
-
    GTM>set y=char1_char2_char3
-
    GTM>write $zsubstr(y,1,3)=$zsubstr(y,1,5)
    0
 
@@ -10213,13 +10160,9 @@
    GTM>write $zchset
    UTF-8
    GTM>set char1="a" ; one byte character
-
    GTM>set char2="c,"; two-byte character
-
    GTM>set char3="*"; three-byte character
-
    GTM>set y=char1_char2_char3
-
    GTM>write $zsubstr(y,1,3)=$zsubstr(y,1,5)
    1
 
@@ -10266,13 +10209,9 @@
    Example:
 
    GTM>set hiraganaA=$char(12354) ; $zchar(227,129,130)
-
    GTM>set temp1=$zchar(130)
-
    GTM>set temp2=$zchar(140)
-
    GTM>set tr=$ztranslate(hiraganaA,temp1,temp2)
-
    GTM>w $ascii(tr)
    12364
    GTM>
@@ -10288,6 +10227,15 @@
    is:
 
    $ZTRIgger(expr1[,expr2])
+
+   **Note**
+
+   A $ZTRIGGER() action (delete or select) applies to all triggers in all
+   regions matching the specified signature. If the argument specifies an
+   incomplete trigger signature, for example, only the name, the
+   specification may match multiple triggers and apply the delete or select
+   to all of them. FIS recommends you run a select and analyze the scope of
+   the signature before any signature limited delete.
 
 3 Examples_of_$ZTRIGGER()
    Examples of $ZTRIGGER()
@@ -10327,8 +10275,8 @@
    definition:
 
    +^a -commands=S -xecute=<<
-     do ^twork1
-     do ^twork2
+    do ^twork1
+    do ^twork2
    >>
 
    Unlike $ztrigger("ITEM"), $ztrigger("FILE") usages require the trigger
@@ -10404,7 +10352,6 @@
 
    GTM>set NG=$char($$FUNC^%HD("200B"))
    GTM>set S=$char(26032)_NG_$CHAR(26033)
-
    GTM>W $ZWidth(STR)
    4
    GTM>
@@ -10418,7 +10365,6 @@
    GTM>write $zwidth("The rain in Spain stays mainly in the plain.")
    44
    GTM>set A="************"
-
    GTM>write $length(A)
    12
    GTM>write $zwidth(A)
@@ -11087,7 +11033,6 @@
      set $etrap="" ; exit if the input isn't valid
      if $length($zcmdline) do @$zcmdline quit
      quit
-
    $ mumps -run foo 'BAR^FOOBAR("hello")'
 
    In this example, GT.M processes the shell command line up to foo and puts
@@ -11430,7 +11375,6 @@
    Example:
 
    set $zinterrupt="do ^interrupthandler($io)"
-
    interrupthandler(currentdev)
           do ^handleinterrupt ; handle the interrupt
           use currentdev      ; restore the device which was current when the interrupt was recognized
@@ -11610,10 +11554,8 @@
    D
     set X=$ZLEVEL
     quit
-
    GTM>do ^zleve
    4
-
    GTM>
 
    This program, executed from Direct Mode, produces a value of 4 for
@@ -11683,20 +11625,14 @@
    Results:
 
    Start with $ZMAXTPTIME=6:
-
    ^X=1,will set ^Y to 3 in 3 seconds...^Y=3...committed.
-
    ^X=2,will set ^Y to 5 in 5 seconds...^Y=5...committed.
-
    ^X=3,will set ^Y to 7 in 7 seconds...
    In $ZTRAP handler. Error was:
    150377322,longtran+7^tptime,%GTM-E-TPTIMEOUT, Transaction timeoutRolled back transaction.
-
    ^X=3,will set ^Y to 9 in 9 seconds...
-
    In $ZTRAP handler. Error was:
    150377322,longtran+7^tptime,%GTM-E-TPTIMEOUT, Transaction timeoutRolled back transaction.
-
    Done TP Timeout test.
 
 2 $ZMOde
@@ -12239,7 +12175,6 @@
    .
    .
    GTM>WRITE $ZSOURCE
-
    subr
 
    Example:
@@ -12249,7 +12184,6 @@
    .
    .
    GTM>WRITE $ZSOURCE
-
    "test"
 
    Example:
@@ -12259,7 +12193,6 @@
    .
    .
    GTM>WRITE $ZSOURCE
-
    /usr/smith/report.txt
 
    Example:
@@ -12353,7 +12286,6 @@
 
    $ export sigusrval=10
    $ /usr/lib/fis-gtm/V6.1-000_x86_64/gtm
-
    GTM>zprint ^ztran
    foo;
      set $ztexit=1
@@ -12382,19 +12314,16 @@
      write "End Transaction",!
      ;do ^srv
      quit
-
    GTM>zprint ^throwint
    throwint
      set $zinterrupt="write !,""interrupt occurred at : "",$stack($stack-1,""PLACE""),! set $ztexit=1"
      if '$zsigproc($job,$ztrnlnm("sigusrval")) write "interrupt sent to process"
      write "***************************************",!!
      quit
-
    GTM>do foo^ztran
    interrupt sent to process
    interrupt occurred at : throwint+3^throwint
    ***************************************
-
    interrupt occurred at : foo+13^ztran
    GTM>
 
@@ -12409,16 +12338,12 @@
    "IF $ZJOBEXAM()"
    GTM>zsystem "ls GTM*"
    ls: No match.
-
    GTM>do bar^ztran
    Begin Transaction
    interrupt sent...
-
    End Transaction
-
    GTM>zsystem "ls GTM*"
    GTM_JOBEXAM.ZSHOW_DMP_3951_1  GTM_JOBEXAM.ZSHOW_DMP_3951_2
-
    GTM>
 
    This uses the default value of $ZINTERRUPT to service interrupts issued to
@@ -13799,7 +13724,6 @@
    Example:
 
    GTM>kill ^a
-
    GTM>zprint ^indepserver
    indepserver;
      read x
@@ -13808,30 +13732,20 @@
      for  do  quit:^quit
      . if $data(^a) write "^a = ",^a,!
      . Hang 5
-
    GTM>set a="test"
-
    GTM>open a:(command="mumps -run ^indepserver>indout":independent)::"pipe"
-
    GTM>use a
-
    GTM>write "instructions",!
-
    GTM>close a
-
    GTM>zsystem "cat indout"
    received = instructions
-
    GTM>set ^a=1
-
    GTM>zsystem "cat indout"
    received = instructions
    ^a = 1
    ^a = 1
    ^a = 1
-
    GTM>s ^quit=1
-
    GTM>zsystem "cat indout"
    received = instructions
    ^a = 1
@@ -14182,18 +14096,18 @@
    CONNSOCKREQ or LOCALSOCKREQ errors, respectively, when those conditions
    are not met.
 
-     o If a numeric targetpid is specified, GT.M matches the value against
+     * If a numeric targetpid is specified, GT.M matches the value against
        the process id ($JOB) of the process receiving the sockets. GT.M uses
        a system service to perform this check on platforms that support it -
        currently: Linux, AIX, and Solaris. On platforms which do not
        implement the service (HP-UX), GT.M ignores the targetpid. If the pids
        do not match, GT.M issues a PEERPIDMISMATCH error and does not
        transfer the sockets.
-     o If a numeric timeout is specified, GT.M sets $TEST to 1 if the
+     * If a numeric timeout is specified, GT.M sets $TEST to 1 if the
        transfer completes within the specified time, and otherwise sets $TEST
        to 0 and does not transfer any of the sockets.
-     o Each handle specifies the name of a socket in the socket pool.
-     o On a successful transfer, GT.M closes the connection of the sending
+     * Each handle specifies the name of a socket in the socket pool.
+     * On a successful transfer, GT.M closes the connection of the sending
        process to the specified and sent sockets. In any case where the
        transfer does not complete, GT.M retains all the sockets in the socket
        pool of the sender.
@@ -14208,22 +14122,22 @@
    CONNSOCKREQ or LOCALSOCKREQ errors, respectively, when those conditions
    are not met.
 
-     o lvar is an unsubscripted local variable name (lvn) which must be
+     * lvar is an unsubscripted local variable name (lvn) which must be
        passed by reference indicated with a period (".") prefix. On
        successful completion, the specified unsubscripted lvn contains the
        handles of the received socket, in the order they were sent, delimited
        with a vertical bar ("|"). GT.M places the sockets in the socket pool,
        so the process can ATTACH them to an appropriate SOCKET device for
        subsequent use.
-     o If a numeric sourcepid is specified, GT.M matches the value against
+     * If a numeric sourcepid is specified, GT.M matches the value against
        the process id ($JOB) of the process sending the sockets. On platforms
        which do not implement the service (HP-UX), GT.M ignores the
        targetpid. If the pids do not match, GT.M issues a PEERPIDMISMATCH
        error and does not transfer the sockets.
-     o If a numeric timeout is specified, GT.M sets $TEST to 1 if the
+     * If a numeric timeout is specified, GT.M sets $TEST to 1 if the
        transfer completes within the specified time, and otherwise sets $TEST
        to 0 and does not transfer the sockets.
-     o If any handles are specified, GT.M assigns the provided handle names
+     * If any handles are specified, GT.M assigns the provided handle names
        to the received sockets in the order in which they appear in the WRITE
        /PASS of the sending process; empty items in the comma delimited
        handle list act to preserve ordering. Where the list provides no
@@ -14248,6 +14162,86 @@
    specifies the appropriate deviceparameter(s). GT.M transfers only the
    socket connection itself, the socket handle, and buffered socket data (if
    any).
+
+   WRITE /TLS(option[,[timeout][,tlsid]])
+
+   SOCKET devices support encrypt connections with TLS using an encryption
+   plugin. GT.M ships with a reference implementation of the plugin which
+   uses OpenSSL and also supports TLS of replication stream. OpenSSL options
+   are controlled by a configuration file. The WRITE /TLS command activates
+   this feature for connected sockets. Because this functionality has a wide
+   variety of user stories (use cases) and has substantial complexity,
+   although the code appears robust, we are not confident that we have
+   exercised a sufficient breadth of use cases in testing. Also we may make
+   changes in future releases that are not entirely backwards compatible. We
+   encourage you to use with this facility in development and testing, and to
+   provide us with feedback. If you are an FIS customer and wish to use this
+   in production, please contact us beforehand to discuss your use case(s).
+
+     * option is "server" or "client" indicating which TLS role to assume or
+       "renegotiate" which is used by a server to request a new handshake to
+       reevaluate the client credentials. The server role requires a
+       certificate specified in the configuration file section with the label
+       matching tlsid. The client role may require a certificate depending on
+       the OpenSSL options. If the argument specifies a timeout, GT.M sets
+       $TEST to 1 if the command successfully completed or to 0 if it timed
+       out. $DEVICE provides status information in case of an error. ZSHOW
+       "D" includes "TLS" in the second line of the output for an encrypted
+       socket.
+     * Note that SOCKET device actions may produce the following errors:
+       TLSDLLOPEN, TLSINIT, TLSCONVSOCK, TLSHANDSHAKE, TLSCONNINFO,
+       TLSIOERROR, and TLSRENEGOTIATE.
+
+   The TLS plugin uses OpenSSL options in the configuration file specified
+   under the tls: label as the default for all TLS connections and under the
+   specific labels to override the defaults for corresponding connections.
+   GT.M recognizes the following for both sockets:
+
+     * The cipher-list option specifies which cryptographic algorithms to
+       use. The format of this option is described by the OpenSSL ciphers man
+       page. An empty string uses a default value of
+       "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH" for replication connections and
+       the OpenSSL default cipher list for socket connections.
+     * The ssl_options, documented in the man page for SSL_set_options,
+       modify the default behavior of OpenSSL. When specifying multiple
+       options, separate them with acolons (:) delimiter. The ssl-options
+       specified in a labeled section add to, or override, those specified at
+       the "tls" level. An exclamation mark ("!") preceding an option in a
+       labeled section disables any default for that option specified at the
+       tls: level; for example:
+
+       tls: {
+        ssl-options: "SSL_OP_CIPHER_SERVER_PREFERENCE";
+        mylabel: {
+        ssl-options: "!SSL_OP_CIPHER_SERVER_PREFERENCE";
+        };
+        }
+
+     * The verify-mode option specifies how OpenSSL verifies certificates. If
+       no verify-mode is specified, a socket connection defaults to
+       SSL_VERIFY_NONE. We have tested with SSL_VERIFY_PEER and
+       SSL_VERIFY_NONE See the man page for SSL_set_verify for details.
+       SSL_VERIFY_PEER has two additional flags which modify verification
+       only for the server role; when adding them to the option string, use
+       the colon (:) delimiter.
+     * A verify-depth option specified in a labeled section applies to
+       connections associated with that section.
+
+   When placing the private key for a certificate at the beginning of the
+   certificate file, you may omit the "key" item from the configuration file.
+   The format of the combined file is:
+
+   -----BEGIN RSA PRIVATE KEY-----
+    [encoded key]
+    -----END RSA PRIVATE KEY-----
+    [empty line]
+    -----BEGIN CERTIFICATE-----
+    [encoded certificate]
+    -----END CERTIFICATE-----
+    [empty line]
+
+   GT.M buffers WRITEs to TLS enabled sockets until a subsequent USE :FLUSH,
+   WRITE !, WRITE #, or an internal 400 millisecond timer expires.
 
 3 Socket_Device_Operation
    Socket Device Operation
@@ -14971,7 +14965,6 @@
 
    GTM>file1="foo.txt"
    GTM>open file1:newversion:recordsize=5000
-
    GTM>
 
    This example creates a new version of sequential file foo.txtwith
@@ -15165,6 +15158,10 @@
    REWIND Applies to: Sequential Files
 
    REWIND positions the file pointer of a sequential disk.
+
+   When $PRINCIPAL identifies a device that supports REWIND, the REWIND or
+   INREWIND device parameters perform a REWIND of the input and OUTREWIND
+   performs a REWIND of the output.
 
    By default, OPEN does not REWIND.
 
@@ -15954,15 +15951,12 @@
    Example:
 
    GTM>set tcp="seerv" open tcp:(listen="6321:TCP":attach="serv")::"SOCKET"
-
    GTM>zshow "D"
    /dev/pts/9 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
    seerv OPEN SOCKET TOTAL=1 CURRENT=0
            SOCKET[0]=serv DESC=3 LISTENING PASSIVE NOTRAP PORT=6321
                      ZDELAY ZBFSIZE=1024 ZIBFSIZE=87380 NODELIMITER
-
    GTM>set tcp="seerv" o tcp:(listen="6322:TCP":attach="serv2")::"SOCKET"
-
    GTM>zshow "D"
    /dev/pts/9 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
    seerv OPEN SOCKET TOTAL=2 CURRENT=1
@@ -15977,7 +15971,6 @@
    The following command moves the "serv" socket to the "socketpool" device.
 
    GTM>use tcp:detach="serv"
-
    GTM>use 0 zshow "D"
    /dev/pts/9 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
    seerv OPEN SOCKET TOTAL=1 CURRENT=0
@@ -16346,9 +16339,7 @@
    Example:
 
    GTM>set tcp="seerv" open tcp:(listen="6321:TCP":attach="serv")::"SOCKET"
-
    GTM>use tcp:listen="6322:TCP"
-
    GTM>use 0 zshow "D"
    /dev/pts/9 OPEN TERMINAL NOPAST NOESCA NOREADS TYPE WIDTH=80 LENG=24
    seerv OPEN SOCKET TOTAL=2 CURRENT=1
@@ -17861,7 +17852,6 @@
    #include <stdio.h>
    #include <string.h>
    #include "gtmxc_types.h"
-
    void gtm_pre_alloc_a (int count, char *arg_prealloca)
    {
        strcpy(arg_prealloca, "New Message");
@@ -17953,21 +17943,15 @@
    % cat /usr/joe/callback.xc
    /usr/lib/callback.sl
    init: void init_callbacks(I:gtm_pointertofunc_t, I:gtm_pointertofunc_t)
-
    % gtm
    GTM> do &.init(4,5)
    GTM>
-
    % cat /usr/joe/callback.c
    #include <stdio.h>
    #include <stdlib.h>
-
    #include "gtmxc_types.h"
-
    void* (*malloc_fn)(int);
-
    void (*free_fn)(void*);
-
    void init_callbacks(int count, void* (*m)(int), void (*f)(void*))
    {
        malloc_fn = m;
@@ -18817,7 +18801,6 @@
    224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,
    240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255
    };
-
    long
    gtm_ac_xform (in, level, out, outlen)
         gtm_descriptor *in;    /* the input string */
@@ -18881,7 +18864,6 @@
    224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,
    240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255
    };
-
    long gtm_ac_xback (in, level, out, outlen)
         gtm_descriptor *in;    /* the input string */
         int level;            /* the subscript level */
@@ -18958,7 +18940,6 @@
    Example:
    #include "gtm_descript.h"
    #define MYAPP_WRONGVERSION 20406080    /* User condition */
-
    gtm_ac_verify (type, ver)
         unsigned char type, ver;
    {
@@ -19028,7 +19009,6 @@
    Example:
 
    GTM>kill ^G
-
    GTM>write $select($$set^%GBLDEF("^G",0,3):"ok",1:"failed")
    ok
    GTM>
@@ -19277,7 +19257,6 @@
    compile-time error with the message:
 
    S =B+C ^-----
-
    At column 4, line 7, source module ADD2
     Variable expected in this context
 
@@ -20043,4 +20022,21 @@
    trigger against the target node, and only invokes the trigger once for
    each KILL command. GT.M does not check nodes in sub-trees to see whether
    they have matching triggers.
+
+3 Accessing_Xecute_Source_Code
+   Accessing Xecute Source Code
+
+   ZPRINT/$TEXT()/ZBREAK recognize both a runtime-disambiguator, delimited
+   with a hash-sign (#), and a region-disambiguator, delimited by a slash(/);
+   previously they supported only the runtime-disambiguator. ZPRINT and
+   ZBREAK treat a trigger-not-found case as a TRIGNAMENF error, while $TEXT()
+   returns the empty string. When their argument contains a
+   region-disambiguator, these features ignore a null runtime-disambiguator.
+   When their argument does not contain a region-disambiguator, these
+   features act as if runtime-disambiguator is specified, even if it has an
+   empty value. When an argument specifies both runtime-disambiguator and
+   region-disambiguator and the runtime-disambiguator identifies a trigger
+   loaded from a region different from the specified region, or the
+   region-disambiguator identifies a region which holds a trigger that is not
+   mapped by $ZGBLDIR, these features treat the trigger as not found.
 

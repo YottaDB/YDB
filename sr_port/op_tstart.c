@@ -215,9 +215,9 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			t_tries = (FALSE == mupip_jnl_recover) ? 0 : CDB_STAGNATE;
 			t_fail_hist[t_tries] = cdb_sc_normal;
 			/* ensure that we don't have crit on any region at the beginning of a TP transaction (be it GT.M or MUPIP).
-			 * The only exception is ONLINE ROLLBACK which holds crit for the entire duration
+			 * The only exception is ONLINE ROLLBACK or MUPIP TRIGGER -UPGRADE which holds crit for the entire duration
 			 */
-			assert(0 == have_crit(CRIT_HAVE_ANY_REG) UNIX_ONLY(|| jgbl.onlnrlbk));
+			assert(0 == have_crit(CRIT_HAVE_ANY_REG) UNIX_ONLY(|| jgbl.onlnrlbk || TREF(in_trigger_upgrade)));
 		}
 #		ifdef GTM_TRIGGER
 		else
@@ -403,10 +403,16 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	tf->restartable = (NORESTART != prescnt);
 	tf->old_locks = (NULL != mlk_pvt_root);
 #	ifdef DEBUG
-	if (!jgbl.forw_phase_recovery)
-	{	/* In case of forward phase of journal recovery, gv_currkey is set by caller (mur_forward) only
-		 * after the call to op_tstart so avoid doing gv_currkey check.
-		 */
+	/* Do check that gv_currkey and gv_target are in sync.
+	 * In case of forward phase of journal recovery, gv_currkey is set by caller (mur_forward) only
+	 * after the call to op_tstart so avoid doing gv_currkey check. Also in case of trigger_upgrade,
+	 * we could start a TP transaction from almost anywhere (e.g. inside name-level $order in op_gvorder)
+	 * and so we are not guaranteed this check will succeed. Since this check is not necessary anymore
+	 * (see comment before macro definition) we skip this check in that case. A broad (but not accurate)
+	 * way to check for trigger_upgrade is if gv_target is directory-tree (i.e. gvname is "").
+	 */
+	if (!jgbl.forw_phase_recovery && (NULL != gv_target) && gv_target->gvname.var_name.len)
+	{
 		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	}
 #	endif
@@ -599,6 +605,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		assert((NULL != first_ua) && (NULL != curr_ua)); /* Since first_sgm_info is NOT NULL, database activity existed */
 		new_gtli->curr_ua = (struct ua_list *)(curr_ua);
 		new_gtli->upd_array_ptr = update_array_ptr;
+		GTMTRIG_ONLY(new_gtli->ztrigbuffLen = TREF(ztrigbuffLen);)
 		new_gtli->next_global_tlvl_info = NULL;
 		if (prev_gtli)
 		{

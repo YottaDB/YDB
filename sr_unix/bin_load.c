@@ -113,22 +113,22 @@ error_def(ERR_RECLOAD);
 
 #define	DEFAULT_SN_HOLD_BUFF_SIZE MAX_IO_BLOCK_SIZE
 
-#define KILL_INCMP_SN_IF_NEEDED(GVNH_REG)									\
-{														\
-	gd_region	*dummy_reg;										\
-														\
-	if (!sn_incmp_gbl_already_killed)									\
-	{													\
-		COPY_KEY(sn_savekey, gv_currkey);								\
-		COPY_KEY(gv_currkey, sn_gvkey);									\
-		/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH				\
-		 * (e.g. setting gv_cur_region for spanning globals).						\
-		 */												\
-		GV_BIND_SUBSNAME_IF_GVSPAN(GVNH_REG, gd_header, gv_currkey, dummy_reg);		\
-		bin_call_db(BIN_KILL, 0, 0);									\
-		COPY_KEY(gv_currkey, sn_savekey);								\
-		sn_incmp_gbl_already_killed = TRUE;								\
-	}													\
+#define KILL_INCMP_SN_IF_NEEDED(GVNH_REG)											\
+{																\
+	gd_region	*dummy_reg;												\
+																\
+	if (!sn_incmp_gbl_already_killed)											\
+	{															\
+		COPY_KEY(sn_savekey, gv_currkey);										\
+		COPY_KEY(gv_currkey, sn_gvkey);											\
+		/* The below macro finishes the task of GV_BIND_NAME_AND_ROOT_SEARCH						\
+		 * (e.g. setting gv_cur_region for spanning globals).								\
+		 */														\
+		GV_BIND_SUBSNAME_IF_GVSPAN(GVNH_REG, gd_header, gv_currkey, dummy_reg);						\
+		bin_call_db(BIN_KILL, 0, 0);											\
+		COPY_KEY(gv_currkey, sn_savekey);										\
+		sn_incmp_gbl_already_killed = TRUE;										\
+	}															\
 }
 
 #define DISPLAY_INCMP_SN_MSG													\
@@ -221,7 +221,7 @@ void zwr_out_print(char * buff, int bufflen)
 	FPRINTF(stderr,"\n");
 }
 
-void bin_load(uint4 begin, uint4 end)
+void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 {
 	unsigned char		*ptr, *cp1, *cp2, *btop, *gvkey_char_ptr, *tmp_ptr, *tmp_key_ptr, *c, *ctop, *ptr_base;
 	unsigned char		hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
@@ -231,9 +231,10 @@ void bin_load(uint4 begin, uint4 end)
 	int			len;
 	int			current, last, length, max_blk_siz, max_key, status;
 	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size;
-	uint4			iter, max_data_len, max_subsc_len, key_count, gblsize;
-	ssize_t			rec_count, global_key_count, subsc_len,extr_std_null_coll, last_sn_error_offset=0,
-					file_offset_base=0, file_offset=0;
+	uint4			max_data_len, max_subsc_len, gblsize;
+	ssize_t			subsc_len, extr_std_null_coll;
+	gtm_uint64_t		iter, key_count, rec_count, tmp_rec_count, global_key_count;
+	off_t			last_sn_error_offset = 0, file_offset_base = 0, file_offset = 0;
 	boolean_t		need_xlation, new_gvn, utf8_extract;
 	boolean_t		is_hidden_subscript, ok_to_put = TRUE, putting_a_sn = FALSE, sn_incmp_gbl_already_killed = FALSE;
 	rec_hdr			*rp, *next_rp;
@@ -260,6 +261,12 @@ void bin_load(uint4 begin, uint4 end)
 	assert(4 == SIZEOF(coll_hdr));
 	gvinit();
 	v.mvtype = MV_STR;
+	file_offset_base = 0;
+	/* line1_ptr,line1_len were initialized as part of get_file_format using reads of the binary extract file which
+	 * did not go through file_input_bin_get. So initialize the internal static structures that file_input_bin_get
+	 * maintains as if that read happened through it. This will let us finish reading the binary extract header line.
+	 */
+	file_input_bin_init(line1_ptr, line1_len);
 	len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base, DO_RTS_ERROR_FALSE);
 	if (0 >= len)
 	{
@@ -329,8 +336,8 @@ void bin_load(uint4 begin, uint4 end)
 #	ifdef GTM_CRYPT
 	if ('7' <= hdr_lvl)
 	{
-		encrypted_hash_array_len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base,
-				DO_RTS_ERROR_TRUE);
+		encrypted_hash_array_len = file_input_bin_get((char **)&ptr, &file_offset_base,
+								(char **)&ptr_base, DO_RTS_ERROR_TRUE);
 		encrypted_hash_array_ptr = malloc(encrypted_hash_array_len);
 		memcpy(encrypted_hash_array_ptr, ptr, encrypted_hash_array_len);
 		n_index = encrypted_hash_array_len / GTMCRYPT_HASH_LEN;
@@ -368,7 +375,7 @@ void bin_load(uint4 begin, uint4 end)
 		if (!(len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base, DO_RTS_ERROR_TRUE)))
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, begin);
-			util_out_print("Error reading record number: !UL\n", TRUE, iter);
+			util_out_print("Error reading record number: !@UQ\n", TRUE, &iter);
 			mupip_error_occurred = TRUE;
 			return;
 		} else if (len == SIZEOF(coll_hdr))
@@ -383,6 +390,7 @@ void bin_load(uint4 begin, uint4 end)
 	max_data_len = 0;
 	max_subsc_len = 0;
 	global_key_count = key_count = 0;
+	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, 4294967196U); /* (2**32)-100=4294967196 */
 	rec_count = begin - 1;
 	extr_collseq = db_collseq = NULL;
 	need_xlation = FALSE;
@@ -405,9 +413,10 @@ void bin_load(uint4 begin, uint4 end)
 			break;
 		if (mu_ctrlc_occurred)
 		{
-			util_out_print("!AD:!_  Key cnt: !UL  max subsc len: !UL  max data len: !UL", TRUE,
-				LEN_AND_LIT("LOAD TOTAL"), key_count, max_subsc_len, max_data_len);
-			util_out_print("Last LOAD record number: !UL", TRUE, key_count ? (rec_count - 1) : 0);
+			util_out_print("!AD:!_  Key cnt: !@UQ  max subsc len: !UL  max data len: !UL", TRUE,
+				LEN_AND_LIT("LOAD TOTAL"), &key_count, max_subsc_len, max_data_len);
+			tmp_rec_count = key_count ? (rec_count - 1) : 0;
+			util_out_print("Last LOAD record number: !@UQ", TRUE, &tmp_rec_count);
 			mu_gvis();
 			util_out_print(0, TRUE);
 			mu_ctrlc_occurred = FALSE;
@@ -458,7 +467,7 @@ void bin_load(uint4 begin, uint4 end)
 			 */
 			if (mupip_error_occurred)
 			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, rec_count);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, &rec_count);
 				ONERROR_PROCESS;
 			}
 			max_key = gvnh_reg->gd_reg->max_key_size;
@@ -817,9 +826,10 @@ void bin_load(uint4 begin, uint4 end)
 	if (NULL != sn_hold_buff)
 		free(sn_hold_buff);
 	file_input_close();
-	util_out_print("LOAD TOTAL!_!_Key Cnt: !UL  Max Subsc Len: !UL  Max Data Len: !UL", TRUE, key_count, max_subsc_len,
+	util_out_print("LOAD TOTAL!_!_Key Cnt: !@UQ  Max Subsc Len: !UL  Max Data Len: !UL", TRUE, &key_count, max_subsc_len,
 			max_data_len);
-	util_out_print("Last LOAD record number: !UL\n", TRUE, key_count ? (rec_count - 1) : 0);
+	tmp_rec_count = key_count ? (rec_count - 1) : 0;
+	util_out_print("Last LOAD record number: !@UQ\n", TRUE, &tmp_rec_count);
 	if (mu_ctrly_occurred)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LOADCTRLY);

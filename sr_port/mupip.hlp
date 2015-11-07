@@ -546,7 +546,6 @@
    $ mupip backup -database -noonline "*" bkup
    DB file /home/gtmnode1/gtmuser1/mumps.dat backed up in file bkup/mumps.dat
    Transactions up to 0x00000000000F42C3 are backed up.
-
    BACKUP COMPLETED.
 
    This command creates a disk-to-disk backup copy of all regions of the
@@ -572,7 +571,6 @@
    $ mupip backup -online DEFAULT bkup
    DB file /gtmnode1/gtmuser1/mumps.dat backed up in file bkup/mumps.dat
    Transactions up to 0x00000000483F807C are backed up.
-
    BACKUP COMPLETED.
 
    This command creates a backup copy of the DEFAULT region of the current
@@ -599,7 +597,6 @@
    DB file /home/reptiles/mumps.dat incrementally backed up in file bkup1921onwards/mumps.dat
    6 blocks saved.
    Transactions from 0x00000000000F4351 to 0x00000000000F4352 are backed up.
-
    BACKUP COMPLETED.
 
    The first command sets a reference point and creates a backup copy of the
@@ -614,7 +611,6 @@
    DB file /gtmnode1/gtmuser1/mumps.dat incrementally backed up in file bkup/mumps.dat
    5 blocks saved.
    Transactions from 0x0000000000000001 to 0x0000000000000003 are backed up.
-
    BACKUP COMPLETED.
 
    This command copies all in-use blocks of the DEFAULT region of the current
@@ -765,9 +761,7 @@
 
    $ mupip endiancvt mumps.dat -outdb=mumps_cvt.dat
    Converting database file mumps.dat from LITTLE endian to BIG endian on a LITTLE endian system
-
    Converting to new file mumps_cvt.dat
-
    Proceed [yes/no] ?
 
    This command detects the endian format of mumps.dat and converts it to the
@@ -807,7 +801,9 @@
    Specifies the number of GDS database blocks by which MUPIP should extend
    the file. GDS files use additional blocks for bitmaps. MUPIP EXTEND adds
    the specified number of blocks plus the bitmap blocks required as
-   overhead. The format of the BLOCK qualifier is:
+   overhead.
+
+   The format of the BLOCK qualifier is:
 
    -BLOCKS=data-blocks-to-add
 
@@ -1256,6 +1252,16 @@
    Specifies that the reported key is for the Receive Pool of the instance
    created by the current Global Directory.
 
+2 HASH
+   HASH
+
+   Uses a 128 bit hash based on the MurmurHash3 algorithm to provide provides
+   the hash of source files from the command line.
+
+   The format of the MUPIP HASH command is:
+
+   MUPIP HASH <file-names>
+
 2 INTEG
    INTEG
 
@@ -1393,9 +1399,6 @@
    The format of the BLOCK qualifier is:
 
    -BL[OCK]=block-number
-
-     o Block numbers are displayed in an INTEG error report or by using DSE.
-     o Incompatible with: -SUBSCRIPT and -TN_RESET
 
 3 BRief
    BRief
@@ -1712,7 +1715,6 @@
    A sample output from the above command follows:
 
    Type           Blocks         Records          % Used      Adjacent
-
    Directory           2               5           4.150            NA
    Index              18            1151          77.018             1
    Data             1137           94189          97.894          1030
@@ -1733,9 +1735,7 @@
    sample output from the above command follows:
 
    No errors detected by integ.
-
    Type           Blocks         Records          % Used      Adjacent
-
    Directory           2               2           2.490            NA
    Index               1               1           2.343             1
    Data                1               3           6.738             1
@@ -1753,7 +1753,6 @@
    No errors detected by fast integ.
 
    Type           Blocks         Records          % Used      Adjacent
-
    Directory           2               2           2.490            NA
    Index               1               1           2.343             1
    Data                1              NA              NA            NA
@@ -1771,16 +1770,12 @@
    Level          Blocks         Records          % Used      Adjacent
        1               1               1           2.343           NA
        0               1               1           2.636           NA
-
    Global variable ^Dinosaur
    Level          Blocks         Records          % Used      Adjacent
        1               1               6           8.398             1
        0               6             500          83.902             6
-
    No errors detected by integ.
-
    Type           Blocks         Records          % Used      Adjacent
-
    Directory           2               2           2.490            NA
    Index               1               6           8.398             1
    Data                6             500          83.902             6
@@ -1855,15 +1850,11 @@
    The format of the LOAD command is:
 
    L[OAD]
-   [
-    -BE[GIN]=integer
-    -E[ND]=integer
-    -FI[LLFACTOR]=integer
-    -FO[RMAT]={GO|B[INARY]|Z[WR]]}
-    -[O]NERROR={STOP|PROCEED|INTERACTIVE}
-    -S[TDIN]
-   ]
-    file-name
+   [-BE[GIN]=integer -E[ND]=integer
+   -FI[LLFACTOR]=integer
+   -FO[RMAT]={GO|B[INARY]|Z[WR]]}
+   -[O]NERROR={STOP|PROCEED|INTERACTIVE}
+   -S[TDIN]] file-name
 
    **Caution**
 
@@ -1871,21 +1862,21 @@
    an application is running may result in an inconsistent application state
    for the database.
 
-     o MUPIP LOAD uses the Global Directory to determine which database files
+     * MUPIP LOAD uses the Global Directory to determine which database files
        to use.
-     o LOAD supports user collation routines.
-     o LOAD takes its input from the file defined by the file-name
-     o LOAD may take its input from a UNIX file on any device that supports
+     * LOAD supports user collation routines.
+     * LOAD takes its input from the file defined by the file-name
+     * LOAD may take its input from a UNIX file on any device that supports
        such files.
-     o MUPIP LOAD command considers a sequential file as encoded in UTF-8 if
+     * MUPIP LOAD command considers a sequential file as encoded in UTF-8 if
        the environment variable gtm_chset is set to UTF-8. Ensure that MUPIP
        EXTRACT commands and corresponding MUPIP LOAD commands execute with
        the same setting for the environment variable gtm_chset.
-     o For information on loading with an M "percent utility," refer to the
+     * For information on loading with an M "percent utility," refer to the
        %GI section of the "M Utility Routines" chapter in GT.M Programmer's
        Guide. LOAD is typically faster, but the %GI utility can be
        customized.
-     o Press <CTRL-C> to produce a status message from LOAD. Entering
+     * Press <CTRL-C> to produce a status message from LOAD. Entering
        <CTRL-C> twice in quick succession stops LOAD. A LOAD that is manually
        stopped or stops because of an internal error is incomplete and may
        lack application level integrity, but will not adversely affect the
@@ -1911,8 +1902,11 @@
 3 FOrmat
    FOrmat
 
-   Specifies the format of the input file. The format must match the actual
-   format of the input file for LOAD to operate.
+   Specifies the format of the input file. If the format of the input file is
+   not specified, MUPIP LOAD automatically detects file format
+   (BINARY/ZWR/GO) based on the file header of the input file. If format is
+   specified, it must match the actual format of the input file for LOAD to
+   operate.
 
    The format codes are:
 
@@ -1920,15 +1914,17 @@
    B[INARY] - Binary format
    Z[WR] - ZWRITE format
 
-     o By default, LOAD uses FORMAT=ZWR.
-     o -FORMAT=GO expects the data in record pairs. Each global node requires
+     * By default, LOAD uses FORMAT=ZWR.
+     * -FORMAT=GO expects the data in record pairs. Each global node requires
        one record for the key and one for the data.
-     o -FORMAT=ZWR expects the data for each global node in a single record.
-     o -FORMAT=BINARY only applies to Greystone Database Structure (GDS)
+     * -FORMAT=ZWR expects the data for each global node in a single record.
+     * -FORMAT=BINARY only applies to Greystone Database Structure (GDS)
        files. A BINARY format file loads significantly faster than a GO or
        ZWR format file. -FORMAT=BINARY works with data in a proprietary
        format. -FORMAT=BINARY has one header record, therefore LOAD
        -FORMAT=BINARY starts active work with record number two (2).
+     * MUPIP LOAD detects file format (BINARY/ZWR/GO) based on the file
+       header of extract files from MUPIP EXTRACT, ^%GO and DSE.
 
 3 BEgin
    BEgin
@@ -1944,14 +1940,14 @@
    Always consider the number of header records for choosing a -BEGIN point.
    See FORMAT qualifier for more information.
 
-     o For -FORMAT=GO input, the value is usually an odd number. As
+     * For -FORMAT=GO input, the value is usually an odd number. As
        -FORMAT=BINARY requires important information from the header, this
        type of load requires an intact file header regardless of the -BEGIN
        value.
-     o For -FORMAT = ZWR input, each record contains a complete set of
+     * For -FORMAT = ZWR input, each record contains a complete set of
        reference and data information. The beginning values are not
        restricted, except to allow two records for the header.
-     o By default, LOAD starts at the beginning of the input file.
+     * By default, LOAD starts at the beginning of the input file.
 
 3 End
    End
@@ -1977,14 +1973,14 @@
 
    -FI[LL_FACTOR]=integer
 
-     o Reserves room and avoid unnecessary block split to accommodate the
+     * Reserves room and avoid unnecessary block split to accommodate the
        forecasted growth in a global variable that may experience significant
        rate of additions over a period.
-     o Users having database performance issues or a high rate of database
+     * Users having database performance issues or a high rate of database
        updates must examine the defined FILL_FACTORs. Unless the application
        only uses uniform records, which is not typical for most applications,
        FILL_FACTORs do not work precisely.
-     o By default, LOAD uses -FILL_FACTOR=100 for maximum data density.
+     * By default, LOAD uses -FILL_FACTOR=100 for maximum data density.
 
    **Note**
 
@@ -2001,9 +1997,9 @@
 
    -[O]NERROR={STOP|PROCEED|INTERACTIVE}
 
-     o STOP causes MUPIP LOAD to exit immediately.
-     o PROCEED proceeds to the next record.
-     o PROMPTS prompts to continue or stop.
+     * STOP causes MUPIP LOAD to exit immediately.
+     * PROCEED proceeds to the next record.
+     * PROMPTS prompts to continue or stop.
 
    By default MUPIP LOAD exits on encountering an error.
 
@@ -2040,10 +2036,11 @@
    output from the above command follows:
 
    GT.M MUPIP EXTRACT
-   02-MAR-2011  18:25:47 ZWR
+   02-MAR-2011 18:25:47 ZWR
    Beginning LOAD at record number: 5
-
-   LOAD TOTAL Key Cnt: 6  Max Subsc Len: 7  Max Data Len: 1
+   LOAD TOTAL Key Cnt: 6
+   Max Subsc Len: 7
+   Max Data Len: 1
    Last LOAD record number: 10
 
    Example:
@@ -2059,6 +2056,65 @@
    $mupip load -stdin < big.glo
 
    These commands loads the extract file big.glo using -stdin.
+
+2 RCTLDUMP
+   RCTLDUMP
+
+   Reports information related to relinkctl files and their associated shared
+   memory segments. The format of the MUPIP RCTLDUMP command is:
+
+   MUPIP RCTLDUMP [dir1]
+
+   If the optional parameter dir1 is not specified, MUPIP RCTLDUMP dumps
+   information on all its active auto-relink-enabled directories (those with
+   with a *-suffix) identified by $gtmroutines. With a directory path
+   specified for dir1, MUPIP RCTLDUMP reports information on the one
+   directory. An example output follows. It lists the full path of the Object
+   directory; its corresponding relinkctl file name; the number of routines
+   currently loaded in this relinkctl file; the number of processes including
+   the reporting MUPIP process that have this Relinkctl file open; the shared
+   memory id and length of the Relinkctl shared memory segment; one or more
+   Rtnobj shared memory segment(s); and a listing of all the routine names
+   loaded in this file (lines starting with rec#...).
+
+     o The Rtnobj shared memory line : All the length fields are displayed in
+       hexadecimal. shmlen is the length of the allocated shared memory
+       segment in bytes. shmused is the length that is currently used.
+       shmfree is the length available for use. objlen is the total length of
+       all the objects currently loaded in this shared memory. As GT.M
+       allocates blocks of memory with sizes rounded-up to an integer power
+       of two bytes, shmused is always greater than objlen; for example with
+       an objlen of 0x1c0, the shmused is 0x200.
+     o Lines of the form rec#... indicate the record # in the relinkctl file.
+       Each relinkctl file can store a maximum of 1,000,000 records, i.e.,
+       the maximum number of routines in a directory with auto-relink enabled
+       is one million. Each record stores a routine name (rtnname:), the
+       current cycle # for this object file record entry (cycle:) which gets
+       bumped on every ZLINK or ZRUPDATE command, the hash of the object file
+       last loaded for this routine name (objhash:), the # of different
+       versions of object files loaded in the Rtnobj shared memory segments
+       with this routine name (numvers:), the total byte-length of the one or
+       more versions of object files currently loaded with this routine name
+       (objlen:), the total length used up in shared memory for these object
+       files where GT.M allocates each object file a rounded-up perfect
+       2-power block of memory (shmlen:).
+
+   Given a relinkctl file name, one can find the corresponding directory path
+   using the Unix "strings" command on the Relinkctl file. For example,
+   "strings /tmp/gtm-relinkctl-f0938d18ab001a7ef09c2bfba946f002",
+   corresponding to the above MUPIP RCTLDUMP output example, would output
+   "/obj" the corresponding directory name.
+
+   Example:
+
+   $ mupip rctldump .
+   Object Directory         : /obj
+   Relinkctl filename       : /tmp/gtm-relinkctl-f0938d18ab001a7ef09c2bfba946f002
+   # of routines            : 1
+   # of attached processes  : 2
+   Relinkctl shared memory  : shmid: 11534344  shmlen: 0x57c6000
+   Rtnobj shared memory # 1 : shmid: 11567113  shmlen: 0x100000  shmused: 0x200  shmfree: 0xffe00  objlen: 0x1c0
+       rec#1: rtnname: abcd  cycle: 1  objhash: 0xedbfac8c7f7ca357  numvers: 1  objlen: 0x1c0  shmlen: 0x200
 
 2 REORG
    REORG
@@ -2140,11 +2196,8 @@
    This command produces an output like the following:
 
    Integ of region DEFAULT
-
    No errors detected by integ.
-
    Type           Blocks         Records          % Used      Adjacent
-
    Directory           2               2           2.490            NA
    Index              29            2528          95.999             1
    Data             2500           10000          82.811          2499
@@ -2159,7 +2212,6 @@
    At the GT.M prompt, execute the following command sequence:
 
    GTM>for i=1:2:10000 s ^x(i)=$justify(i,200)
-
    GTM>for i=2:2:10000 set ^x(i)=$justify(i,200)
 
    Then, execute the following command:
@@ -2169,11 +2221,8 @@
    This command produces an output like the following:
 
    Integ of region DEFAULT
-
    No errors detected by integ.
-
    Type           Blocks         Records          % Used      Adjacent
-
    Directory           2               2           2.490            NA
    Index             153            3902          29.211            57
    Data             3750           10000          55.856          1250
@@ -2500,6 +2549,7 @@
 
    -F[ile]
    -R[egion]=region-list
+   -RELinkctl [dir1]
 
    If the RUNDOWN command does not specify either -File or -Region, it checks
    all the IPC resources (shared memory) on the system and if they are
@@ -2514,6 +2564,24 @@
    first item in the list.
 
    Incompatible with: -REGION
+
+3 Relinkctl
+   Relinkctl
+
+   Cleans up orphaned Relinkctl files. FIS strongly recommends avoiding
+   actions that tend to make such cleanup necessary - for example, kill -9 of
+   GT.M processes or ipcrm -m of active Relinkctl and/or Rtnobj shared memory
+   segments.
+
+   If the optional dir1 is not specified, MUPIP RUNDOWN -RELINKCTL examines
+   the environment variable $gtmroutines, attempts to verify and correct
+   their attach counts and runs down all its inactive auto-relink-enabled
+   directories (those with with a *-suffix). Alternatively, one can specify a
+   directory path for the parameter dir1 and MUPIP RUNDOWN -RELINKCTL treats
+   it as an auto-relink-enabled directory and runs down the resources
+   associated with this one directory. It prints a RLNKCTLRNDWNSUC message on
+   a successful rundown and a RLNKCTLRNDWNFL message on a failure (usually
+   because live processes are still accessing the Relinkctl file).
 
 3 Region
    Region
@@ -2799,7 +2867,6 @@
    all regions.
 
    $ mupip set -version=V4 -file mumps.dat
-
    Database file mumps.dat now has desired DB format V4
 
    This example sets the block format to V4 for all subsequent new blocks in
@@ -2808,7 +2875,6 @@
    Example:
 
    $ mupip set -version=v6 -file mumps.dat
-
    Database file mumps.dat now has desired DB format V5
 
    This example sets the block format to V6 for all subsequent new blocks in
@@ -2999,8 +3065,8 @@
    Examines or loads trigger definitions. The format of the MUPIP TRIGGER
    command is:
 
-   TRIGGER {-TRIG[GERFILE]=<trigger_definitions_file> [-NOPR[OMPT]]|
-   [-SELE[CT][=name-list|*][<select-output-file>]}
+   TRIGGER {-TRIG[GERFILE]=<trigger_definitions_file>
+   [-NOPR[OMPT]]|[-SELE[CT][=name-list|*][<select-output-file>]|-UPGRADE}
 
    Before you run the MUPIP TRIGGER command:
 
@@ -3020,19 +3086,19 @@
 
    -TRIG[GERFILE]=<trigger_definitions_file> [-NOPR[OMPT]]
 
-     o
-     o A MUPIP TRIGGER -TRIGGERFILE operation occurs within a transaction
+     *
+     * A MUPIP TRIGGER -TRIGGERFILE operation occurs within a transaction
        boundary, therefore, if even one trigger from the trigger definition
        file fails to parse correctly, MUPIP TRIGGER rolls back the entire
        trigger definition file load. MUPIP TRIGGER operations have an
        implicit timeout of zero (0), meaning the read must succeed on the
        first try or the command will act as if it received no input.
-     o MUPIP TRIGGER -TRIGGERFILE ignores blank lines and extra whitespace
+     * MUPIP TRIGGER -TRIGGERFILE ignores blank lines and extra whitespace
        within lines. It treats lines with a semi-colon in the first position
        as comments and ignores their content.
-     o MUPIP TRIGGER compiles the XECUTE action string and rejects the load
+     * MUPIP TRIGGER compiles the XECUTE action string and rejects the load
        if the compilation has errors.
-     o Always specify the same value for the environment variable gtm_chset
+     * Always specify the same value for the environment variable gtm_chset
        during loading and executing triggers. If you specify different values
        of gtm_chset during loading and executing triggers, MUPIP TRIGGER
        generates a run-time error (TRIGINVCHSET). GT.M does not prevent a
@@ -3042,13 +3108,17 @@
        for all database updates, should be to ensure that you provide the
        same value for gtm_chset during load compilation and run-time
        compilation.
-     o MUPIP TRIGGER replicate trigger definitions as logical actions from an
+     * MUPIP TRIGGER replicate trigger definitions as logical actions from an
        originating/primary instance to a replicating/secondary instance based
        on LGTRIG journal records. This permits the instances to have
        different sets of triggers and differing database layouts (for
        example, different # of regions, different block sizes, different
        maximum-record-size, and so on).
-     o Incompatible with: -SELECT
+     * MUPIP TRIGGER limits trigger expression source lines to 80 characters
+       including a trailing ellipsis to indicate there was more text, and
+       they also replace any non-graphic characters with a dot (.)
+
+     * Incompatible with: -SELECT
 
    **Note**
 
@@ -3063,17 +3133,21 @@
    produces a list of the current triggers for a comma-separate list of
    global variables or trigger names. The format of the SELECT qualifier is:
 
-   -SELE[CT][=name-list[*]|*][ <select-output-file>]
+   -SELE[CT][=name-list*][ <select-output-file>]
 
-    1. Name-list can include global names, delimited with a leading caret
+     * Name-list can include global names, delimited with a leading caret
        (^), and/or trigger names (user-defined or auto-generated) with no
        leading caret. You can specify a trailing asterisk(*) with either.
-    2. With no arguments specified, GT.M treats -SELECT as -SELECT="*" and
+     * With no arguments specified, GT.M treats -SELECT as -SELECT="*" and
        extracts a list of all current triggers.
-    3. Optionally, you can specify a file name to redirect the output of the
+     * Optionally, you can specify a file name to redirect the output of the
        command. If you do not specify a file name, MUPIP TRIGGER prompts for
        a file name. If you respond with an empty string (RETURN), MUPIP
        TRIGGER directs the output to STDOUT.
+     * MUPIP TRIGGER -SELECT displays all output including errors on STDOUT.
+     * For Trigger definition reporting operations, $ZTRIGGER("SELECT") and
+       MUPIP TRIGGER -SELECT, return a non-zero exit status when their
+       selection criteria encounter an error in the middle of the select.
 
    **Note**
 
@@ -3093,6 +3167,28 @@
    case of trigger selection using trigger names where the number after the
    pound-sign (#) starts with a 0 (which is an impossible auto-generated
    trigger name).
+
+   UPGRADE
+
+   Upgrades older trigger definitions into current format.
+
+   The format of the UPGRADE qualifier is:
+
+   -UPGRADE
+
+   If GT.M encounters an old trigger definition it produces a NEEDTRIGUPGRD
+   message. To preserve the possibility of a straightforward downgrade to an
+   earlier version, perform a select "*" action with MUPIP TRIGGER (or
+   $ZTRIGGER() and save the result. Note that TRIGGER -UPGRADE assumes that
+   the existing trigger definitions are properly defined; if the prior
+   release has produced defective triggers delete them with a wild-card
+   ("*"), do the MUPIP TRIGGER -UPGRADE and redefine the triggers in the new
+   release. In the event of a downgrade, delete "*" all triggers before the
+   downgrade and insert the saved version from before the upgrade. Attempting
+   to perform a MUPIP TRIGGER -UPGRADE on a database without write
+   authorization to the database produces a TRIGMODREGNOTRW error. The
+   -UPGRADE qualifier is not compatible with any other MUPIP TRIGGER
+   qualifier.
 
 3 Examples
    Examples
@@ -3136,7 +3232,7 @@
        This command displays the triggers. A sample output looks like the
        following:
 
-       ;trigger name: ValidateAccount#  cycle: 1
+       ;trigger name: ValidateAccount# cycle: 1
        +^Acct("ID") -name=ValidateAccount -commands=S -xecute="Write ""Hello Earth!"""
 
    To modify an existing trigger for global node ^Acct("ID"):
@@ -3159,7 +3255,7 @@
     2. Specify trigger_mod.trg as the output file. This file contains entries
        like the following:
 
-       ;trigger name: ValidateAccount#  cycle: 1
+       ;trigger name: ValidateAccount# cycle: 1
        +^Acct("ID") -name=ValidateAccount -commands=S -xecute="Write ""Hello Earth!"""
 
     3. Using your editor, open trigger_mod.trg and change + (plus) to -
@@ -3169,8 +3265,10 @@
        new one in the same transaction (Atomic). The trigger_mod.trg file
        should have entries like:
 
-       ;trigger name: ValidateAccount#  cycle: 1-^Acct("ID") -name=ValidateAccount -commands=Set -xecute="Write ""Hello Earth!"""
-       ;trigger name: ValidateAccount#+^Acct("ID") -name=ValidateAccount -commands=Set -xecute="Write ""Hello Mars!"""
+       ;trigger name: ValidateAccount# cycle: 1
+       -^Acct("ID") -name=ValidateAccount -commands=Set -xecute="Write ""Hello Earth!"""
+       ;trigger name: ValidateAccount#
+       +^Acct("ID") -name=ValidateAccount -commands=Set -xecute="Write ""Hello Mars!"""
 
     4. Execute a command like the following:
 
@@ -3200,7 +3298,7 @@
     2. Specify trigger_delete.trg as the output file. This file contains
        entries like the following:
 
-       ;trigger name: ValidateAccount#  cycle: 3
+       ;trigger name: ValidateAccount# cycle: 3
        +^Acct("ID") -name=ValidateAccount -commands=S -xecute="Write ""Hello Mars!"""
 
     3. Using your editor, change + (plus) to - (minus) for the trigger
@@ -3240,7 +3338,7 @@
     3. Respond with an empty string (Press Enter). Confirm that the trigger
        summary report contains an entry like the following:
 
-       ;trigger name: ValidateAccount#  cycle: 3
+       ;trigger name: ValidateAccount# cycle: 3
        +^Acct("ID") -name=ValidateAccount -commands=S -xecute="Write ""Hello Mars!"""
 
     4. Now, execute a command like the following:
@@ -4098,7 +4196,7 @@
 
    To avoid broken transaction or lost transaction processing and instead
    extract all journal records into one file, use the control qualifier
-   -FENCES=NONE. FIS strongly recommended against using  -FENCES=NONE if
+   -FENCES=NONE. FIS strongly recommended against using -FENCES=NONE if
    -RECOVER/-ROLLBACK is also specified.
 
 4 RECover
@@ -4377,13 +4475,11 @@
        -------------------------------------------------------------------------------
        SHOW output for journal file /home/jdoe/.fis-gtm/V6.0-000_x86/g/gtm.mjl
        -------------------------------------------------------------------------------
-
        Journal file name       /home/jdoe/.fis-gtm/V6.0-000_x86/g/gtm.mjl
        Journal file label      GDSJNL23
        Database file name      /home/jdoe/.fis-gtm/V6.0-000_x86/g/gtm.dat
         Prev journal file name /home/jdoe/.fis-gtm/V6.0-000_x86/g/gtm.mjl_2012310190106
         Next journal file name
-
         Before-image journal                      ENABLED
         Journal file header size                    65536 [0x00010000]
         Virtual file size                            2048 [0x00000800] blocks
@@ -4411,15 +4507,11 @@
         Turn Around Point Time                          0
         Start Region Sequence Number                    1 [0x0000000000000001]
         End Region Sequence Number                      1 [0x0000000000000001]
-
        Process That Created the Journal File:
-
        PID        NODE        USER     TERM JPV_TIME
        ---------------------------------------------------------
        0000006706 jdoe-laptop jdoe    0    2012/11/06 17:30:33
-
        Process That First Opened the Journal File:
-
        PID        NODE        USER     TERM JPV_TIME
        ---------------------------------------------------------
        0000006706 jdoe-laptop jdoe    0    2012/11/06 17:30:33
@@ -4438,7 +4530,6 @@
        -------------------------------------------------------------------------------
        SHOW output for journal file /home/jdoe/.fis-gtm/V6.0-000_x86/g/gtm.mjl
        -------------------------------------------------------------------------------
-
        Record type    Count
        ----------------------
           *BAD*          0
@@ -4473,7 +4564,6 @@
           TZTRI          0
           UZTRI          0
           TRUNC          0
-
        %GTM-S-JNLSUCCESS, Show successful
        %GTM-S-JNLSUCCESS, Verify successful
        %GTM-I-MUJNLSTAT, End processing at Tue Nov  6 17:42:21 2012
@@ -4482,7 +4572,6 @@
    stored in the journal file header (the output is one long line).
 
    $ mupip journal -show -backward mumps.mjl 2>&1 | grep hash
-
    Journal file hash F226703EC502E975784
    8EEC733E1C3CABE5AC146C60F922D0E7D7CB5E
    2A37ABA005CE98D908B219249A0464F5BB622B72F5FDA
@@ -5667,6 +5756,7 @@
     <soft tries period>, <alert time>, <heartbeat period>,
     <max heartbeat wait>]
     -instsecondary=<replicating instance name>
+    [-[no]jnlf[ileonly]]
     -log=<log file name> [-log_interval=<integer>]
     {-rootprimary|-propagateprimary} [{-updok|-updnotok}]
     [-cmplvl=<compression level>]
@@ -5879,6 +5969,16 @@
 
    This command starts the Source Server for the originating instance with
    instance B as its replicating instance.
+
+   -[no]jnlfileonly
+
+   Forces the Source Server to read transactions from journal files instead
+   of journal pool shared memory. When combined with the SYNC_IO journal
+   option, this feature delays replication of transactions until their
+   journal records are hardened to disk. This may be useful when replicating
+   to a supplementary instance, as a crash and rollback on the primary could
+   otherwise necessitate a rollback of local updates on the receiving
+   instance. The default is -NOJNLFILEONLY.
 
    -rootprimary
 
@@ -6137,9 +6237,10 @@
 
    -timeout=<timeout in seconds>
 
-   Specifies the time (in seconds) the Source Server should wait before
-   shutting down. If you do not specify -timeout, the default timeout period
-   is 120 seconds. If you specify -timeout=0 , shutdown occurs immediately.
+   Specifies the time (in seconds) the shutdown command should wait before
+   signaling the Source Server to shut down. If you do not specify -timeout,
+   the default timeout period is 120 seconds. If you specify -timeout=0 ,
+   shutdown occurs immediately.
 
 2 Activate_Passive_Source_Server
    Activate Passive Source Server
@@ -6283,13 +6384,10 @@
    Example:
 
    $ mupip replic -source -checkhealth -inst=INSTB
-
    Fri May 21 15:26:18 2010 : Initiating CHECKHEALTH operation on source server pid [15511] for secondary
    instance name [INSTB]
    PID 15511 Source server is alive in ACTIVE mode
-
    $ mupip replic -source -checkhealth -inst=INSTB
-
    Fri May 21 15:29:52 2010 : Initiating CHECKHEALTH operation on source server pid [0] for secondary
    instance name [INSTB]
    PID 0 Source server is NOT alive
@@ -7314,15 +7412,16 @@
 
    Copyright 2014
 
-   Fidelity Information Services, Inc. All rights reserved.
+   Fidelity National Information Services, Inc. and/or its subsidiaries. All
+   rights reserved.
 
    Permission is granted to copy, distribute and/or modify this document
    under the terms of the GNU Free Documentation License, Version 1.3 or any
    later version published by the Free Software Foundation; with no Invariant
    Sections, no Front-Cover Texts and no Back-Cover Texts.
 
-   GT.M(TM) is a trademark of Fidelity Information Services, Inc. Other
-   trademarks are the property of their respective owners.
+   GT.M(TM) is a trademark of Fidelity National Information Services, Inc.
+   Other trademarks are the property of their respective owners.
 
    This document contains a description of GT.M and the operating
    instructions pertaining to the various functions that comprise the system.
@@ -7333,7 +7432,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.2-000 of the
+   This help file is a concise representation of revision V6.2-001 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

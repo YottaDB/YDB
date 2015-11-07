@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,9 +48,10 @@ void util_log_open(char *filename, uint4 len);
 void util_out_write(unsigned char *addr, unsigned int len);
 #else /* UNIX */
 #include "gtm_stdio.h"		/* for FILE * */
-void util_in_open(void *);
-char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leading_spaces);
-void util_out_print_gtmio(caddr_t message, int flush, ...);
+void		util_in_open(void *);
+char		*util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leading_spaces);
+void		util_out_print_gtmio(caddr_t message, int flush, ...);
+boolean_t	util_out_save(char *dst, int *dstlen_ptr);
 #ifdef DEBUG
 void		util_out_syslog_dump(void);
 
@@ -75,7 +76,7 @@ void		util_out_syslog_dump(void);
 		(TREF(util_outbuff_ptr)) += OUT_BUFF_SIZE;				\
 		VAR_COPY(VA_LIST_SAVE_PTR, TREF(last_va_list_ptr));			\
 		UTIL_OUT_SAVE_PTR = TREF(util_outptr);					\
-		TREF(util_outptr) = NULL;						\
+		TREF(util_outptr) = TREF(util_outbuff_ptr);				\
 		COPY_SAVED = TRUE;							\
 	} else										\
 		assert(FALSE);								\
@@ -105,6 +106,20 @@ void		util_out_syslog_dump(void);
 #define SPRINT		5
 #define HEX8		8
 #define HEX16		16
+
+#define	TP_ZTRIGBUFF_PRINT				\
+{							\
+	DCL_THREADGBL_ACCESS;				\
+							\
+	SETUP_THREADGBL_ACCESS;				\
+	if (TREF(ztrigbuffLen))				\
+	{						\
+		tp_ztrigbuff_print();			\
+		TREF(ztrigbuffLen) = 0;			\
+	}						\
+}
+
+void tp_ztrigbuff_print(void);
 
 void util_exit_handler(void);
 void util_out_close(void);

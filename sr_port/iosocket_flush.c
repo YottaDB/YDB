@@ -29,13 +29,14 @@ error_def(ERR_SOCKPASSDATAMIX);
 error_def(ERR_SOCKWRITE);
 error_def(ERR_TEXT);
 
+GBLREF	io_pair	io_std_device;
+
 void iosocket_flush(io_desc *iod)
 {
-#ifdef C9A06001531
-	/* pending change request C9A06001531 */
 
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
+	ssize_t		status;
 	int             on = 1, off = 0;
         char            *errptr;
         int4            errlen;
@@ -61,6 +62,25 @@ void iosocket_flush(io_desc *iod)
 		return;
 	}
 	ENSURE_DATA_SOCKET(socketptr);
+	if (socketptr->obuffer_timer_set)
+	{
+		cancel_timer((TID)socketptr);
+		socketptr->obuffer_timer_set = FALSE;
+	}
+	if (!socketptr->obuffer_output_active)
+	{	/* just to be safe */
+		status = 1;			/* OK value */
+		if ((0 < socketptr->obuffer_length) && (0 == socketptr->obuffer_errno))
+		{
+			socketptr->obuffer_output_active = TRUE;
+			status = iosocket_output_buffer(socketptr);
+			socketptr->obuffer_output_active = FALSE;
+		}
+		if ((0 < socketptr->obuffer_size) && ((0 >= status) || (0 != socketptr->obuffer_errno)))
+			iosocket_buffer_error(socketptr);	/* pre-existing error or error flushing buffer */
+	}
+#ifdef C9A06001531
+	/* pending change request C9A06001531 */
         memcpy(iod->dollar.device, "0", SIZEOF("0"));
         if ( -1 == setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &on, SIZEOF(on)) ||
 		(-1 == setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &off, SIZEOF(off))))

@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,8 +81,6 @@ error_def(ERR_NOSELECT);
 error_def(ERR_NOEXCLUDE);
 error_def(ERR_REORGCTRLY);
 error_def(ERR_REORGINC);
-
-GTMTRIG_ONLY(LITREF mval		literal_hasht;)
 
 GBLREF bool		mu_ctrlc_occurred;
 GBLREF bool		mu_ctrly_occurred;
@@ -297,19 +295,19 @@ void mupip_reorg(void)
 					if (truncate)
 					{	/* Reorg ^#t in this region to move it out of the way. */
 						SET_GVTARGET_TO_HASHT_GBL(cs_addrs);	/* sets gv_target */
+						inctn_opcode = inctn_invalid_op;	/* needed for INITIAL_HASHT_ROOT_SEARCH */
+						INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;	/* sets gv_target->root */
+						DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 						hasht_gl.next = NULL;
 						hasht_gl.reg = gv_cur_region;
 						hasht_gl.gvt = gv_target;
-						inctn_opcode = inctn_invalid_op;	/* needed for *ROOT_SEARCH */
-						INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;	/* sets gv_target->root */
-						DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 						if (0 != gv_target->root)
 						{
 							util_out_print("   ", FLUSH);
 							util_out_print("Global: !AD (region !AD)", FLUSH,
 								GNAME(&hasht_gl).len, GNAME(&hasht_gl).addr,
 								REG_LEN_STR(gv_cur_region));
-							reorg_gv_target->gvname.var_name = literal_hasht.str;
+							reorg_gv_target->gvname.var_name = gv_target->gvname.var_name;
 							cur_success = mu_reorg(&hasht_gl, &exclude_gl_head, &resume,
 										index_fill_factor, data_fill_factor, reorg_op);
 							reorg_success &= cur_success;

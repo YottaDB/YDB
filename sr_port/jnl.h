@@ -54,8 +54,8 @@ error_def(ERR_JNLENDIANLITTLE);
  * 		which needs to change to say IF_curTO17 if the earliest supported version changes to V17 or so).
  *
  */
-#define JNL_LABEL_TEXT		"GDSJNL24"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		24
+#define JNL_LABEL_TEXT		"GDSJNL25"	/* see above comment paragraph for todos whenever this is changed */
+#define JNL_VER_THIS		25
 #define JNL_VER_EARLIEST_REPL	17		/* Replication filter support starts here GDSJNL17 = GT.M V5.1-000.
 						 * (even though it should be V5.0-000, since that is pre-multisite,
 						 * the replication connection with V55000 will error out at handshake
@@ -67,11 +67,11 @@ error_def(ERR_JNLENDIANLITTLE);
 						 */
 #define JRT_MAX_V19		JRT_UZTWORM	/* Max jnlrec type in GDSJNL19/GDSJNL20 that can be input to replication filter */
 #define JRT_MAX_V21		JRT_UZTRIG	/* Max jnlrec type in GDSJNL21 that can be input to replication filter */
-#define JRT_MAX_V23		JRT_UZTRIG	/* Max jnlrec type in GDSJNL22/GDSJNL23 that can be input to replication filter.
+#define JRT_MAX_V22		JRT_UZTRIG	/* Max jnlrec type in GDSJNL22/GDSJNL23 that can be input to replication filter.
 						 * Actually JRT_HISTREC is a higher record type than JRT_UZTRIG but it is only
 						 * sent through the replication pipe and never seen by filter routines.
 						 */
-#define JRT_MAX_V24		JRT_ULGTRIG	/* Max jnlrec type in GDSJNL22/GDSJNL23 that can be input to replication filter */
+#define JRT_MAX_V24		JRT_ULGTRIG	/* Max jnlrec type in GDSJNL24/GDSJNL25 that can be input to replication filter */
 
 #ifdef UNIX
 #  define JNL_ALLOC_DEF		2048
@@ -297,40 +297,30 @@ error_def(ERR_JNLENDIANLITTLE);
 
 #define	CHECK_JNL_FILE_IS_USABLE(JFH, STATUS, DO_GTMPUTMSG, JNL_FN_LEN, JNL_FN)				\
 {													\
-	boolean_t	check_failed = FALSE;								\
-	uint4		lcl_status;									\
-													\
 	assert(JNL_HDR_ENDIAN_OFFSET == OFFSETOF(jnl_file_header, is_little_endian));			\
 	if (0 != MEMCMP_LIT((JFH)->label, JNL_LABEL_TEXT))						\
 	{												\
-		lcl_status = ERR_JNLBADLABEL;								\
-		check_failed = TRUE;									\
+		STATUS = ERR_JNLBADLABEL;								\
+		if (DO_GTMPUTMSG)									\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) STATUS, 6, JNL_FN_LEN, JNL_FN,	\
+				LEN_AND_LIT(JNL_LABEL_TEXT), SIZEOF((JFH)->label), (JFH)->label);	\
 	}												\
 	BIGENDIAN_ONLY(											\
 	else if ((JFH)->is_little_endian)								\
 	{												\
-		lcl_status = ERR_JNLENDIANLITTLE;							\
-		check_failed = TRUE;									\
+		STATUS = ERR_JNLENDIANLITTLE;								\
+		if (DO_GTMPUTMSG)									\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) STATUS, 2, JNL_FN_LEN, JNL_FN);	\
 	}												\
 	)												\
 	LITTLEENDIAN_ONLY(										\
 	else if (!(JFH)->is_little_endian)								\
 	{												\
-		lcl_status = ERR_JNLENDIANBIG;								\
-		check_failed = TRUE;									\
+		STATUS = ERR_JNLENDIANBIG;								\
+		if (DO_GTMPUTMSG)									\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) STATUS, 2, JNL_FN_LEN, JNL_FN);	\
 	}												\
 	)												\
-	/* Currently, we can do one gtm_putmsg for any of the above 3 error messages			\
-	 * because all of them have a fao count of 2 and expect jnl_fn_len and jnl_fn			\
-	 * as arguments. If a new error gets added and has a different fao format,			\
-	 * then the below gtm_putmsg has to be done differently based on that error.			\
-	 */												\
-	if (check_failed)										\
-	{												\
-		STATUS = lcl_status;									\
-		if (DO_GTMPUTMSG)									\
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) lcl_status, 2, JNL_FN_LEN, JNL_FN);	\
-	}												\
 }
 
 /* Token generation used in non-replicated journaled environment. Note the assumption here

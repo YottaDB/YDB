@@ -35,9 +35,12 @@
 # include "gdsbt.h"
 # include "gdsfhead.h"
 # include "gv_trigger.h"
+# include "gtm_trigger.h"
 # include "cdb_sc.h"
 # include "t_retry.h"
 # include "trigger_source_read_andor_verify.h"
+# include "gtm_trigger_trc.h"
+# include "zr_unlink_rtn.h"
 #endif
 #include "stack_frame.h"
 #include "rtn_src_chksum.h"
@@ -59,14 +62,14 @@ LITDEF mval		literal_null;
 error_def(ERR_TXTSRCFMT);
 error_def(ERR_SYSCALL);
 
-int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_t verifytrig)
+int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp **rtn_vec)
 {
 	int			srcrecs, *lt_ptr, size, line_indx, srcfilnamlen;
 	boolean_t		found, added, eof_seen, srcstat;
 	mstr			src;
 	rhdtyp			*rtn_vector;
 	zro_ent			*srcdir;
-	mstr			*base, *current, *top;
+	mstr			*base, *current, *top, tmprtnname;
 	char			buff[MAX_SRCLINE], *cptr, *srcfile_name;
 	char			srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM)];
 	routine_source		*src_tbl;
@@ -95,6 +98,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 	 * Determine which source we need.
 	 */
 	GTMTRIG_ONLY(IS_TRIGGER_RTN(&routine->str, is_trigger));
+	DBGIFTRIGR((stderr, "get_src_line: entered $tlevel=%d and $t_tries=%d\n", dollar_tlevel, t_tries));
 	if (WANT_CURRENT_RTN(routine))
 	{	/* we want $TEXT for the routine currently executing. */
 		rtn_vector = CURRENT_RHEAD_ADR(frame_pointer->rvector);
@@ -103,21 +107,30 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 	if (is_trigger)
 	{	/* Need source on a trigger. Get trigger source loaded and/or verified which may involve
 		 * creating a TP fence and dealing with TP restarts.
-		 * ZPRINT wants a consistent view of triggers across multiple calls so it bypasses verification
-		 * after the first call. In this case, the trigger had better be found since the first call found it.
 		 */
-		if (verifytrig)
+		/* trigger_source_read_andor_verify may alter the length part of the mstr to remove the +BREG
+		 * region-name specification (the string component is unmodified). Pass in a copy of the mstr struct to
+		 * avoid modification to routine->str as it affects the caller which relies on this variable being
+		 * untouched.
+		 */
+		tmprtnname = routine->str;
+		DEBUG_ONLY(rtn_vector = NULL;)
+		DBGTRIGR((stderr, "get_src_line: fetch source for %s\n", tmprtnname.addr));
+		rc = trigger_source_read_andor_verify(&tmprtnname, TRIGGER_SRC_LOAD, &rtn_vector);
+		if (0 != rc)
 		{
-			rc = trigger_source_read_andor_verify(&routine->str, TRIGGER_SRC_LOAD);
-			if (0 != rc)
-				return SRCNOTAVAIL;
+			if (NULL != rtn_vec)
+				*rtn_vec = NULL;
+			return SRCNOTAVAIL;
 		}
-		rtn_vector = find_rtn_hdr(&routine->str);	/* Trigger routine should be loaded now */
 		if (NULL == rtn_vector)
 		{
-			assert(verifytrig);			/* Noverify trig should always be found */
-			return SRCNOTAVAIL;			/* Could happen if trigger name got modified or uniqueified */
+			if (NULL != rtn_vec)
+				*rtn_vec = NULL;
+			return OBJMODMISS;
 		}
+		DBGTRIGR((stderr, "get_src_line: source found @0x%lx(%d)\n", rtn_vector->trigr_handle,
+					((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len));
 	} else
 #	endif
 	{
@@ -126,13 +139,20 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 			op_zlink(routine, NULL);
 			rtn_vector = find_rtn_hdr(&routine->str);
 			if (NULL == rtn_vector)
+			{
+				if (NULL != rtn_vec)
+					*rtn_vec = NULL;
 				return OBJMODMISS;
+			}
 		}
-		USHBIN_ONLY(rtn_vector = op_rhd_ext(routine, (mval *)&literal_null, rtn_vector, NULL));
+		ARLINK_ONLY(rtn_vector = op_rhd_ext(routine, (mval *)&literal_null, rtn_vector, NULL));
 	}
+	if (NULL != rtn_vec)
+		*rtn_vec = rtn_vector;
 	if (!rtn_vector->src_full_name.len)
 		return SRCNOTAVAIL;
 	src_tbl = rtn_vector->source_code;
+	DBGIFTRIGR((stderr, "get_src_line: routine has source_code 0x%lx (%d)\n", src_tbl, (src_tbl)? src_tbl->srcrecs : 0));
 	if (NULL == src_tbl)
 	{
 #		ifdef GTM_TRIGGER
@@ -142,6 +162,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 			srcsize = ((gv_trigger_t *)rtn_vector->trigr_handle)->xecute_str.str.len;
 			assert(0 < srcsize);
 			assert(NULL != srcstart);
+			DBGTRIGR((stderr, "get_src_line: source is %d bytes\n%s\n", srcsize, srcstart));
 			/* Calculate source checksum */
 			if (NULL == memchr(srcstart, '\n', srcsize))
 			{	/* In this case, gtm_trigger_complink() would have written an extra newline character to the
@@ -186,12 +207,13 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 				srcstart = srcptr;
 			}
 			if (!rtn_src_chksum_match(get_ctx_checksum(&checksum_ctx), get_rtnhdr_checksum(rtn_vector)))
-			{	/* Should never happen with a trigger unless it ran into some restartable concurrency
-				 * issues. Assert we can restart and do it.
+			{	/* Should never happen inside TP with a trigger unless it ran into some restartable
+				 * concurrency issues. Assert we can restart and do it.
 				 */
-				assertpro(0 < dollar_tlevel);
-				assert(CDB_STAGNATE > t_tries);
-				t_retry(cdb_sc_triggermod);
+				DBGTRIGR((stderr, "get_src_line: rtn_src_chksum_match failed dumping trigger structure\n"));
+				assert(NULL != rtn_vector->trigr_handle);
+				if (0 < dollar_tlevel)
+					t_retry(cdb_sc_triggermod);
 			}
 		} else
 #		endif
@@ -202,6 +224,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 		rtn_vector->source_code = src_tbl;
 	} else
 		srcstat |= src_tbl->srcstat;
+	DBGIFTRIGR((stderr, " get_src_line: $tlevel %d\t", dollar_tlevel));
 	lt_ptr = (int *)find_line_addr(rtn_vector, &label->str, 0, NULL);
 	if (!lt_ptr)
 		srcstat |= LABELNOTFOUND;
@@ -209,6 +232,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 	{
 		line_indx = (int)(lt_ptr - (int *)LNRTAB_ADR(rtn_vector));
 		line_indx += offset;
+		DBGIFTRIGR((stderr, "get_src_line: line_indx %d\n", line_indx));
 		if (line_indx == 0)
 			srcstat |= ZEROLINE;
 		else if (line_indx < 0)
@@ -221,6 +245,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 			/* DBGFPF((stderr, "get_src_line: returning string %.*s\n", (*srcret)->len, (*srcret)->addr)); */
 		}
 	}
+	DBGIFTRIGR((stderr, "get_src_line: exiting with srcstat %d\n", srcstat));
 	return srcstat;
 }
 
@@ -308,7 +333,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	srcstat = 0;
 	srcfile_name = malloc(rtn_vector->src_full_name.len + 1);
 	memcpy(srcfile_name, rtn_vector->src_full_name.addr, rtn_vector->src_full_name.len);
-	*(srcfile_name + rtn_vector->src_full_name.len) = 0;	/* ensure string is null terminated */
+	*(srcfile_name + rtn_vector->src_full_name.len) = '\0';	/* Ensure string is null terminated */
 	/* At this point, it is not clear if Fopen will handle zos tagging correctly in all cases.
 	 * especially when tagged with other than ISO8859-1 or IBM-1047. When we resurrect the zOS
 	 * platform, we need to test this out.
@@ -325,7 +350,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 		MEMCPY_LIT(&srcnamebuf[srcfilnamlen], DOTM);
 		src.addr = srcnamebuf;
 		src.len = INTCAST(srcfilnamlen + STR_LIT_LEN(DOTM));
-		zro_search (0, 0, &src, &srcdir, TRUE);
+		zro_search(NULL, NULL, &src, &srcdir, TRUE);
 		if (srcdir)
 		{
 			srcfile_name = malloc(src.len + srcdir->str.len + 2);

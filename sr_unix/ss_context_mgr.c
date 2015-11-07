@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,9 @@
 #include "gtm_stdlib.h"
 #include "gtm_tempnam.h"
 #include "gtm_time.h"
+#ifdef DEBUG
+#include "gtm_ipc.h"
+#endif
 
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -64,6 +67,8 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	uint4			process_id;
 
+error_def(ERR_SYSCALL);
+
 boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 {
 	shm_snapshot_ptr_t		ss_shm_ptr;
@@ -73,7 +78,6 @@ boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 	void				*ss_shmaddr;
 	ZOS_ONLY(int			realfiletag;)
 
-	error_def(ERR_SYSCALL);
 	ZOS_ONLY(error_def(ERR_BADTAG);)
 	ZOS_ONLY(error_def(ERR_TEXT);)
 
@@ -107,7 +111,7 @@ boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 			/* It's possible that by the time we attach to the shared memory, the identifier has been removed from the
 			 * system by INTEG which completed it's processing.
 			 */
-			assert((EIDRM == status) || (EINVAL == status));
+			assert(SHM_REMOVED(status));
 			assert(INVALID_SHMID == lcl_ss_ctx->attach_shmid);
 			lcl_ss_ctx->cur_state = SNAPSHOT_SHM_ATTACH_FAIL;
 			lcl_ss_ctx->failure_errno = status;
@@ -135,7 +139,7 @@ boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 		{
 			status = errno;
 			assert(FALSE);
-			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmdt"), CALLFROM, status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmdt"), CALLFROM, status);
 		}
 		lcl_ss_ctx->attach_shmid = lcl_ss_ctx->nl_shmid = INVALID_SHMID; /* reset shmid since we failed */
 		lcl_ss_ctx->cur_state = SHADOW_FIL_OPEN_FAIL;
@@ -154,8 +158,6 @@ boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 {
 	int				status;
 
-	error_def(ERR_SYSCALL);
-
 	assert(NULL != lcl_ss_ctx);
 	if (FD_INVALID != lcl_ss_ctx->shdw_fd)
 	{
@@ -167,7 +169,7 @@ boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 		{
 			status = errno;
 			assert(FALSE);
-			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmdt"), CALLFROM, status);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmdt"), CALLFROM, status);
 		}
 	}
 	/* Invalidate the context */

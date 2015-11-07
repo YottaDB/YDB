@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 #define MAX_PRCNAM_LEN		15
 #define MAX_STDIOE_LEN		1024
 #define MAX_JOBPARM_LEN		1024
+
 #define TIMEOUT_ERROR		(MAX_SYSERR + 1)	/* a special value to differentiate it from the rest of errno's */
 
 #define CHILD_FLAG_ENV		"gtmj0"
@@ -106,6 +107,7 @@ typedef	struct
 	job_parm	*parms;
 	size_t		input_prebuffer_size;
 	char		*input_prebuffer;
+	boolean_t	passcurlvn;
 } job_params_type;
 
 typedef enum
@@ -126,7 +128,9 @@ typedef enum
 	job_done,			/* last message */
 	job_set_params,			/* followed by a job_params_msg message */
 	job_set_parm_list,		/* followed by a job_arg_count_msg and "arg_count" job_arg_msg messages */
-	job_set_input_buffer		/* followed by a job_buffer_size_msg and a data message of "buffer_size" */
+	job_set_input_buffer,		/* followed by a job_buffer_size_msg and a data message of "buffer_size" */
+	job_set_locals,			/* followed by local_variable */
+	local_trans_done		/* Indicates all of the locals have been sent to the grandchild */
 } job_setup_op;
 
 typedef struct
@@ -166,5 +170,5 @@ int ojstartchild(job_params_type *jparms, int argcnt, boolean_t *non_exit_return
 void ojparams(char *p, job_params_type *job_params);
 void ojgetch_env(job_params_type *jparms);
 void ojchildioclean(void);
-
+void ojmidchild_send_var(void);
 #endif

@@ -29,6 +29,7 @@
 
 GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
+LITREF	mval		skiparg;
 
 error_def(ERR_EXPR);
 error_def(ERR_INVCTLMNE);
@@ -46,6 +47,9 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 	int		length, n, timeout;
 	pid_t		pid;
 	mval		*arg, *handlesvar = NULL;
+#ifdef	GTM_TLS
+	mval		*option, *tlsid, *password, *extraarg;
+#endif
 
 	if (0 == mn->len)
 		return;
@@ -59,9 +63,9 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		else
 		{
 			arg = va_arg(args, mval *);
-			if ((NULL == arg) || !MV_DEFINED(arg))
+			if ((NULL == arg) || M_ARG_SKIPPED(arg) || !MV_DEFINED(arg))
 			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_EXPR, 0);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
 				return;
 			}
 			depth = MV_FORCE_INTD(arg);
@@ -74,12 +78,13 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		else
 		{
 			arg = va_arg(args, mval *);
-			if ((NULL == arg) || !MV_DEFINED(arg))
+			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
+				timeout = MV_FORCE_INTD(arg);
+			else
 			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_EXPR, 0);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
 				return;
 			}
-			timeout = MV_FORCE_INTD(arg);
 		}
 		iosocket_wait(io_curr_device.in, timeout);
 #	ifndef VMS
@@ -90,48 +95,110 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		{
 			arg = va_arg(args, mval *);
 			n--;
-			if ((NULL != arg) && MV_DEFINED(arg))
+			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
 				pid = MV_FORCE_INTD(arg);
 			else
 				pid = -1;
-		}
+		} else
+			pid = -1;
 		if (2 <= argcnt)
 		{
 			arg = va_arg(args, mval *);
 			n--;
-			if ((NULL != arg) && MV_DEFINED(arg))
+			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
 				timeout = MV_FORCE_INTD(arg);
 			else
 				timeout = NO_M_TIMEOUT;
-		}
+		} else
+			timeout = NO_M_TIMEOUT;
 		iosocket_pass_local(io_curr_device.out, pid, timeout, n, args);
 	} else if (0 == memcmp(action, "ACCEPT", length))
 	{
 		n = argcnt;
 		if (1 <= argcnt)
 		{
-			handlesvar = va_arg(args, mval *);
+			arg = va_arg(args, mval *);
 			n--;
+			if ((NULL != arg) && !M_ARG_SKIPPED(arg))
+				handlesvar = arg;
 		}
 		if (2 <= argcnt)
 		{
 			arg = va_arg(args, mval *);
 			n--;
-			if ((NULL != arg) && MV_DEFINED(arg))
+			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
 				pid = MV_FORCE_INTD(arg);
 			else
 				pid = -1;
-		}
+		} else
+			pid = -1;
 		if (3 <= argcnt)
 		{
 			arg = va_arg(args, mval *);
 			n--;
-			if ((NULL != arg) && MV_DEFINED(arg))
+			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
 				timeout = MV_FORCE_INTD(arg);
 			else
 				timeout = NO_M_TIMEOUT;
-		}
+		} else
+			timeout = NO_M_TIMEOUT;
 		iosocket_accept_local(io_curr_device.in, handlesvar, pid, timeout, n, args);
+#ifdef	GTM_TLS
+	} else if (0 == memcmp(action, "TLS", length))
+	{	/*	WRITE /TLS(option[,[timeout][,tlsid[,password]]]) */
+		if (1 <= argcnt)
+		{
+			option = va_arg(args, mval *);
+			if ((NULL != option) && !M_ARG_SKIPPED(option) && MV_DEFINED(option))
+				MV_FORCE_STRD(option);
+			else
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
+				return;
+			}
+		} else
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
+			return;
+		}
+		if (2 <= argcnt)
+		{
+			arg = va_arg(args, mval *);
+			if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
+				timeout = MV_FORCE_INTD(arg);
+			else
+				timeout = NO_M_TIMEOUT;
+		} else
+			timeout = NO_M_TIMEOUT;
+		if (3 <= argcnt)
+		{
+			tlsid = va_arg(args, mval *);
+			if ((NULL != tlsid) && !M_ARG_SKIPPED(tlsid) && MV_DEFINED(tlsid))
+				MV_FORCE_STRD(tlsid);
+			else
+				tlsid = NULL;
+		} else
+			tlsid = NULL;
+		if ((4 <= argcnt) && (NULL != tlsid))
+		{	/* password only valid if tlsid provided */
+			password = va_arg(args, mval *);
+			if ((NULL != password) && !M_ARG_SKIPPED(password) && MV_DEFINED(password))
+				MV_FORCE_STRD(password);
+			else
+				password = NULL;
+		} else
+			password = NULL;
+		if (5 <= argcnt)
+		{
+			extraarg = va_arg(args, mval *);
+			if ((NULL != extraarg) && !M_ARG_SKIPPED(extraarg) && MV_DEFINED(extraarg))
+				MV_FORCE_STRD(extraarg);
+			else
+				extraarg = NULL;
+		} else
+			extraarg = NULL;
+		iosocket_tls(option, timeout, tlsid, password, extraarg);
+#	endif
 #	endif
 	} else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVCTLMNE);

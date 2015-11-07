@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,14 +32,16 @@
 #include "updproc_get_gblname.h"
 #include "min_max.h"
 #include "hashtab_mname.h"
+#include "toktyp.h"		/* Needed for "valid_mname.h" */
+#include "valid_mname.h"
 
 /* This routine validates the key from journal record copying to memory pointed updproc_get_gblname
  * "gvname" is an mname_entry pointing to the global name (to be used for gv_bind_name) is set here.
  */
 enum upd_bad_trans_type updproc_get_gblname(char *src_ptr, int key_len, char *gv_mname, mname_entry *gvname)
 {
-	char			*dest_ptr;
-	int			cplen;
+	char		*dest_ptr;
+	int		cplen;
 
 	cplen = MIN(MAX_MIDENT_LEN + 1, key_len);	/* +1 to consider null */
 	dest_ptr = (char *)gv_mname;
@@ -53,6 +55,11 @@ enum upd_bad_trans_type updproc_get_gblname(char *src_ptr, int key_len, char *gv
 		return upd_bad_mname_size;
 	gvname->var_name.addr = (char *)gv_mname;
 	gvname->var_name.len = INTCAST(dest_ptr - 1 - (char *)gv_mname);
+	/* We have already checked for global name length. Now check for global name contents */
+	if (!valid_mname(&gvname->var_name))
+		return upd_bad_mname_size;	/* caller currently only cares good or bad so overload existing error
+						 * even if not entirely accurate.
+						 */
 	COMPUTE_HASH_MNAME(gvname);
 	return upd_good_record;
 }

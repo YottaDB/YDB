@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@
 #include "gtmio.h"
 #include "mmemory.h"
 #include "obj_file.h"
+#include "mmrhash.h"
 
 GBLREF char		object_file_name[];
 GBLREF short		object_name_len;
@@ -51,24 +52,27 @@ static char			emit_buff[OBJ_EMIT_BUF_SIZE];	/* buffer for emit output */
 static int			emit_buff_used;			/* number of chars in emit_buff */
 static int			symcnt;
 static struct rel_table		*link_rel, *link_rel_end;	/* Linkage relocation entries.  */
-static struct linkage_entry	*linkage_first, *linkage_last;
-static struct sym_table		*symbols;
 
-void	emit_link_reference(int4 refoffset, mstr *name);
+static int tmpcnt;
 
-void	drop_object_file(void)
+error_def(ERR_OBJFILERR);
+error_def(ERR_STRINGOFLOW);
+
+STATICFNDCL void emit_link_reference(int4 refoffset, mstr *name);
+
+/* Routine to clear/delete the existing object file (used to delete existing temporary object file name
+ * on an error.
+ */
+void drop_object_file(void)
 {
 	int	rc;
 
         if (0 < object_file_des)
         {
 		UNLINK(object_file_name);
-		CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
+		CLOSE_OBJECT_FILE(object_file_des, rc);		/* Resets "object_file_des" to FD_INVALID */
         }
 }
-
-error_def(ERR_OBJFILERR);
-error_def(ERR_STRINGOFLOW);
 
 /*
  *	emit_link_reference
@@ -76,7 +80,7 @@ error_def(ERR_STRINGOFLOW);
  *	Description: If not already defined, create relocation entry for
  *                   a linkage table entry to be resolved later.
  */
-void	emit_link_reference(int4 refoffset, mstr *name)
+STATICFNDEF void emit_link_reference(int4 refoffset, mstr *name)
 {
 	struct sym_table	*sym;
 	struct rel_table	*newrel;
@@ -86,7 +90,7 @@ void	emit_link_reference(int4 refoffset, mstr *name)
 	if ((N_TEXT | N_EXT) != sym->n.n_type)
 	{
 		newrel = (struct rel_table *)mcalloc(SIZEOF(struct rel_table));
-		newrel->next = (struct rel_table *)0;
+		newrel->next = NULL;
 		newrel->resolve = 0;
 		newrel->r.r_address = refoffset;
 		newrel->r.r_symbolnum = 0;
@@ -101,16 +105,17 @@ void	emit_link_reference(int4 refoffset, mstr *name)
 	}
 }
 
-
 /*
  *	emit_immed
  *
  *	Args:  buffer of executable code, and byte count to be output.
  */
-void	emit_immed(char *source, uint4 size)
+void emit_immed(char *source, uint4 size)
 {
-	short int 	write;
+	int4 	write;
 
+	if (0 == size)
+		return;			/* Not sure why but this does happen */
 	if (run_time)
 	{
 		if (!IS_STP_SPACE_AVAILABLE_PRO(size))
@@ -120,7 +125,7 @@ void	emit_immed(char *source, uint4 size)
 	} else
 	{
 		DEBUG_ONLY(obj_bytes_written += size);
-		while (size > 0)
+		while (0 < size)
 		{
 			write = SIZEOF(emit_buff) - emit_buff_used;
 			write = size < write ? size : write;
@@ -134,16 +139,20 @@ void	emit_immed(char *source, uint4 size)
 	}
 }
 
-
 /*
  *	buff_emit
  *
  *	Output partially or completely filled buffer
  */
-void	buff_emit(void)
+void buff_emit(void)
 {
 	int	stat;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	/* Accumulate object code piece in the object hash with progressive murmurhash call */
+	tmpcnt++;
+	gtmmrhash_128_ingest(TADR(objhash_state), emit_buff, emit_buff_used);
 	DOWRITERC(object_file_des, emit_buff, emit_buff_used, stat);
 	if (0 != stat)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, stat);
@@ -155,7 +164,7 @@ void	buff_emit(void)
  *
  * 	Flush the contents of emit_buff to the file.
  */
-void	buff_flush(void)
+void buff_flush(void)
 {
 	if (emit_buff_used)
 		buff_emit();
@@ -176,13 +185,15 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 	struct sym_table	*sym, *sym1, *newsym;
 	stringkey		symkey;
 	ht_ent_str		*syment;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	usehtab = (SYM_HASH_CUTOVER < symcnt);
 	DEBUG_ONLY(syment = NULL);
 	if (!usehtab)
-	{	/* "Brute force" version of lookup for now */
+	{	/* "Brute force" version of lookup for now (until SYM_HASH_CUTOVER symbols defined) */
 		assert(NULL == compsyms_hashtab || NULL == compsyms_hashtab->base);
-		sym = symbols;
+		sym = TREF(defined_symbols);
 		sym1 = NULL;
 		while (sym)
 		{	/* Consider this a match only if type is N_EXT. If we are inserting an external reference symbol
@@ -190,7 +201,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 			 * (N_EXT) entry so that the symbol table is correctly formed.
 			 */
 			if ((0 >= (cmp = memvcmp(name->addr, (int)name->len, &sym->name[0], sym->name_len - 1)))
-				&& (N_EXT == sym->n.n_type))
+			    && (N_EXT == sym->n.n_type))
 				break;
 			sym1 = sym;
 			sym = sym->next;
@@ -198,11 +209,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 		if (!cmp && sym)
 			return sym;
 	} else
-	{	/* Hashtable lookup -- Note use of hashtab_mname for this is somewhat overloading the usage since there
-		   are compound symbols of the form "routine"."label" which can exceed the typical size of an mname but
-		   since mnames are just addr/length pairs at the definition level, this works for us and is easier than
-		   defining a new hashtable type identical to the mname hash in all but name.
-		*/
+	{	/* Hashtable lookup  */
 		if (!compsyms_hashtab)
 		{	/* Allocate if not allocated yet */
 			compsyms_hashtab = (hash_table_str *)malloc(SIZEOF(hash_table_str));
@@ -212,7 +219,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 		{	/* Need to initialize hash table and load it with the elements so far */
 			init_hashtab_str(compsyms_hashtab, SYM_HASH_CUTOVER * 2, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 			assert(compsyms_hashtab->base);
-			for (sym = symbols; sym; sym = sym->next)
+			for (sym = TREF(defined_symbols); sym; sym = sym->next)
 			{
 				if (N_EXT != sym->n.n_type)	/* Consider this a match only if type is N_EXT. See comment above */
 					continue;
@@ -236,7 +243,6 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 			return sym;
 		}
 	}
-
 	/* Didn't find it in existing symbols; create new symbol.  */
 	newsym = (struct sym_table *)mcalloc(SIZEOF(struct sym_table) + name->len);
 	newsym->name_len = name->len + 1;
@@ -244,22 +250,22 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 	newsym->name[name->len] = 0;
 	newsym->n.n_type = N_EXT;
 	if (GTM_CODE == psect)
-		newsym->n.n_type |= N_TEXT;	/* if symbol is in GTM_CODE, it is defined */
+		newsym->n.n_type |= N_TEXT;	/* If symbol is in GTM_CODE, it is defined */
 	else
-		lnkrel_cnt++;	/* otherwise it's external (only one reference in linkage Psect) */
+		lnkrel_cnt++;		/* Otherwise it's external (only one reference in linkage Psect) */
 	newsym->resolve = 0;
-	newsym->linkage_offset = -1;	/* don't assign linkage Psect offset unless it's used */
+	newsym->linkage_offset = -1;	/* Don't assign linkage Psect offset unless it's used */
 	if (!usehtab)
 	{	/* Brute force -- add into the queue where the test failed (keeping sorted) */
 		newsym->next = sym;
 		if (sym1)
 			sym1->next = newsym;
 		else
-			symbols = newsym;
+			TREF(defined_symbols) = newsym;
 	} else
 	{	/* Hashtab usage -- add at beginning .. easiest since sorting doesn't matter for future lookups */
-		newsym->next = symbols;
-		symbols = newsym;
+		newsym->next = TREF(defined_symbols);
+		TREF(defined_symbols) = newsym;
 		assert(syment);
 		syment->value = newsym;
 	}
@@ -268,23 +274,26 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 	return newsym;
 }
 
-
-void	resolve_sym (void)
+/* Routine to resolve all the symbols of a given name to the same symbol number to associate relocation table
+ * entries together properly so all references for a given name associate to the same linkage table entry.
+ */
+void resolve_sym (void)
 {
 	uint4			symnum;
 	struct sym_table	*sym;
 	struct rel_table	*rel;
+	DCL_THREADGBL_ACCESS;
 
-	for (sym = symbols, symnum = 0; sym; sym = sym->next, symnum++)
+	SETUP_THREADGBL_ACCESS;
+	for (sym = TREF(defined_symbols), symnum = 0; sym; sym = sym->next, symnum++)
 	{
 		for (rel = sym->resolve; rel; rel = rel->resolve)
 			rel->r.r_symbolnum = symnum;
 	}
 }
 
-
 /* Output the relocation table for the linkage section */
-void	output_relocation (void)
+void output_relocation (void)
 {
 	struct rel_table	*rel;
 
@@ -292,16 +301,17 @@ void	output_relocation (void)
 		emit_immed((char *)&rel->r, SIZEOF(rel->r));
 }
 
-
 #ifdef DEBUG
 /* Size that output_symbol() below will eventually generate -- used to verify validity of OUTPUT_SYMBOL_SIZE macro */
-int	output_symbol_size(void)
+int output_symbol_size(void)
 {
 	uint4			string_length;
 	struct sym_table	*sym;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	string_length = SIZEOF(int4);
-	sym = symbols;
+	sym = TREF(defined_symbols);
 	while (sym)
 	{
 		string_length += sym->name_len;
@@ -311,19 +321,20 @@ int	output_symbol_size(void)
 }
 #endif
 
-
 /* Symbol string table output. Consists of a series of null terminated
-   strings in symbol number order.
-*/
-void	output_symbol(void)
+ * strings in symbol number order.
+ */
+void output_symbol(void)
 {
 	uint4			string_length;
 	struct sym_table	*sym;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	string_length = SIZEOF(int4) + sym_table_size;
 	assert(string_length == output_symbol_size());
 	emit_immed((char *)&string_length, SIZEOF(string_length));
-	sym = symbols;
+	sym = TREF(defined_symbols);
 	while (sym)
 	{
 		emit_immed((char *)&sym->name[0], sym->name_len);
@@ -331,25 +342,26 @@ void	output_symbol(void)
 	}
 }
 
-
 /*
  *	obj_init
  *
  *	Description:	Initialize symbol list, relocation information, linkage Psect list, linkage_size.
  */
-void	obj_init(void)
+void obj_init(void)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	lnkrel_cnt = symcnt = 0;
 	link_rel = link_rel_end = NULL;
-	symbols = NULL;
+	TREF(defined_symbols) = NULL;
+	TREF(linkage_first) = NULL;
+	TREF(linkage_last) = NULL;
 	sym_table_size = 0;
-
-	linkage_first = linkage_last = NULL;
-	linkage_size = MIN_LINK_PSECT_SIZE;	/* minimum size of linkage Psect, assuming no references from generated code */
-
+	linkage_size = MIN_LINK_PSECT_SIZE;	/* Minimum size of linkage Psect, assuming no references from generated code */
+   tmpcnt = 0;
 	return;
 }
-
 
 /*
  *	comp_linkages
@@ -357,14 +369,16 @@ void	obj_init(void)
  *	Description: Define the symbols and relocation entries we will need to create
  *		     the linkage section when this module is linked in.
  */
-void	comp_linkages(void)
+void comp_linkages(void)
 {
 	mstr			name;
 	struct linkage_entry	*linkagep;
+	DCL_THREADGBL_ACCESS;
 
-	for (linkagep = linkage_first; NULL != linkagep; linkagep = linkagep->next)
+	SETUP_THREADGBL_ACCESS;
+	for (linkagep = TREF(linkage_first); NULL != linkagep; linkagep = linkagep->next)
 	{
-		name.len = linkagep->symbol->name_len - 1;	/* don't count '\0' terminator */
+		name.len = linkagep->symbol->name_len - 1;	/* Don't count '\0' terminator */
 		name.addr = (char *)&linkagep->symbol->name[0];
 		emit_link_reference(linkagep->symbol->linkage_offset, &name);
 	}
@@ -372,16 +386,19 @@ void	comp_linkages(void)
 	return;
 }
 
-
-void	emit_literals(void)
+void emit_literals(void)
 {
-	uint4		offset, padsize;
-	mliteral	*p;
+	mstr			name;
+	uint4			offset, padsize;
+	mliteral		*p;
+	struct linkage_entry	*linkagep;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* emit the literal text pool which includes the source file path and routine name */
 	offset = (uint4)(stringpool.free - stringpool.base);
 	emit_immed((char *)stringpool.base, offset);
-	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE)); /* comp_lits aligns the start of source path on NATIVE_WSIZE boundary.*/
+	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE)); /* comp_lits() aligns literal area on NATIVE_WSIZE boundary */
 	if (padsize)
 	{
 		emit_immed(PADCHARS, padsize);
@@ -389,7 +406,7 @@ void	emit_literals(void)
 	}
 	emit_immed(source_file_name, source_name_len);
 	offset += source_name_len;
-	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE)); /* comp_lits aligns the start of routine_name on NATIVE_WSIZE boundary.*/
+	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE)); /* comp_lits() aligns routine_name on NATIVE_WSIZE boundary */
 	if (padsize)
 	{
 		emit_immed(PADCHARS, padsize);
@@ -397,15 +414,43 @@ void	emit_literals(void)
 	}
 	emit_immed(routine_name.addr, routine_name.len);
 	offset += routine_name.len;
-	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE)); /* comp_lits aligns the start of literal area on NATIVE_WSIZE boundary.*/
+	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE)); /* comp_lits() aligns extern symbols on NATIVE_WSIZE boundary */
 	if (padsize)
 	{
 		emit_immed(PADCHARS, padsize);
 		offset += padsize;
 	}
+	/* Emit the names associated with the linkage table */
+	for (linkagep = TREF(linkage_first); NULL != linkagep; linkagep = linkagep->next)
+	{
+		emit_immed((char *)linkagep->symbol->name, linkagep->symbol->name_len - 1);
+		offset += linkagep->symbol->name_len - 1;
+		padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE)); /* comp_lits() aligns extern symbols on NATIVE_WSIZE boundary */
+		if (padsize)
+		{
+			emit_immed(PADCHARS, padsize);
+			offset += padsize;
+		}
+	}
 	assert(offset == lits_text_size);
-
-	/* emit the literal mval list */
+	/* Emit the linkage name mstr table (never relocated - always offset/length pair). Same index as linkage table */
+	offset = 0;
+	for (linkagep = TREF(linkage_first); NULL != linkagep; linkagep = linkagep->next)
+	{
+		name.char_len = 0;				/* No need for this length */
+		name.len = linkagep->symbol->name_len - 1;	/* Don't count '\0' terminator */
+		name.addr = (char *)linkagep->lit_offset;
+		emit_immed((char *)&name, SIZEOF(mstr));
+		offset += SIZEOF(mstr);
+	}
+	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE));
+	if (padsize)
+	{
+		emit_immed(PADCHARS, padsize);
+		offset += padsize;
+	}
+	assert(0 == (uint4)(PADLEN(offset, NATIVE_WSIZE)));
+	/* Emit the literal mval list (also aligned by comp_lits() on NATIVE_WSIZE boundary */
 	offset = 0;
  	dqloop(&literal_chain, que, p)
 	{
@@ -416,12 +461,14 @@ void	emit_literals(void)
 		else
 			p->v.str.addr = NULL;
 		p->v.fnpc_indx = (unsigned char)-1;
+		if (!(MV_UTF_LEN & p->v.mvtype))
+			p->v.str.char_len = 0;
+		assert(MAX_STRLEN >= p->v.str.char_len);
 		emit_immed((char *)&p->v, SIZEOF(p->v));
 		offset += SIZEOF(p->v);
 	}
 	assert (offset == lits_mval_size);
 }
-
 
 /*
  *	find_linkage
@@ -430,13 +477,14 @@ void	emit_literals(void)
  *
  *	Description:	Returns the offset into the linkage Psect of a global symbol.
  */
-int4	find_linkage(mstr* name)
+int4 find_linkage(mstr* name)
 {
 	struct linkage_entry	*newlnk;
 	struct sym_table	*sym;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	sym = define_symbol(GTM_LITERALS, name);
-
 	if (-1 == sym->linkage_offset)
 	{
 		/* Add new linkage psect entry at end of list.  */
@@ -445,17 +493,16 @@ int4	find_linkage(mstr* name)
 		newlnk = (struct linkage_entry *)mcalloc(SIZEOF(struct linkage_entry));
 		newlnk->symbol = sym;
 		newlnk->next = NULL;
-		if (NULL == linkage_first)
-			linkage_first = newlnk;
-		if (NULL != linkage_last)
-			linkage_last->next = newlnk;
-		linkage_last = newlnk;
+		if (NULL == TREF(linkage_first))
+			TREF(linkage_first) = newlnk;
+		if (NULL != TREF(linkage_last))
+			(TREF(linkage_last))->next = newlnk;
+		TREF(linkage_last) = newlnk;
 
 		linkage_size += SIZEOF(lnk_tabent);
 	}
 	return sym->linkage_offset;
 }
-
 
 /*
  *	literal_offset

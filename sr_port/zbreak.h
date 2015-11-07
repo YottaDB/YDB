@@ -15,6 +15,7 @@
 #include <zbreaksp.h>
 #include "cache.h"
 
+/* Structure for each ZBREAK set in the process */
 typedef struct
 {
 	zb_code		*mpc;		/* MUMPS address for ZBREAK */
@@ -23,9 +24,12 @@ typedef struct
 	int		offset;
 	int		count;		/* # of time ZBREAK encountered */
 	cache_entry	*action;	/* action associated with ZBREAK (indirect cache entry) */
+	rhdtyp		*rtnhdr;	/* Routine header of routine containing ZBREAK */
 	zb_code 	m_opcode;	/* MUMPS op_code replaced */
+	char		filler[SIZEOF(char *) - SIZEOF(zb_code)];
 } zbrk_struct;
 
+/* ZBREAK anchoring structure */
 typedef struct
 {
 	zbrk_struct	*beg;
@@ -46,9 +50,9 @@ typedef struct
 #define SIZEOF_LA	0
 
 zbrk_struct *zr_find(z_records *zrecs, zb_code *addr);
-zbrk_struct *zr_get_free(z_records *zrecs, zb_code *addr);
+zbrk_struct *zr_add_zbreak(z_records *zrecs, zb_code *addr);
 void zr_init(z_records *zrecs, int4 count);
-void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr);
+void zr_remove_zbreak(z_records *zrecs, zbrk_struct *z_ptr);
 zb_code *find_line_call(void *addr);
 void zr_remove_zbrks(rhdtyp *rtn, boolean_t notify_is_trigger);
 

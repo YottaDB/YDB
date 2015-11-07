@@ -13,7 +13,7 @@
 
 #include <rtnhdr.h>
 
-#ifdef USHBIN_SUPPORTED /* entire file */
+#ifdef AUTORELINK_SUPPORTED /* entire file */
 /* Routine to provide the content of the thread-local variable "lab_lnr" as a return value to
  * generated code.
  *
@@ -29,4 +29,4 @@ void *op_lab_ext(void)
 	SETUP_THREADGBL_ACCESS;
 	return TREF(lab_lnr);
 }
-#endif /* USHBIN_SUPPORTED over entire file */
+#endif /* AUTORELINK_SUPPORTED over entire file */

@@ -34,7 +34,7 @@
 #include "trigger_user_name.h"
 #include "change_reg.h"
 #include "gvcst_protos.h"
-#include "op.h"
+#include "op.h"			/* for op_tstart etc. */
 #include "mupip_exit.h"
 #include "zshow.h"
 #include "util.h"
@@ -54,6 +54,8 @@
 #include "gtmio.h"
 #include "have_crit.h"
 #include "hashtab_mname.h"
+#include "tp_frame.h"
+#include "tp_restart.h"
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -66,8 +68,12 @@ GBLREF	io_pair			io_curr_device;
 GBLREF	io_pair			io_std_device;			/* standard device */
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF	uint4			dollar_tlevel;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+#ifdef DEBUG
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#endif
 
-LITREF	mval		    	literal_hasht;
 LITREF	mval			literal_zero;
 LITREF	mval			literal_ten;
 LITREF	char 			*trigger_subs[];
@@ -77,20 +83,22 @@ LITREF	char 			*trigger_subs[];
 
 #define NAM_LEN(PTR, LEN)	MIN(STRLEN((PTR)), (LEN))
 
-#define COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(OUT_BUFF, OUT_PTR, VAL, VAL_LEN)		\
-{											\
-	mval		op_val;								\
-											\
-	assert(MAX_BUFF_SIZE >= VAL_LEN);						\
-	if ((INTCAST(OUT_PTR - OUT_BUFF) + VAL_LEN) > MAX_BUFF_SIZE)			\
-	{										\
-		STR2MVAL(op_val, OUT_BUFF, (unsigned int)(OUT_PTR - OUT_BUFF));		\
-		op_write(&op_val);							\
-		io_curr_device.out->dollar.x = 0;					\
-		OUT_PTR = OUT_BUFF;							\
-	}										\
-	memcpy(OUT_PTR, (const void *)VAL, VAL_LEN);					\
-	OUT_PTR += VAL_LEN;								\
+#define COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(OUT_BUFF, OUT_PTR, VAL, VAL_LEN)				\
+{													\
+	if ((INTCAST(OUT_PTR - OUT_BUFF) + VAL_LEN) > MAX_BUFF_SIZE)					\
+	{												\
+		util_out_print_gtmio("!AD", NOFLUSH, (unsigned int)(OUT_PTR - OUT_BUFF), OUT_BUFF);	\
+		OUT_PTR = OUT_BUFF;									\
+	}												\
+	if (VAL_LEN > MAX_BUFF_SIZE)									\
+	{												\
+		util_out_print_gtmio("!AD", NOFLUSH, VAL_LEN, VAL);					\
+		OUT_PTR = OUT_BUFF;									\
+	} else												\
+	{												\
+		memcpy(OUT_PTR, (const void *)VAL, VAL_LEN);						\
+		OUT_PTR += VAL_LEN;									\
+	}												\
 }
 
 #define COPY_SUBSCRIPT(OUT_BUFF, OUT_PTR, CHPTR, LEN_LEFT, IS_TYPE)			\
@@ -149,14 +157,19 @@ LITREF	char 			*trigger_subs[];
 	select_status = TRIG_FAILURE;							\
 }
 
+error_def(ERR_DBROLLEDBACK);
+error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUPCLIERR);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_NEEDTRIGUPGRD);
 error_def(ERR_TRIGDEFBAD);
-error_def(ERR_MUPCLIERR);
-error_def(ERR_MUNOACTION);
 
-
-STATICDEF char *triggerfile_quals[] = {"-name=", "", "-commands=", "-options=", "-delim=", "-zdelim=", "-pieces=", "-xecute="};
+STATICDEF char *triggerfile_quals[] = {
+#define TRIGGER_SUBSDEF(SUBSTYPE, SUBSNAME, LITMVALNAME, TRIGFILEQUAL, PARTOFHASH)	TRIGFILEQUAL,
+#include "trigger_subs_def.h"
+#undef TRIGGER_SUBSDEF
+};
 
 STATICFNDEF void write_subscripts(char *out_rec, char **out_ptr, char **sub_ptr, int *sub_len)
 {
@@ -195,7 +208,7 @@ STATICFNDEF void write_subscripts(char *out_rec, char **out_ptr, char **sub_ptr,
 	*out_ptr = out_p;
 }
 
-STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 file_name_len, mval *op_val, int nam_indx)
+STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_indx)
 {
 	mval			data_val;
 	char			out_rec[MAX_BUFF_SIZE];
@@ -220,6 +233,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(!cs_addrs->hdr->hasht_upgrade_needed);	/* all callers should have errored out otherwise */
 	BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHCOUNT, LITERAL_HASHCOUNT_LEN);
 	if (gvcst_get(&trigger_count))
 	{
@@ -228,12 +242,9 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 		{	/* There has to be a #LABEL */
 			if (CDB_STAGNATE > t_tries)
 				t_retry(cdb_sc_triggermod);
-			else
-			{
-				assert(FALSE);
-				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
-						gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#LABEL\""));
-			}
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
+					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#LABEL\""));
 		}
 		skip_chars = 1;
 		if ((trigger_value.str.len != STRLEN(HASHT_GBL_CURLABEL))
@@ -250,12 +261,9 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 		{	/* There has to be a #CYCLE */
 			if (CDB_STAGNATE > t_tries)
 				t_retry(cdb_sc_triggermod);
-			else
-			{
-				assert(FALSE);
-				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
-						gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#CYCLE\""));
-			}
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
+					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#CYCLE\""));
 		}
 		assert(MAX_DIGITS_IN_INT >= trigger_value.str.len);
 		memcpy(cycle, trigger_value.str.addr, trigger_value.str.len);
@@ -269,21 +277,29 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(gbl_name, gbl_name_len, mi, trigger_subs[TRIGNAME_SUB],
 				STRLEN(trigger_subs[TRIGNAME_SUB]));
 			out_rec_ptr = out_rec;
-			if (gvcst_get(&trigger_value))
-			{
-				*out_rec_ptr++ = COMMENT_LITERAL;
+			if (!gvcst_get(&trigger_value))
+			{	/* There has to be a #NAME */
+				if (CDB_STAGNATE > t_tries)
+					t_retry(cdb_sc_triggermod);
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
+						gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#NAME\""));
 
-				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, TRIGGER_NAME_COMMENT,
-					STR_LIT_LEN(TRIGGER_NAME_COMMENT));
-				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, trigger_value.str.addr,
-					trigger_value.str.len);
-				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, TRIGGER_CYCLE_COMMENT,
-					STR_LIT_LEN(TRIGGER_CYCLE_COMMENT));
-				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, cycle, STRLEN(cycle));
-				STR2MVAL((*op_val), out_rec, (unsigned int)(out_rec_ptr - out_rec));
-				op_write(op_val);
-				op_wteol(1);
 			}
+			*out_rec_ptr++ = COMMENT_LITERAL;
+			COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, TRIGGER_NAME_COMMENT,
+				STR_LIT_LEN(TRIGGER_NAME_COMMENT));
+			COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, trigger_value.str.addr,
+				trigger_value.str.len - 1);	/* remove last # in name */
+			COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, SPANREG_REGION_LIT,
+				SPANREG_REGION_LITLEN);
+			COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, gv_cur_region->rname,
+				gv_cur_region->rname_len);
+			COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, ")", 1);
+			COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, TRIGGER_CYCLE_COMMENT,
+				STR_LIT_LEN(TRIGGER_CYCLE_COMMENT));
+			COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, cycle, STRLEN(cycle));
+			util_out_print_gtmio("!AD", FLUSH, (unsigned int)(out_rec_ptr - out_rec), out_rec);
 			out_rec_ptr = out_rec;
 			*out_rec_ptr++ = '+';
 			*out_rec_ptr++ = '^';
@@ -298,6 +314,11 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 				write_subscripts(out_rec, &out_rec_ptr, &sub_ptr, &sub_len);
 				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, ")", 1);
 			}
+			/* Assert that BHASH and LHASH are not part of NUM_SUBS calculation
+			 * (confirms the -2 done in the #define of NUM_SUBS).
+			 */
+			assert(BHASH_SUB == NUM_SUBS);
+			assert(LHASH_SUB == (NUM_SUBS + 1));
 			for (sub_indx = 0; sub_indx < NUM_SUBS; sub_indx++)
 			{
 				if ((GVSUBS_SUB == sub_indx) || (CHSET_SUB == sub_indx))
@@ -305,6 +326,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 				BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(gbl_name, gbl_name_len, mi, trigger_subs[sub_indx],
 					STRLEN(trigger_subs[sub_indx]));
 				have_value = gvcst_get(&trigger_value);
+				have_value = have_value && (trigger_value.str.len);
 				multi_record = FALSE;
 				if (!have_value && (XECUTE_SUB == sub_indx))
 				{
@@ -314,7 +336,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 				if (have_value || multi_record)
 				{
 					if (TRIGNAME_SUB == sub_indx)
-					{	/* Output name only if it is user defined */
+					{	/* Output "-name=XYZ" only if it is user defined */
 						BUILD_HASHT_SUB_MSUB_SUB_MSUB_CURRKEY(gbl_name, gbl_name_len, mi,
 							trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), mi);
 						if (!trigger_user_name(trigger_value.str.addr, trigger_value.str.len))
@@ -360,11 +382,9 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 					}
 				}
 			}
-			/* we had better have an XECUTE STRING, probably should check some buddies */
-			assert(NULL != xecute_buff);
-			STR2MVAL((*op_val), out_rec, (unsigned int)(out_rec_ptr - out_rec));
-			op_write(op_val);
-			op_wteol(1);
+			/* we had better have an XECUTE STRING, if not it is a restartable situation */
+			DEBUG_ONLY(if (NULL == xecute_buff) TREF(donot_commit) |= DONOTCOMMIT_TRIGGER_SELECT_XECUTE;)
+			util_out_print_gtmio("!AD", FLUSH, (unsigned int)(out_rec_ptr - out_rec), out_rec);
 			if (multi_line)
 			{
 				ptr1 = xecute_buff;
@@ -377,16 +397,12 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 						ptr2 = ptrtop; /* if last line is not terminated by newline, make it so */
 					out_rec_ptr = out_rec;
 					COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, ptr1, UINTCAST(ptr2 - ptr1));
-					STR2MVAL((*op_val), out_rec, (unsigned int)(out_rec_ptr - out_rec));
-					op_write(op_val);
-					op_wteol(1);
+					util_out_print_gtmio("!AD", FLUSH, (unsigned int)(out_rec_ptr - out_rec), out_rec);
 					ptr1 = ptr2 + 1;
 				} while (ptr1 < ptrtop);
 				out_rec_ptr = out_rec;
 				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, XTENDED_STOP, XTENDED_STOP_LEN);
-				STR2MVAL((*op_val), out_rec, (unsigned int)(out_rec_ptr - out_rec));
-				op_write(op_val);
-				op_wteol(1);
+				util_out_print_gtmio("!AD", FLUSH, (unsigned int)(out_rec_ptr - out_rec), out_rec);
 			}
 			if (NULL != xecute_buff)
 			{
@@ -397,42 +413,34 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 fil
 	}
 }
 
-STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, uint4 file_name_len, mval *op_val, boolean_t trig_name)
+STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean_t trig_name)
 {
 	char			save_name[MAX_MIDENT_LEN], curr_name[MAX_MIDENT_LEN];
 	boolean_t		wildcard;
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
-	gd_region		*save_gv_cur_region;
-	gv_namehead		*save_gv_target;
-	sgm_info		*save_sgm_info_ptr;
-	mname_entry		ms_gvname;
 	mval			mv_curr_nam;
-        mval                    mi, trigger_count, trig_gbl;
-        mval                    *mv_trig_cnt_ptr, mv_trigger_val;
+        mval                    mi, trig_gbl;
+        mval                    mv_trigger_val;
 	int			indx, count;
-	char			*ptr;
+	char			*ptr, *ptr2;
 	uint4			curr_name_len;
 	int			trigvn_len;
-	gvnh_reg_t		*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	/* If ^#t needs to be upgraded, issue error. Cannot read older ^#t format that newer version does not always understand */
+	if (cs_addrs->hdr->hasht_upgrade_needed)
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
 	memcpy(save_name, gbl_name, gbl_name_len);
 	wildcard = (NULL != (ptr = memchr(gbl_name, '*', gbl_name_len)));
 	if (wildcard)
 	{
-		*ptr = '\0';
 		gbl_name_len--;
 		assert(INTCAST(ptr - gbl_name) == gbl_name_len);
 	}
-	mv_trig_cnt_ptr = &trigger_count;
 	memcpy(curr_name, gbl_name, gbl_name_len);
 	curr_name_len = gbl_name_len;
-	STR2MVAL(mv_curr_nam, gbl_name, gbl_name_len);
 	while (TRUE)
 	{
-		if (0 != memcmp(curr_name, save_name, gbl_name_len))
-			break;
 		if (trig_name)
 		{
 			BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME), curr_name, curr_name_len);
@@ -445,32 +453,34 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, uint4 f
 						break;
 					memcpy(curr_name, mv_curr_nam.str.addr, mv_curr_nam.str.len);
 					curr_name_len = mv_curr_nam.str.len;
+					if (0 != memcmp(curr_name, save_name, gbl_name_len))
+						break;
 					continue;
 				}
 				break;
 			}
 			ptr = mv_trigger_val.str.addr;
-			trigvn_len = STRLEN(mv_trigger_val.str.addr);
-			ptr += trigvn_len + 1;
-			A2I(ptr, mv_trigger_val.str.addr + mv_trigger_val.str.len, indx);
+			ptr2 = memchr(ptr, '\0', mv_trigger_val.str.len);
+			if (NULL == ptr2)
+			{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
+				if (CDB_STAGNATE > t_tries)
+					t_retry(cdb_sc_triggermod);
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
+						LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
+						mv_trigger_val.str.len, mv_trigger_val.str.addr);
+			}
+			trigvn_len = ptr2 - ptr;
+			assert(('\0' == *ptr2) && (mv_trigger_val.str.len > trigvn_len));
+			ptr2++;
+			A2I(ptr2, mv_trigger_val.str.addr + mv_trigger_val.str.len, indx);
 			STR2MVAL(trig_gbl, mv_trigger_val.str.addr, trigvn_len);
-			SAVE_TRIGGER_REGION_INFO(save_currkey);
-			ms_gvname.var_name.addr = mv_trigger_val.str.addr;
-			ms_gvname.var_name.len = trigvn_len;
-			COMPUTE_HASH_MNAME(&ms_gvname);
-			GV_BIND_NAME_ONLY(gd_header, &ms_gvname, gvnh_reg);
-			SET_GVTARGET_TO_HASHT_GBL(gv_target->gd_csa);
-			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 		} else
 		{
 			STR2MVAL(trig_gbl, curr_name, curr_name_len);
 			indx = 0;
 		}
-		write_out_trigger(trig_gbl.str.addr, trig_gbl.str.len, file_name_len, op_val, indx);
-		if (trig_name)
-		{
-			RESTORE_TRIGGER_REGION_INFO(save_currkey);
-		}
+		write_out_trigger(trig_gbl.str.addr, trig_gbl.str.len, indx);
 		if (wildcard)
 		{
 			if (trig_name)
@@ -485,13 +495,15 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, uint4 f
 			if (0 == mv_curr_nam.str.len)
 				break;
 			memcpy(curr_name, mv_curr_nam.str.addr, mv_curr_nam.str.len);
+			if (0 != memcmp(curr_name, save_name, gbl_name_len))
+				break;
 			curr_name_len = mv_curr_nam.str.len;
 		} else
 			break;
 	}
 }
 
-STATICFNDEF void dump_all_triggers(uint4 file_name_len, mval *op_val)
+STATICFNDEF void dump_all_triggers(void)
 {
 	mval			curr_gbl_name, val;
 	gd_region		*reg;
@@ -509,17 +521,18 @@ STATICFNDEF void dump_all_triggers(uint4 file_name_len, mval *op_val)
 	save_gvtarget = gv_target;
 	for (reg_index = 0, reg = gd_header->regions; reg_index < gd_header->n_regions; reg_index++, reg++)
 	{
-		if (!reg->open)
-			gv_init_reg(reg);
-		gv_cur_region = reg;
-		change_reg();
-		SET_GVTARGET_TO_HASHT_GBL(cs_addrs);
-		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
+		GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
+		if (NULL == cs_addrs)	/* not MM or BG access method, which means GT.CM */
+			continue;
+		/* gv_target now points to ^#t in region "reg" */
 		if (0 != gv_target->root)
 		{
+			/* If ^#t needs to be upgraded, issue error. Cannot read older ^#t format */
+			if (cs_addrs->hdr->hasht_upgrade_needed)
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
 			op_gvdata(&val);
 			if ((literal_ten.m[0] == val.m[0]) && (literal_ten.m[1] == val.m[1]))
-			{ /* $DATA(^#t) is 10 - get first subscript (trigger's global) */
+			{	/* $DATA(^#t) is 10 - get first subscript (trigger's global) */
 				BUILD_HASHT_SUB_CURRKEY(LITERAL_MAXHASHVAL, STR_LIT_LEN(LITERAL_MAXHASHVAL));
 				while (TRUE)
 				{
@@ -528,7 +541,7 @@ STATICFNDEF void dump_all_triggers(uint4 file_name_len, mval *op_val)
 						break;
 					gbl_len = curr_gbl_name.str.len;
 					memcpy(global, curr_gbl_name.str.addr, gbl_len);
-					write_out_trigger(global, gbl_len, file_name_len, op_val, 0);
+					write_out_trigger(global, gbl_len, 0);
 					BUILD_HASHT_SUB_CURRKEY(global, gbl_len);
 				}
 			} else
@@ -537,26 +550,16 @@ STATICFNDEF void dump_all_triggers(uint4 file_name_len, mval *op_val)
 	}
 }
 
-boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_name, uint4 file_name_len)
+/* returns TRUE (not TRIG_FAILURE) in case of failure */
+boolean_t trigger_select_tpwrap(char *select_list, uint4 select_list_len, char *file_name, uint4 file_name_len)
 {
-	char			*sel_ptr, *strtok_ptr, *prev_ptr, *ptr1, *ptr2;
-	int			gbl_len, prev_len;
-	mname_entry		gvname;
-	gv_namehead		*save_gvtarget;
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
-	gd_region		*save_gv_cur_region;
-	char			save_select_list[MAX_BUFF_SIZE];
-	mval			trigger_value;
-	int			len, len1, badpos;
-	int			local_errno;
-	boolean_t		trig_name;
-	gv_namehead		*save_gv_target;
-	sgm_info		*save_sgm_info_ptr;
-	boolean_t		dump_all;
 	mval			op_val, op_pars;
 	boolean_t		select_status;
 	io_pair			save_io_curr_device;
-	gvnh_reg_t		*gvnh_reg;
+	mval			ts_mv;
+	int			loopcnt;
+	DEBUG_ONLY(unsigned int	lcl_t_tries;)
+	enum cdb_sc		failure;
 
 	static readonly unsigned char	open_params_list[] =
 	{
@@ -572,15 +575,13 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 		(unsigned char)iop_eol
 	};
 	static readonly unsigned char	no_param = (unsigned char)iop_eol;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* make a local copy of the select list and use it to avoid string-pool problems */
 	if (MAX_BUFF_SIZE <= select_list_len)
-		return TRIG_FAILURE;
-	memcpy(save_select_list, select_list, select_list_len);
-	save_select_list[select_list_len] = '\0';
+		return TRUE;	/* failure return */
 	gvinit();
-	dump_all = FALSE;
-	prev_len = 0;
 	op_pars.mvtype = MV_STR;
 	op_val.mvtype = MV_STR;
 	if (0 == file_name_len)
@@ -608,13 +609,130 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 	}
 	save_io_curr_device = io_curr_device;
 	op_use(&op_val, &op_pars);
+	TREF(ztrig_use_io_curr_device) = TRUE;
+	select_status = TRIG_SUCCESS;
+	ts_mv.mvtype = MV_STR;
+	ts_mv.str.len = 0;
+	ts_mv.str.addr = NULL;
+	if (0 == dollar_tlevel)
+	{	/* If not already wrapped in TP, wrap it now implicitly */
+		assert(!donot_INVOKE_MUMTSTART);
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);
+		/* Note down dollar_tlevel before op_tstart. This is needed to determine if we need to break from the for-loop
+		 * below after a successful op_tcommit of the trigger select . We cannot check that dollar_tlevel is zero
+		 * since the op_tstart done below can be a nested sub-transaction
+		 */
+		op_tstart((IMPLICIT_TSTART + IMPLICIT_TRIGGER_TSTART), TRUE, &ts_mv, 0); /* 0 ==> save no locals but RESTART OK */
+		/* The following for loop structure is similar to that in function "trigger_trgfile_tpwrap" and various
+		 * other places so any changes here might need to be reflected there as well.
+		 */
+		for (loopcnt = 0; ; loopcnt++)
+		{
+			assert(donot_INVOKE_MUMTSTART);	/* Make sure still set */
+			DEBUG_ONLY(lcl_t_tries = t_tries);
+			select_status = trigger_select_tpwrap_helper(select_list, select_list_len);
+			if (0 == dollar_tlevel)
+				break;
+			assert(0 < t_tries);
+			assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
+			failure = LAST_RESTART_CODE;
+			assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
+				|| !gv_target || !gv_target->root);
+			assert((cdb_sc_onln_rlbk2 != failure) || !IS_GTM_IMAGE || TREF(dollar_zonlnrlbk));
+			if (cdb_sc_onln_rlbk2 == failure)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBROLLEDBACK);
+			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than trying again. Since this
+			 * is ^#t global, we don't need to GVCST_ROOT_SEARCH before continuing with the next restart because the
+			 * trigger load logic already takes care of doing INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED before doing the
+			 * actual trigger load
+			 */
+			/* We expect the above function to return with either op_tcommit or a tp_restart invoked.
+			 * In the case of op_tcommit, we expect dollar_tlevel to be 0 and if so we break out of the loop.
+			 * In the tp_restart case, we expect a maximum of 4 tries/retries and much lesser usually.
+			 * Additionally we also want to avoid an infinite loop so limit the loop to what is considered
+			 * a huge iteration count and assertpro if that is reached as it suggests an out-of-design situation.
+			 */
+			assertpro(TPWRAP_HELPER_MAX_ATTEMPTS >= loopcnt);
+		}
+	} else
+	{
+		select_status = trigger_select(select_list, select_list_len);
+		assert(0 < dollar_tlevel);
+	}
+	TREF(ztrig_use_io_curr_device) = FALSE;
+	if (0 != file_name_len)
+	{
+		op_val.mvtype = op_pars.mvtype = MV_STR;
+		op_val.str.addr = (char *)file_name;;
+		op_val.str.len = file_name_len;
+		op_pars.str.len = SIZEOF(no_param);
+		op_pars.str.addr = (char *)&no_param;
+		op_close(&op_val, &op_pars);
+		/* Return back to the current device */
+		io_curr_device = save_io_curr_device;
+	}
+	return (TRIG_FAILURE == select_status);
+}
+
+STATICFNDEF boolean_t trigger_select_tpwrap_helper(char *select_list, uint4 select_list_len)
+{
+	enum cdb_sc		cdb_status;
+	boolean_t		select_status;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	ESTABLISH_RET(trigger_tpwrap_ch, TRIG_FAILURE);
+	select_status = trigger_select(select_list, select_list_len);
+	if (TRIG_SUCCESS == select_status)
+	{
+		GVTR_OP_TCOMMIT(cdb_status);
+		if (cdb_sc_normal != cdb_status)
+			t_retry(cdb_status);	/* won't return */
+	} else
+	{	/* Record cannot be committed - undo everything */
+		assert(donot_INVOKE_MUMTSTART);
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);
+		/* Print $ztrigger/mupip-trigger output before rolling back TP */
+		TP_ZTRIGBUFF_PRINT;
+		OP_TROLLBACK(-1);		/* returns but kills implicit transaction */
+	}
+	REVERT;
+	return select_status;
+}
+
+STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
+{
+	boolean_t		dump_all;
+	char			save_select_list[MAX_BUFF_SIZE];
+	char			*sel_ptr, *strtok_ptr, *prev_ptr, *ptr1, *ptr2;
+	int			gbl_len, prev_len;
+	mname_entry		gvname;
+	int			len, len1, badpos;
+	boolean_t		trig_name;
+	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gd_region		*save_gv_cur_region;
+	gv_namehead		*save_gv_target;
+	sgm_info		*save_sgm_info_ptr;
+	boolean_t		select_status;
+	gvnh_reg_t		*gvnh_reg;
+	gd_binding		*map, *start_map, *end_map;
+	gd_region		*reg, *reg_start, *reg_top;
+	int			*reg_done, reg_array_size, reg_index;
+	sgmnt_addrs		*csa;
+
+	assert(dollar_tlevel);
+	select_status = TRIG_SUCCESS;
+	memcpy(save_select_list, select_list, select_list_len);
+	save_select_list[select_list_len] = '\0';
+	dump_all = FALSE;
+	prev_len = 0;
 	if (0 == select_list_len)
 		dump_all = TRUE;
 	else
 	{
 		for (ptr1 = save_select_list, len = select_list_len;
-		     (NULL != (ptr2 = strchr(ptr1, '*'))) && (len > (len1 = INTCAST(ptr2 - ptr1)));
-		     ptr1 = ptr2 + 1)
+			(NULL != (ptr2 = strchr(ptr1, '*'))) && (len > (len1 = INTCAST(ptr2 - ptr1)));
+				ptr1 = ptr2 + 1)
 		{	/* look for either a real "dump-it-all" *, an error *, or a wildcard * */
 			/* A "*" anywhere in the select list (at a place where a global name would be) is the same as only a "*" */
 			len -= (len1 + 1);		/* Length after the "*" -- len1 is length before the "*" */
@@ -627,9 +745,8 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 				break;
 		}
 	}
-	select_status = TRIG_SUCCESS;
 	if (dump_all)
-		dump_all_triggers(file_name_len, &op_val);
+		dump_all_triggers();
 	else
 	{
 		len = select_list_len;
@@ -652,55 +769,88 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 						select_status, badpos);
 					continue;
 				}
-				SAVE_TRIGGER_REGION_INFO(save_currkey);
 				gbl_len = NAM_LEN(sel_ptr + 1, (int)(ptr1 - sel_ptr) - 1);
 				ptr1 = sel_ptr + 1;
-				if ((prev_len != gbl_len) || (0 != memcmp(prev_ptr, ptr1, gbl_len)))
-				{
-					prev_ptr = ptr1;
-					prev_len = gbl_len;
-					gvname.var_name.addr = ptr1;
-					gvname.var_name.len = gbl_len;
+				/* Skip only if the previous global is the same as the current */
+				if ((prev_len == gbl_len) && (0 == memcmp(prev_ptr, ptr1, gbl_len)))
+					continue;
+				SAVE_TRIGGER_REGION_INFO(save_currkey);
+				prev_ptr = ptr1;
+				prev_len = gbl_len;
+				start_map = gv_srch_map(gd_header, ptr1, gbl_len);
+				ptr1[gbl_len - 1]++;
+				end_map = gv_srch_map(gd_header, ptr1, gbl_len);
+				ptr1[gbl_len - 1]--;
+				gvname.var_name.addr = ptr1;
+				gvname.var_name.len = gbl_len;
+				if (start_map != end_map)
+				{	/* Global specification involves multiple regions */
+					reg_start = &gd_header->regions[0];
+					reg_array_size = gd_header->n_regions;
+					reg_done = malloc(reg_array_size * SIZEOF(*reg_done));
+					memset(reg_done, 0, reg_array_size * SIZEOF(*reg_done));
+					if ('*' == ptr1[gbl_len])
+						gvname.var_name.len++;
+					for (map = start_map; map <= end_map; map++)
+					{
+						reg = map->reg.addr;
+						GET_REG_INDEX(gd_header, reg_start, reg, reg_index);	/* sets "reg_index" */
+						assert(reg_array_size > reg_index);
+						if (!reg_done[reg_index])
+						{	/* this region first encountered now */
+							GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
+							if (NULL == cs_addrs)	/* not BG or MM access method */
+								continue;
+							/* gv_target now points to ^#t in region "reg" */
+							if (0 != gv_target->root)
+								write_gbls_or_names(gvname.var_name.addr, gvname.var_name.len,
+												trig_name);
+							reg_done[reg_index] = TRUE;
+						}
+					}
+					free(reg_done);
+				} else
+				{	/* Global specification involves only one region */
 					COMPUTE_HASH_MNAME(&gvname);
 					GV_BIND_NAME_ONLY(gd_header, &gvname, gvnh_reg);
-					if ('*' == *(ptr1 + gbl_len))
-						gvname.var_name.len++;
+					/* skip selecting/dumping triggers if not BG or MM access method */
+					if (NULL != cs_addrs)
+					{
+						if ('*' == ptr1[gbl_len])
+							gvname.var_name.len++;
+						SET_GVTARGET_TO_HASHT_GBL(gv_target->gd_csa);
+						INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
+						if (0 != gv_target->root)
+							write_gbls_or_names(gvname.var_name.addr, gvname.var_name.len,
+											trig_name);
+					}
 				}
-				SET_GVTARGET_TO_HASHT_GBL(gv_target->gd_csa);
 			} else
 			{
 				if (len1 != (badpos = validate_input_trigger_name(ptr1, len1, NULL))) /* assignment is intended */
 				{ /* is the input name valid */
-					INVALID_NAME_ERROR("Invalid name entry in SELECT list: ",
-							   sel_ptr, select_status, badpos);
+					INVALID_NAME_ERROR("Invalid name entry in SELECT list: ", sel_ptr, select_status, badpos);
 					continue;
 				}
 				if (TRIGNAME_SEQ_DELIM == *(sel_ptr + (len1 - 1)))
-					/* drop the trailing # sign */
-					len1--;
+					len1--;	/* drop the trailing # sign */
 				gvname.var_name.addr = sel_ptr;
 				gvname.var_name.len = len1;
 				SAVE_TRIGGER_REGION_INFO(save_currkey);
-				SWITCH_TO_DEFAULT_REGION;
+				for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions; reg < reg_top; reg++)
+				{
+					GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg);
+					if (NULL == cs_addrs)	/* not BG or MM access method */
+						continue;
+					/* gv_target now points to ^#t in region "reg" */
+					if (0 == gv_target->root)
+						continue;
+					write_gbls_or_names(gvname.var_name.addr, gvname.var_name.len, trig_name);
+				}
 			}
-			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
-			if (0 != gv_target->root)
-				write_gbls_or_names(gvname.var_name.addr, gvname.var_name.len, file_name_len, &op_val, trig_name);
 			RESTORE_TRIGGER_REGION_INFO(save_currkey);
 		} while (NULL != (sel_ptr = strtok_r(NULL, ",", &strtok_ptr)));	/* Embedded assignment is intended */
 	}
-	if (0 != file_name_len)
-	{
-		op_val.mvtype = op_pars.mvtype = MV_STR;
-		op_val.str.addr = (char *)file_name;;
-		op_val.str.len = file_name_len;
-		op_pars.str.len = SIZEOF(no_param);
-		op_pars.str.addr = (char *)&no_param;
-		op_close(&op_val, &op_pars);
-		/* Return back to the current device */
-		io_curr_device = save_io_curr_device;
-	}
 	return select_status;
 }
-
 #endif

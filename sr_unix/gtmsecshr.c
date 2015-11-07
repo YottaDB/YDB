@@ -312,7 +312,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	gtmsecshr_mesg	mesg;
 	struct stat	stat_buf;
 	char		*gtm_tmp_ptr;
-	int		rc;
+	int		status;
 	int		lib_gid;
 	struct stat	dist_stat_buff;
 #	ifdef _AIX
@@ -452,8 +452,8 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 					realpathbef[reclen-- - 1] = '\0';	/* Overwrite nl with null and decr length */
 				newtz = malloc(reclen);				/* putenv arg must be new - no stack vars */
 				strcpy(newtz, realpathbef);
-				rc = putenv(newtz);
-				if (0 != rc)
+				PUTENV(status, newtz);
+				if (0 != status)
 				{
 					save_errno = errno;
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3,
@@ -507,9 +507,9 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	/* Close standard IO devices - we don't need/want them as all IO goes to operator log. Else we would have IO devices
 	 * tied to whatever process started gtmsecshr up which we definitely don't want.
 	 */
-	CLOSEFILE(0, rc);	/* No stdin */
-	CLOSEFILE(1, rc);	/* No stdout */
-	CLOSEFILE(2, rc);	/* No stderr */
+	CLOSEFILE(0, status);	/* No stdin */
+	CLOSEFILE(1, status);	/* No stdout */
+	CLOSEFILE(2, status);	/* No stderr */
 	/* Init signal handling which works slightly different than in other utilities - gtmsecshr has its own handler which
 	 * *calls* generic_signal_handler (which always returns for gtmsecshr) - we then drive our normal exit handling.
 	 */
@@ -519,7 +519,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	{	/* Close the file only if we have it open. This is to avoid a CLOSEFAIL error in case of
 		 * trying to close an invalid file descriptor.
 		 */
-		CLOSEFILE_IF_OPEN(file_des, rc);
+		CLOSEFILE_IF_OPEN(file_des, status);
 	}
 	if (-1 == CHDIR(P_tmpdir))	/* Switch to temporary directory as CWD */
 	{

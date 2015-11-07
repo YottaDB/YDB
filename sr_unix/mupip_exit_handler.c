@@ -124,7 +124,7 @@ void mupip_exit_handler(void)
 		recvpool.recvpool_ctl = NULL;
 	}
 	gv_rundown(); /* also takes care of detaching from the journal pool */
-	relinkctl_rundown(TRUE);
+	relinkctl_rundown(TRUE, TRUE);	/* decrement relinkctl-attach & rtnobj-reference counts */
 	/* Log the exit of replication servers. In case they are exiting abnormally, their log file pointers
 	 * might not be set up. In that case, use "stderr" for logging.
 	 */

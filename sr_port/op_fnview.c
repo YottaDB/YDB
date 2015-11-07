@@ -86,13 +86,15 @@ LITREF	mval		literal_zero;
 LITREF	mval		literal_one;
 LITREF	mval		literal_null;
 
-#define		MM_RES		"MM"
-#define		BG_RES		"BG"
-#define		CM_RES		"CM"
-#define		USR_RES		"USR"
-#define		GTM_BOOL_RES	"GT.M Boolean short-circuit"
-#define		STD_BOOL_RES	"Standard Boolean evaluation side effects"
-#define		WRN_BOOL_RES	"Standard Boolean with side-effect warning"
+#define		MM_RES			"MM"
+#define		BG_RES			"BG"
+#define		CM_RES			"CM"
+#define		USR_RES			"USR"
+#define		GTM_BOOL_RES		"GT.M Boolean short-circuit"
+#define		STD_BOOL_RES		"Standard Boolean evaluation side effects"
+#define		WRN_BOOL_RES		"Standard Boolean with side-effect warning"
+#define		STATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
+#define		STATS_KEYWD_SIZE	(3 + 1 + 1)	/* 3 character mnemonic, colon and comma */
 
 STATICFNDCL unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act);
 
@@ -108,6 +110,16 @@ STATICFNDCL unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act);
 	DST->str.len = keylen;						\
 	DST->str.addr = (char *)stringpool.free;			\
 	stringpool.free += keylen;					\
+}
+
+#define STATS_PUT_PARM(TXT, CNTR, BASE)					\
+{									\
+	MEMCPY_LIT(stringpool.free, TXT);				\
+	stringpool.free += STR_LIT_LEN(TXT);				\
+	*stringpool.free++ = ':';					\
+	stringpool.free = i2ascl(stringpool.free, BASE.CNTR);		\
+	*stringpool.free++ = ',';					\
+	assert(stringpool.free <= stringpool.top);			\
 }
 
 void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
@@ -337,18 +349,42 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			s2pool(&tmpstr);
 			dst->str = tmpstr;
 			break;
-#ifdef		DEBUG
-		case VTK_PROBECRIT:
-			if (!gd_header)
-				gvinit();
-			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr);
+		case VTK_POOLLIMIT:
+			assert(NULL != gd_header);	/* view_arg_convert would have done this for VTK_POOLLIMIT */
 			reg = parmblk.gv_ptr;
-			grab_crit(reg);
-			if (!WBTEST_ENABLED(WBTEST_HOLD_CRIT_ENABLED))
-				rel_crit(reg);
+			if (!reg->open)
+				gv_init_reg(reg);
+			csa = &FILE_INFO(reg)->s_addrs;
+			n = csa->gbuff_limit;
 			break;
-#endif
+		case VTK_PROBECRIT:
+			assert(NULL != gd_header);	/* view_arg_convert would have done this for VTK_POOLLIMIT */
+			reg = parmblk.gv_ptr;
+			if (!reg->open)
+				gv_init_reg(reg);
+			csa = &FILE_INFO(reg)->s_addrs;
+			if (NULL != csa->hdr)
+			{
+				UNIX_ONLY(csa->crit_probe = TRUE);
+				grab_crit(reg);
+				UNIX_ONLY(csa->crit_probe = FALSE);
+				if (!WBTEST_ENABLED(WBTEST_HOLD_CRIT_ENABLED))
+					rel_crit(reg);
+				dst->str.len = 0;
+#				ifdef UNIX
+				ENSURE_STP_FREE_SPACE(n_probecrit_rec_types * (STATS_MAX_DIGITS + STATS_KEYWD_SIZE));
+				dst->str.addr = (char *)stringpool.free;
+				/* initialize csa->proberit_rec.p_crit_success field from cnl->gvstats_rec */
+				csa->probecrit_rec.p_crit_success = csa->nl->gvstats_rec.n_crit_success;
+#				define TAB_PROBECRIT_REC(CNTR,TEXT1,TEXT2)	STATS_PUT_PARM(TEXT1, CNTR, csa->probecrit_rec)
+#				include "tab_probecrit_rec.h"
+#				undef TAB_PROBECRIT_REC
+				assert(stringpool.free < stringpool.top);
+				/* subtract one to remove extra trailing comma delimiter */
+				dst->str.len = INTCAST((char *)stringpool.free - dst->str.addr - 1);
+#				endif
+			}
+			break;
 		case VTK_REGION:
 			gblnamestr = &parmblk.str;
 			assert(NULL != gd_header); /* "view_arg_convert" call done above would have set this (for VTP_DBKEY case) */
@@ -450,23 +486,11 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
 			{
-#				define GVSTATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
-#				define GVSTATS_KEYWORD_SIZE	5		/* THREE PLUS TWO DELIMITERS */
-#				define GVSTATS_KEYWORD_COUNT	n_gvstats_rec_types
-#				define GVSTATS_MAX_SIZE (GVSTATS_KEYWORD_COUNT * (GVSTATS_MAX_DIGITS + GVSTATS_KEYWORD_SIZE))
-				ENSURE_STP_FREE_SPACE(GVSTATS_MAX_SIZE);
+				ENSURE_STP_FREE_SPACE(n_gvstats_rec_types * (STATS_MAX_DIGITS + STATS_KEYWD_SIZE));
 				dst->str.addr = (char *)stringpool.free;
 				/* initialize cnl->gvstats_rec.db_curr_tn field from file header */
 				csa->nl->gvstats_rec.db_curr_tn = csa->hdr->trans_hist.curr_tn;
-#				define GVSTATS_PUT_PARM(TXT, CNTR, cnl)						\
-				{										\
-					MEMCPY_LIT(stringpool.free, TXT);					\
-					stringpool.free += STR_LIT_LEN(TXT);					\
-					*stringpool.free++ = ':';						\
-					stringpool.free = i2ascl(stringpool.free, cnl->gvstats_rec.CNTR);	\
-					*stringpool.free++ = ',';						\
-				}
-#				define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	GVSTATS_PUT_PARM(TEXT1, COUNTER, csa->nl)
+#				define TAB_GVSTATS_REC(CNTR,TEXT1,TEXT2)	STATS_PUT_PARM(TEXT1, CNTR, csa->nl->gvstats_rec)
 #				include "tab_gvstats_rec.h"
 #				undef TAB_GVSTATS_REC
 				assert(stringpool.free < stringpool.top);

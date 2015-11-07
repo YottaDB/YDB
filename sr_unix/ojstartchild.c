@@ -43,18 +43,32 @@
 #include "compiler.h"
 #include "job_addr.h"
 #include "util.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gtmio.h"
 #include "fork_init.h"
+#include "rtnobj.h"
+#include "getjobnum.h"
+#include "zshow.h"
+#include "zwrite.h"
+#include "gtm_maxstr.h"
 
 GBLREF	bool			jobpid;	/* job's output files should have the pid appended to them. */
 GBLREF	volatile boolean_t	ojtimeout;
 GBLREF  boolean_t       	gtm_pipe_child;
 GBLREF	int			job_errno;
+GBLREF	zshow_out		*zwr_output;
+GBLREF	uint4			pat_everything[];
+GBLREF	mstr_len_t		sizeof_pat_everything;
+GBLREF	io_pair			io_curr_device;
 
 static  joberr_t		joberr = joberr_gen;
 static	int			pipe_fd;
+static	int			setup_fds[2];	/* socket pair for setup of final mumps process */
+static	pid_t			child_pid;
 
 #ifndef SYS_ERRLIST_INCLUDE
 /* currently either stdio.h or errno.h both of which are included above needed by TIMEOUT_ERROR in jobsp.h */
@@ -119,7 +133,7 @@ LITREF gtmImageName	gtmImageNames[];
 	kill(child_pid, SIGTERM);							\
 	joberr = joberr_io_setup_op_write;						\
 	job_errno = errno;								\
-	DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);		\
+	DOWRITERC(pipe_fd, &job_errno, SIZEOF(job_errno), pipe_status);			\
 	_exit(joberr);									\
 }
 
@@ -132,8 +146,18 @@ LITREF gtmImageName	gtmImageNames[];
 	_exit(joberr);									\
 }
 
+#ifdef AUTORELINK_SUPPORTED
+#define	RELINKCTL_RUNDOWN_MIDDLE_PARENT(NEED_RTNOBJ_SHM_FREE, RTNHDR)			\
+{											\
+	if (NEED_RTNOBJ_SHM_FREE)							\
+		rtnobj_shm_free(RTNHDR, LATCH_GRABBED_FALSE);				\
+	relinkctl_rundown(TRUE, FALSE);							\
+}
+#endif
+
 error_def(ERR_GTMDISTUNVERIF);
 error_def(ERR_JOBFAIL);
+error_def(ERR_JOBLVN2LONG);
 error_def(ERR_JOBPARTOOLONG);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_TEXT);
@@ -142,8 +166,9 @@ error_def(ERR_TEXT);
  * not want to run.
  */
 
-void job_term_handler(int sig);
-static int io_rename(job_params_msg *params, const int jobid);
+STATICFNDCL void job_term_handler(int sig);
+STATICFNDCL int io_rename(job_params_msg *params, const int jobid);
+STATICFNDCL void local_variable_marshalling(void);
 
 /* Middle process sets the entryref for the jobbed-off process by calling job_addr(). job_addr() internally calls op_zlink(). If
  * rts_error occurs when we are in the job_addr() function, the topmost condition handler inherited from parent process will be
@@ -154,11 +179,12 @@ static CONDITION_HANDLER(middle_child)
 {
 	int pipe_status;
 	START_CH(FALSE);
-	DOWRITERC(pipe_fd, &job_errno, SIZEOF(job_errno), pipe_status);
 	/* As of now, middle process could encounter rts_error only while setting entryref. Hence the following assert.
 	 * Do assert after write to prevent parent hang.
 	 */
 	assert(joberr == joberr_rtn);
+	ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(FALSE, NULL);)	/* decrement refcnts for relinkctl shm */
+	DOWRITERC(pipe_fd, &job_errno, SIZEOF(job_errno), pipe_status);
 	_exit(joberr);
 }
 
@@ -175,7 +201,7 @@ static CONDITION_HANDLER(grand_child)
  * successfully forked-off the job.
  */
 
-void job_term_handler(int sig)
+STATICFNDEF void job_term_handler(int sig)
 {
 		int ret;
 		int status;
@@ -195,7 +221,7 @@ void job_term_handler(int sig)
 			return;
 }
 
-static int io_rename(job_params_msg *params, const int jobid)
+STATICFNDEF int io_rename(job_params_msg *params, const int jobid)
 {
 	char path[MAX_STDIOE_LEN];
 
@@ -217,6 +243,76 @@ static int io_rename(job_params_msg *params, const int jobid)
 	params->error_len = strlen(params->error);
 	return 0;
 }
+
+void ojmidchild_send_var(void)
+{
+	job_setup_op setup_op;
+	int rc, pipe_status;
+	job_buffer_size_msg buffer_size;
+
+	setup_op = job_set_locals;
+	SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
+	if (rc < 0)
+		SETUP_OP_FAIL();
+	buffer_size = zwr_output->ptr - zwr_output->buff;
+	/* Crop the ' ;*' string at the end of the aliases */
+	if (zwr_output->buff[buffer_size - 1] == '*' && zwr_output->buff[buffer_size - 2] == ';'
+	    && zwr_output->buff[buffer_size - 3] == ' ')
+		buffer_size -= 3;
+	assert(buffer_size > 0);
+	/* We must send the buffer_size regardless of its value. The child has its own check for size. It is going to terminate if
+	 * the size is excessive.
+	 */
+	SEND(setup_fds[0], &buffer_size, SIZEOF(buffer_size), 0, rc);
+	if (rc < 0)
+		SETUP_OP_FAIL();
+	if (buffer_size > MAX_STRLEN)
+	{
+		rc = ERR_JOBLVN2LONG;
+		DOWRITERC(pipe_fd, &rc, SIZEOF(rc), pipe_status);
+		/* No need to SIGTERM the child because child will issue a proper error message and quit */
+		_exit(joberr_io_setup_op_write);
+	}
+	SEND(setup_fds[0], zwr_output->buff, buffer_size, 0, rc);
+	if (rc < 0)
+		SETUP_OP_FAIL();
+	zwr_output->ptr = zwr_output->buff;
+	return;
+}
+
+STATICFNDEF void local_variable_marshalling(void)
+{
+	/* Setup buffer to write local variables one at a time */
+	zshow_out	output;
+	mval		pattern;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	memset(&output, 0, SIZEOF(output));
+	output.code = 'V';
+	output.type = ZSHOW_BUFF_ONLY;
+	/* Expanded MAXSTR_BUFF_DECL/MAXSTR_BUFF_INIT below because they are designed to handle the size of MAX_STRBUFF_INIT when we
+	 * really want is MAX_STRLEN The condition handler established within MAXSTR_BUFF_INIT is futile because any error we
+	 * encounter here is fatal
+	 */
+	output.buff = malloc(MAX_STRLEN);
+	output.size = MAX_STRLEN;
+	maxstr_stack_level++;
+	assert(maxstr_stack_level < MAXSTR_STACK_SIZE);
+	maxstr_buff[maxstr_stack_level].len = output.size;
+	maxstr_buff[maxstr_stack_level].addr = NULL;
+	output.ptr = output.buff;
+	TREF(midchild_send_locals) = TRUE;
+	pattern.str.addr = (char *)pat_everything;
+	pattern.str.len = sizeof_pat_everything;
+	pattern.mvtype = MV_STR;
+	lvzwr_init(zwr_patrn_mval, &pattern);
+	lvzwr_fini(&output, ZWRITE_END);
+	TREF(midchild_send_locals) = FALSE;
+	free(output.buff);
+	return;
+}
+
 
 /*
  * --------------------------------------------------------------------------------------------------------------------------------
@@ -241,6 +337,7 @@ static int io_rename(job_params_msg *params, const int jobid)
 
 int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_return, int pipe_fds[])
 {
+	boolean_t		need_rtnobj_shm_free;
 	char			cbuff[TEMP_BUFF_SIZE], pbuff[TEMP_BUFF_SIZE], cmdbuff[TEMP_BUFF_SIZE];
 	char			tbuff[MAX_JOB_LEN], tbuff2[MAX_JOB_LEN], fname_buf[MAX_STDIOE_LEN];
 	char			*pgbldir_str;
@@ -249,34 +346,33 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	int			wait_status, save_errno, kill_ret;
 	int			rc, dup_ret, in_fd;
 	int			status;
-	pid_t			child_pid, done_pid;
+	pid_t			done_pid;
 	job_parm		*jp;
-	rhdtyp			*base_addr;
+	rhdtyp			*rtnhdr;
 	struct sigaction	act, old_act;
 	int			pipe_status, env_len;
 	int			mproc_fds[2]; 	/* pipe between middle process and grandchild process */
 	int			decision;
-	int			setup_fds[2];	/* socket pair for setup of final mumps process */
 	job_setup_op		setup_op;
 	job_params_msg		params;
 	job_arg_count_msg	arg_count;
 	job_arg_msg		arg_msg;
 	job_buffer_size_msg	buffer_size;
-
-#ifdef	__osf__
-/* These must be O/S-compatible 64-bit pointers for OSF/1.  */
-#pragma	pointer_size (save)
-#pragma pointer_size (long)
-#endif
-
+#	ifdef	__osf__
+		/* These must be O/S-compatible 64-bit pointers for OSF/1.  */
+#		pragma	pointer_size (save)
+#		pragma pointer_size (long)
+#	endif
 	char		*c1, *c2, **c3;
 	char		*argv[4];
 	char		**env_ary, **env_ind;
 	char		**new_env_cur, **new_env_top, **old_env_cur, **old_env_top, *env_end;
+#	ifdef	__osf__
+#		pragma pointer_size (restore)
+#	endif
+	DCL_THREADGBL_ACCESS;
 
-#ifdef	__osf__
-#pragma pointer_size (restore)
-#endif
+	SETUP_THREADGBL_ACCESS;
 	/* Do the fork and exec but BEFORE that do a FFLUSH(NULL) to make sure any fclose (done in io_rundown
 	 * in the child process) does not affect file offsets in this (parent) process' file descriptors
 	 */
@@ -292,6 +388,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 * much hitch. If any error occurs during this, exit with appropriate status so the waiting parent can diagnose.
 		 */
 
+		getjobnum();	/* set "process_id" to a value different from parent. This is particularly needed for the
+				 * RELINKCTL_RUNDOWN_MIDDLE_PARENT macro since it does rtnobj_shm_free which deals with latches
+				 * that in turn rely on the "process_id" global variable reflecting the current pid.
+				 */
 		/* set to TRUE so any child process associated with a pipe device will know it is not the parent in iorm_close() */
 		gtm_pipe_child = TRUE;
 		joberr = joberr_gen;
@@ -371,11 +471,30 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 			_exit(status);
 		}
-
+		/* Record the fact that this process is interested in the relinkctl files inherited from the parent by
+		 * incrementing the linkctl->hdr->nattached count. This is required by the relinkctl_rundown(TRUE, FALSE)
+		 * call done as part of the RELINKCTL_RUNDOWN_MIDDLE_PARENT macro in the middle child or the grandchild.
+		 * Do this BEFORE the call to job_addr. In case that does a relinkctl_attach of a new relinkctl file,
+		 * we would increment the counter automatically so dont want that to go through a double-increment.
+		 */
+		ARLINK_ONLY(relinkctl_incr_nattached());
 		joberr = joberr_rtn;
-		if (!job_addr(&jparms->routine, &jparms->label, jparms->offset, (char **)&base_addr, &transfer_addr))
+		/* We are the middle child. It is possible the below call to job_addr loads an object into shared memory
+		 * using "rtnobj_shm_malloc". In that case, as part of halting we need to do a "rtnobj_shm_free" to keep
+		 * the rtnobj reference counts in shared memory intact. The variable "need_rtnobj_shm_free" servers this purpose.
+		 * Note that we cannot safely call relinkctl_rundown since we do not want to decrement reference counts for
+		 * routines that have already been loaded by our parent process (which we inherited due to the fork) since
+		 * the parent process is the one that will do the decrement later. We should decrement the count only for
+		 * routines that we load ourselves. And the only one possible is due to the below call to "job_addr".
+		 * Note that the balancing decrement/free happens in the middle child until the grandchild is forked.
+		 * Once the grandchild fork succeeds, the grandchild is incharge of doing this cleanup. This flow is needed
+		 * so the decrement (and potential removal of rtnobj shmid) only happens AFTER when it is needed.
+		 */
+		if (!job_addr(&jparms->routine, &jparms->label, jparms->offset, (char **)&rtnhdr, &transfer_addr,
+			&need_rtnobj_shm_free))
 		{
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+			ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr);)
 			_exit(joberr);
 		}
 
@@ -384,14 +503,16 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		{
 			job_errno = errno;
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+			ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr);)
 			_exit(joberr);
 		}
 
 		joberr = joberr_sp;
-		if (-1 == (rc = socketpair(AF_UNIX, SOCK_DGRAM, 0, setup_fds)))
+		if (-1 == (rc = socketpair(AF_UNIX, SOCK_STREAM, 0, setup_fds)))
 		{
 			job_errno = errno;
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+			ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr);)
 			_exit(joberr);
 		}
 
@@ -430,7 +551,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 					_exit(joberr);
 				}
 			}
-
 			/* Inform grandchild that everything is properly set for it and it is ready to continue. */
 			decision = JOB_CONTINUE;
 			DOWRITERC(mproc_fds[1], &decision, SIZEOF(decision), pipe_status);
@@ -442,13 +562,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 				_exit(joberr);
 			}
-
 			/* send job parameters and arguments to final mumps process over setup socket */
 			setup_op = job_set_params;
 			SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
 			if (rc < 0)
 				SETUP_OP_FAIL();
-
 			params.directory_len = jparms->directory.len;
 			memcpy(params.directory, jparms->directory.addr, jparms->directory.len);
 			if (0 < jparms->gbldir.len)
@@ -484,17 +602,14 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			SEND(setup_fds[0], &params, SIZEOF(params), 0, rc);
 			if (rc < 0)
 				SETUP_DATA_FAIL();
-
 			setup_op = job_set_parm_list;
 			SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
 			if (rc < 0)
 				SETUP_OP_FAIL();
-
 			arg_count = argcnt;
 			SEND(setup_fds[0], &arg_count, SIZEOF(arg_count), 0, rc);
 			if (rc < 0)
 				SETUP_DATA_FAIL();
-
 			for (jp = jparms->parms;  jp ; jp = jp->next)
 			{
 				if (jp->parm->str.len > MAX_JOB_LEN - 2)
@@ -512,31 +627,37 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				if (rc < 0)
 					SETUP_DATA_FAIL();
 			}
-
 			if (0 < jparms->input_prebuffer_size)
 			{
 				setup_op = job_set_input_buffer;
 				SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
 				if (rc < 0)
 					SETUP_OP_FAIL();
-
 				buffer_size = jparms->input_prebuffer_size;
 				SEND(setup_fds[0], &buffer_size, SIZEOF(buffer_size), 0, rc);
 				if (rc < 0)
 					SETUP_DATA_FAIL();
-
 				SEND(setup_fds[0], jparms->input_prebuffer, jparms->input_prebuffer_size, 0, rc);
 				if (rc < 0)
 					SETUP_DATA_FAIL();
 				/* input_prebuffer leaks, but the middle process is about to exit, so don't worry about it */
 			}
-
-			/* tell job to proceed */
 			setup_op = job_done;
 			SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
 			if (rc < 0)
 				SETUP_OP_FAIL();
-
+			/* Send the local variables */
+			if (jparms->passcurlvn)
+				local_variable_marshalling();
+			/* tell job to proceed */
+			setup_op = local_trans_done;
+			SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
+			if (rc < 0)
+				SETUP_OP_FAIL();
+			/* tell job to proceed but before that detach from relinkctl/rtnobj shared memory in case the grandchild
+			 * needs to remove those (due to linkctl->hdr->nattached being 0).
+			 */
+			ARLINK_ONLY(relinkctl_rundown(FALSE, FALSE));	/* do not decrement counters, just shmdt */
 			/* write child_pid into pipe to be read by parent process(P) for $ZJOB */
 			/* Ignore the status if this fails, as the child is already running, and there is likely not a parent
 			 * to report to.
@@ -547,30 +668,32 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		/* This is now the grandchild process (actual Job process) -- an orphan as soon as the exit(EXIT_SUCCESS) above
 		 * occurs. Revert the condition handler established by middle process and establish its own condition handler */
 		REVERT;
+		getjobnum();	/* set "process_id" to a value different from parent (middle child). This is particularly needed
+				 * for the RELINKCTL_RUNDOWN_MIDDLE_PARENT macro since it does rtnobj_shm_free which deals with
+				 * latches that in turn rely on the "process_id" global variable reflecting the current pid.
+				 */
 		ESTABLISH_RET(grand_child, 0);
 		sigaction(SIGTERM, &old_act, 0);		/* restore the SIGTERM handler */
 		CLOSEFILE_RESET(mproc_fds[1], pipe_status);	/* resets "mproc_fds[0]" to FD_INVALID */
 		CLOSEFILE_RESET(setup_fds[0], pipe_status);	/* resets "setup_fds[0]" to FD_INVALID */
 		DOREADRC(mproc_fds[0], &decision, SIZEOF(decision), pipe_status);
 		if (pipe_status)	 /* We failed to read the communication from middle process */
+		{
+			ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr);)
 	                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("Error reading from pipe"), errno);
-		else {
+		} else {
 			if (JOB_EXIT == decision)
 				exit(EXIT_SUCCESS);
 			assert(JOB_CONTINUE == decision);
 		}
 		CLOSEFILE_RESET(mproc_fds[0], pipe_status);	/* resets "mproc_fds[0]" to FD_INVALID */
-
 		/* Run down any open flat files to reclaim their file descriptors */
 		io_rundown(RUNDOWN_EXCEPT_STD);
 
 		/* release the pipe opened by grand parent (P) */
 		CLOSEFILE_RESET(pipe_fds[0], pipe_status);	/* resets "pipe_fds[0]" to FD_INVALID */
 		CLOSEFILE_RESET(pipe_fds[1], pipe_status);	/* resets "pipe_fds[1]" to FD_INVALID */
-
-		/* do common cleanup in child */
-		ojchildioclean();
 
 		/* Count the number of environment variables.  */
 		for (environ_count = 0, c3 = environ, c2 = *c3;  c2;  c3++, c2 = *c3)
@@ -617,7 +740,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 
 		string_len = STRLEN("%s=%d") + STRLEN(CHILD_FLAG_ENV) + MAX_NUM_LEN - 4;
 		if (string_len > MAX_JOB_LEN)
+		{
+			ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr);)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
+		}
 		c1 = (char *)malloc(string_len + 1);
 #ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
@@ -639,7 +765,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			*(pbuff + jparms->gbldir.len) = '\0';
 			string_len = STRLEN("%s=%s") + STRLEN(GBLDIR_ENV) + STRLEN(pbuff) - 4;
 			if (string_len > TEMP_BUFF_SIZE)
+			{
+				ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr);)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
+			}
 			c1 = (char *)malloc(string_len + 1);
 #ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
@@ -700,9 +829,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			c2 = &tbuff[string_len];
 			strcpy(c2, MUMPS_EXE_STR);
 		} else
+		{
+			ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr);)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, string_len, c1,
 				SIZEOF(tbuff) - SIZEOF(MUMPS_EXE_STR));
-
+		}
 #		ifdef KEEP_zOS_EBCDIC_	/* use real strcpy to preserve env in native code set */
 #		pragma convlit(suspend)
 #		endif
@@ -720,6 +851,15 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			*(cmdbuff + jparms->cmdline.len) = 0;
 		} else
 			memset(cmdbuff, 0, TEMP_BUFF_SIZE);
+		/* Now that all job parameters (which could potentially be in relinkctl rtnobj shared memory) have been
+		 * copied over, we can get rid of our relinkctl files. Note that the below macro decrements
+		 * linkctl->hdr->nattached in the grandchild on behalf of the middle child (who did the increment).
+		 */
+		ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr);)
+		/* Do common cleanup in child. Note that the below call to "ojchildioclean" invokes "relinkctl_rundown"
+		 * but that is not needed since we have already done it in the RELINKCTL_RUNDOWN_MIDDLE_PARENT invocation.
+		 */
+		ojchildioclean();
 
 #ifdef KEEP_zOS_EBCDIC
 		__getEstring1_a_copy(tbuff2, STR_AND_LEN(tbuff));
@@ -784,6 +924,5 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			return (EINVAL);		/* return some error condition */
 		}
 	}
-
 	return (EINVAL); /* This should never get executed, added to make compiler happy */
 }

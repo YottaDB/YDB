@@ -214,6 +214,7 @@ int gtm_is_main_thread()
 int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
 		unsigned int *has_ret_value)
 {
+	boolean_t		need_rtnobj_shm_free;
 	callin_entry_list	*entry;
 	mstr			label, routine;
 	int			has_return, i, len;
@@ -283,7 +284,10 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	/* The 3rd argument is NULL because we will get lnr_adr via lab_proxy. */
-	if(!job_addr(&routine, &label, 0, (char **)&base_addr, NULL))
+	/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
+	 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
+	 */
+	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL, &need_rtnobj_shm_free))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 	memset(&param_blk, 0, SIZEOF(param_blk));
 	param_blk.rtnaddr = (void *)base_addr;
@@ -521,6 +525,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 /* Common work-routine for gtm_ci() and gtm_cip() to drive callin */
 int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var)
 {
+	boolean_t		need_rtnobj_shm_free;
 	va_list			var;
 	callin_entry_list	*entry;
 	mstr			label, routine;
@@ -596,7 +601,10 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		entry = callin_handle;
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	/* 3rd argument is NULL because we will get lnr_adr via lab_proxy */
-	if(!job_addr(&routine, &label, 0, (char **)&base_addr, NULL))
+	/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
+	 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
+	 */
+	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL, &need_rtnobj_shm_free))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 	memset(&param_blk, 0, SIZEOF(param_blk));
 	param_blk.rtnaddr = (void *)base_addr;

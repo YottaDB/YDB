@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,9 +98,14 @@ void		zshow_zwrite(zshow_out *output);
 boolean_t	zwr2format(mstr *src, mstr *des);
 int		zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1, int *val_len1);
 int		format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len);
+void		format2disp(char *src, int src_len, char *dispbuff, int *displen);
 void		mval_write(zshow_out *output, mval *v, boolean_t flush);
 void		mval_nongraphic(zshow_out *output, char *cp, int len, int num);
 void		gvzwr_fini(zshow_out *out, int pat);
 void		lvzwr_fini(zshow_out *out, int t);
+
+#ifdef AUTORELINK_SUPPORTED
+void		zshow_rctldump(zshow_out *output);
+#endif
 
 #endif

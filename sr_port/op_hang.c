@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,10 @@
 #include "getzposition.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
+#endif
+#ifdef UNIX
+#include "sleep.h"
+#include "time.h"
 #endif
 
 GBLREF	uint4		dollar_trestart;
@@ -176,7 +180,10 @@ void op_hang(mval* num)
 				return;		/* done HANGing */
 		}
 #		ifdef UNIX
-		hiber_start(ms);
+		if (ms < 10)
+			SLEEP_USEC(ms * 1000, TRUE);	/* Finish the sleep if it is less than 10ms. */
+		else
+			hiber_start(ms);
 #		elif defined(VMS)
 		time[0] = -time_low_ms(ms);
 		time[1] = -time_high_ms(ms) - 1;

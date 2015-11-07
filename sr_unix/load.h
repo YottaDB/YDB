@@ -33,8 +33,8 @@
 	continue; /* continue, when (onerror = ONERROR_PROCEED) or when user selects Yes in ONERROR_INTERACTIVE */		\
 }
 
-void bin_load(uint4 begin, uint4 end);
-void go_load(uint4 begin, uint4 end);
+void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len);
+void go_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len, char *line2_ptr, int line2_len);
 void goq_load(void);
 
 #endif /* LOAD_INCLUDED */

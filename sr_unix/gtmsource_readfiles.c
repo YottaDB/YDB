@@ -814,7 +814,7 @@ static void increase_buffer(unsigned char **buff, int *buflen, int buffer_needed
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			  LEN_AND_LIT("Error extending buffer space while reading files. Malloc error"), alloc_status);
 	}
-	REPL_DPRINT3("Old gtmsource_msgp = 0x%llx; New gtmsource_msgp = 0x%llx\n", (long long)old_msgp, (long long)gtmsource_msgp);
+	REPL_DPRINT3("Old gtmsource_msgp = 0x%llx; New gtmsource_msgp = 0x%llx\n", old_msgp, gtmsource_msgp);
 	REPL_DPRINT2("Old *buff = 0x%llx\n", *buff);
 	*buff = (unsigned char *)gtmsource_msgp + (*buff - old_msgp);
 	REPL_DPRINT2("New *buff = 0x%llx\n", *buff);
@@ -1000,7 +1000,7 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 					srch_status->seqno = rec_jnl_seqno;
 				}
 				if (ctl->max_seqno < rec_jnl_seqno)
-					CTL_SET_MAX_SEQNO(ctl, rec_jnl_seqno, b->recaddr, b->recaddr, DO_EOF_ADDR_CHECK);
+					CTL_SET_MAX_SEQNO(ctl, rec_jnl_seqno, b->recaddr, b->recaddr, SKIP_EOF_ADDR_CHECK);
 				QWASSIGN(ctl->seqno, rec_jnl_seqno);
 				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 				if (QWEQ(rec_jnl_seqno, read_seqno))
@@ -1386,11 +1386,14 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 					} else
 						repl_log(gtmsource_log_fp, FALSE, TRUE, "\n");
 				}
-				if (TREF(gtm_environment_init)
-					DEBUG_ONLY(&& (WBTEST_CLOSE_JNLFILE != gtm_white_box_test_case_number)))
-						gtm_fork_n_core();
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SEQNUMSEARCHTIMEOUT, 2,
-					&read_jnl_seqno, &read_jnl_seqno);
+				if (!jnlpool.gtmsource_local->jnlfileonly)
+				{
+					if (TREF(gtm_environment_init)
+						DEBUG_ONLY(&& (WBTEST_CLOSE_JNLFILE != gtm_white_box_test_case_number)))
+							gtm_fork_n_core();
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SEQNUMSEARCHTIMEOUT, 2,
+						&read_jnl_seqno, &read_jnl_seqno);
+				}
 			    }
 			}
 		}
@@ -1818,7 +1821,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 			maxbufflen = gtmsource_msgbufsiz - REPL_MSG_HDRLEN;
 		}
 	} while (TRUE);
-	if (file2pool)
+	if (file2pool && !gtmsource_local->jnlfileonly)
 	{
 		gtmsource_local->read = (uint4)(read_addr % jnlpool_size) ;
 		gtmsource_local->read_state = read_state = READ_POOL;

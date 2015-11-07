@@ -239,7 +239,8 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	jb->before_images = header->before_images;
 	jb->epoch_tn = eof_record.prefix.tn;
 	csd->jnl_checksum = header->checksum;
-	LOG2_OF_INTEGER(header->alignsize, jb->log2_of_alignsize);
+	assert(4 == SIZEOF(header->alignsize));	/* so we can use the 32bit version of ceil_log2 */
+	jb->log2_of_alignsize = ceil_log2_32bit(header->alignsize);
 	assert(header->autoswitchlimit == csd->autoswitchlimit);
 	assert(header->jnl_alq == csd->jnl_alq);
 	assert(header->jnl_deq == csd->jnl_deq);

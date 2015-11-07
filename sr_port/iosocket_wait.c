@@ -208,28 +208,31 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		}
 		if (nselect)
 		{
-			utimeout.tv_sec = timepar;
-			utimeout.tv_usec = 0;
-			msec_timeout = timeout2msec(timepar);
-			sys_get_curr_time(&cur_time);
-			if (!retry_accept && (!zint_restart || !sockintr->end_time_valid))
-				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
-			else
-			{       /* end_time taken from restart data. Compute what msec_timeout should be so timeout timer
-				   gets set correctly below.  Or retry after failed accept.
-				*/
-				DBGSOCK((stdout, "socwait: Taking timeout end time from wait restart data\n"));
-				cur_time = sub_abs_time(&end_time, &cur_time);
-				if (0 > cur_time.at_sec)
-				{
-					msec_timeout = -1;
-					utimeout.tv_sec = 0;
-					utimeout.tv_usec = 0;
-				} else
-				{
-					msec_timeout = (int4)(cur_time.at_sec * 1000 + cur_time.at_usec / 1000);
-					utimeout.tv_sec = cur_time.at_sec;
-					utimeout.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
+			if (NO_M_TIMEOUT != timepar)
+			{
+				utimeout.tv_sec = timepar;
+				utimeout.tv_usec = 0;
+				msec_timeout = timeout2msec(timepar);
+				sys_get_curr_time(&cur_time);
+				if (!retry_accept && (!zint_restart || !sockintr->end_time_valid))
+					add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+				else
+				{       /* end_time taken from restart data. Compute what msec_timeout should be so timeout timer
+				   	gets set correctly below.  Or retry after failed accept.
+					*/
+					DBGSOCK((stdout, "socwait: Taking timeout end time from wait restart data\n"));
+					cur_time = sub_abs_time(&end_time, &cur_time);
+					if (0 > cur_time.at_sec)
+					{
+						msec_timeout = -1;
+						utimeout.tv_sec = 0;
+						utimeout.tv_usec = 0;
+					} else
+					{
+						msec_timeout = (int4)(cur_time.at_sec * 1000 + cur_time.at_usec / 1000);
+						utimeout.tv_sec = cur_time.at_sec;
+						utimeout.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
+					}
 				}
 			}
 			zint_restart = sockintr->end_time_valid = FALSE;
@@ -265,8 +268,12 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 							mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
 							mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 							sockintr->who_saved = sockwhich_wait;
-							sockintr->end_time = end_time;
-							sockintr->end_time_valid = TRUE;
+							if (NO_M_TIMEOUT != timepar)
+							{
+								sockintr->end_time = end_time;
+								sockintr->end_time_valid = TRUE;
+							} else
+								sockintr->end_time_valid = FALSE;
 							dsocketptr->mupintr = TRUE;
 							socketus_interruptus++;
 							DBGSOCK((stdout, "socwait: mv_stent queued - endtime: %d/%d"
@@ -277,15 +284,18 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 						assertpro(FALSE);      /* Should *never* return from outofband_action */
 						return FALSE;   /* For the compiler.. */
 					}
-					sys_get_curr_time(&cur_time);
-					cur_time = sub_abs_time(&end_time, &cur_time);
-					if (0 > cur_time.at_sec)
+					if (NO_M_TIMEOUT != timepar)
 					{
-						rv = 0;		/* time out */
-						break;
+						sys_get_curr_time(&cur_time);
+						cur_time = sub_abs_time(&end_time, &cur_time);
+						if (0 > cur_time.at_sec)
+						{
+							rv = 0;		/* time out */
+							break;
+						}
+						utimeout.tv_sec = cur_time.at_sec;
+						utimeout.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
 					}
-					utimeout.tv_sec = cur_time.at_sec;
-					utimeout.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
 				} else
 					break;	/* either other error or done */
 			}
@@ -293,8 +303,11 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 			{	/* none selected or prior pending event */
 				iod->dollar.key[0] = '\0';
 				if (NO_M_TIMEOUT != timepar)
+				{
 					dollar_truth = FALSE;
-				return FALSE;
+					return FALSE;
+				} else
+					continue;
 			} else  if (rv < 0)
 			{
 				errptr = (char *)STRERROR(errno);
@@ -306,8 +319,11 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		{	/* nothing to select and no pending events */
 			iod->dollar.key[0] = '\0';
 			if (NO_M_TIMEOUT != timepar)
+			{
 				dollar_truth = FALSE;
-			return FALSE;
+				return FALSE;
+			} else
+				continue;
 		}
 		/* find out which sockets are ready */
 		oldestlistencycle = oldestconnectedcycle = oldesteventcycle = 0;
@@ -324,7 +340,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 					break;
 			}
 			assertpro((0 == jj) || (jj <= poll_nfds));	/* equal poll_nfds if not polled */
-			if (nselect && (jj != poll_nfds) && (socketptr->sd == poll_fds[jj].fd) && (poll_fds[jj].revents & POLLIN))
+			if (nselect && (jj != poll_nfds) && (socketptr->sd == poll_fds[jj].fd) && poll_fds[jj].revents)
 #endif
 #ifdef USE_SELECT
 			assertpro(FD_SETSIZE > socketptr->sd);
@@ -374,7 +390,16 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 			oldesteventcycle = oldestconnectedcycle;
 			oldesteventindex = oldestconnectedindex;
 		} else
-			assertpro((0 < oldestlistencycle) || (0 < oldestconnectedcycle));
+		{	/* unexpected nothing to do */
+			assert((0 < oldestlistencycle) || (0 < oldestconnectedcycle));
+			iod->dollar.key[0] = '\0';
+			if (NO_M_TIMEOUT != timepar)
+			{
+				dollar_truth = FALSE;
+				return FALSE;
+			} else
+				continue;
+		}
 		socketptr = dsocketptr->socket[oldesteventindex];
 		socketptr->pendingevent = FALSE;
 		if (socket_listening == socketptr->state)

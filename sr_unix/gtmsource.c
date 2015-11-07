@@ -381,6 +381,7 @@ int gtmsource()
 		sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool.jnlpool_ctl->freeze_comment);
 		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 	}
+	gtmsource_local->jnlfileonly = gtmsource_options.jnlfileonly;
 	do
 	{ 	/* If mode is passive, go to sleep. Wakeup every now and then and check to see if I have to become active. */
 		gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_START;
@@ -420,7 +421,7 @@ int gtmsource()
 		}
 		QWASSIGN(gtmsource_local->read_addr, jnlpool.jnlpool_ctl->write_addr);
 		gtmsource_local->read = jnlpool.jnlpool_ctl->write;
-		gtmsource_local->read_state = READ_POOL;
+		gtmsource_local->read_state = gtmsource_local->jnlfileonly ? READ_FILE : READ_POOL;
 		read_jnl_seqno = gtmsource_local->read_jnl_seqno;
 		assert(read_jnl_seqno <= jnlpool.jnlpool_ctl->jnl_seqno);
 		if (read_jnl_seqno < jnlpool.jnlpool_ctl->jnl_seqno)

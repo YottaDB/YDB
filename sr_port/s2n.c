@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,7 @@ char *s2n (mval *u)
 	SETUP_THREADGBL_ACCESS;
 	i = 0;
 	assertpro(MV_DEFINED(u));
+	((mval_b *)u)->sgne = 0;				/* Clear current sign/exponent to contant start value */
 	c = u->str.addr;
 	if (0 == u->str.len)
 	{	/* Substitute pre-converted NULL/0 value */

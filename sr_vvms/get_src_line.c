@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@
 
 #define RT_TBL_SZ 20
 
-int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_t verifytrig)
+int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp **rtn_vec)
 {
 	struct FAB		fab;
 	struct RAB		rab;
@@ -60,10 +60,20 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_
 		op_zlink(routine, NULL);
 		rtn_vector = find_rtn_hdr(&routine->str);
 		if (!rtn_vector)
+		{
+			if (NULL != rtn_vec)
+				*rtn_vec = NULL;
 			return OBJMODMISS;
+		}
 	}
 	if (!rtn_vector->src_full_name.len)
+	{
+		if (NULL != rtn_vec)
+			*rtn_vec = NULL;
 		return SRCNOTAVAIL;
+	}
+	if (NULL != rtn_vec)
+		*rtn_vec = rtn_vector;
 	rtnent.var_name = rtn_vector->routine_name;
 	COMPUTE_HASH_MNAME(&rtnent);
 	added = add_hashtab_mname(TADR(rt_name_tbl), &rtnent, NULL, &tabent);

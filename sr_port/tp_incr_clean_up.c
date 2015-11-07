@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -260,9 +260,10 @@ void rollbk_gbl_tlvl_info(uint4 newlevel)
 	sgmnt_addrs		*old_csa, *tmp_next_csa;
 	ua_list			*ua_ptr;
 	DEBUG_ONLY(uint4	dbg_upd_array_size;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	old_csa = jnl_fence_ctl.fence_list;
-
 	for (prev_gtli = NULL, gtli = global_tlvl_info_head; gtli; gtli = gtli->next_global_tlvl_info)
 	{
 		if (newlevel < gtli->t_level)
@@ -284,6 +285,7 @@ void rollbk_gbl_tlvl_info(uint4 newlevel)
 		assert(NULL != gtli->curr_ua);
 		curr_ua = (ua_list *)(gtli->curr_ua);
 		update_array_ptr = gtli->upd_array_ptr;
+		GTMTRIG_ONLY(TREF(ztrigbuffLen) = gtli->ztrigbuffLen;)
 	} else
 	{
 		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;

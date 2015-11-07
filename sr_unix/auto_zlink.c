@@ -46,13 +46,6 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line)
 	rhdtyp		*rhead;
 	urx_rtnref	*rtnurx;
 
-#	ifdef USHBIN_SUPPORTED
-	/* With the current autorelink multi-opcode call (OP_RHD_EXT and OP_LAB_EXT prior to actual call), auto_zlink()
-	 * isn't really at all used but this is likely to change in the next release which streamlines some of this so
-	 * for now, this routine is not being nixed.
-	 */
-	USHBIN_ONLY(assertpro(FALSE));
-#	else
 /* (ASSUMPTION)
  * The instructions immediately preceding the current mpc form a transfer table call.
  *	There will be two arguments to this call:
@@ -90,28 +83,27 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line)
 	if (azl_geturxrtn((char *)A_rtnhdr, &rname, &rtnurx))
 	{
 		assert(rname.len <= MAX_MIDENT_LEN);
-		assert(0 != rname.addr);
+		assert(NULL != rname.addr);
 		/* Copy rname into local storage because azl_geturxrtn sets rname.addr to an address that is
 		 * free'd during op_zlink and before the call to find_rtn_hdr.
 		 */
                 memcpy(rname_buff.c, rname.addr, rname.len);
                 rname.addr = rname_buff.c;
-		assert(0 != rtnurx);
+		assert(NULL != rtnurx);
 		assert(azl_geturxlab((char *)A_labaddr, rtnurx));
-		assert(0 == find_rtn_hdr(&rname));
+		assert(NULL == find_rtn_hdr(&rname));
 		rtn.mvtype = MV_STR;
 		rtn.str.len = rname.len;
 		rtn.str.addr = rname.addr;
-		op_zlink(&rtn, 0);
-		if (0 != (rhead = find_rtn_hdr(&rname)))
+		op_zlink(&rtn, NULL);
+		if (NULL != (rhead = find_rtn_hdr(&rname)))
 		{	/* Pull the linkage table reference out and return it to caller */
 			*line = (lnr_tabent **)(A_labaddr->ext_ref);
-			if (0 == *line)
+			if (NULL == *line)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LABELUNKNOWN);
 			return rhead;
 		}
 	}
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ROUTINEUNKNOWN);
-#	endif		/* ifdef USHBIN_SUPPORTED */
 	return NULL;	/* Compiler happiness phase */
 }

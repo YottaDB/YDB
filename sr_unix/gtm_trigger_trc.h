@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,11 +21,13 @@
 /* #include "have_crit.h" for DBGFPF/FFLUSH/INTRPT_IN_FFLUSH */
 /* #define DEBUG_TRIGR */
 #if defined(DEBUG_TRIGR) && defined(GTM_TRIGGER)
+# define DBGIFTRIGR(x) if (is_trigger) DBGFPF(x)
 # define DBGTRIGR(x) DBGFPF(x)
 # define DBGTRIGR_ONLY(x) x
 # include "gtm_stdio.h"
 # include "gtmio.h"
 #else
+# define DBGIFTRIGR(x)
 # define DBGTRIGR(x)
 # define DBGTRIGR_ONLY(x)
 #endif

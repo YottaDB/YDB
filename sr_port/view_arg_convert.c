@@ -48,19 +48,18 @@ error_def(ERR_VIEWLVN);
 void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *parmblk, boolean_t is_dollar_view)
 {
 	static	int4		first_time = TRUE;
-	int			n, reg_index;
-	ht_ent_mname		*tabent;
-	mstr			tmpstr, namestr;
-	gd_region		*r_top, *r_ptr, *gd_reg_start;
-	mname_entry		gvent, lvent;
-	mident_fixed		lcl_buff;
-	unsigned char		global_names[1024], stashed;
-	unsigned char 		*src, *nextsrc, *src_top, *dst, *dst_top, y;
-	unsigned char		*c, *c_top;
+	char			*cptr;
 	gd_binding		*gd_map;
-	gv_namehead		*tmp_gvt;
+	gd_region		*gd_reg_start, *r_ptr, *r_top;
 	gvnh_reg_t		*gvnh_reg;
 	gvnh_spanreg_t		*gvspan;
+	gv_namehead		*tmp_gvt;
+	ht_ent_mname		*tabent;
+	int			n, reg_index;
+	mident_fixed		lcl_buff;
+	mname_entry		gvent, lvent;
+	mstr			namestr, tmpstr;
+	unsigned char 		*c, *c_top, *dst, *dst_top, global_names[1024], *nextsrc, *src, *src_top, stashed, y;
 
 	switch (vtp_parm)
 	{
@@ -83,9 +82,9 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			parmblk->value = parm;
 			break;
 		case (VTP_NULL | VTP_DBREGION):
-			if (NULL == parm)
+			if ((NULL == parm) || ((1 == parm->str.len) && ('*' == *parm->str.addr)))
 			{
-				parmblk->gv_ptr = 0;
+				parmblk->gv_ptr = NULL;
 				break;
 			}
 			/* caution:  fall through */
@@ -100,18 +99,23 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				parmblk->gv_ptr = r_ptr;
 			else
 			{
+				for (cptr = parm->str.addr, n = 0; n < parm->str.len; cptr++, n++)
+					lcl_buff.c[n] = TOUPPER(*cptr);		/* Region names are upper-case ASCII */
+				cptr = parm->str.addr;				/* remember the original name */
+				parm->str.addr = (char *)&lcl_buff.c;		/* use the upper case name formed above */
 				for (r_top = r_ptr + gd_header->n_regions; ; r_ptr++)
 				{
 					if (r_ptr >= r_top)
 						rts_error_csa(CSA_ARG(NULL)
 							VARLSTCNT(4) ERR_NOREGION,2, parm->str.len, parm->str.addr);
 					tmpstr.len = r_ptr->rname_len;
-					tmpstr.addr = (char *) r_ptr->rname;
+					tmpstr.addr = (char *)r_ptr->rname;
 					MSTR_CMP(tmpstr, parm->str, n);
 					if (0 == n)
 						break;
 				}
 				parmblk->gv_ptr = r_ptr;
+				parm->str.addr = cptr;				/* be nice and restore the original name */
 			}
 			break;
 		case VTP_DBKEY:

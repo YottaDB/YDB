@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Serivces, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Serivces, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,5 +38,9 @@
 }
 
 key_t gtm_ftok(const char *path, int id);
+
+#define IPC_REMOVED(ERRNO)	((EINVAL == ERRNO) || (EIDRM == ERRNO))	/* EIDRM is only on Linux */
+#define	SEM_REMOVED(ERRNO)	IPC_REMOVED(ERRNO)
+#define	SHM_REMOVED(ERRNO)	IPC_REMOVED(ERRNO)
 
 #endif

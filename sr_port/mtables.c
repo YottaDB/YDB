@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -197,7 +197,6 @@ LITDEF boolean_t mvs_save[] =
 LITDEF mval skiparg		= DEFINE_MVAL_COMMON(0, 0, 0, 0, 0, 0, 0, 0);
 
 static readonly unsigned char localpool[7] = {'1', '1', '1', '0', '1', '0', '0'};
-LITDEF mval literal_null	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX | MV_UTF_LEN, 0, 0, 0, 0, 0, 0);
 LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[3], 0,   0);
 LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[0], 0,   1 * MV_BIAS);
 LITDEF mval literal_ten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[2], 0,  10 * MV_BIAS);
@@ -214,26 +213,22 @@ LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 
  * try to set the MV_NUM_APPROX bit and that could cause a SIG-11 since these mvals are in the read-only data segment.
  * --------------------------------------------------------------------------------------------------------------------------
  */
-
+LITDEF mval literal_null	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX | MV_UTF_LEN, 0, 0, 0, 0, 0, 0);
 /* Create mval to hold batch type TSTART. "BA" or "BATCH" mean the same.
  * We define the shorter version here to try reduce the time taken for comparison.
  */
 LITDEF mval literal_batch       = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, TP_BATCH_SHRT, (char *)TP_BATCH_ID, 0, 0);
 
 #ifdef GTM_TRIGGER
-LITDEF mval literal_hasht	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, HASHT_GBLNAME_LEN    , (char *)HASHT_GBLNAME    , 0, 0);	/* BYPASSOK */
 LITDEF mval literal_hashlabel	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHLABEL_LEN, (char *)LITERAL_HASHLABEL, 0, 0);	/* BYPASSOK */
 LITDEF mval literal_hashcycle	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHCYCLE_LEN, (char *)LITERAL_HASHCYCLE, 0, 0);	/* BYPASSOK */
 LITDEF mval literal_hashcount	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHCOUNT_LEN, (char *)LITERAL_HASHCOUNT, 0, 0);	/* BYPASSOK */
-LITDEF mval literal_cmd		= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_CMD_LEN      , (char *)LITERAL_CMD      , 0, 0);	/* BYPASSOK */
-LITDEF mval literal_gvsubs	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_GVSUBS_LEN   , (char *)LITERAL_GVSUBS   , 0, 0);	/* BYPASSOK */
-LITDEF mval literal_options	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_OPTIONS_LEN  , (char *)LITERAL_OPTIONS  , 0, 0);	/* BYPASSOK */
-LITDEF mval literal_delim	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_DELIM_LEN    , (char *)LITERAL_DELIM    , 0, 0);	/* BYPASSOK */
-LITDEF mval literal_zdelim	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_ZDELIM_LEN   , (char *)LITERAL_ZDELIM   , 0, 0);	/* BYPASSOK */
-LITDEF mval literal_pieces	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_PIECES_LEN   , (char *)LITERAL_PIECES   , 0, 0);	/* BYPASSOK */
-LITDEF mval literal_trigname	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_TRIGNAME_LEN , (char *)LITERAL_TRIGNAME , 0, 0);	/* BYPASSOK */
-LITDEF mval literal_xecute	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_XECUTE_LEN   , (char *)LITERAL_XECUTE   , 0, 0);	/* BYPASSOK */
-LITDEF mval literal_chset	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_CHSET_LEN    , (char *)LITERAL_CHSET    , 0, 0);	/* BYPASSOK */
+
+#define TRIGGER_SUBSDEF(SUBSTYPE, SUBSNAME, LITMVALNAME, TRIGFILEQUAL, PARTOFHASH)	\
+	LITDEF mval LITMVALNAME = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, STR_LIT_LEN(SUBSNAME), (char *)SUBSNAME, 0, 0);
+
+#include "trigger_subs_def.h"		/* BYPASSOK */
+#undef TRIGGER_SUBSDEF
 
 LITDEF mval gvtr_cmd_mval[GVTR_CMDTYPES] = {
 /* Define GVTR_CMD_SET, GVTR_CMD_KILL etc. */
@@ -251,10 +246,10 @@ LITDEF	int4	gvtr_cmd_mask[GVTR_CMDTYPES] = {
 };
 
 /* The initialization order of this array matches enum trig_subs_t defined in triggers.h */
-#define TRIGGER_SUBDEF(SUBNAME) LITERAL_##SUBNAME
 LITDEF char *trigger_subs[] = {
-#include "trigger_subs_def.h"
-#undef TRIGGER_SUBDEF
+#define TRIGGER_SUBSDEF(SUBSTYPE, SUBSNAME, LITMVALNAME, TRIGFILEQUAL, PARTOFHASH)	SUBSNAME,
+#include "trigger_subs_def.h"		/* BYPASSOK */
+#undef TRIGGER_SUBSDEF
 };
 
 #endif

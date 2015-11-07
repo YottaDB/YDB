@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@
 #include "op.h"
 #include "mvalconv.h"
 #include "zroutines.h"
+#include "zshow.h"
 #include "getstorage.h"
 #include "get_command_line.h"
 #include "getzposition.h"
@@ -98,6 +99,7 @@ GBLREF boolean_t	dollar_zquit_anyway;
 #ifdef GTM_TRIGGER
 GBLREF	mstr		*dollar_ztname;
 GBLREF	mval		*dollar_ztdata;
+GBLREF	mval		*dollar_ztdelim;
 GBLREF	mval		*dollar_ztoldval;
 GBLREF	mval		*dollar_ztriggerop;
 GBLREF	mval		dollar_ztslate;
@@ -449,6 +451,17 @@ void op_svget(int varnum, mval *v)
 			if (NULL != dollar_ztdata)
 				MV_FORCE_STR(dollar_ztdata);
 			memcpy(v, (NULL != dollar_ztdata) ? dollar_ztdata : &literal_null, SIZEOF(mval));
+			break;
+#			else
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZTDELIM:
+#			ifdef GTM_TRIGGER
+			assert(!dollar_ztdelim || MV_DEFINED(dollar_ztdelim));
+			if (NULL == dollar_ztdelim || !(MV_STR & dollar_ztdelim->mvtype) || (0 == dollar_ztdelim->str.len))
+				memcpy(v, &literal_null, SIZEOF(mval));
+			else
+				memcpy(v, dollar_ztdelim, SIZEOF(mval));
 			break;
 #			else
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);

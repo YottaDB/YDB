@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,12 +20,18 @@
 #include "md5hash.h"
 
 #ifdef UNIX
+# include "mmrhash.h"
 # define GTM_USE_128BIT_SRC_CHKSUM
 #endif
 
 typedef struct
 {
+#	ifdef UNIX
+	hash128_state_t	hash_state;
+	uint4		total_size;
+#	else
 	cvs_MD5_CTX	md5ctx;
+#	endif
 	unsigned char	digest[MD5_DIGEST_LENGTH];
 #	ifndef GTM_USE_128BIT_SRC_CHKSUM
 	uint4		checksum;	/* 32-bit checksum, equals first 4 bytes of digest */

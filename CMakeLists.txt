@@ -26,7 +26,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version V6.2-000)
+set(version V6.2-001)
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -60,8 +60,6 @@ set(gtm_osarch_libs "")
 set(gt_src_list)
 set(sources_used "")
 set(extralibs "")
-set(GTMCRYPTLIB "GCRYPT")
-set(GTMCRYPTALGO "AES256CFB")
 message("--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 # Establish platform
 # Except for Solaris, CMAKE_COMPILER_IS_GNUCC is true
@@ -76,7 +74,6 @@ elseif("${CMAKE_SYSTEM_NAME}" MATCHES "SunOS")
 else()
   message(FATAL_ERROR "--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
-message("--> Encryption Library = ${GTMCRYPTLIB} / Algorithm = ${GTMCRYPTALGO}")
 
 # Choose where to get bootstrap sources.
 set(GTM_DIST "" CACHE PATH "Existing GT.M Distribution")
@@ -461,14 +458,50 @@ foreach(tlslib ssl crypto config)
   set(TLS_LIBRARIES ${TLS_LIBRARIES} ${TLSLIB_${tlslib}})
 endforeach()
 
-add_library(libgtmcrypt MODULE ${libgtmcrypt_SOURCES})
-set_target_properties(libgtmcrypt PROPERTIES
-  OUTPUT_NAME gtmcrypt
-  COMPILE_DEFINITIONS "USE_${GTMCRYPTLIB} -DUSE_${GTMCRYPTALGO}"
+# Building the three encryption libraries could by a loop of some sort, but
+# manually creating each target is way easier.
+
+# Library=GCRYPT Algorithm=AES256CFB
+add_library(libgtmcrypt_gcrypt_AES256CFB.so MODULE ${libgtmcrypt_SOURCES})
+set_target_properties(libgtmcrypt_gcrypt_AES256CFB.so PROPERTIES
+  OUTPUT_NAME gtmcrypt_gcrypt_AES256CFB
+  COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
-target_link_libraries(libgtmcrypt ${GPG_LIBRARIES})
-install(TARGETS libgtmcrypt DESTINATION ${GTM_INSTALL_DIR}/plugin)
+target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so ${GPG_LIBRARIES})
+install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${GTM_INSTALL_DIR}/plugin)
+
+# Establish the default encryption link
+set(default_encr_link   ${GTM_BINARY_DIR}/plugin/libgtmcrypt.so)
+set(default_encr_target libgtmcrypt_gcrypt_AES256CFB.so)
+add_custom_command(
+	OUTPUT ${default_encr_link}
+	COMMAND ${CMAKE_COMMAND} -E create_symlink "${default_encr_target}" "${default_encr_link}"
+	DEPENDS ${GTM_BINARY_DIR}/plugin/${default_encr_target}
+	COMMENT "Generating default_encr symbolic link"
+	)
+add_custom_target(install_default_encr ALL DEPENDS ${default_encr_link})
+install(FILES ${default_encr_link} DESTINATION ${GTM_INSTALL_DIR}/plugin)
+
+# Library=OPENSSL Algorithm=AES256CFB
+add_library(libgtmcrypt_openssl_AES256CFB MODULE ${libgtmcrypt_SOURCES})
+set_target_properties(libgtmcrypt_openssl_AES256CFB PROPERTIES
+  OUTPUT_NAME gtmcrypt_openssl_AES256CFB
+  COMPILE_DEFINITIONS "USE_OPENSSL -DUSE_AES256CFB"
+  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+  )
+target_link_libraries(libgtmcrypt_openssl_AES256CFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
+install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
+
+# Library=OPENSSL Algorithm=BLOWFISHCFB
+add_library(libgtmcrypt_openssl_BLOWFISHCFB MODULE ${libgtmcrypt_SOURCES})
+set_target_properties(libgtmcrypt_openssl_BLOWFISHCFB PROPERTIES
+  OUTPUT_NAME gtmcrypt_openssl_BLOWFISHCFB
+  COMPILE_DEFINITIONS "USE_OPENSSL -DUSE_BLOWFISHCFB"
+  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+  )
+target_link_libraries(libgtmcrypt_openssl_BLOWFISHCFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
+install(TARGETS libgtmcrypt_openssl_BLOWFISHCFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
 add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
 set_target_properties(libgtmtls PROPERTIES
@@ -482,7 +515,7 @@ install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
 add_executable(maskpass ${maskpass_SOURCES})
 target_link_libraries(maskpass ${GPG_LIBRARIES} ${TLS_LIBRARIES})
 set_target_properties(maskpass PROPERTIES
-  COMPILE_DEFINITIONS "USE_${GTMCRYPTLIB} -DUSE_SYSLIB_FUNCS"
+  COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_SYSLIB_FUNCS"
   RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
   )
 install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)

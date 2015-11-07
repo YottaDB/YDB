@@ -8,8 +8,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#ifndef _GTM_TLS_IMPL_H
-#define _GTM_TLS_IMPL_H
+#ifndef GTM_TLS_IMPL_H
+#define GTM_TLS_IMPL_H
 
 STATICFNDEF int format_ASN1_TIME(ASN1_TIME *tm, char *buf, int maxlen);
 STATICFNDEF int ssl_generic_vfy_callback(int preverify_ok, X509_STORE_CTX *ctx);
@@ -29,6 +29,7 @@ typedef struct gtmtls_passwd_list_struct
 
 #define GET_SOCKFD(TLS)			SSL_get_fd((SSL *)TLS)
 #define VERIFY_PEER(FLAGS)		(FLAGS & GTMTLS_OP_VERIFY_PEER)
+#define CLIENT_MODE(FLAGS)		(FLAGS & GTMTLS_OP_CLIENT_MODE)
 #define DEFAULT_SESSION_TIMEOUT		3600		/* Old sessions can be reused upto 1 hour since the creation time. */
 
 #ifdef DEBUG

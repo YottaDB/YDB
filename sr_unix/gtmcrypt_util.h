@@ -8,8 +8,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#ifndef __GTMCRYPT_UTIL_H
-#define __GTMCRYPT_UTIL_H
+#ifndef GTMCRYPT_UTIL_H
+#define GTMCRYPT_UTIL_H
 
 #if !defined(DEBUG) && defined(assert)
 # undef assert
@@ -28,14 +28,15 @@
 #define MAX_GTMCRYPT_STR_ARG_LEN	256
 #define MAX_GTMCRYPT_ERR_STRLEN		2048
 
-#define GTM_PASSPHRASE_MAX		512
+/* next two defines also in gtm_tls_interface.h and should be kept in sync */
+#define GTM_PASSPHRASE_MAX		512	/* obfuscated */
+#define GTM_PASSPHRASE_MAX_ASCII	(GTM_PASSPHRASE_MAX / 2)
 #define PASSPHRASE_ENVNAME_MAX		64
 #define GTMCRYPT_DEFAULT_PASSWD_PROMPT	"Enter Passphrase: "
 
 #define GTM_OBFUSCATION_KEY		"gtm_obfuscation_key"
 
 #define GTMCRYPT_FIPS_ENV		"gtmcrypt_FIPS"
-
 
 #define GC_H2D(C, RES, MULT)							\
 {										\
@@ -48,7 +49,6 @@
 	else									\
 		RES = -1;							\
 }
-
 
 /* Convert SOURCE, sequence of hexadecimal characters, into decimal representation. LEN denotes the length of the SOURCE string.
  * NOTE: Hexadecimal characters, presented in SOURCE string, has to be in upper case.
@@ -198,7 +198,7 @@
 /* Libgcrypt specific error handling. */
 #define GC_APPEND_GCRY_ERROR(ERR, ...)											\
 {															\
-	char	*errptr, *end;												\
+	char *errptr, *end;												\
 															\
 	errptr = &gtmcrypt_err_string[0];										\
 	end = errptr + MAX_GTMCRYPT_ERR_STRLEN;										\
@@ -235,7 +235,7 @@ GBLREF	char			gtmcrypt_err_string[MAX_GTMCRYPT_ERR_STRLEN];
 
 int				gc_load_gtmshr_symbols(void);
 void 				gtm_gcry_log_handler(void *opaque, int level, const char *fmt, va_list arg_ptr);
-int				gc_read_passwd(char *prompt, char *buf, int maxlen);
+int				gc_read_passwd(char *prompt, char *buf, int maxlen, void *tty);
 int				gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out);
 void				gc_freeup_pwent(passwd_entry_t *pwent);
 int 				gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int interactive);

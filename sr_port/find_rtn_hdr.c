@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,6 @@
 #include "stack_frame.h"
 #include "compiler.h"	/* for WANT_CURRENT_RTN_MSTR macro */
 
-#define S_CUTOFF 7
 GBLREF rtn_tabent	*rtn_names, *rtn_names_end;
 GBLREF stack_frame	*frame_pointer;
 
@@ -40,7 +39,8 @@ rhdtyp	*find_rtn_hdr(mstr *name)
  * Returns FALSE otherwise.
  * In either case, also "returns" (via <res>) the rtn_tabent
  * 	corresponding to the first routine name greater than or equal to
- * 	<name>.
+ * 	<name>. This is useful for looking up trigger routines that
+ * 	include runtime disambiguators in their names.
  */
 
 boolean_t find_rtn_tabent(rtn_tabent **res, mstr *name)
@@ -49,55 +49,42 @@ boolean_t find_rtn_tabent(rtn_tabent **res, mstr *name)
 	int4		comp;
 	mident		rtn_name;
 	mident_fixed	rtn_name_buff;
+	boolean_t	ret;
+	int		len;
 
-	assert(name->len <= MAX_MIDENT_LEN);
-	rtn_name.len = name->len;
+	len = name->len;
+	rtn_name.len = MIN(MAX_MIDENT_LEN, len);
 #ifdef VMS
 	rtn_name.addr = &rtn_name_buff.c[0];
 	CONVERT_IDENT(rtn_name.addr, name->addr, name->len);
 #else
 	rtn_name.addr = name->addr;
 #endif
-	bot = rtn_names;
-	top = rtn_names_end;
-	for (;;)
-	{	/* See if routine exists in list via a binary search which reverts to serial
-		   search when # of items drops below the threshold S_CUTOFF.
-		*/
-		if (S_CUTOFF > (top - bot))
-		{
-			comp = -1;
-			for (mid = bot; comp < 0 && mid <= top; mid++)
-			{
-				MIDENT_CMP(&mid->rt_name, &rtn_name, comp);
-				if (0 == comp)
-				{
-					*res = mid;
-					return TRUE;
-				} else if (0 < comp)
-					break;
-			}
+	bot = rtn_names + 1;	/* Exclude the first NULL entry */
+	top = rtn_names_end + 1;/* Include the last entry */
+	for ( ; ; )
+	{
+		if (bot == top)
 			break;
+		assert(bot < top);
+		mid = bot + (top - bot) / 2;
+		assert(mid >= bot);
+		MIDENT_CMP(&mid->rt_name, &rtn_name, comp);
+		if (0 == comp)
+		{
+			*res = mid;
+			return TRUE;
+		} else if (0 > comp)
+		{
+			bot = mid + 1;
+			continue;
 		} else
 		{
-			mid = bot + (top - bot) / 2;
-			MIDENT_CMP(&mid->rt_name, &rtn_name, comp);
-			if (0 == comp)
-			{
-				*res = mid;
-				return TRUE;
-			}
-			else if (comp < 0)
-			{
-				bot = mid + 1;
-				continue;
-			} else
-			{
-				top = mid - 1;
-				continue;
-			}
+			assert(mid < top);
+			top = mid;
+			continue;
 		}
 	}
-	*res = mid;
+	*res = bot;
 	return FALSE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,7 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	char		*top;
 	unsigned char	*msp_save;
 	int4		shift, size, mv_st_type;
+	rhdtyp		*old_rtnhdr;
 
 	unwind_nocounts();
 	/* We are going to mutate the current frame from the program it was running to the program we want it to run.
@@ -68,7 +69,12 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	frame_pointer->flags &= SFF_ETRAP_ERR_OFF;	  /* clear SFF_ETRAP_ERR bit */
 	frame_pointer->flags &= SFF_IMPLTSTART_CALLD_OFF; /* clear SFF_IMPLTSTART_CALLD bit since this frame is being rewritten */
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "flush_jmp: Turrning off SFF_IMPLTSTART_CALLD_OFF in frame 0x"lvaddr"\n", frame_pointer)));
+	old_rtnhdr = frame_pointer->rvector;
 	frame_pointer->rvector = rtn_base;
+	/* Now that fp->rvector has been overwritten to new routine, check if the older routine had a "rtn_relinked" flag set
+	 * and if so that cleanup can be performed now.
+	 */
+	USHBIN_ONLY(CLEANUP_COPIED_RECURSIVE_RTN(old_rtnhdr));	/* cleanup if needed */
 	frame_pointer->vartab_ptr = (char *)VARTAB_ADR(rtn_base);
 	frame_pointer->vartab_len = frame_pointer->rvector->vartab_len;
 	frame_pointer->mpc = transfer_addr;
@@ -98,9 +104,9 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 			if (msp <= stacktop)
 			{
 				msp = msp_save;
-				rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
 	   		} else
-				rts_error(VARLSTCNT(1) ERR_STACKCRIT);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
 	   	}
 		memset(msp, 0, size);
 		DBGEHND((stderr, "flush_jmp: Old msp: 0x"lvaddr"  New msp: 0x"lvaddr"\n", msp_save, msp));
@@ -155,9 +161,9 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
    		if ((unsigned char *)mv_chain + shift <= stackwarn)
    		{
 			if ((unsigned char *)mv_chain + shift <= stacktop)
-   				rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
+   				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
    			else
-   				rts_error(VARLSTCNT(1) ERR_STACKCRIT);
+   				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
       		}
 		DBGEHND((stderr, "flush_jmp: Shifting %d bytes of stack from 0x"lvaddr" to 0x"lvaddr" by %d bytes\n",
 			 INTCAST(top - (char *)mv_chain), mv_chain, (mv_chain + shift), shift));

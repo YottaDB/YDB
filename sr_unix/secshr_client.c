@@ -19,6 +19,7 @@
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <sys/param.h>
+
 #include "gtm_ctype.h"
 #include "gtm_stdlib.h"		/* for exit() */
 #include "gtm_string.h"
@@ -27,10 +28,11 @@
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
-#include "gt_timer.h"
 #include "gtm_limits.h"
 #include "gtm_syslog.h"
+#include "gtm_ipc.h"
 
+#include "gt_timer.h"
 #include "gtmio.h"
 #include "io.h"
 #include "gtmsecshr.h"
@@ -52,9 +54,9 @@
 #include "filestruct.h"
 #include "gtm_logicals.h"
 #include "secshr_client.h"
-#include "gtm_semutils.h"
 #include "hashtab.h"		/* for STR_HASH macro */
 #include "fork_init.h"
+#include "wbox_test_init.h"
 
 GBLREF struct sockaddr_un       gtmsecshr_sock_name;
 GBLREF key_t                    gtmsecshr_key;
@@ -92,7 +94,7 @@ const static char readonly *secshrstart_error_code[] = {
 	"",
 	"gtmsecshr unable to set-uid to root",
 	"The environmental variable gtm_dist is pointing to an invalid path",
-	"Unable to exec gtmsecshr",
+	"Unable to start gtmsecshr executable",
 	"gtmsecshr unable to create a  child process",
 	"Error with gtmsecshr semaphore",
 	"gtmsecshr already running - invalid invocation",
@@ -210,8 +212,9 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("stat"), CALLFROM, errno);
-		if ((ROOTUID != stat_buf.st_uid) ||
-		    !(stat_buf.st_mode & S_ISUID))
+		if ((ROOTUID != stat_buf.st_uid)
+			|| !(stat_buf.st_mode & S_ISUID)
+			|| (0 != ACCESS(gtmsecshr_pathname.addr, (X_OK))))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
 		gtmsecshr_file_check_done = TRUE;
 	}
@@ -442,12 +445,14 @@ int create_server(void)
 	{
 		process_id = getpid();
 		/* Do exec using gtmsecshr_path, which was initialize in file check code - send_mesg2gtmsecshr */
+		if (WBTEST_ENABLED(WBTEST_BADEXEC_SECSHR_PROCESS))
+			STRCPY(gtmsecshr_path, "");
 		status = EXECL(gtmsecshr_path, gtmsecshr_path, 0);
 		if (-1 == status)
 		{
-                        send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
-				 ERR_TEXT, 2, RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
-			exit(UNABLETOEXECGTMSECSHR);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
+				ERR_TEXT, 2, RTS_ERROR_STRING(secshrstart_error_code[UNABLETOEXECGTMSECSHR]));
+			_exit(UNABLETOEXECGTMSECSHR);
 		}
         } else
 	{

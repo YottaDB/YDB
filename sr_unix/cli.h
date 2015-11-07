@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
  * Parser include file
  * -----------------------------------------------------------
  */
-#define	MAX_PARMS	5	/* Maximum parameters on commands line */
+#define	MAX_PARMS	1024	/* Maximum parameters on command line */
 
 #define MAX_CMD_LEN	25	/* Max Command name string length */
 #define MAX_OPT_LEN	25	/* Max Option name string length */
@@ -90,7 +90,7 @@ typedef struct cmd_parm_tag {
 							0 - disallowed,
 							1 - optional
 							2 - required */
-	unsigned 	max_parms : 3;		/* Max. # of parameters allowed */
+	unsigned short	max_parms;		/* Max. # of parameters allowed */
 	unsigned 	negatable : 1;		/* Negatable flag  */
 	unsigned 	val_type : 2;		/* Value Type
 							VAL_N_A - type not applicable

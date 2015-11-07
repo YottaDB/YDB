@@ -28,9 +28,7 @@
 #include "gtm_string.h"
 #include "gtm_sem.h"
 #include "gtm_statvfs.h"
-#ifdef __linux__
-#include "hugetlbfs_overrides.h"
-#endif
+#include "hugetlbfs_overrides.h"	/* for the ADJUST_SHM_SIZE_FOR_HUGEPAGES macro */
 
 #include "gt_timer.h"
 #include "gdsroot.h"
@@ -356,7 +354,7 @@ gd_region *dbfilopn (gd_region *reg)
 			free(seg->file_cntl);
 			seg->file_cntl = 0;
 		}
-		RTS_ERROR(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	}
 	assert(((int)pblk.b_esl + 1) <= SIZEOF(seg->fname));
 	memcpy(seg->fname, pblk.buffer, pblk.b_esl);
@@ -395,7 +393,7 @@ gd_region *dbfilopn (gd_region *reg)
 				free(seg->file_cntl);
 				seg->file_cntl = 0;
 			}
-			RTS_ERROR(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
 		}
 		reg->read_only = TRUE;			/* maintain csa->read_write simultaneously */
 		csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
@@ -408,7 +406,7 @@ gd_region *dbfilopn (gd_region *reg)
         if (-1 == stat_res)
         {
         	save_errno = errno;
-        	RTS_ERROR(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
+        	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
         }
 	set_gdid_from_stat(&udi->fileid, &buf);
 	if (prev_reg = gv_match(reg))
@@ -446,11 +444,7 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size)
 		assertpro(dba_bg == reg->dyn.addr->acc_meth);
 		tmp_sec_size += CACHE_CONTROL_SIZE(csd) + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE);
 	}
-#	ifdef HUGETLB_SUPPORTED
-	*sec_size = ROUND_UP(tmp_sec_size, OS_HUGEPAGE_SIZE);
-#	else
-	*sec_size = ROUND_UP(tmp_sec_size, OS_PAGE_SIZE);
-#	endif
+	ADJUST_SHM_SIZE_FOR_HUGEPAGES(tmp_sec_size, *sec_size);	/* *sec_size is adjusted size */
 	return;
 }
 
@@ -1158,7 +1152,7 @@ int db_init(gd_region *reg)
 			if (-1 == shmctl(csa->nl->jnlpool_shmid, IPC_STAT, &shmstat))
 			{
 				save_errno = errno;
-				if ((EINVAL == save_errno) || (EIDRM == save_errno)) /* EIDRM is only on Linux */
+				if (SHM_REMOVED(save_errno))
 				{
 					replinst_mismatch = FALSE;
 					csa->nl->jnlpool_shmid = jnlpool.repl_inst_filehdr->jnlpool_shmid;

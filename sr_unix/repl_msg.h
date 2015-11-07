@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,10 +66,11 @@ enum
 #define	REPL_PROTO_VER_MULTISITE_CMP	(char)0x2	/* Versions V5.3-003 and above that support multisite replication with
 							 * the ability to compress the logical records in the replication pipe.
 							 */
-#define	REPL_PROTO_VER_SUPPLEMENTARY	(char)0x3	/* Versions V5.5-000 and above that support supplementary instances */
-#define	REPL_PROTO_VER_REMOTE_LOGPATH	(char)0x4	/* Versions V6.0-003 and above that send remote $CWD as part of handshake */
-#define REPL_PROTO_VER_TLS_SUPPORT	(char)0x5	/* Versions V6.1-000 and above that supports SSL/TLS communication. */
-#define	REPL_PROTO_VER_THIS		REPL_PROTO_VER_TLS_SUPPORT
+#define	REPL_PROTO_VER_SUPPLEMENTARY	(char)0x3	/* Versions >= V5.5-000 that support supplementary instances */
+#define	REPL_PROTO_VER_REMOTE_LOGPATH	(char)0x4	/* Versions >= V6.0-003 that send remote $CWD as part of handshake */
+#define REPL_PROTO_VER_TLS_SUPPORT	(char)0x5	/* Versions >= V6.1-000 that supports SSL/TLS communication. */
+#define REPL_PROTO_VER_XENDIANFIXES	(char)0x6	/* Versions >= V6.2-001 support cross-endian replication (GTM-8205) */
+#define	REPL_PROTO_VER_THIS		REPL_PROTO_VER_XENDIANFIXES
 							/* The current/latest version of the communication protocol between the
 							 * primary (source server) and secondary (receiver server or rollback)
 							 */
@@ -225,7 +226,8 @@ typedef struct	/* used to send a message of type REPL_NEED_INSTINFO */
 					 * the macros REPL_PROTO_VER_DUALSITE (0) and REPL_PROTO_VER_UNINITIALIZED (-1) */
 	char		is_rootprimary;	/* Whether the source server that is sending this message is a root primary or not. */
 	char		is_supplementary;	/* TRUE for a supplementary instance; FALSE otherwise */
-	char		filler_32[5];
+	char		jnl_ver;	/* jnl format of this side */
+	char		filler_32[4];
 } repl_needinst_msg_t; /* The first two fields should be as in repl_msg_t */
 
 typedef struct	/* used to send a message of type REPL_OLD_INSTANCE_INFO */

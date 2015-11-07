@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,12 +19,19 @@
 #include "error.h"
 #include "op.h"
 #include "outofband.h"
+#include "min_max.h"
 #ifdef GTM_TRIGGER
 # include "gtm_trigger_trc.h"
+#else
+# define DBGIFTRIGR(x)
+# define DBGTRIGR(x)
+# define DBGTRIGR_ONLY(x)
 #endif
 
 #define	INFO_MSK(error)	(error & ~SEV_MSK | INFO)
 
+DBGTRIGR_ONLY(GBLREF	uint4		dollar_tlevel;)
+DBGTRIGR_ONLY(GBLREF	unsigned int	t_tries;)
 GBLREF int4		outofband;
 GBLREF mident_fixed	zlink_mname;
 
@@ -43,67 +50,63 @@ void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label,
 /*	 parser makes the second label the duplicate	*/
 /*	 of the first. (not so vice versa)		*/
 {
-	mval		print_line, null_str;
-	mstr		*src1, *src2;
-	uint4		stat1, stat2;
-	rhdtyp		*rtn_vector;
-	boolean_t	is_trigger;
+	mval			print_line, null_str;
+	mstr			*src1, *src2;
+	uint4			stat1, stat2;
+	rhdtyp			*rtn_vector, *rtn_vector2;
+	GTMTRIG_ONLY(boolean_t	is_trigger;)
 
 	MV_FORCE_STR(start_label);
 	MV_FORCE_STR(end_label);
 	MV_FORCE_STR(rtn);
-	/* This first call to get_src_line() for our entry "locks-in" the source we will be extracting. If the rtn
-	 * in question in a trigger, it would be possible for the further get_src_line() calls we do to cause the
-	 * trigger to be reloaded making our earlier fetches irrelevant. After this first call, all following calls
-	 * to get_src_line() for this operation will tell get_src_line() to NOT verify or reload the triggers so
-	 * we get a consistent (if no longer current) view of the trigger.
-	 */
 	GTMTRIG_ONLY(IS_TRIGGER_RTN(&rtn->str, is_trigger));
-	GTMTRIG_ONLY(if (is_trigger) DBGTRIGR((stderr, "op_zprint: Performing zprint of a trigger\n")));
-	stat1 = get_src_line(rtn, start_label, start_int_exp, &src1, VERIFY);
+	DBGIFTRIGR((stderr, "op_zprint: Performing zprint of a trigger $tlevel=%d $trestart=%d\n", dollar_tlevel, t_tries));
+	stat1 = get_src_line(rtn, start_label, start_int_exp, &src1, &rtn_vector);
+	DBGIFTRIGR((stderr, "op_zprint: get_src_line returned %d\n", stat1));
 	if (OBJMODMISS == stat1)
 	{
 #		ifdef GTM_TRIGGER
 		if (is_trigger)
-			rts_error(VARLSTCNT(4) ERR_TRIGNAMENF, 2, rtn->str.len, rtn->str.addr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TRIGNAMENF, 2, rtn->str.len, rtn->str.addr);
 #		endif
 		/* get_src_line did not find the object file to load */
-		rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->str.len, rtn->str.addr,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->str.len, rtn->str.addr,
 			  ERR_ZLMODULE, 2, mid_len(&zlink_mname), &zlink_mname.c[0]);
 	}
-	if (NULL == (rtn_vector = find_rtn_hdr(&rtn->str)))
-	{
-#		ifdef GTM_TRIGGER
-		if (is_trigger)
-			rts_error(VARLSTCNT(4) ERR_TRIGNAMENF, 2, rtn->str.len, rtn->str.addr);
-#		endif
-		GTMASSERT;	/* If couldn't find module, should have returned OBJMODMISS */
-	}
+	/* In case of GTM_TRIGGER, rtn_vector would have been initialized in the call to get_src_line above.
+	 * We need to use that and not do a find_rtn_hdr as rtn->str might contain region-name disambiguator
+	 * which find_rtn_hdr has no clue about. Even in case of no GTM_TRIGGER, we should be able to use rtn_vector
+	 * from "get_src_line". Assert that below before using.
+	 */
+	DEBUG_ONLY(NON_GTMTRIG_ONLY(rtn_vector2 = find_rtn_hdr(&rtn->str);))
+	NON_GTMTRIG_ONLY(assert(rtn_vector2 == rtn_vector);)
+	assertpro(NULL != rtn_vector);	/* If couldn't find module, should have returned OBJMODMISS */
 	if (stat1 & LABELNOTFOUND)
-		rts_error(VARLSTCNT(1) ERR_ZPRTLABNOTFND);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPRTLABNOTFND);
 	if (stat1 & SRCNOTFND)
-		rts_error(VARLSTCNT(4) ERR_FILENOTFND, 2, rtn_vector->src_full_name.len, rtn_vector->src_full_name.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILENOTFND, 2,
+				rtn_vector->src_full_name.len, rtn_vector->src_full_name.addr);
 	if (stat1 & (SRCNOTAVAIL | AFTERLASTLINE))
 		return;
 	if (stat1 & (ZEROLINE | NEGATIVELINE))
 	{
 		null_str.mvtype = MV_STR;
 		null_str.str.len = 0;
-		stat1 = get_src_line(rtn, &null_str, 1, &src1, NOVERIFY);
+		stat1 = get_src_line(rtn, &null_str, 1, &src1, NULL);
 		if (stat1 & AFTERLASTLINE)		/* the "null" file */
 			return;
 	}
 	if (end_int_exp == 0 && (end_label->str.len == 0 || *end_label->str.addr == 0))
 		stat2 = AFTERLASTLINE;
-	else if ((stat2 = get_src_line(rtn, end_label, end_int_exp, &src2, NOVERIFY)) & LABELNOTFOUND)
-		rts_error(VARLSTCNT(1) ERR_ZPRTLABNOTFND);
+	else if ((stat2 = get_src_line(rtn, end_label, end_int_exp, &src2, NULL)) & LABELNOTFOUND)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPRTLABNOTFND);
 	if (stat2 & (ZEROLINE | NEGATIVELINE))
 		return;
 	if (stat2 & AFTERLASTLINE)
 	{
 		null_str.mvtype = MV_STR;
 		null_str.str.len = 0;
-		stat2 = get_src_line(rtn, &null_str, 1, &src2, NOVERIFY);
+		stat2 = get_src_line(rtn, &null_str, 1, &src2, NULL);
 		/* number of lines less one for duplicated zero'th line and one due
 		   to termination condition being <=
 		*/
@@ -112,13 +115,14 @@ void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label,
 	}
 	if (stat1 & CHECKSUMFAIL)
 	{
-		rts_error(VARLSTCNT(1) INFO_MSK(ERR_TXTSRCMAT));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) INFO_MSK(ERR_TXTSRCMAT));
 		op_wteol(1);
 	}
 	print_line.mvtype = MV_STR;
+	DBGIFTRIGR((stderr, "op_zprint: printing the trigger from 0x%lx to 0x%lx\n", src1, src2));
 	for ( ; src1 <= src2 ; src1++)
 	{	/* Note outofband check currently disabled. This routine (op_zprint) needs to be rewritten to provide
-		 * a TP wrapper (if not already in place) and to buffer the lines obtained from get_src_line() completely
+		 * a TP wrapper (if not already in place) and to buffer the lines obtained from "get_src_line" completely
 		 * before outputting anything because obtaining these source lines is subject to TP restarts when we are
 		 * accessing triggers. In addition, for the case of "normal" routine source fetches, an outofband could
 		 * invoke a job interrupt which could relink an entry point so an out-of-band interrupt of any kind means
@@ -132,5 +136,6 @@ void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label,
 		op_write(&print_line);
 		op_wteol(1);
 	}
+	DBGIFTRIGR((stderr, "op_zprint: exiting\n\n"));
 	return;
 }
